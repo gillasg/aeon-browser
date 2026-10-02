@@ -1,0 +1,197 @@
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ChatService } from "./chat-service.js";
+import { PiSdkSessionAdapter, resolvePiAgentDirectory } from "@pippin/pi-adapter";
+import { openChatStore } from "@pippin/store";
+import { BrowserControlService } from "./browser-control-service.js";
+import { ThreadCoordinationService } from "./thread-coordination-service.js";
+import { CapabilityRegistry } from "./capability-registry.js";
+import { RoutineScheduler } from "./routine-scheduler.js";
+import { CapabilityToolService } from "./capability-tool-service.js";
+import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
+import { piMcpServerName } from "./mcp-registry-mapping.js";
+
+export function createProductionRuntime(dataDirectory: string): {
+  service: ChatService;
+  threadCoordination: ThreadCoordinationService;
+  browserControl: BrowserControlService;
+  ready: Promise<void>;
+  close(): Promise<void>;
+} {
+  const dataRoot = resolve(dataDirectory);
+  const store = openChatStore(dataRoot);
+  const registry = new CapabilityRegistry(join(dataRoot, "capabilities.json"), store);
+  const piAgentDirectory = resolvePiAgentDirectory();
+  const mcpMigration = new PiMcpConfigMigration({
+    dataDirectory: dataRoot,
+    legacyRegistryPath: join(dataRoot, "capabilities.json"),
+    piAgentDirectory,
+    defaultWorkingDirectory: process.cwd(),
+    cliBridge: {
+      command: process.execPath,
+      scriptPath: fileURLToPath(new URL("./cli-mcp-bridge.js", import.meta.url)),
+      registryPath: join(dataRoot, "capabilities.json"),
+    },
+  });
+  const browserControl = new BrowserControlService();
+  const pi = new PiSdkSessionAdapter({
+    sessionDirectory: join(dataRoot, "pi-sessions"),
+    agentDirectory: piAgentDirectory,
+    preferredInitialModel: {
+      provider: process.env.PIPPIN_INITIAL_MODEL_PROVIDER || "openai-codex",
+      id: process.env.PIPPIN_INITIAL_MODEL_ID || "gpt-6-luna",
+    },
+    browserTool: browserControl.execute.bind(browserControl),
+  });
+  warmModels(pi);
+  const service = new ChatService({ dataDirectory: dataRoot, store, pi });
+  const threadCoordination = new ThreadCoordinationService(service, store);
+  const routines = new RoutineScheduler(store, service, browserControl);
+  const capabilityTools = new CapabilityToolService(registry, mcpMigration, pi, store, routines);
+  pi.setThreadToolHost(threadCoordination);
+  pi.setCapabilityToolHost(capabilityTools);
+  service.management.setActionRunner((chatId, action, input) =>
+    capabilityTools.executeManagementAction(chatId, action, input),
+  );
+  service.management.setReader((selectedChatId) =>
+    readManagementSnapshot(service, store, capabilityTools, selectedChatId),
+  );
+  service.management.setHomeReader(() => readHomeManagementSnapshot(service, store));
+  const ready = initializeRuntime(registry, mcpMigration, threadCoordination, routines);
+
+  return {
+    service,
+    threadCoordination,
+    browserControl,
+    ready,
+    close: async () => {
+      routines.close();
+      threadCoordination.close();
+      await pi.closeAll();
+      closeRuntimeStores(service, store);
+    },
+  };
+}
+
+async function readManagementSnapshot(
+  service: ChatService,
+  store: ReturnType<typeof openChatStore>,
+  capabilityTools: CapabilityToolService,
+  selectedChatId?: import("@pippin/domain").ChatId,
+): Promise<unknown> {
+  let resources = null;
+  let resourceError: string | null = null;
+  if (selectedChatId) {
+    try {
+      resources = await service.getEffectiveResources(selectedChatId);
+    } catch (error) {
+      resourceError = error instanceof Error ? error.message.slice(0, 300) : "Pi is unavailable.";
+    }
+  }
+  const routines = managementRoutines(service, store);
+  const catalog = (await capabilityTools.readManagementCatalog()) as {
+    revision: number;
+    capabilities: Array<Record<string, unknown>>;
+  };
+  const capabilities = catalog.capabilities.map((capability) => {
+    if (capability.kind !== "mcp") return capability;
+    if (!resources || resources.sessionState !== "loaded")
+      return {
+        ...capability,
+        connectionState: "not_reported",
+        loadedInSelectedChat: null,
+      };
+    const id = typeof capability.id === "string" ? capability.id : "";
+    const status = id
+      ? resources.mcpServers.find(({ name }) => name === piMcpServerName(id))
+      : undefined;
+    return {
+      ...capability,
+      connectionState: status?.state ?? "not_configured",
+      loadedInSelectedChat: status !== undefined,
+    };
+  });
+  return {
+    chats: service.listChats(100),
+    routines,
+    capabilityRevision: catalog.revision,
+    capabilities,
+    resources,
+    resourceError,
+  };
+}
+
+async function readHomeManagementSnapshot(
+  service: ChatService,
+  store: ReturnType<typeof openChatStore>,
+): Promise<unknown> {
+  return {
+    routines: store
+      .listRoutines()
+      .filter((routine) => !routine.deletedAt)
+      .slice(0, 3)
+      .map((routine) => ({
+        routineId: routine.routineId,
+        chatId: routine.chatId,
+        chatTitle: service.getChat(routine.chatId)?.title ?? "Unavailable Chat",
+        title: routine.title,
+        nextDueAt: routine.nextDueAt,
+        enabled: routine.enabled,
+      })),
+  };
+}
+
+async function initializeRuntime(
+  registry: CapabilityRegistry,
+  migration: PiMcpConfigMigration,
+  threads: ThreadCoordinationService,
+  routines: RoutineScheduler,
+): Promise<void> {
+  await registry.initialize();
+  await migration.migrate(await registry.snapshot());
+  await threads.recover();
+  await routines.start();
+}
+
+function managementRoutines(
+  service: ChatService,
+  store: ReturnType<typeof openChatStore>,
+): unknown {
+  return store
+    .listRoutines()
+    .filter((routine) => !routine.deletedAt)
+    .slice(0, 100)
+    .map((routine) => ({
+      routineId: routine.routineId,
+      chatId: routine.chatId,
+      chatTitle: service.getChat(routine.chatId)?.title ?? "Unavailable Chat",
+      title: routine.title,
+      instruction: routine.instruction,
+      schedule: routine.schedule,
+      nextDueAt: routine.nextDueAt,
+      requiredBrowserInstanceId: routine.requiredBrowserInstanceId,
+      enabled: routine.enabled,
+      revision: routine.revision,
+      recentRuns: store.listRoutineRuns(routine.routineId, 10).map((run) => ({
+        runId: run.runId,
+        scheduledSlot: run.scheduledSlot,
+        manual: run.manual,
+        state: run.state,
+        piEntryId: run.piEntryId,
+        createdAt: run.createdAt,
+        completedAt: run.completedAt,
+        lastError: run.lastError?.slice(0, 500) ?? null,
+      })),
+    }));
+}
+
+function warmModels(pi: PiSdkSessionAdapter): void {
+  void pi
+    .getModelCatalog()
+    .catch((error) => process.stderr.write("Aeon model warmup failed: " + String(error) + "\n"));
+}
+
+function closeRuntimeStores(service: ChatService, store: ReturnType<typeof openChatStore>): void {
+  service.projects.close();
+  store.close();
+}

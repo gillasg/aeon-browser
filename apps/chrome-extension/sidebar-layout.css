@@ -1,0 +1,171 @@
+/* Shared sidebar geometry for home and active-chat pages. */
+.home-sidebar,
+.chat-sidebar {
+  padding-top: 12px;
+  padding-inline: 8px;
+}
+.home-sidebar > *,
+.chat-sidebar > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+.home-sidebar > .sidebar-top,
+.chat-sidebar > .sidebar-top {
+  height: 36px;
+  min-height: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+}
+.home-sidebar .sidebar-management-links,
+.chat-sidebar .sidebar-management-links {
+  margin: 10px 0;
+  gap: 2px;
+}
+.home-sidebar .sidebar-management-links button,
+.chat-sidebar .sidebar-management-links button {
+  height: 34px;
+  flex: none;
+  padding: 6px 12px;
+}
+.home-nav-section nav {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sidebar-chat-item {
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+}
+.home-sidebar .sidebar-chat-item .sidebar-chat-row,
+.chat-sidebar .sidebar-chat-item .sidebar-chat-row {
+  width: 100%;
+  height: 36px;
+  padding: 6px 12px;
+  min-width: 0;
+}
+.sidebar-chat-item .sidebar-chat-row > span {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sidebar-chat-item:hover .sidebar-chat-row > span,
+.sidebar-chat-item:focus-within .sidebar-chat-row > span,
+.sidebar-chat-item:has(:popover-open) .sidebar-chat-row > span {
+  text-overflow: clip;
+  mask-image: linear-gradient(to right, #000 calc(100% - 104px), transparent calc(100% - 74px));
+}
+.sidebar-chat-item .sidebar-row-actions {
+  right: 6px;
+  top: 0;
+  height: 36px;
+  z-index: 1;
+  gap: 0;
+}
+.sidebar-chat-item:hover .sidebar-row-actions,
+.sidebar-chat-item:focus-within .sidebar-row-actions,
+.sidebar-chat-item:has(:popover-open) .sidebar-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sidebar-row-actions > button {
+  flex: none;
+  width: 26px;
+  height: 28px;
+}
+
+.sidebar-project-row {
+  position: relative;
+  min-height: 36px;
+  border-radius: 10px;
+}
+.sidebar-project-row:hover,
+.sidebar-project-row:focus-within,
+.sidebar-chat-item:hover,
+.sidebar-chat-item:focus-within {
+  background: var(--surface);
+}
+.sidebar-project-row > button:first-child {
+  height: 36px;
+  padding: 6px 12px;
+}
+.project-row-actions {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+}
+.project-row-actions > button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 26px;
+  height: 28px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+}
+.sidebar-project-row:hover .project-row-actions,
+.sidebar-project-row:focus-within .project-row-actions,
+.project-row-actions:has(:popover-open) {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sidebar-project-row:hover > button:first-child span,
+.sidebar-project-row:focus-within > button:first-child span {
+  mask-image: linear-gradient(to right, #000 calc(100% - 76px), transparent calc(100% - 48px));
+}
+.sidebar-project-row > button:first-child span {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-row-actions > button,
+.project-row-actions > button {
+  color: var(--muted);
+}
+.sidebar-row-actions > button:hover,
+.project-row-actions > button:hover {
+  color: var(--muted);
+  background: var(--surface-raised);
+  border-radius: 5px;
+}
+.sidebar-recents-heading .sidebar-section-toggle {
+  width: auto;
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+}
+.sidebar-section-chevron {
+  opacity: 0;
+  flex: none;
+}
+.sidebar-recents-heading:hover .sidebar-section-chevron,
+.sidebar-recents-heading:focus-within .sidebar-section-chevron {
+  opacity: 1;
+}
+.sidebar-recents-heading[data-collapsed="true"] + nav,
+.sidebar-projects:has(> .sidebar-recents-heading[data-collapsed="true"]) > .sidebar-project {
+  display: none;
+}
+
+/* Section names stay visible; only the arrow and add action appear on hover. */
+.sidebar-recents-heading .sidebar-section-toggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sidebar-section-toggle > span {
+  flex: none;
+}
+.sidebar-section-toggle .sidebar-section-chevron {
+  order: 1;
+}

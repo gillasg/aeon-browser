@@ -1,0 +1,25 @@
+{
+  "name": "@pippin/chrome-extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-dev-extension.mjs && node scripts/build-native-extension.mjs",
+    "build:dev": "node scripts/build-dev-extension.mjs",
+    "build:native": "node scripts/build-native-extension.mjs"
+  },
+  "dependencies": {
+    "@pippin/protocol": "workspace:*",
+    "@pippin/ui": "workspace:*",
+    "monaco-editor": "0.57.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2"
+  }
+}

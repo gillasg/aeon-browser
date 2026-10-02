@@ -1,0 +1,151 @@
+import { useState, type ReactElement } from "react";
+import type { PiEntryDto, PiMessageDto } from "@pippin/protocol";
+import { copyTextToClipboard } from "./clipboard.js";
+
+export interface MessageActionProps {
+  message: PiMessageDto | null;
+  entry?: PiEntryDto | undefined;
+  onEditEntry?: ((entryId: string) => Promise<void> | void) | undefined;
+  onBranchEntry?: ((entryId: string) => Promise<void> | void) | undefined;
+  actionsDisabled: boolean;
+  text: string;
+}
+
+export function MessageActions(props: MessageActionProps): ReactElement {
+  const isUser = props.message?.role === "user";
+  const isAssistant = props.message?.role === "assistant";
+  return (
+    <div className={`message-actions ${isUser ? "for-user" : "for-assistant"}`}>
+      {isUser && <MessageTime entry={props.entry} />}
+      <CopyAction text={props.text} isUser={isUser} />
+      {isUser && props.entry && props.onEditEntry && (
+        <EntryAction
+          kind="edit"
+          entryId={props.entry.entryId}
+          action={props.onEditEntry}
+          disabled={props.actionsDisabled}
+        />
+      )}
+      {isAssistant && props.entry && props.onBranchEntry && (
+        <EntryAction
+          kind="branch"
+          entryId={props.entry.entryId}
+          action={props.onBranchEntry}
+          disabled={props.actionsDisabled}
+        />
+      )}
+      {!isUser && <MessageTime entry={props.entry} />}
+    </div>
+  );
+}
+
+function CopyAction({ text, isUser }: { text: string; isUser: boolean }): ReactElement | null {
+  const [state, setState] = useState<"Copy" | "Copied" | "Copy failed">("Copy");
+  if (!text.trim()) return null;
+  const copy = async (): Promise<void> => {
+    try {
+      await copyTextToClipboard(text.trim());
+      setState("Copied");
+    } catch {
+      setState("Copy failed");
+    }
+  };
+  return (
+    <button
+      type="button"
+      className="message-copy"
+      aria-label={`Copy ${isUser ? "user" : "assistant"} message`}
+      title={state === "Copy" ? "Copy message" : state}
+      onClick={() => void copy()}
+    >
+      {state === "Copied" || state === "Copy failed" ? (
+        <span className="message-copy-state">{state}</span>
+      ) : (
+        <CopyIcon />
+      )}
+    </button>
+  );
+}
+
+function CopyIcon(): ReactElement {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <rect x="7" y="6" width="9" height="11" rx="1.5" />
+      <path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H7" />
+    </svg>
+  );
+}
+
+function EntryAction({
+  kind,
+  entryId,
+  action,
+  disabled,
+}: {
+  kind: "edit" | "branch";
+  entryId: string;
+  action(entryId: string): Promise<void> | void;
+  disabled: boolean;
+}): ReactElement {
+  const [pending, setPending] = useState(false);
+  const run = async (): Promise<void> => {
+    if (pending || disabled) return;
+    setPending(true);
+    try {
+      await action(entryId);
+    } finally {
+      setPending(false);
+    }
+  };
+  const label = kind === "edit" ? "Edit" : "Branch";
+  const pendingLabel = kind === "edit" ? "Editing…" : "Branching…";
+  return (
+    <button
+      type="button"
+      className={`message-action-link message-${kind}`}
+      aria-label={kind === "edit" ? "Edit message" : "Branch from response"}
+      disabled={disabled || pending}
+      title={
+        disabled
+          ? `Wait for Pi to finish before ${kind === "edit" ? "editing" : "branching"}.`
+          : label
+      }
+      onClick={() => void run()}
+    >
+      {pending ? (
+        pendingLabel
+      ) : (
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          {kind === "edit" ? (
+            <>
+              <path d="m13 3 4 4-9 9H4v-4zM11 5l4 4" />
+            </>
+          ) : (
+            <>
+              <path d="M10 17V9m0 0L4 3m6 6 6-6M4 3v4m0-4h4m8 0v4m0-4h-4" />
+            </>
+          )}
+        </svg>
+      )}
+    </button>
+  );
+}
+
+function MessageTime({ entry }: { entry?: PiEntryDto | undefined }): ReactElement | null {
+  if (!entry) return null;
+  const timestamp = new Date(entry.timestamp);
+  if (!Number.isFinite(timestamp.valueOf())) return null;
+  const formatted = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(timestamp);
+  const full = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(timestamp);
+  return (
+    <time className="message-time" dateTime={timestamp.toISOString()} title={full}>
+      {formatted}
+    </time>
+  );
+}

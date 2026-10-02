@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Aeon Slice 2 development fixture",
+  "version": "0.0.0",
+  "description": "Development-only Aeon browser shell and Chat UI; not a product extension.",
+  "minimum_chrome_version": "116",
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Open Aeon Chat"
+  },
+  "chrome_url_overrides": {
+    "newtab": "home.html"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_page": "options.html",
+  "permissions": ["storage", "tabs", "sidePanel", "notifications"],
+  "host_permissions": ["http://127.0.0.1/*", "https://models.dev/*"]
+}

@@ -1,0 +1,245 @@
+:root {
+  color-scheme: dark;
+  font:
+    14px/1.55 Inter,
+    Geist,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #e5e5e5;
+  background: #171716;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 340px;
+}
+main {
+  width: min(680px, calc(100% - 48px));
+  margin: 56px auto 72px;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: #292927;
+  color: #dfd3c1;
+  font:
+    600 25px/1 Georgia,
+    serif;
+}
+.eyebrow {
+  margin: 0 0 3px;
+  color: #898985;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+}
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+h1 {
+  margin-bottom: 0;
+  font-size: 21px;
+  font-weight: 570;
+  letter-spacing: -0.02em;
+}
+.intro {
+  margin: 26px 0 10px;
+  color: #c3c3be;
+  font-size: 15px;
+}
+.fixture-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #aaa9a1;
+  font-size: 12px;
+}
+.fixture-note span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #bb9c6a;
+}
+form {
+  display: grid;
+  gap: 9px;
+  margin-top: 27px;
+}
+label {
+  color: #bebeb8;
+  font-size: 12px;
+}
+input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid #353532;
+  border-radius: 8px;
+  outline: none;
+  background: #20201f;
+  color: #eee;
+  font: inherit;
+}
+input:focus {
+  border-color: #8c795f;
+  box-shadow: 0 0 0 2px #8c795f33;
+}
+button {
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 1px solid #393936;
+  border-radius: 8px;
+  background: #292927;
+  color: #e5e5e0;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover {
+  background: #333330;
+}
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #c0a47a;
+  outline-offset: 2px;
+}
+button.primary {
+  justify-self: start;
+  border-color: #73634c;
+  background: #7c6b51;
+  color: #fffaf2;
+}
+button.primary:hover {
+  background: #8c795e;
+}
+.status {
+  min-height: 22px;
+  margin: 14px 0 0;
+  color: #a7a7a1;
+  font-size: 12px;
+}
+.status code {
+  color: #ded0bb;
+  font:
+    12px ui-monospace,
+    "Cascadia Code",
+    monospace;
+}
+#chat-launcher {
+  margin-top: 35px;
+  padding-top: 25px;
+  border-top: 1px solid #30302d;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 570;
+}
+.section-heading .eyebrow {
+  margin-bottom: 3px;
+}
+.quiet {
+  min-height: 30px;
+  padding: 4px 9px;
+  border-color: transparent;
+  background: transparent;
+  color: #a6a6a0;
+  font-size: 12px;
+}
+.new-chat-form {
+  grid-template-columns: 1fr auto;
+  margin: 18px 0 8px;
+}
+.new-chat-form input {
+  min-width: 0;
+}
+.new-chat-form button {
+  min-width: 100px;
+}
+.chat-list {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 10px 3px 10px 11px;
+  border-radius: 8px;
+}
+.chat-row:hover {
+  background: #222220;
+}
+.chat-title {
+  overflow: hidden;
+  margin: 0;
+  color: #d9d9d4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-meta {
+  margin: 2px 0 0;
+  color: #858580;
+  font-size: 11px;
+}
+.open-chat {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.empty {
+  padding: 15px 10px;
+  color: #898985;
+  font-size: 12px;
+}
+.connection-details {
+  margin-top: 25px;
+  color: #aaa9a2;
+  font-size: 12px;
+}
+.connection-details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.footnote {
+  margin: 30px 0 0;
+  color: #797974;
+  font-size: 11px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+[hidden] {
+  display: none !important;
+}

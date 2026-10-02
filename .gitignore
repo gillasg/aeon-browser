@@ -1,0 +1,28 @@
+node_modules/
+**/dist/
+*.tsbuildinfo
+apps/chrome-extension/dev-dist/
+apps/chrome-extension/native-dist/
+.slice0-audit/
+coverage/
+
+# Local documentation, planning, and reference material
+*.md
+*.markdown
+*.mdx
+/architecture/
+/artifacts/
+/planning/
+/plans/
+
+# Local configuration and generated output
+.env
+.env.*
+!.env.example
+*.log
+
+# Archived planning and reference material
+/archive/
+
+# Minimal public project introduction
+!/README.md

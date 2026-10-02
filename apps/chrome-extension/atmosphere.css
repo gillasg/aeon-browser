@@ -1,0 +1,613 @@
+/* Shared surfaces use the active theme; wallpaper belongs only to new-tab content. */
+.attach-integrated {
+  display: none;
+}
+.home-sidebar,
+.chat-sidebar {
+  background: var(--canvas);
+  color: var(--text);
+  border-color: var(--line);
+}
+.home-sidebar {
+  min-height: 100dvh;
+  padding-bottom: 12px;
+}
+.chat-sidebar {
+  bottom: 0;
+}
+.chat-navigation::after {
+  display: none;
+}
+.sidebar-management-links button,
+.home-chat-row,
+.sidebar-row-title,
+.chat-row-title {
+  color: var(--text);
+}
+.sidebar-management-links button:hover,
+.sidebar-management-links button[aria-current="page"],
+.home-chat-row:hover {
+  background: var(--surface);
+}
+.home-main[data-screen="management"],
+.home-main[data-screen="catalog"] {
+  padding: 0;
+  background: var(--canvas);
+}
+.management-main {
+  width: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 32px clamp(20px, 4vw, 64px);
+  background: var(--canvas);
+  color: var(--text);
+}
+.chat-management-frame {
+  padding-top: 0;
+  background: var(--canvas);
+}
+.settings-group,
+.management-card {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+.settings-group p {
+  color: var(--muted);
+}
+select,
+select option,
+.management-main input,
+.management-main textarea {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--line);
+  color-scheme: inherit;
+}
+.pi-picker-menu,
+.pi-picker-panel,
+.pi-session-panel,
+.sidebar-chat-menu,
+.attachment-menu {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+.pi-picker-option,
+.pi-picker-option button {
+  color: var(--text);
+}
+.composer,
+.home-query-form {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.composer textarea,
+.home-query-form input,
+.home-query-form textarea {
+  color: var(--text);
+}
+.composer textarea::placeholder,
+.home-query-form input::placeholder,
+.home-query-form textarea::placeholder {
+  color: var(--muted);
+}
+.home-send-button,
+.send-button {
+  background: var(--text);
+  color: var(--canvas);
+}
+.home-send-button:disabled,
+.send-button:disabled {
+  background: var(--surface);
+  color: var(--muted);
+}
+.home-chat-card,
+.home-routine-card,
+.home-card-placeholder {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+.home-chat-card-title,
+.home-routine-title,
+.home-chat-card p {
+  color: var(--text);
+}
+.home-collection-tabs button {
+  color: var(--muted);
+}
+.home-collection-tabs button[aria-selected="true"] {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.wallpaper-settings {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.wallpaper-settings button {
+  justify-self: start;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+html[data-wallpaper="true"] .home-main[data-screen="new-tab"] {
+  background-color: var(--canvas);
+  background-image:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--canvas) 40%, transparent) 35%,
+      var(--canvas) 95%
+    ),
+    radial-gradient(circle, #222d4940 0.65px, transparent 0.85px),
+    var(--wallpaper-image, url("atmosphere-wallpaper.png"));
+  background-size:
+    100% 100%,
+    4px 4px,
+    cover;
+  background-position:
+    center,
+    center,
+    center top;
+}
+html[data-wallpaper="true"] .home-main[data-screen="new-tab"] .home-query-form {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(14px);
+}
+html[data-wallpaper="true"] .home-main[data-screen="new-tab"] .home-start {
+  margin-top: 0;
+  padding-top: clamp(120px, 35vh, 340px);
+}
+
+.management-toolbar select,
+.settings-group select,
+.routine-editor select,
+.routine-editor input,
+.capability-editor select,
+.capability-editor input {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--line);
+}
+.home-main .home-query-form {
+  background: var(--surface-raised);
+  border-color: var(--line);
+}
+.home-sidebar .sidebar-row-title,
+.chat-sidebar .sidebar-row-title {
+  color: var(--text);
+}
+
+.sidebar-chat-row,
+.sidebar-chat-row[aria-current="page"] {
+  color: var(--text);
+}
+.sidebar-section-label,
+.home-nav-section h2 {
+  color: var(--muted);
+}
+.home-sidebar,
+.chat-sidebar {
+  border-right-color: var(--line);
+}
+
+body[data-host="panel"] .home-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+body[data-host="panel"] .home-sidebar,
+body[data-host="panel"] .home-shell > .chat-navigation {
+  display: none;
+}
+body[data-host="panel"] .home-main {
+  padding: 0 16px 20px;
+}
+body[data-host="panel"] .home-start {
+  padding-top: 100px;
+}
+
+.file-link {
+  display: inline;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+}
+.file-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.sidebar-project-row {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  min-height: 38px;
+}
+.sidebar-project-row:hover {
+  background: var(--surface);
+}
+.sidebar-project-row button {
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  font: inherit;
+}
+.sidebar-project-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.sidebar-project-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-project-row svg {
+  flex-shrink: 0;
+}
+.project-new-chat {
+  opacity: 0;
+}
+.sidebar-project-row:hover .project-new-chat,
+.sidebar-project-row:focus-within .project-new-chat {
+  opacity: 1;
+}
+.sidebar-project-chats {
+  padding-left: 28px;
+}
+.create-project-dialog {
+  box-sizing: border-box;
+  width: min(650px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--canvas);
+  color: var(--text);
+  font: inherit;
+}
+.create-project-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+.create-project-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.create-project-dialog h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.create-project-dialog h3 {
+  font-size: 14px;
+  margin: 20px 0 10px;
+}
+.create-project-dialog button {
+  font: inherit;
+  border: 0;
+  border-radius: 12px;
+  padding: 6px 12px;
+  background: var(--canvas);
+  color: var(--text);
+  cursor: pointer;
+}
+.create-project-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.project-name {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0 16px;
+}
+.project-name:focus-within {
+  border-color: #5799cb;
+}
+.project-name input {
+  min-width: 0;
+  width: 100%;
+  padding: 16px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.project-source-folders {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+}
+.project-source-folders p {
+  margin: 12px 0;
+}
+.project-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+.project-source-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.create-project-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 32px;
+}
+.create-project-dialog footer button[type="submit"] {
+  background: var(--text);
+  color: var(--canvas);
+  padding: 10px 20px;
+}
+.create-project-dialog [role="alert"] {
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* File operations share a compact, flat surface and sticky filename row. */
+.inline-edit-diff,
+.inline-read-file {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 420px;
+  background: var(--canvas);
+}
+.inline-edit-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+  font:
+    500 13px/20px Geist,
+    sans-serif;
+}
+.inline-edit-path {
+  flex: 1;
+  min-width: 0;
+}
+.inline-edit-path .file-link,
+.inline-read-file .file-link {
+  text-decoration: none;
+}
+.inline-edit-open {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px;
+  display: flex;
+  cursor: pointer;
+}
+.inline-edit-open:hover {
+  color: var(--text);
+}
+.inline-edit-copy {
+  margin-left: 0;
+  opacity: 0;
+}
+.inline-edit-header:hover .inline-edit-copy,
+.inline-edit-header:focus-within .inline-edit-copy {
+  opacity: 1;
+}
+.inline-edit-note {
+  display: block;
+  padding: 3px 12px;
+  margin: 0;
+  background: transparent;
+  color: var(--muted);
+  font:
+    11px/18px Geist,
+    sans-serif;
+}
+.inline-edit-lines {
+  padding: 0;
+  overflow: visible;
+}
+.diff-line {
+  line-height: 23px;
+}
+.diff-added {
+  background: color-mix(in srgb, #258647 18%, var(--canvas));
+}
+.diff-removed {
+  background: color-mix(in srgb, #bd3344 18%, var(--canvas));
+}
+.activity-step > .inline-read-file {
+  margin: 8px 0 12px 28px;
+}
+.activity-step > .inline-edit-diff {
+  margin: 8px 0 12px 28px;
+}
+.inline-read-content {
+  margin: 0;
+  padding: 10px 12px;
+  font:
+    13px/23px Consolas,
+    monospace;
+  white-space: pre;
+  overflow: auto;
+  color: var(--text);
+}
+
+/* One composer geometry for new tabs and active chats. */
+.composer,
+.home-query-form {
+  box-sizing: border-box;
+  min-height: 66px;
+  border-radius: 25px;
+  gap: 12px;
+  padding: 8px 10px;
+  align-items: center;
+  background: var(--surface);
+}
+.composer textarea,
+.home-query-form textarea {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  max-height: 180px;
+  padding: 4px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.45;
+}
+.composer .attach-button,
+.home-query-form .attach-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--muted);
+  line-height: 1;
+}
+.attach-button svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.composer .send-button,
+.home-query-form .home-send-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+.home-attachments {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: min(100%, 760px);
+  margin: 8px auto 0;
+}
+.home-attachments:empty {
+  display: none;
+}
+.home-attachments p {
+  color: var(--muted);
+  font-size: 12px;
+}
+/* Quiet project creation, without the oversized boxed empty state. */
+.create-project-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 22px;
+  border-radius: 16px;
+}
+.create-project-dialog h2 {
+  font-size: 20px;
+}
+.create-project-dialog header {
+  margin-bottom: 16px;
+}
+.create-project-dialog h3 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 20px 0 8px;
+}
+.project-name {
+  border-radius: 8px;
+  padding: 0 12px;
+}
+.project-name input {
+  padding: 12px 0;
+}
+.project-source-folders {
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+.project-source-folders p {
+  display: none;
+}
+.project-source-folders > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.project-source-row {
+  padding: 6px 0;
+  font-size: 13px;
+}
+.create-project-dialog footer {
+  margin-top: 24px;
+  gap: 10px;
+}
+.create-project-dialog footer button[type="submit"] {
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.home-shell > .chat-navigation .icon-button,
+.app-shell > .chat-navigation .icon-button {
+  border-radius: 50%;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+.attach-button:hover,
+.attach-button:focus-visible {
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--muted);
+}
+.home-collection-actions button:hover,
+.home-collection-actions button:focus-visible,
+.home-collection-tabs button:hover,
+.home-collection-tabs button:focus-visible {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 8px;
+}
+.home-collection-actions button:active,
+.home-collection-tabs button:active,
+.attach-button:active,
+.chat-navigation .icon-button:active {
+  background: var(--surface-raised);
+  filter: brightness(1.2);
+}

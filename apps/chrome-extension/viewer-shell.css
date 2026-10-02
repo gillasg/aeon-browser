@@ -1,0 +1,162 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+.file-viewer {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--text);
+}
+.viewer-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.viewer-header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-header button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.viewer-header button[aria-pressed="true"] {
+  background: var(--surface-raised);
+}
+.viewer-body {
+  min-height: 0;
+  flex: 1;
+  position: relative;
+}
+.viewer-editor {
+  height: 100%;
+  width: 100%;
+}
+.viewer-preview {
+  height: 100%;
+  overflow: auto;
+  padding: 32px max(24px, calc((100% - 900px) / 2));
+}
+.viewer-status {
+  padding: 24px;
+  color: var(--muted);
+}
+.viewer-preview table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.viewer-preview th,
+.viewer-preview td {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+}
+.viewer-note {
+  width: 100%;
+  font-size: 12px;
+  color: var(--muted);
+}
+.file-link {
+  display: inline;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+}
+.file-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.viewer-controls {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--canvas);
+}
+.viewer-controls button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.viewer-controls button:hover,
+.viewer-controls button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+}
+.viewer-controls button:focus-visible {
+  outline: 2px solid var(--muted);
+}
+.viewer-path {
+  position: fixed;
+  bottom: 7px;
+  right: 18px;
+  max-width: min(80vw, 900px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  opacity: 0.6;
+  font-size: 11px;
+  z-index: 10;
+  pointer-events: none;
+}
+.viewer-body {
+  display: flex;
+  flex-direction: column;
+  padding-right: 62px;
+  padding-bottom: 26px;
+}
+.viewer-editor {
+  flex: 1;
+  min-height: 0;
+}
+.viewer-diff-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+  font-size: 13px;
+}
+.viewer-diff-heading small {
+  color: var(--muted);
+  margin-left: auto;
+  font-size: 11px;
+}

@@ -1,0 +1,79 @@
+import type { BrowserTargetKey } from "@pippin/protocol";
+import type { BrowserIdentity } from "./native-worker-identity.js";
+
+export interface AxNode {
+  backendDOMNodeId?: number;
+  ignored?: boolean;
+  role?: { value?: unknown };
+  name?: { value?: unknown };
+  value?: { value?: unknown };
+  properties?: { name?: string; value?: { value?: unknown } }[];
+}
+
+export interface AxRef {
+  backendNodeId: number;
+  role: string;
+  name: string;
+}
+
+export interface ScreenshotRef {
+  target: BrowserTargetKey;
+  epoch: number;
+  viewport: { width: number; height: number };
+  capturedAt: number;
+}
+
+export function safePage(value: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
+export function textValue(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+export function booleanProperty(
+  node: AxNode,
+  name: "disabled" | "checked" | "focused",
+): { disabled?: boolean; checked?: boolean; focused?: boolean } {
+  const value = node.properties?.find((item) => item.name === name)?.value?.value;
+  return typeof value === "boolean" ? { [name]: value } : {};
+}
+
+export function targetIdentity(target: BrowserTargetKey): string {
+  return `${target.clientInstanceId}/${target.browserRunId}/${target.tabId}/${target.tabIncarnation}`;
+}
+
+export function sameTarget(left: BrowserTargetKey, right: BrowserTargetKey): boolean {
+  return targetIdentity(left) === targetIdentity(right);
+}
+
+export function sameIdentity(target: BrowserTargetKey, identity: BrowserIdentity): boolean {
+  return (
+    target.clientInstanceId === identity.clientInstanceId &&
+    target.browserRunId === identity.browserRunId
+  );
+}
+
+export function errorCode(error: unknown): string {
+  const value = error instanceof Error ? error.message : "";
+  if (
+    [
+      "TARGET_LOST",
+      "AMBIGUOUS_TARGET",
+      "STALE_REF",
+      "CLAIM_CONFLICT",
+      "UNSUPPORTED",
+      "INVALID_TARGET",
+      "TIMEOUT",
+      "BROWSER_OFFLINE",
+    ].includes(value)
+  )
+    return value;
+  return value.toLowerCase().includes("debugger") || value.toLowerCase().includes("not permitted")
+    ? "UNSUPPORTED"
+    : "OPERATION_FAILED";
+}
