@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
 import { PiSdkSessionAdapter, resolvePiAgentDirectory } from "@pippin/pi-adapter";
 import { openChatStore } from "@pippin/store";
+import { SiteScriptService } from "./site-script-service.js";
 import { BrowserControlService } from "./browser-control-service.js";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { CapabilityRegistry } from "./capability-registry.js";
@@ -34,15 +35,8 @@ export function createProductionRuntime(dataDirectory: string): {
     },
   });
   const browserControl = new BrowserControlService();
-  const pi = new PiSdkSessionAdapter({
-    sessionDirectory: join(dataRoot, "pi-sessions"),
-    agentDirectory: piAgentDirectory,
-    preferredInitialModel: {
-      provider: process.env.PIPPIN_INITIAL_MODEL_PROVIDER || "openai-codex",
-      id: process.env.PIPPIN_INITIAL_MODEL_ID || "gpt-6-luna",
-    },
-    browserTool: browserControl.execute.bind(browserControl),
-  });
+  const siteScripts = attachSiteScripts(dataRoot, browserControl);
+  const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
   warmModels(pi);
   const service = new ChatService({ dataDirectory: dataRoot, store, pi });
   const threadCoordination = new ThreadCoordinationService(service, store);
@@ -68,6 +62,7 @@ export function createProductionRuntime(dataDirectory: string): {
       routines.close();
       threadCoordination.close();
       await pi.closeAll();
+      siteScripts.close();
       closeRuntimeStores(service, store);
     },
   };
@@ -194,4 +189,27 @@ function warmModels(pi: PiSdkSessionAdapter): void {
 function closeRuntimeStores(service: ChatService, store: ReturnType<typeof openChatStore>): void {
   service.projects.close();
   store.close();
+}
+
+function attachSiteScripts(directory: string, browser: BrowserControlService): SiteScriptService {
+  const scripts = new SiteScriptService(directory, browser);
+  browser.useSiteScripts(scripts);
+  return scripts;
+}
+
+function createPiAdapter(
+  dataRoot: string,
+  piAgentDirectory: string,
+  browserControl: BrowserControlService,
+): PiSdkSessionAdapter {
+  const pi = new PiSdkSessionAdapter({
+    sessionDirectory: join(dataRoot, "pi-sessions"),
+    agentDirectory: piAgentDirectory,
+    preferredInitialModel: {
+      provider: process.env.PIPPIN_INITIAL_MODEL_PROVIDER || "openai-codex",
+      id: process.env.PIPPIN_INITIAL_MODEL_ID || "gpt-6-luna",
+    },
+    browserTool: browserControl.execute.bind(browserControl),
+  });
+  return pi;
 }

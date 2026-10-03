@@ -13,6 +13,12 @@ export const PiBrowserContextRecordSchema = z
       .max(2048)
       .refine((value) => ["http:", "https:"].includes(new URL(value).protocol)),
     title: z.string().max(512).optional(),
+    favIconUrl: z
+      .string()
+      .url()
+      .max(2048)
+      .refine((value) => /^https?:/.test(value))
+      .optional(),
     selectedText: z.string().max(8000).optional(),
     selectionTruncated: z.boolean().optional(),
     sourceStatus: z.enum(["current", "stale", "lost", "offline"]).optional(),

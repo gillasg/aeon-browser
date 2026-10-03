@@ -78,7 +78,7 @@
 .sidebar-project-row {
   position: relative;
   min-height: 36px;
-  border-radius: 10px;
+  border-radius: var(--pippin-r-md);
 }
 .sidebar-project-row:hover,
 .sidebar-project-row:focus-within,
@@ -132,7 +132,7 @@
 .project-row-actions > button:hover {
   color: var(--muted);
   background: var(--surface-raised);
-  border-radius: 5px;
+  border-radius: var(--pippin-r-sm);
 }
 .sidebar-recents-heading .sidebar-section-toggle {
   width: auto;

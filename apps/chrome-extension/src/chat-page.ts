@@ -1,3 +1,4 @@
+import { InitialChatDisplay } from "./initial-chat-display.js";
 import { observeChatTabStatus } from "./chat-tab-status.js";
 import { subscribeSavedChat } from "./chat-subscribe-client.js";
 import "./project-bridge.js";
@@ -8,7 +9,12 @@ import { createToolImageLoader } from "./tool-image-client.js";
 import { ChatIdSchema, type ChatViewSnapshotDto, type DaemonUiResponse } from "@pippin/protocol";
 import { ChatSurface, mountPippinUi, TranscriptModel } from "@pippin/ui";
 import type { DevUiClient } from "./dev-ui-client.js";
-import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
+import {
+  connectCatalogPage,
+  connectPage,
+  connectionErrorMessage,
+  openExtensionChat,
+} from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
 import { ChatSidebarController } from "./chat-sidebar-controller.js";
 import { ChatComposerController } from "./chat-composer-controller.js";
@@ -30,6 +36,7 @@ import { ChatPiUiController } from "./chat-pi-ui-controller.js";
 const root = requiredElement("root");
 const chatIdResult = ChatIdSchema.safeParse(new URL(location.href).searchParams.get("chatId"));
 const chatId = chatIdResult.success ? chatIdResult.data : "";
+const initialDisplay = new InitialChatDisplay(chatId);
 if (new URL(location.href).searchParams.get("host") === "panel")
   document.body.dataset.host = "panel";
 let connectionGrant = "";
@@ -102,13 +109,13 @@ function createView() {
     title,
     connection,
     notice,
-    rows: transcript.rows,
+    rows: initialDisplay.rows(transcript.rows),
     loadToolImage: fetchToolImage,
     transcriptActionsDisabled: runState !== "idle",
     chats: sidebar.chats,
     sidebarOpen: sidebar.open,
     sidebarQuery: sidebar.query,
-    composer: { ...composer.props(), contextUsage, ...piUi.composerProps() },
+    composer: { ...composer.props(), controls: initialDisplay.controls(composer.props().controls), contextUsage, ...piUi.composerProps() },
     ...resources.viewProps(),
     ...piUi.viewProps(),
     onToggleSidebar: () => sidebar.setOpen(!sidebar.open),
@@ -145,10 +152,6 @@ window.addEventListener("pagehide", () => piUi.close(), { once: true });
 if (chatId) void start();
 async function start(): Promise<void> {
   try {
-    const catalog = await connectPage({ kind: "catalog" });
-    if (catalog.kind === "connected") catalogClient = catalog.client;
-    const reason = catalog.kind === "failed" ? connectionErrorMessage(catalog.code) : "";
-    if (reason) showError(`Chat list unavailable · ${reason}`);
     await connectAndSubscribe();
   } catch (error) {
     showError(errorMessage(error));
@@ -157,6 +160,7 @@ async function start(): Promise<void> {
 }
 async function connectAndSubscribe(): Promise<void> {
   if (isClosing || !chatId) return;
+  void connectCatalogPage(catalogClient).then((value) => { catalogClient = value; }).catch(showError);
   const result = await connectPage({ kind: "chat", chatId });
   if (result.kind !== "connected") {
     setConnection("Disconnected", "error");
@@ -208,6 +212,7 @@ async function submitFirstPrompt(): Promise<void> {
   if (!__PIPPIN_NATIVE_TRANSPORT__ || initialSubmitAttempted || !client) return;
   initialSubmitAttempted = true;
   await submitInitialPrompt(chatId, client, __PIPPIN_NATIVE_TRANSPORT__);
+  void composer.refreshControls();
 }
 function handleDaemonMessage(message: DaemonUiResponse): void {
   if (message.kind === "chat.snapshot") {

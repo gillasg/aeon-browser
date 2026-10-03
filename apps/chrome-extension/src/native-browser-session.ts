@@ -1,3 +1,4 @@
+import { enableDiagnostics, forgetDiagnostics } from "./native-browser-diagnostics.js";
 interface Attachment {
   chatId: string;
   attached: Promise<void>;
@@ -19,6 +20,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   cancelled.delete(tabId);
 });
 
+export function browserSessionOwner(tabId: number): string | undefined {
+  return owners.get(tabId);
+}
+
 export function bindBrowserSession(tabId: number, chatId: string): void {
   if (owners.get(tabId) !== chatId && attachments.has(tabId)) throw new Error("CLAIM_CONFLICT");
   owners.set(tabId, chatId);
@@ -34,7 +39,7 @@ export async function withBrowserDebugger<T>(
   if (!chatId) throw new Error("CLAIM_CONFLICT");
   let entry = attachments.get(tabId);
   if (!entry) {
-    entry = { chatId, attached: chrome.debugger.attach({ tabId }, "1.3") };
+    entry = { chatId, attached: attach(tabId) };
     attachments.set(tabId, entry);
   }
   try {
@@ -68,8 +73,17 @@ function forget(tabId: number): void {
   const entry = attachments.get(tabId);
   if (entry?.timer !== undefined) clearTimeout(entry.timer);
   attachments.delete(tabId);
+  forgetDiagnostics(tabId);
   void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => undefined);
   void chrome.action.setTitle({ tabId, title: "Open Aeon Chat" }).catch(() => undefined);
+}
+
+async function attach(tabId: number): Promise<void> {
+  await chrome.debugger.attach({ tabId }, "1.3");
+  await chrome.debugger
+    .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true })
+    .catch(() => undefined);
+  await enableDiagnostics(tabId);
 }
 
 function detach(tabId: number): Promise<void> {
@@ -80,7 +94,12 @@ function detach(tabId: number): Promise<void> {
   if (!entry) return Promise.resolve();
   const work = entry.attached
     .then(
-      () => chrome.debugger.detach({ tabId }).catch(() => undefined),
+      async () => {
+        await chrome.debugger
+          .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: false })
+          .catch(() => undefined);
+        await chrome.debugger.detach({ tabId }).catch(() => undefined);
+      },
       () => undefined,
     )
     .finally(() => {

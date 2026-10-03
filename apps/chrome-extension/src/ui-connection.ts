@@ -131,3 +131,9 @@ export async function takeNativeInitialSubmit(chatId: string): Promise<
 export function connectionErrorMessage(code: string): string {
   return __PIPPIN_NATIVE_TRANSPORT__ ? pageGrantErrorMessage(code) : code;
 }
+
+export async function connectCatalogPage(current?: DevUiClient): Promise<DevUiClient | undefined> {
+  if (current?.socket.readyState === WebSocket.OPEN) return current;
+  const result = await connectPage({ kind: "catalog" });
+  return result.kind === "connected" ? result.client : undefined;
+}

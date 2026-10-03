@@ -59,6 +59,7 @@ export interface ChatComposerProps {
     mode: "followUp" | "steer",
     attachments: readonly ComposerAttachment[],
   ): Promise<boolean>;
+  onQueueAction?(mode: "followUp" | "steer", index: number, action: "delete" | "edit" | "up" | "down" | "steer", text?: string): Promise<void>;
   onStop(): void;
   onModel(value: ComposerModel): void;
   onThinking(value: string): void;
@@ -78,7 +79,15 @@ export function ChatComposer(props: ChatComposerProps): ReactElement {
         </p>
       )}
       <AnnotationAttachments />
-      <PiQueue controls={props.controls} />
+      <PiQueue controls={props.controls} onAction={props.onQueueAction} />
+      {props.browserContext && (
+        <div className="composer-context-slot">
+          <BrowserContextChip
+            record={props.browserContext}
+            onRemove={props.onRemoveBrowserContext}
+          />
+        </div>
+      )}
       <ComposerEntry {...props} mode={mode} />
       {panels}
     </div>
@@ -112,20 +121,11 @@ function ComposerEntry(
     <form
       id="composer"
       className="composer"
-      data-has-context={String(Boolean(props.browserContext))}
       onSubmit={(event) => {
         event.preventDefault();
         void send();
       }}
     >
-      {props.browserContext && (
-        <div className="composer-context-slot">
-          <BrowserContextChip
-            record={props.browserContext}
-            onRemove={props.onRemoveBrowserContext}
-          />
-        </div>
-      )}
       <AttachmentPicker chatId={props.chatId} onAttach={props.onAttach} />
       <PromptField
         multiline

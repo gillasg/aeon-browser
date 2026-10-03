@@ -6,12 +6,17 @@ import {
   createBrowserControlTool,
   type BrowserToolRunner,
 } from "./browser-tool.js";
+import { createSiteScriptTool } from "./site-script-tool.js";
 import { executeBrowserCode } from "./browser-code-runtime.js";
 export function createBrowserTools(
   chatId: string,
   run?: BrowserToolRunner,
 ): ReturnType<typeof defineTool>[] {
-  return [createBrowserControlTool(chatId, run), createBrowserCodeTool(chatId, run)];
+  return [
+    createBrowserControlTool(chatId, run),
+    createBrowserCodeTool(chatId, run),
+    createSiteScriptTool(chatId, run),
+  ];
 }
 
 export function createBrowserCodeTool(
@@ -26,7 +31,7 @@ export function createBrowserCodeTool(
     promptSnippet: "Prefer browser_code for multi-step browser work to avoid model round trips.",
     promptGuidelines: [
       "Already available; do not use tool_search to discover browser_code or browser_control.",
-      "API: await browser.tabs(query?), await browser.openTab(url,{clientInstanceId?,foreground?}), await browser.attachTab(target), browser.page(target). A page has target, snapshot(), screenshot(), click(element), fill(element,value), scroll(direction='down',amount=1200,element?), scrollToEnd({maxSteps?,direction?,amount?,element?}). Return the final result explicitly.",
+      "API: await browser.tabs(query?), await browser.openTab(url,{clientInstanceId?,foreground?}), await browser.attachTab(target), browser.page(target). A page has target, snapshot(), screenshot(), click(element), fill(element,value), scroll(direction='down',amount=1200,element?), scrollToEnd({maxSteps?,direction?,amount?,element?}). Also: read(selector,{limit:30,textLimit:1000,attributes:['href']}), wait(selector,timeoutMs=5000), navigate(url), diagnostics(clear=false), popups(). read extracts many matching elements in one call. These new methods return {kind:'page',data:...}; use result.data for their payload. Return the final result explicitly.",
       "Use scrollToEnd() for reaching the bottom; report reachedEnd:false honestly. Infinite feeds may hit a step limit. Use snapshots and the existing ref/locator/point element shapes to target actions. Never replay consequential actions after uncertain delivery.",
       "Example: const page = await browser.openTab('https://www.yahoo.com/'); return await page.scrollToEnd();",
     ],

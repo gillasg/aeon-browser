@@ -1,7 +1,9 @@
 import "./completion-notifications.js";
+import { scheduleExecutorReconnect } from "./native-executor-reconnect.js";
+import { startExecutorHeartbeat } from "./native-executor-health.js";
+import { installBrowserPopupGuard } from "./native-browser-popup.js";
 import {
   BrowserExecutorHeartbeatReplySchema,
-  BrowserExecutorHeartbeatSchema,
   AuthHelloSchema,
   AuthReplySchema,
   BrowserInventoryReplySchema,
@@ -38,7 +40,6 @@ import {
 
 const NATIVE_HOST = "com.pippin.native_host_dev";
 const GRANT_WAIT_MS = 5000;
-const EXECUTOR_HEARTBEAT_MS = 20_000;
 interface PendingGrant {
   resolve(response: PageGrantIssueResponse | undefined): void;
   timer: number;
@@ -71,7 +72,11 @@ function handleRuntimeMessage(
   const request = NativeExtensionRequestSchema.safeParse(candidate);
   if (!request.success || sender.id !== chrome.runtime.id) return;
   if (request.data.kind === "pippin.native.page-grant") {
-    void getPageGrant(sender, request.data.pageInstanceId, request.data.scope).then(sendResponse);
+    void getPageGrant(sender, request.data.pageInstanceId, request.data.scope).then(
+      sendResponse,
+      () =>
+        sendResponse(NativePageGrantResponseSchema.parse({ ok: false, code: "DAEMON_OFFLINE" })),
+    );
     return true;
   }
   if (request.data.kind === "pippin.native.take-initial-submit") {
@@ -119,6 +124,7 @@ async function getPageGrant(
     ),
   );
   const response = await pending;
+  if (!response) connection.socket.close(4005, "Page grant timed out; reconnect required");
   if (!response || !response.ok)
     return NativePageGrantResponseSchema.parse({
       ok: false,
@@ -186,27 +192,13 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   socket.addEventListener("close", () => dropExecutor(connection), { once: true });
   try {
     await synchronizeBrowserInventory(socket, identity);
+    installBrowserPopupGuard(socket);
   } catch (error) {
     socket.close(4001, "Inventory sync failed");
     throw error;
   }
   executor = connection;
-  connection.heartbeatTimer = globalThis.setInterval(() => {
-    if (connection.socket.readyState !== WebSocket.OPEN) return;
-    try {
-      connection.socket.send(
-        JSON.stringify(
-          BrowserExecutorHeartbeatSchema.parse({
-            kind: "browser.executor.heartbeat",
-            clientInstanceId: connection.clientInstanceId,
-            browserRunId: connection.browserRunId,
-          }),
-        ),
-      );
-    } catch {
-      connection.socket.close(4004, "Executor heartbeat failed");
-    }
-  }, EXECUTOR_HEARTBEAT_MS);
+  connection.heartbeatTimer = startExecutorHeartbeat(socket, identity);
   return connection;
 }
 
@@ -299,7 +291,10 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
 function dropExecutor(connection: ExecutorConnection): void {
   if (executor === connection) releaseBrowserExecutor();
   if (connection.heartbeatTimer !== undefined) globalThis.clearInterval(connection.heartbeatTimer);
-  if (executor === connection) executor = undefined;
+  if (executor === connection) {
+    executor = undefined;
+    scheduleExecutorReconnect(ensureExecutor);
+  }
   for (const [requestId, pending] of connection.pending) {
     globalThis.clearTimeout(pending.timer);
     pending.resolve(undefined);

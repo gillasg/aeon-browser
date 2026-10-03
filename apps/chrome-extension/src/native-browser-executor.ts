@@ -1,3 +1,7 @@
+import { handleScriptSync } from "./site-script-runtime.js";
+import { performExtra } from "./native-browser-extra.js";
+import { navigateReady } from "./native-browser-navigation.js";
+import { withBrowserDebugger } from "./native-browser-session.js";
 import {
   BrowserExecutorRequestSchema,
   BrowserExecutorResultSchema,
@@ -36,7 +40,7 @@ export function handleBrowserExecutorMessage(
   socket: WebSocket,
   candidate: unknown,
 ): boolean {
-  if (handleBrowserRelease(candidate)) return true;
+  if (handleScriptSync(candidate) || handleBrowserRelease(candidate)) return true;
   const request = BrowserExecutorRequestSchema.safeParse(candidate);
   if (!request.success) return false;
   registerBrowserRequest(request.data);
@@ -91,6 +95,7 @@ async function executeStep(
       : captureScreenshot(request, tab, revalidateTarget);
   if (step.op === "click" || step.op === "fill" || step.op === "scroll")
     return performAction({ ...request, step }, revalidateTarget);
+  if (isExtraStep(step)) return performExtra({ ...request, step }, revalidateTarget);
   throw new Error("UNSUPPORTED");
 }
 
@@ -107,9 +112,12 @@ async function openTab(
   request: BrowserExecutorRequest,
 ): Promise<BrowserExecutorResult> {
   const step = validOpenTab(request, identity);
-  const created = await chrome.tabs.create({ url: step.url, active: step.foreground });
+  const created = await chrome.tabs.create({ url: "about:blank", active: step.foreground });
   if (created.id === undefined) throw new Error("TARGET_LOST");
-  const tab = await waitForTabReady(created.id);
+  bindBrowserSession(created.id, request.chatId);
+  await withBrowserDebugger(created.id, () => navigateReady(created.id as number, step.url));
+  assertRequestActive(request);
+  const tab = await refreshInventoryTab(created.id);
   if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
   return BrowserExecutorResultSchema.parse({ kind: "tab", tab });
 }
@@ -125,20 +133,6 @@ function validOpenTab(
   )
     throw new Error("INVALID_TARGET");
   return request.step;
-}
-
-async function waitForTabReady(tabId: number) {
-  const deadline = Date.now() + 7000;
-  while (true) {
-    const live = await chrome.tabs.get(tabId).catch(() => undefined);
-    if (!live) throw new Error("TARGET_LOST");
-    if (live.url && safePage(live.url)) {
-      const tab = await refreshInventoryTab(tabId);
-      if (tab && (live.status === "complete" || Date.now() >= deadline)) return tab;
-    }
-    if (Date.now() >= deadline) throw new Error("TIMEOUT");
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
 }
 
 async function assertTarget(request: BrowserExecutorRequest): Promise<chrome.tabs.Tab> {
@@ -211,10 +205,17 @@ function enqueueTarget(
   return current;
 }
 
-function isTargetStep(
+type TargetStep = Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>;
+function isTargetStep(step: BrowserStep): step is TargetStep {
+  return !["listTabs", "openTab", "attachTab"].includes(step.op);
+}
+function isExtraStep(
   step: BrowserStep,
-): step is Extract<BrowserStep, { op: "observe" | "click" | "fill" | "scroll" }> {
-  return step.op === "observe" || step.op === "click" || step.op === "fill" || step.op === "scroll";
+): step is Extract<
+  BrowserStep,
+  { op: "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
+> {
+  return ["read", "wait", "navigate", "diagnostics", "siteScript", "popups"].includes(step.op);
 }
 
 function sendResult(

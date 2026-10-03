@@ -37,7 +37,7 @@ export function AnnotationProvider({ children }: { children: ReactNode }): React
 export function useAnnotations(): AnnotationState | null {
   return useContext(AnnotationContext);
 }
-// Adapted from PiStudio: annotations are pending attachments, serialized only at send time.
+// Annotations remain pending attachments until the message is sent.
 export function serializeAnnotations(records: readonly ResponseAnnotation[]): string {
   if (!records.length) return "";
   const body = records

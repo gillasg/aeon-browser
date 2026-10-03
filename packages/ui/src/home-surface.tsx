@@ -1,3 +1,4 @@
+import { SidebarResizer } from "./sidebar-resizer.js";
 import { useWallpaper } from "./wallpaper-settings.js";
 import { useEffect, useState, type ReactElement } from "react";
 import type { ChatCatalogItemDto } from "@pippin/protocol";
@@ -45,7 +46,7 @@ export interface NewTabHomeProps {
   managementLoading: boolean;
   managementError: string;
   managementSelectedChatId: string;
-  theme: "dark" | "light" | "system";
+  theme: "dark" | "midnight" | "light" | "system";
   sidebarDefaultOpen: boolean;
   onManagementLoad(): void;
   onManagementRefresh(): void;
@@ -56,7 +57,7 @@ export interface NewTabHomeProps {
     action: ManagementActionName,
     input: Record<string, unknown>,
   ): void;
-  onTheme(theme: "dark" | "light" | "system"): void;
+  onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
   onSidebarDefault(open: boolean): void;
 }
 
@@ -92,8 +93,7 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
     setManagementSection(section);
     props.onManagementLoad();
   };
-  return (
-    <div className="home-shell" data-sidebar-collapsed={String(collapsed)}>
+  return (<div className="home-shell" data-sidebar-collapsed={String(collapsed)}>
       <HomeSidebar
         developmentFixture={props.developmentFixture}
         onNewChat={() => {
@@ -113,6 +113,7 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
         collapsed={collapsed}
         onCollapse={() => setCollapsed((value) => !value)}
       />
+      <SidebarResizer open={!collapsed} onCollapse={() => setCollapsed(true)} />
       <HomeMain
         props={{ ...props, onManageRoutines: () => openSection("routines") }}
         active={active}

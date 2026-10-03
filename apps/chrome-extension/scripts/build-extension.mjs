@@ -24,6 +24,7 @@ export async function buildExtension(variant) {
     [join(appRoot, `src/${native ? "native" : "dev"}-worker.ts`), "service-worker.js"],
     [join(appRoot, "src/chat-page.ts"), "chat.js"],
     [join(appRoot, "src/viewer-page.tsx"), "viewer.js"],
+    [join(appRoot, "src/site-scripts-page.ts"), "site-scripts.js"],
     [join(appRoot, "src/home-page.ts"), "home.js"],
     [join(appRoot, "src/sidepanel-page.ts"), "sidepanel.js"],
   ];
@@ -36,6 +37,8 @@ export async function buildExtension(variant) {
     "chat.html",
     "completion-icon.png",
     "viewer.html",
+    "site-scripts.html",
+    "site-scripts.css",
     "viewer-shell.css",
     "chat.css",
     "home.html",

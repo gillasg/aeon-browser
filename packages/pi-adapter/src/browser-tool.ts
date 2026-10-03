@@ -118,7 +118,8 @@ const parameters = Type.Object(
   { steps: Type.Array(step, { minItems: 1, maxItems: 8 }) },
   { additionalProperties: false },
 );
-type BrowserInput = { steps: unknown[] } | { release: true; reset?: boolean };
+type BrowserInput =
+  { steps: unknown[] } | { release: true; reset?: boolean } | { siteScript: unknown };
 export type BrowserToolRunner = (
   chatId: string,
   toolCallId: string,

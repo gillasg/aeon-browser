@@ -8,12 +8,12 @@ export interface ManagementSurfaceProps {
   loading: boolean;
   error: string;
   connectionLabel: string;
-  theme: "dark" | "light" | "system";
+  theme: "dark" | "midnight" | "light" | "system";
   sidebarDefaultOpen: boolean;
   onRefresh(): void;
   onSelectChat(chatId: string): void;
   onOpenChat(chatId: string): void;
   onAction(chatId: string, action: ManagementActionName, input: Record<string, unknown>): void;
-  onTheme(theme: "dark" | "light" | "system"): void;
+  onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
   onSidebarDefault(open: boolean): void;
 }

@@ -47,7 +47,7 @@ export function PiModelPicker({
         hint="Model"
         open={open}
         disabled={disabled}
-        value={selected ? selected.name : "Pi model unavailable"}
+        value={selected ? selected.name : "Loading model…"}
         provider={selected?.provider}
         modelId={selected?.id}
       />

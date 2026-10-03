@@ -97,7 +97,11 @@ function applyFullInventory(
   if (!accepted) socket.close(1008, "Invalid or stale browser inventory");
   else {
     state.inventoryReady = true;
-    browserControl.connectExecutor(executor.clientInstanceId, socket);
+    browserControl.connectExecutor(
+      executor.clientInstanceId,
+      socket,
+      inventory.capabilities?.includes("site-scripts"),
+    );
     socket.send(
       JSON.stringify(
         BrowserInventoryReplySchema.parse({
@@ -149,21 +153,16 @@ function applyInventoryDelta(
   return true;
 }
 
-async function issuePageGrant(
+function issuePageGrant(
   socket: WebSocket,
   request: PageGrantIssueRequest,
   executor: GrantContext,
   service: ChatService,
   endpoint: string,
   grants: GrantAuthority,
-): Promise<void> {
-  if (request.scope.kind === "chat") {
-    try {
-      await service.getChatView(asChatId(request.scope.chatId));
-    } catch {
-      return sendGrantFailure(socket, request.requestId, "INVALID_SCOPE");
-    }
-  }
+): void {
+  if (request.scope.kind === "chat" && !service.getChat(asChatId(request.scope.chatId)))
+    return sendGrantFailure(socket, request.requestId, "INVALID_SCOPE");
   const issued = grants.issuePage(executor, request.pageInstanceId, request.scope);
   if (!issued) return sendGrantFailure(socket, request.requestId, "DAEMON_OFFLINE");
   const response = PageGrantIssueResponseSchema.parse({

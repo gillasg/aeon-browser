@@ -192,6 +192,13 @@ async function handleContextCommand(
           ) ?? "offline",
       });
       return;
+    case "chat.queue-edit":
+      await service.withSession(asChatId(request.payload.chatId), (session) => {
+        if (!session.editQueue) throw new Error("Queue editing is unavailable in this session.");
+        session.editQueue(request.payload);
+      });
+      completeCommand(socket, request, { kind: "chat.queued", chatId: request.payload.chatId, mode: request.payload.mode });
+      return;
     case "chat.queue":
       await service.queueInput(
         asChatId(request.payload.chatId),
@@ -305,7 +312,6 @@ function commandErrorCode(
   if (operation === "chat.submit") return "PI_PROMPT_FAILED";
   return "INVALID_COMMAND";
 }
-
 function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message.slice(0, 300)

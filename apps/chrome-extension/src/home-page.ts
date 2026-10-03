@@ -1,4 +1,6 @@
+import { saveInitialDisplay } from "./initial-chat-display.js";
 import "./status-favicon.js";
+import { PageReconnect } from "./page-reconnect.js";
 import { projectDraftPayload } from "./project-bridge.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
@@ -89,17 +91,21 @@ if (new URL(location.href).searchParams.get("embedded") === "1")
   document.body.dataset.embedded = "true";
 render();
 void restoreModelCatalog();
-void start();
+const reconnect = new PageReconnect(start, (message) => {
+  connectionLabel = "Reconnecting";
+  showError(message);
+});
+void reconnect.start();
 window.addEventListener("pagehide", () => client?.close(), { once: true });
 
 async function start(): Promise<void> {
   const result = await connectPage({ kind: "catalog" });
   if (result.kind !== "connected") {
-    connectionLabel = "Not connected";
-    showError(connectionErrorMessage(result.code));
-    return;
+    throw new Error(connectionErrorMessage(result.code));
   }
   client = result.client;
+  reconnect.watch(client);
+  errorMessage = "";
   connectionGrant = result.developmentGrant;
   connectionLabel = "Connected";
   render();
@@ -144,6 +150,7 @@ async function askPippin(
     if (created.kind !== "command.completed" || created.result.kind !== "chat.created")
       throw new Error("Unexpected Chat creation response.");
     const chatId = created.result.chat.chatId;
+    saveInitialDisplay(chatId, { text, model, thinkingLevel });
     if (
       __PIPPIN_NATIVE_TRANSPORT__ &&
       new URL(location.href).searchParams.get("host") !== "panel"

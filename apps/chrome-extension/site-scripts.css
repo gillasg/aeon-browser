@@ -1,0 +1,53 @@
+@font-face {
+  font-family: Geist;
+  src: url(geist-latin.woff2) format("woff2");
+}
+body {
+  margin: 0;
+  background: var(--pippin-canvas, #111);
+  color: var(--pippin-text, #eee);
+  font:
+    15px/1.6 Geist,
+    system-ui,
+    sans-serif;
+  color-scheme: light dark;
+}
+main {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 0 24px;
+}
+h1 {
+  font-size: 24px;
+}
+h2 {
+  font-size: 17px;
+}
+section {
+  padding: 20px;
+  margin: 20px 0;
+  border: 1px solid var(--pippin-line, #333);
+  border-radius: 14px;
+}
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--pippin-line, #444);
+  background: var(--pippin-surface, #222);
+  color: inherit;
+  cursor: pointer;
+  margin-right: 8px;
+}
+button:hover {
+  filter: brightness(1.15);
+}
+.script-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--pippin-line, #333);
+}
+.script-detail {
+  display: block;
+  opacity: 0.65;
+  overflow-wrap: anywhere;
+}

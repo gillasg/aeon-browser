@@ -1,3 +1,4 @@
+import { SidebarResizer } from "./sidebar-resizer.js";
 import type { ChatSummaryDto, PiUiSnapshotDto } from "@pippin/protocol";
 import { AnnotationProvider } from "./transcript-annotations.js";
 import { useState, type ReactElement } from "react";
@@ -84,6 +85,7 @@ export function ChatSurface(props: ChatSurfaceProps): ReactElement {
         onManagement={openSection}
         managementSection={section ?? undefined}
       />
+      <SidebarResizer open={props.sidebarOpen} onCollapse={props.onCloseSidebar} />
       <ToolImageContext.Provider value={props.loadToolImage}>
         {section && (
           <main className="chat-main">

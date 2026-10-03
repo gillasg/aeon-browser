@@ -611,3 +611,73 @@ body[data-host="panel"] .home-start {
   background: var(--surface-raised);
   filter: brightness(1.2);
 }
+
+/* Softer sidebar surfaces shared by home and chat. */
+.home-sidebar,
+.chat-sidebar {
+  background: color-mix(in srgb, var(--canvas) 60%, var(--surface));
+  border-right-color: color-mix(in srgb, var(--line) 45%, var(--canvas));
+}
+.home-sidebar .sidebar-chat-item,
+.chat-sidebar .sidebar-chat-item,
+.home-sidebar .sidebar-chat-row,
+.chat-sidebar .sidebar-chat-row,
+.home-sidebar .home-chat-row,
+.home-sidebar .sidebar-project-row,
+.chat-sidebar .sidebar-project-row,
+.home-sidebar .sidebar-management-links button,
+.chat-sidebar .sidebar-management-links button {
+  border-radius: 10px;
+}
+
+/* Midnight: cool charcoal surfaces over a near-black canvas. */
+
+:root[data-theme="midnight"] .home-sidebar,
+:root[data-theme="midnight"] .chat-sidebar {
+  background: #16161c;
+  border-right-color: #24242b;
+}
+:root[data-theme="midnight"] .composer,
+:root[data-theme="midnight"] .home-query-form {
+  background: var(--pippin-surface);
+  border-color: #1c1c22;
+}
+.home-shell[data-sidebar-collapsed="false"] {
+  --home-sidebar-width: min(var(--aeon-sidebar-width, 264px), calc(100vw - 100px));
+}
+.app-shell {
+  --chat-sidebar-width: min(var(--aeon-sidebar-width, 264px), calc(100vw - 100px));
+}
+.sidebar-resizer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 30;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer:hover,
+.sidebar-resizer:focus-visible {
+  background: color-mix(in srgb, var(--pippin-muted) 25%, transparent);
+  outline: none;
+}
+body[data-embedded="true"] .sidebar-resizer,
+body[data-host="panel"] .sidebar-resizer { display: none; }
+
+/* Queue tray sits directly against the composer. */
+.composer-queue-list { width: min(100% - 32px, 908px); margin: 0 auto -8px; gap: 0; }
+.composer-queue-item { min-height: 40px; padding: 6px 12px 12px; border-radius: 0; background: var(--surface); gap: 10px; }
+.composer-queue-item:first-child { border-radius: 18px 18px 0 0; }
+.composer-queue-item + .composer-queue-item { border-top: 0; }
+.composer-queue-copy { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-actions, .queue-edit { display: flex; align-items: center; gap: 8px; }
+.queue-actions { flex: none; }
+.queue-actions button, .queue-reorder button, .queue-edit button { border: 0; background: transparent; color: var(--muted); font: inherit; cursor: pointer; padding: 4px; border-radius: 5px; }
+.queue-actions button { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.queue-actions button:hover, .queue-reorder button:hover, .queue-edit button:hover { color: var(--text); background: var(--surface-raised); }
+.queue-reorder { display: flex; flex-direction: column; color: var(--muted); flex: none; }
+.queue-reorder button { height: 14px; line-height: 10px; }
+.queue-reorder button:disabled { opacity: .3; cursor: default; }
+.queue-edit { flex: 1; min-width: 0; }
+.queue-edit input { min-width: 0; width: 100%; background: var(--canvas); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 6px; font: inherit; }

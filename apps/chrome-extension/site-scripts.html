@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Site customizations · Aeon</title>
+    <link rel="stylesheet" href="ui-tokens.css" />
+    <link rel="stylesheet" href="site-scripts.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Site customizations</h1>
+      <p>
+        Ask your agent to preview or save a customization. Saved scripts run locally on matching
+        pages.
+      </p>
+      <section>
+        <h2>Setup</h2>
+        <p id="script-access" role="status"></p>
+        <button id="extension-details" type="button">Enable Allow User Scripts</button>
+        <button id="refresh" type="button">Refresh</button>
+        <div id="site-access"></div>
+      </section>
+      <section>
+        <h2>Saved scripts</h2>
+        <div id="scripts"></div>
+      </section>
+      <p>
+        Ask your agent to update, disable, delete, or undo a saved script. Disabling stops future
+        runs; reload the website to reset changes without cleanup.
+      </p>
+    </main>
+    <script src="site-scripts.js"></script>
+  </body>
+</html>

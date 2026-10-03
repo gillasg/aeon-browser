@@ -10,8 +10,19 @@ export function BrowserContextChip({
 }): ReactElement {
   return (
     <section className="browser-context-chip" aria-label="Attached page context">
-      <ContextIdentity record={record} />
-      <ContextDetails record={record} />
+      <span className="browser-context-page-icon" aria-hidden="true">
+        {record.favIconUrl ? (
+          <img src={record.favIconUrl} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          "◎"
+        )}
+      </span>
+      <span
+        className="browser-context-page-label"
+        title={`${record.title ?? record.url}\n${record.url}${record.selectedText ? "\nSelected text attached" : ""}`}
+      >
+        {record.title || new URL(record.url).hostname}
+      </span>
       {onRemove && (
         <button
           className="browser-context-remove"

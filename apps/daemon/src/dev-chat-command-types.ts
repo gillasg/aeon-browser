@@ -30,7 +30,7 @@ export type ReadCommandRequest = Extract<
       | "chat.model"
       | "chat.thinking"
       | "chat.attach-browser-context"
-      | "chat.queue"
+      | "chat.queue" | "chat.queue-edit"
       | "chat.stop";
   }
 >;
@@ -80,7 +80,7 @@ export type SessionCommand = Extract<
 >;
 export type ContextCommand = Extract<
   NonSubmitCommand,
-  { operation: "chat.attach-browser-context" | "chat.queue" }
+  { operation: "chat.attach-browser-context" | "chat.queue" | "chat.queue-edit" }
 >;
 
 const SIMPLE_COMMANDS = new Set([
@@ -105,7 +105,7 @@ const SESSION_COMMANDS = new Set([
   "chat.compact",
   "chat.extension-ui-answer",
 ]);
-const CONTEXT_COMMANDS = new Set(["chat.attach-browser-context", "chat.queue"]);
+const CONTEXT_COMMANDS = new Set(["chat.attach-browser-context", "chat.queue", "chat.queue-edit"]);
 
 export function isSimpleCommand(request: NonSubmitCommand): request is SimpleCommand {
   return SIMPLE_COMMANDS.has(request.operation);

@@ -166,6 +166,14 @@ const ChatQueueRequestSchema = z
       .strict(),
   })
   .strict();
+const ChatQueueEditRequestSchema = z.object({
+  kind: z.literal("command"), requestId: RequestIdSchema, operation: z.literal("chat.queue-edit"),
+  payload: z.object({ chatId: ChatIdSchema, mode: z.enum(["followUp", "steer"]),
+    index: z.number().int().min(0).max(99), action: z.enum(["delete", "edit", "up", "down", "steer"]),
+    text: z.string().trim().min(1).max(50_000).optional(),
+    steering: z.array(z.string()).max(100), followUp: z.array(z.string()).max(100),
+  }).strict(),
+}).strict();
 const ChatStopRequestSchema = z
   .object({
     kind: z.literal("command"),
@@ -204,6 +212,7 @@ export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ChatThinkingRequestSchema,
   ChatAttachBrowserContextRequestSchema,
   ChatQueueRequestSchema,
+  ChatQueueEditRequestSchema,
   ChatStopRequestSchema,
 ]);
 

@@ -30,7 +30,6 @@ interface InventorySession extends BrowserIdentity {
 
 let active: InventorySession | undefined;
 let listenersInstalled = false;
-
 export async function synchronizeBrowserInventory(
   socket: WebSocket,
   identity: BrowserIdentity,
@@ -156,6 +155,7 @@ async function buildFullInventory(session: InventorySession) {
     kind: "browser.inventory.full",
     ...inventoryIdentity(session),
     generation: session.generation,
+    capabilities: ["site-scripts"],
     windows,
     tabs: inventoryTabs,
   });

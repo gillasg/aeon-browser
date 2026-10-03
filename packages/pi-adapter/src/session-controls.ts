@@ -1,3 +1,4 @@
+import { editSessionQueue } from "./session-queue-edit.js";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import {
   clampThinkingLevel,
@@ -11,7 +12,7 @@ import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-
 
 type Controls = Pick<
   PiSessionHandle,
-  "queue" | "abort" | "controls" | "setModel" | "setThinkingLevel"
+  "queue" | "editQueue" | "abort" | "controls" | "setModel" | "setThinkingLevel"
 >;
 
 export function createSessionControls(session: AgentSession): Controls {
@@ -24,6 +25,7 @@ export function createSessionControls(session: AgentSession): Controls {
       if (mode === "steer") await session.steer(text, decoded.images);
       else await session.followUp(text, decoded.images);
     },
+    editQueue: (input) => editSessionQueue(session, input),
     abort: () => session.abort(),
     controls: () => {
       const model = session.model;

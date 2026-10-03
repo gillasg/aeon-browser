@@ -17,6 +17,15 @@
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
-  "permissions": ["storage", "tabs", "sidePanel", "notifications"],
-  "host_permissions": ["http://127.0.0.1/*", "https://models.dev/*"]
+  "permissions": [
+    "storage",
+    "tabs",
+    "sidePanel",
+    "notifications",
+    "userScripts",
+    "scripting",
+    "webNavigation"
+  ],
+  "host_permissions": ["http://127.0.0.1/*", "https://models.dev/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"]
 }

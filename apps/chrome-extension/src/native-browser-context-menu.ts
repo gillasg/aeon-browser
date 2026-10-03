@@ -84,6 +84,7 @@ function createContextRecord(
     capturedAt: new Date().toISOString(),
     target,
     url: capturedUrl,
+    ...contextFavicon(tab),
     ...(tab.title ? { title: tab.title.slice(0, 512) } : {}),
     ...(selection
       ? {
@@ -133,4 +134,10 @@ function isSafePageUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function contextFavicon(tab: chrome.tabs.Tab): { favIconUrl?: string } {
+  return tab.favIconUrl && isSafePageUrl(tab.favIconUrl)
+    ? { favIconUrl: tab.favIconUrl.slice(0, 2048) }
+    : {};
 }

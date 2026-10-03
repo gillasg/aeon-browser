@@ -57,6 +57,15 @@ export class ChatComposerController {
       editNotice: this.editNotice,
       browserContext: this.browserContext,
       onSend: (text, mode) => this.sendMessage(text, mode),
+      onQueueAction: async (mode, index, action, text) => {
+        if (!this.controls) return;
+        try {
+          await this.command({ operation: "chat.queue-edit", payload: { chatId: this.chatId,
+            mode, index, action, ...(text ? { text } : {}),
+            steering: this.controls.steeringQueue, followUp: this.controls.followUpQueue } });
+        } catch (error) { this.onError(messageOf(error)); }
+        await this.refreshControls();
+      },
       onStop: () => void this.stop(),
       onModel: (value) => void this.changeModel(value),
       onThinking: (value) => void this.changeThinking(value),
@@ -185,7 +194,7 @@ export class ChatComposerController {
     }
   }
 
-  private async refreshControls(): Promise<void> {
+  async refreshControls(): Promise<void> {
     if (!this.client || this.disposed) return;
     try {
       const response = await this.command({

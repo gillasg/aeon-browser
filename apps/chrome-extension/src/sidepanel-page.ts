@@ -1,4 +1,5 @@
 import "./status-favicon.js";
+import { PageReconnect } from "./page-reconnect.js";
 import { createElement } from "react";
 import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
 import { mountPippinUi, SidePanel, type SidePanelProps } from "@pippin/ui";
@@ -95,7 +96,11 @@ const stopObservingTitle = observePanelFrameTitle(
 window.addEventListener("pagehide", stopObservingTitle, { once: true });
 render();
 void applyStoredTheme();
-void start();
+const reconnect = new PageReconnect(start, (message) => {
+  status = message;
+  render();
+});
+void reconnect.start();
 window.addEventListener("pagehide", () => client?.close(), { once: true });
 chrome.storage.onChanged.addListener((_changes, area) => {
   if (area === "session") void routePendingContext();
@@ -110,6 +115,7 @@ async function start(): Promise<void> {
     const connection = await connectPage({ kind: "catalog" });
     if (connection.kind !== "connected") throw new Error(connectionErrorMessage(connection.code));
     client = connection.client;
+    reconnect.watch(client);
     grant = connection.developmentGrant;
     client.subscribe(handleDaemonMessage);
     const stored = await chrome.storage.session.get(selectionKey(windowId));
@@ -126,8 +132,8 @@ async function start(): Promise<void> {
     if (!selectedChatId) render();
   } catch (error) {
     status = `Aeon is unavailable · ${messageOf(error)}`;
-    selectedChatId = "";
     render();
+    throw error;
   }
 }
 

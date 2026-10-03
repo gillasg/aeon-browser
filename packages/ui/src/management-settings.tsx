@@ -37,6 +37,11 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
       <section className="settings-group">
         <h2>Connected Chrome</h2>
         <p>
+          <a href="site-scripts.html" target="_blank" rel="noreferrer">
+            Site customizations and permissions
+          </a>
+        </p>
+        <p>
           Aeon bridge: <strong>{props.connectionLabel}</strong>
         </p>
         <p>Chrome profiles are managed by Chrome; Aeon does not enumerate or switch profiles.</p>
@@ -53,9 +58,10 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
         Theme{" "}
         <select
           value={props.theme}
-          onChange={(event) => props.onTheme(event.target.value as "dark" | "light" | "system")}
+          onChange={(event) => props.onTheme(event.target.value as "dark" | "midnight" | "light" | "system")}
         >
           <option value="dark">Dark</option>
+          <option value="midnight">Midnight</option>
           <option value="light">Light</option>
           <option value="system">System</option>
         </select>

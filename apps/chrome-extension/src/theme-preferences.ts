@@ -6,7 +6,7 @@ export async function applyStoredTheme(): Promise<void> {
     await chrome.storage.sync.set({ "pippin-theme": "light" });
   }
   document.documentElement.dataset.theme =
-    value === "light" || value === "system" ? value : value === "atmosphere" ? "light" : "dark";
+    value === "light" || value === "system" || value === "midnight" ? value : value === "atmosphere" ? "light" : "dark";
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes["pippin-theme"]) void applyStoredTheme();

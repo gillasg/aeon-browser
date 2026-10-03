@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { browserExtraSteps } from "./browser-extra-steps.js";
 import { BrowserTabSchema, BrowserTargetKeySchema } from "./browser-inventory.js";
 
 const HttpUrlSchema = z
@@ -51,6 +52,7 @@ const SemanticTargetSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const BrowserStepSchema = z.discriminatedUnion("op", [
+  ...browserExtraSteps,
   z.object({ op: z.literal("listTabs"), query: z.string().max(160).optional() }).strict(),
   z
     .object({
@@ -114,7 +116,7 @@ export const BrowserExecutorRequestSchema = z
   })
   .strict()
   .superRefine((request, context) => {
-    const targetAction = ["observe", "click", "fill", "scroll"].includes(request.step.op);
+    const targetAction = !["listTabs", "openTab", "attachTab"].includes(request.step.op);
     const hasClaim =
       request.claimId !== undefined &&
       request.claimGeneration !== undefined &&
@@ -192,6 +194,17 @@ export const BrowserScrollStateSchema = z
 export type BrowserScrollState = z.infer<typeof BrowserScrollStateSchema>;
 
 export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("page"),
+      target: BrowserTargetKeySchema,
+      url: z.string().max(8192),
+      documentEpoch: z.number().int().nonnegative(),
+      data: z.unknown(),
+      source: z.literal("website"),
+      trust: z.literal("untrusted"),
+    })
+    .strict(),
   z.object({ kind: z.literal("tabs"), tabs: z.array(BrowserTabSchema).max(256) }).strict(),
   z.object({ kind: z.literal("tab"), tab: BrowserTabSchema }).strict(),
   SemanticObservationSchema,

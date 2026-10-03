@@ -80,8 +80,7 @@ internal static class NativeMessagingHost
             { "requestBase64", Convert.ToBase64String(request) }
         });
         var bytes = Encoding.UTF8.GetBytes(envelope);
-        var started = false;
-        for (var attempt = 0; attempt < 36; attempt++)
+        for (var attempt = 0; attempt < 80; attempt++)
         {
             try
             {
@@ -96,10 +95,9 @@ internal static class NativeMessagingHost
             }
             catch (TimeoutException) { }
             catch (IOException) { }
-            if (!started)
+            if (attempt % 5 == 0)
             {
                 StartSupervisor();
-                started = true;
             }
             System.Threading.Thread.Sleep(200);
         }

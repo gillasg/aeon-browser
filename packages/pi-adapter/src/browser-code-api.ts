@@ -20,6 +20,12 @@ const browser = Object.freeze({
   },
   page: (target) => Object.freeze({
     target,
+    read: (selector, options = {}) => __call({op:"read", target, selector, ...options}),
+    wait: (selector, timeoutMs = 5000) => __call({op:"wait", target, selector, timeoutMs}),
+    navigate: (url) => __call({op:"navigate", target, url}),
+    diagnostics: (clear = false) => __call({op:"diagnostics", target, clear}),
+    popups: () => __call({op:"popups", target}),
+    removePreview: (scriptId) => __call({op:"siteScript", target, action:"remove", scriptId}),
     snapshot: () => __call({op:'observe', target, kind:'semantic'}),
     screenshot: () => __call({op:'observe', target, kind:'screenshot'}),
     click: (element) => __call({op:'click', target, element}),

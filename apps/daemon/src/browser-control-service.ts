@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import {
   BrowserExecutorRequestSchema,
-  BrowserOperationCallSchema,
+  BrowserPopupSchema,
   BrowserOperationResultSchema,
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
   type BrowserStep,
   type BrowserTargetKey,
 } from "@pippin/protocol";
+import { executeBrowserBatch } from "./browser-batch.js";
+import type { SiteScriptService } from "./site-script-service.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import {
   listBrowserTabs,
@@ -17,9 +19,6 @@ import {
   targetIdentity,
   sameTarget,
 } from "./browser-control-values.js";
-
-const BATCH_BUDGET_MS = 30_000;
-const STEP_TIMEOUT_MS = 12_000;
 type Ownership = "borrowed" | "agent-created";
 type AcquisitionSource = "user-context" | "user-picker" | "agent-open";
 interface Association {
@@ -34,7 +33,6 @@ interface Pending {
   finish(result?: BrowserExecutorResult, code?: string): void;
   timer: NodeJS.Timeout;
 }
-
 export class BrowserControlService {
   private inventories: BrowserInventoryRegistry | undefined;
   private readonly executors = new Map<string, WebSocket>();
@@ -42,15 +40,29 @@ export class BrowserControlService {
   private readonly associations = new Map<string, Map<string, Association>>();
   private readonly claims = new Map<string, string>();
   private claimGeneration = 0;
-
+  private scripts: SiteScriptService | undefined;
+  private readonly scriptClients = new Set<string>();
+  useSiteScripts(scripts: SiteScriptService): void {
+    this.scripts = scripts;
+  }
+  resyncScripts(clientId: string): void {
+    const socket = this.executors.get(clientId);
+    if (this.scriptClients.has(clientId) && socket?.readyState === WebSocket.OPEN)
+      this.scripts?.sync(clientId, socket);
+  }
+  targetUrl(chatId: string, target: BrowserTargetKey): string {
+    if (!this.getAssociation(chatId, target))
+      throw new Error("Attach the exact browser target first.");
+    const tab = this.inventories?.findTarget(target);
+    if (!tab || !safeUrl(tab.url)) throw new Error("TARGET_LOST");
+    return tab.url;
+  }
   useInventories(inventories: BrowserInventoryRegistry): void {
     this.inventories = inventories;
   }
-
   isInstanceAvailable(clientInstanceId: string): boolean {
     return this.executors.has(clientInstanceId) && !!this.inventories?.get(clientInstanceId);
   }
-
   attachContext(
     chatId: string,
     target: BrowserTargetKey,
@@ -65,17 +77,19 @@ export class BrowserControlService {
     this.setAssociation(chatId, target, "borrowed", "user-context");
     return "attached";
   }
-
-  connectExecutor(clientInstanceId: string, socket: WebSocket): void {
+  connectExecutor(clientInstanceId: string, socket: WebSocket, supportsScripts = false): void {
+    if (supportsScripts) this.scriptClients.add(clientInstanceId);
+    else this.scriptClients.delete(clientInstanceId);
     this.executors.set(clientInstanceId, socket);
+    this.resyncScripts(clientInstanceId);
     socket.once("close", () => {
       if (this.executors.get(clientInstanceId) === socket) this.executors.delete(clientInstanceId);
       for (const pending of this.pending.values())
         if (pending.socket === socket) pending.finish(undefined, "BROWSER_OFFLINE");
     });
   }
-
   handleExecutorResult(candidate: unknown, socket: WebSocket): boolean {
+    if (this.adoptPopup(candidate, socket)) return true;
     const parsed = BrowserOperationResultSchema.safeParse(candidate);
     if (!parsed.success) return false;
     const pending = this.pending.get(parsed.data.requestId);
@@ -89,27 +103,46 @@ export class BrowserControlService {
       );
     return true;
   }
-
   async execute(
     chatId: string,
     toolCallId: string,
     raw: unknown,
     signal?: AbortSignal,
   ): Promise<string> {
-    if (typeof raw === "object" && raw !== null && "release" in raw && raw.release === true) {
-      this.release(chatId, "reset" in raw && raw.reset === true);
-      return JSON.stringify({ released: true });
-    }
+    const special = this.executeSpecial(chatId, toolCallId, raw, signal);
+    if (special) return special;
     if (signal?.aborted) return JSON.stringify({ error: "CANCELLED" });
     const abort = () => this.release(chatId);
     signal?.addEventListener("abort", abort, { once: true });
     try {
-      return await this.executeBatch(chatId, toolCallId, raw, signal);
+      return await executeBrowserBatch(
+        raw,
+        toolCallId,
+        (id, step, timeout) => this.executeStep(chatId, toolCallId, id, step, timeout),
+        signal,
+      );
     } finally {
       signal?.removeEventListener("abort", abort);
     }
   }
-
+  private executeSpecial(
+    chatId: string,
+    callId: string,
+    raw: unknown,
+    signal?: AbortSignal,
+  ): Promise<string> | undefined {
+    if (typeof raw !== "object" || raw === null) return;
+    if ("siteScript" in raw)
+      return (
+        this.scripts?.execute(chatId, callId, raw.siteScript, signal) ??
+        Promise.resolve(JSON.stringify({ error: "UNSUPPORTED" }))
+      );
+    if ("release" in raw && raw.release === true) {
+      this.release(chatId, "reset" in raw && raw.reset === true);
+      return Promise.resolve(JSON.stringify({ released: true }));
+    }
+    return;
+  }
   private release(chatId: string, reset = false): void {
     for (const pending of this.pending.values())
       if (pending.chatId === chatId) pending.finish(undefined, "OPERATION_FAILED");
@@ -117,59 +150,6 @@ export class BrowserControlService {
       if (socket.readyState === WebSocket.OPEN)
         socket.send(JSON.stringify({ kind: "browser.release", chatId, reset }));
   }
-
-  private async executeBatch(
-    chatId: string,
-    toolCallId: string,
-    raw: unknown,
-    signal?: AbortSignal,
-  ): Promise<string> {
-    const parsed = BrowserOperationCallSchema.safeParse(raw);
-    if (!parsed.success)
-      return JSON.stringify({
-        error: "INVALID_TARGET",
-        detail: "Browser arguments did not match the closed operation schema.",
-      });
-    const operationId = randomUUID();
-    const deadline = Date.now() + BATCH_BUDGET_MS;
-    const dispositions: {
-      index: number;
-      disposition: "completed" | "failed" | "skipped";
-      code?: string;
-      result?: BrowserExecutorResult;
-    }[] = [];
-    for (const [index, step] of parsed.data.steps.entries()) {
-      if (Date.now() >= deadline || signal?.aborted) {
-        dispositions.push({ index, disposition: "failed", code: "TIMEOUT" });
-        break;
-      }
-      const outcome = await this.executeStep(
-        chatId,
-        toolCallId,
-        operationId,
-        step,
-        Math.min(STEP_TIMEOUT_MS, deadline - Date.now()),
-      );
-      if (outcome.result)
-        dispositions.push({ index, disposition: "completed", result: outcome.result });
-      else {
-        dispositions.push({
-          index,
-          disposition: "failed",
-          code: outcome.code ?? "OPERATION_FAILED",
-        });
-        for (let skipped = index + 1; skipped < parsed.data.steps.length; skipped++)
-          dispositions.push({
-            index: skipped,
-            disposition: "skipped",
-            code: "STOPPED_AFTER_ERROR",
-          });
-        break;
-      }
-    }
-    return JSON.stringify({ operationId, toolCallId, steps: dispositions });
-  }
-
   private async executeStep(
     chatId: string,
     toolCallId: string,
@@ -184,7 +164,6 @@ export class BrowserControlService {
     if (step.op === "attachTab") return this.executeAttachTab(chatId, step);
     return this.executeTargetedStep(chatId, toolCallId, operationId, step, timeoutMs);
   }
-
   private async executeOpenTab(
     chatId: string,
     toolCallId: string,
@@ -199,7 +178,6 @@ export class BrowserControlService {
       this.setAssociation(chatId, opened.result.tab.target, "agent-created", "agent-open");
     return opened;
   }
-
   private executeAttachTab(
     chatId: string,
     step: Extract<BrowserStep, { op: "attachTab" }>,
@@ -210,7 +188,6 @@ export class BrowserControlService {
     this.setAssociation(chatId, step.target, "borrowed", "user-picker");
     return { result: { kind: "tab", tab } };
   }
-
   private async executeTargetedStep(
     chatId: string,
     toolCallId: string,
@@ -247,7 +224,6 @@ export class BrowserControlService {
       if (this.claims.get(key) === claimId) this.claims.delete(key);
     }
   }
-
   private async dispatch(
     socket: WebSocket,
     chatId: string,
@@ -270,7 +246,6 @@ export class BrowserControlService {
     });
     return this.sendAndWait(socket, request, timeoutMs);
   }
-
   private sendAndWait(
     socket: WebSocket,
     request: BrowserExecutorRequest,
@@ -284,7 +259,10 @@ export class BrowserControlService {
         clearTimeout(pending.timer);
         resolve(result ? { result } : { code: code ?? "BROWSER_OFFLINE" });
       };
-      const timer = setTimeout(() => finish(undefined, "TIMEOUT"), timeoutMs);
+      const timer = setTimeout(() => {
+        finish(undefined, "TIMEOUT");
+        this.release(request.chatId);
+      }, timeoutMs);
       this.pending.set(request.requestId, {
         chatId: request.chatId,
         socket,
@@ -297,10 +275,24 @@ export class BrowserControlService {
       });
     });
   }
-
+  private adoptPopup(candidate: unknown, socket: WebSocket): boolean {
+    const popup = BrowserPopupSchema.safeParse(candidate);
+    if (!popup.success) return false;
+    const { chatId, opener, tab } = popup.data;
+    if (
+      this.executors.get(opener.clientInstanceId) !== socket ||
+      !this.getAssociation(chatId, opener) ||
+      tab.target.clientInstanceId !== opener.clientInstanceId ||
+      tab.target.browserRunId !== opener.browserRunId ||
+      !safeUrl(tab.url)
+    )
+      return true;
+    const live = this.inventories?.findTarget(tab.target);
+    if (live) this.setAssociation(chatId, live.target, "agent-created", "agent-open");
+    return true;
+  }
   private connected = (clientInstanceId: string): boolean =>
     this.executors.get(clientInstanceId)?.readyState === WebSocket.OPEN;
-
   private setAssociation(
     chatId: string,
     target: BrowserTargetKey,
@@ -311,7 +303,6 @@ export class BrowserControlService {
     if (!byTarget) this.associations.set(chatId, (byTarget = new Map()));
     byTarget.set(targetIdentity(target), { target, ownership, source });
   }
-
   private getAssociation(chatId: string, target: BrowserTargetKey): Association | undefined {
     const association = this.associations.get(chatId)?.get(targetIdentity(target));
     return association && sameTarget(association.target, target) ? association : undefined;

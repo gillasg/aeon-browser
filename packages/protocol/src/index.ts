@@ -130,3 +130,5 @@ export {
 export * from "./image-asset.js";
 
 export { ProjectSchema, type ProjectDto } from "./projects.js";
+
+export * from "./site-scripts.js";
