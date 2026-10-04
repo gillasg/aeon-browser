@@ -1,0 +1,21 @@
+{
+  "name": "@pippin/daemon",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.2.0",
+    "@pippin/domain": "workspace:*",
+    "@pippin/pi-adapter": "workspace:*",
+    "@pippin/protocol": "workspace:*",
+    "@pippin/store": "workspace:*",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "@types/ws": "8.18.1"
+  }
+}
