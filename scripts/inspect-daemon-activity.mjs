@@ -17,20 +17,38 @@ function bootstrap() {
       windowsHide: true,
       stdio: ["pipe", "pipe", "ignore"],
     });
-    const chunks = [];
+    let data = Buffer.alloc(0),
+      settled = false;
     const timer = setTimeout(() => {
       child.kill();
       reject(Error("Native bootstrap timed out"));
-    }, 10000);
-    child.stdout.on("data", (chunk) => chunks.push(chunk));
-    child.once("error", reject);
-    child.once("close", () => {
+    }, 20000);
+    child.stdout.on("data", (chunk) => {
+      data = Buffer.concat([data, chunk]);
+      if (settled || data.length < 4) return;
+      const length = data.readInt32LE(0);
+      if (length < 1 || length > 16384) {
+        child.kill();
+        return;
+      }
+      if (data.length < 4 + length) return;
+      settled = true;
       clearTimeout(timer);
+      child.stdout.destroy();
       try {
-        const data = Buffer.concat(chunks);
-        resolve(JSON.parse(data.subarray(4, 4 + data.readInt32LE(0)).toString()));
+        resolve(JSON.parse(data.subarray(4, 4 + length).toString()));
       } catch {
         reject(Error("Invalid native bootstrap response"));
+      }
+    });
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("exit", () => {
+      if (!settled) {
+        clearTimeout(timer);
+        reject(Error("Native bootstrap exited without a response"));
       }
     });
     const payload = Buffer.from(
