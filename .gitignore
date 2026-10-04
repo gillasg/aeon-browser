@@ -26,3 +26,9 @@ coverage/
 
 # Minimal public project introduction
 !/README.md
+
+core-connection.json
+core-attention.json*
+**/*.sqlite*
+**/pi-sessions/
+**/data/

@@ -1,4 +1,6 @@
-import { DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
+import { associateComposerContext } from "./composer-context-association.js";
+import { editComposerQueue, sendComposerCommand, messageOf } from "./composer-command.js";
+import { type DaemonUiResponse } from "@pippin/protocol";
 import type { PiBrowserContextRecord } from "@pippin/protocol";
 import type { ChatComposerProps, ComposerAttachment, ComposerControls } from "@pippin/ui";
 import type { PiAttachmentDto } from "@pippin/protocol";
@@ -69,26 +71,18 @@ export class ChatComposerController {
       editNotice: this.editNotice,
       browserContext: this.browserContext,
       onSend: (text, mode) => this.sendMessage(text, mode),
-      onQueueAction: async (mode, index, action, text) => {
-        if (!this.controls) return;
-        try {
-          await this.command({
-            operation: "chat.queue-edit",
-            payload: {
-              chatId: this.chatId,
-              mode,
-              index,
-              action,
-              ...(text ? { text } : {}),
-              steering: this.controls.steeringQueue,
-              followUp: this.controls.followUpQueue,
-            },
-          });
-        } catch (error) {
-          this.onError(messageOf(error));
-        }
-        await this.refreshControls();
-      },
+      onQueueAction: (mode, index, action, text) =>
+        editComposerQueue(
+          this.controls,
+          this.chatId,
+          mode,
+          index,
+          action,
+          text,
+          (request) => this.command(request),
+          this.onError,
+          () => this.refreshControls(),
+        ),
       onReadDraftAttachments: (files) => Promise.all(files.map(readComposerAttachment)),
       onStart: async (text, model, thinking, files) => {
         this.submitting = true;
@@ -292,67 +286,25 @@ export class ChatComposerController {
     }
   }
 
-  private async command(request: Record<string, unknown>): Promise<DaemonUiResponse> {
-    if (!this.client) throw new Error("The local daemon is unavailable.");
-    const requestId = crypto.randomUUID();
-    const after = this.client.send(
-      DaemonUiRequestSchema.parse({ kind: "command", requestId, ...request }),
-    );
-    const response = await this.client.waitFor(
-      (message) =>
-        (message.kind === "command.completed" || message.kind === "command.failed") &&
-        message.requestId === requestId,
-      after,
-      request.operation === "chat.controls" ? 60_000 : 8_000,
-    );
-    if (response.kind === "command.failed") throw new Error(response.message);
-    return response;
+  private command(request: Record<string, unknown>): Promise<DaemonUiResponse> {
+    return sendComposerCommand(this.client, request);
   }
 
   private ensureBrowserContextAttached(record: PiBrowserContextRecord): Promise<void> {
     if (!this.client) return Promise.resolve();
-    const current = this.contextAssociations.get(record.contextId);
-    if (current) return current;
-    const attaching = Promise.resolve()
-      .then(() =>
-        this.command({
-          operation: "chat.attach-browser-context",
-          payload: { chatId: this.chatId, target: record.target, url: record.url },
-        }),
-      )
-      .then(async (response) => {
-        if (
-          response.kind !== "command.completed" ||
-          response.result.kind !== "chat.browser-context-attached"
-        )
-          throw new Error("The daemon did not confirm the page association.");
-        if (response.result.status !== "attached")
-          this.onError(contextAssociationMessage(response.result.status));
-        const sourceStatus =
-          response.result.status === "attached" ? "current" : response.result.status;
+    return associateComposerContext(
+      record,
+      this.chatId,
+      this.contextAssociations,
+      (request) => this.command(request),
+      this.onError,
+      async (status) => {
         if (this.browserContext?.contextId === record.contextId) {
-          this.browserContext = { ...this.browserContext, sourceStatus };
+          this.browserContext = { ...this.browserContext, sourceStatus: status };
           this.onChange();
         }
-        await this.onBrowserContextStatus(record.contextId, sourceStatus);
-      })
-      .catch(() => {
-        if (this.contextAssociations.get(record.contextId) === attaching)
-          this.contextAssociations.delete(record.contextId);
-        this.onError("Page context is saved, but browser control could not attach its source tab.");
-      });
-    this.contextAssociations.set(record.contextId, attaching);
-    return attaching;
+        await this.onBrowserContextStatus(record.contextId, status);
+      },
+    );
   }
-}
-
-function contextAssociationMessage(status: "stale" | "lost" | "offline" | "attached"): string {
-  if (status === "stale") return "Page context is saved, but its source page has changed.";
-  if (status === "lost") return "Page context is saved, but its source tab has closed.";
-  if (status === "offline") return "Page context is saved; browser control is offline.";
-  return "";
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : "The local operation failed.";
 }

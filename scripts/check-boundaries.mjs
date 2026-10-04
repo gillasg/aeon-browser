@@ -6,23 +6,12 @@ import ts from "typescript";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRules = new Map([
   ["@pippin/protocol", []],
-  ["@pippin/domain", []],
-  ["@pippin/store", ["@pippin/domain"]],
-  ["@pippin/daemon", ["@pippin/protocol", "@pippin/domain", "@pippin/store", "@pippin/pi-adapter"]],
   ["@pippin/chrome-extension", ["@pippin/protocol", "@pippin/ui"]],
   ["@pippin/ui", ["@pippin/protocol"]],
-  ["@pippin/pi-adapter", ["@pippin/domain"]],
-  ["@pippin/native-host", []],
 ]);
 const packagePaths = new Map([
-  ["@pippin/protocol", "packages/protocol"],
-  ["@pippin/domain", "packages/domain"],
-  ["@pippin/store", "packages/store"],
-  ["@pippin/daemon", "apps/daemon"],
   ["@pippin/chrome-extension", "apps/chrome-extension"],
   ["@pippin/ui", "packages/ui"],
-  ["@pippin/pi-adapter", "packages/pi-adapter"],
-  ["@pippin/native-host", "apps/native-host"],
 ]);
 const violations = [];
 
@@ -85,7 +74,7 @@ for (const [name, relativePath] of packagePaths) {
         if (!packageRules.get(name)?.includes(targetName)) {
           violations.push(`${name} is not allowed to depend on ${targetName}.`);
         }
-        if (declared[targetName] !== "workspace:*") {
+        if (targetName !== "@pippin/protocol" && declared[targetName] !== "workspace:*") {
           violations.push(`${name} must use workspace:* for ${targetName}.`);
         }
       }

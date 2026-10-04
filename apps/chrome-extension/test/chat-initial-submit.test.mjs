@@ -12,11 +12,16 @@ const extensionRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("native Chat takes and submits its staged first prompt", async () => {
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "pippin-chat-initial-submit-test-"));
   const previousChrome = globalThis.chrome;
+  const previousDocument = globalThis.document;
+  const previousStorage = globalThis.sessionStorage;
+  globalThis.sessionStorage = { getItem: () => null, removeItem() {} };
+  globalThis.document = { body: { dataset: {} } };
   const chatId = "968c135b-a48f-4f5e-9223-dff7f9a10a07";
   const requestId = randomUUID();
   const submitted = [];
   try {
     globalThis.chrome = {
+      storage: { session: { get: async () => ({}) } },
       runtime: {
         sendMessage: async (request) => takeInitialSubmit(request, chatId, requestId),
       },
@@ -36,6 +41,8 @@ test("native Chat takes and submits its staged first prompt", async () => {
     assert.equal(await submitInitialPrompt(chatId, client, true), true);
     assertInitialCommands(submitted, chatId);
   } finally {
+    globalThis.document = previousDocument;
+    globalThis.sessionStorage = previousStorage;
     if (previousChrome === undefined) delete globalThis.chrome;
     else globalThis.chrome = previousChrome;
     await rm(temporaryDirectory, { recursive: true, force: true });
@@ -93,5 +100,10 @@ function assertInitialCommands(submitted, chatId) {
   assert.equal(submitted[1].operation, "chat.thinking");
   assert.deepEqual(submitted[1].payload, { chatId, level: "low" });
   assert.equal(submitted[2].operation, "chat.submit");
-  assert.deepEqual(submitted[2].payload, { chatId, text: "First prompt" });
+  assert.deepEqual(submitted[2].payload, {
+    chatId,
+    text: "First prompt",
+    attachments: [],
+    browserContexts: [],
+  });
 }

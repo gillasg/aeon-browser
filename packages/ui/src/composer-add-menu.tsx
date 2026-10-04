@@ -1,96 +1,24 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
-import { PiBrowserContextRecordSchema } from "@pippin/protocol";
-interface Tab {
-  tabId: number;
-  title: string;
-  url: string;
-  favIconUrl?: string;
-  current: boolean;
-}
-function request(kind: string, tabId?: number): Promise<unknown> {
-  return new Promise((resolve, reject) =>
-    window.dispatchEvent(
-      new CustomEvent("aeon.context-picker", { detail: { kind, tabId, resolve, reject } }),
-    ),
-  );
-}
-export function ComposerAddMenu({
-  onFiles,
-  contextId = "draft",
-}: {
+import type { ReactElement } from "react";
+import { useComposerAddMenu, type ContextTab } from "./composer-add-state.js";
+
+export function ComposerAddMenu(props: {
   onFiles(): void;
   contextId?: string | undefined;
 }): ReactElement {
-  const [open, setOpen] = useState(false),
-    [tabs, setTabs] = useState<Tab[] | null>(null);
-  const [error, setError] = useState(""),
-    [loading, setLoading] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const outside = (event: PointerEvent): void => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("pointerdown", outside);
-    window.addEventListener("keydown", escape);
-    return () => {
-      window.removeEventListener("pointerdown", outside);
-      window.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-  const listTabs = async (): Promise<void> => {
-    setLoading(true);
-    setError("");
-    try {
-      const value = await request("list");
-      setTabs(Array.isArray(value) ? (value as Tab[]) : []);
-    } catch {
-      setError("Could not load tabs.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  const choose = async (tabId: number): Promise<void> => {
-    setLoading(true);
-    setError("");
-    try {
-      const record = PiBrowserContextRecordSchema.parse(await request("capture", tabId));
-      const key = "aeon-context-pages:" + contextId;
-      const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? "[]");
-      const pages = Array.isArray(value)
-        ? value.flatMap((item) => {
-            const parsed = PiBrowserContextRecordSchema.safeParse(item);
-            return parsed.success ? [parsed.data] : [];
-          })
-        : [];
-      if (!pages.some((page) => page.target.tabId === tabId)) {
-        if (pages.length >= 8) throw new Error("Attach up to eight tabs.");
-        sessionStorage.setItem(key, JSON.stringify([...pages, record]));
-        window.dispatchEvent(new CustomEvent("aeon.context-added", { detail: { id: contextId } }));
-      }
-      setOpen(false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not attach tab.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const state = useComposerAddMenu(props.contextId ?? "draft");
   return (
-    <div className="composer-add-wrap" ref={root}>
+    <div className="composer-add-wrap" ref={state.root}>
       <button
         className="attach-button"
         type="button"
         title="Add files or tabs"
         aria-label="Add files or tabs"
-        aria-expanded={open}
+        aria-expanded={state.open}
         aria-haspopup="dialog"
         onClick={() => {
-          setOpen(!open);
-          setTabs(null);
-          setError("");
+          state.setOpen(!state.open);
+          state.setTabs(null);
+          state.setError("");
         }}
       >
         <svg
@@ -106,62 +34,82 @@ export function ComposerAddMenu({
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
-      {open && (
-        <div className="composer-add-menu" role="dialog" aria-label="Add context">
-          {tabs === null ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onFiles();
-                }}
-              >
-                <span aria-hidden="true">＋</span> Add files
-              </button>
-              <button type="button" disabled={loading} onClick={() => void listTabs()}>
-                <span aria-hidden="true">▣</span> Add tabs
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className="tab-picker-back"
-                type="button"
-                onClick={() => {
-                  setTabs(null);
-                  setError("");
-                }}
-              >
-                <span aria-hidden="true">‹</span> Back
-              </button>
-              <div className="tab-picker-list">
-                {tabs.map((tab) => (
-                  <button
-                    type="button"
-                    disabled={loading}
-                    key={tab.tabId}
-                    title={tab.url}
-                    onClick={() => void choose(tab.tabId)}
-                  >
-                    <span className="tab-picker-icon">
-                      {tab.favIconUrl && /^https?:/.test(tab.favIconUrl) ? (
-                        <img src={tab.favIconUrl} alt="" referrerPolicy="no-referrer" />
-                      ) : (
-                        "◎"
-                      )}
-                    </span>
-                    <span className="tab-picker-title">{tab.title || tab.url}</span>
-                    {tab.current && <span className="tab-picker-current">· Current tab</span>}
-                  </button>
-                ))}
-                {!tabs.length && <p>No supported tabs open.</p>}
-              </div>
-            </>
-          )}
-          {error && <p role="alert">{error}</p>}
-        </div>
+      {state.open && (
+        <AddMenuDialog
+          tabs={state.tabs}
+          error={state.error}
+          loading={state.loading}
+          onFiles={() => {
+            state.setOpen(false);
+            props.onFiles();
+          }}
+          onTabs={() => void state.listTabs()}
+          onBack={() => {
+            state.setTabs(null);
+            state.setError("");
+          }}
+          onChoose={(id) => void state.choose(id)}
+        />
       )}
     </div>
+  );
+}
+interface AddMenuProps {
+  tabs: ContextTab[] | null;
+  error: string;
+  loading: boolean;
+  onFiles(): void;
+  onTabs(): void;
+  onBack(): void;
+  onChoose(id: number): void;
+}
+function AddMenuDialog(props: AddMenuProps): ReactElement {
+  return (
+    <div className="composer-add-menu" role="dialog" aria-label="Add context">
+      {props.tabs === null ? (
+        <>
+          <button type="button" onClick={props.onFiles}>
+            <span aria-hidden="true">＋</span> Add files
+          </button>
+          <button type="button" disabled={props.loading} onClick={props.onTabs}>
+            <span aria-hidden="true">▣</span> Add tabs
+          </button>
+        </>
+      ) : (
+        <TabPicker {...props} tabs={props.tabs} />
+      )}
+      {props.error && <p role="alert">{props.error}</p>}
+    </div>
+  );
+}
+function TabPicker(props: AddMenuProps & { tabs: ContextTab[] }): ReactElement {
+  return (
+    <>
+      <button className="tab-picker-back" type="button" onClick={props.onBack}>
+        <span aria-hidden="true">‹</span> Back
+      </button>
+      <div className="tab-picker-list">
+        {props.tabs.map((tab) => (
+          <button
+            type="button"
+            disabled={props.loading}
+            key={tab.tabId}
+            title={tab.url}
+            onClick={() => props.onChoose(tab.tabId)}
+          >
+            <span className="tab-picker-icon">
+              {tab.favIconUrl && /^https?:/.test(tab.favIconUrl) ? (
+                <img src={tab.favIconUrl} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                "◎"
+              )}
+            </span>
+            <span className="tab-picker-title">{tab.title || tab.url}</span>
+            {tab.current && <span className="tab-picker-current">· Current tab</span>}
+          </button>
+        ))}
+        {!props.tabs.length && <p>No supported tabs open.</p>}
+      </div>
+    </>
   );
 }

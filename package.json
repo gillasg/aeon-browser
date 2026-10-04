@@ -1,5 +1,5 @@
 {
-  "name": "pippin-workspace",
+  "name": "aeon-browser",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.4.0",
@@ -7,17 +7,13 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "pnpm exec tsc -b packages/domain packages/protocol packages/ui apps/daemon packages/pi-adapter packages/store && pnpm --filter @pippin/chrome-extension build && pnpm --filter @pippin/native-host build",
-    "typecheck": "pnpm exec tsc -b packages/domain packages/protocol packages/ui apps/daemon packages/pi-adapter packages/store --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
+    "build": "node scripts/verify-protocol.mjs && pnpm exec tsc -b packages/ui && pnpm --filter @pippin/chrome-extension build",
+    "typecheck": "node scripts/verify-protocol.mjs && pnpm exec tsc -b packages/ui --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
     "lint": "eslint apps packages scripts --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "test": "pnpm build && node --test",
-    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
-    "build:native-host": "pnpm --filter @pippin/native-host build",
-    "dev:handshake": "pnpm build && node apps/daemon/dist/main.js --dev-handshake",
-    "dev:chat": "pnpm build && node apps/daemon/dist/main.js --dev-chat",
-    "probe:mv3": "pnpm build && node scripts/probe-mv3-handshake.mjs"
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

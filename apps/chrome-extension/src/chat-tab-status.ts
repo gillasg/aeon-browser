@@ -6,7 +6,7 @@ let status: "idle" | "working" = "idle";
 window.addEventListener(
   "pagehide",
   () => {
-    void chrome.storage.session.remove([key, "aeon-chat-working-" + activeChatId]);
+    void chrome.storage.session.remove(key);
   },
   { once: true },
 );
@@ -16,34 +16,43 @@ export function observeChatTabStatus(
 ): void {
   activeChatId = chatId;
   const acknowledge = () => {
-    if (document.visibilityState === "visible" && document.hasFocus()) {
-      void chrome.storage.session.remove("piper-unread-" + chatId);
-    }
+    const visible = document.visibilityState === "visible" && document.hasFocus();
+    void chrome.storage.session
+      .get("aeon-completion-id-" + chatId)
+      .then((values) =>
+        chrome.runtime.sendMessage({
+          kind: "core.attention.read",
+          chatId,
+          completionId: values["aeon-completion-id-" + chatId] ?? null,
+          viewId: key.slice("pippin-tab-status-".length),
+          visible,
+        }),
+      )
+      .catch(() => undefined);
   };
   window.addEventListener("focus", acknowledge);
+  window.addEventListener("blur", acknowledge);
   document.addEventListener("visibilitychange", acknowledge);
+  const presence = window.setInterval(acknowledge, 10000);
+  window.addEventListener("pagehide", () => clearInterval(presence), { once: true });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "session" && changes["aeon-completion-id-" + chatId]) acknowledge();
+  });
   acknowledge();
   client.subscribe((message) => {
     if (message.kind === "chat.snapshot" && message.snapshot.chat.chatId === chatId) {
-      applyState(message.snapshot.runState, false);
+      applyState(message.snapshot.runState);
     } else if (message.kind === "command.started" && message.chatId === chatId) publish("working");
     else if (message.kind === "command.settled" && message.chatId === chatId)
-      applyState(message.runState, message.state === "settled" && status === "working");
+      applyState(message.runState);
     else if (message.kind === "chat.event" && message.chatId === chatId) {
       const event = message.event.event;
-      if (event.kind === "run-state") applyState(event.state, status === "working");
-      if (event.kind === "view-replaced") applyState(event.runState, false);
+      if (event.kind === "run-state") applyState(event.state);
+      if (event.kind === "view-replaced") applyState(event.runState);
     }
   });
 }
-function applyState(state: ChatViewSnapshotDto["runState"], completed: boolean): void {
-  if (state === "idle" && completed) {
-    const chatId = activeChatId;
-    if (chatId)
-      void chrome.runtime
-        .sendMessage({ kind: "piper.chat-completed", chatId })
-        .catch(() => undefined);
-  }
+function applyState(state: ChatViewSnapshotDto["runState"]): void {
   publish(state === "running-unconfirmed" || state === "needs_attention" ? "working" : "idle");
 }
 function publish(next: typeof status): void {

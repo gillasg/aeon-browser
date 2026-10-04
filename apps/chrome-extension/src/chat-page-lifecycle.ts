@@ -1,3 +1,5 @@
+import { ChatIdSchema } from "@pippin/protocol";
+import { InitialChatDisplay } from "./initial-chat-display.js";
 import { DaemonUiRequestSchema } from "@pippin/protocol";
 import type { DevUiClient } from "./dev-ui-client.js";
 
@@ -48,4 +50,31 @@ export function requiredChatPageElement(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing Chat page element: ${id}`);
   return element;
+}
+
+export function initializeChatPage(): {
+  root: HTMLElement;
+  chatId: string;
+  initialDisplay: InitialChatDisplay;
+} {
+  const root = requiredChatPageElement("root");
+  const parsed = ChatIdSchema.safeParse(new URL(location.href).searchParams.get("chatId"));
+  const chatId = parsed.success ? parsed.data : "";
+  if (new URL(location.href).searchParams.get("host") === "panel")
+    document.body.dataset.host = "panel";
+  return { root, chatId, initialDisplay: new InitialChatDisplay(chatId) };
+}
+
+export function reconnectChat(attempt: number, retry: () => Promise<void>): number {
+  return globalThis.setTimeout(
+    () => void retry(),
+    Math.min(250 * 2 ** Math.min(attempt - 1, 3), 2000),
+  );
+}
+
+export function initialChatConnection(): {
+  label: string;
+  state: "connecting" | "connected" | "error";
+} {
+  return { label: "Connecting", state: "connecting" };
 }

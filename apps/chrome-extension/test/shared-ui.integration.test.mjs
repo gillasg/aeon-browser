@@ -127,7 +127,7 @@ test("New Tab is Ask-only and applies its dynamic Pi selection before the first 
     readFile(join(app, "src", "initial-chat-selection.ts"), "utf8"),
     readFile(join(app, "src", "home-management-controller.ts"), "utf8"),
   ]);
-  assert.match(homeStart, /placeholder="What would you like to work on\?"/);
+  assert.match(homeStart, /placeholder=""/);
   assert.match(homeStart, /<PiModelPicker/);
   assert.match(homeStart, /<PiThinkingPicker/);
   assert.match(homeStart, /models=\{catalog\?\.models/);

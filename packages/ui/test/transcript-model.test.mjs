@@ -85,7 +85,7 @@ test("inline edit projection uses only file contents present in Pi tool argument
     added: 1,
     truncated: false,
     noChanges: false,
-    confirmed: false,
+    confirmed: true,
   });
   assert.equal(projectEditDiff({ ...step, toolName: "read" }), undefined);
 });

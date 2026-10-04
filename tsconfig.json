@@ -1,10 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/domain" },
-    { "path": "./packages/protocol" },
-    { "path": "./packages/store" },
-    { "path": "./apps/daemon" },
-    { "path": "./packages/pi-adapter" }
+    {
+      "path": "./packages/ui"
+    }
   ]
 }

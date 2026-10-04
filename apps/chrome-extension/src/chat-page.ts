@@ -1,7 +1,6 @@
 import { connectionSingleFlight } from "./connection-single-flight.js";
 import { connectSidebarCatalog } from "./sidebar-catalog-connection.js";
 import { ensurePanelContext } from "./panel-prompt-handoff.js";
-import { InitialChatDisplay } from "./initial-chat-display.js";
 import { observeChatTabStatus } from "./chat-tab-status.js";
 import { subscribeSavedChat } from "./chat-subscribe-client.js";
 import "./project-bridge.js";
@@ -9,7 +8,7 @@ import { installFileViewerLinks } from "./file-viewer-launch.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
 import { createToolImageLoader } from "./tool-image-client.js";
-import { ChatIdSchema, type ChatViewSnapshotDto, type DaemonUiResponse } from "@pippin/protocol";
+import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@pippin/protocol";
 import { ChatSurface, mountPippinUi, TranscriptModel } from "@pippin/ui";
 import type { DevUiClient } from "./dev-ui-client.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
@@ -26,17 +25,14 @@ import { createBrowserContextDraftHandler } from "./chat-browser-context-draft.j
 import {
   chatPageErrorMessage as errorMessage,
   createChatPageCloser,
-  requiredChatPageElement as requiredElement,
+  initializeChatPage,
+  initialChatConnection,
+  reconnectChat,
 } from "./chat-page-lifecycle.js";
 import { ChatResourcesController } from "./chat-resources-controller.js";
 import { initializeChatPreferences } from "./chat-preferences.js";
 import { ChatPiUiController } from "./chat-pi-ui-controller.js";
-const root = requiredElement("root");
-const chatIdResult = ChatIdSchema.safeParse(new URL(location.href).searchParams.get("chatId"));
-const chatId = chatIdResult.success ? chatIdResult.data : "";
-const initialDisplay = new InitialChatDisplay(chatId);
-if (new URL(location.href).searchParams.get("host") === "panel")
-  document.body.dataset.host = "panel";
+const { root, chatId, initialDisplay } = initializeChatPage();
 let connectionGrant = "";
 let client: DevUiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);
@@ -53,10 +49,7 @@ const connectAndSubscribe = connectionSingleFlight(establishChatConnection, (mes
   scheduleReconnect();
 });
 let isClosing = false;
-let connection: { label: string; state: "connecting" | "connected" | "error" } = {
-  label: "Connecting",
-  state: "connecting",
-};
+let connection = initialChatConnection();
 let notice = chatId ? "" : "This Chat link does not include a valid Chat ID.";
 let title = "Chat · Aeon";
 const pendingSubmits = new Set<string>();
@@ -318,10 +311,8 @@ function showError(message: string): void {
 }
 function scheduleReconnect(): void {
   if (isClosing || reconnectTimer) return;
-  reconnectAttempt += 1;
-  const delay = Math.min(250 * 2 ** Math.min(reconnectAttempt - 1, 3), 2000);
-  reconnectTimer = globalThis.setTimeout(() => {
+  reconnectTimer = reconnectChat(++reconnectAttempt, () => {
     reconnectTimer = 0;
-    void connectAndSubscribe();
-  }, delay);
+    return connectAndSubscribe();
+  });
 }

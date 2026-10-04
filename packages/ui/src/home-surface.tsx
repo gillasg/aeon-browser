@@ -84,7 +84,6 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
     sectionRoute ?? "routines",
   );
   const active = props.chats.filter((chat) => !chat.archived);
-  const sections = homeSections(active);
   useEffect(() => {
     if (props.catalogOpen || management) setCollapsed(false);
   }, [props.catalogOpen, management]);
@@ -110,7 +109,7 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
         onManagementOpen={() => openSection("settings")}
         onManagementSection={openSection}
         onReturnHome={() => setManagement(false)}
-        sections={sections}
+        sections={homeSections(active)}
         collapsed={collapsed}
         onCollapse={() => setCollapsed((value) => !value)}
       />

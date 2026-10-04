@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ChatNavigation } from "../dist/chat-navigation.js";
 import { NewTabHome } from "../dist/home-surface.js";
 
-test("headerless navigation offers sidebar and settings without a title bar", () => {
+test("headerless navigation offers sidebar without a title bar", () => {
   const html = renderToStaticMarkup(
     createElement(ChatNavigation, {
       sidebarOpen: false,
@@ -16,22 +16,29 @@ test("headerless navigation offers sidebar and settings without a title bar", ()
     }),
   );
   assert.match(html, /id="sidebar-toggle"/);
-  assert.match(html, /aria-label="Settings"/);
+  assert.match(html, /aria-label="Open Chat list"/);
   assert.doesNotMatch(html, /<header|Connected|Pippin/);
 });
 
-test("new tab starts with a closed sidebar and an unbranded new chat prompt", () => {
+test("new tab starts with a closed sidebar and an empty composer", () => {
+  globalThis.localStorage = { getItem: () => null };
+  globalThis.location = { search: "" };
   const html = renderToStaticMarkup(
     createElement(NewTabHome, {
       chats: [],
       modelCatalog: null,
       developmentFixture: false,
       catalogOpen: false,
+      homeRoutines: [],
+      openChatIds: new Set(),
+      catalogResults: [],
     }),
   );
   assert.match(html, /data-sidebar-collapsed="true"/);
-  assert.match(html, /placeholder="What would you like to work on\?"/);
+  assert.match(html, /placeholder=""/);
   assert.doesNotMatch(html, /id="pinned-label"|id="projects-label"/);
   assert.match(html, /MCPs \/ CLIs/);
-  assert.doesNotMatch(html, /class="home-mark"|class="brand-mark"|class="home-sidebar-name"/);
+  assert.match(html, /Aeon|aeon-wordmark/);
+  delete globalThis.localStorage;
+  delete globalThis.location;
 });

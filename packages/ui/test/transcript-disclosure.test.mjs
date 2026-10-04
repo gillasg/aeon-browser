@@ -37,7 +37,7 @@ test("empty thinking and tool-only assistant messages create no empty rows", () 
   assert.equal(html, "");
 });
 
-test("tool turns gather thinking into one Markdown disclosure inside the aggregate", () => {
+test("tool turns preserve ordered thinking disclosures inside the aggregate", () => {
   const rows = [
     row("before", [{ type: "thinking", text: "**Planning the request**" }]),
     {
@@ -73,8 +73,8 @@ test("tool turns gather thinking into one Markdown disclosure inside the aggrega
   const html = renderToStaticMarkup(
     createElement(TranscriptTurn, { rows, actions: { actionsDisabled: false } }),
   );
-  assert.equal((html.match(/class="thinking-detail"/g) ?? []).length, 1);
-  assert.ok(html.indexOf('class="activity-steps"') < html.indexOf('class="thinking-detail"'));
+  assert.equal((html.match(/class="thinking-detail"/g) ?? []).length, 2);
+  assert.ok(html.indexOf('class="thinking-detail"') < html.indexOf('class="activity-group"'));
   assert.ok(html.indexOf('class="thinking-detail"') < html.indexOf("Final answer."));
   assert.match(html, /<strong>Planning the request<\/strong>/);
   assert.match(html, /<strong>Checking the result<\/strong>/);

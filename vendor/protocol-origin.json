@@ -1,0 +1,8 @@
+{
+  "package": "@pippin/protocol",
+  "version": "0.1.0",
+  "source": "https://github.com/gillasg/core",
+  "revision": "20e151c0b6c6910f801c03a149e6e8898aaee56a",
+  "file": "pippin-protocol-0.1.0.tgz",
+  "sha256": "a3208cdb0a50a383b51af354a558f926320de798345d4ca70e7314fe807db325"
+}

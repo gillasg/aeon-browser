@@ -7,6 +7,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["chrome"]
   },
-  "references": [{ "path": "../../packages/protocol" }, { "path": "../../packages/ui" }],
+  "references": [
+    {
+      "path": "../../packages/ui"
+    }
+  ],
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

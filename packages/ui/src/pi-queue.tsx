@@ -36,13 +36,14 @@ export function PiQueue(props: {
     </section>
   );
 }
-function QueueRow(props: {
+interface QueueRowProps {
   text: string;
   index: number;
   mode: "steer" | "followUp";
   count: number;
   onAction?: Action | undefined;
-}): ReactElement {
+}
+function QueueRow(props: QueueRowProps): ReactElement {
   const [editing, setEditing] = useState(false),
     [text, setText] = useState(props.text);
   const [busy, setBusy] = useState(false);
@@ -57,90 +58,130 @@ function QueueRow(props: {
   };
   return (
     <div className="composer-queue-item">
-      <div className="queue-reorder">
-        {props.count > 1 ? (
-          <>
-            <button
-              title="Move up"
-              aria-label="Move queued message up"
-              disabled={busy || props.index === 0}
-              onClick={() => void act("up")}
-            >
-              ⌃
-            </button>
-            <button
-              title="Move down"
-              aria-label="Move queued message down"
-              disabled={busy || props.index === props.count - 1}
-              onClick={() => void act("down")}
-            >
-              ⌄
-            </button>
-          </>
-        ) : (
-          <span aria-hidden="true">↳</span>
-        )}
-      </div>
+      <QueueReorder {...props} busy={busy} act={act} />
       {editing ? (
-        <form
-          className="queue-edit"
-          onSubmit={(event) => {
-            event.preventDefault();
+        <QueueEditor
+          text={text}
+          onText={setText}
+          busy={busy}
+          cancel={() => setEditing(false)}
+          save={() => {
             if (text.trim()) void act("edit", text.trim()).then(() => setEditing(false));
           }}
-        >
-          <input
-            autoFocus
-            aria-label="Edit queued message"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-          />
-          <button disabled={busy || !text.trim()}>Save</button>
-          <button type="button" onClick={() => setEditing(false)}>
-            Cancel
-          </button>
-        </form>
+        />
       ) : (
         <span className="composer-queue-copy" title={props.text}>
           {props.text}
         </span>
       )}
       {!editing && (
-        <div className="queue-actions">
-          {props.mode === "followUp" ? (
-            <button disabled={busy} onClick={() => void act("steer")}>
-              <span aria-hidden="true">↪</span> Steer
-            </button>
-          ) : (
-            <span className="composer-queue-mode">Steering</span>
-          )}
-          <button
-            disabled={busy}
-            title="Delete queued message"
-            aria-label="Delete queued message"
-            onClick={() => void act("delete")}
-          >
-            <SidebarIcon kind="delete" />
-          </button>
-          <button
-            disabled={busy}
-            title="Edit queued message"
-            aria-label="Edit queued message"
-            onClick={() => setEditing(true)}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path d="m15 4 5 5M4 20l4-1L20 7l-4-4L4 15z" />
-            </svg>
-          </button>
-        </div>
+        <QueueActions mode={props.mode} busy={busy} act={act} edit={() => setEditing(true)} />
       )}
     </div>
+  );
+}
+type Act = (action: Parameters<Action>[2], value?: string) => Promise<void>;
+function QueueReorder(props: QueueRowProps & { busy: boolean; act: Act }): ReactElement {
+  return (
+    <div className="queue-reorder">
+      {props.count > 1 ? (
+        <>
+          <button
+            title="Move up"
+            aria-label="Move queued message up"
+            disabled={props.busy || props.index === 0}
+            onClick={() => void props.act("up")}
+          >
+            ⌃
+          </button>
+          <button
+            title="Move down"
+            aria-label="Move queued message down"
+            disabled={props.busy || props.index === props.count - 1}
+            onClick={() => void props.act("down")}
+          >
+            ⌄
+          </button>
+        </>
+      ) : (
+        <span aria-hidden="true">↳</span>
+      )}
+    </div>
+  );
+}
+function QueueEditor(props: {
+  text: string;
+  onText(value: string): void;
+  busy: boolean;
+  cancel(): void;
+  save(): void;
+}): ReactElement {
+  return (
+    <form
+      className="queue-edit"
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.save();
+      }}
+    >
+      <input
+        autoFocus
+        aria-label="Edit queued message"
+        value={props.text}
+        onChange={(event) => props.onText(event.target.value)}
+      />
+      <button disabled={props.busy || !props.text.trim()}>Save</button>
+      <button type="button" onClick={props.cancel}>
+        Cancel
+      </button>
+    </form>
+  );
+}
+function QueueActions(props: {
+  mode: "steer" | "followUp";
+  busy: boolean;
+  act: Act;
+  edit(): void;
+}): ReactElement {
+  return (
+    <div className="queue-actions">
+      {props.mode === "followUp" ? (
+        <button disabled={props.busy} onClick={() => void props.act("steer")}>
+          <span aria-hidden="true">↪</span> Steer
+        </button>
+      ) : (
+        <span className="composer-queue-mode">Steering</span>
+      )}
+      <button
+        disabled={props.busy}
+        title="Delete queued message"
+        aria-label="Delete queued message"
+        onClick={() => void props.act("delete")}
+      >
+        <SidebarIcon kind="delete" />
+      </button>
+      <button
+        disabled={props.busy}
+        title="Edit queued message"
+        aria-label="Edit queued message"
+        onClick={props.edit}
+      >
+        <QueueEditIcon />
+      </button>
+    </div>
+  );
+}
+function QueueEditIcon(): ReactElement {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="m15 4 5 5M4 20l4-1L20 7l-4-4L4 15z" />
+    </svg>
   );
 }

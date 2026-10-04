@@ -1,13 +1,16 @@
+import { authenticate } from "./native-authenticate.js";
 import { handleContextPicker } from "./context-picker-handler.js";
 import { captureCurrentPage } from "./native-browser-context-menu.js";
-import "./completion-notifications.js";
+import {
+  installCoreAttentionBridge,
+  handleCoreAttentionMessage,
+} from "./completion-notifications.js";
 import { scheduleExecutorReconnect } from "./native-executor-reconnect.js";
 import { startExecutorHeartbeat } from "./native-executor-health.js";
 import { installBrowserPopupGuard } from "./native-browser-popup.js";
 import {
   BrowserExecutorHeartbeatReplySchema,
   AuthHelloSchema,
-  AuthReplySchema,
   BrowserInventoryReplySchema,
   NativeBootstrapRequestSchema,
   NativeBootstrapResponseSchema,
@@ -213,6 +216,9 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   socket.addEventListener("message", (event) => handleExecutorMessage(connection, event.data));
   socket.addEventListener("close", () => dropExecutor(connection), { once: true });
   executor = connection;
+  installCoreAttentionBridge((request) => {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(request));
+  });
   connection.heartbeatTimer = startExecutorHeartbeat(socket, identity);
   connection.inventoryReady = synchronizeBrowserInventory(socket, identity).then(() =>
     installBrowserPopupGuard(socket),
@@ -243,39 +249,6 @@ async function sendNativeBootstrap(identity: BrowserIdentity) {
   return parsed.data;
 }
 
-function authenticate(
-  socket: WebSocket,
-  hello: unknown,
-): Promise<ReturnType<typeof AuthReplySchema.parse> | undefined> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (reply?: ReturnType<typeof AuthReplySchema.parse>) => {
-      if (settled) return;
-      settled = true;
-      globalThis.clearTimeout(timer);
-      socket.removeEventListener("message", onMessage);
-      if (!reply || reply.kind !== "auth.ready") socket.close();
-      resolve(reply);
-    };
-    const timer = globalThis.setTimeout(() => finish(), 5000);
-    const onMessage = (event: MessageEvent) => {
-      let value: unknown;
-      try {
-        value = JSON.parse(String(event.data)) as unknown;
-      } catch {
-        return finish();
-      }
-      const parsed = AuthReplySchema.safeParse(value);
-      if (!parsed.success) return finish();
-      finish(parsed.data);
-    };
-    socket.addEventListener("message", onMessage, { once: true });
-    socket.addEventListener("open", () => socket.send(JSON.stringify(hello)), { once: true });
-    socket.addEventListener("error", () => finish(), { once: true });
-    socket.addEventListener("close", () => finish(), { once: true });
-  });
-}
-
 function handleExecutorMessage(connection: ExecutorConnection, data: unknown): void {
   let candidate: unknown;
   try {
@@ -284,6 +257,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     connection.socket.close(4002, "Invalid daemon response");
     return;
   }
+  if (handleCoreAttentionMessage(candidate)) return;
   const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
   if (heartbeat.success) {
     if (
