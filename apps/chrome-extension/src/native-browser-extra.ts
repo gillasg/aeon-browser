@@ -1,3 +1,6 @@
+import { BrowserActionError } from "./native-browser-errors.js";
+import { focusNode, pressKey } from "./native-browser-input.js";
+import { prepareElement } from "./native-browser-prepare.js";
 import type { BrowserExecutorRequest, BrowserExecutorResult } from "@pippin/protocol";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
@@ -10,7 +13,7 @@ import { browserPopups } from "./native-browser-popup.js";
 type ExtraRequest = BrowserExecutorRequest & {
   step: Extract<
     BrowserExecutorRequest["step"],
-    { op: "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
+    { op: "press" | "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
   >;
 };
 export async function performExtra(
@@ -31,6 +34,8 @@ export async function performExtra(
   } else
     data = await withBrowserDebugger(tabId, async (debuggee) => {
       await revalidate(request, tabId);
+      if (request.step.op === "press")
+        return pressElement(debuggee, request, () => revalidate(request, tabId));
       if (request.step.op === "navigate") return navigateReady(tabId, request.step.url);
       if (request.step.op === "diagnostics") return readDiagnostics(tabId, request.step.clear);
       if (request.step.op === "popups") return { tabs: await browserPopups(tabId) };
@@ -70,12 +75,15 @@ async function readOrWait(
     await revalidate();
     const found = await evaluate(
       debuggee,
-      `Boolean(document.querySelector(${JSON.stringify(step.selector)}))`,
+      `(${selectorState.toString()})(${JSON.stringify(step.selector)},${JSON.stringify(step.state)})`,
     );
     if (found) return { found: true };
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  return { found: false, timedOut: true };
+  throw new BrowserActionError(
+    "TIMEOUT",
+    `Selector ${JSON.stringify(step.selector)} did not become ${step.state} within ${step.timeoutMs}ms. Inspect the page or use another selector.`,
+  );
 }
 function extract(
   selector: string,
@@ -88,7 +96,9 @@ function extract(
     count: elements.length,
     truncated: elements.length > limit,
     items: [...elements].slice(0, limit).map((element) => ({
-      text: (element.textContent ?? "").trim().slice(0, textLimit),
+      text: ((element as HTMLElement).innerText ?? element.textContent ?? "")
+        .trim()
+        .slice(0, textLimit),
       attributes: Object.fromEntries(
         attributes.map((attribute) => [
           attribute,
@@ -108,4 +118,36 @@ async function evaluate(debuggee: chrome.debugger.Debuggee, expression: string):
   };
   if (result.exceptionDetails) throw new Error("INVALID_TARGET");
   return result.result?.value;
+}
+
+function selectorState(selector: string, state: string): boolean {
+  const elements = [...document.querySelectorAll(selector)];
+  const visible = (el: Element) => {
+    const box = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return (
+      box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none"
+    );
+  };
+  if (state === "attached") return elements.length > 0;
+  if (state === "hidden") return elements.every((el) => !visible(el));
+  return elements.some(
+    (el) =>
+      visible(el) &&
+      (state !== "editable" ||
+        (!el.matches(":disabled,[aria-disabled='true']") &&
+          (el.matches("input:not([readonly]),textarea:not([readonly])") ||
+            (el as HTMLElement).isContentEditable))),
+  );
+}
+async function pressElement(
+  debuggee: chrome.debugger.Debuggee,
+  request: ExtraRequest,
+  revalidate: () => Promise<void>,
+) {
+  if (request.step.op !== "press") throw new Error("INVALID_TARGET");
+  const { node } = await prepareElement(debuggee, request, request.step.element, revalidate);
+  await focusNode(debuggee, node.backendNodeId);
+  await pressKey(debuggee, request.step.key);
+  return { pressed: request.step.key };
 }

@@ -9,6 +9,7 @@ import { submitComposerMessage } from "./chat-composer-submit.js";
 export class ChatComposerController {
   private client: DevUiClient | undefined;
   private disposed = false;
+  private submitting = false;
   private projectName: string | null = null;
   private controls: ComposerControls | null = null;
   private attachments: ComposerAttachment[] = [];
@@ -36,6 +37,16 @@ export class ChatComposerController {
 
   setClient(client: DevUiClient): void {
     this.client = client;
+    client.socket.addEventListener(
+      "close",
+      () => {
+        if (this.client === client) {
+          this.client = undefined;
+          this.onChange();
+        }
+      },
+      { once: true },
+    );
     client.subscribe((message) => this.onDaemonMessage(message));
     if (this.browserContext) {
       this.contextAssociations.delete(this.browserContext.contextId);
@@ -50,7 +61,8 @@ export class ChatComposerController {
       chatId: this.chatId,
       projectName: this.projectName,
       connected: Boolean(this.client),
-      running: this.isRunning(),
+      running: this.isRunning() || this.submitting,
+      starting: this.submitting,
       controls: this.controls,
       attachments: this.attachments,
       ...(this.editDraftInsertion ? { editDraftInsertion: this.editDraftInsertion } : {}),
@@ -60,11 +72,45 @@ export class ChatComposerController {
       onQueueAction: async (mode, index, action, text) => {
         if (!this.controls) return;
         try {
-          await this.command({ operation: "chat.queue-edit", payload: { chatId: this.chatId,
-            mode, index, action, ...(text ? { text } : {}),
-            steering: this.controls.steeringQueue, followUp: this.controls.followUpQueue } });
-        } catch (error) { this.onError(messageOf(error)); }
+          await this.command({
+            operation: "chat.queue-edit",
+            payload: {
+              chatId: this.chatId,
+              mode,
+              index,
+              action,
+              ...(text ? { text } : {}),
+              steering: this.controls.steeringQueue,
+              followUp: this.controls.followUpQueue,
+            },
+          });
+        } catch (error) {
+          this.onError(messageOf(error));
+        }
         await this.refreshControls();
+      },
+      onReadDraftAttachments: (files) => Promise.all(files.map(readComposerAttachment)),
+      onStart: async (text, model, thinking, files) => {
+        this.submitting = true;
+        this.onChange();
+        try {
+          await this.command({
+            operation: "chat.model",
+            payload: { chatId: this.chatId, provider: model.provider, id: model.id },
+          });
+          await this.command({
+            operation: "chat.thinking",
+            payload: { chatId: this.chatId, level: thinking },
+          });
+          this.attachments = [...files];
+          return this.sendMessage(text, "followUp");
+        } catch (error) {
+          this.onError(messageOf(error));
+          return false;
+        } finally {
+          this.submitting = false;
+          this.onChange();
+        }
       },
       onStop: () => void this.stop(),
       onModel: (value) => void this.changeModel(value),
@@ -125,6 +171,8 @@ export class ChatComposerController {
       this.onError("Wait for Pi to finish before sending the attached page context.");
       return false;
     }
+    this.submitting = !wasRunning;
+    this.onChange();
     try {
       if (browserContext) await this.ensureBrowserContextAttached(browserContext);
       browserContext = this.browserContext;
@@ -142,7 +190,11 @@ export class ChatComposerController {
       if (!accepted) return false;
       this.attachments = [];
       this.editNotice = null;
-      if (browserContext && this.browserContext?.contextId === browserContext.contextId) {
+      if (
+        browserContext &&
+        document.body.dataset.host !== "panel" &&
+        this.browserContext?.contextId === browserContext.contextId
+      ) {
         this.browserContext = null;
         this.onBrowserContextConsumed(browserContext.contextId);
       }
@@ -151,6 +203,9 @@ export class ChatComposerController {
     } catch (error) {
       this.onError(messageOf(error));
       return false;
+    } finally {
+      this.submitting = false;
+      this.onChange();
     }
   }
 

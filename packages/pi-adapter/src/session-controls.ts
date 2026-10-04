@@ -19,7 +19,7 @@ export function createSessionControls(session: AgentSession): Controls {
   return {
     queue: async (input, mode) => {
       const decoded = decodePiInput(input);
-      if (decoded.browserContext)
+      if (decoded.browserContext || decoded.browserContexts?.length)
         throw new Error("Wait for Pi to finish before sending a message with page context.");
       const text = `${decoded.text}${decoded.attachmentText}`;
       if (mode === "steer") await session.steer(text, decoded.images);
@@ -74,13 +74,17 @@ export async function submitToPi(
 ): Promise<void> {
   const input = typeof candidate === "string" ? { text: candidate } : candidate;
   const decoded = decodePiInput(input);
-  if (decoded.browserContext) {
+  const browserContexts = [
+    ...(decoded.browserContext ? [decoded.browserContext] : []),
+    ...(decoded.browserContexts ?? []),
+  ];
+  if (browserContexts.length) {
     await session.sendCustomMessage(
       {
         customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE,
-        content: browserContextPrompt(decoded.browserContext),
+        content: browserContexts.map(browserContextPrompt).join("\n\n"),
         display: false,
-        details: { browserContext: decoded.browserContext },
+        details: { browserContext: browserContexts[0], browserContexts },
       },
       { deliverAs: "nextTurn" },
     );

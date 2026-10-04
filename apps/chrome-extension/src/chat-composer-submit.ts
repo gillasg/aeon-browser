@@ -1,3 +1,4 @@
+import { additionalPages, attachAdditionalPages } from "./additional-page-context.js";
 import {
   DaemonUiRequestSchema,
   type DaemonUiResponse,
@@ -19,6 +20,12 @@ interface SubmitComposerMessageInput {
 }
 
 export async function submitComposerMessage(input: SubmitComposerMessageInput): Promise<boolean> {
+  const pages = additionalPages(input.chatId).filter(
+    (page) => page.target.tabId !== input.browserContext?.target.tabId,
+  );
+  if (input.wasRunning && pages.length)
+    throw new Error("Wait for the current response before sending tab context.");
+  await attachAdditionalPages(input.client, input.chatId, pages);
   const request = createRequest(input);
   const after = input.client.send(DaemonUiRequestSchema.parse(request));
   const response = await input.client.waitFor(
@@ -42,6 +49,9 @@ export async function submitComposerMessage(input: SubmitComposerMessageInput): 
 function createRequest(input: SubmitComposerMessageInput) {
   const payload = {
     chatId: input.chatId,
+    browserContexts: additionalPages(input.chatId).filter(
+      (page) => page.target.tabId !== input.browserContext?.target.tabId,
+    ),
     text: input.text,
     ...(input.attachments.length ? { attachments: [...input.attachments] } : {}),
     ...(input.browserContext ? { browserContext: input.browserContext } : {}),

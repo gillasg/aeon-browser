@@ -1,3 +1,4 @@
+import { SidebarChatStatus } from "./sidebar-chat-status.js";
 import { SidebarSectionHeading } from "./sidebar-section-heading.js";
 import type { ReactElement } from "react";
 import { SidebarIcon } from "./sidebar-icons.js";
@@ -21,6 +22,7 @@ export function SidebarChatItem(props: SidebarChatItemProps): ReactElement {
       >
         <span>{props.chat.title}</span>
       </button>
+      <SidebarChatStatus chatId={props.chat.chatId} />
       <div className="sidebar-row-actions">
         {props.onPin && (
           <button

@@ -169,3 +169,45 @@
 .sidebar-section-toggle .sidebar-section-chevron {
   order: 1;
 }
+
+.sidebar-chat-status {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  color: #85858b;
+  pointer-events: none;
+}
+.sidebar-working-spinner {
+  width: 16px;
+  height: 16px;
+  animation: aeon-sidebar-spin 1.2s linear infinite;
+}
+.sidebar-completion-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #4299ff;
+}
+.sidebar-chat-item:has(.sidebar-chat-status) .sidebar-chat-row > span {
+  padding-right: 20px;
+}
+.sidebar-chat-item:hover .sidebar-chat-status,
+.sidebar-chat-item:focus-within .sidebar-chat-status,
+.sidebar-chat-item:has(:popover-open) .sidebar-chat-status {
+  opacity: 0;
+}
+@keyframes aeon-sidebar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-working-spinner {
+    animation-duration: 3s;
+  }
+}

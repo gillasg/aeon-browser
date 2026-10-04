@@ -197,13 +197,20 @@ async function handleContextCommand(
         if (!session.editQueue) throw new Error("Queue editing is unavailable in this session.");
         session.editQueue(request.payload);
       });
-      completeCommand(socket, request, { kind: "chat.queued", chatId: request.payload.chatId, mode: request.payload.mode });
+      completeCommand(socket, request, {
+        kind: "chat.queued",
+        chatId: request.payload.chatId,
+        mode: request.payload.mode,
+      });
       return;
     case "chat.queue":
       await service.queueInput(
         asChatId(request.payload.chatId),
         {
           text: request.payload.text,
+          ...(request.payload.browserContexts
+            ? { browserContexts: request.payload.browserContexts }
+            : {}),
           ...(request.payload.attachments ? { attachments: request.payload.attachments } : {}),
           ...(request.payload.browserContext
             ? { browserContext: request.payload.browserContext }

@@ -6,6 +6,7 @@ import {
   useState,
   type ReactElement,
 } from "react";
+import { PendingWork } from "./pending-work.js";
 import { AnnotationSelection } from "./annotation-selection.js";
 import type { TranscriptRow } from "./transcript-model.js";
 import { TranscriptTurn, transcriptTurns } from "./transcript-turn.js";
@@ -15,11 +16,15 @@ export function ChatTranscript({
   onEditEntry,
   onBranchEntry,
   actionsDisabled = false,
+  running = false,
+  starting = false,
 }: {
   rows: readonly TranscriptRow[];
   onEditEntry?: (entryId: string) => Promise<void> | void;
   onBranchEntry?: (entryId: string) => Promise<void> | void;
   actionsDisabled?: boolean;
+  running?: boolean;
+  starting?: boolean;
 }): ReactElement {
   const { root, awayFromLatest, atTop, updateScrollState, jumpToLatest } =
     useTranscriptScroll(rows);
@@ -47,6 +52,7 @@ export function ChatTranscript({
             }}
           />
         ))}
+        {(starting || running) && !latestWorkVisible(rows, starting) && <PendingWork />}
       </section>
       <AnnotationSelection root={root} />
       {awayFromLatest && <JumpToLatest onClick={jumpToLatest} />}
@@ -105,4 +111,15 @@ function useTranscriptScroll(rows: readonly TranscriptRow[]) {
   };
 
   return { root, awayFromLatest, atTop, updateScrollState, jumpToLatest };
+}
+
+function latestWorkVisible(rows: readonly TranscriptRow[], starting: boolean): boolean {
+  const latest = transcriptTurns(rows).at(-1) ?? [];
+  return latest.some(
+    (row) =>
+      (row.timing && (!starting || !row.timing.finished)) ||
+      (row.kind === "transient" && row.message.role === "assistant") ||
+      (row.kind === "tool-group" &&
+        (!starting || row.group.steps.some((step) => step.state === "running"))),
+  );
 }

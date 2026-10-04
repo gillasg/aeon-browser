@@ -1,6 +1,7 @@
+import { AttachmentPreview } from "./attachment-preview.js";
 import { useRef, useState, type ReactElement } from "react";
 import type { ComposerAttachment } from "./chat-composer.js";
-import { AttachmentButton } from "./attachment-button.js";
+import { ComposerAddMenu } from "./composer-add-menu.js";
 interface HomeAttachmentsState {
   attachments: ComposerAttachment[];
   error: string;
@@ -42,13 +43,15 @@ export function useHomeAttachments(
 }
 export function HomeAttachmentPicker({
   onFiles,
+  contextId,
 }: {
   onFiles(files: readonly File[]): void;
+  contextId?: string | undefined;
 }): ReactElement {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
-      <AttachmentButton onClick={() => input.current?.click()} />
+      <ComposerAddMenu contextId={contextId} onFiles={() => input.current?.click()} />
       <input
         ref={input}
         type="file"
@@ -71,16 +74,7 @@ export function HomeAttachmentList({
   return (
     <div className="home-attachments">
       {state.attachments.map((file, index) => (
-        <span className="attachment-chip" key={index}>
-          <span>{file.name}</span>
-          <button
-            type="button"
-            aria-label={"Remove " + file.name}
-            onClick={() => state.remove(index)}
-          >
-            ×
-          </button>
-        </span>
+        <AttachmentPreview file={file} key={index} onRemove={() => state.remove(index)} />
       ))}
       {state.error && <p role="alert">{state.error}</p>}
     </div>

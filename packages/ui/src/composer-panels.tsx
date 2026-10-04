@@ -1,3 +1,4 @@
+import { AttachmentPreview } from "./attachment-preview.js";
 import { type ReactElement } from "react";
 import type {
   ComposerAttachment,
@@ -30,15 +31,11 @@ export function ComposerPanels(props: ComposerPanelsProps): ReactElement {
         <PiContextUsageRing usage={props.contextUsage ?? null} />
         <PiToolsButton {...props} />
       </div>
-      <AttachmentList
-        attachments={props.attachments}
-        onRemoveAttachment={props.onRemoveAttachment}
-      />
     </>
   );
 }
 
-function AttachmentList({
+export function AttachmentList({
   attachments,
   onRemoveAttachment,
 }: Pick<ComposerPanelsProps, "attachments" | "onRemoveAttachment">): ReactElement | null {
@@ -46,16 +43,11 @@ function AttachmentList({
   return (
     <div className="attachment-list" aria-live="polite">
       {attachments.map((file, index) => (
-        <span key={`${file.name}:${index}`} className="attachment-chip">
-          <span>{file.name}</span>
-          <button
-            type="button"
-            aria-label={`Remove ${file.name}`}
-            onClick={() => onRemoveAttachment(index)}
-          >
-            ×
-          </button>
-        </span>
+        <AttachmentPreview
+          key={file.name + ":" + index}
+          file={file}
+          onRemove={() => onRemoveAttachment(index)}
+        />
       ))}
     </div>
   );

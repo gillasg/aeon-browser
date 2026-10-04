@@ -6,7 +6,7 @@ let status: "idle" | "working" = "idle";
 window.addEventListener(
   "pagehide",
   () => {
-    void chrome.storage.session.remove(key);
+    void chrome.storage.session.remove([key, "aeon-chat-working-" + activeChatId]);
   },
   { once: true },
 );
@@ -49,5 +49,5 @@ function applyState(state: ChatViewSnapshotDto["runState"], completed: boolean):
 function publish(next: typeof status): void {
   if (status === next) return;
   status = next;
-  void chrome.storage.session.set({ [key]: next });
+  void chrome.storage.session.set({ [key]: next, ["aeon-chat-working-" + activeChatId]: next });
 }

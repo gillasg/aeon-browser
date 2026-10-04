@@ -70,7 +70,9 @@
   --pippin-elev-1: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 1px 2px rgb(0 0 0 / 30%);
   --pippin-elev-2: 0 1px 0 rgb(255 255 255 / 5%) inset, 0 8px 24px rgb(0 0 0 / 35%);
   --pippin-elev-3: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 48px rgb(0 0 0 / 45%);
-  --pippin-focus-ring: 0 0 0 2px var(--pippin-bg-0), 0 0 0 4px color-mix(in srgb, var(--pippin-accent) 70%, transparent);
+  --pippin-focus-ring:
+    0 0 0 2px var(--pippin-bg-0),
+    0 0 0 4px color-mix(in srgb, var(--pippin-accent) 70%, transparent);
   /* Motion */
   --pippin-ease: cubic-bezier(0.2, 0, 0, 1);
   --pippin-dur-fast: 120ms;

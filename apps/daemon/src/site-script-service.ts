@@ -57,6 +57,30 @@ export class SiteScriptService {
     if (signal?.aborted) throw new Error("CANCELLED");
     const existing = command.scriptId ? this.store.get(command.scriptId) : undefined;
     if (command.action === "list" || command.action === "get") return this.query(command, existing);
+    if (command.action === "status") {
+      if (!existing || !command.target)
+        throw new Error("Provide scriptId and the attached target.");
+      this.validateTarget(chatId, existing.matches, command.target);
+      if (command.target.clientInstanceId !== existing.clientInstanceId)
+        throw new Error("Script belongs to a different Chrome instance.");
+      return JSON.parse(
+        await this.browser.execute(
+          chatId,
+          callId,
+          {
+            steps: [
+              {
+                op: "siteScript",
+                action: "status",
+                target: command.target,
+                scriptId: existing.scriptId,
+              },
+            ],
+          },
+          signal,
+        ),
+      );
+    }
     if (["preview", "save"].includes(command.action))
       return this.createAndApply(chatId, callId, command, signal);
     this.validateChange(chatId, command, existing);
@@ -182,11 +206,12 @@ export class SiteScriptService {
   ): SiteScriptRecord {
     const restored = command.action === "undo" ? script.history.at(-1) : undefined;
     if (command.action === "undo" && !restored) throw new Error("No earlier revision.");
+    const patch: Partial<SiteScriptCommand> = updatePatch(command);
     const value = restored ?? {
-      name: command.name ?? script.name,
-      matches: command.matches ?? script.matches,
-      code: command.code ?? script.code,
-      css: command.css ?? script.css,
+      name: patch.name ?? script.name,
+      matches: patch.matches ?? script.matches,
+      code: patch.code ?? script.code,
+      css: patch.css ?? script.css,
     };
     return {
       ...script,
@@ -263,4 +288,8 @@ export class SiteScriptService {
       enabled: script.enabled,
     };
   }
+}
+
+function updatePatch(command: SiteScriptCommand): Partial<SiteScriptCommand> {
+  return command.action === "update" ? command : {};
 }

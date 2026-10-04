@@ -1,123 +1,7 @@
-import { Type } from "typebox";
+import { browserParameters } from "./browser-tool-schema.js";
+import { browserFailure, browserErrorGuidance } from "./browser-recovery.js";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 
-const targetKey = Type.Object(
-  {
-    clientInstanceId: Type.String({ format: "uuid" }),
-    browserRunId: Type.String({ format: "uuid" }),
-    tabId: Type.Integer({ minimum: 0 }),
-    tabIncarnation: Type.String({ format: "uuid" }),
-  },
-  { additionalProperties: false },
-);
-
-const element = Type.Union([
-  Type.Object(
-    {
-      kind: Type.Literal("ref"),
-      snapshotId: Type.String({ format: "uuid" }),
-      ref: Type.String({ pattern: "^e[0-9]{1,4}$" }),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      kind: Type.Literal("locator"),
-      role: Type.String({ minLength: 1, maxLength: 80 }),
-      name: Type.String({ minLength: 1, maxLength: 256 }),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      kind: Type.Literal("point"),
-      screenshotId: Type.String({ format: "uuid" }),
-      x: Type.Number({ minimum: 0, maximum: 1 }),
-      y: Type.Number({ minimum: 0, maximum: 1 }),
-    },
-    { additionalProperties: false },
-  ),
-]);
-
-const semanticElement = Type.Union([
-  Type.Object(
-    {
-      kind: Type.Literal("ref"),
-      snapshotId: Type.String({ format: "uuid" }),
-      ref: Type.String({ pattern: "^e[0-9]{1,4}$" }),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      kind: Type.Literal("locator"),
-      role: Type.String({ minLength: 1, maxLength: 80 }),
-      name: Type.String({ minLength: 1, maxLength: 256 }),
-    },
-    { additionalProperties: false },
-  ),
-]);
-
-const step = Type.Union([
-  Type.Object(
-    { op: Type.Literal("listTabs"), query: Type.Optional(Type.String({ maxLength: 160 })) },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      op: Type.Literal("openTab"),
-      clientInstanceId: Type.String({ format: "uuid" }),
-      url: Type.String({ format: "uri", maxLength: 8192 }),
-      foreground: Type.Optional(Type.Boolean()),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    { op: Type.Literal("attachTab"), target: targetKey },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      op: Type.Literal("observe"),
-      target: targetKey,
-      kind: Type.Union([Type.Literal("semantic"), Type.Literal("screenshot")]),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    { op: Type.Literal("click"), target: targetKey, element },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      op: Type.Literal("fill"),
-      target: targetKey,
-      element: semanticElement,
-      value: Type.String({ maxLength: 20000 }),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      op: Type.Literal("scroll"),
-      target: targetKey,
-      element: Type.Optional(semanticElement),
-      direction: Type.Union([
-        Type.Literal("up"),
-        Type.Literal("down"),
-        Type.Literal("left"),
-        Type.Literal("right"),
-      ]),
-      amount: Type.Integer({ minimum: 40, maximum: 1200 }),
-    },
-    { additionalProperties: false },
-  ),
-]);
-
-const parameters = Type.Object(
-  { steps: Type.Array(step, { minItems: 1, maxItems: 8 }) },
-  { additionalProperties: false },
-);
 type BrowserInput =
   { steps: unknown[] } | { release: true; reset?: boolean } | { siteScript: unknown };
 export type BrowserToolRunner = (
@@ -139,22 +23,25 @@ export function createBrowserControlTool(
     promptSnippet:
       "When asked to inspect or control a browser page, use browser_control to perform the requested work and verify the result.",
     promptGuidelines: [
+      "When page context supplies an attached browser target, use that exact target immediately. Do not list tabs to rediscover it. List tabs only when no usable target is provided or the user requests another tab.",
       "Call browser_control for browser tasks; do not only describe intended actions or claim results without tool output.",
       "browser_control and browser_code are already available: do not search for them. Prefer browser_code for multi-action browser workflows and scrollToEnd for reaching the bottom. Scroll results report moved and atBoundary; never claim a boundary without verifying it.",
-      "List tabs before choosing one; attach the exact target before acting.",
+      "Only list tabs when no attached target is available. Copy target identifiers exactly, never reconstruct UUIDs; prefer browser_code with one page object to reuse its target.",
       "Click/fill already return a fresh observation; scroll returns position, movement and boundary feedback. Request another snapshot only when needed to locate content, and after STALE_REF. Never substitute a same-URL tab after TARGET_LOST.",
       "For a new user request to continue reversible work after TARGET_LOST, open a replacement tab only when its URL is known, then inspect it and locate the content again before continuing.",
       "If browser_control reports BROWSER_OFFLINE, stop browser work for this turn and report that the browser is disconnected.",
+      "Target inputs using their actual role (often combobox), label, placeholder or CSS; a search landmark is not an input. Use press(element,Enter) after fill for search submission. observe supports query, interactive and selector filters. When asked for another tab, open it rather than navigate the user’s current tab.",
+      browserErrorGuidance,
       "Never repeat a consequential action after uncertain delivery. Inspect the page first and ask the user when its outcome cannot be determined.",
     ],
-    parameters,
+    parameters: browserParameters,
     executionMode: "sequential",
     execute: async (toolCallId, input, signal) => {
       const output = run
         ? await run(chatId, toolCallId, input, signal)
         : JSON.stringify({ error: "BROWSER_OFFLINE" });
       const content = browserContent(output);
-      return { content, details: undefined };
+      return { content, isError: browserFailure(output), details: undefined };
     },
   });
 }
@@ -168,36 +55,36 @@ export function browserContent(
   } catch {
     return [{ type: "text", text: output }];
   }
-  const image = findAndStripScreenshot(parsed);
+  const images = new Map<string, { data: string; mimeType: string }>();
+  stripScreenshots(parsed, images);
   return [
     { type: "text", text: JSON.stringify(parsed) },
-    ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : []),
+    ...[...images.values()].slice(-3).map((image) => ({ type: "image" as const, ...image })),
   ];
 }
 
-function findAndStripScreenshot(value: unknown): { data: string; mimeType: string } | undefined {
+function stripScreenshots(
+  value: unknown,
+  images: Map<string, { data: string; mimeType: string }>,
+): void {
   if (Array.isArray(value)) {
-    for (const item of value) {
-      const result = findAndStripScreenshot(item);
-      if (result) return result;
-    }
-    return undefined;
+    for (const item of value) stripScreenshots(item, images);
+    return;
   }
-  if (!isRecord(value)) return undefined;
+  if (!isRecord(value)) return;
   if (
     value.kind === "screenshot" &&
     typeof value.dataBase64 === "string" &&
     typeof value.mimeType === "string"
   ) {
-    const result = { data: value.dataBase64, mimeType: value.mimeType };
+    images.set(String(value.screenshotId ?? images.size), {
+      data: value.dataBase64,
+      mimeType: value.mimeType,
+    });
     delete value.dataBase64;
-    return result;
+    return;
   }
-  for (const item of Object.values(value)) {
-    const result = findAndStripScreenshot(item);
-    if (result) return result;
-  }
-  return undefined;
+  for (const item of Object.values(value)) stripScreenshots(item, images);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

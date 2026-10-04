@@ -1330,7 +1330,8 @@ summary:focus-visible {
   border: 1px solid var(--pippin-line);
   border-radius: var(--pippin-r-lg);
   background: var(--pippin-canvas);
-  font: 14px/25px Consolas,
+  font:
+    14px/25px Consolas,
     "Cascadia Code",
     monospace;
 }
@@ -1602,8 +1603,7 @@ summary:focus-visible {
   min-height: 52px;
   align-items: center;
   gap: var(--pippin-s-3);
-  padding: var(--pippin-s-2) var(--pippin-s-2) var(--pippin-s-2)
-    var(--pippin-s-2);
+  padding: var(--pippin-s-2) var(--pippin-s-2) var(--pippin-s-2) var(--pippin-s-2);
   border: 1px solid var(--pippin-swatch-3b3b3b);
   border-radius: var(--pippin-r-xl);
   background: var(--pippin-swatch-2d2d2d);
@@ -2633,7 +2633,8 @@ body[data-host="panel"] .queue-view {
   gap: 8px;
   background: var(--pippin-surface-raised);
   border: 0;
-  font: 600 14px/20px Geist,
+  font:
+    600 14px/20px Geist,
     sans-serif;
 }
 .inline-edit-copy {
@@ -2646,7 +2647,8 @@ body[data-host="panel"] .queue-view {
   padding: 4px var(--pippin-s-3);
   border-bottom: 1px solid var(--pippin-line);
   color: var(--pippin-faint);
-  font: 10px/1.4 system-ui,
+  font:
+    10px/1.4 system-ui,
     sans-serif;
   border: 0;
   background: var(--pippin-surface);
@@ -3328,7 +3330,14 @@ body[data-host="panel"] .composer-meta {
 }
 
 /* Provider headers stick within the scrollable model list, pushing each other out. */
-.pi-picker-group h3 { position: sticky; top: 0; z-index: 2; padding: 7px 9px; margin: 0; background: var(--surface); }
+.pi-picker-group h3 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 7px 9px;
+  margin: 0;
+  background: var(--surface);
+}
 .pi-picker-option-label {
   grid-column: 1;
   grid-row: 1;
@@ -3346,38 +3355,180 @@ body[data-host="panel"] .composer-meta {
   mask-repeat: no-repeat;
   mask-position: center;
 }
-.sidebar-row-actions button[aria-pressed="true"] { color: var(--text); }
-.composer-queue-list { display: grid; gap: 4px; margin: 0 0 8px; }
-.composer-queue-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--pippin-r-md); background: var(--surface); color: var(--text); }
-.composer-queue-copy { display: flex; gap: 8px; min-width: 0; flex: 1; }
-.composer-queue-copy > span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.composer-queue-mode { font-size: 12px; color: var(--muted); flex: none; }
-.annotation-editor { position: fixed; z-index: 120; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 294px; padding: 8px; border: 1px solid var(--line); border-radius: var(--pippin-r-md); background: var(--surface); color: var(--text); }
-.annotation-editor button { border: 0; border-radius: var(--pippin-r-sm); padding: 6px 8px; color: inherit; background: var(--surface-raised); font: inherit; cursor: pointer; }
-.annotation-editor textarea { width: 100%; resize: vertical; min-height: 42px; border: 0; background: transparent; color: inherit; font: inherit; }
-.annotation-label { color: var(--muted); font-size: 12px; }
-.annotation-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.annotation-attachment { display: flex; align-items: start; gap: 8px; max-width: 320px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--pippin-r-md); background: var(--surface); }
-.annotation-attachment > span { display: grid; gap: 4px; min-width: 0; }
-.annotation-attachment strong { font-size: 12px; color: var(--muted); font-weight: 400; }
-.annotation-attachment q { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.annotation-attachment button { background: transparent; color: var(--muted); border: 0; font: inherit; cursor: pointer; }
+.sidebar-row-actions button[aria-pressed="true"] {
+  color: var(--text);
+}
+.composer-queue-list {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+.composer-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--pippin-r-md);
+  background: var(--surface);
+  color: var(--text);
+}
+.composer-queue-copy {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.composer-queue-copy > span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.composer-queue-mode {
+  font-size: 12px;
+  color: var(--muted);
+  flex: none;
+}
+.annotation-editor {
+  position: fixed;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 294px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--pippin-r-md);
+  background: var(--surface);
+  color: var(--text);
+}
+.annotation-editor button {
+  border: 0;
+  border-radius: var(--pippin-r-sm);
+  padding: 6px 8px;
+  color: inherit;
+  background: var(--surface-raised);
+  font: inherit;
+  cursor: pointer;
+}
+.annotation-editor textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.annotation-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.annotation-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.annotation-attachment {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  max-width: 320px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--pippin-r-md);
+  background: var(--surface);
+}
+.annotation-attachment > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.annotation-attachment strong {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.annotation-attachment q {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.annotation-attachment button {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
 
-::highlight(pippin-annotations) { background: #ffffff24; color: inherit; }
+::highlight(pippin-annotations) {
+  background: #ffffff24;
+  color: inherit;
+}
 
-::highlight(pippin-selection) { background: #ffffff38; color: inherit; }
+::highlight(pippin-selection) {
+  background: #ffffff38;
+  color: inherit;
+}
 
-.annotation-attachment textarea { width: 100%; min-height: 44px; background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--pippin-r-sm); font: inherit; }
-.annotation-attachment button:hover { color: var(--text); }
+.annotation-attachment textarea {
+  width: 100%;
+  min-height: 44px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--pippin-r-sm);
+  font: inherit;
+}
+.annotation-attachment button:hover {
+  color: var(--text);
+}
 
-.sent-annotations { display: grid; gap: 10px; margin-top: 8px; }
-.sent-annotations small { color: var(--muted); font-size: 12px; }
-.sent-annotations blockquote { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--muted); white-space: pre-wrap; }
-.sent-annotations p { margin: 4px 0; white-space: pre-wrap; }
+.sent-annotations {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.sent-annotations small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.sent-annotations blockquote {
+  margin: 4px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--muted);
+  white-space: pre-wrap;
+}
+.sent-annotations p {
+  margin: 4px 0;
+  white-space: pre-wrap;
+}
 
-.sidebar-chat-menu button { display: flex; align-items: center; gap: 9px; width: 100%; height: 34px; padding: 6px 8px; border: 0; border-radius: var(--pippin-r-sm); background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
-.sidebar-chat-menu button:hover { background: var(--surface-raised); }
-.sidebar-row-actions:has(:popover-open) { opacity: 1; pointer-events: auto; }
+.sidebar-chat-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--pippin-r-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sidebar-chat-menu button:hover {
+  background: var(--surface-raised);
+}
+.sidebar-row-actions:has(:popover-open) {
+  opacity: 1;
+  pointer-events: auto;
+}
 .sidebar-chat-menu {
   position: fixed;
   inset: auto;
@@ -3390,11 +3541,21 @@ body[data-host="panel"] .composer-meta {
   color: var(--text);
   pointer-events: auto;
 }
-.activity-operation-body { margin: 8px 0 16px 28px; }
-.activity-operation-body > .activity-operation-detail, .activity-operation-body > .activity-result-note { margin-left: 0; }
-.activity-operation-body .activity-raw-details { position: static; opacity: 1; pointer-events: auto; margin-top: 12px; }
+.activity-operation-body {
+  margin: 8px 0 16px 28px;
+}
+.activity-operation-body > .activity-operation-detail,
+.activity-operation-body > .activity-result-note {
+  margin-left: 0;
+}
+.activity-operation-body .activity-raw-details {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  margin-top: 12px;
+}
 
-.composer-context-slot .browser-context-chip {
+.browser-context-chip {
   display: flex;
   align-items: center;
   gap: 6px;

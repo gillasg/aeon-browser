@@ -37,10 +37,11 @@ export function ChatActivityGroup({
   const active = latestRunningStep(group);
   const now = useActivityClock(Boolean(active));
   useLayoutEffect(() => {
+    if (!active && !streaming && activityDetails.current) activityDetails.current.open = false;
     if (!initialized.current && active && activityDetails.current)
       activityDetails.current.open = true;
     initialized.current = true;
-  }, [Boolean(active)]);
+  }, [Boolean(active), streaming]);
 
   if (!group.steps.length) return null;
   const action = latestAction(group, active);

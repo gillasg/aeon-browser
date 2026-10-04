@@ -39,7 +39,6 @@ import {
   type ChatEventSubscription,
   type PublishedChatEvent,
 } from "./chat-event-hub.js";
-
 export class ChatService {
   private readonly store: ChatStore & ThreadCoordinationStore;
   private readonly pi: PiSessionPort;
@@ -89,6 +88,15 @@ export class ChatService {
       this.observeSession(chatId, session);
       return operation(session, activeChat);
     });
+  }
+  async readToolImage(
+    chatId: ChatId,
+    toolCallId: string,
+    index: number,
+  ): Promise<{ mimeType: string; bytes: Uint8Array }> {
+    const { session } = await this.resolveSession(this.requireChat(chatId));
+    if (!session.readToolImage) throw new Error("Image retrieval is unavailable");
+    return session.readToolImage(toolCallId, index);
   }
   forkFromEntry(
     input: Parameters<ChatThreadSupport["forkFromEntry"]>[0],
@@ -181,7 +189,6 @@ export class ChatService {
       return this.recordMaterializedSession(chatId, session) ?? chat;
     });
   }
-
   async getControls(chatId: ChatId): Promise<PiSessionControlState | null> {
     const chat = this.requireChat(chatId);
     if (chat.status === "failed") return null;
@@ -189,19 +196,16 @@ export class ChatService {
     this.observeSession(chatId, session);
     return session.controls();
   }
-
   async setModel(chatId: ChatId, provider: string, id: string): Promise<void> {
     const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
     await session.setModel(provider, id);
   }
-
   async setThinkingLevel(chatId: ChatId, level: string): Promise<void> {
     const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
     session.setThinkingLevel(level);
   }
-
   async queueInput(
     chatId: ChatId,
     input: PiSessionInput,
@@ -213,13 +217,11 @@ export class ChatService {
       throw new Error("Queue input is only available while Pi is running.");
     await session.queue(input, mode);
   }
-
   async stop(chatId: ChatId): Promise<void> {
     const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
     await session.abort();
   }
-
   private async resolveSession(chat: ChatRecord): Promise<{
     activeChat: ChatRecord;
     session: PiSessionHandle;
@@ -228,20 +230,17 @@ export class ChatService {
     if (activeChat.status === "unavailable") {
       throw new PiSessionUnavailableError("This Chat's Pi session needs manual recovery.");
     }
-
     const activationId = activationIdFor(activeChat);
     const session = await this.openSession(activeChat, activationId);
     activeChat = this.persistSessionReference(activeChat, activationId, session);
     return { activeChat, session };
   }
-
   private beginOrResumeActivation(chat: ChatRecord): ChatRecord {
     if (chat.status === "draft" || chat.status === "creating" || chat.status === "failed") {
       return this.store.beginActivation(chat.chatId, asActivationId(randomUUID()));
     }
     return chat;
   }
-
   private async openSession(
     chat: ChatRecord,
     activationId: ActivationId,
@@ -259,7 +258,6 @@ export class ChatService {
       throw error;
     }
   }
-
   private recordOpenFailure(chat: ChatRecord, activationId: ActivationId, error: unknown): void {
     if (error instanceof PiSessionUnavailableError && chat.piReference) {
       this.store.markPiUnavailable(chat.chatId, chat.piReference.sessionId);
@@ -267,7 +265,6 @@ export class ChatService {
       this.store.markActivationFailed(chat.chatId, activationId);
     }
   }
-
   private persistSessionReference(
     chat: ChatRecord,
     activationId: ActivationId,
@@ -290,7 +287,6 @@ export class ChatService {
     }
     return chat;
   }
-
   private recordMaterializedSession(
     chatId: ChatId,
     session: PiSessionHandle,
@@ -298,7 +294,6 @@ export class ChatService {
     const { materialized, reference } = session.snapshot();
     return materialized ? this.store.markPiMaterialized(chatId, reference.sessionId) : undefined;
   }
-
   private observeSession(chatId: ChatId, session: PiSessionHandle): void {
     const current = this.observedSessions.get(chatId);
     if (current?.session === session) return;
@@ -308,7 +303,6 @@ export class ChatService {
     });
     this.observedSessions.set(chatId, { session, unsubscribe });
   }
-
   private requireChat(chatId: ChatId): ChatRecord {
     const chat = this.store.getChat(chatId);
     if (!chat) throw new Error(`Chat ${chatId} does not exist.`);

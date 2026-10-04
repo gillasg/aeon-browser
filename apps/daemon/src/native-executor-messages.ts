@@ -32,8 +32,7 @@ export function attachNativeExecutor(
     if (handleExecutorHeartbeat(candidate, socket, executor)) return;
     if (handleInventory(socket, candidate, executor, inventories, state, browserControl)) return;
     if (browserControl.handleExecutorResult(candidate, socket)) return;
-    if (!state.inventoryReady)
-      return socket.close(1008, "Full browser inventory is required first");
+    // Page grants authenticate the UI independently of browser inventory.
     const request = PageGrantIssueRequestSchema.safeParse(candidate);
     if (!request.success) return socket.close(1008, "Unsupported executor message");
     void issuePageGrant(socket, request.data, executor, service, endpoint, grants);
@@ -101,6 +100,7 @@ function applyFullInventory(
       executor.clientInstanceId,
       socket,
       inventory.capabilities?.includes("site-scripts"),
+      inventory.capabilities?.includes("browser-actions-v2"),
     );
     socket.send(
       JSON.stringify(

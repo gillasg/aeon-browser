@@ -1,24 +1,22 @@
+import { captureViewport } from "./native-browser-screenshot.js";
 import {
   BrowserExecutorResultSchema,
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
   type BrowserTargetKey,
-  type BrowserSemanticNode,
 } from "@pippin/protocol";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import {
-  booleanProperty,
   sameTarget,
   targetIdentity,
-  textValue,
-  type AxNode,
   type AxRef,
   type ScreenshotRef,
 } from "./native-browser-common.js";
 import { getAxTree, withDebugger } from "./native-browser-debugger.js";
 
-const REF_LIMIT = 180;
-const SCREENSHOT_MAX_AGE_MS = 5000;
+import { createSemanticNodes } from "./native-browser-semantic.js";
+import { scopedBackendIds } from "./native-browser-dom.js";
+const SCREENSHOT_MAX_AGE_MS = 60_000;
 const refs = new Map<string, Map<string, AxRef>>();
 const latestSnapshots = new Map<string, string>();
 const screenshots = new Map<string, ScreenshotRef>();
@@ -40,8 +38,22 @@ export async function observeSemantic(
     return getAxTree(debuggee);
   });
   const snapshotId = crypto.randomUUID();
-  const semantic = createSemanticNodes(nodes);
+  const options =
+    request.step.op === "observe"
+      ? request.step
+      : { query: undefined, interactive: undefined, selector: undefined };
+  const scopedIds = options.selector
+    ? await withDebugger(target.tabId, (debuggee) =>
+        scopedBackendIds(debuggee, options.selector ?? ""),
+      )
+    : undefined;
+  const scoped = scopedIds
+    ? nodes.filter((node) => scopedIds.has(node.backendDOMNodeId ?? -1))
+    : nodes;
+  await revalidateTarget(request, target.tabId);
+  const semantic = createSemanticNodes(scoped, options);
   const key = targetIdentity(target);
+  for (const ref of semantic.refs.values()) ref.documentEpoch = current.documentEpoch;
   refs.set(snapshotId, semantic.refs);
   latestSnapshots.set(key, snapshotId);
   trimOldRefs(snapshotId);
@@ -54,7 +66,7 @@ export async function observeSemantic(
     snapshotId,
     url: tab.url ?? current.url,
     nodes: semantic.nodes,
-    truncated: nodes.length > semantic.nodes.length,
+    truncated: semantic.truncated,
   });
 }
 
@@ -68,35 +80,9 @@ function targetForRequest(request: BrowserExecutorRequest): BrowserTargetKey {
   return request.step.target;
 }
 
-function createSemanticNodes(nodes: AxNode[]): {
-  refs: Map<string, AxRef>;
-  nodes: BrowserSemanticNode[];
-} {
-  const map = new Map<string, AxRef>();
-  const compact: BrowserSemanticNode[] = [];
-  for (const node of nodes) {
-    if (compact.length >= REF_LIMIT) break;
-    const backendNodeId = node.backendDOMNodeId;
-    const role = textValue(node.role?.value);
-    if (node.ignored || backendNodeId === undefined || !role) continue;
-    const name = textValue(node.name?.value).slice(0, 512);
-    const ref = `e${compact.length}`;
-    map.set(ref, { backendNodeId, role, name });
-    compact.push({
-      ref,
-      role: role.slice(0, 80),
-      name,
-      ...(node.value ? { value: textValue(node.value.value).slice(0, 512) } : {}),
-      ...booleanProperty(node, "disabled"),
-      ...booleanProperty(node, "checked"),
-      ...booleanProperty(node, "focused"),
-    });
-  }
-  return { refs: map, nodes: compact };
-}
-
 function trimOldRefs(snapshotId: string): void {
   for (const prior of refs.keys()) if (prior !== snapshotId && refs.size > 8) refs.delete(prior);
+  for (const [key, id] of latestSnapshots) if (!refs.has(id)) latestSnapshots.delete(key);
 }
 
 export async function captureScreenshot(
@@ -107,27 +93,20 @@ export async function captureScreenshot(
   const target = targetForRequest(request);
   const result = await withDebugger(target.tabId, async (debuggee) => {
     await revalidateTarget(request, target.tabId);
-    const metrics = (await chrome.debugger.sendCommand(debuggee, "Page.getLayoutMetrics")) as {
-      cssVisualViewport?: { clientWidth?: number; clientHeight?: number };
-    };
-    await chrome.debugger.sendCommand(debuggee, "Page.enable");
-    const capture = (await chrome.debugger.sendCommand(debuggee, "Page.captureScreenshot", {
-      format: "jpeg",
-      quality: 60,
-      captureBeyondViewport: false,
-    })) as { data?: string };
-    const width = Math.floor(metrics.cssVisualViewport?.clientWidth ?? 0);
-    const height = Math.floor(metrics.cssVisualViewport?.clientHeight ?? 0);
-    if (!capture.data || width < 1 || height < 1 || capture.data.length > 1_500_000)
-      throw new Error("UNSUPPORTED");
+    const capture = await captureViewport(debuggee);
+    await revalidateTarget(request, target.tabId);
     const screenshotId = crypto.randomUUID();
     const capturedAt = Date.now();
     screenshots.set(screenshotId, {
       target,
       epoch: request.expectedDocumentEpoch ?? -1,
-      viewport: { width, height },
+      viewport: capture.viewport,
       capturedAt,
+      fingerprint: capture.fingerprint,
+      scrollX: capture.scrollX,
+      scrollY: capture.scrollY,
     });
+    while (screenshots.size > 8) screenshots.delete(screenshots.keys().next().value ?? "");
     return {
       kind: "screenshot" as const,
       source: "website" as const,
@@ -136,10 +115,10 @@ export async function captureScreenshot(
       documentEpoch: request.expectedDocumentEpoch ?? -1,
       screenshotId,
       url: tab.url ?? "",
-      viewport: { width, height },
+      viewport: capture.viewport,
       capturedAt,
       mimeType: "image/jpeg" as const,
-      dataBase64: capture.data,
+      dataBase64: capture.dataBase64,
     };
   });
   return BrowserExecutorResultSchema.parse(result);

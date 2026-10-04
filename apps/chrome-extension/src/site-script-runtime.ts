@@ -1,5 +1,7 @@
+import { previewSiteScript, removeScriptPreview } from "./site-script-preview.js";
 import { BrowserScriptsSyncSchema, type SiteScriptDefinition } from "@pippin/protocol";
 import { siteScriptSource, siteScriptCleanup } from "./site-script-source.js";
+import { inspectSiteScript } from "./site-script-status.js";
 import { SCRIPT_KEY, readScripts } from "./site-script-records.js";
 const PENDING_KEY = "aeon-site-script-access";
 const PREFIX = "aeon-site-";
@@ -43,23 +45,26 @@ export async function executeSiteScript(
     await assertActive();
     if (action === "remove") {
       if (!scriptId) throw new Error("INVALID_TARGET");
+      await removeScriptPreview(tabId, scriptId);
       await unregister(scriptId);
       return { removed: true, reloadToResetUntrackedChanges: true };
     }
-    if (action === "status")
-      return chrome.storage.local.get([SCRIPT_KEY, "aeon-site-script-errors"]);
+    if (action === "status") return inspectSiteScript(tabId, scriptId);
     if (!definition) throw new Error("INVALID_TARGET");
+    if (action === "preview") return previewSiteScript(tabId, definition, assertActive);
     const setup = await checkAccess(definition);
     if (setup) return setup;
+    await removeScriptPreview(tabId, definition.scriptId);
     await validateScriptTab(tabId, definition);
     await assertActive();
-    if (action === "install") await register(definition);
+    if (action === "install") {
+      await register(definition);
+      await rememberScript(definition);
+    }
     await configure(definition.scriptId);
     await assertActive();
     const results = await boundedScriptExecution(tabId, definition);
-    const first = results[0];
-    if (first?.error) return { applied: false, error: String(first.error).slice(0, 1000) };
-    return { installed: action === "install", result: first?.result ?? null };
+    return executionResult(results);
   });
 }
 function serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -78,7 +83,8 @@ async function configure(id: string): Promise<void> {
   });
 }
 async function register(script: SiteScriptDefinition): Promise<void> {
-  if (await checkAccess(script)) return;
+  const setup = await checkAccess(script);
+  if (setup) throw new Error(JSON.stringify(setup));
   await configure(script.scriptId);
   const value: chrome.userScripts.RegisteredUserScript = {
     id: PREFIX + script.scriptId,
@@ -113,7 +119,9 @@ async function checkAccess(script: SiteScriptDefinition): Promise<unknown | unde
     siteAccess,
     userScripts,
     setupUrl: chrome.runtime.getURL("site-scripts.html"),
-    message: "Allow site access and enable Allow User Scripts, then retry.",
+    message: siteAccess
+      ? "Enable Allow User Scripts in extension details, then retry."
+      : "In extension details, set Site access to On all sites and enable Allow User Scripts, then retry.",
   };
 }
 async function unregister(id: string): Promise<void> {
@@ -172,6 +180,8 @@ chrome.permissions.onRemoved.addListener(
 chrome.permissions.onAdded.addListener(
   () => void restoreScripts().catch((error) => recordError("restore", String(error))),
 );
+void restoreScripts().catch((error) => recordError("restore", String(error)));
+
 async function restoreScripts(): Promise<void> {
   const stored = await chrome.storage.local.get(SCRIPT_KEY);
   handleScriptSync({ kind: "browser.scripts.sync", scripts: readScripts(stored[SCRIPT_KEY]) });
@@ -219,4 +229,21 @@ async function boundedScriptExecution(
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+function executionResult(results: chrome.userScripts.InjectionResult[]): unknown {
+  const first = results[0];
+  if (!first)
+    return { installed: true, applied: false, error: "No execution result from the target page." };
+  if (first.error)
+    return { installed: true, applied: false, error: String(first.error).slice(0, 1000) };
+  return { installed: true, result: first.result ?? null };
+}
+
+async function rememberScript(script: SiteScriptDefinition): Promise<void> {
+  const stored = await chrome.storage.local.get(SCRIPT_KEY);
+  const scripts = readScripts(stored[SCRIPT_KEY]).filter(
+    (item) => item.scriptId !== script.scriptId,
+  );
+  await chrome.storage.local.set({ [SCRIPT_KEY]: [...scripts, script] });
 }

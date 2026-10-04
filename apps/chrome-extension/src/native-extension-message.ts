@@ -117,6 +117,14 @@ export const NativeOpenChatResponseSchema = z.discriminatedUnion("ok", [
 ]);
 
 export const NativeExtensionRequestSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("pippin.native.current-page") }).strict(),
+  z.object({ kind: z.literal("pippin.native.list-context-tabs") }).strict(),
+  z
+    .object({
+      kind: z.literal("pippin.native.capture-page"),
+      tabId: z.number().int().nonnegative(),
+    })
+    .strict(),
   NativePageGrantRequestSchema,
   NativeOpenChatRequestSchema,
   NativeTakeInitialSubmitRequestSchema,

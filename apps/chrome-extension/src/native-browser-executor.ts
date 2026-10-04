@@ -1,3 +1,4 @@
+import { browserErrorDetail } from "./native-browser-errors.js";
 import { handleScriptSync } from "./site-script-runtime.js";
 import { performExtra } from "./native-browser-extra.js";
 import { navigateReady } from "./native-browser-navigation.js";
@@ -51,7 +52,8 @@ export function handleBrowserExecutorMessage(
     : executeStep(identity, request.data);
   void work.then(
     (result) => sendResult(socket, request.data, result),
-    (error: unknown) => sendFailure(socket, request.data, errorCode(error)),
+    (error: unknown) =>
+      sendFailure(socket, request.data, errorCode(error), browserErrorDetail(error)),
   );
   return true;
 }
@@ -213,9 +215,11 @@ function isExtraStep(
   step: BrowserStep,
 ): step is Extract<
   BrowserStep,
-  { op: "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
+  { op: "press" | "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
 > {
-  return ["read", "wait", "navigate", "diagnostics", "siteScript", "popups"].includes(step.op);
+  return ["press", "read", "wait", "navigate", "diagnostics", "siteScript", "popups"].includes(
+    step.op,
+  );
 }
 
 function sendResult(
@@ -238,12 +242,23 @@ function sendResult(
   );
 }
 
-function sendFailure(socket: WebSocket, request: BrowserExecutorRequest, code: string): void {
+function sendFailure(
+  socket: WebSocket,
+  request: BrowserExecutorRequest,
+  code: string,
+  detail?: string,
+): void {
   completeBrowserRequest(request);
   if (socket.readyState !== WebSocket.OPEN) return;
   const safe = [
     "TARGET_LOST",
     "AMBIGUOUS_TARGET",
+    "TARGET_NOT_FOUND",
+    "TARGET_HIDDEN",
+    "TARGET_DISABLED",
+    "TARGET_BLOCKED",
+    "NOT_EDITABLE",
+    "INPUT_FAILED",
     "STALE_REF",
     "CLAIM_CONFLICT",
     "UNSUPPORTED",
@@ -263,6 +278,7 @@ function sendFailure(socket: WebSocket, request: BrowserExecutorRequest, code: s
         operationId: request.operationId,
         ok: false,
         code: safe,
+        ...(detail ? { detail } : {}),
       }),
     ),
   );

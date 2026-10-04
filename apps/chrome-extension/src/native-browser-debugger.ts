@@ -1,5 +1,7 @@
+import { BrowserActionError } from "./native-browser-errors.js";
 import type { BrowserElementTarget, BrowserTargetKey } from "@pippin/protocol";
 import { targetIdentity, textValue, type AxNode, type AxRef } from "./native-browser-common.js";
+import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom.js";
 export { withBrowserDebugger as withDebugger } from "./native-browser-session.js";
 
 export async function resolveElement(
@@ -8,6 +10,7 @@ export async function resolveElement(
   target: BrowserTargetKey,
   refs: Map<string, Map<string, AxRef>>,
   latestSnapshots: Map<string, string>,
+  documentEpoch?: number,
 ): Promise<AxRef> {
   const nodes = await getAxTree(debuggee);
   if (!element) throw new Error("INVALID_TARGET");
@@ -16,11 +19,43 @@ export async function resolveElement(
     if (latestSnapshots.get(key) !== element.snapshotId) throw new Error("STALE_REF");
     const prior = refs.get(element.snapshotId)?.get(element.ref);
     const live = nodes.find((node) => node.backendDOMNodeId === prior?.backendNodeId);
+    if (documentEpoch !== undefined && prior?.documentEpoch !== documentEpoch)
+      throw new Error("STALE_REF");
     if (!prior || !sameSemanticNode(live, prior)) throw new Error("STALE_REF");
     return prior;
   }
   if (element.kind === "point") throw new Error("STALE_REF");
-  return findUniqueLocator(nodes, element.role, element.name);
+  if (element.kind === "query") return resolveQuery(debuggee, nodes, element);
+  return resolveRole(debuggee, nodes, element);
+}
+
+async function resolveRole(
+  debuggee: chrome.debugger.Debuggee,
+  nodes: AxNode[],
+  element: Extract<BrowserElementTarget, { kind: "locator" }>,
+): Promise<AxRef> {
+  const scoped = element.scope ? await scopedBackendIds(debuggee, element.scope) : undefined;
+  const eligible = scoped ? nodes.filter((node) => scoped.has(node.backendDOMNodeId ?? -1)) : nodes;
+  const matches = locatorMatches(eligible, element.role, element.name, element.exact);
+  if (!matches.length)
+    throw new BrowserActionError(
+      "TARGET_NOT_FOUND",
+      `No ${element.role} named ${JSON.stringify(element.name)}. Nearby named controls: ${eligible
+        .filter((node) => !node.ignored && textValue(node.name?.value))
+        .slice(0, 12)
+        .map(
+          (node) => `${textValue(node.role?.value)}: ${textValue(node.name?.value).slice(0, 100)}`,
+        )
+        .join("; ")}. Use snapshot({query}) or a CSS/label locator.`,
+    );
+  const visible = await visibleNodes(
+    debuggee,
+    matches.map((node) => node.backendDOMNodeId ?? -1),
+  );
+  return uniqueNode(
+    matches.filter((node) => visible.includes(node.backendDOMNodeId ?? -1)),
+    "TARGET_HIDDEN",
+  );
 }
 
 function sameSemanticNode(live: AxNode | undefined, prior: AxRef | undefined): boolean {
@@ -32,18 +67,50 @@ function sameSemanticNode(live: AxNode | undefined, prior: AxRef | undefined): b
   );
 }
 
-function findUniqueLocator(nodes: AxNode[], role: string, name: string): AxRef {
-  const matches = nodes.filter(
+function locatorMatches(nodes: AxNode[], role: string, name: string, exact = true): AxNode[] {
+  const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
+  return nodes.filter(
     (node) =>
       !node.ignored &&
       node.backendDOMNodeId !== undefined &&
       textValue(node.role?.value).toLowerCase() === role.toLowerCase() &&
-      textValue(node.name?.value) === name,
+      (exact
+        ? normalize(textValue(node.name?.value)) === normalize(name)
+        : normalize(textValue(node.name?.value))
+            .toLowerCase()
+            .includes(normalize(name).toLowerCase())),
   );
-  if (matches.length > 1) throw new Error("AMBIGUOUS_TARGET");
-  const match = matches[0];
-  if (!match || match.backendDOMNodeId === undefined) throw new Error("STALE_REF");
-  return { backendNodeId: match.backendDOMNodeId, role, name };
+}
+function uniqueNode(nodes: AxNode[], missing: string): AxRef {
+  if (nodes.length > 1)
+    throw new BrowserActionError(
+      "AMBIGUOUS_TARGET",
+      "Multiple visible elements match. Narrow the name or scope to one container; no element was clicked.",
+    );
+  const node = nodes[0];
+  if (!node || node.backendDOMNodeId === undefined) throw new Error(missing);
+  return {
+    backendNodeId: node.backendDOMNodeId,
+    role: textValue(node.role?.value),
+    name: textValue(node.name?.value),
+  };
+}
+async function resolveQuery(
+  debuggee: chrome.debugger.Debuggee,
+  nodes: AxNode[],
+  query: Extract<BrowserElementTarget, { kind: "query" }>,
+): Promise<AxRef> {
+  const ids = await queryNodes(debuggee, query);
+  const visible = await visibleNodes(debuggee, ids);
+  if (visible.length > 1) throw new Error("AMBIGUOUS_TARGET");
+  const id = visible[0];
+  if (id === undefined) throw new Error(ids.length ? "TARGET_HIDDEN" : "TARGET_NOT_FOUND");
+  const node = nodes.find((node) => node.backendDOMNodeId === id);
+  return {
+    backendNodeId: id,
+    role: textValue(node?.role?.value),
+    name: textValue(node?.name?.value),
+  };
 }
 
 export async function getAxTree(debuggee: chrome.debugger.Debuggee): Promise<AxNode[]> {
@@ -79,6 +146,7 @@ export async function getCenter(
   debuggee: chrome.debugger.Debuggee,
   backendNodeId: number,
 ): Promise<{ x: number; y: number }> {
+  await chrome.debugger.sendCommand(debuggee, "DOM.scrollIntoViewIfNeeded", { backendNodeId });
   const result = (await chrome.debugger.sendCommand(debuggee, "DOM.getBoxModel", {
     backendNodeId,
   })) as { model?: { content?: number[] } };
@@ -121,36 +189,6 @@ export async function clickAt(
     button: "left",
     clickCount: 1,
   });
-}
-
-export async function fillAt(
-  debuggee: chrome.debugger.Debuggee,
-  x: number,
-  y: number,
-  value: string,
-): Promise<void> {
-  await clickAt(debuggee, x, y);
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyDown",
-    key: "Control",
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyDown",
-    key: "a",
-    code: "KeyA",
-    modifiers: 2,
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyUp",
-    key: "a",
-    code: "KeyA",
-    modifiers: 2,
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyUp",
-    key: "Control",
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text: value });
 }
 
 export async function scrollAt(

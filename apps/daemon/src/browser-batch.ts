@@ -11,7 +11,7 @@ export async function executeBrowserBatch(
     id: string,
     step: BrowserStep,
     timeout: number,
-  ) => Promise<{ result?: BrowserExecutorResult; code?: string }>,
+  ) => Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }>,
   signal?: AbortSignal,
 ): Promise<string> {
   const parsed = BrowserOperationCallSchema.safeParse(raw);
@@ -32,7 +32,12 @@ export async function executeBrowserBatch(
     steps.push(
       outcome.result
         ? { index, disposition: "completed", result: outcome.result }
-        : { index, disposition: "failed", code: outcome.code ?? "OPERATION_FAILED" },
+        : {
+            index,
+            disposition: "failed",
+            code: outcome.code ?? "OPERATION_FAILED",
+            detail: outcome.detail,
+          },
     );
     if (!outcome.result) {
       for (let next = index + 1; next < parsed.data.steps.length; next++)

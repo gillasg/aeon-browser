@@ -1,3 +1,4 @@
+import { stagePanelPrompt } from "./panel-prompt-handoff.js";
 import { saveInitialDisplay } from "./initial-chat-display.js";
 import "./status-favicon.js";
 import { PageReconnect } from "./page-reconnect.js";
@@ -96,6 +97,9 @@ const reconnect = new PageReconnect(start, (message) => {
   showError(message);
 });
 void reconnect.start();
+window.addEventListener("focus", () => {
+  if (client?.socket.readyState === WebSocket.OPEN) void refreshHome();
+});
 window.addEventListener("pagehide", () => client?.close(), { once: true });
 
 async function start(): Promise<void> {
@@ -151,10 +155,7 @@ async function askPippin(
       throw new Error("Unexpected Chat creation response.");
     const chatId = created.result.chat.chatId;
     saveInitialDisplay(chatId, { text, model, thinkingLevel });
-    if (
-      __PIPPIN_NATIVE_TRANSPORT__ &&
-      new URL(location.href).searchParams.get("host") !== "panel"
-    ) {
+    if (__PIPPIN_NATIVE_TRANSPORT__) {
       await openChatInCurrentTab(chatId, {
         requestId: crypto.randomUUID(),
         text,
@@ -205,10 +206,9 @@ async function openChatInCurrentTab(
   },
 ): Promise<void> {
   if (new URL(location.href).searchParams.get("host") === "panel") {
+    if (initialSubmit) await stagePanelPrompt(chatId, initialSubmit);
     window.parent.postMessage({ kind: "pippin.select-chat", chatId }, location.origin);
-    location.assign(
-      chrome.runtime.getURL("chat.html") + "?chatId=" + encodeURIComponent(chatId) + "&host=panel",
-    );
+
     return;
   }
   await requestOpenChat(chatId, true, initialSubmit);

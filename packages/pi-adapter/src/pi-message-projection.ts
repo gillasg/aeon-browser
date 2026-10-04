@@ -110,11 +110,18 @@ export function projectCustomMessage(customType: string, details: unknown): PiMe
       };
     }
   }
-  const record =
-    customType === PI_BROWSER_CONTEXT_CUSTOM_TYPE ? browserContextFromDetails(details) : undefined;
-  return record
-    ? { role: "custom", content: [{ type: "browser-context", record }] }
-    : redactedCustomMessage();
+  if (customType !== PI_BROWSER_CONTEXT_CUSTOM_TYPE) return redactedCustomMessage();
+  const records =
+    isRecord(details) && Array.isArray(details.browserContexts)
+      ? details.browserContexts.slice(0, 9).flatMap((browserContext) => {
+          const record = browserContextFromDetails({ browserContext });
+          return record ? [record] : [];
+        })
+      : [browserContextFromDetails(details)].filter((record) => record !== undefined);
+  return {
+    role: "custom",
+    content: records.map((record) => ({ type: "browser-context", record })),
+  };
 }
 
 function redactedCustomMessage(): PiMessageProjection {

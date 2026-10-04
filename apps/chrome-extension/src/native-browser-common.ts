@@ -12,6 +12,7 @@ export interface AxNode {
 
 export interface AxRef {
   backendNodeId: number;
+  documentEpoch?: number;
   role: string;
   name: string;
 }
@@ -21,6 +22,9 @@ export interface ScreenshotRef {
   epoch: number;
   viewport: { width: number; height: number };
   capturedAt: number;
+  fingerprint: string;
+  scrollX: number;
+  scrollY: number;
 }
 
 export function safePage(value: string): boolean {
@@ -64,6 +68,12 @@ export function errorCode(error: unknown): string {
     [
       "TARGET_LOST",
       "AMBIGUOUS_TARGET",
+      "TARGET_NOT_FOUND",
+      "TARGET_HIDDEN",
+      "TARGET_DISABLED",
+      "TARGET_BLOCKED",
+      "NOT_EDITABLE",
+      "INPUT_FAILED",
       "STALE_REF",
       "CLAIM_CONFLICT",
       "UNSUPPORTED",

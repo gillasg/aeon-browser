@@ -20,13 +20,14 @@ internal static class DaemonSupervisor
     {
         HostConfiguration config;
         try { config = HostConfiguration.Load(); }
-        catch { return 1; }
+        catch (Exception error) { SupervisorLog.Write("Configuration failed: " + error.Message); return 1; }
 
         bool created;
         using (var mutex = CreateUserMutex(out created))
         {
-            if (!created || !mutex.WaitOne(0)) return 0;
-            while (RunLocked(config) != 0) Thread.Sleep(3000);
+            try { if (!mutex.WaitOne(0)) return 0; }
+            catch (AbandonedMutexException) { /* This thread owns the recovered mutex. */ }
+            while (RunLocked(config) != 0) Thread.Sleep(500);
             return 0;
         }
     }
@@ -66,13 +67,15 @@ internal static class DaemonSupervisor
             daemon = StartDaemon(config);
             if (!AssignProcessToJobObject(job, daemon.Handle))
                 throw new InvalidOperationException("Unable to bind the daemon to its supervisor lifetime.");
+            daemon.ErrorDataReceived += (sender, eventArgs) => SupervisorLog.Write(eventArgs.Data);
             daemon.BeginErrorReadLine();
             var ready = daemon.StandardOutput.ReadLineAsync();
             if (!ready.Wait(TimeSpan.FromSeconds(20)) || ready.Result != "PIPPIN_DAEMON_READY")
                 throw new TimeoutException("Daemon startup did not complete.");
+            SupervisorLog.Write("Daemon ready, process " + daemon.Id);
             return ServePipe(config, daemon);
         }
-        catch { return 1; }
+        catch (Exception error) { SupervisorLog.Write("Daemon restarting: " + error.Message); return 1; }
         finally
         {
             if (activePipe != null) activePipe.Dispose();
@@ -82,6 +85,7 @@ internal static class DaemonSupervisor
                 catch { }
             }
             if (job != IntPtr.Zero) CloseHandle(job);
+            if (daemon != null) daemon.Dispose();
         }
     }
 
@@ -91,6 +95,7 @@ internal static class DaemonSupervisor
         {
             try { daemon.WaitForExit(); }
             catch { }
+            SupervisorLog.Write("Daemon exited, code " + daemon.ExitCode);
             var pipe = activePipe;
             if (pipe != null) pipe.Dispose();
         });
@@ -103,9 +108,8 @@ internal static class DaemonSupervisor
                 {
                     activePipe = pipe;
                     pipe.WaitForConnection();
-                    activePipe = null;
                     if (daemon.HasExited) break;
-                    var request = NativeMessagingHost.ReadFrame(pipe);
+                    var request = SupervisorPipe.ReadRequest(pipe);
                     if (request == null) continue;
                     if (IsStopRequest(request))
                     {

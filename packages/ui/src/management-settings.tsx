@@ -58,7 +58,9 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
         Theme{" "}
         <select
           value={props.theme}
-          onChange={(event) => props.onTheme(event.target.value as "dark" | "midnight" | "light" | "system")}
+          onChange={(event) =>
+            props.onTheme(event.target.value as "dark" | "midnight" | "light" | "system")
+          }
         >
           <option value="dark">Dark</option>
           <option value="midnight">Midnight</option>

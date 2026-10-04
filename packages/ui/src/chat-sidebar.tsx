@@ -1,3 +1,4 @@
+import { AeonWordmark } from "./aeon-wordmark.js";
 import { ProjectsSidebar } from "./projects-sidebar.js";
 import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import { SidebarChatItem, SidebarRecents } from "./sidebar-chat-item.js";
@@ -74,7 +75,9 @@ function SidebarDialog(
       hidden={!props.open}
       aria-label="Aeon Chats"
     >
-      <div className="sidebar-top" />
+      <div className="sidebar-top">
+        <AeonWordmark />
+      </div>
       {props.onManagement && (
         <SidebarManagementLinks onSelect={props.onManagement} selected={props.managementSection} />
       )}

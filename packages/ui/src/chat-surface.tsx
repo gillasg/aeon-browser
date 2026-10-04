@@ -1,3 +1,4 @@
+import { EmptyChatStart } from "./empty-chat-start.js";
 import { SidebarResizer } from "./sidebar-resizer.js";
 import type { ChatSummaryDto, PiUiSnapshotDto } from "@pippin/protocol";
 import { AnnotationProvider } from "./transcript-annotations.js";
@@ -107,6 +108,7 @@ export function ChatSurface(props: ChatSurfaceProps): ReactElement {
 }
 
 function ChatContent(props: ChatSurfaceProps): ReactElement {
+  if (isEmptyChat(props)) return <EmptyChatStart {...props} />;
   return (
     <main className="chat-main">
       {props.notice && (
@@ -124,9 +126,11 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
         />
       ) : (
         <>
-          {props.rows.length ? (
+          {showTranscript(props) ? (
             <ChatTranscript
               rows={props.rows}
+              running={props.composer.running}
+              starting={Boolean(props.composer.starting)}
               actionsDisabled={
                 Boolean(props.transcriptActionsDisabled) || props.composer.running || props.piUiBusy
               }
@@ -190,4 +194,12 @@ function ChatPiOverlays(props: ChatSurfaceProps): ReactElement | null {
       ))}
     </>
   );
+}
+
+function isEmptyChat(props: ChatSurfaceProps): boolean {
+  return !props.rows.length && !props.resourcesOpen && !props.notice && !props.composer.running;
+}
+
+function showTranscript(props: ChatSurfaceProps): boolean {
+  return Boolean(props.rows.length || props.composer.running);
 }

@@ -8,10 +8,11 @@ export async function sendChatImage(
   service: ChatService,
   request: Extract<DaemonUiRequest, { operation: "chat.image" }>,
 ): Promise<void> {
-  const image = await service.withSession(asChatId(request.payload.chatId), (session) => {
-    if (!session.readToolImage) throw new Error("Image retrieval is unavailable");
-    return session.readToolImage(request.payload.toolCallId, request.payload.index);
-  });
+  const image = await service.readToolImage(
+    asChatId(request.payload.chatId),
+    request.payload.toolCallId,
+    request.payload.index,
+  );
   const header = ImageAssetHeaderSchema.parse({
     kind: "image.asset",
     requestId: request.requestId,

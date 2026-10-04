@@ -1,8 +1,30 @@
 import { z } from "zod";
 import { BrowserTargetKeySchema } from "./browser-inventory.js";
 import { SiteScriptDefinitionSchema } from "./site-scripts.js";
+import { SemanticTargetSchema } from "./browser-elements.js";
 const target = BrowserTargetKeySchema;
 export const browserExtraSteps = [
+  z
+    .object({
+      op: z.literal("press"),
+      target,
+      element: SemanticTargetSchema,
+      key: z.enum([
+        "Enter",
+        "Tab",
+        "Escape",
+        "Backspace",
+        "Delete",
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "Home",
+        "End",
+        "Space",
+      ]),
+    })
+    .strict(),
   z
     .object({
       op: z.literal("read"),
@@ -21,6 +43,7 @@ export const browserExtraSteps = [
       op: z.literal("wait"),
       target,
       selector: z.string().min(1).max(512),
+      state: z.enum(["attached", "visible", "hidden", "editable"]).default("visible"),
       timeoutMs: z.number().int().min(100).max(8000).default(5000),
     })
     .strict(),

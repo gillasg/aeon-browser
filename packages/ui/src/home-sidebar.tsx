@@ -1,3 +1,4 @@
+import { AeonWordmark } from "./aeon-wordmark.js";
 import { ProjectsSidebar } from "./projects-sidebar.js";
 import type { ChatCatalogItemDto } from "@pippin/protocol";
 import type { ReactElement } from "react";
@@ -39,7 +40,9 @@ export function HomeSidebar(props: HomeSidebarProps): ReactElement {
         onSettings={props.onManagementOpen}
       />
       <aside id="chat-sidebar" className="home-sidebar" aria-label="Chat navigation">
-        <div className="sidebar-top" />
+        <div className="sidebar-top">
+          <AeonWordmark />
+        </div>
 
         <SidebarManagementLinks
           selected={props.management ? props.managementSection : undefined}

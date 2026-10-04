@@ -1,5 +1,21 @@
 // Executed inside QuickJS. The only host capability is the validated browser call bridge.
 export const browserCodeApi = `
+function __locator(target, element) {
+  return Object.freeze({
+    element,
+    click: () => __call({op:'click',target,element}),
+    fill: (value) => __call({op:'fill',target,element,value}),
+    press: (key) => __call({op:'press',target,element,key}),
+    getByRole: (role, options = {}) => {
+      if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with page.locator(css).getByRole(...)');
+      return __locator(target,{kind:'locator',role,name:options.name || '',exact:options.name !== undefined,...options,scope:element.value});
+    },
+    locator: (selector) => {
+      if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with a CSS locator');
+      return __locator(target,{kind:'query',by:'css',value:selector,scope:element.value});
+    },
+  });
+}
 const browser = Object.freeze({
   tabs: async (query) => (await __call({op:'listTabs', ...(query ? {query} : {})})).tabs,
   openTab: async (url, options = {}) => {
@@ -21,12 +37,19 @@ const browser = Object.freeze({
   page: (target) => Object.freeze({
     target,
     read: (selector, options = {}) => __call({op:"read", target, selector, ...options}),
-    wait: (selector, timeoutMs = 5000) => __call({op:"wait", target, selector, timeoutMs}),
+    wait: (selector, options = {}) => __call({op:"wait", target, selector,
+      ...(typeof options === "number" ? {timeoutMs:options} : options)}),
     navigate: (url) => __call({op:"navigate", target, url}),
     diagnostics: (clear = false) => __call({op:"diagnostics", target, clear}),
     popups: () => __call({op:"popups", target}),
     removePreview: (scriptId) => __call({op:"siteScript", target, action:"remove", scriptId}),
-    snapshot: () => __call({op:'observe', target, kind:'semantic'}),
+    snapshot: (options = {}) => __call({op:'observe', target, kind:'semantic', ...options}),
+    locator: (selector, options = {}) => __locator(target,{kind:'query',by:'css',value:selector,...options}),
+    getByRole: (role, options = {}) => __locator(target,{kind:'locator',role,name:options.name || '',exact:options.name !== undefined,...options}),
+    getByText: (value, options = {}) => __locator(target,{kind:'query',by:'text',value,...options}),
+    getByLabel: (value, options = {}) => __locator(target,{kind:'query',by:'label',value,...options}),
+    getByPlaceholder: (value, options = {}) => __locator(target,{kind:'query',by:'placeholder',value,...options}),
+    press: (element, key) => __call({op:'press',target,element,key}),
     screenshot: () => __call({op:'observe', target, kind:'screenshot'}),
     click: (element) => __call({op:'click', target, element}),
     fill: (element, value) => __call({op:'fill', target, element, value}),

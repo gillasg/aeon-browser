@@ -1,3 +1,4 @@
+import { watchSocketHealth } from "./socket-health.js";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import {
@@ -51,6 +52,7 @@ export async function startNativeTransport(
     },
   });
   server.on("connection", (socket, request) => {
+    watchSocketHealth(socket);
     authenticateSocket(
       socket,
       request.headers.origin ?? "",

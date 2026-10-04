@@ -1,10 +1,11 @@
+import { sendBrowserRequest, type BrowserPending } from "./browser-operation-pending.js";
+import { requiresBrowserActions } from "./browser-capabilities.js";
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import {
   BrowserExecutorRequestSchema,
   BrowserPopupSchema,
   BrowserOperationResultSchema,
-  type BrowserExecutorRequest,
   type BrowserExecutorResult,
   type BrowserStep,
   type BrowserTargetKey,
@@ -26,22 +27,16 @@ interface Association {
   ownership: Ownership;
   source: AcquisitionSource;
 }
-interface Pending {
-  chatId: string;
-  socket: WebSocket;
-  operationId: string;
-  finish(result?: BrowserExecutorResult, code?: string): void;
-  timer: NodeJS.Timeout;
-}
 export class BrowserControlService {
   private inventories: BrowserInventoryRegistry | undefined;
   private readonly executors = new Map<string, WebSocket>();
-  private readonly pending = new Map<string, Pending>();
+  private readonly pending = new Map<string, BrowserPending>();
   private readonly associations = new Map<string, Map<string, Association>>();
   private readonly claims = new Map<string, string>();
   private claimGeneration = 0;
   private scripts: SiteScriptService | undefined;
   private readonly scriptClients = new Set<string>();
+  private readonly actionClients = new Map<string, boolean>();
   useSiteScripts(scripts: SiteScriptService): void {
     this.scripts = scripts;
   }
@@ -77,13 +72,23 @@ export class BrowserControlService {
     this.setAssociation(chatId, target, "borrowed", "user-context");
     return "attached";
   }
-  connectExecutor(clientInstanceId: string, socket: WebSocket, supportsScripts = false): void {
+  connectExecutor(
+    clientInstanceId: string,
+    socket: WebSocket,
+    supportsScripts = false,
+    supportsActions = false,
+  ): void {
+    this.actionClients.set(clientInstanceId, supportsActions);
     if (supportsScripts) this.scriptClients.add(clientInstanceId);
     else this.scriptClients.delete(clientInstanceId);
     this.executors.set(clientInstanceId, socket);
     this.resyncScripts(clientInstanceId);
     socket.once("close", () => {
-      if (this.executors.get(clientInstanceId) === socket) this.executors.delete(clientInstanceId);
+      if (this.executors.get(clientInstanceId) === socket) {
+        this.executors.delete(clientInstanceId);
+        this.actionClients.delete(clientInstanceId);
+        this.scriptClients.delete(clientInstanceId);
+      }
       for (const pending of this.pending.values())
         if (pending.socket === socket) pending.finish(undefined, "BROWSER_OFFLINE");
     });
@@ -100,6 +105,7 @@ export class BrowserControlService {
       pending.finish(
         undefined,
         parsed.data.code === "DAEMON_OFFLINE" ? "BROWSER_OFFLINE" : parsed.data.code,
+        parsed.data.detail,
       );
     return true;
   }
@@ -156,7 +162,7 @@ export class BrowserControlService {
     operationId: string,
     step: BrowserStep,
     timeoutMs: number,
-  ): Promise<{ result?: BrowserExecutorResult; code?: string }> {
+  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     if (!this.inventories) return { code: "DAEMON_OFFLINE" };
     if (step.op === "listTabs") return listBrowserTabs(step, this.executors, this.inventories);
     if (step.op === "openTab")
@@ -170,7 +176,7 @@ export class BrowserControlService {
     operationId: string,
     step: Extract<BrowserStep, { op: "openTab" }>,
     timeoutMs: number,
-  ): Promise<{ result?: BrowserExecutorResult; code?: string }> {
+  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const socket = this.executors.get(step.clientInstanceId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return { code: "BROWSER_OFFLINE" };
     const opened = await this.dispatch(socket, chatId, toolCallId, operationId, step, timeoutMs);
@@ -181,7 +187,7 @@ export class BrowserControlService {
   private executeAttachTab(
     chatId: string,
     step: Extract<BrowserStep, { op: "attachTab" }>,
-  ): { result?: BrowserExecutorResult; code?: string } {
+  ): { result?: BrowserExecutorResult; code?: string; detail?: string } {
     const tab = this.inventories?.findTarget(step.target);
     if (!this.connected(step.target.clientInstanceId)) return { code: "BROWSER_OFFLINE" };
     if (!tab || !safeUrl(tab.url)) return { code: "TARGET_LOST" };
@@ -194,7 +200,13 @@ export class BrowserControlService {
     operationId: string,
     step: Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>,
     timeoutMs: number,
-  ): Promise<{ result?: BrowserExecutorResult; code?: string }> {
+  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
+    if (requiresBrowserActions(step) && !this.actionClients.get(step.target.clientInstanceId))
+      return {
+        code: "UNSUPPORTED",
+        detail:
+          "The extension still has the older browser executor loaded. Reload Aeon in chrome://extensions, then retry this browser task.",
+      };
     if (!this.getAssociation(chatId, step.target)) return { code: "TARGET_LOST" };
     const tab = this.inventories?.findTarget(step.target);
     if (!tab || !safeUrl(tab.url)) return { code: "TARGET_LOST" };
@@ -234,7 +246,7 @@ export class BrowserControlService {
     claimId?: string,
     claimGeneration?: number,
     expectedDocumentEpoch?: number,
-  ): Promise<{ result?: BrowserExecutorResult; code?: string }> {
+  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const request = BrowserExecutorRequestSchema.parse({
       kind: "browser.operation",
       requestId: randomUUID(),
@@ -244,36 +256,9 @@ export class BrowserControlService {
       step,
       ...(claimId ? { claimId, claimGeneration, expectedDocumentEpoch } : {}),
     });
-    return this.sendAndWait(socket, request, timeoutMs);
-  }
-  private sendAndWait(
-    socket: WebSocket,
-    request: BrowserExecutorRequest,
-    timeoutMs: number,
-  ): Promise<{ result?: BrowserExecutorResult; code?: string }> {
-    return new Promise((resolve) => {
-      const finish = (result?: BrowserExecutorResult, code?: string) => {
-        const pending = this.pending.get(request.requestId);
-        if (!pending) return;
-        this.pending.delete(request.requestId);
-        clearTimeout(pending.timer);
-        resolve(result ? { result } : { code: code ?? "BROWSER_OFFLINE" });
-      };
-      const timer = setTimeout(() => {
-        finish(undefined, "TIMEOUT");
-        this.release(request.chatId);
-      }, timeoutMs);
-      this.pending.set(request.requestId, {
-        chatId: request.chatId,
-        socket,
-        operationId: request.operationId,
-        finish,
-        timer,
-      });
-      socket.send(JSON.stringify(request), (error) => {
-        if (error) finish(undefined, "BROWSER_OFFLINE");
-      });
-    });
+    return sendBrowserRequest(this.pending, socket, request, timeoutMs, () =>
+      this.release(request.chatId),
+    );
   }
   private adoptPopup(candidate: unknown, socket: WebSocket): boolean {
     const popup = BrowserPopupSchema.safeParse(candidate);

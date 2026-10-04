@@ -6,6 +6,7 @@ export function decodePiInput(input: PiSessionInput): {
   attachmentText: string;
   images: Array<{ type: "image"; data: string; mimeType: string }>;
   browserContext?: PiSessionInput["browserContext"];
+  browserContexts?: PiSessionInput["browserContexts"];
 } {
   if (!input.text.trim()) throw new Error("Prompt text must not be empty.");
   const attachments = input.attachments ?? [];
@@ -25,6 +26,7 @@ export function decodePiInput(input: PiSessionInput): {
     attachmentText: textParts.join(""),
     images,
     ...(input.browserContext ? { browserContext: input.browserContext } : {}),
+    ...(input.browserContexts ? { browserContexts: input.browserContexts } : {}),
   };
 }
 

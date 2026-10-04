@@ -1,5 +1,6 @@
 param([ValidateSet('Install', 'Remove', 'Validate')][string]$Mode = 'Install')
 $ErrorActionPreference = 'Stop'
+& (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Validate
 $appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Pippin\Slice3Dev'))
 $startupScript = Join-Path $appRoot 'start-daemon.ps1'
 $hostExecutable = Join-Path $appRoot 'pippin-native-host.exe'
@@ -40,6 +41,7 @@ try {
         }
         $scriptContent | Set-Content -LiteralPath $startupScript -Encoding UTF8
         $runKey.SetValue($runName, $command, [Microsoft.Win32.RegistryValueKind]::String)
+        & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Remove
         Write-Output 'Aeon will start one hidden daemon at user login; routines can run without Chrome.'
     } else {
         if ($existing) { $runKey.DeleteValue($runName, $false) }
@@ -47,6 +49,7 @@ try {
             (Get-Content -LiteralPath $startupScript -Raw).Trim() -ceq $scriptContent.Trim()) {
             Remove-Item -LiteralPath $startupScript -Force
         }
+        & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Remove
         Write-Output 'Removed the owned Aeon daemon login entry.'
     }
 } finally { if ($null -ne $runKey) { $runKey.Dispose() } }

@@ -131,6 +131,7 @@ const ChatSubmitRequestSchema = z
         text: z.string().trim().min(1).max(50_000),
         attachments: AttachmentsSchema,
         browserContext: PiBrowserContextRecordSchema.optional(),
+        browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
       })
       .strict(),
   })
@@ -162,18 +163,29 @@ const ChatQueueRequestSchema = z
         text: z.string().trim().min(1).max(50_000),
         attachments: AttachmentsSchema,
         browserContext: PiBrowserContextRecordSchema.optional(),
+        browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
       })
       .strict(),
   })
   .strict();
-const ChatQueueEditRequestSchema = z.object({
-  kind: z.literal("command"), requestId: RequestIdSchema, operation: z.literal("chat.queue-edit"),
-  payload: z.object({ chatId: ChatIdSchema, mode: z.enum(["followUp", "steer"]),
-    index: z.number().int().min(0).max(99), action: z.enum(["delete", "edit", "up", "down", "steer"]),
-    text: z.string().trim().min(1).max(50_000).optional(),
-    steering: z.array(z.string()).max(100), followUp: z.array(z.string()).max(100),
-  }).strict(),
-}).strict();
+const ChatQueueEditRequestSchema = z
+  .object({
+    kind: z.literal("command"),
+    requestId: RequestIdSchema,
+    operation: z.literal("chat.queue-edit"),
+    payload: z
+      .object({
+        chatId: ChatIdSchema,
+        mode: z.enum(["followUp", "steer"]),
+        index: z.number().int().min(0).max(99),
+        action: z.enum(["delete", "edit", "up", "down", "steer"]),
+        text: z.string().trim().min(1).max(50_000).optional(),
+        steering: z.array(z.string()).max(100),
+        followUp: z.array(z.string()).max(100),
+      })
+      .strict(),
+  })
+  .strict();
 const ChatStopRequestSchema = z
   .object({
     kind: z.literal("command"),

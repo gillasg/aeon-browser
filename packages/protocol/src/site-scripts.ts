@@ -27,6 +27,7 @@ export const SiteScriptCommandSchema = z
     action: z.enum([
       "list",
       "get",
+      "status",
       "preview",
       "save",
       "update",

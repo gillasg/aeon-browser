@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AttachmentButton } from "./attachment-button.js";
+import { ComposerAddMenu } from "./composer-add-menu.js";
 import {
   AnnotationAttachments,
   serializeAnnotations,
@@ -8,8 +8,8 @@ import {
 import { PiQueue } from "./pi-queue.js";
 import { useMessageSendMode } from "./message-send-mode.js";
 import { PromptField } from "./prompt-field.js";
-import { ComposerPanels } from "./composer-panels.js";
-import { BrowserContextChip } from "./browser-context-view.js";
+import { ComposerPanels, AttachmentList } from "./composer-panels.js";
+import { PageContextTray } from "./page-context-tray.js";
 import type { PiBrowserContextRecord } from "@pippin/protocol";
 
 export interface ComposerAttachment {
@@ -47,6 +47,7 @@ export interface ChatComposerProps {
   chatId: string;
   connected: boolean;
   running: boolean;
+  starting?: boolean;
   controls: ComposerControls | null;
   contextUsage?: PiContextUsage | null;
   attachments: readonly ComposerAttachment[];
@@ -59,7 +60,19 @@ export interface ChatComposerProps {
     mode: "followUp" | "steer",
     attachments: readonly ComposerAttachment[],
   ): Promise<boolean>;
-  onQueueAction?(mode: "followUp" | "steer", index: number, action: "delete" | "edit" | "up" | "down" | "steer", text?: string): Promise<void>;
+  onQueueAction?(
+    mode: "followUp" | "steer",
+    index: number,
+    action: "delete" | "edit" | "up" | "down" | "steer",
+    text?: string,
+  ): Promise<void>;
+  onStart?(
+    text: string,
+    model: ComposerModel,
+    thinking: string,
+    files: readonly ComposerAttachment[],
+  ): Promise<boolean>;
+  onReadDraftAttachments?(files: readonly File[]): Promise<readonly ComposerAttachment[]>;
   onStop(): void;
   onModel(value: ComposerModel): void;
   onThinking(value: string): void;
@@ -80,14 +93,15 @@ export function ChatComposer(props: ChatComposerProps): ReactElement {
       )}
       <AnnotationAttachments />
       <PiQueue controls={props.controls} onAction={props.onQueueAction} />
-      {props.browserContext && (
-        <div className="composer-context-slot">
-          <BrowserContextChip
-            record={props.browserContext}
-            onRemove={props.onRemoveBrowserContext}
-          />
-        </div>
-      )}
+      <PageContextTray
+        chatId={props.chatId}
+        primary={props.browserContext}
+        onRemove={props.onRemoveBrowserContext}
+      />
+      <AttachmentList
+        attachments={props.attachments}
+        onRemoveAttachment={props.onRemoveAttachment}
+      />
       <ComposerEntry {...props} mode={mode} />
       {panels}
     </div>
@@ -148,6 +162,7 @@ function ComposerEntry(
 
 function ComposerSendControl(props: {
   running: boolean;
+  starting?: boolean;
   connected: boolean;
   enabled: boolean;
   onStop(): void;
@@ -174,8 +189,9 @@ function AttachmentPicker({
   const targetChatId = useRef(chatId);
   return (
     <>
-      <AttachmentButton
-        onClick={() => {
+      <ComposerAddMenu
+        contextId={chatId}
+        onFiles={() => {
           targetChatId.current = chatId;
           picker.current?.click();
         }}

@@ -20,4 +20,5 @@ export interface PiSessionInput {
   text: string;
   attachments?: readonly PiAttachment[];
   browserContext?: PiBrowserContextRecord;
+  browserContexts?: PiBrowserContextRecord[];
 }

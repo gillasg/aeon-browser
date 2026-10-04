@@ -1,3 +1,6 @@
+import { clickScreenshotPoint } from "./native-browser-point.js";
+import { prepareElement } from "./native-browser-prepare.js";
+import { fillNode } from "./native-browser-input.js";
 import {
   BrowserExecutorResultSchema,
   type BrowserExecutorRequest,
@@ -7,21 +10,8 @@ import {
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { safePage } from "./native-browser-common.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
-import {
-  clickAt,
-  fillAt,
-  getCenter,
-  getViewportCenter,
-  getViewportSize,
-  resolveElement,
-  scrollAt,
-  withDebugger,
-} from "./native-browser-debugger.js";
-import {
-  browserObservationRefs,
-  observeSemantic,
-  screenshotPoint,
-} from "./native-browser-observation.js";
+import { clickAt, getViewportCenter, scrollAt, withDebugger } from "./native-browser-debugger.js";
+import { observeSemantic } from "./native-browser-observation.js";
 
 type ActionRequest = BrowserExecutorRequest & {
   step: Extract<BrowserStep, { op: "click" | "fill" | "scroll" }>;
@@ -71,39 +61,18 @@ async function dispatchAction(
     return clickScreenshotPoint(debuggee, request);
   if (request.step.op === "scroll" && !request.step.element)
     return scrollViewport(debuggee, request);
-  const node = await resolveElement(
+  if (!request.step.element) throw new Error("INVALID_TARGET");
+  const { node, point: box } = await prepareElement(
     debuggee,
+    request,
     request.step.element,
-    request.step.target,
-    browserObservationRefs.refs,
-    browserObservationRefs.latestSnapshots,
+    () => revalidateTarget(request, request.step.target.tabId),
+    request.step.op === "fill",
   );
-  validateFillTarget(request, node.role);
-  const box = await getCenter(debuggee, node.backendNodeId);
   if (request.step.op === "click") await clickAt(debuggee, box.x, box.y);
-  else if (request.step.op === "fill") await fillAt(debuggee, box.x, box.y, request.step.value);
+  else if (request.step.op === "fill")
+    await fillNode(debuggee, node.backendNodeId, request.step.value);
   else await scrollAt(debuggee, box.x, box.y, request.step.direction, request.step.amount);
-}
-
-async function clickScreenshotPoint(
-  debuggee: chrome.debugger.Debuggee,
-  request: ActionRequest,
-): Promise<void> {
-  if (request.step.op !== "click" || request.step.element.kind !== "point")
-    throw new Error("INVALID_TARGET");
-  const point = screenshotPoint(
-    request.step.element.screenshotId,
-    request.step.target,
-    request.expectedDocumentEpoch ?? -1,
-  );
-  const viewport = await getViewportSize(debuggee);
-  if (viewport.width !== point.viewport.width || viewport.height !== point.viewport.height)
-    throw new Error("STALE_REF");
-  await clickAt(
-    debuggee,
-    Math.round(point.viewport.width * request.step.element.x),
-    Math.round(point.viewport.height * request.step.element.y),
-  );
 }
 
 async function scrollViewport(
@@ -113,12 +82,4 @@ async function scrollViewport(
   if (request.step.op !== "scroll" || request.step.element) throw new Error("INVALID_TARGET");
   const center = await getViewportCenter(debuggee);
   await scrollAt(debuggee, center.x, center.y, request.step.direction, request.step.amount);
-}
-
-function validateFillTarget(request: ActionRequest, role: string): void {
-  if (
-    request.step.op === "fill" &&
-    !["textbox", "searchbox", "combobox"].includes(role.toLowerCase())
-  )
-    throw new Error("INVALID_TARGET");
 }

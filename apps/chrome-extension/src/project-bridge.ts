@@ -49,3 +49,19 @@ export function projectDraftPayload(): { projectId?: string } {
   const projectId = new URLSearchParams(location.search).get("projectId");
   return projectId ? { projectId } : {};
 }
+
+window.addEventListener("pippin.panel-current-page", (event) => {
+  const detail = (event as CustomEvent).detail;
+  void chrome.runtime
+    .sendMessage({ kind: "pippin.native.current-page" })
+    .then(detail.resolve, detail.reject);
+});
+
+window.addEventListener("aeon.context-picker", (event) => {
+  const detail = (event as CustomEvent).detail;
+  const message =
+    detail.kind === "list"
+      ? { kind: "pippin.native.list-context-tabs" }
+      : { kind: "pippin.native.capture-page", tabId: detail.tabId };
+  void chrome.runtime.sendMessage(message).then(detail.resolve, detail.reject);
+});

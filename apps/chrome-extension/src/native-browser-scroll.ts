@@ -55,6 +55,7 @@ async function elementCenter(debuggee: chrome.debugger.Debuggee, request: Scroll
     request.step.target,
     browserObservationRefs.refs,
     browserObservationRefs.latestSnapshots,
+    request.expectedDocumentEpoch,
   );
   return getCenter(debuggee, ref.backendNodeId);
 }

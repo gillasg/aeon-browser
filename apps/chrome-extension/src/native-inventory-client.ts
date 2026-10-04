@@ -155,7 +155,7 @@ async function buildFullInventory(session: InventorySession) {
     kind: "browser.inventory.full",
     ...inventoryIdentity(session),
     generation: session.generation,
-    capabilities: ["site-scripts"],
+    capabilities: ["site-scripts", "browser-actions-v2"],
     windows,
     tabs: inventoryTabs,
   });

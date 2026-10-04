@@ -1,9 +1,10 @@
+import { waitPageInteractive } from "./native-browser-readiness.js";
 export async function navigateReady(
   tabId: number,
   url: string,
   timeoutMs = 8000,
 ): Promise<{ url: string; timedOut: boolean }> {
-  return new Promise((resolve, reject) => {
+  const navigation = await new Promise<{ url: string; timedOut: boolean }>((resolve, reject) => {
     let committed = false;
     const top = (event: { tabId: number; frameId: number }) =>
       event.tabId === tabId && event.frameId === 0;
@@ -34,12 +35,15 @@ export async function navigateReady(
         reject(new Error("OPERATION_FAILED"));
       }
     };
-    const timer = setTimeout(() => {
-      clean();
-      void chrome.tabs
-        .get(tabId)
-        .then((tab) => resolve({ url: tab.url ?? url, timedOut: true }), reject);
-    }, timeoutMs);
+    const timer = setTimeout(
+      () => {
+        clean();
+        void chrome.tabs
+          .get(tabId)
+          .then((tab) => resolve({ url: tab.url ?? url, timedOut: true }), reject);
+      },
+      Math.max(100, timeoutMs - 2000),
+    );
     chrome.webNavigation.onCommitted.addListener(commit);
     chrome.webNavigation.onDOMContentLoaded.addListener(ready);
     chrome.webNavigation.onErrorOccurred.addListener(error);
@@ -50,4 +54,6 @@ export async function navigateReady(
       reject(cause);
     });
   });
+  const interactive = await waitPageInteractive(tabId);
+  return { ...navigation, timedOut: navigation.timedOut || !interactive };
 }

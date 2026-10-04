@@ -51,7 +51,7 @@ export class PageReconnect {
   }
   private schedule(): void {
     if (this.stopped || this.timer !== undefined) return;
-    const delay = Math.min(1000 * 2 ** Math.min(this.attempt++, 4), 15000);
+    const delay = Math.min(250 * 2 ** Math.min(this.attempt++, 3), 2000);
     this.timer = globalThis.setTimeout(() => {
       this.timer = undefined;
       void this.start();

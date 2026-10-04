@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactElement } from "react";
+import { createContext, useContext, useEffect, useState, type ReactElement } from "react";
 import type { ToolStep } from "./transcript-model.js";
 export type ToolImageLoader = (toolCallId: string, index: number) => Promise<Blob>;
 export const ToolImageContext = createContext<ToolImageLoader | undefined>(undefined);
@@ -29,18 +29,7 @@ function ToolImage({
   mimeType: string;
 }): ReactElement {
   const loader = useContext(ToolImageContext);
-  const target = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setVisible(true);
-        observer.disconnect();
-      }
-    });
-    if (target.current) observer.observe(target.current);
-    return () => observer.disconnect();
-  }, []);
+  const [attempt, setAttempt] = useState(0);
   const [url, setUrl] = useState<string>();
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -48,7 +37,7 @@ function ToolImage({
     let objectUrl: string | undefined;
     setUrl(undefined);
     setError(false);
-    if (loader && visible)
+    if (loader)
       void loader(toolCallId, index)
         .then((blob) => {
           if (!active) return;
@@ -62,12 +51,17 @@ function ToolImage({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [loader, visible, toolCallId, index]);
+  }, [loader, attempt, toolCallId, index]);
   return (
-    <div ref={target}>
+    <div>
       {!url ? (
         <p className="activity-result-note" role="status">
           {error || !loader ? "Image preview unavailable" : "Loading image…"} · {mimeType}
+          {error && (
+            <button type="button" onClick={() => setAttempt(attempt + 1)}>
+              Retry image
+            </button>
+          )}
         </p>
       ) : (
         <a href={url} target="_blank" rel="noreferrer" aria-label="Open tool image">

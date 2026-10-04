@@ -1,3 +1,6 @@
+import { PageContextTray } from "./page-context-tray.js";
+import { usePanelPage } from "./panel-page-chip.js";
+import { ProjectChip } from "./project-chip.js";
 import {
   useHomeAttachments,
   HomeAttachmentPicker,
@@ -20,7 +23,14 @@ type HomeStartProps = Pick<
   | "onOpenChat"
   | "onCatalog"
   | "onReadAttachments"
-> & { onManageRoutines(): void };
+> & {
+  onManageRoutines(): void;
+  projectName?: string | null;
+  projectId?: string | null;
+  browserContext?: import("@pippin/protocol").PiBrowserContextRecord | null;
+  onRemoveContext?(): void;
+  chatId?: string;
+};
 
 export function HomeStart({
   props,
@@ -29,6 +39,8 @@ export function HomeStart({
   props: HomeStartProps;
   active: readonly ChatCatalogItemDto[];
 }): ReactElement {
+  const panelPage = usePanelPage();
+  const page = props.browserContext ?? panelPage.record;
   const [query, setQuery] = useState("");
   const files = useHomeAttachments(props.onReadAttachments);
   const selection = useHomeSelection(props.modelCatalog);
@@ -38,14 +50,24 @@ export function HomeStart({
   };
   return (
     <section className="home-start" aria-label="Ask Aeon">
+      <ProjectChip name={props.projectName} projectId={props.projectId} />
+      <PageContextTray
+        chatId={props.chatId}
+        primary={page}
+        onRemove={() => {
+          panelPage.remove();
+          props.onRemoveContext?.();
+        }}
+      />
+      <HomeAttachmentList state={files} />
       <HomePrompt
+        contextId={props.chatId}
         query={query}
         onQuery={setQuery}
         canSubmit={Boolean(selection.model && selection.thinkingLevel && !files.loading)}
         onSubmit={ask}
         onFiles={(items) => void files.add(items)}
       />
-      <HomeAttachmentList state={files} />
       <HomeModelControls
         catalog={props.modelCatalog}
         model={selection.model}
@@ -98,12 +120,14 @@ function HomePrompt({
   canSubmit,
   onSubmit,
   onFiles,
+  contextId,
 }: {
   query: string;
   onQuery(value: string): void;
   canSubmit: boolean;
   onSubmit(value: string): void;
   onFiles(files: readonly File[]): void;
+  contextId?: string | undefined;
 }): ReactElement {
   const submit = (event: FormEvent): void => {
     event.preventDefault();
@@ -111,7 +135,7 @@ function HomePrompt({
   };
   return (
     <form id="home-form" className="home-query-form" onSubmit={submit}>
-      <HomeAttachmentPicker onFiles={onFiles} />
+      <HomeAttachmentPicker onFiles={onFiles} contextId={contextId} />
       <PromptField
         multiline
         id="home-query"

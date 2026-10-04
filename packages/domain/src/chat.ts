@@ -229,7 +229,14 @@ export interface PiSessionHandle {
   readonly reference: PiSessionReference;
   submit(input: PiSessionInput | string): Promise<void>;
   queue(input: PiSessionInput, mode: "followUp" | "steer"): Promise<void>;
-  editQueue?(input: { mode: "followUp" | "steer"; index: number; action: "delete" | "edit" | "up" | "down" | "steer"; text?: string | undefined; steering: string[]; followUp: string[] }): void;
+  editQueue?(input: {
+    mode: "followUp" | "steer";
+    index: number;
+    action: "delete" | "edit" | "up" | "down" | "steer";
+    text?: string | undefined;
+    steering: string[];
+    followUp: string[];
+  }): void;
   abort(): Promise<void>;
   controls(): PiSessionControlState;
   setModel(provider: string, id: string): Promise<void>;

@@ -112,8 +112,8 @@ export class TranscriptModel {
     const message = entry.message;
     if (!message) return;
     if (message.role === "custom") {
-      const context = message.content.find((block) => block.type === "browser-context");
-      if (context?.type === "browser-context") this.attachBrowserContext(entry, context);
+      for (const context of message.content)
+        if (context.type === "browser-context") this.attachBrowserContext(entry, context);
       if (
         message.content.some(
           (block) =>
@@ -182,7 +182,7 @@ export class TranscriptModel {
       };
       return;
     }
-    const orphanKey = `orphan-context:${entry.entryId}`;
+    const orphanKey = `orphan-context:${entry.entryId}:${context.record.contextId}`;
     this.rows.push({ kind: "context-orphan", key: orphanKey, entry, targetEntryId });
     if (targetEntryId) {
       const pending = this.pendingContexts.get(targetEntryId) ?? [];

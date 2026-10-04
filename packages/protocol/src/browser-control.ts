@@ -8,48 +8,8 @@ const HttpUrlSchema = z
   .max(8192)
   .refine((value) => ["http:", "https:"].includes(new URL(value).protocol));
 
-export const BrowserElementTargetSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("ref"),
-      snapshotId: z.string().uuid(),
-      ref: z.string().regex(/^e[0-9]{1,4}$/),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("locator"),
-      role: z.string().min(1).max(80),
-      name: z.string().min(1).max(256),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("point"),
-      screenshotId: z.string().uuid(),
-      x: z.number().min(0).max(1),
-      y: z.number().min(0).max(1),
-    })
-    .strict(),
-]);
-export type BrowserElementTarget = z.infer<typeof BrowserElementTargetSchema>;
-
-const SemanticTargetSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("ref"),
-      snapshotId: z.string().uuid(),
-      ref: z.string().regex(/^e[0-9]{1,4}$/),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("locator"),
-      role: z.string().min(1).max(80),
-      name: z.string().min(1).max(256),
-    })
-    .strict(),
-]);
+export { BrowserElementTargetSchema, type BrowserElementTarget } from "./browser-elements.js";
+import { BrowserElementTargetSchema, SemanticTargetSchema } from "./browser-elements.js";
 
 export const BrowserStepSchema = z.discriminatedUnion("op", [
   ...browserExtraSteps,
@@ -68,6 +28,9 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       op: z.literal("observe"),
       target: BrowserTargetKeySchema,
       kind: z.enum(["semantic", "screenshot"]),
+      query: z.string().max(256).optional(),
+      interactive: z.boolean().optional(),
+      selector: z.string().min(1).max(512).optional(),
     })
     .strict(),
   z
@@ -238,9 +201,16 @@ export const BrowserOperationResultSchema = z.discriminatedUnion("ok", [
       requestId: z.string().uuid(),
       operationId: z.string().uuid(),
       ok: z.literal(false),
+      detail: z.string().max(2000).optional(),
       code: z.enum([
         "TARGET_LOST",
         "AMBIGUOUS_TARGET",
+        "TARGET_NOT_FOUND",
+        "TARGET_HIDDEN",
+        "TARGET_DISABLED",
+        "TARGET_BLOCKED",
+        "NOT_EDITABLE",
+        "INPUT_FAILED",
         "STALE_REF",
         "CLAIM_CONFLICT",
         "UNSUPPORTED",

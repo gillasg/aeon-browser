@@ -8,12 +8,9 @@ export interface TurnTiming {
 export function updateTurnTiming(rows: readonly TranscriptRow[], event: PiSessionEventDto): void {
   const user = findUser(rows);
   if (!user) return;
-  const token =
-    (event.kind === "message-update" ||
-      event.kind === "message-start" ||
-      event.kind === "message-end") &&
-    event.message.role === "assistant" &&
-    hasOutput(event.message);
+  if (startsWork(event))
+    user.timing ??= { startedAt: Date.now(), lastTokenAt: Date.now(), finished: false };
+  const token = outputEvent(event);
   if (token) {
     const now = Date.now();
     user.timing ??= { startedAt: now, lastTokenAt: now, finished: false };
@@ -38,4 +35,25 @@ function findUser(rows: readonly TranscriptRow[]): TranscriptRow | undefined {
 }
 function isIdle(event: PiSessionEventDto): boolean {
   return event.kind === "run-state" && event.state === "idle";
+}
+
+function startsWork(event: PiSessionEventDto): boolean {
+  return (
+    (event.kind === "run-state" && event.state !== "idle") ||
+    (event.kind === "entry-added" && event.entry.message?.role === "user")
+  );
+}
+function outputEvent(
+  event: PiSessionEventDto,
+): event is Extract<
+  PiSessionEventDto,
+  { kind: "message-start" | "message-update" | "message-end" }
+> {
+  return (
+    (event.kind === "message-update" ||
+      event.kind === "message-start" ||
+      event.kind === "message-end") &&
+    event.message.role === "assistant" &&
+    hasOutput(event.message)
+  );
 }

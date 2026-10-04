@@ -14,35 +14,19 @@ async function render(): Promise<void> {
   } catch {
     if (status) status.textContent = "Open extension details and switch on Allow User Scripts.";
   }
-  const stored = await chrome.storage.local.get([
-    SCRIPT_KEY,
-    "aeon-site-script-access",
-    "aeon-site-script-errors",
-  ]);
-  await renderAccess(stored["aeon-site-script-access"]);
+  const stored = await chrome.storage.local.get([SCRIPT_KEY, "aeon-site-script-errors"]);
+  await renderAccess();
   renderScripts(stored);
 }
 void render();
 
-async function renderAccess(value: unknown): Promise<void> {
+async function renderAccess(): Promise<void> {
   const access = document.getElementById("site-access");
-  access?.replaceChildren();
-  const origins = Array.isArray(value) ? (value as string[]) : [];
-  for (const origin of origins) {
-    const allowed = await chrome.permissions.contains({ origins: [origin] });
-    const row = document.createElement("p"),
-      label = document.createElement("span");
-    label.textContent = new URL(origin).hostname + " ";
-    row.append(label);
-    const button = document.createElement("button");
-    button.textContent = allowed ? "Allowed" : "Allow site";
-    button.disabled = allowed;
-    button.addEventListener("click", () => {
-      void chrome.permissions.request({ origins: [origin] }).then(() => render());
-    });
-    row.append(button);
-    access?.append(row);
-  }
+  const allowed = await chrome.permissions.contains({ origins: ["http://*/*", "https://*/*"] });
+  if (access)
+    access.textContent = allowed
+      ? "Website access is enabled for all sites."
+      : "Chrome is restricting website access. Open extension details and set Site access to On all sites.";
 }
 function renderScripts(stored: Record<string, unknown>): void {
   const list = document.getElementById("scripts");

@@ -71,7 +71,8 @@ export class HomeManagementController {
   async readPreferences(): Promise<void> {
     const values = await chrome.storage.sync.get(["pippin-theme", "pippin-chat-sidebar-open"]);
     const savedTheme = values["pippin-theme"];
-    if (savedTheme === "light" || savedTheme === "system" || savedTheme === "midnight") this.theme = savedTheme;
+    if (savedTheme === "light" || savedTheme === "system" || savedTheme === "midnight")
+      this.theme = savedTheme;
     if (savedTheme === "atmosphere") this.theme = "light";
     this.sidebarDefaultOpen = values["pippin-chat-sidebar-open"] === true;
     document.documentElement.dataset.theme = this.theme;

@@ -36,6 +36,8 @@ export async function buildExtension(variant) {
     native ? "manifest.native.json" : "manifest.dev.json",
     "chat.html",
     "completion-icon.png",
+    "aeon-icon.svg",
+    ...[16, 32, 48, 128].map((size) => "aeon-icon-" + size + ".png"),
     "viewer.html",
     "site-scripts.html",
     "site-scripts.css",

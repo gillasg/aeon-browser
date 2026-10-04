@@ -83,7 +83,7 @@ function turnState(rows: readonly TranscriptRow[]) {
     steps,
     timing,
     active,
-    hasWork: Boolean(steps.length || streaming || timing),
+    hasWork: Boolean(steps.length || active),
     before: rows.slice(0, userIndex + 1),
     work: index < 0 ? body : body.slice(0, index),
     final: index < 0 ? [] : body.slice(index),
@@ -170,7 +170,10 @@ function useTurnClock(active: boolean, outer: React.RefObject<HTMLDetailsElement
   const initialized = useRef(false);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      if (outer.current) outer.current.open = false;
+      return;
+    }
     if (!initialized.current && outer.current) outer.current.open = true;
     initialized.current = true;
     const timer = window.setInterval(() => setNow(Date.now()), 250);

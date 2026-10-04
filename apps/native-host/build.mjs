@@ -21,6 +21,8 @@ const source = [
   "NativeMessagingHost.cs",
   "DaemonSupervisor.cs",
   "DaemonOutputReader.cs",
+  "SupervisorLog.cs",
+  "SupervisorPipe.cs",
 ];
 const args = [
   "/nologo",

@@ -52,7 +52,23 @@ export async function withBrowserDebugger<T>(
     void chrome.action.setTitle({ tabId, title: "Aeon is controlling this tab · " + chatId });
     return await action({ tabId });
   } catch (error) {
-    await detach(tabId);
+    if (
+      attachments.get(tabId) !== entry ||
+      !(error instanceof Error) ||
+      ![
+        "STALE_REF",
+        "AMBIGUOUS_TARGET",
+        "TARGET_NOT_FOUND",
+        "TARGET_HIDDEN",
+        "TARGET_DISABLED",
+        "TARGET_BLOCKED",
+        "NOT_EDITABLE",
+        "INPUT_FAILED",
+        "INVALID_TARGET",
+        "TIMEOUT",
+      ].includes(error.message)
+    )
+      await detach(tabId);
     throw error;
   }
 }

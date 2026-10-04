@@ -1064,16 +1064,59 @@ body[data-embedded="true"] .chat-navigation {
   justify-content: space-between;
   margin-bottom: 20px;
 }
-.home-collection-actions { display: flex; align-items: center; gap: 8px; }
-.home-collection-actions button:last-child { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: var(--pippin-r-sm); }
-.home-collection-actions button:last-child:hover { background: var(--pippin-surface-raised); }
-.home-collection-tabs button { font: inherit; font-size: 13px; padding: 4px 12px; }
-.home-collection-tabs button[aria-selected="true"] { background: var(--pippin-surface-raised); border-radius: var(--pippin-r-lg); }
-.home-chat-card { min-height: 280px; display: flex; flex-direction: column; padding: 16px; background: var(--pippin-surface-raised); border-color: var(--pippin-line); color: var(--pippin-text); }
+.home-collection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home-collection-actions button:last-child {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--pippin-r-sm);
+}
+.home-collection-actions button:last-child:hover {
+  background: var(--pippin-surface-raised);
+}
+.home-collection-tabs button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 12px;
+}
+.home-collection-tabs button[aria-selected="true"] {
+  background: var(--pippin-surface-raised);
+  border-radius: var(--pippin-r-lg);
+}
+.home-chat-card {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--pippin-surface-raised);
+  border-color: var(--pippin-line);
+  color: var(--pippin-text);
+}
 .home-chat-card:hover {
   background: var(--pippin-surface-raised);
   border-color: var(--pippin-muted);
 }
-.home-chat-card .card-date, .home-chat-card .card-preview { color: var(--pippin-muted); }
-.home-card-placeholder { border: 1px dashed var(--pippin-line); border-radius: var(--pippin-r-lg); min-height: 280px; }
-@media(max-width: 720px) { .home-chat-card, .home-card-placeholder { min-height: 160px; } .home-recent-section { margin-top: 48px; } }
+.home-chat-card .card-date,
+.home-chat-card .card-preview {
+  color: var(--pippin-muted);
+}
+.home-card-placeholder {
+  border: 1px dashed var(--pippin-line);
+  border-radius: var(--pippin-r-lg);
+  min-height: 280px;
+}
+@media (max-width: 720px) {
+  .home-chat-card,
+  .home-card-placeholder {
+    min-height: 160px;
+  }
+  .home-recent-section {
+    margin-top: 48px;
+  }
+}

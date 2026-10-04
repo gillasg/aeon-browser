@@ -141,3 +141,33 @@ function contextFavicon(tab: chrome.tabs.Tab): { favIconUrl?: string } {
     ? { favIconUrl: tab.favIconUrl.slice(0, 2048) }
     : {};
 }
+
+export async function captureCurrentPage(
+  ensureExecutor: () => Promise<unknown>,
+): Promise<PiBrowserContextRecord | undefined> {
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const tab = tabs[0];
+  if (tab?.id === undefined || !tab.url || !isSafePageUrl(tab.url)) return undefined;
+  await ensureExecutor();
+  const source = await sourceForTab(tab.id);
+  return createContextRecord(
+    { menuItemId: MENU_ADD_CONTEXT, pageUrl: tab.url, editable: false },
+    tab,
+    source?.target,
+  );
+}
+
+export async function captureTabPage(
+  tabId: number,
+  ensureExecutor: () => Promise<unknown>,
+): Promise<PiBrowserContextRecord | undefined> {
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab.url || !isSafePageUrl(tab.url)) return;
+  await ensureExecutor();
+  const source = await sourceForTab(tabId);
+  return createContextRecord(
+    { menuItemId: MENU_ADD_CONTEXT, pageUrl: tab.url, editable: false },
+    tab,
+    source?.target,
+  );
+}

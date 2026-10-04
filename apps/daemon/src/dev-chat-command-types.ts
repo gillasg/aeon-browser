@@ -30,7 +30,8 @@ export type ReadCommandRequest = Extract<
       | "chat.model"
       | "chat.thinking"
       | "chat.attach-browser-context"
-      | "chat.queue" | "chat.queue-edit"
+      | "chat.queue"
+      | "chat.queue-edit"
       | "chat.stop";
   }
 >;

@@ -1,3 +1,5 @@
+import { handleContextPicker } from "./context-picker-handler.js";
+import { captureCurrentPage } from "./native-browser-context-menu.js";
 import "./completion-notifications.js";
 import { scheduleExecutorReconnect } from "./native-executor-reconnect.js";
 import { startExecutorHeartbeat } from "./native-executor-health.js";
@@ -49,6 +51,7 @@ interface ExecutorConnection extends BrowserIdentity {
   socket: WebSocket;
   pending: Map<string, PendingGrant>;
   heartbeatTimer?: number;
+  inventoryReady?: Promise<void>;
 }
 
 let executor: ExecutorConnection | undefined;
@@ -56,10 +59,14 @@ let connecting: Promise<ExecutorConnection> | undefined;
 
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
-installNativeBrowserContextMenus(() => ensureExecutor());
+installNativeBrowserContextMenus(() => ensureInventoryExecutor());
 
-chrome.runtime.onInstalled.addListener(() => void ensureExecutor().catch(() => undefined));
-chrome.runtime.onStartup.addListener(() => void ensureExecutor().catch(() => undefined));
+chrome.runtime.onInstalled.addListener(
+  () => void ensureExecutor().catch(() => scheduleExecutorReconnect(ensureExecutor)),
+);
+chrome.runtime.onStartup.addListener(
+  () => void ensureExecutor().catch(() => scheduleExecutorReconnect(ensureExecutor)),
+);
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
   handleRuntimeMessage(request, sender, sendResponse),
 );
@@ -69,8 +76,17 @@ function handleRuntimeMessage(
   sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void,
 ): boolean | void {
+  if (handleContextPicker(candidate, sender, sendResponse, () => ensureInventoryExecutor()))
+    return true;
   const request = NativeExtensionRequestSchema.safeParse(candidate);
   if (!request.success || sender.id !== chrome.runtime.id) return;
+  if (request.data.kind === "pippin.native.current-page") {
+    if (!sender.url?.startsWith(chrome.runtime.getURL(""))) return;
+    void captureCurrentPage(() => ensureInventoryExecutor()).then(sendResponse, () =>
+      sendResponse(null),
+    );
+    return true;
+  }
   if (request.data.kind === "pippin.native.page-grant") {
     void getPageGrant(sender, request.data.pageInstanceId, request.data.scope).then(
       sendResponse,
@@ -89,7 +105,7 @@ function handleRuntimeMessage(
     );
     return true;
   }
-  if (!isOpenChatSender(sender)) return;
+  if (request.data.kind !== "pippin.native.open-chat" || !isOpenChatSender(sender)) return;
   void openNativeChat(sender, request.data)
     .then(sendResponse)
     .catch(() =>
@@ -167,6 +183,12 @@ async function ensureExecutor(): Promise<ExecutorConnection> {
   return connecting;
 }
 
+async function ensureInventoryExecutor(): Promise<ExecutorConnection> {
+  const connection = await ensureExecutor();
+  await connection.inventoryReady;
+  return connection;
+}
+
 async function connectExecutor(): Promise<ExecutorConnection> {
   const identity = await getBrowserIdentity();
   const native = await sendNativeBootstrap(identity);
@@ -190,15 +212,12 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   };
   socket.addEventListener("message", (event) => handleExecutorMessage(connection, event.data));
   socket.addEventListener("close", () => dropExecutor(connection), { once: true });
-  try {
-    await synchronizeBrowserInventory(socket, identity);
-    installBrowserPopupGuard(socket);
-  } catch (error) {
-    socket.close(4001, "Inventory sync failed");
-    throw error;
-  }
   executor = connection;
   connection.heartbeatTimer = startExecutorHeartbeat(socket, identity);
+  connection.inventoryReady = synchronizeBrowserInventory(socket, identity).then(() =>
+    installBrowserPopupGuard(socket),
+  );
+  void connection.inventoryReady.catch(() => socket.close(4001, "Inventory sync failed"));
   return connection;
 }
 

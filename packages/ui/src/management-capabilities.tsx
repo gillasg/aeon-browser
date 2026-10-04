@@ -113,8 +113,8 @@ function CapabilityFacts({ item }: { item: Capability }): ReactElement {
         <p className="credential-binding-guidance" role="note">
           Pi needs this MCP credential in its own server configuration. Add the credential setting
           required by this server to <code>~/.pi/agent/mcp.json</code> or this project’s{" "}
-          <code>.pi/mcp.json</code>, then reload the Pi session. Aeon does not store or display
-          the secret.
+          <code>.pi/mcp.json</code>, then reload the Pi session. Aeon does not store or display the
+          secret.
         </p>
       )}
     </>

@@ -93,7 +93,8 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
     setManagementSection(section);
     props.onManagementLoad();
   };
-  return (<div className="home-shell" data-sidebar-collapsed={String(collapsed)}>
+  return (
+    <div className="home-shell" data-sidebar-collapsed={String(collapsed)}>
       <HomeSidebar
         developmentFixture={props.developmentFixture}
         onNewChat={() => {

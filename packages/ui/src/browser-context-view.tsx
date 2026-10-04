@@ -54,8 +54,7 @@ export function BrowserContextTranscriptChip({
 }): ReactElement {
   return (
     <div className="browser-context-transcript" data-context-id={record.contextId}>
-      <ContextIdentity record={record} />
-      <ContextDetails record={record} />
+      <BrowserContextChip record={record} />
     </div>
   );
 }

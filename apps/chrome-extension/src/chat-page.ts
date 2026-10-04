@@ -1,3 +1,6 @@
+import { connectionSingleFlight } from "./connection-single-flight.js";
+import { connectSidebarCatalog } from "./sidebar-catalog-connection.js";
+import { ensurePanelContext } from "./panel-prompt-handoff.js";
 import { InitialChatDisplay } from "./initial-chat-display.js";
 import { observeChatTabStatus } from "./chat-tab-status.js";
 import { subscribeSavedChat } from "./chat-subscribe-client.js";
@@ -9,12 +12,7 @@ import { createToolImageLoader } from "./tool-image-client.js";
 import { ChatIdSchema, type ChatViewSnapshotDto, type DaemonUiResponse } from "@pippin/protocol";
 import { ChatSurface, mountPippinUi, TranscriptModel } from "@pippin/ui";
 import type { DevUiClient } from "./dev-ui-client.js";
-import {
-  connectCatalogPage,
-  connectPage,
-  connectionErrorMessage,
-  openExtensionChat,
-} from "./ui-connection.js";
+import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
 import { ChatSidebarController } from "./chat-sidebar-controller.js";
 import { ChatComposerController } from "./chat-composer-controller.js";
@@ -49,6 +47,11 @@ let runState: "idle" | "running-unconfirmed" | "uncertain" | "needs_attention" =
 let contextUsage: ChatViewSnapshotDto["contextUsage"] = null;
 let reconnectTimer = 0;
 let reconnectAttempt = 0;
+const connectAndSubscribe = connectionSingleFlight(establishChatConnection, (message) => {
+  setConnection("Disconnected", "error");
+  showError(message);
+  scheduleReconnect();
+});
 let isClosing = false;
 let connection: { label: string; state: "connecting" | "connected" | "error" } = {
   label: "Connecting",
@@ -71,6 +74,15 @@ const sidebar = new ChatSidebarController({
   onChange: () => render(),
   onError: showError,
 });
+const catalogReconnect = connectSidebarCatalog(
+  sidebar,
+  () => catalogClient,
+  (value) => {
+    catalogClient = value;
+  },
+  () => isClosing,
+  showError,
+);
 const composer = new ChatComposerController(
   chatId,
   () =>
@@ -115,7 +127,12 @@ function createView() {
     chats: sidebar.chats,
     sidebarOpen: sidebar.open,
     sidebarQuery: sidebar.query,
-    composer: { ...composer.props(), controls: initialDisplay.controls(composer.props().controls), contextUsage, ...piUi.composerProps() },
+    composer: {
+      ...composer.props(),
+      controls: initialDisplay.controls(composer.props().controls),
+      contextUsage,
+      ...piUi.composerProps(),
+    },
     ...resources.viewProps(),
     ...piUi.viewProps(),
     onToggleSidebar: () => sidebar.setOpen(!sidebar.open),
@@ -149,7 +166,10 @@ const closeView = createChatPageCloser(() => ({
 }));
 window.addEventListener("pagehide", closeView, { once: true });
 window.addEventListener("pagehide", () => piUi.close(), { once: true });
-if (chatId) void start();
+if (chatId) {
+  void catalogReconnect.start();
+  void start();
+}
 async function start(): Promise<void> {
   try {
     await connectAndSubscribe();
@@ -158,9 +178,8 @@ async function start(): Promise<void> {
     setConnection("Disconnected", "error");
   }
 }
-async function connectAndSubscribe(): Promise<void> {
+async function establishChatConnection(): Promise<void> {
   if (isClosing || !chatId) return;
-  void connectCatalogPage(catalogClient).then((value) => { catalogClient = value; }).catch(showError);
   const result = await connectPage({ kind: "chat", chatId });
   if (result.kind !== "connected") {
     setConnection("Disconnected", "error");
@@ -186,6 +205,8 @@ async function connectAndSubscribe(): Promise<void> {
       applySnapshot(response.snapshot, response.cursor, response.subscriptionId);
     if (response.kind === "chat.resumed") subscriptionId = response.subscriptionId;
     piUi.setClient(client);
+    await ensurePanelContext(chatId);
+    await applyBrowserContextDraft(await readChatContext(chatId));
     await submitFirstPrompt();
     await applyBrowserContextDraft(await readChatContext(chatId));
     if (resources.open) void resources.refresh();
@@ -298,7 +319,7 @@ function showError(message: string): void {
 function scheduleReconnect(): void {
   if (isClosing || reconnectTimer) return;
   reconnectAttempt += 1;
-  const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempt, 4), 15_000);
+  const delay = Math.min(250 * 2 ** Math.min(reconnectAttempt - 1, 3), 2000);
   reconnectTimer = globalThis.setTimeout(() => {
     reconnectTimer = 0;
     void connectAndSubscribe();

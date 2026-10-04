@@ -26,6 +26,7 @@ export function beginSubmit(
       text: payload.text,
       ...(payload.attachments ? { attachments: payload.attachments } : {}),
       ...(payload.browserContext ? { browserContext: payload.browserContext } : {}),
+      ...(payload.browserContexts ? { browserContexts: payload.browserContexts } : {}),
     })
     .then(() => completeSubmit(socket, service, request))
     .catch((error: unknown) => failSubmit(socket, service, request, error));
