@@ -1,8 +1,190 @@
-import { previewSiteScript, removeScriptPreview } from "./site-script-preview.js";
-import { BrowserScriptsSyncSchema, type SiteScriptDefinition } from "@pippin/protocol";
-import { siteScriptSource, siteScriptCleanup } from "./site-script-source.js";
-import { inspectSiteScript } from "./site-script-status.js";
-import { SCRIPT_KEY, readScripts } from "./site-script-records.js";
+import {
+  SiteScriptDefinitionSchema,
+  type SiteScriptDefinition,
+  BrowserScriptsSyncSchema,
+} from "@pippin/protocol";
+import { withBrowserDebugger } from "./native-browser-session.js";
+
+export const SCRIPT_KEY = "aeon-site-scripts";
+export function readScripts(value: unknown): SiteScriptDefinition[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const parsed = SiteScriptDefinitionSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+const bootstrap = `
+const previous = globalThis.__aeonSiteScript;
+if (previous && previous.revision === revision && !previous.failed) return {alreadyApplied:true};
+previous?.dispose();
+const cleanups = [], controller = new AbortController();
+const state = {revision, failed:false, completed:false, url:location.href, startedAt:Date.now(), value:null, error:null, dispose: () => {
+  controller.abort();
+  for (const cleanup of cleanups.splice(0).reverse()) {try {cleanup();} catch {}}
+  delete globalThis.__aeonSiteScript;
+}};
+globalThis.__aeonSiteScript = state;
+const report = (error) => {
+  state.failed = true; state.error = String(error?.message || error).slice(0,1000);
+  globalThis.chrome?.runtime?.sendMessage?.({kind:'aeon.script.report', scriptId, revision,
+    error:String(error?.message || error).slice(0,1000)})?.catch(() => {});
+};
+const guarded = (fn) => {try {Promise.resolve(fn()).catch(report);} catch(error) {report(error);}};
+const style = (text) => {
+  const element = document.createElement('style');
+  element.textContent = text; (document.head || document.documentElement).append(element);
+  cleanups.push(() => element.remove()); return element;
+};
+const aeon = Object.freeze({signal:controller.signal, style,
+  cleanup: (fn) => {if(typeof fn !== 'function') throw Error('cleanup needs a function'); cleanups.push(fn);},
+  hide: (selector) => style(selector + '{display:none!important}'),
+  onChange: (fn) => {
+    let timer;
+    const observer = new MutationObserver(() => {
+      if(timer || controller.signal.aborted) return;
+      timer = setTimeout(() => {timer = undefined; guarded(fn);}, 120);
+    });
+    observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["title","aria-label","href","class"]});
+    cleanups.push(() => {observer.disconnect(); clearTimeout(timer);}); guarded(fn);
+  },
+  onRoute: (fn) => {
+    let url = location.href;
+    const timer = setInterval(() => {if(location.href !== url){url = location.href; guarded(fn);}}, 500);
+    cleanups.push(() => clearInterval(timer)); guarded(fn);
+  },
+});
+if(css) style(css);
+`;
+export function siteScriptSource(script: SiteScriptDefinition): string {
+  return `(async () => {
+const scriptId = ${JSON.stringify(script.scriptId)}, revision = ${script.revision}, css = ${JSON.stringify(script.css)};
+if (!document.documentElement) await new Promise(resolve => document.addEventListener("DOMContentLoaded", resolve, {once:true}));
+${bootstrap}
+try {
+  const value = await (async () => {${script.code}\n})();
+  state.completed = true; state.value = typeof value === 'undefined' ? null : value;
+  return {applied:!state.failed, revision, value:state.value, error:state.error};
+} catch(error) {report(error); return {applied:false, error:String(error?.message || error).slice(0,1000)};}
+})()`;
+}
+export const siteScriptCleanup = "globalThis.__aeonSiteScript?.dispose(); ({removed:true})";
+
+export async function inspectSiteScript(tabId: number, scriptId?: string): Promise<unknown> {
+  if (!scriptId) throw new Error("Provide scriptId for status.");
+  const stored = await chrome.storage.local.get([SCRIPT_KEY, "aeon-site-script-errors"]);
+  const saved = readScripts(stored[SCRIPT_KEY]).find((script) => script.scriptId === scriptId);
+  const tab = await chrome.tabs.get(tabId);
+  try {
+    const registered = await chrome.userScripts.getScripts({ ids: ["aeon-site-" + scriptId] });
+    const results = await chrome.userScripts.execute({
+      target: { tabId },
+      world: "USER_SCRIPT",
+      worldId: "aeon-site-" + scriptId,
+      js: [
+        {
+          code: `(() => {const s = globalThis.__aeonSiteScript; return s ? {revision:s.revision,
+        completed:s.completed === true, failed:s.failed, error:s.error, startedAt:s.startedAt,
+        url:location.href, value:s.value} : {executed:false,url:location.href};})()`,
+        },
+      ],
+    });
+    const first = results[0];
+    return {
+      saved: Boolean(saved),
+      enabled: saved?.enabled ?? false,
+      registered: registered.length > 0,
+      url: tab.url,
+      execution: first?.result ?? null,
+      error: first?.error ? String(first.error) : undefined,
+      lastError:
+        (stored["aeon-site-script-errors"] as Record<string, unknown> | undefined)?.[scriptId] ??
+        null,
+    };
+  } catch (error) {
+    return { saved: Boolean(saved), url: tab.url, error: String(error) };
+  }
+}
+
+const worlds = new Map<string, number>();
+export async function previewSiteScript(
+  tabId: number,
+  script: SiteScriptDefinition,
+  assertActive: () => Promise<void>,
+): Promise<unknown> {
+  return withBrowserDebugger(tabId, async (debuggee) => {
+    await assertActive();
+    const tree = (await chrome.debugger.sendCommand(debuggee, "Page.getFrameTree")) as {
+      frameTree: { frame: { id: string; url: string } };
+    };
+    const url = tree.frameTree.frame.url;
+    if (!script.matches.some((pattern) => matches(pattern, url))) throw new Error("INVALID_TARGET");
+    const world = (await chrome.debugger.sendCommand(debuggee, "Page.createIsolatedWorld", {
+      frameId: tree.frameTree.frame.id,
+      worldName: "aeon-preview-" + script.scriptId,
+    })) as { executionContextId: number };
+    worlds.set(tabId + ":" + script.scriptId, world.executionContextId);
+    await assertActive();
+    const response = (await boundedPreview(
+      chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
+        expression: siteScriptSource(script),
+        contextId: world.executionContextId,
+        awaitPromise: true,
+        returnByValue: true,
+        timeout: 5000,
+      }),
+    )) as { result?: { value?: unknown }; exceptionDetails?: { text?: string } };
+    if (response.exceptionDetails)
+      return { applied: false, error: response.exceptionDetails.text ?? "Preview failed" };
+    return { installed: false, temporary: true, result: response.result?.value ?? null };
+  });
+}
+export async function removeScriptPreview(tabId: number, scriptId: string): Promise<boolean> {
+  const key = tabId + ":" + scriptId,
+    contextId = worlds.get(key);
+  if (contextId === undefined) return false;
+  await withBrowserDebugger(tabId, (debuggee) =>
+    chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
+      expression: siteScriptCleanup,
+      contextId,
+      returnByValue: true,
+    }),
+  ).catch(() => undefined);
+  worlds.delete(key);
+  return true;
+}
+function matches(pattern: string, url: string): boolean {
+  const escaped = pattern
+    .split("*")
+    .map((part) =>
+      Array.from(part, (char) => (/[a-z0-9]/i.test(char) ? char : "\\" + char)).join(""),
+    );
+  return new RegExp("^" + escaped.join(".*") + "$").test(url);
+}
+chrome.tabs.onRemoved.addListener((id) => {
+  for (const key of worlds.keys()) if (key.startsWith(id + ":")) worlds.delete(key);
+});
+
+async function boundedPreview<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error("Preview exceeded 5 seconds; reload the page if its state is uncertain."),
+            ),
+          5000,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 const PENDING_KEY = "aeon-site-script-access";
 const PREFIX = "aeon-site-";
 let chain: Promise<unknown> = Promise.resolve();
