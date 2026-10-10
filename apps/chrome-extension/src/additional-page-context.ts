@@ -3,7 +3,7 @@ import {
   PiBrowserContextRecordSchema,
   type PiBrowserContextRecord,
 } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 export function additionalPages(chatId: string): PiBrowserContextRecord[] {
   try {
     const data: unknown = JSON.parse(
@@ -22,7 +22,7 @@ export function additionalPages(chatId: string): PiBrowserContextRecord[] {
   }
 }
 export async function attachAdditionalPages(
-  client: DevUiClient,
+  client: UiClient,
   chatId: string,
   pages: PiBrowserContextRecord[],
 ): Promise<void> {

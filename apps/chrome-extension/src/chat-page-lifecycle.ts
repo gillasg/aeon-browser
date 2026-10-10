@@ -1,14 +1,14 @@
 import { ChatIdSchema } from "@pippin/protocol";
 import { InitialChatDisplay } from "./initial-chat-display.js";
 import { DaemonUiRequestSchema } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 interface ChatPageCloseState {
   chatId: string;
   subscriptionId: string;
   reconnectTimer: number;
-  client: DevUiClient | undefined;
-  catalogClient: DevUiClient | undefined;
+  client: UiClient | undefined;
+  catalogClient: UiClient | undefined;
   composer: { close(): void };
   onStorageChanged: Parameters<typeof chrome.storage.onChanged.removeListener>[0];
   markClosing(): void;

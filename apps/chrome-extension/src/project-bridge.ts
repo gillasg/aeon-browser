@@ -1,9 +1,9 @@
 import { DaemonUiRequestSchema } from "@pippin/protocol";
 import { connectPage } from "./ui-connection.js";
 import { openNewChat } from "./new-chat-navigation.js";
-import type { DevUiClient } from "./dev-ui-client.js";
-let connection: Promise<DevUiClient> | undefined;
-async function projectClient(): Promise<DevUiClient> {
+import type { UiClient } from "./ui-client-core.js";
+let connection: Promise<UiClient> | undefined;
+async function projectClient(): Promise<UiClient> {
   connection ??= connectPage({ kind: "catalog" }).then((result) => {
     if (result.kind !== "connected") {
       connection = undefined;

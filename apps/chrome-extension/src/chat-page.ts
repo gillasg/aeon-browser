@@ -10,7 +10,7 @@ import { createElement } from "react";
 import { createToolImageLoader } from "./tool-image-client.js";
 import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@pippin/protocol";
 import { ChatSurface, mountPippinUi, TranscriptModel } from "@pippin/ui";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
 import { ChatSidebarController } from "./chat-sidebar-controller.js";
@@ -33,10 +33,9 @@ import { ChatResourcesController } from "./chat-resources-controller.js";
 import { initializeChatPreferences } from "./chat-preferences.js";
 import { ChatPiUiController } from "./chat-pi-ui-controller.js";
 const { root, chatId, initialDisplay } = initializeChatPage();
-let connectionGrant = "";
-let client: DevUiClient | undefined;
+let client: UiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);
-let catalogClient: DevUiClient | undefined;
+let catalogClient: UiClient | undefined;
 let subscriptionId = "";
 let cursor: { epoch: string; revision: number } | undefined;
 let runState: "idle" | "running-unconfirmed" | "uncertain" | "needs_attention" = "idle";
@@ -62,7 +61,7 @@ const sidebar = new ChatSidebarController({
   currentChatId: chatId,
   client: () => catalogClient,
   openChat: async (nextChatId) => {
-    await openExtensionChat(nextChatId, { reuseCurrentTab: true }, connectionGrant);
+    await openExtensionChat(nextChatId, { reuseCurrentTab: true });
   },
   onChange: () => render(),
   onError: showError,
@@ -91,7 +90,7 @@ const piUi = new ChatPiUiController(
   (snapshot, nextCursor) => applySnapshot(snapshot, nextCursor, subscriptionId),
   (text, attachments, notice) => composer.loadEditDraft(text, attachments, notice),
   async (forkedChatId) => {
-    await openExtensionChat(forkedChatId, {}, connectionGrant);
+    await openExtensionChat(forkedChatId, {});
   },
   showError,
 );
@@ -179,7 +178,6 @@ async function establishChatConnection(): Promise<void> {
     scheduleReconnect();
     return;
   }
-  connectionGrant = result.developmentGrant;
   client = result.client;
   resources.setClient(client);
   composer.setClient(client);
@@ -206,7 +204,7 @@ async function establishChatConnection(): Promise<void> {
     showError(errorMessage(error));
   }
 }
-function attachChatClientListeners(activeClient: DevUiClient): void {
+function attachChatClientListeners(activeClient: UiClient): void {
   observeChatTabStatus(activeClient, chatId);
   activeClient.subscribe(handleDaemonMessage);
   activeClient.socket.addEventListener(

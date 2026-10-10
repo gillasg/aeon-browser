@@ -8,7 +8,7 @@ import {
   NativePageGrantRequestSchema,
   NativePageGrantResponseSchema,
 } from "./native-extension-message.js";
-import { DevUiClient, type UiConnectResult } from "./dev-ui-client.js";
+import { UiClient, type UiConnectResult } from "./ui-client-core.js";
 
 export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectResult> {
   const pageInstanceId = crypto.randomUUID();
@@ -50,7 +50,7 @@ export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectR
       kind: "failed",
       code: reply?.kind === "auth.rejected" ? reply.code : "CONNECTION_TIMEOUT",
     };
-  return { kind: "connected", client: new DevUiClient(socket) };
+  return { kind: "connected", client: new UiClient(socket) };
 }
 
 function authenticate(socket: WebSocket, hello: unknown) {

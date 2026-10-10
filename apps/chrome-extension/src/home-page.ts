@@ -16,7 +16,7 @@ import {
 import { mountPippinUi, NewTabHome, type ComposerModel, type ComposerAttachment } from "@pippin/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { applyStoredTheme } from "./theme-preferences.js";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { HomeCatalogController } from "./home-catalog-controller.js";
 import { HomeManagementController } from "./home-management-controller.js";
@@ -26,8 +26,7 @@ const root = requiredElement("root");
 if (new URL(location.href).searchParams.get("host") === "panel")
   document.body.dataset.host = "panel";
 void applyStoredTheme();
-let client: DevUiClient | undefined;
-let connectionGrant = "";
+let client: UiClient | undefined;
 let chats: ChatCatalogItemDto[] = [];
 let modelCatalog: PiModelCatalogDto | null = null;
 let connectionLabel = "Starting";
@@ -110,7 +109,6 @@ async function start(): Promise<void> {
   client = result.client;
   reconnect.watch(client);
   errorMessage = "";
-  connectionGrant = result.developmentGrant;
   connectionLabel = "Connected";
   render();
   await Promise.all([
@@ -191,14 +189,10 @@ async function requestOpenChat(
     attachments?: PiAttachmentDto[];
   },
 ): Promise<void> {
-  await openExtensionChat(
-    chatId,
-    {
-      ...(reuseCurrentTab ? { reuseCurrentTab: true } : {}),
-      ...(initialSubmit ? { initialSubmit } : {}),
-    },
-    connectionGrant,
-  );
+  await openExtensionChat(chatId, {
+    ...(reuseCurrentTab ? { reuseCurrentTab: true } : {}),
+    ...(initialSubmit ? { initialSubmit } : {}),
+  });
 }
 
 async function loadModelCatalog(): Promise<void> {

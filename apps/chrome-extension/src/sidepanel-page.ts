@@ -3,15 +3,14 @@ import { PageReconnect } from "./page-reconnect.js";
 import { createElement } from "react";
 import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
 import { mountPippinUi, SidePanel, type SidePanelProps } from "@pippin/ui";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { handoffKey, pendingHandoffs, saveChatContext } from "./browser-context-storage.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import { observePanelFrameTitle } from "./panel-frame-title.js";
 
 const root = requiredElement("root");
-let client: DevUiClient | undefined;
-let grant = "";
+let client: UiClient | undefined;
 let windowId: number | undefined;
 let chats: Array<{ chatId: string; title: string; updatedAt: string }> = [];
 let selectedChatId = "";
@@ -116,7 +115,6 @@ async function start(): Promise<void> {
     if (connection.kind !== "connected") throw new Error(connectionErrorMessage(connection.code));
     client = connection.client;
     reconnect.watch(client);
-    grant = connection.developmentGrant;
     client.subscribe(handleDaemonMessage);
     const stored = await chrome.storage.session.get(selectionKey(windowId));
     const savedId = stored[selectionKey(windowId)];
@@ -239,13 +237,9 @@ async function routePendingContext(): Promise<void> {
 async function openSelectedChat(): Promise<void> {
   if (!selectedChatId) return;
   try {
-    await openExtensionChat(
-      selectedChatId,
-      {
-        ...(windowId !== undefined ? { targetWindowId: windowId } : {}),
-      },
-      grant,
-    );
+    await openExtensionChat(selectedChatId, {
+      ...(windowId !== undefined ? { targetWindowId: windowId } : {}),
+    });
     await closePanel();
   } catch (error) {
     status = `Could not open this Chat · ${messageOf(error)}`;
@@ -285,7 +279,7 @@ function handleDaemonMessage(message: DaemonUiResponse): void {
   )
     void refreshChats();
 }
-function requireClient(): DevUiClient {
+function requireClient(): UiClient {
   if (!client) throw new Error("The local daemon is unavailable.");
   return client;
 }

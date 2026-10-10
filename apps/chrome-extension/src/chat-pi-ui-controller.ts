@@ -6,7 +6,7 @@ import {
   type PiSessionEventDto,
   type PiUiSnapshotDto,
 } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import type { ChatSurfaceProps, ChatComposerProps } from "@pippin/ui";
 type CompletedCommandResult = Extract<DaemonUiResponse, { kind: "command.completed" }>["result"];
 type MessageEditResultDto = Extract<CompletedCommandResult, { kind: "chat.message-edited" }>;
@@ -30,7 +30,7 @@ export class ChatPiUiController {
   open = false;
   busy = false;
   commandInsertion: { id: number; text: string } | undefined;
-  private client: DevUiClient | undefined;
+  private client: UiClient | undefined;
   private insertionId = 0;
   constructor(
     private readonly chatId: string,
@@ -69,7 +69,7 @@ export class ChatPiUiController {
     return this.commandInsertion ? { commandInsertion: this.commandInsertion } : {};
   }
 
-  setClient(client: DevUiClient | undefined): void {
+  setClient(client: UiClient | undefined): void {
     this.client = client;
     if (client) void this.refresh();
   }

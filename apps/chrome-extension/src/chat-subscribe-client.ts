@@ -3,9 +3,9 @@ import {
   type ChatEventCursorDto,
   type DaemonUiResponse,
 } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 export async function subscribeSavedChat(
-  client: DevUiClient,
+  client: UiClient,
   chatId: string,
   cursor: ChatEventCursorDto | undefined,
 ): Promise<DaemonUiResponse> {

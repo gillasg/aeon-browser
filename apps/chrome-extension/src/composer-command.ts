@@ -1,8 +1,8 @@
 import { DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
 import type { ChatComposerProps, ComposerControls } from "@pippin/ui";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 export async function sendComposerCommand(
-  client: DevUiClient | undefined,
+  client: UiClient | undefined,
   request: Record<string, unknown>,
 ): Promise<DaemonUiResponse> {
   if (!client) throw new Error("The local daemon is unavailable.");

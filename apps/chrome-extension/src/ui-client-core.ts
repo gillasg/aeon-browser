@@ -4,12 +4,11 @@ import {
   type DaemonUiRequest,
   type DaemonUiResponse,
 } from "@pippin/protocol";
-import { connectDevelopmentClient } from "./dev-socket.js";
 
 export type UiConnectResult =
-  { kind: "connected"; client: DevUiClient } | { kind: "failed"; code: string };
+  { kind: "connected"; client: UiClient } | { kind: "failed"; code: string };
 
-export class DevUiClient {
+export class UiClient {
   readonly history: DaemonUiResponse[] = [];
   private messageCount = 0;
   private historyStart = 0;
@@ -105,11 +104,4 @@ export class DevUiClient {
     )
       this.socket.close();
   }
-}
-
-export async function connectDevUi(connectionGrant: string): Promise<UiConnectResult> {
-  const result = await connectDevelopmentClient("ui", connectionGrant);
-  return result.kind === "ack"
-    ? { kind: "connected", client: new DevUiClient(result.socket) }
-    : { kind: "failed", code: result.kind === "rejected" ? result.message.code : result.code };
 }

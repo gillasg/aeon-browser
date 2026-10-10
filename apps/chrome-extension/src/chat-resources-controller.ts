@@ -1,11 +1,11 @@
 import { DaemonUiRequestSchema } from "@pippin/protocol";
 import type { ChatSurfaceProps, LoadedResourcesState } from "@pippin/ui";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 export class ChatResourcesController {
   open = false;
   state: LoadedResourcesState = { kind: "idle" };
-  private client: DevUiClient | undefined;
+  private client: UiClient | undefined;
   private generation = 0;
 
   constructor(
@@ -13,7 +13,7 @@ export class ChatResourcesController {
     private readonly onChange: () => void,
   ) {}
 
-  setClient(client: DevUiClient): void {
+  setClient(client: UiClient): void {
     this.client = client;
   }
 

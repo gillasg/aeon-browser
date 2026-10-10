@@ -4,12 +4,12 @@ import { type DaemonUiResponse } from "@pippin/protocol";
 import type { PiBrowserContextRecord } from "@pippin/protocol";
 import type { ChatComposerProps, ComposerAttachment, ComposerControls } from "@pippin/ui";
 import type { PiAttachmentDto } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { submitComposerMessage } from "./chat-composer-submit.js";
 
 export class ChatComposerController {
-  private client: DevUiClient | undefined;
+  private client: UiClient | undefined;
   private disposed = false;
   private submitting = false;
   private projectName: string | null = null;
@@ -37,7 +37,7 @@ export class ChatComposerController {
     this.projectName = name;
   }
 
-  setClient(client: DevUiClient): void {
+  setClient(client: UiClient): void {
     this.client = client;
     this.controls = null;
     client.socket.addEventListener(

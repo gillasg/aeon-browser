@@ -1,12 +1,12 @@
 import type { ChatSidebarController } from "./chat-sidebar-controller.js";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { PageReconnect } from "./page-reconnect.js";
 import { connectCatalogPage } from "./ui-connection.js";
 
 export function connectSidebarCatalog(
   sidebar: ChatSidebarController,
-  current: () => DevUiClient | undefined,
-  assign: (client: DevUiClient) => void,
+  current: () => UiClient | undefined,
+  assign: (client: UiClient) => void,
   closing: () => boolean,
   onError: (message: string) => void,
 ): PageReconnect {

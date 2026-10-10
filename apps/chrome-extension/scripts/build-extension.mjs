@@ -6,9 +6,8 @@ import { build } from "esbuild";
 
 const appRoot = fileURLToPath(new URL("../", import.meta.url));
 
-export async function buildExtension(variant) {
-  const native = variant === "native";
-  const output = join(appRoot, native ? "native-dist" : "dev-dist");
+export async function buildExtension() {
+  const output = join(appRoot, "native-dist");
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   const shared = {
@@ -18,22 +17,21 @@ export async function buildExtension(variant) {
     jsx: "automatic",
     target: "chrome116",
     loader: { ".ttf": "file" },
-    define: { __PIPPIN_NATIVE_TRANSPORT__: native ? "true" : "false" },
+    define: { __PIPPIN_NATIVE_TRANSPORT__: "true" },
   };
   const entries = [
-    [join(appRoot, `src/${native ? "native" : "dev"}-worker.ts`), "service-worker.js"],
+    [join(appRoot, "src/native-worker.ts"), "service-worker.js"],
     [join(appRoot, "src/chat-page.ts"), "chat.js"],
     [join(appRoot, "src/viewer-page.tsx"), "viewer.js"],
     [join(appRoot, "src/site-scripts-page.ts"), "site-scripts.js"],
     [join(appRoot, "src/home-page.ts"), "home.js"],
     [join(appRoot, "src/sidepanel-page.ts"), "sidepanel.js"],
   ];
-  if (!native) entries.push([join(appRoot, "src/dev-options.ts"), "options.js"]);
   await Promise.all(entries.map(([entry, file]) => buildEntry(shared, output, entry, file)));
 
   await buildViewerWorker(shared, output);
   const files = [
-    native ? "manifest.native.json" : "manifest.dev.json",
+    "manifest.native.json",
     "chat.html",
     "completion-icon.png",
     "aeon-icon.svg",
@@ -52,7 +50,6 @@ export async function buildExtension(variant) {
     "sidebar-layout.css",
     "atmosphere-wallpaper.png",
   ];
-  if (!native) files.push("options.html", "options.css");
   await Promise.all(
     files.map((file) =>
       copyFile(
@@ -62,9 +59,7 @@ export async function buildExtension(variant) {
     ),
   );
   await copyFile(join(appRoot, "../../packages/ui/src/tokens.css"), join(output, "ui-tokens.css"));
-  process.stdout.write(
-    `Built ${native ? "native" : "development fixture"} extension at ${output}\n`,
-  );
+  process.stdout.write(`Built native extension at ${output}\n`);
 }
 
 function buildViewerWorker(shared, output) {

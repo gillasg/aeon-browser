@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build-dev-extension.mjs && node scripts/build-native-extension.mjs",
-    "build:dev": "node scripts/build-dev-extension.mjs",
+    "build": "node scripts/build-native-extension.mjs",
     "build:native": "node scripts/build-native-extension.mjs"
   },
   "dependencies": {

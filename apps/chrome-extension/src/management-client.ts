@@ -1,11 +1,11 @@
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { connectNativeUi } from "./native-ui-client.js";
 
 export function createManagementClient(
   native: boolean,
-  catalog: () => DevUiClient | undefined,
-): () => Promise<DevUiClient | undefined> {
-  let pending: Promise<DevUiClient> | undefined;
+  catalog: () => UiClient | undefined,
+): () => Promise<UiClient | undefined> {
+  let pending: Promise<UiClient> | undefined;
   return async () => {
     if (!native) return catalog();
     pending ??= connectNativeUi({ kind: "management" })

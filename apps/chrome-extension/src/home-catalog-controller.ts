@@ -1,8 +1,8 @@
 import { type ChatCatalogItemDto, type DaemonUiResponse } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 interface HomeCatalogOptions {
-  client(): DevUiClient | undefined;
+  client(): UiClient | undefined;
   onError(message: string): void;
   onClearError(): void;
   onChange(): void;

@@ -1,13 +1,13 @@
 import { additionalPages, attachAdditionalPages } from "./additional-page-context.js";
 import { readChatContext, removeChatContext } from "./browser-context-storage.js";
 import { DaemonUiRequestSchema } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { takeNativeInitialSubmit } from "./ui-connection.js";
 import { applyInitialChatSelection } from "./initial-chat-selection.js";
 
 export async function submitInitialPrompt(
   chatId: string,
-  client: DevUiClient | undefined,
+  client: UiClient | undefined,
   nativeTransport: boolean,
 ): Promise<boolean> {
   if (!nativeTransport || !client) return false;

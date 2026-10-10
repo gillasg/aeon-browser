@@ -1,5 +1,5 @@
 import { DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 export interface InitialChatSelection {
   model: { provider: string; id: string };
@@ -7,7 +7,7 @@ export interface InitialChatSelection {
 }
 
 export async function applyInitialChatSelection(
-  client: DevUiClient,
+  client: UiClient,
   chatId: string,
   selection: InitialChatSelection,
 ): Promise<void> {
@@ -22,7 +22,7 @@ export async function applyInitialChatSelection(
 }
 
 async function sendCommand(
-  client: DevUiClient,
+  client: UiClient,
   command:
     | {
         operation: "chat.model";

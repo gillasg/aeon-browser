@@ -1,9 +1,4 @@
-import {
-  DevPageGrantResponseSchema,
-  DevTakeChatGrantResponseSchema,
-} from "./dev-extension-message.js";
-import type { DevUiClient, UiConnectResult } from "./dev-ui-client.js";
-import { connectDevUi } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { connectNativeUi } from "./native-ui-client.js";
 import {
   NativeTakeInitialSubmitResponseSchema,
@@ -27,47 +22,22 @@ interface OpenChatOptions {
 export type PageConnection =
   | {
       kind: "connected";
-      client: DevUiClient;
-      developmentGrant: string;
+      client: UiClient;
     }
   | { kind: "failed"; code: string };
 
 export async function connectPage(scope: PageGrantScope): Promise<PageConnection> {
-  if (__PIPPIN_NATIVE_TRANSPORT__) {
-    const result = await connectNativeUi(scope);
-    return result.kind === "connected"
-      ? { kind: "connected", client: result.client, developmentGrant: "" }
-      : { kind: "failed", code: result.code };
-  }
-
-  const grantResponse =
-    scope.kind === "chat"
-      ? DevTakeChatGrantResponseSchema.safeParse(
-          await chrome.runtime.sendMessage({
-            kind: "pippin.dev.take-chat-grant",
-            chatId: scope.chatId,
-          }),
-        )
-      : DevPageGrantResponseSchema.safeParse(
-          await chrome.runtime.sendMessage({ kind: "pippin.dev.get-page-grant" }),
-        );
-  if (!grantResponse.success) return { kind: "failed", code: "INVALID_GRANT_RESPONSE" };
-  if (!grantResponse.data.ok) return { kind: "failed", code: grantResponse.data.code };
-  const grant = grantResponse.data.connectionGrant;
-  const result: UiConnectResult = await connectDevUi(grant);
+  const result = await connectNativeUi(scope);
   return result.kind === "connected"
-    ? { kind: "connected", client: result.client, developmentGrant: grant }
+    ? { kind: "connected", client: result.client }
     : { kind: "failed", code: result.code };
 }
 
 export async function openExtensionChat(
   chatId: string,
   options: OpenChatOptions = {},
-  developmentGrant = "",
 ): Promise<{ focusedExisting: boolean }> {
-  return __PIPPIN_NATIVE_TRANSPORT__
-    ? openNativeChat(chatId, options)
-    : openDevelopmentChat(chatId, options, developmentGrant);
+  return openNativeChat(chatId, options);
 }
 
 async function openNativeChat(
@@ -83,23 +53,6 @@ async function openNativeChat(
   return { focusedExisting: response.focusedExisting };
 }
 
-async function openDevelopmentChat(
-  chatId: string,
-  options: OpenChatOptions,
-  developmentGrant: string,
-): Promise<{ focusedExisting: boolean }> {
-  if (!developmentGrant) throw new Error("The development grant is unavailable.");
-  const response = await chrome.runtime.sendMessage({
-    kind: "pippin.dev.open-chat",
-    chatId,
-    connectionGrant: developmentGrant,
-    ...(options.targetWindowId !== undefined ? { targetWindowId: options.targetWindowId } : {}),
-    ...(options.reuseCurrentTab !== undefined ? { reuseCurrentTab: options.reuseCurrentTab } : {}),
-  });
-  if (!response?.ok) throw new Error(response?.code ?? "TAB_OPEN_FAILED");
-  return { focusedExisting: response.focusedExisting };
-}
-
 export async function takeNativeInitialSubmit(chatId: string): Promise<
   | {
       requestId: string;
@@ -110,7 +63,6 @@ export async function takeNativeInitialSubmit(chatId: string): Promise<
     }
   | undefined
 > {
-  if (!__PIPPIN_NATIVE_TRANSPORT__) return undefined;
   const response = NativeTakeInitialSubmitResponseSchema.safeParse(
     await chrome.runtime.sendMessage({ kind: "pippin.native.take-initial-submit", chatId }),
   );
@@ -129,10 +81,10 @@ export async function takeNativeInitialSubmit(chatId: string): Promise<
 }
 
 export function connectionErrorMessage(code: string): string {
-  return __PIPPIN_NATIVE_TRANSPORT__ ? pageGrantErrorMessage(code) : code;
+  return pageGrantErrorMessage(code);
 }
 
-export async function connectCatalogPage(current?: DevUiClient): Promise<DevUiClient | undefined> {
+export async function connectCatalogPage(current?: UiClient): Promise<UiClient | undefined> {
   if (current?.socket.readyState === WebSocket.OPEN) return current;
   const result = await connectPage({ kind: "catalog" });
   return result.kind === "connected" ? result.client : undefined;

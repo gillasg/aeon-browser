@@ -4,7 +4,7 @@ import {
   type ManagementSnapshotDto,
 } from "@pippin/protocol";
 import type { ManagementActionName, NewTabHomeProps } from "@pippin/ui";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 type Theme = "dark" | "midnight" | "light" | "system";
 type HomeManagementProps = Pick<
@@ -36,10 +36,10 @@ export class HomeManagementController {
   private requestGeneration = 0;
 
   constructor(
-    private readonly client: () => DevUiClient | undefined,
+    private readonly client: () => UiClient | undefined,
     private readonly onChange: () => void,
     private readonly onOpenChat: (chatId: string) => void,
-    private readonly managementClient?: () => Promise<DevUiClient | undefined>,
+    private readonly managementClient?: () => Promise<UiClient | undefined>,
   ) {}
 
   viewProps(): HomeManagementProps {
@@ -112,7 +112,7 @@ export class HomeManagementController {
     this.onChange();
   }
 
-  private async getManagementClient(): Promise<DevUiClient | undefined> {
+  private async getManagementClient(): Promise<UiClient | undefined> {
     return this.managementClient ? this.managementClient() : this.client();
   }
 

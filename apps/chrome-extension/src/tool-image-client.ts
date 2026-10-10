@@ -1,7 +1,7 @@
 import { decodeImageAsset, MAX_IMAGE_ASSET_BYTES, type DaemonUiResponse } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 export function createToolImageLoader(
-  getClient: () => DevUiClient | undefined,
+  getClient: () => UiClient | undefined,
   chatId: string,
 ): (toolCallId: string, index: number) => Promise<Blob> {
   return (toolCallId, index) => {
@@ -13,7 +13,7 @@ export function createToolImageLoader(
 }
 
 export function loadToolImage(
-  client: DevUiClient,
+  client: UiClient,
   chatId: string,
   toolCallId: string,
   index: number,

@@ -1,9 +1,9 @@
 import { type ChatSummaryDto, type DaemonUiResponse } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 interface ChatSidebarOptions {
   currentChatId: string;
-  client: () => DevUiClient | undefined;
+  client: () => UiClient | undefined;
   openChat(chatId: string): Promise<void>;
   onChange(): void;
   onError(message: string): void;

@@ -5,10 +5,10 @@ import {
   type PiBrowserContextRecord,
 } from "@pippin/protocol";
 import type { ComposerAttachment } from "@pippin/ui";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 interface SubmitComposerMessageInput {
-  client: DevUiClient;
+  client: UiClient;
   chatId: string;
   requestId: string;
   text: string;

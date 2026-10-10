@@ -1,4 +1,4 @@
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 
 /** Retries connections and read-only initialization; never replays submitted commands. */
 export class PageReconnect {
@@ -6,7 +6,7 @@ export class PageReconnect {
   private attempt = 0;
   private busy = false;
   private stopped = false;
-  private watched: DevUiClient | undefined;
+  private watched: UiClient | undefined;
   constructor(
     private readonly connect: () => Promise<void>,
     private readonly onFailure: (message: string) => void,
@@ -29,7 +29,7 @@ export class PageReconnect {
       this.busy = false;
     }
   }
-  watch(client: DevUiClient): void {
+  watch(client: UiClient): void {
     this.watched = client;
     this.attempt = 0;
     if (this.timer !== undefined) clearTimeout(this.timer);

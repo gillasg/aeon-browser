@@ -1,10 +1,10 @@
 import { PiBrowserContextRecordSchema, type PiAttachmentDto } from "@pippin/protocol";
-import type { DevUiClient } from "./dev-ui-client.js";
+import type { UiClient } from "./ui-client-core.js";
 import { additionalPages } from "./additional-page-context.js";
 import { projectDraftPayload } from "./project-bridge.js";
 
 export async function startHomePrompt(
-  client: DevUiClient,
+  client: UiClient,
   initial: {
     text: string;
     model: { provider: string; id: string };

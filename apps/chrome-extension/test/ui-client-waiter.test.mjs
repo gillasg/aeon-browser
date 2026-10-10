@@ -11,20 +11,20 @@ test("a presentation listener failure cannot strand an already matched command w
   try {
     const outfile = join(directory, "client.mjs");
     await build({
-      entryPoints: [fileURLToPath(new URL("../src/dev-ui-client.ts", import.meta.url))],
+      entryPoints: [fileURLToPath(new URL("../src/ui-client-core.ts", import.meta.url))],
       outfile,
       bundle: true,
       platform: "node",
       format: "esm",
     });
-    const { DevUiClient } = await import(pathToFileURL(outfile).href);
+    const { UiClient } = await import(pathToFileURL(outfile).href);
     const handlers = new Map();
     const socket = {
       addEventListener(kind, handler) {
         handlers.set(kind, handler);
       },
     };
-    const client = new DevUiClient(socket);
+    const client = new UiClient(socket);
     client.subscribe(() => {
       throw new Error("presentation failed");
     });

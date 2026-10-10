@@ -6,7 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoots = ["apps", "packages", "scripts"].map((path) => join(root, path));
 const maxLines = 800;
 const maxBytes = 40 * 1024;
-const generatedDirectories = new Set(["dist", "dev-dist", "node_modules"]);
+const generatedDirectories = new Set(["dist", "node_modules"]);
 const failures = [];
 
 async function visit(path, files = []) {
