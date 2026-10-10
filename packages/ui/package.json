@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@pippin/protocol": "file:../../vendor/pippin-protocol-0.1.0.tgz",
+    "@pippin/protocol": "file:..\\..\\vendor\\pippin-protocol-0.3.1.tgz",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",

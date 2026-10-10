@@ -1,4 +1,5 @@
 import { onNode, nodeState } from "./native-browser-dom.js";
+import { fillTextNode } from "./native-browser-text.js";
 interface Point {
   x: number;
   y: number;
@@ -37,9 +38,20 @@ function hitPoint(this: HTMLElement) {
     y = (top + bottom) / 2;
   const root = this.getRootNode() as Document | ShadowRoot;
   const hit = root.elementFromPoint(x, y);
+  let offsetX = 0,
+    offsetY = 0,
+    current: Window = window;
+  while (current !== current.parent) {
+    const frame = current.frameElement;
+    if (!frame) return { x, y, hit: false };
+    const rect = frame.getBoundingClientRect();
+    offsetX += rect.left + (frame as HTMLElement).clientLeft;
+    offsetY += rect.top + (frame as HTMLElement).clientTop;
+    current = current.parent;
+  }
   return {
-    x,
-    y,
+    x: x + offsetX,
+    y: y + offsetY,
     hit: right > left && bottom > top && !!hit && (hit === this || this.contains(hit)),
   };
 }
@@ -48,35 +60,42 @@ export async function fillNode(
   id: number,
   value: string,
 ): Promise<void> {
-  const focused = await onNode<boolean>(debuggee, id, selectInput);
-  if (!focused) throw new Error("NOT_EDITABLE");
-  if (value) await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text: value });
-  else await pressKey(debuggee, "Backspace");
-  const actual = await onNode<string>(debuggee, id, inputValue);
-  if (actual !== value) throw new Error("INPUT_FAILED");
+  const native = await onNode<string>(debuggee, id, setNativeValue, [value]);
+  if (native === "done") return;
+  if (native !== "text") throw new Error(native);
+  await fillTextNode(debuggee, id, value);
 }
-function selectInput(this: HTMLInputElement | HTMLTextAreaElement) {
-  this.focus({ preventScroll: true });
-  const root = this.getRootNode() as Document | ShadowRoot;
-  if (root.activeElement !== this) return false;
-  if (this.isContentEditable) {
-    const selection = getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(this);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    return true;
-  }
-  if (!this.matches("input:not([readonly]),textarea:not([readonly])")) return false;
-  try {
-    this.select();
-    return true;
-  } catch {
-    return false;
-  }
-}
-function inputValue(this: HTMLInputElement | HTMLTextAreaElement) {
-  return this.isContentEditable ? this.innerText : this.value;
+function setNativeValue(this: HTMLInputElement | HTMLSelectElement, value: string): string {
+  if (this instanceof HTMLSelectElement) {
+    const options = [...this.options].filter((option) => !option.disabled);
+    const normalize = (text: string) => text.trim().toLowerCase();
+    let matches = options.filter(
+      (option) =>
+        normalize(option.value) === normalize(value) || normalize(option.text) === normalize(value),
+    );
+    if (!matches.length)
+      matches = options.filter((option) => normalize(option.text).startsWith(normalize(value)));
+    if (matches.length !== 1) return matches.length ? "AMBIGUOUS_TARGET" : "TARGET_NOT_FOUND";
+    const match = matches[0];
+    if (!match) return "TARGET_NOT_FOUND";
+    this.value = match.value;
+  } else if (
+    this instanceof HTMLInputElement &&
+    ["date", "time", "datetime-local", "month", "week", "number", "range", "color"].includes(
+      this.type,
+    )
+  ) {
+    const before = this.value;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(this, value);
+    if (this.value !== value) {
+      setter?.call(this, before);
+      return "INPUT_FAILED";
+    }
+  } else return "text";
+  this.dispatchEvent(new Event("input", { bubbles: true }));
+  this.dispatchEvent(new Event("change", { bubbles: true }));
+  return "done";
 }
 export async function focusNode(debuggee: chrome.debugger.Debuggee, id: number): Promise<void> {
   const focused = await onNode<boolean>(debuggee, id, function (this: HTMLElement) {

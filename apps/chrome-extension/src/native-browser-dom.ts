@@ -43,7 +43,8 @@ export function nodeState(this: HTMLElement): {
       style.display !== "none",
     enabled: !this.matches(":disabled,[aria-disabled='true']") && !this.closest("[inert]"),
     editable:
-      this.matches("input:not([readonly]),textarea:not([readonly])") || this.isContentEditable,
+      this.matches("input:not([readonly]),textarea:not([readonly]),select") ||
+      this.isContentEditable,
   };
 }
 

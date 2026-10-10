@@ -9,7 +9,7 @@
     "build:native": "node scripts/build-native-extension.mjs"
   },
   "dependencies": {
-    "@pippin/protocol": "file:../../vendor/pippin-protocol-0.1.0.tgz",
+    "@pippin/protocol": "file:../../vendor/pippin-protocol-0.3.1.tgz",
     "@pippin/ui": "workspace:*",
     "monaco-editor": "0.57.0",
     "react": "19.3.0",

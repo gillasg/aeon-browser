@@ -1,4 +1,4 @@
-import type { ComposerControls, ComposerModel, TranscriptRow } from "@pippin/ui";
+import type { ChatComposerProps, ComposerModel, TranscriptRow } from "@pippin/ui";
 
 interface InitialDisplay {
   text: string;
@@ -44,16 +44,31 @@ export class InitialChatDisplay {
       },
     ];
   }
-  controls(current: ComposerControls | null): ComposerControls | null {
-    if (current?.effectiveModel || !this.value) return current;
-    const { model, thinkingLevel } = this.value;
+  pending(rows: readonly TranscriptRow[]): boolean {
+    return (
+      Boolean(this.value) &&
+      !rows.some((row) => {
+        const message =
+          row.kind === "entry" ? row.entry.message : row.kind === "transient" ? row.message : null;
+        return message?.role === "user";
+      })
+    );
+  }
+  composer(
+    props: ChatComposerProps,
+    rows: readonly TranscriptRow[],
+    connection: "connecting" | "connected" | "error",
+    runState: "idle" | "running-unconfirmed" | "uncertain" | "needs_attention",
+  ): ChatComposerProps {
     return {
-      effectiveModel: model,
-      availableModels: [model],
-      thinkingLevel,
-      availableThinkingLevels: model.thinkingLevels,
-      steeringQueue: [],
-      followUpQueue: [],
+      ...props,
+      connected: connection === "connected" && props.connected,
+      controls: connection === "connected" ? props.controls : null,
+      connecting: connection !== "connected",
+      preparing:
+        connection === "connected" &&
+        runState === "idle" &&
+        (this.pending(rows) || Boolean(props.starting)),
     };
   }
 }

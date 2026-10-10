@@ -39,6 +39,7 @@ export class ChatComposerController {
 
   setClient(client: DevUiClient): void {
     this.client = client;
+    this.controls = null;
     client.socket.addEventListener(
       "close",
       () => {
@@ -62,7 +63,7 @@ export class ChatComposerController {
     return {
       chatId: this.chatId,
       projectName: this.projectName,
-      connected: Boolean(this.client),
+      connected: this.client?.socket.readyState === WebSocket.OPEN,
       running: this.isRunning() || this.submitting,
       starting: this.submitting,
       controls: this.controls,

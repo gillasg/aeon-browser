@@ -1,6 +1,8 @@
 import { BrowserPopupSchema, type BrowserTab } from "@pippin/protocol";
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
 import { browserSessionOwner, bindBrowserSession } from "./native-browser-session.js";
+import { restoreBrowserSessionOwners } from "./native-browser-session.js";
+import { publishBrowserEvent } from "./native-browser-events.js";
 const children = new Map<number, Set<number>>();
 const active = new Map<number, number>(),
   previous = new Map<number, number>();
@@ -8,6 +10,7 @@ const handled = new Set<number>();
 let socket: WebSocket | undefined;
 export function installBrowserPopupGuard(connection: WebSocket): void {
   socket = connection;
+  void restoreBrowserSessionOwners();
   void chrome.tabs.query({ active: true }).then((tabs) => {
     for (const tab of tabs) if (tab.id !== undefined) active.set(tab.windowId, tab.id);
   });
@@ -47,6 +50,7 @@ async function adopt(tabId: number, openerId: number): Promise<void> {
     set.add(tabId);
     children.set(openerId, set);
     bindBrowserSession(tabId, owner);
+    publishBrowserEvent(openerId, "popup", { tabId, openerId });
     await publishPopup(tabId, openerId, owner, connection);
   } catch {
     /* A popup can disappear before adoption finishes. */

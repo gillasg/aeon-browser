@@ -16,10 +16,22 @@ const interactiveRoles = new Set([
   "menuitem",
   "option",
   "treeitem",
+  "listbox",
+  "menuitemcheckbox",
+  "menuitemradio",
 ]);
 interface Options {
   query?: string | undefined;
   interactive?: boolean | undefined;
+}
+export function filterVisibleTextNodes(nodes: AxNode[], visibleText: string): AxNode[] {
+  const normalized = visibleText.replace(/\s+/g, " ").toLowerCase();
+  return nodes.filter((node) => {
+    if (!["statictext", "heading", "paragraph"].includes(textValue(node.role?.value).toLowerCase()))
+      return true;
+    const text = textValue(node.name?.value).replace(/\s+/g, " ").trim().toLowerCase();
+    return !text || normalized.includes(text);
+  });
 }
 function relevant(node: AxNode, options: Options): boolean {
   const role = textValue(node.role?.value).toLowerCase();
@@ -55,12 +67,22 @@ export function createSemanticNodes(
     refs.set(ref, { backendNodeId: backendNodeId, role, name });
     compact.push({
       ref,
+      backendNodeId,
       role,
       name,
       ...(node.value ? { value: textValue(node.value.value).slice(0, 512) } : {}),
       ...booleanProperty(node, "disabled"),
       ...booleanProperty(node, "checked"),
       ...booleanProperty(node, "focused"),
+      ...booleanProperty(node, "expanded"),
+      ...booleanProperty(node, "selected"),
+      ...booleanProperty(node, "pressed"),
+      ...(node.properties?.some((p) => p.name === "pressed" && p.value?.value === "mixed")
+        ? { pressed: "mixed" as const }
+        : {}),
+      ...(node.properties?.some((p) => p.name === "checked" && p.value?.value === "mixed")
+        ? { mixed: true }
+        : {}),
     });
   }
   return { refs, nodes: compact, truncated: candidates.length > compact.length };

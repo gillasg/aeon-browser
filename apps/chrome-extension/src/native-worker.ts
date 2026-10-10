@@ -1,4 +1,5 @@
 import { authenticate } from "./native-authenticate.js";
+import { installNativeStartup } from "./native-startup.js";
 import { handleContextPicker } from "./context-picker-handler.js";
 import { captureCurrentPage } from "./native-browser-context-menu.js";
 import {
@@ -64,12 +65,7 @@ void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 installNativeBrowserContextMenus(() => ensureInventoryExecutor());
 
-chrome.runtime.onInstalled.addListener(
-  () => void ensureExecutor().catch(() => scheduleExecutorReconnect(ensureExecutor)),
-);
-chrome.runtime.onStartup.addListener(
-  () => void ensureExecutor().catch(() => scheduleExecutorReconnect(ensureExecutor)),
-);
+installNativeStartup(ensureExecutor, () => scheduleExecutorReconnect(ensureExecutor));
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
   handleRuntimeMessage(request, sender, sendResponse),
 );
@@ -143,11 +139,10 @@ async function getPageGrant(
     ),
   );
   const response = await pending;
-  if (!response) connection.socket.close(4005, "Page grant timed out; reconnect required");
   if (!response || !response.ok)
     return NativePageGrantResponseSchema.parse({
       ok: false,
-      code: response && !response.ok ? response.code : "DAEMON_OFFLINE",
+      code: response && !response.ok ? response.code : "CONNECTION_TIMEOUT",
     });
   if (response.pageInstanceId !== pageInstanceId || !sameScope(response.scope, scope))
     return NativePageGrantResponseSchema.parse({ ok: false, code: "BOOTSTRAP_UNAVAILABLE" });
@@ -205,7 +200,7 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   const socket = new WebSocket(native.endpoint);
   const reply = await authenticate(socket, hello);
   if (!reply || reply.kind !== "auth.ready" || reply.role !== "extension-executor")
-    throw new Error(reply?.kind === "auth.rejected" ? reply.code : "DAEMON_OFFLINE");
+    throw new Error(reply?.kind === "auth.rejected" ? reply.code : "CONNECTION_TIMEOUT");
 
   const connection: ExecutorConnection = {
     ...identity,

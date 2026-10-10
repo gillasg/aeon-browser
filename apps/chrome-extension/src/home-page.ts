@@ -1,8 +1,8 @@
-import { stagePanelPrompt } from "./panel-prompt-handoff.js";
+import { savePanelContext } from "./panel-prompt-handoff.js";
+import { startHomePrompt } from "./home-first-submit.js";
 import { saveInitialDisplay } from "./initial-chat-display.js";
 import "./status-favicon.js";
 import { PageReconnect } from "./page-reconnect.js";
-import { projectDraftPayload } from "./project-bridge.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
 import {
@@ -21,7 +21,6 @@ import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-con
 import { HomeCatalogController } from "./home-catalog-controller.js";
 import { HomeManagementController } from "./home-management-controller.js";
 import { createManagementClient } from "./management-client.js";
-import { applyInitialChatSelection } from "./initial-chat-selection.js";
 
 const root = requiredElement("root");
 if (new URL(location.href).searchParams.get("host") === "panel")
@@ -53,6 +52,7 @@ function createView() {
   return createElement(NewTabHome, {
     developmentFixture: !__PIPPIN_NATIVE_TRANSPORT__,
     connectionLabel,
+    connected: client?.socket.readyState === WebSocket.OPEN && connectionLabel === "Connected",
     chats,
     modelCatalog,
     openChatIds,
@@ -142,46 +142,14 @@ async function askPippin(
   if (!activeClient || !text) return;
   try {
     const files = attachments.map((file) => PiAttachmentSchema.parse(file));
-    const createId = crypto.randomUUID();
-    const createAfter = activeClient.send({
-      kind: "command",
-      requestId: createId,
-      operation: "chat.create",
-      payload: projectDraftPayload(),
-    });
-    const created = await activeClient.waitFor(isCommandResponse(createId), createAfter);
-    if (created.kind === "command.failed") throw new Error(created.message);
-    if (created.kind !== "command.completed" || created.result.kind !== "chat.created")
-      throw new Error("Unexpected Chat creation response.");
-    const chatId = created.result.chat.chatId;
-    saveInitialDisplay(chatId, { text, model, thinkingLevel });
-    if (__PIPPIN_NATIVE_TRANSPORT__) {
-      await openChatInCurrentTab(chatId, {
-        requestId: crypto.randomUUID(),
-        text,
-        model: { provider: model.provider, id: model.id },
-        thinkingLevel,
-        attachments: files,
-      });
-      return;
-    }
-    await applyInitialChatSelection(activeClient, chatId, {
+    const chatId = await startHomePrompt(activeClient, {
+      text,
       model: { provider: model.provider, id: model.id },
       thinkingLevel,
+      attachments: files,
     });
-    const submitId = crypto.randomUUID();
-    const submitAfter = activeClient.send({
-      kind: "command",
-      requestId: submitId,
-      operation: "chat.submit",
-      payload: { chatId, text, attachments: files },
-    });
-    const started = await activeClient.waitFor(
-      (message) => message.kind === "command.started" && message.requestId === submitId,
-      submitAfter,
-    );
-    if (started.kind !== "command.started")
-      throw new Error("Pi did not start the first Chat prompt.");
+    saveInitialDisplay(chatId, { text, model, thinkingLevel });
+    if (document.body.dataset.host === "panel") await savePanelContext(chatId);
     await openChatInCurrentTab(chatId);
   } catch (error) {
     showError(toMessage(error));
@@ -206,7 +174,6 @@ async function openChatInCurrentTab(
   },
 ): Promise<void> {
   if (new URL(location.href).searchParams.get("host") === "panel") {
-    if (initialSubmit) await stagePanelPrompt(chatId, initialSubmit);
     window.parent.postMessage({ kind: "pippin.select-chat", chatId }, location.origin);
 
     return;

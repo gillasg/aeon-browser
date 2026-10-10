@@ -12,6 +12,7 @@ import { safePage } from "./native-browser-common.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
 import { clickAt, getViewportCenter, scrollAt, withDebugger } from "./native-browser-debugger.js";
 import { observeSemantic } from "./native-browser-observation.js";
+import { primeBrowserSettle, settleBrowserPage, pageOutcome } from "./native-browser-settle.js";
 
 type ActionRequest = BrowserExecutorRequest & {
   step: Extract<BrowserStep, { op: "click" | "fill" | "scroll" }>;
@@ -23,29 +24,36 @@ export async function performAction(
   revalidateTarget: RevalidateTarget,
 ): Promise<BrowserExecutorResult> {
   const tabId = request.step.target.tabId;
+  let outcome: "navigated" | "changed" | "unchanged" | "unknown" = "unknown";
   const scroll = await withDebugger(tabId, async (debuggee) => {
     await revalidateTarget(request, tabId);
-    return request.step.op === "scroll"
-      ? scrollWithFeedback(debuggee, { ...request, step: request.step })
-      : dispatchAction(debuggee, request, revalidateTarget);
+    if (request.step.op === "scroll")
+      return scrollWithFeedback(debuggee, { ...request, step: request.step });
+    const before = await primeBrowserSettle(debuggee);
+    await dispatchAction(debuggee, request, revalidateTarget);
+    const settled = await settleBrowserPage(debuggee);
+    outcome = pageOutcome(before, settled.probe);
+    return undefined;
   });
   if (scroll) await revalidateTarget(request, tabId);
   const current = await refreshInventoryTab(tabId);
   if (!current) throw new Error("TARGET_LOST");
   const liveTab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!liveTab?.url || !safePage(liveTab.url)) throw new Error("TARGET_LOST");
-  const observation = scroll
-    ? undefined
-    : await observeSemantic(
-        { ...request, expectedDocumentEpoch: current.documentEpoch },
-        liveTab,
-        revalidateTarget,
-      );
+  const observation =
+    scroll || (request.step.op !== "scroll" && request.step.observe === false)
+      ? undefined
+      : await observeSemantic(
+          { ...request, expectedDocumentEpoch: current.documentEpoch },
+          liveTab,
+          revalidateTarget,
+        );
   return BrowserExecutorResultSchema.parse({
     kind: "action",
     target: current.target,
     documentEpoch: current.documentEpoch,
     url: liveTab.url,
+    outcome,
     ...(observation ? { observation } : {}),
     ...(scroll ? { scroll } : {}),
   });

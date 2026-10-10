@@ -35,6 +35,7 @@ export const NativePageGrantResponseSchema = z.discriminatedUnion("ok", [
         "HOST_MISSING",
         "HOST_CONFIG_INVALID",
         "DAEMON_OFFLINE",
+        "CONNECTION_TIMEOUT",
         "UPDATE_REQUIRED",
         "INVALID_SENDER",
         "INVALID_SCOPE",
@@ -138,7 +139,9 @@ export function pageGrantErrorMessage(code: string): string {
     case "HOST_CONFIG_INVALID":
       return "Aeon's native host needs repair. Reinstall the Aeon host.";
     case "DAEMON_OFFLINE":
-      return "Aeon's local daemon is offline. Reconnecting…";
+      return "Aeon's local connection is unavailable. Reconnecting…";
+    case "CONNECTION_TIMEOUT":
+      return "Aeon's local connection did not respond in time. Reconnecting…";
     case "UPDATE_REQUIRED":
       return "Aeon needs an update before this page can connect.";
     default:

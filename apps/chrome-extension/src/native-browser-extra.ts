@@ -1,3 +1,4 @@
+import { selectorState } from "./native-browser-selector-state.js";
 import { BrowserActionError } from "./native-browser-errors.js";
 import { focusNode, pressKey } from "./native-browser-input.js";
 import { prepareElement } from "./native-browser-prepare.js";
@@ -10,10 +11,25 @@ import { executeSiteScript } from "./site-script-runtime.js";
 import { assertRequestActive } from "./native-browser-request-lifecycle.js";
 import { sameTarget, safePage } from "./native-browser-common.js";
 import { browserPopups } from "./native-browser-popup.js";
+import { executePageCode } from "./native-browser-code.js";
+import { primeBrowserSettle, settleBrowserPage } from "./native-browser-settle.js";
+import { isFocusedInput } from "./native-browser-text.js";
 type ExtraRequest = BrowserExecutorRequest & {
   step: Extract<
     BrowserExecutorRequest["step"],
-    { op: "press" | "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
+    {
+      op:
+        | "press"
+        | "read"
+        | "wait"
+        | "navigate"
+        | "diagnostics"
+        | "siteScript"
+        | "popups"
+        | "evaluate"
+        | "cdp"
+        | "waitFor";
+    }
   >;
 };
 export async function performExtra(
@@ -34,6 +50,14 @@ export async function performExtra(
   } else
     data = await withBrowserDebugger(tabId, async (debuggee) => {
       await revalidate(request, tabId);
+      if (
+        request.step.op === "evaluate" ||
+        request.step.op === "cdp" ||
+        request.step.op === "waitFor"
+      )
+        return executePageCode(debuggee, { ...request, step: request.step }, () =>
+          revalidate(request, tabId),
+        );
       if (request.step.op === "press")
         return pressElement(debuggee, request, () => revalidate(request, tabId));
       if (request.step.op === "navigate") return navigateReady(tabId, request.step.url);
@@ -46,8 +70,11 @@ export async function performExtra(
   if (!tab || !sameTarget(tab.target, request.step.target) || !safePage(tab.url))
     throw new Error("TARGET_LOST");
   const encoded = JSON.stringify(data);
-  if (encoded && encoded.length > 160_000)
-    data = { truncated: true, message: "Result exceeded 160 KB; narrow the query." };
+  if (encoded && encoded.length > 1_000_000)
+    throw new BrowserActionError(
+      "UNSUPPORTED",
+      "Result exceeds 1 MB; extract in smaller batches and save artifacts.",
+    );
   return {
     kind: "page",
     source: "website",
@@ -120,34 +147,23 @@ async function evaluate(debuggee: chrome.debugger.Debuggee, expression: string):
   return result.result?.value;
 }
 
-function selectorState(selector: string, state: string): boolean {
-  const elements = [...document.querySelectorAll(selector)];
-  const visible = (el: Element) => {
-    const box = el.getBoundingClientRect();
-    const style = getComputedStyle(el);
-    return (
-      box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none"
-    );
-  };
-  if (state === "attached") return elements.length > 0;
-  if (state === "hidden") return elements.every((el) => !visible(el));
-  return elements.some(
-    (el) =>
-      visible(el) &&
-      (state !== "editable" ||
-        (!el.matches(":disabled,[aria-disabled='true']") &&
-          (el.matches("input:not([readonly]),textarea:not([readonly])") ||
-            (el as HTMLElement).isContentEditable))),
-  );
-}
 async function pressElement(
   debuggee: chrome.debugger.Debuggee,
   request: ExtraRequest,
   revalidate: () => Promise<void>,
 ) {
   if (request.step.op !== "press") throw new Error("INVALID_TARGET");
-  const { node } = await prepareElement(debuggee, request, request.step.element, revalidate);
-  await focusNode(debuggee, node.backendNodeId);
+  if (request.step.focus === false) {
+    const element = request.step.element;
+    if (element.kind === "backend" && element.documentEpoch !== request.expectedDocumentEpoch)
+      throw new Error("STALE_REF");
+    if (!(await isFocusedInput(debuggee))) throw new Error("NOT_EDITABLE");
+  } else {
+    const { node } = await prepareElement(debuggee, request, request.step.element, revalidate);
+    await focusNode(debuggee, node.backendNodeId);
+  }
+  await primeBrowserSettle(debuggee);
+  await revalidate();
   await pressKey(debuggee, request.step.key);
-  return { pressed: request.step.key };
+  return { pressed: request.step.key, settle: await settleBrowserPage(debuggee) };
 }

@@ -41,6 +41,7 @@ export function nativeErrorCode(error: unknown): string {
     "HOST_MISSING",
     "HOST_CONFIG_INVALID",
     "DAEMON_OFFLINE",
+    "CONNECTION_TIMEOUT",
     "UPDATE_REQUIRED",
     "BOOTSTRAP_UNAVAILABLE",
   ].includes(code)

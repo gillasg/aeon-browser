@@ -15,6 +15,7 @@ import type { ManagementActionName, ManagementSection } from "./management-types
 export interface NewTabHomeProps {
   developmentFixture: boolean;
   connectionLabel: string;
+  connected?: boolean;
   chats: readonly ChatCatalogItemDto[];
   modelCatalog: PiModelCatalogDto | null;
   openChatIds: ReadonlySet<string>;

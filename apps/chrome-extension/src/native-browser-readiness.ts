@@ -1,31 +1,6 @@
+import { settleBrowserPage } from "./native-browser-settle.js";
 export async function waitPageInteractive(tabId: number, timeoutMs = 2000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  let prior = "";
-  while (Date.now() < deadline) {
-    const result = (await chrome.debugger
-      .sendCommand({ tabId }, "Runtime.evaluate", {
-        expression: `(${interactiveProbe.toString()})()`,
-        returnByValue: true,
-      })
-      .catch(() => undefined)) as { result?: { value?: string } } | undefined;
-    const value = result?.result?.value ?? "";
-    if (value && value === prior) return true;
-    prior = value;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return false;
-}
-function interactiveProbe(): string {
-  if (document.readyState === "loading" || !document.body) return "";
-  const elements = [
-    ...document.querySelectorAll("input,textarea,button,a[href],[role=button],[role=combobox]"),
-  ];
-  const visible = elements.filter((el) => {
-    const box = el.getBoundingClientRect();
-    return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== "hidden";
-  });
-  if (!visible.length && document.readyState !== "complete") return "";
-  return JSON.stringify([location.href, visible.length, document.body.innerText.slice(0, 1000)]);
+  return (await settleBrowserPage({ tabId }, timeoutMs)).why === "quiet";
 }
 
 export async function viewportFingerprint(debuggee: chrome.debugger.Debuggee): Promise<string> {

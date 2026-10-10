@@ -6,7 +6,6 @@ export async function selectScrollContainer(
   const expression = `(() => {
     const horizontal = ${horizontal};
     let node = document.elementFromPoint(${point.x}, ${point.y});
-    if (node?.tagName === 'IFRAME') return null;
     while (node && node !== document.documentElement && node !== document.body) {
       const style = getComputedStyle(node);
       const overflow = horizontal ? style.overflowX : style.overflowY;
@@ -15,7 +14,7 @@ export async function selectScrollContainer(
       if (/(auto|scroll|overlay)/.test(overflow) && extent > viewport + 2) return node;
       node = node.parentElement;
     }
-    return document.scrollingElement;
+    return document.scrollingElement || document.documentElement;
   })()`;
   const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
     expression,

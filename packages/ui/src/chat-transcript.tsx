@@ -18,6 +18,8 @@ export function ChatTranscript({
   actionsDisabled = false,
   running = false,
   starting = false,
+  connecting = false,
+  preparing = false,
 }: {
   rows: readonly TranscriptRow[];
   onEditEntry?: (entryId: string) => Promise<void> | void;
@@ -25,6 +27,8 @@ export function ChatTranscript({
   actionsDisabled?: boolean;
   running?: boolean;
   starting?: boolean;
+  connecting?: boolean;
+  preparing?: boolean;
 }): ReactElement {
   const { root, awayFromLatest, atTop, updateScrollState, jumpToLatest } =
     useTranscriptScroll(rows);
@@ -52,7 +56,14 @@ export function ChatTranscript({
             }}
           />
         ))}
-        {(starting || running) && !latestWorkVisible(rows, starting) && <PendingWork />}
+        {connecting ? (
+          <PendingWork key="connecting" connecting />
+        ) : preparing ? (
+          <PendingWork key="preparing" preparing />
+        ) : (
+          (starting || running) &&
+          !latestWorkVisible(rows, starting) && <PendingWork key="working" />
+        )}
       </section>
       <AnnotationSelection root={root} />
       {awayFromLatest && <JumpToLatest onClick={jumpToLatest} />}

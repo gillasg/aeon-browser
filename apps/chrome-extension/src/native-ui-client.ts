@@ -48,7 +48,7 @@ export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectR
   if (!reply || reply.kind !== "auth.ready" || reply.role !== "ui")
     return {
       kind: "failed",
-      code: reply?.kind === "auth.rejected" ? reply.code : "DAEMON_OFFLINE",
+      code: reply?.kind === "auth.rejected" ? reply.code : "CONNECTION_TIMEOUT",
     };
   return { kind: "connected", client: new DevUiClient(socket) };
 }

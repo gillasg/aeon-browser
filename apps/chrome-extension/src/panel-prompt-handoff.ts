@@ -2,6 +2,10 @@ import { PiBrowserContextRecordSchema } from "@pippin/protocol";
 import { readChatContext, saveChatContext } from "./browser-context-storage.js";
 export async function stagePanelPrompt(chatId: string, prompt: unknown): Promise<void> {
   sessionStorage.setItem("aeon-panel-initial:" + chatId, JSON.stringify(prompt));
+  await savePanelContext(chatId);
+}
+
+export async function savePanelContext(chatId: string): Promise<void> {
   const raw = sessionStorage.getItem("aeon-panel-page");
   if (!raw) return;
   const parsed = PiBrowserContextRecordSchema.safeParse(JSON.parse(raw));

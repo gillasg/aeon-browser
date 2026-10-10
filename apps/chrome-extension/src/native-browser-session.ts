@@ -1,4 +1,9 @@
 import { enableDiagnostics, forgetDiagnostics } from "./native-browser-diagnostics.js";
+import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-settle.js";
+import { releaseBrowserEvents } from "./native-browser-events.js";
+import { persistBrowserOwners, restoreBrowserOwners } from "./native-browser-ownership.js";
+import { ensureBrowserViewport, restoreBrowserViewport } from "./native-browser-viewport.js";
+import { presentBrowserTask } from "./native-browser-layout.js";
 interface Attachment {
   chatId: string;
   attached: Promise<void>;
@@ -27,6 +32,7 @@ export function browserSessionOwner(tabId: number): string | undefined {
 export function bindBrowserSession(tabId: number, chatId: string): void {
   if (owners.get(tabId) !== chatId && attachments.has(tabId)) throw new Error("CLAIM_CONFLICT");
   owners.set(tabId, chatId);
+  persistBrowserOwners(owners);
 }
 
 export async function withBrowserDebugger<T>(
@@ -44,6 +50,8 @@ export async function withBrowserDebugger<T>(
   }
   try {
     await entry.attached;
+    await presentBrowserTask(chatId, tabId);
+    await ensureBrowserViewport(tabId);
     if (attachments.get(tabId) !== entry) throw new Error("OPERATION_FAILED");
     if (entry.timer !== undefined) clearTimeout(entry.timer);
     entry.timer = globalThis.setTimeout(() => void detach(tabId), 90_000);
@@ -74,6 +82,7 @@ export async function withBrowserDebugger<T>(
 }
 
 export async function releaseBrowserSessions(chatId?: string, reset = false): Promise<void> {
+  releaseBrowserEvents(chatId);
   if (reset || !chatId)
     for (const [tabId, owner] of cancelled)
       if (!chatId || owner === chatId) cancelled.delete(tabId);
@@ -83,6 +92,7 @@ export async function releaseBrowserSessions(chatId?: string, reset = false): Pr
     if (reset || !chatId) cancelled.delete(tabId);
     await detach(tabId);
   }
+  persistBrowserOwners(owners);
 }
 
 function forget(tabId: number): void {
@@ -90,12 +100,25 @@ function forget(tabId: number): void {
   if (entry?.timer !== undefined) clearTimeout(entry.timer);
   attachments.delete(tabId);
   forgetDiagnostics(tabId);
+  forgetBrowserActivity(tabId);
   void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => undefined);
   void chrome.action.setTitle({ tabId, title: "Open Aeon Chat" }).catch(() => undefined);
 }
 
 async function attach(tabId: number): Promise<void> {
-  await chrome.debugger.attach({ tabId }, "1.3");
+  try {
+    await chrome.debugger.attach({ tabId }, "1.3");
+  } catch (error) {
+    if (!/already attached/i.test(String(error))) throw error;
+    // sendCommand succeeds only for our extension's attachment; do not take over DevTools.
+    await chrome.debugger.sendCommand({ tabId }, "Runtime.enable");
+  }
+  trackBrowserActivity(tabId);
+  await chrome.debugger.sendCommand({ tabId }, "Page.enable");
+  await Promise.all([
+    chrome.debugger.sendCommand({ tabId }, "DOM.enable"),
+    chrome.debugger.sendCommand({ tabId }, "Accessibility.enable"),
+  ]);
   await chrome.debugger
     .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true })
     .catch(() => undefined);
@@ -111,6 +134,7 @@ function detach(tabId: number): Promise<void> {
   const work = entry.attached
     .then(
       async () => {
+        await restoreBrowserViewport(tabId);
         await chrome.debugger
           .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: false })
           .catch(() => undefined);
@@ -123,4 +147,10 @@ function detach(tabId: number): Promise<void> {
     });
   closing.set(tabId, work);
   return work;
+}
+export async function reconnectBrowserSession(tabId: number): Promise<void> {
+  await detach(tabId);
+}
+export async function restoreBrowserSessionOwners(): Promise<void> {
+  await restoreBrowserOwners(owners);
 }

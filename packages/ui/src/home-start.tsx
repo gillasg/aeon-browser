@@ -1,6 +1,7 @@
 import { PageContextTray } from "./page-context-tray.js";
 import { usePanelPage } from "./panel-page-chip.js";
 import { ProjectChip } from "./project-chip.js";
+import { PendingWork } from "./pending-work.js";
 import {
   useHomeAttachments,
   HomeAttachmentPicker,
@@ -30,6 +31,7 @@ type HomeStartProps = Pick<
   browserContext?: import("@pippin/protocol").PiBrowserContextRecord | null;
   onRemoveContext?(): void;
   chatId?: string;
+  connected?: boolean;
 };
 
 export function HomeStart({
@@ -64,17 +66,21 @@ export function HomeStart({
         contextId={props.chatId}
         query={query}
         onQuery={setQuery}
-        canSubmit={Boolean(selection.model && selection.thinkingLevel && !files.loading)}
+        canSubmit={Boolean(
+          props.connected !== false && selection.model && selection.thinkingLevel && !files.loading,
+        )}
         onSubmit={ask}
         onFiles={(items) => void files.add(items)}
       />
       <HomeModelControls
+        connected={props.connected}
         catalog={props.modelCatalog}
         model={selection.model}
         effort={selection.thinkingLevel}
         onModel={selection.setModel}
         onEffort={selection.setEffort}
       />
+      {props.connected === false && <PendingWork connecting />}
       <HomeRecentCards
         chats={active}
         routines={props.homeRoutines}
@@ -143,6 +149,7 @@ function HomePrompt({
         placeholder=""
         ariaLabel="Ask Aeon anything"
         onChange={onQuery}
+        onFiles={onFiles}
         onEnter={() => {
           if (query.trim() && canSubmit) onSubmit(query.trim());
         }}
@@ -162,18 +169,26 @@ function HomePrompt({
 }
 
 function HomeModelControls({
+  connected,
   catalog,
   model,
   effort,
   onModel,
   onEffort,
 }: {
+  connected: boolean | undefined;
   catalog: PiModelCatalogDto | null;
   model: ComposerModel | null;
   effort: string;
   onModel(value: ComposerModel): void;
   onEffort(value: string): void;
 }): ReactElement {
+  if (connected === false)
+    return (
+      <div className="home-model-controls" role="status">
+        Connecting…
+      </div>
+    );
   return (
     <div className="home-model-controls" role="group" aria-label="Pi model and effort">
       <div className="home-model-control">

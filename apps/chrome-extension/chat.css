@@ -3126,7 +3126,7 @@ body[data-host="panel"] .composer-meta {
   margin: 0 0 4px;
 }
 
-/* Neutral Codex palette and one scroll surface for chat navigation. */
+/* Neutral chat palette and one scroll surface for chat navigation. */
 .composer {
   background: var(--pippin-surface-raised);
   border-color: #333333;

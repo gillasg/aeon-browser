@@ -14,19 +14,38 @@ export async function resolveElement(
 ): Promise<AxRef> {
   const nodes = await getAxTree(debuggee);
   if (!element) throw new Error("INVALID_TARGET");
+  if (element.kind === "backend") return resolveBackend(nodes, element, documentEpoch);
   if (element.kind === "ref") {
     const key = targetIdentity(target);
     if (latestSnapshots.get(key) !== element.snapshotId) throw new Error("STALE_REF");
     const prior = refs.get(element.snapshotId)?.get(element.ref);
-    const live = nodes.find((node) => node.backendDOMNodeId === prior?.backendNodeId);
-    if (documentEpoch !== undefined && prior?.documentEpoch !== documentEpoch)
+    if (!prior) throw new Error("STALE_REF");
+    const live = nodes.find((node) => node.backendDOMNodeId === prior.backendNodeId);
+    if (documentEpoch !== undefined && prior.documentEpoch !== documentEpoch)
       throw new Error("STALE_REF");
-    if (!prior || !sameSemanticNode(live, prior)) throw new Error("STALE_REF");
+    if (!sameSemanticNode(live, prior)) throw new Error("STALE_REF");
     return prior;
   }
   if (element.kind === "point") throw new Error("STALE_REF");
   if (element.kind === "query") return resolveQuery(debuggee, nodes, element);
   return resolveRole(debuggee, nodes, element);
+}
+function resolveBackend(
+  nodes: AxNode[],
+  element: Extract<BrowserElementTarget, { kind: "backend" }>,
+  documentEpoch?: number,
+): AxRef {
+  if (documentEpoch !== element.documentEpoch) throw new Error("STALE_REF");
+  const live = nodes.find(
+    (node) => node.backendDOMNodeId === element.backendNodeId && !node.ignored,
+  );
+  if (!live) throw new Error("STALE_REF");
+  return {
+    backendNodeId: element.backendNodeId,
+    documentEpoch: element.documentEpoch,
+    role: textValue(live.role?.value),
+    name: textValue(live.name?.value),
+  };
 }
 
 async function resolveRole(
@@ -114,13 +133,41 @@ async function resolveQuery(
 }
 
 export async function getAxTree(debuggee: chrome.debugger.Debuggee): Promise<AxNode[]> {
-  await chrome.debugger.sendCommand(debuggee, "DOM.enable");
-  await chrome.debugger.sendCommand(debuggee, "Accessibility.enable");
   const result = (await chrome.debugger.sendCommand(debuggee, "Accessibility.getFullAXTree")) as {
     nodes?: AxNode[];
   };
   if (!Array.isArray(result.nodes)) throw new Error("UNSUPPORTED");
-  return result.nodes;
+  const frames = (await chrome.debugger.sendCommand(debuggee, "Page.getFrameTree")) as {
+    frameTree?: { childFrames?: Frame[] };
+  };
+  interface Frame {
+    frame: { id: string };
+    childFrames?: Frame[];
+  }
+  const pending = [...(frames.frameTree?.childFrames ?? [])],
+    ids: string[] = [];
+  while (pending.length) {
+    const frame = pending.pop();
+    if (frame) {
+      ids.push(frame.frame.id);
+      pending.push(...(frame.childFrames ?? []));
+    }
+  }
+  const children = await Promise.all(
+    ids.slice(0, 32).map((frameId) =>
+      chrome.debugger.sendCommand(debuggee, "Accessibility.getFullAXTree", { frameId }).then(
+        (value) => (value as { nodes: AxNode[] }).nodes,
+        () => [],
+      ),
+    ),
+  );
+  const seen = new Set<number>();
+  return [result.nodes, ...children].flat().filter((node) => {
+    if (node.backendDOMNodeId === undefined) return true;
+    if (seen.has(node.backendDOMNodeId)) return false;
+    seen.add(node.backendDOMNodeId);
+    return true;
+  });
 }
 
 export async function getViewportCenter(

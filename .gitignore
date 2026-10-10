@@ -14,6 +14,9 @@ coverage/
 /artifacts/
 /planning/
 /plans/
+/a-refer/
+/reference/
+/references/
 
 # Local configuration and generated output
 .env
@@ -23,6 +26,10 @@ coverage/
 
 # Archived planning and reference material
 /archive/
+
+# Older local protocol snapshots; the active snapshot is versioned below.
+/vendor/pippin-protocol-0.2.0.tgz
+/vendor/pippin-protocol-0.3.0.tgz
 
 # Minimal public project introduction
 !/README.md

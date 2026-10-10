@@ -136,7 +136,7 @@ select option,
   padding: 8px 12px;
   cursor: pointer;
 }
-html[data-wallpaper="true"] .home-main[data-screen="new-tab"] {
+html[data-wallpaper="true"] body:not([data-host="panel"]) .home-main[data-screen="new-tab"] {
   background-color: var(--canvas);
   background-image:
     linear-gradient(
@@ -156,11 +156,17 @@ html[data-wallpaper="true"] .home-main[data-screen="new-tab"] {
     center,
     center top;
 }
-html[data-wallpaper="true"] .home-main[data-screen="new-tab"] .home-query-form {
+html[data-wallpaper="true"]
+  body:not([data-host="panel"])
+  .home-main[data-screen="new-tab"]
+  .home-query-form {
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: blur(14px);
 }
-html[data-wallpaper="true"] .home-main[data-screen="new-tab"] .home-start {
+html[data-wallpaper="true"]
+  body:not([data-host="panel"])
+  .home-main[data-screen="new-tab"]
+  .home-start {
   margin-top: 0;
   padding-top: clamp(120px, 35vh, 340px);
 }

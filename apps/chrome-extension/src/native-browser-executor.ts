@@ -1,6 +1,7 @@
 import { browserErrorDetail } from "./native-browser-errors.js";
 import { handleScriptSync } from "./site-script-runtime.js";
 import { performExtra } from "./native-browser-extra.js";
+import { isCapabilityStep, performCapability } from "./native-browser-capabilities.js";
 import { navigateReady } from "./native-browser-navigation.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import {
@@ -91,6 +92,7 @@ async function executeStep(
   activateClaim(request);
   const tab = await assertTarget(request);
   bindBrowserSession(step.target.tabId, request.chatId);
+  if (isCapabilityStep(step)) return performCapability({ ...request, step }, revalidateTarget);
   if (step.op === "observe")
     return step.kind === "semantic"
       ? observeSemantic(request, tab, revalidateTarget)
@@ -121,6 +123,7 @@ async function openTab(
   assertRequestActive(request);
   const tab = await refreshInventoryTab(created.id);
   if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
+  bindBrowserSession(created.id, request.chatId);
   return BrowserExecutorResultSchema.parse({ kind: "tab", tab });
 }
 
@@ -157,7 +160,9 @@ function inventoryMatchesRequest(
     tab &&
     isTargetStep(request.step) &&
     sameTarget(tab.target, request.step.target) &&
-    tab.documentEpoch === request.expectedDocumentEpoch &&
+    (request.step.op === "event" ||
+      request.step.op === "downloads" ||
+      tab.documentEpoch === request.expectedDocumentEpoch) &&
     safePage(tab.url),
   );
 }
@@ -211,15 +216,34 @@ type TargetStep = Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab
 function isTargetStep(step: BrowserStep): step is TargetStep {
   return !["listTabs", "openTab", "attachTab"].includes(step.op);
 }
-function isExtraStep(
-  step: BrowserStep,
-): step is Extract<
+function isExtraStep(step: BrowserStep): step is Extract<
   BrowserStep,
-  { op: "press" | "read" | "wait" | "navigate" | "diagnostics" | "siteScript" | "popups" }
+  {
+    op:
+      | "press"
+      | "read"
+      | "wait"
+      | "navigate"
+      | "diagnostics"
+      | "siteScript"
+      | "popups"
+      | "evaluate"
+      | "cdp"
+      | "waitFor";
+  }
 > {
-  return ["press", "read", "wait", "navigate", "diagnostics", "siteScript", "popups"].includes(
-    step.op,
-  );
+  return [
+    "press",
+    "read",
+    "wait",
+    "navigate",
+    "diagnostics",
+    "siteScript",
+    "popups",
+    "evaluate",
+    "cdp",
+    "waitFor",
+  ].includes(step.op);
 }
 
 function sendResult(

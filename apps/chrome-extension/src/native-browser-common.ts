@@ -41,10 +41,21 @@ export function textValue(value: unknown): string {
 
 export function booleanProperty(
   node: AxNode,
-  name: "disabled" | "checked" | "focused",
-): { disabled?: boolean; checked?: boolean; focused?: boolean } {
+  name: "disabled" | "checked" | "focused" | "expanded" | "selected" | "pressed",
+): {
+  disabled?: boolean;
+  checked?: boolean;
+  focused?: boolean;
+  expanded?: boolean;
+  selected?: boolean;
+  pressed?: boolean;
+} {
   const value = node.properties?.find((item) => item.name === name)?.value?.value;
-  return typeof value === "boolean" ? { [name]: value } : {};
+  return typeof value === "boolean"
+    ? { [name]: value }
+    : value === "true" || value === "false"
+      ? { [name]: value === "true" }
+      : {};
 }
 
 export function targetIdentity(target: BrowserTargetKey): string {

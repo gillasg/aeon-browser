@@ -136,9 +136,12 @@ test("New Tab is Ask-only and applies its dynamic Pi selection before the first 
   assert.match(page, /operation: "chat\.model-catalog"/);
   assert.match(homeManagement, /operation: "management\.home"/);
   assert.ok(
-    page.indexOf("applyInitialChatSelection(activeClient, chatId") <
-      page.indexOf('operation: "chat.submit"'),
+    page.indexOf("await startHomePrompt(activeClient") < page.indexOf("saveInitialDisplay(chatId"),
   );
+  assert.doesNotMatch(page, /applyInitialChatSelection|operation: "chat\.submit"/);
+  const firstPrompt = await readFile(join(app, "src", "home-first-submit.ts"), "utf8");
+  assert.match(firstPrompt, /operation: "chat\.create"/);
+  assert.match(firstPrompt, /initialSubmit:/);
   assert.match(catalogRequest, /operation: "chat\.model"/);
   assert.match(catalogRequest, /operation: "chat\.thinking"/);
   assert.match(initialSubmit, /applyInitialChatSelection\(client, chatId/);

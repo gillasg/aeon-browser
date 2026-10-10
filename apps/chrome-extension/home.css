@@ -1015,7 +1015,7 @@ body[data-embedded="true"] .chat-navigation {
   margin: 0;
 }
 
-/* Match the chat surface and Codex reference without a nested list scrollbar. */
+/* Match the chat surface without adding a nested list scrollbar. */
 .home-query-form {
   background: var(--pippin-surface-raised);
   border-color: #333333;

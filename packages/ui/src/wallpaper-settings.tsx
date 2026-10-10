@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactElement } from "react";
 const key = "pippin-wallpaper";
 export function applyWallpaper(): void {
   const saved = JSON.parse(localStorage.getItem(key) || "{}");
-  document.documentElement.dataset.wallpaper = String(saved.enabled === true);
+  document.documentElement.dataset.wallpaper = String(
+    saved.enabled === true && document.body.dataset.host !== "panel",
+  );
   document.documentElement.style.setProperty(
     "--wallpaper-image",
     saved.image ? 'url("' + saved.image + '")' : 'url("atmosphere-wallpaper.png")',

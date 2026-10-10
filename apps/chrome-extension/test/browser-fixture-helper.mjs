@@ -47,6 +47,8 @@ export async function browserFixture() {
       commands,
       close,
       debuggee: { tabId: 1 },
+      folder,
+      send: (method, params, sessionId) => cdp.send(method, params, sessionId),
       evaluate: (expression) => evaluate(cdp, expression),
       setPage: async (html) =>
         cdp.send("Page.setDocumentContent", {
@@ -61,9 +63,14 @@ export async function browserFixture() {
 }
 function installChromeShim(cdp, commands) {
   const event = { addListener() {}, removeListener() {} };
+  const listeners = new Set();
+  cdp.onEvent((method, params, sessionId) => {
+    for (const listener of listeners)
+      listener({ tabId: 1, ...(sessionId ? { sessionId } : {}) }, method, params);
+  });
   const send = async (_debuggee, command, args) => {
     commands.push(command);
-    return cdp.send(command, args);
+    return cdp.send(command, args, _debuggee.sessionId);
   };
   globalThis.chrome = {
     debugger: {
@@ -71,7 +78,10 @@ function installChromeShim(cdp, commands) {
       attach: async () => {},
       detach: async () => {},
       onDetach: event,
-      onEvent: event,
+      onEvent: {
+        addListener: (listener) => listeners.add(listener),
+        removeListener: (listener) => listeners.delete(listener),
+      },
     },
     tabs: { onRemoved: event },
     action: {
@@ -95,6 +105,20 @@ async function buildLayer(folder) {
         "observation",
         "point",
         "session",
+        "settle",
+        "visible",
+        "code",
+        "text",
+        "events",
+        "frames",
+        "files",
+        "interaction",
+        "frame-input",
+        "downloads",
+        "viewport",
+        "scroll",
+        "scroll-container",
+        "selector-state",
       ]
         .map((name) => `export * from './apps/chrome-extension/src/native-browser-${name}.ts';`)
         .join("\n"),

@@ -19,9 +19,13 @@ export function connectCdp(url) {
   const socket = new WebSocket(url),
     pending = new Map();
   let nextId = 0;
+  const listeners = new Set();
   socket.addEventListener("message", (event) => {
     const response = JSON.parse(String(event.data)),
       waiter = pending.get(response.id);
+    if (response.method)
+      for (const listener of listeners)
+        listener(response.method, response.params, response.sessionId);
     if (!waiter) return;
     pending.delete(response.id);
     if (response.error) waiter.reject(Error(response.error.message));
@@ -37,11 +41,17 @@ export function connectCdp(url) {
       () =>
         resolve({
           socket,
-          send(method, params = {}) {
+          onEvent: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          send(method, params = {}, sessionId) {
             const id = ++nextId;
             return new Promise((done, fail) => {
               pending.set(id, { resolve: done, reject: fail });
-              socket.send(JSON.stringify({ id, method, params }));
+              socket.send(
+                JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }),
+              );
             });
           },
         }),

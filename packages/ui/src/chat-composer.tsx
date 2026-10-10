@@ -48,6 +48,8 @@ export interface ChatComposerProps {
   connected: boolean;
   running: boolean;
   starting?: boolean;
+  connecting?: boolean;
+  preparing?: boolean;
   controls: ComposerControls | null;
   contextUsage?: PiContextUsage | null;
   attachments: readonly ComposerAttachment[];
@@ -147,6 +149,7 @@ function ComposerEntry(
         placeholder="Reply, @ for context"
         ariaLabel="Message Aeon"
         onChange={setText}
+        onFiles={(files) => props.onAttach(props.chatId, files)}
         onEnter={() => void send()}
       />
       <ComposerSendControl

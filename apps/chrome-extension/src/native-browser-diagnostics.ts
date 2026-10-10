@@ -33,6 +33,14 @@ chrome.debugger.onEvent.addListener((source, method, raw) => {
   const buffer = buffers.get(source.tabId);
   if (!buffer) return;
   const params = (raw ?? {}) as Record<string, unknown>;
+  if (method === "Page.javascriptDialogOpening") {
+    buffer.console.push({
+      level: "info",
+      text: `[dialog ${String(params.type)}] ${String(params.message).slice(0, 300)} (accepted)`,
+    });
+    if (buffer.console.length > 80) buffer.console.shift();
+    return;
+  }
   if (method === "Runtime.consoleAPICalled" || method === "Runtime.exceptionThrown")
     captureConsole(buffer, method, params);
   else captureNetwork(source.tabId, buffer, method, params);

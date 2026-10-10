@@ -10,6 +10,7 @@ import { PiModelPicker, PiThinkingPicker } from "./pi-model-picker.js";
 import { PiContextUsageRing } from "./pi-context-usage.js";
 
 export interface ComposerPanelsProps {
+  connected?: boolean;
   onTogglePiUi?(): void;
   piUiOpen?: boolean;
   mode: "followUp" | "steer";
@@ -27,9 +28,17 @@ export function ComposerPanels(props: ComposerPanelsProps): ReactElement {
   return (
     <>
       <div className="composer-meta">
-        <ComposerModelControls props={props} />
-        <PiContextUsageRing usage={props.contextUsage ?? null} />
-        <PiToolsButton {...props} />
+        {props.connected === false || !props.controls?.effectiveModel ? (
+          <span className="model-loading" role="status">
+            {props.connected === false ? "Connecting…" : "Starting…"}
+          </span>
+        ) : (
+          <>
+            <ComposerModelControls props={props} />
+            <PiContextUsageRing usage={props.contextUsage ?? null} />
+            <PiToolsButton {...props} />
+          </>
+        )}
       </div>
     </>
   );

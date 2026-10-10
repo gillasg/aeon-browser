@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ChangeEvent, type KeyboardEvent, type ReactElement } from "react";
+import { imagePasteHandler } from "./composer-image-paste.js";
 
 export interface PromptFieldProps {
   id?: string;
@@ -10,6 +11,7 @@ export interface PromptFieldProps {
   rows?: number;
   onChange(value: string): void;
   onEnter?(): void;
+  onFiles?(files: readonly File[]): void;
 }
 
 export function PromptField(props: PromptFieldProps): ReactElement {
@@ -45,6 +47,7 @@ export function PromptField(props: PromptFieldProps): ReactElement {
         value={props.value}
         onChange={change}
         onKeyDown={keyDown}
+        onPaste={imagePasteHandler(props.onFiles)}
       />
     );
   return (
@@ -59,6 +62,7 @@ export function PromptField(props: PromptFieldProps): ReactElement {
       value={props.value}
       onChange={change}
       onKeyDown={keyDown}
+      onPaste={imagePasteHandler(props.onFiles)}
     />
   );
 }

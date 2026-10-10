@@ -37,7 +37,9 @@ export function EmptyChatStart(props: ChatSurfaceProps): ReactElement {
           },
         }}
       />
-      {props.composer.running && <PendingWork />}
+      {(props.composer.running || props.composer.connecting) && (
+        <PendingWork connecting={Boolean(props.composer.connecting)} />
+      )}
     </div>
   );
 }

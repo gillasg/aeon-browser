@@ -121,8 +121,7 @@ function createView() {
     sidebarOpen: sidebar.open,
     sidebarQuery: sidebar.query,
     composer: {
-      ...composer.props(),
-      controls: initialDisplay.controls(composer.props().controls),
+      ...initialDisplay.composer(composer.props(), transcript.rows, connection.state, runState),
       contextUsage,
       ...piUi.composerProps(),
     },

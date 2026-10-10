@@ -131,6 +131,8 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               rows={props.rows}
               running={props.composer.running}
               starting={Boolean(props.composer.starting)}
+              connecting={Boolean(props.composer.connecting)}
+              preparing={Boolean(props.composer.preparing)}
               actionsDisabled={
                 Boolean(props.transcriptActionsDisabled) || props.composer.running || props.piUiBusy
               }
