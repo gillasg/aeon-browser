@@ -6,6 +6,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { browserContent, type BrowserToolRunner } from "./browser-tool.js";
 import { createSiteScriptTool } from "./site-script-tool.js";
 import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
+import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 
 const CELL_TIMEOUT_MS = 60_000;
 
@@ -13,14 +14,16 @@ export function createBrowserTools(
   chatId: string,
   run?: BrowserToolRunner,
   workspace?: string,
+  skills?: string,
 ): ReturnType<typeof defineTool>[] {
-  return [createBrowserCodeTool(chatId, run, workspace), createSiteScriptTool(chatId, run)];
+  return [createBrowserCodeTool(chatId, run, workspace, skills), createSiteScriptTool(chatId, run)];
 }
 
 export function createBrowserCodeTool(
   chatId: string,
   run?: BrowserToolRunner,
   workspace?: string,
+  skills?: string,
 ): ReturnType<typeof defineTool> {
   return defineTool({
     name: "browser_code",
@@ -51,7 +54,7 @@ export function createBrowserCodeTool(
           codeCell: {
             code,
             timeoutMs: CELL_TIMEOUT_MS,
-            onCall: (request) => serveCall(request, workspace, steps),
+            onCall: (request) => serveCall(request, workspace, steps, skills),
             onProgress: (next) => {
               steps = next.map(compactStep);
               onUpdate?.({
@@ -90,7 +93,12 @@ async function serveCall(
   request: unknown,
   workspace: string | undefined,
   steps: Record<string, unknown>[],
+  skills: string | undefined,
 ): Promise<unknown> {
+  if (isSiteSkillRequest(request)) {
+    if (!skills) throw new Error("Site skills are unavailable");
+    return siteSkillCall(skills, request);
+  }
   if (isWorkspaceRequest(request)) {
     if (!workspace) throw new Error("Chat workspace is unavailable");
     const result = await workspaceCall(workspace, request);

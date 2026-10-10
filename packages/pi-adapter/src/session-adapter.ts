@@ -245,7 +245,12 @@ export class PiSdkSessionAdapter implements PiSessionPort {
       ...(thinkingLevel ? { thinkingLevel } : {}),
       ...fixtureSessionOptions(fixture),
       customTools: [
-        ...createBrowserTools(input.chatId, this.browserTool, input.workingDirectory),
+        ...createBrowserTools(
+          input.chatId,
+          this.browserTool,
+          input.workingDirectory,
+          resolve(this.sessionDirectory, "..", "site-skills"),
+        ),
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),
       ],
