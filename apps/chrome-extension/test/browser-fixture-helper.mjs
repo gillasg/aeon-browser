@@ -103,7 +103,6 @@ async function buildLayer(folder) {
         "navigation",
         "point",
         "session",
-        "text",
         "events",
         "frames",
         "files",
@@ -112,7 +111,6 @@ async function buildLayer(folder) {
         "downloads",
         "scroll",
         "scroll-container",
-        "selector-state",
       ]
         .map((name) => `export * from './apps/chrome-extension/src/native-browser-${name}.ts';`)
         .join("\n"),

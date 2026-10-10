@@ -1,4 +1,4 @@
-import { selectorState } from "./native-browser-selector-state.js";
+import { selectorState, isFocusedInput } from "./native-browser-dom.js";
 import { BrowserActionError, sameTarget, safePage } from "./native-browser-common.js";
 import { focusNode, pressKey } from "./native-browser-input.js";
 import { prepareElement } from "./native-browser-prepare.js";
@@ -14,7 +14,6 @@ import {
 } from "./native-browser-navigation.js";
 import { executeSiteScript } from "./site-script-runtime.js";
 import { browserPopups } from "./native-browser-popup.js";
-import { isFocusedInput } from "./native-browser-text.js";
 type ExtraRequest = BrowserExecutorRequest & {
   step: Extract<
     BrowserExecutorRequest["step"],

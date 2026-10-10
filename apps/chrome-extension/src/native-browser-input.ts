@@ -1,5 +1,4 @@
-import { onNode, nodeState } from "./native-browser-dom.js";
-import { fillTextNode } from "./native-browser-text.js";
+import { onNode, nodeState, fillTextNode } from "./native-browser-dom.js";
 interface Point {
   x: number;
   y: number;
