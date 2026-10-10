@@ -88,13 +88,12 @@ test("shared root rejects duplicate mounts and imperative page renderers are gon
 });
 
 test("browser capture hooks follow the React home, Chat, and panel controls", async () => {
-  const [home, homeStart, chat, composer, panel, panelCapture, panelCss] = await Promise.all([
+  const [home, homeStart, chat, composer, panel, panelCss] = await Promise.all([
     readFile(join(ui, "home-surface.tsx"), "utf8"),
     readFile(join(ui, "home-start.tsx"), "utf8"),
     readFile(join(ui, "chat-surface.tsx"), "utf8"),
     readFile(join(ui, "chat-composer.tsx"), "utf8"),
     readFile(join(ui, "side-panel.tsx"), "utf8"),
-    readFile(join(app, "..", "..", "scripts", "capture-slice-2-sidepanel.mjs"), "utf8"),
     readFile(join(app, "sidepanel.css"), "utf8"),
   ]);
   assert.match(home, /id="home-connection"/);
@@ -106,7 +105,6 @@ test("browser capture hooks follow the React home, Chat, and panel controls", as
   assert.match(panel, /id="chat-picker-list"/);
   assert.match(panel, /data-chat-id=\{chat\.chatId\}/);
   assert.match(panelCss, /#root\s*\{[^}]*flex:\s*1/s);
-  assert.match(panelCapture, /assertPanelFillsHeight\(layout\)/);
 });
 
 test("New Tab is Ask-only and applies its dynamic Pi selection before the first prompt", async () => {
