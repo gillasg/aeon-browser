@@ -35,6 +35,10 @@ $definition.Principal.UserId = $userId
 $definition.Principal.LogonType = 3
 $trigger = $definition.Triggers.Create(9)
 $trigger.UserId = $userId
+# Re-run every minute for the whole session. The supervisor is single-instance, so a healthy
+# daemon makes this a no-op; a daemon that exited for any reason is back within a minute.
+$trigger.Repetition.Interval = 'PT1M'
+$trigger.Repetition.Duration = ''
 $action = $definition.Actions.Create(0)
 $action.Path = $PowerShellPath
 $action.Arguments = $arguments

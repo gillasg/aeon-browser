@@ -9,7 +9,15 @@ public static class AeonPackageIdentity {
 }
 '@
 [uint32]$taskLength = 0
-if (-not $env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY -and
+# Some packaged desktop hosts redirect AppData writes from child processes that
+# have no package identity of their own. Detect that with a probe instead of trusting identity.
+$probeName = 'aeon-virtualization-probe-' + [Guid]::NewGuid().ToString('N')
+$probe = Join-Path $env:LOCALAPPDATA $probeName
+[IO.File]::WriteAllText($probe, '')
+$redirected = @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Packages') -Directory -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName ('LocalCacheLocal' + $probeName)) })
+Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+if (-not $env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY -and $redirected.Count -eq 0 -and
     [AeonPackageIdentity]::GetCurrentPackageFullName([ref]$taskLength, [IntPtr]::Zero) -eq 15700) {
     return $false
 }
@@ -25,8 +33,9 @@ $taskScript = Join-Path $taskOutput 'setup.ps1'
 $taskArgs = '-Unvirtualized -NodeExecutable ' + (Quote-SetupLiteral $NodeExecutable)
 if ($BrowserRoot) { $taskArgs += ' -BrowserRoot ' + (Quote-SetupLiteral $BrowserRoot) }
 if ($Update) { $taskArgs += ' -Update' }
-if ($env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY) {
-    $redirectedData = Join-Path $env:LOCALAPPDATA ('Packages/' + $env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY + '/LocalCache/Local/Aeon/data')
+$families = @($redirected | ForEach-Object { $_.Name }) + @($env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY | Where-Object { $_ })
+foreach ($family in $families) {
+    $redirectedData = Join-Path $env:LOCALAPPDATA ('Packages/' + $family + '/LocalCache/Local/Aeon/data')
     if (Test-Path -LiteralPath (Join-Path $redirectedData 'aeon.sqlite')) {
         $taskArgs += ' -ImportDataFrom ' + (Quote-SetupLiteral $redirectedData)
     }
