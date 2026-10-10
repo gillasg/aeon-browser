@@ -1,5 +1,5 @@
 import { onNode } from "./native-browser-dom.js";
-import { BrowserActionError } from "./native-browser-errors.js";
+import { BrowserActionError } from "./native-browser-common.js";
 export async function isFocusedInput(debuggee: chrome.debugger.Debuggee): Promise<boolean> {
   const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
     expression: `(${focusedInput.toString()})()`,

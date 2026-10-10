@@ -1,4 +1,11 @@
-import { browserErrorDetail } from "./native-browser-errors.js";
+import {
+  browserErrorDetail,
+  errorCode,
+  safePage,
+  sameIdentity,
+  sameTarget,
+  targetIdentity,
+} from "./native-browser-common.js";
 import { handleScriptSync } from "./site-script-runtime.js";
 import { performExtra } from "./native-browser-extra.js";
 import { isCapabilityStep, performCapability } from "./native-browser-capabilities.js";
@@ -21,13 +28,6 @@ import {
   type BrowserTargetKey,
 } from "@pippin/protocol";
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
-import {
-  errorCode,
-  safePage,
-  sameIdentity,
-  sameTarget,
-  targetIdentity,
-} from "./native-browser-common.js";
 import { performAction } from "./native-browser-actions.js";
 import { captureScreenshot, observeSemantic } from "./native-browser-observation.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";

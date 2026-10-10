@@ -1,6 +1,11 @@
-import { BrowserActionError } from "./native-browser-errors.js";
+import {
+  BrowserActionError,
+  targetIdentity,
+  textValue,
+  type AxNode,
+  type AxRef,
+} from "./native-browser-common.js";
 import type { BrowserElementTarget, BrowserTargetKey } from "@pippin/protocol";
-import { targetIdentity, textValue, type AxNode, type AxRef } from "./native-browser-common.js";
 import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom.js";
 export { withBrowserDebugger as withDebugger } from "./native-browser-session.js";
 

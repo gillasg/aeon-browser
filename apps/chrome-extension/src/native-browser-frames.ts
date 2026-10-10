@@ -1,4 +1,4 @@
-import { BrowserActionError } from "./native-browser-errors.js";
+import { BrowserActionError } from "./native-browser-common.js";
 interface FrameNode {
   frame: { id: string; url: string; loaderId?: string; parentId?: string };
   childFrames?: FrameNode[];

@@ -1,5 +1,5 @@
 import type { BrowserExecutorRequest } from "@pippin/protocol";
-import { BrowserActionError } from "./native-browser-errors.js";
+import { BrowserActionError } from "./native-browser-common.js";
 
 interface Activity {
   pending: Map<string, number>;
