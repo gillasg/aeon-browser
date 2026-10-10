@@ -21,4 +21,18 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Cache Chrome for Testing
+        uses: actions/cache@v4
+        with:
+          path: .slice0-audit/chrome-for-testing-154.0.8037.57
+          key: chrome-for-testing-154.0.8037.57-win64
+      - name: Install Chrome for Testing
+        shell: pwsh
+        run: |
+          $dir = ".slice0-audit/chrome-for-testing-154.0.8037.57"
+          if (-not (Test-Path "$dir/chrome-win64/chrome.exe")) {
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            Invoke-WebRequest "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/win64/chrome-win64.zip" -OutFile "$dir/chrome-win64.zip"
+            Expand-Archive "$dir/chrome-win64.zip" -DestinationPath $dir -Force
+          }
       - run: pnpm check

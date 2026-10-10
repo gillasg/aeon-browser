@@ -36,8 +36,14 @@ export async function browserFixture() {
   }
   try {
     const port = await waitForDebugPort(folder);
-    const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    cdp = await connectCdp(targets.find((item) => item.type === "page").webSocketDebuggerUrl);
+    let page;
+    for (let attempt = 0; !page && attempt < 50; attempt++) {
+      if (attempt) await new Promise((done) => setTimeout(done, 100));
+      const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      page = targets.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
+    }
+    assert.ok(page, "Chrome did not expose a page target");
+    cdp = await connectCdp(page.webSocketDebuggerUrl);
     const commands = [];
     installChromeShim(cdp, commands);
     const api = await buildLayer(folder);
