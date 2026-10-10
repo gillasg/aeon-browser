@@ -1,5 +1,9 @@
 import { authenticate } from "./native-authenticate.js";
-import { installNativeStartup } from "./native-startup.js";
+import {
+  installNativeStartup,
+  scheduleExecutorReconnect,
+  startExecutorHeartbeat,
+} from "./native-executor-lifecycle.js";
 import { handleContextPicker } from "./context-picker-handler.js";
 import {
   captureCurrentPage,
@@ -10,8 +14,6 @@ import {
   installCoreAttentionBridge,
   handleCoreAttentionMessage,
 } from "./completion-notifications.js";
-import { scheduleExecutorReconnect } from "./native-executor-reconnect.js";
-import { startExecutorHeartbeat } from "./native-executor-health.js";
 import { installBrowserPopupGuard } from "./native-browser-popup.js";
 import {
   BrowserExecutorHeartbeatReplySchema,

@@ -85,7 +85,7 @@ test("extension prepares on worker load and on Chrome startup or activation", as
       tabs: { onActivated: event("activated") },
       windows: { onFocusChanged: event("focus"), WINDOW_ID_NONE: -1 },
     };
-    const { installNativeStartup } = await load("native-startup", directory);
+    const { installNativeStartup } = await load("native-executor-lifecycle", directory);
     let calls = 0,
       retries = 0;
     installNativeStartup(

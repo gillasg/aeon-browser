@@ -3,6 +3,38 @@ import {
   BrowserExecutorHeartbeatSchema,
 } from "@pippin/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
+
+/** Prepare on worker load, browser startup, and wake before a page requests a grant. */
+export function installNativeStartup(connect: () => Promise<unknown>, retry: () => void): void {
+  const warm = () => {
+    void connect().catch(retry);
+  };
+  chrome.runtime.onStartup.addListener(warm);
+  chrome.runtime.onInstalled.addListener(warm);
+  chrome.tabs.onActivated.addListener(warm);
+  chrome.windows.onFocusChanged.addListener((windowId) => {
+    if (windowId !== chrome.windows.WINDOW_ID_NONE) warm();
+  });
+  warm();
+}
+
+let timer: number | undefined;
+let attempts = 0;
+/** Re-establish the browser executor without replaying any browser operation. */
+export function scheduleExecutorReconnect(connect: () => Promise<unknown>): void {
+  if (timer !== undefined) return;
+  const delay = Math.min(250 * 2 ** Math.min(attempts++, 3), 2000);
+  timer = globalThis.setTimeout(() => {
+    timer = undefined;
+    void connect().then(
+      () => {
+        attempts = 0;
+      },
+      () => scheduleExecutorReconnect(connect),
+    );
+  }, delay);
+}
+
 export function startExecutorHeartbeat(socket: WebSocket, identity: BrowserIdentity): number {
   let acknowledged = Date.now();
   const onMessage = (event: MessageEvent) => {
