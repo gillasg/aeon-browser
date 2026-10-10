@@ -60,7 +60,7 @@ importers:
   packages/ui:
     dependencies:
       "@pippin/protocol":
-        specifier: file:../../vendor/pippin-protocol-0.3.1.tgz
+        specifier: file:..\..\vendor\pippin-protocol-0.3.1.tgz
         version: file:vendor/pippin-protocol-0.3.1.tgz
       react:
         specifier: 19.3.0
