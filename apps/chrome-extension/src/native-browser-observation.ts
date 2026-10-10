@@ -16,7 +16,7 @@ import { getAxTree, withDebugger } from "./native-browser-debugger.js";
 
 import { createSemanticNodes, filterVisibleTextNodes } from "./native-browser-semantic.js";
 import { scopedBackendIds } from "./native-browser-dom.js";
-import { settleBrowserPage } from "./native-browser-settle.js";
+import { settleBrowserPage } from "./native-browser-navigation.js";
 import { visiblePageText } from "./native-browser-visible.js";
 const SCREENSHOT_MAX_AGE_MS = 60_000;
 const refs = new Map<string, Map<string, AxRef>>();

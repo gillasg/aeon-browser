@@ -1,5 +1,5 @@
 import type { BrowserExecutorRequest, BrowserStep } from "@pippin/protocol";
-import { viewportFingerprint } from "./native-browser-readiness.js";
+import { viewportFingerprint } from "./native-browser-navigation.js";
 import { screenshotPoint } from "./native-browser-observation.js";
 import { clickAt } from "./native-browser-debugger.js";
 type ActionRequest = BrowserExecutorRequest & {

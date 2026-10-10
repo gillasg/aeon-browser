@@ -6,12 +6,15 @@ import type { BrowserExecutorRequest, BrowserExecutorResult } from "@pippin/prot
 import { withBrowserDebugger, assertRequestActive } from "./native-browser-session.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { readDiagnostics } from "./native-browser-events.js";
-import { navigateReady } from "./native-browser-navigation.js";
+import {
+  navigateReady,
+  executePageCode,
+  primeBrowserSettle,
+  settleBrowserPage,
+} from "./native-browser-navigation.js";
 import { executeSiteScript } from "./site-script-runtime.js";
 import { sameTarget, safePage } from "./native-browser-common.js";
 import { browserPopups } from "./native-browser-popup.js";
-import { executePageCode } from "./native-browser-code.js";
-import { primeBrowserSettle, settleBrowserPage } from "./native-browser-settle.js";
 import { isFocusedInput } from "./native-browser-text.js";
 type ExtraRequest = BrowserExecutorRequest & {
   step: Extract<

@@ -3,7 +3,7 @@ import {
   forgetDiagnostics,
   releaseBrowserEvents,
 } from "./native-browser-events.js";
-import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-settle.js";
+import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-navigation.js";
 import { presentBrowserTask } from "./native-browser-layout.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import type { BrowserExecutorRequest } from "@pippin/protocol";

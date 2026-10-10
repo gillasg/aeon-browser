@@ -1,4 +1,4 @@
-import { viewportFingerprint } from "./native-browser-readiness.js";
+import { viewportFingerprint } from "./native-browser-navigation.js";
 interface Capture {
   viewport: { width: number; height: number };
   scrollX: number;

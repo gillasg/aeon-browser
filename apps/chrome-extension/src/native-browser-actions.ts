@@ -12,7 +12,7 @@ import { safePage } from "./native-browser-common.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
 import { clickAt, getViewportCenter, scrollAt, withDebugger } from "./native-browser-debugger.js";
 import { observeSemantic } from "./native-browser-observation.js";
-import { primeBrowserSettle, settleBrowserPage, pageOutcome } from "./native-browser-settle.js";
+import { primeBrowserSettle, settleBrowserPage, pageOutcome } from "./native-browser-navigation.js";
 
 type ActionRequest = BrowserExecutorRequest & {
   step: Extract<BrowserStep, { op: "click" | "fill" | "scroll" }>;
