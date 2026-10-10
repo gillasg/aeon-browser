@@ -4,9 +4,10 @@ import {
   releaseBrowserEvents,
 } from "./native-browser-events.js";
 import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-settle.js";
-import { persistBrowserOwners, restoreBrowserOwners } from "./native-browser-ownership.js";
-import { ensureBrowserViewport, restoreBrowserViewport } from "./native-browser-viewport.js";
 import { presentBrowserTask } from "./native-browser-layout.js";
+import { currentInventoryTabs } from "./native-inventory-client.js";
+import type { BrowserExecutorRequest } from "@pippin/protocol";
+
 interface Attachment {
   chatId: string;
   attached: Promise<void>;
@@ -156,4 +157,88 @@ export async function reconnectBrowserSession(tabId: number): Promise<void> {
 }
 export async function restoreBrowserSessionOwners(): Promise<void> {
   await restoreBrowserOwners(owners);
+}
+
+const key = "aeon-browser-owners";
+let writes: Promise<unknown> = Promise.resolve();
+export function persistBrowserOwners(owners: Map<number, string>): void {
+  if (!chrome.storage?.session) return;
+  const tabs = currentInventoryTabs();
+  const records = [...owners].flatMap(([tabId, chatId]) => {
+    const tab = tabs.find((item) => item.target.tabId === tabId);
+    return tab ? [{ chatId, target: tab.target }] : [];
+  });
+  writes = writes
+    .catch(() => undefined)
+    .then(() => chrome.storage.session.set({ [key]: records }))
+    .catch(() => undefined);
+}
+export async function restoreBrowserOwners(owners: Map<number, string>): Promise<void> {
+  if (!chrome.storage?.session) return;
+  const stored = (await chrome.storage.session.get(key))[key] as
+    { chatId: string; target: unknown }[] | undefined;
+  const tabs = currentInventoryTabs();
+  for (const record of stored ?? []) {
+    const tab = tabs.find((item) => JSON.stringify(item.target) === JSON.stringify(record.target));
+    if (tab && !owners.has(tab.target.tabId)) owners.set(tab.target.tabId, record.chatId);
+  }
+}
+
+const overridden = new Set<number>();
+chrome.tabs.onActivated?.addListener(({ tabId }) => void restoreBrowserViewport(tabId));
+export async function ensureBrowserViewport(tabId: number): Promise<void> {
+  if (overridden.has(tabId)) return;
+  const tab = await chrome.tabs.get?.(tabId).catch(() => undefined);
+  if (!tab) return;
+  if (tab.active || ((tab as chrome.tabs.Tab & { splitViewId?: number }).splitViewId ?? -1) >= 0) {
+    await restoreBrowserViewport(tabId);
+    return;
+  }
+  await chrome.debugger.sendCommand({ tabId }, "Emulation.setDeviceMetricsOverride", {
+    width: 1280,
+    height: 800,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  overridden.add(tabId);
+}
+export async function restoreBrowserViewport(tabId: number): Promise<void> {
+  overridden.delete(tabId);
+  await chrome.debugger
+    .sendCommand({ tabId }, "Emulation.clearDeviceMetricsOverride")
+    .catch(() => undefined);
+}
+
+const chatEpochs = new Map<string, number>();
+const requestEpochs = new Map<string, number>();
+
+export function releaseBrowserExecutor(): void {
+  for (const [chatId, epoch] of chatEpochs) chatEpochs.set(chatId, epoch + 1);
+  void releaseBrowserSessions();
+}
+export function handleBrowserRelease(candidate: unknown): boolean {
+  if (
+    typeof candidate !== "object" ||
+    candidate === null ||
+    !("kind" in candidate) ||
+    candidate.kind !== "browser.release" ||
+    !("chatId" in candidate) ||
+    typeof candidate.chatId !== "string"
+  )
+    return false;
+  chatEpochs.set(candidate.chatId, (chatEpochs.get(candidate.chatId) ?? 0) + 1);
+  void releaseBrowserSessions(candidate.chatId, "reset" in candidate && candidate.reset === true);
+  return true;
+}
+export function registerBrowserRequest(request: BrowserExecutorRequest): void {
+  const epoch = chatEpochs.get(request.chatId) ?? 0;
+  chatEpochs.set(request.chatId, epoch);
+  requestEpochs.set(request.requestId, epoch);
+}
+export function assertRequestActive(request: BrowserExecutorRequest): void {
+  if (requestEpochs.get(request.requestId) !== chatEpochs.get(request.chatId))
+    throw new Error("OPERATION_FAILED");
+}
+export function completeBrowserRequest(request: BrowserExecutorRequest): void {
+  requestEpochs.delete(request.requestId);
 }

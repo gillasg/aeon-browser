@@ -3,7 +3,14 @@ import { handleScriptSync } from "./site-script-runtime.js";
 import { performExtra } from "./native-browser-extra.js";
 import { isCapabilityStep, performCapability } from "./native-browser-capabilities.js";
 import { navigateReady } from "./native-browser-navigation.js";
-import { withBrowserDebugger } from "./native-browser-session.js";
+import {
+  withBrowserDebugger,
+  bindBrowserSession,
+  handleBrowserRelease,
+  registerBrowserRequest,
+  assertRequestActive,
+  completeBrowserRequest,
+} from "./native-browser-session.js";
 import {
   BrowserExecutorRequestSchema,
   BrowserExecutorResultSchema,
@@ -24,14 +31,7 @@ import {
 import { performAction } from "./native-browser-actions.js";
 import { captureScreenshot, observeSemantic } from "./native-browser-observation.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
-import { bindBrowserSession } from "./native-browser-session.js";
-import {
-  handleBrowserRelease,
-  registerBrowserRequest,
-  assertRequestActive,
-  completeBrowserRequest,
-} from "./native-browser-request-lifecycle.js";
-export { releaseBrowserExecutor } from "./native-browser-request-lifecycle.js";
+export { releaseBrowserExecutor } from "./native-browser-session.js";
 
 const claimGenerations = new Map<string, number>();
 const usedClaims = new Set<string>();

@@ -1,12 +1,15 @@
 import type { BrowserExecutorRequest, BrowserExecutorResult, BrowserStep } from "@pippin/protocol";
-import { withBrowserDebugger, reconnectBrowserSession } from "./native-browser-session.js";
+import {
+  withBrowserDebugger,
+  reconnectBrowserSession,
+  assertRequestActive,
+} from "./native-browser-session.js";
 import { discoverFrames, frameDebuggee, evaluateFrame } from "./native-browser-frames.js";
 import { executeBrowserEvent } from "./native-browser-events.js";
 import { executeDownload } from "./native-browser-downloads.js";
 import { uploadFiles } from "./native-browser-files.js";
 import { executeInteraction } from "./native-browser-interaction.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
-import { assertRequestActive } from "./native-browser-request-lifecycle.js";
 import { interactFrame } from "./native-browser-frame-input.js";
 import { createSemanticNodes } from "./native-browser-semantic.js";
 import type { AxNode } from "./native-browser-common.js";

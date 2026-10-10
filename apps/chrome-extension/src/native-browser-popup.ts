@@ -1,7 +1,10 @@
 import { BrowserPopupSchema, type BrowserTab } from "@pippin/protocol";
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
-import { browserSessionOwner, bindBrowserSession } from "./native-browser-session.js";
-import { restoreBrowserSessionOwners } from "./native-browser-session.js";
+import {
+  browserSessionOwner,
+  bindBrowserSession,
+  restoreBrowserSessionOwners,
+} from "./native-browser-session.js";
 import { publishBrowserEvent } from "./native-browser-events.js";
 const children = new Map<number, Set<number>>();
 const active = new Map<number, number>(),

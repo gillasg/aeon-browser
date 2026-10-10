@@ -115,7 +115,6 @@ async function buildLayer(folder) {
         "interaction",
         "frame-input",
         "downloads",
-        "viewport",
         "scroll",
         "scroll-container",
         "selector-state",
