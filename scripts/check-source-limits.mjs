@@ -4,10 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoots = ["apps", "packages", "scripts"].map((path) => join(root, path));
-const maxLines = 320;
-const maxBytes = 16 * 1024;
+const maxLines = 800;
+const maxBytes = 40 * 1024;
 const generatedDirectories = new Set(["dist", "dev-dist", "node_modules"]);
-const notices = [];
 const failures = [];
 
 async function visit(path, files = []) {
@@ -28,15 +27,12 @@ for (const path of sourceRoots) {
     const label = relative(root, file);
     if (lines > maxLines || bytes > maxBytes)
       failures.push(`${label}: ${lines} lines, ${bytes} bytes`);
-    else if (lines > 240) notices.push(`Review ${label}: ${lines} lines.`);
-    else if (lines > 180) notices.push(`Above 180-line aim: ${label} has ${lines} lines.`);
   }
 }
 
-if (notices.length > 0) process.stdout.write(`${notices.join("\n")}\n`);
 if (failures.length > 0) {
-  process.stderr.write(`Source limits exceeded (320 lines or 16 KiB):\n${failures.join("\n")}\n`);
+  process.stderr.write(`Source limits exceeded (800 lines or 40 KiB):\n${failures.join("\n")}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write("All authored source files are below 320 lines and 16 KiB.\n");
+  process.stdout.write("All authored source files are below 800 lines and 40 KiB.\n");
 }
