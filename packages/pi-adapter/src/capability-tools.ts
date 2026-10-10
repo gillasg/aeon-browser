@@ -120,7 +120,7 @@ function createRoutineTools(
       host,
       "create_routine",
       "Create a routine. Optionally require the browser's clientInstanceId from " +
-        "browser_control listTabs; absent instances are recorded unavailable before Pi starts.",
+        "browser.tabs() in browser_code; absent instances are recorded unavailable before Pi starts.",
       routineCreate,
     ),
     tool(

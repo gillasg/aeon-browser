@@ -37,7 +37,6 @@ import {
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
-import { disposeBrowserRuntime } from "./browser-code-runtime.js";
 import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { bindPiExtensions } from "./sdk-resources.js";
@@ -297,7 +296,6 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     const cached: PiSessionHandle = {
       ...handle,
       close: async () => {
-        disposeBrowserRuntime(chatId);
         await this.browserTool?.(chatId, "browser-session-cleanup", { release: true, reset: true });
         unsubscribe();
         this.pendingResourceReloads.delete(chatId);

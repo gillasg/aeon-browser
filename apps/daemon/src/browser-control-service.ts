@@ -11,6 +11,7 @@ import {
   type BrowserTargetKey,
 } from "@aeon/protocol";
 import { executeBrowserBatch } from "./browser-batch.js";
+import { BrowserCodeCells, type BrowserCodeCellInput } from "./browser-code-cells.js";
 import type { SiteScriptService } from "./site-script-service.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import {
@@ -38,6 +39,10 @@ export class BrowserControlService {
   private readonly scriptClients = new Set<string>();
   private readonly actionClients = new Map<string, boolean>();
   private readonly runtimeClients = new Set<string>();
+  private readonly codeClients = new Set<string>();
+  private readonly cells = new BrowserCodeCells((chatId, target) =>
+    this.setAssociation(chatId, target, "agent-created", "agent-open"),
+  );
   useSiteScripts(scripts: SiteScriptService): void {
     this.scripts = scripts;
   }
@@ -79,7 +84,10 @@ export class BrowserControlService {
     supportsScripts = false,
     supportsActions = false,
     supportsRuntime = false,
+    supportsCode = false,
   ): void {
+    if (supportsCode) this.codeClients.add(clientInstanceId);
+    else this.codeClients.delete(clientInstanceId);
     this.actionClients.set(clientInstanceId, supportsActions);
     if (supportsRuntime) this.runtimeClients.add(clientInstanceId);
     else this.runtimeClients.delete(clientInstanceId);
@@ -93,12 +101,14 @@ export class BrowserControlService {
         this.actionClients.delete(clientInstanceId);
         this.runtimeClients.delete(clientInstanceId);
         this.scriptClients.delete(clientInstanceId);
+        this.codeClients.delete(clientInstanceId);
       }
       for (const pending of this.pending.values())
         if (pending.socket === socket) pending.finish(undefined, "BROWSER_OFFLINE");
     });
   }
   handleExecutorResult(candidate: unknown, socket: WebSocket): boolean {
+    if (this.cells.handle(candidate, socket)) return true;
     if (this.adoptPopup(candidate, socket)) return true;
     const parsed = BrowserOperationResultSchema.safeParse(candidate);
     if (!parsed.success) return false;
@@ -156,11 +166,43 @@ export class BrowserControlService {
         this.scripts?.execute(chatId, callId, raw.siteScript, signal) ??
         Promise.resolve(JSON.stringify({ error: "UNSUPPORTED" }))
       );
+    if ("codeCell" in raw)
+      return this.runCode(chatId, callId, raw.codeCell as BrowserCodeCellInput, signal);
     if ("release" in raw && raw.release === true) {
       this.release(chatId, "reset" in raw && raw.reset === true);
       return Promise.resolve(JSON.stringify({ released: true }));
     }
     return;
+  }
+  private async runCode(
+    chatId: string,
+    toolCallId: string,
+    input: BrowserCodeCellInput,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const associated = [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target);
+    const available = [...this.codeClients].filter((id) => this.isInstanceAvailable(id));
+    const preferred = associated
+      .map((t) => t.clientInstanceId)
+      .find((id) => available.includes(id));
+    const clientInstanceId = preferred ?? (available.length === 1 ? available[0] : undefined);
+    if (!clientInstanceId)
+      return JSON.stringify({
+        error: available.length ? "AMBIGUOUS_BROWSER" : "BROWSER_OFFLINE",
+        detail: available.length
+          ? "Several browsers are connected; attach a tab from the intended browser first."
+          : "No connected browser can run browser_code. Reload Aeon in chrome://extensions.",
+      });
+    const socket = this.executors.get(clientInstanceId);
+    if (!socket) return JSON.stringify({ error: "BROWSER_OFFLINE" });
+    const targets = associated.filter((t) => t.clientInstanceId === clientInstanceId);
+    try {
+      return JSON.stringify(
+        await this.cells.run(socket, chatId, toolCallId, targets, input, signal),
+      );
+    } catch (error) {
+      return JSON.stringify({ error: error instanceof Error ? error.message : String(error) });
+    }
   }
   private release(chatId: string, reset = false): void {
     for (const pending of this.pending.values())

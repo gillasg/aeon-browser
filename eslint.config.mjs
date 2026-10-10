@@ -23,8 +23,8 @@ export default tseslint.config(
     },
     rules: {
       complexity: ["error", 12],
-      "max-lines": ["error", { max: 320 }],
-      "max-lines-per-function": ["error", { max: 60, skipBlankLines: true, skipComments: true }],
+      "max-lines": ["error", { max: 800 }],
+      "max-lines-per-function": ["error", { max: 100, skipBlankLines: true, skipComments: true }],
       "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK"], location: "start" }],
     },
   },

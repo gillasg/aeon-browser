@@ -134,3 +134,4 @@ export { ProjectSchema, type ProjectDto } from "./projects.js";
 export * from "./site-scripts.js";
 
 export * from "./core-client.js";
+export * from "./browser-code.js";
