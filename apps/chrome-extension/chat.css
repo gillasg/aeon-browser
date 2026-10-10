@@ -3590,3 +3590,40 @@ body[data-host="panel"] .composer-meta {
   height: 18px;
   padding: 0;
 }
+
+.aeon-browser-preview {
+  position: fixed;
+  right: 16px;
+  bottom: 112px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--aeon-border);
+  border-radius: 12px;
+  background: var(--aeon-surface-raised);
+  box-shadow: var(--aeon-shadow-md);
+  color: var(--aeon-muted);
+  font: 500 12px/16px inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.aeon-browser-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  background: var(--aeon-surface);
+}
+.aeon-browser-preview span {
+  overflow: hidden;
+  padding: 6px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aeon-browser-preview:hover {
+  border-color: var(--aeon-border-strong);
+}

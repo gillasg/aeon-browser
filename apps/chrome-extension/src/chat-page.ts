@@ -1,4 +1,5 @@
 import { connectionSingleFlight } from "./connection-single-flight.js";
+import { installBrowserPreview } from "./chat-browser-preview.js";
 import { connectSidebarCatalog } from "./sidebar-catalog-connection.js";
 import { ensurePanelContext } from "./panel-prompt-handoff.js";
 import { observeChatTabStatus } from "./chat-tab-status.js";
@@ -33,6 +34,7 @@ import { ChatResourcesController } from "./chat-resources-controller.js";
 import { initializeChatPreferences } from "./chat-preferences.js";
 import { ChatPiUiController } from "./chat-pi-ui-controller.js";
 const { root, chatId, initialDisplay } = initializeChatPage();
+installBrowserPreview(chatId);
 let client: UiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);
 let catalogClient: UiClient | undefined;

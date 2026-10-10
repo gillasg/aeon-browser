@@ -11,6 +11,7 @@ import { browserErrorDetail, errorCode, targetIdentity } from "./native-browser-
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
 import { browserSessionOwner } from "./native-browser-session.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
+import { notePreviewActivity } from "./native-browser-preview.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
 const OFFSCREEN = "code-offscreen.html";
@@ -189,6 +190,13 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
       cell.opened.set(key, result.tab.target);
     }
     Object.assign(entry, { disposition: "completed", result });
+    const tabId =
+      result.kind === "tab"
+        ? result.tab.target.tabId
+        : "target" in step
+          ? step.target.tabId
+          : undefined;
+    if (tabId !== undefined) notePreviewActivity(cell.run.chatId, tabId);
     recordScreenshot(cell, step, result);
     return result;
   } catch (error) {

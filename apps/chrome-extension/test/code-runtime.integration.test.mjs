@@ -136,6 +136,32 @@ test(
         assert.equal(used.value, "Fixture");
       });
 
+      await t.test("work in a background tab publishes a live preview", async () => {
+        const offscreen = await waitForTarget(port, (item) =>
+          item.url.endsWith("/code-offscreen.html"),
+        );
+        const listener = await connect(offscreen.webSocketDebuggerUrl);
+        await listener("Runtime.evaluate", {
+          expression:
+            "globalThis.previews = []; chrome.runtime.onMessage.addListener((m) => { if (m?.kind === 'aeon.browser.preview') previews.push(!!m.image); })",
+        });
+        const chat = randomUUID();
+        const opened = await core.run({
+          chatId: chat,
+          code: `page = await browser.openTab(${JSON.stringify(pageUrl)}); await page.evaluate(() => document.title)`,
+          targets: [],
+        });
+        assert.equal(opened.error, undefined);
+        let frames = [];
+        for (let i = 0; i < 40 && !frames.includes(true); i++) {
+          await sleep(100);
+          frames = (
+            await listener("Runtime.evaluate", { expression: "previews", returnByValue: true })
+          ).result.result.value;
+        }
+        assert.ok(frames.includes(true), JSON.stringify(frames));
+      });
+
       await t.test("workspace calls are served by Core", async () => {
         const result = await run("await checkpoint('progress.json', {done: 3})");
         assert.equal(result.error, undefined);
