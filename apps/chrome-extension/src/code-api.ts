@@ -16,7 +16,7 @@ function __locator(target, element) {
     },
   });
 }
-const browser = Object.freeze({
+var browser = Object.freeze({
   waitFor: (event, options = {}) => __event(options.target || __lastTarget,event,options),
   tabs: Object.assign(async (query) => (await __step({op:'listTabs', ...(query ? {query} : {})})).tabs,
     {list: async (query) => browser.tabs(query)}),
@@ -169,6 +169,8 @@ var bu = Object.freeze({
     if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');
     var state = await browser.page(target).snapshot(options);
     var text = __formatState(state, options.max);
+    var known = await __siteSkills(state.url);
+    if (known.length) text = 'Site skills (skills.load(name)): ' + known.map(k => k.name + ' - ' + k.description.slice(0, 80)).join('; ') + '\\n' + text;
     console.log(text);
     return text;
   },
@@ -199,6 +201,30 @@ async function __labeledScreenshot(target) {
   try { return await __step({op:'observe', target, kind:'screenshot'}); }
   finally { await __call({op:'evaluate',target,expression:'document.getElementById("aeon-labels")?.remove()'}).catch(()=>{}); }
 }
+var __skillCache = new Map();
+async function __siteSkills(url) {
+  var host; try { host = new URL(url).hostname; } catch { return []; }
+  var cached = __skillCache.get(host);
+  if (cached && Date.now() - cached.at < 60000) return cached.list;
+  var list = await __call({siteSkill:'list', url}).catch(() => []);
+  __skillCache.set(host, {at: Date.now(), list});
+  return list;
+}
+var skills = Object.freeze({
+  list: (url) => __call({siteSkill:'list', url: url ?? (__lastTarget ? browser.page(__lastTarget).url : undefined)}),
+  load: async (name) => {
+    var skill = await __call({siteSkill:'get', name});
+    (0, eval)(skill.code);
+    return {name: skill.name, domains: skill.domains, description: skill.description, examples: skill.examples};
+  },
+  save: async (skill) => {
+    var code = typeof skill.code === 'function' ? '(' + skill.code.toString() + ')()' : skill.code;
+    var saved = await __call({siteSkill:'save', skill: {...skill, code}});
+    __skillCache.clear();
+    return saved;
+  },
+  remove: async (name) => { __skillCache.clear(); return __call({siteSkill:'delete', name}); },
+});
 async function __finishCell() {
   for (var target of [...__dirty.values()]) {
     try { await bu.state({target}); }

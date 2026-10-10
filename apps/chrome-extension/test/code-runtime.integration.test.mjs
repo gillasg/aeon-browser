@@ -44,7 +44,7 @@ test(
         "--no-first-run",
         "--no-default-browser-check",
         "--headless=new",
-        pageUrl,
+        "about:blank",
       ],
       { stdio: "ignore" },
     );
@@ -69,6 +69,10 @@ test(
           expiresAt: Date.now() + 600000, daemonProtocolVersion: request.protocolVersion });`,
       });
       log("bootstrap overridden");
+      await core.connected;
+      const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json());
+      const browserCdp = await connect(version.webSocketDebuggerUrl);
+      await browserCdp("Target.createTarget", { url: pageUrl });
       const target = await core.target(pageUrl);
       log("target", JSON.stringify(target));
       const chatId = randomUUID();
@@ -110,6 +114,26 @@ test(
           [Math.round(Math.min(box[1], box[3])) === Math.round(rect), shot.kind, await page.evaluate(() => !!document.getElementById('aeon-labels'))]`);
         assert.equal(result.error, undefined);
         assert.deepEqual(result.value, [true, "screenshot", false]);
+      });
+
+      await t.test("a saved site skill is offered and loads in another chat", async () => {
+        const saved = await run(
+          "await skills.save({name: 'shop-title', domains: ['127.0.0.1'], description: 'Reads the shop title', code: \"var shop = {title: () => page.evaluate(() => document.title)}\"})",
+        );
+        assert.equal(saved.error, undefined);
+        const other = (code) => core.run({ chatId: otherChat, code, targets: [] });
+        const otherChat = randomUUID();
+        const listed = await other(
+          `page = await browser.openTab(${JSON.stringify(pageUrl)}); await bu.state()`,
+        );
+        assert.match(
+          listed.output,
+          /Site skills .*shop-title/,
+          JSON.stringify(listed).slice(0, 400),
+        );
+        const used = await other("await skills.load('shop-title'); await shop.title()");
+        assert.equal(used.error, undefined);
+        assert.equal(used.value, "Fixture");
       });
 
       await t.test("workspace calls are served by Core", async () => {
@@ -155,6 +179,7 @@ async function fakeCore() {
     tabs = [];
   const results = new Map();
   const calls = [];
+  const skills = new Map();
   const connected = new Promise((done) =>
     server.on("connection", (ws) => {
       socket = ws;
@@ -182,6 +207,7 @@ async function fakeCore() {
           );
           done();
         } else if (message.kind === "browser.inventory.delta") {
+          log("delta", JSON.stringify(message.delta).slice(0, 200));
           if (message.delta.kind === "tab.upsert")
             tabs = [
               ...tabs.filter((tab) => tab.target.tabId !== message.delta.tab.target.tabId),
@@ -204,6 +230,24 @@ async function fakeCore() {
           );
         else if (message.kind === "browser.code.call") {
           calls.push(message.request);
+          if (message.request.siteSkill) {
+            const request = message.request;
+            const value =
+              request.siteSkill === "save"
+                ? (skills.set(request.skill.name, request.skill), { saved: request.skill.name })
+                : request.siteSkill === "get"
+                  ? skills.get(request.name)
+                  : [...skills.values()].map(({ name, description }) => ({ name, description }));
+            ws.send(
+              JSON.stringify({
+                kind: "browser.code.reply",
+                cellId: message.cellId,
+                callId: message.callId,
+                value,
+              }),
+            );
+            return;
+          }
           ws.send(
             JSON.stringify({
               kind: "browser.code.reply",
@@ -219,10 +263,10 @@ async function fakeCore() {
   return {
     port: server.address().port,
     calls,
+    connected,
     async target(url) {
-      await connected;
-      for (let i = 0; i < 50; i++) {
-        const tab = tabs.find((item) => item.url === url);
+      for (let i = 0; i < 80; i++) {
+        const tab = tabs.find((item) => item.url === url && item.status === "complete");
         if (tab) return tab.target;
         await sleep(100);
       }
