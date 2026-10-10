@@ -1,7 +1,11 @@
 import { authenticate } from "./native-authenticate.js";
 import { installNativeStartup } from "./native-startup.js";
 import { handleContextPicker } from "./context-picker-handler.js";
-import { captureCurrentPage } from "./native-browser-context-menu.js";
+import {
+  captureCurrentPage,
+  claimBrowserContextSubmit,
+  installNativeBrowserContextMenus,
+} from "./native-browser-context-menu.js";
 import {
   installCoreAttentionBridge,
   handleCoreAttentionMessage,
@@ -26,9 +30,7 @@ import {
   NativeOpenChatResponseSchema,
   NativePageGrantResponseSchema,
 } from "./native-extension-message.js";
-import { claimBrowserContextSubmit } from "./native-browser-context-submit.js";
 import { synchronizeBrowserInventory } from "./native-inventory-client.js";
-import { installNativeBrowserContextMenus } from "./native-browser-context-menu.js";
 import { handleBrowserExecutorMessage, releaseBrowserExecutor } from "./native-browser-executor.js";
 import {
   getBrowserIdentity,
