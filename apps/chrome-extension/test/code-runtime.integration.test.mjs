@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function -- one end-to-end scenario with its fake Core */
+/* eslint-disable max-lines-per-function, complexity -- one end-to-end scenario with its fake Core */
 // End to end: the built extension in real Chrome, connected to a fake Core, running browser_code cells.
 import test from "node:test";
 import assert from "node:assert/strict";
