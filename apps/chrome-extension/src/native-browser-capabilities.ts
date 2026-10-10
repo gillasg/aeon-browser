@@ -4,10 +4,14 @@ import {
   reconnectBrowserSession,
   assertRequestActive,
 } from "./native-browser-session.js";
-import { discoverFrames, frameDebuggee, evaluateFrame } from "./native-browser-frames.js";
+import {
+  discoverFrames,
+  frameDebuggee,
+  evaluateFrame,
+  uploadFiles,
+} from "./native-browser-frames.js";
 import { executeBrowserEvent } from "./native-browser-events.js";
 import { executeDownload } from "./native-browser-downloads.js";
-import { uploadFiles } from "./native-browser-files.js";
 import { executeInteraction } from "./native-browser-interaction.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { interactFrame } from "./native-browser-frame-input.js";

@@ -105,7 +105,6 @@ async function buildLayer(folder) {
         "session",
         "events",
         "frames",
-        "files",
         "interaction",
         "frame-input",
         "downloads",
