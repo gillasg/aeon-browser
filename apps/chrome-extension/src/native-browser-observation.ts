@@ -1,23 +1,197 @@
-import { captureViewport } from "./native-browser-screenshot.js";
+import { viewportFingerprint, settleBrowserPage } from "./native-browser-navigation.js";
 import {
+  type BrowserSemanticNode,
   BrowserExecutorResultSchema,
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
   type BrowserTargetKey,
 } from "@pippin/protocol";
-import { currentInventoryTabs } from "./native-inventory-client.js";
 import {
+  booleanProperty,
+  textValue,
+  type AxNode,
+  type AxRef,
   sameTarget,
   targetIdentity,
-  type AxRef,
   type ScreenshotRef,
 } from "./native-browser-common.js";
+import { currentInventoryTabs } from "./native-inventory-client.js";
 import { getAxTree, withDebugger } from "./native-browser-debugger.js";
-
-import { createSemanticNodes, filterVisibleTextNodes } from "./native-browser-semantic.js";
 import { scopedBackendIds } from "./native-browser-dom.js";
-import { settleBrowserPage } from "./native-browser-navigation.js";
-import { visiblePageText } from "./native-browser-visible.js";
+
+interface Capture {
+  viewport: { width: number; height: number };
+  scrollX: number;
+  scrollY: number;
+  fingerprint: string;
+  dataBase64: string;
+}
+export async function captureViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture> {
+  const metrics = (await chrome.debugger.sendCommand(debuggee, "Page.getLayoutMetrics")) as {
+    cssVisualViewport?: {
+      clientWidth?: number;
+      clientHeight?: number;
+      pageX?: number;
+      pageY?: number;
+    };
+  };
+  await chrome.debugger.sendCommand(debuggee, "Page.enable");
+  const fingerprint = await viewportFingerprint(debuggee);
+  const capture = (await chrome.debugger.sendCommand(debuggee, "Page.captureScreenshot", {
+    format: "jpeg",
+    quality: 60,
+    captureBeyondViewport: false,
+  })) as { data?: string };
+  const view = metrics.cssVisualViewport ?? {};
+  const width = Math.floor(view.clientWidth ?? 0),
+    height = Math.floor(view.clientHeight ?? 0);
+  if (!capture.data || width < 1 || height < 1 || capture.data.length > 1_500_000)
+    throw new Error("UNSUPPORTED");
+  if ((await viewportFingerprint(debuggee)) !== fingerprint) throw new Error("STALE_REF");
+  return {
+    viewport: { width, height },
+    scrollX: view.pageX ?? 0,
+    scrollY: view.pageY ?? 0,
+    fingerprint,
+    dataBase64: capture.data,
+  };
+}
+
+const interactiveRoles = new Set([
+  "button",
+  "link",
+  "textbox",
+  "searchbox",
+  "combobox",
+  "checkbox",
+  "radio",
+  "switch",
+  "slider",
+  "spinbutton",
+  "tab",
+  "menuitem",
+  "option",
+  "treeitem",
+  "listbox",
+  "menuitemcheckbox",
+  "menuitemradio",
+]);
+interface Options {
+  query?: string | undefined;
+  interactive?: boolean | undefined;
+}
+export function filterVisibleTextNodes(nodes: AxNode[], visibleText: string): AxNode[] {
+  const normalized = visibleText.replace(/\s+/g, " ").toLowerCase();
+  return nodes.filter((node) => {
+    if (!["statictext", "heading", "paragraph"].includes(textValue(node.role?.value).toLowerCase()))
+      return true;
+    const text = textValue(node.name?.value).replace(/\s+/g, " ").trim().toLowerCase();
+    return !text || normalized.includes(text);
+  });
+}
+function relevant(node: AxNode, options: Options): boolean {
+  const role = textValue(node.role?.value).toLowerCase();
+  const name = textValue(node.name?.value).trim();
+  if (node.ignored || node.backendDOMNodeId === undefined || !role) return false;
+  if (options.interactive && !interactiveRoles.has(role)) return false;
+  if (!name && !interactiveRoles.has(role)) return false;
+  if (["generic", "none", "presentation", "inlinetextbox"].includes(role)) return false;
+  return !options.query || `${role} ${name}`.toLowerCase().includes(options.query.toLowerCase());
+}
+function priority(node: AxNode): number {
+  if (booleanProperty(node, "focused").focused) return 0;
+  const role = textValue(node.role?.value).toLowerCase();
+  if (["textbox", "searchbox", "combobox"].includes(role)) return 1;
+  if (role === "button") return 2;
+  return interactiveRoles.has(role) ? 3 : 4;
+}
+export function createSemanticNodes(
+  nodes: AxNode[],
+  options: Options = {},
+): { refs: Map<string, AxRef>; nodes: BrowserSemanticNode[]; truncated: boolean } {
+  const candidates = nodes.filter((node) => relevant(node, options));
+  const selected = new Set([...candidates].sort((a, b) => priority(a) - priority(b)).slice(0, 180));
+  const refs = new Map<string, AxRef>();
+  const compact: BrowserSemanticNode[] = [];
+  for (const node of candidates) {
+    if (!selected.has(node)) continue;
+    const backendNodeId = node.backendDOMNodeId;
+    if (backendNodeId === undefined) continue;
+    const role = textValue(node.role?.value).slice(0, 80);
+    const name = textValue(node.name?.value).trim().slice(0, 512);
+    const ref = `e${compact.length}`;
+    refs.set(ref, { backendNodeId: backendNodeId, role, name });
+    compact.push({
+      ref,
+      backendNodeId,
+      role,
+      name,
+      ...(node.value ? { value: textValue(node.value.value).slice(0, 512) } : {}),
+      ...booleanProperty(node, "disabled"),
+      ...booleanProperty(node, "checked"),
+      ...booleanProperty(node, "focused"),
+      ...booleanProperty(node, "expanded"),
+      ...booleanProperty(node, "selected"),
+      ...booleanProperty(node, "pressed"),
+      ...(node.properties?.some((p) => p.name === "pressed" && p.value?.value === "mixed")
+        ? { pressed: "mixed" as const }
+        : {}),
+      ...(node.properties?.some((p) => p.name === "checked" && p.value?.value === "mixed")
+        ? { mixed: true }
+        : {}),
+    });
+  }
+  return { refs, nodes: compact, truncated: candidates.length > compact.length };
+}
+
+export async function visiblePageText(debuggee: chrome.debugger.Debuggee): Promise<string> {
+  const response = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
+    expression: `(${collectVisibleText.toString()})()`,
+    returnByValue: true,
+  })) as { result?: { value?: string } };
+  return response.result?.value ?? "";
+}
+function collectVisibleText() {
+  const roots: (Document | ShadowRoot)[] = [document];
+  const lines: string[] = [];
+  const visible = new WeakMap<Element, boolean>();
+  let length = 0;
+  for (let i = 0; i < roots.length && length < 20000; i++) {
+    const root = roots[i];
+    if (!root) continue;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node && length < 20000; node = walker.nextNode()) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as Element;
+        if (element.shadowRoot) roots.push(element.shadowRoot);
+        if (element instanceof HTMLIFrameElement && element.contentDocument)
+          roots.push(element.contentDocument);
+        continue;
+      }
+      const text = visibleLine(node);
+      if (text) {
+        lines.push(text);
+        length += text.length + 1;
+      }
+    }
+  }
+  return lines.join("\n").slice(0, 20000);
+  function visibleLine(node: Node) {
+    let element = node.parentElement;
+    const text = node.textContent?.replace(/\s+/g, " ").trim();
+    if (!element || !text || element.closest("script,style,noscript,[data-aeon-overlay]"))
+      return "";
+    while (element.parentElement && getComputedStyle(element).display === "contents")
+      element = element.parentElement;
+    if (!visible.has(element))
+      visible.set(
+        element,
+        element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }),
+      );
+    return visible.get(element) ? text : "";
+  }
+}
+
 const SCREENSHOT_MAX_AGE_MS = 60_000;
 const refs = new Map<string, Map<string, AxRef>>();
 const latestSnapshots = new Map<string, string>();

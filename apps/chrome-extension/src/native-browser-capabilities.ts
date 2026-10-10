@@ -11,7 +11,7 @@ import { uploadFiles } from "./native-browser-files.js";
 import { executeInteraction } from "./native-browser-interaction.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { interactFrame } from "./native-browser-frame-input.js";
-import { createSemanticNodes } from "./native-browser-semantic.js";
+import { createSemanticNodes } from "./native-browser-observation.js";
 import type { AxNode } from "./native-browser-common.js";
 import { sameTarget } from "./native-browser-common.js";
 type Capability = Extract<
