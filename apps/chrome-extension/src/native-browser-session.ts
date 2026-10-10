@@ -1,6 +1,9 @@
-import { enableDiagnostics, forgetDiagnostics } from "./native-browser-diagnostics.js";
+import {
+  enableDiagnostics,
+  forgetDiagnostics,
+  releaseBrowserEvents,
+} from "./native-browser-events.js";
 import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-settle.js";
-import { releaseBrowserEvents } from "./native-browser-events.js";
 import { persistBrowserOwners, restoreBrowserOwners } from "./native-browser-ownership.js";
 import { ensureBrowserViewport, restoreBrowserViewport } from "./native-browser-viewport.js";
 import { presentBrowserTask } from "./native-browser-layout.js";

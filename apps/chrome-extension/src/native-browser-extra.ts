@@ -5,7 +5,7 @@ import { prepareElement } from "./native-browser-prepare.js";
 import type { BrowserExecutorRequest, BrowserExecutorResult } from "@pippin/protocol";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
-import { readDiagnostics } from "./native-browser-diagnostics.js";
+import { readDiagnostics } from "./native-browser-events.js";
 import { navigateReady } from "./native-browser-navigation.js";
 import { executeSiteScript } from "./site-script-runtime.js";
 import { assertRequestActive } from "./native-browser-request-lifecycle.js";
