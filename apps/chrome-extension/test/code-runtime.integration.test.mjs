@@ -92,6 +92,26 @@ test(
         assert.ok(clicked.steps.some((step) => step.action?.op === "click"));
       });
 
+      await t.test("the agent cursor appears without entering the page state", async () => {
+        const result = await run(
+          "await new Promise((r) => setTimeout(r, 50)); [!!document, await page.evaluate(() => !!document.getElementById('aeon-agent-cursor'))]",
+        );
+        assert.deepEqual(result.value, [true, true]);
+        assert.doesNotMatch((await run("await bu.state()")).output, /aeon-agent-cursor/);
+      });
+
+      await t.test("labeled screenshots place ids on the elements and clean up", async () => {
+        const result = await run(`
+          await page.evaluate(() => { document.body.style.height = '3000px'; scrollTo(0, 400); });
+          const id = /\\[(\\d+)\\] button "Go"/.exec(await bu.state()).at(1);
+          const box = (await page.cdp('DOM.getBoxModel', { backendNodeId: Number(id) })).model.border;
+          const rect = await page.evaluate(() => document.querySelector('button').getBoundingClientRect().top);
+          const shot = await page.screenshot({ labels: true });
+          [Math.round(Math.min(box[1], box[3])) === Math.round(rect), shot.kind, await page.evaluate(() => !!document.getElementById('aeon-labels'))]`);
+        assert.equal(result.error, undefined);
+        assert.deepEqual(result.value, [true, "screenshot", false]);
+      });
+
       await t.test("workspace calls are served by Core", async () => {
         const result = await run("await checkpoint('progress.json', {done: 3})");
         assert.equal(result.error, undefined);

@@ -1,3 +1,4 @@
+import { showAgentCursor } from "./native-browser-cursor.js";
 import { onNode, nodeState, fillTextNode } from "./native-browser-dom.js";
 import {
   type BrowserExecutorRequest,
@@ -171,6 +172,7 @@ export async function executeInteraction(
   if (step.op === "keys") return keyboard(debuggee, step.keys);
   const send = (type: string, x: number, y: number, extra: Record<string, unknown> = {}) =>
     chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", { type, x, y, ...extra });
+  showAgentCursor(debuggee, step.x, step.y, step.action !== "hover");
   await send("mouseMoved", step.x, step.y);
   if (step.action === "hover") return { hovered: true };
   if (step.action === "drag") {
@@ -270,6 +272,7 @@ export async function prepareElement(
         request.expectedDocumentEpoch,
       );
       const point = await actionablePoint(debuggee, node.backendNodeId, editable);
+      showAgentCursor(debuggee, point.x, point.y);
       await revalidate();
       return { node, point };
     } catch (caught) {

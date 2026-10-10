@@ -70,7 +70,7 @@ const browser = Object.freeze({
     getByLabel: (value, options = {}) => __locator(target,{kind:'query',by:'label',value,...options}),
     getByPlaceholder: (value, options = {}) => __locator(target,{kind:'query',by:'placeholder',value,...options}),
     press: (element, key, options = {}) => __step({op:'press',target,element:__element(target,element),key,...options}),
-    screenshot: () => __step({op:'observe', target, kind:'screenshot'}),
+    screenshot: (options = {}) => options.labels ? __labeledScreenshot(target) : __step({op:'observe', target, kind:'screenshot'}),
     click: (element) => __step({op:'click',target,element:__element(target,element),observe:false}),
     fill: (element, value) => __step({op:'fill',target,element:__element(target,element),value,observe:false}),
     evaluate: async (fn, arg) => (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value,
@@ -181,6 +181,24 @@ var bu = Object.freeze({
     return result;
   },
 });
+// Draws each interactive bu id on the page, captures, then removes the overlay.
+async function __labeledScreenshot(target) {
+  if (!__states.get(__key(target))) await browser.page(target).snapshot({});
+  var state = __states.get(__key(target));
+  var skip = ['heading','statictext','paragraph','generic','none'];
+  var labels = [];
+  for (var n of state.nodes) {
+    if (!n.backendNodeId || skip.includes(n.role.toLowerCase()) || labels.length >= 120) continue;
+    try {
+      var box = (await __call({op:'cdp',target,method:'DOM.getBoxModel',params:{backendNodeId:n.backendNodeId}})).data.value.model.border;
+      labels.push([n.backendNodeId, Math.min(box[0],box[6]), Math.min(box[1],box[3])]);
+    } catch {}
+  }
+  var draw = '(()=>{var h=document.createElement("div");h.id="aeon-labels";h.setAttribute("data-aeon-overlay","");h.setAttribute("aria-hidden","true");h.style.cssText="position:fixed;inset:0;z-index:2147483646;pointer-events:none";for(var [id,x,y] of '+JSON.stringify(labels)+'){var b=document.createElement("b");b.textContent=id;b.style.cssText="position:fixed;left:"+Math.max(0,x)+"px;top:"+Math.max(0,y-14)+"px;font:600 11px/14px system-ui;padding:0 3px;background:#4f46e5;color:#fff;border-radius:3px;box-shadow:0 0 0 1px #fff";h.append(b)}document.documentElement.append(h)})()';
+  await __call({op:'evaluate',target,expression:draw});
+  try { return await __step({op:'observe', target, kind:'screenshot'}); }
+  finally { await __call({op:'evaluate',target,expression:'document.getElementById("aeon-labels")?.remove()'}).catch(()=>{}); }
+}
 async function __finishCell() {
   for (var target of [...__dirty.values()]) {
     try { await bu.state({target}); }

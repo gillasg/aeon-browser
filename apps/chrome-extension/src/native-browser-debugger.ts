@@ -1,3 +1,4 @@
+import { showAgentCursor } from "./native-browser-cursor.js";
 import {
   BrowserActionError,
   targetIdentity,
@@ -227,6 +228,7 @@ export async function clickAt(
   x: number,
   y: number,
 ): Promise<void> {
+  showAgentCursor(debuggee, x, y, true);
   await chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", {
     type: "mousePressed",
     x,
