@@ -1,3 +1,4 @@
+import { configureInitialPrompt, type InitialPromptSelection } from "./initial-prompt-selection.js";
 import { boundedChatEntries, type ObservedSession } from "./bounded-chat-entries.js";
 import { ProjectService } from "./project-service.js";
 import { deleteStoredChat } from "./chat-deletion.js";
@@ -70,13 +71,11 @@ export class ChatService {
   }
   createDraft = (title = "New Chat", projectId?: string): Promise<ChatRecord> =>
     this.threadSupport.createDraft(title, projectId ? this.projects.get(projectId) : undefined);
-  async createThreadDraft(input: {
-    senderChatId: ChatId;
-    targetChatId: ChatId;
-    title: string;
-    idempotencyKey: string;
-    payloadHash: string;
-  }): Promise<{ intent: ThreadCreationIntent; chat: ChatRecord }> {
+  prepareNextDraft = (): Promise<void> => this.threadSupport.prepareNextDraft();
+  closePreparation = (): void => this.threadSupport.closePreparation();
+  async createThreadDraft(
+    input: Parameters<ChatThreadSupport["createThreadDraft"]>[0],
+  ): Promise<{ intent: ThreadCreationIntent; chat: ChatRecord }> {
     return this.threadSupport.createThreadDraft(input);
   }
   async createForkDraft(input: CreateThreadForkInput): Promise<ThreadForkIntent> {
@@ -175,15 +174,19 @@ export class ChatService {
   ): ChatEventSubscription {
     return this.eventHub.subscribeFrom(chatId, cursor, listener);
   }
-  submitPrompt(chatId: ChatId, input: PiSessionInput | string): Promise<ChatRecord> {
+  submitPrompt(
+    chatId: ChatId,
+    input: PiSessionInput | string,
+    selection?: InitialPromptSelection,
+  ): Promise<ChatRecord> {
     const prompt = typeof input === "string" ? { text: input } : input;
     if (!prompt.text.trim()) return Promise.reject(new Error("Prompt text must not be empty."));
     return this.commandGate.run(chatId, async () => {
-      let chat = this.requireChat(chatId);
-      const { activeChat, session } = await this.resolveSession(chat);
-      chat = this.metadata.nameInitialPrompt(activeChat, session, prompt.text);
+      const { activeChat, session } = await this.resolveSession(this.requireChat(chatId));
+      const chat = this.metadata.nameInitialPrompt(activeChat, session, prompt.text);
       this.observeSession(chatId, session);
       try {
+        await configureInitialPrompt(session, selection);
         await session.submit(prompt);
       } catch (error) {
         this.recordMaterializedSession(chatId, session);

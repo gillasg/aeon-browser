@@ -42,7 +42,7 @@ test("code mode fills, submits, waits and extracts without tab rediscovery or ve
   assert.equal(result.isError, undefined);
   assert.deepEqual(
     calls.map((step) => step.op),
-    ["fill", "press", "wait", "read"],
+    ["fill", "press", "wait", "read", "observe"],
   );
   assert.ok(calls.every((step) => step.target.tabId === target.tabId));
   const output = JSON.parse(result.content[0].text);
@@ -53,7 +53,17 @@ test("code mode fills, submits, waits and extracts without tab rediscovery or ve
 
 test("failed browser operations are errors and repeated failures are bounded across both tools", async () => {
   let calls = 0;
-  const run = async () => {
+  const run = async (_chat, _id, input) => {
+    if (input.steps[0].op === "observe")
+      return completed({
+        kind: "semantic",
+        target,
+        documentEpoch: 1,
+        snapshotId: randomUUID(),
+        url: "https://example.test",
+        nodes: [],
+        truncated: false,
+      });
     calls++;
     return JSON.stringify({
       steps: [
@@ -89,6 +99,16 @@ test("recoverable workflow errors preserve the browser session and include actio
   const inputs = [];
   const tool = createBrowserCodeTool(randomUUID(), async (_chat, _id, input) => {
     inputs.push(input);
+    if (input.steps?.[0].op === "observe")
+      return completed({
+        kind: "semantic",
+        target,
+        documentEpoch: 1,
+        snapshotId: randomUUID(),
+        url: "https://example.test",
+        nodes: [],
+        truncated: false,
+      });
     return JSON.stringify({
       steps: [
         {
@@ -105,7 +125,8 @@ test("recoverable workflow errors preserve the browser session and include actio
   });
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /Scope to one container/);
-  assert.equal(inputs.length, 1);
+  assert.equal(inputs.length, 2);
+  assert.equal(inputs[1].steps[0].op, "observe");
   assert.ok(!inputs[0].release);
 });
 

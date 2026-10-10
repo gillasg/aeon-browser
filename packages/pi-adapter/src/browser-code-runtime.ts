@@ -1,84 +1,149 @@
-import { readFile } from "node:fs/promises";
-import { QuickJS, type JSValueHandle } from "quickjs-wasi";
-import { browserCodeApi } from "./browser-code-api.js";
-let modulePromise: Promise<WebAssembly.Module> | undefined;
+import { fork, type ChildProcess, type ForkOptions } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
-function wasmModule(): Promise<WebAssembly.Module> {
-  return (modulePromise ??= readFile(
-    new URL(import.meta.resolve("quickjs-wasi/quickjs.wasm")),
-  ).then((bytes) => WebAssembly.compile(bytes)));
+type BrowserCall = (step: unknown) => Promise<unknown>;
+export interface BrowserCellResult {
+  value?: unknown;
+  output: string;
+  reset?: boolean;
 }
-
-export async function executeBrowserCode(
-  code: string,
-  call: (step: unknown) => Promise<unknown>,
-  signal?: AbortSignal,
-): Promise<unknown> {
-  const deadline = Date.now() + 30_000;
-  const vm = await QuickJS.create({
-    wasm: await wasmModule(),
-    memoryLimit: 16 * 1024 * 1024,
-    interruptHandler: () => !!signal?.aborted || Date.now() >= deadline,
-  });
-  let closed = false;
-  const stop = codeDeadline(signal, deadline);
-  const pending = new Set<Promise<void>>();
-  const hostCall = vm.newFunction("__call", (argument: JSValueHandle) => {
-    const step = vm.dump(argument);
-    const deferred = vm.newPromise();
-    const work = call(step)
-      .then(
-        (value) => settle(value, false),
-        (error: unknown) => settle(error instanceof Error ? error.message : String(error), true),
-      )
-      .catch(stop.fail);
-    pending.add(work);
-    void work.finally(() => pending.delete(work)).catch(() => undefined);
-    function settle(value: unknown, failed: boolean): void {
-      if (closed) return;
-      using handle = failed ? vm.newError(String(value)) : vm.hostToHandle(value);
-      if (failed) deferred.reject(handle);
-      else deferred.resolve(handle);
-      vm.executePendingJobs();
-    }
-    return deferred.handle;
-  });
-  try {
-    vm.setProp(vm.global, "__call", hostCall);
-    using promise = vm.evalCode(`${browserCodeApi}\n(async () => {${code}\n})()`);
-    vm.executePendingJobs();
-    const result = await Promise.race([vm.resolvePromise(promise), stop.promise]);
-    if ("error" in result) throw new Error(result.error.consume((handle) => handle.toString()));
-    while (pending.size) await Promise.race([Promise.allSettled([...pending]), stop.promise]);
-    return result.value.consume((handle) => vm.dump(handle));
-  } finally {
-    closed = true;
-    stop.close();
-    hostCall.dispose();
-    vm.dispose();
+interface Cell {
+  id: string;
+  call: BrowserCall;
+  resolve: (value: BrowserCellResult) => void;
+  reject: (error: Error) => void;
+  cleanup: () => void;
+}
+const runtimes = new Map<string, BrowserCodeRuntime>();
+export function browserRuntime(chatId: string): BrowserCodeRuntime {
+  let runtime = runtimes.get(chatId);
+  if (!runtime) {
+    runtime = new BrowserCodeRuntime();
+    runtimes.set(chatId, runtime);
   }
+  return runtime;
 }
-
-function codeDeadline(signal: AbortSignal | undefined, deadline: number) {
-  let timer: NodeJS.Timeout | undefined;
-  let abort = () => {};
-  let fail: (error: unknown) => void = () => {};
-  const promise = new Promise<never>((_, reject) => {
-    fail = reject;
-    abort = () => reject(new Error("Browser workflow cancelled"));
-    timer = setTimeout(
-      () => reject(new Error("Browser code exceeded 30 seconds")),
-      Math.max(0, deadline - Date.now()),
-    );
-    signal?.addEventListener("abort", abort, { once: true });
-    if (signal?.aborted) abort();
-  });
-  return {
-    promise,
-    fail,
-    close: () => {
-      if (timer) clearTimeout(timer);
-      signal?.removeEventListener("abort", abort);
-    },
-  };
+export function disposeBrowserRuntime(chatId: string): void {
+  runtimes.get(chatId)?.close();
+  runtimes.delete(chatId);
+}
+export class BrowserCodeRuntime {
+  private worker: ChildProcess | undefined;
+  private cell: Cell | undefined;
+  private chain: Promise<unknown> = Promise.resolve();
+  private generation = 0;
+  private closed = false;
+  constructor(private readonly timeoutMs = 30_000) {}
+  execute(code: string, call: BrowserCall, signal?: AbortSignal): Promise<BrowserCellResult> {
+    const work = this.chain.catch(() => undefined).then(() => this.evaluate(code, call, signal));
+    this.chain = work;
+    return work;
+  }
+  close(): void {
+    this.closed = true;
+    this.stop(new Error("Browser runtime closed"));
+  }
+  private start(): ChildProcess {
+    const options: ForkOptions & { windowsHide: boolean } = {
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+      windowsHide: true,
+      execArgv: ["--max-old-space-size=64"],
+      serialization: "advanced",
+    };
+    const worker = fork(new URL("./browser-code-worker.js", import.meta.url), [], options);
+    this.worker = worker;
+    this.generation++;
+    worker.on("message", (message: unknown) => this.receive(worker, message));
+    worker.on("error", (error) => {
+      if (this.worker === worker) this.stop(error);
+    });
+    worker.on("exit", () => {
+      if (this.worker === worker) this.stop(new Error("Browser worker exited; runtime reset"));
+    });
+    return worker;
+  }
+  private evaluate(code: string, call: BrowserCall, signal?: AbortSignal) {
+    if (this.closed) throw new Error("Browser runtime closed");
+    if (signal?.aborted) throw new Error("Browser workflow cancelled");
+    const fresh = !this.worker;
+    const worker = this.worker ?? this.start();
+    worker.ref();
+    worker.channel?.ref();
+    return new Promise<BrowserCellResult>((resolve, reject) => {
+      const abort = () => this.stop(new Error("Browser workflow cancelled; runtime reset"));
+      const timer = setTimeout(
+        () => this.stop(new Error("Browser code exceeded its deadline; runtime reset")),
+        this.timeoutMs,
+      );
+      signal?.addEventListener("abort", abort, { once: true });
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+        worker.unref();
+        worker.channel?.unref();
+      };
+      const id = randomUUID();
+      this.cell = { id, call, resolve, reject, cleanup };
+      worker.send({ kind: "cell", id, code, reset: fresh && this.generation > 1 }, (error) => {
+        if (error && this.cell?.id === id) this.stop(error);
+      });
+    });
+  }
+  private receive(worker: ChildProcess, raw: unknown): void {
+    const message = raw as {
+      kind?: string;
+      id?: string;
+      requestId?: string;
+      step?: unknown;
+      error?: string;
+      value?: unknown;
+      output?: string;
+      reset?: boolean;
+    };
+    const cell = this.cell;
+    if (worker !== this.worker || !cell || message.id !== cell.id) return;
+    if (message.kind === "call") {
+      const reply = (result: { value?: unknown; error?: string }) => {
+        if (worker.connected && this.cell === cell)
+          worker.send(
+            { kind: "reply", id: cell.id, requestId: message.requestId, ...result },
+            () => {},
+          );
+      };
+      void cell.call(message.step).then(
+        (value) => reply({ value }),
+        (error: unknown) =>
+          reply({ error: error instanceof Error ? error.message : String(error) }),
+      );
+      return;
+    }
+    if (message.kind !== "result") return;
+    if (message.error?.includes("Cannot find context with specified id")) {
+      this.stop(
+        new Error(
+          "Browser execution context was lost; runtime reset. Rebuild bindings before the next call; completed browser actions were not replayed.",
+        ),
+      );
+      return;
+    }
+    this.cell = undefined;
+    cell.cleanup();
+    if (message.error)
+      cell.reject(new Error(message.error + (message.output ? "\n" + message.output : "")));
+    else
+      cell.resolve({
+        value: message.value,
+        output: message.output ?? "",
+        ...(message.reset ? { reset: true } : {}),
+      });
+  }
+  private stop(error: Error): void {
+    const worker = this.worker;
+    this.worker = undefined;
+    const cell = this.cell;
+    this.cell = undefined;
+    cell?.cleanup();
+    cell?.reject(error);
+    worker?.kill();
+  }
 }

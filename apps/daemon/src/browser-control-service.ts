@@ -1,5 +1,5 @@
 import { sendBrowserRequest, type BrowserPending } from "./browser-operation-pending.js";
-import { requiresBrowserActions } from "./browser-capabilities.js";
+import { requiresBrowserActions, requiresBrowserRuntime } from "./browser-capabilities.js";
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import {
@@ -37,6 +37,7 @@ export class BrowserControlService {
   private scripts: SiteScriptService | undefined;
   private readonly scriptClients = new Set<string>();
   private readonly actionClients = new Map<string, boolean>();
+  private readonly runtimeClients = new Set<string>();
   useSiteScripts(scripts: SiteScriptService): void {
     this.scripts = scripts;
   }
@@ -77,8 +78,11 @@ export class BrowserControlService {
     socket: WebSocket,
     supportsScripts = false,
     supportsActions = false,
+    supportsRuntime = false,
   ): void {
     this.actionClients.set(clientInstanceId, supportsActions);
+    if (supportsRuntime) this.runtimeClients.add(clientInstanceId);
+    else this.runtimeClients.delete(clientInstanceId);
     if (supportsScripts) this.scriptClients.add(clientInstanceId);
     else this.scriptClients.delete(clientInstanceId);
     this.executors.set(clientInstanceId, socket);
@@ -87,6 +91,7 @@ export class BrowserControlService {
       if (this.executors.get(clientInstanceId) === socket) {
         this.executors.delete(clientInstanceId);
         this.actionClients.delete(clientInstanceId);
+        this.runtimeClients.delete(clientInstanceId);
         this.scriptClients.delete(clientInstanceId);
       }
       for (const pending of this.pending.values())
@@ -138,6 +143,14 @@ export class BrowserControlService {
     signal?: AbortSignal,
   ): Promise<string> | undefined {
     if (typeof raw !== "object" || raw === null) return;
+    if ("browserInfo" in raw && raw.browserInfo === true)
+      return Promise.resolve(
+        JSON.stringify({
+          clientInstanceIds: [...this.executors.keys()].filter((id) =>
+            this.isInstanceAvailable(id),
+          ),
+        }),
+      );
     if ("siteScript" in raw)
       return (
         this.scripts?.execute(chatId, callId, raw.siteScript, signal) ??
@@ -201,6 +214,11 @@ export class BrowserControlService {
     step: Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>,
     timeoutMs: number,
   ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
+    if (!this.runtimeAvailable(step))
+      return {
+        code: "UNSUPPORTED",
+        detail: "Reload Aeon in chrome://extensions to load the new browser runtime.",
+      };
     if (requiresBrowserActions(step) && !this.actionClients.get(step.target.clientInstanceId))
       return {
         code: "UNSUPPORTED",
@@ -278,6 +296,11 @@ export class BrowserControlService {
   }
   private connected = (clientInstanceId: string): boolean =>
     this.executors.get(clientInstanceId)?.readyState === WebSocket.OPEN;
+  private runtimeAvailable(
+    step: Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>,
+  ): boolean {
+    return !requiresBrowserRuntime(step) || this.runtimeClients.has(step.target.clientInstanceId);
+  }
   private setAssociation(
     chatId: string,
     target: BrowserTargetKey,

@@ -1,4 +1,5 @@
 import { startStandaloneCore, acquireCoreLock } from "./core-startup.js";
+import { reserveSupervisorOutput } from "./supervisor-output.js";
 import { startCoreTransport } from "./core-transport.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,6 +43,7 @@ async function main(): Promise<void> {
 }
 
 async function runManagedDaemon(): Promise<void> {
+  const writeReply = reserveSupervisorOutput();
   if (process.env.PIPPIN_NATIVE_SUPERVISED !== "1")
     throw new Error("Managed daemon startup requires the Native Messaging supervisor.");
   const dataDirectory = process.env.PIPPIN_NATIVE_DATA_DIR;
@@ -75,11 +77,11 @@ async function runManagedDaemon(): Promise<void> {
       runtime.threadCoordination,
       runtime.attention,
     );
-    process.stdout.write("PIPPIN_DAEMON_READY\n");
+    writeReply("PIPPIN_DAEMON_READY\n");
     input = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of input) {
       if (line === "shutdown") break;
-      process.stdout.write(`${await handleSupervisorLine(line, transport)}\n`);
+      writeReply(`${await handleSupervisorLine(line, transport)}\n`);
     }
   } finally {
     input?.close();

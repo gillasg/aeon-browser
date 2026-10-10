@@ -16,7 +16,9 @@ export function createBrowserProgressGuard(): (step: unknown, failed?: boolean) 
   return (step, failed) => {
     const action = step as { op: string };
     if (!["click", "fill", "press", "scroll", "navigate"].includes(action.op)) return;
-    const key = JSON.stringify(step);
+    const identity = { ...(step as Record<string, unknown>) };
+    delete identity.observe;
+    const key = JSON.stringify(identity);
     const prior = failures.get(key);
     if (failed === undefined) {
       if (prior && prior.count >= 2 && Date.now() - prior.at < 120_000)
@@ -37,8 +39,13 @@ export function compactBrowserTrace(result: unknown): unknown {
   if (typeof result !== "object" || result === null) return result;
   const item = result as Record<string, unknown>;
   if (item.kind === "semantic") {
-    const { nodes, ...metadata } = item;
-    return { ...metadata, nodeCount: Array.isArray(nodes) ? nodes.length : 0 };
+    const { nodes, text, ...metadata } = item;
+    const excerpt = typeof text === "string" ? text.slice(0, 3000) : undefined;
+    return {
+      ...metadata,
+      ...(excerpt ? { text: excerpt, textClipped: excerpt.length !== String(text).length } : {}),
+      nodeCount: Array.isArray(nodes) ? nodes.length : 0,
+    };
   }
   if (item.kind === "action")
     return { ...item, observation: compactBrowserTrace(item.observation) };

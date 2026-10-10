@@ -1,3 +1,4 @@
+import { ChatInitialPromptSchema } from "./chat-initial-prompt.js";
 import {
   ProjectListRequestSchema,
   ProjectCreateRequestSchema,
@@ -59,6 +60,7 @@ const ChatCreateRequestSchema = z
       .object({
         title: z.string().trim().min(1).max(120).optional(),
         projectId: z.string().uuid().optional(),
+        initialSubmit: ChatInitialPromptSchema.optional(),
       })
       .strict(),
   })

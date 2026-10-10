@@ -1,4 +1,5 @@
 import { CoreAttention } from "./core-attention.js";
+import { installChatPreparation, prepareChat } from "./chat-preparation.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
@@ -41,6 +42,7 @@ export function createProductionRuntime(dataDirectory: string): {
   const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
   warmModels(pi);
   const service = new ChatService({ dataDirectory: dataRoot, store, pi });
+  const stopPreparing = installChatPreparation(service);
   const attention = new CoreAttention(dataRoot, service);
   const threadCoordination = new ThreadCoordinationService(service, store);
   const routines = new RoutineScheduler(store, service, browserControl);
@@ -54,7 +56,7 @@ export function createProductionRuntime(dataDirectory: string): {
     readManagementSnapshot(service, store, capabilityTools, selectedChatId),
   );
   service.management.setHomeReader(() => readHomeManagementSnapshot(service, store));
-  const ready = initializeRuntime(registry, mcpMigration, threadCoordination, routines);
+  const ready = initializeRuntime(registry, mcpMigration, threadCoordination, routines, service);
 
   return {
     service,
@@ -63,6 +65,7 @@ export function createProductionRuntime(dataDirectory: string): {
     browserControl,
     ready,
     close: async () => {
+      stopPreparing();
       await attention.close();
       routines.close();
       threadCoordination.close();
@@ -146,11 +149,13 @@ async function initializeRuntime(
   migration: PiMcpConfigMigration,
   threads: ThreadCoordinationService,
   routines: RoutineScheduler,
+  service: ChatService,
 ): Promise<void> {
   await registry.initialize();
   await migration.migrate(await registry.snapshot());
   await threads.recover();
   await routines.start();
+  await prepareChat(service);
 }
 
 function managementRoutines(
@@ -186,8 +191,18 @@ function managementRoutines(
 }
 
 function warmModels(pi: PiSdkSessionAdapter): void {
+  const startedAt = Date.now();
   void pi
     .getModelCatalog()
+    .then(() =>
+      process.stderr.write(
+        JSON.stringify({
+          kind: "core.startup-timing",
+          phase: "model-catalog-ready",
+          durationMs: Date.now() - startedAt,
+        }) + "\n",
+      ),
+    )
     .catch((error) => process.stderr.write("Aeon model warmup failed: " + String(error) + "\n"));
 }
 

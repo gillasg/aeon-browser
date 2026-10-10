@@ -159,7 +159,10 @@ async function verifyCliReload(pidFile, handle, initialPid, registeredCli) {
     () =>
       handle
         .effectiveResources()
-        .mcpServers.some(({ name, state }) => name === "pippin_cli" && state === "connected"),
+        .mcpServers.some(({ name, state }) => name === "pippin_cli" && state === "connected") &&
+      handle
+        .effectiveResources()
+        .mcpServers.some(({ name, state }) => name === "pippin_fixture" && state === "connected"),
     () =>
       `Pi CLI bridge connection after a live config reload; statuses=${JSON.stringify(handle.effectiveResources().mcpServers)}`,
   );

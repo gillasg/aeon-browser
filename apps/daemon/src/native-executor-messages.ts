@@ -106,6 +106,7 @@ function applyFullInventory(
       socket,
       inventory.capabilities?.includes("site-scripts"),
       inventory.capabilities?.includes("browser-actions-v2"),
+      inventory.capabilities?.includes("browser-runtime-v4"),
     );
     socket.send(
       JSON.stringify(

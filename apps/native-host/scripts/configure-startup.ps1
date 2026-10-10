@@ -20,6 +20,7 @@ $runKey = if ($Mode -eq 'Validate') {
     [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($runKeyPath, $false)
 } else { [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($runKeyPath, $true) }
 try {
+    & (Join-Path $PSScriptRoot 'configure-login-task.ps1') -Mode Validate -PowerShellPath $powershellPath -StartupScript $startupScript
     $existing = if ($null -ne $runKey) { [string]$runKey.GetValue($runName, '') } else { '' }
     if ($existing -and $existing -cne $command) {
         throw 'The Aeon login entry belongs to another installation; it was preserved.'
@@ -40,10 +41,12 @@ try {
             throw 'The login launcher has local changes; it was preserved.'
         }
         $scriptContent | Set-Content -LiteralPath $startupScript -Encoding UTF8
-        $runKey.SetValue($runName, $command, [Microsoft.Win32.RegistryValueKind]::String)
+        & (Join-Path $PSScriptRoot 'configure-login-task.ps1') -Mode Install -PowerShellPath $powershellPath -StartupScript $startupScript
+        if ($existing) { $runKey.DeleteValue($runName, $false) }
         & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Remove
         Write-Output 'Aeon will start one hidden daemon at user login; routines can run without Chrome.'
     } else {
+        & (Join-Path $PSScriptRoot 'configure-login-task.ps1') -Mode Remove -PowerShellPath $powershellPath -StartupScript $startupScript
         if ($existing) { $runKey.DeleteValue($runName, $false) }
         if ((Test-Path -LiteralPath $startupScript -PathType Leaf) -and
             (Get-Content -LiteralPath $startupScript -Raw).Trim() -ceq $scriptContent.Trim()) {

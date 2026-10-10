@@ -15,7 +15,12 @@ internal static class NativeMessagingHost
     {
         HostConfiguration config;
         try { config = HostConfiguration.Load(); }
-        catch { WriteFailure("HOST_CONFIG_INVALID", false); return 0; }
+        catch (Exception error)
+        {
+            SupervisorLog.Write("Native configuration rejected: " + error.GetType().Name + ": " + error.Message);
+            WriteFailure("HOST_CONFIG_INVALID", false);
+            return 0;
+        }
 
         if (args.Length == 0 || !MatchesOrigin(args[0], config.ExtensionOrigin))
         {

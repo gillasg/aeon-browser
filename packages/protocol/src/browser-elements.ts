@@ -25,11 +25,19 @@ const query = z
     scope: z.string().min(1).max(512).optional(),
   })
   .strict();
-export const SemanticTargetSchema = z.discriminatedUnion("kind", [ref, locator, query]);
+const backend = z
+  .object({
+    kind: z.literal("backend"),
+    backendNodeId: z.number().int().positive(),
+    documentEpoch: z.number().int().nonnegative(),
+  })
+  .strict();
+export const SemanticTargetSchema = z.discriminatedUnion("kind", [ref, locator, query, backend]);
 export const BrowserElementTargetSchema = z.discriminatedUnion("kind", [
   ref,
   locator,
   query,
+  backend,
   z
     .object({
       kind: z.literal("point"),

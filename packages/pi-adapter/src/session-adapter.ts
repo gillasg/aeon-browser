@@ -1,10 +1,12 @@
 import { findDetachedFork, inspectForkEntry } from "./session-detached-fork.js";
-import { setInitialModel } from "./session-initial-model.js";
+import { setInitialModel, verifyCachedHandle } from "./session-initial-model.js";
+import { PreparedModelRuntime } from "./prepared-model-runtime.js";
+import { startupTiming, timeStartupStep } from "./startup-timing.js";
+import { PreparedSessionResources } from "./prepared-session-resources.js";
 import { installBrowserControlRequestProjection } from "./browser-provider-projection.js";
-import { projectMcpStatuses, waitForMcpConnectionState } from "./session-mcp-status.js";
+import { waitForMcpConnectionState } from "./session-mcp-status.js";
 import {
   SessionManager,
-  SettingsManager,
   VERSION,
   createAgentSession,
   getAgentDir,
@@ -23,7 +25,7 @@ import {
   type PiForkEntryCheck,
 } from "@pippin/domain";
 import { createThreadTools, type ThreadToolHost } from "./thread-tools.js";
-import { createLocalFixtureModel } from "./fixture-model.js";
+import { createLocalFixtureModel, fixtureSessionOptions } from "./fixture-model.js";
 import { readCachedPiModelCatalog } from "./session-model-catalog.js";
 import { wrapPiSession } from "./session-projection.js";
 import { searchTranscript } from "./transcript-search.js";
@@ -35,13 +37,10 @@ import {
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
+import { disposeBrowserRuntime } from "./browser-code-runtime.js";
 import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
-import {
-  bindPiExtensions,
-  createPiResourceLoader,
-  enablePiNativeDefaultTools,
-} from "./sdk-resources.js";
+import { bindPiExtensions } from "./sdk-resources.js";
 
 export interface PiSdkSessionAdapterOptions {
   sessionDirectory: string;
@@ -62,6 +61,8 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   private threadToolHost: ThreadToolHost | undefined;
   private readonly liveSessions = new Map<string, Promise<PiSessionHandle>>();
   private readonly pendingResourceReloads = new Set<string>();
+  private readonly preparedRuntime: PreparedModelRuntime | undefined;
+  private readonly resources: PreparedSessionResources;
 
   constructor(options: PiSdkSessionAdapterOptions) {
     this.sessionDirectory = resolve(options.sessionDirectory);
@@ -70,9 +71,16 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.preferredInitialModel = options.preferredInitialModel;
     this.browserTool = options.browserTool;
     this.capabilityToolHost = options.capabilityToolHost;
+    this.resources = new PreparedSessionResources(
+      this.agentDirectory ?? resolvePiAgentDirectory(),
+      Boolean(this.browserTool),
+    );
     if (this.testModel && !this.agentDirectory) {
       throw new Error("The local faux model requires a separate, explicit Pi agent directory.");
     }
+    this.preparedRuntime = this.testModel
+      ? undefined
+      : new PreparedModelRuntime(this.agentDirectory ?? resolvePiAgentDirectory());
   }
 
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle> {
@@ -80,9 +88,11 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     if (current) return current.then((handle) => verifyCachedHandle(handle, input));
     if (VERSION !== "0.99.1") throw new Error(`Unsupported Pi SDK version ${VERSION}.`);
 
-    const opening: Promise<PiSessionHandle> = this.createHandle(input).then((handle) =>
-      this.cacheAwareHandle(handle, input.chatId, opening),
-    );
+    const startedAt = Date.now();
+    const opening: Promise<PiSessionHandle> = this.createHandle(input).then((handle) => {
+      startupTiming("session-ready", startedAt);
+      return this.cacheAwareHandle(handle, input.chatId, opening);
+    });
     this.liveSessions.set(input.chatId, opening);
     return opening.catch((error: unknown) => {
       if (this.liveSessions.get(input.chatId) === opening) this.liveSessions.delete(input.chatId);
@@ -91,12 +101,18 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   }
 
   getModelCatalog(): Promise<PiModelCatalog> {
+    this.preparedRuntime?.prepare();
     return readCachedPiModelCatalog(this, {
       sessionDirectory: this.sessionDirectory,
       agentDirectory: this.agentDirectory,
       testModel: this.testModel,
       preferredInitialModel: this.preferredInitialModel,
     });
+  }
+
+  prepareResources(workingDirectory: string): Promise<void> {
+    this.preparedRuntime?.prepare();
+    return this.resources.prepare(workingDirectory);
   }
 
   async searchTranscript(
@@ -164,12 +180,15 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   }
 
   async closeAll(): Promise<void> {
+    this.resources.clear();
+    this.preparedRuntime?.close();
     const pendingSessions = [...this.liveSessions.values()];
     this.liveSessions.clear();
     await Promise.all(pendingSessions.map(async (pending) => (await pending).close()));
   }
 
   async reloadAllResources(): Promise<void> {
+    this.resources.clear();
     const chats = [...this.liveSessions.entries()];
     await Promise.all(
       chats.map(async ([chatId, pending]) => {
@@ -209,45 +228,32 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   private async createHandle(input: OpenPiSessionInput): Promise<PiSessionHandle> {
     const manager = resolvePiSessionManager(input, this.sessionDirectory);
     const thinkingLevel = storedThinkingLevel(manager);
-    const workingDirectory = input.workingDirectory;
-    const agentDirectory = this.agentDirectory ?? resolvePiAgentDirectory();
-    let mcpServers: readonly PiMcpServerStatus[] = [];
-    const settingsManager = SettingsManager.create(workingDirectory, agentDirectory);
-    const resourceLoader = createPiResourceLoader({
-      workingDirectory,
-      agentDirectory,
-      settingsManager,
-      onMcpStatusChange: (servers) => {
-        mcpServers = projectMcpStatuses(servers);
-      },
-    });
-    await resourceLoader.reload();
-    enablePiNativeDefaultTools(settingsManager);
+    const [{ resourceLoader, settingsManager, getMcpServers }, modelRuntime] = await Promise.all([
+      this.resources.take(input.workingDirectory),
+      this.preparedRuntime?.take(),
+    ]);
     const fixture =
       this.testModel && this.agentDirectory
         ? await createLocalFixtureModel(this.agentDirectory)
         : undefined;
     const options = {
-      cwd: workingDirectory,
-      agentDir: agentDirectory,
+      cwd: input.workingDirectory,
+      agentDir: this.agentDirectory ?? resolvePiAgentDirectory(),
       settingsManager,
       resourceLoader,
       sessionManager: manager,
+      ...(modelRuntime ? { modelRuntime } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
-      ...(fixture
-        ? {
-            modelRuntime: fixture.modelRuntime,
-            model: fixture.model,
-            tools: fixture.tools,
-          }
-        : {}),
+      ...fixtureSessionOptions(fixture),
       customTools: [
-        ...createBrowserTools(input.chatId, this.browserTool),
+        ...createBrowserTools(input.chatId, this.browserTool, input.workingDirectory),
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),
       ],
     };
-    const { session } = await createAgentSession(options);
+    const { session } = await timeStartupStep("agent-session-created", () =>
+      createAgentSession(options),
+    );
     installBrowserSessionLifecycle(session, input.chatId, this.browserTool);
     await setInitialModel(session, input, this.preferredInitialModel, fixture);
     const reference = sessionReferenceFromManager(manager);
@@ -258,13 +264,15 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     installBrowserControlRequestProjection(session);
     const extensionUi = new ExtensionUiBridge(session);
     try {
-      await bindPiExtensions(session, extensionUi.context);
+      await timeStartupStep("extensions-bound", () =>
+        bindPiExtensions(session, extensionUi.context),
+      );
     } catch (error) {
       extensionUi.close();
       session.dispose();
       throw error;
     }
-    return wrapPiSession(session, manager, reference, input.chatId, extensionUi, () => mcpServers);
+    return wrapPiSession(session, manager, reference, input.chatId, extensionUi, getMcpServers);
   }
 
   private cacheAwareHandle(
@@ -289,6 +297,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     const cached: PiSessionHandle = {
       ...handle,
       close: async () => {
+        disposeBrowserRuntime(chatId);
         await this.browserTool?.(chatId, "browser-session-cleanup", { release: true, reset: true });
         unsubscribe();
         this.pendingResourceReloads.delete(chatId);
@@ -306,11 +315,4 @@ export class PiSdkSessionAdapter implements PiSessionPort {
 
 export function resolvePiAgentDirectory(): string {
   return resolve(getAgentDir());
-}
-
-function verifyCachedHandle(handle: PiSessionHandle, input: OpenPiSessionInput): PiSessionHandle {
-  if (handle.reference.sessionId !== input.activationId) {
-    throw new Error("A different Pi session is already attached to this Chat in the daemon.");
-  }
-  return handle;
 }

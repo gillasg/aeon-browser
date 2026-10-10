@@ -5,10 +5,33 @@ import { SemanticTargetSchema } from "./browser-elements.js";
 const target = BrowserTargetKeySchema;
 export const browserExtraSteps = [
   z
+    .object({ op: z.literal("evaluate"), target, expression: z.string().min(1).max(20000) })
+    .strict(),
+  z
+    .object({
+      op: z.literal("cdp"),
+      target,
+      method: z
+        .string()
+        .regex(/^[A-Za-z]+\.[A-Za-z]+$/)
+        .max(120),
+      params: z.record(z.string(), z.unknown()).default({}),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("waitFor"),
+      target,
+      expression: z.string().min(1).max(20000),
+      timeoutMs: z.number().int().min(100).max(8000).default(5000),
+    })
+    .strict(),
+  z
     .object({
       op: z.literal("press"),
       target,
       element: SemanticTargetSchema,
+      focus: z.boolean().optional(),
       key: z.enum([
         "Enter",
         "Tab",

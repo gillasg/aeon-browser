@@ -8,6 +8,8 @@ import {
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { PiModelCatalog, PiModelOption } from "@pippin/domain";
 import { createLocalFixtureModel } from "./fixture-model.js";
+import { BackgroundCache } from "./background-cache.js";
+import { join } from "node:path";
 
 interface ModelCatalogOptions {
   sessionDirectory: string;
@@ -20,7 +22,14 @@ export async function readPiModelCatalog(options: ModelCatalogOptions): Promise<
   if (options.testModel && options.agentDirectory)
     return readFixtureCatalog(options.agentDirectory);
 
-  const runtime = await ModelRuntime.create();
+  const runtime = await ModelRuntime.create(
+    options.agentDirectory
+      ? {
+          authPath: join(options.agentDirectory, "auth.json"),
+          modelsPath: join(options.agentDirectory, "models.json"),
+        }
+      : {},
+  );
   const models = runtime.getAvailableSnapshot();
   const settings = SettingsManager.create(options.sessionDirectory, options.agentDirectory);
   const selectedDefault =
@@ -77,20 +86,15 @@ function getInitialThinkingLevel(settings: SettingsManager, model: Model<Api>): 
   return clampThinkingLevel(model, requested as ModelThinkingLevel);
 }
 
-const catalogCaches = new WeakMap<
-  object,
-  { expiresAt: number; pending: Promise<PiModelCatalog> }
->();
+const catalogCaches = new WeakMap<object, BackgroundCache<PiModelCatalog>>();
 export function readCachedPiModelCatalog(
   owner: object,
   options: ModelCatalogOptions,
 ): Promise<PiModelCatalog> {
-  const cached = catalogCaches.get(owner);
-  if (cached && cached.expiresAt > Date.now()) return cached.pending;
-  const pending = readPiModelCatalog(options);
-  catalogCaches.set(owner, { expiresAt: Date.now() + 60_000, pending });
-  void pending.catch(() => {
-    if (catalogCaches.get(owner)?.pending === pending) catalogCaches.delete(owner);
-  });
-  return pending;
+  let cached = catalogCaches.get(owner);
+  if (!cached) {
+    cached = new BackgroundCache(() => readPiModelCatalog(options), 60_000);
+    catalogCaches.set(owner, cached);
+  }
+  return cached.read();
 }

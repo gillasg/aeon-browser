@@ -12,6 +12,7 @@ import {
   type ResourceLoader,
   type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import { browserRuntimePrimer } from "./browser-code-guidance.js";
 
 export function createPiResourceLoader(input: {
   workingDirectory: string;
@@ -20,6 +21,7 @@ export function createPiResourceLoader(input: {
   mcpOptions?: McpExtensionOptions;
   onMcpStatusChange?: (servers: readonly McpServerStatus[]) => void;
   additionalFactories?: readonly InlineExtension[];
+  browserGuidance?: boolean;
 }): ResourceLoader {
   const onMcpStatusChange = input.onMcpStatusChange;
   const existingStatusListener = input.mcpOptions?.onStatusChange;
@@ -35,10 +37,14 @@ export function createPiResourceLoader(input: {
     cwd: input.workingDirectory,
     agentDir: input.agentDirectory,
     settingsManager: input.settingsManager,
+    appendSystemPromptOverride: (base) =>
+      input.browserGuidance ? [...base, browserRuntimePrimer] : base,
     extensionFactories: [
       createCodemodeExtension(),
       createToolSearchExtension(),
       createMcpExtension({
+        // Browser and local tools can run while optional MCP servers connect in the background.
+        startupWaitMs: 0,
         ...input.mcpOptions,
         loadConfig,
         ...(onMcpStatusChange || existingStatusListener

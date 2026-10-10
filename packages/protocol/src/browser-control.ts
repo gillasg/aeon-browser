@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { browserExtraSteps } from "./browser-extra-steps.js";
+import { browserCapabilitySteps } from "./browser-capability-steps.js";
 import { BrowserTabSchema, BrowserTargetKeySchema } from "./browser-inventory.js";
 
 const HttpUrlSchema = z
@@ -13,13 +14,14 @@ import { BrowserElementTargetSchema, SemanticTargetSchema } from "./browser-elem
 
 export const BrowserStepSchema = z.discriminatedUnion("op", [
   ...browserExtraSteps,
+  ...browserCapabilitySteps,
   z.object({ op: z.literal("listTabs"), query: z.string().max(160).optional() }).strict(),
   z
     .object({
       op: z.literal("openTab"),
       clientInstanceId: z.string().uuid(),
       url: HttpUrlSchema,
-      foreground: z.boolean().default(true),
+      foreground: z.boolean().default(false),
     })
     .strict(),
   z.object({ op: z.literal("attachTab"), target: BrowserTargetKeySchema }).strict(),
@@ -38,6 +40,7 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       op: z.literal("click"),
       target: BrowserTargetKeySchema,
       element: BrowserElementTargetSchema,
+      observe: z.boolean().optional(),
     })
     .strict(),
   z
@@ -46,6 +49,7 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       target: BrowserTargetKeySchema,
       element: SemanticTargetSchema,
       value: z.string().max(20000),
+      observe: z.boolean().optional(),
     })
     .strict(),
   z
@@ -105,6 +109,11 @@ export const BrowserSemanticNodeSchema = z
     disabled: z.boolean().optional(),
     checked: z.boolean().optional(),
     focused: z.boolean().optional(),
+    backendNodeId: z.number().int().positive().optional(),
+    expanded: z.boolean().optional(),
+    selected: z.boolean().optional(),
+    pressed: z.union([z.boolean(), z.literal("mixed")]).optional(),
+    mixed: z.boolean().optional(),
   })
   .strict();
 export type BrowserSemanticNode = z.infer<typeof BrowserSemanticNodeSchema>;
@@ -120,6 +129,7 @@ const SemanticObservationSchema = z
     url: z.string().max(8192),
     nodes: z.array(BrowserSemanticNodeSchema).max(180),
     truncated: z.boolean(),
+    text: z.string().max(20000).optional(),
   })
   .strict();
 
@@ -180,6 +190,7 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
       url: z.string().max(8192),
       observation: SemanticObservationSchema.optional(),
       scroll: BrowserScrollStateSchema.optional(),
+      outcome: z.enum(["navigated", "changed", "unchanged", "unknown"]).optional(),
     })
     .strict(),
 ]);

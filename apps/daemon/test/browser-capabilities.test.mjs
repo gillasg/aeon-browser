@@ -10,6 +10,29 @@ const target = {
   tabIncarnation: randomUUID(),
 };
 const url = "https://example.test/";
+test("new runtime operations fail immediately on an older extension instead of timing out", async () => {
+  const service = new BrowserControlService();
+  service.useInventories({ findTarget: () => ({ target, url, documentEpoch: 1 }) });
+  const socket = new EventEmitter();
+  socket.readyState = 1;
+  socket.send = () => assert.fail("An old extension cannot execute runtime commands");
+  service.connectExecutor(target.clientInstanceId, socket, false, true);
+  const chatId = randomUUID();
+  service.attachContext(chatId, target, url);
+  for (const step of [
+    { op: "evaluate", target, expression: "document.title" },
+    {
+      op: "click",
+      target,
+      element: { kind: "backend", backendNodeId: 1, documentEpoch: 1 },
+      observe: false,
+    },
+  ]) {
+    const result = JSON.parse(await service.execute(chatId, "upgrade", { steps: [step] }));
+    assert.equal(result.steps[0].code, "UNSUPPORTED");
+    assert.match(result.steps[0].detail, /Reload Aeon/);
+  }
+});
 test("old browser executors reject new commands immediately with update guidance", async () => {
   const service = new BrowserControlService();
   service.useInventories({ findTarget: () => ({ target, url, documentEpoch: 1 }) });

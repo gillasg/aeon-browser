@@ -70,7 +70,7 @@ internal static class DaemonSupervisor
             daemon.ErrorDataReceived += (sender, eventArgs) => SupervisorLog.Write(eventArgs.Data);
             daemon.BeginErrorReadLine();
             var ready = daemon.StandardOutput.ReadLineAsync();
-            if (!ready.Wait(TimeSpan.FromSeconds(20)) || ready.Result != "PIPPIN_DAEMON_READY")
+            if (!ready.Wait(TimeSpan.FromSeconds(60)) || ready.Result != "PIPPIN_DAEMON_READY")
                 throw new TimeoutException("Daemon startup did not complete.");
             SupervisorLog.Write("Daemon ready, process " + daemon.Id);
             return ServePipe(config, daemon);

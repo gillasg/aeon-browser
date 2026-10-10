@@ -43,8 +43,10 @@ export const BrowserInventoryFullSchema = z
     browserRunId: z.string().uuid(),
     generation: z.number().int().positive(),
     capabilities: z
-      .array(z.enum(["site-scripts", "browser-actions-v2"]))
-      .max(2)
+      .array(
+        z.enum(["site-scripts", "browser-actions-v2", "browser-runtime-v3", "browser-runtime-v4"]),
+      )
+      .max(4)
       .optional(),
     windows: z.array(BrowserWindowSchema).max(256),
     tabs: z.array(BrowserTabSchema).max(2048),

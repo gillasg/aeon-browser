@@ -7,6 +7,6 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "references": [{ "path": "../domain/tsconfig.json" }],
+  "references": [{ "path": "../domain/tsconfig.json" }, { "path": "../protocol/tsconfig.json" }],
   "include": ["src/**/*.ts"]
 }

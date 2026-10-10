@@ -10,6 +10,7 @@ export function beginSubmit(
   socket: WebSocket,
   service: ChatService,
   request: CommandRequest,
+  selection?: { model: { provider: string; id: string }; thinkingLevel: string },
 ): void {
   if (request.operation !== "chat.submit") return;
   const { requestId, operation, payload } = request;
@@ -22,12 +23,16 @@ export function beginSubmit(
     piAcceptance: "unknown",
   });
   void service
-    .submitPrompt(asChatId(payload.chatId), {
-      text: payload.text,
-      ...(payload.attachments ? { attachments: payload.attachments } : {}),
-      ...(payload.browserContext ? { browserContext: payload.browserContext } : {}),
-      ...(payload.browserContexts ? { browserContexts: payload.browserContexts } : {}),
-    })
+    .submitPrompt(
+      asChatId(payload.chatId),
+      {
+        text: payload.text,
+        ...(payload.attachments ? { attachments: payload.attachments } : {}),
+        ...(payload.browserContext ? { browserContext: payload.browserContext } : {}),
+        ...(payload.browserContexts ? { browserContexts: payload.browserContexts } : {}),
+      },
+      selection,
+    )
     .then(() => completeSubmit(socket, service, request))
     .catch((error: unknown) => failSubmit(socket, service, request, error));
 }

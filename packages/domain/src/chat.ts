@@ -270,8 +270,8 @@ export interface OpenPiSessionInput {
   reference: PiSessionReference | null;
   materialized: boolean;
 }
-
 export interface PiSessionPort {
+  prepareResources?(workingDirectory: string): Promise<void>;
   getModelCatalog(): Promise<PiModelCatalog>;
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle>;
   searchTranscript(

@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   asChatId,
+  asActivationId,
   type ChatId,
   type ChatRecord,
   type ChatStore,
@@ -12,12 +13,16 @@ import {
   type PiForkEntryCheck,
   type PiSessionPort,
   type PiSessionReference,
+  type PiSessionHandle,
   type ThreadCreationIntent,
   type ThreadForkIntent,
 } from "@pippin/domain";
 
 export class ChatThreadSupport {
   private readonly dataDirectory: string;
+  private prepared: Promise<{ draft: ChatRecord; session: PiSessionHandle }> | undefined;
+  private refill: ReturnType<typeof setTimeout> | undefined;
+  private closed = false;
 
   constructor(
     dataDirectory: string,
@@ -31,11 +36,70 @@ export class ChatThreadSupport {
     title = "New Chat",
     project?: { projectId: string; folders: string[] },
   ): Promise<ChatRecord> {
+    if (!project && this.prepared) {
+      const pending = this.prepared;
+      this.prepared = undefined;
+      const { draft, session } = await pending;
+      this.scheduleRefill();
+      const now = new Date().toISOString();
+      this.store.createDraft({
+        ...draft,
+        title: this.makeDraft(draft.chatId, title, null).title,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const activationId = asActivationId(session.reference.sessionId);
+      this.store.beginActivation(draft.chatId, activationId);
+      return this.store.attachPiSession(
+        draft.chatId,
+        activationId,
+        session.reference,
+        session.snapshot().materialized,
+      );
+    }
     const chatId = asChatId(randomUUID());
     const draft = this.makeDraft(chatId, title, project?.projectId ?? null);
     if (project) draft.workingDirectory = project.folders[0] ?? draft.workingDirectory;
     await mkdir(draft.workingDirectory, { recursive: true });
     return this.store.createDraft(draft);
+  }
+
+  prepareNextDraft(): Promise<void> {
+    if (this.closed) return Promise.resolve();
+    if (!this.pi.prepareResources) return Promise.resolve();
+    if (!this.prepared) {
+      const draft = this.makeDraft(asChatId(randomUUID()), "New Chat", null);
+      const pending = mkdir(draft.workingDirectory, { recursive: true }).then(async () => {
+        await this.pi.prepareResources?.(draft.workingDirectory);
+        const session = await this.pi.openOrCreate({
+          chatId: draft.chatId,
+          activationId: asActivationId(randomUUID()),
+          workingDirectory: draft.workingDirectory,
+          reference: null,
+          materialized: false,
+        });
+        return { draft, session };
+      });
+      this.prepared = pending;
+      void pending.catch(() => {
+        if (this.prepared === pending) this.prepared = undefined;
+      });
+    }
+    return this.prepared.then(() => undefined);
+  }
+
+  closePreparation(): void {
+    this.closed = true;
+    if (this.refill) clearTimeout(this.refill);
+    this.refill = undefined;
+  }
+  private scheduleRefill(): void {
+    if (this.closed || this.refill) return;
+    this.refill = setTimeout(() => {
+      this.refill = undefined;
+      void this.prepareNextDraft().catch(() => undefined);
+    }, 1000);
+    this.refill.unref();
   }
 
   async createThreadDraft(input: {

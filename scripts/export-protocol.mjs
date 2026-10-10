@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve, join } from "node:path";
 
@@ -22,6 +22,19 @@ const sha256 = createHash("sha256")
   .update(await readFile(join(directory, file)))
   .digest("hex");
 const revision = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", windowsHide: true });
+const changes = spawnSync("git", ["status", "--porcelain", "--", "packages/protocol"], {
+  encoding: "utf8",
+  windowsHide: true,
+});
+const sourceHash = createHash("sha256");
+for (const path of [
+  "package.json",
+  ...(await readdir("packages/protocol/src"))
+    .filter((path) => path.endsWith(".ts"))
+    .sort()
+    .map((path) => "src/" + path),
+])
+  sourceHash.update(path).update(await readFile(join("packages/protocol", path)));
 await writeFile(
   join(directory, "protocol-origin.json"),
   JSON.stringify(
@@ -30,6 +43,8 @@ await writeFile(
       version: manifest.version,
       source: "https://github.com/gillasg/core",
       revision: revision.status === 0 ? revision.stdout.trim() : null,
+      sourceDirty: changes.status !== 0 || !!changes.stdout.trim(),
+      sourceSnapshotSha256: sourceHash.digest("hex"),
       file,
       sha256,
     },

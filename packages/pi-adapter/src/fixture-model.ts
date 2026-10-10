@@ -13,6 +13,14 @@ const FIXTURE_MODEL = "read-only-stream";
 const FIXTURE_RESPONSES = 64;
 const DEFAULT_TOKENS_PER_SECOND = 35;
 
+export function fixtureSessionOptions(
+  fixture: Awaited<ReturnType<typeof createLocalFixtureModel>> | undefined,
+): Partial<Awaited<ReturnType<typeof createLocalFixtureModel>>> {
+  return fixture
+    ? { modelRuntime: fixture.modelRuntime, model: fixture.model, tools: fixture.tools }
+    : {};
+}
+
 export async function createLocalFixtureModel(agentDirectory: string): Promise<{
   modelRuntime: ModelRuntime;
   model: Model<Api>;

@@ -27,11 +27,35 @@ internal sealed class HostConfiguration
 
     public static HostConfiguration Load()
     {
-        var file = new FileInfo(ConfigPath);
+        return Load(ConfigPath);
+    }
+
+    internal static HostConfiguration Load(string path)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try { return ReadConfiguration(path); }
+            catch (Exception error)
+            {
+                if (attempt >= 5) throw;
+                if (!(error is IOException) && !(error is InvalidDataException) && !(error is ArgumentException) &&
+                    !(error is InvalidOperationException)) throw;
+                System.Threading.Thread.Sleep(100);
+            }
+        }
+    }
+
+    private static HostConfiguration ReadConfiguration(string path)
+    {
+        var file = new FileInfo(path);
         if (!file.Exists || file.Length < 2 || file.Length > 16384)
             throw new InvalidDataException("Native host config is missing or too large.");
         var serializer = new JavaScriptSerializer { MaxJsonLength = 16384, RecursionLimit = 8 };
-        var values = serializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(file.FullName));
+        string text;
+        using (var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete))
+        using (var reader = new StreamReader(stream)) text = reader.ReadToEnd();
+        var values = serializer.Deserialize<Dictionary<string, object>>(text);
         if (values == null || values.Count != 4 ||
             !values.ContainsKey("extensionId") || !values.ContainsKey("nodeExecutable") ||
             !values.ContainsKey("daemonEntrypoint") || !values.ContainsKey("dataDirectory"))

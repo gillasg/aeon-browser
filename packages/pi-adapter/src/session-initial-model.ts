@@ -1,5 +1,13 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { OpenPiSessionInput } from "@pippin/domain";
+import type { OpenPiSessionInput, PiSessionHandle } from "@pippin/domain";
+export function verifyCachedHandle(
+  handle: PiSessionHandle,
+  input: OpenPiSessionInput,
+): PiSessionHandle {
+  if (handle.reference.sessionId !== input.activationId)
+    throw new Error("A different Pi session is already attached to this Chat in the daemon.");
+  return handle;
+}
 export async function setInitialModel(
   session: AgentSession,
   input: OpenPiSessionInput,

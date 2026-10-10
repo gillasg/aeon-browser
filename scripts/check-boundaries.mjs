@@ -9,7 +9,7 @@ const packageRules = new Map([
   ["@pippin/domain", []],
   ["@pippin/store", ["@pippin/domain"]],
   ["@pippin/daemon", ["@pippin/protocol", "@pippin/domain", "@pippin/store", "@pippin/pi-adapter"]],
-  ["@pippin/pi-adapter", ["@pippin/domain"]],
+  ["@pippin/pi-adapter", ["@pippin/domain", "@pippin/protocol"]],
   ["@pippin/native-host", []],
 ]);
 const packagePaths = new Map([
