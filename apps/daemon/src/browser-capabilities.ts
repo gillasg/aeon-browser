@@ -1,4 +1,4 @@
-import type { BrowserStep } from "@pippin/protocol";
+import type { BrowserStep } from "@aeon/protocol";
 export function requiresBrowserRuntime(step: BrowserStep): boolean {
   if (
     [

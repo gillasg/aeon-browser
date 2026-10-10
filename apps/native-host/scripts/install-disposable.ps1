@@ -26,14 +26,14 @@ if ((-not $NodeExecutable -and $LASTEXITCODE -ne 0) -or -not (Test-Path -Literal
     throw 'A permanent Node executable could not be resolved.'
 }
 $nodeFull = [IO.Path]::GetFullPath($node.Trim())
-$nativeOutput = Join-Path $repoRoot 'apps\native-host\dist\pippin-native-host.exe'
+$nativeOutput = Join-Path $repoRoot 'apps\native-host\dist\aeon-native-host.exe'
 $daemonEntry = Join-Path $repoRoot 'apps\daemon\dist\main.js'
 $extensionManifest = if ($BrowserRoot) { Join-Path ([IO.Path]::GetFullPath($BrowserRoot)) 'apps\chrome-extension\native-dist\manifest.json' } else { $null }
-$appRoot = Join-Path $env:LOCALAPPDATA 'Pippin\Slice3Dev'
-$hostExecutable = Join-Path $appRoot 'pippin-native-host.exe'
-$hostManifestPath = Join-Path $appRoot 'com.pippin.native_host_dev.json'
+$appRoot = Join-Path $env:LOCALAPPDATA 'Aeon'
+$hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
+$hostManifestPath = Join-Path $appRoot 'com.aeon.native_host.json'
 $hostConfigPath = Join-Path $appRoot 'host-config.json'
-$registrySubKey = 'Software\Google\Chrome\NativeMessagingHosts\com.pippin.native_host_dev'
+$registrySubKey = 'Software\Google\Chrome\NativeMessagingHosts\com.aeon.native_host'
 $expectedExtensionId = 'npcdopokfkpfmepknhoecppgdgmkmihh'
 $expectedPublicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA89DgbMVu50oH2AAiN0vILGKRKc2ePGR9r1W92yDIiVq9n1rxtqxQZSLsxPKuymvi3wB9hpo0h9vJ3++teaw8fqBllliSeELEAUmPNhauLcvlKe1nhkbgRf2wXilCUVI+zumNinkqw5h85rew1FI894ev8M9wWzSHm90eL9WILlWTrjhdaNTpMs2w9sF8GrsKj+sX1anF9/iUfZ9hbracUa47Z2b4KiviZp5SlF6o+0SwFHbeOVM0Aq2nHMFujmfaOcW7TkxDdPXBns2uRY1CTmRIyi3B1pONLQd8ERteRbOlj2BM9AYIrnGyJScaKAu7OUht0gI4C/NlEhdQruxTfQIDAQAB'
 
@@ -84,7 +84,7 @@ if ($null -ne $registration) {
     } while ([DateTime]::UtcNow -lt $deadline)
 if ($running.Count) { throw 'Supervisor did not stop; files were preserved.' }
 }
-if ($ImportDataFrom -and (Test-Path -LiteralPath (Join-Path $ImportDataFrom 'pippin.sqlite'))) {
+if ($ImportDataFrom -and ((Test-Path -LiteralPath (Join-Path $ImportDataFrom 'aeon.sqlite')) -or (Test-Path -LiteralPath (Join-Path $ImportDataFrom 'pippin.sqlite')))) {
     & $nodeFull (Join-Path $repoRoot 'scripts/import-virtualized-data.mjs') $ImportDataFrom (Join-Path $appRoot 'data')
     if ($LASTEXITCODE -ne 0) { throw 'Could not recover the redirected data; originals preserved.' }
 }
@@ -99,7 +99,7 @@ $daemonFull = [IO.Path]::GetFullPath($daemonEntry)
 New-Item -ItemType Directory -Path $appRootFull -Force | Out-Null
 Copy-Item -LiteralPath $nativeOutput -Destination $hostExecutable
 $hostManifest = [ordered]@{
-    name = 'com.pippin.native_host_dev'
+    name = 'com.aeon.native_host'
     description = 'Disposable Aeon Slice 3 native messaging host'
     path = $hostExecutable
     type = 'stdio'

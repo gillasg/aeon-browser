@@ -86,7 +86,7 @@ async function waitFor(predicate, description = "the Pi extension dialog") {
 }
 
 async function prepareNativeExtensionSpikeCase1Stage1(t) {
-  const root = await mkdtemp(join(tmpdir(), "pippin-pi-extension-spike-"));
+  const root = await mkdtemp(join(tmpdir(), "aeon-pi-extension-spike-"));
   const workingDirectory = join(root, "project");
   const agentDirectory = join(root, "pi-agent");
   await Promise.all([
@@ -181,7 +181,7 @@ async function verifyNativeExtensionSpikeCase1Stage3(commandArguments, session) 
 }
 
 async function prepareNativeExtensionSpikeCase2Stage1(t) {
-  const root = await mkdtemp(join(tmpdir(), "pippin-pi-attention-spike-"));
+  const root = await mkdtemp(join(tmpdir(), "aeon-pi-attention-spike-"));
   const workingDirectory = join(root, "project");
   const agentDirectory = join(root, "pi-agent");
   const sessionDirectory = join(root, "sessions");

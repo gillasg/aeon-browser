@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import type { CapabilityDefinition, CliCapability } from "@pippin/domain";
+import type { CapabilityDefinition, CliCapability } from "@aeon/domain";
 
 export async function verifyCliCapability(
   capability: CliCapability,

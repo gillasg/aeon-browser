@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
 import { ChatService, closeProjectServices } from "./chat-service-fixture.mjs";
-import { PiSdkSessionAdapter } from "@pippin/pi-adapter";
-import { openChatStore } from "@pippin/store";
+import { PiSdkSessionAdapter } from "@aeon/pi-adapter";
+import { openChatStore } from "@aeon/store";
 import { createNoProviderSubmitPort } from "./no-provider-submit-port.mjs";
 
 test("real Pi session activation, restart, and attach-crash recovery use one Pi file", async (t) => {
-  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "pippin-real-pi-chat-")));
+  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "aeon-real-pi-chat-")));
   assert.ok(dataDirectory.startsWith(`${resolve(tmpdir())}${sep}`));
   const agentDirectory = join(dataDirectory, "pi-agent-config");
   const sessionDirectory = join(dataDirectory, "pi-sessions");
@@ -72,7 +72,7 @@ test("real Pi session activation, restart, and attach-crash recovery use one Pi 
 });
 
 test("real Pi file created before SQLite attach is found after daemon restart", async (t) => {
-  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "pippin-pi-crash-test-")));
+  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "aeon-pi-crash-test-")));
   assert.ok(dataDirectory.startsWith(`${resolve(tmpdir())}${sep}`));
   const agentDirectory = join(dataDirectory, "pi-agent-config");
   const sessionDirectory = join(dataDirectory, "pi-sessions");

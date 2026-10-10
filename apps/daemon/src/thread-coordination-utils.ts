@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ThreadDeliveryState } from "@pippin/domain";
+import type { ThreadDeliveryState } from "@aeon/domain";
 
 export function record(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value))

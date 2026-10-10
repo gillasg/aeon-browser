@@ -23,7 +23,7 @@ import {
   type PiTranscriptMatch,
   PiForkUnsupportedEntryError,
   type PiForkEntryCheck,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import { createThreadTools, type ThreadToolHost } from "./thread-tools.js";
 import { createLocalFixtureModel, fixtureSessionOptions } from "./fixture-model.js";
 import { readCachedPiModelCatalog } from "./session-model-catalog.js";
@@ -135,7 +135,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     reference: PiSessionReference;
     workingDirectory: string;
     entryId: string;
-    targetChatId: import("@pippin/domain").ChatId;
+    targetChatId: import("@aeon/domain").ChatId;
   }): Promise<PiSessionReference> {
     const check = this.inspectForkEntry(input);
     if (!check.supported && check.reason === "entry_not_found")
@@ -174,8 +174,8 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     sourceReference: PiSessionReference;
     workingDirectory: string;
     entryId: string;
-    targetChatId: import("@pippin/domain").ChatId;
-  }): import("@pippin/domain").PiDetachedForkEvidence {
+    targetChatId: import("@aeon/domain").ChatId;
+  }): import("@aeon/domain").PiDetachedForkEvidence {
     return findDetachedFork(this.sessionDirectory, input);
   }
 

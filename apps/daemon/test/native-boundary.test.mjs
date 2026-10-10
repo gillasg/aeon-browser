@@ -8,7 +8,7 @@ import {
   DaemonUiRequestSchema,
   NativeBootstrapResponseSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { BrowserInventoryRegistry } from "../dist/browser-inventory-registry.js";
 import { GrantAuthority } from "../dist/grant-authority.js";
 import { authorizeNativeUiScope } from "../dist/native-ui-authz.js";
@@ -30,16 +30,16 @@ test("bootstrap endpoints require an explicit bounded loopback port and fixed pa
     daemonProtocolVersion: SUPPORTED_PROTOCOL_VERSION,
   });
   assert.equal(
-    NativeBootstrapResponseSchema.safeParse(response("ws://127.0.0.1:49152/pippin/v1")).success,
+    NativeBootstrapResponseSchema.safeParse(response("ws://127.0.0.1:49152/aeon/v1")).success,
     true,
   );
   for (const endpoint of [
-    "ws://127.0.0.1/pippin/v1",
-    "ws://127.0.0.1:0/pippin/v1",
-    "ws://127.0.0.1:65536/pippin/v1",
-    "ws://user@127.0.0.1:49152/pippin/v1",
-    "ws://127.0.0.1:49152/pippin/v1?grant=secret",
-    "ws://localhost:49152/pippin/v1",
+    "ws://127.0.0.1/aeon/v1",
+    "ws://127.0.0.1:0/aeon/v1",
+    "ws://127.0.0.1:65536/aeon/v1",
+    "ws://user@127.0.0.1:49152/aeon/v1",
+    "ws://127.0.0.1:49152/aeon/v1?grant=secret",
+    "ws://localhost:49152/aeon/v1",
   ])
     assert.equal(
       NativeBootstrapResponseSchema.safeParse(response(endpoint)).success,

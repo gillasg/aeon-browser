@@ -8,7 +8,8 @@ import { startDevHandshakeServer } from "./dev-harness.js";
 import { createLocalFixtureRuntime } from "./dev-runtime.js";
 import { createProductionRuntime } from "./production-runtime.js";
 import { startNativeTransport } from "./native-transport.js";
-import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@pippin/protocol";
+import { readEnvironment } from "./environment.js";
+import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
@@ -44,10 +45,10 @@ async function main(): Promise<void> {
 
 async function runManagedDaemon(): Promise<void> {
   const writeReply = reserveSupervisorOutput();
-  if (process.env.PIPPIN_NATIVE_SUPERVISED !== "1")
+  if (readEnvironment("NATIVE_SUPERVISED") !== "1")
     throw new Error("Managed daemon startup requires the Native Messaging supervisor.");
-  const dataDirectory = process.env.PIPPIN_NATIVE_DATA_DIR;
-  const extensionOrigin = process.env.PIPPIN_NATIVE_EXTENSION_ORIGIN;
+  const dataDirectory = readEnvironment("NATIVE_DATA_DIR");
+  const extensionOrigin = readEnvironment("NATIVE_EXTENSION_ORIGIN");
   if (
     !dataDirectory ||
     !extensionOrigin ||
@@ -77,7 +78,7 @@ async function runManagedDaemon(): Promise<void> {
       runtime.threadCoordination,
       runtime.attention,
     );
-    writeReply("PIPPIN_DAEMON_READY\n");
+    writeReply("AEON_DAEMON_READY\n");
     input = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of input) {
       if (line === "shutdown") break;
@@ -118,7 +119,10 @@ async function handleSupervisorLine(
 }
 
 async function runLocalFixture(): Promise<void> {
-  const dataDirectory = process.env.PIPPIN_DEV_DATA_DIR ?? join(tmpdir(), "pippin-slice1-dev-chat");
+  const dataDirectory =
+    process.env.AEON_DEV_DATA_DIR ??
+    process.env.PIPPIN_DEV_DATA_DIR ??
+    join(tmpdir(), "aeon-slice1-dev-chat");
   const runtime = createLocalFixtureRuntime(dataDirectory);
   await runtime.ready;
   const harness = await startDevHandshakeServer({

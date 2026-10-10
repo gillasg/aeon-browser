@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { SiteScriptRecord, SiteScriptRevision } from "@pippin/domain";
-import { SqliteSiteScriptStore } from "@pippin/store";
+import type { SiteScriptRecord, SiteScriptRevision } from "@aeon/domain";
+import { SqliteSiteScriptStore } from "@aeon/store";
 import {
   SiteScriptCommandSchema,
   SiteScriptDefinitionSchema,
   type SiteScriptCommand,
   type BrowserTargetKey,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 
@@ -277,7 +277,7 @@ export class SiteScriptService {
         );
     }
   }
-  private definition(script: SiteScriptRecord): import("@pippin/protocol").SiteScriptDefinition {
+  private definition(script: SiteScriptRecord): import("@aeon/protocol").SiteScriptDefinition {
     return {
       scriptId: script.scriptId,
       revision: script.revision,

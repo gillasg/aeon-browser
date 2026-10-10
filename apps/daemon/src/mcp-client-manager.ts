@@ -1,5 +1,5 @@
 import { Client, type CallToolResult, type Tool } from "@modelcontextprotocol/client";
-import type { CapabilityDefinition, McpCapability } from "@pippin/domain";
+import type { CapabilityDefinition, McpCapability } from "@aeon/domain";
 import type { CapabilityRegistry } from "./capability-registry.js";
 import { McpTransportAdapter, type McpTransport } from "./mcp-transport-adapter.js";
 import {
@@ -203,7 +203,7 @@ export class McpClientManager {
     signature: string,
     signal?: AbortSignal,
   ): Promise<ManagedClient> {
-    const client = new Client({ name: "pippin-mcp-client", version: "1.0.0" });
+    const client = new Client({ name: "aeon-mcp-client", version: "1.0.0" });
     const transport = this.transportAdapter.create(capability);
     try {
       await client.connect(transport, { timeout: CONNECTION_TIMEOUT_MS });

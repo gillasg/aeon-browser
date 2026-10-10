@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { DaemonUiRequestSchema, PageGrantScopeSchema } from "@pippin/protocol";
+import { DaemonUiRequestSchema, PageGrantScopeSchema } from "@aeon/protocol";
 import { authorizeNativeUiScope } from "../dist/native-ui-authz.js";
 
 test("management has a separate grant without transcript or browser authority", () => {

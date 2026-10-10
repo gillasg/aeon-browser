@@ -9,12 +9,12 @@ if (!destination)
 const directory = resolve(destination);
 await mkdir(directory, { recursive: true });
 const manifest = JSON.parse(await readFile("packages/protocol/package.json", "utf8"));
-const file = `pippin-protocol-${manifest.version}.tgz`;
+const file = `aeon-protocol-${manifest.version}.tgz`;
 const pnpm = process.env.npm_execpath;
 if (!pnpm) throw new Error("Run through pnpm export:protocol.");
 const packed = spawnSync(
   process.execPath,
-  [pnpm, "--filter", "@pippin/protocol", "pack", "--out", join(directory, file)],
+  [pnpm, "--filter", "@aeon/protocol", "pack", "--out", join(directory, file)],
   { stdio: "ignore", windowsHide: true },
 );
 if (packed.status !== 0) throw new Error("Build and pack the protocol before exporting it.");

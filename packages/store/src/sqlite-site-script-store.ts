@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { SiteScriptRecord } from "@pippin/domain";
+import type { SiteScriptRecord } from "@aeon/domain";
 export class SqliteSiteScriptStore {
   private readonly database: Database.Database;
   constructor(directory: string) {

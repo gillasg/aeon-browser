@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { CapabilityRegistryFile } from "@pippin/domain";
+import type { CapabilityRegistryFile } from "@aeon/domain";
 import type { PiCliBridgeConfig } from "./mcp-registry-mapping.js";
 import {
   MANIFEST_SCHEMA_VERSION,

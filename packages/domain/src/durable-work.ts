@@ -165,7 +165,7 @@ export interface CapabilityAuditRecord {
   result: string;
 }
 
-export interface PippinProductStore {
+export interface AeonProductStore {
   createRoutine(record: RoutineRecord): RoutineRecord;
   getRoutine(routineId: string): RoutineRecord | undefined;
   listRoutines(chatId?: ChatId): readonly RoutineRecord[];

@@ -3,7 +3,7 @@ import {
   BrowserOperationCallSchema,
   type BrowserStep,
   type BrowserExecutorResult,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 export async function executeBrowserBatch(
   raw: unknown,
   toolCallId: string,

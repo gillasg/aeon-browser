@@ -9,7 +9,7 @@ import {
   type BrowserExecutorResult,
   type BrowserStep,
   type BrowserTargetKey,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { executeBrowserBatch } from "./browser-batch.js";
 import type { SiteScriptService } from "./site-script-service.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";

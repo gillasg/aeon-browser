@@ -1,4 +1,4 @@
-import type { BrowserExecutorRequest, BrowserExecutorResult } from "@pippin/protocol";
+import type { BrowserExecutorRequest, BrowserExecutorResult } from "@aeon/protocol";
 import type { WebSocket } from "ws";
 export interface BrowserPending {
   chatId: string;

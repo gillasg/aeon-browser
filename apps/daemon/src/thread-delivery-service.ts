@@ -7,7 +7,7 @@ import {
   type PiThreadMessageAcceptance,
   type ThreadDeliveryRecord,
   type ThreadDeliveryState,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import { ChatService } from "./chat-service.js";
 import { hash, messageOf, requiredString, stateRank } from "./thread-coordination-utils.js";
 

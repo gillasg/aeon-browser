@@ -1,5 +1,5 @@
-import { asChatId } from "@pippin/domain";
-import { ChatSummarySchema, type DaemonUiRequest } from "@pippin/protocol";
+import { asChatId } from "@aeon/domain";
+import { ChatSummarySchema, type DaemonUiRequest } from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserContextAttachStatus } from "./dev-chat-command-types.js";
@@ -16,7 +16,7 @@ export async function createAndSubmitChat(
   request: CreateRequest,
   attach?: (
     chatId: string,
-    target: import("@pippin/protocol").BrowserTargetKey,
+    target: import("@aeon/protocol").BrowserTargetKey,
     url: string,
   ) => BrowserContextAttachStatus,
 ): Promise<void> {

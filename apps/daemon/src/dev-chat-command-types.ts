@@ -1,4 +1,4 @@
-import type { DaemonUiRequest } from "@pippin/protocol";
+import type { DaemonUiRequest } from "@aeon/protocol";
 
 export type CommandRequest = Extract<DaemonUiRequest, { kind: "command" }>;
 export type BrowserContextAttachStatus = "attached" | "stale" | "lost" | "offline";

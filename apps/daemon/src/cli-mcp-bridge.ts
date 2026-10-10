@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { CliCapability } from "@pippin/domain";
+import type { CliCapability } from "@aeon/domain";
 import { parseRegistry } from "./capability-parsing.js";
 import {
   HELP_TIMEOUT_MS,
@@ -237,7 +237,7 @@ async function dispatchRequest(
       protocolVersion:
         typeof params.protocolVersion === "string" ? params.protocolVersion : "2025-06-18",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "pippin-cli", version: VERSION },
+      serverInfo: { name: "aeon-cli", version: VERSION },
     };
   } else if (message.method === "ping") {
     result = {};

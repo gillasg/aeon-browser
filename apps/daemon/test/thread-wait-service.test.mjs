@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { asChatId } from "@pippin/domain";
+import { asChatId } from "@aeon/domain";
 import { ThreadWaitService } from "../dist/thread-wait-service.js";
 
 const firstChat = asChatId("c1900cbf-d3cc-49d8-aab0-8a5e6ff5c1f3");

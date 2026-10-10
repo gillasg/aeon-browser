@@ -12,7 +12,7 @@ import {
   type AuthHello,
   type AuthReply,
   type NativeBootstrapResponse,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { ChatService } from "./chat-service.js";
 import { attachDevChatCommands } from "./dev-chat-connection.js";
@@ -46,7 +46,7 @@ export async function startNativeTransport(
   const server = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
-    path: "/pippin/v1",
+    path: "/aeon/v1",
     maxPayload: MAX_SOCKET_BYTES,
     perMessageDeflate: false,
     verifyClient: (info, callback) => {
@@ -72,7 +72,7 @@ export async function startNativeTransport(
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("Loopback WebSocket has no TCP endpoint.");
-  const endpoint = `ws://127.0.0.1:${address.port}/pippin/v1`;
+  const endpoint = `ws://127.0.0.1:${address.port}/aeon/v1`;
 
   return {
     endpoint,
@@ -234,5 +234,5 @@ function endpointFromServer(server: WebSocketServer): string {
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("Loopback WebSocket endpoint disappeared.");
-  return `ws://127.0.0.1:${address.port}/pippin/v1`;
+  return `ws://127.0.0.1:${address.port}/aeon/v1`;
 }

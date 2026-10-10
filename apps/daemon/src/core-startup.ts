@@ -26,7 +26,7 @@ export async function acquireCoreLock(directory: string): Promise<() => Promise<
 }
 
 export async function startStandaloneCore(): Promise<void> {
-  const installedRoot = join(process.env.LOCALAPPDATA ?? "", "Pippin", "Slice3Dev");
+  const installedRoot = join(process.env.LOCALAPPDATA ?? "", "Aeon");
   const directory = resolve(process.env.AEON_CORE_DATA_DIR ?? join(installedRoot, "data"));
   const unlock = await acquireCoreLock(directory);
   let runtime: ReturnType<typeof createProductionRuntime> | undefined;

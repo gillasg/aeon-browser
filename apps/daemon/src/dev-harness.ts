@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
-import { HelloRejectionSchema, SUPPORTED_PROTOCOL_VERSION } from "@pippin/protocol";
+import { HelloRejectionSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 import { ChatService } from "./chat-service.js";
 import { attachDevChatCommands } from "./dev-chat-connection.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";

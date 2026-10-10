@@ -1,4 +1,4 @@
-import type { ChatViewSnapshot, PiSessionHandle } from "@pippin/domain";
+import type { ChatViewSnapshot, PiSessionHandle } from "@aeon/domain";
 export function boundedChatEntries(all: ChatViewSnapshot["entries"]): {
   entries: ChatViewSnapshot["entries"];
   omittedEntryCount: number;

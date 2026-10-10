@@ -5,7 +5,7 @@ import {
   type OpenPiSessionInput,
   type PiSessionReference,
   PiSessionUnavailableError,
-} from "@pippin/domain";
+} from "@aeon/domain";
 
 export function resolvePiSessionManager(
   input: OpenPiSessionInput,

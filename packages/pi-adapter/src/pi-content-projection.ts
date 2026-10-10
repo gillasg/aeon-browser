@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { type PiContentBlock, type PiJsonValue } from "@pippin/domain";
+import { type PiContentBlock, type PiJsonValue } from "@aeon/domain";
 import { compactBrowserResult } from "./browser-result-projection.js";
 
 const MAX_TEXT_CHARS = 24_000;

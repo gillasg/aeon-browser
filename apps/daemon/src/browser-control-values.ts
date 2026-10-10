@@ -1,5 +1,5 @@
 import { WebSocket } from "ws";
-import type { BrowserExecutorResult, BrowserStep, BrowserTargetKey } from "@pippin/protocol";
+import type { BrowserExecutorResult, BrowserStep, BrowserTargetKey } from "@aeon/protocol";
 import type { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 
 export function listBrowserTabs(

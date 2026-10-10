@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setImmediate } from "node:timers";
-import { DaemonUiRequestSchema } from "@pippin/protocol";
+import { DaemonUiRequestSchema } from "@aeon/protocol";
 import { createAndSubmitChat } from "../dist/chat-first-submit.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openChatStore } from "@pippin/store";
+import { openChatStore } from "@aeon/store";
 import { ChatService } from "../dist/chat-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 

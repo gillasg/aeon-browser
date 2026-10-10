@@ -5,9 +5,9 @@ import type {
   ChatId,
   McpCapability,
   PiMcpServerStatus,
-  PippinProductStore,
-} from "@pippin/domain";
-import type { CapabilityToolHost } from "@pippin/pi-adapter";
+  AeonProductStore,
+} from "@aeon/domain";
+import type { CapabilityToolHost } from "@aeon/pi-adapter";
 import type { CapabilityRegistry } from "./capability-registry.js";
 import { verifyCliCapability } from "./capability-verification.js";
 import { parseCapability } from "./capability-parsing.js";
@@ -32,7 +32,7 @@ export class CapabilityToolService implements CapabilityToolHost {
     private readonly registry: CapabilityRegistry,
     private readonly mcpMigration: PiMcpConfigMigration,
     private readonly piMcp: PiMcpSessionHost,
-    private readonly store: PippinProductStore,
+    private readonly store: AeonProductStore,
     private readonly routines: RoutineScheduler,
   ) {
     this.routineTools = new RoutineManagementTools(store, routines);

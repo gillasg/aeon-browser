@@ -8,7 +8,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
-const FIXTURE_PROVIDER = "pippin-local-fixture";
+const FIXTURE_PROVIDER = "aeon-local-fixture";
 const FIXTURE_MODEL = "read-only-stream";
 const FIXTURE_RESPONSES = 64;
 const DEFAULT_TOKENS_PER_SECOND = 35;
@@ -34,7 +34,7 @@ export async function createLocalFixtureModel(agentDirectory: string): Promise<{
   });
   const fixture = fauxProvider({
     provider: FIXTURE_PROVIDER,
-    api: "pippin-local-faux",
+    api: "aeon-local-faux",
     models: [
       {
         id: FIXTURE_MODEL,
@@ -67,11 +67,11 @@ export async function createLocalFixtureModel(agentDirectory: string): Promise<{
 }
 
 function fixtureTokensPerSecond(): number {
-  const configured = Number(process.env.PIPPIN_FIXTURE_TOKENS_PER_SECOND);
-  const value = process.env.PIPPIN_FIXTURE_TOKENS_PER_SECOND
-    ? configured
-    : DEFAULT_TOKENS_PER_SECOND;
+  const raw =
+    process.env.AEON_FIXTURE_TOKENS_PER_SECOND ?? process.env.PIPPIN_FIXTURE_TOKENS_PER_SECOND;
+  const configured = Number(raw);
+  const value = raw ? configured : DEFAULT_TOKENS_PER_SECOND;
   if (!Number.isFinite(value) || value < 1 || value > 100)
-    throw new Error("PIPPIN_FIXTURE_TOKENS_PER_SECOND must be between 1 and 100.");
+    throw new Error("AEON_FIXTURE_TOKENS_PER_SECOND must be between 1 and 100.");
   return value;
 }

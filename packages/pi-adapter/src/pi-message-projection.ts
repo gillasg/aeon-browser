@@ -1,5 +1,5 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { PiMessageProjection } from "@pippin/domain";
+import type { PiMessageProjection } from "@aeon/domain";
 import { projectContent, resultText, safeJsonObject } from "./pi-content-projection.js";
 import {
   browserContextFromDetails,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
-import { BrowserInventoryFullSchema, BrowserOperationResultSchema } from "@pippin/protocol";
+import { BrowserInventoryFullSchema, BrowserOperationResultSchema } from "@aeon/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import { BrowserControlService } from "../dist/browser-control-service.js";
 import { BrowserInventoryRegistry } from "../dist/browser-inventory-registry.js";

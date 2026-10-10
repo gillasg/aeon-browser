@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { McpCapability } from "@pippin/domain";
+import type { McpCapability } from "@aeon/domain";
 
 export type PiMcpServerConfig =
   | {

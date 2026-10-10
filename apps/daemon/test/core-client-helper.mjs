@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
-import { CoreDiscoverySchema, SUPPORTED_PROTOCOL_VERSION } from "@pippin/protocol";
+import { CoreDiscoverySchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 
 export async function connectCore(directory, surface = "development") {
   const discovery = CoreDiscoverySchema.parse(

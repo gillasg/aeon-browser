@@ -118,7 +118,7 @@ test("Pi MCP migration registers one dynamic bridge for explicitly registered CL
     ...paths.input,
     cliBridge: {
       command: "C:/runtime/node.exe",
-      scriptPath: "C:/pippin/cli-mcp-bridge.js",
+      scriptPath: "C:/aeon/cli-mcp-bridge.js",
       registryPath: paths.registryPath,
     },
   });
@@ -144,8 +144,8 @@ test("Pi MCP migration registers one dynamic bridge for explicitly registered CL
   assert.deepEqual(configured.mcpServers.pippin_cli, {
     type: "stdio",
     command: "C:/runtime/node.exe",
-    args: ["C:/pippin/cli-mcp-bridge.js", "--registry", paths.registryPath],
-    cwd: "C:\\pippin",
+    args: ["C:/aeon/cli-mcp-bridge.js", "--registry", paths.registryPath],
+    cwd: "C:\\aeon",
     enabled: true,
     exposure: "codemode",
   });
@@ -170,9 +170,9 @@ test("Pi MCP migration rejects a server-name collision without changing the sour
 });
 
 async function makePaths(t) {
-  const root = await mkdtemp(join(tmpdir(), "pippin-mcp-migration-"));
+  const root = await mkdtemp(join(tmpdir(), "aeon-mcp-migration-"));
   const piAgentDirectory = join(root, "pi-agent");
-  const dataDirectory = join(root, "pippin-data");
+  const dataDirectory = join(root, "aeon-data");
   await Promise.all([
     mkdir(piAgentDirectory, { recursive: true }),
     mkdir(dataDirectory, { recursive: true }),
@@ -187,7 +187,7 @@ async function makePaths(t) {
       dataDirectory,
       legacyRegistryPath: join(dataDirectory, "capabilities.json"),
       piAgentDirectory,
-      defaultWorkingDirectory: "C:/pippin",
+      defaultWorkingDirectory: "C:/aeon",
     },
   };
 }
@@ -257,7 +257,7 @@ async function verifyPiMcpConfigMigrationCase1Stage2(
     type: "stdio",
     command: "docs-mcp",
     args: ["--read-only"],
-    cwd: "C:\\pippin",
+    cwd: "C:\\aeon",
     env: { DOCS_TOKEN: "${DOCS_TOKEN}" },
     enabled: true,
     exposure: "codemode",

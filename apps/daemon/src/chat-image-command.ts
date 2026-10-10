@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { asChatId } from "@pippin/domain";
-import { encodeImageAsset, ImageAssetHeaderSchema, type DaemonUiRequest } from "@pippin/protocol";
+import { asChatId } from "@aeon/domain";
+import { encodeImageAsset, ImageAssetHeaderSchema, type DaemonUiRequest } from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 export async function sendChatImage(

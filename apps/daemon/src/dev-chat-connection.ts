@@ -1,8 +1,4 @@
-import {
-  DaemonUiRequestSchema,
-  type BrowserTargetKey,
-  type DaemonUiRequest,
-} from "@pippin/protocol";
+import { DaemonUiRequestSchema, type BrowserTargetKey, type DaemonUiRequest } from "@aeon/protocol";
 import { WebSocket, type RawData } from "ws";
 import { ChatService } from "./chat-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";

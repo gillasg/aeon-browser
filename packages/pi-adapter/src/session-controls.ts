@@ -6,7 +6,7 @@ import {
   type Api,
   type Model,
 } from "@earendil-works/pi-ai";
-import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@pippin/domain";
+import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@aeon/domain";
 import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
 

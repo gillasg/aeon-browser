@@ -6,7 +6,7 @@ import test from "node:test";
 import { McpClientManager } from "../dist/mcp-client-manager.js";
 
 test("MCP stdio discovery validates and invokes a tool over the pinned client", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-mcp-smoke-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-mcp-smoke-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const serverPath = join(directory, "server.mjs");
   await writeFile(

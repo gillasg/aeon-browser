@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import type {
   PiRoutineRunEvidence,
   PiSessionHandle,
-  PippinProductStore,
+  AeonProductStore,
   RoutineRunRecord,
   RoutineRunState,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
@@ -20,7 +20,7 @@ export class RoutineScheduler {
   private readonly subscriptions = new Map<string, () => void>();
 
   constructor(
-    private readonly store: PippinProductStore,
+    private readonly store: AeonProductStore,
     private readonly chats: ChatService,
     private readonly browser: BrowserControlService,
   ) {}

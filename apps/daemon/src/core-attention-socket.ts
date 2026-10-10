@@ -1,4 +1,4 @@
-import { CoreAttentionRequestSchema } from "@pippin/protocol";
+import { CoreAttentionRequestSchema } from "@aeon/protocol";
 import { WebSocket } from "ws";
 import type { CoreAttention } from "./core-attention.js";
 

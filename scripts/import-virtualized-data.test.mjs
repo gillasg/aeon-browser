@@ -16,7 +16,9 @@ test("redirected data import is additive and idempotent and preserves existing w
   try {
     for (const directory of [source, target]) {
       mkdirSync(join(directory, "workspaces"), { recursive: true });
-      const database = new Database(join(directory, "pippin.sqlite"));
+      const database = new Database(
+        join(directory, directory === source ? "pippin.sqlite" : "aeon.sqlite"),
+      );
       database.exec(
         "CREATE TABLE chats(id TEXT PRIMARY KEY, value TEXT); INSERT INTO chats VALUES ('shared','original');",
       );
@@ -38,7 +40,7 @@ test("redirected data import is additive and idempotent and preserves existing w
       );
       assert.equal(result.status, 0, result.stderr);
     }
-    const database = new Database(join(target, "pippin.sqlite"));
+    const database = new Database(join(target, "aeon.sqlite"));
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM chats").get().count, 3);
     database.close();
     assert.equal(readFileSync(join(target, "workspaces", "shared.txt"), "utf8"), "existing");

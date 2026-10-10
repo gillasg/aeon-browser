@@ -1,5 +1,5 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { type PiTranscriptMatch, type PiSessionReference } from "@pippin/domain";
+import { type PiTranscriptMatch, type PiSessionReference } from "@aeon/domain";
 import { assertOwnedSessionPath } from "./session-resolver.js";
 
 export function searchTranscript(

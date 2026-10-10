@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 const { WebSocket } = createRequire(new URL("../apps/daemon/package.json", import.meta.url))("ws");
-const root = join(process.env.LOCALAPPDATA ?? "", "Pippin", "Slice3Dev");
+const root = join(process.env.LOCALAPPDATA ?? "", "Aeon");
 const config = JSON.parse(await readFile(join(root, "host-config.json"), "utf8"));
 const origin = "chrome-extension://" + config.extensionId;
 const identity = { clientInstanceId: randomUUID(), browserRunId: randomUUID() };
@@ -13,7 +13,7 @@ const sockets = [];
 
 function bootstrap() {
   return new Promise((resolve, reject) => {
-    const child = spawn(join(root, "pippin-native-host.exe"), [origin + "/"], {
+    const child = spawn(join(root, "aeon-native-host.exe"), [origin + "/"], {
       windowsHide: true,
       stdio: ["pipe", "pipe", "ignore"],
     });

@@ -1,17 +1,17 @@
 param([ValidateSet('Install', 'Remove', 'Validate')][string]$Mode = 'Install')
 $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Validate
-$appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Pippin\Slice3Dev'))
+$appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Aeon'))
 $startupScript = Join-Path $appRoot 'start-daemon.ps1'
-$hostExecutable = Join-Path $appRoot 'pippin-native-host.exe'
+$hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
 $runKeyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
-$runName = 'PippinDaemon'
+$runName = 'AeonDaemon'
 $powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $command = '"' + $powershellPath + '" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $startupScript + '"'
 $scriptContent = @'
-# Pippin-owned daemon login launcher.
+# Aeon-owned daemon login launcher.
 $ErrorActionPreference = 'Stop'
-$hostExecutable = Join-Path $PSScriptRoot 'pippin-native-host.exe'
+$hostExecutable = Join-Path $PSScriptRoot 'aeon-native-host.exe'
 if (Test-Path -LiteralPath $hostExecutable -PathType Leaf) {
     Start-Process -FilePath $hostExecutable -ArgumentList '--daemon-supervisor' -WindowStyle Hidden
 }

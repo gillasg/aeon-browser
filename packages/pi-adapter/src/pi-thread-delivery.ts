@@ -5,7 +5,7 @@ import type {
   PiThreadDeliveryEvidence,
   PiThreadMessageAcceptance,
   PiThreadMessageInput,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import {
   findMessageEntry,
   findReceipt,

@@ -21,7 +21,7 @@ internal sealed class HostConfiguration
         {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Pippin", "Slice3Dev", "host-config.json");
+                "Aeon", "host-config.json");
         }
     }
 
@@ -79,21 +79,21 @@ internal sealed class HostConfiguration
         NodeExecutable = ExistingFile(NodeExecutable);
         DaemonEntrypoint = ExistingFile(DaemonEntrypoint);
         var localAppData = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
-        var appDataRoot = Path.GetFullPath(Path.Combine(localAppData, "Pippin")) + Path.DirectorySeparatorChar;
+        var appDataRoot = Path.GetFullPath(Path.Combine(localAppData, "Aeon")) + Path.DirectorySeparatorChar;
         DataDirectory = Path.GetFullPath(DataDirectory);
         if (!DataDirectory.StartsWith(appDataRoot, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Daemon data must live under the user-local Pippin data directory.");
+            throw new InvalidDataException("Daemon data must live under the user-local Aeon data directory.");
         Directory.CreateDirectory(DataDirectory);
     }
 
     public static string PipeName()
     {
-        return "pippin-bootstrap-" + UserHash();
+        return "aeon-bootstrap-" + UserHash();
     }
 
     public static string MutexName()
     {
-        return "Global\\Pippin-Daemon-" + UserHash();
+        return "Global\\Aeon-Daemon-" + UserHash();
     }
 
     public static SecurityIdentifier CurrentUserSid()

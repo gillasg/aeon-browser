@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ChatService, closeProjectServices } from "./chat-service-fixture.mjs";
-import { openChatStore } from "@pippin/store";
+import { openChatStore } from "@aeon/store";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 test("first prompt titles a thread even after initial model selection activates Pi", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-initial-title-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-initial-title-"));
   const store = openChatStore(directory);
   try {
     const pi = new FakePiPort();

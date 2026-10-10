@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, writeFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { once } from "node:events";
-import { CoreHelloSchema, SUPPORTED_PROTOCOL_VERSION } from "@pippin/protocol";
+import { CoreHelloSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";

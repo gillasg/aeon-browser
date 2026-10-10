@@ -131,7 +131,7 @@ for await (const line of input) {
 }
 
 async function prepareNativeMcpIntegrationCase1Stage1() {
-  const root = await mkdtemp(join(tmpdir(), "pippin-native-mcp-"));
+  const root = await mkdtemp(join(tmpdir(), "aeon-native-mcp-"));
   const workingDirectory = join(root, "project");
   const agentDirectory = join(root, "pi-agent");
   const sessionDirectory = join(root, "sessions");
@@ -182,7 +182,7 @@ async function verifyNativeMcpIntegrationCase1Stage2(
               command: process.execPath,
               args: [serverPath],
               cwd: workingDirectory,
-              env: { PIPPIN_MCP_PID_FILE: pidFile },
+              env: { AEON_MCP_PID_FILE: pidFile },
               enabled: true,
               exposure: "codemode",
             },

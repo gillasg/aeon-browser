@@ -1,5 +1,5 @@
 import type { McpServerStatus } from "@earendil-works/pi-coding-agent";
-import type { PiMcpServerStatus, PiSessionHandle } from "@pippin/domain";
+import type { PiMcpServerStatus, PiSessionHandle } from "@aeon/domain";
 export function projectMcpStatuses(servers: readonly McpServerStatus[]): PiMcpServerStatus[] {
   return servers.slice(0, 100).flatMap((server) => {
     const validState =

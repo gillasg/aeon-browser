@@ -1,5 +1,5 @@
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import type { PiMcpServerStatus } from "@pippin/domain";
+import type { PiMcpServerStatus } from "@aeon/domain";
 import { createPiResourceLoader, enablePiNativeDefaultTools } from "./sdk-resources.js";
 import { projectMcpStatuses } from "./session-mcp-status.js";
 import { startupTiming } from "./startup-timing.js";

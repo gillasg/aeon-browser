@@ -29,7 +29,7 @@ const EndpointSchema = z
   .refine((value) => {
     try {
       const endpoint = new URL(value);
-      const rawPort = /^ws:\/\/127\.0\.0\.1:([1-9]\d{0,4})\/pippin\/v1$/.exec(value)?.[1];
+      const rawPort = /^ws:\/\/127\.0\.0\.1:([1-9]\d{0,4})\/aeon\/v1$/.exec(value)?.[1];
       return (
         endpoint.protocol === "ws:" &&
         endpoint.hostname === "127.0.0.1" &&
@@ -37,7 +37,7 @@ const EndpointSchema = z
         endpoint.password === "" &&
         rawPort !== undefined &&
         Number(rawPort) <= 65535 &&
-        endpoint.pathname === "/pippin/v1" &&
+        endpoint.pathname === "/aeon/v1" &&
         !endpoint.search &&
         !endpoint.hash
       );

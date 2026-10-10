@@ -1,4 +1,4 @@
-import type { PiSessionHandle } from "@pippin/domain";
+import type { PiSessionHandle } from "@aeon/domain";
 export interface InitialPromptSelection {
   model: { provider: string; id: string };
   thinkingLevel: string;

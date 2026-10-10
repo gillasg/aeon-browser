@@ -1,4 +1,4 @@
-import type { RoutineSchedule } from "@pippin/domain";
+import type { RoutineSchedule } from "@aeon/domain";
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 const MAX_INTERVAL_MINUTES = 525_600;

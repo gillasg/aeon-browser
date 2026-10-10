@@ -2,7 +2,7 @@ import type {
   CapabilityDefinition,
   CapabilityRegistryFile,
   CapabilityVerification,
-} from "@pippin/domain";
+} from "@aeon/domain";
 
 export const REGISTRY_SCHEMA_VERSION = 1;
 export const MAX_CAPABILITIES = 100;

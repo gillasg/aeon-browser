@@ -19,7 +19,7 @@ test(
   () => {
     const compiler = compilerCandidates.find(existsSync);
     assert.ok(compiler, "the .NET Framework csc.exe used by the native host build is available");
-    const directory = mkdtempSync(join(tmpdir(), "pippin-output-reader-"));
+    const directory = mkdtempSync(join(tmpdir(), "aeon-output-reader-"));
     try {
       const executable = join(directory, "probe.exe");
       const compile = spawnSync(

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ChatId, PippinProductStore, RoutineRecord } from "@pippin/domain";
+import type { ChatId, AeonProductStore, RoutineRecord } from "@aeon/domain";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 import type { RoutineScheduler } from "./routine-scheduler.js";
 
@@ -18,7 +18,7 @@ export function isRoutineTool(name: string): boolean {
 
 export class RoutineManagementTools {
   constructor(
-    private readonly store: PippinProductStore,
+    private readonly store: AeonProductStore,
     private readonly routines: RoutineScheduler,
   ) {}
 

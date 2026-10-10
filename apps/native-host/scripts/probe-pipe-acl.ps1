@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
-$hostExecutable = Join-Path $repoRoot 'apps\native-host\dist\pippin-native-host.exe'
+$hostExecutable = Join-Path $repoRoot 'apps\native-host\dist\aeon-native-host.exe'
 if (-not (Test-Path -LiteralPath $hostExecutable -PathType Leaf)) { throw 'Build the native host first with pnpm build.' }
 $sddl = (& $hostExecutable --inspect-pipe-acl | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) { throw "Native host pipe ACL probe failed with exit $LASTEXITCODE." }

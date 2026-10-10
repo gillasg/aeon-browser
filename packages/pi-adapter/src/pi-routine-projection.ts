@@ -1,4 +1,4 @@
-import type { PiMessageProjection } from "@pippin/domain";
+import type { PiMessageProjection } from "@aeon/domain";
 import { isRecord, stringProperty } from "./pi-thread-delivery-evidence.js";
 
 export const PI_ROUTINE_INVOCATION_TYPE = "pippin.routine-invocation.v1";

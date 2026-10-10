@@ -1,4 +1,4 @@
-import type { PiBrowserContextRecord } from "@pippin/domain";
+import type { PiBrowserContextRecord } from "@aeon/domain";
 
 export const PI_BROWSER_CONTEXT_CUSTOM_TYPE = "pippin.browser-context.v1";
 

@@ -1,4 +1,4 @@
-import type { ChatId, ChatStore, PiSessionHandle } from "@pippin/domain";
+import type { ChatId, ChatStore, PiSessionHandle } from "@aeon/domain";
 import type { ChatCommandGate } from "./chat-command-gate.js";
 export async function deleteStoredChat(
   store: ChatStore,

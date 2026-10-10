@@ -1,11 +1,11 @@
 import type Database from "better-sqlite3";
-import type { ChatId } from "@pippin/domain";
+import type { ChatId } from "@aeon/domain";
 import type {
   ClaimRoutineSlotsInput,
   RoutineRecord,
   RoutineRunPatch,
   RoutineRunRecord,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import {
   mayAdvance,
   toRoutine,

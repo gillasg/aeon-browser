@@ -1,5 +1,5 @@
 import type { WebSocket } from "ws";
-import type { DaemonUiResponse } from "@pippin/protocol";
+import type { DaemonUiResponse } from "@aeon/protocol";
 import type { ReadCommandRequest } from "./dev-chat-command-types.js";
 import { sendDevChatMessage } from "./dev-chat-send.js";
 export function completeCommand(

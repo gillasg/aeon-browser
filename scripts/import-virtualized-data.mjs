@@ -7,9 +7,13 @@ const [source, destination] = process.argv.slice(2).map((path) => resolve(path))
 if (!source || !destination || source === destination) throw Error("Invalid import directories");
 const backup = join(destination, "repair-backups", new Date().toISOString().replaceAll(":", "-"));
 await mkdir(backup, { recursive: true });
-for (const name of ["pippin.sqlite", "aeon-site-scripts.sqlite"]) {
-  const origin = join(source, name),
-    target = join(destination, name);
+for (const [name, legacyName] of [
+  ["aeon.sqlite", "pippin.sqlite"],
+  ["aeon-site-scripts.sqlite", "aeon-site-scripts.sqlite"],
+]) {
+  const target = join(destination, name);
+  let origin = join(source, name);
+  if (!(await exists(origin))) origin = join(source, legacyName);
   if (!(await exists(origin))) continue;
   const database = new Database(target);
   try {

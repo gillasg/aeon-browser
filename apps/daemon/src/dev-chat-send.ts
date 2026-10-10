@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { DaemonUiResponseSchema, type DaemonUiResponse } from "@pippin/protocol";
+import { DaemonUiResponseSchema, type DaemonUiResponse } from "@aeon/protocol";
 import { WebSocket } from "ws";
 
 const MAX_OUTBOUND_BYTES = 1_000_000;

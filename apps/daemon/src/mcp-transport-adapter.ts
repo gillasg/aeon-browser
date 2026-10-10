@@ -1,6 +1,6 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import type { McpCapability } from "@pippin/domain";
+import type { McpCapability } from "@aeon/domain";
 
 export type McpTransport = StdioClientTransport | StreamableHTTPClientTransport;
 

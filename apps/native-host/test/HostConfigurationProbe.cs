@@ -14,7 +14,7 @@ internal static class HostConfigurationProbe
         File.WriteAllText(executable, "fixture");
         File.WriteAllText(entry, "fixture");
         var data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Pippin", "configuration-probe-" + Guid.NewGuid().ToString("N"));
+            "Aeon", "configuration-probe-" + Guid.NewGuid().ToString("N"));
         try
         {
             var json = new JavaScriptSerializer().Serialize(new Dictionary<string, object> {

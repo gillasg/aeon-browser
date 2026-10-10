@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { ProjectRecord } from "@pippin/domain";
+import type { ProjectRecord } from "@aeon/domain";
 export class SqliteProjectStore {
   private readonly database: Database.Database;
   constructor(directory: string) {

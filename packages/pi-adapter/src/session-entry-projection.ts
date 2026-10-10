@@ -1,5 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { PiEntryCategory, PiEntryProjection, PiMessageProjection } from "@pippin/domain";
+import type { PiEntryCategory, PiEntryProjection, PiMessageProjection } from "@aeon/domain";
 import { projectRoutineSettlement, PI_ROUTINE_SETTLEMENT_TYPE } from "./pi-routine.js";
 import { projectCustomMessage, projectMessage } from "./pi-message-projection.js";
 

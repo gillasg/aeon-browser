@@ -8,7 +8,7 @@ import type {
   PiSlashCommand,
   PiTreeEntry,
   PiTreeNavigationResult,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { toEntryProjection } from "./session-entry-projection.js";
 

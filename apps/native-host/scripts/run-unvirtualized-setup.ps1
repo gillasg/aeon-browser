@@ -26,8 +26,8 @@ $taskArgs = '-Unvirtualized -NodeExecutable ' + (Quote-SetupLiteral $NodeExecuta
 if ($BrowserRoot) { $taskArgs += ' -BrowserRoot ' + (Quote-SetupLiteral $BrowserRoot) }
 if ($Update) { $taskArgs += ' -Update' }
 if ($env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY) {
-    $redirectedData = Join-Path $env:LOCALAPPDATA ('Packages/' + $env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY + '/LocalCache/Local/Pippin/Slice3Dev/data')
-    if (Test-Path -LiteralPath (Join-Path $redirectedData 'pippin.sqlite')) {
+    $redirectedData = Join-Path $env:LOCALAPPDATA ('Packages/' + $env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY + '/LocalCache/Local/Aeon/data')
+    if (Test-Path -LiteralPath (Join-Path $redirectedData 'aeon.sqlite')) {
         $taskArgs += ' -ImportDataFrom ' + (Quote-SetupLiteral $redirectedData)
     }
 }

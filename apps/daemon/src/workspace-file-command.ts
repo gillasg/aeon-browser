@@ -1,8 +1,8 @@
 import { readGitBase } from "./workspace-git-base.js";
 import { open, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, extname } from "node:path";
-import { asChatId } from "@pippin/domain";
-import type { DaemonUiRequest } from "@pippin/protocol";
+import { asChatId } from "@aeon/domain";
+import type { DaemonUiRequest } from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import { completeCommand } from "./chat-command-complete.js";

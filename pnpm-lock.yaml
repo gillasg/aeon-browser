@@ -31,16 +31,16 @@ importers:
       "@modelcontextprotocol/client":
         specifier: 2.2.0
         version: 2.2.0
-      "@pippin/domain":
+      "@aeon/domain":
         specifier: workspace:*
         version: link:../../packages/domain
-      "@pippin/pi-adapter":
+      "@aeon/pi-adapter":
         specifier: workspace:*
         version: link:../../packages/pi-adapter
-      "@pippin/protocol":
+      "@aeon/protocol":
         specifier: workspace:*
         version: link:../../packages/protocol
-      "@pippin/store":
+      "@aeon/store":
         specifier: workspace:*
         version: link:../../packages/store
       ws:
@@ -66,10 +66,10 @@ importers:
       "@earendil-works/pi-coding-agent":
         specifier: 0.99.1
         version: 0.99.1(patch_hash=a3979a9588f0bb1a44a95317f65047a8cf34019aae059dddf7f44616f06e46fb)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5)
-      "@pippin/domain":
+      "@aeon/domain":
         specifier: workspace:*
         version: link:../domain
-      "@pippin/protocol":
+      "@aeon/protocol":
         specifier: workspace:*
         version: link:../protocol
       typebox:
@@ -84,7 +84,7 @@ importers:
 
   packages/store:
     dependencies:
-      "@pippin/domain":
+      "@aeon/domain":
         specifier: workspace:*
         version: link:../domain
       better-sqlite3:

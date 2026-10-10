@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openChatStore } from "@pippin/store";
+import { openChatStore } from "@aeon/store";
 import { ChatService } from "../dist/chat-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 

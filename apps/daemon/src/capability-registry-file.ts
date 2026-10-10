@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, open, rename, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { CapabilityRegistryFile } from "@pippin/domain";
+import type { CapabilityRegistryFile } from "@aeon/domain";
 
 export async function atomicWrite(path: string, registry: CapabilityRegistryFile): Promise<void> {
   await mkdir(dirname(path), { recursive: true });

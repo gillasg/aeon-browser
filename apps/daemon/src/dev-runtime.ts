@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { ChatService } from "./chat-service.js";
-import { PiSdkSessionAdapter } from "@pippin/pi-adapter";
-import { openChatStore } from "@pippin/store";
+import { PiSdkSessionAdapter } from "@aeon/pi-adapter";
+import { openChatStore } from "@aeon/store";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
 
 export function createLocalFixtureRuntime(dataDirectory: string): {

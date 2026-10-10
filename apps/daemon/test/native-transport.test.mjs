@@ -9,7 +9,7 @@ import {
   NativeSupervisorBootstrapEnvelopeSchema,
   PageGrantIssueRequestSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { WebSocket } from "ws";
 import { startNativeTransport } from "../dist/native-transport.js";
 

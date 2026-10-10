@@ -1,5 +1,5 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { PiSessionHandle } from "@pippin/domain";
+import type { PiSessionHandle } from "@aeon/domain";
 type Input = Parameters<NonNullable<PiSessionHandle["editQueue"]>>[0];
 export function editSessionQueue(session: AgentSession, input: Input): void {
   const steering = [...session.getSteeringMessages()];

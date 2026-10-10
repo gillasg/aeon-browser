@@ -7,9 +7,9 @@ import Database from "better-sqlite3";
 import { migrate, STORE_SCHEMA_VERSION } from "../dist/migrations.js";
 
 test("schema 3 fork intents migrate without losing rows and allow terminal failures", async (t) => {
-  const root = resolve(await mkdtemp(join(tmpdir(), "pippin-fork-migration-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-fork-migration-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
-  const database = new Database(join(root, "pippin.sqlite"));
+  const database = new Database(join(root, "aeon.sqlite"));
   database.pragma("foreign_keys = ON");
   t.after(() => database.close());
   t.after(() => rm(root, { recursive: true, force: true }));

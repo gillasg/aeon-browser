@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { asChatId, type CapabilityAuditRecord } from "@pippin/domain";
+import { asChatId, type CapabilityAuditRecord } from "@aeon/domain";
 
 interface AuditRow {
   registry_revision: number;

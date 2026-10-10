@@ -15,8 +15,8 @@ import {
   type ThreadForkIntent,
   type CreateThreadDeliveryInput,
   type CreateThreadForkInput,
-  type PippinProductStore,
-} from "@pippin/domain";
+  type AeonProductStore,
+} from "@aeon/domain";
 import { type ChatRow, toChatRecord } from "./chat-row.js";
 import { migrate } from "./migrations.js";
 import { SqliteThreadStore } from "./sqlite-thread-store.js";
@@ -25,10 +25,10 @@ import { SqliteProductStore } from "./sqlite-product-store.js";
 
 export function openChatStore(
   dataDirectory: string,
-): ChatStore & ThreadCoordinationStore & PippinProductStore {
+): ChatStore & ThreadCoordinationStore & AeonProductStore {
   const appData = resolve(dataDirectory);
   mkdirSync(appData, { recursive: true });
-  const database = new Database(join(appData, "pippin.sqlite"));
+  const database = new Database(join(appData, "aeon.sqlite"));
   database.pragma("journal_mode = WAL");
   database.pragma("foreign_keys = ON");
   database.pragma("busy_timeout = 5000");

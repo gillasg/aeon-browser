@@ -1,5 +1,5 @@
 {
-  "name": "@pippin/daemon",
+  "name": "@aeon/daemon",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.2.0",
-    "@pippin/domain": "workspace:*",
-    "@pippin/pi-adapter": "workspace:*",
-    "@pippin/protocol": "workspace:*",
-    "@pippin/store": "workspace:*",
+    "@aeon/domain": "workspace:*",
+    "@aeon/pi-adapter": "workspace:*",
+    "@aeon/protocol": "workspace:*",
+    "@aeon/store": "workspace:*",
     "ws": "8.22.0"
   },
   "devDependencies": {

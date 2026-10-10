@@ -19,7 +19,7 @@ test("Pi CLI bridge reads explicit registrations and preserves argv boundaries",
 });
 
 async function prepareCliMcpBridgeCase1Stage1() {
-  const root = await mkdtemp(join(tmpdir(), "pippin-cli-bridge-"));
+  const root = await mkdtemp(join(tmpdir(), "aeon-cli-bridge-"));
   const registryPath = join(root, "capabilities.json");
   const fixturePath = join(root, "fixture-cli.mjs");
   const bridgePath = fileURLToPath(new URL("../dist/cli-mcp-bridge.js", import.meta.url));
@@ -95,7 +95,7 @@ async function verifyCliMcpBridgeCase1Stage3(child, responses) {
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     });
   const initialized = await request(1, "initialize", { protocolVersion: "2025-06-18" });
-  assert.equal(initialized.result.serverInfo.name, "pippin-cli");
+  assert.equal(initialized.result.serverInfo.name, "aeon-cli");
   child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
   const catalog = await request(2, "tools/call", {
     name: "cli_catalog",

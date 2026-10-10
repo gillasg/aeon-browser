@@ -1,4 +1,4 @@
-import { type ActivationId, type ChatId, type ChatRecord } from "@pippin/domain";
+import { type ActivationId, type ChatId, type ChatRecord } from "@aeon/domain";
 
 export interface ChatRow {
   chat_id: string;

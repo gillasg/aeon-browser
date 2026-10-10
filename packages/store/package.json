@@ -1,5 +1,5 @@
 {
-  "name": "@pippin/store",
+  "name": "@aeon/store",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
-    "@pippin/domain": "workspace:*",
+    "@aeon/domain": "workspace:*",
     "better-sqlite3": "13.0.3"
   },
   "devDependencies": {

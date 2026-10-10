@@ -1,5 +1,5 @@
-import { asChatId } from "@pippin/domain";
-import type { RoutineRecord, RoutineRunRecord } from "@pippin/domain";
+import { asChatId } from "@aeon/domain";
+import type { RoutineRecord, RoutineRunRecord } from "@aeon/domain";
 
 export interface RoutineRow {
   routine_id: string;

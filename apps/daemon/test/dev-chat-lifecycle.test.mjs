@@ -30,7 +30,7 @@ test("UI Chat streams Pi events, closes one view, and reopens the Pi snapshot", 
 });
 
 async function createEnvironment(t) {
-  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "pippin-dev-chat-")));
+  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "aeon-dev-chat-")));
   assert.ok(dataDirectory.startsWith(`${resolve(tmpdir())}${sep}`));
   const context = {
     dataDirectory,

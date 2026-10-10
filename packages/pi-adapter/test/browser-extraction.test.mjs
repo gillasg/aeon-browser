@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { BrowserCodeRuntime } from "../dist/browser-code-runtime.js";
 import { browserDocumentApi } from "../dist/browser-document-api.js";
-import { BrowserElementTargetSchema } from "@pippin/protocol";
+import { BrowserElementTargetSchema } from "@aeon/protocol";
 
 test("read-only inspection avoids observations while mutations still observe", async () => {
   const runtime = new BrowserCodeRuntime(),

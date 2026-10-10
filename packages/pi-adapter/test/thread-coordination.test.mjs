@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { asActivationId, asChatId } from "@pippin/domain";
+import { asActivationId, asChatId } from "@aeon/domain";
 import { PiSdkSessionAdapter } from "../dist/index.js";
 
 test("Pi creates an exact detached fork without changing the source branch", async (t) => {
@@ -95,7 +95,7 @@ test("thread delivery uses Pi custom entries and exact turn settlement receipts"
 });
 
 async function makeSandbox() {
-  const root = resolve(await mkdtemp(join(tmpdir(), "pippin-thread-pi-test-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-thread-pi-test-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
   const paths = {
     root,

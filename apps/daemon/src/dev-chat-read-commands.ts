@@ -1,5 +1,5 @@
-import { asChatId } from "@pippin/domain";
-import { EffectivePiResourcesSchema, type DaemonUiResponse } from "@pippin/protocol";
+import { asChatId } from "@aeon/domain";
+import { EffectivePiResourcesSchema, type DaemonUiResponse } from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { CommandRequest } from "./dev-chat-command-types.js";

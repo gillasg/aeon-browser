@@ -4,7 +4,7 @@ import {
   type ChatStore,
   type ChatSummary,
   type PiSessionPort,
-} from "@pippin/domain";
+} from "@aeon/domain";
 
 export async function searchChats(
   store: ChatStore,

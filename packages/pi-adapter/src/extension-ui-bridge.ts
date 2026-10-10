@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import type { PiExtensionUiNotice, PiExtensionUiRequest, PiSessionEvent } from "@pippin/domain";
+import type { PiExtensionUiNotice, PiExtensionUiRequest, PiSessionEvent } from "@aeon/domain";
 
 type DialogValue = string | boolean | null;
 interface PendingDialog {

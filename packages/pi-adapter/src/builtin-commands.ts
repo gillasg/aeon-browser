@@ -1,4 +1,4 @@
-import type { PiSlashCommand } from "@pippin/domain";
+import type { PiSlashCommand } from "@aeon/domain";
 
 // Read the pinned Pi SDK's canonical catalog, which its root API does not export.
 const sdkEntry = import.meta.resolve("@earendil-works/pi-coding-agent");

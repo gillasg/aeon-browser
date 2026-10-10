@@ -5,7 +5,7 @@ import type {
   PiRoutineInvocation,
   PiRoutineRunEvidence,
   PiRoutineRunEvent,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import { PI_ROUTINE_INVOCATION_TYPE, PI_ROUTINE_SETTLEMENT_TYPE } from "./pi-routine-projection.js";
 import { isRecord, latestTurnFailed, stringProperty } from "./pi-thread-delivery-evidence.js";
 import { resultText } from "./pi-content-projection.js";

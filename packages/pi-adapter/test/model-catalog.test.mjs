@@ -6,7 +6,7 @@ import test from "node:test";
 import { PiSdkSessionAdapter } from "../dist/index.js";
 
 test("model catalog is sourced from Pi and reports model-specific effort support", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-model-catalog-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-model-catalog-"));
   const agentDirectory = join(directory, "agent");
   await mkdir(agentDirectory, { recursive: true });
   const adapter = new PiSdkSessionAdapter({
@@ -16,7 +16,7 @@ test("model catalog is sourced from Pi and reports model-specific effort support
   });
   try {
     const catalog = await adapter.getModelCatalog();
-    assert.equal(catalog.defaultModel?.provider, "pippin-local-fixture");
+    assert.equal(catalog.defaultModel?.provider, "aeon-local-fixture");
     assert.equal(catalog.defaultModel?.id, "read-only-stream");
     assert.deepEqual(catalog.models[0]?.thinkingLevels, ["off"]);
     assert.equal(catalog.models[0]?.defaultThinkingLevel, "off");

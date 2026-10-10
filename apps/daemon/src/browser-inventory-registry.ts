@@ -6,7 +6,7 @@ import {
   type BrowserTab,
   type BrowserTargetKey,
   type BrowserWindow,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 
 interface Snapshot {
   browserRunId: string;

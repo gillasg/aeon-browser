@@ -5,20 +5,20 @@ import ts from "typescript";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRules = new Map([
-  ["@pippin/protocol", []],
-  ["@pippin/domain", []],
-  ["@pippin/store", ["@pippin/domain"]],
-  ["@pippin/daemon", ["@pippin/protocol", "@pippin/domain", "@pippin/store", "@pippin/pi-adapter"]],
-  ["@pippin/pi-adapter", ["@pippin/domain", "@pippin/protocol"]],
-  ["@pippin/native-host", []],
+  ["@aeon/protocol", []],
+  ["@aeon/domain", []],
+  ["@aeon/store", ["@aeon/domain"]],
+  ["@aeon/daemon", ["@aeon/protocol", "@aeon/domain", "@aeon/store", "@aeon/pi-adapter"]],
+  ["@aeon/pi-adapter", ["@aeon/domain", "@aeon/protocol"]],
+  ["@aeon/native-host", []],
 ]);
 const packagePaths = new Map([
-  ["@pippin/protocol", "packages/protocol"],
-  ["@pippin/domain", "packages/domain"],
-  ["@pippin/store", "packages/store"],
-  ["@pippin/daemon", "apps/daemon"],
-  ["@pippin/pi-adapter", "packages/pi-adapter"],
-  ["@pippin/native-host", "apps/native-host"],
+  ["@aeon/protocol", "packages/protocol"],
+  ["@aeon/domain", "packages/domain"],
+  ["@aeon/store", "packages/store"],
+  ["@aeon/daemon", "apps/daemon"],
+  ["@aeon/pi-adapter", "packages/pi-adapter"],
+  ["@aeon/native-host", "apps/native-host"],
 ]);
 const violations = [];
 

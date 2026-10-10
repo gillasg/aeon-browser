@@ -5,7 +5,7 @@ import type {
   ChatStore,
   ChatSummary,
   PiSessionHandle,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import { titleFromPrompt, toChatSummary } from "./chat-projection.js";
 import type { ChatEventHub } from "./chat-event-hub.js";
 

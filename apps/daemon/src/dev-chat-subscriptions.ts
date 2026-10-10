@@ -1,4 +1,4 @@
-import { asChatId, PiSessionUnavailableError, type ChatId } from "@pippin/domain";
+import { asChatId, PiSessionUnavailableError, type ChatId } from "@aeon/domain";
 import {
   ChatCloseViewRequestSchema,
   ChatEventMessageSchema,
@@ -7,7 +7,7 @@ import {
   ChatSubscriptionFailedMessageSchema,
   ChatViewClosedMessageSchema,
   type DaemonUiRequest,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { WebSocket } from "ws";
 import { ChatService } from "./chat-service.js";
 import { type PublishedChatEvent } from "./chat-event-hub.js";

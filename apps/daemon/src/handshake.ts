@@ -6,7 +6,7 @@ import {
   SUPPORTED_PROTOCOL_VERSION,
   type HelloRejection,
   type ProtocolHandshakeMessage,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 
 export type HandshakeDecision =
   | { accepted: true; response: ProtocolHandshakeMessage }

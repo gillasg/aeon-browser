@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import type { PiSessionInput } from "@pippin/domain";
+import type { PiSessionInput } from "@aeon/domain";
 
 export function decodePiInput(input: PiSessionInput): {
   text: string;

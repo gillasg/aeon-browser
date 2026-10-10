@@ -6,7 +6,7 @@ import {
   type ModelThinkingLevel,
 } from "@earendil-works/pi-ai";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
-import type { PiModelCatalog, PiModelOption } from "@pippin/domain";
+import type { PiModelCatalog, PiModelOption } from "@aeon/domain";
 import { createLocalFixtureModel } from "./fixture-model.js";
 import { BackgroundCache } from "./background-cache.js";
 import { join } from "node:path";

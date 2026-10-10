@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
-import { asActivationId, asChatId } from "@pippin/domain";
+import { asActivationId, asChatId } from "@aeon/domain";
 import { openChatStore } from "../dist/index.js";
 
 test("draft metadata is durable without a transcript or Pi reference table", async (t) => {
@@ -31,7 +31,7 @@ test("draft metadata is durable without a transcript or Pi reference table", asy
   });
   store.close();
 
-  const reader = new Database(join(dataDirectory, "pippin.sqlite"), { readonly: true });
+  const reader = new Database(join(dataDirectory, "aeon.sqlite"), { readonly: true });
   const tables = reader.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
   assert.deepEqual(tables.map(({ name }) => name).sort(), [
     "capability_audit",
@@ -86,7 +86,7 @@ test("Chat title, pin, and archive metadata persist without adding transcript ta
   assert.equal(archived[0]?.title, "Model notes");
   assert.equal(archived[0]?.pinned, true);
   assert.equal(archived[0]?.archived, true);
-  const reader = new Database(join(dataDirectory, "pippin.sqlite"), { readonly: true });
+  const reader = new Database(join(dataDirectory, "aeon.sqlite"), { readonly: true });
   const tables = reader.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
   assert.deepEqual(tables.map(({ name }) => name).sort(), [
     "capability_audit",
@@ -180,7 +180,7 @@ test("thread creation and delivery intents are durable, idempotent, and body-fre
   store.updateThreadDelivery(delivery.deliveryId, { state: "submitting", attempt: 1 }, now);
   store.close();
 
-  const reader = new Database(join(dataDirectory, "pippin.sqlite"), { readonly: true });
+  const reader = new Database(join(dataDirectory, "aeon.sqlite"), { readonly: true });
   const columns = reader.prepare("PRAGMA table_info(thread_deliveries)").all();
   assert.equal(
     columns.some(({ name }) => name === "message"),
@@ -274,7 +274,7 @@ test("a known unsupported Pi fork is terminal and leaves its target as a draft",
 });
 
 async function makeTemp() {
-  const root = resolve(await mkdtemp(join(tmpdir(), "pippin-store-test-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-store-test-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
   return root;
 }

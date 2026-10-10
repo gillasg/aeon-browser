@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import type { PiSessionPort, PiDetachedForkEvidence } from "@pippin/domain";
+import type { PiSessionPort, PiDetachedForkEvidence } from "@aeon/domain";
 export function findDetachedFork(
   sessionDirectory: string,
   input: Parameters<PiSessionPort["findDetachedFork"]>[0],

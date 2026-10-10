@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
 import { ChatService, closeProjectServices } from "./chat-service-fixture.mjs";
-import { openChatStore } from "@pippin/store";
+import { openChatStore } from "@aeon/store";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 test("draft creation does not start Pi; first submit attaches one session", async (t) => {
@@ -155,7 +155,7 @@ test("reopening the daemon store resolves the same Pi reference", async (t) => {
 });
 
 async function makeTemp() {
-  const root = resolve(await mkdtemp(join(tmpdir(), "pippin-daemon-test-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-daemon-test-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
   return root;
 }

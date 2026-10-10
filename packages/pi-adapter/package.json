@@ -1,5 +1,5 @@
 {
-  "name": "@pippin/pi-adapter",
+  "name": "@aeon/pi-adapter",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,8 +16,8 @@
   "dependencies": {
     "@earendil-works/pi-ai": "0.99.1",
     "@earendil-works/pi-coding-agent": "0.99.1",
-    "@pippin/domain": "workspace:*",
-    "@pippin/protocol": "workspace:*",
+    "@aeon/domain": "workspace:*",
+    "@aeon/protocol": "workspace:*",
     "typebox": "1.3.27"
   }
 }

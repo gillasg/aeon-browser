@@ -2,8 +2,8 @@ import { rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CoreAttentionSnapshotSchema, type CoreAttentionRequest } from "@pippin/protocol";
-import type { ChatId, PiSessionEvent } from "@pippin/domain";
+import { CoreAttentionSnapshotSchema, type CoreAttentionRequest } from "@aeon/protocol";
+import type { ChatId, PiSessionEvent } from "@aeon/domain";
 import type { ChatService } from "./chat-service.js";
 
 interface AttentionRecord {

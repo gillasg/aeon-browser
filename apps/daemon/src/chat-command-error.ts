@@ -1,4 +1,4 @@
-import { PiSessionUnavailableError } from "@pippin/domain";
+import { PiSessionUnavailableError } from "@aeon/domain";
 import type { WebSocket } from "ws";
 import type { CommandRequest } from "./dev-chat-command-types.js";
 import { sendDevChatMessage } from "./dev-chat-send.js";

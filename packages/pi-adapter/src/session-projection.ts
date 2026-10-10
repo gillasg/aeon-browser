@@ -14,7 +14,7 @@ import {
   type PiSessionEventListener,
   type PiSessionHandle,
   type PiSessionReference,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import { resultText, safeJsonObject } from "./pi-content-projection.js";
 import { submitToPi, createSessionControls } from "./session-controls.js";
 import { createPiThreadDelivery } from "./pi-thread-delivery.js";
@@ -33,7 +33,7 @@ export function wrapPiSession(
   reference: PiSessionReference,
   chatId: ChatId,
   extensionUi: ExtensionUiBridge,
-  getMcpServers: () => readonly import("@pippin/domain").PiMcpServerStatus[],
+  getMcpServers: () => readonly import("@aeon/domain").PiMcpServerStatus[],
 ): PiSessionHandle {
   const threadDelivery = createPiThreadDelivery(session, manager);
   const routineSupport: PiRoutinePort = createPiRoutineSupport(session, manager, chatId);

@@ -1,4 +1,4 @@
-import type { ActivationId, ChatRecord, ChatSummary } from "@pippin/domain";
+import type { ActivationId, ChatRecord, ChatSummary } from "@aeon/domain";
 
 export function toChatSummary(chat: ChatRecord): ChatSummary {
   return {

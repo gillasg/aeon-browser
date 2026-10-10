@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import type { CapabilityRegistryFile, McpCapability } from "@pippin/domain";
+import type { CapabilityRegistryFile, McpCapability } from "@aeon/domain";
 import {
   mapMcpCapabilityToPi,
   mapRegisteredCliBridge,

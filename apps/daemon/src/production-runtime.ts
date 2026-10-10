@@ -3,8 +3,8 @@ import { installChatPreparation, prepareChat } from "./chat-preparation.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
-import { PiSdkSessionAdapter, resolvePiAgentDirectory } from "@pippin/pi-adapter";
-import { openChatStore } from "@pippin/store";
+import { PiSdkSessionAdapter, resolvePiAgentDirectory } from "@aeon/pi-adapter";
+import { openChatStore } from "@aeon/store";
 import { SiteScriptService } from "./site-script-service.js";
 import { BrowserControlService } from "./browser-control-service.js";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
@@ -13,6 +13,7 @@ import { RoutineScheduler } from "./routine-scheduler.js";
 import { CapabilityToolService } from "./capability-tool-service.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
+import { readEnvironment } from "./environment.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -80,7 +81,7 @@ async function readManagementSnapshot(
   service: ChatService,
   store: ReturnType<typeof openChatStore>,
   capabilityTools: CapabilityToolService,
-  selectedChatId?: import("@pippin/domain").ChatId,
+  selectedChatId?: import("@aeon/domain").ChatId,
 ): Promise<unknown> {
   let resources = null;
   let resourceError: string | null = null;
@@ -226,8 +227,11 @@ function createPiAdapter(
     sessionDirectory: join(dataRoot, "pi-sessions"),
     agentDirectory: piAgentDirectory,
     preferredInitialModel: {
-      provider: process.env.PIPPIN_INITIAL_MODEL_PROVIDER || "openai-codex",
-      id: process.env.PIPPIN_INITIAL_MODEL_ID || "gpt-6-luna",
+      provider:
+        process.env.AEON_INITIAL_MODEL_PROVIDER ||
+        process.env.PIPPIN_INITIAL_MODEL_PROVIDER ||
+        "openai-codex",
+      id: readEnvironment("INITIAL_MODEL_ID") || "gpt-6-luna",
     },
     browserTool: browserControl.execute.bind(browserControl),
   });

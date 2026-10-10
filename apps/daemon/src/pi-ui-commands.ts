@@ -1,11 +1,11 @@
-import { asChatId } from "@pippin/domain";
+import { asChatId } from "@aeon/domain";
 import {
   ChatSummarySchema,
   ChatViewSnapshotSchema,
   PiAttachmentSchema,
   PiUiSnapshotSchema,
   type DaemonUiResponse,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";

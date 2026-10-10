@@ -27,7 +27,7 @@ import {
   type ThreadForkIntent,
   type PiForkEntryCheck,
   PiSessionUnavailableError,
-} from "@pippin/domain";
+} from "@aeon/domain";
 import { ChatCommandGate } from "./chat-command-gate.js";
 import { ChatThreadSupport } from "./chat-thread-support.js";
 import { ChatMetadataService } from "./chat-metadata-service.js";
@@ -153,7 +153,7 @@ export class ChatService {
       cursor: this.eventHub.cursor(chatId),
     };
   }
-  getEffectiveResources(chatId: ChatId): Promise<import("@pippin/domain").EffectivePiResources> {
+  getEffectiveResources(chatId: ChatId): Promise<import("@aeon/domain").EffectivePiResources> {
     return readEffectiveResources(this, chatId);
   }
   async refreshViews(chatId: ChatId): Promise<Awaited<ReturnType<ChatService["getChatView"]>>> {

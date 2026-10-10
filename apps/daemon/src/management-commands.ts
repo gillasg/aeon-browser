@@ -1,9 +1,9 @@
-import { asChatId } from "@pippin/domain";
+import { asChatId } from "@aeon/domain";
 import {
   HomeManagementSnapshotSchema,
   ManagementSnapshotSchema,
   type DaemonUiResponse,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { CommandRequest, ManagementActionCommand } from "./dev-chat-command-types.js";

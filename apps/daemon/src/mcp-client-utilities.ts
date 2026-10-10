@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { fromJsonSchema, type Tool } from "@modelcontextprotocol/client";
-import type { McpCapability } from "@pippin/domain";
+import type { McpCapability } from "@aeon/domain";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_SERVER_TOOLS = 128;

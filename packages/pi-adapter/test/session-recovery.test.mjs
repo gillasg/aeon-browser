@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { SessionManager, VERSION } from "@earendil-works/pi-coding-agent";
-import { asActivationId, asChatId, PiSessionUnavailableError } from "@pippin/domain";
+import { asActivationId, asChatId, PiSessionUnavailableError } from "@aeon/domain";
 import { PiSdkSessionAdapter } from "../dist/index.js";
 
 test("pinned Pi creates one stable session and flushes it without provider access", async (t) => {
@@ -94,7 +94,7 @@ test("Pi's persisted reference reopens the same entries without a transcript mir
 test("local faux model streams through real Pi prompt and persists exact entry IDs", async (t) => {
   const fixture = await createFixturePromptSession(t);
   const controls = fixture.session.controls();
-  assert.equal(controls.effectiveModel?.provider, "pippin-local-fixture");
+  assert.equal(controls.effectiveModel?.provider, "aeon-local-fixture");
   assert.equal(controls.effectiveModel?.id, "read-only-stream");
   assert.ok(controls.availableModels.some(({ id }) => id === "read-only-stream"));
   assert.equal(controls.active, false);
@@ -295,7 +295,7 @@ function makeInput(paths) {
 }
 
 async function makeSandbox() {
-  const root = resolve(await mkdtemp(join(tmpdir(), "pippin-pi-test-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-pi-test-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
   const paths = {
     root,

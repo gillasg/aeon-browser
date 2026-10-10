@@ -14,4 +14,4 @@ export type {
   PiSessionReference,
   PiSessionSnapshot,
   PiSessionUnavailableError,
-} from "@pippin/domain";
+} from "@aeon/domain";

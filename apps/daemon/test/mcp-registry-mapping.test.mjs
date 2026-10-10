@@ -19,7 +19,7 @@ test("legacy stdio MCP records map to Pi config without materializing credential
       endpoint: null,
       workingDirectory: "relative/project",
     },
-    "C:/pippin",
+    "C:/aeon",
   );
 
   assert.deepEqual(mapped, {
@@ -28,7 +28,7 @@ test("legacy stdio MCP records map to Pi config without materializing credential
       type: "stdio",
       command: "docs-mcp",
       args: ["--read-only"],
-      cwd: "C:\\pippin\\relative\\project",
+      cwd: "C:\\aeon\\relative\\project",
       env: { DOCS_TOKEN: "${DOCS_TOKEN}" },
       enabled: true,
       exposure: "codemode",
@@ -64,7 +64,7 @@ function prepareMcpRegistryMappingCase1Stage1() {
       endpoint: "https://example.test/mcp",
       workingDirectory: null,
     },
-    "C:/pippin",
+    "C:/aeon",
   );
   assert.deepEqual(mapped.config, {
     type: "http",
@@ -92,7 +92,7 @@ function verifyMcpRegistryMappingCase1Stage2() {
       endpoint: "https://example.test/mcp",
       workingDirectory: null,
     },
-    "C:/pippin",
+    "C:/aeon",
   );
   assert.equal(external.config.enabled, false);
   assert.equal(external.warning, "manual-credential-binding-required");
@@ -116,7 +116,7 @@ function verifyMcpRegistryMappingCase1Stage3() {
       endpoint: "https://example.test/mcp",
       workingDirectory: null,
     },
-    "C:/pippin",
+    "C:/aeon",
   );
   assert.equal(externalConfigOnly.config.enabled, false);
   assert.equal(externalConfigOnly.warning, "manual-credential-binding-required");

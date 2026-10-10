@@ -70,7 +70,7 @@ internal static class DaemonSupervisor
             daemon.ErrorDataReceived += (sender, eventArgs) => SupervisorLog.Write(eventArgs.Data);
             daemon.BeginErrorReadLine();
             var ready = daemon.StandardOutput.ReadLineAsync();
-            if (!ready.Wait(TimeSpan.FromSeconds(60)) || ready.Result != "PIPPIN_DAEMON_READY")
+            if (!ready.Wait(TimeSpan.FromSeconds(60)) || ready.Result != "AEON_DAEMON_READY")
                 throw new TimeoutException("Daemon startup did not complete.");
             SupervisorLog.Write("Daemon ready, process " + daemon.Id);
             return ServePipe(config, daemon);
@@ -220,9 +220,9 @@ internal static class DaemonSupervisor
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        start.EnvironmentVariables["PIPPIN_NATIVE_DATA_DIR"] = config.DataDirectory;
-        start.EnvironmentVariables["PIPPIN_NATIVE_EXTENSION_ORIGIN"] = config.ExtensionOrigin;
-        start.EnvironmentVariables["PIPPIN_NATIVE_SUPERVISED"] = "1";
+        start.EnvironmentVariables["AEON_NATIVE_DATA_DIR"] = config.DataDirectory;
+        start.EnvironmentVariables["AEON_NATIVE_EXTENSION_ORIGIN"] = config.ExtensionOrigin;
+        start.EnvironmentVariables["AEON_NATIVE_SUPERVISED"] = "1";
         var process = Process.Start(start);
         if (process == null) throw new InvalidOperationException("The daemon process did not start.");
         return process;

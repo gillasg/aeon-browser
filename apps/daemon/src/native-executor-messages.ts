@@ -1,6 +1,6 @@
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
-import { asChatId } from "@pippin/domain";
+import { asChatId } from "@aeon/domain";
 import {
   BrowserExecutorHeartbeatReplySchema,
   BrowserExecutorHeartbeatSchema,
@@ -11,7 +11,7 @@ import {
   PageGrantIssueResponseSchema,
   SUPPORTED_PROTOCOL_VERSION,
   type PageGrantIssueRequest,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { WebSocket, type RawData } from "ws";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import { ChatService } from "./chat-service.js";

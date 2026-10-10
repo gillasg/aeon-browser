@@ -1,5 +1,5 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { OpenPiSessionInput, PiSessionHandle } from "@pippin/domain";
+import type { OpenPiSessionInput, PiSessionHandle } from "@aeon/domain";
 export function verifyCachedHandle(
   handle: PiSessionHandle,
   input: OpenPiSessionInput,
