@@ -12,9 +12,8 @@ import {
 } from "./native-browser-frames.js";
 import { executeBrowserEvent } from "./native-browser-events.js";
 import { executeDownload } from "./native-browser-downloads.js";
-import { executeInteraction } from "./native-browser-interaction.js";
+import { executeInteraction, interactFrame } from "./native-browser-input.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
-import { interactFrame } from "./native-browser-frame-input.js";
 import { createSemanticNodes } from "./native-browser-observation.js";
 import { type AxNode, sameTarget } from "./native-browser-common.js";
 type Capability = Extract<

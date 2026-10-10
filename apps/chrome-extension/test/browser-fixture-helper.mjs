@@ -101,12 +101,9 @@ async function buildLayer(folder) {
         "observation",
         "dom",
         "navigation",
-        "point",
         "session",
         "events",
         "frames",
-        "interaction",
-        "frame-input",
         "downloads",
         "scroll",
       ]

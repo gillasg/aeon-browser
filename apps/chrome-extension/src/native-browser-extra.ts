@@ -1,7 +1,6 @@
 import { selectorState, isFocusedInput } from "./native-browser-dom.js";
 import { BrowserActionError, sameTarget, safePage } from "./native-browser-common.js";
-import { focusNode, pressKey } from "./native-browser-input.js";
-import { prepareElement } from "./native-browser-prepare.js";
+import { focusNode, pressKey, prepareElement } from "./native-browser-input.js";
 import type { BrowserExecutorRequest, BrowserExecutorResult } from "@pippin/protocol";
 import { withBrowserDebugger, assertRequestActive } from "./native-browser-session.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";

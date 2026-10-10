@@ -28,7 +28,7 @@ import {
   type BrowserTargetKey,
 } from "@pippin/protocol";
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
-import { performAction } from "./native-browser-actions.js";
+import { performAction } from "./native-browser-input.js";
 import { captureScreenshot, observeSemantic } from "./native-browser-observation.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 export { releaseBrowserExecutor } from "./native-browser-session.js";
