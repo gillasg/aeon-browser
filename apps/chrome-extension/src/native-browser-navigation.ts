@@ -67,6 +67,7 @@ export async function settleBrowserPage(
   debuggee: chrome.debugger.Debuggee,
   capMs = 800,
   since = Date.now(),
+  minQuietMs = 80,
 ): Promise<PageSettle> {
   const start = Date.now();
   let limit = capMs,
@@ -78,7 +79,7 @@ export async function settleBrowserPage(
       if (state?.ready === "loading") limit = Math.max(capMs, 3000);
       const net = networkState(debuggee.tabId ?? -1);
       pending = net.pending;
-      if (isQuiet(state, net, since))
+      if (isQuiet(state, net, since, minQuietMs))
         return { why: "quiet", ms: Date.now() - start, pending, probe: state };
     } catch (error) {
       if (!/context|navigat|frame/i.test(String(error)))
@@ -92,11 +93,12 @@ function isQuiet(
   state: PageProbe | undefined,
   net: { pending: number; quiet: boolean },
   since: number,
+  minQuietMs: number,
 ): state is PageProbe {
   return (
     !!state &&
     state.ready !== "loading" &&
-    Math.min(state.idle, Date.now() - since) >= 80 &&
+    Math.min(state.idle, Date.now() - since) >= minQuietMs &&
     !net.pending &&
     net.quiet
   );
@@ -316,7 +318,10 @@ export async function executePageCode(
       );
     value = await chrome.debugger.sendCommand(debuggee, step.method, step.params);
   }
-  return { value, ...(!readOnly ? { settle: await settleBrowserPage(debuggee) } : {}) };
+  return {
+    value,
+    ...(!readOnly ? { settle: await settleBrowserPage(debuggee, 800, Date.now(), 0) } : {}),
+  };
 }
 async function evaluatePage(
   debuggee: chrome.debugger.Debuggee,

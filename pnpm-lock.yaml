@@ -22,15 +22,21 @@ importers:
       typescript-eslint:
         specifier: 8.70.1
         version: 8.70.1(eslint@10.11.0)(typescript@6.0.3)
+      ws:
+        specifier: 8.22.0
+        version: 8.22.0
 
   apps/chrome-extension:
     dependencies:
       "@aeon/protocol":
-        specifier: file:../../vendor/aeon-protocol-0.4.0.tgz
-        version: file:vendor/aeon-protocol-0.4.0.tgz
+        specifier: file:../../vendor/aeon-protocol-0.5.0.tgz
+        version: file:vendor/aeon-protocol-0.5.0.tgz
       "@aeon/ui":
         specifier: workspace:*
         version: link:../../packages/ui
+      acorn:
+        specifier: 8.18.0
+        version: 8.18.0
       monaco-editor:
         specifier: 0.57.0
         version: 0.57.0
@@ -60,8 +66,8 @@ importers:
   packages/ui:
     dependencies:
       "@aeon/protocol":
-        specifier: file:../../vendor/aeon-protocol-0.4.0.tgz
-        version: file:vendor/aeon-protocol-0.4.0.tgz
+        specifier: file:../../vendor/aeon-protocol-0.5.0.tgz
+        version: file:vendor/aeon-protocol-0.5.0.tgz
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -83,13 +89,13 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
 
 packages:
-  "@aeon/protocol@file:vendor/aeon-protocol-0.4.0.tgz":
+  "@aeon/protocol@file:vendor/aeon-protocol-0.5.0.tgz":
     resolution:
       {
-        integrity: sha512-X3qsT5+xZpmApiE1es97GgJyI14HAMPs/A+kmjlVoEKuFEdZundCLurU+aOPm79waQDd/d2rAT4h05qqTdVOog==,
-        tarball: file:vendor/aeon-protocol-0.4.0.tgz,
+        integrity: sha512-bewP/NowNZjHLg/0F6gJagOf3iC+ZK3pOLavFiTAnj9I2SDD1qoInVVAwvC6HA2+pIBlF1TafW6/nyk7BxvgDQ==,
+        tarball: file:vendor/aeon-protocol-0.5.0.tgz,
       }
-    version: 0.4.0
+    version: 0.5.0
 
   "@cacheable/memory@2.2.0":
     resolution:
@@ -1715,6 +1721,21 @@ packages:
       }
     engines: { node: ">=0.10.0" }
 
+  ws@8.22.0:
+    resolution:
+      {
+        integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==,
+      }
+    engines: { node: ">=10.0.0" }
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: ">=5.0.2"
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   yocto-queue@0.1.0:
     resolution:
       {
@@ -1735,7 +1756,7 @@ packages:
       }
 
 snapshots:
-  "@aeon/protocol@file:vendor/aeon-protocol-0.4.0.tgz":
+  "@aeon/protocol@file:vendor/aeon-protocol-0.5.0.tgz":
     dependencies:
       zod: 4.6.5
 
@@ -2895,6 +2916,8 @@ snapshots:
       isexe: 2.0.0
 
   word-wrap@1.2.5: {}
+
+  ws@8.22.0: {}
 
   yocto-queue@0.1.0: {}
 

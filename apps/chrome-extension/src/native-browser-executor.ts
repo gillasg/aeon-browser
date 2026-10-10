@@ -573,3 +573,43 @@ function respondFailure(socket: WebSocket, request: BrowserExecutorRequest, code
   sendFailure(socket, request, code);
   return true;
 }
+
+/** Runs one browser_code step inside the extension: same queueing, claims and target checks, no socket. */
+export async function executeLocalBrowserStep(
+  identity: BrowserIdentity,
+  chatId: string,
+  toolCallId: string,
+  operationId: string,
+  step: BrowserStep,
+): Promise<BrowserExecutorResult> {
+  const target = isTargetStep(step) ? step.target : undefined;
+  const known = target && currentInventoryTabs().find((tab) => sameTarget(tab.target, target));
+  if (target && !known) throw new Error("TARGET_LOST");
+  const key = target && targetIdentity(target);
+  const claimGeneration = key
+    ? Math.max((claimGenerations.get(key) ?? 0) + 1, Date.now() * 1000)
+    : undefined;
+  const request = BrowserExecutorRequestSchema.parse({
+    kind: "browser.operation",
+    requestId: crypto.randomUUID(),
+    operationId,
+    toolCallId,
+    chatId,
+    step,
+    ...(known
+      ? {
+          claimId: crypto.randomUUID(),
+          claimGeneration,
+          expectedDocumentEpoch: known.documentEpoch,
+        }
+      : {}),
+  });
+  registerBrowserRequest(request);
+  try {
+    return target
+      ? await enqueueTarget(target, () => executeStep(identity, request))
+      : await executeStep(identity, request);
+  } finally {
+    completeBrowserRequest(request);
+  }
+}

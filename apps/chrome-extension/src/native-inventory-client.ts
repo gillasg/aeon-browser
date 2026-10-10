@@ -190,7 +190,7 @@ async function buildFullInventory(session: InventorySession) {
     kind: "browser.inventory.full",
     ...inventoryIdentity(session),
     generation: session.generation,
-    capabilities: ["site-scripts", "browser-actions-v2", "browser-runtime-v4"],
+    capabilities: ["site-scripts", "browser-actions-v2", "browser-runtime-v4", "browser-code-v1"],
     windows,
     tabs: inventoryTabs,
   });

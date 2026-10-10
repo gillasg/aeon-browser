@@ -35,6 +35,7 @@ import {
 } from "./native-extension-message.js";
 import { synchronizeBrowserInventory } from "./native-inventory-client.js";
 import { handleBrowserExecutorMessage, releaseBrowserExecutor } from "./native-browser-executor.js";
+import { handleBrowserCodeMessage, resetRealm } from "./code-runtime-host.js";
 import {
   getBrowserIdentity,
   hostErrorCode,
@@ -269,6 +270,8 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     return;
   }
   if (BrowserInventoryReplySchema.safeParse(candidate).success) return;
+  if (handleBrowserCodeMessage(connection, connection.socket, candidate)) return;
+  resetReleasedRealm(candidate);
   if (handleBrowserExecutorMessage(connection, connection.socket, candidate)) return;
   const response = PageGrantIssueResponseSchema.safeParse(candidate);
   if (!response.success) {
@@ -294,4 +297,14 @@ function dropExecutor(connection: ExecutorConnection): void {
     pending.resolve(undefined);
     connection.pending.delete(requestId);
   }
+}
+
+function resetReleasedRealm(candidate: unknown): void {
+  const release = candidate as { kind?: unknown; chatId?: unknown; reset?: unknown } | null;
+  if (
+    release?.kind === "browser.release" &&
+    release.reset === true &&
+    typeof release.chatId === "string"
+  )
+    void resetRealm(release.chatId);
 }

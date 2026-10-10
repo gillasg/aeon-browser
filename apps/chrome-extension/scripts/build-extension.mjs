@@ -26,6 +26,8 @@ export async function buildExtension() {
     [join(appRoot, "src/site-scripts-page.ts"), "site-scripts.js"],
     [join(appRoot, "src/home-page.ts"), "home.js"],
     [join(appRoot, "src/sidepanel-page.ts"), "sidepanel.js"],
+    [join(appRoot, "src/code-offscreen.ts"), "code-offscreen.js"],
+    [join(appRoot, "src/code-sandbox.ts"), "code-sandbox.js"],
   ];
   await Promise.all(entries.map(([entry, file]) => buildEntry(shared, output, entry, file)));
 
@@ -44,6 +46,8 @@ export async function buildExtension() {
     "home.html",
     "home.css",
     "sidepanel.html",
+    "code-offscreen.html",
+    "code-sandbox.html",
     "sidepanel.css",
     "geist-latin.woff2",
     "atmosphere.css",

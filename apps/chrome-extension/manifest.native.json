@@ -34,7 +34,8 @@
     "userScripts",
     "scripting",
     "webNavigation",
-    "downloads"
+    "downloads",
+    "offscreen"
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "icons": {
@@ -42,5 +43,8 @@
     "32": "aeon-icon-32.png",
     "48": "aeon-icon-48.png",
     "128": "aeon-icon-128.png"
+  },
+  "sandbox": {
+    "pages": ["code-sandbox.html"]
   }
 }
