@@ -1,4 +1,4 @@
-import { type ChatSummaryDto, type DaemonUiResponse } from "@pippin/protocol";
+import { type ChatSummaryDto, type DaemonUiResponse } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 interface ChatSidebarOptions {
@@ -18,7 +18,7 @@ export class ChatSidebarController {
 
   setOpen(open: boolean): void {
     this.open = open;
-    localStorage.setItem("pippin-sidebar-expanded", String(open));
+    localStorage.setItem("aeon-sidebar-expanded", String(open));
     this.options.onChange();
     if (open) void this.refresh();
   }

@@ -1,6 +1,6 @@
 import { EmptyChatStart } from "./empty-chat-start.js";
 import { SidebarResizer } from "./sidebar-resizer.js";
-import type { ChatSummaryDto, PiUiSnapshotDto } from "@pippin/protocol";
+import type { ChatSummaryDto, PiUiSnapshotDto } from "@aeon/protocol";
 import { AnnotationProvider } from "./transcript-annotations.js";
 import { useState, type ReactElement } from "react";
 import type { ManagementSection } from "./management-types.js";

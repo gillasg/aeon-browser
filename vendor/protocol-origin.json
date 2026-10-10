@@ -1,10 +1,10 @@
 {
-  "package": "@pippin/protocol",
-  "version": "0.3.1",
+  "package": "@aeon/protocol",
+  "version": "0.4.0",
   "source": "https://github.com/gillasg/core",
-  "revision": "f04dbc8f1f1dc67dbbded13c26ba4e2815b459f5",
+  "revision": "3243d5c8c9b652b684d69aabccd5e6a61d82ca26",
   "sourceDirty": false,
-  "sourceSnapshotSha256": "f03a5dfef3c67b46f909689013815baa552fc9e7a03be3c16951d0b883f15738",
-  "file": "pippin-protocol-0.3.1.tgz",
-  "sha256": "70d05083a3521df5784c3d26e8a62824eb008f5539504896393375868c855c0f"
+  "sourceSnapshotSha256": "5e639b4f249bad7d135fac1853090cff91ea86ea62a19dc0cd88ee9a79d3774d",
+  "file": "aeon-protocol-0.4.0.tgz",
+  "sha256": "9cb305f8d3c01d266172b02fad3510b092c347a782a6710145320f9ad4531f15"
 }

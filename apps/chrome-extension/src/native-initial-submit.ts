@@ -1,8 +1,8 @@
-import { ChatIdSchema, PiAttachmentSchema, type PiAttachmentDto } from "@pippin/protocol";
+import { ChatIdSchema, PiAttachmentSchema, type PiAttachmentDto } from "@aeon/protocol";
 import { z } from "zod";
 
 const HANDOFF_TTL_MS = 2 * 60 * 1000;
-const PREFIX = "pippin.initial-submit.";
+const PREFIX = "aeon.initial-submit.";
 
 interface InitialSubmit {
   requestId: string;

@@ -1,4 +1,4 @@
-import { BrowserPopupSchema, type BrowserTab } from "@pippin/protocol";
+import { BrowserPopupSchema, type BrowserTab } from "@aeon/protocol";
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
 import {
   browserSessionOwner,

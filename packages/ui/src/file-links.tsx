@@ -7,7 +7,7 @@ export interface FileOpenDetail {
   line?: number;
 }
 export function openFile(detail: FileOpenDetail): void {
-  window.dispatchEvent(new CustomEvent("pippin.open-file", { detail }));
+  window.dispatchEvent(new CustomEvent("aeon.open-file", { detail }));
 }
 export function localFilePath(value: string): string | null {
   if (/^(?:https?:|mailto:|data:|javascript:|#)/i.test(value)) return null;

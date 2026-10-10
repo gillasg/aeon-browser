@@ -9,7 +9,7 @@ const Detail = z
   })
   .strict();
 export function installFileViewerLinks(chatId: string, currentPath?: () => string): void {
-  window.addEventListener("pippin.open-file", (event) => {
+  window.addEventListener("aeon.open-file", (event) => {
     if (!(event instanceof CustomEvent)) return;
     const detail = Detail.safeParse(event.detail);
     if (!detail.success) return;
@@ -29,7 +29,7 @@ async function launch(chatId: string, detail: z.infer<typeof Detail>): Promise<v
   if (detail.line) url.searchParams.set("line", String(detail.line));
   if (detail.original !== undefined && detail.modified !== undefined) {
     const id = crypto.randomUUID();
-    await chrome.storage.session.set({ ["pippin-viewer-" + id]: { ...detail, chatId } });
+    await chrome.storage.session.set({ ["aeon-viewer-" + id]: { ...detail, chatId } });
     url.searchParams.set("diff", id);
   }
   const existing = await chrome.tabs.query({});

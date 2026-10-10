@@ -1,1 +1,1 @@
-declare const __PIPPIN_NATIVE_TRANSPORT__: boolean;
+declare const __AEON_NATIVE_TRANSPORT__: boolean;

@@ -3,15 +3,15 @@ import {
   PiBrowserContextRecordSchema,
   type BrowserTargetKey,
   type PiBrowserContextRecord,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
 import { handoffKey, clearAutoPrompt, readChatContext } from "./browser-context-storage.js";
 import { NativeClaimBrowserContextSubmitResponseSchema } from "./native-extension-message.js";
 import { isPageScopeAllowed } from "./native-worker-tabs.js";
 
-const MENU_ASK_SELECTION = "pippin.ask-selection";
-const MENU_SUMMARIZE = "pippin.summarize-page";
-const MENU_ADD_CONTEXT = "pippin.add-page-context";
+const MENU_ASK_SELECTION = "aeon.ask-selection";
+const MENU_SUMMARIZE = "aeon.summarize-page";
+const MENU_ADD_CONTEXT = "aeon.add-page-context";
 
 export function installNativeBrowserContextMenus(ensureExecutor: () => Promise<unknown>): void {
   chrome.contextMenus.onClicked.addListener((info, tab) =>

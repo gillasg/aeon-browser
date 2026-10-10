@@ -1,5 +1,7 @@
-const INSTANCE_KEY = "pippin-client-instance-id";
-const RUN_KEY = "pippin-browser-run-id";
+import { migrateLegacyChromeStorage } from "./legacy-storage-migration.js";
+
+const INSTANCE_KEY = "aeon-client-instance-id";
+const RUN_KEY = "aeon-browser-run-id";
 
 export interface BrowserIdentity {
   clientInstanceId: string;
@@ -7,6 +9,7 @@ export interface BrowserIdentity {
 }
 
 export async function getBrowserIdentity(): Promise<BrowserIdentity> {
+  await migrateLegacyChromeStorage();
   const local = await chrome.storage.local.get(INSTANCE_KEY);
   const instance = isUuid(local[INSTANCE_KEY]) ? local[INSTANCE_KEY] : crypto.randomUUID();
   if (local[INSTANCE_KEY] !== instance)
@@ -18,8 +21,8 @@ export async function getBrowserIdentity(): Promise<BrowserIdentity> {
 }
 
 export function sameScope(
-  left: import("@pippin/protocol").PageGrantScope,
-  right: import("@pippin/protocol").PageGrantScope,
+  left: import("@aeon/protocol").PageGrantScope,
+  right: import("@aeon/protocol").PageGrantScope,
 ): boolean {
   return (
     left.kind === right.kind &&

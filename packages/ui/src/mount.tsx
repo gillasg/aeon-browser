@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 const roots = new WeakMap<Element, Root>();
 
-export function mountPippinUi(rootElement: Element, view: ReactNode): (next: ReactNode) => void {
+export function mountAeonUi(rootElement: Element, view: ReactNode): (next: ReactNode) => void {
   if (roots.has(rootElement)) throw new Error("This Aeon UI host already has a React root.");
   const root = createRoot(rootElement);
   roots.set(rootElement, root);
@@ -12,5 +12,5 @@ export function mountPippinUi(rootElement: Element, view: ReactNode): (next: Rea
 }
 
 function HostRoot({ children }: { children: ReactNode }) {
-  return <div data-pippin-root="true">{children}</div>;
+  return <div data-aeon-root="true">{children}</div>;
 }

@@ -2,7 +2,7 @@ import {
   SiteScriptDefinitionSchema,
   type SiteScriptDefinition,
   BrowserScriptsSyncSchema,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import { withBrowserDebugger } from "./native-browser-session.js";
 
 export const SCRIPT_KEY = "aeon-site-scripts";

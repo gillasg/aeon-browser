@@ -3,7 +3,7 @@ import {
   CoreAttentionSnapshotSchema,
   CoreAttentionRequestSchema,
   type CoreAttentionRequest,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 let send: ((request: CoreAttentionRequest) => void) | undefined;
 let pending = Promise.resolve();
 export function installCoreAttentionBridge(sender: (request: CoreAttentionRequest) => void): void {

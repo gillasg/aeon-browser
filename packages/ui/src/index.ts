@@ -1,4 +1,4 @@
-export { mountPippinUi } from "./mount.js";
+export { mountAeonUi } from "./mount.js";
 export { ChatSurface, type ChatSurfaceProps } from "./chat-surface.js";
 export {
   ChatComposer,

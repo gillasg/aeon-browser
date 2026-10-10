@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
-import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@pippin/protocol";
+import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@aeon/protocol";
 import { BrowserContextChip } from "./browser-context-view.js";
 export function PageContextTray(props: {
   chatId?: string | undefined;

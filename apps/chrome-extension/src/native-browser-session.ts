@@ -6,7 +6,7 @@ import {
 import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-navigation.js";
 import { presentBrowserTask } from "./native-browser-layout.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
-import type { BrowserExecutorRequest } from "@pippin/protocol";
+import type { BrowserExecutorRequest } from "@aeon/protocol";
 
 interface Attachment {
   chatId: string;

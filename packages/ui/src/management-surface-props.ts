@@ -1,4 +1,4 @@
-import type { ManagementSnapshotDto } from "@pippin/protocol";
+import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementActionName, ManagementSection } from "./management-types.js";
 
 export interface ManagementSurfaceProps {

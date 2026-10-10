@@ -1,6 +1,6 @@
 import { additionalPages, attachAdditionalPages } from "./additional-page-context.js";
 import { readChatContext, removeChatContext } from "./browser-context-storage.js";
-import { DaemonUiRequestSchema } from "@pippin/protocol";
+import { DaemonUiRequestSchema } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { takeNativeInitialSubmit } from "./ui-connection.js";
 import { applyInitialChatSelection } from "./initial-chat-selection.js";

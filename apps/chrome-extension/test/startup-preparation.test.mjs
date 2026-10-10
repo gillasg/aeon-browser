@@ -17,7 +17,7 @@ async function load(source, directory) {
     bundle: true,
     platform: "node",
     format: "esm",
-    define: { __PIPPIN_NATIVE_TRANSPORT__: "true" },
+    define: { __AEON_NATIVE_TRANSPORT__: "true" },
   });
   return import(pathToFileURL(outfile).href);
 }

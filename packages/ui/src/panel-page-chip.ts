@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@pippin/protocol";
+import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@aeon/protocol";
 export function usePanelPage(): { record: PiBrowserContextRecord | null; remove(): void } {
   const [record, setRecord] = useState<PiBrowserContextRecord | null>(null);
   useEffect(() => {
@@ -9,7 +9,7 @@ export function usePanelPage(): { record: PiBrowserContextRecord | null; remove(
       try {
         const response = await new Promise<unknown>((resolve, reject) =>
           window.dispatchEvent(
-            new CustomEvent("pippin.panel-current-page", { detail: { resolve, reject } }),
+            new CustomEvent("aeon.panel-current-page", { detail: { resolve, reject } }),
           ),
         );
         const parsed = PiBrowserContextRecordSchema.safeParse(response);

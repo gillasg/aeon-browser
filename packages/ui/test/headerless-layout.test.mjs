@@ -17,7 +17,7 @@ test("headerless navigation offers sidebar without a title bar", () => {
   );
   assert.match(html, /id="sidebar-toggle"/);
   assert.match(html, /aria-label="Open Chat list"/);
-  assert.doesNotMatch(html, /<header|Connected|Pippin/);
+  assert.doesNotMatch(html, /<header|Connected|Aeon/);
 });
 
 test("new tab starts with a closed sidebar and an empty composer", () => {

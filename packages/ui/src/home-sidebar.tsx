@@ -1,6 +1,6 @@
 import { AeonWordmark } from "./aeon-wordmark.js";
 import { ProjectsSidebar } from "./projects-sidebar.js";
-import type { ChatCatalogItemDto } from "@pippin/protocol";
+import type { ChatCatalogItemDto } from "@aeon/protocol";
 import type { ReactElement } from "react";
 import { SidebarChatItem, SidebarRecents } from "./sidebar-chat-item.js";
 import { ChatNavigation } from "./chat-navigation.js";

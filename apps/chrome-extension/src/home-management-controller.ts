@@ -2,8 +2,8 @@ import {
   DaemonUiRequestSchema,
   type HomeRoutineCardDto,
   type ManagementSnapshotDto,
-} from "@pippin/protocol";
-import type { ManagementActionName, NewTabHomeProps } from "@pippin/ui";
+} from "@aeon/protocol";
+import type { ManagementActionName, NewTabHomeProps } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 type Theme = "dark" | "midnight" | "light" | "system";
@@ -69,12 +69,12 @@ export class HomeManagementController {
   }
 
   async readPreferences(): Promise<void> {
-    const values = await chrome.storage.sync.get(["pippin-theme", "pippin-chat-sidebar-open"]);
-    const savedTheme = values["pippin-theme"];
+    const values = await chrome.storage.sync.get(["aeon-theme", "aeon-chat-sidebar-open"]);
+    const savedTheme = values["aeon-theme"];
     if (savedTheme === "light" || savedTheme === "system" || savedTheme === "midnight")
       this.theme = savedTheme;
     if (savedTheme === "atmosphere") this.theme = "light";
-    this.sidebarDefaultOpen = values["pippin-chat-sidebar-open"] === true;
+    this.sidebarDefaultOpen = values["aeon-chat-sidebar-open"] === true;
     document.documentElement.dataset.theme = this.theme;
   }
 
@@ -229,13 +229,13 @@ export class HomeManagementController {
   private async saveTheme(value: Theme): Promise<void> {
     this.theme = value;
     document.documentElement.dataset.theme = value;
-    await chrome.storage.sync.set({ "pippin-theme": value });
+    await chrome.storage.sync.set({ "aeon-theme": value });
     this.onChange();
   }
 
   private async saveSidebarDefault(value: boolean): Promise<void> {
     this.sidebarDefaultOpen = value;
-    await chrome.storage.sync.set({ "pippin-chat-sidebar-open": value });
+    await chrome.storage.sync.set({ "aeon-chat-sidebar-open": value });
     this.onChange();
   }
 }

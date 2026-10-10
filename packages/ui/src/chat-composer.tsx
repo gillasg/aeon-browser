@@ -10,7 +10,7 @@ import { useMessageSendMode } from "./message-send-mode.js";
 import { PromptField } from "./prompt-field.js";
 import { ComposerPanels, AttachmentList } from "./composer-panels.js";
 import { PageContextTray } from "./page-context-tray.js";
-import type { PiBrowserContextRecord } from "@pippin/protocol";
+import type { PiBrowserContextRecord } from "@aeon/protocol";
 
 export interface ComposerAttachment {
   name: string;

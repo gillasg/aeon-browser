@@ -1,4 +1,4 @@
-import type { EffectivePiResourcesDto } from "@pippin/protocol";
+import type { EffectivePiResourcesDto } from "@aeon/protocol";
 import { useState, type ReactElement } from "react";
 
 export type LoadedResourcesState =

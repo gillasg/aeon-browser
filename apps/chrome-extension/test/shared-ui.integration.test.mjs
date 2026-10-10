@@ -18,10 +18,10 @@ test("New Tab, Chat and side panel each mount one shared UI root", async () => {
       readFile(join(app, "src", host.page), "utf8"),
       readFile(join(app, host.html), "utf8"),
     ]);
-    assert.match(page, /from "@pippin\/ui"/, `${host.page} must consume the shared UI package`);
+    assert.match(page, /from "@aeon\/ui"/, `${host.page} must consume the shared UI package`);
     assert.match(page, new RegExp(`createElement\\(${host.component}\\b`));
     assert.equal(
-      (page.match(/mountPippinUi\(/g) ?? []).length,
+      (page.match(/mountAeonUi\(/g) ?? []).length,
       1,
       `${host.page} must own one mount call`,
     );

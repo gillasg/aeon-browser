@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@pippin/protocol";
+import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { CapabilityEditor } from "./capability-editor.js";

@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("a presentation listener failure cannot strand an already matched command waiter", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-ui-waiter-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-ui-waiter-"));
   try {
     const outfile = join(directory, "client.mjs");
     await build({

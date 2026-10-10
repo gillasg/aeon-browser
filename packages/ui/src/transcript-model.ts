@@ -6,7 +6,7 @@ import type {
   PiEntryDto,
   PiMessageDto,
   PiSessionEventDto,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 
 export interface ToolStep {
   key: string;

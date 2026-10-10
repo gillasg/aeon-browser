@@ -1,6 +1,6 @@
-import { ChatIdSchema } from "@pippin/protocol";
+import { ChatIdSchema } from "@aeon/protocol";
 import { InitialChatDisplay } from "./initial-chat-display.js";
-import { DaemonUiRequestSchema } from "@pippin/protocol";
+import { DaemonUiRequestSchema } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 interface ChatPageCloseState {

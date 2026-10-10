@@ -10,7 +10,7 @@ import test from "node:test";
 const extensionRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 test("native first-prompt handoff is tab/chat-bound, expiring, and one-use", async () => {
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "pippin-initial-submit-test-"));
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "aeon-initial-submit-test-"));
   const priorChrome = globalThis.chrome;
   try {
     const records = new Map();
@@ -63,12 +63,12 @@ async function verifyOneUseAndIdentity(handoff, records) {
   const initialSubmit = {
     requestId,
     text: "synthetic one-use handoff check",
-    model: { provider: "pippin-fixture", id: "model-one" },
+    model: { provider: "aeon-fixture", id: "model-one" },
     thinkingLevel: "off",
   };
   await handoff.stageInitialSubmit(tabId, chatId, initialSubmit);
   assert.equal(await handoff.takeInitialSubmit(tabId + 1, chatId), undefined);
-  const stored = records.get(`pippin.initial-submit.${tabId}`);
+  const stored = records.get(`aeon.initial-submit.${tabId}`);
   assert.deepEqual(handoff.validateInitialSubmitRecord(stored, tabId, chatId), initialSubmit);
   assert.equal(
     handoff.validateInitialSubmitRecord(stored, tabId, "005cfe90-b334-4b04-bb8e-e50b091f2fe5"),
@@ -89,7 +89,7 @@ async function verifyExpiry(handoff) {
     await handoff.stageInitialSubmit(42, "968c135b-a48f-4f5e-9223-dff7f9a10a07", {
       requestId: randomUUID(),
       text: "expires",
-      model: { provider: "pippin-fixture", id: "model-one" },
+      model: { provider: "aeon-fixture", id: "model-one" },
       thinkingLevel: "off",
     });
     Date.now = () => 121_000;

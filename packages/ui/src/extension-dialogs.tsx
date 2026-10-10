@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactElement } from "react";
-import type { PiUiSnapshotDto } from "@pippin/protocol";
+import type { PiUiSnapshotDto } from "@aeon/protocol";
 
 type ExtensionDialog = PiUiSnapshotDto["extensionDialogs"][number];
 type Answer = (requestId: string, value: string | boolean | null) => void;

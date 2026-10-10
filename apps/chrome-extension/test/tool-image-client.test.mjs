@@ -6,10 +6,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { build } from "esbuild";
 import test from "node:test";
-import { encodeImageAsset } from "@pippin/protocol";
+import { encodeImageAsset } from "@aeon/protocol";
 
 test("tool image client verifies checksums and cleans up each request", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-image-client-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-image-client-"));
   try {
     const outfile = join(directory, "client.mjs");
     await build({

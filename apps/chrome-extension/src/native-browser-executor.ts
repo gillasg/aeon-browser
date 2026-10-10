@@ -6,7 +6,7 @@ import {
   BrowserExecutorResultSchema,
   BrowserOperationResultSchema,
   type BrowserTargetKey,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import {
   withBrowserDebugger,
   reconnectBrowserSession,

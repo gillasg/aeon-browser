@@ -8,7 +8,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("management ignores a slower snapshot for a previously selected thread", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-management-race-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-management-race-"));
   try {
     const outfile = join(directory, "controller.mjs");
     await build({

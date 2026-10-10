@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("browser locators reject ambiguous names and never choose the first matching node", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-browser-locator-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-browser-locator-"));
   const priorChrome = globalThis.chrome;
   try {
     const outfile = join(directory, "debugger.mjs");

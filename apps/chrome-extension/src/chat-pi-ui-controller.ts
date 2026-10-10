@@ -5,9 +5,9 @@ import {
   type PiAttachmentDto,
   type PiSessionEventDto,
   type PiUiSnapshotDto,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
-import type { ChatSurfaceProps, ChatComposerProps } from "@pippin/ui";
+import type { ChatSurfaceProps, ChatComposerProps } from "@aeon/ui";
 type CompletedCommandResult = Extract<DaemonUiResponse, { kind: "command.completed" }>["result"];
 type MessageEditResultDto = Extract<CompletedCommandResult, { kind: "chat.message-edited" }>;
 type MessageForkResultDto = Extract<CompletedCommandResult, { kind: "chat.message-forked" }>;

@@ -8,7 +8,7 @@ import {
   HomeAttachmentList,
 } from "./home-attachments.js";
 import { useState, type FormEvent, type ReactElement } from "react";
-import type { ChatCatalogItemDto, PiModelCatalogDto } from "@pippin/protocol";
+import type { ChatCatalogItemDto, PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { HomeRecentCards } from "./home-recent-cards.js";
@@ -28,7 +28,7 @@ type HomeStartProps = Pick<
   onManageRoutines(): void;
   projectName?: string | null;
   projectId?: string | null;
-  browserContext?: import("@pippin/protocol").PiBrowserContextRecord | null;
+  browserContext?: import("@aeon/protocol").PiBrowserContextRecord | null;
   onRemoveContext?(): void;
   chatId?: string;
   connected?: boolean;

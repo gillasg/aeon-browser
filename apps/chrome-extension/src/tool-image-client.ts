@@ -1,4 +1,4 @@
-import { decodeImageAsset, MAX_IMAGE_ASSET_BYTES, type DaemonUiResponse } from "@pippin/protocol";
+import { decodeImageAsset, MAX_IMAGE_ASSET_BYTES, type DaemonUiResponse } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 export function createToolImageLoader(
   getClient: () => UiClient | undefined,

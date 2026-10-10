@@ -1,4 +1,4 @@
-import { BrowserContextDraftSchema, type PiBrowserContextRecord } from "@pippin/protocol";
+import { BrowserContextDraftSchema, type PiBrowserContextRecord } from "@aeon/protocol";
 import { NativeClaimBrowserContextSubmitResponseSchema } from "./native-extension-message.js";
 
 interface BrowserContextComposer {
@@ -44,7 +44,7 @@ export async function applyBrowserContextDraft(
   input.attemptedInvocations.add(draft.invocationId);
   const response = NativeClaimBrowserContextSubmitResponseSchema.safeParse(
     await chrome.runtime.sendMessage({
-      kind: "pippin.native.claim-browser-context-submit",
+      kind: "aeon.native.claim-browser-context-submit",
       chatId: input.chatId,
       invocationId: draft.invocationId,
     }),

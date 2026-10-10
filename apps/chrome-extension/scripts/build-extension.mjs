@@ -17,7 +17,7 @@ export async function buildExtension() {
     jsx: "automatic",
     target: "chrome116",
     loader: { ".ttf": "file" },
-    define: { __PIPPIN_NATIVE_TRANSPORT__: "true" },
+    define: { __AEON_NATIVE_TRANSPORT__: "true" },
   };
   const entries = [
     [join(appRoot, "src/native-worker.ts"), "service-worker.js"],

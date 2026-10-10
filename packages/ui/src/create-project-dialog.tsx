@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactElement } from "react";
-import type { ProjectDto } from "@pippin/protocol";
+import type { ProjectDto } from "@aeon/protocol";
 import { useCreateProject } from "./use-create-project.js";
 import { ProjectForm } from "./project-form.js";
 export function CreateProjectDialog({

@@ -133,9 +133,9 @@ function useAnnotationHighlights(records: readonly ResponseAnnotation[]): void {
     };
     if (!browser.Highlight || !browser.CSS.highlights) return;
     const ranges = records.flatMap((record) => (record.range ? [record.range] : []));
-    browser.CSS.highlights.set("pippin-annotations", new browser.Highlight(...ranges));
+    browser.CSS.highlights.set("aeon-annotations", new browser.Highlight(...ranges));
     return () => {
-      browser.CSS.highlights?.delete("pippin-annotations");
+      browser.CSS.highlights?.delete("aeon-annotations");
     };
   }, [records]);
 }

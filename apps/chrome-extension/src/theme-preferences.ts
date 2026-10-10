@@ -1,9 +1,17 @@
+import {
+  migrateLegacyChromeStorage,
+  migrateLegacyLocalStorage,
+} from "./legacy-storage-migration.js";
+
+migrateLegacyLocalStorage();
+
 export async function applyStoredTheme(): Promise<void> {
-  const values = await chrome.storage.sync.get("pippin-theme");
-  const value = values["pippin-theme"];
+  await migrateLegacyChromeStorage();
+  const values = await chrome.storage.sync.get("aeon-theme");
+  const value = values["aeon-theme"];
   if (value === "atmosphere") {
-    localStorage.setItem("pippin-wallpaper", JSON.stringify({ enabled: true }));
-    await chrome.storage.sync.set({ "pippin-theme": "light" });
+    localStorage.setItem("aeon-wallpaper", JSON.stringify({ enabled: true }));
+    await chrome.storage.sync.set({ "aeon-theme": "light" });
   }
   document.documentElement.dataset.theme =
     value === "light" || value === "system" || value === "midnight"
@@ -13,5 +21,5 @@ export async function applyStoredTheme(): Promise<void> {
         : "dark";
 }
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "sync" && changes["pippin-theme"]) void applyStoredTheme();
+  if (area === "sync" && changes["aeon-theme"]) void applyStoredTheme();
 });

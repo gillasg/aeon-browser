@@ -5,7 +5,7 @@ import {
   type BrowserStep,
   BrowserExecutorResultSchema,
   type BrowserExecutorResult,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import {
   resolveElement,
   clickAt,

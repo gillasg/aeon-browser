@@ -4,8 +4,8 @@
 }
 body {
   margin: 0;
-  background: var(--pippin-canvas, #111);
-  color: var(--pippin-text, #eee);
+  background: var(--aeon-canvas, #111);
+  color: var(--aeon-text, #eee);
   font:
     15px/1.6 Geist,
     system-ui,
@@ -26,15 +26,15 @@ h2 {
 section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--pippin-line, #333);
+  border: 1px solid var(--aeon-line, #333);
   border-radius: 14px;
 }
 button {
   font: inherit;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid var(--pippin-line, #444);
-  background: var(--pippin-surface, #222);
+  border: 1px solid var(--aeon-line, #444);
+  background: var(--aeon-surface, #222);
   color: inherit;
   cursor: pointer;
   margin-right: 8px;
@@ -44,7 +44,7 @@ button:hover {
 }
 .script-row {
   padding: 12px 0;
-  border-bottom: 1px solid var(--pippin-line, #333);
+  border-bottom: 1px solid var(--aeon-line, #333);
 }
 .script-detail {
   display: block;

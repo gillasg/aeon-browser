@@ -9,7 +9,7 @@ export function handleContextPicker(
     return false;
   if (!candidate || typeof candidate !== "object") return false;
   const value = candidate as { kind?: string; tabId?: number };
-  if (value.kind === "pippin.native.list-context-tabs") {
+  if (value.kind === "aeon.native.list-context-tabs") {
     void Promise.all([chrome.tabs.query({}), chrome.windows.getLastFocused()]).then(
       ([tabs, window]) =>
         send(
@@ -28,8 +28,7 @@ export function handleContextPicker(
     );
     return true;
   }
-  if (value.kind !== "pippin.native.capture-page" || !Number.isSafeInteger(value.tabId))
-    return false;
+  if (value.kind !== "aeon.native.capture-page" || !Number.isSafeInteger(value.tabId)) return false;
   void captureTabPage(value.tabId as number, ensureExecutor).then(send, () => send(null));
   return true;
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import { SidebarChatItem, SidebarRecents } from "./sidebar-chat-item.js";
 import { SidebarManagementLinks } from "./sidebar-management-links.js";
 import type { ManagementSection } from "./management-types.js";
-import type { ChatSummaryDto } from "@pippin/protocol";
+import type { ChatSummaryDto } from "@aeon/protocol";
 
 export interface ChatSidebarProps {
   developmentFixture: boolean;

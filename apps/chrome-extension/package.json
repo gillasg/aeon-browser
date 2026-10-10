@@ -1,5 +1,5 @@
 {
-  "name": "@pippin/chrome-extension",
+  "name": "@aeon/chrome-extension",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,8 +8,8 @@
     "build:native": "node scripts/build-native-extension.mjs"
   },
   "dependencies": {
-    "@pippin/protocol": "file:../../vendor/pippin-protocol-0.3.1.tgz",
-    "@pippin/ui": "workspace:*",
+    "@aeon/protocol": "file:../../vendor/aeon-protocol-0.4.0.tgz",
+    "@aeon/ui": "workspace:*",
     "monaco-editor": "0.57.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

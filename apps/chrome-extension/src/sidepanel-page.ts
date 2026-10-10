@@ -1,8 +1,8 @@
 import "./status-favicon.js";
 import { PageReconnect } from "./page-reconnect.js";
 import { createElement } from "react";
-import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
-import { mountPippinUi, SidePanel, type SidePanelProps } from "@pippin/ui";
+import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@aeon/protocol";
+import { mountAeonUi, SidePanel, type SidePanelProps } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { handoffKey, pendingHandoffs, saveChatContext } from "./browser-context-storage.js";
@@ -33,7 +33,7 @@ window.addEventListener("message", (event) => {
     event.source !== document.querySelector<HTMLIFrameElement>("#chat-frame")?.contentWindow
   )
     return;
-  if (event.data?.kind === "pippin.new-chat") {
+  if (event.data?.kind === "aeon.new-chat") {
     void selectChat("").then(() => {
       draftProjectId = ChatIdSchema.safeParse(event.data.projectId).success
         ? event.data.projectId
@@ -42,10 +42,7 @@ window.addEventListener("message", (event) => {
     });
     return;
   }
-  if (
-    event.data?.kind !== "pippin.select-chat" ||
-    !ChatIdSchema.safeParse(event.data.chatId).success
-  )
+  if (event.data?.kind !== "aeon.select-chat" || !ChatIdSchema.safeParse(event.data.chatId).success)
     return;
   void refreshChats().then(() => selectChat(event.data.chatId));
 });
@@ -75,7 +72,7 @@ function createView() {
 
 function render(): void {
   if (updateUi) updateUi(createView());
-  else updateUi = mountPippinUi(root, createView());
+  else updateUi = mountAeonUi(root, createView());
 }
 function setPickerOpen(open: boolean): void {
   pickerOpen = open;
@@ -284,7 +281,7 @@ function requireClient(): UiClient {
   return client;
 }
 function selectionKey(id: number): string {
-  return `pippin-selected-chat-${id}`;
+  return `aeon-selected-chat-${id}`;
 }
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "LOCAL_ERROR";

@@ -645,7 +645,7 @@ body[data-host="panel"] .home-start {
 }
 :root[data-theme="midnight"] .composer,
 :root[data-theme="midnight"] .home-query-form {
-  background: var(--pippin-surface);
+  background: var(--aeon-surface);
   border-color: #1c1c22;
 }
 .home-shell[data-sidebar-collapsed="false"] {
@@ -665,7 +665,7 @@ body[data-host="panel"] .home-start {
 }
 .sidebar-resizer:hover,
 .sidebar-resizer:focus-visible {
-  background: color-mix(in srgb, var(--pippin-muted) 25%, transparent);
+  background: color-mix(in srgb, var(--aeon-muted) 25%, transparent);
   outline: none;
 }
 body[data-embedded="true"] .sidebar-resizer,
@@ -844,11 +844,11 @@ body[data-host="panel"] .composer-context-slot {
   background: transparent;
 }
 .message-row.user:has(.message-context) .message-content {
-  border-top-right-radius: var(--pippin-r-md);
+  border-top-right-radius: var(--aeon-r-md);
 }
 .pending-work {
   margin: 24px 0;
-  color: var(--pippin-muted);
+  color: var(--aeon-muted);
   font-size: 13px;
 }
 .home-start .page-context-tray {

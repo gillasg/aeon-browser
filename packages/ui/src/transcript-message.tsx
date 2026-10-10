@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { PiContentBlockDto, PiMessageDto } from "@pippin/protocol";
+import type { PiContentBlockDto, PiMessageDto } from "@aeon/protocol";
 import { BrowserContextCard, BrowserContextTranscriptChip } from "./browser-context-view.js";
 import { AnnotatedMessage } from "./annotated-message.js";
 import { ThinkingDisclosure } from "./thinking-disclosure.js";
@@ -251,7 +251,7 @@ function messageText(message: PiMessageDto | null): string {
 
 function messagePresentation(row: Exclude<TranscriptRow, { kind: "tool-group" }>): {
   message: PiMessageDto | null;
-  entry: import("@pippin/protocol").PiEntryDto | undefined;
+  entry: import("@aeon/protocol").PiEntryDto | undefined;
   isUser: boolean;
   isAssistant: boolean;
   text: string;

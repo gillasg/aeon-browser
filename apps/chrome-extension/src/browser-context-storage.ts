@@ -3,10 +3,10 @@ import {
   BrowserContextHandoffSchema,
   type BrowserContextDraft,
   type BrowserContextHandoff,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 
-export const CONTEXT_HANDOFF_PREFIX = "pippin-browser-context-handoff:";
-const CHAT_CONTEXT_PREFIX = "pippin-chat-browser-context:";
+export const CONTEXT_HANDOFF_PREFIX = "aeon-browser-context-handoff:";
+const CHAT_CONTEXT_PREFIX = "aeon-chat-browser-context:";
 
 export function handoffKey(invocationId: string): string {
   return `${CONTEXT_HANDOFF_PREFIX}${invocationId}`;

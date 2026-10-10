@@ -1,4 +1,4 @@
-import { PiBrowserContextRecordSchema, type PiAttachmentDto } from "@pippin/protocol";
+import { PiBrowserContextRecordSchema, type PiAttachmentDto } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { additionalPages } from "./additional-page-context.js";
 import { projectDraftPayload } from "./project-bridge.js";

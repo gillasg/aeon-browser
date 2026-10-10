@@ -7,7 +7,7 @@ import {
   BrowserInventoryFullSchema,
   BrowserInventoryReplySchema,
   type BrowserInventoryDeltaMessage,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
 export type TabIdentity = { tabIncarnation: string; documentEpoch: number };
@@ -49,8 +49,8 @@ export function inventoryIdentity(identity: BrowserIdentity): BrowserIdentity {
   return { clientInstanceId: identity.clientInstanceId, browserRunId: identity.browserRunId };
 }
 
-const GENERATION_KEY = "pippin-inventory-generation";
-const TAB_MAP_KEY = "pippin-tab-incarnations";
+const GENERATION_KEY = "aeon-inventory-generation";
+const TAB_MAP_KEY = "aeon-tab-incarnations";
 type Change = () => Promise<void>;
 interface InventorySession extends BrowserIdentity {
   socket: WebSocket;

@@ -8,8 +8,8 @@ import { installFileViewerLinks } from "./file-viewer-launch.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
 import { createToolImageLoader } from "./tool-image-client.js";
-import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@pippin/protocol";
-import { ChatSurface, mountPippinUi, TranscriptModel } from "@pippin/ui";
+import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@aeon/protocol";
+import { ChatSurface, mountAeonUi, TranscriptModel } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
@@ -97,7 +97,7 @@ const piUi = new ChatPiUiController(
 const applyBrowserContextDraft = createBrowserContextDraftHandler({
   chatId,
   composer,
-  nativeTransport: __PIPPIN_NATIVE_TRANSPORT__,
+  nativeTransport: __AEON_NATIVE_TRANSPORT__,
   attemptedInvocations: attemptedContextSubmits,
   showError,
   readRuntimeState: () => ({
@@ -108,7 +108,7 @@ const applyBrowserContextDraft = createBrowserContextDraftHandler({
 });
 function createView() {
   return createElement(ChatSurface, {
-    developmentFixture: !__PIPPIN_NATIVE_TRANSPORT__,
+    developmentFixture: !__AEON_NATIVE_TRANSPORT__,
     chatId,
     title,
     connection,
@@ -136,7 +136,7 @@ function createView() {
 }
 function render(): void {
   if (updateUi) updateUi(createView());
-  else updateUi = mountPippinUi(root, createView());
+  else updateUi = mountAeonUi(root, createView());
 }
 installFileViewerLinks(chatId);
 render();
@@ -220,9 +220,9 @@ function attachChatClientListeners(activeClient: UiClient): void {
   );
 }
 async function submitFirstPrompt(): Promise<void> {
-  if (!__PIPPIN_NATIVE_TRANSPORT__ || initialSubmitAttempted || !client) return;
+  if (!__AEON_NATIVE_TRANSPORT__ || initialSubmitAttempted || !client) return;
   initialSubmitAttempted = true;
-  await submitInitialPrompt(chatId, client, __PIPPIN_NATIVE_TRANSPORT__);
+  await submitInitialPrompt(chatId, client, __AEON_NATIVE_TRANSPORT__);
   void composer.refreshControls();
 }
 function handleDaemonMessage(message: DaemonUiResponse): void {

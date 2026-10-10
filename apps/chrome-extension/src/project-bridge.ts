@@ -1,4 +1,4 @@
-import { DaemonUiRequestSchema } from "@pippin/protocol";
+import { DaemonUiRequestSchema } from "@aeon/protocol";
 import { connectPage } from "./ui-connection.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import type { UiClient } from "./ui-client-core.js";
@@ -21,11 +21,11 @@ async function projectClient(): Promise<UiClient> {
   });
   return connection;
 }
-window.addEventListener("pippin.project-request", (event) => {
+window.addEventListener("aeon.project-request", (event) => {
   const detail = (event as CustomEvent).detail;
   void projectRequest(detail.operation, detail.payload).then(detail.resolve, detail.reject);
 });
-window.addEventListener("pippin.project-new-chat", (event) =>
+window.addEventListener("aeon.project-new-chat", (event) =>
   openNewChat((event as CustomEvent<string>).detail),
 );
 async function projectRequest(operation: string, payload: unknown): Promise<unknown> {
@@ -50,10 +50,10 @@ export function projectDraftPayload(): { projectId?: string } {
   return projectId ? { projectId } : {};
 }
 
-window.addEventListener("pippin.panel-current-page", (event) => {
+window.addEventListener("aeon.panel-current-page", (event) => {
   const detail = (event as CustomEvent).detail;
   void chrome.runtime
-    .sendMessage({ kind: "pippin.native.current-page" })
+    .sendMessage({ kind: "aeon.native.current-page" })
     .then(detail.resolve, detail.reject);
 });
 
@@ -61,7 +61,7 @@ window.addEventListener("aeon.context-picker", (event) => {
   const detail = (event as CustomEvent).detail;
   const message =
     detail.kind === "list"
-      ? { kind: "pippin.native.list-context-tabs" }
-      : { kind: "pippin.native.capture-page", tabId: detail.tabId };
+      ? { kind: "aeon.native.list-context-tabs" }
+      : { kind: "aeon.native.capture-page", tabId: detail.tabId };
   void chrome.runtime.sendMessage(message).then(detail.resolve, detail.reject);
 });

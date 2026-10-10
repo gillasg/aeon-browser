@@ -12,8 +12,8 @@ import {
   PiModelCatalogSchema,
   PiAttachmentSchema,
   type PiAttachmentDto,
-} from "@pippin/protocol";
-import { mountPippinUi, NewTabHome, type ComposerModel, type ComposerAttachment } from "@pippin/ui";
+} from "@aeon/protocol";
+import { mountAeonUi, NewTabHome, type ComposerModel, type ComposerAttachment } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import type { UiClient } from "./ui-client-core.js";
@@ -44,12 +44,12 @@ const management = new HomeManagementController(
   () => client,
   () => render(),
   (chatId) => void openChat(chatId),
-  createManagementClient(__PIPPIN_NATIVE_TRANSPORT__, () => client),
+  createManagementClient(__AEON_NATIVE_TRANSPORT__, () => client),
 );
 
 function createView() {
   return createElement(NewTabHome, {
-    developmentFixture: !__PIPPIN_NATIVE_TRANSPORT__,
+    developmentFixture: !__AEON_NATIVE_TRANSPORT__,
     connectionLabel,
     connected: client?.socket.readyState === WebSocket.OPEN && connectionLabel === "Connected",
     chats,
@@ -67,7 +67,7 @@ function createView() {
       model: ComposerModel,
       thinkingLevel: string,
       attachments?: readonly ComposerAttachment[],
-    ) => void askPippin(query, model, thinkingLevel, attachments),
+    ) => void askAeon(query, model, thinkingLevel, attachments),
     onReadAttachments: (files: readonly File[]) => Promise.all(files.map(readComposerAttachment)),
     onNewChat: openNewChat,
     onOpenChat: (chatId: string) => void openChat(chatId),
@@ -84,7 +84,7 @@ function createView() {
 
 function render(): void {
   if (updateUi) updateUi(createView());
-  else updateUi = mountPippinUi(root, createView());
+  else updateUi = mountAeonUi(root, createView());
 }
 
 if (new URL(location.href).searchParams.get("embedded") === "1")
@@ -130,7 +130,7 @@ async function refreshHome(): Promise<void> {
   render();
 }
 
-async function askPippin(
+async function askAeon(
   text: string,
   model: ComposerModel,
   thinkingLevel: string,
@@ -172,7 +172,7 @@ async function openChatInCurrentTab(
   },
 ): Promise<void> {
   if (new URL(location.href).searchParams.get("host") === "panel") {
-    window.parent.postMessage({ kind: "pippin.select-chat", chatId }, location.origin);
+    window.parent.postMessage({ kind: "aeon.select-chat", chatId }, location.origin);
 
     return;
   }
@@ -211,7 +211,7 @@ async function loadModelCatalog(): Promise<void> {
     if (response.kind !== "command.completed" || response.result.kind !== "chat.model-catalog")
       throw new Error("Pi did not return its model catalog.");
     modelCatalog = response.result.catalog;
-    void chrome.storage.local.set({ pippinModelCatalog: modelCatalog });
+    void chrome.storage.local.set({ aeonModelCatalog: modelCatalog });
     render();
   } catch (error) {
     showError(`Pi model settings unavailable · ${toMessage(error)}`);
@@ -262,9 +262,9 @@ function requiredElement(id: string): HTMLElement {
 
 async function restoreModelCatalog(): Promise<void> {
   try {
-    const stored = await chrome.storage.local.get("pippinModelCatalog");
-    if (!modelCatalog && stored.pippinModelCatalog) {
-      const parsed = PiModelCatalogSchema.safeParse(stored.pippinModelCatalog);
+    const stored = await chrome.storage.local.get("aeonModelCatalog");
+    if (!modelCatalog && stored.aeonModelCatalog) {
+      const parsed = PiModelCatalogSchema.safeParse(stored.aeonModelCatalog);
       if (parsed.success) {
         modelCatalog = parsed.data;
         render();

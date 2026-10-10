@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import type { ChatCatalogItemDto, HomeRoutineCardDto } from "@pippin/protocol";
+import type { ChatCatalogItemDto, HomeRoutineCardDto } from "@aeon/protocol";
 export function HomeRecentCards({
   chats,
   routines,

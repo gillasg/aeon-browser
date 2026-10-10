@@ -5,13 +5,13 @@ import ts from "typescript";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRules = new Map([
-  ["@pippin/protocol", []],
-  ["@pippin/chrome-extension", ["@pippin/protocol", "@pippin/ui"]],
-  ["@pippin/ui", ["@pippin/protocol"]],
+  ["@aeon/protocol", []],
+  ["@aeon/chrome-extension", ["@aeon/protocol", "@aeon/ui"]],
+  ["@aeon/ui", ["@aeon/protocol"]],
 ]);
 const packagePaths = new Map([
-  ["@pippin/chrome-extension", "apps/chrome-extension"],
-  ["@pippin/ui", "packages/ui"],
+  ["@aeon/chrome-extension", "apps/chrome-extension"],
+  ["@aeon/ui", "packages/ui"],
 ]);
 const violations = [];
 
@@ -74,7 +74,7 @@ for (const [name, relativePath] of packagePaths) {
         if (!packageRules.get(name)?.includes(targetName)) {
           violations.push(`${name} is not allowed to depend on ${targetName}.`);
         }
-        if (targetName !== "@pippin/protocol" && declared[targetName] !== "workspace:*") {
+        if (targetName !== "@aeon/protocol" && declared[targetName] !== "workspace:*") {
           violations.push(`${name} must use workspace:* for ${targetName}.`);
         }
       }

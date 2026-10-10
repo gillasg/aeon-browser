@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
-const key = "pippin-wallpaper";
+const key = "aeon-wallpaper";
 export function applyWallpaper(): void {
   const saved = JSON.parse(localStorage.getItem(key) || "{}");
   document.documentElement.dataset.wallpaper = String(
@@ -66,10 +66,10 @@ export function useWallpaper(): void {
   useEffect(() => {
     applyWallpaper();
     window.addEventListener("storage", applyWallpaper);
-    window.addEventListener("pippin-wallpaper", applyWallpaper);
+    window.addEventListener("aeon-wallpaper", applyWallpaper);
     return () => {
       window.removeEventListener("storage", applyWallpaper);
-      window.removeEventListener("pippin-wallpaper", applyWallpaper);
+      window.removeEventListener("aeon-wallpaper", applyWallpaper);
     };
   }, []);
 }

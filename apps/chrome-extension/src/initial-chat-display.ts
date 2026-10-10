@@ -1,4 +1,4 @@
-import type { ChatComposerProps, ComposerModel, TranscriptRow } from "@pippin/ui";
+import type { ChatComposerProps, ComposerModel, TranscriptRow } from "@aeon/ui";
 
 interface InitialDisplay {
   text: string;

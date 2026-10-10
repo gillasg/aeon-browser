@@ -1,6 +1,6 @@
-import type { DaemonUiResponse, ChatViewSnapshotDto } from "@pippin/protocol";
+import type { DaemonUiResponse, ChatViewSnapshotDto } from "@aeon/protocol";
 import "./status-favicon.js";
-const key = "pippin-tab-status-" + crypto.randomUUID();
+const key = "aeon-tab-status-" + crypto.randomUUID();
 let activeChatId = "";
 let status: "idle" | "working" = "idle";
 window.addEventListener(
@@ -24,7 +24,7 @@ export function observeChatTabStatus(
           kind: "core.attention.read",
           chatId,
           completionId: values["aeon-completion-id-" + chatId] ?? null,
-          viewId: key.slice("pippin-tab-status-".length),
+          viewId: key.slice("aeon-tab-status-".length),
           visible,
         }),
       )

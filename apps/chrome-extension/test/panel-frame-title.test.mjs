@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("panel caption follows only the selected same-origin Chat and disconnects", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-panel-title-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-panel-title-"));
   const globals = installDomFixture();
   try {
     const outfile = join(directory, "title.mjs");
@@ -28,8 +28,8 @@ test("panel caption follows only the selected same-origin Chat and disconnects",
     );
     const doc = {
       head: {},
-      URL: "chrome-extension://pippin/chat.html?chatId=selected",
-      title: "Yahoo · Pippin",
+      URL: "chrome-extension://aeon/chat.html?chatId=selected",
+      title: "Yahoo · Aeon",
     };
     const frame = new globalThis.HTMLIFrameElement();
     Object.assign(frame, { id: "chat-frame", contentDocument: doc });
@@ -37,10 +37,10 @@ test("panel caption follows only the selected same-origin Chat and disconnects",
     Object.defineProperty(event, "target", { value: frame });
     root.dispatchEvent(event);
     assert.deepEqual(titles, [["selected", "Yahoo"]]);
-    doc.title = "Renamed · Pippin";
+    doc.title = "Renamed · Aeon";
     globals.observer.callback();
     assert.deepEqual(titles.at(-1), ["selected", "Renamed"]);
-    doc.URL = "chrome-extension://pippin/chat.html?chatId=other";
+    doc.URL = "chrome-extension://aeon/chat.html?chatId=other";
     globals.observer.callback();
     doc.URL = "https://example.com/chat.html?chatId=selected";
     globals.observer.callback();
@@ -59,7 +59,7 @@ function installDomFixture() {
   );
   const state = { observer: undefined, restore: () => Object.assign(globalThis, saved) };
   globalThis.HTMLIFrameElement = class {};
-  globalThis.location = { origin: new URL("chrome-extension://pippin/chat.html").origin };
+  globalThis.location = { origin: new URL("chrome-extension://aeon/chat.html").origin };
   globalThis.MutationObserver = class {
     constructor(callback) {
       this.callback = callback;

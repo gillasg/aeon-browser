@@ -5,7 +5,7 @@ import {
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
   type BrowserTargetKey,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import {
   booleanProperty,
   textValue,

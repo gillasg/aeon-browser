@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { PiBrowserContextRecord } from "@pippin/protocol";
+import type { PiBrowserContextRecord } from "@aeon/protocol";
 
 export function BrowserContextChip({
   record,

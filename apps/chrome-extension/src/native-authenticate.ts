@@ -1,4 +1,4 @@
-import { AuthReplySchema } from "@pippin/protocol";
+import { AuthReplySchema } from "@aeon/protocol";
 export function authenticate(
   socket: WebSocket,
   hello: unknown,

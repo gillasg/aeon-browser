@@ -1,4 +1,5 @@
 import { authenticate } from "./native-authenticate.js";
+import { migrateLegacyChromeStorage } from "./legacy-storage-migration.js";
 import {
   installNativeStartup,
   scheduleExecutorReconnect,
@@ -26,7 +27,7 @@ import {
   SUPPORTED_PROTOCOL_VERSION,
   type PageGrantIssueResponse,
   type PageGrantScope,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import {
   NativeExtensionRequestSchema,
   NativeOpenChatResponseSchema,
@@ -48,7 +49,7 @@ import {
   takeNativeInitialSubmit,
 } from "./native-worker-tabs.js";
 
-const NATIVE_HOST = "com.pippin.native_host_dev";
+const NATIVE_HOST = "com.aeon.native_host";
 const GRANT_WAIT_MS = 5000;
 interface PendingGrant {
   resolve(response: PageGrantIssueResponse | undefined): void;
@@ -66,6 +67,7 @@ let executor: ExecutorConnection | undefined;
 let connecting: Promise<ExecutorConnection> | undefined;
 
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+void migrateLegacyChromeStorage();
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 installNativeBrowserContextMenus(() => ensureInventoryExecutor());
 
@@ -83,14 +85,14 @@ function handleRuntimeMessage(
     return true;
   const request = NativeExtensionRequestSchema.safeParse(candidate);
   if (!request.success || sender.id !== chrome.runtime.id) return;
-  if (request.data.kind === "pippin.native.current-page") {
+  if (request.data.kind === "aeon.native.current-page") {
     if (!sender.url?.startsWith(chrome.runtime.getURL(""))) return;
     void captureCurrentPage(() => ensureInventoryExecutor()).then(sendResponse, () =>
       sendResponse(null),
     );
     return true;
   }
-  if (request.data.kind === "pippin.native.page-grant") {
+  if (request.data.kind === "aeon.native.page-grant") {
     void getPageGrant(sender, request.data.pageInstanceId, request.data.scope).then(
       sendResponse,
       () =>
@@ -98,17 +100,17 @@ function handleRuntimeMessage(
     );
     return true;
   }
-  if (request.data.kind === "pippin.native.take-initial-submit") {
+  if (request.data.kind === "aeon.native.take-initial-submit") {
     void takeNativeInitialSubmit(sender, request.data.chatId).then(sendResponse);
     return true;
   }
-  if (request.data.kind === "pippin.native.claim-browser-context-submit") {
+  if (request.data.kind === "aeon.native.claim-browser-context-submit") {
     void claimBrowserContextSubmit(sender, request.data.chatId, request.data.invocationId).then(
       sendResponse,
     );
     return true;
   }
-  if (request.data.kind !== "pippin.native.open-chat" || !isOpenChatSender(sender)) return;
+  if (request.data.kind !== "aeon.native.open-chat" || !isOpenChatSender(sender)) return;
   void openNativeChat(sender, request.data)
     .then(sendResponse)
     .catch(() =>

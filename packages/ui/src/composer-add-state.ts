@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { PiBrowserContextRecordSchema } from "@pippin/protocol";
+import { PiBrowserContextRecordSchema } from "@aeon/protocol";
 export interface ContextTab {
   tabId: number;
   title: string;

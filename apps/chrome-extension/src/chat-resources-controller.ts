@@ -1,5 +1,5 @@
-import { DaemonUiRequestSchema } from "@pippin/protocol";
-import type { ChatSurfaceProps, LoadedResourcesState } from "@pippin/ui";
+import { DaemonUiRequestSchema } from "@aeon/protocol";
+import type { ChatSurfaceProps, LoadedResourcesState } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 export class ChatResourcesController {

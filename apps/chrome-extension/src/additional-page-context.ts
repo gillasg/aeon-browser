@@ -2,7 +2,7 @@ import {
   DaemonUiRequestSchema,
   PiBrowserContextRecordSchema,
   type PiBrowserContextRecord,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 export function additionalPages(chatId: string): PiBrowserContextRecord[] {
   try {

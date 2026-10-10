@@ -1,5 +1,5 @@
-import { DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
-import type { ChatComposerProps, ComposerControls } from "@pippin/ui";
+import { DaemonUiRequestSchema, type DaemonUiResponse } from "@aeon/protocol";
+import type { ChatComposerProps, ComposerControls } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 export async function sendComposerCommand(
   client: UiClient | undefined,

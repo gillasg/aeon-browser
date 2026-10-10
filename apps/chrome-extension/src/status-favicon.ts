@@ -1,4 +1,4 @@
-const prefix = "pippin-tab-status-";
+const prefix = "aeon-tab-status-";
 const statuses = new Map<string, string>();
 const canvas = document.createElement("canvas");
 canvas.width = canvas.height = 32;

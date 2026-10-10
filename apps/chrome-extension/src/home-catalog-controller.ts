@@ -1,4 +1,4 @@
-import { type ChatCatalogItemDto, type DaemonUiResponse } from "@pippin/protocol";
+import { type ChatCatalogItemDto, type DaemonUiResponse } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 interface HomeCatalogOptions {

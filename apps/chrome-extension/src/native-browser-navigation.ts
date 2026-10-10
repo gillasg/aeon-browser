@@ -1,4 +1,4 @@
-import type { BrowserExecutorRequest } from "@pippin/protocol";
+import type { BrowserExecutorRequest } from "@aeon/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
 
 interface Activity {

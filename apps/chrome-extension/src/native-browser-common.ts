@@ -1,4 +1,4 @@
-import type { BrowserTargetKey } from "@pippin/protocol";
+import type { BrowserTargetKey } from "@aeon/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
 export interface AxNode {

@@ -1,9 +1,9 @@
 import { associateComposerContext } from "./composer-context-association.js";
 import { editComposerQueue, sendComposerCommand, messageOf } from "./composer-command.js";
-import { type DaemonUiResponse } from "@pippin/protocol";
-import type { PiBrowserContextRecord } from "@pippin/protocol";
-import type { ChatComposerProps, ComposerAttachment, ComposerControls } from "@pippin/ui";
-import type { PiAttachmentDto } from "@pippin/protocol";
+import { type DaemonUiResponse } from "@aeon/protocol";
+import type { PiBrowserContextRecord } from "@aeon/protocol";
+import type { ChatComposerProps, ComposerAttachment, ComposerControls } from "@aeon/ui";
+import type { PiAttachmentDto } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { submitComposerMessage } from "./chat-composer-submit.js";

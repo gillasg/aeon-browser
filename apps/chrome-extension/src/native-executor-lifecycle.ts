@@ -1,7 +1,7 @@
 import {
   BrowserExecutorHeartbeatReplySchema,
   BrowserExecutorHeartbeatSchema,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
 /** Prepare on worker load, browser startup, and wake before a page requests a grant. */

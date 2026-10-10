@@ -1,7 +1,7 @@
 import { ViewerControls } from "./viewer-controls.js";
 import { createElement, useEffect, useRef, useState, type ReactElement } from "react";
-import { ChatMarkdown, mountPippinUi } from "@pippin/ui";
-import { ChatIdSchema } from "@pippin/protocol";
+import { ChatMarkdown, mountAeonUi } from "@aeon/ui";
+import { ChatIdSchema } from "@aeon/protocol";
 import { z } from "zod";
 import { connectPage, connectionErrorMessage } from "./ui-connection.js";
 import { applyStoredTheme } from "./theme-preferences.js";
@@ -22,7 +22,7 @@ if (!root) throw new Error("Viewer root is missing.");
 void applyStoredTheme();
 let displayedPath = "";
 installFileViewerLinks(chatId, () => displayedPath);
-const update = mountPippinUi(root, createElement(Viewer, { data: null, error: "" }));
+const update = mountAeonUi(root, createElement(Viewer, { data: null, error: "" }));
 void load()
   .then((data) => {
     displayedPath = data.path;
@@ -42,7 +42,7 @@ async function load(): Promise<FileData> {
   ChatIdSchema.parse(chatId);
   const diffId = params.get("diff");
   if (diffId) {
-    const key = "pippin-viewer-" + diffId;
+    const key = "aeon-viewer-" + diffId;
     const values = await chrome.storage.session.get(key);
     const diff = z
       .object({
@@ -63,7 +63,7 @@ async function load(): Promise<FileData> {
     };
   }
   const connection = await connectPage(
-    __PIPPIN_NATIVE_TRANSPORT__ ? { kind: "chat", chatId } : { kind: "catalog" },
+    __AEON_NATIVE_TRANSPORT__ ? { kind: "chat", chatId } : { kind: "catalog" },
   );
   if (connection.kind !== "connected") throw new Error(connectionErrorMessage(connection.code));
   const client = connection.client;

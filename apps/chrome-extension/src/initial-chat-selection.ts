@@ -1,4 +1,4 @@
-import { DaemonUiRequestSchema, type DaemonUiResponse } from "@pippin/protocol";
+import { DaemonUiRequestSchema, type DaemonUiResponse } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 export interface InitialChatSelection {

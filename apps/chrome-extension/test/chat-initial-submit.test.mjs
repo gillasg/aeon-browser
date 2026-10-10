@@ -10,7 +10,7 @@ import test from "node:test";
 const extensionRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 test("native Chat takes and submits its staged first prompt", async () => {
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "pippin-chat-initial-submit-test-"));
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "aeon-chat-initial-submit-test-"));
   const previousChrome = globalThis.chrome;
   const previousDocument = globalThis.document;
   const previousStorage = globalThis.sessionStorage;
@@ -34,7 +34,7 @@ test("native Chat takes and submits its staged first prompt", async () => {
       format: "esm",
       platform: "node",
       target: "node22",
-      define: { __PIPPIN_NATIVE_TRANSPORT__: "true" },
+      define: { __AEON_NATIVE_TRANSPORT__: "true" },
     });
     const { submitInitialPrompt } = await import(pathToFileURL(modulePath).href);
     const client = recordingClient(submitted, chatId, requestId);
@@ -50,12 +50,12 @@ test("native Chat takes and submits its staged first prompt", async () => {
 });
 
 function takeInitialSubmit(request, chatId, requestId) {
-  assert.deepEqual(request, { kind: "pippin.native.take-initial-submit", chatId });
+  assert.deepEqual(request, { kind: "aeon.native.take-initial-submit", chatId });
   return {
     ok: true,
     requestId,
     text: "First prompt",
-    model: { provider: "pippin-fixture", id: "model-one" },
+    model: { provider: "aeon-fixture", id: "model-one" },
     thinkingLevel: "low",
   };
 }
@@ -96,7 +96,7 @@ function commandResponse(request, chatId, requestId) {
 function assertInitialCommands(submitted, chatId) {
   assert.equal(submitted.length, 3);
   assert.equal(submitted[0].operation, "chat.model");
-  assert.deepEqual(submitted[0].payload, { chatId, provider: "pippin-fixture", id: "model-one" });
+  assert.deepEqual(submitted[0].payload, { chatId, provider: "aeon-fixture", id: "model-one" });
   assert.equal(submitted[1].operation, "chat.thinking");
   assert.deepEqual(submitted[1].payload, { chatId, level: "low" });
   assert.equal(submitted[2].operation, "chat.submit");

@@ -3,8 +3,8 @@ import {
   DaemonUiRequestSchema,
   type DaemonUiResponse,
   type PiBrowserContextRecord,
-} from "@pippin/protocol";
-import type { ComposerAttachment } from "@pippin/ui";
+} from "@aeon/protocol";
+import type { ComposerAttachment } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 interface SubmitComposerMessageInput {

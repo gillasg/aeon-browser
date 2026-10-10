@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("own side-panel chat without a tab skips the tab-bound handoff safely", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pippin-panel-handoff-"));
+  const directory = await mkdtemp(join(tmpdir(), "aeon-panel-handoff-"));
   const previousChrome = globalThis.chrome;
   try {
     const id = "npcdopokfkpfmepknhoecppgdgmkmihh";

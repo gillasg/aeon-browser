@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@pippin/protocol";
+import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
 type Resources = NonNullable<ManagementSnapshotDto["resources"]>;

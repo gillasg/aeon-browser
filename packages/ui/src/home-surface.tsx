@@ -1,12 +1,12 @@
 import { SidebarResizer } from "./sidebar-resizer.js";
 import { useWallpaper } from "./wallpaper-settings.js";
 import { useEffect, useState, type ReactElement } from "react";
-import type { ChatCatalogItemDto } from "@pippin/protocol";
+import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { HomeCatalog } from "./home-catalog.js";
 import { HomeSidebar } from "./home-sidebar.js";
-import type { ManagementSnapshotDto } from "@pippin/protocol";
-import type { HomeRoutineCardDto } from "@pippin/protocol";
-import type { PiModelCatalogDto } from "@pippin/protocol";
+import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { HomeRoutineCardDto } from "@aeon/protocol";
+import type { PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel, ComposerAttachment } from "./chat-composer.js";
 import { HomeStart } from "./home-start.js";
 import { ManagementSurface } from "./management-surface.js";
@@ -66,10 +66,10 @@ type RenderedHomeProps = NewTabHomeProps & { onManageRoutines(): void };
 
 export function NewTabHome(props: NewTabHomeProps): ReactElement {
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem("pippin-sidebar-expanded") !== "true",
+    () => localStorage.getItem("aeon-sidebar-expanded") !== "true",
   );
   useEffect(() => {
-    localStorage.setItem("pippin-sidebar-expanded", String(!collapsed));
+    localStorage.setItem("aeon-sidebar-expanded", String(!collapsed));
   }, [collapsed]);
   useWallpaper();
   const route = new URLSearchParams(globalThis.location?.search ?? "").get("view");

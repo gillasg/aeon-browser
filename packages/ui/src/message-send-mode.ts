@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 export type MessageSendMode = "followUp" | "steer";
-const key = "pippinMessageSendMode";
+const key = "aeonMessageSendMode";
 export function useMessageSendMode(): [MessageSendMode, (mode: MessageSendMode) => void] {
   const [mode, setMode] = useState<MessageSendMode>("followUp");
   useEffect(() => {

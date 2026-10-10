@@ -4,8 +4,8 @@ import {
   NativeTakeInitialSubmitResponseSchema,
   pageGrantErrorMessage,
 } from "./native-extension-message.js";
-import type { PageGrantScope } from "@pippin/protocol";
-import type { PiAttachmentDto } from "@pippin/protocol";
+import type { PageGrantScope } from "@aeon/protocol";
+import type { PiAttachmentDto } from "@aeon/protocol";
 
 interface OpenChatOptions {
   targetWindowId?: number;
@@ -45,7 +45,7 @@ async function openNativeChat(
   options: OpenChatOptions,
 ): Promise<{ focusedExisting: boolean }> {
   const response = await chrome.runtime.sendMessage({
-    kind: "pippin.native.open-chat",
+    kind: "aeon.native.open-chat",
     chatId,
     ...options,
   });
@@ -64,7 +64,7 @@ export async function takeNativeInitialSubmit(chatId: string): Promise<
   | undefined
 > {
   const response = NativeTakeInitialSubmitResponseSchema.safeParse(
-    await chrome.runtime.sendMessage({ kind: "pippin.native.take-initial-submit", chatId }),
+    await chrome.runtime.sendMessage({ kind: "aeon.native.take-initial-submit", chatId }),
   );
   if (!response.success) throw new Error("The initial Chat prompt handoff was invalid.");
   if (!response.data.ok) {

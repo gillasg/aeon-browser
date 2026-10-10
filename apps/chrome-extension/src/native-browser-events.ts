@@ -1,4 +1,4 @@
-import type { BrowserExecutorRequest, BrowserTargetKey } from "@pippin/protocol";
+import type { BrowserExecutorRequest, BrowserTargetKey } from "@aeon/protocol";
 
 interface EventItem {
   method: string;

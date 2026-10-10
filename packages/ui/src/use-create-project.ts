@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
-import type { ProjectDto } from "@pippin/protocol";
+import type { ProjectDto } from "@aeon/protocol";
 import { requestProject } from "./project-requests.js";
 export interface CreateProjectState {
   name: string;

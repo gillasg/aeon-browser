@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactElement, type RefObject } from "react";
-import type { ChatCatalogItemDto } from "@pippin/protocol";
+import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { PickerChevron } from "./picker-chevron.js";
 
 export interface SidePanelProps {

@@ -4,11 +4,11 @@ import {
   PageGrantScopeSchema,
   ProtocolVersionSchema,
   PiAttachmentSchema,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 
 export const NativePageGrantRequestSchema = z
   .object({
-    kind: z.literal("pippin.native.page-grant"),
+    kind: z.literal("aeon.native.page-grant"),
     pageInstanceId: z.string().uuid(),
     scope: PageGrantScopeSchema,
   })
@@ -47,7 +47,7 @@ export const NativePageGrantResponseSchema = z.discriminatedUnion("ok", [
 
 export const NativeOpenChatRequestSchema = z
   .object({
-    kind: z.literal("pippin.native.open-chat"),
+    kind: z.literal("aeon.native.open-chat"),
     chatId: ChatIdSchema,
     targetWindowId: z.number().int().nonnegative().optional(),
     reuseCurrentTab: z.boolean().optional(),
@@ -68,14 +68,14 @@ export const NativeOpenChatRequestSchema = z
 
 export const NativeTakeInitialSubmitRequestSchema = z
   .object({
-    kind: z.literal("pippin.native.take-initial-submit"),
+    kind: z.literal("aeon.native.take-initial-submit"),
     chatId: ChatIdSchema,
   })
   .strict();
 
 export const NativeClaimBrowserContextSubmitRequestSchema = z
   .object({
-    kind: z.literal("pippin.native.claim-browser-context-submit"),
+    kind: z.literal("aeon.native.claim-browser-context-submit"),
     chatId: ChatIdSchema,
     invocationId: z.string().uuid(),
   })
@@ -118,11 +118,11 @@ export const NativeOpenChatResponseSchema = z.discriminatedUnion("ok", [
 ]);
 
 export const NativeExtensionRequestSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("pippin.native.current-page") }).strict(),
-  z.object({ kind: z.literal("pippin.native.list-context-tabs") }).strict(),
+  z.object({ kind: z.literal("aeon.native.current-page") }).strict(),
+  z.object({ kind: z.literal("aeon.native.list-context-tabs") }).strict(),
   z
     .object({
-      kind: z.literal("pippin.native.capture-page"),
+      kind: z.literal("aeon.native.capture-page"),
       tabId: z.number().int().nonnegative(),
     })
     .strict(),

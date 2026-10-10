@@ -1,4 +1,4 @@
-import type { BrowserScrollState, BrowserExecutorRequest, BrowserStep } from "@pippin/protocol";
+import type { BrowserScrollState, BrowserExecutorRequest, BrowserStep } from "@aeon/protocol";
 import {
   getCenter,
   getViewportCenter,

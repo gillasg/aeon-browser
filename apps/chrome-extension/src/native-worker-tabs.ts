@@ -1,4 +1,4 @@
-import type { PageGrantScope } from "@pippin/protocol";
+import type { PageGrantScope } from "@aeon/protocol";
 import {
   NativeExtensionRequestSchema,
   NativeOpenChatResponseSchema,
@@ -13,7 +13,7 @@ import {
 const nativeOrigin = new URL(chrome.runtime.getURL("/")).origin;
 type OpenRequest = Extract<
   ReturnType<typeof NativeExtensionRequestSchema.parse>,
-  { kind: "pippin.native.open-chat" }
+  { kind: "aeon.native.open-chat" }
 >;
 
 export function isPageScopeAllowed(

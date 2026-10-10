@@ -1,5 +1,5 @@
 import { BrowserActionError } from "./native-browser-common.js";
-import type { BrowserExecutorRequest } from "@pippin/protocol";
+import type { BrowserExecutorRequest } from "@aeon/protocol";
 import { onNode } from "./native-browser-dom.js";
 
 interface FrameNode {

@@ -3,7 +3,7 @@ import {
   AuthReplySchema,
   SUPPORTED_PROTOCOL_VERSION,
   type PageGrantScope,
-} from "@pippin/protocol";
+} from "@aeon/protocol";
 import {
   NativePageGrantRequestSchema,
   NativePageGrantResponseSchema,
@@ -16,7 +16,7 @@ export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectR
   try {
     raw = await chrome.runtime.sendMessage(
       NativePageGrantRequestSchema.parse({
-        kind: "pippin.native.page-grant",
+        kind: "aeon.native.page-grant",
         pageInstanceId,
         scope,
       }),
