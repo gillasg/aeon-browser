@@ -26,7 +26,7 @@ internal static class HostConfigurationProbe
             writer.Start();
             var config = HostConfiguration.Load(path);
             writer.Join();
-            if (config.DaemonEntrypoint != entry) throw new Exception("Transient read did not recover");
+            if (config.DaemonEntrypoint != Path.GetFullPath(entry)) throw new Exception("Transient read did not recover");
             File.WriteAllText(path, "{}");
             try { HostConfiguration.Load(path); throw new Exception("Invalid configuration accepted"); }
             catch (InvalidDataException) { }
