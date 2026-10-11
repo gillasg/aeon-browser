@@ -156,7 +156,9 @@ async function initializeRuntime(
   await migration.migrate(await registry.snapshot());
   await threads.recover();
   await routines.start();
-  await prepareChat(service);
+  // Warm the next chat's resources in the background: readiness must not wait on compiling
+  // extensions (seconds when cold), and the first chat joins this same preparation.
+  void prepareChat(service);
 }
 
 function managementRoutines(
