@@ -113,7 +113,10 @@ async function buildLayer(folder) {
         "downloads",
         "scroll",
       ]
-        .map((name) => `export * from './apps/chrome-extension/src/native-browser-${name}.ts';`)
+        .map(
+          (name) =>
+            `export * from './apps/chrome-extension/node_modules/@browser-use-extension/engine/src/native-browser-${name}.ts';`,
+        )
         .join("\n"),
       resolveDir: resolve("."),
     },

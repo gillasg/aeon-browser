@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
+const require = createRequire(import.meta.url);
+const engine = (file) => require.resolve("@browser-use-extension/engine/" + file);
+
 const appRoot = fileURLToPath(new URL("../", import.meta.url));
 
 export async function buildExtension() {
@@ -26,8 +29,8 @@ export async function buildExtension() {
     [join(appRoot, "src/site-scripts-page.ts"), "site-scripts.js"],
     [join(appRoot, "src/home-page.ts"), "home.js"],
     [join(appRoot, "src/sidepanel-page.ts"), "sidepanel.js"],
-    [join(appRoot, "src/code-offscreen.ts"), "code-offscreen.js"],
-    [join(appRoot, "src/code-sandbox.ts"), "code-sandbox.js"],
+    [engine("code-offscreen"), "code-offscreen.js"],
+    [engine("code-sandbox"), "code-sandbox.js"],
   ];
   await Promise.all(entries.map(([entry, file]) => buildEntry(shared, output, entry, file)));
 

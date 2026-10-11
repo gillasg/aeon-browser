@@ -1,10 +1,11 @@
-import { authenticate } from "./native-authenticate.js";
-import { migrateLegacyChromeStorage } from "./legacy-storage-migration.js";
+import { authenticate } from "@browser-use-extension/engine/native-authenticate";
+import { configureEngine } from "@browser-use-extension/engine/engine-config";
+import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
   installNativeStartup,
   scheduleExecutorReconnect,
   startExecutorHeartbeat,
-} from "./native-executor-lifecycle.js";
+} from "@browser-use-extension/engine/native-executor-lifecycle";
 import { handleContextPicker } from "./context-picker-handler.js";
 import {
   captureCurrentPage,
@@ -15,7 +16,7 @@ import {
   installCoreAttentionBridge,
   handleCoreAttentionMessage,
 } from "./completion-notifications.js";
-import { installBrowserPopupGuard } from "./native-browser-popup.js";
+import { installBrowserPopupGuard } from "@browser-use-extension/engine/native-browser-popup";
 import {
   BrowserExecutorHeartbeatReplySchema,
   AuthHelloSchema,
@@ -33,16 +34,22 @@ import {
   NativeOpenChatResponseSchema,
   NativePageGrantResponseSchema,
 } from "./native-extension-message.js";
-import { synchronizeBrowserInventory } from "./native-inventory-client.js";
-import { handleBrowserExecutorMessage, releaseBrowserExecutor } from "./native-browser-executor.js";
-import { handleBrowserCodeMessage, resetRealm } from "./code-runtime-host.js";
+import { synchronizeBrowserInventory } from "@browser-use-extension/engine/native-inventory-client";
+import {
+  handleBrowserExecutorMessage,
+  releaseBrowserExecutor,
+} from "@browser-use-extension/engine/native-browser-executor";
+import {
+  handleBrowserCodeMessage,
+  resetRealm,
+} from "@browser-use-extension/engine/code-runtime-host";
 import {
   getBrowserIdentity,
   hostErrorCode,
   nativeErrorCode,
   sameScope,
   type BrowserIdentity,
-} from "./native-worker-identity.js";
+} from "@browser-use-extension/engine/native-worker-identity";
 import {
   isOpenChatSender,
   isPageScopeAllowed,
@@ -67,6 +74,11 @@ interface ExecutorConnection extends BrowserIdentity {
 let executor: ExecutorConnection | undefined;
 let connecting: Promise<ExecutorConnection> | undefined;
 
+configureEngine({
+  controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
+  idleTitle: "Open Aeon Chat",
+  notificationIcon: "completion-icon.png",
+});
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void migrateLegacyChromeStorage();
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);

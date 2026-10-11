@@ -5,13 +5,23 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
 import { build } from "esbuild";
 
 async function load(source, directory) {
   const outfile = join(directory, source + ".mjs");
   await build({
+    // Aeon's own modules live in src; browser modules come from the engine package.
     entryPoints: [
-      new URL("../src/" + source + ".ts", import.meta.url).pathname.replace(/^\/(\w:)/, "$1"),
+      [
+        new URL("../src/" + source + ".ts", import.meta.url),
+        new URL(
+          "../node_modules/@browser-use-extension/engine/src/" + source + ".ts",
+          import.meta.url,
+        ),
+      ]
+        .map((url) => url.pathname.replace(/^\/(\w:)/, "$1"))
+        .find((path) => existsSync(path)),
     ],
     outfile,
     bundle: true,

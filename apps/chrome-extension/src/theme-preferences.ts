@@ -1,7 +1,7 @@
 import {
   migrateLegacyChromeStorage,
   migrateLegacyLocalStorage,
-} from "./legacy-storage-migration.js";
+} from "@browser-use-extension/engine/legacy-storage-migration";
 
 migrateLegacyLocalStorage();
 

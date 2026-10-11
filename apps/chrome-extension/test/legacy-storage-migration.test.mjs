@@ -50,7 +50,14 @@ test("legacy extension storage moves to the Aeon keys without overwriting newer 
   try {
     const outfile = join(directory, "migration.mjs");
     await build({
-      entryPoints: [fileURLToPath(new URL("../src/legacy-storage-migration.ts", import.meta.url))],
+      entryPoints: [
+        fileURLToPath(
+          new URL(
+            "../node_modules/@browser-use-extension/engine/src/legacy-storage-migration.ts",
+            import.meta.url,
+          ),
+        ),
+      ],
       outfile,
       bundle: true,
       platform: "node",

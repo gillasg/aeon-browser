@@ -34,6 +34,9 @@ importers:
       "@aeon/ui":
         specifier: workspace:*
         version: link:../../packages/ui
+      "@browser-use-extension/engine":
+        specifier: file:../../vendor/browser-use-extension-engine-0.1.0.tgz
+        version: file:vendor/browser-use-extension-engine-0.1.0.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.6.0.tgz)
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -96,6 +99,16 @@ packages:
         tarball: file:vendor/aeon-protocol-0.6.0.tgz,
       }
     version: 0.6.0
+
+  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.1.0.tgz":
+    resolution:
+      {
+        integrity: sha512-lFGsHxYYY3Yn/V4DQUyg0OBTM3l0HUFpGwVNi2+kJpjhZhSu86OIWhoogtIL9U1XbxQvb+LQ9tSqO/JAbha0TQ==,
+        tarball: file:vendor/browser-use-extension-engine-0.1.0.tgz,
+      }
+    version: 0.1.0
+    peerDependencies:
+      "@aeon/protocol": 0.6.0
 
   "@cacheable/memory@2.2.0":
     resolution:
@@ -1758,6 +1771,12 @@ packages:
 snapshots:
   "@aeon/protocol@file:vendor/aeon-protocol-0.6.0.tgz":
     dependencies:
+      zod: 4.6.5
+
+  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.1.0.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.6.0.tgz)":
+    dependencies:
+      "@aeon/protocol": file:vendor/aeon-protocol-0.6.0.tgz
+      acorn: 8.18.0
       zod: 4.6.5
 
   "@cacheable/memory@2.2.0":

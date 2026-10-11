@@ -1,5 +1,5 @@
 import { applyStoredTheme } from "./theme-preferences.js";
-import { readScripts, SCRIPT_KEY } from "./site-script-runtime.js";
+import { readScripts, SCRIPT_KEY } from "@browser-use-extension/engine/site-script-runtime";
 applyStoredTheme();
 document.getElementById("extension-details")?.addEventListener("click", () => {
   void chrome.tabs.create({ url: "chrome://extensions/?id=" + chrome.runtime.id });

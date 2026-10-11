@@ -11,7 +11,14 @@ test("regular-chat browser work pairs tabs automatically and side-panel work kee
   try {
     const outfile = join(folder, "layout.mjs");
     await build({
-      entryPoints: [fileURLToPath(new URL("../src/native-browser-layout.ts", import.meta.url))],
+      entryPoints: [
+        fileURLToPath(
+          new URL(
+            "../node_modules/@browser-use-extension/engine/src/native-browser-layout.ts",
+            import.meta.url,
+          ),
+        ),
+      ],
       outfile,
       bundle: true,
       platform: "node",

@@ -12,7 +12,14 @@ test("browser locators reject ambiguous names and never choose the first matchin
   try {
     const outfile = join(directory, "debugger.mjs");
     await build({
-      entryPoints: [fileURLToPath(new URL("../src/native-browser-debugger.ts", import.meta.url))],
+      entryPoints: [
+        fileURLToPath(
+          new URL(
+            "../node_modules/@browser-use-extension/engine/src/native-browser-debugger.ts",
+            import.meta.url,
+          ),
+        ),
+      ],
       outfile,
       bundle: true,
       platform: "node",
