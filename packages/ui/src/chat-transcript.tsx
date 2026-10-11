@@ -8,6 +8,7 @@ import {
 } from "react";
 import { PendingWork } from "./pending-work.js";
 import { AnnotationSelection } from "./annotation-selection.js";
+import { HandoffCard, pendingHandoff } from "./handoff-card.js";
 import type { TranscriptRow } from "./transcript-model.js";
 import { TranscriptTurn, transcriptTurns } from "./transcript-turn.js";
 
@@ -56,18 +57,41 @@ export function ChatTranscript({
             }}
           />
         ))}
-        {connecting ? (
-          <PendingWork key="connecting" connecting />
-        ) : preparing ? (
-          <PendingWork key="preparing" preparing />
-        ) : (
-          (starting || running) &&
-          !latestWorkVisible(rows, starting) && <PendingWork key="working" />
-        )}
+        <TranscriptTail
+          rows={rows}
+          running={running}
+          starting={starting}
+          connecting={connecting}
+          preparing={preparing}
+        />
       </section>
       <AnnotationSelection root={root} />
       {awayFromLatest && <JumpToLatest onClick={jumpToLatest} />}
     </div>
+  );
+}
+
+// What follows the last turn: a pending hand-off card, then the working/connecting indicator.
+function TranscriptTail(props: {
+  rows: readonly TranscriptRow[];
+  running: boolean;
+  starting: boolean;
+  connecting: boolean;
+  preparing: boolean;
+}): ReactElement {
+  const handoff = pendingHandoff(props.rows);
+  return (
+    <>
+      {handoff && <HandoffCard key={handoff.toolCallId} handoff={handoff} />}
+      {props.connecting ? (
+        <PendingWork key="connecting" connecting />
+      ) : props.preparing ? (
+        <PendingWork key="preparing" preparing />
+      ) : (
+        (props.starting || props.running) &&
+        !latestWorkVisible(props.rows, props.starting) && <PendingWork key="working" />
+      )}
+    </>
   );
 }
 

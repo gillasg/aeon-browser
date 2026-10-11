@@ -12,6 +12,8 @@ import { executeLocalBrowserStep } from "./native-browser-executor.js";
 import { browserSessionOwner } from "./native-browser-session.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { notePreviewActivity } from "./native-browser-preview.js";
+import { handOffToUser } from "./native-browser-handoff.js";
+import { networkCall } from "./native-browser-network.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
 const OFFSCREEN = "code-offscreen.html";
@@ -30,6 +32,7 @@ interface Cell {
   calls: Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>;
   sequence: number;
   progressTimer: ReturnType<typeof setTimeout> | undefined;
+  waitingForUser: boolean;
   done: boolean;
 }
 const cells = new Map<string, Cell>();
@@ -95,6 +98,7 @@ async function startCell(identity: BrowserIdentity, socket: WebSocket, run: Brow
     calls: new Map(),
     sequence: 0,
     progressTimer: undefined,
+    waitingForUser: false,
     done: false,
   };
   cells.set(run.cellId, cell);
@@ -162,11 +166,20 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   return true;
 });
 
+// Non-step requests: browser info and hand-off stay local, everything else goes to Core.
+function serveCall(cell: Cell, value: Record<string, unknown> | null): Promise<unknown> {
+  if (value?.browserInfo === true)
+    return Promise.resolve({ clientInstanceIds: [cell.identity.clientInstanceId] });
+  if (value && typeof value.handoff === "object" && value.handoff)
+    return handoff(cell, value.handoff);
+  if (value && typeof value.network === "string")
+    return networkCall(authorizedTarget(cell, value.target).tabId, value.network, value);
+  return callCore(cell, value);
+}
+
 async function serve(cell: Cell, request: unknown): Promise<unknown> {
   const value = request as Record<string, unknown> | null;
-  if (value && value.browserInfo === true)
-    return { clientInstanceIds: [cell.identity.clientInstanceId] };
-  if (!value || typeof value.op !== "string") return callCore(cell, request);
+  if (!value || typeof value.op !== "string") return serveCall(cell, value);
   const step = await prepare(cell, value);
   authorize(cell, step);
   const entry: Record<string, unknown> = {
@@ -205,6 +218,50 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   } finally {
     progress(cell);
   }
+}
+
+async function handoff(cell: Cell, request: object): Promise<"done" | "cancelled"> {
+  const { message } = request as { message?: unknown };
+  const target = authorizedTarget(cell, (request as { target?: unknown }).target);
+  notePreviewActivity(cell.run.chatId, target.tabId);
+  const text = String(message ?? "").slice(0, 500) || "Please take over, then click Done.";
+  const entry: Record<string, unknown> = {
+    index: cell.steps.length,
+    action: { op: "handoff", message: text, target },
+    disposition: "running",
+  };
+  cell.steps.push(entry);
+  setWaiting(cell, true);
+  try {
+    const outcome = await handOffToUser(target.tabId, text, () => !cell.done);
+    Object.assign(entry, { disposition: outcome === "done" ? "completed" : "failed" });
+    return outcome;
+  } catch (error) {
+    Object.assign(entry, { disposition: "failed", code: describe(error) });
+    throw error;
+  } finally {
+    setWaiting(cell, false);
+  }
+}
+
+/** A target from a local request, held to the same ownership rules as browser steps. */
+function authorizedTarget(cell: Cell, target: unknown): BrowserTargetKey {
+  const parsed = BrowserStepSchema.safeParse({ op: "observe", kind: "semantic", target });
+  if (!parsed.success || parsed.data.op !== "observe") throw new Error("INVALID_TARGET");
+  authorize(cell, parsed.data);
+  return parsed.data.target;
+}
+
+// Sent at once rather than throttled: Core pauses or restarts the cell deadline on it.
+function setWaiting(cell: Cell, waiting: boolean): void {
+  cell.waitingForUser = waiting;
+  if (cell.done) return;
+  send(cell.socket, {
+    kind: "browser.code.progress",
+    cellId: cell.run.cellId,
+    steps: progressSteps(cell),
+    waitingForUser: waiting,
+  });
 }
 
 async function prepare(cell: Cell, value: Record<string, unknown>): Promise<BrowserStep> {
@@ -270,13 +327,20 @@ function progress(cell: Cell): void {
   cell.progressTimer = setTimeout(() => {
     cell.progressTimer = undefined;
     if (cell.done) return;
-    // Progress is for the live activity view; images and full observations wait for the result.
-    const steps = cell.steps.slice(-MAX_TRACE).map(({ result, ...rest }) => ({
-      ...rest,
-      ...(result ? { result: { kind: (result as { kind?: unknown }).kind } } : {}),
-    }));
-    send(cell.socket, { kind: "browser.code.progress", cellId: cell.run.cellId, steps });
+    send(cell.socket, {
+      kind: "browser.code.progress",
+      cellId: cell.run.cellId,
+      steps: progressSteps(cell),
+    });
   }, 150);
+}
+
+// Progress is for the live activity view; images and full observations wait for the result.
+function progressSteps(cell: Cell): Record<string, unknown>[] {
+  return cell.steps.slice(-MAX_TRACE).map(({ result, ...rest }) => ({
+    ...rest,
+    ...(result ? { result: { kind: (result as { kind?: unknown }).kind } } : {}),
+  }));
 }
 
 async function ensureOffscreen(): Promise<void> {

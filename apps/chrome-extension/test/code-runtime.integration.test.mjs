@@ -24,7 +24,19 @@ test(
   "browser_code cells run inside the extension against real Chrome",
   { skip: process.platform !== "win32" || !existsSync(chromePath) || !existsSync(extension) },
   async (t) => {
-    const page = createServer((_request, response) => {
+    const page = createServer((request, response) => {
+      if (request.url?.startsWith("/api/orders")) {
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            orders: [
+              { id: 1, total: 42 },
+              { id: 2, total: 7 },
+            ],
+          }),
+        );
+        return;
+      }
       response.setHeader("content-type", "text/html");
       response.end(
         `<title>Fixture</title><h1>Shop</h1><input aria-label="Search"><button onclick="document.title='clicked'">Go</button>`,
@@ -69,10 +81,12 @@ test(
           expiresAt: Date.now() + 600000, daemonProtocolVersion: request.protocolVersion });`,
       });
       log("bootstrap overridden");
-      await core.connected;
+      // A bootstrap that failed before the override is retried on tab activation, so opening the
+      // fixture tab also wakes the connection.
       const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json());
       const browserCdp = await connect(version.webSocketDebuggerUrl);
       await browserCdp("Target.createTarget", { url: pageUrl });
+      await core.connected;
       const target = await core.target(pageUrl);
       log("target", JSON.stringify(target));
       const chatId = randomUUID();
@@ -162,6 +176,55 @@ test(
         assert.ok(frames.includes(true), JSON.stringify(frames));
       });
 
+      await t.test("a hand-off waits for the user, pausing Core's deadline", async () => {
+        const pending = run("await bu.handoff('Sign in to continue'); 'resumed'");
+        const banner = await handoffPage(port, pageUrl);
+        assert.deepEqual(core.waiting, [true]);
+        await banner.answer("done");
+        const result = await pending;
+        assert.equal(result.error, undefined);
+        assert.equal(result.value, "resumed");
+        assert.deepEqual(core.waiting, [true, false]);
+        assert.ok(result.steps.some((step) => step.action?.op === "handoff"));
+        assert.equal(await banner.present(), false);
+
+        const cancelled = run("await bu.handoff('Pick a seat')");
+        await (await handoffPage(port, pageUrl)).answer("cancelled");
+        assert.match((await cancelled).error, /HANDOFF_CANCELLED/);
+
+        // The chat's hand-off card answers through a runtime message instead of the banner.
+        const fromChat = run("await bu.handoff('Approve the order'); 'approved'");
+        await handoffPage(port, pageUrl);
+        const extensionPage = await waitForTarget(port, (item) =>
+          item.url.endsWith("/code-offscreen.html"),
+        );
+        const sender = await connect(extensionPage.webSocketDebuggerUrl);
+        await sender("Runtime.evaluate", {
+          expression: `chrome.runtime.sendMessage({ kind: "aeon.handoff.answer", tabId: ${target.tabId}, answer: "done" })`,
+        });
+        assert.equal((await fromChat).value, "approved");
+      });
+
+      await t.test("network recording finds a site's JSON API and fetchJson calls it", async () => {
+        const learned = await run(`
+          await page.network.start();
+          await page.evaluate(() => fetch('/api/orders?page=1').then((r) => r.json()));
+          await page.waitFor(() => true);
+          let calls = [];
+          for (let i = 0; i < 20 && !calls.some((c) => c.status); i++) {
+            calls = await page.network.list('/api/');
+            await new Promise((r) => setTimeout(r, 50));
+          }
+          const body = await page.network.body(calls[0].id);
+          await page.network.stop();
+          [calls.length, calls[0].method, calls[0].json, body.orders.length]`);
+        assert.equal(learned.error, undefined);
+        assert.deepEqual(learned.value, [1, "GET", true, 2]);
+        const direct = await run("(await page.fetchJson('/api/orders?page=2')).orders[0].total");
+        assert.equal(direct.value, 42);
+        assert.match((await run("await page.network.list()")).error, /Not recording/);
+      });
+
       await t.test("workspace calls are served by Core", async () => {
         const result = await run("await checkpoint('progress.json', {done: 3})");
         assert.equal(result.error, undefined);
@@ -205,6 +268,7 @@ async function fakeCore() {
     tabs = [];
   const results = new Map();
   const calls = [];
+  const waiting = [];
   const skills = new Map();
   const connected = new Promise((done) =>
     server.on("connection", (ws) => {
@@ -282,6 +346,8 @@ async function fakeCore() {
               value: { path: "C:/workspace/" + message.request.name },
             }),
           );
+        } else if (message.kind === "browser.code.progress") {
+          if (message.waitingForUser !== undefined) waiting.push(message.waitingForUser);
         } else if (message.kind === "browser.code.result") results.get(message.cellId)?.(message);
       });
     }),
@@ -289,6 +355,7 @@ async function fakeCore() {
   return {
     port: server.address().port,
     calls,
+    waiting,
     connected,
     async target(url) {
       for (let i = 0; i < 80; i++) {
@@ -316,6 +383,33 @@ async function fakeCore() {
     },
     close: () => server.close(),
   };
+}
+
+// Finds the fixture tab showing the hand-off banner and answers it as the user would.
+async function handoffPage(port, url) {
+  for (let i = 0; i < 80; i++) {
+    const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
+    for (const item of targets.filter((entry) => entry.type === "page" && entry.url === url)) {
+      const page = await connect(item.webSocketDebuggerUrl);
+      const check = async () =>
+        (
+          await page("Runtime.evaluate", {
+            expression: "!!document.getElementById('aeon-handoff')",
+            returnByValue: true,
+          })
+        ).result?.result?.value === true;
+      if (await check())
+        return {
+          present: check,
+          answer: (state) =>
+            page("Runtime.evaluate", {
+              expression: `globalThis[Symbol.for('aeon.handoff')] = ${JSON.stringify(state)}`,
+            }),
+        };
+    }
+    await sleep(100);
+  }
+  throw new Error("Hand-off banner never appeared");
 }
 
 async function debugPort(profile) {

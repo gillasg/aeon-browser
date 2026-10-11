@@ -3644,3 +3644,63 @@ body[data-host="panel"] .composer-meta {
 .aeon-browser-preview:hover {
   border-color: var(--aeon-border-strong);
 }
+
+/* Hand-off: the agent waits for the user in a tab (shape after the Grok takeover card). */
+.handoff-card {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+.handoff-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 550;
+}
+.handoff-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #16a34a26;
+  color: #4ade80;
+  font-size: 12px;
+  font-weight: 500;
+}
+.handoff-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.handoff-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.handoff-actions button {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.handoff-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.handoff-actions .handoff-primary {
+  border-color: transparent;
+  background: var(--text);
+  color: var(--surface);
+}
+.handoff-actions .handoff-skip {
+  margin-left: auto;
+  border: 0;
+  color: var(--muted);
+}

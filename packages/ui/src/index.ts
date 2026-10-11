@@ -24,3 +24,4 @@ export {
 } from "./loaded-resources.js";
 
 export { ChatMarkdown } from "./chat-markdown.js";
+export { HANDOFF_EVENT, type HandoffAction } from "./handoff-card.js";

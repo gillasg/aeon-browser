@@ -77,6 +77,22 @@ var browser = Object.freeze({
     inspect: async (fn, arg) => (await __step({op:'evaluate',target,expression:__expression(fn,arg)},true)).data.value,
     pdfText: (options = {}) => browser.page(target).inspect(__readPdfText,options),
     cdp: async (method, params = {}) => (await __step({op:'cdp',target,method,params})).data.value,
+    network: Object.freeze({
+      start: () => __call({network:'start', target}),
+      list: (options = {}) => __call({network:'list', target, match: typeof options === 'string' ? options : options.match}),
+      body: (id) => __call({network:'body', target, id}),
+      stop: () => __call({network:'stop', target}),
+    }),
+    fetchJson: async (url, init = {}) => {
+      var result = await browser.page(target).evaluate(async ({url, init}) => {
+        var response = await fetch(url, {credentials: 'include', ...init});
+        var text = await response.text();
+        try { return {status: response.status, data: JSON.parse(text)}; } catch { return {status: response.status, text: text.slice(0, 200000)}; }
+      }, {url, init});
+      if (result.status >= 400) throw Error('HTTP ' + result.status + ' from ' + url + ': ' + JSON.stringify(result.data ?? result.text).slice(0, 300));
+      return result.data ?? result.text;
+    },
+    close: async () => { await __step({op:'cdp',target,method:'Page.close',params:{}}).catch(() => {}); __states.delete(__key(target)); __tabs.delete(__key(target)); },
     waitFor: (fn, options = {}) => __step({op:'waitFor',target,expression:'('+fn.toString()+')()',...options}),
     scroll: (direction = 'down', amount = 1200, element) =>
       __step({op:'scroll', target, direction, amount, ...(element ? {element} : {})}),
@@ -181,6 +197,14 @@ var bu = Object.freeze({
     var result = await browser.page(target).fill(element, text);
     if (options.enter) result = await browser.page(target).press(element, 'Enter', {focus:false});
     return result;
+  },
+  handoff: async (message, options = {}) => {
+    var target = options.target || __lastTarget;
+    if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');
+    var outcome = await __call({handoff: {message: String(message).slice(0, 500), target}});
+    __states.delete(__key(target));
+    if (outcome === 'cancelled') throw Error('HANDOFF_CANCELLED: the user cancelled the hand-off');
+    return 'done';
   },
 });
 // Draws each interactive bu id on the page, captures, then removes the overlay.

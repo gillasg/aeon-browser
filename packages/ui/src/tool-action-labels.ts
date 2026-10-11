@@ -190,6 +190,7 @@ function progressive(value: string): string {
 }
 
 const browserLabels: ReadonlyArray<readonly [RegExp, string]> = [
+  [/handoff/, "Waiting for you on"],
   [/history/, "Browsing recent activity"],
   [/listtabs|tabslist|tablist/, "Checking open browser tabs"],
   [/scroll/, "Scrolling page"],
