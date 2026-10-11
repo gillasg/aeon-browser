@@ -255,9 +255,11 @@ export class ChatPiUiController {
       const after = client.send(
         DaemonUiRequestSchema.parse({ kind: "command", requestId, operation, payload }),
       );
+      // These run against the live Pi session: it may be starting, and compaction is a model call.
       const response = await client.waitFor(
         (message) => isCommandResponse(message, requestId),
         after,
+        operation === "chat.compact" ? 600_000 : 60_000,
       );
       if (response.kind === "command.failed") throw new Error(response.message);
       return response;

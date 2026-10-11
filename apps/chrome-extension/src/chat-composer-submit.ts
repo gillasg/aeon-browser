@@ -31,6 +31,8 @@ export async function submitComposerMessage(input: SubmitComposerMessageInput): 
   const response = await input.client.waitFor(
     (item) => isSubmitResponse(item, input.requestId, input.wasRunning),
     after,
+    // A reopened chat starts its Pi session first; a short timeout here would invite a resend.
+    60_000,
   );
   if (response.kind === "command.failed") {
     input.onError(`${response.code} · ${response.message}`);
