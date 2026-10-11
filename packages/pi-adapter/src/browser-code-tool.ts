@@ -79,14 +79,67 @@ export function createBrowserCodeTool(
       await journalOutput(result, workspace, operationId);
       const failed = Boolean(cell.error);
       const body = {
-        ...envelope(),
+        steps,
         ...result,
         ...(cell.reset ? { reset: true } : {}),
         ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
       };
-      return { content: browserContent(JSON.stringify(body)), isError: failed, details: undefined };
+      return { content: modelContent(body), isError: failed, details: undefined };
     },
   });
+}
+
+// The model rereads this on every later call, so it gets one line per step plus the cell's own
+// output instead of the raw envelope with its repeated tab identities. Screenshots stay images.
+function modelContent(body: {
+  steps: Record<string, unknown>[];
+  output: string;
+  value?: unknown;
+  error?: string;
+  reset?: boolean;
+}): ReturnType<typeof browserContent> {
+  const images = browserContent(JSON.stringify({ steps: body.steps })).slice(1);
+  const parts = [stepSummary(body.steps)];
+  if (body.output) parts.push("output:\n" + body.output);
+  if (body.value !== undefined) parts.push("value: " + (JSON.stringify(body.value) ?? "undefined"));
+  if (body.error) parts.push("error: " + body.error);
+  if (body.reset) parts.push("runtime reset: top-level variables are gone");
+  return [{ type: "text", text: parts.join("\n") }, ...images];
+}
+
+function stepSummary(steps: Record<string, unknown>[]): string {
+  const lines = steps.filter((step) => step.action !== undefined).map(stepLine);
+  if (!lines.length) return "steps: none";
+  const shown = lines.length > 40 ? [...lines.slice(0, 10), "...", ...lines.slice(-29)] : lines;
+  return "steps:\n" + shown.join("\n");
+}
+
+function stepLine(step: Record<string, unknown>): string {
+  if (typeof step.action !== "object" || step.action === null) return "- " + String(step.action);
+  const action = step.action as Record<string, unknown>;
+  const detail = actionDetail(action);
+  const result = step.result as
+    { kind?: unknown; tab?: { target?: { tabId?: unknown } } } | undefined;
+  const opened = result?.kind === "tab" ? " -> tab " + String(result.tab?.target?.tabId) : "";
+  const failed =
+    step.disposition === "failed"
+      ? " FAILED " + String(step.code ?? "") + (step.detail ? ": " + String(step.detail) : "")
+      : "";
+  return "- " + String(action.op) + (detail ? " " + detail : "") + opened + failed;
+}
+
+function actionDetail(action: Record<string, unknown>): string {
+  const target = action.target as { tabId?: unknown } | undefined;
+  const element = action.element as Record<string, unknown> | undefined;
+  const id = element && (element.backendNodeId ?? element.value ?? element.ref ?? element.role);
+  return [
+    target?.tabId !== undefined ? "tab " + String(target.tabId) : "",
+    typeof action.url === "string" ? action.url : "",
+    id === undefined ? "" : String(id),
+    typeof action.method === "string" ? action.method : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 async function serveCall(
@@ -122,6 +175,11 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
 function browserCodeError(message = "OPERATION_FAILED", detail?: string): string {
   const text = detail ? `${message}: ${detail}` : message;
   if (!/is not a function|is not defined/.test(text)) return text;
+  if (/\.(title|url) is not a function/.test(text))
+    return (
+      text.split("\n")[0] +
+      "\npage.url and page.title are properties: use page.url, not page.url()."
+    );
   return (
     text.split("\n")[0] +
     "\nAvailable: browser.openTab(url), browser.tabs(), bu.use(target), bu.state(), bu.click(id), bu.type(id,text), page.evaluate(fn), page.cdp(method,params), page.screenshot()."
