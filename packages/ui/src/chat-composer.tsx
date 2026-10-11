@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { ComposerAddMenu } from "./composer-add-menu.js";
-import {
-  AnnotationAttachments,
-  serializeAnnotations,
-  useAnnotations,
-} from "./transcript-annotations.js";
+import { serializeAnnotations, useAnnotations } from "./transcript-annotations.js";
 import { PiQueue } from "./pi-queue.js";
 import { useMessageSendMode } from "./message-send-mode.js";
 import { PromptField } from "./prompt-field.js";
@@ -93,7 +89,6 @@ export function ChatComposer(props: ChatComposerProps): ReactElement {
           {props.editNotice}
         </p>
       )}
-      <AnnotationAttachments />
       <PiQueue controls={props.controls} onAction={props.onQueueAction} />
       <PageContextTray
         chatId={props.chatId}

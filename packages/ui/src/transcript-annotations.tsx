@@ -47,15 +47,16 @@ export function serializeAnnotations(records: readonly ResponseAnnotation[]): st
         .join("\n\n"),
     )
     .join("\n\n");
-  return `[Pippin annotations v1]\n\n${body}\n\n[/Pippin annotations v1]`;
+  return `[Aeon annotations v1]\n\n${body}\n\n[/Aeon annotations v1]`;
 }
-export function AnnotationAttachments(): ReactElement | null {
+// Pending annotations render as chips beside pasted images, in the same attachment row.
+export function AnnotationChips(): ReactElement | null {
   const annotations = useAnnotations();
   if (!annotations?.records.length) return null;
   return (
-    <div className="annotation-attachments" aria-label="Response annotations">
+    <>
       {annotations.records.map((record, index) => (
-        <AnnotationAttachment
+        <AnnotationChip
           key={record.id}
           record={record}
           index={index}
@@ -63,10 +64,10 @@ export function AnnotationAttachments(): ReactElement | null {
           onRemove={() => annotations.remove(record.id)}
         />
       ))}
-    </div>
+    </>
   );
 }
-function AnnotationAttachment({
+function AnnotationChip({
   record,
   index,
   onUpdate,
@@ -79,46 +80,46 @@ function AnnotationAttachment({
 }): ReactElement {
   const [editing, setEditing] = useState(false);
   const [comment, setComment] = useState(record.comment);
+  const save = () => {
+    onUpdate(comment.trim());
+    setEditing(false);
+  };
   return (
-    <div className="annotation-attachment">
-      <span>
-        <strong>{index + 1} selection</strong>
-        <q title={record.quote}>{record.quote}</q>
-        {editing ? (
-          <>
-            <textarea
-              value={comment}
-              autoFocus
-              aria-label="Edit annotation comment"
-              onChange={(event) => setComment(event.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                onUpdate(comment.trim());
-                setEditing(false);
-              }}
-            >
-              Save
-            </button>
-            <button type="button" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            aria-label={`Edit annotation ${index + 1}`}
-            onClick={() => {
-              setComment(record.comment);
-              setEditing(true);
-            }}
-          >
-            {record.comment || "Add comment"}
-          </button>
-        )}
-      </span>
-      <button type="button" aria-label={`Remove annotation ${index + 1}`} onClick={onRemove}>
+    <div className="annotation-chip" title={record.quote}>
+      <q>{record.quote}</q>
+      {editing ? (
+        <textarea
+          value={comment}
+          autoFocus
+          aria-label={`Edit annotation ${index + 1}`}
+          onChange={(event) => setComment(event.target.value)}
+          onBlur={save}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              save();
+            } else if (event.key === "Escape") setEditing(false);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          className="annotation-chip-comment"
+          aria-label={`Edit annotation ${index + 1}`}
+          onClick={() => {
+            setComment(record.comment);
+            setEditing(true);
+          }}
+        >
+          {record.comment || "Add comment"}
+        </button>
+      )}
+      <button
+        type="button"
+        className="annotation-chip-remove"
+        aria-label={`Remove annotation ${index + 1}`}
+        onClick={onRemove}
+      >
         ×
       </button>
     </div>

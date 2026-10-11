@@ -3422,43 +3422,73 @@ body[data-host="panel"] .composer-meta {
   color: var(--muted);
   font-size: 12px;
 }
-.annotation-attachments {
+/* Same footprint as .attachment-thumbnail so annotations sit in the image row. */
+.annotation-chip {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.annotation-attachment {
-  display: flex;
-  align-items: start;
-  gap: 8px;
-  max-width: 320px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-md);
-  background: var(--surface);
-}
-.annotation-attachment > span {
-  display: grid;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 4px;
-  min-width: 0;
-}
-.annotation-attachment strong {
+  width: 168px;
+  height: 76px;
+  flex: none;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
   font-size: 12px;
-  color: var(--muted);
-  font-weight: 400;
 }
-.annotation-attachment q {
+.annotation-chip q {
+  display: -webkit-box;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text);
+  line-height: 1.35;
 }
-.annotation-attachment button {
+.annotation-chip-comment,
+.annotation-chip textarea {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
   background: transparent;
   color: var(--muted);
-  border: 0;
   font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   cursor: pointer;
+}
+.annotation-chip textarea {
+  height: 1.4em;
+  resize: none;
+  color: var(--text);
+  outline: none;
+  cursor: text;
+}
+.annotation-chip-comment:hover {
+  color: var(--text);
+}
+.annotation-chip-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.annotation-chip-remove:hover {
+  background: var(--surface-raised);
 }
 
 ::highlight(aeon-annotations) {
@@ -3469,19 +3499,6 @@ body[data-host="panel"] .composer-meta {
 ::highlight(aeon-selection) {
   background: #ffffff38;
   color: inherit;
-}
-
-.annotation-attachment textarea {
-  width: 100%;
-  min-height: 44px;
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-sm);
-  font: inherit;
-}
-.annotation-attachment button:hover {
-  color: var(--text);
 }
 
 .sent-annotations {

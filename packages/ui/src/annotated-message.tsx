@@ -22,8 +22,11 @@ function parseAnnotations(text: string): {
   prompt: string;
   annotations: Array<{ quote: string; comment: string }>;
 } | null {
-  const opening = "[Pippin annotations v1]\n\n";
-  const closing = "\n\n[/Pippin annotations v1]";
+  // Messages sent before the rename carry the old Pippin tag.
+  const tag = ["Aeon", "Pippin"].find((name) => text.endsWith(`\n\n[/${name} annotations v1]`));
+  if (!tag) return null;
+  const opening = `[${tag} annotations v1]\n\n`;
+  const closing = `\n\n[/${tag} annotations v1]`;
   const start = text.lastIndexOf(opening);
   if (start < 0 || !text.endsWith(closing)) return null;
   const body = text.slice(start + opening.length, -closing.length);

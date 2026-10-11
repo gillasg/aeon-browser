@@ -8,6 +8,7 @@ import type {
 } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker } from "./pi-model-picker.js";
 import { PiContextUsageRing } from "./pi-context-usage.js";
+import { AnnotationChips, useAnnotations } from "./transcript-annotations.js";
 
 export interface ComposerPanelsProps {
   connected?: boolean;
@@ -48,9 +49,11 @@ export function AttachmentList({
   attachments,
   onRemoveAttachment,
 }: Pick<ComposerPanelsProps, "attachments" | "onRemoveAttachment">): ReactElement | null {
-  if (!attachments.length) return null;
+  const annotations = useAnnotations();
+  if (!attachments.length && !annotations?.records.length) return null;
   return (
     <div className="attachment-list" aria-live="polite">
+      <AnnotationChips />
       {attachments.map((file, index) => (
         <AttachmentPreview
           key={file.name + ":" + index}
