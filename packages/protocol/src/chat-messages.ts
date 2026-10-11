@@ -248,10 +248,19 @@ export const ChatCloseViewRequestSchema = z
   })
   .strict();
 
+/** Liveness only: the page asks while it waits on work, so slow work is never mistaken for a dead daemon. */
+export const PingRequestSchema = z
+  .object({ kind: z.literal("ping"), requestId: RequestIdSchema })
+  .strict();
+export const PongMessageSchema = z
+  .object({ kind: z.literal("pong"), requestId: RequestIdSchema })
+  .strict();
+
 export const DaemonUiRequestSchema = z.discriminatedUnion("kind", [
   ChatCommandRequestSchema,
   ChatSubscribeRequestSchema,
   ChatCloseViewRequestSchema,
+  PingRequestSchema,
 ]);
 
 export const ChatSnapshotMessageSchema = z
@@ -312,6 +321,7 @@ export const DaemonUiResponseSchema = z.union([
   ChatEventMessageSchema,
   ChatSubscriptionFailedMessageSchema,
   ChatViewClosedMessageSchema,
+  PongMessageSchema,
 ]);
 
 export type DaemonUiRequest = z.infer<typeof DaemonUiRequestSchema>;

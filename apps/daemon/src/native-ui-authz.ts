@@ -1,7 +1,10 @@
 import type { DaemonUiRequest } from "@aeon/protocol";
 import type { GrantContext } from "./grant-authority.js";
 
-export function authorizeNativeUiScope(context: GrantContext, request: DaemonUiRequest): boolean {
+export function authorizeNativeUiScope(
+  context: GrantContext,
+  request: Exclude<DaemonUiRequest, { kind: "ping" }>,
+): boolean {
   if (context.role !== "ui" || !context.scope) return false;
   if (context.scope.kind === "management")
     return (

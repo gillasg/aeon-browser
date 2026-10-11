@@ -25,7 +25,8 @@ function parseRequest(data: RawData, isBinary: boolean): DaemonUiRequest | undef
 export function attachDevChatCommands(
   socket: WebSocket,
   service: ChatService,
-  authorize: (request: DaemonUiRequest) => boolean = () => true,
+  // Pings are answered before authorization; every other request is checked.
+  authorize: (request: Exclude<DaemonUiRequest, { kind: "ping" }>) => boolean = () => true,
   attachBrowserContext?: (
     chatId: string,
     target: BrowserTargetKey,
@@ -47,6 +48,10 @@ export function attachDevChatCommands(
     const request = parseRequest(data, isBinary);
     if (!request) {
       socket.close(1008, "Invalid closed Aeon command schema");
+      return;
+    }
+    if (request.kind === "ping") {
+      socket.send(JSON.stringify({ kind: "pong", requestId: request.requestId }));
       return;
     }
     if (!authorize(request)) {

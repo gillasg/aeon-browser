@@ -122,6 +122,8 @@ export {
   ChatSubscribeRequestSchema,
   ChatViewClosedMessageSchema,
   DaemonUiRequestSchema,
+  PingRequestSchema,
+  PongMessageSchema,
   DaemonUiResponseSchema,
   type ChatCommandRequest,
   type DaemonUiRequest,
