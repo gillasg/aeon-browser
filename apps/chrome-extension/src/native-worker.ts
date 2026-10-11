@@ -235,8 +235,12 @@ async function sendNativeBootstrap(identity: BrowserIdentity) {
     protocolVersion: SUPPORTED_PROTOCOL_VERSION,
     ...identity,
   });
+  // A host that never answers (slow start, daemon restarting) must not hold the single-flight
+  // connection forever; timing out hands it back to the normal reconnect schedule.
   const result = await new Promise<{ response?: unknown; error?: string }>((resolve) => {
+    const timer = globalThis.setTimeout(() => resolve({ error: "BOOTSTRAP_TIMEOUT" }), 10_000);
     chrome.runtime.sendNativeMessage(NATIVE_HOST, request, (response) => {
+      globalThis.clearTimeout(timer);
       resolve({
         response,
         ...(chrome.runtime.lastError ? { error: chrome.runtime.lastError.message } : {}),
