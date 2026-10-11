@@ -45,6 +45,8 @@ export const BrowserCodeProgressSchema = z
     kind: z.literal("browser.code.progress"),
     cellId: z.string().uuid(),
     steps: z.array(z.record(z.string(), z.unknown())).max(256),
+    // True while the cell is handed off to the user; the cell deadline is paused meanwhile.
+    waitingForUser: z.boolean().optional(),
   })
   .strict();
 

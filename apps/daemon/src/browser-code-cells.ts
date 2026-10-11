@@ -19,6 +19,8 @@ interface Pending {
   socket: WebSocket;
   input: BrowserCodeCellInput;
   finish: (result?: BrowserCodeResult, error?: Error) => void;
+  /** Stops the deadline while the user handles a hand-off; restarts it in full afterwards. */
+  waiting: (waiting: boolean) => void;
 }
 
 /** Runs browser_code cells inside a connected executor: one round trip per cell, not per step. */
@@ -40,10 +42,18 @@ export class BrowserCodeCells {
         if (socket.readyState === WebSocket.OPEN)
           socket.send(JSON.stringify({ kind: "browser.code.cancel", cellId, reset }));
       };
-      const timer = setTimeout(() => {
+      const expire = () => {
         cancel(true);
         finish(undefined, new Error("Browser code exceeded its deadline; runtime reset"));
-      }, input.timeoutMs + 5000);
+      };
+      let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(
+        expire,
+        input.timeoutMs + 5000,
+      );
+      const waiting = (paused: boolean) => {
+        clearTimeout(timer);
+        timer = paused ? undefined : setTimeout(expire, input.timeoutMs + 5000);
+      };
       const abort = () => {
         cancel(true);
         finish(undefined, new Error("Browser workflow cancelled; runtime reset"));
@@ -59,7 +69,7 @@ export class BrowserCodeCells {
           resolve(result);
         } else reject(error ?? new Error("OPERATION_FAILED"));
       };
-      this.cells.set(cellId, { socket, input, finish });
+      this.cells.set(cellId, { socket, input, finish, waiting });
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("close", close);
       socket.send(
@@ -91,7 +101,9 @@ export class BrowserCodeCells {
     const progress = BrowserCodeProgressSchema.safeParse(candidate);
     if (progress.success) {
       const cell = this.cells.get(progress.data.cellId);
-      if (cell?.socket === socket) cell.input.onProgress(progress.data.steps);
+      if (cell?.socket !== socket) return;
+      if (progress.data.waitingForUser !== undefined) cell.waiting(progress.data.waitingForUser);
+      cell.input.onProgress(progress.data.steps);
       return;
     }
     const result = BrowserCodeResultSchema.safeParse(candidate);
