@@ -5,3 +5,4 @@ allowBuilds:
   esbuild: set this to true or false
 minimumReleaseAgeExclude:
   - "@aeon/protocol"
+  - "@browser-use-extension/engine"
