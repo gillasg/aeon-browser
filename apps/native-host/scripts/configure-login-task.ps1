@@ -7,8 +7,7 @@ $taskFolder = $taskService.GetFolder('\')
 $taskName = 'Aeon-Core-Login'
 $description = 'Aeon owned login startup: ' + $StartupScript
 $powerShellArguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $StartupScript + '"'
-# conhost --headless gives PowerShell no console at all. -WindowStyle Hidden alone still flashes a
-# window, which the per-minute repetition below would show every minute.
+# conhost --headless gives PowerShell no console at all; -WindowStyle Hidden alone still flashes.
 $hostPath = Join-Path $env:WINDIR 'System32\conhost.exe'
 $arguments = '--headless "' + $PowerShellPath + '" ' + $powerShellArguments
 $existingTask = $null
@@ -42,14 +41,9 @@ $definition.Principal.UserId = $userId
 $definition.Principal.LogonType = 3
 $trigger = $definition.Triggers.Create(9)
 $trigger.UserId = $userId
-# Re-run every minute for the whole session. The supervisor is single-instance, so a healthy
-# daemon makes this a no-op; a daemon that exited for any reason is back within a minute.
-$trigger.Repetition.Interval = 'PT1M'
-$trigger.Repetition.Duration = ''
-# A logon trigger's repetition only begins at the next logon; this one starts it on install.
-$registered = $definition.Triggers.Create(7)
-$registered.Repetition.Interval = 'PT1M'
-$registered.Repetition.Duration = ''
+# Starting at logon only gives the daemon a head start. Recovery does not depend on it: the
+# supervisor restarts a daemon that exits, and the native host starts the supervisor whenever
+# Chrome connects and finds none.
 $action = $definition.Actions.Create(0)
 $action.Path = $hostPath
 $action.Arguments = $arguments
