@@ -3,13 +3,23 @@ import type { RoutineSchedule } from "@aeon/domain";
 const formatters = new Map<string, Intl.DateTimeFormat>();
 const MAX_INTERVAL_MINUTES = 525_600;
 
-export function parseRoutineSchedule(value: unknown, now = new Date()): RoutineSchedule {
+/** Watchers (routines with a check) may run every minute; plain routines wake the agent, so five. */
+export function parseRoutineSchedule(
+  value: unknown,
+  now = new Date(),
+  minMinutes = 5,
+): RoutineSchedule {
   if (!isRecord(value)) throw new Error("Routine schedule must be an object.");
   const timeZone =
     value.timeZone === undefined ? localTimeZone() : requiredString(value.timeZone, 80);
   formatter(timeZone);
   if (value.kind === "interval") {
-    const everyMinutes = integer(value.everyMinutes, 5, MAX_INTERVAL_MINUTES, "everyMinutes");
+    const everyMinutes = integer(
+      value.everyMinutes,
+      minMinutes,
+      MAX_INTERVAL_MINUTES,
+      "everyMinutes",
+    );
     const anchorUtc =
       value.anchorUtc === undefined ? now.toISOString() : requiredString(value.anchorUtc, 40);
     if (!Number.isFinite(Date.parse(anchorUtc)))

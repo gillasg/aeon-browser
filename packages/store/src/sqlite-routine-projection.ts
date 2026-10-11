@@ -6,6 +6,7 @@ export interface RoutineRow {
   chat_id: string;
   title: string;
   instruction: string;
+  check_code: string | null;
   schedule_json: string;
   next_due_at: string | null;
   required_browser_instance_id: string | null;
@@ -37,6 +38,7 @@ export function toRoutine(row: RoutineRow): RoutineRecord {
     chatId: asChatId(row.chat_id),
     title: row.title,
     instruction: row.instruction,
+    check: row.check_code ?? null,
     schedule: JSON.parse(row.schedule_json) as RoutineRecord["schedule"],
     nextDueAt: row.next_due_at,
     requiredBrowserInstanceId: row.required_browser_instance_id,

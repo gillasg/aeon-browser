@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const STORE_SCHEMA_VERSION = 8;
+export const STORE_SCHEMA_VERSION = 9;
 
 export function migrate(database: Database.Database): void {
   database.exec(`
@@ -34,6 +34,12 @@ export function migrate(database: Database.Database): void {
         "CREATE TABLE deleted_chats (chat_id TEXT PRIMARY KEY REFERENCES chats(chat_id), deleted_at TEXT NOT NULL);",
       );
       markVersion(database, 8);
+    })();
+  if (current < 9)
+    database.transaction(() => {
+      // Optional watcher check: browser code run before the routine wakes the agent.
+      database.exec("ALTER TABLE routines ADD COLUMN check_code TEXT;");
+      markVersion(database, 9);
     })();
 }
 

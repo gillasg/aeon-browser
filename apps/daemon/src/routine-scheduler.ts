@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   PiRoutineRunEvidence,
   PiSessionHandle,
   AeonProductStore,
+  RoutineRecord,
   RoutineRunRecord,
   RoutineRunState,
 } from "@aeon/domain";
@@ -12,6 +13,7 @@ import { collectDueSlots } from "./routine-schedule.js";
 
 const TICK_MS = 10_000;
 const MAX_RUNS_PER_TICK = 32;
+const CHECK_TIMEOUT_MS = 30_000;
 
 export class RoutineScheduler {
   private timer: NodeJS.Timeout | undefined;
@@ -126,6 +128,8 @@ export class RoutineScheduler {
       });
       return;
     }
+    const instruction = await this.instructionFor(routine, run);
+    if (instruction === undefined) return;
     this.update(run.runId, "pending");
     try {
       await this.chats.withSession(run.chatId, async (session) => {
@@ -141,7 +145,7 @@ export class RoutineScheduler {
             routineId: routine.routineId,
             title: routine.title,
             scheduledSlot: run.scheduledSlot,
-            instruction: routine.instruction,
+            instruction,
           });
           this.update(run.runId, "accepted", { piEntryId: accepted.piEntryId });
         } catch {
@@ -152,6 +156,53 @@ export class RoutineScheduler {
       });
     } catch {
       this.update(run.runId, "uncertain", { lastError: "ROUTINE_ACCEPTANCE_UNCERTAIN" });
+    }
+  }
+
+  /** The instruction to send, or undefined when a watcher's check did not pass (run recorded). */
+  private async instructionFor(
+    routine: RoutineRecord,
+    run: RoutineRunRecord,
+  ): Promise<string | undefined> {
+    if (!routine.check) return routine.instruction;
+    const check = await this.runCheck(routine, run);
+    if (check.met)
+      return `${routine.instruction}
+
+This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`;
+    const completedAt = new Date().toISOString();
+    if (check.error) this.update(run.runId, "failed", { completedAt, lastError: check.error });
+    else this.update(run.runId, "skipped", { completedAt });
+    return undefined;
+  }
+
+  /**
+   * Runs a watcher's check as plain browser code: no model call. It gets its own realm (one per
+   * routine), so a check can keep values between slots without touching the chat's own realm.
+   */
+  private async runCheck(
+    routine: RoutineRecord,
+    run: RoutineRunRecord,
+  ): Promise<{ met: boolean; value?: unknown; error?: string }> {
+    const raw = await this.browser.execute(
+      checkRealm(routine.routineId),
+      `routine-check:${run.runId}`,
+      {
+        codeCell: {
+          code: routine.check,
+          timeoutMs: CHECK_TIMEOUT_MS,
+          onCall: () =>
+            Promise.reject(new Error("Workspace calls are unavailable in routine checks")),
+          onProgress: () => undefined,
+        },
+      },
+    );
+    try {
+      const result = JSON.parse(raw) as { value?: unknown; error?: string };
+      if (result.error) return { met: false, error: `CHECK_FAILED: ${result.error}`.slice(0, 500) };
+      return { met: Boolean(result.value), value: result.value };
+    } catch {
+      return { met: false, error: "CHECK_FAILED: unreadable result" };
     }
   }
 
@@ -223,4 +274,10 @@ export class RoutineScheduler {
   ): void {
     this.store.updateRoutineRun(runId, { state, ...fields }, new Date().toISOString());
   }
+}
+
+/** A stable UUID per routine, used as the chat id of its check realm. */
+function checkRealm(routineId: string): string {
+  const hex = createHash("sha256").update(`routine-check:${routineId}`).digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

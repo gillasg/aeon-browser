@@ -46,13 +46,15 @@ export class RoutineManagementTools {
 
   private create(args: Record<string, unknown>, chatId: ChatId): RoutineRecord {
     const now = new Date();
-    const schedule = parseRoutineSchedule(args.schedule, now);
+    const check = optionalCheck(args.check, null);
+    const schedule = parseRoutineSchedule(args.schedule, now, check ? 1 : 5);
     const timestamp = now.toISOString();
     const saved = this.store.createRoutine({
       routineId: randomUUID(),
       chatId,
       title: requiredString(args.title, "title"),
       instruction: requiredString(args.instruction, "instruction"),
+      check,
       schedule,
       nextDueAt: nextRoutineOccurrence(schedule, now),
       requiredBrowserInstanceId: optionalNullableUuid(
@@ -71,7 +73,8 @@ export class RoutineManagementTools {
   private update(args: Record<string, unknown>, chatId: ChatId): RoutineRecord {
     const id = requiredString(args.routineId, "routineId");
     const current = this.requireOwned(id, chatId);
-    const schedule = parseRoutineSchedule(args.schedule);
+    const check = optionalCheck(args.check, current.check);
+    const schedule = parseRoutineSchedule(args.schedule, new Date(), check ? 1 : 5);
     const enabled = boolean(args.enabled, "enabled");
     const updated = this.store.updateRoutine(
       id,
@@ -79,6 +82,7 @@ export class RoutineManagementTools {
       {
         title: requiredString(args.title, "title"),
         instruction: requiredString(args.instruction, "instruction"),
+        check,
         schedule,
         requiredBrowserInstanceId: optionalNullableUuid(
           args.requiredBrowserInstanceId,
@@ -137,6 +141,15 @@ function previewSchedule(input: unknown): {
 function requiredString(value: unknown, label: string): string {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${label} is required.`);
   return value.trim();
+}
+
+/** Omitted keeps the current check (editors that do not know about checks); null removes it. */
+function optionalCheck(value: unknown, fallback: string | null): string | null {
+  if (value === undefined) return fallback;
+  if (value === null) return null;
+  if (typeof value !== "string" || !value.trim() || value.length > 8000)
+    throw new Error("check must be browser code of at most 8000 characters, or null.");
+  return value;
 }
 
 function integer(value: unknown): number {

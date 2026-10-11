@@ -21,6 +21,8 @@ export interface RoutineRecord {
   chatId: ChatId;
   title: string;
   instruction: string;
+  /** Watcher check: browser code the daemon runs first; the agent only wakes on a truthy result. */
+  check: string | null;
   schedule: RoutineSchedule;
   nextDueAt: string | null;
   requiredBrowserInstanceId: string | null;
@@ -175,7 +177,13 @@ export interface AeonProductStore {
     expectedRevision: number,
     patch: Pick<
       RoutineRecord,
-      "title" | "instruction" | "schedule" | "nextDueAt" | "requiredBrowserInstanceId" | "enabled"
+      | "title"
+      | "instruction"
+      | "check"
+      | "schedule"
+      | "nextDueAt"
+      | "requiredBrowserInstanceId"
+      | "enabled"
     >,
     updatedAt: string,
   ): RoutineRecord;

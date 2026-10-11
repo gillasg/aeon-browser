@@ -28,6 +28,7 @@ const routineCreate = Type.Object(
   {
     title: Type.String({ minLength: 1, maxLength: 120 }),
     instruction: Type.String({ minLength: 1, maxLength: 20_000 }),
+    check: Type.Optional(Type.String({ minLength: 1, maxLength: 8000 })),
     schedule: record,
     requiredBrowserInstanceId: Type.Optional(Type.String({ format: "uuid" })),
   },
@@ -40,6 +41,7 @@ const routineUpdate = Type.Object(
     expectedRevision: Type.Integer({ minimum: 1 }),
     title: Type.String({ minLength: 1, maxLength: 120 }),
     instruction: Type.String({ minLength: 1, maxLength: 20_000 }),
+    check: Type.Optional(Type.Union([Type.String({ minLength: 1, maxLength: 8000 }), Type.Null()])),
     schedule: record,
     enabled: Type.Boolean(),
     requiredBrowserInstanceId: Type.Optional(
@@ -120,7 +122,11 @@ function createRoutineTools(
       host,
       "create_routine",
       "Create a routine. Optionally require the browser's clientInstanceId from " +
-        "browser.tabs() in browser_code; absent instances are recorded unavailable before Pi starts.",
+        "browser.tabs() in browser_code; absent instances are recorded unavailable before Pi starts. " +
+        "For a watcher, add check: browser_code that runs on each slot without a model call " +
+        "(e.g. const p = await browser.openTab(url); const price = await p.evaluate(() => ...); " +
+        "await p.close(); price < 400 ? {price} : false). You are woken with the instruction only " +
+        "when its last expression is truthy, and receive that value. Watchers may run every minute.",
       routineCreate,
     ),
     tool(
