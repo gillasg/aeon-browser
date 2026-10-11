@@ -46,6 +46,10 @@ $trigger.UserId = $userId
 # daemon makes this a no-op; a daemon that exited for any reason is back within a minute.
 $trigger.Repetition.Interval = 'PT1M'
 $trigger.Repetition.Duration = ''
+# A logon trigger's repetition only begins at the next logon; this one starts it on install.
+$registered = $definition.Triggers.Create(7)
+$registered.Repetition.Interval = 'PT1M'
+$registered.Repetition.Duration = ''
 $action = $definition.Actions.Create(0)
 $action.Path = $hostPath
 $action.Arguments = $arguments
