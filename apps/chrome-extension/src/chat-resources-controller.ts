@@ -67,8 +67,6 @@ export class ChatResourcesController {
           (message.kind === "command.completed" || message.kind === "command.failed") &&
           message.requestId === requestId,
         after,
-        // Resources come from the chat's Pi session, which may still be starting (seconds).
-        60_000,
       );
       if (generation !== this.generation) return;
       if (response.kind === "command.failed") {

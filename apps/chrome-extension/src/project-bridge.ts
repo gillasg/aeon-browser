@@ -39,7 +39,6 @@ async function projectRequest(operation: string, payload: unknown): Promise<unkn
       (message.kind === "command.completed" || message.kind === "command.failed") &&
       message.requestId === requestId,
     after,
-    operation === "project.pick-folder" ? 150_000 : 60_000,
   );
   if (response.kind === "command.failed") throw new Error(response.message);
   if (response.kind !== "command.completed") throw new Error("Unexpected project response.");

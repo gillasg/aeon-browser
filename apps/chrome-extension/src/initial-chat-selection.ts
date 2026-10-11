@@ -35,7 +35,7 @@ async function sendCommand(
     DaemonUiRequestSchema.parse({ kind: "command", requestId, ...command }),
   );
   // First use materializes Pi's session and configured MCP connections.
-  const response = await client.waitFor(isCommandResponse(requestId), after, 60_000);
+  const response = await client.waitFor(isCommandResponse(requestId), after);
   if (response.kind === "command.failed") throw new Error(response.message);
   if (response.kind !== "command.completed") throw new Error("Pi rejected the initial settings.");
 }

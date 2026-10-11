@@ -15,8 +15,6 @@ export async function sendComposerCommand(
       (message.kind === "command.completed" || message.kind === "command.failed") &&
       message.requestId === requestId,
     after,
-    // Every composer command runs against the chat's Pi session, which may still be starting.
-    60_000,
   );
   if (response.kind === "command.failed") throw new Error(response.message);
   return response;

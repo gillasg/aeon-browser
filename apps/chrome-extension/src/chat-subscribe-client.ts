@@ -25,6 +25,5 @@ export async function subscribeSavedChat(
         message.kind === "chat.subscription-failed") &&
       message.requestId === requestId,
     after,
-    60_000,
   );
 }

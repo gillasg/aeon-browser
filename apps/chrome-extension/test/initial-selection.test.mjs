@@ -27,7 +27,8 @@ test("first prompt waits for native Pi setup and applies model before effort", a
       },
       async waitFor(predicate, after, timeout) {
         assert.equal(after, sent.length);
-        assert.equal(timeout, 60_000);
+        // Setup waits on connection liveness, not a fixed per-request timer.
+        assert.equal(timeout, undefined);
         const request = sent.at(-1);
         const reply = { kind: "command.completed", requestId: request.requestId };
         assert.equal(predicate(reply), true);
