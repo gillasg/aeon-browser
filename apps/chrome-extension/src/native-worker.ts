@@ -78,6 +78,7 @@ configureEngine({
   controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
   idleTitle: "Open Aeon Chat",
   notificationIcon: "completion-icon.png",
+  tabGroupTitle: () => "Aeon",
 });
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void migrateLegacyChromeStorage();

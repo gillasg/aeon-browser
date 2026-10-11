@@ -12,8 +12,6 @@ import { handoffKey, clearAutoPrompt, readChatContext } from "./browser-context-
 import { NativeClaimBrowserContextSubmitResponseSchema } from "./native-extension-message.js";
 import { isPageScopeAllowed } from "./native-worker-tabs.js";
 
-const MENU_ASK_SELECTION = "aeon.ask-selection";
-const MENU_SUMMARIZE = "aeon.summarize-page";
 const MENU_ADD_CONTEXT = "aeon.add-page-context";
 
 export function installNativeBrowserContextMenus(ensureExecutor: () => Promise<unknown>): void {
@@ -46,13 +44,12 @@ function isContextMenuClick(
     tab?.id !== undefined &&
     tab.windowId !== undefined &&
     tab.windowId >= 0 &&
-    isSafePageUrl(info.pageUrl ?? tab.url ?? "") &&
-    (info.menuItemId !== MENU_ASK_SELECTION || Boolean(info.selectionText?.trim()))
+    isSafePageUrl(info.pageUrl ?? tab.url ?? "")
   );
 }
 
 function isMenuAction(action: string): boolean {
-  return [MENU_ASK_SELECTION, MENU_SUMMARIZE, MENU_ADD_CONTEXT].includes(action);
+  return action === MENU_ADD_CONTEXT;
 }
 
 async function captureContext(
@@ -64,7 +61,7 @@ async function captureContext(
   const source = await sourceForTab(tab.id);
   const context = createContextRecord(info, tab, source?.target);
   if (!context) return;
-  const handoff = createContextHandoff(String(info.menuItemId), tab.windowId, context);
+  const handoff = createContextHandoff(tab.windowId, context);
   await chrome.storage.session.set({ [handoffKey(handoff.invocationId)]: handoff });
 }
 
@@ -101,30 +98,16 @@ function createContextRecord(
   return result.success ? result.data : undefined;
 }
 
-function createContextHandoff(action: string, windowId: number, context: PiBrowserContextRecord) {
-  const selection = context.selectedText;
+function createContextHandoff(windowId: number, context: PiBrowserContextRecord) {
   return BrowserContextHandoffSchema.parse({
     invocationId: crypto.randomUUID(),
     windowId,
     context,
-    ...(action === MENU_SUMMARIZE
-      ? { autoPrompt: selection ? "Summarize this selected text." : "Summarize this page." }
-      : {}),
   });
 }
 
 function registerMenus(): void {
   void chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: MENU_ASK_SELECTION,
-      title: "Ask Aeon about selection",
-      contexts: ["selection"],
-    });
-    chrome.contextMenus.create({
-      id: MENU_SUMMARIZE,
-      title: "Summarize with Aeon",
-      contexts: ["page", "selection"],
-    });
     chrome.contextMenus.create({
       id: MENU_ADD_CONTEXT,
       title: "Add to Aeon Chat",
