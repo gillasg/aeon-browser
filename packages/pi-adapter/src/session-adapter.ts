@@ -36,6 +36,7 @@ import {
 } from "./session-resolver.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
+import { createClockTool } from "./clock-tool.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
 import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
@@ -253,6 +254,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
         ),
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),
+        createClockTool(),
       ],
     };
     const { session } = await timeStartupStep("agent-session-created", () =>
