@@ -1,5 +1,6 @@
 import { connectionSingleFlight } from "./connection-single-flight.js";
 import { installBrowserPreview } from "./chat-browser-preview.js";
+import { mirrorAgentTabView } from "./agent-tab-view.js";
 import { installHandoffBridge } from "./chat-handoff-bridge.js";
 import { connectSidebarCatalog } from "./sidebar-catalog-connection.js";
 import { ensurePanelContext } from "./panel-prompt-handoff.js";
@@ -36,6 +37,7 @@ import { initializeChatPreferences } from "./chat-preferences.js";
 import { ChatPiUiController } from "./chat-pi-ui-controller.js";
 const { root, chatId, initialDisplay } = initializeChatPage();
 installBrowserPreview(chatId);
+mirrorAgentTabView();
 installHandoffBridge();
 let client: UiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);

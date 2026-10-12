@@ -3608,14 +3608,31 @@ body[data-host="panel"] .composer-meta {
   padding: 0;
 }
 
-.aeon-browser-preview {
+.aeon-browser-previews {
   position: fixed;
   right: 16px;
   bottom: 112px;
   z-index: 20;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.aeon-browser-previews[data-view="thumbnails"] {
+  top: 72px;
+  bottom: 112px;
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+.aeon-browser-preview {
+  display: flex;
+  flex: none;
+  flex-direction: column;
   width: 220px;
+  pointer-events: auto;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--aeon-border);
@@ -3643,6 +3660,20 @@ body[data-host="panel"] .composer-meta {
 }
 .aeon-browser-preview:hover {
   border-color: var(--aeon-border-strong);
+}
+.aeon-browser-preview[data-view="thumbnails"] {
+  width: 240px;
+}
+.aeon-browser-preview.latest[data-view="thumbnails"] {
+  border-color: var(--aeon-accent, #6366f1);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--aeon-accent, #6366f1) 35%, transparent),
+    var(--aeon-shadow-md);
+}
+@media (max-width: 900px) {
+  .aeon-browser-previews[data-view="thumbnails"] .aeon-browser-preview {
+    width: 160px;
+  }
 }
 
 /* Hand-off: the agent waits for the user in a tab (shape after the Grok takeover card). */

@@ -1,5 +1,7 @@
 import { authenticate } from "@browser-use-extension/engine/native-authenticate";
 import { configureEngine } from "@browser-use-extension/engine/engine-config";
+import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
+import { readAgentTabView } from "./agent-tab-view.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
   installNativeStartup,
@@ -79,6 +81,15 @@ configureEngine({
   idleTitle: "Open Aeon Chat",
   notificationIcon: "completion-icon.png",
   tabGroupTitle: () => "Aeon",
+  agentView: readAgentTabView,
+});
+// A clicked thumbnail on a Chat page opens that agent tab in Split View beside the Chat.
+chrome.runtime.onMessage.addListener((request: unknown, sender) => {
+  const message = request as { kind?: unknown; chatId?: unknown; tabId?: unknown } | null;
+  if (message?.kind !== "aeon.browser.expand" || sender.id !== chrome.runtime.id) return;
+  if (!sender.url?.startsWith(chrome.runtime.getURL("chat.html"))) return;
+  if (typeof message.chatId !== "string" || !Number.isSafeInteger(message.tabId)) return;
+  void presentBrowserTask(message.chatId, message.tabId as number, true);
 });
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void migrateLegacyChromeStorage();

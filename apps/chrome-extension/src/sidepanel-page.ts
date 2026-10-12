@@ -1,3 +1,4 @@
+import { mirrorAgentTabView } from "./agent-tab-view.js";
 import "./status-favicon.js";
 import { PageReconnect } from "./page-reconnect.js";
 import { createElement } from "react";
@@ -299,3 +300,5 @@ async function closePanel(): Promise<void> {
   if (windowId !== undefined && panel.close) await panel.close({ windowId });
   else window.close();
 }
+
+mirrorAgentTabView();

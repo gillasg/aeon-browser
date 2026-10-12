@@ -1,4 +1,5 @@
 import { useMessageSendMode } from "./message-send-mode.js";
+import { useAgentTabView, type AgentTabView } from "./agent-tab-view.js";
 import type { ReactElement } from "react";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { WallpaperSettings } from "./wallpaper-settings.js";
@@ -34,6 +35,7 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
           </select>
         </label>
       </section>
+      <AgentTabSettings />
       <section className="settings-group">
         <h2>Connected Chrome</h2>
         <p>
@@ -70,6 +72,30 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
       </label>
       <p>System follows your operating system appearance.</p>
       <WallpaperSettings />
+    </section>
+  );
+}
+
+function AgentTabSettings(): ReactElement {
+  const [tabView, setTabView] = useAgentTabView();
+  return (
+    <section className="settings-group">
+      <h2>Agent tabs</h2>
+      <label>
+        While the agent works{" "}
+        <select
+          aria-label="Agent tabs view"
+          value={tabView}
+          onChange={(event) => setTabView(event.target.value as AgentTabView)}
+        >
+          <option value="split">Split screen beside the Chat</option>
+          <option value="thumbnails">Live thumbnails beside the Chat</option>
+        </select>
+      </label>
+      <p>
+        Split screen shows the tab the agent touched last. Thumbnails stack every tab it is working
+        in; click one to open it in split screen.
+      </p>
     </section>
   );
 }

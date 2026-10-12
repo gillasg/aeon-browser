@@ -112,3 +112,35 @@ function initialTabs() {
     ],
   ]);
 }
+
+test("the chat joins its agent's tab group, and thumbnail view never splits on its own", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "aeon-layout-")),
+    old = globalThis.chrome;
+  try {
+    const engine = new URL("../node_modules/@browser-use-extension/engine/src/", import.meta.url);
+    const entry = join(folder, "entry.mjs");
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(
+      entry,
+      `export { presentBrowserTask } from ${JSON.stringify(fileURLToPath(new URL("native-browser-layout.ts", engine)))};\n` +
+        `export { configureEngine } from ${JSON.stringify(fileURLToPath(new URL("engine-config.ts", engine)))};\n`,
+    );
+    const outfile = join(folder, "layout.mjs");
+    await build({ entryPoints: [entry], outfile, bundle: true, platform: "node", format: "esm" });
+    const api = await import(pathToFileURL(outfile).href);
+    const mock = layoutChrome();
+    globalThis.chrome = mock.chrome;
+    mock.rows.get(10).groupId = -1;
+    mock.rows.get(20).groupId = 3;
+    api.configureEngine({ agentView: async () => "thumbnails" });
+    await api.presentBrowserTask("test", 20);
+    assert.equal(mock.splits(), 0, "Thumbnail view leaves the layout alone");
+    await api.presentBrowserTask("test", 20, true);
+    assert.equal(mock.splits(), 1, "A clicked thumbnail opens Split View");
+    assert.equal(mock.rows.get(10).groupId, 3, "The chat joins its agent's group");
+    assert.equal(mock.rows.get(20).groupId, 3);
+  } finally {
+    globalThis.chrome = old;
+    await rm(folder, { recursive: true, force: true });
+  }
+});

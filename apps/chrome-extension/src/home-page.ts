@@ -1,3 +1,4 @@
+import { mirrorAgentTabView } from "./agent-tab-view.js";
 import { savePanelContext } from "./panel-prompt-handoff.js";
 import { startHomePrompt } from "./home-first-submit.js";
 import { saveInitialDisplay } from "./initial-chat-display.js";
@@ -274,3 +275,5 @@ async function restoreModelCatalog(): Promise<void> {
     /* Fresh daemon catalog remains authoritative. */
   }
 }
+
+mirrorAgentTabView();

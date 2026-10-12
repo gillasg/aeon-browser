@@ -39,7 +39,8 @@
     "tabGroups",
     "history",
     "bookmarks",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "contentSettings"
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "icons": {
