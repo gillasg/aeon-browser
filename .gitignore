@@ -38,3 +38,10 @@ core-attention.json*
 **/*.sqlite*
 **/pi-sessions/
 **/data/
+
+# Local planning notes and agent instructions stay out of the repo
+AGENTS.md
+PLAN*.md
+*.plan.md
+plans/
+notes/
