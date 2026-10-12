@@ -2,7 +2,11 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, writeFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { once } from "node:events";
-import { CoreHelloSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import {
+  CoreHelloSchema,
+  CoreOpenChatRequestSchema,
+  SUPPORTED_PROTOCOL_VERSION,
+} from "@aeon/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
@@ -99,9 +103,26 @@ function authenticate(
       () => true,
       (chatId, target, url) => browser.attachContext(chatId, target, url),
       threads,
-      (candidate) => handleAttentionMessage(socket, candidate, attention),
+      (candidate) =>
+        handleAttentionMessage(socket, candidate, attention) ||
+        handleOpenChat(socket, candidate, service, browser),
     );
   });
+}
+function handleOpenChat(
+  socket: WebSocket,
+  candidate: unknown,
+  service: ChatService,
+  browser: BrowserControlService,
+): boolean {
+  const request = CoreOpenChatRequestSchema.safeParse(candidate);
+  if (!request.success) return false;
+  const known = Boolean(
+    service.getChat(request.data.chatId as Parameters<ChatService["getChat"]>[0]),
+  );
+  const browsers = known ? browser.openChatTab(request.data.chatId, request.data.active) : 0;
+  socket.send(JSON.stringify({ kind: "core.chat.opened", chatId: request.data.chatId, browsers }));
+  return true;
 }
 function equalToken(expected: string, actual: string): boolean {
   const left = Buffer.from(expected),

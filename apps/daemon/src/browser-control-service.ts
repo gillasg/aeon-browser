@@ -204,6 +204,16 @@ export class BrowserControlService {
       return JSON.stringify({ error: error instanceof Error ? error.message : String(error) });
     }
   }
+  /** Ask every connected browser to show a chat as a tab; returns how many were asked. */
+  openChatTab(chatId: string, active = false): number {
+    let asked = 0;
+    for (const socket of this.executors.values())
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ kind: "native.chat.open", chatId, active }));
+        asked++;
+      }
+    return asked;
+  }
   private release(chatId: string, reset = false): void {
     for (const pending of this.pending.values())
       if (pending.chatId === chatId) pending.finish(undefined, "OPERATION_FAILED");

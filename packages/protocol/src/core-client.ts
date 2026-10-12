@@ -14,7 +14,7 @@ export const CoreHelloSchema = z
     kind: z.literal("core.hello"),
     protocolVersion: ProtocolVersionSchema,
     clientId: z.string().uuid(),
-    surface: z.enum(["orb", "desktop", "development"]),
+    surface: z.enum(["orb", "desktop", "development", "cli"]),
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   })
   .strict();
@@ -62,3 +62,27 @@ export const CoreAttentionClaimSchema = z
   .strict();
 export type CoreDiscovery = z.infer<typeof CoreDiscoverySchema>;
 export type CoreAttentionRequest = z.infer<typeof CoreAttentionRequestSchema>;
+
+/** A local client (the Aeon CLI/MCP) asks Core to show a chat as a tab in the connected Chrome. */
+export const CoreOpenChatRequestSchema = z
+  .object({
+    kind: z.literal("core.chat.open"),
+    chatId: z.string().uuid(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export const CoreOpenChatReplySchema = z
+  .object({
+    kind: z.literal("core.chat.opened"),
+    chatId: z.string().uuid(),
+    browsers: z.number().int().nonnegative(),
+  })
+  .strict();
+/** Core asks the extension to open (or reuse) a chat tab, in the background unless active. */
+export const NativeOpenChatSchema = z
+  .object({
+    kind: z.literal("native.chat.open"),
+    chatId: z.string().uuid(),
+    active: z.boolean(),
+  })
+  .strict();

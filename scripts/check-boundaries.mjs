@@ -11,6 +11,7 @@ const packageRules = new Map([
   ["@aeon/daemon", ["@aeon/protocol", "@aeon/domain", "@aeon/store", "@aeon/pi-adapter"]],
   ["@aeon/pi-adapter", ["@aeon/domain", "@aeon/protocol"]],
   ["@aeon/native-host", []],
+  ["@aeon/cli", ["@aeon/protocol"]],
 ]);
 const packagePaths = new Map([
   ["@aeon/protocol", "packages/protocol"],
@@ -19,6 +20,7 @@ const packagePaths = new Map([
   ["@aeon/daemon", "apps/daemon"],
   ["@aeon/pi-adapter", "packages/pi-adapter"],
   ["@aeon/native-host", "apps/native-host"],
+  ["@aeon/cli", "apps/cli"],
 ]);
 const violations = [];
 
