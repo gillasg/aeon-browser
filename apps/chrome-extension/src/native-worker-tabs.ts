@@ -133,7 +133,7 @@ function getOwnSenderUrl(sender: chrome.runtime.MessageSender): URL | undefined 
   }
 }
 
-async function findExistingChat(chatId: string): Promise<chrome.tabs.Tab | undefined> {
+export async function findExistingChat(chatId: string): Promise<chrome.tabs.Tab | undefined> {
   const tabs = await chrome.tabs.query({});
   return tabs.find((tab) => {
     if (!tab.url) return false;
@@ -146,6 +146,6 @@ async function findExistingChat(chatId: string): Promise<chrome.tabs.Tab | undef
   });
 }
 
-function chatUrl(chatId: string): string {
+export function chatUrl(chatId: string): string {
   return `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}`;
 }

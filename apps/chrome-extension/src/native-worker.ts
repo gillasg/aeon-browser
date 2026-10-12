@@ -2,6 +2,7 @@ import { authenticate } from "@browser-use-extension/engine/native-authenticate"
 import { configureEngine } from "@browser-use-extension/engine/engine-config";
 import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
 import { readAgentTabView } from "./agent-tab-view.js";
+import { handleOpenChatMessage } from "./native-worker-open-chat.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
   installNativeStartup,
@@ -288,6 +289,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     return;
   }
   if (handleCoreAttentionMessage(candidate)) return;
+  if (handleOpenChatMessage(candidate)) return;
   const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
   if (heartbeat.success) {
     if (
