@@ -35,8 +35,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       "@browser-use-extension/engine":
-        specifier: file:../../vendor/browser-use-extension-engine-0.1.6.tgz
-        version: file:vendor/browser-use-extension-engine-0.1.6.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz)
+        specifier: file:../../vendor/browser-use-extension-engine-0.1.7.tgz
+        version: file:vendor/browser-use-extension-engine-0.1.7.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz)
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -100,13 +100,13 @@ packages:
       }
     version: 0.8.0
 
-  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.1.6.tgz":
+  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.1.7.tgz":
     resolution:
       {
-        integrity: sha512-CB7bXUO9HiBEVlKS0N9jLN5gcdQnXa1Y54tgz0h6OT8Gd4ep2D9O3OsczbvNh6rHfEN6XC3nzjcDCjJSs7W7dA==,
-        tarball: file:vendor/browser-use-extension-engine-0.1.6.tgz,
+        integrity: sha512-5a9zjWlYLv/62+waTpQMzgTN6QCd73HzWijAwGw78thq09/ikn6NSygtcKWh5TJBTbjqVJ2DJLxO7PhWb4YvgA==,
+        tarball: file:vendor/browser-use-extension-engine-0.1.7.tgz,
       }
-    version: 0.1.6
+    version: 0.1.7
     peerDependencies:
       "@aeon/protocol": ">=0.6.0"
 
@@ -1773,7 +1773,7 @@ snapshots:
     dependencies:
       zod: 4.6.5
 
-  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.1.6.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz)":
+  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.1.7.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz)":
     dependencies:
       "@aeon/protocol": file:vendor/aeon-protocol-0.8.0.tgz
       acorn: 8.18.0

@@ -1,8 +1,8 @@
 {
   "package": "@browser-use-extension/engine",
-  "version": "0.1.6",
-  "revision": "6ac81fea39982eae34e4b4ec7ae3039ba996c832",
+  "version": "0.1.7",
+  "revision": "623b802a188f8c173215757853aafef1f70860ea",
   "sourceDirty": false,
-  "file": "browser-use-extension-engine-0.1.6.tgz",
-  "sha256": "d071c161adeba96946cc0787407cb734491ef91a924c261f69adad22667c9e2d"
+  "file": "browser-use-extension-engine-0.1.7.tgz",
+  "sha256": "0cbee87c59913c569e9928d1e06b1094d60d226a8f0ae5333829f177f4ef7adc"
 }
