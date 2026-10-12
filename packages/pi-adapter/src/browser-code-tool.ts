@@ -175,14 +175,9 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
 function browserCodeError(message = "OPERATION_FAILED", detail?: string): string {
   const text = detail ? `${message}: ${detail}` : message;
   if (!/is not a function|is not defined/.test(text)) return text;
-  if (/\.(title|url) is not a function/.test(text))
-    return (
-      text.split("\n")[0] +
-      "\npage.url and page.title are properties: use page.url, not page.url()."
-    );
   return (
     text.split("\n")[0] +
-    "\nAvailable: browser.openTab(url), browser.tabs(), bu.use(target), bu.state(), bu.click(id), bu.type(id,text), page.evaluate(fn), page.cdp(method,params), page.screenshot()."
+    "\nAvailable: browser.openTab(url), browser.tabs(), bu.state(), bu.click(id), bu.type(id,text); Playwright-style page.goto, page.title(), page.locator(css)/getByRole/getByText with .click/.fill/.innerText/.count/.nth, page.$eval/$$eval, page.table(css), page.evaluate(fn), google.search(q)."
   );
 }
 
