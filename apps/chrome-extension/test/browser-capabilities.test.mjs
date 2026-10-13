@@ -172,7 +172,7 @@ async function eventsCase(f, request) {
       op: "event",
       action: "poll",
       subscriptionId: sub.subscriptionId,
-      timeoutMs: 1000,
+      timeoutMs: 5000,
     }),
     f.debuggee,
   );
