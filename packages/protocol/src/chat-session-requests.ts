@@ -12,6 +12,16 @@ export const ChatModelCatalogRequestSchema = z
   })
   .strict();
 
+/** Opens the model sign-in page (every provider Pi supports); the reply carries its address. */
+export const ChatModelLoginRequestSchema = z
+  .object({
+    kind: z.literal("command"),
+    requestId: RequestIdSchema,
+    operation: z.literal("chat.model-login"),
+    payload: z.object({}).strict(),
+  })
+  .strict();
+
 export const ChatPiUiRequestSchema = z
   .object({
     kind: z.literal("command"),

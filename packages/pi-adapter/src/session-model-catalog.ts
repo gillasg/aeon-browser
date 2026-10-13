@@ -87,6 +87,11 @@ function getInitialThinkingLevel(settings: SettingsManager, model: Model<Api>): 
 }
 
 const catalogCaches = new WeakMap<object, BackgroundCache<PiModelCatalog>>();
+/** Call after a sign-in or sign-out so the next catalog read sees the new providers. */
+export function invalidatePiModelCatalog(owner: object): void {
+  catalogCaches.get(owner)?.invalidate();
+}
+
 export function readCachedPiModelCatalog(
   owner: object,
   options: ModelCatalogOptions,

@@ -26,7 +26,7 @@ import {
 } from "@aeon/domain";
 import { createThreadTools, type ThreadToolHost } from "./thread-tools.js";
 import { createLocalFixtureModel, fixtureSessionOptions } from "./fixture-model.js";
-import { readCachedPiModelCatalog } from "./session-model-catalog.js";
+import { invalidatePiModelCatalog, readCachedPiModelCatalog } from "./session-model-catalog.js";
 import { wrapPiSession } from "./session-projection.js";
 import { searchTranscript } from "./transcript-search.js";
 import {
@@ -98,6 +98,14 @@ export class PiSdkSessionAdapter implements PiSessionPort {
       if (this.liveSessions.get(input.chatId) === opening) this.liveSessions.delete(input.chatId);
       throw error;
     });
+  }
+
+  get modelAgentDirectory(): string | undefined {
+    return this.agentDirectory;
+  }
+
+  invalidateModelCatalog(): void {
+    invalidatePiModelCatalog(this);
   }
 
   getModelCatalog(): Promise<PiModelCatalog> {

@@ -30,6 +30,7 @@ const ChatCommandResultSchema = z.discriminatedUnion("kind", [
   WorkspaceFileResultSchema,
   z.object({ kind: z.literal("chat.deleted"), chatId: ChatIdSchema }).strict(),
   z.object({ kind: z.literal("chat.model-catalog"), catalog: PiModelCatalogSchema }).strict(),
+  z.object({ kind: z.literal("chat.model-login"), url: z.string().url().max(500) }).strict(),
   z.object({ kind: z.literal("chat.created"), chat: ChatSummarySchema }).strict(),
   z
     .object({
@@ -195,6 +196,7 @@ export const ChatCommandCompletedSchema = z
       "project.pick-folder",
       "workspace.file",
       "chat.model-catalog",
+      "chat.model-login",
       "chat.create",
       "chat.list",
       "chat.get",
@@ -234,6 +236,7 @@ export const ChatCommandFailedSchema = z
       "workspace.file",
       "chat.image",
       "chat.model-catalog",
+      "chat.model-login",
       "chat.create",
       "chat.list",
       "chat.get",

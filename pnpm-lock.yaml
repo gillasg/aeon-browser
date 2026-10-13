@@ -59,6 +59,9 @@ importers:
       "@modelcontextprotocol/client":
         specifier: 2.2.0
         version: 2.2.0
+      pi-ai-login:
+        specifier: file:../../vendor/pi-ai-login-0.1.1.tgz
+        version: file:vendor/pi-ai-login-0.1.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
       ws:
         specifier: 8.22.0
         version: 8.22.0
@@ -119,6 +122,18 @@ packages:
     resolution:
       {
         integrity: sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==,
+      }
+    hasBin: true
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
+  "@anthropic-ai/sdk@0.129.0":
+    resolution:
+      {
+        integrity: sha512-MH7LB20kNpGLUpPTe2OG5XvL/KhX8HUO9XyBaFjgFk6TLS4Xjt0VPIuMKywe7POKKPslX+QxSlVok9e+8kG5Nw==,
       }
     hasBin: true
     peerDependencies:
@@ -308,6 +323,14 @@ packages:
     engines: { node: ">=22.19.0" }
     hasBin: true
 
+  "@earendil-works/pi-ai@1.2.0":
+    resolution:
+      {
+        integrity: sha512-U5/1zXqfV1on7/9sbez03tT4Ru49Lvfb4+zXSDK3DBKF5cRk6KxvAOTOY3HJ4jimlZth+rs7vbJqN6iBQAoNuQ==,
+      }
+    engines: { node: ">=22.19.0" }
+    hasBin: true
+
   "@earendil-works/pi-codemode@0.99.1":
     resolution:
       {
@@ -334,6 +357,13 @@ packages:
     resolution:
       {
         integrity: sha512-9PBPjGk+TXRtuMianpqBbHBpYpyKusESF6rwdmgD0WTZSTUQXhcKEO0hAINRLuSwy4V7yPvXV+EVV0ONY7mbpQ==,
+      }
+    engines: { node: ">=22.19.0" }
+
+  "@earendil-works/pi-telemetry@1.2.0":
+    resolution:
+      {
+        integrity: sha512-NZ3aJE6dr7aTgzzXDe53OW7BsAsF8ZUKHPJTtnjaQcxtlagkUT0Ew8Qas0EvYQsZqR/KpF1lB+z209XBzIC7xg==,
       }
     engines: { node: ">=22.19.0" }
 
@@ -1637,6 +1667,16 @@ packages:
       }
     engines: { node: ">=8" }
 
+  pi-ai-login@file:vendor/pi-ai-login-0.1.1.tgz:
+    resolution:
+      {
+        integrity: sha512-2KRSXVeTgWERsbxZYiM6oyoDju5xsvxlDyt9cCzs5SJb3EH8wPXL+2478yGwg21pnaoqqp0A5z5WAFY7D8pmrA==,
+        tarball: file:vendor/pi-ai-login-0.1.1.tgz,
+      }
+    version: 0.1.1
+    engines: { node: ">=22.19.0" }
+    hasBin: true
+
   picomatch@4.0.7:
     resolution:
       {
@@ -1909,6 +1949,13 @@ snapshots:
     optionalDependencies:
       zod: 4.6.5
 
+  "@anthropic-ai/sdk@0.129.0(zod@4.6.5)":
+    dependencies:
+      json-schema-to-ts: 3.1.1
+      standardwebhooks: 1.1.1
+    optionalDependencies:
+      zod: 4.6.5
+
   "@aws-sdk/client-bedrock-runtime@3.1127.0":
     dependencies:
       "@aws-sdk/core": 3.978.1
@@ -2156,6 +2203,31 @@ snapshots:
       - ws
       - zod
 
+  "@earendil-works/pi-ai@1.2.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)":
+    dependencies:
+      "@anthropic-ai/sdk": 0.129.0(zod@4.6.5)
+      "@aws-sdk/client-bedrock-runtime": 3.1127.0
+      "@earendil-works/pi-telemetry": 1.2.0
+      "@google/genai": 2.21.0
+      "@smithy/node-http-handler": 4.12.1
+      http-proxy-agent: 9.1.0
+      https-proxy-agent: 9.1.0
+      openai: 7.19.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
+      partial-json: 0.1.7
+      typebox: 1.3.27
+    transitivePeerDependencies:
+      - "@aws-sdk/credential-provider-node"
+      - "@modelcontextprotocol/sdk"
+      - "@smithy/hash-node"
+      - "@smithy/signature-v4"
+      - bufferutil
+      - kerberos
+      - supports-color
+      - undici
+      - utf-8-validate
+      - ws
+      - zod
+
   "@earendil-works/pi-codemode@0.99.1":
     dependencies:
       quickjs-wasi: 3.6.2
@@ -2201,6 +2273,8 @@ snapshots:
       cross-spawn: 7.0.6
 
   "@earendil-works/pi-telemetry@0.99.1": {}
+
+  "@earendil-works/pi-telemetry@1.2.0": {}
 
   "@earendil-works/pi-tui@0.99.1":
     dependencies:
@@ -2938,6 +3012,23 @@ snapshots:
   path-exists@4.0.0: {}
 
   path-key@3.1.1: {}
+
+  pi-ai-login@file:vendor/pi-ai-login-0.1.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5):
+    dependencies:
+      "@earendil-works/pi-ai": 1.2.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
+      proper-lockfile: 4.1.2
+    transitivePeerDependencies:
+      - "@aws-sdk/credential-provider-node"
+      - "@modelcontextprotocol/sdk"
+      - "@smithy/hash-node"
+      - "@smithy/signature-v4"
+      - bufferutil
+      - kerberos
+      - supports-color
+      - undici
+      - utf-8-validate
+      - ws
+      - zod
 
   picomatch@4.0.7: {}
 

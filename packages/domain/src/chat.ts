@@ -273,6 +273,10 @@ export interface OpenPiSessionInput {
 export interface PiSessionPort {
   prepareResources?(workingDirectory: string): Promise<void>;
   getModelCatalog(): Promise<PiModelCatalog>;
+  /** Forget the cached catalog, e.g. after the user signs in to a provider. */
+  invalidateModelCatalog?(): void;
+  /** Pi's agent directory (auth.json, settings.json) this port reads; undefined means Pi's default. */
+  readonly modelAgentDirectory?: string | undefined;
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle>;
   searchTranscript(
     reference: PiSessionReference,

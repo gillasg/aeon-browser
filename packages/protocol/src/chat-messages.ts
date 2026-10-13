@@ -26,6 +26,7 @@ import { PiBrowserContextRecordSchema } from "./browser-context.js";
 import { BrowserTargetKeySchema } from "./browser-inventory.js";
 import {
   ChatModelCatalogRequestSchema,
+  ChatModelLoginRequestSchema,
   ChatPiUiRequestSchema,
   ChatNavigateTreeRequestSchema,
   ChatEditMessageRequestSchema,
@@ -205,6 +206,7 @@ export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   WorkspaceFileRequestSchema,
   ChatImageRequestSchema,
   ChatModelCatalogRequestSchema,
+  ChatModelLoginRequestSchema,
   ChatCreateRequestSchema,
   ChatListRequestSchema,
   ChatUpdateRequestSchema,

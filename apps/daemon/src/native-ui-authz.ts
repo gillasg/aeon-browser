@@ -22,6 +22,7 @@ export function authorizeNativeUiScope(
         "chat.create",
         "chat.list",
         "chat.model-catalog",
+        "chat.model-login",
         "chat.update",
         "chat.delete",
         "management.home",

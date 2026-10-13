@@ -13,6 +13,10 @@ export class BackgroundCache<T> {
     if (this.value !== undefined) return Promise.resolve(this.value);
     return this.pending ?? Promise.reject(new Error("Cache initialization did not start."));
   }
+  /** The next read loads fresh data (the current value is still served meanwhile). */
+  invalidate(): void {
+    this.refreshedAt = 0;
+  }
   private refresh(): void {
     const pending = this.load()
       .then((value) => {

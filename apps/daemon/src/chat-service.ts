@@ -1,3 +1,4 @@
+import { openModelLogin } from "./model-login.js";
 import { configureInitialPrompt, type InitialPromptSelection } from "./initial-prompt-selection.js";
 import { boundedChatEntries, type ObservedSession } from "./bounded-chat-entries.js";
 import { ProjectService } from "./project-service.js";
@@ -118,6 +119,9 @@ export class ChatService {
     return this.store.listChats(limit, includeArchived).map(toChatSummary);
   }
   getModelCatalog = (): Promise<PiModelCatalog> => this.pi.getModelCatalog();
+  /** Opens the model sign-in page; the catalog refreshes after every sign-in or sign-out. */
+  openModelLogin = (): Promise<string> =>
+    openModelLogin(this.pi.modelAgentDirectory, () => this.pi.invalidateModelCatalog?.());
   async searchChats(
     query: string,
     limit = 50,

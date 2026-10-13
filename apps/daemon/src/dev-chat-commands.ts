@@ -86,26 +86,42 @@ async function handleReadOrControlCommand(
   if (isContextCommand(request))
     return handleContextCommand(socket, service, request, attachBrowserContext);
 }
+/** The model catalog and the model sign-in page. */
+const MODEL_COMMANDS: Partial<
+  Record<
+    SimpleCommand["operation"],
+    (socket: WebSocket, service: ChatService, request: SimpleCommand) => Promise<void>
+  >
+> = {
+  "chat.model-catalog": async (socket, service, request) => {
+    const catalog = await service.getModelCatalog();
+    completeCommand(socket, request, {
+      kind: "chat.model-catalog",
+      catalog: {
+        defaultModel: catalog.defaultModel ? { ...catalog.defaultModel } : null,
+        models: catalog.models.map((model) => ({
+          ...model,
+          thinkingLevels: [...model.thinkingLevels],
+        })),
+      },
+    });
+  },
+  "chat.model-login": async (socket, service, request) => {
+    completeCommand(socket, request, {
+      kind: "chat.model-login",
+      url: await service.openModelLogin(),
+    });
+  },
+};
+
 async function handleSimpleCommand(
   socket: WebSocket,
   service: ChatService,
   request: SimpleCommand,
 ): Promise<void> {
+  const model = MODEL_COMMANDS[request.operation];
+  if (model) return model(socket, service, request);
   switch (request.operation) {
-    case "chat.model-catalog": {
-      const catalog = await service.getModelCatalog();
-      completeCommand(socket, request, {
-        kind: "chat.model-catalog",
-        catalog: {
-          defaultModel: catalog.defaultModel ? { ...catalog.defaultModel } : null,
-          models: catalog.models.map((model) => ({
-            ...model,
-            thinkingLevels: [...model.thinkingLevels],
-          })),
-        },
-      });
-      return;
-    }
     case "chat.create":
       await sendCreated(socket, service, request);
       return;

@@ -12,6 +12,7 @@ export type ReadCommandRequest = Extract<
       | "project.pick-folder"
       | "workspace.file"
       | "chat.model-catalog"
+      | "chat.model-login"
       | "chat.create"
       | "chat.list"
       | "chat.get"
@@ -53,6 +54,7 @@ export type SimpleCommand = Extract<
   {
     operation:
       | "chat.model-catalog"
+      | "chat.model-login"
       | "chat.create"
       | "chat.list"
       | "chat.get"
@@ -86,6 +88,7 @@ export type ContextCommand = Extract<
 
 const SIMPLE_COMMANDS = new Set([
   "chat.model-catalog",
+  "chat.model-login",
   "chat.create",
   "chat.list",
   "chat.get",
