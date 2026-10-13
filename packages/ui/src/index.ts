@@ -8,6 +8,7 @@ export {
   type ComposerModel,
 } from "./chat-composer.js";
 export { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
+export { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 export { NewTabHome, type NewTabHomeProps } from "./home-surface.js";
 export { ManagementSurface, type ManagementSurfaceProps } from "./management-surface.js";
 export type { ManagementActionName, ManagementSection } from "./management-types.js";

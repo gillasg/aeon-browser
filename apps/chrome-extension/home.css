@@ -1120,3 +1120,117 @@ body[data-embedded="true"] .chat-navigation {
     margin-top: 48px;
   }
 }
+
+/* "Connect an AI model": shown when no model is connected yet. */
+.connect-model {
+  display: flex;
+  width: min(100%, 760px);
+  align-items: center;
+  gap: var(--aeon-s-3);
+  margin: var(--aeon-s-3) auto 0;
+  padding: var(--aeon-s-3) var(--aeon-s-4);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
+  background: var(--aeon-surface-raised);
+  box-shadow: var(--aeon-shadow-md);
+}
+.connect-model-icon {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--aeon-r-md);
+  background: color-mix(in srgb, var(--aeon-accent) 16%, transparent);
+  color: var(--aeon-accent);
+}
+.connect-model-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.connect-model-body {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.connect-model-body strong {
+  color: var(--aeon-text);
+  font-size: var(--aeon-fs-base);
+}
+.connect-model-body p {
+  margin: 0;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+}
+.connect-model-body .connect-model-error {
+  color: var(--aeon-swatch-c78b84);
+}
+.connect-model-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--aeon-s-2);
+  min-height: 34px;
+  padding: 0 var(--aeon-s-4);
+  border: 1px solid var(--aeon-accent);
+  border-radius: var(--aeon-r-md);
+  background: var(--aeon-accent);
+  color: var(--aeon-canvas);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.connect-model-button.secondary {
+  border-color: var(--aeon-line);
+  background: transparent;
+  color: var(--aeon-text);
+  font-weight: 500;
+}
+.connect-model-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--aeon-line);
+  border-top-color: var(--aeon-accent);
+  border-radius: 50%;
+  animation: connect-model-spin 0.8s linear infinite;
+}
+@keyframes connect-model-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 520px) {
+  .connect-model {
+    flex-wrap: wrap;
+  }
+  .connect-model-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .connect-model-spinner {
+    animation-duration: 2.4s;
+  }
+}
+.pi-picker-manage {
+  display: block;
+  width: 100%;
+  margin-top: var(--aeon-s-1);
+  padding: var(--aeon-s-2);
+  border: 0;
+  border-top: 1px solid var(--aeon-line);
+  background: transparent;
+  color: var(--aeon-accent);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.composer-meta .connect-model {
+  margin: 0;
+  box-shadow: none;
+}

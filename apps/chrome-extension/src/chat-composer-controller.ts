@@ -7,6 +7,7 @@ import type { PiAttachmentDto } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { submitComposerMessage } from "./chat-composer-submit.js";
+import { ModelSignIn } from "./model-sign-in.js";
 
 export class ChatComposerController {
   private client: UiClient | undefined;
@@ -20,6 +21,14 @@ export class ChatComposerController {
   private editDraftId = 0;
   private browserContext: PiBrowserContextRecord | null = null;
   private readonly contextAssociations = new Map<string, Promise<void>>();
+  private readonly modelSignIn = new ModelSignIn(
+    (request) => this.command(request),
+    async () => {
+      await this.refreshControls();
+      return Boolean(this.controls?.availableModels.length);
+    },
+    () => this.onChange(),
+  );
 
   constructor(
     private readonly chatId: string,
@@ -67,6 +76,8 @@ export class ChatComposerController {
       running: this.isRunning() || this.submitting,
       starting: this.submitting,
       controls: this.controls,
+      modelLogin: this.modelSignIn.state,
+      onManageModels: () => void this.modelSignIn.open(),
       attachments: this.attachments,
       ...(this.editDraftInsertion ? { editDraftInsertion: this.editDraftInsertion } : {}),
       editNotice: this.editNotice,
@@ -118,6 +129,7 @@ export class ChatComposerController {
 
   close(): void {
     this.disposed = true;
+    this.modelSignIn.dispose();
     this.client = undefined;
   }
 

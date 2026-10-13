@@ -18,12 +18,15 @@ export function PiModelPicker({
   selected,
   disabled = false,
   onSelect,
+  onManageModels,
 }: {
   id: string;
   models: readonly ComposerModel[];
   selected: EffectiveComposerModel | null;
   disabled?: boolean;
   onSelect(model: ComposerModel): void;
+  /** Opens the model sign-in page, to connect another provider or sign out of one. */
+  onManageModels?: (() => void) | undefined;
 }): ReactElement {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -56,18 +59,23 @@ export function PiModelPicker({
         query={query}
         selectedKey={selectedKey}
         onQuery={setQuery}
+        onManage={onManageModels && (() => closeThen(details.current, onManageModels))}
         onSelect={(model) => {
           onSelect(model);
           setQuery("");
-          if (details.current) {
-            details.current.open = false;
-            details.current.querySelector("summary")?.focus();
-            details.current.dataset.hintDismissed = "true";
-          }
+          closeThen(details.current, () => {
+            details.current?.querySelector("summary")?.focus();
+            if (details.current) details.current.dataset.hintDismissed = "true";
+          });
         }}
       />
     </details>
   );
+}
+
+function closeThen(details: HTMLDetailsElement | null, then: () => void): void {
+  if (details) details.open = false;
+  then();
 }
 
 export function PiThinkingPicker({

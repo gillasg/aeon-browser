@@ -48,6 +48,8 @@ export interface ChatComposerProps {
   preparing?: boolean;
   controls: ComposerControls | null;
   contextUsage?: PiContextUsage | null;
+  modelLogin?: import("./connect-model-card.js").ModelLoginState;
+  onManageModels?(): void;
   attachments: readonly ComposerAttachment[];
   editDraftInsertion?: { id: number; text: string };
   editNotice?: string | null;

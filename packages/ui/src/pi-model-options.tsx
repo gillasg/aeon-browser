@@ -8,12 +8,14 @@ export function ModelOptions({
   selectedKey,
   onQuery,
   onSelect,
+  onManage,
 }: {
   models: readonly ComposerModel[];
   query: string;
   selectedKey: string;
   onQuery(value: string): void;
   onSelect(model: ComposerModel): void;
+  onManage?: (() => void) | undefined;
 }): ReactElement {
   const providers = [...new Set(models.map((model) => model.provider))].sort();
   return (
@@ -49,6 +51,11 @@ export function ModelOptions({
         ))}
         {!models.length && <p className="pi-picker-empty">No models match that search.</p>}
       </div>
+      {onManage && (
+        <button type="button" className="pi-picker-manage" onClick={onManage}>
+          Add or manage models…
+        </button>
+      )}
     </div>
   );
 }

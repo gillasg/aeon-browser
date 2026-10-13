@@ -16,6 +16,8 @@ import {
 } from "@aeon/protocol";
 import { mountAeonUi, NewTabHome, type ComposerModel, type ComposerAttachment } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
+import { sendComposerCommand } from "./composer-command.js";
+import { ModelSignIn } from "./model-sign-in.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
@@ -34,6 +36,14 @@ let connectionLabel = "Starting";
 let errorMessage = "";
 let openChatIds: ReadonlySet<string> = new Set();
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
+const modelSignIn = new ModelSignIn(
+  (request) => sendComposerCommand(client, request),
+  async () => {
+    await loadModelCatalog();
+    return Boolean(modelCatalog?.models.length);
+  },
+  () => render(),
+);
 const catalog = new HomeCatalogController({
   client: () => client,
   onError: showError,
@@ -55,6 +65,8 @@ function createView() {
     connected: client?.socket.readyState === WebSocket.OPEN && connectionLabel === "Connected",
     chats,
     modelCatalog,
+    modelLogin: modelSignIn.state,
+    onConnectModel: () => void modelSignIn.open(),
     openChatIds,
     catalogOpen: catalog.open,
     catalogQuery: catalog.query,

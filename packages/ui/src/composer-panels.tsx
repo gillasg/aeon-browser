@@ -7,6 +7,7 @@ import type {
   PiContextUsage,
 } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker } from "./pi-model-picker.js";
+import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 import { PiContextUsageRing } from "./pi-context-usage.js";
 import { AnnotationChips, useAnnotations } from "./transcript-annotations.js";
 
@@ -23,13 +24,21 @@ export interface ComposerPanelsProps {
   onModel(value: ComposerModel): void;
   onThinking(value: string): void;
   onRemoveAttachment(index: number): void;
+  modelLogin?: ModelLoginState;
+  /** Opens the model sign-in page (every provider Pi supports). */
+  onManageModels?(): void;
 }
 
 export function ComposerPanels(props: ComposerPanelsProps): ReactElement {
   return (
     <>
       <div className="composer-meta">
-        {props.connected === false || !props.controls?.effectiveModel ? (
+        {props.controls && !props.controls.availableModels.length && props.onManageModels ? (
+          <ConnectModelCard
+            state={props.modelLogin ?? { waiting: false }}
+            onConnect={props.onManageModels}
+          />
+        ) : props.connected === false || !props.controls?.effectiveModel ? (
           <span className="model-loading" role="status">
             {props.connected === false ? "Connecting…" : "Starting…"}
           </span>
@@ -75,6 +84,7 @@ function ComposerModelControls({ props }: { props: ComposerPanelsProps }): React
           selected={props.controls?.effectiveModel ?? null}
           disabled={!props.controls?.availableModels.length}
           onSelect={props.onModel}
+          onManageModels={props.onManageModels}
         />
       </div>
       <div className="pi-control" aria-label="Thinking effort">

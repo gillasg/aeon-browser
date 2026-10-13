@@ -29,14 +29,14 @@ importers:
   apps/chrome-extension:
     dependencies:
       "@aeon/protocol":
-        specifier: file:../../vendor/aeon-protocol-0.8.0.tgz
-        version: file:vendor/aeon-protocol-0.8.0.tgz
+        specifier: file:../../vendor/aeon-protocol-0.9.0.tgz
+        version: file:vendor/aeon-protocol-0.9.0.tgz
       "@aeon/ui":
         specifier: workspace:*
         version: link:../../packages/ui
       "@browser-use-extension/engine":
         specifier: file:../../vendor/browser-use-extension-engine-0.2.1.tgz
-        version: file:vendor/browser-use-extension-engine-0.2.1.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz)
+        version: file:vendor/browser-use-extension-engine-0.2.1.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.9.0.tgz)
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -69,8 +69,8 @@ importers:
   packages/ui:
     dependencies:
       "@aeon/protocol":
-        specifier: file:../../vendor/aeon-protocol-0.8.0.tgz
-        version: file:vendor/aeon-protocol-0.8.0.tgz
+        specifier: file:../../vendor/aeon-protocol-0.9.0.tgz
+        version: file:vendor/aeon-protocol-0.9.0.tgz
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -92,13 +92,13 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
 
 packages:
-  "@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz":
+  "@aeon/protocol@file:vendor/aeon-protocol-0.9.0.tgz":
     resolution:
       {
-        integrity: sha512-lENGq9CG2z1PIYs35P2oWPLaCpF2vLX/PLJXxcRS8H5kOW07Prrg0+HeVPzQ3kkLjDfiQn00CCAgnx1aIKZn2w==,
-        tarball: file:vendor/aeon-protocol-0.8.0.tgz,
+        integrity: sha512-Uh4epYDJYvAv09PIb5UF9Y3sqaM/0YUcHIqm8i3QCoTeOFtDxvkdzhrr+WekyVqxoefFQ+agkMLUmX1pnhnl9w==,
+        tarball: file:vendor/aeon-protocol-0.9.0.tgz,
       }
-    version: 0.8.0
+    version: 0.9.0
 
   "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.2.1.tgz":
     resolution:
@@ -1769,13 +1769,13 @@ packages:
       }
 
 snapshots:
-  "@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz":
+  "@aeon/protocol@file:vendor/aeon-protocol-0.9.0.tgz":
     dependencies:
       zod: 4.6.5
 
-  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.2.1.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.8.0.tgz)":
+  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.2.1.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.9.0.tgz)":
     dependencies:
-      "@aeon/protocol": file:vendor/aeon-protocol-0.8.0.tgz
+      "@aeon/protocol": file:vendor/aeon-protocol-0.9.0.tgz
       acorn: 8.18.0
       zod: 4.6.5
 

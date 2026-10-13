@@ -1,4 +1,5 @@
 import { SidebarResizer } from "./sidebar-resizer.js";
+import type { ModelLoginState } from "./connect-model-card.js";
 import { useWallpaper } from "./wallpaper-settings.js";
 import { useEffect, useState, type ReactElement } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
@@ -18,6 +19,10 @@ export interface NewTabHomeProps {
   connected?: boolean;
   chats: readonly ChatCatalogItemDto[];
   modelCatalog: PiModelCatalogDto | null;
+  /** Sign-in progress for "Connect a model". */
+  modelLogin?: ModelLoginState;
+  /** Opens the model sign-in page (every provider Pi supports). */
+  onConnectModel?(): void;
   openChatIds: ReadonlySet<string>;
   catalogOpen: boolean;
   catalogQuery: string;

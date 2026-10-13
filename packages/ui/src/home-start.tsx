@@ -12,12 +12,15 @@ import type { ChatCatalogItemDto, PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { HomeRecentCards } from "./home-recent-cards.js";
+import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 import { PromptField } from "./prompt-field.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
 type HomeStartProps = Pick<
   NewTabHomeProps,
   | "modelCatalog"
+  | "modelLogin"
+  | "onConnectModel"
   | "onAsk"
   | "homeRoutines"
   | "openChatIds"
@@ -74,6 +77,8 @@ export function HomeStart({
       />
       <HomeModelControls
         connected={props.connected}
+        modelLogin={props.modelLogin}
+        onConnectModel={props.onConnectModel}
         catalog={props.modelCatalog}
         model={selection.model}
         effort={selection.thinkingLevel}
@@ -170,6 +175,8 @@ function HomePrompt({
 
 function HomeModelControls({
   connected,
+  modelLogin,
+  onConnectModel,
   catalog,
   model,
   effort,
@@ -177,6 +184,8 @@ function HomeModelControls({
   onEffort,
 }: {
   connected: boolean | undefined;
+  modelLogin: ModelLoginState | undefined;
+  onConnectModel: (() => void) | undefined;
   catalog: PiModelCatalogDto | null;
   model: ComposerModel | null;
   effort: string;
@@ -189,6 +198,35 @@ function HomeModelControls({
         Connecting…
       </div>
     );
+  if (catalog && !catalog.models.length && onConnectModel)
+    return <ConnectModelCard state={modelLogin ?? { waiting: false }} onConnect={onConnectModel} />;
+  return (
+    <HomePickers
+      catalog={catalog}
+      model={model}
+      effort={effort}
+      onModel={onModel}
+      onEffort={onEffort}
+      onConnectModel={onConnectModel}
+    />
+  );
+}
+
+function HomePickers({
+  catalog,
+  model,
+  effort,
+  onModel,
+  onEffort,
+  onConnectModel,
+}: {
+  catalog: PiModelCatalogDto | null;
+  model: ComposerModel | null;
+  effort: string;
+  onModel(value: ComposerModel): void;
+  onEffort(value: string): void;
+  onConnectModel: (() => void) | undefined;
+}): ReactElement {
   return (
     <div className="home-model-controls" role="group" aria-label="Pi model and effort">
       <div className="home-model-control">
@@ -203,6 +241,7 @@ function HomeModelControls({
             selected={model}
             disabled={!catalog?.models.length}
             onSelect={onModel}
+            onManageModels={onConnectModel}
           />
         )}
       </div>
