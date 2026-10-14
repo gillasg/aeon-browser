@@ -41,25 +41,52 @@ function requireSite(input: Input): string {
   return siteName(input.site);
 }
 
+const HOW_TO_CALL =
+  "Pass params flat: path and query parameters and top-level body fields by name, for example {query: 'shoes', page: 2}. Anything left out keeps the value recorded from the site. Use body: {...} to merge deeper body fields.";
+
+type SiteOperation = NonNullable<Awaited<ReturnType<typeof loadModel>>>["operations"][number];
+
+/** Top-level body fields with the value the site last sent, so the model sees what each holds. */
+function bodyFields(op: SiteOperation): Record<string, unknown> | undefined {
+  const properties = Object.keys(
+    (op.requestBody?.schema.properties as Record<string, unknown> | undefined) ?? {},
+  );
+  if (!properties.length) return undefined;
+  let sample: Record<string, unknown> = {};
+  try {
+    sample = JSON.parse(op.samples.at(-1)?.requestBody ?? "{}") as Record<string, unknown>;
+  } catch {
+    /* a form or text body: names only */
+  }
+  return Object.fromEntries(
+    properties.slice(0, 25).map((name) => {
+      const value = JSON.stringify(sample[name] ?? null);
+      return [name, value.length > 60 ? value.slice(0, 60) + "…" : JSON.parse(value)];
+    }),
+  );
+}
+
+function describeOperation(op: SiteOperation): Record<string, unknown> {
+  const body = bodyFields(op);
+  return {
+    id: op.id,
+    what: op.summary,
+    method: op.method,
+    path: op.path,
+    role: op.role,
+    params: op.params
+      .filter((p) => !p.constant && !p.generated)
+      .map((p) => `${p.name}${p.required ? "" : "?"}`),
+    ...(body ? { bodyFields: body } : {}),
+    ...(op.pagination ? { paginated: true } : {}),
+  };
+}
+
 async function operations(input: Input): Promise<unknown> {
   const site = requireSite(input);
   const model = await loadModel(site);
   if (!model) throw new Error(`${site} is not mapped yet. Map it with the learn action.`);
-  return {
-    site,
-    operations: model.operations.map((op) => ({
-      id: op.id,
-      what: op.summary,
-      method: op.method,
-      path: op.path,
-      role: op.role,
-      params: op.params
-        .filter((p) => !p.constant && !p.generated)
-        .map((p) => `${p.name}${p.required ? "" : "?"}`),
-      ...(op.requestBody ? { body: true } : {}),
-      ...(op.pagination ? { paginated: true } : {}),
-    })),
-  };
+  return { site, howToCall: HOW_TO_CALL, operations: model.operations.map(describeOperation) };
 }
 
 async function call(input: Input, workspace: string | undefined): Promise<ToolText> {
@@ -79,12 +106,13 @@ async function learn(input: Input, workspace: string | undefined): Promise<unkno
     throw new Error("Capture files must be inside the workspace");
   await importCaptures(site, paths);
   const result = await rebuild(site);
+  // The operations come back right away, so the next step can be a call.
   return {
     site,
-    operations: result.model.operations.length,
     version: result.version,
     changed: result.changed,
-    next: "Use the operations action to see what can be called.",
+    howToCall: HOW_TO_CALL,
+    operations: result.model.operations.map(describeOperation),
   };
 }
 

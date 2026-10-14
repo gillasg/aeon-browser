@@ -4,7 +4,7 @@ packages:
 overrides:
   # Shared code from sibling repos, as packed tarballs (one copy for everything that uses it).
   pi-ai-login: file:vendor/pi-ai-login-0.1.1.tgz
-  site-to-api: file:vendor/site-to-api-0.2.0.tgz
+  site-to-api: file:vendor/site-to-api-0.2.1.tgz
 minimumReleaseAgeExclude:
   - pi-ai-login
   - site-to-api

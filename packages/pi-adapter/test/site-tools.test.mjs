@@ -97,7 +97,8 @@ test("site_api maps a site from a capture in the workspace, then calls it", asyn
   const learned = JSON.parse(
     text(await tool.execute("1", { action: "learn", site: origin, files: ["shop.har"] })),
   );
-  assert.ok(learned.operations >= 1, text(await tool.execute("x", { action: "sites" })));
+  assert.ok(learned.operations.length >= 1, "learn lists the operations right away");
+  assert.match(learned.howToCall, /Pass params flat/);
   const sites = JSON.parse(text(await tool.execute("2", { action: "sites" })));
   assert.equal(sites.sites.length, 1);
   const listed = JSON.parse(text(await tool.execute("3", { action: "operations", site: origin })));

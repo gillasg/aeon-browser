@@ -6,7 +6,7 @@ settings:
 
 overrides:
   pi-ai-login: file:vendor/pi-ai-login-0.1.1.tgz
-  site-to-api: file:vendor/site-to-api-0.2.0.tgz
+  site-to-api: file:vendor/site-to-api-0.2.1.tgz
 
 patchedDependencies:
   "@earendil-works/pi-coding-agent@0.99.1": aaa8f7a086be1c6405b8b57b8a9e4354c18fa7f05fa003e7462cb5b367c34ebc
@@ -96,11 +96,11 @@ importers:
         specifier: 0.99.1
         version: 0.99.1(patch_hash=aaa8f7a086be1c6405b8b57b8a9e4354c18fa7f05fa003e7462cb5b367c34ebc)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5)
       browser-crawl:
-        specifier: file:../../vendor/browser-crawl-0.2.1.tgz
-        version: file:vendor/browser-crawl-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5)
+        specifier: file:../../vendor/browser-crawl-0.2.2.tgz
+        version: file:vendor/browser-crawl-0.2.2.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5)
       site-to-api:
-        specifier: file:../../vendor/site-to-api-0.2.0.tgz
-        version: file:vendor/site-to-api-0.2.0.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
+        specifier: file:../../vendor/site-to-api-0.2.1.tgz
+        version: file:vendor/site-to-api-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
       typebox:
         specifier: 1.3.27
         version: 1.3.27
@@ -1220,13 +1220,13 @@ packages:
       }
     engines: { node: 20 || >=22 }
 
-  browser-crawl@file:vendor/browser-crawl-0.2.1.tgz:
+  browser-crawl@file:vendor/browser-crawl-0.2.2.tgz:
     resolution:
       {
-        integrity: sha512-XVW0H2M8bNTDfA8neQp00qc8LOJ+QDHORpXFZkYtf/Zd9xkhOZnicC/j8Oz9vWMdJ1szJnA+uppYqQy0L0Iw0Q==,
-        tarball: file:vendor/browser-crawl-0.2.1.tgz,
+        integrity: sha512-DYSmSc33pJmyEtFoYMz/qN9C3Ghn/MyCtB40va4V+IJn8BNnbwDrATSMfxfKJwG1BjtAtHM1nl6WOyeoWu+e1g==,
+        tarball: file:vendor/browser-crawl-0.2.2.tgz,
       }
-    version: 0.2.1
+    version: 0.2.2
     engines: { node: ">=22.19.0" }
     hasBin: true
 
@@ -3003,13 +3003,13 @@ packages:
         integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==,
       }
 
-  site-to-api@file:vendor/site-to-api-0.2.0.tgz:
+  site-to-api@file:vendor/site-to-api-0.2.1.tgz:
     resolution:
       {
-        integrity: sha512-odRveotn/QtoLM+aOAXoz9d2ui7yC9udI8S76sFAwFVFwQwjcpSWjXcOXX85tNltPxacaGOwnDZzvM0qgNudLw==,
-        tarball: file:vendor/site-to-api-0.2.0.tgz,
+        integrity: sha512-x/3ravZQ4d1TqFHIyV4CrzUDvkggxQ+n/lhbNvfO4D1ByjFHt/tK7CiQxfQHyfplFSy+lScj70zGw54IWYSZuQ==,
+        tarball: file:vendor/site-to-api-0.2.1.tgz,
       }
-    version: 0.2.0
+    version: 0.2.1
     engines: { node: ">=22.19.0" }
     hasBin: true
 
@@ -4195,14 +4195,14 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
-  browser-crawl@file:vendor/browser-crawl-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5):
+  browser-crawl@file:vendor/browser-crawl-0.2.2.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5):
     dependencies:
       "@mozilla/readability": 0.6.0
       exceljs: 4.4.0
       linkedom: 0.18.13
       mammoth: 1.13.0
       pi-ai-login: file:vendor/pi-ai-login-0.1.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
-      site-to-api: file:vendor/site-to-api-0.2.0.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
+      site-to-api: file:vendor/site-to-api-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
       turndown: 7.2.4
       turndown-plugin-gfm: 1.0.2
       unpdf: 1.8.1
@@ -5391,7 +5391,7 @@ snapshots:
 
   signal-exit@3.0.7: {}
 
-  site-to-api@file:vendor/site-to-api-0.2.0.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5):
+  site-to-api@file:vendor/site-to-api-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5):
     dependencies:
       pi-ai-login: file:vendor/pi-ai-login-0.1.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
