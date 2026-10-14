@@ -8,9 +8,9 @@
     "build:native": "node scripts/build-native-extension.mjs"
   },
   "dependencies": {
-    "@aeon/protocol": "file:../../vendor/aeon-protocol-0.9.0.tgz",
+    "@aeon/protocol": "file:../../vendor/aeon-protocol-0.10.0.tgz",
     "@aeon/ui": "workspace:*",
-    "@browser-use-extension/engine": "file:../../vendor/browser-use-extension-engine-0.2.1.tgz",
+    "@browser-use-extension/engine": "file:../../vendor/browser-use-extension-engine-0.2.2.tgz",
     "acorn": "8.18.0",
     "monaco-editor": "0.57.0",
     "react": "19.3.0",

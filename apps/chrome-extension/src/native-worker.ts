@@ -1,3 +1,4 @@
+import { handleCompanionResult, listenToCompanions } from "./companion-requests.js";
 import { authenticate } from "@browser-use-extension/engine/native-authenticate";
 import { configureEngine } from "@browser-use-extension/engine/engine-config";
 import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
@@ -204,6 +205,8 @@ function waitForPageGrant(
   });
 }
 
+listenToCompanions(async () => (await ensureExecutor()).socket);
+
 async function ensureExecutor(): Promise<ExecutorConnection> {
   if (executor?.socket.readyState === WebSocket.OPEN) return executor;
   if (connecting) return connecting;
@@ -280,6 +283,15 @@ async function sendNativeBootstrap(identity: BrowserIdentity) {
   return parsed.data;
 }
 
+/** Messages core sends on its own: attention, companion results, chats to open. */
+function handleCoreMessage(candidate: unknown): boolean {
+  return (
+    handleCoreAttentionMessage(candidate) ||
+    handleCompanionResult(candidate) ||
+    handleOpenChatMessage(candidate)
+  );
+}
+
 function handleExecutorMessage(connection: ExecutorConnection, data: unknown): void {
   let candidate: unknown;
   try {
@@ -288,8 +300,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     connection.socket.close(4002, "Invalid daemon response");
     return;
   }
-  if (handleCoreAttentionMessage(candidate)) return;
-  if (handleOpenChatMessage(candidate)) return;
+  if (handleCoreMessage(candidate)) return;
   const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
   if (heartbeat.success) {
     if (
