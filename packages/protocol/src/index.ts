@@ -137,3 +137,9 @@ export * from "./site-scripts.js";
 
 export * from "./core-client.js";
 export * from "./browser-code.js";
+export {
+  CompanionRequestSchema,
+  CompanionResultSchema,
+  type CompanionRequest,
+  type CompanionResult,
+} from "./companion.js";

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SUPPORTED_PROTOCOL_VERSION = { major: 1, minor: 6 } as const;
+export const SUPPORTED_PROTOCOL_VERSION = { major: 1, minor: 7 } as const;
 
 export const ClientRoleSchema = z.enum(["ui", "extension-executor", "desktop-ui"]);
 export type ClientRole = z.infer<typeof ClientRoleSchema>;

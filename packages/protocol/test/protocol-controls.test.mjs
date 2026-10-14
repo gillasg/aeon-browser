@@ -37,8 +37,8 @@ test("thread-message Pi content blocks carry typed delivery and reply provenance
   );
 });
 
-test("chat and browser commands use version 1.6 and bound image and text attachments", () => {
-  assert.deepEqual(SUPPORTED_PROTOCOL_VERSION, { major: 1, minor: 6 });
+test("chat and browser commands use version 1.7 and bound image and text attachments", () => {
+  assert.deepEqual(SUPPORTED_PROTOCOL_VERSION, { major: 1, minor: 7 });
   const chatId = "1c8e73dc-f996-4aac-94ae-198773512ab3";
   const valid = {
     kind: "command",

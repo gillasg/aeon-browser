@@ -17,6 +17,7 @@ import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import { ChatService } from "./chat-service.js";
 import { GrantAuthority, type GrantContext } from "./grant-authority.js";
 import { BrowserControlService } from "./browser-control-service.js";
+import { handleCompanionMessage } from "./companion-requests.js";
 
 export function attachNativeExecutor(
   socket: WebSocket,
@@ -37,6 +38,7 @@ export function attachNativeExecutor(
     if (handleExecutorHeartbeat(candidate, socket, executor)) return;
     if (handleInventory(socket, candidate, executor, inventories, state, browserControl)) return;
     if (browserControl.handleExecutorResult(candidate, socket)) return;
+    if (handleCompanionMessage(socket, candidate, { service, browserControl })) return;
     // Page grants authenticate the UI independently of browser inventory.
     const request = PageGrantIssueRequestSchema.safeParse(candidate);
     if (!request.success) return socket.close(1008, "Unsupported executor message");

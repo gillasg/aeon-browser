@@ -1,4 +1,4 @@
-import { openModelLogin } from "./model-login.js";
+import { modelComplete, openModelLogin } from "./model-login.js";
 import { configureInitialPrompt, type InitialPromptSelection } from "./initial-prompt-selection.js";
 import { boundedChatEntries, type ObservedSession } from "./bounded-chat-entries.js";
 import { ProjectService } from "./project-service.js";
@@ -122,6 +122,10 @@ export class ChatService {
   /** Opens the model sign-in page; the catalog refreshes after every sign-in or sign-out. */
   openModelLogin = (): Promise<string> =>
     openModelLogin(this.pi.modelAgentDirectory, () => this.pi.invalidateModelCatalog?.());
+  modelComplete = (
+    system: string,
+    messages: { role: string; content: string }[],
+  ): Promise<string> => modelComplete(this.pi.modelAgentDirectory, system, messages);
   async searchChats(
     query: string,
     limit = 50,
