@@ -222,7 +222,8 @@ test(
         assert.deepEqual(learned.value, [1, "GET", true, 2]);
         const direct = await run("(await page.fetchJson('/api/orders?page=2')).orders[0].total");
         assert.equal(direct.value, 42);
-        assert.match((await run("await page.network.list()")).error, /Not recording/);
+        // A stopped recording stays readable (and savable) until the next start.
+        assert.equal((await run("(await page.network.list('/api/')).length")).value, 1);
       });
 
       await t.test("workspace calls are served by Core", async () => {
