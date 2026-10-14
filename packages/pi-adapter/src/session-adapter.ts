@@ -37,6 +37,7 @@ import {
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import { createClockTool } from "./clock-tool.js";
+import { completeWithDefaultModel } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createSiteApiTool } from "./site-api-tool.js";
 import { installAeonBrowser } from "./site-browser.js";
@@ -110,6 +111,23 @@ export class PiSdkSessionAdapter implements PiSessionPort {
 
   invalidateModelCatalog(): void {
     invalidatePiModelCatalog(this);
+  }
+
+  completeText(
+    system: string,
+    messages: { role: string; content: string }[],
+    choice?: { model?: string; thinking?: string },
+  ): Promise<string> {
+    return completeWithDefaultModel(
+      {
+        sessionDirectory: this.sessionDirectory,
+        agentDirectory: this.agentDirectory,
+        preferredInitialModel: this.preferredInitialModel,
+      },
+      system,
+      messages,
+      choice,
+    );
   }
 
   getModelCatalog(): Promise<PiModelCatalog> {

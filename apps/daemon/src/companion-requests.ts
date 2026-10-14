@@ -17,6 +17,7 @@ interface Deps {
 }
 
 const MAX_FIELD = 2000;
+const COMPANION_MODEL = "openai-codex/gpt-6-luna";
 const quote = (value: unknown): string =>
   JSON.stringify(typeof value === "string" ? value.slice(0, MAX_FIELD) : (value ?? null));
 
@@ -48,17 +49,32 @@ async function startChat(deps: Deps, title: string, prompt: string): Promise<{ c
   return { chatId: chat.chatId };
 }
 
+async function complete(data: Record<string, unknown>, deps: Deps): Promise<{ text: string }> {
+  const messages = Array.isArray(data.messages)
+    ? (data.messages as { role: string; content: string }[]).filter(
+        (m) => typeof m?.content === "string",
+      )
+    : [];
+  if (!messages.length) throw new Error("No messages to complete");
+  // The user's choice for companion work: GPT-6 Luna at high thinking, unless the request names one.
+  const choice = {
+    model: typeof data.model === "string" && data.model ? data.model : COMPANION_MODEL,
+    thinking: typeof data.thinking === "string" ? data.thinking : "high",
+  };
+  const system = String(data.system ?? "");
+  const text = await deps.service
+    .modelComplete(system, messages, choice)
+    .catch((error: unknown) =>
+      choice.model === COMPANION_MODEL && /not available/.test(String(error))
+        ? deps.service.modelComplete(system, messages, { thinking: choice.thinking })
+        : Promise.reject(error),
+    );
+  return { text };
+}
+
 async function answer(request: CompanionRequest, deps: Deps): Promise<unknown> {
   const data = request.data;
-  if (request.request === "model.complete") {
-    const messages = Array.isArray(data.messages)
-      ? (data.messages as { role: string; content: string }[]).filter(
-          (m) => typeof m?.content === "string",
-        )
-      : [];
-    if (!messages.length) throw new Error("No messages to complete");
-    return { text: await deps.service.modelComplete(String(data.system ?? ""), messages) };
-  }
+  if (request.request === "model.complete") return complete(data, deps);
   if (typeof data.url !== "string" && request.request === "watch")
     throw new Error("A watch needs the page address");
   if (request.request === "watch")

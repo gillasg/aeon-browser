@@ -277,6 +277,12 @@ export interface PiSessionPort {
   invalidateModelCatalog?(): void;
   /** Pi's agent directory (auth.json, settings.json) this port reads; undefined means Pi's default. */
   readonly modelAgentDirectory?: string | undefined;
+  /** One completion with the model new chats use (for other extensions the user allowed). */
+  completeText?(
+    system: string,
+    messages: { role: string; content: string }[],
+    choice?: { model?: string; thinking?: string },
+  ): Promise<string>;
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle>;
   searchTranscript(
     reference: PiSessionReference,

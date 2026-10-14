@@ -125,7 +125,11 @@ export class ChatService {
   modelComplete = (
     system: string,
     messages: { role: string; content: string }[],
-  ): Promise<string> => modelComplete(this.pi.modelAgentDirectory, system, messages);
+    choice?: { model?: string; thinking?: string },
+  ): Promise<string> =>
+    this.pi.completeText
+      ? this.pi.completeText(system, messages, choice)
+      : modelComplete(this.pi.modelAgentDirectory, system, messages);
   async searchChats(
     query: string,
     limit = 50,
