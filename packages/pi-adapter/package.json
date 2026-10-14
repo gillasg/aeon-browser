@@ -18,7 +18,7 @@
     "@aeon/protocol": "workspace:*",
     "@earendil-works/pi-ai": "0.99.1",
     "@earendil-works/pi-coding-agent": "0.99.1",
-    "browser-crawl": "file:../../vendor/browser-crawl-0.2.0.tgz",
+    "browser-crawl": "file:../../vendor/browser-crawl-0.2.1.tgz",
     "site-to-api": "file:../../vendor/site-to-api-0.2.0.tgz",
     "typebox": "1.3.27"
   }

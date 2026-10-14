@@ -96,8 +96,8 @@ importers:
         specifier: 0.99.1
         version: 0.99.1(patch_hash=aaa8f7a086be1c6405b8b57b8a9e4354c18fa7f05fa003e7462cb5b367c34ebc)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5)
       browser-crawl:
-        specifier: file:../../vendor/browser-crawl-0.2.0.tgz
-        version: file:vendor/browser-crawl-0.2.0.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5)
+        specifier: file:../../vendor/browser-crawl-0.2.1.tgz
+        version: file:vendor/browser-crawl-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5)
       site-to-api:
         specifier: file:../../vendor/site-to-api-0.2.0.tgz
         version: file:vendor/site-to-api-0.2.0.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
@@ -1220,13 +1220,13 @@ packages:
       }
     engines: { node: 20 || >=22 }
 
-  browser-crawl@file:vendor/browser-crawl-0.2.0.tgz:
+  browser-crawl@file:vendor/browser-crawl-0.2.1.tgz:
     resolution:
       {
-        integrity: sha512-y219KHmX/jdT2d9UO36AmTFU0k7xHI15ywsFNKgPEMi6ssQZNxq6a5lSzgfg78vB1CJ2iUuJIu9y2jKmqe4QPg==,
-        tarball: file:vendor/browser-crawl-0.2.0.tgz,
+        integrity: sha512-XVW0H2M8bNTDfA8neQp00qc8LOJ+QDHORpXFZkYtf/Zd9xkhOZnicC/j8Oz9vWMdJ1szJnA+uppYqQy0L0Iw0Q==,
+        tarball: file:vendor/browser-crawl-0.2.1.tgz,
       }
-    version: 0.2.0
+    version: 0.2.1
     engines: { node: ">=22.19.0" }
     hasBin: true
 
@@ -4195,7 +4195,7 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
-  browser-crawl@file:vendor/browser-crawl-0.2.0.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5):
+  browser-crawl@file:vendor/browser-crawl-0.2.1.tgz(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(zod@4.6.5):
     dependencies:
       "@mozilla/readability": 0.6.0
       exceljs: 4.4.0
