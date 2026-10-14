@@ -101,7 +101,10 @@ async function call(input: Input, workspace: string | undefined): Promise<ToolTe
 async function learn(input: Input, workspace: string | undefined): Promise<unknown> {
   const site = requireSite(input);
   if (!workspace) throw new Error("This chat has no workspace for captures");
-  if (!input.files?.length) throw new Error("Give the HAR files saved in the workspace");
+  if (!input.files?.length)
+    throw new Error(
+      "learn needs a capture of the site's own traffic. In one browser_code call: const tab = await browser.openTab('https://<site>'); await tab.network.start({ types: 'all' }); then do something that loads new data (a search, a filter, the next page); then await tab.network.save('<site>.har'). Then call learn with files: ['<site>.har']. Never write a capture by hand.",
+    );
   const paths = input.files.map((file) => resolve(workspace, file));
   if (paths.some((path) => !path.startsWith(resolve(workspace))))
     throw new Error("Capture files must be inside the workspace");
@@ -125,7 +128,17 @@ async function learn(input: Input, workspace: string | undefined): Promise<unkno
 }
 
 async function runAction(input: Input, workspace: string | undefined): Promise<ToolText> {
-  if (input.action === "sites") return textResult({ sites: await listSites() });
+  if (input.action === "sites") {
+    const sites = await listSites();
+    return textResult(
+      sites.length
+        ? { sites }
+        : {
+            sites,
+            next: "Nothing is mapped yet. To map a site, capture its traffic and use learn.",
+          },
+    );
+  }
   if (input.action === "operations") return textResult(await operations(input));
   if (input.action === "call") return call(input, workspace);
   return textResult(await learn(input, workspace));
