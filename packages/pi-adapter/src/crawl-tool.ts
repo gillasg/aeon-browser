@@ -55,7 +55,8 @@ type Input = Static<typeof Parameters>;
 
 const GUIDELINES = [
   "crawl reads pages without driving tabs step by step: scrape one URL, crawl a site or a section (include ['/docs/**']), map a site's URLs, or search Google. Pages behind the user's logins work: they are fetched in their browser when plain HTTP is not enough.",
-  "Prefer crawl over browser_code to read or collect content from many pages; use browser_code to act on pages (click, fill, buy).",
+  "Prefer crawl over browser_code to read or collect content from many pages; use browser_code to act on pages (click, fill, buy). When webfetch fails (blocked shops, ticketing and travel sites, pages built by JavaScript), use crawl scrape instead of retrying webfetch: it switches to the user's browser.",
+  "This computer runs Windows and bash has no python: process data in browser_code, or with node in bash.",
   "Give a query to rank pages by relevance and get fitMarkdown (only the relevant parts). Whole crawls are saved in the workspace as Markdown files plus pages.jsonl; the reply lists them with short previews.",
 ];
 
