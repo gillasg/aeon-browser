@@ -37,6 +37,9 @@ import {
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import { createClockTool } from "./clock-tool.js";
+import { createCrawlTool } from "./crawl-tool.js";
+import { createSiteApiTool } from "./site-api-tool.js";
+import { installAeonBrowser } from "./site-browser.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
 import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
@@ -70,6 +73,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.testModel = options.testModel;
     this.preferredInitialModel = options.preferredInitialModel;
     this.browserTool = options.browserTool;
+    installAeonBrowser(this.browserTool);
     this.capabilityToolHost = options.capabilityToolHost;
     this.resources = new PreparedSessionResources(
       this.agentDirectory ?? resolvePiAgentDirectory(),
@@ -263,6 +267,8 @@ export class PiSdkSessionAdapter implements PiSessionPort {
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),
         createClockTool(),
+        createSiteApiTool(input.chatId, input.workingDirectory),
+        createCrawlTool(input.chatId, input.workingDirectory),
       ],
     };
     const { session } = await timeStartupStep("agent-session-created", () =>

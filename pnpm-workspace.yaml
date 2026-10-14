@@ -1,8 +1,14 @@
 packages:
   - apps/*
   - packages/*
+overrides:
+  # Shared code from sibling repos, as packed tarballs (one copy for everything that uses it).
+  pi-ai-login: file:vendor/pi-ai-login-0.1.1.tgz
+  site-to-api: file:vendor/site-to-api-0.2.0.tgz
 minimumReleaseAgeExclude:
   - pi-ai-login
+  - site-to-api
+  - browser-crawl
   - "@earendil-works/pi-ai@1.2.0"
   - "@earendil-works/pi-telemetry@1.2.0"
   - "@modelcontextprotocol/client@2.2.0"
