@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Type, type Static } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
@@ -32,7 +33,7 @@ type Input = Static<typeof Parameters>;
 const GUIDELINES = [
   "site_api calls the APIs of sites mapped from the user's own browsing: one call replaces many page actions and returns clean JSON. Check `sites` before working on a site you may have mapped; if it is there, use `operations` then `call` instead of browser_code.",
   "Calls run with the user's logins (through the site's own page when the API needs it), so treat writes (role action) like clicking the button: only when the user asked for that action.",
-  "To map a site you will use again (prices, orders, listings, a dashboard): in browser_code start `await page.network.start({ types: 'all' })`, do the task, then `await artifact('<site>.har', JSON.stringify(await page.network.har()))`, then call site_api with action learn, the site and files ['<site>.har']. More captures of other features make the API more complete.",
+  "To map a site you will use again (prices, orders, listings, a dashboard): in one browser_code call: open the site, `await page.network.start({ types: 'all' })`, do something that loads new data (a fresh search, a filter, the next page; repeating what is already on screen loads nothing), then `await page.network.save('<site>.har')`. Then site_api learn with the site and files ['<site>.har'] returns the operations and how to call them. More captures of other features make the API more complete.",
   "Long results are saved in the workspace and previewed; load the file in browser_code or read it with other tools if you need all of it.",
 ];
 
@@ -104,6 +105,13 @@ async function learn(input: Input, workspace: string | undefined): Promise<unkno
   const paths = input.files.map((file) => resolve(workspace, file));
   if (paths.some((path) => !path.startsWith(resolve(workspace))))
     throw new Error("Capture files must be inside the workspace");
+  for (const [index, path] of paths.entries()) {
+    const har = JSON.parse(await readFile(path, "utf8")) as { log?: { entries?: unknown[] } };
+    if (!har.log?.entries?.length)
+      throw new Error(
+        `${input.files[index]} has no requests. Start the capture first (page.network.start()), then do something on the site that loads new data (a new search, the next page, opening an item), then page.network.save('${input.files[index]}').`,
+      );
+  }
   await importCaptures(site, paths);
   const result = await rebuild(site);
   // The operations come back right away, so the next step can be a call.
