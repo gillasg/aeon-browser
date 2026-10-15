@@ -11,8 +11,22 @@ icon.rel = "icon";
 icon.type = "image/png";
 document.head.append(icon);
 let timer = 0;
-let angle = 0;
+let frame = 0;
 let working = false;
+let chatFilter = "";
+// Spinner frames are drawn once and stepped evenly, so the turn stays smooth when timers jitter.
+const FRAMES = 24;
+const spinnerFrames: string[] = [];
+/** Limits this tab's icon to one chat's status (chat pages); other pages show any chat's. */
+export function showStatusForChat(chatId: string): void {
+  chatFilter = chatId;
+  refresh();
+}
+function relevant(key: string): boolean {
+  return (
+    !chatFilter || key === "aeon-chat-working-" + chatFilter || key === "piper-unread-" + chatFilter
+  );
+}
 let done = false;
 const touchedKeys = new Set<string>();
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -50,35 +64,44 @@ void chrome.storage.session.get(null).then((values) => {
   }
 });
 function refresh(): void {
-  working = [...statuses.values()].includes("working");
-  done = [...statuses.values()].includes("done");
+  const values = [...statuses].filter(([key]) => relevant(key)).map(([, value]) => value);
+  working = values.includes("working");
+  done = !working && values.includes("done");
   if (working && !timer)
     timer = window.setInterval(() => {
-      angle = ((performance.now() % 1200) / 1200) * Math.PI * 2;
+      frame = (frame + 1) % FRAMES;
       draw();
-    }, 1000 / 30);
+    }, 1200 / FRAMES);
   if (!working && timer) {
     clearInterval(timer);
     timer = 0;
-    angle = 0;
+    frame = 0;
   }
   draw();
 }
+function spinnerFrame(index: number): string {
+  if (spinnerFrames[index] || !context) return spinnerFrames[index] ?? "";
+  const angle = (index / FRAMES) * Math.PI * 2;
+  context.clearRect(0, 0, 32, 32);
+  context.strokeStyle = "#737373";
+  context.lineWidth = 3;
+  context.lineCap = "round";
+  context.beginPath();
+  context.arc(16, 16, 12, angle, angle + Math.PI * 1.5);
+  context.stroke();
+  return (spinnerFrames[index] = canvas.toDataURL("image/png"));
+}
 function draw(): void {
   if (!context) return;
-  context.clearRect(0, 0, 32, 32);
   if (working) {
-    context.strokeStyle = "#737373";
-    context.lineWidth = 3;
-    context.lineCap = "round";
-    context.beginPath();
-    context.arc(16, 16, 12, angle, angle + Math.PI * 1.5);
-    context.stroke();
+    icon.href = spinnerFrame(frame);
+    return;
   }
+  context.clearRect(0, 0, 32, 32);
   if (done) {
     context.fillStyle = "#4299ff";
     context.beginPath();
-    context.arc(16, 16, working ? 4 : 6, 0, Math.PI * 2);
+    context.arc(16, 16, 6, 0, Math.PI * 2);
     context.fill();
   }
   if (!working && !done && orbit.complete && orbit.naturalWidth)

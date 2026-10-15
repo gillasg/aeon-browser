@@ -1,5 +1,5 @@
 import type { DaemonUiResponse, ChatViewSnapshotDto } from "@aeon/protocol";
-import "./status-favicon.js";
+import { showStatusForChat } from "./status-favicon.js";
 const key = "aeon-tab-status-" + crypto.randomUUID();
 let activeChatId = "";
 let status: "idle" | "working" = "idle";
@@ -15,6 +15,7 @@ export function observeChatTabStatus(
   chatId: string,
 ): void {
   activeChatId = chatId;
+  showStatusForChat(chatId);
   const acknowledge = () => {
     const visible = document.visibilityState === "visible" && document.hasFocus();
     void chrome.storage.session
