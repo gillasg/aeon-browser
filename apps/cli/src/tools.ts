@@ -58,7 +58,22 @@ async function print(content: Content[]): Promise<void> {
   }
 }
 
-/** aeon tool <name> [json | @file | -] [--session s] */
+/** key=value arguments, so simple inputs need no JSON quoting: values parse as JSON when they can. */
+function fromPairs(pairs: string[]): Json {
+  return Object.fromEntries(
+    pairs.map((pair) => {
+      const at = pair.indexOf("=");
+      const value = pair.slice(at + 1);
+      try {
+        return [pair.slice(0, at), JSON.parse(value) as unknown];
+      } catch {
+        return [pair.slice(0, at), value];
+      }
+    }),
+  );
+}
+
+/** aeon tool <name> [json | @file | - | key=value ...] [--session s] */
 export async function runTool(client: AeonClient, rest: string[]): Promise<number> {
   const [name, ...others] = rest;
   if (!name || !TOOL_NAMES.includes(name))
@@ -66,12 +81,14 @@ export async function runTool(client: AeonClient, rest: string[]): Promise<numbe
   const sessionIndex = others.indexOf("--session");
   const session = sessionIndex >= 0 ? others[sessionIndex + 1] : undefined;
   const sessionValue = sessionIndex >= 0 ? sessionIndex + 1 : -1;
-  const raw = others.find((arg, index) => !arg.startsWith("--") && index !== sessionValue);
+  const inputs = others.filter((arg, index) => !arg.startsWith("--") && index !== sessionValue);
+  const pairs = inputs.filter((arg) => /^[A-Za-z_]\w*=/.test(arg));
+  const input = pairs.length ? fromPairs(pairs) : await readInput(inputs[0]);
   const reply = await client.tool({
     kind: "core.tool.call",
     tool: name,
     session: session || "cli",
-    arguments: await readInput(raw),
+    arguments: input,
   });
   await print((reply.content as Content[] | undefined) ?? []);
   return reply.isError === true ? 1 : 0;
