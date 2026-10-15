@@ -86,3 +86,18 @@ export const NativeOpenChatSchema = z
     active: z.boolean(),
   })
   .strict();
+
+/** A local client (the Aeon MCP) lists or calls the chat tools (browser_code, crawl, ...). */
+export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("core.tool.list"), requestId: z.string().uuid() }).strict(),
+  z
+    .object({
+      kind: z.literal("core.tool.call"),
+      requestId: z.string().uuid(),
+      tool: z.enum(["browser_code", "browser_tabs", "crawl", "site_api"]),
+      session: z.string().min(1).max(100),
+      arguments: z.record(z.string(), z.unknown()),
+    })
+    .strict(),
+]);
+export type CoreToolRequest = z.infer<typeof CoreToolRequestSchema>;

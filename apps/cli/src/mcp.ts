@@ -5,7 +5,8 @@ import { inspect, runTasks } from "./run.js";
 import type { ChatResult } from "./results.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
-// and read the answers and traces. Runs start in the background and are polled, because a
+// and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
+// (browser_code, browser_tabs, crawl, site_api), as with the Browser Use Extension. Runs start in the background and are polled, because a
 // browser task can take far longer than an MCP client waits for one call.
 type Json = Record<string, unknown>;
 interface Run {
@@ -76,6 +77,29 @@ const tools = [
   },
 ];
 
+const CHAT_TOOLS = new Set(["browser_code", "browser_tabs", "crawl", "site_api"]);
+
+/** The chat tools, described by the daemon itself; none while Aeon is not running. */
+async function chatTools(aeon: () => Promise<AeonClient>): Promise<unknown[]> {
+  try {
+    const reply = await (await aeon()).tool({ kind: "core.tool.list" }, 10_000);
+    return Array.isArray(reply.tools) ? reply.tools : [];
+  } catch {
+    return [];
+  }
+}
+
+async function callChatTool(client: AeonClient, name: string, args: Json = {}): Promise<unknown> {
+  const { session, ...rest } = args;
+  const reply = await client.tool({
+    kind: "core.tool.call",
+    tool: name,
+    session: typeof session === "string" && session ? session : "mcp",
+    arguments: rest,
+  });
+  return { content: reply.content, isError: reply.isError === true };
+}
+
 function chatIdSchema() {
   return {
     type: "object",
@@ -114,10 +138,11 @@ async function handle(
       capabilities: { tools: {} },
       serverInfo: { name: "aeon", version: "0.1.0" },
     };
-  if (message.method === "tools/list") return { tools };
+  if (message.method === "tools/list") return { tools: [...tools, ...(await chatTools(aeon))] };
   if (message.method === "ping") return {};
   if (message.method !== "tools/call") throw new Error("Method not found");
   const params = message.params as { name: string; arguments?: Json };
+  if (CHAT_TOOLS.has(params.name)) return callChatTool(await aeon(), params.name, params.arguments);
   try {
     return text(await callTool(params.name, params.arguments ?? {}, aeon, runs));
   } catch (error) {

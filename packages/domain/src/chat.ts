@@ -283,6 +283,13 @@ export interface PiSessionPort {
     messages: { role: string; content: string }[],
     choice?: { model?: string; thinking?: string },
   ): Promise<string>;
+  /** Chat tools for agents outside Aeon: definitions, and one call in a named session. */
+  externalTools?(): unknown[];
+  callExternalTool?(
+    name: string,
+    session: string,
+    args: Record<string, unknown>,
+  ): Promise<{ content: unknown[]; isError: boolean }>;
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle>;
   searchTranscript(
     reference: PiSessionReference,

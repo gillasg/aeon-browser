@@ -41,6 +41,7 @@ import { completeWithDefaultModel } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createSiteApiTool } from "./site-api-tool.js";
 import { installAeonBrowser } from "./site-browser.js";
+import { externalToolDefinitions, runExternalTool } from "./external-tools.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
 import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
@@ -107,6 +108,19 @@ export class PiSdkSessionAdapter implements PiSessionPort {
 
   get modelAgentDirectory(): string | undefined {
     return this.agentDirectory;
+  }
+
+  /** browser_code, browser_tabs, crawl and site_api for agents outside Aeon (the Aeon MCP). */
+  externalTools(): unknown[] {
+    return externalToolDefinitions(this.sessionDirectory, this.browserTool);
+  }
+
+  callExternalTool(
+    name: string,
+    session: string,
+    args: Record<string, unknown>,
+  ): Promise<{ content: unknown[]; isError: boolean }> {
+    return runExternalTool(this.sessionDirectory, this.browserTool, name, session, args);
   }
 
   invalidateModelCatalog(): void {

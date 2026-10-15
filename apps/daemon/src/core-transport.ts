@@ -5,6 +5,7 @@ import { once } from "node:events";
 import {
   CoreHelloSchema,
   CoreOpenChatRequestSchema,
+  CoreToolRequestSchema,
   SUPPORTED_PROTOCOL_VERSION,
 } from "@aeon/protocol";
 import { WebSocket, WebSocketServer } from "ws";
@@ -105,7 +106,8 @@ function authenticate(
       threads,
       (candidate) =>
         handleAttentionMessage(socket, candidate, attention) ||
-        handleOpenChat(socket, candidate, service, browser),
+        handleOpenChat(socket, candidate, service, browser) ||
+        handleToolRequest(socket, candidate, service),
     );
   });
 }
@@ -122,6 +124,28 @@ function handleOpenChat(
   );
   const browsers = known ? browser.openChatTab(request.data.chatId, request.data.active) : 0;
   socket.send(JSON.stringify({ kind: "core.chat.opened", chatId: request.data.chatId, browsers }));
+  return true;
+}
+/** The chat tools for agents outside Aeon: listed, or called in a named session. */
+function handleToolRequest(socket: WebSocket, candidate: unknown, service: ChatService): boolean {
+  const request = CoreToolRequestSchema.safeParse(candidate);
+  if (!request.success) return false;
+  const { requestId } = request.data;
+  const send = (body: Record<string, unknown>) =>
+    socket.send(JSON.stringify({ kind: "core.tool.result", requestId, ...body }));
+  if (request.data.kind === "core.tool.list") {
+    send({ tools: service.externalTools() });
+    return true;
+  }
+  const { tool, session } = request.data;
+  service.callExternalTool(tool, session, request.data.arguments).then(
+    (result) => send(result),
+    (error: unknown) =>
+      send({
+        content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+        isError: true,
+      }),
+  );
   return true;
 }
 function equalToken(expected: string, actual: string): boolean {

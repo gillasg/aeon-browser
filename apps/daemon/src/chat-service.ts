@@ -130,6 +130,15 @@ export class ChatService {
     this.pi.completeText
       ? this.pi.completeText(system, messages, choice)
       : modelComplete(this.pi.modelAgentDirectory, system, messages);
+  externalTools = (): unknown[] => this.pi.externalTools?.() ?? [];
+  callExternalTool = (
+    name: string,
+    session: string,
+    args: Record<string, unknown>,
+  ): Promise<{ content: unknown[]; isError: boolean }> => {
+    if (!this.pi.callExternalTool) throw new Error("Aeon's tools are not available");
+    return this.pi.callExternalTool(name, session, args);
+  };
   async searchChats(
     query: string,
     limit = 50,
