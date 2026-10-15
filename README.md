@@ -12,6 +12,8 @@ Load `apps/chrome-extension/native-dist` in Chrome. Core supplies Pi sessions an
 
 ## Outside agents
 
+Setup also installs an `aeon` command and an Aeon skill (in `~/.agents/skills` and `~/.claude/skills`), so agents on this machine know Aeon exists and can use it from their shell in the same session: `aeon tools` lists the tools with their guidance, `aeon tool browser_code '{...}' --session s` runs one, `aeon run "task"` hands Aeon a whole task. `aeon install` sets this up again.
+
 Other agents (Claude Code, Codex, any MCP client) can use Aeon two ways through its MCP server (`node core/apps/cli/dist/cli.js mcp`):
 
 - **Hand Aeon a task**: `aeon_run`, then `aeon_run_status` / `aeon_result` / `aeon_trace`. Aeon's own agent does the work in a chat.
