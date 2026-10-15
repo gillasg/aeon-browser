@@ -2,4 +2,56 @@
 
 Local browser agent powered by the shared Core runtime.
 
-`pnpm install --ignore-scripts` then `pnpm build`. Load `apps/chrome-extension/native-dist` in Chrome. Core supplies Pi sessions and local storage; the extension supplies browser control.
+```sh
+node scripts/link-repos.mjs   # fetches and builds core and the Browser Use Extension next to this folder
+pnpm install --ignore-scripts
+pnpm build
+```
+
+Load `apps/chrome-extension/native-dist` in Chrome. Core supplies Pi sessions and local storage; the extension supplies browser control. `native-dist/build-info.json` lists the revision of every repo the build used.
+
+## How it all fits together
+
+Aeon is two parts: **core**, the brain (Pi, chats, the agent, and every tool it runs), and **aeon-browser**, this extension (the side panel and chat). Everything browser-related comes from one place, the **browser family**, through the Browser Use Extension.
+
+```
+Aeon
+├── core                     the brain: Pi, chats, runs every tool
+│     └── from BUE: site-to-api and browser-crawl (the site_api and crawl tools)
+└── aeon-browser             the face: side panel and chat
+      └── from BUE: the engine (browser control) with Site Boosts' engine (boosts)
+
+Browser family (each its own repo, each usable alone)
+├── browser-use-extension (BUE)   Aeon without the agent: any agent drives Chrome with it
+│     ├── Chrome side: engine (browser control), Site Boosts' engine
+│     └── PC side:     bridge, CLI, MCP, site-to-api, browser-crawl
+├── site-to-api                    turns a site into an API from your own traffic
+├── browser-crawl                  reads pages and whole sites as Markdown and data
+└── site-boosts                    lasting changes to sites, in plain English
+```
+
+### Why each part plugs in where it does
+
+- **Core runs every tool**, whichever repo the tool's code comes from.
+- **site-to-api and browser-crawl run on the PC**, like core, so they plug into core as tools. Core gets them through BUE's PC side (`@browser-use-extension/tools`).
+- **Site Boosts' engine has to run inside Chrome** (it changes pages as they load), so it plugs into the extension side: it is part of BUE's engine, which this extension builds in.
+- **BUE is the only door.** Aeon takes everything browser-related from BUE; the three other products feed BUE. Links point one way:
+
+```
+site-to-api ─┐
+browser-crawl├─► BUE ─► Aeon (core + aeon-browser)
+site-boosts ─┘
+```
+
+### Live links, not copies
+
+The repos use each other through links to sibling folders (`link:../../../browser-use-extension/packages/engine`), not copied files. A change is committed only in the repo where it was made; everything that uses it picks it up at its next build. `node scripts/link-repos.mjs` clones and builds the linked repos; `--revisions` prints which revision of each one is in use.
+
+| You change…                                             | Commits                                |
+| ------------------------------------------------------- | -------------------------------------- |
+| site-to-api, browser-crawl or site-boosts               | that repo only                         |
+| the Browser Use Extension                               | that repo only                         |
+| core or aeon-browser                                    | that repo only                         |
+| a message or API others call, in a way that breaks them | that repo, plus the code that calls it |
+
+Guards: sprint work happens on branches and reaches `main` when it works; BUE's CI also checks core and aeon-browser against each commit; BUE publishes a tagged release whenever anything in the family changes, listing every revision it was built from.

@@ -2,6 +2,7 @@ import { handleCompanionResult, listenToCompanions } from "./companion-requests.
 import { authenticate } from "@browser-use-extension/engine/native-authenticate";
 import { configureEngine } from "@browser-use-extension/engine/engine-config";
 import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
+import { installBoosts } from "@browser-use-extension/engine/native-browser-boosts";
 import { readAgentTabView } from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
@@ -95,6 +96,8 @@ chrome.runtime.onMessage.addListener((request: unknown, sender) => {
 });
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void migrateLegacyChromeStorage();
+// Saved boosts (browser.boosts) apply in every tab, without Site Boosts installed.
+installBoosts();
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 installNativeBrowserContextMenus(() => ensureInventoryExecutor());
 

@@ -19,7 +19,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
-          cache: pnpm
+      # core (its protocol) and the Browser Use Extension (the engine), next to this checkout.
+      - name: Set up linked repos
+        run: node scripts/link-repos.mjs
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Cache Chrome for Testing
         uses: actions/cache@v4

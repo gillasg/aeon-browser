@@ -29,14 +29,14 @@ importers:
   apps/chrome-extension:
     dependencies:
       "@aeon/protocol":
-        specifier: file:../../vendor/aeon-protocol-0.10.0.tgz
-        version: file:vendor/aeon-protocol-0.10.0.tgz
+        specifier: link:../../../core/packages/protocol
+        version: link:../../../core/packages/protocol
       "@aeon/ui":
         specifier: workspace:*
         version: link:../../packages/ui
       "@browser-use-extension/engine":
-        specifier: file:../../vendor/browser-use-extension-engine-0.2.5.tgz
-        version: file:vendor/browser-use-extension-engine-0.2.5.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.10.0.tgz)
+        specifier: link:../../../browser-use-extension/packages/engine
+        version: link:../../../browser-use-extension/packages/engine
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -69,8 +69,8 @@ importers:
   packages/ui:
     dependencies:
       "@aeon/protocol":
-        specifier: file:../../vendor/aeon-protocol-0.10.0.tgz
-        version: file:vendor/aeon-protocol-0.10.0.tgz
+        specifier: link:../../../core/packages/protocol
+        version: link:../../../core/packages/protocol
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -92,24 +92,6 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
 
 packages:
-  "@aeon/protocol@file:vendor/aeon-protocol-0.10.0.tgz":
-    resolution:
-      {
-        integrity: sha512-YG6KUuyooGx6U8YtOyDG+N91j5Pq7vWeCq+oeJC4O2qNtGZ8uhAN3xPsvhyEK6i4Fg7YY+aw9vTocd59O6/B2A==,
-        tarball: file:vendor/aeon-protocol-0.10.0.tgz,
-      }
-    version: 0.10.0
-
-  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.2.5.tgz":
-    resolution:
-      {
-        integrity: sha512-fUiDofNr5ZuhRCSHKtEnJcFxed+T1TYoHKrUGoM1RAqWdeTo03rKrgS1dz1Xpze1QItQ02KrKmqBEPNnXZCIpQ==,
-        tarball: file:vendor/browser-use-extension-engine-0.2.5.tgz,
-      }
-    version: 0.2.5
-    peerDependencies:
-      "@aeon/protocol": ">=0.6.0"
-
   "@cacheable/memory@2.2.0":
     resolution:
       {
@@ -1769,16 +1751,6 @@ packages:
       }
 
 snapshots:
-  "@aeon/protocol@file:vendor/aeon-protocol-0.10.0.tgz":
-    dependencies:
-      zod: 4.6.5
-
-  "@browser-use-extension/engine@file:vendor/browser-use-extension-engine-0.2.5.tgz(@aeon/protocol@file:vendor/aeon-protocol-0.10.0.tgz)":
-    dependencies:
-      "@aeon/protocol": file:vendor/aeon-protocol-0.10.0.tgz
-      acorn: 8.18.0
-      zod: 4.6.5
-
   "@cacheable/memory@2.2.0":
     dependencies:
       "@cacheable/utils": 2.5.0
