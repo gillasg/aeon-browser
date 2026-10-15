@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import {
   BrowserNotConnected,
+  handleSiteApiRequest,
+  isSiteApiRequest,
   useBrowser,
   type Bridge,
 } from "@browser-use-extension/tools/site-to-api";
@@ -69,4 +71,10 @@ export function installAeonBrowser(run: BrowserToolRunner | undefined): void {
 /** Runs tool work with browser calls attributed to this chat. */
 export function inChat<T>(chatId: string, work: () => Promise<T>): Promise<T> {
   return chats.run({ chatId }, work);
+}
+
+/** Browser code's siteApi.call / watch requests (cells and watcher checks), run for this chat. */
+export function siteApiRequest(chatId: string, request: unknown): Promise<unknown> | undefined {
+  if (!isSiteApiRequest(request)) return undefined;
+  return inChat(chatId, () => handleSiteApiRequest(request));
 }

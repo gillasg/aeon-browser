@@ -5,6 +5,8 @@ import type { defineTool } from "@earendil-works/pi-coding-agent";
 import { createBrowserCodeTool } from "./browser-code-tool.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createCrawlTool } from "./crawl-tool.js";
+import { createExtractTool } from "./extract-tool.js";
+import { siteToolModel, type CompletionOptions } from "./text-completion.js";
 import { createSiteApiTool } from "./site-api-tool.js";
 import { inChat, sessionChatId } from "./site-browser.js";
 
@@ -35,17 +37,23 @@ const TABS_CODE =
   "(await browser.tabs()).map((tab) => ({ tabId: tab.target?.tabId, title: tab.title, url: tab.url, target: tab.target }))";
 
 function toolsFor(
-  directory: string,
+  options: CompletionOptions,
   run: BrowserToolRunner | undefined,
   session: string,
 ): Record<string, Tool> {
   const chatId = sessionChatId("external", session);
-  const workspace = resolve(directory, "..", "external", session.replace(/[^\w.-]+/g, "-"));
-  const skills = resolve(directory, "..", "site-skills");
+  const workspace = resolve(
+    options.sessionDirectory,
+    "..",
+    "external",
+    session.replace(/[^\w.-]+/g, "-"),
+  );
+  const skills = resolve(options.sessionDirectory, "..", "site-skills");
   return {
     browser_code: createBrowserCodeTool(chatId, run, workspace, skills),
     crawl: createCrawlTool(chatId, workspace),
-    site_api: createSiteApiTool(chatId, workspace),
+    site_api: createSiteApiTool(chatId, workspace, siteToolModel(options)),
+    extract: createExtractTool(options, workspace),
   };
 }
 
@@ -53,10 +61,10 @@ const describe = (tool: Tool): string =>
   [tool.description, ...(tool.promptGuidelines ?? [])].join("\n\n");
 
 export function externalToolDefinitions(
-  directory: string,
+  options: CompletionOptions,
   run: BrowserToolRunner | undefined,
 ): ExternalToolDefinition[] {
-  const tools = toolsFor(directory, run, "default");
+  const tools = toolsFor(options, run, "default");
   const withSession = (tool: Tool) => {
     const schema = JSON.parse(JSON.stringify(tool.parameters)) as {
       properties: Record<string, unknown>;
@@ -83,17 +91,22 @@ export function externalToolDefinitions(
 }
 
 export async function runExternalTool(
-  directory: string,
+  options: CompletionOptions,
   run: BrowserToolRunner | undefined,
   name: string,
   session: string,
   args: Record<string, unknown>,
 ): Promise<ExternalToolResult> {
-  const tools = toolsFor(directory, run, session);
+  const tools = toolsFor(options, run, session);
   const tool = name === "browser_tabs" ? tools.browser_code : tools[name];
   if (!tool) throw new Error(`Unknown tool ${name}`);
   const input = name === "browser_tabs" ? { code: TABS_CODE } : args;
-  const workspace = resolve(directory, "..", "external", session.replace(/[^\w.-]+/g, "-"));
+  const workspace = resolve(
+    options.sessionDirectory,
+    "..",
+    "external",
+    session.replace(/[^\w.-]+/g, "-"),
+  );
   await mkdir(workspace, { recursive: true });
   const result = await inChat(sessionChatId("external", session), () =>
     tool.execute(randomUUID(), input as never, undefined, undefined, undefined as never),

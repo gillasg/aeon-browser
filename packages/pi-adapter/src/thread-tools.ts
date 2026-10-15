@@ -9,6 +9,18 @@ const createParameters = Type.Object(
   {
     title: Type.String({ minLength: 1, maxLength: 120 }),
     idempotencyKey: Type.String({ minLength: 1, maxLength: 160 }),
+    model: Type.Optional(
+      Type.String({
+        maxLength: 200,
+        description:
+          "provider/id for this thread (default: the chat default). A cheaper model suits bulk work.",
+      }),
+    ),
+    thinking: Type.Optional(
+      Type.Union(
+        ["off", "minimal", "low", "medium", "high", "xhigh"].map((level) => Type.Literal(level)),
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -68,7 +80,13 @@ export function createThreadTools(
   host?: ThreadToolHost,
 ): ReturnType<typeof defineTool>[] {
   return [
-    tool(chatId, host, "create_thread", "Create a new independent chat thread.", createParameters),
+    tool(
+      chatId,
+      host,
+      "create_thread",
+      "Create a new independent chat thread, optionally with its own model and thinking level, to hand off work and steer it with send_message_to_thread.",
+      createParameters,
+    ),
     tool(chatId, host, "list_threads", "List chat threads.", listParameters),
     tool(
       chatId,

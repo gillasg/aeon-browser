@@ -165,7 +165,11 @@ export class ThreadCoordinationService implements ThreadToolHost {
   private async createThread(senderChatId: ChatId, args: Record<string, unknown>): Promise<string> {
     const title = requiredString(args, "title", 120);
     const idempotencyKey = requiredString(args, "idempotencyKey", 160);
-    const payloadHash = hash({ title });
+    const model = typeof args.model === "string" && args.model ? args.model : undefined;
+    const thinking = typeof args.thinking === "string" ? args.thinking : undefined;
+    if (model && !/^[^/]+\/.+/.test(model))
+      throw new Error("model must be provider/id, as in the model picker");
+    const payloadHash = hash(model || thinking ? { title, model, thinking } : { title });
     const result = await this.chats.createThreadDraft({
       senderChatId,
       targetChatId: asChatId(randomUUID()),
@@ -173,7 +177,24 @@ export class ThreadCoordinationService implements ThreadToolHost {
       idempotencyKey,
       payloadHash,
     });
-    return JSON.stringify({ thread: result.chat, createdAt: result.intent.createdAt });
+    await this.chooseModel(result.chat.chatId, model, thinking);
+    return JSON.stringify({
+      thread: result.chat,
+      createdAt: result.intent.createdAt,
+      ...(model ? { model } : {}),
+      ...(thinking ? { thinking } : {}),
+    });
+  }
+
+  /** A thread can run on its own model and thinking level, set before its first message. */
+  private async chooseModel(chatId: ChatId, model?: string, thinking?: string): Promise<void> {
+    if (model) {
+      const [provider, ...id] = model.split("/");
+      if (!provider || !id.length)
+        throw new Error("model must be provider/id, as in the model picker");
+      await this.chats.setModel(chatId, provider, id.join("/"));
+    }
+    if (thinking) await this.chats.setThinkingLevel(chatId, thinking);
   }
 
   private async readThread(args: Record<string, unknown>): Promise<string> {

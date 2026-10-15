@@ -37,10 +37,12 @@ import {
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import { createClockTool } from "./clock-tool.js";
-import { completeWithDefaultModel } from "./text-completion.js";
+import { completeWithDefaultModel, siteToolModel } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
+import { createExtractTool } from "./extract-tool.js";
 import { createSiteApiTool } from "./site-api-tool.js";
 import { installAeonBrowser } from "./site-browser.js";
+import { installSiteMapping } from "./site-mapping.js";
 import { externalToolDefinitions, runExternalTool } from "./external-tools.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
 import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
@@ -76,6 +78,11 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.preferredInitialModel = options.preferredInitialModel;
     this.browserTool = options.browserTool;
     installAeonBrowser(this.browserTool);
+    if (this.browserTool && !options.testModel)
+      installSiteMapping(
+        resolve(this.sessionDirectory, "..", "site-mapping.json"),
+        siteToolModel(this.completionOptions()),
+      );
     this.capabilityToolHost = options.capabilityToolHost;
     this.resources = new PreparedSessionResources(
       this.agentDirectory ?? resolvePiAgentDirectory(),
@@ -112,7 +119,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
 
   /** browser_code, browser_tabs, crawl and site_api for agents outside Aeon (the Aeon MCP). */
   externalTools(): unknown[] {
-    return externalToolDefinitions(this.sessionDirectory, this.browserTool);
+    return externalToolDefinitions(this.completionOptions(), this.browserTool);
   }
 
   callExternalTool(
@@ -120,11 +127,19 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     session: string,
     args: Record<string, unknown>,
   ): Promise<{ content: unknown[]; isError: boolean }> {
-    return runExternalTool(this.sessionDirectory, this.browserTool, name, session, args);
+    return runExternalTool(this.completionOptions(), this.browserTool, name, session, args);
   }
 
   invalidateModelCatalog(): void {
     invalidatePiModelCatalog(this);
+  }
+
+  private completionOptions() {
+    return {
+      sessionDirectory: this.sessionDirectory,
+      agentDirectory: this.agentDirectory,
+      preferredInitialModel: this.preferredInitialModel,
+    };
   }
 
   completeText(
@@ -299,8 +314,13 @@ export class PiSdkSessionAdapter implements PiSessionPort {
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),
         createClockTool(),
-        createSiteApiTool(input.chatId, input.workingDirectory),
+        createSiteApiTool(
+          input.chatId,
+          input.workingDirectory,
+          siteToolModel(this.completionOptions()),
+        ),
         createCrawlTool(input.chatId, input.workingDirectory),
+        createExtractTool(this.completionOptions(), input.workingDirectory),
       ],
     };
     const { session } = await timeStartupStep("agent-session-created", () =>

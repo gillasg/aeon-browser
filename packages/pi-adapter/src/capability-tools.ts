@@ -126,7 +126,13 @@ function createRoutineTools(
         "For a watcher, add check: browser_code that runs on each slot without a model call " +
         "(e.g. const p = await browser.openTab(url); const price = await p.evaluate(() => ...); " +
         "await p.close(); price < 400 ? {price} : false). You are woken with the instruction only " +
-        "when its last expression is truthy, and receive that value. Watchers may run every minute.",
+        "when its last expression is truthy, and receive that value. Watchers may run every minute. " +
+        "Use them as event triggers: new items from a mapped API " +
+        "(const r = await siteApi.watch('shop.com', 'searchListings', {q: 'lamp'}); r.new.length ? r.new : false), " +
+        "a new message or email (siteApi.watch on the inbox's API, or count unread on the page), " +
+        "a page changing (const t = (await browser.fetch(url, {as: 'text'})).text; " +
+        "const changed = globalThis.last !== undefined && globalThis.last !== t; globalThis.last = t; changed). " +
+        "Check variables persist between runs.",
       routineCreate,
     ),
     tool(

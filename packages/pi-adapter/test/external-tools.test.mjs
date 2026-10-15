@@ -9,7 +9,7 @@ import { sessionChatId } from "../dist/site-browser.js";
 test("outside agents get the chat tools, each session in its own runtime and workspace", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "aeon-external-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const sessions = join(root, "pi-sessions");
+  const sessions = { sessionDirectory: join(root, "pi-sessions"), agentDirectory: undefined };
   const calls = [];
   const run = async (chatId, _toolCallId, input) => {
     calls.push({ chatId, code: input.codeCell.code });
@@ -19,7 +19,7 @@ test("outside agents get the chat tools, each session in its own runtime and wor
   const tools = externalToolDefinitions(sessions, run);
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["browser_code", "crawl", "site_api", "browser_tabs"],
+    ["browser_code", "crawl", "site_api", "extract", "browser_tabs"],
   );
   for (const tool of tools) assert.ok(tool.inputSchema.properties.session, tool.name);
   assert.match(tools[0].description, /browser\.openTab/);

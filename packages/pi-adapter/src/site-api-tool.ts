@@ -3,14 +3,18 @@ import { resolve } from "node:path";
 import { Type, type Static } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import {
+  explore,
   importCaptures,
   listSites,
   loadModel,
   rebuild,
   siteApi,
   siteName,
+  watch,
+  type ModelLike,
 } from "@browser-use-extension/tools/site-to-api";
 import { inChat } from "./site-browser.js";
+import { repairSoon } from "./site-mapping.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
 // site_api: sites mapped with site-to-api become APIs the agent calls directly, with the user's
@@ -24,6 +28,8 @@ const Parameters = Type.Object(
       Type.Literal("operations"),
       Type.Literal("call"),
       Type.Literal("learn"),
+      Type.Literal("watch"),
+      Type.Literal("explore"),
     ]),
     site: Type.Optional(Type.String({ maxLength: 200 })),
     operation: Type.Optional(Type.String({ maxLength: 200 })),
@@ -32,6 +38,9 @@ const Parameters = Type.Object(
       Type.Union([Type.Literal("auto"), Type.Literal("page"), Type.Literal("direct")]),
     ),
     files: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 20 })),
+    sites: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 10 })),
+    goal: Type.Optional(Type.String({ maxLength: 2000 })),
+    key: Type.Optional(Type.String({ maxLength: 100 })),
   },
   { additionalProperties: false },
 );
@@ -41,6 +50,8 @@ const GUIDELINES = [
   "site_api calls the APIs of sites mapped from the user's own browsing: one call replaces many page actions and returns clean JSON. Check `sites` before working on a site you may have mapped; if it is there, use `operations` then `call` instead of browser_code.",
   "Calls run with the user's logins (through the site's own page when the API needs it), so treat writes (role action) like clicking the button: only when the user asked for that action.",
   "To map a site you will use again (prices, orders, listings, a dashboard): in one browser_code call: open the site, `await page.network.start({ types: 'all' })`, do something that loads new data (a fresh search, a filter, the next page; repeating what is already on screen loads nothing), then `await page.network.save('<site>.har')`. Then site_api learn with the site and files ['<site>.har'] returns the operations and how to call them. More captures of other features make the API more complete.",
+  "watch: like call, but returns only the items that are new or changed since the last watch of the same operation and params (new listings, price drops, new messages); the first watch returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
+  "explore maps sites by name (sites: ['a.com', 'https://b.com/search']) without you driving them: an agent uses each one in a background tab, looking only, while its traffic is recorded, then builds the API. Several sites run at once; goal adds things to do, e.g. 'open the cart'. Use it when you will call a site again later and it is not in sites yet.",
   "Long results are saved in the workspace and previewed; load the file in browser_code or read it with other tools if you need all of it.",
 ];
 
@@ -101,8 +112,13 @@ async function call(input: Input, workspace: string | undefined): Promise<ToolTe
   const site = requireSite(input);
   if (!input.operation) throw new Error("Give the operation id (see the operations action)");
   const api = await siteApi(site, { transport: input.transport ?? "auto" });
-  const value = await api.call(input.operation, (input.params ?? {}) as never);
-  return boundedResult(value, workspace, "site-api", `${site}-${input.operation}`);
+  try {
+    const value = await api.call(input.operation, (input.params ?? {}) as never);
+    return boundedResult(value, workspace, "site-api", `${site}-${input.operation}`);
+  } catch (error) {
+    repairSoon(site, input.operation, error);
+    throw error;
+  }
 }
 
 async function learn(input: Input, workspace: string | undefined): Promise<unknown> {
@@ -134,7 +150,34 @@ async function learn(input: Input, workspace: string | undefined): Promise<unkno
   };
 }
 
-async function runAction(input: Input, workspace: string | undefined): Promise<ToolText> {
+async function watchAction(input: Input, workspace: string | undefined): Promise<ToolText> {
+  const site = requireSite(input);
+  if (!input.operation)
+    throw new Error("Give the operation id to watch (see the operations action)");
+  const result = await watch(site, input.operation, (input.params ?? {}) as never, {
+    transport: input.transport ?? "auto",
+    ...(input.key ? { key: input.key } : {}),
+  });
+  return boundedResult(result, workspace, "site-api", `${site}-watch-${input.operation}`);
+}
+
+async function exploreAction(input: Input, model?: () => Promise<ModelLike>): Promise<ToolText> {
+  const sites = input.sites?.length ? input.sites : input.site ? [input.site] : [];
+  if (!sites.length) throw new Error("Give sites: the names or URLs of the sites to map");
+  const results = await explore(sites, {
+    ...(input.goal ? { goal: input.goal } : {}),
+    ...(model ? { model: await model() } : {}),
+  });
+  return textResult({ howToCall: HOW_TO_CALL, results });
+}
+
+async function runAction(
+  input: Input,
+  workspace: string | undefined,
+  model?: () => Promise<ModelLike>,
+): Promise<ToolText> {
+  if (input.action === "watch") return watchAction(input, workspace);
+  if (input.action === "explore") return exploreAction(input, model);
   if (input.action === "sites") {
     const sites = await listSites();
     return textResult(
@@ -154,18 +197,19 @@ async function runAction(input: Input, workspace: string | undefined): Promise<T
 export function createSiteApiTool(
   chatId: string,
   workspace?: string,
+  model?: () => Promise<ModelLike>,
 ): ReturnType<typeof defineTool> {
   return defineTool({
     name: "site_api",
     label: "Site API",
     description:
-      "Call the API of a site mapped from the user's browsing (actions: sites, operations, call), or map one from network captures saved in the workspace (learn). Calls use the user's logins.",
+      "Call the API of a site mapped from the user's browsing (actions: sites, operations, call, watch), or map sites: by name (explore) or from network captures saved in the workspace (learn). Calls use the user's logins.",
     promptSnippet: "Use site_api for mapped sites: one API call instead of many page actions.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,
     execute: async (_toolCallId, input) => {
       try {
-        return await inChat(chatId, () => runAction(input, workspace));
+        return await inChat(chatId, () => runAction(input, workspace, model));
       } catch (error) {
         return errorResult(error);
       }

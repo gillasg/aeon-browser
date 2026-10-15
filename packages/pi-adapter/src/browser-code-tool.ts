@@ -7,6 +7,8 @@ import { browserContent, type BrowserToolRunner } from "./browser-tool.js";
 import { createSiteScriptTool } from "./site-script-tool.js";
 import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
+import { noteVisits, visitedUrls } from "./site-mapping.js";
+import { siteApiRequest } from "./site-browser.js";
 
 const CELL_TIMEOUT_MS = 60_000;
 
@@ -54,7 +56,8 @@ export function createBrowserCodeTool(
           codeCell: {
             code,
             timeoutMs: CELL_TIMEOUT_MS,
-            onCall: (request) => serveCall(request, workspace, steps, skills),
+            onCall: (request) =>
+              siteApiRequest(chatId, request) ?? serveCall(request, workspace, steps, skills),
             onProgress: (next) => {
               steps = next.map(compactStep);
               onUpdate?.({
@@ -75,6 +78,7 @@ export function createBrowserCodeTool(
         reset?: boolean;
       };
       if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
+      noteVisits(chatId, visitedUrls(cell.steps ?? []));
       const result = { value: cell.value, output: cell.output ?? "" };
       await journalOutput(result, workspace, operationId);
       const failed = Boolean(cell.error);

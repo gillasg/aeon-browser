@@ -5,7 +5,7 @@ import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 // One plain completion with the model a new chat would use: the same runtime (auth.json and
 // models.json, so custom providers work) and the same default as the model picker.
 
-interface Options {
+export interface CompletionOptions {
   sessionDirectory: string;
   agentDirectory: string | undefined;
   preferredInitialModel: { provider: string; id: string } | undefined;
@@ -19,8 +19,8 @@ export interface CompletionChoice {
 
 const THINKING = new Set(["minimal", "low", "medium", "high", "xhigh"]);
 
-async function defaultModel(
-  options: Options,
+export async function defaultModel(
+  options: CompletionOptions,
   choice: CompletionChoice,
 ): Promise<{ runtime: ModelRuntime; model: Model<Api> }> {
   const runtime = await ModelRuntime.create(
@@ -71,7 +71,7 @@ function replyText(reply: AssistantMessage, name: string): string {
 }
 
 export async function completeWithDefaultModel(
-  options: Options,
+  options: CompletionOptions,
   system: string,
   messages: { role: string; content: string }[],
   choice: CompletionChoice = {},
@@ -90,4 +90,14 @@ export async function completeWithDefaultModel(
     reasoning ? { reasoning } : {},
   );
   return replyText(reply, `${model.provider}/${model.id}`);
+}
+
+/** The default model as site-to-api's model interface (for explore and other model features). */
+export function siteToolModel(
+  options: CompletionOptions,
+): () => Promise<{ complete(context: unknown): Promise<never> }> {
+  return async () => {
+    const { runtime, model } = await defaultModel(options, {});
+    return { complete: (context) => runtime.completeSimple(model, context as never) as never };
+  };
 }

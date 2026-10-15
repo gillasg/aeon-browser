@@ -16,6 +16,40 @@ test("thread tools create chats, deliver idempotently, wait by exact ID, read Pi
   await forkTranscript(runtime, sender.chatId);
 });
 
+test("a thread can run on its own model and thinking level", async (t) => {
+  const runtime = await makeRuntime(t);
+  const sender = await runtime.chats.createDraft("Planner");
+  const plain = JSON.parse(
+    await runtime.coordination.execute(sender.chatId, "c-1", "create_thread", {
+      title: "Plain",
+      idempotencyKey: "plain",
+    }),
+  );
+  const defaults = await runtime.chats.getControls(plain.thread.chatId);
+  const model = defaults.effectiveModel;
+  const level = defaults.availableThinkingLevels.find((l) => l !== defaults.thinkingLevel);
+  const created = JSON.parse(
+    await runtime.coordination.execute(sender.chatId, "c-2", "create_thread", {
+      title: "Bulk",
+      idempotencyKey: "bulk",
+      model: `${model.provider}/${model.id}`,
+      ...(level ? { thinking: level } : {}),
+    }),
+  );
+  assert.equal(created.model, `${model.provider}/${model.id}`);
+  const controls = await runtime.chats.getControls(created.thread.chatId);
+  assert.equal(controls.effectiveModel.id, model.id);
+  if (level) assert.equal(controls.thinkingLevel, level);
+  await assert.rejects(
+    runtime.coordination.execute(sender.chatId, "c-3", "create_thread", {
+      title: "Bad",
+      idempotencyKey: "bad",
+      model: "no-slash",
+    }),
+    /provider\/id/,
+  );
+});
+
 async function makeRuntime(t) {
   const root = resolve(await mkdtemp(join(tmpdir(), "aeon-coordination-test-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
