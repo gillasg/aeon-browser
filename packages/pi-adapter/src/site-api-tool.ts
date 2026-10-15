@@ -1,9 +1,13 @@
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Type, type Static } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import {
+  checkCaptures,
   explore,
+  isSiteToolAction,
+  runSiteToolAction,
+  SITE_TOOL_ACTIONS,
+  SITE_TOOL_HELP,
   importCaptures,
   listSites,
   loadModel,
@@ -30,7 +34,15 @@ const Parameters = Type.Object(
       Type.Literal("learn"),
       Type.Literal("watch"),
       Type.Literal("explore"),
+      ...SITE_TOOL_ACTIONS.map((action) => Type.Literal(action)),
     ]),
+    name: Type.Optional(Type.String({ maxLength: 200 })),
+    steps: Type.Optional(Type.Array(Type.String({ maxLength: 200 }), { maxItems: 20 })),
+    description: Type.Optional(Type.String({ maxLength: 1000 })),
+    change: Type.Optional(Type.String({ maxLength: 4000 })),
+    folder: Type.Optional(Type.String({ maxLength: 500 })),
+    repair: Type.Optional(Type.Boolean()),
+    actions: Type.Optional(Type.Boolean()),
     site: Type.Optional(Type.String({ maxLength: 200 })),
     operation: Type.Optional(Type.String({ maxLength: 200 })),
     params: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
@@ -52,6 +64,8 @@ const GUIDELINES = [
   "To map a site you will use again (prices, orders, listings, a dashboard): in one browser_code call: open the site, `await page.network.start({ types: 'all' })`, do something that loads new data (a fresh search, a filter, the next page; repeating what is already on screen loads nothing), then `await page.network.save('<site>.har')`. Then site_api learn with the site and files ['<site>.har'] returns the operations and how to call them. More captures of other features make the API more complete.",
   "watch: like call, but returns only the items that are new or changed since the last watch of the same operation and params (new listings, price drops, new messages); the first watch returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
   "explore maps sites by name (sites: ['a.com', 'https://b.com/search']) without you driving them: an agent uses each one in a background tab, looking only, while its traffic is recorded, then builds the API. Several sites run at once; goal adds things to do, e.g. 'open the cart'. Use it when you will call a site again later and it is not in sites yet.",
+  ...SITE_TOOL_HELP,
+  "learn also takes mitmproxy flow files, so phone and desktop apps can be mapped: capture the app's traffic through mitmproxy (on Android: adb to set the proxy and install its certificate), save the flows in the workspace, then learn with them.",
   "Long results are saved in the workspace and previewed; load the file in browser_code or read it with other tools if you need all of it.",
 ];
 
@@ -131,13 +145,12 @@ async function learn(input: Input, workspace: string | undefined): Promise<unkno
   const paths = input.files.map((file) => resolve(workspace, file));
   if (paths.some((path) => !path.startsWith(resolve(workspace))))
     throw new Error("Capture files must be inside the workspace");
-  for (const [index, path] of paths.entries()) {
-    const har = JSON.parse(await readFile(path, "utf8")) as { log?: { entries?: unknown[] } };
-    if (!har.log?.entries?.length)
-      throw new Error(
-        `${input.files[index]} has no requests. Start the capture first (page.network.start()), then do something on the site that loads new data (a new search, the next page, opening an item), then page.network.save('${input.files[index]}').`,
-      );
-  }
+  await checkCaptures(paths).catch((error: unknown) => {
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}. Start the capture first (page.network.start()), then do something on the site that loads new data (a new search, the next page, opening an item), then page.network.save('<file>').`,
+      { cause: error },
+    );
+  });
   await importCaptures(site, paths);
   const result = await rebuild(site);
   // The operations come back right away, so the next step can be a call.
@@ -166,6 +179,7 @@ async function exploreAction(input: Input, model?: () => Promise<ModelLike>): Pr
   if (!sites.length) throw new Error("Give sites: the names or URLs of the sites to map");
   const results = await explore(sites, {
     ...(input.goal ? { goal: input.goal } : {}),
+    ...(input.actions ? { actions: true } : {}),
     ...(model ? { model: await model() } : {}),
   });
   return textResult({ howToCall: HOW_TO_CALL, results });
@@ -177,6 +191,17 @@ async function runAction(
   model?: () => Promise<ModelLike>,
 ): Promise<ToolText> {
   if (input.action === "watch") return watchAction(input, workspace);
+  if (isSiteToolAction(input.action))
+    return boundedResult(
+      await runSiteToolAction(input.action, {
+        ...input,
+        site: requireSite(input),
+        ...(input.folder && workspace ? { folder: resolve(workspace, input.folder) } : {}),
+      }),
+      workspace,
+      "site-api",
+      `${requireSite(input)}-${input.action}`,
+    );
   if (input.action === "explore") return exploreAction(input, model);
   if (input.action === "sites") {
     const sites = await listSites();
@@ -203,7 +228,7 @@ export function createSiteApiTool(
     name: "site_api",
     label: "Site API",
     description:
-      "Call the API of a site mapped from the user's browsing (actions: sites, operations, call, watch), or map sites: by name (explore) or from network captures saved in the workspace (learn). Calls use the user's logins.",
+      "Call the API of a site mapped from the user's browsing (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, signing, session, export), or map sites: by name (explore) or from network captures saved in the workspace (learn). Calls use the user's logins.",
     promptSnippet: "Use site_api for mapped sites: one API call instead of many page actions.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,

@@ -11,6 +11,7 @@ import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
 import { siteApiRequest } from "@aeon/pi-adapter";
+import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
 
 const TICK_MS = 10_000;
 const MAX_RUNS_PER_TICK = 32;
@@ -21,6 +22,19 @@ export class RoutineScheduler {
   private started = false;
   private ticking = false;
   private readonly subscriptions = new Map<string, () => void>();
+  /** What a listening routine heard, waiting for the run it triggered. */
+  private readonly heard = new Map<string, unknown>();
+  private readonly listeners = new RoutineListeners({
+    routines: () => this.store.listRoutines(),
+    available: (routine) =>
+      !routine.requiredBrowserInstanceId ||
+      this.browser.isInstanceAvailable(routine.requiredBrowserInstanceId),
+    check: (routine) => this.runCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS),
+    heard: (routine, value) => {
+      this.heard.set(routine.routineId, value);
+      this.runNow(routine.routineId);
+    },
+  });
 
   constructor(
     private readonly store: AeonProductStore,
@@ -32,6 +46,7 @@ export class RoutineScheduler {
     if (this.started) return;
     this.started = true;
     await this.reconcileOpenRuns();
+    this.listeners.start();
     await this.tick();
   }
 
@@ -44,6 +59,7 @@ export class RoutineScheduler {
 
   close(): void {
     this.started = false;
+    this.listeners.close();
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     for (const unsubscribe of this.subscriptions.values()) unsubscribe();
@@ -166,7 +182,9 @@ export class RoutineScheduler {
     run: RoutineRunRecord,
   ): Promise<string | undefined> {
     if (!routine.check) return routine.instruction;
-    const check = await this.runCheck(routine, run);
+    const check = isListening(routine)
+      ? this.takeHeard(routine.routineId)
+      : await this.runCheck(routine, run.runId);
     if (check.met)
       return `${routine.instruction}
 
@@ -181,25 +199,30 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
    * Runs a watcher's check as plain browser code: no model call. It gets its own realm (one per
    * routine), so a check can keep values between slots without touching the chat's own realm.
    */
+  /** A listening routine's runs carry what it heard; its scheduled slots are skipped. */
+  private takeHeard(routineId: string): { met: boolean; value?: unknown; error?: string } {
+    if (!this.heard.has(routineId)) return { met: false };
+    const value = this.heard.get(routineId);
+    this.heard.delete(routineId);
+    return { met: true, value };
+  }
+
   private async runCheck(
     routine: RoutineRecord,
-    run: RoutineRunRecord,
+    id: string,
+    timeoutMs = CHECK_TIMEOUT_MS,
   ): Promise<{ met: boolean; value?: unknown; error?: string }> {
-    const raw = await this.browser.execute(
-      checkRealm(routine.routineId),
-      `routine-check:${run.runId}`,
-      {
-        codeCell: {
-          code: routine.check,
-          timeoutMs: CHECK_TIMEOUT_MS,
-          // Checks can call and watch mapped site APIs; workspace files stay with the chat.
-          onCall: (request: unknown) =>
-            siteApiRequest(checkRealm(routine.routineId), request) ??
-            Promise.reject(new Error("Workspace calls are unavailable in routine checks")),
-          onProgress: () => undefined,
-        },
+    const raw = await this.browser.execute(checkRealm(routine.routineId), `routine-check:${id}`, {
+      codeCell: {
+        code: routine.check ?? "",
+        timeoutMs,
+        // Checks can call and watch mapped site APIs; workspace files stay with the chat.
+        onCall: (request: unknown) =>
+          siteApiRequest(checkRealm(routine.routineId), request) ??
+          Promise.reject(new Error("Workspace calls are unavailable in routine checks")),
+        onProgress: () => undefined,
       },
-    );
+    });
     try {
       const result = JSON.parse(raw) as { value?: unknown; error?: string };
       if (result.error) return { met: false, error: `CHECK_FAILED: ${result.error}`.slice(0, 500) };

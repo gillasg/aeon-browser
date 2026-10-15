@@ -132,7 +132,11 @@ function createRoutineTools(
         "a new message or email (siteApi.watch on the inbox's API, or count unread on the page), " +
         "a page changing (const t = (await browser.fetch(url, {as: 'text'})).text; " +
         "const changed = globalThis.last !== undefined && globalThis.last !== t; globalThis.last = t; changed). " +
-        "Check variables persist between runs.",
+        "Check variables persist between runs. " +
+        'For instant triggers, start the check with "use listen"; and make it wait: it then runs continuously ' +
+        "(each run up to a minute) and wakes you the moment it returns something truthy, e.g. " +
+        "\"use listen\"; const p = await browser.openTab(url); await p.waitForChange('.inbox', {timeoutMs: 55000}) " +
+        "(also p.waitForResponse('/api/messages'), p.waitForMessage(/new_message/) for WebSockets).",
       routineCreate,
     ),
     tool(

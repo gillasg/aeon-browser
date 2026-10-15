@@ -2,6 +2,7 @@ import { Type, type Static } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import {
   crawl,
+  findList,
   mapSite,
   scrape,
   search,
@@ -35,7 +36,10 @@ const Parameters = Type.Object(
       Type.Literal("crawl"),
       Type.Literal("map"),
       Type.Literal("search"),
+      Type.Literal("find"),
     ]),
+    columns: Type.Optional(Type.Record(Type.String(), Type.String({ maxLength: 300 }))),
+    criteria: Type.Optional(Type.String({ maxLength: 1000 })),
     url: Type.Optional(Type.String({ maxLength: 2000 })),
     query: Type.Optional(Type.String({ maxLength: 500 })),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 1000 })),
@@ -57,6 +61,7 @@ const GUIDELINES = [
   "crawl reads pages without driving tabs step by step: scrape one URL, crawl a site or a section (include ['/docs/**']), map a site's URLs, or search Google. Pages behind the user's logins work: they are fetched in their browser when plain HTTP is not enough.",
   "Prefer crawl over browser_code to read or collect content from many pages; use browser_code to act on pages (click, fill, buy). When webfetch fails (blocked shops, ticketing and travel sites, pages built by JavaScript), use crawl scrape instead of retrying webfetch: it switches to the user's browser.",
   "This computer runs Windows and bash has no python: process data in browser_code, or with node in bash.",
+  "find builds a list from the web: query, criteria (what every row must be) and columns ({founded: 'year founded'}); it searches, reads each result, keeps matches and fills the columns, with each row's source page.",
   "Give a query to rank pages by relevance and get fitMarkdown (only the relevant parts). Whole crawls are saved in the workspace as Markdown files plus pages.jsonl; the reply lists them with short previews.",
 ];
 
@@ -110,6 +115,15 @@ async function runCrawl(input: Input, workspace: string | undefined): Promise<To
   );
 }
 
+async function find(query: string, input: Input, workspace: string | undefined): Promise<ToolText> {
+  const rows = await findList(query, {
+    columns: input.columns ?? { name: "name" },
+    ...(input.criteria ? { criteria: input.criteria } : {}),
+    perQuery: input.limit ?? 10,
+  });
+  return boundedResult(rows, workspace, "crawls", "find");
+}
+
 async function runAction(input: Input, workspace: string | undefined): Promise<ToolText> {
   if (input.action === "scrape") {
     const page = await scrape(requireUrl(input), {
@@ -128,6 +142,7 @@ async function runAction(input: Input, workspace: string | undefined): Promise<T
     return boundedResult(urls, workspace, "crawls", "map");
   }
   if (!input.query) throw new Error("Give the query to search for");
+  if (input.action === "find") return find(input.query, input, workspace);
   return textResult(await search(input.query, { limit: input.limit ?? 10 }));
 }
 

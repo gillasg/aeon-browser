@@ -24,6 +24,7 @@ test("a required browser instance is checked before a routine opens Pi", async (
     listDueRoutines: () => [],
     listDueRoutineRuns: () => [run],
     getRoutine: () => routine,
+    listRoutines: () => [routine],
     updateRoutineRun: (_runId, patch) => {
       update = patch;
     },

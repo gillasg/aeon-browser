@@ -27,6 +27,7 @@ async function runWatcher(checkResult) {
     listDueRoutines: () => [],
     listDueRoutineRuns: () => (updates.length ? [] : [run]),
     getRoutine: () => routine,
+    listRoutines: () => [routine],
     updateRoutineRun: (_runId, patch) => updates.push(patch),
   };
   const checks = [];
