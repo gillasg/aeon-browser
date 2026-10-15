@@ -10,6 +10,15 @@ pnpm build
 
 Load `apps/chrome-extension/native-dist` in Chrome. Core supplies Pi sessions and local storage; the extension supplies browser control. `native-dist/build-info.json` lists the revision of every repo the build used.
 
+## Outside agents
+
+Other agents (Claude Code, Codex, any MCP client) can use Aeon two ways through its MCP server (`node core/apps/cli/dist/cli.js mcp`):
+
+- **Hand Aeon a task**: `aeon_run`, then `aeon_run_status` / `aeon_result` / `aeon_trace`. Aeon's own agent does the work in a chat.
+- **Drive the browser themselves**: `browser_code`, `browser_tabs`, `crawl` and `site_api`, the same tools Aeon's chats use and the same ones the Browser Use Extension offers. Calls with the same `session` share variables, tabs and files.
+
+So with Aeon installed, an outside agent can do everything it could with the Browser Use Extension, without installing it.
+
 ## How it all fits together
 
 Aeon is two parts: **core**, the brain (Pi, chats, the agent, and every tool it runs), and **aeon-browser**, this extension (the side panel and chat). Everything browser-related comes from one place, the **browser family**, through the Browser Use Extension.
