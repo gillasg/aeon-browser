@@ -259,13 +259,9 @@ export class BrowserControlService {
     this.setAssociation(chatId, step.target, "borrowed", "user-picker");
     return { result: { kind: "tab", tab } };
   }
-  private async executeTargetedStep(
-    chatId: string,
-    toolCallId: string,
-    operationId: string,
+  private outdatedRuntime(
     step: Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>,
-    timeoutMs: number,
-  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
+  ): { code: string; detail: string } | undefined {
     if (!this.runtimeAvailable(step))
       return {
         code: "UNSUPPORTED",
@@ -277,11 +273,36 @@ export class BrowserControlService {
         detail:
           "The extension still has the older browser executor loaded. Reload Aeon in chrome://extensions, then retry this browser task.",
       };
+    return undefined;
+  }
+  private async executeTargetedStep(
+    chatId: string,
+    toolCallId: string,
+    operationId: string,
+    step: Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>,
+    timeoutMs: number,
+  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
+    const outdated = this.outdatedRuntime(step);
+    if (outdated) return outdated;
     if (!this.getAssociation(chatId, step.target)) return { code: "TARGET_LOST" };
     const tab = this.inventories?.findTarget(step.target);
     if (!tab || !safeUrl(tab.url)) return { code: "TARGET_LOST" };
     const socket = this.executors.get(step.target.clientInstanceId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return { code: "BROWSER_OFFLINE" };
+    // Polling an event subscription only reads its buffer, so it neither takes nor waits for the
+    // tab's claim (a long poll would otherwise block every action on the tab).
+    if (step.op === "event" && step.action !== "subscribe")
+      return this.dispatch(
+        socket,
+        chatId,
+        toolCallId,
+        operationId,
+        step,
+        timeoutMs,
+        randomUUID(),
+        Math.max(1, this.claimGeneration),
+        tab.documentEpoch,
+      );
     const key = targetIdentity(step.target);
     if (this.claims.has(key)) return { code: "CLAIM_CONFLICT" };
     const claimId = randomUUID();
