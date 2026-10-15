@@ -19,7 +19,7 @@ export const CHAT_REVIEW_TOOL = {
   name: "chat_review",
   description: [
     "Track which Aeon chats have been reviewed (trace and tool calls read).",
-    "action=list: recent chats not reviewed yet, or used again since their review (newest first; limit, default 20; all=true lists reviewed ones too).",
+    "action=list: of the 100 most recent chats, those not reviewed yet, or used again since their review (newest first; limit, default 20; all=true lists reviewed ones too).",
     "action=mark: mark chatId reviewed; note is saved as the findings (reviews/<chatId>.md in Aeon's data folder).",
     "action=get: the review for chatId. action=unmark: clear it.",
   ].join("\n"),
@@ -29,7 +29,7 @@ export const CHAT_REVIEW_TOOL = {
       action: { type: "string", enum: ["list", "mark", "get", "unmark"] },
       chatId: { type: "string", maxLength: 100 },
       note: { type: "string", maxLength: 50000 },
-      limit: { type: "number", minimum: 1, maximum: 500 },
+      limit: { type: "number", minimum: 1, maximum: 100 },
       all: { type: "boolean" },
       session: { type: "string", maxLength: 100 },
     },
@@ -59,7 +59,7 @@ export class ChatReviews {
     if (args.action === "list")
       return text(await this.list(Number(args.limit) || 20, args.all === true));
     if (!chatId) return text("chatId is required", true);
-    if (!this.chats(1000).some((chat) => chat.chatId === chatId))
+    if (!this.chats(100).some((chat) => chat.chatId === chatId))
       return text(`No chat ${chatId}`, true);
     if (args.action === "mark") return text(await this.mark(chatId, args.note));
     if (args.action === "unmark") return text(await this.unmark(chatId));
@@ -69,7 +69,7 @@ export class ChatReviews {
 
   private async list(limit: number, all: boolean) {
     const index = await this.index();
-    const rows = this.chats(1000).map((chat) => {
+    const rows = this.chats(100).map((chat) => {
       const review = index[chat.chatId];
       const reviewed = Boolean(review && review.reviewedAt >= chat.updatedAt);
       return { ...chat, reviewed, reviewedAt: review?.reviewedAt };
