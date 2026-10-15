@@ -117,6 +117,8 @@ $registryKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($registrySub
 try { $registryKey.SetValue('', $hostManifestPath, [Microsoft.Win32.RegistryValueKind]::String) }
 finally { $registryKey.Dispose() }
 & (Join-Path $PSScriptRoot 'configure-startup.ps1') -Mode Install
+# The aeon command and the Aeon skill, so agents on this machine know how to use Aeon.
+try { & $nodeFull (Join-Path $repoRoot 'apps\cli\dist\cli.js') install } catch { Write-Warning "aeon install failed: $_" }
 Write-Output "Registered the disposable host for chrome-extension://$expectedExtensionId/."
 if ($extensionManifest) { Write-Output "Browser extension: $(Split-Path $extensionManifest)" }
 Write-Output "Daemon data will be stored outside the repository at: $((Join-Path $appRootFull 'data'))"

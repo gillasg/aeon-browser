@@ -5,6 +5,8 @@ import { AeonClient, dataDirectory } from "./client.js";
 import { inspect, runTasks, type RunOptions } from "./run.js";
 import type { ChatResult } from "./results.js";
 import { runMcpServer } from "./mcp.js";
+import { install } from "./install.js";
+import { listTools, runTool } from "./tools.js";
 
 const usage = `aeon: run and inspect Aeon chats from the terminal or another agent.
 
@@ -20,11 +22,17 @@ const usage = `aeon: run and inspect Aeon chats from the terminal or another age
   result <chatId>               a chat's final answer
   trace <chatId>                a chat's tool calls, results and errors
   open <chatId>                 show a chat as a tab in Chrome
+  tools [--json]                the browser tools and their full guidance
+  tool <name> '<json>'          run one: browser_code, browser_tabs, crawl, site_api, extract
+      --session name            calls in one session share variables, tabs and files
+                                (the input can also be @file.json, or - for stdin)
+  install                       put the aeon command on the PATH and link the Aeon skill for agents
   mcp                           run the stdio MCP server`;
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   if (command === "mcp") return runMcpServer().then(() => 0);
+  if (command === "install") return install();
   if (!command || command === "help" || command === "--help") {
     process.stdout.write(usage + "\n");
     return command ? 0 : 1;
@@ -37,8 +45,15 @@ async function main(argv: string[]): Promise<number> {
   }
 }
 
+const TOOL_COMMANDS: Record<string, (client: AeonClient, rest: string[]) => Promise<number>> = {
+  tools: (client, rest) => listTools(client, rest.includes("--json")),
+  tool: runTool,
+};
+
 async function dispatch(client: AeonClient, command: string, rest: string[]): Promise<number> {
   if (command === "run") return run(client, rest);
+  const toolCommand = TOOL_COMMANDS[command];
+  if (toolCommand) return toolCommand(client, rest);
   if (command === "chats") {
     const listed = await client.command("chat.list", {
       limit: Number(option(rest, "--limit") ?? 20),
