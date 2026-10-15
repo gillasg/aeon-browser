@@ -78,11 +78,18 @@ export class AeonClient {
   command(operation: string, payload: Json): Promise<Json> {
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
+      // Aeon drops requests it can't parse (e.g. a limit over 100) without a reply.
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error(`Aeon did not answer ${operation}; check its inputs.`));
+      }, 30000);
       this.waiting.set(requestId, (message) => {
+        clearTimeout(timer);
         if (message.kind === "command.completed") resolve(message.result as Json);
         else if (message.kind === "command.failed" || message.state === "failed")
           reject(new Error(String(message.message ?? message.code ?? "Aeon command failed")));
         else return;
+        clearTimeout(timer);
         this.waiting.delete(requestId);
       });
       this.socket.send(JSON.stringify({ kind: "command", requestId, operation, payload }));

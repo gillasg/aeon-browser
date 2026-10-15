@@ -3,6 +3,7 @@ import { configureInitialPrompt, type InitialPromptSelection } from "./initial-p
 import { boundedChatEntries, type ObservedSession } from "./bounded-chat-entries.js";
 import { ProjectService } from "./project-service.js";
 import { deleteStoredChat } from "./chat-deletion.js";
+import { ChatReviews, CHAT_REVIEW_TOOL } from "./chat-reviews.js";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import {
@@ -51,6 +52,7 @@ export class ChatService {
   private readonly observedSessions = new Map<ChatId, ObservedSession>();
   readonly projects: ProjectService;
   readonly management: ChatManagementCommands;
+  private readonly reviews: ChatReviews;
   constructor(options: {
     dataDirectory: string;
     store: ChatStore & ThreadCoordinationStore;
@@ -62,6 +64,7 @@ export class ChatService {
     this.projects = new ProjectService(dataDirectory);
     this.threadSupport = new ChatThreadSupport(dataDirectory, this.store, this.pi);
     this.metadata = new ChatMetadataService(this.store, this.eventHub);
+    this.reviews = new ChatReviews(dataDirectory, (limit) => this.listChats(limit, true));
     this.management = new ChatManagementCommands(
       (chatId) => Boolean(this.store.getChat(chatId)),
       () => this.listChats(100),
@@ -130,12 +133,13 @@ export class ChatService {
     this.pi.completeText
       ? this.pi.completeText(system, messages, choice)
       : modelComplete(this.pi.modelAgentDirectory, system, messages);
-  externalTools = (): unknown[] => this.pi.externalTools?.() ?? [];
+  externalTools = (): unknown[] => [...(this.pi.externalTools?.() ?? []), CHAT_REVIEW_TOOL];
   callExternalTool = (
     name: string,
     session: string,
     args: Record<string, unknown>,
   ): Promise<{ content: unknown[]; isError: boolean }> => {
+    if (name === CHAT_REVIEW_TOOL.name) return this.reviews.run(args);
     if (!this.pi.callExternalTool) throw new Error("Aeon's tools are not available");
     return this.pi.callExternalTool(name, session, args);
   };

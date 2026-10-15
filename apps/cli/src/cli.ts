@@ -19,6 +19,8 @@ const usage = `aeon: run and inspect Aeon chats from the terminal or another age
       --timeout 20              minutes per task (default 20)
       --json                    print the full results as JSON
   chats [--limit 20]            recent chats
+      --unreviewed              only chats not reviewed yet (or used again since)
+  review <chatId> [note]        mark a chat reviewed; note text or @file.md is saved as findings
   result <chatId>               a chat's final answer
   trace <chatId>                a chat's tool calls, results and errors
   open <chatId>                 show a chat as a tab in Chrome
@@ -49,20 +51,23 @@ async function main(argv: string[]): Promise<number> {
 const TOOL_COMMANDS: Record<string, (client: AeonClient, rest: string[]) => Promise<number>> = {
   tools: (client, rest) => listTools(client, rest.includes("--json")),
   tool: runTool,
+  chats: listChats,
+  review: (client, rest) => reviewCommand(client, ["mark", ...rest]),
 };
+
+async function listChats(client: AeonClient, rest: string[]): Promise<number> {
+  const limit = option(rest, "--limit") ?? "20";
+  if (rest.includes("--unreviewed")) return reviewCommand(client, ["list", limit]);
+  const listed = await client.command("chat.list", { limit: Math.min(100, Number(limit)) });
+  for (const chat of listed.chats as { chatId: string; title: string }[])
+    process.stdout.write(`${chat.chatId}  ${chat.title}\n`);
+  return 0;
+}
 
 async function dispatch(client: AeonClient, command: string, rest: string[]): Promise<number> {
   if (command === "run") return run(client, rest);
   const toolCommand = TOOL_COMMANDS[command];
   if (toolCommand) return toolCommand(client, rest);
-  if (command === "chats") {
-    const listed = await client.command("chat.list", {
-      limit: Number(option(rest, "--limit") ?? 20),
-    });
-    for (const chat of listed.chats as { chatId: string; title: string; updatedAt?: string }[])
-      process.stdout.write(`${chat.chatId}  ${chat.title}\n`);
-    return 0;
-  }
   const chatId = rest[0];
   if (!chatId) throw new Error(`Usage: aeon ${command} <chatId>`);
   if (command === "open") {
@@ -169,3 +174,25 @@ main(process.argv.slice(2)).then(
     process.exit(1);
   },
 );
+
+async function reviewCommand(client: AeonClient, [action, value, note]: string[]): Promise<number> {
+  const args: Record<string, unknown> =
+    action === "list" ? { action, limit: Number(value) } : { action, chatId: value };
+  if (!value) throw new Error("Usage: aeon review <chatId> [note | @file.md]");
+  if (action === "mark" && note)
+    args.note = note.startsWith("@") ? await readFile(note.slice(1), "utf8") : note;
+  const reply = await client.tool({
+    kind: "core.tool.call",
+    tool: "chat_review",
+    session: "cli",
+    arguments: args,
+  });
+  const text = ((reply.content as { text?: string }[] | undefined) ?? []).map((c) => c.text ?? "");
+  if (action !== "list" || reply.isError === true) {
+    process.stdout.write(text.join("\n") + "\n");
+    return reply.isError === true ? 1 : 0;
+  }
+  for (const chat of JSON.parse(text.join("")) as { chatId: string; title: string }[])
+    process.stdout.write(`${chat.chatId}  ${chat.title}\n`);
+  return 0;
+}

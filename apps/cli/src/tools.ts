@@ -8,7 +8,7 @@ import { AeonClient, dataDirectory } from "./client.js";
 type Json = Record<string, unknown>;
 type Content = { type: string; text?: string; data?: string; mimeType?: string };
 
-const TOOL_NAMES = ["browser_code", "browser_tabs", "crawl", "site_api", "extract"];
+const TOOL_NAMES = ["browser_code", "browser_tabs", "crawl", "site_api", "extract", "chat_review"];
 
 /** Every tool with its full guidance, as the daemon describes it. */
 export async function listTools(client: AeonClient, asJson: boolean): Promise<number> {
