@@ -2,7 +2,14 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Type, type Static } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { importCaptures, listSites, loadModel, rebuild, siteApi, siteName } from "site-to-api";
+import {
+  importCaptures,
+  listSites,
+  loadModel,
+  rebuild,
+  siteApi,
+  siteName,
+} from "@browser-use-extension/tools/site-to-api";
 import { inChat } from "./site-browser.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 

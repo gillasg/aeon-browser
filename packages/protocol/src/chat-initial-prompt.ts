@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PiAttachmentSchema } from "./chat-dto.js";
-import { PiBrowserContextRecordSchema } from "./browser-context.js";
+import { PiBrowserContextRecordSchema } from "@browser-use-extension/protocol";
 
 export const ChatInitialPromptSchema = z
   .object({

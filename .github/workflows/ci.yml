@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
-          cache: pnpm
+      # The Browser Use Extension (its protocol and tools) and pi-ai-login, next to this checkout.
+      - name: Set up linked repos
+        run: node scripts/link-repos.mjs
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm check

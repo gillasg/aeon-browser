@@ -8,7 +8,7 @@ import {
   writeOutput,
   type Format,
   type PageResult,
-} from "browser-crawl";
+} from "@browser-use-extension/tools/browser-crawl";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { inChat } from "./site-browser.js";

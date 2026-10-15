@@ -13,7 +13,7 @@
     "@aeon/protocol": "workspace:*",
     "@aeon/store": "workspace:*",
     "ws": "8.22.0",
-    "pi-ai-login": "file:../../vendor/pi-ai-login-0.1.1.tgz"
+    "pi-ai-login": "link:../../../pi-ai-login"
   },
   "devDependencies": {
     "@types/node": "26.6.3",

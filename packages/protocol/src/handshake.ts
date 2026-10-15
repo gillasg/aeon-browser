@@ -1,17 +1,12 @@
 import { z } from "zod";
+import { ProtocolVersionSchema } from "@browser-use-extension/protocol";
+
+export { ProtocolVersionSchema, type ProtocolVersion } from "@browser-use-extension/protocol";
 
 export const SUPPORTED_PROTOCOL_VERSION = { major: 1, minor: 7 } as const;
 
 export const ClientRoleSchema = z.enum(["ui", "extension-executor", "desktop-ui"]);
 export type ClientRole = z.infer<typeof ClientRoleSchema>;
-
-export const ProtocolVersionSchema = z
-  .object({
-    major: z.number().int().positive(),
-    minor: z.number().int().nonnegative(),
-  })
-  .strict();
-export type ProtocolVersion = z.infer<typeof ProtocolVersionSchema>;
 
 export const HelloSchema = z
   .object({

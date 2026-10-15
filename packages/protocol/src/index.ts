@@ -1,3 +1,5 @@
+// Aeon's messages, on top of the browser engine's own (re-exported here).
+export * from "@browser-use-extension/protocol";
 export {
   ClientRoleSchema,
   HelloAckSchema,
@@ -13,67 +15,6 @@ export {
   type ProtocolHandshakeMessage,
   type ProtocolVersion,
 } from "./handshake.js";
-export {
-  BrowserContextDraftSchema,
-  BrowserContextHandoffSchema,
-  PiBrowserContextRecordSchema,
-  type BrowserContextDraft,
-  type BrowserContextHandoff,
-  type PiBrowserContextRecord,
-} from "./browser-context.js";
-export {
-  BrowserElementTargetSchema,
-  BrowserExecutorRequestSchema,
-  BrowserExecutorResultSchema,
-  BrowserOperationCallSchema,
-  BrowserOperationResultSchema,
-  BrowserSemanticNodeSchema,
-  BrowserStepSchema,
-  BrowserScrollStateSchema,
-  type BrowserScrollState,
-  type BrowserElementTarget,
-  type BrowserExecutorRequest,
-  type BrowserExecutorResult,
-  type BrowserOperationCall,
-  type BrowserOperationResult,
-  type BrowserSemanticNode,
-  type BrowserStep,
-} from "./browser-control.js";
-export {
-  BrowserExecutorHeartbeatSchema,
-  BrowserExecutorHeartbeatReplySchema,
-  BrowserInventoryDeltaMessageSchema,
-  BrowserInventoryFullSchema,
-  BrowserInventoryReplySchema,
-  BrowserTabSchema,
-  BrowserTargetKeySchema,
-  BrowserWindowSchema,
-  type BrowserInventoryDeltaMessage,
-  type BrowserExecutorHeartbeat,
-  type BrowserExecutorHeartbeatReply,
-  type BrowserInventoryFull,
-  type BrowserInventoryReply,
-  type BrowserTab,
-  type BrowserTargetKey,
-  type BrowserWindow,
-} from "./browser-inventory.js";
-export {
-  AuthHelloSchema,
-  AuthReplySchema,
-  NativeBootstrapRequestSchema,
-  NativeBootstrapResponseSchema,
-  NativeSupervisorBootstrapEnvelopeSchema,
-  PageGrantIssueRequestSchema,
-  PageGrantIssueResponseSchema,
-  PageGrantScopeSchema,
-  type AuthHello,
-  type AuthReply,
-  type NativeBootstrapRequest,
-  type NativeBootstrapResponse,
-  type PageGrantIssueRequest,
-  type PageGrantIssueResponse,
-  type PageGrantScope,
-} from "./native-bootstrap.js";
 export {
   ChatEventCursorSchema,
   ChatEventSchema,
@@ -133,10 +74,7 @@ export * from "./image-asset.js";
 
 export { ProjectSchema, type ProjectDto } from "./projects.js";
 
-export * from "./site-scripts.js";
-
 export * from "./core-client.js";
-export * from "./browser-code.js";
 export {
   CompanionRequestSchema,
   CompanionResultSchema,

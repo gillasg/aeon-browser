@@ -1,6 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
-import { BrowserNotConnected, useBrowser, type Bridge } from "site-to-api";
+import {
+  BrowserNotConnected,
+  useBrowser,
+  type Bridge,
+} from "@browser-use-extension/tools/site-to-api";
 import type { BrowserToolRunner } from "./browser-tool.js";
 
 // site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they

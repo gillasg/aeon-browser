@@ -22,8 +22,8 @@ import {
   PiAttachmentSchema,
   ChatViewSnapshotSchema,
 } from "./chat-dto.js";
-import { PiBrowserContextRecordSchema } from "./browser-context.js";
-import { BrowserTargetKeySchema } from "./browser-inventory.js";
+import { PiBrowserContextRecordSchema } from "@browser-use-extension/protocol";
+import { BrowserTargetKeySchema } from "@browser-use-extension/protocol";
 import {
   ChatModelCatalogRequestSchema,
   ChatModelLoginRequestSchema,
