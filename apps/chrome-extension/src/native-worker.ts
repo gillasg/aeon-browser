@@ -10,6 +10,7 @@ import {
   readAgentTabView,
 } from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
+import { handleSettingsMessage } from "./native-worker-settings.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
   installNativeStartup,
@@ -314,6 +315,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     return;
   }
   if (handleCoreMessage(candidate)) return;
+  if (handleSettingsMessage(candidate, connection.socket)) return;
   const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
   if (heartbeat.success) {
     if (
