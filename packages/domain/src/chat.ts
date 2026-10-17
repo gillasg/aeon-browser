@@ -182,6 +182,29 @@ export interface PiMessageProjection {
   isError?: boolean;
   nestedCalls?: PiNestedCallsProjection;
   changeDiff?: string;
+  /** Timed browser actions of a browser_code call (see BrowserTraceAction). */
+  actions?: readonly BrowserTraceAction[];
+}
+
+/**
+ * One browser action inside a tool call: what ran, in which tab, when its input reached the page
+ * and where (viewport CSS pixels). Screen recorders (Aperture) read these through `aeon trace`;
+ * keep the shape.
+ */
+export interface BrowserTraceAction {
+  kind: string;
+  tabId?: number;
+  visible?: boolean;
+  tStart: number;
+  tAct?: number;
+  tEnd: number;
+  box?: { x: number; y: number; width: number; height: number };
+  point?: { x: number; y: number };
+  dpr?: number;
+  url?: string;
+  text?: string;
+  scroll?: { direction: string; amount: number; before: number; after: number };
+  failed?: boolean;
 }
 
 export interface PiNestedCallsProjection {

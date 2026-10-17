@@ -10,7 +10,7 @@ export const CompanionRequestSchema = z
     kind: z.literal("companion.request"),
     requestId: z.string().uuid(),
     from: ExtensionIdSchema,
-    request: z.enum(["model.complete", "watch", "task"]),
+    request: z.enum(["model.complete", "watch", "task", "siteApi"]),
     data: z.record(z.string(), z.unknown()),
   })
   .strict();

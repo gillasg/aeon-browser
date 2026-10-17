@@ -17,6 +17,7 @@ interface Entry {
     isError?: boolean;
     stopReason?: string;
     errorMessage?: string;
+    actions?: TraceAction[];
   } | null;
 }
 interface Snapshot {
@@ -26,11 +27,31 @@ interface Snapshot {
   entries: Entry[];
 }
 
+/**
+ * A timed browser action inside a step (epoch ms; box and point in viewport CSS pixels).
+ * Screen recorders (Aperture) read these through `aeon trace --json`; keep the shape.
+ */
+export interface TraceAction {
+  kind: string;
+  tabId?: number;
+  visible?: boolean;
+  tStart: number;
+  tAct?: number;
+  tEnd: number;
+  box?: { x: number; y: number; width: number; height: number };
+  point?: { x: number; y: number };
+  dpr?: number;
+  url?: string;
+  text?: string;
+  scroll?: { direction: string; amount: number; before: number; after: number };
+  failed?: boolean;
+}
 export interface TraceStep {
   at: string;
   tool: string;
   summary: string;
   error: boolean;
+  actions?: TraceAction[];
 }
 export interface ChatResult {
   chatId: string;
@@ -42,6 +63,10 @@ export interface ChatResult {
   toolErrors: number;
   tabsOpened: number;
   contextTokens: number | null;
+  /** When the latest prompt was submitted and when the chat finished it (ISO; finishedAt only
+   * once finished). Screen recorders (Aperture) frame recordings with these; keep them. */
+  promptAt: string | null;
+  finishedAt: string | null;
   trace: TraceStep[];
 }
 
@@ -65,8 +90,17 @@ export function summarize(
     toolErrors: trace.filter((step) => step.error).length,
     tabsOpened: trace.reduce((count, step) => count + countOpened(step.summary), 0),
     contextTokens: snapshot.contextUsage?.tokens ?? null,
+    promptAt: lastOf(snapshot.entries, "user")?.timestamp ?? null,
+    finishedAt:
+      outcome === "timeout" || snapshot.runState !== "idle"
+        ? null
+        : (lastOf(snapshot.entries, "assistant")?.timestamp ?? null),
     trace,
   };
+}
+
+function lastOf(entries: Entry[], role: string): Entry | undefined {
+  return [...entries].reverse().find((entry) => entry.message?.role === role);
 }
 
 function countOpened(summary: string): number {
@@ -125,4 +159,5 @@ function addResult(message: NonNullable<Entry["message"]>, byCall: Map<string, T
   const text = message.content.map((block) => block.text ?? "").join("\n");
   step.summary += "\n" + text.slice(0, 600);
   step.error = Boolean(message.isError);
+  if (message.actions?.length) step.actions = message.actions;
 }

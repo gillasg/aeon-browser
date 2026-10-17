@@ -116,7 +116,11 @@ test("the CLI says plainly when Aeon is not running", async () => {
 
 function mcp(messages) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [cli, "mcp"], { stdio: ["pipe", "pipe", "inherit"] });
+    // An empty data folder, so an Aeon running on this machine does not add its tools.
+    const child = spawn(process.execPath, [cli, "mcp"], {
+      stdio: ["pipe", "pipe", "inherit"],
+      env: { ...process.env, AEON_DATA_DIR: join(tmpdir(), "aeon-cli-mcp-" + process.pid) },
+    });
     let buffer = "";
     const replies = [];
     child.stdout.on("data", (chunk) => {

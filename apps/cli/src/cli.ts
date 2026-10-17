@@ -22,7 +22,8 @@ const usage = `aeon: run and inspect Aeon chats from the terminal or another age
       --unreviewed              only chats not reviewed yet (or used again since)
   review <chatId> [note]        mark a chat reviewed; note text or @file.md is saved as findings
   result <chatId>               a chat's final answer
-  trace <chatId>                a chat's tool calls, results and errors
+  trace <chatId> [--json]       a chat's tool calls, results and errors; --json adds timed
+                                browser actions, promptAt and finishedAt
   open <chatId>                 show a chat as a tab in Chrome
   tools [--json]                the browser tools and their full guidance
   tool <name> '<json>'          run one: browser_code, browser_tabs, crawl, site_api, extract
@@ -77,7 +78,10 @@ async function dispatch(client: AeonClient, command: string, rest: string[]): Pr
   }
   const result = await inspect(client, chatId);
   if (command === "result") process.stdout.write(result.answer + "\n");
-  else if (command === "trace") process.stdout.write(formatTrace(result) + "\n");
+  else if (command === "trace")
+    process.stdout.write(
+      (rest.includes("--json") ? JSON.stringify(result, null, 2) : formatTrace(result)) + "\n",
+    );
   else throw new Error(usage);
   return 0;
 }

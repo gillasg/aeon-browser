@@ -2,7 +2,11 @@ import { rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CoreAttentionSnapshotSchema, type CoreAttentionRequest } from "@aeon/protocol";
+import {
+  CoreAttentionSnapshotSchema,
+  type CoreAttentionAlert,
+  type CoreAttentionRequest,
+} from "@aeon/protocol";
 import type { ChatId, PiSessionEvent } from "@aeon/domain";
 import type { ChatService } from "./chat-service.js";
 
@@ -17,6 +21,7 @@ export class CoreAttention {
   private readonly records = new Map<string, AttentionRecord>();
   private readonly views = new Map<object, Map<string, { chatId: string; until: number }>>();
   private readonly listeners = new Set<() => void>();
+  private readonly alertListeners = new Set<(alert: CoreAttentionAlert) => void>();
   private pending = Promise.resolve();
   private readonly path: string;
   private readonly unsubscribe: () => void;
@@ -63,12 +68,34 @@ export class CoreAttention {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
+  /** Alerts go to every connected browser as they happen; they are not kept. */
+  onAlert(listener: (alert: CoreAttentionAlert) => void): () => void {
+    this.alertListeners.add(listener);
+    return () => this.alertListeners.delete(listener);
+  }
+  alert(chatId: string, title: string, message: string): void {
+    const alert: CoreAttentionAlert = {
+      kind: "core.attention.alert",
+      alertId: randomUUID(),
+      chatId,
+      title: title.slice(0, 120),
+      message: message.slice(0, 300),
+    };
+    for (const listener of this.alertListeners) {
+      try {
+        listener(alert);
+      } catch {
+        process.stderr.write("Core attention alert listener failed.\n");
+      }
+    }
+  }
   disconnect(owner: object): void {
     this.views.delete(owner);
   }
   async close(): Promise<void> {
     this.unsubscribe();
     this.listeners.clear();
+    this.alertListeners.clear();
     await this.pending;
   }
   handle(owner: object, request: CoreAttentionRequest): unknown {

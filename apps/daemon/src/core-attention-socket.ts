@@ -4,8 +4,10 @@ import type { CoreAttention } from "./core-attention.js";
 
 export function attachAttentionSocket(socket: WebSocket, attention: CoreAttention): void {
   const unsubscribe = attention.subscribe(() => send(socket, attention.snapshot()));
+  const stopAlerts = attention.onAlert((alert) => send(socket, alert));
   socket.once("close", () => {
     unsubscribe();
+    stopAlerts();
     attention.disconnect(socket);
   });
 }

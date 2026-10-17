@@ -42,6 +42,9 @@ export class RoutineScheduler {
     private readonly browser: BrowserControlService,
   ) {}
 
+  /** Told when a watcher's check passes, before its agent run (a notification, at once). */
+  onAlert: ((chatId: string, title: string, message: string) => void) | undefined;
+
   async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
@@ -185,10 +188,12 @@ export class RoutineScheduler {
     const check = isListening(routine)
       ? this.takeHeard(routine.routineId)
       : await this.runCheck(routine, run.runId);
-    if (check.met)
+    if (check.met) {
+      this.onAlert?.(routine.chatId, routine.title, describeCheck(check.value));
       return `${routine.instruction}
 
 This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`;
+    }
     const completedAt = new Date().toISOString();
     if (check.error) this.update(run.runId, "failed", { completedAt, lastError: check.error });
     else this.update(run.runId, "skipped", { completedAt });
@@ -306,4 +311,22 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
 function checkRealm(routineId: string): string {
   const hex = createHash("sha256").update(`routine-check:${routineId}`).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** One line about what a passing check found, for the notification. */
+export function describeCheck(value: unknown): string {
+  const items = Array.isArray(value) ? value : (value as { items?: unknown })?.items;
+  if (Array.isArray(items) && items.length)
+    return `${items.length} new: ${labelOf(items[0])}${items.length > 1 ? " and more" : ""}`;
+  return labelOf(value) || "Its check passed.";
+}
+function labelOf(value: unknown): string {
+  if (typeof value === "string") return value.slice(0, 200);
+  if (typeof value !== "object" || value === null) return "";
+  const record = value as Record<string, unknown>;
+  const name = [record.title, record.name, record.text, record.summary].find(
+    (field) => typeof field === "string" && field,
+  );
+  const price = record.price ?? record.amount;
+  return [name, price === undefined ? "" : String(price)].filter(Boolean).join(" · ").slice(0, 200);
 }

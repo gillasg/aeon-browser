@@ -1,3 +1,4 @@
+import { storedTraceActions } from "./browser-trace-actions.js";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { PiMessageProjection } from "@aeon/domain";
 import { projectContent, resultText, safeJsonObject } from "./pi-content-projection.js";
@@ -33,6 +34,7 @@ export function projectMessage(message: AgentMessageFromEvent): PiMessageProject
       isError: message.isError,
       ...(changeDiff !== undefined ? { changeDiff } : {}),
       ...(message.nestedCalls ? { nestedCalls: projectNestedCalls(message.nestedCalls) } : {}),
+      ...actionsOf(message.details),
     };
   }
   if (message.role === "custom") return projectCustomMessage(message.customType, message.details);
@@ -134,4 +136,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function actionsOf(
+  details: unknown,
+): { actions: NonNullable<PiMessageProjection["actions"]> } | Record<string, never> {
+  const actions = storedTraceActions(details);
+  return actions ? { actions } : {};
 }

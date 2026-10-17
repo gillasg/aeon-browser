@@ -24,7 +24,8 @@ import { BrowserControlService } from "./browser-control-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
 
 const MAX_BOOTSTRAP_BYTES = 16 * 1024;
-const MAX_SOCKET_BYTES = 4 * 1024 * 1024;
+// Matches the browser-use-extension bridge; the extension refuses messages over 3.5 MB itself.
+const MAX_SOCKET_BYTES = 32 * 1024 * 1024;
 
 export interface NativeTransport {
   endpoint: string;

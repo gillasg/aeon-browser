@@ -47,6 +47,7 @@ export function createProductionRuntime(dataDirectory: string): {
   const attention = new CoreAttention(dataRoot, service);
   const threadCoordination = new ThreadCoordinationService(service, store);
   const routines = new RoutineScheduler(store, service, browserControl);
+  routines.onAlert = (chatId, title, message) => attention.alert(chatId, title, message);
   const capabilityTools = new CapabilityToolService(registry, mcpMigration, pi, store, routines);
   pi.setThreadToolHost(threadCoordination);
   pi.setCapabilityToolHost(capabilityTools);

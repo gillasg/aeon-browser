@@ -141,6 +141,38 @@ const PiContentBlockSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
+// One browser action inside a tool call: what ran, in which tab, when its input reached the page
+// and where (viewport CSS pixels). Screen recorders (Aperture) read these through `aeon trace`;
+// keep the shape.
+const BrowserTraceActionSchema = z
+  .object({
+    kind: z.string().min(1).max(40),
+    tabId: z.number().int().optional(),
+    visible: z.boolean().optional(),
+    tStart: z.number(),
+    tAct: z.number().optional(),
+    tEnd: z.number(),
+    box: z
+      .object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
+      .strict()
+      .optional(),
+    point: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    dpr: z.number().optional(),
+    url: z.string().max(2000).optional(),
+    text: z.string().max(200).optional(),
+    scroll: z
+      .object({
+        direction: z.string().max(10),
+        amount: z.number(),
+        before: z.number(),
+        after: z.number(),
+      })
+      .strict()
+      .optional(),
+    failed: z.boolean().optional(),
+  })
+  .strict();
+
 const PiMessageSchema = z
   .object({
     role: z.enum(["user", "assistant", "tool", "custom"]),
@@ -174,6 +206,7 @@ const PiMessageSchema = z
       })
       .strict()
       .optional(),
+    actions: z.array(BrowserTraceActionSchema).max(500).optional(),
   })
   .strict();
 

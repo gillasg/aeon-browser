@@ -60,6 +60,17 @@ export const CoreAttentionClaimSchema = z
     granted: z.boolean(),
   })
   .strict();
+/** A watcher's check passed: shown at once as a notification, before its agent run starts. */
+export const CoreAttentionAlertSchema = z
+  .object({
+    kind: z.literal("core.attention.alert"),
+    alertId: z.string().uuid(),
+    chatId: z.string().uuid(),
+    title: z.string().max(120),
+    message: z.string().max(300),
+  })
+  .strict();
+export type CoreAttentionAlert = z.infer<typeof CoreAttentionAlertSchema>;
 export type CoreDiscovery = z.infer<typeof CoreDiscoverySchema>;
 export type CoreAttentionRequest = z.infer<typeof CoreAttentionRequestSchema>;
 

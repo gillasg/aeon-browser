@@ -1,3 +1,4 @@
+import { traceActions } from "./browser-trace-actions.js";
 import { browserCodeGuidelines } from "./browser-code-guidance.js";
 import { compactBrowserTrace } from "./browser-recovery.js";
 import { randomUUID } from "node:crypto";
@@ -88,7 +89,12 @@ export function createBrowserCodeTool(
         ...(cell.reset ? { reset: true } : {}),
         ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
       };
-      return { content: modelContent(body), isError: failed, details: undefined };
+      const actions = traceActions(cell.steps ?? []);
+      return {
+        content: modelContent(body),
+        isError: failed,
+        details: actions.length ? { actions } : undefined,
+      };
     },
   });
 }
