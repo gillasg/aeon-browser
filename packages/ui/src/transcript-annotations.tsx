@@ -6,6 +6,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
+import { AnnotationEditor, AnnotationSummary } from "./annotation-parts.js";
 export interface ResponseAnnotation {
   id: string;
   quote: string;
@@ -32,7 +34,12 @@ export function AnnotationProvider({ children }: { children: ReactNode }): React
     remove: (id) => setRecords((items) => items.filter((item) => item.id !== id)),
     clear: (ids) => setRecords((items) => items.filter((item) => !ids.includes(item.id))),
   };
-  return <AnnotationContext.Provider value={value}>{children}</AnnotationContext.Provider>;
+  return (
+    <AnnotationContext.Provider value={value}>
+      {children}
+      <AnnotationBadges />
+    </AnnotationContext.Provider>
+  );
 }
 export function useAnnotations(): AnnotationState | null {
   return useContext(AnnotationContext);
@@ -49,81 +56,105 @@ export function serializeAnnotations(records: readonly ResponseAnnotation[]): st
     .join("\n\n");
   return `[Aeon annotations v1]\n\n${body}\n\n[/Aeon annotations v1]`;
 }
-// Pending annotations render as chips beside pasted images, in the same attachment row.
+// Pending annotations: one chip in the attachment row; hovering lists them, each editable.
 export function AnnotationChips(): ReactElement | null {
   const annotations = useAnnotations();
   if (!annotations?.records.length) return null;
   return (
-    <>
-      {annotations.records.map((record, index) => (
-        <AnnotationChip
-          key={record.id}
-          record={record}
-          index={index}
-          onUpdate={(comment) => annotations.update(record.id, comment)}
-          onRemove={() => annotations.remove(record.id)}
-        />
-      ))}
-    </>
+    <AnnotationSummary
+      items={annotations.records}
+      onUpdate={(id, comment) => annotations.update(id, comment)}
+      onRemove={(id) => annotations.remove(id)}
+      onClear={() => annotations.clear(annotations.records.map((record) => record.id))}
+    />
   );
 }
-function AnnotationChip({
-  record,
-  index,
-  onUpdate,
-  onRemove,
-}: {
-  record: ResponseAnnotation;
-  index: number;
-  onUpdate(comment: string): void;
-  onRemove(): void;
-}): ReactElement {
-  const [editing, setEditing] = useState(false);
-  const [comment, setComment] = useState(record.comment);
-  const save = () => {
-    onUpdate(comment.trim());
-    setEditing(false);
-  };
-  return (
-    <div className="annotation-chip" title={record.quote}>
-      <q>{record.quote}</q>
-      {editing ? (
-        <textarea
-          value={comment}
-          autoFocus
-          aria-label={`Edit annotation ${index + 1}`}
-          onChange={(event) => setComment(event.target.value)}
-          onBlur={save}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              save();
-            } else if (event.key === "Escape") setEditing(false);
+
+interface Badge {
+  id: string;
+  number: number;
+  left: number;
+  top: number;
+}
+// A numbered marker at the end of each annotated passage; clicking it edits that annotation.
+function AnnotationBadges(): ReactElement | null {
+  const annotations = useAnnotations();
+  const records = annotations?.records ?? [];
+  const badges = useBadgePositions(records);
+  const [editing, setEditing] = useState<Badge | null>(null);
+  const record = editing && records.find((item) => item.id === editing.id);
+  if (!annotations || !records.length) return null;
+  return createPortal(
+    <>
+      {badges.map((badge) => (
+        <button
+          key={badge.id}
+          type="button"
+          className="annotation-badge"
+          style={{ left: badge.left, top: badge.top }}
+          aria-label={`Edit annotation ${badge.number}`}
+          onClick={() => setEditing(badge)}
+        >
+          {badge.number}
+        </button>
+      ))}
+      {editing && record && (
+        <AnnotationEditor
+          left={Math.max(8, Math.min(editing.left - 280, innerWidth - 348))}
+          top={Math.max(8, Math.min(editing.top + 26, innerHeight - 170))}
+          initial={record.comment}
+          onSave={(comment) => {
+            annotations.update(record.id, comment);
+            setEditing(null);
+          }}
+          onCancel={() => setEditing(null)}
+          onDelete={() => {
+            annotations.remove(record.id);
+            setEditing(null);
           }}
         />
-      ) : (
-        <button
-          type="button"
-          className="annotation-chip-comment"
-          aria-label={`Edit annotation ${index + 1}`}
-          onClick={() => {
-            setComment(record.comment);
-            setEditing(true);
-          }}
-        >
-          {record.comment || "Add comment"}
-        </button>
       )}
-      <button
-        type="button"
-        className="annotation-chip-remove"
-        aria-label={`Remove annotation ${index + 1}`}
-        onClick={onRemove}
-      >
-        ×
-      </button>
-    </div>
+    </>,
+    document.body,
   );
+}
+
+function useBadgePositions(records: readonly ResponseAnnotation[]): Badge[] {
+  const [badges, setBadges] = useState<Badge[]>([]);
+  useEffect(() => {
+    if (!records.length) {
+      setBadges([]);
+      return;
+    }
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setBadges(badgePositions(records)));
+    };
+    measure();
+    // Text above can stream in or re-wrap, so re-measure now and then besides scroll and resize.
+    const timer = setInterval(measure, 400);
+    document.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearInterval(timer);
+      document.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [records]);
+  return badges;
+}
+
+function badgePositions(records: readonly ResponseAnnotation[]): Badge[] {
+  return records.flatMap((record, index) => {
+    const range = record.range;
+    if (!range || !range.startContainer.isConnected) return [];
+    const rects = [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
+    const last = rects.at(-1);
+    if (!last || last.bottom < 0 || last.top > innerHeight) return [];
+    return [{ id: record.id, number: index + 1, left: last.right - 4, top: last.top - 12 }];
+  });
 }
 
 function useAnnotationHighlights(records: readonly ResponseAnnotation[]): void {

@@ -1,9 +1,14 @@
-import { handleCompanionResult, listenToCompanions } from "./companion-requests.js";
+import { askCore, handleCompanionResult, listenToCompanions } from "./companion-requests.js";
 import { authenticate } from "@browser-use-extension/engine/native-authenticate";
 import { configureEngine } from "@browser-use-extension/engine/engine-config";
 import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
 import { installBoosts } from "@browser-use-extension/engine/native-browser-boosts";
-import { readAgentTabView } from "./agent-tab-view.js";
+import {
+  AGENT_IN_FRONT_KEY,
+  HIDE_AGENT_CURSOR_KEY,
+  readAgentFlag,
+  readAgentTabView,
+} from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
@@ -85,6 +90,8 @@ configureEngine({
   notificationIcon: "completion-icon.png",
   tabGroupTitle: () => "Aeon",
   agentView: readAgentTabView,
+  agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
+  hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
 });
 // A clicked thumbnail on a Chat page opens that agent tab in Split View beside the Chat.
 chrome.runtime.onMessage.addListener((request: unknown, sender) => {
@@ -97,7 +104,10 @@ chrome.runtime.onMessage.addListener((request: unknown, sender) => {
 void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 void migrateLegacyChromeStorage();
 // Saved boosts (browser.boosts) apply in every tab, without Site Boosts installed.
-installBoosts();
+installBoosts(undefined, {
+  // Boost scripts call mapped site APIs (sb.api) through Aeon's own site-to-api.
+  siteApi: (site, operation, params) => askCore("siteApi", { site, operation, params }),
+});
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 installNativeBrowserContextMenus(() => ensureInventoryExecutor());
 

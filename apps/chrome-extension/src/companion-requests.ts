@@ -9,7 +9,7 @@ const ALLOWED_KEY = "companionExtensions";
 const TRUSTED = new Set(["kcfodpkdfapojnbhkgdlpkikipneejpf"]);
 const APPROVAL_TIMEOUT_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 180_000;
-const FORWARDED = new Set(["model.complete", "watch", "task"]);
+const FORWARDED = new Set(["model.complete", "watch", "task", "siteApi"]);
 
 interface CompanionMessage {
   type?: string;
@@ -95,7 +95,7 @@ async function handle(
   connect: () => Promise<Socket>,
 ): Promise<Reply> {
   if (message.kind === "ping")
-    return { ok: true, value: { name: "Aeon", features: ["model", "watch", "task"] } };
+    return { ok: true, value: { name: "Aeon", features: ["model", "watch", "task", "siteApi"] } };
   if (!FORWARDED.has(String(message.kind)))
     return { ok: false, error: `Unsupported request: ${String(message.kind)}` };
   if (!(await permitted(senderId)))
@@ -110,7 +110,26 @@ async function handle(
   });
 }
 
+let coreConnection: (() => Promise<Socket>) | undefined;
+/** A request from Aeon itself (its built-in boosts), sent to core without asking the user. */
+export async function askCore(
+  kind: CompanionRequest["request"],
+  data: Record<string, unknown>,
+): Promise<unknown> {
+  if (!coreConnection) throw new Error("Aeon is not connected");
+  const reply = await forward(await coreConnection(), {
+    kind: "companion.request",
+    requestId: crypto.randomUUID(),
+    from: chrome.runtime.id,
+    request: kind,
+    data,
+  });
+  if (!reply.ok) throw new Error(reply.error);
+  return reply.value;
+}
+
 export function listenToCompanions(connect: () => Promise<Socket>): void {
+  coreConnection = connect;
   chrome.runtime.onMessageExternal.addListener((message: CompanionMessage, sender, reply) => {
     if (message?.type !== "site-boosts" || !sender.id || !/^[a-p]{32}$/.test(sender.id))
       return false;

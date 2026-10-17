@@ -308,8 +308,17 @@ function setConnection(label: string, state: "connecting" | "connected" | "error
   connection = { label, state };
   render();
 }
+let noticeTimer = 0;
 function showError(message: string): void {
   notice = message;
+  clearTimeout(noticeTimer);
+  // Page-context notes are informational: they leave on their own after a few seconds.
+  if (message.startsWith("Page context is saved"))
+    noticeTimer = window.setTimeout(() => {
+      if (notice !== message) return;
+      notice = "";
+      render();
+    }, 4000);
   render();
 }
 function scheduleReconnect(): void {

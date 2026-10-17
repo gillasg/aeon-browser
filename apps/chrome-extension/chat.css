@@ -2565,6 +2565,27 @@ body[data-host="panel"] .queue-view {
   gap: 6px;
 }
 
+.message-markdown img.markdown-image {
+  display: inline-block;
+  max-width: min(100%, 280px);
+  max-height: 180px;
+  width: auto;
+  height: auto;
+  margin: 4px 8px 4px 0;
+  vertical-align: top;
+  object-fit: cover;
+  border-radius: var(--aeon-r-lg);
+  background: var(--aeon-surface);
+  cursor: zoom-in;
+}
+.message-markdown a img.markdown-image {
+  cursor: pointer;
+}
+.message-markdown td img.markdown-image {
+  max-height: 96px;
+  margin: 0;
+}
+
 .tool-images {
   margin: 12px 0 16px 36px;
   display: flex;
@@ -3386,139 +3407,265 @@ body[data-host="panel"] .composer-meta {
   color: var(--muted);
   flex: none;
 }
-.annotation-editor {
+/* Response annotations: a selection toolbar, the comment editor, numbered badges on annotated
+   text, and an "N annotations" chip whose hover list shows each one. Theme colours only. */
+.annotation-toolbar {
   position: fixed;
   z-index: 120;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 294px;
-  padding: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--aeon-r-md);
-  background: var(--surface);
-  color: var(--text);
-}
-.annotation-editor button {
-  border: 0;
-  border-radius: var(--aeon-r-sm);
-  padding: 6px 8px;
-  color: inherit;
+  border-radius: 999px;
   background: var(--surface-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+}
+.annotation-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
   font: inherit;
+  font-size: 13px;
   cursor: pointer;
+}
+.annotation-toolbar button:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.annotation-editor {
+  position: fixed;
+  z-index: 121;
+  display: grid;
+  gap: 10px;
+  width: 340px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.32);
 }
 .annotation-editor textarea {
   width: 100%;
-  resize: vertical;
-  min-height: 42px;
+  min-height: 44px;
+  max-height: 160px;
+  padding: 0;
   border: 0;
+  outline: none;
+  resize: none;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 15px;
 }
-.annotation-label {
+.annotation-editor textarea::placeholder {
   color: var(--muted);
-  font-size: 12px;
 }
-/* Same footprint as .attachment-thumbnail so annotations sit in the image row. */
-.annotation-chip {
-  position: relative;
+.annotation-editor-actions {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 4px;
-  width: 168px;
-  height: 76px;
+  align-items: center;
+  gap: 8px;
+}
+.annotation-editor-actions > span {
+  flex: 1;
+}
+.annotation-cancel,
+.annotation-save {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.annotation-cancel {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+}
+.annotation-cancel:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.annotation-save {
+  border: 0;
+  background: var(--text);
+  color: var(--canvas);
+  font-weight: 500;
+}
+.annotation-icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.annotation-icon-button:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+}
+/* White circle, black number, whatever the theme. */
+.annotation-badge {
+  position: fixed;
+  z-index: 110;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid rgb(0 0 0 / 0.14);
+  border-radius: 999px 999px 999px 3px;
+  background: #fff;
+  color: #111;
+  font:
+    600 11px/1 "Segoe UI",
+    system-ui,
+    sans-serif;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  cursor: pointer;
+}
+.annotation-badge:hover {
+  transform: scale(1.08);
+}
+.annotation-summary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
   flex: none;
-  padding: 8px 10px;
-  box-sizing: border-box;
+}
+.annotation-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
-  font-size: 12px;
-}
-.annotation-chip q {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   color: var(--text);
-  line-height: 1.35;
-}
-.annotation-chip-comment,
-.annotation-chip textarea {
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
   font: inherit;
-  text-align: left;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
-.annotation-chip textarea {
-  height: 1.4em;
-  resize: none;
-  color: var(--text);
-  outline: none;
-  cursor: text;
-}
-.annotation-chip-comment:hover {
-  color: var(--text);
-}
-.annotation-chip-remove {
+.annotation-summary-clear {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 20px;
-  height: 20px;
+  top: -7px;
+  right: -7px;
   display: grid;
   place-items: center;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--text);
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
-.annotation-chip-remove:hover {
+.annotation-summary:hover .annotation-summary-clear,
+.annotation-summary:focus-within .annotation-summary-clear {
+  opacity: 1;
+}
+/* Opens above the chip; the padding bridges the gap so the pointer can move into it. */
+.annotation-list {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 115;
+  display: grid;
+  gap: 14px;
+  width: min(420px, 86vw);
+  max-height: 360px;
+  overflow: auto;
+  margin: 0 0 8px;
+  padding: 14px 16px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 16px;
   background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.32);
+  text-align: left;
+}
+.annotation-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+.annotation-list-number {
+  color: var(--muted);
+  font-size: 13px;
+}
+.annotation-list-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+.annotation-list-body small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.annotation-list-body small + q,
+.annotation-list-body small + p,
+.annotation-list-body small + textarea {
+  margin-bottom: 6px;
+}
+.annotation-list-body q {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  quotes: none;
+  white-space: pre-wrap;
+}
+.annotation-list-body p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.annotation-list-body textarea {
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+  resize: vertical;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.annotation-list-actions {
+  display: flex;
+  gap: 2px;
 }
 
 ::highlight(aeon-annotations) {
-  background: #ffffff24;
+  background: rgb(96 165 250 / 0.22);
   color: inherit;
 }
 
 ::highlight(aeon-selection) {
-  background: #ffffff38;
+  background: rgb(96 165 250 / 0.34);
   color: inherit;
 }
 
 .sent-annotations {
-  display: grid;
-  gap: 10px;
+  display: flex;
   margin-top: 8px;
-}
-.sent-annotations small {
-  color: var(--muted);
-  font-size: 12px;
-}
-.sent-annotations blockquote {
-  margin: 4px 0;
-  padding-left: 10px;
-  border-left: 2px solid var(--muted);
-  white-space: pre-wrap;
-}
-.sent-annotations p {
-  margin: 4px 0;
-  white-space: pre-wrap;
 }
 
 .sidebar-chat-menu button {

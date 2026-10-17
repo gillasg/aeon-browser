@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { ChatMarkdown } from "./chat-markdown.js";
+import { AnnotationSummary } from "./annotation-parts.js";
 export function AnnotatedMessage({ text, user }: { text: string; user: boolean }): ReactElement {
   const parsed = user ? parseAnnotations(text) : null;
   if (!parsed) return <ChatMarkdown text={text} />;
@@ -7,13 +8,7 @@ export function AnnotatedMessage({ text, user }: { text: string; user: boolean }
     <>
       {parsed.prompt && <ChatMarkdown text={parsed.prompt} />}
       <div className="sent-annotations" aria-label="Sent response annotations">
-        {parsed.annotations.map((annotation, index) => (
-          <div key={index}>
-            <small>Selection {index + 1}</small>
-            <blockquote>{annotation.quote}</blockquote>
-            {annotation.comment && <p>{annotation.comment}</p>}
-          </div>
-        ))}
+        <AnnotationSummary items={parsed.annotations} />
       </div>
     </>
   );

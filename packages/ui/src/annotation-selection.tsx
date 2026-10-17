@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement, type RefObject } from "react";
 import { copyTextToClipboard } from "./clipboard.js";
 import { createPortal } from "react-dom";
 import { useAnnotations } from "./transcript-annotations.js";
+import { AnnotationEditor, CommentIcon } from "./annotation-parts.js";
 interface SelectedQuote {
   text: string;
   range: Range;
@@ -43,13 +44,13 @@ export function AnnotationSelection({
   useSelectionAnchor(quote, setQuote);
   useSelectionEvents(root, Boolean(annotations), editing, quote, setQuote, setEditing, setComment);
   if (!quote || !annotations) return null;
-  const save = () => {
+  const save = (value: string) => {
     if (!quote.range.startContainer.isConnected || quote.range.toString().trim() !== quote.text) {
       setQuote(null);
       setEditing(false);
       return;
     }
-    annotations.add(quote.text, comment.trim(), quote.range);
+    annotations.add(quote.text, value.trim(), quote.range);
     setQuote(null);
     setEditing(false);
     setComment("");
@@ -61,8 +62,11 @@ export function AnnotationSelection({
       quote={quote}
       editing={editing}
       comment={comment}
-      setEditing={setEditing}
-      setComment={setComment}
+      setEditing={(value) => {
+        // Cancel closes the editor and the selection toolbar together.
+        if (!value) setQuote(null);
+        setEditing(value);
+      }}
       save={save}
     />
   );
@@ -73,51 +77,38 @@ function SelectionOverlay({
   editing,
   comment,
   setEditing,
-  setComment,
   save,
 }: {
   quote: SelectedQuote;
   editing: boolean;
   comment: string;
   setEditing(value: boolean): void;
-  setComment(value: string): void;
-  save(): void;
+  save(value: string): void;
 }): ReactElement {
+  if (editing)
+    return createPortal(
+      <AnnotationEditor
+        left={quote.left}
+        top={quote.top}
+        initial={comment}
+        onSave={save}
+        onCancel={() => setEditing(false)}
+      />,
+      document.body,
+    );
   return createPortal(
     <div
-      className="annotation-editor"
+      className="annotation-toolbar"
       data-selected-text-annotation-editor="true"
       style={{ left: quote.left, top: quote.top }}
-      role="dialog"
-      aria-label="Annotate selection"
+      role="toolbar"
+      aria-label="Selected text"
       onPointerDown={(event) => {
         event.stopPropagation();
-        if (!editing) event.preventDefault();
+        event.preventDefault();
       }}
     >
-      {!editing ? (
-        <SelectionToolbar text={quote.text} onAnnotate={() => setEditing(true)} />
-      ) : (
-        <>
-          <span className="annotation-label">1 selection</span>
-          <textarea
-            autoFocus
-            value={comment}
-            aria-label="Annotation comment"
-            placeholder="Ask about this…"
-            onChange={(event) => setComment(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                save();
-              }
-            }}
-          />
-          <button type="button" onClick={save}>
-            Add
-          </button>
-        </>
-      )}
+      <SelectionToolbar text={quote.text} onAnnotate={() => setEditing(true)} />
     </div>,
     document.body,
   );
@@ -238,7 +229,8 @@ function SelectionToolbar({
   return (
     <>
       <button type="button" onClick={onAnnotate}>
-        Annotate
+        <CommentIcon />
+        Comment
       </button>
       <button type="button" onClick={() => void copy()}>
         {copied ? "Copied" : "Copy"}

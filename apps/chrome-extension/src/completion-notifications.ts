@@ -1,5 +1,8 @@
+import { clearAgentCursors } from "@browser-use-extension/engine/native-browser-cursor";
 import {
+  CoreAttentionAlertSchema,
   CoreAttentionClaimSchema,
+  type CoreAttentionAlert,
   CoreAttentionSnapshotSchema,
   CoreAttentionRequestSchema,
   type CoreAttentionRequest,
@@ -11,6 +14,11 @@ export function installCoreAttentionBridge(sender: (request: CoreAttentionReques
   sender({ kind: "core.attention.watch" });
 }
 export function handleCoreAttentionMessage(candidate: unknown): boolean {
+  const alert = CoreAttentionAlertSchema.safeParse(candidate);
+  if (alert.success) {
+    void showAlert(alert.data);
+    return true;
+  }
   const snapshot = CoreAttentionSnapshotSchema.safeParse(candidate);
   if (snapshot.success) {
     pending = pending.then(() => mirror(snapshot.data)).catch(() => undefined);
@@ -27,6 +35,9 @@ async function mirror(
   const existing = await chrome.storage.session.get(null);
   const values: Record<string, string> = {};
   for (const chat of snapshot.chats) {
+    // The turn is over: the agent cursor leaves its tabs.
+    if (!chat.working && existing["aeon-chat-working-" + chat.chatId] === "working")
+      void clearAgentCursors(chat.chatId);
     values["aeon-chat-working-" + chat.chatId] = chat.working ? "working" : "idle";
     if (chat.completionId) values["aeon-completion-id-" + chat.chatId] = chat.completionId;
     if (chat.unread && chat.completionId) {
@@ -60,8 +71,23 @@ async function notify(chatId: string): Promise<void> {
     message: "Your chat is ready. Click to open it.",
   });
 }
+// A watcher found something: say what at once; the agent's follow-up run comes after.
+async function showAlert(alert: CoreAttentionAlert): Promise<void> {
+  await chrome.notifications.create(ALERT_PREFIX + alert.chatId + ":" + alert.alertId, {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("completion-icon.png"),
+    title: alert.title || "Aeon watcher",
+    message: alert.message || "Its check passed. Click to open the chat.",
+    priority: 2,
+  });
+}
+const ALERT_PREFIX = "aeon-alert-";
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith("piper-done-")) void openCompletedChat(id.slice("piper-done-".length));
+  if (id.startsWith(ALERT_PREFIX)) {
+    const chatId = id.slice(ALERT_PREFIX.length).split(":")[0] ?? "";
+    void openCompletedChat(chatId).then(() => chrome.notifications.clear(id));
+  }
 });
 async function openCompletedChat(chatId: string): Promise<void> {
   const url = chrome.runtime.getURL("chat.html") + "?chatId=" + encodeURIComponent(chatId);

@@ -1,5 +1,11 @@
 import { useMessageSendMode } from "./message-send-mode.js";
-import { useAgentTabView, type AgentTabView } from "./agent-tab-view.js";
+import {
+  agentInFrontKey,
+  hideAgentCursorKey,
+  useAgentFlag,
+  useAgentTabView,
+  type AgentTabView,
+} from "./agent-tab-view.js";
 import type { ReactElement } from "react";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { WallpaperSettings } from "./wallpaper-settings.js";
@@ -78,6 +84,9 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
 
 function AgentTabSettings(): ReactElement {
   const [tabView, setTabView] = useAgentTabView();
+  // Both switches are relied on by screen recorders (Aperture); keep them.
+  const [inFront, setInFront] = useAgentFlag(agentInFrontKey);
+  const [hideCursor, setHideCursor] = useAgentFlag(hideAgentCursorKey);
   return (
     <section className="settings-group">
       <h2>Agent tabs</h2>
@@ -95,6 +104,30 @@ function AgentTabSettings(): ReactElement {
       <p>
         Split screen shows the tab the agent touched last. Thumbnails stack every tab it is working
         in; click one to open it in split screen.
+      </p>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={inFront}
+          onChange={(event) => setInFront(event.target.checked)}
+        />{" "}
+        Agent works in front
+      </label>
+      <p>
+        Its tabs open in front and it switches to whichever tab it works in, so you can watch (or
+        record) every step. Off: it works in background tabs and leaves yours alone.
+      </p>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={hideCursor}
+          onChange={(event) => setHideCursor(event.target.checked)}
+        />{" "}
+        Hide agent cursor
+      </label>
+      <p>
+        Hides the agent's cursor and its captions on pages, e.g. while a screen recorder draws its
+        own.
       </p>
     </section>
   );

@@ -23,6 +23,21 @@ const components: Components = {
       <code className={className ? "markdown-block-code" : "markdown-inline-code"}>{children}</code>
     ),
   pre: ({ children }) => <MarkdownCodeBlock>{children}</MarkdownCodeBlock>,
+  // Images stay thumbnails (several sit side by side); a click opens the full image, unless the
+  // image is itself a link.
+  img: ({ src, alt }) =>
+    typeof src === "string" && src ? (
+      <img
+        className="markdown-image"
+        src={src}
+        alt={alt ?? ""}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onClick={(event) => {
+          if (!event.currentTarget.closest("a")) window.open(src, "_blank", "noreferrer");
+        }}
+      />
+    ) : null,
 };
 
 export function ChatMarkdown({ text }: { text: string }): ReactElement {
