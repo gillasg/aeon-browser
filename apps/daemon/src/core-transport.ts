@@ -5,6 +5,7 @@ import { once } from "node:events";
 import {
   CoreHelloSchema,
   CoreOpenChatRequestSchema,
+  CoreSettingsRequestSchema,
   CoreToolRequestSchema,
   SUPPORTED_PROTOCOL_VERSION,
 } from "@aeon/protocol";
@@ -14,6 +15,7 @@ import type { BrowserControlService } from "./browser-control-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { attachDevChatCommands } from "./dev-chat-connection.js";
 import { watchSocketHealth } from "./socket-health.js";
+import { relayAgentSettings } from "./agent-settings.js";
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
 
@@ -107,6 +109,7 @@ function authenticate(
       (candidate) =>
         handleAttentionMessage(socket, candidate, attention) ||
         handleOpenChat(socket, candidate, service, browser) ||
+        handleSettings(socket, candidate, browser) ||
         handleToolRequest(socket, candidate, service),
     );
   });
@@ -124,6 +127,20 @@ function handleOpenChat(
   );
   const browsers = known ? browser.openChatTab(request.data.chatId, request.data.active) : 0;
   socket.send(JSON.stringify({ kind: "core.chat.opened", chatId: request.data.chatId, browsers }));
+  return true;
+}
+/** `aeon settings`: read or change the agent settings in every connected Chrome. */
+function handleSettings(
+  socket: WebSocket,
+  candidate: unknown,
+  browser: BrowserControlService,
+): boolean {
+  const request = CoreSettingsRequestSchema.safeParse(candidate);
+  if (!request.success) return false;
+  const { requestId, set } = request.data;
+  void relayAgentSettings(browser.executorSockets(), set).then((browsers) =>
+    socket.send(JSON.stringify({ kind: "core.settings.result", requestId, browsers })),
+  );
   return true;
 }
 /** The chat tools for agents outside Aeon: listed, or called in a named session. */

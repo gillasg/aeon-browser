@@ -114,6 +114,26 @@ export class AeonClient {
     });
   }
 
+  /** Reads (no `set`) or changes the agent settings; one entry per connected Chrome. */
+  settings(set: Json | undefined, timeoutMs = 15_000): Promise<Json[]> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+      }, timeoutMs);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.settings.result") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve((message.browsers as Json[] | undefined) ?? []);
+      });
+      this.socket.send(
+        JSON.stringify({ kind: "core.settings", requestId, ...(set ? { set } : {}) }),
+      );
+    });
+  }
+
   /** Shows a chat as a tab in the connected Chrome; resolves with how many browsers were asked. */
   openChat(chatId: string, active = false): Promise<number> {
     return new Promise((resolve) => {

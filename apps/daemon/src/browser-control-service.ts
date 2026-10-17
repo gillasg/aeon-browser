@@ -204,6 +204,10 @@ export class BrowserControlService {
       return JSON.stringify({ error: error instanceof Error ? error.message : String(error) });
     }
   }
+  /** The sockets of the connected browsers, for messages every browser answers on its own. */
+  executorSockets(): WebSocket[] {
+    return [...this.executors.values()];
+  }
   /** Ask every connected browser to show a chat as a tab; returns how many were asked. */
   openChatTab(chatId: string, active = false): number {
     let asked = 0;

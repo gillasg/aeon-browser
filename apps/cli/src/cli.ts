@@ -7,6 +7,7 @@ import type { ChatResult } from "./results.js";
 import { runMcpServer } from "./mcp.js";
 import { install } from "./install.js";
 import { listTools, runTool } from "./tools.js";
+import { settingsCommand, settingsUsage } from "./settings.js";
 
 const usage = `aeon: run and inspect Aeon chats from the terminal or another agent.
 
@@ -30,6 +31,7 @@ const usage = `aeon: run and inspect Aeon chats from the terminal or another age
                                 (or key=value pairs: action=scrape url=https://...)
       --session name            calls in one session share variables, tabs and files
                                 (the input can also be @file.json, or - for stdin)
+  ${settingsUsage.trimStart()}
   install                       put the aeon command on the PATH and link the Aeon skill for agents
   mcp                           run the stdio MCP server`;
 
@@ -54,6 +56,7 @@ const TOOL_COMMANDS: Record<string, (client: AeonClient, rest: string[]) => Prom
   tool: runTool,
   chats: listChats,
   review: (client, rest) => reviewCommand(client, ["mark", ...rest]),
+  settings: settingsCommand,
 };
 
 async function listChats(client: AeonClient, rest: string[]): Promise<number> {

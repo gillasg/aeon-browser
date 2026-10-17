@@ -112,3 +112,39 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 export type CoreToolRequest = z.infer<typeof CoreToolRequestSchema>;
+
+/**
+ * Aeon's agent settings, read or changed from outside the settings page (the Aeon CLI). Screen
+ * recorders (Aperture) switch these on for a recording and restore them after; keep the names.
+ */
+export const AgentSettingsSchema = z
+  .object({
+    agentInFront: z.boolean(),
+    hideAgentCursor: z.boolean(),
+    agentTabView: z.enum(["split", "thumbnails"]),
+  })
+  .strict();
+export type AgentSettings = z.infer<typeof AgentSettingsSchema>;
+/** A local client reads (no `set`) or changes the agent settings in every connected Chrome. */
+export const CoreSettingsRequestSchema = z
+  .object({
+    kind: z.literal("core.settings"),
+    requestId: z.string().uuid(),
+    set: AgentSettingsSchema.partial().optional(),
+  })
+  .strict();
+/** Core asks the extension for its agent settings, applying `set` first. */
+export const NativeSettingsRequestSchema = z
+  .object({
+    kind: z.literal("native.settings"),
+    requestId: z.string().uuid(),
+    set: AgentSettingsSchema.partial().optional(),
+  })
+  .strict();
+export const NativeSettingsReplySchema = z
+  .object({
+    kind: z.literal("native.settings.result"),
+    requestId: z.string().uuid(),
+    settings: AgentSettingsSchema,
+  })
+  .strict();
