@@ -1,5 +1,6 @@
 export { mountAeonUi } from "./mount.js";
 export { ChatSurface, type ChatSurfaceProps } from "./chat-surface.js";
+export { invokePiCommand, UI_BUILTIN_COMMANDS } from "./pi-native-command.js";
 export {
   ChatComposer,
   type ChatComposerProps,

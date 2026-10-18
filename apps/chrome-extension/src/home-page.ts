@@ -82,7 +82,7 @@ function createView() {
       attachments?: readonly ComposerAttachment[],
     ) => void askAeon(query, model, thinkingLevel, attachments),
     onReadAttachments: (files: readonly File[]) => Promise.all(files.map(readComposerAttachment)),
-    onNewChat: openNewChat,
+    onNewChat: () => openNewChat(),
     onOpenChat: (chatId: string) => void openChat(chatId),
     onCatalog: () => catalog.show(),
     onCatalogQuery: (query: string) => catalog.setQuery(query),

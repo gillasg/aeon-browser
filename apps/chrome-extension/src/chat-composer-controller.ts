@@ -46,6 +46,16 @@ export class ChatComposerController {
     this.projectName = name;
   }
 
+  // Typed UI commands (/new, /compact, ...) run here instead of reaching the model as text.
+  private runCommand: (text: string) => boolean = () => false;
+  setCommandHandler(handler: (text: string) => boolean): void {
+    this.runCommand = handler;
+  }
+  private readonly send = (text: string, mode: "followUp" | "steer"): Promise<boolean> =>
+    !this.attachments.length && this.runCommand(text.trim())
+      ? Promise.resolve(true)
+      : this.sendMessage(text, mode);
+
   setClient(client: UiClient): void {
     this.client = client;
     this.controls = null;
@@ -82,7 +92,7 @@ export class ChatComposerController {
       ...(this.editDraftInsertion ? { editDraftInsertion: this.editDraftInsertion } : {}),
       editNotice: this.editNotice,
       browserContext: this.browserContext,
-      onSend: (text, mode) => this.sendMessage(text, mode),
+      onSend: this.send,
       onQueueAction: (mode, index, action, text) =>
         editComposerQueue(
           this.controls,

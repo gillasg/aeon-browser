@@ -1,4 +1,4 @@
-import { DaemonUiRequestSchema } from "@aeon/protocol";
+import { ChatIdSchema, DaemonUiRequestSchema } from "@aeon/protocol";
 import { connectPage } from "./ui-connection.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import type { UiClient } from "./ui-client-core.js";
@@ -46,7 +46,7 @@ async function projectRequest(operation: string, payload: unknown): Promise<unkn
 }
 export function projectDraftPayload(): { projectId?: string } {
   const projectId = new URLSearchParams(location.search).get("projectId");
-  return projectId ? { projectId } : {};
+  return projectId && ChatIdSchema.safeParse(projectId).success ? { projectId } : {};
 }
 
 window.addEventListener("aeon.panel-current-page", (event) => {

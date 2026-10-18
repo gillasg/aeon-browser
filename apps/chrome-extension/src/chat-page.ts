@@ -12,7 +12,13 @@ import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
 import { createToolImageLoader } from "./tool-image-client.js";
 import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@aeon/protocol";
-import { ChatSurface, mountAeonUi, TranscriptModel } from "@aeon/ui";
+import {
+  ChatSurface,
+  invokePiCommand,
+  mountAeonUi,
+  TranscriptModel,
+  UI_BUILTIN_COMMANDS,
+} from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
@@ -90,6 +96,11 @@ const composer = new ChatComposerController(
   (contextId) => void removeChatContext(chatId, contextId),
   (contextId, status) => updateContextStatus(chatId, contextId, status),
 );
+composer.setCommandHandler((text) => {
+  if (!UI_BUILTIN_COMMANDS.has(text)) return false;
+  invokePiCommand(text, createView().props);
+  return true;
+});
 const piUi = new ChatPiUiController(
   chatId,
   () => render(),
@@ -137,7 +148,7 @@ function createView() {
     onSidebarQuery: (value: string) => sidebar.setQuery(value),
     onSelectChat: (nextChatId: string) => void sidebar.openChat(nextChatId),
     ...sidebar.actionProps(),
-    onNewChat: openNewChat,
+    onNewChat: () => openNewChat(),
   });
 }
 function render(): void {
