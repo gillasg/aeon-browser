@@ -284,6 +284,9 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
       toolName: z.string().min(1).max(120),
       result: z.string().max(24_020),
       isError: z.boolean(),
+      /** Which fast path the tool used, for the speed chip and the orb. */
+      path: z.enum(["recipe", "site-api", "data", "url", "read", "ui"]).optional(),
+      durationMs: z.number().int().nonnegative().optional(),
       parentToolCallId: z.string().min(1).max(160).optional(),
     })
     .strict(),

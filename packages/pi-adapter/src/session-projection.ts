@@ -249,15 +249,33 @@ function projectToolEvent(
       ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
     };
   const changeDiff = event.isError ? undefined : projectChangeDiff(event.result);
+  const path = toolPath(event.toolName, event.result);
   return {
     kind: "tool-end",
     ...(changeDiff !== undefined ? { changeDiff } : {}),
+    ...(path ? { path } : {}),
     toolCallId: event.toolCallId,
     toolName: event.toolName,
     result: resultText(event.result),
     isError: event.isError,
     ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
   };
+}
+
+type ToolPath = "recipe" | "site-api" | "data" | "url" | "read" | "ui";
+
+function toolPath(toolName: string, result: unknown): ToolPath | undefined {
+  if (toolName === "site_api") return "site-api";
+  if (toolName === "skills" || toolName === "site_skill") return "recipe";
+  const steps = (result as { steps?: Array<{ action?: { op?: string } }> } | undefined)?.steps;
+  if (!steps?.length) return undefined;
+  const ops = steps.map((step) => step.action?.op).filter((op): op is string => Boolean(op));
+  if (ops.includes("data")) return "data";
+  if (ops.includes("goto") || ops.includes("navigate")) return "url";
+  if (ops.some((op) => op === "markdown" || op === "read" || op === "snapshot")) return "read";
+  if (ops.some((op) => op === "click" || op === "type" || op === "press" || op === "fill"))
+    return "ui";
+  return undefined;
 }
 
 function settledRunState(manager: SessionManager): PiSessionEvent {

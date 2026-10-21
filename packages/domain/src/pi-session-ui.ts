@@ -77,6 +77,9 @@ export type PiSessionEvent =
       toolName: string;
       result: string;
       isError: boolean;
+      /** Which fast path the tool used, for the speed chip and the orb. */
+      path?: "recipe" | "site-api" | "data" | "url" | "read" | "ui";
+      durationMs?: number;
       parentToolCallId?: string;
     }
   | { kind: "run-state"; state: PiRunState }
