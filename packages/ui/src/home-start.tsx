@@ -13,6 +13,7 @@ import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { HomeRecentCards } from "./home-recent-cards.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
+import { ActionBarNote } from "./action-bar-note.js";
 import { PromptField } from "./prompt-field.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
@@ -45,7 +46,6 @@ export function HomeStart({
   active: readonly ChatCatalogItemDto[];
 }): ReactElement {
   const panelPage = usePanelPage();
-  const page = props.browserContext ?? panelPage.record;
   const [query, setQuery] = useState("");
   const files = useHomeAttachments(props.onReadAttachments);
   const selection = useHomeSelection(props.modelCatalog);
@@ -55,10 +55,11 @@ export function HomeStart({
   };
   return (
     <section className="home-start" aria-label="Ask Aeon">
+      <ActionBarNote />
       <ProjectChip name={props.projectName} projectId={props.projectId} />
       <PageContextTray
         chatId={props.chatId}
-        primary={page}
+        primary={props.browserContext ?? panelPage.record}
         onRemove={() => {
           panelPage.remove();
           props.onRemoveContext?.();

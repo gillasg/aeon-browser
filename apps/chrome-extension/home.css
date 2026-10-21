@@ -456,6 +456,32 @@
   margin: 0 auto;
   padding-top: clamp(150px, 24vh, 210px);
 }
+.action-bar-note {
+  display: flex;
+  width: min(100%, 760px);
+  align-items: center;
+  gap: var(--aeon-s-3);
+  margin: 0 auto var(--aeon-s-3);
+  padding: var(--aeon-s-3) var(--aeon-s-4);
+  border: 1px solid var(--aeon-swatch-3b3b3b);
+  border-radius: var(--aeon-r-lg);
+  background: var(--aeon-swatch-2d2d2d);
+  color: var(--aeon-swatch-d4d4cf);
+  font-size: var(--aeon-fs-sm);
+}
+.action-bar-note span {
+  flex: 1;
+}
+.action-bar-note button {
+  flex: none;
+  border: 0;
+  border-radius: var(--aeon-r-sm);
+  padding: 4px 10px;
+  background: var(--aeon-swatch-575753);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 .home-mark {
   width: 40px;
   height: 40px;
