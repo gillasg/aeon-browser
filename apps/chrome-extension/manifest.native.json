@@ -51,5 +51,26 @@
   },
   "sandbox": {
     "pages": ["code-sandbox.html"]
-  }
+  },
+  "commands": {
+    "summon-orb": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space"
+      },
+      "description": "Summon the Aeon orb"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["orb-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["orb.html"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
 }

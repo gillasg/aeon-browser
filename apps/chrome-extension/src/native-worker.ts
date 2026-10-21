@@ -10,6 +10,7 @@ import {
   readAgentTabView,
 } from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
+import { installOrb } from "./orb/orb-worker.js";
 import { handleSettingsMessage } from "./native-worker-settings.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
@@ -111,6 +112,7 @@ installBoosts(undefined, {
 });
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 installNativeBrowserContextMenus(() => ensureInventoryExecutor());
+installOrb();
 
 installNativeStartup(ensureExecutor, () => scheduleExecutorReconnect(ensureExecutor));
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>

@@ -1,0 +1,191 @@
+@font-face {
+  font-family: Geist;
+  src: url("geist-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+/* The bubble: dark glass beside the swarm (spec in orb-candidates.html, "Bubble"). */
+html,
+body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.bubble {
+  box-sizing: border-box;
+  width: 340px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: #16141f;
+  color: #eeeef4;
+  font:
+    13px/1.45 Geist,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  color: #9a96ad;
+}
+
+.bar b {
+  color: #ddd;
+}
+
+.compose textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: none;
+  border: 0;
+  outline: none;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  caret-color: #b9a6ff;
+}
+
+.compose textarea:focus {
+  box-shadow: 0 0 0 1px rgba(155, 140, 255, 0.45);
+}
+
+.hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 7px;
+  font-size: 11px;
+  color: #9a96ad;
+}
+
+.hint.warn span:first-child {
+  color: #ffd27a;
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: rgba(183, 169, 255, 0.14);
+  color: #cbbcff;
+}
+
+.asked {
+  color: #bdbac9;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  font-weight: 600;
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #8b87a0 0, #f2f0ff 40%, #8b87a0 80%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.3s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.meta {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: #9a96ad;
+}
+
+.meta:empty {
+  display: none;
+}
+
+.done {
+  color: #8ff5b8;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.failed {
+  color: #ffb3a8;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.answer {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+button {
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #e4e2ee;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+button:focus-visible {
+  outline: 2px solid #9b8cff;
+  outline-offset: 1px;
+}
+
+button.primary {
+  border-color: transparent;
+  background: #7c5cff;
+  color: #fff;
+  font-weight: 600;
+}
+
+button.primary:hover {
+  background: #8b6eff;
+}
+
+button.icon {
+  border: 0;
+  padding: 2px 6px;
+  color: #9a96ad;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    color: #e4e2ee;
+    background: none;
+  }
+}

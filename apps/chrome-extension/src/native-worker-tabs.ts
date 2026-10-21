@@ -23,21 +23,27 @@ export function isPageScopeAllowed(
   const url = getOwnSenderUrl(sender);
   if (
     !url ||
-    !["/home.html", "/sidepanel.html", "/chat.html", "/viewer.html"].includes(url.pathname)
+    !["/home.html", "/sidepanel.html", "/chat.html", "/viewer.html", "/orb.html"].includes(
+      url.pathname,
+    )
   )
     return false;
   if (url.pathname === "/viewer.html")
     return scope.kind === "chat" && url.searchParams.get("chatId") === scope.chatId;
   if (scope.kind === "management") return url.pathname === "/home.html";
+  // The orb starts a chat (catalog) and then follows that chat, so it may open either scope.
   return (
     scope.kind === "catalog" ||
+    url.pathname === "/orb.html" ||
     (url.pathname === "/chat.html" && url.searchParams.get("chatId") === scope.chatId)
   );
 }
 
 export function isOpenChatSender(sender: chrome.runtime.MessageSender): boolean {
   const url = getOwnSenderUrl(sender);
-  return !!url && ["/home.html", "/sidepanel.html", "/chat.html"].includes(url.pathname);
+  return (
+    !!url && ["/home.html", "/sidepanel.html", "/chat.html", "/orb.html"].includes(url.pathname)
+  );
 }
 
 export async function openNativeChat(
