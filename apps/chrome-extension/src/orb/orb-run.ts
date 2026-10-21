@@ -52,6 +52,8 @@ export interface OrbRun {
   actions: OrbAction[];
   answer: string;
   dialog?: { title: string; message: string | null };
+  /** The run stopped to ask the user something (approvals are for writes: pay, order, send). */
+  asked?: boolean;
   error?: string;
 }
 
@@ -107,6 +109,7 @@ const handlers: { [K in PiSessionEventDto["kind"]]?: Handler<K> } = {
     ...run,
     status: "needs",
     label: "Needs you",
+    asked: true,
     dialog: { title: event.request.title, message: event.request.message },
   }),
   "extension-ui-resolved": (run) => {

@@ -8,6 +8,7 @@ import {
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
+import type { RoutineDraftSeed } from "./routine-draft-route.js";
 
 type Routine = ManagementSnapshotDto["routines"][number];
 type ScheduleKind = "interval" | "calendar";
@@ -35,13 +36,16 @@ interface RoutineDraft {
 export function RoutineEditor({
   props,
   routine,
+  initial,
   onCancel,
 }: {
   props: ManagementSurfaceProps;
   routine?: Routine;
+  /** Prefill for a new routine (ignored when editing an existing one). */
+  initial?: RoutineDraftSeed;
   onCancel(): void;
 }): ReactElement {
-  const draft = useRoutineDraft(props, routine);
+  const draft = useRoutineDraft(props, routine, routine ? undefined : initial);
   const submit = (event: FormEvent): void => {
     event.preventDefault();
     perform(props, draft.chatId, routine ? "update_routine" : "create_routine", {
@@ -73,12 +77,17 @@ export function RoutineEditor({
   );
 }
 
-function useRoutineDraft(props: ManagementSurfaceProps, routine?: Routine): RoutineDraft {
-  const [title, setTitle] = useState(routine?.title ?? "");
-  const [chatId, setChatId] = useState(initialChatId(props, routine));
-  const [instruction, setInstruction] = useState(routine?.instruction ?? "");
+function useRoutineDraft(
+  props: ManagementSurfaceProps,
+  routine?: Routine,
+  initial?: RoutineDraftSeed,
+): RoutineDraft {
+  const start = startingValues(props, routine, initial);
+  const [title, setTitle] = useState(start.title);
+  const [chatId, setChatId] = useState(start.chatId);
+  const [instruction, setInstruction] = useState(start.instruction);
   const [kind, setKind] = useState<ScheduleKind>(initialScheduleKind(routine));
-  const [everyMinutes, setEveryMinutes] = useState(initialIntervalMinutes(routine?.schedule));
+  const [everyMinutes, setEveryMinutes] = useState(start.everyMinutes);
   const [daysOfWeek, setDaysOfWeek] = useState(initialDaysOfWeek(routine?.schedule));
   const [localTime, setLocalTime] = useState(initialLocalTime(routine?.schedule));
   const [timeZone, setTimeZone] = useState(initialTimeZone(routine?.schedule));
@@ -105,6 +114,24 @@ function useRoutineDraft(props: ManagementSurfaceProps, routine?: Routine): Rout
     browserInstanceId,
     setBrowserInstanceId,
   };
+}
+
+/** An existing routine wins; otherwise a prefilled draft (from the orb's Watch); otherwise blank. */
+function startingValues(
+  props: ManagementSurfaceProps,
+  routine?: Routine,
+  initial?: RoutineDraftSeed,
+): { title: string; chatId: string; instruction: string; everyMinutes: string } {
+  return {
+    title: routine?.title ?? initial?.title ?? "",
+    chatId: initial?.chatId ?? initialChatId(props, routine),
+    instruction: routine?.instruction ?? initial?.instruction ?? "",
+    everyMinutes: startingMinutes(routine, initial),
+  };
+}
+
+function startingMinutes(routine?: Routine, initial?: RoutineDraftSeed): string {
+  return initial ? String(initial.everyMinutes) : initialIntervalMinutes(routine?.schedule);
 }
 
 function initialChatId(props: ManagementSurfaceProps, routine?: Routine): string {

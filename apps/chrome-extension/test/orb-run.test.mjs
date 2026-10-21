@@ -178,3 +178,69 @@ test("an assistant error ends the run as an error", () => {
   assert.equal(run.status, "error");
   assert.equal(run.error, "No model");
 });
+
+async function loadWatch() {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-watch-"));
+  const outfile = join(directory, "orb-watch.mjs");
+  await build({
+    entryPoints: [fileURLToPath(new URL("../src/orb/orb-watch.ts", import.meta.url))],
+    outfile,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+  });
+  const module = await import(pathToFileURL(outfile).href);
+  await rm(directory, { recursive: true, force: true });
+  return module;
+}
+
+const watch = await loadWatch();
+const action = (kind) => ({ toolCallId: "a", kind, tStart: 0 });
+const read = (path = "site-api") => ({
+  ...orb.initialRun(),
+  status: "done",
+  answer: "$39.99",
+  steps: [{ toolCallId: "a", toolName: "site_api", label: "", startedAt: 0, done: true, path }],
+});
+
+test("watch: a read-only check with a stable read is created directly", () => {
+  assert.deepEqual(watch.watchPlan(read()), { kind: "direct" });
+  assert.deepEqual(watch.watchPlan({ ...read("data"), actions: [action("scroll")] }), {
+    kind: "direct",
+  });
+});
+
+test("watch: a read that clicked through the page opens the editor to confirm", () => {
+  assert.deepEqual(watch.watchPlan({ ...read(), actions: [action("click")] }), { kind: "editor" });
+});
+
+test("watch: writes and page-only reads cannot be watched, with a reason", () => {
+  for (const run of [
+    { ...read(), actions: [action("click"), action("fill")] },
+    { ...read(), asked: true },
+  ]) {
+    const plan = watch.watchPlan(run);
+    assert.equal(plan.kind, "none");
+    assert.match(plan.reason, /changes things/);
+  }
+  const plan = watch.watchPlan(read("ui"));
+  assert.equal(plan.kind, "none");
+  assert.match(plan.reason, /no stable read/);
+});
+
+test("watch: the routine is every 15 minutes and the editor URL carries the draft", () => {
+  const routine = watch.watchRoutine("Check the price of the Soundcore Q20");
+  assert.equal(routine.schedule.kind, "interval");
+  assert.equal(routine.schedule.everyMinutes, 15);
+  assert.match(routine.title, /^Watch: Check the price/);
+  assert.match(routine.instruction, /report only what changed/);
+  const url = new URL(watch.routineEditorUrl("chrome-extension://x/home.html", "chat-1", routine));
+  assert.equal(url.searchParams.get("view"), "routines");
+  assert.equal(url.searchParams.get("chatId"), "chat-1");
+  assert.deepEqual(JSON.parse(url.searchParams.get("routineDraft")), {
+    chatId: "chat-1",
+    title: routine.title,
+    instruction: routine.instruction,
+    everyMinutes: 15,
+  });
+});

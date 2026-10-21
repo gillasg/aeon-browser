@@ -11,16 +11,23 @@ import {
 } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
 import { renderView, type OrbViewModel } from "./orb-view.js";
+import { WATCH_EVERY_MINUTES, routineEditorUrl, watchPlan, watchRoutine } from "./orb-watch.js";
 
 // orb.html: the bubble. Framed by the content script; talks to the daemon and drives the overlay.
 
 const params = new URLSearchParams(location.search);
 const tabId = Number(params.get("tabId"));
 const root = document.getElementById("root") as HTMLElement;
-const model: OrbViewModel = { host: "", prompt: "", run: undefined, notice: "", busy: false };
+const model: OrbViewModel = {
+  host: "",
+  prompt: "",
+  run: undefined,
+  notice: "",
+  busy: false,
+  watch: { state: "idle", note: "" },
+};
 let lastVisual = "";
 let sentActions = 0;
-let replaying = false;
 
 const session = new OrbSession(tabId, {
   event: (event) => onEvent(event),
@@ -57,6 +64,7 @@ async function submit(text: string): Promise<void> {
   model.prompt = text;
   model.busy = true;
   model.run = initialRun();
+  model.watch = { state: "idle", note: "" };
   sentActions = 0;
   sync();
   try {
@@ -85,7 +93,7 @@ function onEvent(event: PiSessionEventDto, update = true): void {
 /** Pushes the run to the overlay (swarm state, cursor, spotlight) and redraws the bubble. */
 function sync(): void {
   const run = model.run;
-  if (run && !replaying) {
+  if (run) {
     visual(visualState(run), run.label);
     sendNewActions(run.actions);
     if (run.status === "needs")
@@ -112,23 +120,41 @@ function visual(state: OrbVisualState, label: string): void {
   toContent({ kind: "aeon.orb.visual", state, label });
 }
 
-/** Watch: replays this run's recorded actions on the page; otherwise opens the full chat. */
-function watch(): void {
-  const steps = cursorSteps(model.run?.actions ?? [], tabId);
-  if (!steps.length) return openChat();
-  replaying = true;
-  visual("working", "Replaying");
-  toContent({ kind: "aeon.orb.cursor", steps });
-  const total = steps.reduce((sum, step) => sum + step.delayMs + 650, 400);
-  setTimeout(() => {
-    replaying = false;
-    visual("done", "Done");
-  }, total);
+/**
+ * Watch: makes this task a routine every 15 minutes. A read-only check is saved directly;
+ * anything that clicked through the page opens the routine editor, prefilled, to confirm.
+ */
+async function watch(): Promise<void> {
+  const plan = model.run ? watchPlan(model.run) : undefined;
+  if (!plan || plan.kind === "none" || !session.chatId || !model.prompt) return;
+  const routine = watchRoutine(model.prompt);
+  if (plan.kind === "editor") {
+    const url = routineEditorUrl(chrome.runtime.getURL("home.html"), session.chatId, routine);
+    await chrome.tabs.create({ url, openerTabId: tabId });
+    setWatch("idle", "Review the routine in the new tab and save it to start watching.");
+    return;
+  }
+  setWatch("saving", "Saving the watcher…");
+  try {
+    await session.createRoutine({ ...routine });
+    setWatch(
+      "saved",
+      `Checking every ${WATCH_EVERY_MINUTES} minutes. You'll get a notification when it changes.`,
+    );
+  } catch (error) {
+    setWatch("idle", "Couldn't save the watcher · " + messageOf(error));
+  }
+}
+
+function setWatch(state: OrbViewModel["watch"]["state"], note: string): void {
+  model.watch = { state, note };
+  render();
 }
 
 async function again(): Promise<void> {
   if (!model.prompt) return;
   model.run = initialRun();
+  model.watch = { state: "idle", note: "" };
   sentActions = 0;
   sync();
   await session.again(model.prompt).catch((error: unknown) => {
@@ -149,7 +175,7 @@ function render(): void {
     close: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
     stop: () => void session.stop().catch(() => undefined),
     again: () => void again(),
-    watch,
+    watch: () => void watch(),
     openChat,
   });
   const next = document.getElementById("prompt") as HTMLTextAreaElement | null;

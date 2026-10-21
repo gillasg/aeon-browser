@@ -78,6 +78,16 @@ export class OrbSession {
       await command(this.chat, { operation: "chat.stop", payload: { chatId: this.chatId } });
   }
 
+  /** Creates a routine in this chat through the routines system (the chat grant covers its own chat). */
+  async createRoutine(routine: Record<string, unknown>): Promise<void> {
+    if (!this.chat || !this.chatId) throw new Error("This run has no chat to watch from.");
+    const result = await command(this.chat, {
+      operation: "management.action",
+      payload: { chatId: this.chatId, action: "create_routine", input: routine },
+    });
+    if (result.kind !== "management.snapshot") throw new Error("The routine was not saved.");
+  }
+
   close(): void {
     this.catalog?.close();
     this.chat?.close();

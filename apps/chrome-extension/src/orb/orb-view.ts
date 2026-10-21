@@ -1,4 +1,5 @@
 import { summarize, type OrbRun } from "./orb-run.js";
+import { watchPlan } from "./orb-watch.js";
 
 // Renders the bubble from plain state. No framework: the bubble is small and loads in every
 // page it's summoned on.
@@ -9,6 +10,8 @@ export interface OrbViewModel {
   run: OrbRun | undefined;
   notice: string;
   busy: boolean;
+  /** Watch progress for the finished run: saving, saved (a routine exists) or a note. */
+  watch: { state: "idle" | "saving" | "saved"; note: string };
 }
 
 export interface OrbViewActions {
@@ -93,18 +96,27 @@ function needs(run: OrbRun, actions: OrbViewActions): HTMLElement {
 
 function card(model: OrbViewModel, actions: OrbViewActions): HTMLElement {
   const run = model.run as OrbRun;
+  const plan = watchPlan(run);
   const box = element("div", "card");
+  const buttons = [button("Run again", "primary", actions.again)];
+  if (plan.kind !== "none") buttons.push(watchButton(model, actions));
+  buttons.push(button("Open chat", "ghost", actions.openChat));
   box.append(
     element("div", "done", "✓ Done"),
     element("div", "answer", run.answer || "Finished."),
     element("div", "meta", summarize(run)),
-    row(
-      button("Run again", "primary", actions.again),
-      button("Watch", "ghost", actions.watch),
-      button("Open chat", "ghost", actions.openChat),
-    ),
+    row(...buttons),
+    element("div", "why", plan.kind === "none" ? plan.reason : model.watch.note),
   );
   return box;
+}
+
+function watchButton(model: OrbViewModel, actions: OrbViewActions): HTMLButtonElement {
+  const saved = model.watch.state === "saved";
+  const node = button(saved ? "Watching ✓" : "Watch", "ghost", actions.watch);
+  node.disabled = saved || model.watch.state === "saving";
+  node.title = "Check this again every 15 minutes and tell me when it changes";
+  return node;
 }
 
 function failure(message: string, actions: OrbViewActions): HTMLElement {

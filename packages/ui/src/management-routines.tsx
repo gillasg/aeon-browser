@@ -1,8 +1,9 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutineEditor } from "./management-routine-editor.js";
+import { forgetRoutineDraft, readRoutineDraft } from "./routine-draft-route.js";
 
 type Routine = ManagementSnapshotDto["routines"][number];
 type Filter = "all" | "active" | "paused";
@@ -11,11 +12,24 @@ export function RoutinesPanel(props: ManagementSurfaceProps): ReactElement {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState("");
-  const [creating, setCreating] = useState(false);
+  // A draft in the URL (from the orb's Watch) opens the editor prefilled.
+  const [seed, setSeed] = useState(() => readRoutineDraft());
+  const [creating, setCreating] = useState(Boolean(seed));
+  useEffect(forgetRoutineDraft, []);
   const routines = props.snapshot?.routines ?? [];
   const selected = routines.find((item) => item.routineId === selectedId);
   const visible = filterRoutines(routines, filter, query);
-  if (creating) return <RoutineEditor props={props} onCancel={() => setCreating(false)} />;
+  if (creating)
+    return (
+      <RoutineEditor
+        props={props}
+        {...(seed ? { initial: seed } : {})}
+        onCancel={() => {
+          setCreating(false);
+          setSeed(undefined);
+        }}
+      />
+    );
   if (selected)
     return <RoutineDetail props={props} routine={selected} onBack={() => setSelectedId("")} />;
   return (
