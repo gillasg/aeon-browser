@@ -21,6 +21,7 @@ const source = [
   "NativeMessagingHost.cs",
   "DaemonSupervisor.cs",
   "DaemonOutputReader.cs",
+  "SupervisorStatus.cs",
   "SupervisorLog.cs",
   "SupervisorPipe.cs",
 ];

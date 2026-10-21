@@ -58,14 +58,21 @@ async function runManagedDaemon(): Promise<void> {
   )
     throw new Error("Managed daemon configuration is invalid.");
 
+  // The supervisor replaces a daemon stuck inside one phase, so a cold start that keeps
+  // moving is never mistaken for a hang.
+  const phase = (name: string) => writeReply(`AEON_DAEMON_PHASE ${name}\n`);
+  phase("lock");
   const unlock = await acquireCoreLock(dataDirectory);
   let runtime: ReturnType<typeof createProductionRuntime> | undefined;
   let transport: Awaited<ReturnType<typeof startNativeTransport>> | undefined;
   let coreTransport: Awaited<ReturnType<typeof startCoreTransport>> | undefined;
   let input: ReturnType<typeof createInterface> | undefined;
   try {
+    phase("runtime");
     runtime = createProductionRuntime(dataDirectory);
+    phase("initialize");
     await runtime.ready;
+    phase("native");
     transport = await startNativeTransport(
       runtime.service,
       extensionOrigin,
@@ -73,6 +80,7 @@ async function runManagedDaemon(): Promise<void> {
       runtime.threadCoordination,
       runtime.attention,
     );
+    phase("core");
     coreTransport = await startCoreTransport(
       dataDirectory,
       runtime.service,
@@ -80,6 +88,7 @@ async function runManagedDaemon(): Promise<void> {
       runtime.threadCoordination,
       runtime.attention,
     );
+    phase("ready");
     writeReply("AEON_DAEMON_READY\n");
     input = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of input) {

@@ -12,7 +12,7 @@ internal static class SupervisorPipe
         try
         {
             if (pending.Wait(TimeSpan.FromSeconds(5))) return pending.Result;
-            pipe.Dispose();
+            // The caller disconnects the pipe, which also ends the pending read.
             pending.ContinueWith(task => { var ignored = task.Exception; },
                 TaskContinuationOptions.OnlyOnFaulted);
             throw new IOException("Bootstrap client did not finish its request.");

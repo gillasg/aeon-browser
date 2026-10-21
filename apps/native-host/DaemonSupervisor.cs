@@ -14,7 +14,10 @@ using System.Web.Script.Serialization;
 internal static class DaemonSupervisor
 {
     private const int MaxMessageBytes = 16384;
-    private static NamedPipeServerStream activePipe;
+    /// <summary>One startup phase may stall this long before the daemon is replaced.</summary>
+    private const int PhaseTimeoutSeconds = 90;
+
+    private enum Outcome { Stopped, Crashed, NeverStarted }
 
     public static int Run()
     {
@@ -25,10 +28,23 @@ internal static class DaemonSupervisor
         bool created;
         using (var mutex = CreateUserMutex(out created))
         {
-            try { if (!mutex.WaitOne(0)) return 0; }
+            try
+            {
+                if (!mutex.WaitOne(0))
+                {
+                    SupervisorLog.Write("Another supervisor already owns the daemon.");
+                    return 0;
+                }
+            }
             catch (AbandonedMutexException) { /* This thread owns the recovered mutex. */ }
-            while (RunLocked(config) != 0) Thread.Sleep(500);
-            return 0;
+            SupervisorStatus.Initialize();
+            SupervisorLog.Write("Supervisor started, process " + Process.GetCurrentProcess().Id);
+            try { return RestartForever(config); }
+            finally
+            {
+                SupervisorStatus.Clear();
+                SupervisorLog.Write("Supervisor stopped.");
+            }
         }
     }
 
@@ -40,7 +56,15 @@ internal static class DaemonSupervisor
             {
                 pipe.Connect(1500);
                 NativeMessagingHost.WriteFrame(pipe, Encoding.UTF8.GetBytes("{\"kind\":\"supervisor.stop\"}"));
-                NativeMessagingHost.ReadFrame(pipe);
+                // A wedged supervisor never answers, so a stop request must not wait for it.
+                var pending = Task.Run(() => NativeMessagingHost.ReadFrame(pipe));
+                if (!pending.Wait(TimeSpan.FromSeconds(3)))
+                {
+                    pending.ContinueWith(task => { var ignored = task.Exception; },
+                        TaskContinuationOptions.OnlyOnFaulted);
+                    pipe.Dispose();
+                    return 1;
+                }
             }
             return 0;
         }
@@ -57,35 +81,98 @@ internal static class DaemonSupervisor
         }
     }
 
-    private static int RunLocked(HostConfiguration config)
+    /// <summary>
+    /// The daemon is one restartable child, so this loop never exits on its own: a daemon that
+    /// crashes after serving gets an immediate restart, and one that never starts backs off.
+    /// </summary>
+    private static int RestartForever(HostConfiguration config)
+    {
+        var failures = 0;
+        while (true)
+        {
+            var outcome = RunLocked(config);
+            if (outcome == Outcome.Stopped) return 0;
+            failures = outcome == Outcome.Crashed ? 0 : failures + 1;
+            var delay = failures == 0
+                ? 1000
+                : (int)Math.Min(30000, 500 * (1 << Math.Min(failures, 6)));
+            SupervisorLog.Write("Daemon restart in " + delay + "ms.");
+            Thread.Sleep(delay);
+        }
+    }
+
+    private static Outcome RunLocked(HostConfiguration config)
     {
         Process daemon = null;
         IntPtr job = IntPtr.Zero;
         try
         {
             job = CreateKillOnCloseJob();
+            SupervisorStatus.SetPhase("spawn");
             daemon = StartDaemon(config);
             if (!AssignProcessToJobObject(job, daemon.Handle))
                 throw new InvalidOperationException("Unable to bind the daemon to its supervisor lifetime.");
             daemon.ErrorDataReceived += (sender, eventArgs) => SupervisorLog.Write(eventArgs.Data);
             daemon.BeginErrorReadLine();
-            var ready = daemon.StandardOutput.ReadLineAsync();
-            if (!ready.Wait(TimeSpan.FromSeconds(60)) || ready.Result != "AEON_DAEMON_READY")
-                throw new TimeoutException("Daemon startup did not complete.");
+            WaitForDaemonReady(daemon);
+            SupervisorStatus.SetReady(daemon.Id);
             SupervisorLog.Write("Daemon ready, process " + daemon.Id);
-            return ServePipe(config, daemon);
+            return ServePipe(config, daemon) == 0 ? Outcome.Stopped : Outcome.Crashed;
         }
-        catch (Exception error) { SupervisorLog.Write("Daemon restarting: " + error.Message); return 1; }
+        catch (Exception error)
+        {
+            SupervisorLog.Write("Daemon restarting: " + error);
+            return Outcome.NeverStarted;
+        }
         finally
         {
-            if (activePipe != null) activePipe.Dispose();
             if (daemon != null && !daemon.HasExited)
             {
                 try { daemon.Kill(); }
                 catch { }
+                // Give the job time to reclaim anything the daemon spawned before it is closed.
+                try { daemon.WaitForExit(5000); }
+                catch { }
             }
             if (job != IntPtr.Zero) CloseHandle(job);
             if (daemon != null) daemon.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Readiness is judged per phase: a slow cold start that keeps moving is never killed,
+    /// while one stuck inside a single phase is replaced.
+    /// </summary>
+    private static void WaitForDaemonReady(Process daemon)
+    {
+        var phase = "spawn";
+        var deadline = DateTime.UtcNow.AddSeconds(PhaseTimeoutSeconds);
+        var pending = daemon.StandardOutput.ReadLineAsync();
+        while (true)
+        {
+            if (pending.Wait(250))
+            {
+                var line = pending.Result;
+                if (line == null)
+                    throw new InvalidOperationException(
+                        "Daemon output closed during " + phase + ", code " + ExitCodeOf(daemon) + ".");
+                if (line == "AEON_DAEMON_READY") return;
+                var marker = PhaseOf(line);
+                if (marker != null)
+                {
+                    phase = marker;
+                    deadline = DateTime.UtcNow.AddSeconds(PhaseTimeoutSeconds);
+                    SupervisorStatus.SetPhase(phase);
+                    SupervisorLog.Write("Daemon phase " + phase);
+                }
+                pending = daemon.StandardOutput.ReadLineAsync();
+                continue;
+            }
+            if (daemon.HasExited)
+                throw new InvalidOperationException(
+                    "Daemon exited during " + phase + ", code " + ExitCodeOf(daemon) + ".");
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException("Daemon startup stalled during " + phase + ".");
         }
     }
 
@@ -95,41 +182,73 @@ internal static class DaemonSupervisor
         {
             try { daemon.WaitForExit(); }
             catch { }
-            SupervisorLog.Write("Daemon exited, code " + daemon.ExitCode);
-            var pipe = activePipe;
-            if (pipe != null) pipe.Dispose();
+            SupervisorLog.Write("Daemon exited, code " + ExitCodeOf(daemon));
+            SupervisorStatus.SetRestarting("daemon-exited");
         });
 
-        while (!daemon.HasExited)
+        // One server pipe per daemon lifetime: a pending accept is cancelled rather than
+        // disposed, because a disposed pipe with a pending accept keeps its name reserved.
+        using (var pipe = CreateServerPipe())
         {
-            try
+            while (!daemon.HasExited)
             {
-                using (var pipe = CreateServerPipe())
+                if (!WaitForClient(pipe, daemon)) break;
+                var restartRequired = false;
+                try
                 {
-                    activePipe = pipe;
-                    pipe.WaitForConnection();
-                    if (daemon.HasExited) break;
                     var request = SupervisorPipe.ReadRequest(pipe);
-                    if (request == null) continue;
-                    if (IsStopRequest(request))
+                    if (request != null)
                     {
-                        NativeMessagingHost.WriteFrame(pipe, Encoding.UTF8.GetBytes("{\"kind\":\"supervisor.stopped\"}"));
-                        daemon.StandardInput.WriteLine("shutdown");
-                        daemon.StandardInput.Flush();
-                        if (!daemon.WaitForExit(5000)) daemon.Kill();
-                        return 0;
+                        if (IsStopRequest(request))
+                        {
+                            NativeMessagingHost.WriteFrame(pipe, Encoding.UTF8.GetBytes("{\"kind\":\"supervisor.stopped\"}"));
+                            daemon.StandardInput.WriteLine("shutdown");
+                            daemon.StandardInput.Flush();
+                            if (!daemon.WaitForExit(5000)) daemon.Kill();
+                            return 0;
+                        }
+                        var response = ForwardToDaemon(config, daemon, request, out restartRequired);
+                        NativeMessagingHost.WriteFrame(pipe, response);
                     }
-                    bool restartRequired;
-                    var response = ForwardToDaemon(config, daemon, request, out restartRequired);
-                    NativeMessagingHost.WriteFrame(pipe, response);
-                    if (restartRequired) return 1;
                 }
+                catch (IOException) { if (daemon.HasExited) break; }
+                finally
+                {
+                    try { pipe.Disconnect(); }
+                    catch { }
+                }
+                if (restartRequired) return 1;
             }
-            catch (ObjectDisposedException) { if (daemon.HasExited) break; }
-            catch (IOException) { if (daemon.HasExited) break; }
-            finally { activePipe = null; }
         }
         return 1;
+    }
+
+    /// <summary>
+    /// A cancelled accept keeps its handle and name; a disposed one does not. That distinction
+    /// is what lets the supervisor survive a dead daemon and serve the next one.
+    /// </summary>
+    private static bool WaitForClient(NamedPipeServerStream pipe, Process daemon)
+    {
+        while (!daemon.HasExited)
+        {
+            using (var cancellation = new CancellationTokenSource())
+            {
+                Task waiting;
+                try { waiting = pipe.WaitForConnectionAsync(cancellation.Token); }
+                catch (Exception) { return false; }
+                while (!waiting.Wait(500))
+                {
+                    if (!daemon.HasExited) continue;
+                    cancellation.Cancel();
+                    try { waiting.Wait(TimeSpan.FromSeconds(5)); }
+                    catch { }
+                    return false;
+                }
+                try { waiting.Wait(); return true; }
+                catch (AggregateException) { if (daemon.HasExited) return false; }
+            }
+        }
+        return false;
     }
 
     private static byte[] ForwardToDaemon(
@@ -153,10 +272,8 @@ internal static class DaemonSupervisor
         {
             daemon.StandardInput.WriteLine(Convert.ToBase64String(envelopeBytes));
             daemon.StandardInput.Flush();
-            var pending = daemon.StandardOutput.ReadLineAsync();
-            string line;
-            if (!DaemonOutputReader.TryReadLine(
-                pending, TimeSpan.FromSeconds(15), () => PoisonDaemon(daemon), out line))
+            var line = ReadDaemonReply(daemon);
+            if (line == null)
             {
                 restartRequired = true;
                 return Failure("DAEMON_OFFLINE", true);
@@ -176,6 +293,35 @@ internal static class DaemonSupervisor
             restartRequired = true;
             return Failure("BOOTSTRAP_UNAVAILABLE", true);
         }
+    }
+
+    /// <summary>One reply line, skipping any progress marker the daemon still has in flight.</summary>
+    private static string ReadDaemonReply(Process daemon)
+    {
+        var pending = daemon.StandardOutput.ReadLineAsync();
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            string line;
+            if (!DaemonOutputReader.TryReadLine(
+                pending, TimeSpan.FromSeconds(15), () => PoisonDaemon(daemon), out line))
+                return null;
+            if (PhaseOf(line) == null) return line;
+            pending = daemon.StandardOutput.ReadLineAsync();
+        }
+        return null;
+    }
+
+    private static string PhaseOf(string line)
+    {
+        const string marker = "AEON_DAEMON_PHASE ";
+        if (line == null || !line.StartsWith(marker, StringComparison.Ordinal)) return null;
+        return line.Substring(marker.Length).Trim();
+    }
+
+    private static string ExitCodeOf(Process daemon)
+    {
+        try { return daemon.HasExited ? daemon.ExitCode.ToString() : "running"; }
+        catch { return "unknown"; }
     }
 
     private static void PoisonDaemon(Process daemon)

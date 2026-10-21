@@ -34,16 +34,22 @@ $definition.Settings.Hidden = $true
 $definition.Settings.DisallowStartIfOnBatteries = $false
 $definition.Settings.StopIfGoingOnBatteries = $false
 $definition.Settings.StartWhenAvailable = $true
-$definition.Settings.ExecutionTimeLimit = 'PT0S'
+$definition.Settings.ExecutionTimeLimit = 'PT5M'
 $definition.Settings.MultipleInstances = 2
 $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 $definition.Principal.UserId = $userId
 $definition.Principal.LogonType = 3
-$trigger = $definition.Triggers.Create(9)
-$trigger.UserId = $userId
-# Starting at logon only gives the daemon a head start. Recovery does not depend on it: the
-# supervisor restarts a daemon that exits, and the native host starts the supervisor whenever
-# Chrome connects and finds none.
+# The launcher is idempotent, so a logon run plus a minute-by-minute time trigger keep one
+# daemon alive: a supervisor that dies or wedges is replaced instead of staying down until the
+# next logon. The repetition belongs to the time trigger because a logon trigger only starts
+# repeating once it has fired.
+$logon = $definition.Triggers.Create(9)
+$logon.UserId = $userId
+$watchdog = $definition.Triggers.Create(1)
+$watchdog.StartBoundary = (Get-Date).AddMinutes(-1).ToString('yyyy-MM-ddTHH:mm:sszzz')
+$watchdog.Repetition.Interval = 'PT1M'
+$watchdog.Repetition.Duration = ''
+$watchdog.Repetition.StopAtDurationEnd = $false
 $action = $definition.Actions.Create(0)
 $action.Path = $hostPath
 $action.Arguments = $arguments
