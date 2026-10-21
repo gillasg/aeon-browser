@@ -18,7 +18,6 @@ import {
   type ModelLike,
 } from "@browser-use-extension/tools/site-to-api";
 import { inChat } from "./site-browser.js";
-import { repairSoon } from "./site-mapping.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
 // site_api: sites mapped with site-to-api become APIs the agent calls directly, with the user's
@@ -60,7 +59,7 @@ type Input = Static<typeof Parameters>;
 
 const GUIDELINES = [
   "site_api calls the APIs of sites mapped from the user's own browsing: one call replaces many page actions and returns clean JSON. Check `sites` before working on a site you may have mapped; if it is there, use `operations` then `call` instead of browser_code.",
-  "Calls run with the user's logins (through the site's own page when the API needs it), so treat writes (role action) like clicking the button: only when the user asked for that action.",
+  "site_api reads only. Any operation whose role is action (a write) is refused; do those through the page UI with browser_code.",
   "To map a site you will use again (prices, orders, listings, a dashboard): in one browser_code call: open the site, `await page.network.start({ types: 'all' })`, do something that loads new data (a fresh search, a filter, the next page; repeating what is already on screen loads nothing), then `await page.network.save('<site>.har')`. Then site_api learn with the site and files ['<site>.har'] returns the operations and how to call them. More captures of other features make the API more complete.",
   "watch: like call, but returns only the items that are new or changed since the last watch of the same operation and params (new listings, price drops, new messages); the first watch returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
   "explore maps sites by name (sites: ['a.com', 'https://b.com/search']) without you driving them: an agent uses each one in a background tab, looking only, while its traffic is recorded, then builds the API. Several sites run at once; goal adds things to do, e.g. 'open the cart'. Use it when you will call a site again later and it is not in sites yet.",
@@ -75,7 +74,7 @@ function requireSite(input: Input): string {
 }
 
 const HOW_TO_CALL =
-  "Pass params flat: path and query parameters and top-level body fields by name, for example {query: 'shoes', page: 2}. Anything left out keeps the value recorded from the site. Use body: {...} to merge deeper body fields.";
+  "Pass params flat: path and query parameters and top-level body fields by name, for example {query: 'shoes', page: 2}. Every required parameter must be passed; nothing is filled from the recording. Use body: {...} to pass deeper body fields.";
 
 type SiteOperation = NonNullable<Awaited<ReturnType<typeof loadModel>>>["operations"][number];
 
@@ -126,13 +125,8 @@ async function call(input: Input, workspace: string | undefined): Promise<ToolTe
   const site = requireSite(input);
   if (!input.operation) throw new Error("Give the operation id (see the operations action)");
   const api = await siteApi(site, { transport: input.transport ?? "auto" });
-  try {
-    const value = await api.call(input.operation, (input.params ?? {}) as never);
-    return boundedResult(value, workspace, "site-api", `${site}-${input.operation}`);
-  } catch (error) {
-    repairSoon(site, input.operation, error);
-    throw error;
-  }
+  const value = await api.call(input.operation, (input.params ?? {}) as never);
+  return boundedResult(value, workspace, "site-api", `${site}-${input.operation}`);
 }
 
 async function learn(input: Input, workspace: string | undefined): Promise<unknown> {

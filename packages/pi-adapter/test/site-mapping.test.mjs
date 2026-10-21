@@ -10,7 +10,7 @@ import {
   visitedUrls,
 } from "../dist/site-mapping.js";
 
-test("background mapping notes the sites chats use, skipping search and sign-in pages", async (t) => {
+test("background mapping is off: visits are not recorded and no model is asked", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "aeon-mapping-"));
   const home = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = join(root, "registry");
@@ -34,14 +34,8 @@ test("background mapping notes the sites chats use, skipping search and sign-in 
   assert.equal(urls.length, 4);
   noteVisits("chat-1", urls);
   noteVisits("chat-1", urls);
-  await mappingSettled();
-  const state = JSON.parse(await readFile(file, "utf8"));
-  assert.deepEqual(Object.keys(state.hosts), ["shop.example"]);
-  assert.deepEqual(state.hosts["shop.example"].chats, ["chat-1"]);
-  assert.equal(modelAsked, false, "one chat is not enough to map a site");
-
   noteVisits("chat-2", ["https://shop.example/"]);
   await mappingSettled();
-  await new Promise((done) => setTimeout(done, 200));
-  assert.equal(modelAsked, true, "a site used in two chats is mapped in the background");
+  await assert.rejects(() => readFile(file, "utf8"), /ENOENT/);
+  assert.equal(modelAsked, false, "no background model runs");
 });
