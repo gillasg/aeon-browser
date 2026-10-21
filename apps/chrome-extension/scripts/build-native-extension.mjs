@@ -12,7 +12,13 @@ await buildOrb();
 
 // The orb: a content script that draws over pages, and orb.html, the bubble it frames.
 async function buildOrb() {
-  const shared = { bundle: true, platform: "browser", format: "iife", target: "chrome116" };
+  const shared = {
+    bundle: true,
+    platform: "browser",
+    format: "iife",
+    target: "chrome116",
+    jsx: "automatic",
+  };
   await Promise.all([
     build({
       ...shared,

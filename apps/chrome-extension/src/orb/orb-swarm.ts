@@ -28,6 +28,7 @@ const COLORS: Record<OrbVisualState, [string, string]> = {
   needs: ["#ffd27a", "#ff8a00"],
   done: ["#8ff5b8", "#0fae5c"],
   error: ["#ffb3a8", "#d2412f"],
+  paused: ["#c9c4dc", "#5b5770"],
 };
 const RADIUS: Record<OrbVisualState, number> = {
   listening: 22,
@@ -36,6 +37,7 @@ const RADIUS: Record<OrbVisualState, number> = {
   needs: 21,
   done: 16,
   error: 17,
+  paused: 15,
 };
 const SPEED: Record<OrbVisualState, number> = {
   listening: 0.9,
@@ -44,6 +46,7 @@ const SPEED: Record<OrbVisualState, number> = {
   needs: 1,
   done: 0.25,
   error: 0.3,
+  paused: 0.2,
 };
 const SPARK_MS = 520;
 
@@ -56,7 +59,7 @@ export class Swarm {
 
   constructor(
     private readonly context: CanvasRenderingContext2D,
-    private readonly reducedMotion: boolean,
+    public reducedMotion: boolean,
     count = 80,
   ) {
     this.particles = Array.from({ length: count }, () => ({

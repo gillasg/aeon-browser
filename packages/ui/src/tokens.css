@@ -59,6 +59,8 @@
   --aeon-danger-soft: #e3b2a9;
   --aeon-danger-bg: #4a3030;
   --aeon-warm: #b8975f;
+  /* Needs you: the one status colour Aeon's own pages add. */
+  --aeon-needs: #c9a46a;
   --aeon-diff-add: #258647;
   --aeon-diff-del: #bd3344;
   --aeon-diff-add-fg: #3fcf8e;
@@ -121,6 +123,7 @@
   --aeon-danger: light-dark(#a8463f, #bd716b);
   --aeon-danger-soft: light-dark(#8f3a33, #e3b2a9);
   --aeon-danger-bg: light-dark(#f6dedb, #4a3030);
+  --aeon-needs: light-dark(#8a6526, #c9a46a);
   --aeon-diff-add-fg: light-dark(#17803f, #3fcf8e);
   --aeon-diff-del-fg: light-dark(#c0283f, #ff5a78);
   --aeon-shadow-sm: light-dark(#0000001a, #00000033);

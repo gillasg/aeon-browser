@@ -1,7 +1,9 @@
+import { isNeedsKey } from "./orb-control.js";
 import { ORB_COMMAND, nonceKey, type OrbToggle, type OrbVerify } from "./orb-messages.js";
 
 // The shortcut lives in the service worker. Pages Chrome keeps extensions out of
-// (chrome://, the Web Store, the PDF viewer) get the side panel instead.
+// (chrome://, the Web Store, the PDF viewer) get the side panel instead. The worker also keeps
+// the toolbar badge: how many runs need the user, else how many finished results are unread.
 
 export function installOrb(): void {
   chrome.commands.onCommand.addListener((command, tab) => {
@@ -12,6 +14,30 @@ export function installOrb(): void {
     if (message?.kind !== "aeon.orb.verify" || sender.id !== chrome.runtime.id) return;
     void verify(message, sender).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
+  });
+  chrome.storage.session.onChanged.addListener((changes) => {
+    if (Object.keys(changes).some((key) => isNeedsKey(key) || key.startsWith(UNREAD_PREFIX)))
+      void updateBadge();
+  });
+  void updateBadge();
+}
+
+const UNREAD_PREFIX = "piper-unread-";
+
+async function updateBadge(): Promise<void> {
+  const values = await chrome.storage.session.get(null);
+  const keys = Object.keys(values);
+  const needs = keys.filter(isNeedsKey).length;
+  const unread = keys.filter((key) => key.startsWith(UNREAD_PREFIX)).length;
+  const count = needs || unread;
+  await chrome.action.setBadgeText({ text: count ? String(Math.min(count, 99)) : "" });
+  await chrome.action.setBadgeBackgroundColor({ color: needs ? "#c9a46a" : "#3f3f46" });
+  await chrome.action.setTitle({
+    title: needs
+      ? `Aeon · ${needs} need${needs === 1 ? "s" : ""} you`
+      : unread
+        ? `Aeon · ${unread} new result${unread === 1 ? "" : "s"}`
+        : "Open Aeon Chat",
   });
 }
 

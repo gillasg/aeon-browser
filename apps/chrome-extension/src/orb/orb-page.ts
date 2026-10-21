@@ -1,5 +1,9 @@
+import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
+import { ORB_REDUCE_MOTION_KEY, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
+import { logWrites } from "./orb-activity.js";
+import { TabControl, isNeedsKey, markSeen, needsCount, setNeeds } from "./orb-control.js";
 import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
 import {
   applyEvent,
@@ -10,13 +14,15 @@ import {
   type OrbRun,
 } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
-import { renderView, type OrbViewModel } from "./orb-view.js";
+import { playSound } from "./orb-sounds.js";
+import { Island, islandState, type IslandState, type OrbViewModel } from "./orb-view.js";
 import { WATCH_EVERY_MINUTES, routineEditorUrl, watchPlan, watchRoutine } from "./orb-watch.js";
 
-// orb.html: the bubble. Framed by the content script; talks to the daemon and drives the overlay.
+// orb.html: the island. Framed by the content script; talks to the daemon and drives the overlay.
 
 const params = new URLSearchParams(location.search);
 const tabId = Number(params.get("tabId"));
+const viewId = crypto.randomUUID();
 const root = document.getElementById("root") as HTMLElement;
 const model: OrbViewModel = {
   host: "",
@@ -25,9 +31,15 @@ const model: OrbViewModel = {
   notice: "",
   busy: false,
   watch: { state: "idle", note: "" },
+  paused: false,
+  expanded: false,
+  needsCount: 0,
 };
+const tab = new TabControl(tabId);
 let lastVisual = "";
+let lastState: IslandState = "compose";
 let sentActions = 0;
+let update: ((next: ReactNode) => void) | undefined;
 
 const session = new OrbSession(tabId, {
   event: (event) => onEvent(event),
@@ -48,33 +60,56 @@ async function boot(): Promise<void> {
   document.body.hidden = false;
   model.host = await tabHost();
   render();
-  new ResizeObserver(() => reportSize()).observe(root);
-  addEventListener("keydown", (event) => {
-    if (event.key === "Escape") toContent({ kind: "aeon.orb.hide", keepRunning: true });
-  });
-  chrome.runtime.onMessage.addListener((message: { kind?: string; tabId?: number }) => {
-    if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) focusPrompt();
-  });
+  listen();
+  sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
   focusPrompt();
   await session.connect().catch((error: unknown) => notice(messageOf(error)));
 }
 
+function listen(): void {
+  new ResizeObserver(() => reportSize()).observe(root);
+  addEventListener("keydown", (event) => {
+    if (event.key === "Escape") toContent({ kind: "aeon.orb.hide", keepRunning: true });
+  });
+  addEventListener("storage", (event) => {
+    if (event.key === ORB_REDUCE_MOTION_KEY) sendPrefs();
+  });
+  addEventListener("pagehide", () => void setNeeds(tabId, false));
+  chrome.runtime.onMessage.addListener((message: { kind?: string; tabId?: number }) => {
+    if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) focusPrompt();
+  });
+  chrome.storage.session.onChanged.addListener((changes) => {
+    if (Object.keys(changes).some(isNeedsKey)) void refreshNeeds();
+  });
+}
+
 async function submit(text: string): Promise<void> {
   model.prompt = text;
   model.busy = true;
-  model.run = initialRun();
-  model.watch = { state: "idle", note: "" };
-  sentActions = 0;
-  sync();
+  reset();
+  playSound("start");
   try {
     await session.start(text);
   } catch (error) {
-    model.run = { ...initialRun(), status: "error", error: messageOf(error) };
-    sync();
+    fail(error);
   } finally {
     model.busy = false;
   }
+}
+
+function reset(): void {
+  model.run = initialRun();
+  model.watch = { state: "idle", note: "" };
+  model.paused = false;
+  model.expanded = false;
+  sentActions = 0;
+  sync();
+}
+
+function fail(error: unknown): void {
+  model.run = { ...initialRun(), status: "error", error: messageOf(error) };
+  sync();
 }
 
 function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
@@ -82,34 +117,53 @@ function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
   onEvent({ kind: "run-state", state: runState as "idle" }, true);
 }
 
-function onEvent(event: PiSessionEventDto, update = true): void {
-  if (!model.run) return;
+function onEvent(event: PiSessionEventDto, refresh = true): void {
+  if (!model.run || model.paused) return;
   const next = applyEvent(model.run, event, Date.now());
   if (next === model.run) return;
   model.run = next;
-  if (update) sync();
+  if (refresh) sync();
 }
 
-/** Pushes the run to the overlay (swarm state, cursor, spotlight) and redraws the bubble. */
+/** Pushes the run to the overlay (swarm, cursor, spotlight, glow) and redraws the island. */
 function sync(): void {
   const run = model.run;
   if (run) {
-    visual(visualState(run), run.label);
+    visual(visualState(run), model.paused ? "You're driving" : run.label);
     sendNewActions(run.actions);
-    if (run.status === "needs")
+    if (run.status === "needs" && !model.paused)
       toContent({ kind: "aeon.orb.spotlight", box: spotlightBox(run.actions, tabId) ?? null });
   }
+  changed(islandState(model));
   render();
+}
+
+/** Things that happen once per change of state: sounds, the tab group, the needs count, the log. */
+function changed(state: IslandState): void {
+  if (state === lastState) return;
+  lastState = state;
+  void setNeeds(tabId, state === "needs", session.chatId ?? "");
+  if (state === "working") void tab.hold();
+  else void tab.release();
+  if (state === "needs") playSound("needs");
+  if (state === "done" && model.run) {
+    playSound("done");
+    if (session.chatId) {
+      void markSeen(session.chatId, viewId);
+      logWrites(model.run, { chatId: session.chatId, host: model.host, task: model.prompt });
+    }
+  }
 }
 
 function sendNewActions(actions: readonly OrbAction[]): void {
   if (actions.length <= sentActions) return;
   const steps = cursorSteps(actions.slice(sentActions), tabId);
   sentActions = actions.length;
-  if (steps.length) toContent({ kind: "aeon.orb.cursor", steps });
+  if (steps.length && !model.paused) toContent({ kind: "aeon.orb.cursor", steps });
 }
 
 function visualState(run: OrbRun): OrbVisualState {
+  if (model.paused) return "paused";
   return run.status === "idle" ? "thinking" : run.status;
 }
 
@@ -131,7 +185,7 @@ async function watch(): Promise<void> {
   if (plan.kind === "editor") {
     const url = routineEditorUrl(chrome.runtime.getURL("home.html"), session.chatId, routine);
     await chrome.tabs.create({ url, openerTabId: tabId });
-    setWatch("idle", "Review the routine in the new tab and save it to start watching.");
+    setWatch("idle", "Review the watcher in the new tab and save it to start watching.");
     return;
   }
   setWatch("saving", "Saving the watcher…");
@@ -151,38 +205,66 @@ function setWatch(state: OrbViewModel["watch"]["state"], note: string): void {
   render();
 }
 
-async function again(): Promise<void> {
-  if (!model.prompt) return;
-  model.run = initialRun();
-  model.watch = { state: "idle", note: "" };
-  sentActions = 0;
+async function again(text = model.prompt): Promise<void> {
+  if (!text) return;
+  reset();
+  playSound("start");
+  await session.again(text).catch(fail);
+}
+
+/** The user takes the wheel: the run stops and the island waits for Resume. */
+function takeOver(): void {
+  model.paused = true;
+  model.expanded = false;
+  toContent({ kind: "aeon.orb.spotlight", box: null });
+  void session.stop().catch(() => undefined);
   sync();
-  await session.again(model.prompt).catch((error: unknown) => {
-    model.run = { ...initialRun(), status: "error", error: messageOf(error) };
-    sync();
-  });
+}
+
+function resume(): void {
+  void again(
+    `Continue this task from where the page is now (I changed things myself): ${model.prompt}`,
+  );
 }
 
 function openChat(): void {
   if (session.chatId) void openExtensionChat(session.chatId).catch(() => undefined);
 }
 
-function render(): void {
-  const draft = document.getElementById("prompt") as HTMLTextAreaElement | null;
-  const kept = draft ? { value: draft.value, focused: document.activeElement === draft } : null;
-  renderView(root, model, {
-    submit: (text) => void submit(text),
-    close: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
-    stop: () => void session.stop().catch(() => undefined),
-    again: () => void again(),
-    watch: () => void watch(),
-    openChat,
+function view(): ReactNode {
+  return createElement(Island, {
+    model: { ...model },
+    actions: {
+      submit: (text) => void submit(text),
+      close: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
+      stop: () => void session.stop().catch(() => undefined),
+      again: () => void again(),
+      watch: () => void watch(),
+      openChat,
+      takeOver,
+      resume,
+      toggleDetails: () => {
+        model.expanded = !model.expanded;
+        render();
+      },
+    },
   });
-  const next = document.getElementById("prompt") as HTMLTextAreaElement | null;
-  if (next && kept) {
-    next.value = kept.value;
-    if (kept.focused) next.focus();
-  }
+}
+
+function render(): void {
+  if (update) update(view());
+  else update = mountAeonUi(root, view());
+}
+
+async function refreshNeeds(): Promise<void> {
+  model.needsCount = await needsCount();
+  render();
+}
+
+function sendPrefs(): void {
+  const reduceMotion = orbFlag(ORB_REDUCE_MOTION_KEY);
+  document.documentElement.toggleAttribute("data-reduced-motion", reduceMotion);
+  toContent({ kind: "aeon.orb.prefs", reduceMotion });
 }
 
 function reportSize(): void {
@@ -195,7 +277,9 @@ function toContent(message: OrbToContent): void {
 }
 
 function focusPrompt(): void {
-  (document.getElementById("prompt") as HTMLTextAreaElement | null)?.focus();
+  requestAnimationFrame(() =>
+    (document.getElementById("prompt") as HTMLTextAreaElement | null)?.focus(),
+  );
 }
 
 function notice(text: string): void {
@@ -204,9 +288,9 @@ function notice(text: string): void {
 }
 
 async function tabHost(): Promise<string> {
-  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  const current = await chrome.tabs.get(tabId).catch(() => undefined);
   try {
-    return tab?.url ? new URL(tab.url).hostname.replace(/^www\./, "") : "";
+    return current?.url ? new URL(current.url).hostname.replace(/^www\./, "") : "";
   } catch {
     return "";
   }

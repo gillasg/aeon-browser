@@ -6,7 +6,7 @@ import { Swarm } from "./orb-swarm.js";
 // Everything the orb draws over the page. All of it is pointer-transparent except the bubble,
 // which is orb.html in an iframe so the page can't read what the user types.
 
-const DEFAULT_PANEL = { width: 340, height: 132 };
+const DEFAULT_PANEL = { width: 360, height: 96 };
 const ACTING_KINDS = /click|fill|type|press|select|check|drag|upload/i;
 const TRAVEL_MS = 650;
 
@@ -23,8 +23,10 @@ export class OrbOverlay {
   private readonly label = document.createElement("div");
   private readonly ring = document.createElement("div");
   private readonly frame = document.createElement("iframe");
+  private readonly edge = document.createElement("div");
   private readonly swarm: Swarm;
-  private readonly reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  private readonly systemReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  private reducedMotion = this.systemReducedMotion;
   private state: OrbVisualState = "listening";
   private orb: Point = { x: 0, y: 0 };
   private orbTarget: Point = { x: 0, y: 0 };
@@ -58,7 +60,7 @@ export class OrbOverlay {
 
   /** Keeps the swarm on screen after the bubble closes while a run is still going. */
   get running(): boolean {
-    return this.state === "thinking" || this.state === "working" || this.state === "needs";
+    return ["thinking", "working", "needs", "paused"].includes(this.state);
   }
 
   showBubble(at?: Point, focus = true): void {
@@ -84,8 +86,16 @@ export class OrbOverlay {
     else if (message.kind === "aeon.orb.panel")
       this.panel = {
         width: clampSize(message.width, 260, 420),
-        height: clampSize(message.height, 60, 560),
+        height: clampSize(message.height, 44, 560),
       };
+    else if (message.kind === "aeon.orb.prefs") this.setReducedMotion(message.reduceMotion);
+  }
+
+  /** The setting in Aeon adds to the system's reduce-motion; it never turns that off. */
+  private setReducedMotion(on: boolean): void {
+    this.reducedMotion = on || this.systemReducedMotion;
+    this.swarm.reducedMotion = this.reducedMotion;
+    this.host.toggleAttribute("data-reduced-motion", this.reducedMotion);
   }
 
   destroy(): void {
@@ -102,6 +112,7 @@ export class OrbOverlay {
     const layer = document.createElement("div");
     layer.className = "layer";
     this.spot.className = "spot";
+    this.edge.className = "edge";
     this.cursor.className = "cursor";
     this.cursor.innerHTML = CURSOR_SVG;
     this.label.className = "label";
@@ -114,7 +125,7 @@ export class OrbOverlay {
     this.frame.title = "Aeon";
     this.frame.className = "off";
     this.frame.setAttribute("allowtransparency", "true");
-    layer.append(this.spot, this.canvas, this.ring, this.cursor, this.frame);
+    layer.append(this.edge, this.spot, this.canvas, this.ring, this.cursor, this.frame);
     shadow.append(style, layer);
     document.documentElement.append(this.host);
   }
@@ -123,6 +134,8 @@ export class OrbOverlay {
     this.state = state;
     this.swarm.setState(state);
     this.label.textContent = label;
+    // While the agent drives this tab, its edges glow.
+    this.edge.classList.toggle("on", state === "thinking" || state === "working");
     if (state !== "working" && Date.now() >= this.playUntil) this.releaseCursor();
     if (state !== "needs") this.spotlight(null);
     // Results and questions come to the user even if they closed the bubble; focus stays put.

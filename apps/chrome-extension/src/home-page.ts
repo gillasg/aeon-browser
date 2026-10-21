@@ -35,6 +35,8 @@ let modelCatalog: PiModelCatalogDto | null = null;
 let connectionLabel = "Starting";
 let errorMessage = "";
 let openChatIds: ReadonlySet<string> = new Set();
+let runningChatIds: ReadonlySet<string> = new Set();
+let needsChatIds: ReadonlySet<string> = new Set();
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 const modelSignIn = new ModelSignIn(
   (request) => sendComposerCommand(client, request),
@@ -64,6 +66,8 @@ function createView() {
     connectionLabel,
     connected: client?.socket.readyState === WebSocket.OPEN && connectionLabel === "Connected",
     chats,
+    runningChatIds,
+    needsChatIds,
     modelCatalog,
     modelLogin: modelSignIn.state,
     onConnectModel: () => void modelSignIn.open(),
@@ -85,6 +89,7 @@ function createView() {
     onNewChat: () => openNewChat(),
     onOpenChat: (chatId: string) => void openChat(chatId),
     onCatalog: () => catalog.show(),
+    onCloseCatalog: () => catalog.hide(),
     onCatalogQuery: (query: string) => catalog.setQuery(query),
     onIncludeArchived: (include: boolean) => catalog.setIncludeArchived(include),
     onPin: (chat: ChatCatalogItemDto) => void catalog.togglePinned(chat),
@@ -104,6 +109,7 @@ if (new URL(location.href).searchParams.get("embedded") === "1")
   document.body.dataset.embedded = "true";
 render();
 void restoreModelCatalog();
+void watchRunningChats();
 const reconnect = new PageReconnect(start, (message) => {
   connectionLabel = "Reconnecting";
   showError(message);
@@ -247,6 +253,36 @@ async function getOpenChatIds(): Promise<Set<string>> {
     }
   }
   return ids;
+}
+
+// The worker mirrors each chat's working state into session storage (completion-notifications);
+// orbs record the chat that is waiting for the user (orb-control).
+const WORKING_PREFIX = "aeon-chat-working-";
+const NEEDS_PREFIX = "aeon-orb-needs:";
+async function watchRunningChats(): Promise<void> {
+  const read = async () => {
+    const values = await chrome.storage.session.get(null);
+    runningChatIds = new Set(
+      Object.entries(values)
+        .filter(([key, value]) => key.startsWith(WORKING_PREFIX) && value === "working")
+        .map(([key]) => key.slice(WORKING_PREFIX.length)),
+    );
+    needsChatIds = new Set(
+      Object.entries(values)
+        .filter(([key, value]) => key.startsWith(NEEDS_PREFIX) && typeof value === "string")
+        .map(([, value]) => value as string),
+    );
+    render();
+  };
+  chrome.storage.session.onChanged.addListener((changes) => {
+    if (
+      Object.keys(changes).some((key) =>
+        [WORKING_PREFIX, NEEDS_PREFIX].some((p) => key.startsWith(p)),
+      )
+    )
+      void read();
+  });
+  await read().catch(() => undefined);
 }
 
 function isCommandResponse(requestId: string) {

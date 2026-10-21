@@ -8,28 +8,18 @@ import {
   HomeAttachmentList,
 } from "./home-attachments.js";
 import { useState, type FormEvent, type ReactElement } from "react";
-import type { ChatCatalogItemDto, PiModelCatalogDto } from "@aeon/protocol";
+import type { PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
-import { HomeRecentCards } from "./home-recent-cards.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
-import { ActionBarNote } from "./action-bar-note.js";
 import { PromptField } from "./prompt-field.js";
+import { MiniSwarm } from "./mini-swarm.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
 type HomeStartProps = Pick<
   NewTabHomeProps,
-  | "modelCatalog"
-  | "modelLogin"
-  | "onConnectModel"
-  | "onAsk"
-  | "homeRoutines"
-  | "openChatIds"
-  | "onOpenChat"
-  | "onCatalog"
-  | "onReadAttachments"
+  "modelCatalog" | "modelLogin" | "onConnectModel" | "onAsk" | "onReadAttachments"
 > & {
-  onManageRoutines(): void;
   projectName?: string | null;
   projectId?: string | null;
   browserContext?: import("@aeon/protocol").PiBrowserContextRecord | null;
@@ -38,13 +28,7 @@ type HomeStartProps = Pick<
   connected?: boolean;
 };
 
-export function HomeStart({
-  props,
-  active,
-}: {
-  props: HomeStartProps;
-  active: readonly ChatCatalogItemDto[];
-}): ReactElement {
+export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
   const panelPage = usePanelPage();
   const [query, setQuery] = useState("");
   const files = useHomeAttachments(props.onReadAttachments);
@@ -55,7 +39,6 @@ export function HomeStart({
   };
   return (
     <section className="home-start" aria-label="Ask Aeon">
-      <ActionBarNote />
       <ProjectChip name={props.projectName} projectId={props.projectId} />
       <PageContextTray
         chatId={props.chatId}
@@ -87,14 +70,6 @@ export function HomeStart({
         onEffort={selection.setEffort}
       />
       {props.connected === false && <PendingWork connecting />}
-      <HomeRecentCards
-        chats={active}
-        routines={props.homeRoutines}
-        openChatIds={props.openChatIds}
-        onCatalog={props.onCatalog}
-        onOpen={props.onOpenChat}
-        onRoutines={props.onManageRoutines}
-      />
     </section>
   );
 }
@@ -147,6 +122,7 @@ function HomePrompt({
   };
   return (
     <form id="home-form" className="home-query-form" onSubmit={submit}>
+      <MiniSwarm size={34} />
       <HomeAttachmentPicker onFiles={onFiles} contextId={contextId} />
       <PromptField
         multiline
@@ -160,6 +136,11 @@ function HomePrompt({
           if (query.trim() && canSubmit) onSubmit(query.trim());
         }}
       />
+      {!query && (
+        <kbd className="home-summon-hint" title="Call Aeon on any page">
+          ctrl ⇧ space
+        </kbd>
+      )}
       <button
         className="home-send-button"
         type="submit"

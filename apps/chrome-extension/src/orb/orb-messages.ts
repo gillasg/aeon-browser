@@ -3,11 +3,12 @@ import type { OrbBox, OrbCursorStep, OrbStatus } from "./orb-run.js";
 // Messages between the orb's three parts:
 // - the service worker (shortcut, nonce),
 // - the content script (swarm, cursor, spotlight, drawn over the page),
-// - orb.html (the bubble, framed by the content script; the page cannot read it).
+// - orb.html (the island, framed by the content script; the page cannot read it).
 
 export const ORB_COMMAND = "summon-orb";
 
-export type OrbVisualState = Exclude<OrbStatus, "idle"> | "listening";
+/** "paused": the user took over and is driving the page. */
+export type OrbVisualState = Exclude<OrbStatus, "idle"> | "listening" | "paused";
 
 /** orb.html → content script (chrome.tabs.sendMessage, top frame of its tab). */
 export type OrbToContent =
@@ -15,7 +16,8 @@ export type OrbToContent =
   | { kind: "aeon.orb.cursor"; steps: OrbCursorStep[] }
   | { kind: "aeon.orb.spotlight"; box: OrbBox | null }
   | { kind: "aeon.orb.panel"; width: number; height: number }
-  | { kind: "aeon.orb.hide"; keepRunning: boolean };
+  | { kind: "aeon.orb.hide"; keepRunning: boolean }
+  | { kind: "aeon.orb.prefs"; reduceMotion: boolean };
 
 /** Service worker → content script. */
 export interface OrbToggle {
@@ -43,6 +45,7 @@ const CONTENT_KINDS = new Set([
   "aeon.orb.spotlight",
   "aeon.orb.panel",
   "aeon.orb.hide",
+  "aeon.orb.prefs",
 ]);
 
 export function isOrbToContent(value: unknown): value is OrbToContent {

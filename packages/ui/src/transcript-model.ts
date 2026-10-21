@@ -1,3 +1,4 @@
+import type { RunPath } from "./run-model.js";
 import { insertAssistantEntry, separatesToolBatch } from "./transcript-assistant-entry.js";
 import { updateTurnTiming, type TurnTiming } from "./turn-timing.js";
 import { timestampMs, blockText, hasRenderableContent } from "./transcript-content.js";
@@ -26,6 +27,9 @@ export interface ToolStep {
   resultUnavailable?: boolean;
   changeDiff?: string;
   images?: Array<{ mimeType: string; byteLength: number }>;
+  /** From tool-end: which fast path the tool took, and how long it ran. */
+  path?: RunPath;
+  durationMs?: number;
 }
 
 export interface ToolGroup {
@@ -101,6 +105,7 @@ export class TranscriptModel {
         endedAt: Date.now(),
         resultUnavailable: false,
         changeDiff: event.changeDiff,
+        ...pathAndDuration(event),
       });
     updateTurnTiming(this.rows, event);
     this.rows = [...this.rows];
@@ -307,4 +312,15 @@ export class TranscriptModel {
     this.rows.push({ kind: "tool-group", key: group.key, group });
     return group;
   }
+}
+
+/** tool-end's fast path and duration, when the tool reported them. */
+function pathAndDuration(event: {
+  path?: RunPath | undefined;
+  durationMs?: number | undefined;
+}): Partial<ToolStep> {
+  const fields: Partial<ToolStep> = {};
+  if (event.path) fields.path = event.path;
+  if (event.durationMs !== undefined) fields.durationMs = event.durationMs;
+  return fields;
 }

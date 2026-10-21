@@ -8,7 +8,8 @@ import {
 } from "./agent-tab-view.js";
 import type { ReactElement } from "react";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
-import { WallpaperSettings } from "./wallpaper-settings.js";
+import { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY } from "./orb-prefs.js";
+import { resetTour } from "./first-run-tour.js";
 
 export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
   const [mode, setMode] = useMessageSendMode();
@@ -41,6 +42,7 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
           </select>
         </label>
       </section>
+      <OrbSettings />
       <AgentTabSettings />
       <section className="settings-group">
         <h2>Connected Chrome</h2>
@@ -77,7 +79,49 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
         </select>
       </label>
       <p>System follows your operating system appearance.</p>
-      <WallpaperSettings />
+    </section>
+  );
+}
+
+function OrbSettings(): ReactElement {
+  const [reduceMotion, setReduceMotion] = useAgentFlag(ORB_REDUCE_MOTION_KEY);
+  const [sounds, setSounds] = useAgentFlag(ORB_SOUNDS_KEY);
+  return (
+    <section className="settings-group">
+      <h2>Orb</h2>
+      <p>Press Ctrl+Shift+Space on any page to call Aeon there.</p>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={reduceMotion}
+          onChange={(event) => setReduceMotion(event.target.checked)}
+        />{" "}
+        Reduce motion
+      </label>
+      <p>
+        The swarm holds still and the island stops animating. On already when your system asks for
+        less motion.
+      </p>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={sounds}
+          onChange={(event) => setSounds(event.target.checked)}
+        />{" "}
+        Sounds
+      </label>
+      <p>A soft tone when a run starts, when it needs you, and when it&rsquo;s done.</p>
+      <p>
+        <button
+          type="button"
+          onClick={() => {
+            resetTour();
+            location.assign("home.html");
+          }}
+        >
+          Show the tour again
+        </button>
+      </p>
     </section>
   );
 }

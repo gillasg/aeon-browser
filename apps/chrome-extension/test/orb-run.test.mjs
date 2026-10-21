@@ -244,3 +244,38 @@ test("watch: the routine is every 15 minutes and the editor URL carries the draf
     everyMinutes: 15,
   });
 });
+
+test("the island's step line names the step, the site and the last path taken", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-view-"));
+  const outfile = join(directory, "orb-view.mjs");
+  await build({
+    entryPoints: [fileURLToPath(new URL("../src/orb/orb-view.tsx", import.meta.url))],
+    outfile,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    jsx: "automatic",
+  });
+  const view = await import(pathToFileURL(outfile).href);
+  await rm(directory, { recursive: true, force: true });
+  const run = play([
+    [{ kind: "tool-start", toolCallId: "1", toolName: "site_api", arguments: {} }, 0],
+    [
+      {
+        kind: "tool-end",
+        toolCallId: "1",
+        toolName: "site_api",
+        result: "",
+        isError: false,
+        path: "site-api",
+      },
+      900,
+    ],
+    [{ kind: "tool-start", toolCallId: "2", toolName: "browser_code", arguments: {} }, 1000],
+  ]);
+  assert.equal(view.stepLine(run, "kayak.com"), "Step 2 · kayak.com · site API");
+  const base = { run, paused: false };
+  assert.equal(view.islandState(base), "working");
+  assert.equal(view.islandState({ ...base, paused: true }), "paused");
+  assert.equal(view.islandState({ run: undefined }), "compose");
+});

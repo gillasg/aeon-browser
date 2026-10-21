@@ -10,7 +10,7 @@ export type OrbWatchPlan =
   { kind: "direct" } | { kind: "editor" } | { kind: "none"; reason: string };
 
 // Trace action kinds that change something on the page (typing, choosing, sending).
-const WRITE_KINDS = /fill|type|insert|press|key|select|check|upload|drop|drag|submit/i;
+export const WRITE_KINDS = /fill|type|insert|press|key|select|check|upload|drop|drag|submit/i;
 const CLICK_KINDS = /click|tap/i;
 
 export function watchPlan(run: OrbRun): OrbWatchPlan {

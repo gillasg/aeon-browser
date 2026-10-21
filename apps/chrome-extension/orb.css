@@ -5,7 +5,8 @@
   font-weight: 100 900;
 }
 
-/* The bubble: dark glass beside the swarm (spec in orb-candidates.html, "Bubble"). */
+/* The island: one black pill beside the swarm. Always dark, whatever the page or theme, because it
+   sits on other people's sites. The shared run cards (@aeon/ui run-cards) are skinned here too. */
 html,
 body {
   margin: 0;
@@ -13,14 +14,25 @@ body {
   overflow: hidden;
 }
 
-.bubble {
+#root {
+  display: inline-block;
+}
+
+.island {
+  --needs: #e5b567;
+  --done: #8ff5b8;
+  --failed: #ffb3a8;
+  --muted: #8f8b9e;
   box-sizing: border-box;
-  width: 340px;
-  padding: 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: #16141f;
+  width: 360px;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #050507;
   color: #eeeef4;
+  position: relative;
+  overflow: hidden;
   font:
     13px/1.45 Geist,
     system-ui,
@@ -29,76 +41,167 @@ body {
     sans-serif;
 }
 
-.bar {
+.island[data-state="working"],
+.island[data-state="paused"] {
+  width: 330px;
+  border-radius: 999px;
+  padding: 7px 8px 9px 10px;
+}
+
+.island[data-state="working"]:has(.run-timeline) {
+  border-radius: 24px;
+}
+
+.isl-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 11.5px;
-  color: #9a96ad;
+  gap: 8px;
 }
 
-.bar b {
-  color: #ddd;
+.isl-orb {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d9d2ff, #7c5cff 55%, #2a1680);
+  box-shadow: 0 0 12px rgba(124, 92, 255, 0.55);
 }
 
-.compose textarea {
-  box-sizing: border-box;
-  width: 100%;
+.isl-orb[data-live="true"] {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.isl-orb[data-paused="true"] {
+  background: radial-gradient(circle at 35% 30%, #e7e4f0, #6d6880 60%, #2b2934);
+  box-shadow: none;
+}
+
+@keyframes breathe {
+  50% {
+    transform: scale(0.82);
+    box-shadow: 0 0 18px rgba(124, 92, 255, 0.85);
+  }
+}
+
+textarea {
+  flex: 1;
+  min-width: 0;
   resize: none;
   border: 0;
   outline: none;
-  border-radius: 10px;
-  padding: 9px 10px;
-  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 0;
+  background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 14px;
   caret-color: #b9a6ff;
+  field-sizing: content;
+  max-height: 120px;
 }
 
-.compose textarea:focus {
-  box-shadow: 0 0 0 1px rgba(155, 140, 255, 0.45);
+textarea::placeholder {
+  color: #6f6b80;
 }
 
-.hint {
+.isl-hint {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 7px;
+  gap: 8px;
+  margin: 6px 0 0 30px;
   font-size: 11px;
-  color: #9a96ad;
+  color: var(--muted);
 }
 
-.hint.warn span:first-child {
-  color: #ffd27a;
+.isl-hint[data-warn="true"] span:first-child {
+  color: var(--needs);
 }
 
-.chip {
+.isl-chip {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   border-radius: 999px;
   padding: 1px 8px;
-  background: rgba(183, 169, 255, 0.14);
-  color: #cbbcff;
+  background: rgba(255, 255, 255, 0.07);
+  color: #cfcbdc;
 }
 
-.asked {
-  color: #bdbac9;
-  margin-bottom: 6px;
+.isl-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+
+.isl-main:hover {
+  background: transparent;
+}
+
+.isl-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.isl-live,
+.isl-detail {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.status {
+.isl-live {
   font-weight: 600;
 }
 
-.shimmer {
+.island[data-state="working"] .isl-live {
   background: linear-gradient(90deg, #8b87a0 0, #f2f0ff 40%, #8b87a0 80%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: shimmer 1.3s linear infinite;
+}
+
+.isl-detail {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* The endless progress line along the bottom edge while it works. */
+.isl-progress {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.isl-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, #9b8cff, transparent);
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
 }
 
 @keyframes shimmer {
@@ -110,54 +213,176 @@ body {
   }
 }
 
-.meta {
-  margin-top: 4px;
+/* Shared run cards, island skin. */
+.run-timeline {
+  list-style: none;
+  margin: 8px 4px 4px;
+  padding: 8px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.run-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.run-step-more {
+  color: var(--muted);
+  padding-left: 14px;
+}
+
+.run-step-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9b8cff;
+}
+
+.run-step[data-state="done"] .run-step-dot {
+  background: var(--done);
+}
+
+.run-step[data-state="failed"] .run-step-dot {
+  background: var(--failed);
+}
+
+.run-step[data-state="running"] .run-step-dot {
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+.run-step-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-step-meta {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.run-path {
+  border-radius: 999px;
+  padding: 0 6px;
+  background: rgba(155, 140, 255, 0.14);
+  color: #cbbcff;
+}
+
+.run-path[data-mocked="true"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(155, 140, 255, 0.35);
+}
+
+.run-duration {
+  font-variant-numeric: tabular-nums;
+}
+
+.run-approval header,
+.run-result header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.run-eyebrow {
   font-size: 11.5px;
-  color: #9a96ad;
-}
-
-.meta:empty {
-  display: none;
-}
-
-.done {
-  color: #8ff5b8;
   font-weight: 700;
-  margin-bottom: 4px;
+  letter-spacing: 0.02em;
 }
 
-.failed {
-  color: #ffb3a8;
+.run-approval .run-eyebrow {
+  color: var(--needs);
+}
+
+.run-result[data-tone="done"] .run-eyebrow {
+  color: var(--done);
+}
+
+.run-result[data-tone="failed"] .run-eyebrow {
+  color: var(--failed);
+}
+
+.run-needs-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--needs);
+  box-shadow: 0 0 10px var(--needs);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.run-count {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--needs);
+  color: #1b1408;
+  font-size: 11px;
   font-weight: 700;
-  margin-bottom: 4px;
+  text-align: center;
 }
 
-.answer {
+.run-approval h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.run-approval p {
+  margin: 4px 0 0;
+  color: #bdbac9;
+}
+
+.run-answer {
   max-height: 220px;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.actions {
+.run-summary,
+.run-note {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.run-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-top: 10px;
+}
+
+.run-actions .icon {
+  margin-left: auto;
 }
 
 button {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-  border-radius: 8px;
-  padding: 6px 11px;
+  border-radius: 999px;
+  padding: 5px 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: transparent;
   color: #e4e2ee;
 }
 
 button:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 button:focus-visible {
@@ -167,40 +392,51 @@ button:focus-visible {
 
 button.primary {
   border-color: transparent;
-  background: #7c5cff;
-  color: #fff;
+  background: #f2f0f7;
+  color: #0b0a10;
   font-weight: 600;
 }
 
 button.primary:hover {
-  background: #8b6eff;
+  background: #fff;
 }
 
 button.icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 0;
-  padding: 2px 6px;
-  color: #9a96ad;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+button.icon:hover {
+  color: #fff;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shimmer {
+  .isl-orb,
+  .run-needs-dot,
+  .run-step-dot,
+  .isl-progress::after {
+    animation: none !important;
+  }
+  .island[data-state="working"] .isl-live {
     animation: none;
     color: #e4e2ee;
     background: none;
   }
 }
 
-.why {
-  margin-top: 8px;
-  font-size: 11.5px;
-  color: #9a96ad;
-}
-
-.why:empty {
-  display: none;
-}
-
-button:disabled {
-  cursor: default;
-  opacity: 0.6;
+html[data-reduced-motion] .isl-orb,
+html[data-reduced-motion] .run-needs-dot,
+html[data-reduced-motion] .run-step-dot,
+html[data-reduced-motion] .isl-progress::after {
+  animation: none !important;
 }

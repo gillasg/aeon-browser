@@ -67,10 +67,10 @@ function RoutineToolbar({
       <input
         value={query}
         onChange={(event) => onQuery(event.target.value)}
-        placeholder="Search routines"
-        aria-label="Search routines"
+        placeholder="Search watchers"
+        aria-label="Search watchers"
       />
-      <div role="group" aria-label="Routine status">
+      <div role="group" aria-label="Watcher status">
         {(["all", "active", "paused"] as const).map((value) => (
           <button
             key={value}
@@ -84,7 +84,7 @@ function RoutineToolbar({
         ))}
       </div>
       <button type="button" disabled={!props.snapshot?.chats.length} onClick={onCreate}>
-        New routine
+        New watcher
       </button>
     </div>
   );
@@ -102,32 +102,72 @@ function RoutineList({
   if (!routines.length)
     return (
       <p className="management-empty">
-        {props.loading ? "Loading routines…" : "No routines match this view."}
+        {props.loading ? "Loading watchers…" : "No watchers match this view."}
       </p>
     );
   return (
     <div className="management-list">
       {routines.map((routine) => (
-        <button
-          className="management-list-row"
-          key={routine.routineId}
-          type="button"
-          onClick={() => onSelect(routine.routineId)}
-        >
-          <span>
+        <div className="management-list-row watcher-row" key={routine.routineId}>
+          <button
+            type="button"
+            className="watcher-open"
+            onClick={() => onSelect(routine.routineId)}
+          >
             <strong>{routine.title}</strong>
-            <small>
-              For {routine.chatTitle} · Next{" "}
-              {routine.nextDueAt ? new Date(routine.nextDueAt).toLocaleString() : "not scheduled"}
-            </small>
-          </span>
-          <span className={`routine-status ${routine.enabled ? "enabled" : "paused"}`}>
-            {routine.enabled ? "Active" : "Paused"} ›
-          </span>
-        </button>
+            <small>{watcherLine(routine)}</small>
+          </button>
+          {routine.enabled ? (
+            <span className="routine-status enabled">Active</span>
+          ) : (
+            <button
+              type="button"
+              className="watcher-resume"
+              onClick={() => perform(props, routine.chatId, "update_routine", toggled(routine))}
+            >
+              Resume
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );
+}
+
+/** Next check, or why it's paused, then the last check. */
+export function watcherLine(routine: Routine): string {
+  const last = routine.recentRuns[0];
+  const head = routine.enabled
+    ? `Next ${routine.nextDueAt ? new Date(routine.nextDueAt).toLocaleString() : "not scheduled"}`
+    : pauseReason(routine);
+  return last ? `${head} · Last check ${new Date(last.createdAt).toLocaleString()}` : head;
+}
+
+/**
+ * Why a watcher is paused. Core doesn't say yet; repeated failures at the top of its history are
+ * the usual cause of an auto-pause, so those are named. Otherwise it is just "Paused".
+ */
+export function pauseReason(routine: Routine): string {
+  const failures = [];
+  for (const run of routine.recentRuns) {
+    if (run.state !== "failed" && run.state !== "unavailable") break;
+    failures.push(run);
+  }
+  if (failures.length < 2) return "Paused";
+  const error = failures[0]?.lastError;
+  return `Paused after ${failures.length} failed checks${error ? `: ${error}` : ""}`;
+}
+
+function toggled(routine: Routine): Record<string, unknown> {
+  return {
+    routineId: routine.routineId,
+    expectedRevision: routine.revision,
+    title: routine.title,
+    instruction: routine.instruction,
+    schedule: routine.schedule,
+    enabled: !routine.enabled,
+    requiredBrowserInstanceId: routine.requiredBrowserInstanceId,
+  };
 }
 
 function RoutineDetail({
@@ -142,16 +182,7 @@ function RoutineDetail({
   const [editing, setEditing] = useState(false);
   if (editing)
     return <RoutineEditor props={props} routine={routine} onCancel={() => setEditing(false)} />;
-  const toggle = () =>
-    perform(props, routine.chatId, "update_routine", {
-      routineId: routine.routineId,
-      expectedRevision: routine.revision,
-      title: routine.title,
-      instruction: routine.instruction,
-      schedule: routine.schedule,
-      enabled: !routine.enabled,
-      requiredBrowserInstanceId: routine.requiredBrowserInstanceId,
-    });
+  const toggle = () => perform(props, routine.chatId, "update_routine", toggled(routine));
   const remove = () => {
     if (window.confirm(`Delete “${routine.title}”?`))
       perform(props, routine.chatId, "delete_routine", {
@@ -162,7 +193,7 @@ function RoutineDetail({
   return (
     <div className="routine-detail">
       <button className="management-back" type="button" onClick={onBack}>
-        ‹ All routines
+        ‹ All watchers
       </button>
       <RoutineSummary routine={routine} />
       <h3>Instruction</h3>
@@ -196,8 +227,14 @@ function RoutineSummary({ routine }: { routine: Routine }): ReactElement {
       </div>
       <dl className="management-facts">
         <div>
-          <dt>Next run</dt>
-          <dd>{routine.nextDueAt ? new Date(routine.nextDueAt).toLocaleString() : "Paused"}</dd>
+          <dt>{routine.enabled ? "Next check" : "Status"}</dt>
+          <dd>
+            {routine.enabled
+              ? routine.nextDueAt
+                ? new Date(routine.nextDueAt).toLocaleString()
+                : "Not scheduled"
+              : pauseReason(routine)}
+          </dd>
         </div>
         <div>
           <dt>Schedule</dt>
@@ -247,17 +284,17 @@ function RoutineActions({
 function RoutineRunHistory({ routine }: { routine: Routine }): ReactElement {
   return (
     <>
-      <h3>Recent runs</h3>
+      <h3>History</h3>
       {routine.recentRuns.length ? (
         routine.recentRuns.map((run) => (
-          <div className="routine-run" key={run.runId}>
-            <span>{run.state}</span>
+          <div className="routine-run" key={run.runId} data-state={run.state}>
+            <span>{RUN_LABELS[run.state] ?? run.state}</span>
             <time>{new Date(run.createdAt).toLocaleString()}</time>
             {run.lastError && <p>{run.lastError}</p>}
           </div>
         ))
       ) : (
-        <p className="management-empty">No runs yet.</p>
+        <p className="management-empty">No checks yet.</p>
       )}
     </>
   );
@@ -287,3 +324,14 @@ function scheduleLabel(schedule: Routine["schedule"]): string {
     ? `Every ${schedule.everyMinutes} minutes · ${schedule.timeZone}`
     : `${schedule.daysOfWeek.join(", ")} at ${schedule.localTime} · ${schedule.timeZone}`;
 }
+
+const RUN_LABELS: Partial<Record<Routine["recentRuns"][number]["state"], string>> = {
+  completed: "Checked",
+  failed: "Failed",
+  unavailable: "Browser unavailable",
+  skipped: "Skipped",
+  coalesced: "Merged with the next check",
+  running: "Checking now",
+  pending: "Waiting",
+  due: "Due",
+};

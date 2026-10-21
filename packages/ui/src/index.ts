@@ -27,3 +27,30 @@ export {
 
 export { ChatMarkdown } from "./chat-markdown.js";
 export { HANDOFF_EVENT, type HandoffAction } from "./handoff-card.js";
+export {
+  applyEvent,
+  cursorSteps,
+  describeTool,
+  formatRunDuration,
+  inferPath,
+  initialRun,
+  PATH_NAMES,
+  spotlightBox,
+  summarize,
+  type AgentRun,
+  type RunAction,
+  type RunBox,
+  type RunCursorStep,
+  type RunPath,
+  type RunStatus,
+  type RunStep,
+} from "./run-model.js";
+export { ApprovalCard, PathTag, ResultCard, StepMeta, StepTimeline } from "./run-cards.js";
+export {
+  ACTIVITY_LOG_KEY,
+  appendActivity,
+  describeWrites,
+  readActivityLog,
+  type ActivityEntry,
+} from "./activity-log.js";
+export { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY, orbFlag } from "./orb-prefs.js";

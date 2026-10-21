@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import type { PiUiSnapshotDto } from "@aeon/protocol";
+import { ApprovalCard } from "./run-cards.js";
 
 type ExtensionDialog = PiUiSnapshotDto["extensionDialogs"][number];
 type Answer = (requestId: string, value: string | boolean | null) => void;
@@ -13,12 +14,12 @@ export function ExtensionDialogs({
 }): ReactElement {
   const [value, setValue] = useState(dialog.prefill ?? "");
   return (
-    <section className="extension-dialog" aria-label={`Extension request: ${dialog.title}`}>
-      <h2>{dialog.title}</h2>
-      {dialog.message && <p>{dialog.message}</p>}
-      <DialogFields dialog={dialog} value={value} setValue={setValue} onAnswer={onAnswer} />
-      <small>Expires {new Date(dialog.expiresAt).toLocaleTimeString()}</small>
-    </section>
+    <div className="extension-dialog">
+      <ApprovalCard title={dialog.title} message={dialog.message}>
+        <DialogFields dialog={dialog} value={value} setValue={setValue} onAnswer={onAnswer} />
+        <small>Expires {new Date(dialog.expiresAt).toLocaleTimeString()}</small>
+      </ApprovalCard>
+    </div>
   );
 }
 

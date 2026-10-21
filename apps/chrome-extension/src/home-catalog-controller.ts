@@ -27,6 +27,13 @@ export class HomeCatalogController {
     void this.refresh();
   }
 
+  hide(): void {
+    if (!this.open) return;
+    this.open = false;
+    document.title = "Aeon";
+    this.options.onChange();
+  }
+
   setQuery(query: string): void {
     this.query = query;
     this.options.onChange();

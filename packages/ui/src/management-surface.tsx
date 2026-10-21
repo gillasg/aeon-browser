@@ -10,7 +10,7 @@ export type { ManagementSurfaceProps } from "./management-surface-props.js";
 
 export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
   const titles: Record<ManagementSection, string> = {
-    routines: "Routines",
+    routines: "Watchers",
     resources: "Skills & extensions",
     capabilities: "MCPs / CLIs",
     settings: "Settings",
@@ -19,7 +19,6 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
     <section className="management-main" aria-label={titles[props.section]}>
       <header className="management-heading">
         <div>
-          <p className="management-eyebrow">Aeon</p>
           <h1>{titles[props.section]}</h1>
         </div>
         {props.section !== "settings" && (

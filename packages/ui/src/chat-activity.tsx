@@ -20,6 +20,7 @@ import { BrowserCallRows, browserActionValues } from "./activity-browser-call.js
 import { ShellToolDetails, CodeToolDetails, ToolStepFooter } from "./activity-tool-details.js";
 import { ToolResultView } from "./tool-result-view.js";
 import { ToolImages } from "./tool-images.js";
+import { StepMeta } from "./run-cards.js";
 
 export function ChatActivityGroup({
   group,
@@ -114,6 +115,9 @@ function ToolStepRow({
         <span className="activity-step-name">
           <ToolActionLabel step={step} />
         </span>
+        {step.state !== "running" && (
+          <StepMeta path={step.path} durationMs={step.durationMs ?? measured(step)} />
+        )}
         {label && (
           <span className={`activity-state-badge ${step.isError ? "is-error" : "is-running"}`}>
             {label}
@@ -305,4 +309,8 @@ function useActivityClock(active: boolean): number {
     return () => window.clearInterval(timer);
   }, [active]);
   return now;
+}
+
+function measured(step: ToolStep): number | undefined {
+  return step.endedAt === undefined ? undefined : Math.max(0, step.endedAt - step.startedAt);
 }

@@ -2397,10 +2397,10 @@ body[data-host="panel"] .queue-view {
   margin: 12px auto;
   width: min(720px, calc(100% - 32px));
   padding: 16px;
-  border: 1px solid var(--border-subtle, #d8dce2);
+  border: 1px solid color-mix(in srgb, var(--aeon-needs) 45%, var(--aeon-line));
   border-radius: var(--aeon-r-md);
-  background: var(--surface-raised, #fff);
-  box-shadow: 0 8px 28px rgb(30 40 55 / 10%);
+  background: var(--aeon-surface);
+  box-shadow: var(--aeon-elev-2);
 }
 .extension-dialog h2 {
   margin: 0 0 8px;
@@ -3885,4 +3885,55 @@ body[data-host="panel"] .composer-meta {
   margin-left: auto;
   border: 0;
   color: var(--muted);
+}
+
+/* Shared run parts (@aeon/ui run-cards): Aeon's theme. The orb's island has its own dark skin. */
+.run-approval header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.run-needs-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--aeon-needs);
+}
+.run-eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--aeon-needs);
+}
+.run-count {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--aeon-needs);
+  color: var(--aeon-canvas);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.run-step-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: none;
+  font-size: 11.5px;
+  color: var(--aeon-muted);
+}
+.run-path {
+  padding: 0 6px;
+  border: 1px solid var(--aeon-line);
+  border-radius: 999px;
+  line-height: 17px;
+}
+.run-path[data-mocked="true"] {
+  border-style: dashed;
+}
+.run-duration {
+  font-variant-numeric: tabular-nums;
 }

@@ -8,6 +8,13 @@ canvas { position: fixed; inset: 0; pointer-events: none; }
   transition: opacity .5s ease;
 }
 .spot.on { opacity: 1; }
+.edge {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0;
+  box-shadow: inset 0 0 0 2px rgba(124, 92, 255, .55), inset 0 0 28px rgba(124, 92, 255, .35);
+  transition: opacity .6s ease;
+}
+.edge.on { opacity: 1; animation: edge 2.4s ease-in-out infinite; }
+@keyframes edge { 50% { opacity: .55; } }
 .cursor {
   position: fixed; left: 0; top: 0; pointer-events: none; opacity: 0;
   transition: opacity .3s ease; will-change: transform;
@@ -38,9 +45,12 @@ iframe {
 iframe.on { opacity: 1; transform: none; }
 iframe.off { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  iframe, .spot, .cursor { transition: none; }
-  .ring.go { animation: none; }
+  iframe, .spot, .cursor, .edge { transition: none; }
+  .ring.go, .edge.on { animation: none; }
 }
+:host([data-reduced-motion]) iframe, :host([data-reduced-motion]) .spot,
+:host([data-reduced-motion]) .cursor, :host([data-reduced-motion]) .edge { transition: none; }
+:host([data-reduced-motion]) .ring.go, :host([data-reduced-motion]) .edge.on { animation: none; }
 `;
 
 export const CURSOR_SVG = `<svg width="20" height="24" viewBox="0 0 20 24" aria-hidden="true">
