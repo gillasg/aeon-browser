@@ -26,7 +26,7 @@ export function handleCoreAttentionMessage(candidate: unknown): boolean {
   }
   const claim = CoreAttentionClaimSchema.safeParse(candidate);
   if (!claim.success) return false;
-  if (claim.data.granted) void notify(claim.data.chatId);
+  if (claim.data.granted) void notify(claim.data.chatId, claim.data.title, claim.data.summary);
   return true;
 }
 async function mirror(
@@ -63,12 +63,13 @@ chrome.runtime.onMessage.addListener((request, sender) => {
   const parsed = CoreAttentionRequestSchema.safeParse(request);
   if (parsed.success && parsed.data.kind === "core.attention.read") send?.(parsed.data);
 });
-async function notify(chatId: string): Promise<void> {
+// Says what happened ("Price dropped to ₹2,999"), titled with the chat, not "Your chat is ready".
+async function notify(chatId: string, title?: string, summary?: string): Promise<void> {
   await chrome.notifications.create("piper-done-" + chatId, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("completion-icon.png"),
-    title: "Aeon finished",
-    message: "Your chat is ready. Click to open it.",
+    title: title || "Aeon finished",
+    message: summary || "Done. Click to open the chat.",
   });
 }
 // A watcher found something: say what at once; the agent's follow-up run comes after.

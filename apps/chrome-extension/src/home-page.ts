@@ -15,6 +15,7 @@ import {
   type PiAttachmentDto,
 } from "@aeon/protocol";
 import { mountAeonUi, NewTabHome, type ComposerModel, type ComposerAttachment } from "@aeon/ui";
+import { markActivityUndone, type ActivityEntry } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { sendComposerCommand } from "./composer-command.js";
 import { ModelSignIn } from "./model-sign-in.js";
@@ -60,6 +61,26 @@ const management = new HomeManagementController(
   createManagementClient(__AEON_NATIVE_TRANSPORT__, () => client),
 );
 
+/** Reverses an API write from Activity, one item at a time, through its learned reverse. */
+async function undoActivity(entry: ActivityEntry): Promise<void> {
+  const undo = entry.undo;
+  if (!undo) return;
+  try {
+    for (const params of undo.params) {
+      const reply = (await chrome.runtime.sendMessage({
+        kind: "aeon.site.undo",
+        site: undo.site,
+        operation: undo.operation,
+        params,
+      })) as { ok?: boolean; error?: string } | undefined;
+      if (!reply?.ok) throw new Error(reply?.error ?? "The site refused the change");
+    }
+    markActivityUndone(entry.id);
+  } catch (error) {
+    markActivityUndone(entry.id, error instanceof Error ? error.message : String(error));
+  }
+}
+
 function createView() {
   return createElement(NewTabHome, {
     developmentFixture: !__AEON_NATIVE_TRANSPORT__,
@@ -88,6 +109,7 @@ function createView() {
     onReadAttachments: (files: readonly File[]) => Promise.all(files.map(readComposerAttachment)),
     onNewChat: () => openNewChat(),
     onOpenChat: (chatId: string) => void openChat(chatId),
+    onUndoActivity: (entry: ActivityEntry) => void undoActivity(entry),
     onCatalog: () => catalog.show(),
     onCloseCatalog: () => catalog.hide(),
     onCatalogQuery: (query: string) => catalog.setQuery(query),

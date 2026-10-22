@@ -8,7 +8,7 @@ export type HomeView = "home" | "chats" | "watchers" | "activity" | "settings";
 
 const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings">, string]> = [
   ["chats", "Chats"],
-  ["watchers", "Watchers"],
+  ["watchers", "Routines"],
   ["activity", "Activity"],
 ];
 
@@ -73,7 +73,7 @@ export function HomeTopBar({
   );
 }
 
-/** `?view=` to a page. "routines" is the old name for Watchers, still used by Watch links. */
+/** `?view=` to a page. The page is Routines; "watchers" is its old name, still in old links. */
 export function viewFromRoute(route: string | null): {
   view: HomeView;
   settingsSection?: "settings" | "resources" | "capabilities";

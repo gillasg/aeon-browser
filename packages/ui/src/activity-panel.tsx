@@ -7,9 +7,11 @@ import type { ActivityEntry } from "./activity-log.js";
 export function ActivityPanel({
   entries,
   onOpenChat,
+  onUndo,
 }: {
   entries: readonly ActivityEntry[];
   onOpenChat(chatId: string): void;
+  onUndo?(entry: ActivityEntry): void;
 }): ReactElement {
   return (
     <section className="management-main activity-page" aria-label="Activity">
@@ -27,7 +29,12 @@ export function ActivityPanel({
           <section key={day} className="activity-day" aria-label={day}>
             <h2>{day}</h2>
             {items.map((entry) => (
-              <ActivityRow key={entry.id} entry={entry} onOpenChat={onOpenChat} />
+              <ActivityRow
+                key={entry.id}
+                entry={entry}
+                onOpenChat={onOpenChat}
+                {...(onUndo ? { onUndo } : {})}
+              />
             ))}
           </section>
         ))
@@ -43,9 +50,11 @@ export function ActivityPanel({
 function ActivityRow({
   entry,
   onOpenChat,
+  onUndo,
 }: {
   entry: ActivityEntry;
   onOpenChat(chatId: string): void;
+  onUndo?(entry: ActivityEntry): void;
 }): ReactElement {
   return (
     <div className="activity-row">
@@ -72,7 +81,11 @@ function ActivityRow({
         ) : null}
       </div>
       <div className="activity-row-actions">
-        {entry.undo && <button type="button">{entry.undo.label}</button>}
+        {entry.undo && (
+          <button type="button" onClick={() => onUndo?.(entry)}>
+            {entry.undo.label}
+          </button>
+        )}
         <button type="button" onClick={() => onOpenChat(entry.chatId)}>
           Open chat
         </button>

@@ -17,6 +17,7 @@ import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
 import { Island, islandState, type IslandState, type OrbViewModel } from "./orb-view.js";
 import { WATCH_EVERY_MINUTES, routineEditorUrl, watchPlan, watchRoutine } from "./orb-watch.js";
+import { siteVerbs, type SiteVerb } from "./orb-verbs.js";
 
 // orb.html: the island. Framed by the content script; talks to the daemon and drives the overlay.
 
@@ -34,6 +35,8 @@ const model: OrbViewModel = {
   paused: false,
   expanded: false,
   needsCount: 0,
+  verbs: [],
+  learning: false,
 };
 const tab = new TabControl(tabId);
 let lastVisual = "";
@@ -60,6 +63,7 @@ async function boot(): Promise<void> {
   document.body.hidden = false;
   model.host = await tabHost();
   render();
+  void loadSite();
   listen();
   sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
@@ -206,10 +210,10 @@ async function watch(): Promise<void> {
   if (plan.kind === "editor") {
     const url = routineEditorUrl(chrome.runtime.getURL("home.html"), session.chatId, routine);
     await chrome.tabs.create({ url, openerTabId: tabId });
-    setWatch("idle", "Review the watcher in the new tab and save it to start watching.");
+    setWatch("idle", "Review the routine in the new tab and save it to start checking.");
     return;
   }
-  setWatch("saving", "Saving the watcher…");
+  setWatch("saving", "Saving the routine…");
   try {
     await session.createRoutine({ ...routine });
     setWatch(
@@ -217,7 +221,7 @@ async function watch(): Promise<void> {
       `Checking every ${WATCH_EVERY_MINUTES} minutes. You'll get a notification when it changes.`,
     );
   } catch (error) {
-    setWatch("idle", "Couldn't save the watcher · " + messageOf(error));
+    setWatch("idle", "Couldn't save the routine · " + messageOf(error));
   }
 }
 
@@ -248,6 +252,43 @@ function resume(): void {
   );
 }
 
+/** What Aeon knows about this site: its learned verbs, and whether this tab is learning. */
+async function loadSite(): Promise<void> {
+  if (!model.host) return;
+  const [operations, learning] = await Promise.all([
+    chrome.runtime
+      .sendMessage({ kind: "aeon.site.operations", host: model.host })
+      .catch(() => []) as Promise<unknown>,
+    chrome.runtime.sendMessage({ kind: "aeon.learn.get", tabId }).catch(() => null) as Promise<{
+      on?: boolean;
+    } | null>,
+  ]);
+  model.verbs = siteVerbs(model.host, Array.isArray(operations) ? operations : []);
+  model.learning = learning?.on === true;
+  render();
+}
+
+function useVerb(verb: SiteVerb): void {
+  if (verb.run) {
+    void submit(verb.prompt);
+    return;
+  }
+  const field = document.getElementById("prompt") as HTMLTextAreaElement | null;
+  if (!field) return;
+  field.value = verb.prompt;
+  field.focus();
+  field.setSelectionRange(field.value.length, field.value.length);
+}
+
+async function toggleLearning(): Promise<void> {
+  const reply = (await chrome.runtime
+    .sendMessage({ kind: "aeon.learn.set", tabId, on: !model.learning })
+    .catch(() => null)) as { ok?: boolean; on?: boolean; error?: string } | null;
+  if (reply?.ok) model.learning = reply.on === true;
+  else notice("Couldn't start learning this site" + (reply?.error ? " · " + reply.error : ""));
+  render();
+}
+
 function openChat(): void {
   if (session.chatId) void openExtensionChat(session.chatId).catch(() => undefined);
 }
@@ -264,6 +305,8 @@ function view(): ReactNode {
       openChat,
       takeOver,
       resume,
+      useVerb,
+      toggleLearning: () => void toggleLearning(),
       toggleDetails: () => {
         model.expanded = !model.expanded;
         render();

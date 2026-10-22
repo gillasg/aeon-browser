@@ -12,7 +12,7 @@ import type { ManagementActionName, ManagementSection } from "./management-types
 import { HomeTopBar, viewFromRoute, type HomeView } from "./home-top-bar.js";
 import { HomeDashboard } from "./home-dashboard.js";
 import { ActivityPanel } from "./activity-panel.js";
-import { recentActivityCount, useActivityLog } from "./activity-log.js";
+import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
 import { FirstRunTour } from "./first-run-tour.js";
 
 export interface NewTabHomeProps {
@@ -46,6 +46,8 @@ export interface NewTabHomeProps {
   onReadAttachments?(files: readonly File[]): Promise<ComposerAttachment[]>;
   onNewChat(): void;
   onOpenChat(chatId: string): void;
+  /** Reverses an API write from the Activity page, when the site knows the reverse. */
+  onUndoActivity?(entry: ActivityEntry): void;
   onCatalog(): void;
   /** Leaves the chat list (it is a page of its own now). */
   onCloseCatalog?(): void;
@@ -95,7 +97,7 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
     setView(next);
     if (next === "chats") props.onCatalog();
     else props.onCloseCatalog?.();
-    if (next === "watchers" || next === "settings") props.onManagementLoad();
+    if (next === "home" || next === "watchers" || next === "settings") props.onManagementLoad();
     syncRoute(next, settingsSection);
   };
   return (
@@ -150,7 +152,13 @@ function HomePage({
 }): ReactElement {
   if (view === "chats") return <HomeCatalog {...props} />;
   if (view === "activity")
-    return <ActivityPanel entries={activity} onOpenChat={props.onOpenChat} />;
+    return (
+      <ActivityPanel
+        entries={activity}
+        onOpenChat={props.onOpenChat}
+        {...(props.onUndoActivity ? { onUndo: props.onUndoActivity } : {})}
+      />
+    );
   if (view === "watchers") return <Management props={props} section="routines" />;
   if (view === "settings")
     return (
@@ -170,6 +178,7 @@ function HomePage({
         openChatIds={props.openChatIds}
         routines={props.homeRoutines}
         watchers={props.managementSnapshot?.routines}
+        pins={props.managementSnapshot?.pins}
         onOpenChat={props.onOpenChat}
         onChats={() => onView("chats")}
         onWatchers={() => onView("watchers")}

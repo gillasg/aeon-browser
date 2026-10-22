@@ -12,6 +12,8 @@ import {
 } from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
 import { installOrb } from "./orb/orb-worker.js";
+import { installSiteAnswers } from "./orb/orb-site.js";
+import { installBrowseLearning } from "./browse-learning.js";
 import { handleSettingsMessage } from "./native-worker-settings.js";
 import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
 import {
@@ -137,6 +139,8 @@ attempt(
 );
 attempt("context menus", () => installNativeBrowserContextMenus(() => ensureInventoryExecutor()));
 attempt("orb", () => installOrb());
+attempt("site answers", () => installSiteAnswers());
+attempt("browse learning", () => installBrowseLearning());
 attempt("native startup", () =>
   installNativeStartup(ensureExecutor, () => scheduleExecutorReconnect(ensureExecutor)),
 );

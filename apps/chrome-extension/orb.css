@@ -128,6 +128,46 @@ textarea::placeholder {
   color: #cfcbdc;
 }
 
+.isl-learn {
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.isl-learn[aria-pressed="true"] {
+  background: rgba(155, 140, 255, 0.22);
+  color: #e4e0ff;
+}
+
+.isl-learn[aria-pressed="true"]::before {
+  content: "● ";
+  color: #9b8cff;
+}
+
+.isl-verbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 6px;
+}
+
+.isl-verb {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e4e2ee;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.isl-verb:hover,
+.isl-verb:focus-visible {
+  background: rgba(155, 140, 255, 0.18);
+  border-color: rgba(155, 140, 255, 0.5);
+}
+
 .isl-main {
   display: flex;
   align-items: center;

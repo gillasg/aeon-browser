@@ -54,6 +54,7 @@ export {
   appendActivity,
   describeWrites,
   readActivityLog,
+  markActivityUndone,
   type ActivityEntry,
 } from "./activity-log.js";
 export { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY, orbFlag } from "./orb-prefs.js";

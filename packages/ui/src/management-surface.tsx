@@ -10,7 +10,7 @@ export type { ManagementSurfaceProps } from "./management-surface-props.js";
 
 export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
   const titles: Record<ManagementSection, string> = {
-    routines: "Watchers",
+    routines: "Routines",
     resources: "Skills & extensions",
     capabilities: "MCPs / CLIs",
     settings: "Settings",

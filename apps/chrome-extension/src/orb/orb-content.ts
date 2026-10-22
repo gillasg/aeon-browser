@@ -1,7 +1,9 @@
 import { isOrbToContent, isOrbToggle, type OrbShown } from "./orb-messages.js";
 import { OrbOverlay } from "./orb-overlay.js";
+import { watchPageChanges } from "./page-changes.js";
 
-// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed.
+// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed, except on
+// pages Aeon has read before, where it shows what changed since (page-changes.ts).
 
 declare global {
   interface Window {
@@ -15,6 +17,7 @@ if (!window.__aeonOrbLoaded) {
 }
 
 function start(): void {
+  if (window.top === window) watchPageChanges();
   let pointer: { x: number; y: number } | undefined;
   let overlay: OrbOverlay | undefined;
   addEventListener("pointermove", (event) => (pointer = { x: event.clientX, y: event.clientY }), {

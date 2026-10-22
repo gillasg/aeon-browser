@@ -16,7 +16,12 @@ export interface ActivityEntry {
   /** What it changed, e.g. "Typed into 2 fields, submitted 1 form". */
   summary: string;
   /** Present only when the site lets the change be reversed. */
-  undo?: { label: string };
+  undo?: {
+    label: string;
+    site: string;
+    operation: string;
+    params: Record<string, unknown>[];
+  };
   /** Every item a write through the site's API changed, for the full list. */
   items?: string[];
 }
@@ -70,6 +75,7 @@ export function logApiWrites(
   for (const write of event.writes) {
     if (!write.done) continue;
     const failed = write.failed ? `, ${write.failed} failed` : "";
+    const params = (write.params ?? []).slice(0, 200);
     appendActivity({
       id: [info.chatId, event.toolCallId, write.site, write.operation].join(":"),
       at: new Date().toISOString(),
@@ -78,7 +84,36 @@ export function logApiWrites(
       task: info.task ?? "",
       summary: `${operationWords(write.operation)}: ${write.done} item${write.done === 1 ? "" : "s"}${failed}`,
       items: write.items,
+      ...(params.length
+        ? {
+            undo: {
+              label: "Undo",
+              site: write.site,
+              operation: write.operation,
+              params,
+            },
+          }
+        : {}),
     });
+  }
+}
+
+/** Removes the Undo from an entry once it ran (or failed), so it cannot run twice. */
+export function markActivityUndone(id: string, error?: string): void {
+  try {
+    const entries = readActivityLog().map((entry) => {
+      if (entry.id !== id) return entry;
+      const rest = { ...entry };
+      delete rest.undo;
+      return {
+        ...rest,
+        summary: entry.summary + (error ? " · undo failed" : " · undone"),
+      };
+    });
+    localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+    window.dispatchEvent(new Event(ACTIVITY_LOG_KEY));
+  } catch {
+    /* Storage may be unavailable; the log is a convenience. */
   }
 }
 

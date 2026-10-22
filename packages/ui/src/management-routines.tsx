@@ -67,10 +67,10 @@ function RoutineToolbar({
       <input
         value={query}
         onChange={(event) => onQuery(event.target.value)}
-        placeholder="Search watchers"
-        aria-label="Search watchers"
+        placeholder="Search routines"
+        aria-label="Search routines"
       />
-      <div role="group" aria-label="Watcher status">
+      <div role="group" aria-label="Routine status">
         {(["all", "active", "paused"] as const).map((value) => (
           <button
             key={value}
@@ -84,7 +84,7 @@ function RoutineToolbar({
         ))}
       </div>
       <button type="button" disabled={!props.snapshot?.chats.length} onClick={onCreate}>
-        New watcher
+        New routine
       </button>
     </div>
   );
@@ -102,7 +102,7 @@ function RoutineList({
   if (!routines.length)
     return (
       <p className="management-empty">
-        {props.loading ? "Loading watchers…" : "No watchers match this view."}
+        {props.loading ? "Loading routines…" : "No routines match this view."}
       </p>
     );
   return (
@@ -114,7 +114,12 @@ function RoutineList({
             className="watcher-open"
             onClick={() => onSelect(routine.routineId)}
           >
-            <strong>{routine.title}</strong>
+            <strong>
+              {routine.title}
+              <span className="routine-kind" data-checks={String(Boolean(routine.checks))}>
+                {routineKind(routine)}
+              </span>
+            </strong>
             <small>{watcherLine(routine)}</small>
           </button>
           {routine.enabled ? (
@@ -134,6 +139,14 @@ function RoutineList({
   );
 }
 
+/**
+ * Everything recurring is a routine; the label says what it costs to run: a check with no model
+ * (the agent only wakes when it finds something), or the agent on every run.
+ */
+export function routineKind(routine: Pick<Routine, "checks">): string {
+  return routine.checks ? "Checks, no AI" : "Runs the agent";
+}
+
 /** Next check, or why it's paused, then the last check. */
 export function watcherLine(routine: Routine): string {
   const last = routine.recentRuns[0];
@@ -144,7 +157,7 @@ export function watcherLine(routine: Routine): string {
 }
 
 /**
- * Why a watcher is paused. Core doesn't say yet; repeated failures at the top of its history are
+ * Why a routine is paused. Core doesn't say yet; repeated failures at the top of its history are
  * the usual cause of an auto-pause, so those are named. Otherwise it is just "Paused".
  */
 export function pauseReason(routine: Routine): string {
@@ -193,7 +206,7 @@ function RoutineDetail({
   return (
     <div className="routine-detail">
       <button className="management-back" type="button" onClick={onBack}>
-        ‹ All watchers
+        ‹ All routines
       </button>
       <RoutineSummary routine={routine} />
       <h3>Instruction</h3>

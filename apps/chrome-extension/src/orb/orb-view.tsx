@@ -9,6 +9,7 @@ import {
 } from "@aeon/ui";
 import { summarize, type OrbRun } from "./orb-run.js";
 import { watchPlan } from "./orb-watch.js";
+import type { SiteVerb } from "./orb-verbs.js";
 
 // The island: one black pill that grows into whatever the run needs. Compose at the mouse,
 // a live step while working, an approval when it needs you, the result when it's done.
@@ -27,6 +28,10 @@ export interface OrbViewModel {
   expanded: boolean;
   /** Things waiting for the user across open orbs, this one included. */
   needsCount: number;
+  /** What this site can do, from the operations Aeon learned on it. */
+  verbs: readonly SiteVerb[];
+  /** This tab records the site's requests while the user browses ("Learn this site"). */
+  learning: boolean;
 }
 
 export interface OrbViewActions {
@@ -39,6 +44,8 @@ export interface OrbViewActions {
   takeOver(): void;
   resume(): void;
   toggleDetails(): void;
+  useVerb(verb: SiteVerb): void;
+  toggleLearning(): void;
 }
 
 export type IslandState = "compose" | "working" | "paused" | "needs" | "done" | "error";
@@ -134,9 +141,51 @@ function Compose({
           ✕
         </Button>
       </div>
+      <ComposeSiteInfo model={model} actions={actions} />
+    </>
+  );
+}
+
+/** What this site can do (its learned verbs), and whether Aeon is learning it as you browse. */
+function ComposeSiteInfo({
+  model,
+  actions,
+}: {
+  model: OrbViewModel;
+  actions: OrbViewActions;
+}): ReactElement {
+  return (
+    <>
+      {model.verbs.length > 0 && (
+        <div className="isl-verbs" role="group" aria-label={`What ${model.host} can do`}>
+          {model.verbs.map((verb) => (
+            <button
+              type="button"
+              key={verb.label}
+              className="isl-verb"
+              onClick={() => actions.useVerb(verb)}
+            >
+              {verb.label}
+              {verb.run ? "" : "…"}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="isl-hint" data-warn={String(Boolean(model.notice))}>
         <span>{model.notice || "Enter to send · Esc to close"}</span>
-        <span className="isl-chip">{model.host || "This page"}</span>
+        <button
+          type="button"
+          className="isl-chip isl-learn"
+          aria-pressed={model.learning}
+          title={
+            model.learning
+              ? "Aeon is learning this site's API while you browse this tab. Click to stop."
+              : "Learn this site's API while you browse this tab (Chrome shows a debugger bar)"
+          }
+          onClick={actions.toggleLearning}
+        >
+          {model.learning ? `Learning ${model.host || "this site"}` : model.host || "This page"}
+        </button>
       </div>
     </>
   );
