@@ -6,4 +6,5 @@ export type ManagementActionName =
   | "register_capability"
   | "update_capability"
   | "remove_capability"
-  | "recheck_capability";
+  | "recheck_capability"
+  | "pin_result";

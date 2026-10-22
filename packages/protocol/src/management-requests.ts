@@ -38,6 +38,7 @@ export const ManagementActionRequestSchema = z
           "update_capability",
           "remove_capability",
           "recheck_capability",
+          "pin_result",
         ]),
         input: z.record(z.string(), z.unknown()),
       })
