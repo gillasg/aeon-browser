@@ -258,8 +258,8 @@ function createPiAdapter(
       provider:
         process.env.AEON_INITIAL_MODEL_PROVIDER ||
         process.env.PIPPIN_INITIAL_MODEL_PROVIDER ||
-        "openai-codex",
-      id: readEnvironment("INITIAL_MODEL_ID") || "gpt-6-luna",
+        "opencode",
+      id: readEnvironment("INITIAL_MODEL_ID") || "deepseek-v4.1-flash",
     },
     browserTool: browserControl.execute.bind(browserControl),
   });
