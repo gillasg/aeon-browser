@@ -9,20 +9,25 @@ import {
   NativePageGrantResponseSchema,
 } from "./native-extension-message.js";
 import { UiClient, type UiConnectResult } from "./ui-client-core.js";
+import { withConnectionTimeout } from "./connection-timeout.js";
 
 export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectResult> {
   const pageInstanceId = crypto.randomUUID();
   let raw: unknown;
   try {
-    raw = await chrome.runtime.sendMessage(
-      NativePageGrantRequestSchema.parse({
-        kind: "aeon.native.page-grant",
-        pageInstanceId,
-        scope,
-      }),
+    // A wedged worker must fail the attempt so the page can retry, not hang on "Connecting…".
+    raw = await withConnectionTimeout(
+      chrome.runtime.sendMessage(
+        NativePageGrantRequestSchema.parse({
+          kind: "aeon.native.page-grant",
+          pageInstanceId,
+          scope,
+        }),
+      ),
+      8_000,
     );
-  } catch {
-    return { kind: "failed", code: "DAEMON_OFFLINE" };
+  } catch (error) {
+    return { kind: "failed", code: unreachableCode(error) };
   }
   const response = NativePageGrantResponseSchema.safeParse(raw);
   if (!response.success) return { kind: "failed", code: "BOOTSTRAP_UNAVAILABLE" };
@@ -88,4 +93,11 @@ function sameScope(left: PageGrantScope, right: PageGrantScope): boolean {
     left.kind === right.kind &&
     (left.kind !== "chat" || (right.kind === "chat" && left.chatId === right.chatId))
   );
+}
+
+/** CONNECTION_TIMEOUT: the worker took the message but never answered; else it was unreachable. */
+function unreachableCode(error: unknown): "CONNECTION_TIMEOUT" | "DAEMON_OFFLINE" {
+  return error instanceof Error && error.message === "CONNECTION_TIMEOUT"
+    ? "CONNECTION_TIMEOUT"
+    : "DAEMON_OFFLINE";
 }

@@ -19,6 +19,7 @@ import {
   startExecutorHeartbeat,
 } from "@browser-use-extension/engine/native-executor-lifecycle";
 import { handleContextPicker } from "./context-picker-handler.js";
+import { withConnectionTimeout } from "./connection-timeout.js";
 import {
   captureCurrentPage,
   claimBrowserContextSubmit,
@@ -95,6 +96,11 @@ configureEngine({
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
 });
+// The worker's own handler is registered before anything else starts: one surface that fails
+// to install must not leave the extension unable to answer a page at all.
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
+  handleRuntimeMessage(request, sender, sendResponse),
+);
 // A clicked thumbnail on a Chat page opens that agent tab in Split View beside the Chat.
 chrome.runtime.onMessage.addListener((request: unknown, sender) => {
   const message = request as { kind?: unknown; chatId?: unknown; tabId?: unknown } | null;
@@ -103,21 +109,36 @@ chrome.runtime.onMessage.addListener((request: unknown, sender) => {
   if (typeof message.chatId !== "string" || !Number.isSafeInteger(message.tabId)) return;
   void presentBrowserTask(message.chatId, message.tabId as number, true);
 });
-void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-void migrateLegacyChromeStorage();
-// Saved boosts (browser.boosts) apply in every tab, without Site Boosts installed.
-installBoosts(undefined, {
-  // Boost scripts call mapped site APIs (sb.api) through Aeon's own site-to-api.
-  siteApi: (site, operation, params) => askCore("siteApi", { site, operation, params }),
-});
-void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
-installNativeBrowserContextMenus(() => ensureInventoryExecutor());
-installOrb();
-
-installNativeStartup(ensureExecutor, () => scheduleExecutorReconnect(ensureExecutor));
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
-  handleRuntimeMessage(request, sender, sendResponse),
+attempt(
+  "session storage",
+  () => void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }),
 );
+attempt("storage migration", () => void migrateLegacyChromeStorage());
+// Saved boosts (browser.boosts) apply in every tab, without Site Boosts installed.
+attempt("boosts", () =>
+  installBoosts(undefined, {
+    // Boost scripts call mapped site APIs (sb.api) through Aeon's own site-to-api.
+    siteApi: (site, operation, params) => askCore("siteApi", { site, operation, params }),
+  }),
+);
+attempt(
+  "side panel",
+  () =>
+    void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined),
+);
+attempt("context menus", () => installNativeBrowserContextMenus(() => ensureInventoryExecutor()));
+attempt("orb", () => installOrb());
+attempt("native startup", () =>
+  installNativeStartup(ensureExecutor, () => scheduleExecutorReconnect(ensureExecutor)),
+);
+
+function attempt(name: string, install: () => void): void {
+  try {
+    install();
+  } catch (error) {
+    console.error("Aeon: " + name + " failed to start", error);
+  }
+}
 
 function handleRuntimeMessage(
   candidate: unknown,
@@ -138,8 +159,10 @@ function handleRuntimeMessage(
   if (request.data.kind === "aeon.native.page-grant") {
     void getPageGrant(sender, request.data.pageInstanceId, request.data.scope).then(
       sendResponse,
-      () =>
-        sendResponse(NativePageGrantResponseSchema.parse({ ok: false, code: "DAEMON_OFFLINE" })),
+      (error: unknown) =>
+        sendResponse(
+          NativePageGrantResponseSchema.parse({ ok: false, code: nativeErrorCode(error) }),
+        ),
     );
     return true;
   }
@@ -226,7 +249,8 @@ listenToCompanions(async () => (await ensureExecutor()).socket);
 async function ensureExecutor(): Promise<ExecutorConnection> {
   if (executor?.socket.readyState === WebSocket.OPEN) return executor;
   if (connecting) return connecting;
-  connecting = connectExecutor().finally(() => {
+  // A hung bootstrap or authentication must not wedge every later page grant.
+  connecting = withConnectionTimeout(connectExecutor(), 20_000).finally(() => {
     connecting = undefined;
   });
   return connecting;
@@ -239,7 +263,7 @@ async function ensureInventoryExecutor(): Promise<ExecutorConnection> {
 }
 
 async function connectExecutor(): Promise<ExecutorConnection> {
-  const identity = await getBrowserIdentity();
+  const identity = await withConnectionTimeout(getBrowserIdentity(), 5_000);
   const native = await sendNativeBootstrap(identity);
   const hello = AuthHelloSchema.parse({
     kind: "auth.hello",

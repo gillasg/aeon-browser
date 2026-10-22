@@ -64,7 +64,25 @@ async function boot(): Promise<void> {
   sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
   focusPrompt();
-  await session.connect().catch((error: unknown) => notice(messageOf(error)));
+  void connectSession();
+}
+
+// The orb opens and stays open across daemon restarts, so one failed attempt must not leave it
+// on "Connecting…" until the window is closed.
+async function connectSession(): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await session.connect();
+      model.notice = "";
+      render();
+      return;
+    } catch (error) {
+      if (attempt === 10) notice(messageOf(error));
+      await new Promise((resolve) =>
+        globalThis.setTimeout(resolve, Math.min(500 * 2 ** Math.min(attempt, 3), 5000)),
+      );
+    }
+  }
 }
 
 function listen(): void {
