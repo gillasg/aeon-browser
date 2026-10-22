@@ -7,6 +7,7 @@ import { WebSocket } from "ws";
 import { siteApiRequest } from "@aeon/pi-adapter";
 import type { BrowserControlService } from "./browser-control-service.js";
 import type { ChatService } from "./chat-service.js";
+import { answerSiteRequest } from "./site-requests.js";
 
 // Requests other extensions send through Aeon's browser extension (which only passes on ones the
 // user allowed): a completion with the user's model, or a task that starts a chat (watching a
@@ -88,6 +89,8 @@ async function answer(request: CompanionRequest, deps: Deps): Promise<unknown> {
   const data = request.data;
   if (request.request === "model.complete") return complete(data, deps);
   if (request.request === "siteApi") return callSiteApi(data);
+  // Aeon's own extension never forwards this kind from other extensions.
+  if (request.request === "site") return answerSiteRequest(data);
   if (typeof data.url !== "string" && request.request === "watch")
     throw new Error("A watch needs the page address");
   if (request.request === "watch")

@@ -9,6 +9,8 @@ export interface SiteWrite {
   failed: number;
   /** A short label per item that went through, for the Activity log. */
   items: string[];
+  /** The values each item was written with, so Activity can reverse them. */
+  params: Record<string, unknown>[];
 }
 
 const MAX_ITEMS = 200;
@@ -35,12 +37,14 @@ export class SiteWrites {
       done: 0,
       failed: 0,
       items: [],
+      params: [],
     };
     this.writes.set(key, write);
     return sent.then(
       (value) => {
         write.done += 1;
         if (write.items.length < MAX_ITEMS) write.items.push(itemLabel(call.params));
+        if (write.params.length < MAX_ITEMS) write.params.push(itemParams(call.params));
         return value;
       },
       (error: unknown) => {
@@ -63,4 +67,16 @@ function itemLabel(params: unknown): string {
     .map(String)
     .join(" · ")
     .slice(0, 80);
+}
+
+/** The item's values as they were sent, kept so Undo can send the reverse for the same item. */
+function itemParams(params: unknown): Record<string, unknown> {
+  if (!params || typeof params !== "object" || Array.isArray(params)) return {};
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params as Record<string, unknown>).slice(0, 20)) {
+    if (typeof value === "string") kept[key] = value.slice(0, 500);
+    else if (typeof value === "number" || typeof value === "boolean" || value === null)
+      kept[key] = value;
+  }
+  return kept;
 }

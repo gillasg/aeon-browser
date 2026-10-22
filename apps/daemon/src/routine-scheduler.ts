@@ -44,6 +44,10 @@ export class RoutineScheduler {
 
   /** Told when a watcher's check passes, before its agent run (a notification, at once). */
   onAlert: ((chatId: string, title: string, message: string) => void) | undefined;
+  /** Every watcher check, passed or not: its pin on home shows the value and history. */
+  onCheck:
+    | ((routine: RoutineRecord, check: { met: boolean; value?: unknown; error?: string }) => void)
+    | undefined;
 
   async start(): Promise<void> {
     if (this.started) return;
@@ -188,6 +192,7 @@ export class RoutineScheduler {
     const check = isListening(routine)
       ? this.takeHeard(routine.routineId)
       : await this.runCheck(routine, run.runId);
+    this.onCheck?.(routine, check);
     if (check.met) {
       this.onAlert?.(routine.chatId, routine.title, describeCheck(check.value));
       return `${routine.instruction}

@@ -119,6 +119,7 @@ test("management DTO distinguishes environment references from manual Pi credent
     ManagementSnapshotSchema.parse({
       chats: [],
       routines: [],
+      pins: [],
       capabilityRevision: 1,
       capabilities: [capability],
       resources: null,
@@ -130,6 +131,7 @@ test("management DTO distinguishes environment references from manual Pi credent
     ManagementSnapshotSchema.safeParse({
       chats: [],
       routines: [],
+      pins: [],
       capabilityRevision: 1,
       capabilities: [{ ...capability, credentialBinding: "secret_value" }],
       resources: null,

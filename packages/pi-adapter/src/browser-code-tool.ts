@@ -1,3 +1,4 @@
+import { dirname, join } from "node:path";
 import { traceActions } from "./browser-trace-actions.js";
 import { browserCodeGuidelines } from "./browser-code-guidance.js";
 import { compactBrowserTrace } from "./browser-recovery.js";
@@ -9,6 +10,7 @@ import { createSiteScriptTool } from "./site-script-tool.js";
 import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 import { SiteWrites } from "./browser-site-writes.js";
+import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { noteVisits, visitedUrls } from "./site-mapping.js";
 import { siteApiRequest } from "./site-browser.js";
 
@@ -79,7 +81,7 @@ export function createBrowserCodeTool(
               }
               const site = siteApiRequest(chatId, request);
               return site
-                ? writes.track(request, site)
+                ? rememberApiRead(skills, request, writes.track(request, site))
                 : serveCall(request, workspace, steps, skills);
             },
             onProgress: (next) => {
@@ -187,6 +189,16 @@ async function serveCall(
     if (!skills) throw new Error("Site skills are unavailable");
     return siteSkillCall(skills, request);
   }
+  // Saved reads sit beside site skills in the data folder.
+  if (isSavedReadRequest(request)) {
+    if (!skills) return { saved: false };
+    const saved = await putSavedRead(
+      savedReadsRoot(skills),
+      request.savedRead.url,
+      request.savedRead.text,
+    );
+    return { saved };
+  }
   if (isWorkspaceRequest(request)) {
     if (!workspace) throw new Error("Chat workspace is unavailable");
     const result = await workspaceCall(workspace, request);
@@ -263,4 +275,49 @@ async function journalOutput(
   });
   cell.output =
     cell.output.slice(0, 6000) + "\n[Full output saved: " + JSON.stringify(journal) + "]";
+}
+
+function savedReadsRoot(skills: string): string {
+  return join(dirname(skills), "saved-reads");
+}
+
+/**
+ * Everything a site API read returns is kept as a saved read, so pinned answers and "changed
+ * since you last looked" can compare against it later. Reads only, never writes.
+ */
+function rememberApiRead(
+  skills: string | undefined,
+  request: unknown,
+  sent: Promise<unknown>,
+): Promise<unknown> {
+  const call = request as {
+    siteApi?: string;
+    site?: string;
+    operation?: string;
+    params?: unknown;
+  };
+  const site = call.site;
+  const operation = call.operation;
+  if (!skills || !site || !operation) return sent;
+  if (call.siteApi !== "call" && call.siteApi !== "watch") return sent;
+  return sent.then(async (value) => {
+    const text = JSON.stringify(value) ?? "null";
+    await putSavedRead(
+      savedReadsRoot(skills),
+      apiReadKey(site, operation, call.params),
+      text,
+    ).catch(() => false);
+    return value;
+  });
+}
+
+/** A stable address for one API read: the same call always compares against its own last result. */
+function apiReadKey(site: string, operation: string, params: unknown): string {
+  const entries =
+    params && typeof params === "object"
+      ? Object.entries(params as Record<string, unknown>).sort(([left], [right]) =>
+          left.localeCompare(right),
+        )
+      : [];
+  return `aeon-api://${site}/${operation}?${encodeURIComponent(JSON.stringify(entries))}`;
 }

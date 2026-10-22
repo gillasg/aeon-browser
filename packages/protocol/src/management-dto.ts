@@ -124,10 +124,36 @@ const ManagedCapabilitySchema = z
   })
   .strict();
 
+export const PinnedResultSchema = z
+  .object({
+    pinId: z.string().uuid(),
+    title: z.string().min(1).max(120),
+    value: z.string().max(200),
+    detail: z.string().max(300).optional(),
+    condition: z.string().max(200).optional(),
+    source: z.enum(["api", "routine", "answer"]),
+    site: z.string().max(200).optional(),
+    operation: z.string().max(200).optional(),
+    params: z.record(z.string(), z.unknown()).optional(),
+    chatId: ChatIdSchema.optional(),
+    routineId: z.string().uuid().optional(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    checkedAt: z.string().datetime().nullable(),
+    refreshMinutes: z.number().int().positive().max(1440).optional(),
+    needsYou: z.boolean().optional(),
+    error: z.string().max(500).optional(),
+    history: z
+      .array(z.object({ at: z.string().datetime(), value: z.string().max(200) }).strict())
+      .max(12),
+  })
+  .strict();
+
 export const ManagementSnapshotSchema = z
   .object({
     chats: z.array(ChatSummarySchema).max(100),
     routines: z.array(ManagementRoutineSchema).max(100),
+    pins: z.array(PinnedResultSchema).max(50),
     capabilityRevision: z.number().int().nonnegative(),
     capabilities: z.array(ManagedCapabilitySchema).max(100),
     resources: EffectivePiResourcesSchema.nullable(),

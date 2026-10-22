@@ -14,6 +14,7 @@ import { parseCapability } from "./capability-parsing.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
 import type { RoutineScheduler } from "./routine-scheduler.js";
+import type { PinnedResults } from "./pinned-results.js";
 import type { ManagementActionName } from "./management-actions.js";
 import { isRoutineTool, RoutineManagementTools } from "./routine-management-tools.js";
 
@@ -34,6 +35,7 @@ export class CapabilityToolService implements CapabilityToolHost {
     private readonly piMcp: PiMcpSessionHost,
     private readonly store: AeonProductStore,
     private readonly routines: RoutineScheduler,
+    private readonly pins: PinnedResults,
   ) {
     this.routineTools = new RoutineManagementTools(store, routines);
   }
@@ -75,9 +77,12 @@ export class CapabilityToolService implements CapabilityToolHost {
   ): Promise<string> {
     const actor = chatId as ChatId;
     const args = asRecord(input);
-    const result = isRoutineTool(toolName)
-      ? this.routineTools.execute(toolName, args, actor)
-      : await this.executeCapabilityTool(toolName, args, actor, signal);
+    const result =
+      toolName === "pin_result"
+        ? await this.pins.execute(args, actor)
+        : isRoutineTool(toolName)
+          ? this.routineTools.execute(toolName, args, actor)
+          : await this.executeCapabilityTool(toolName, args, actor, signal);
     return JSON.stringify(result) ?? "null";
   }
 

@@ -314,6 +314,7 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
               done: z.number().int().nonnegative(),
               failed: z.number().int().nonnegative(),
               items: z.array(z.string().max(80)).max(200),
+              params: z.array(z.record(z.string(), z.unknown())).max(200).optional(),
             })
             .strict(),
         )

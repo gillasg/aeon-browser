@@ -14,7 +14,7 @@ export const browserCodeGuidelines = [
     "- A site used before: the here: line at the top of bu.state() lists its learned API, boosts and data; use them before clicking.",
     "- The same change on many items: do the first one in the page; the output then says 'Learned on <site>: <operation>' and siteApi.batch(site, operation, items) does the rest in this one call. Any long job runs in one cell with bu.progress(done, total, label), never in batches of a few.",
     "- Took more than one try to work out: skills.save({...}) before answering. Skills for a site load by themselves.",
-    "- 'Every time I visit': a boost. 'Keep an eye on', 'every 3 hours', 'tell me when': a routine.",
+    "- 'Every time I visit': a boost. 'Keep an eye on', 'every 3 hours', 'tell me when': a routine. 'Pin this', 'keep this on my home': pin_result (include the site API operation it came from, if any, so it stays current).",
     "- Only the user can do it (their password, a 2FA code, a payment, a choice that is theirs): bu.handoff(message).",
     "- Anything else: await help() lists topics (tabs, reading, history, api, network, skills, progress, recording, demonstrations, boosts, rules, media, live, visual, debugging, workspace); help(topic) gives the reference.",
   ].join("\n"),

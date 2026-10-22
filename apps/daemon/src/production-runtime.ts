@@ -1,3 +1,5 @@
+import { configureSiteRequests } from "./site-requests.js";
+import { PinnedResults } from "./pinned-results.js";
 import { CoreAttention } from "./core-attention.js";
 import { installChatPreparation, prepareChat } from "./chat-preparation.js";
 import { join, resolve } from "node:path";
@@ -45,20 +47,37 @@ export function createProductionRuntime(dataDirectory: string): {
   const service = new ChatService({ dataDirectory: dataRoot, store, pi });
   const stopPreparing = installChatPreparation(service);
   const attention = new CoreAttention(dataRoot, service);
+  configureSiteRequests(dataRoot);
+  const pins = new PinnedResults(dataRoot);
   const threadCoordination = new ThreadCoordinationService(service, store);
   const routines = new RoutineScheduler(store, service, browserControl);
   routines.onAlert = (chatId, title, message) => attention.alert(chatId, title, message);
-  const capabilityTools = new CapabilityToolService(registry, mcpMigration, pi, store, routines);
+  routines.onCheck = (routine, check) => void pins.recordCheck(routine, check);
+  const capabilityTools = new CapabilityToolService(
+    registry,
+    mcpMigration,
+    pi,
+    store,
+    routines,
+    pins,
+  );
   pi.setThreadToolHost(threadCoordination);
   pi.setCapabilityToolHost(capabilityTools);
   service.management.setActionRunner((chatId, action, input) =>
     capabilityTools.executeManagementAction(chatId, action, input),
   );
   service.management.setReader((selectedChatId) =>
-    readManagementSnapshot(service, store, capabilityTools, selectedChatId),
+    readManagementSnapshot(service, store, capabilityTools, pins, selectedChatId),
   );
   service.management.setHomeReader(() => readHomeManagementSnapshot(service, store));
-  const ready = initializeRuntime(registry, mcpMigration, threadCoordination, routines, service);
+  const ready = initializeRuntime(
+    registry,
+    mcpMigration,
+    threadCoordination,
+    routines,
+    pins,
+    service,
+  );
 
   return {
     service,
@@ -70,6 +89,7 @@ export function createProductionRuntime(dataDirectory: string): {
       stopPreparing();
       await attention.close();
       routines.close();
+      pins.close();
       threadCoordination.close();
       await pi.closeAll();
       siteScripts.close();
@@ -82,6 +102,7 @@ async function readManagementSnapshot(
   service: ChatService,
   store: ReturnType<typeof openChatStore>,
   capabilityTools: CapabilityToolService,
+  pins: PinnedResults,
   selectedChatId?: import("@aeon/domain").ChatId,
 ): Promise<unknown> {
   let resources = null;
@@ -119,6 +140,7 @@ async function readManagementSnapshot(
   return {
     chats: service.listChats(100),
     routines,
+    pins: await pins.list(),
     capabilityRevision: catalog.revision,
     capabilities,
     resources,
@@ -151,12 +173,14 @@ async function initializeRuntime(
   migration: PiMcpConfigMigration,
   threads: ThreadCoordinationService,
   routines: RoutineScheduler,
+  pins: PinnedResults,
   service: ChatService,
 ): Promise<void> {
   await registry.initialize();
   await migration.migrate(await registry.snapshot());
   await threads.recover();
   await routines.start();
+  await pins.start();
   // Warm the next chat's resources in the background: readiness must not wait on compiling
   // extensions (seconds when cold), and the first chat joins this same preparation.
   void prepareChat(service);

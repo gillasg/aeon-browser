@@ -61,12 +61,51 @@ const routineDelete = Type.Object(
   },
   { additionalProperties: false },
 );
+const pinResult = Type.Object(
+  {
+    title: Type.String({ minLength: 1, maxLength: 120 }),
+    value: Type.Optional(Type.String({ maxLength: 200 })),
+    detail: Type.Optional(Type.String({ maxLength: 300 })),
+    condition: Type.Optional(Type.String({ maxLength: 200 })),
+    site: Type.Optional(Type.String({ maxLength: 200 })),
+    operation: Type.Optional(Type.String({ maxLength: 200 })),
+    params: Type.Optional(record),
+    refreshMinutes: Type.Optional(Type.Integer({ minimum: 5, maximum: 1440 })),
+    remove: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
 
 export function createCapabilityTools(
   chatId: string,
   host?: CapabilityToolHost,
 ): ReturnType<typeof defineTool>[] {
-  return [...createRegistryTools(chatId, host), ...createRoutineTools(chatId, host)];
+  return [
+    ...createRegistryTools(chatId, host),
+    ...createRoutineTools(chatId, host),
+    ...createPinTools(chatId, host),
+  ];
+}
+
+/** Keeping an answer on the new-tab home, where it stays current on its own when it can. */
+function createPinTools(
+  chatId: string,
+  host?: CapabilityToolHost,
+): ReturnType<typeof defineTool>[] {
+  return [
+    tool(
+      chatId,
+      host,
+      "pin_result",
+      "Keep an answer on the new-tab home. Call it when the user says 'pin this', 'keep this on my home' " +
+        "or asks for something to stay visible. Pass the answer as value, plus site and operation when it " +
+        "came from a mapped site API read (the pin then refreshes itself with no model; add params when the " +
+        "read needs them and refreshMinutes for how often). A saved answer stays as it was. " +
+        "For a watcher, create a routine with a check instead: its checks update its pin by themselves. " +
+        "remove: true unpins the card with the same title.",
+      pinResult,
+    ),
+  ];
 }
 
 function createRegistryTools(

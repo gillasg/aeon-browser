@@ -376,7 +376,22 @@ function toolWrites(value: unknown): ToolWrite[] | undefined {
     items: Array.isArray(write.items)
       ? write.items.slice(0, 200).map((item) => String(item).slice(0, 80))
       : [],
+    ...(Array.isArray(write.params)
+      ? { params: write.params.slice(0, 200).map(toolWriteParams) }
+      : {}),
   }));
+}
+
+/** Only the item's own values travel to Activity, so Undo can send the same ones back. */
+function toolWriteParams(params: unknown): Record<string, unknown> {
+  if (!params || typeof params !== "object" || Array.isArray(params)) return {};
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params as Record<string, unknown>).slice(0, 20)) {
+    if (typeof value === "string") kept[key] = value.slice(0, 500);
+    else if (typeof value === "number" || typeof value === "boolean" || value === null)
+      kept[key] = value;
+  }
+  return kept;
 }
 
 interface ToolWrite {
@@ -385,4 +400,5 @@ interface ToolWrite {
   done: number;
   failed: number;
   items: string[];
+  params?: Record<string, unknown>[];
 }
