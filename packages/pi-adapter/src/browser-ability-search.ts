@@ -108,6 +108,26 @@ const ABILITIES: Ability[] = [
     words: "progress long job loop many items",
   },
   {
+    call: "page.controls.inspect() / page.batch(steps)",
+    what: "read a form's full state; fill, select, check and submit in one verified call",
+    words: "form field input select dropdown checkbox radio fill submit batch controls options",
+  },
+  {
+    call: "page.overlays.dismiss()",
+    what: "close cookie banners and pop-ups (rejects cookies first)",
+    words: "cookie banner consent popup pop-up modal newsletter overlay dismiss close",
+  },
+  {
+    call: "page.media.inspect()",
+    what: "what video or audio is playing, where, and its title",
+    words: "video audio playing music media player position duration song",
+  },
+  {
+    call: "page.challenges()",
+    what: "name a bot check, captcha, block or sign-in wall on the page",
+    words: "captcha cloudflare bot blocked challenge rate limit access denied",
+  },
+  {
     call: "bu.handoff(message)",
     what: "hand the tab to the user (sign-in, 2FA, payment)",
     words: "handoff login sign in password 2fa captcha user payment",
