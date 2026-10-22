@@ -109,13 +109,26 @@ function PinAction({
   return (
     <button
       type="button"
-      className="message-pin"
+      className="message-copy message-pin"
       aria-label="Pin answer to home"
       title={state === "Pin" ? "Keep this answer on the new-tab home" : state}
       onClick={() => void run()}
     >
-      {state}
+      {state === "Pin failed" ? <span className="message-copy-state">{state}</span> : null}
+      <PinIcon pinned={state === "Pinned"} />
     </button>
+  );
+}
+
+function PinIcon({ pinned }: { pinned: boolean }): ReactElement {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      {pinned ? (
+        <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+      ) : (
+        <path d="M12.5 3.5 16.5 7.5 13.5 9 11 14 6 9l5-2.5zM8.5 11.5 4 16" />
+      )}
+    </svg>
   );
 }
 

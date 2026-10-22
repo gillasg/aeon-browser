@@ -2,6 +2,7 @@ import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
 import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
+import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { TabControl, isNeedsKey, markSeen, needsCount, setNeeds } from "./orb-control.js";
 import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
 import {
@@ -299,8 +300,20 @@ async function toggleLearning(): Promise<void> {
   render();
 }
 
+// The chat opens in the side panel beside the page; a tab only if the panel cannot open.
 function openChat(): void {
-  if (session.chatId) void openExtensionChat(session.chatId).catch(() => undefined);
+  const chatId = session.chatId;
+  if (!chatId) return;
+  // Must run before any await: opening the side panel needs the click's user gesture.
+  const opened = chrome.sidePanel.open({ tabId });
+  void chrome.tabs
+    .get(tabId)
+    .then((tab) => chrome.storage.session.set({ [sidePanelSelectionKey(tab.windowId)]: chatId }))
+    .catch(() => undefined);
+  void opened.then(
+    () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
+    () => openExtensionChat(chatId).catch(() => undefined),
+  );
 }
 
 function view(): ReactNode {

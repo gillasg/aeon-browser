@@ -15,6 +15,11 @@ import {
 import type { ToolStep } from "./transcript-model.js";
 
 export function describeBrowserAction(step: ToolStep): string {
+  const code = stringValue(step.arguments, "code");
+  return code ? describeCodeCell(code, step.state === "running") : describeBrowserStep(step);
+}
+
+function describeBrowserStep(step: ToolStep): string {
   const action = lastBrowserAction(step.arguments);
   const operation = stringValue(action, "op", "action", "operation", "type")
     ? action
@@ -59,6 +64,32 @@ export function describeNamedAction(name: string, step: ToolStep): string {
     describeFileAction(name, file, editing) ??
     describeOtherAction(name, step, file)
   );
+}
+
+// browser_code cells carry only code: name the main thing it does, and the site it opens.
+const codeLabels: ReadonlyArray<readonly [RegExp, string, string]> = [
+  [/bu\.handoff\(/, "Waiting for you", "Handed over to you"],
+  [/boosts\.save\(/, "Saving a site boost", "Saved a site boost"],
+  [/page\.batch\(/, "Filling in the form", "Filled in the form"],
+  [/overlays\.dismiss\(/, "Clearing pop-ups", "Cleared pop-ups"],
+  [/siteApi\.(?:batch|write)\(/, "Updating through the site", "Updated through the site"],
+  [/siteApi\./, "Reading through the site", "Read through the site"],
+  [/google\.search\(/, "Searching Google", "Searched Google"],
+  [/browser\.history|browser\.bookmarks/, "Browsing recent activity", "Browsed history"],
+  [/saveMedia\(|\.download\(/, "Saving files", "Saved files"],
+  [/\.upload\(/, "Uploading files", "Uploaded files"],
+  [/\.(?:click|fill|press|check|selectOption)\(|bu\.(?:click|type)\(/, "Working in", "Worked in"],
+  [/openTab\(|\.goto\(|\.navigate\(/, "Opening", "Opened"],
+];
+
+function describeCodeCell(code: string, running: boolean): string {
+  const match = codeLabels.find(([pattern]) => pattern.test(code));
+  const host = /https?:\/\/(?:www\.)?([^/'"`\s?#]+)/.exec(code)?.[1];
+  if (!match) return host ? `${running ? "Reading" : "Read"} ${host}` : "Working in the page";
+  const label = running ? match[1] : match[2];
+  if (/^(?:Opening|Opened|Working in|Worked in)$/.test(label))
+    return host ? `${label} ${host}` : running ? "Working in the page" : "Worked in the page";
+  return label;
 }
 
 function browserActionLabel(operation: string): string {

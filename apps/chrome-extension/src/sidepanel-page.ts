@@ -9,6 +9,7 @@ import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-con
 import { handoffKey, pendingHandoffs, saveChatContext } from "./browser-context-storage.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import { observePanelFrameTitle } from "./panel-frame-title.js";
+import { sidePanelSelectionKey as selectionKey } from "./sidebar-selection.js";
 
 const root = requiredElement("root");
 let client: UiClient | undefined;
@@ -99,8 +100,13 @@ const reconnect = new PageReconnect(start, (message) => {
 });
 void reconnect.start();
 window.addEventListener("pagehide", () => client?.close(), { once: true });
-chrome.storage.onChanged.addListener((_changes, area) => {
-  if (area === "session") void routePendingContext();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "session") return;
+  void routePendingContext();
+  // Another surface (the orb's Open chat) chose the chat this window's panel shows.
+  const chosen = windowId === undefined ? undefined : changes[selectionKey(windowId)]?.newValue;
+  if (typeof chosen === "string" && chosen !== selectedChatId && client)
+    void refreshChats().then(() => selectChat(chosen, false));
 });
 
 async function start(): Promise<void> {
@@ -280,9 +286,6 @@ function handleDaemonMessage(message: DaemonUiResponse): void {
 function requireClient(): UiClient {
   if (!client) throw new Error("The local daemon is unavailable.");
   return client;
-}
-function selectionKey(id: number): string {
-  return `aeon-selected-chat-${id}`;
 }
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "LOCAL_ERROR";
