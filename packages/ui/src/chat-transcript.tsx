@@ -10,12 +10,13 @@ import { PendingWork } from "./pending-work.js";
 import { AnnotationSelection } from "./annotation-selection.js";
 import { HandoffCard, pendingHandoff } from "./handoff-card.js";
 import type { TranscriptRow } from "./transcript-model.js";
-import { TranscriptTurn, transcriptTurns } from "./transcript-turn.js";
+import { TranscriptTurn, transcriptTurns, type TranscriptActions } from "./transcript-turn.js";
 
 export function ChatTranscript({
   rows,
   onEditEntry,
   onBranchEntry,
+  onPinMessage,
   actionsDisabled = false,
   running = false,
   starting = false,
@@ -25,6 +26,7 @@ export function ChatTranscript({
   rows: readonly TranscriptRow[];
   onEditEntry?: (entryId: string) => Promise<void> | void;
   onBranchEntry?: (entryId: string) => Promise<void> | void;
+  onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
   actionsDisabled?: boolean;
   running?: boolean;
   starting?: boolean;
@@ -33,6 +35,7 @@ export function ChatTranscript({
 }): ReactElement {
   const { root, awayFromLatest, atTop, updateScrollState, jumpToLatest } =
     useTranscriptScroll(rows);
+  const actions = turnActions({ actionsDisabled, onEditEntry, onBranchEntry, onPinMessage });
   return (
     <div
       className="transcript-wrap"
@@ -47,15 +50,7 @@ export function ChatTranscript({
         onScroll={updateScrollState}
       >
         {transcriptTurns(rows).map((turn) => (
-          <TranscriptTurn
-            key={turn[0]?.key}
-            rows={turn}
-            actions={{
-              actionsDisabled,
-              ...(onEditEntry ? { onEditEntry } : {}),
-              ...(onBranchEntry ? { onBranchEntry } : {}),
-            }}
-          />
+          <TranscriptTurn key={turn[0]?.key} rows={turn} actions={actions} />
         ))}
         <TranscriptTail
           rows={rows}
@@ -104,6 +99,26 @@ function JumpToLatest({ onClick }: { onClick(): void }): ReactElement {
       Latest
     </button>
   );
+}
+
+/** The action props every row gets, built once per render. */
+function turnActions({
+  actionsDisabled,
+  onEditEntry,
+  onBranchEntry,
+  onPinMessage,
+}: {
+  actionsDisabled: boolean;
+  onEditEntry?: ((entryId: string) => Promise<void> | void) | undefined;
+  onBranchEntry?: ((entryId: string) => Promise<void> | void) | undefined;
+  onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
+}): TranscriptActions {
+  return {
+    actionsDisabled,
+    ...(onEditEntry ? { onEditEntry } : {}),
+    ...(onBranchEntry ? { onBranchEntry } : {}),
+    ...(onPinMessage ? { onPinMessage } : {}),
+  };
 }
 
 function useTranscriptScroll(rows: readonly TranscriptRow[]) {

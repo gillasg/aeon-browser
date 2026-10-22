@@ -8,6 +8,7 @@ export interface TranscriptActions {
   actionsDisabled: boolean;
   onEditEntry?: (entryId: string) => Promise<void> | void;
   onBranchEntry?: (entryId: string) => Promise<void> | void;
+  onPinMessage?: (text: string) => Promise<void> | void;
 }
 export function transcriptTurns(rows: readonly TranscriptRow[]): TranscriptRow[][] {
   const turns: TranscriptRow[][] = [];

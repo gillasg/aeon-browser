@@ -88,6 +88,16 @@ export class OrbSession {
     if (result.kind !== "management.snapshot") throw new Error("The routine was not saved.");
   }
 
+  /** Keeps this run's answer on the new-tab home, through the same management grant. */
+  async createPin(title: string, value: string): Promise<void> {
+    if (!this.chat || !this.chatId) throw new Error("This run has no chat to pin from.");
+    const result = await command(this.chat, {
+      operation: "management.action",
+      payload: { chatId: this.chatId, action: "pin_result", input: { title, value } },
+    });
+    if (result.kind !== "management.snapshot") throw new Error("The answer was not pinned.");
+  }
+
   close(): void {
     this.catalog?.close();
     this.chat?.close();

@@ -39,6 +39,7 @@ export interface ChatSurfaceProps {
   transcriptActionsDisabled?: boolean;
   onEditMessage?(entryId: string): Promise<void> | void;
   onBranchMessage?(entryId: string): Promise<void> | void;
+  onPinAnswer?: ((text: string) => Promise<void> | void) | undefined;
   onNewChat(): void;
   onPinChat?(chat: ChatSummaryDto): void;
   onDeleteChat?(chat: ChatSummaryDto): void;
@@ -138,6 +139,7 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               }
               {...(props.onEditMessage ? { onEditEntry: props.onEditMessage } : {})}
               {...(props.onBranchMessage ? { onBranchEntry: props.onBranchMessage } : {})}
+              onPinMessage={props.onPinAnswer}
             />
           ) : (
             <section className="welcome" aria-label="New Chat">

@@ -621,6 +621,21 @@ summary:focus-visible {
   color: var(--aeon-text);
   white-space: nowrap;
 }
+.message-pin {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--aeon-r-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.message-pin:hover,
+.message-pin:focus-visible {
+  background: var(--aeon-surface-raised);
+  color: var(--aeon-text);
+}
 .message-time {
   padding: 0 var(--aeon-s-2);
   color: var(--aeon-faint);

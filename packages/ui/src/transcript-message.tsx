@@ -10,12 +10,14 @@ export function TranscriptMessage({
   row,
   onEditEntry,
   onBranchEntry,
+  onPinMessage,
   actionsDisabled,
   hideThinking = false,
 }: {
   row: Exclude<TranscriptRow, { kind: "tool-group" }>;
   onEditEntry?: (entryId: string) => Promise<void> | void;
   onBranchEntry?: (entryId: string) => Promise<void> | void;
+  onPinMessage?: (text: string) => Promise<void> | void;
   actionsDisabled: boolean;
   hideThinking?: boolean;
 }): ReactElement | null {
@@ -44,6 +46,7 @@ export function TranscriptMessage({
           entry={entry}
           onEditEntry={onEditEntry}
           onBranchEntry={onBranchEntry}
+          {...(onPinMessage ? { onPin: onPinMessage } : {})}
           actionsDisabled={actionsDisabled}
           text={text}
         />

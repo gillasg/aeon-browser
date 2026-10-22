@@ -40,6 +40,7 @@ export interface OrbViewActions {
   stop(): void;
   again(): void;
   watch(): void;
+  pin(): void;
   openChat(): void;
   takeOver(): void;
   resume(): void;
@@ -319,6 +320,7 @@ function Done({
           {saved ? "Watching ✓" : "Watch"}
         </Button>
       )}
+      <Button onClick={actions.pin}>Pin to home</Button>
       <Button onClick={actions.openChat}>Open chat</Button>
       <Button kind="icon" label="Close (Esc)" onClick={actions.close}>
         ✕

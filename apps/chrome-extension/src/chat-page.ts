@@ -11,7 +11,11 @@ import { installFileViewerLinks } from "./file-viewer-launch.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
 import { createToolImageLoader } from "./tool-image-client.js";
-import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@aeon/protocol";
+import {
+  type ChatViewSnapshotDto,
+  type DaemonUiResponse,
+  DaemonUiRequestSchema,
+} from "@aeon/protocol";
 import {
   ChatSurface,
   invokePiCommand,
@@ -150,7 +154,43 @@ function createView() {
     onSelectChat: (nextChatId: string) => void sidebar.openChat(nextChatId),
     ...sidebar.actionProps(),
     onNewChat: () => openNewChat(),
+    onPinAnswer: (text: string) => void pinAnswer(text),
   });
+}
+
+/** Keeps an answer on the new-tab home through the same management grant the orb uses. */
+async function pinAnswer(text: string): Promise<void> {
+  const value = text.trim().slice(0, 200);
+  if (!value) return;
+  if (!client) throw new Error("Aeon is not connected.");
+  const requestId = crypto.randomUUID();
+  const after = client.send(
+    DaemonUiRequestSchema.parse({
+      kind: "command",
+      requestId,
+      operation: "management.action",
+      payload: {
+        chatId,
+        action: "pin_result",
+        input: { title: pinTitle(title), value },
+      },
+    }),
+  );
+  const response = await client.waitFor(
+    (message) =>
+      (message.kind === "command.completed" || message.kind === "command.failed") &&
+      message.requestId === requestId,
+    after,
+  );
+  if (response.kind === "command.failed") throw new Error(response.message);
+}
+
+function pinTitle(current: string): string {
+  const stripped = current
+    .replace(/\s*Aeon\s*$/, "")
+    .replace(/[^\w\s]+$/, "")
+    .trim();
+  return (stripped || "Chat").slice(0, 120);
 }
 function render(): void {
   if (updateUi) updateUi(createView());

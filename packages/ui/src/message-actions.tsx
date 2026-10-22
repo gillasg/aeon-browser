@@ -7,36 +7,49 @@ export interface MessageActionProps {
   entry?: PiEntryDto | undefined;
   onEditEntry?: ((entryId: string) => Promise<void> | void) | undefined;
   onBranchEntry?: ((entryId: string) => Promise<void> | void) | undefined;
+  onPin?: ((text: string) => Promise<void> | void) | undefined;
   actionsDisabled: boolean;
   text: string;
 }
 
 export function MessageActions(props: MessageActionProps): ReactElement {
   const isUser = props.message?.role === "user";
-  const isAssistant = props.message?.role === "assistant";
   return (
     <div className={`message-actions ${isUser ? "for-user" : "for-assistant"}`}>
       {isUser && <MessageTime entry={props.entry} />}
       <CopyAction text={props.text} isUser={isUser} />
-      {isUser && props.entry && props.onEditEntry && (
-        <EntryAction
-          kind="edit"
-          entryId={props.entry.entryId}
-          action={props.onEditEntry}
-          disabled={props.actionsDisabled}
-        />
-      )}
-      {isAssistant && props.entry && props.onBranchEntry && (
-        <EntryAction
-          kind="branch"
-          entryId={props.entry.entryId}
-          action={props.onBranchEntry}
-          disabled={props.actionsDisabled}
-        />
-      )}
+      {!isUser && <PinAction text={props.text} onPin={props.onPin} />}
+      <RoleAction props={props} isUser={isUser} />
       {!isUser && <MessageTime entry={props.entry} />}
     </div>
   );
+}
+
+/** Edit for a user message, branch for an assistant one. */
+function RoleAction({
+  props,
+  isUser,
+}: {
+  props: MessageActionProps;
+  isUser: boolean;
+}): ReactElement | null {
+  if (isUser)
+    return props.entry && props.onEditEntry ? (
+      <EntryAction
+        kind="edit"
+        entryId={props.entry.entryId}
+        action={props.onEditEntry}
+        disabled={props.actionsDisabled}
+      />
+    ) : null;
+  return props.entry && props.onBranchEntry ? (
+    <EntryAction
+      kind="branch"
+      entryId={props.entry.entryId}
+      action={props.onBranchEntry}
+      disabled={props.actionsDisabled}
+    />
+  ) : null;
 }
 
 function CopyAction({ text, isUser }: { text: string; isUser: boolean }): ReactElement | null {
@@ -73,6 +86,36 @@ function CopyIcon(): ReactElement {
       <rect x="7" y="6" width="9" height="11" rx="1.5" />
       <path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H7" />
     </svg>
+  );
+}
+
+function PinAction({
+  text,
+  onPin,
+}: {
+  text: string;
+  onPin?: ((text: string) => Promise<void> | void) | undefined;
+}): ReactElement | null {
+  const [state, setState] = useState<"Pin" | "Pinned" | "Pin failed">("Pin");
+  if (!onPin || !text.trim()) return null;
+  const run = async (): Promise<void> => {
+    try {
+      await onPin(text.trim());
+      setState("Pinned");
+    } catch {
+      setState("Pin failed");
+    }
+  };
+  return (
+    <button
+      type="button"
+      className="message-pin"
+      aria-label="Pin answer to home"
+      title={state === "Pin" ? "Keep this answer on the new-tab home" : state}
+      onClick={() => void run()}
+    >
+      {state}
+    </button>
   );
 }
 

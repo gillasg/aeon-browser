@@ -2,7 +2,6 @@ import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
 import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
-import { logWrites } from "./orb-activity.js";
 import { TabControl, isNeedsKey, markSeen, needsCount, setNeeds } from "./orb-control.js";
 import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
 import {
@@ -173,10 +172,7 @@ function changed(state: IslandState): void {
   if (state === "needs") playSound("needs");
   if (state === "done" && model.run) {
     playSound("done");
-    if (session.chatId) {
-      void markSeen(session.chatId, viewId);
-      logWrites(model.run, { chatId: session.chatId, host: model.host, task: model.prompt });
-    }
+    if (session.chatId) void markSeen(session.chatId, viewId);
   }
 }
 
@@ -280,6 +276,20 @@ function useVerb(verb: SiteVerb): void {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
+/** Keep this run's answer on the new-tab home (the same pin the agent can make). */
+async function pinResult(): Promise<void> {
+  if (!session.chatId) return;
+  const value = (model.run?.answer || model.prompt).trim().slice(0, 200);
+  if (!value) return;
+  try {
+    await session.createPin((model.prompt || "Pinned answer").slice(0, 120), value);
+    notice("Pinned to home.");
+  } catch (error) {
+    notice("Couldn't pin · " + messageOf(error));
+  }
+  render();
+}
+
 async function toggleLearning(): Promise<void> {
   const reply = (await chrome.runtime
     .sendMessage({ kind: "aeon.learn.set", tabId, on: !model.learning })
@@ -302,6 +312,7 @@ function view(): ReactNode {
       stop: () => void session.stop().catch(() => undefined),
       again: () => void again(),
       watch: () => void watch(),
+      pin: () => void pinResult(),
       openChat,
       takeOver,
       resume,
