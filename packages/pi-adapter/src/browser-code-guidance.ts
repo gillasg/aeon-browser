@@ -10,7 +10,7 @@ export const browserCodeGuidelines = [
     "Which ability, when:",
     "- What the user visited, saved or has open: browser.history.search(text, {days}), browser.bookmarks.search(text), browser.tabs() (read their open tabs in place, all at once with Promise.all; never re-fetch them).",
     "- Anything live or on a specific site (prices, stock, listings, showtimes, reviews): open that site in the browser. Web search only finds which page to open; google.search(q) is a real Google search in the user's browser.",
-    "- Reading a page: page.data() first (embedded JSON: every value, no HTML parsing), then page.table(css), page.links(css), page.markdown(), then locators. Never parse __NEXT_DATA__ or innerText by hand.",
+    "- Reading a page: page.data() first (embedded JSON: every value, no HTML parsing), then page.table(css), page.links(css), page.markdown(), then locators. Never parse __NEXT_DATA__ or innerText by hand. Large scripts or responses: fetch once and keep the text in a top-level variable, which persists between cells; never refetch them each cell.",
     "- A site used before: the here: line at the top of bu.state() lists its learned API, boosts and data; use them before clicking.",
     "- The same change on many items: do the first one in the page; the output then says 'Learned on <site>: <operation>' and siteApi.batch(site, operation, items) does the rest in this one call. Any long job runs in one cell with bu.progress(done, total, label), never in batches of a few.",
     "- Took more than one try to work out: skills.save({...}) before answering. Skills for a site load by themselves.",

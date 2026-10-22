@@ -242,9 +242,19 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
 
 function browserCodeError(message = "OPERATION_FAILED", detail?: string): string {
   const text = detail ? `${message}: ${detail}` : message;
+  const selector = selectorHint(text);
+  if (selector) return text.split("\n")[0] + "\nHint: " + selector;
   // The runtime adds a "did you mean" from the real API when it can; otherwise point at help().
   if (!/is not a function|is not defined/.test(text) || /\nHint: /.test(text)) return text;
   return text.split("\n")[0] + "\nawait help() lists what browser code can do.";
+}
+
+/** Playwright habits that are not CSS: say what to use instead. */
+function selectorHint(text: string): string | undefined {
+  if (!/not a valid selector|valid selector/i.test(text)) return undefined;
+  if (/:has-text|:text\(|:visible|>>/.test(text))
+    return "Playwright text selectors are not CSS: use page.getByText('…') or page.getByRole('button', {name: '…'}).";
+  return "That is not a valid CSS selector: use page.getByRole/page.getByText, or a plain CSS selector.";
 }
 
 async function journalOutput(

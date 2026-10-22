@@ -69,3 +69,14 @@ test("errors and offline signals stay visible to the model", async () => {
   const offline = await createBrowserCodeTool("chat-1").execute("c", { code: "x" });
   assert.match(offline.content[0].text, /BROWSER_OFFLINE/);
 });
+
+test("a Playwright text selector gets a CSS hint", async () => {
+  const failed = await runCell({
+    output: "",
+    error:
+      "OPERATION_FAILED: SyntaxError: Failed to execute 'querySelectorAll' on 'Document': 'button:has-text(\"SUBMIT\")' is not a valid selector.",
+    steps: [],
+  });
+  assert.match(failed.content[0].text, /Hint: Playwright text selectors are not CSS/);
+  assert.match(failed.content[0].text, /getByText/);
+});
