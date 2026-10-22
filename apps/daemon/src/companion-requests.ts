@@ -19,7 +19,7 @@ interface Deps {
 }
 
 const MAX_FIELD = 2000;
-const COMPANION_MODEL = "opencode/deepseek-v4.1-flash";
+const COMPANION_MODEL = "opencode-go/deepseek-v4.1-flash";
 const quote = (value: unknown): string =>
   JSON.stringify(typeof value === "string" ? value.slice(0, MAX_FIELD) : (value ?? null));
 
