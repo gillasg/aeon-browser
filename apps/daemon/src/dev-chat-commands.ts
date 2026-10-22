@@ -212,10 +212,7 @@ async function handleContextCommand(
       });
       return;
     case "chat.queue-edit":
-      await service.withSession(asChatId(request.payload.chatId), (session) => {
-        if (!session.editQueue) throw new Error("Queue editing is unavailable in this session.");
-        session.editQueue(request.payload);
-      });
+      await service.editQueue(asChatId(request.payload.chatId), request.payload);
       completeCommand(socket, request, {
         kind: "chat.queued",
         chatId: request.payload.chatId,

@@ -7,6 +7,8 @@ export function installBrowserSessionLifecycle(
 ): void {
   session.subscribe((event) => {
     if (event.type === "agent_end")
-      void run?.(chatId, "browser-turn-cleanup", { release: true }).catch(() => undefined);
+      void run?.(chatId, "browser-turn-cleanup", { release: true, tidy: true }).catch(
+        () => undefined,
+      );
   });
 }

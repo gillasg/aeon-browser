@@ -168,11 +168,16 @@ export class BrowserControlService {
       );
     if ("codeCell" in raw)
       return this.runCode(chatId, callId, raw.codeCell as BrowserCodeCellInput, signal);
-    if ("release" in raw && raw.release === true) {
-      this.release(chatId, "reset" in raw && raw.reset === true);
-      return Promise.resolve(JSON.stringify({ released: true }));
-    }
+    if ("release" in raw && raw.release === true)
+      return this.releaseRequest(chatId, raw as { reset?: unknown; tidy?: unknown });
     return;
+  }
+  private releaseRequest(
+    chatId: string,
+    raw: { reset?: unknown; tidy?: unknown },
+  ): Promise<string> {
+    this.release(chatId, raw.reset === true, raw.tidy === true);
+    return Promise.resolve(JSON.stringify({ released: true }));
   }
   private async runCode(
     chatId: string,
@@ -218,12 +223,14 @@ export class BrowserControlService {
       }
     return asked;
   }
-  private release(chatId: string, reset = false): void {
+  private release(chatId: string, reset = false, tidy = false): void {
     for (const pending of this.pending.values())
       if (pending.chatId === chatId) pending.finish(undefined, "OPERATION_FAILED");
     for (const socket of this.executors.values())
       if (socket.readyState === WebSocket.OPEN)
-        socket.send(JSON.stringify({ kind: "browser.release", chatId, reset }));
+        socket.send(
+          JSON.stringify({ kind: "browser.release", chatId, reset, ...(tidy ? { tidy } : {}) }),
+        );
   }
   private async executeStep(
     chatId: string,

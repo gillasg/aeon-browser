@@ -6,7 +6,7 @@ export type BrowserCodeCell = {
 };
 type BrowserInput =
   | { steps: unknown[] }
-  | { release: true; reset?: boolean }
+  | { release: true; reset?: boolean; tidy?: boolean }
   | { siteScript: unknown }
   | { browserInfo: true }
   | { codeCell: BrowserCodeCell };

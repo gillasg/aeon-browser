@@ -50,6 +50,8 @@ export class ChatService {
   private readonly commandGate = new ChatCommandGate();
   private readonly eventHub = new ChatEventHub();
   private readonly observedSessions = new Map<ChatId, ObservedSession>();
+  /** Submissions waiting for their run; stop marks them so a run that starts late is stopped too. */
+  private readonly starting = new Map<ChatId, { stopped: boolean }>();
   readonly projects: ProjectService;
   readonly management: ChatManagementCommands;
   private readonly reviews: ChatReviews;
@@ -206,19 +208,25 @@ export class ChatService {
   ): Promise<ChatRecord> {
     const prompt = typeof input === "string" ? { text: input } : input;
     if (!prompt.text.trim()) return Promise.reject(new Error("Prompt text must not be empty."));
-    return this.commandGate.run(chatId, async () => {
-      const { activeChat, session } = await this.resolveSession(this.requireChat(chatId));
-      const chat = this.metadata.nameInitialPrompt(activeChat, session, prompt.text);
-      this.observeSession(chatId, session);
-      try {
-        await configureInitialPrompt(session, selection);
-        await session.submit(prompt);
-      } catch (error) {
-        this.recordMaterializedSession(chatId, session);
-        throw error;
-      }
-      return this.recordMaterializedSession(chatId, session) ?? chat;
-    });
+    const pending = { stopped: false };
+    this.starting.set(chatId, pending);
+    return this.commandGate
+      .run(chatId, async () => {
+        const { activeChat, session } = await this.resolveSession(this.requireChat(chatId));
+        const chat = this.metadata.nameInitialPrompt(activeChat, session, prompt.text);
+        this.observeSession(chatId, session);
+        try {
+          await configureInitialPrompt(session, selection);
+          if (!pending.stopped) await session.submit(prompt);
+        } catch (error) {
+          this.recordMaterializedSession(chatId, session);
+          throw error;
+        }
+        return this.recordMaterializedSession(chatId, session) ?? chat;
+      })
+      .finally(() => {
+        if (this.starting.get(chatId) === pending) this.starting.delete(chatId);
+      });
   }
   async getControls(chatId: ChatId): Promise<PiSessionControlState | null> {
     const chat = this.requireChat(chatId);
@@ -248,10 +256,38 @@ export class ChatService {
       throw new Error("Queue input is only available while Pi is running.");
     await session.queue(input, mode);
   }
+  /** Queue edits skip the command gate, which a running submission holds until its run ends. */
+  async editQueue(
+    chatId: ChatId,
+    input: Parameters<NonNullable<PiSessionHandle["editQueue"]>>[0],
+  ): Promise<void> {
+    const { session } = await this.resolveSession(this.requireChat(chatId));
+    this.observeSession(chatId, session);
+    if (!session.editQueue) throw new Error("Queue editing is unavailable in this session.");
+    session.editQueue(input);
+  }
   async stop(chatId: ChatId): Promise<void> {
+    const pending = this.starting.get(chatId);
+    if (pending) pending.stopped = true;
     const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
     await session.abort();
+    if (pending) await this.abortLateStart(chatId, pending, session);
+  }
+  // A stop pressed while the prompt was still being prepared finds no run to abort, and the run
+  // starts right after: abort it once it does, for as long as that submission is pending.
+  private async abortLateStart(
+    chatId: ChatId,
+    pending: { stopped: boolean },
+    session: PiSessionHandle,
+  ): Promise<void> {
+    for (let waited = 0; waited < 10_000 && this.starting.get(chatId) === pending; waited += 100) {
+      if (session.controls().active) {
+        await session.abort();
+        return;
+      }
+      await new Promise((done) => setTimeout(done, 100));
+    }
   }
   private async resolveSession(chat: ChatRecord): Promise<{
     activeChat: ChatRecord;
