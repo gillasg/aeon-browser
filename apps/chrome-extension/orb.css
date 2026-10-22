@@ -195,6 +195,13 @@ textarea::placeholder {
   animation: sweep 1.4s ease-in-out infinite;
 }
 
+.isl-progress[data-determinate="true"]::after {
+  width: calc(var(--isl-progress, 0) * 100%);
+  background: #9b8cff;
+  animation: none;
+  transition: width 0.3s ease-out;
+}
+
 @keyframes sweep {
   from {
     transform: translateX(-100%);

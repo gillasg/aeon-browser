@@ -17,7 +17,8 @@ export function ActivityPanel({
         <div>
           <h1>Activity</h1>
           <p className="activity-lede">
-            What Aeon changed on sites for you: forms sent, orders, messages, bookings.
+            What Aeon changed on sites for you: forms sent, items changed in bulk, orders, messages,
+            bookings.
           </p>
         </div>
       </header>
@@ -57,6 +58,18 @@ function ActivityRow({
           {entry.host && <>{entry.host} · </>}
           {entry.task}
         </span>
+        {entry.items?.length ? (
+          <details className="activity-items">
+            <summary>
+              {entry.items.length} item{entry.items.length === 1 ? "" : "s"}
+            </summary>
+            <ul>
+              {entry.items.map((item, index) => (
+                <li key={index}>{item || "(no label)"}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </div>
       <div className="activity-row-actions">
         {entry.undo && <button type="button">{entry.undo.label}</button>}

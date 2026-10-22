@@ -34,6 +34,7 @@ export {
   formatRunDuration,
   inferPath,
   initialRun,
+  formatProgress,
   PATH_NAMES,
   spotlightBox,
   summarize,
@@ -42,12 +43,14 @@ export {
   type RunBox,
   type RunCursorStep,
   type RunPath,
+  type RunProgress,
   type RunStatus,
   type RunStep,
 } from "./run-model.js";
 export { ApprovalCard, PathTag, ResultCard, StepMeta, StepTimeline } from "./run-cards.js";
 export {
   ACTIVITY_LOG_KEY,
+  logApiWrites,
   appendActivity,
   describeWrites,
   readActivityLog,

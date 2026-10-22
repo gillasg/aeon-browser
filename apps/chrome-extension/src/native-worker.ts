@@ -3,6 +3,7 @@ import { authenticate } from "@browser-use-extension/engine/native-authenticate"
 import { configureEngine } from "@browser-use-extension/engine/engine-config";
 import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
 import { installBoosts } from "@browser-use-extension/engine/native-browser-boosts";
+import { installEngineListeners } from "@browser-use-extension/engine/native-engine-install";
 import {
   AGENT_IN_FRONT_KEY,
   HIDE_AGENT_CURSOR_KEY,
@@ -86,6 +87,8 @@ interface ExecutorConnection extends BrowserIdentity {
 
 let executor: ExecutorConnection | undefined;
 let connecting: Promise<ExecutorConnection> | undefined;
+/** Parts of the worker that failed to start; pages that can't connect report them. */
+const startupFailures: string[] = [];
 
 configureEngine({
   controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
@@ -101,6 +104,11 @@ configureEngine({
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
   handleRuntimeMessage(request, sender, sendResponse),
 );
+// Pages that can't connect ask which part of the worker failed to start.
+chrome.runtime.onMessage.addListener((request: { kind?: unknown } | null, sender, reply) => {
+  if (request?.kind !== "aeon.native.health" || sender.id !== chrome.runtime.id) return;
+  reply({ startupFailures });
+});
 // A clicked thumbnail on a Chat page opens that agent tab in Split View beside the Chat.
 chrome.runtime.onMessage.addListener((request: unknown, sender) => {
   const message = request as { kind?: unknown; chatId?: unknown; tabId?: unknown } | null;
@@ -109,6 +117,7 @@ chrome.runtime.onMessage.addListener((request: unknown, sender) => {
   if (typeof message.chatId !== "string" || !Number.isSafeInteger(message.tabId)) return;
   void presentBrowserTask(message.chatId, message.tabId as number, true);
 });
+attempt("engine listeners", installEngineListeners);
 attempt(
   "session storage",
   () => void chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }),
@@ -136,6 +145,7 @@ function attempt(name: string, install: () => void): void {
   try {
     install();
   } catch (error) {
+    startupFailures.push(name);
     console.error("Aeon: " + name + " failed to start", error);
   }
 }

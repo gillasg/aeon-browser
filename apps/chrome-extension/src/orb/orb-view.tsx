@@ -1,5 +1,12 @@
-import type { KeyboardEvent, ReactElement } from "react";
-import { ApprovalCard, PATH_NAMES, ResultCard, StepTimeline } from "@aeon/ui";
+import type { CSSProperties, KeyboardEvent, ReactElement } from "react";
+import {
+  ApprovalCard,
+  formatProgress,
+  PATH_NAMES,
+  ResultCard,
+  StepTimeline,
+  type RunProgress,
+} from "@aeon/ui";
 import { summarize, type OrbRun } from "./orb-run.js";
 import { watchPlan } from "./orb-watch.js";
 
@@ -171,18 +178,49 @@ function Working({
         </Button>
       </div>
       {model.expanded && <StepTimeline steps={run.steps} />}
-      <div className="isl-progress" aria-hidden="true" />
+      <ProgressLine progress={currentProgress(run)} />
     </>
   );
 }
 
-/** "Step 3 · kayak.com · site API": where the run is, and the last path it took. */
+/**
+ * "Step 3 · kayak.com · site API": where the run is, and the last path it took. A long job inside
+ * the current step shows its count instead: "Removing 47/77 · youtube.com".
+ */
 export function stepLine(run: OrbRun, host: string): string {
   const count = run.steps.length;
   const last = [...run.steps].reverse().find((step) => step.done && step.path);
+  const job = currentProgress(run);
+  if (job) return [formatProgress(job), host].filter(Boolean).join(" · ");
   return [count ? `Step ${count}` : "Starting", host, last?.path ? PATH_NAMES[last.path] : ""]
     .filter(Boolean)
     .join(" · ");
+}
+
+function currentProgress(run: OrbRun): RunProgress | undefined {
+  const step = run.steps.at(-1);
+  return step && !step.done ? step.progress : undefined;
+}
+
+/** Endless while the count is unknown; fills up as a job with a known total goes. */
+function ProgressLine({ progress }: { progress: RunProgress | undefined }): ReactElement {
+  const share =
+    progress?.total !== undefined && progress.total > 0
+      ? Math.min(1, progress.done / progress.total)
+      : undefined;
+  return share === undefined ? (
+    <div className="isl-progress" aria-hidden="true" />
+  ) : (
+    <div
+      className="isl-progress"
+      data-determinate="true"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={progress?.total}
+      aria-valuenow={progress?.done}
+      style={{ "--isl-progress": share } as CSSProperties}
+    />
+  );
 }
 
 function Paused({ actions }: { actions: OrbViewActions }): ReactElement {

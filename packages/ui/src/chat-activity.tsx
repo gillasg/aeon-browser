@@ -21,6 +21,7 @@ import { ShellToolDetails, CodeToolDetails, ToolStepFooter } from "./activity-to
 import { ToolResultView } from "./tool-result-view.js";
 import { ToolImages } from "./tool-images.js";
 import { StepMeta } from "./run-cards.js";
+import { formatProgress } from "./run-model.js";
 
 export function ChatActivityGroup({
   group,
@@ -117,6 +118,9 @@ function ToolStepRow({
         </span>
         {step.state !== "running" && (
           <StepMeta path={step.path} durationMs={step.durationMs ?? measured(step)} />
+        )}
+        {step.state === "running" && step.progress && (
+          <span className="run-step-meta">{formatProgress(step.progress)}</span>
         )}
         {label && (
           <span className={`activity-state-badge ${step.isError ? "is-error" : "is-running"}`}>

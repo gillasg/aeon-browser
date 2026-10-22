@@ -117,6 +117,9 @@ async function buildLayer(folder) {
           (name) =>
             `export * from './apps/chrome-extension/node_modules/@browser-use-extension/engine/src/native-browser-${name}.ts';`,
         )
+        .concat(
+          "export { installEngineListeners } from './apps/chrome-extension/node_modules/@browser-use-extension/engine/src/native-engine-install.ts';",
+        )
         .join("\n"),
       resolveDir: resolve("."),
     },
@@ -125,7 +128,16 @@ async function buildLayer(folder) {
     format: "esm",
     outfile,
   });
-  return import(pathToFileURL(outfile).href);
+  const layer = await import(pathToFileURL(outfile).href);
+  // Engine modules register their Chrome listeners when the worker installs them, as here. The
+  // stand-in chrome has only the debugger and tab events these tests use; listeners for other
+  // APIs fail to install, which these tests don't need.
+  try {
+    layer.installEngineListeners();
+  } catch {
+    // The debugger and tab listeners are installed; only the missing APIs' are not.
+  }
+  return layer;
 }
 async function evaluate(cdp, expression) {
   const result = await cdp.send("Runtime.evaluate", {

@@ -15,6 +15,7 @@ import { type ChatViewSnapshotDto, type DaemonUiResponse } from "@aeon/protocol"
 import {
   ChatSurface,
   invokePiCommand,
+  logApiWrites,
   mountAeonUi,
   TranscriptModel,
   UI_BUILTIN_COMMANDS,
@@ -293,6 +294,7 @@ function handleChatEvent(message: Extract<DaemonUiResponse, { kind: "chat.event"
   if (message.event.event.kind === "context-usage") contextUsage = message.event.event.contextUsage;
   if (message.event.event.kind.startsWith("extension-ui-")) piUi.applyEvent(message.event.event);
   transcript.apply(message.event.event);
+  logApiWrites(message.event.event, { chatId, task: title.replace(/ · Aeon$/, "") });
   if (message.event.event.kind === "run-state") runState = message.event.event.state;
   render();
 }

@@ -25,6 +25,21 @@ export interface RunStep {
   path?: RunPath;
   pathMocked?: boolean;
   isError?: boolean;
+  /** A long job inside this one call, as the tool reports it ("Removing 47/77"). */
+  progress?: RunProgress;
+}
+
+export interface RunProgress {
+  done: number;
+  total?: number | undefined;
+  label?: string | undefined;
+}
+
+/** "Removing 47/77", or "47 done" when the total isn't known. */
+export function formatProgress(progress: RunProgress): string {
+  const count =
+    progress.total !== undefined ? `${progress.done}/${progress.total}` : `${progress.done} done`;
+  return progress.label ? `${progress.label} ${count}` : count;
 }
 
 export interface RunBox {
@@ -94,6 +109,16 @@ const handlers: { [K in PiSessionEventDto["kind"]]?: Handler<K> } = {
             },
           ],
         },
+  "tool-update": (run, event) => {
+    const progress = event.progress;
+    if (event.parentToolCallId || !progress) return run;
+    return {
+      ...run,
+      steps: run.steps.map((step) =>
+        step.toolCallId === event.toolCallId ? { ...step, progress } : step,
+      ),
+    };
+  },
   "tool-end": (run, event, now) =>
     event.parentToolCallId
       ? run

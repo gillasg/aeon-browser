@@ -1,4 +1,4 @@
-import type { RunPath } from "./run-model.js";
+import type { RunPath, RunProgress } from "./run-model.js";
 import { insertAssistantEntry, separatesToolBatch } from "./transcript-assistant-entry.js";
 import { updateTurnTiming, type TurnTiming } from "./turn-timing.js";
 import { timestampMs, blockText, hasRenderableContent } from "./transcript-content.js";
@@ -30,6 +30,8 @@ export interface ToolStep {
   /** From tool-end: which fast path the tool took, and how long it ran. */
   path?: RunPath;
   durationMs?: number;
+  /** A long job inside this call (bu.progress): "Removing 47/77". */
+  progress?: RunProgress;
 }
 
 export interface ToolGroup {
@@ -92,11 +94,10 @@ export class TranscriptModel {
         state: "running",
       });
     else if (event.kind === "tool-update")
-      Object.assign(this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId), {
-        arguments: event.arguments,
-        partialResult: event.partialResult,
-        state: "running",
-      });
+      Object.assign(
+        this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId),
+        runningUpdate(event),
+      );
     else if (event.kind === "tool-end")
       Object.assign(this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId), {
         result: event.result,
@@ -323,4 +324,16 @@ function pathAndDuration(event: {
   if (event.path) fields.path = event.path;
   if (event.durationMs !== undefined) fields.durationMs = event.durationMs;
   return fields;
+}
+
+/** What a tool-update changes on its step: the partial result and any reported progress. */
+function runningUpdate(
+  event: Extract<PiSessionEventDto, { kind: "tool-update" }>,
+): Partial<ToolStep> {
+  return {
+    arguments: event.arguments,
+    partialResult: event.partialResult,
+    ...(event.progress ? { progress: event.progress } : {}),
+    state: "running",
+  };
 }

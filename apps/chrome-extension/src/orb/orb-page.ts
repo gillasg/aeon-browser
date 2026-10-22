@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
-import { ORB_REDUCE_MOTION_KEY, mountAeonUi, orbFlag } from "@aeon/ui";
+import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
 import { logWrites } from "./orb-activity.js";
 import { TabControl, isNeedsKey, markSeen, needsCount, setNeeds } from "./orb-control.js";
@@ -70,6 +70,7 @@ async function boot(): Promise<void> {
 // The orb opens and stays open across daemon restarts, so one failed attempt must not leave it
 // on "Connecting…" until the window is closed.
 async function connectSession(): Promise<void> {
+  const started = Date.now();
   for (let attempt = 0; ; attempt += 1) {
     try {
       await session.connect();
@@ -77,7 +78,8 @@ async function connectSession(): Promise<void> {
       render();
       return;
     } catch (error) {
-      if (attempt === 10) notice(messageOf(error));
+      // After a few seconds, say which link is down instead of leaving "Connecting…".
+      if (Date.now() - started > 5_000) notice(messageOf(error));
       await new Promise((resolve) =>
         globalThis.setTimeout(resolve, Math.min(500 * 2 ** Math.min(attempt, 3), 5000)),
       );
@@ -136,6 +138,7 @@ function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
 }
 
 function onEvent(event: PiSessionEventDto, refresh = true): void {
+  if (session.chatId) logApiWrites(event, { chatId: session.chatId, task: model.prompt });
   if (!model.run || model.paused) return;
   const next = applyEvent(model.run, event, Date.now());
   if (next === model.run) return;

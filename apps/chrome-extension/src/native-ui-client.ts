@@ -27,11 +27,11 @@ export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectR
       8_000,
     );
   } catch (error) {
-    return { kind: "failed", code: unreachableCode(error) };
+    return { kind: "failed", code: await unreachableCode(error) };
   }
   const response = NativePageGrantResponseSchema.safeParse(raw);
   if (!response.success) return { kind: "failed", code: "BOOTSTRAP_UNAVAILABLE" };
-  if (!response.data.ok) return { kind: "failed", code: response.data.code };
+  if (!response.data.ok) return { kind: "failed", code: await workerCode(response.data.code) };
   if (
     response.data.pageInstanceId !== pageInstanceId ||
     !sameScope(response.data.scope, scope) ||
@@ -95,9 +95,31 @@ function sameScope(left: PageGrantScope, right: PageGrantScope): boolean {
   );
 }
 
-/** CONNECTION_TIMEOUT: the worker took the message but never answered; else it was unreachable. */
-function unreachableCode(error: unknown): "CONNECTION_TIMEOUT" | "DAEMON_OFFLINE" {
-  return error instanceof Error && error.message === "CONNECTION_TIMEOUT"
-    ? "CONNECTION_TIMEOUT"
-    : "DAEMON_OFFLINE";
+/**
+ * CONNECTION_TIMEOUT: the worker took the message but never answered. WORKER_UNREACHABLE: no
+ * worker took it at all (it crashed at load).
+ */
+async function unreachableCode(error: unknown): Promise<string> {
+  const timedOut = error instanceof Error && error.message === "CONNECTION_TIMEOUT";
+  const health = await workerHealth();
+  if (!health) return timedOut ? "CONNECTION_TIMEOUT" : "WORKER_UNREACHABLE";
+  return health.startupFailures?.length
+    ? "WORKER_DEGRADED"
+    : timedOut
+      ? "CONNECTION_TIMEOUT"
+      : "DAEMON_OFFLINE";
+}
+
+/** WORKER_DEGRADED when part of the worker failed to start: that, not the daemon, is the cause. */
+async function workerCode(code: string): Promise<string> {
+  return (await workerHealth())?.startupFailures?.length ? "WORKER_DEGRADED" : code;
+}
+
+function workerHealth(): Promise<{ startupFailures?: string[] } | undefined> {
+  return withConnectionTimeout(
+    chrome.runtime.sendMessage({ kind: "aeon.native.health" }) as Promise<{
+      startupFailures?: string[];
+    }>,
+    2_000,
+  ).catch(() => undefined);
 }

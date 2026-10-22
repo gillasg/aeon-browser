@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import type { PiSessionEventDto } from "@aeon/protocol";
 
-// Actions that matter (orders, messages, bookings, deletes, site changes), newest first.
-// Stand-in until Core records writes: the orb logs each run that typed into or submitted a page,
-// in the extension's localStorage, which home.html and orb.html share. Undo stays off until a
-// tool reports how to reverse what it did.
+// Actions that matter (orders, messages, bookings, deletes, site changes), newest first, in the
+// extension's localStorage, which every Aeon page shares. Writes sent through a site's API come
+// from Core on the step that sent them, with every item; runs that typed into or submitted a
+// page are logged by the orb. Undo stays off until a tool reports how to reverse what it did.
 
 export interface ActivityEntry {
   id: string;
@@ -16,6 +17,8 @@ export interface ActivityEntry {
   summary: string;
   /** Present only when the site lets the change be reversed. */
   undo?: { label: string };
+  /** Every item a write through the site's API changed, for the full list. */
+  items?: string[];
 }
 
 export const ACTIVITY_LOG_KEY = "aeonActivityLog";
@@ -53,6 +56,36 @@ export function useActivityLog(): ActivityEntry[] {
     };
   }, []);
   return entries;
+}
+
+/**
+ * Logs the writes a step sent through sites' APIs (siteApi.write / batch). Each chat page that
+ * sees the step logs it; the id keeps it to one entry.
+ */
+export function logApiWrites(
+  event: PiSessionEventDto,
+  info: { chatId: string; task?: string },
+): void {
+  if (event.kind !== "tool-end" || !event.writes?.length) return;
+  for (const write of event.writes) {
+    if (!write.done) continue;
+    const failed = write.failed ? `, ${write.failed} failed` : "";
+    appendActivity({
+      id: [info.chatId, event.toolCallId, write.site, write.operation].join(":"),
+      at: new Date().toISOString(),
+      chatId: info.chatId,
+      host: write.site,
+      task: info.task ?? "",
+      summary: `${operationWords(write.operation)}: ${write.done} item${write.done === 1 ? "" : "s"}${failed}`,
+      items: write.items,
+    });
+  }
+}
+
+/** removeFromWatchLater → "Remove from watch later". */
+function operationWords(operation: string): string {
+  const words = operation.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** Entries from the last 24 hours, for the count in the top bar. */

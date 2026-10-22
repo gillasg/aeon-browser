@@ -119,6 +119,7 @@ export const NativeOpenChatResponseSchema = z.discriminatedUnion("ok", [
 
 export const NativeExtensionRequestSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("aeon.native.current-page") }).strict(),
+  z.object({ kind: z.literal("aeon.native.health") }).strict(),
   z.object({ kind: z.literal("aeon.native.list-context-tabs") }).strict(),
   z
     .object({
@@ -132,19 +133,24 @@ export const NativeExtensionRequestSchema = z.discriminatedUnion("kind", [
   NativeClaimBrowserContextSubmitRequestSchema,
 ]);
 
+/** What a page shows when it can't connect: which link is down and how to fix it. */
 export function pageGrantErrorMessage(code: string): string {
   switch (code) {
+    case "WORKER_UNREACHABLE":
+      return "Aeon's background worker isn't running. Open chrome://extensions and click Reload on Aeon; its Errors button shows why it stopped.";
+    case "WORKER_DEGRADED":
+      return "Part of Aeon's background worker failed to start. Open chrome://extensions and click Reload on Aeon; its Errors button shows what failed.";
     case "HOST_MISSING":
-      return "Aeon's native host is not installed. Run the Aeon host installer.";
+      return "Aeon's native host isn't installed, so Chrome can't reach the daemon. Run Aeon's setup again.";
     case "HOST_CONFIG_INVALID":
-      return "Aeon's native host needs repair. Reinstall the Aeon host.";
+      return "Aeon's native host registration is broken. Run Aeon's setup again to repair it.";
     case "DAEMON_OFFLINE":
-      return "Aeon's local connection is unavailable. Reconnecting…";
+      return "Aeon's daemon isn't answering. It restarts by itself within a minute; if it doesn't, sign out of Windows and back in, or run start-daemon.ps1 in %LOCALAPPDATA%\\Aeon. Retrying…";
     case "CONNECTION_TIMEOUT":
-      return "Aeon's local connection did not respond in time. Reconnecting…";
+      return "Aeon's daemon is starting or busy and didn't answer in time. Retrying…";
     case "UPDATE_REQUIRED":
-      return "Aeon needs an update before this page can connect.";
+      return "Aeon and its daemon are different versions. Update Aeon, then reload it in chrome://extensions.";
     default:
-      return "Aeon could not establish a local connection. Retrying…";
+      return "Aeon couldn't connect to its daemon. Retrying…";
   }
 }
