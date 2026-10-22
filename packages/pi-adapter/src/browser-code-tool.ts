@@ -8,6 +8,7 @@ import { browserContent, type BrowserToolRunner } from "./browser-tool.js";
 import { createSiteScriptTool } from "./site-script-tool.js";
 import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
+import { SiteWrites } from "./browser-site-writes.js";
 import { noteVisits, visitedUrls } from "./site-mapping.js";
 import { siteApiRequest } from "./site-browser.js";
 
@@ -44,6 +45,7 @@ export function createBrowserCodeTool(
       const operationId = randomUUID();
       let steps: Record<string, unknown>[] = [];
       let progress: ToolProgress | undefined;
+      const writes = new SiteWrites();
       const envelope = () => ({
         operationId,
         toolCallId,
@@ -75,9 +77,10 @@ export function createBrowserCodeTool(
                 update();
                 return Promise.resolve({ ok: true });
               }
-              return (
-                siteApiRequest(chatId, request) ?? serveCall(request, workspace, steps, skills)
-              );
+              const site = siteApiRequest(chatId, request);
+              return site
+                ? writes.track(request, site)
+                : serveCall(request, workspace, steps, skills);
             },
             onProgress: (next) => {
               steps = next.map(compactStep);
@@ -107,10 +110,15 @@ export function createBrowserCodeTool(
         ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
       };
       const actions = traceActions(cell.steps ?? []);
+      const details = {
+        ...(actions.length ? { actions } : {}),
+        ...(writes.list().length ? { writes: writes.list() } : {}),
+        ...(writes.usedApi ? { siteApi: true } : {}),
+      };
       return {
         content: modelContent(body),
         isError: failed,
-        details: actions.length ? { actions } : undefined,
+        details: Object.keys(details).length ? details : undefined,
       };
     },
   });

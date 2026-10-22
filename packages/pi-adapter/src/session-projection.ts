@@ -251,10 +251,12 @@ function projectToolEvent(
     };
   const changeDiff = event.isError ? undefined : projectChangeDiff(event.result);
   const path = toolPath(event.toolName, event.result);
+  const writes = event.isError ? undefined : toolWrites(event.result);
   return {
     kind: "tool-end",
     ...(changeDiff !== undefined ? { changeDiff } : {}),
     ...(path ? { path } : {}),
+    ...(writes ? { writes } : {}),
     toolCallId: event.toolCallId,
     toolName: event.toolName,
     result: resultText(event.result),
@@ -266,8 +268,17 @@ function projectToolEvent(
 type ToolPath = "recipe" | "site-api" | "data" | "url" | "read" | "ui";
 
 function toolPath(toolName: string, result: unknown): ToolPath | undefined {
-  if (toolName === "site_api") return "site-api";
+  if (toolName === "site_api" || usedSiteApi(result)) return "site-api";
   if (toolName === "skills" || toolName === "site_skill") return "recipe";
+  return stepsPath(result);
+}
+
+/** A browser_code step that called a site's API went the site-API way, whatever else it did. */
+function usedSiteApi(result: unknown): boolean {
+  return (result as { details?: { siteApi?: boolean } } | undefined)?.details?.siteApi === true;
+}
+
+function stepsPath(result: unknown): ToolPath | undefined {
   const steps = (result as { steps?: Array<{ action?: { op?: string } }> } | undefined)?.steps;
   if (!steps?.length) return undefined;
   const ops = steps.map((step) => step.action?.op).filter((op): op is string => Boolean(op));
@@ -351,4 +362,27 @@ function toolProgress(value: unknown): {
       ...(typeof progress.label === "string" ? { label: progress.label } : {}),
     },
   };
+}
+
+/** API writes a browser_code step made (siteApi.write / batch), for the Activity log. */
+function toolWrites(value: unknown): ToolWrite[] | undefined {
+  const writes = (value as { details?: { writes?: unknown } } | null)?.details?.writes;
+  if (!Array.isArray(writes) || !writes.length) return undefined;
+  return writes.slice(0, 20).map((write: ToolWrite) => ({
+    site: String(write.site).slice(0, 200),
+    operation: String(write.operation).slice(0, 200),
+    done: Number(write.done) || 0,
+    failed: Number(write.failed) || 0,
+    items: Array.isArray(write.items)
+      ? write.items.slice(0, 200).map((item) => String(item).slice(0, 80))
+      : [],
+  }));
+}
+
+interface ToolWrite {
+  site: string;
+  operation: string;
+  done: number;
+  failed: number;
+  items: string[];
 }

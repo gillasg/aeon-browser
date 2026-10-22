@@ -295,6 +295,21 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
       isError: z.boolean(),
       /** Which fast path the tool used, for the speed chip and the orb. */
       path: z.enum(["recipe", "site-api", "data", "url", "read", "ui"]).optional(),
+      /** Writes the step sent through sites' APIs (siteApi.write / batch), for Activity. */
+      writes: z
+        .array(
+          z
+            .object({
+              site: z.string().max(200),
+              operation: z.string().max(200),
+              done: z.number().int().nonnegative(),
+              failed: z.number().int().nonnegative(),
+              items: z.array(z.string().max(80)).max(200),
+            })
+            .strict(),
+        )
+        .max(20)
+        .optional(),
       durationMs: z.number().int().nonnegative().optional(),
       parentToolCallId: z.string().min(1).max(160).optional(),
     })

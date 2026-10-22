@@ -79,6 +79,8 @@ export type PiSessionEvent =
       toolName: string;
       result: string;
       isError: boolean;
+      /** Writes the step sent through sites' APIs (siteApi.write / batch), for Activity. */
+      writes?: { site: string; operation: string; done: number; failed: number; items: string[] }[];
       /** Which fast path the tool used, for the speed chip and the orb. */
       path?: "recipe" | "site-api" | "data" | "url" | "read" | "ui";
       durationMs?: number;

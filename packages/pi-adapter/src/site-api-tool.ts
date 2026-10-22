@@ -30,7 +30,7 @@ const Parameters = Type.Object(
       Type.Literal("sites"),
       Type.Literal("operations"),
       Type.Literal("call"),
-      Type.Literal("learn"),
+      Type.Literal("import"),
       Type.Literal("watch"),
       Type.Literal("explore"),
       ...SITE_TOOL_ACTIONS.map((action) => Type.Literal(action)),
@@ -58,13 +58,12 @@ const Parameters = Type.Object(
 type Input = Static<typeof Parameters>;
 
 const GUIDELINES = [
-  "site_api calls the APIs of sites mapped from the user's own browsing: one call replaces many page actions and returns clean JSON. Check `sites` before working on a site you may have mapped; if it is there, use `operations` then `call` instead of browser_code.",
-  "site_api reads only. Any operation whose role is action (a write) is refused; do those through the page UI with browser_code.",
-  "To map a site you will use again (prices, orders, listings, a dashboard): in one browser_code call: open the site, `await page.network.start({ types: 'all' })`, do something that loads new data (a fresh search, a filter, the next page; repeating what is already on screen loads nothing), then `await page.network.save('<site>.har')`. Then site_api learn with the site and files ['<site>.har'] returns the operations and how to call them. More captures of other features make the API more complete.",
-  "watch: like call, but returns only the items that are new or changed since the last watch of the same operation and params (new listings, price drops, new messages); the first watch returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
-  "explore maps sites by name (sites: ['a.com', 'https://b.com/search']) without you driving them: an agent uses each one in a background tab, looking only, while its traffic is recorded, then builds the API. Several sites run at once; goal adds things to do, e.g. 'open the cart'. Use it when you will call a site again later and it is not in sites yet.",
+  "Sites learn their APIs while you work: every page action's requests are built into the site's API after each browser_code call, and the call's output says when something new can be called ('Learned on <site>: ...'). Check `sites` / `operations` before working on a site you have used before; one call replaces many page actions.",
+  "Reads go through `call` here or siteApi.call in browser_code. Writes: do one in the page; once it worked, siteApi.write repeats it and siteApi.batch runs it over many items (paced, stops at the first error; continue what is left in the page). Paying, ordering, sending, posting, deleting and account changes always stay in the page.",
+  "watch: like call, but returns only items new or changed since the last watch of the same operation and params; the first returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
+  "explore maps sites you have not used yet (sites: ['a.com']) in background tabs, looking only. The system runs it when a routine or watcher needs a site with no read that fits; use it yourself only when a task needs a part of a site that no page you can reach shows.",
+  "import adds capture files from outside the browser (HAR exports, mitmproxy flows from phone or desktop apps, saved in the workspace) to a site's API.",
   ...SITE_TOOL_HELP,
-  "learn also takes mitmproxy flow files, so phone and desktop apps can be mapped: capture the app's traffic through mitmproxy (on Android: adb to set the proxy and install its certificate), save the flows in the workspace, then learn with them.",
   "Long results are saved in the workspace and previewed; load the file in browser_code or read it with other tools if you need all of it.",
 ];
 
@@ -119,7 +118,10 @@ function describeOperation(op: SiteOperation): Record<string, unknown> {
 async function operations(input: Input): Promise<unknown> {
   const site = requireSite(input);
   const model = await loadModel(site);
-  if (!model) throw new Error(`${site} is not mapped yet. Map it with the learn action.`);
+  if (!model)
+    throw new Error(
+      `${site} has no API yet. Use the site in browser_code: its requests are learned as you go.`,
+    );
   return { site, howToCall: HOW_TO_CALL, operations: model.operations.map(describeOperation) };
 }
 
@@ -131,19 +133,19 @@ async function call(input: Input, workspace: string | undefined): Promise<ToolTe
   return boundedResult(value, workspace, "site-api", `${site}-${input.operation}`);
 }
 
-async function learn(input: Input, workspace: string | undefined): Promise<unknown> {
+async function importFiles(input: Input, workspace: string | undefined): Promise<unknown> {
   const site = requireSite(input);
   if (!workspace) throw new Error("This chat has no workspace for captures");
   if (!input.files?.length)
     throw new Error(
-      "learn needs a capture of the site's own traffic. In one browser_code call: const tab = await browser.openTab('https://<site>'); await tab.network.start({ types: 'all' }); then do something that loads new data (a search, a filter, the next page); then await tab.network.save('<site>.har'). Then call learn with files: ['<site>.har']. Never write a capture by hand.",
+      "import needs capture files in the workspace (a HAR export or mitmproxy flows). Sites you use in browser_code are learned without it.",
     );
   const paths = input.files.map((file) => resolve(workspace, file));
   if (paths.some((path) => !path.startsWith(resolve(workspace))))
     throw new Error("Capture files must be inside the workspace");
   await checkCaptures(paths).catch((error: unknown) => {
     throw new Error(
-      `${error instanceof Error ? error.message : String(error)}. Start the capture first (page.network.start()), then do something on the site that loads new data (a new search, the next page, opening an item), then page.network.save('<file>').`,
+      `${error instanceof Error ? error.message : String(error)}. Give a HAR export or mitmproxy flow file of the site's own requests.`,
       { cause: error },
     );
   });
@@ -206,13 +208,13 @@ async function runAction(
         ? { sites }
         : {
             sites,
-            next: "Nothing is mapped yet. To map a site, capture its traffic and use learn.",
+            next: "Nothing is mapped yet. Sites you use in browser_code are learned as you go.",
           },
     );
   }
   if (input.action === "operations") return textResult(await operations(input));
   if (input.action === "call") return call(input, workspace);
-  return textResult(await learn(input, workspace));
+  return textResult(await importFiles(input, workspace));
 }
 
 export function createSiteApiTool(
@@ -224,7 +226,7 @@ export function createSiteApiTool(
     name: "site_api",
     label: "Site API",
     description:
-      "Call the API of a site mapped from the user's browsing (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, signing, session, export), or map sites: by name (explore) or from network captures saved in the workspace (learn). Calls use the user's logins.",
+      "Call the API a site learned while you used it (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). Calls use the user's logins.",
     promptSnippet: "Use site_api for mapped sites: one API call instead of many page actions.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,

@@ -95,7 +95,7 @@ test("site_api maps a site from a capture in the workspace, then calls it", asyn
   await writeFile(join(workspace, "shop.har"), JSON.stringify(har));
   const tool = createSiteApiTool("chat", workspace);
   const learned = JSON.parse(
-    text(await tool.execute("1", { action: "learn", site: origin, files: ["shop.har"] })),
+    text(await tool.execute("1", { action: "import", site: origin, files: ["shop.har"] })),
   );
   assert.ok(learned.operations.length >= 1, "learn lists the operations right away");
   assert.match(learned.howToCall, /Pass params flat/);
