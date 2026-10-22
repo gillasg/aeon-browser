@@ -230,11 +230,9 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
 
 function browserCodeError(message = "OPERATION_FAILED", detail?: string): string {
   const text = detail ? `${message}: ${detail}` : message;
-  if (!/is not a function|is not defined/.test(text)) return text;
-  return (
-    text.split("\n")[0] +
-    "\nAvailable: browser.openTab(url), browser.tabs(), bu.state(), bu.click(id), bu.type(id,text); Playwright-style page.goto, page.title(), page.locator(css)/getByRole/getByText with .click/.fill/.innerText/.count/.nth, page.$eval/$$eval, page.table(css), page.evaluate(fn), google.search(q)."
-  );
+  // The runtime adds a "did you mean" from the real API when it can; otherwise point at help().
+  if (!/is not a function|is not defined/.test(text) || /\nHint: /.test(text)) return text;
+  return text.split("\n")[0] + "\nawait help() lists what browser code can do.";
 }
 
 async function journalOutput(

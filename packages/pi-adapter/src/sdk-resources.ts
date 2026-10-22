@@ -13,6 +13,7 @@ import {
   type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { browserRuntimePrimer } from "./browser-code-guidance.js";
+import { browserAbilitySearch } from "./browser-ability-search.js";
 
 export function createPiResourceLoader(input: {
   workingDirectory: string;
@@ -56,6 +57,7 @@ export function createPiResourceLoader(input: {
             }
           : {}),
       }),
+      ...(input.browserGuidance ? [browserAbilitySearch()] : []),
       ...(input.additionalFactories ?? []),
     ],
   });

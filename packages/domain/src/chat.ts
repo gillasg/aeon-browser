@@ -172,11 +172,20 @@ export type PiMessageRole = "user" | "assistant" | "tool" | "custom";
 export type PiStopReason =
   "pending" | "stop" | "length" | "toolUse" | "error" | "aborted" | "deferred";
 
+export interface PiTokenUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
 export interface PiMessageProjection {
   role: PiMessageRole;
   content: readonly PiContentBlock[];
   stopReason?: PiStopReason;
   errorMessage?: string;
+  /** Tokens of an assistant turn, with how many came from the prompt cache. */
+  usage?: PiTokenUsage;
   toolCallId?: string;
   toolName?: string;
   isError?: boolean;

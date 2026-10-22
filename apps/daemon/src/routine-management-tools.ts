@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ChatId, AeonProductStore, RoutineRecord } from "@aeon/domain";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 import type { RoutineScheduler } from "./routine-scheduler.js";
+import { exploreForRoutine } from "@aeon/pi-adapter";
 
 const ROUTINE_TOOLS = new Set([
   "create_routine",
@@ -67,6 +68,11 @@ export class RoutineManagementTools {
       createdAt: timestamp,
       updatedAt: timestamp,
     });
+    // A routine on a site with no learned read gets that site explored, so its checks can use
+    // the site's API.
+    exploreForRoutine(
+      [saved.title, saved.instruction, JSON.stringify(saved.check ?? "")].join(" "),
+    );
     return this.store.getRoutine(saved.routineId) ?? saved;
   }
 

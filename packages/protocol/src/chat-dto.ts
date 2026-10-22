@@ -181,6 +181,15 @@ const PiMessageSchema = z
       .enum(["pending", "stop", "length", "toolUse", "error", "aborted", "deferred"])
       .optional(),
     errorMessage: z.string().max(2000).optional(),
+    usage: z
+      .object({
+        input: z.number().int().nonnegative(),
+        output: z.number().int().nonnegative(),
+        cacheRead: z.number().int().nonnegative(),
+        cacheWrite: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
     toolCallId: z.string().min(1).max(160).optional(),
     toolName: z.string().min(1).max(120).optional(),
     changeDiff: z.string().max(24_000).optional(),

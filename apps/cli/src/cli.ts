@@ -161,12 +161,21 @@ function formatResult(result: ChatResult): string {
 }
 
 function formatTrace(result: ChatResult): string {
-  return result.trace
+  const steps = result.trace
     .map(
       (step, index) =>
         `${index + 1}. ${step.tool}${step.error ? " [ERROR]" : ""} ${step.at}\n${step.summary}`,
     )
     .join("\n\n");
+  return [steps, cacheLine(result)].filter(Boolean).join("\n\n");
+}
+
+/** "Prompt cache: 94% of prompt tokens over 12 turns; fell on turn 5, 9", for reviews. */
+function cacheLine(result: ChatResult): string {
+  const cache = result.cache;
+  if (!cache) return "";
+  const fell = cache.misses.length ? `; fell on turn ${cache.misses.join(", ")}` : "";
+  return `Prompt cache: ${Math.round(cache.hitRate * 100)}% of prompt tokens over ${cache.turns} turns${fell}`;
 }
 
 function option(args: string[], name: string): string | undefined {

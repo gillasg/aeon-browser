@@ -22,6 +22,7 @@ export function projectMessage(message: AgentMessageFromEvent): PiMessageProject
       content: projectContent(message.content),
       stopReason: message.stopReason,
       ...(message.errorMessage ? { errorMessage: message.errorMessage.slice(0, 2000) } : {}),
+      ...usageOf(message.usage),
     };
   }
   if (message.role === "toolResult") {
@@ -39,6 +40,20 @@ export function projectMessage(message: AgentMessageFromEvent): PiMessageProject
   }
   if (message.role === "custom") return projectCustomMessage(message.customType, message.details);
   return redactedCustomMessage();
+}
+
+/** Token counts of a turn, so traces can show how much of each prompt the cache served. */
+function usageOf(usage: unknown): { usage?: NonNullable<PiMessageProjection["usage"]> } {
+  if (!isRecord(usage)) return {};
+  const count = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : 0;
+  const projected = {
+    input: count(usage.input),
+    output: count(usage.output),
+    cacheRead: count(usage.cacheRead),
+    cacheWrite: count(usage.cacheWrite),
+  };
+  return projected.input + projected.output + projected.cacheRead > 0 ? { usage: projected } : {};
 }
 
 function projectNestedCalls(value: unknown): NonNullable<PiMessageProjection["nestedCalls"]> {

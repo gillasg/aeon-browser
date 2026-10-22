@@ -18,6 +18,7 @@ interface Entry {
     stopReason?: string;
     errorMessage?: string;
     actions?: TraceAction[];
+    usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
   } | null;
 }
 interface Snapshot {
@@ -63,11 +64,45 @@ export interface ChatResult {
   toolErrors: number;
   tabsOpened: number;
   contextTokens: number | null;
+  /**
+   * The prompt cache across the chat's turns: the share of prompt tokens read from the cache,
+   * and the turns where it fell (the prompt changed before the cached part, which costs time
+   * and money). Every turn after the first should mostly hit the cache.
+   */
+  cache?: CacheReport;
   /** When the latest prompt was submitted and when the chat finished it (ISO; finishedAt only
    * once finished). Screen recorders (Aperture) frame recordings with these; keep them. */
   promptAt: string | null;
   finishedAt: string | null;
   trace: TraceStep[];
+}
+
+export interface CacheReport {
+  turns: number;
+  hitRate: number;
+  /** Turns (1-based) after the first whose cached share fell below half. */
+  misses: number[];
+}
+
+/** How well the prompt cache held across the chat's assistant turns. */
+export function cacheReport(entries: Entry[]): CacheReport | undefined {
+  const turns = entries
+    .map((entry) => entry.message?.usage)
+    .filter((usage): usage is NonNullable<typeof usage> => Boolean(usage));
+  if (!turns.length) return undefined;
+  const prompt = (usage: (typeof turns)[number]) =>
+    usage.input + usage.cacheRead + usage.cacheWrite;
+  const read = turns.reduce((sum, usage) => sum + usage.cacheRead, 0);
+  const total = turns.reduce((sum, usage) => sum + prompt(usage), 0);
+  const misses = turns
+    .map((usage, index) => ({ index, share: prompt(usage) ? usage.cacheRead / prompt(usage) : 1 }))
+    .filter(({ index, share }) => index > 0 && share < 0.5)
+    .map(({ index }) => index + 1);
+  return {
+    turns: turns.length,
+    hitRate: total ? Math.round((read / total) * 100) / 100 : 0,
+    misses,
+  };
 }
 
 export function summarize(
@@ -90,6 +125,7 @@ export function summarize(
     toolErrors: trace.filter((step) => step.error).length,
     tabsOpened: trace.reduce((count, step) => count + countOpened(step.summary), 0),
     contextTokens: snapshot.contextUsage?.tokens ?? null,
+    ...cacheOf(snapshot.entries),
     promptAt: lastOf(snapshot.entries, "user")?.timestamp ?? null,
     finishedAt:
       outcome === "timeout" || snapshot.runState !== "idle"
@@ -97,6 +133,11 @@ export function summarize(
         : (lastOf(snapshot.entries, "assistant")?.timestamp ?? null),
     trace,
   };
+}
+
+function cacheOf(entries: Entry[]): { cache?: CacheReport } {
+  const cache = cacheReport(entries);
+  return cache ? { cache } : {};
 }
 
 function lastOf(entries: Entry[], role: string): Entry | undefined {

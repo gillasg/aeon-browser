@@ -57,7 +57,15 @@ test("errors and offline signals stay visible to the model", async () => {
   const failed = await runCell({ output: "", error: "p.title is not a function", steps: [] });
   assert.equal(failed.isError, true);
   assert.match(failed.content[0].text, /error: p\.title is not a function/);
-  assert.match(failed.content[0].text, /Playwright-style page\.goto/);
+  assert.match(failed.content[0].text, /await help\(\) lists what browser code can do/);
+  // A hint from the runtime's real API replaces the pointer.
+  const hinted = await runCell({
+    output: "",
+    error: "page.playwright.click is not a function\nHint: there is no page.playwright",
+    steps: [],
+  });
+  assert.match(hinted.content[0].text, /Hint: there is no page\.playwright/);
+  assert.doesNotMatch(hinted.content[0].text, /await help\(\)/);
   const offline = await createBrowserCodeTool("chat-1").execute("c", { code: "x" });
   assert.match(offline.content[0].text, /BROWSER_OFFLINE/);
 });
