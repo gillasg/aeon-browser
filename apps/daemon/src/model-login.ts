@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { LoginServer } from "pi-ai-login";
 
 // The "Connect a model" page: every provider Pi supports, in the browser. Logins land in Pi's
@@ -45,10 +46,14 @@ export async function modelComplete(
     .map((message) => `${message.role === "assistant" ? "You" : "User"}: ${message.content}`)
     .join("\n\n");
   const content = earlier ? `Conversation so far:\n\n${earlier}\n\nNow:\n\n${last}` : last;
-  const reply = await handle.models.completeSimple(handle.model, {
-    systemPrompt: system,
-    messages: [{ role: "user", content, timestamp: Date.now() }],
-  });
+  const reply = await handle.models.completeSimple(
+    handle.model,
+    {
+      systemPrompt: system,
+      messages: [{ role: "user", content, timestamp: Date.now() }],
+    },
+    { sessionId: randomUUID() },
+  );
   if (reply.stopReason === "error" || reply.stopReason === "aborted")
     throw new Error(
       `${handle.model.provider}/${handle.model.id}: ${reply.errorMessage ?? "the model failed"}`,

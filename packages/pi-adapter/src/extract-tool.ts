@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { AssistantMessage, Tool } from "@earendil-works/pi-ai";
@@ -94,19 +95,25 @@ export async function extractJson(
     constrainedSampling: { type: "json_schema", strict: "prefer" },
   };
   let problems = "";
+  // One session for the attempts, so providers that route by session (OpenCode Go) accept them.
+  const sessionId = randomUUID();
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-    const reply = await runtime.completeSimple(chosen, {
-      systemPrompt:
-        "Extract the requested data from the user's text. Answer only by calling submit_result with the result. Use only what the text says; leave optional fields out when it does not say.",
-      tools: [tool],
-      messages: [
-        {
-          role: "user",
-          content: `${instructions ? `${instructions}\n\n` : ""}${problems}Text:\n\n${text}`,
-          timestamp: Date.now(),
-        },
-      ],
-    });
+    const reply = await runtime.completeSimple(
+      chosen,
+      {
+        systemPrompt:
+          "Extract the requested data from the user's text. Answer only by calling submit_result with the result. Use only what the text says; leave optional fields out when it does not say.",
+        tools: [tool],
+        messages: [
+          {
+            role: "user",
+            content: `${instructions ? `${instructions}\n\n` : ""}${problems}Text:\n\n${text}`,
+            timestamp: Date.now(),
+          },
+        ],
+      },
+      { sessionId },
+    );
     const result = dropNulls(answerOf(reply), schema as Schema);
     if (result !== undefined && Value.Check(schema, result)) return result;
     const errors = [...Value.Errors(schema, result)].slice(0, 10).map((e) => e.message);

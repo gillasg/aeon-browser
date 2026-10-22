@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Api, AssistantMessage, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
@@ -87,7 +88,8 @@ export async function completeWithDefaultModel(
       systemPrompt: system,
       messages: [{ role: "user", content: transcript(messages), timestamp: Date.now() }],
     },
-    reasoning ? { reasoning } : {},
+    // OpenCode Go routes by session and refuses requests without one.
+    { ...(reasoning ? { reasoning } : {}), sessionId: randomUUID() },
   );
   return replyText(reply, `${model.provider}/${model.id}`);
 }
@@ -98,6 +100,10 @@ export function siteToolModel(
 ): () => Promise<{ complete(context: unknown): Promise<never> }> {
   return async () => {
     const { runtime, model } = await defaultModel(options, {});
-    return { complete: (context) => runtime.completeSimple(model, context as never) as never };
+    const sessionId = randomUUID();
+    return {
+      complete: (context) =>
+        runtime.completeSimple(model, context as never, { sessionId }) as never,
+    };
   };
 }
