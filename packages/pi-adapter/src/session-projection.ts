@@ -246,6 +246,7 @@ function projectToolEvent(
       toolName: event.toolName,
       arguments: safeJsonObject(event.args),
       partialResult: resultText(event.partialResult),
+      ...toolProgress(event.partialResult),
       ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
     };
   const changeDiff = event.isError ? undefined : projectChangeDiff(event.result);
@@ -335,3 +336,19 @@ function createCloseSession(
   return closeSession;
 }
 import { readToolImage } from "./session-image.js";
+
+/** The progress a tool reported in its partial result's details (browser_code's bu.progress). */
+function toolProgress(value: unknown): {
+  progress?: { done: number; total?: number; label?: string };
+} {
+  const progress = (value as { details?: { progress?: unknown } } | null)?.details?.progress as
+    { done?: unknown; total?: unknown; label?: unknown } | undefined;
+  if (!progress || typeof progress.done !== "number") return {};
+  return {
+    progress: {
+      done: progress.done,
+      ...(typeof progress.total === "number" ? { total: progress.total } : {}),
+      ...(typeof progress.label === "string" ? { label: progress.label } : {}),
+    },
+  };
+}

@@ -43,7 +43,18 @@ export function createBrowserCodeTool(
     execute: async (toolCallId, { code }, signal, onUpdate) => {
       const operationId = randomUUID();
       let steps: Record<string, unknown>[] = [];
-      const envelope = () => ({ operationId, toolCallId, steps });
+      let progress: ToolProgress | undefined;
+      const envelope = () => ({
+        operationId,
+        toolCallId,
+        steps,
+        ...(progress ? { progress } : {}),
+      });
+      const update = () =>
+        onUpdate?.({
+          content: browserContent(JSON.stringify(envelope())),
+          details: progress ? { progress } : undefined,
+        });
       if (!run)
         return {
           content: browserContent(JSON.stringify({ ...envelope(), error: "BROWSER_OFFLINE" })),
@@ -57,14 +68,20 @@ export function createBrowserCodeTool(
           codeCell: {
             code,
             timeoutMs: CELL_TIMEOUT_MS,
-            onCall: (request) =>
-              siteApiRequest(chatId, request) ?? serveCall(request, workspace, steps, skills),
+            onCall: (request) => {
+              const reported = progressRequest(request);
+              if (reported) {
+                progress = reported;
+                update();
+                return Promise.resolve({ ok: true });
+              }
+              return (
+                siteApiRequest(chatId, request) ?? serveCall(request, workspace, steps, skills)
+              );
+            },
             onProgress: (next) => {
               steps = next.map(compactStep);
-              onUpdate?.({
-                content: browserContent(JSON.stringify(envelope())),
-                details: undefined,
-              });
+              update();
             },
           },
         },
@@ -172,6 +189,27 @@ async function serveCall(
   if (Array.isArray(upload.validateUpload))
     return validateUploadFiles(upload.validateUpload as string[], workspace ?? process.cwd());
   throw new Error("UNSUPPORTED: unknown browser runtime request");
+}
+
+export interface ToolProgress {
+  done: number;
+  total?: number;
+  label?: string;
+}
+
+/** bu.progress(done, total, label) from a cell: how far a long job inside one call has got. */
+function progressRequest(request: unknown): ToolProgress | undefined {
+  const value = (request as { progress?: Record<string, unknown> } | null)?.progress;
+  if (!value || typeof value !== "object") return undefined;
+  const count = (item: unknown) =>
+    typeof item === "number" && Number.isFinite(item) && item >= 0
+      ? Math.min(Math.floor(item), 1_000_000_000)
+      : undefined;
+  const done = count(value.done);
+  if (done === undefined) return undefined;
+  const total = count(value.total);
+  const label = typeof value.label === "string" ? value.label.slice(0, 200) : undefined;
+  return { done, ...(total !== undefined ? { total } : {}), ...(label ? { label } : {}) };
 }
 
 function workspaceSteps(steps: Record<string, unknown>[]) {

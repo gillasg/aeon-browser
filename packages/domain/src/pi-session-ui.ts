@@ -68,6 +68,8 @@ export type PiSessionEvent =
       toolName: string;
       arguments: { readonly [key: string]: PiJsonValue };
       partialResult: string;
+      /** How far a long job inside this call has got (bu.progress in browser_code). */
+      progress?: { done: number; total?: number; label?: string };
       parentToolCallId?: string;
     }
   | {

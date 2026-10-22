@@ -273,6 +273,15 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
       toolName: z.string().min(1).max(120),
       arguments: z.record(z.string(), z.json()),
       partialResult: z.string().max(24_020),
+      /** How far a long job inside this call has got (bu.progress in browser_code). */
+      progress: z
+        .object({
+          done: z.number().int().nonnegative(),
+          total: z.number().int().nonnegative().optional(),
+          label: z.string().max(200).optional(),
+        })
+        .strict()
+        .optional(),
       parentToolCallId: z.string().min(1).max(160).optional(),
     })
     .strict(),

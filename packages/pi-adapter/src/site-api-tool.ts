@@ -69,8 +69,10 @@ const GUIDELINES = [
 ];
 
 function requireSite(input: Input): string {
-  if (!input.site) throw new Error("Give the site, for example shop.example.com");
-  return siteName(input.site);
+  // Models often pass the site as `name`; outside the name action that can only mean the site.
+  const site = input.site ?? ((input.action as string) !== "name" ? input.name : undefined);
+  if (!site) throw new Error("Give the site, for example shop.example.com");
+  return siteName(site);
 }
 
 const HOW_TO_CALL =
