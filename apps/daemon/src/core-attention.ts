@@ -7,7 +7,7 @@ import {
   type CoreAttentionAlert,
   type CoreAttentionRequest,
 } from "@aeon/protocol";
-import type { ChatId, PiSessionEvent } from "@aeon/domain";
+import type { ChatId, PiMessageProjection, PiSessionEvent } from "@aeon/domain";
 import type { ChatService } from "./chat-service.js";
 
 interface AttentionRecord {
@@ -25,8 +25,13 @@ export class CoreAttention {
   private pending = Promise.resolve();
   private readonly path: string;
   private readonly unsubscribe: () => void;
+  /** The last thing each chat said, for a notification that says what happened. */
+  private readonly answers = new Map<string, string>();
 
-  constructor(directory: string, service: ChatService) {
+  constructor(
+    directory: string,
+    private readonly service: ChatService,
+  ) {
     this.path = join(directory, "core-attention.json");
     if (existsSync(this.path)) this.restore(service);
     this.unsubscribe = service.subscribeAllEvents((chatId, event) => this.observe(chatId, event));
@@ -131,15 +136,20 @@ export class CoreAttention {
       record.notified = true;
       this.changed();
     }
+    const title = this.service.getChat(request.chatId as ChatId)?.title;
+    const summary = this.answers.get(request.chatId);
     return {
       kind: "core.attention.claimed",
       chatId: request.chatId,
       completionId: request.completionId,
       granted,
+      ...(granted && title ? { title: title.slice(0, 120) } : {}),
+      ...(granted && summary ? { summary } : {}),
     };
   }
 
   private observe(chatId: string, event: PiSessionEvent): void {
+    if (event.kind === "message-end") this.noteAnswer(chatId, event.message);
     if (event.kind !== "run-state") return;
     const previous = this.records.get(chatId) ?? {
       chatId,
@@ -160,6 +170,20 @@ export class CoreAttention {
     this.records.set(chatId, previous);
     this.changed();
   }
+  /** "Price dropped to ₹2,999": the first sentence of the chat's latest reply. */
+  private noteAnswer(chatId: string, message: PiMessageProjection): void {
+    if (message.role !== "assistant") return;
+    const text = message.content
+      .map((block) => (block.type === "text" ? (block.text ?? "") : ""))
+      .join(" ")
+      .replace(/[*_`#>]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) return;
+    const sentence = /^(.{12,}?[.!?])(\s|$)/.exec(text)?.[1] ?? text;
+    this.answers.set(chatId, sentence.length > 180 ? sentence.slice(0, 179) + "…" : sentence);
+  }
+
   private changed(): void {
     const saved = JSON.stringify([...this.records.values()]);
     this.pending = this.pending

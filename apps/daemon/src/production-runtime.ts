@@ -177,6 +177,7 @@ function managementRoutines(
       title: routine.title,
       instruction: routine.instruction,
       schedule: routine.schedule,
+      ...(routine.check ? { checks: true } : {}),
       nextDueAt: routine.nextDueAt,
       requiredBrowserInstanceId: routine.requiredBrowserInstanceId,
       enabled: routine.enabled,

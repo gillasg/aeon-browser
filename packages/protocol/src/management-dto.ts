@@ -46,6 +46,8 @@ const ManagementRoutineSchema = z
     title: z.string().min(1).max(120),
     instruction: z.string().min(1).max(20_000),
     schedule: RoutineScheduleSchema,
+    /** It runs a check with no model first (a learned API, a page read); the agent only when it passes. */
+    checks: z.boolean().optional(),
     nextDueAt: z.string().datetime().nullable(),
     requiredBrowserInstanceId: z.string().uuid().nullable(),
     enabled: z.boolean(),

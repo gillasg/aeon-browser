@@ -58,6 +58,9 @@ export const CoreAttentionClaimSchema = z
     chatId: z.string().uuid(),
     completionId: z.string().uuid(),
     granted: z.boolean(),
+    /** For the notification: the chat's title and what it found, so it says what happened. */
+    title: z.string().max(120).optional(),
+    summary: z.string().max(200).optional(),
   })
   .strict();
 /** A watcher's check passed: shown at once as a notification, before its agent run starts. */
