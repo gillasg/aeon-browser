@@ -142,6 +142,45 @@ export class AeonClient {
     });
   }
 
+  /**
+   * Sends a Chat's first prompt through the daemon, the same path its tab uses: no tab has to
+   * open, and the prompt does not depend on one finishing loading. Resolves once the daemon
+   * starts the run; rejects when it refuses or cannot start Pi.
+   */
+  submit(
+    chatId: string,
+    text: string,
+    selection: { model: { provider: string; id: string }; thinkingLevel: string },
+  ): Promise<void> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not start the prompt; check the model and try again."));
+      }, 30_000);
+      this.waiting.set(requestId, (message) => {
+        const started = message.kind === "command.started";
+        const failed =
+          message.kind === "command.failed" ||
+          (message.kind === "command.settled" && message.state === "failed");
+        if (!started && !failed) return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        if (failed)
+          reject(new Error(String(message.message ?? message.code ?? "Aeon could not submit.")));
+        else resolve();
+      });
+      this.socket.send(
+        JSON.stringify({
+          kind: "command",
+          requestId,
+          operation: "chat.submit",
+          payload: { chatId, text, selection },
+        }),
+      );
+    });
+  }
+
   onAttention(listener: (chats: AttentionChat[]) => void): () => void {
     this.attentionListeners.add(listener);
     return () => this.attentionListeners.delete(listener);

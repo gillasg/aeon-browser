@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Api, AssistantMessage, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { chooseCompletionModel } from "./completion-model.js";
 
 // One plain completion with the model a new chat would use: the same runtime (auth.json and
 // models.json, so custom providers work) and the same default as the model picker.
@@ -34,19 +35,7 @@ export async function defaultModel(
   );
   const models = await runtime.getAvailable();
   const settings = SettingsManager.create(options.sessionDirectory, options.agentDirectory);
-  const wanted = (provider?: string, id?: string) =>
-    models.find((model) => model.provider === provider && model.id === id);
-  const [provider, ...id] = (choice.model ?? "").split("/");
-  if (choice.model && !wanted(provider, id.join("/")))
-    throw new Error(
-      `${choice.model} is not available in Aeon. Use provider/model as in the model picker.`,
-    );
-  const model =
-    wanted(provider, id.join("/")) ??
-    wanted(options.preferredInitialModel?.provider, options.preferredInitialModel?.id) ??
-    wanted(settings.getDefaultProvider(), settings.getDefaultModel()) ??
-    models[0];
-  if (!model) throw new Error("No AI model is connected in Aeon.");
+  const model = chooseCompletionModel(models, settings, choice, options.preferredInitialModel);
   return { runtime, model };
 }
 

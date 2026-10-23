@@ -135,6 +135,18 @@ const ChatSubmitRequestSchema = z
         attachments: AttachmentsSchema,
         browserContext: PiBrowserContextRecordSchema.optional(),
         browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
+        selection: z
+          .object({
+            model: z
+              .object({
+                provider: z.string().min(1).max(120),
+                id: z.string().min(1).max(300),
+              })
+              .strict(),
+            thinkingLevel: z.string().min(1).max(40),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
   })

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { summarize } from "../dist/results.js";
+import { runTasks } from "../dist/run.js";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 const at = "2026-10-12T10:00:00.000Z";
@@ -113,6 +114,99 @@ test("the CLI says plainly when Aeon is not running", async () => {
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("a quiet run submits the prompt through the daemon and opens no tab", async () => {
+  const client = fakeClient();
+  const [result] = await runTasks(client, ["Find the price"], {
+    parallel: 1,
+    quiet: true,
+    timeoutMs: 5_000,
+  });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(client.opens, []);
+  assert.deepEqual(client.submits, [
+    {
+      chatId: "chat-1",
+      text: "Find the price",
+      selection: { model: { provider: "aeon-fixture", id: "model-one" }, thinkingLevel: "low" },
+    },
+  ]);
+  assert.equal(
+    client.commands.some((command) => command.operation === "chat.create"),
+    true,
+  );
+});
+
+test("a run with a tab still submits directly, so a loading tab cannot hold it up", async () => {
+  const client = fakeClient();
+  const [result] = await runTasks(client, ["Open the page"], {
+    parallel: 1,
+    quiet: false,
+    timeoutMs: 5_000,
+  });
+  assert.equal(result.status, "finished");
+  assert.deepEqual(client.opens, ["chat-1"]);
+  assert.equal(client.submits.length, 1);
+  assert.equal(client.submits[0].text, "Open the page");
+});
+
+function fakeClient() {
+  const commands = [];
+  const opens = [];
+  const submits = [];
+  let attention;
+  return {
+    commands,
+    opens,
+    submits,
+    async command(operation, payload) {
+      commands.push({ operation, payload });
+      if (operation === "chat.model-catalog")
+        return {
+          catalog: {
+            defaultModel: { provider: "aeon-fixture", id: "model-one" },
+            models: [
+              {
+                provider: "aeon-fixture",
+                id: "model-one",
+                name: "Model One",
+                defaultThinkingLevel: "low",
+                thinkingLevels: ["low", "high"],
+              },
+            ],
+          },
+        };
+      if (operation === "chat.create") return { chat: { chatId: "chat-1" } };
+      if (operation === "chat.get")
+        return {
+          snapshot: {
+            chat: { chatId: "chat-1", title: "A chat" },
+            runState: "idle",
+            contextUsage: null,
+            entries: [],
+            omittedEntryCount: 0,
+          },
+        };
+      return {};
+    },
+    async openChat(chatId) {
+      opens.push(chatId);
+      return 1;
+    },
+    submit(chatId, text, selection) {
+      submits.push({ chatId, text, selection });
+      attention?.([{ chatId, working: true, completionId: null }]);
+      setTimeout(() => attention?.([{ chatId, working: false, completionId: "completed" }]), 0);
+      return Promise.resolve();
+    },
+    onAttention(listener) {
+      attention = listener;
+      return () => {
+        attention = undefined;
+      };
+    },
+  };
+}
 
 function mcp(messages) {
   return new Promise((resolve, reject) => {

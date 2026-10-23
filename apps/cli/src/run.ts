@@ -51,12 +51,15 @@ async function chooseModel(client: AeonClient, options: RunOptions): Promise<Sel
   const model = catalog.models.find(
     (item) => item.provider === wanted?.provider && item.id === wanted.id,
   );
-  if (!model)
-    throw new Error(
-      wanted
-        ? `Model ${wanted.provider}/${wanted.id} is not available in Pi.`
-        : "Pi has no default model; pass --model provider/id.",
-    );
+  if (!model) {
+    const problem = wanted
+      ? `${wanted.provider}/${wanted.id} isn't available.`
+      : "Pi has no default model.";
+    const hint = wanted
+      ? `Sign in to ${wanted.provider} again from the model picker ("Add or manage models…").`
+      : 'Pass --model provider/id or sign in from the model picker ("Add or manage models…").';
+    throw new Error(`${problem} ${hint}`);
+  }
   const thinkingLevel = options.thinkingLevel ?? model.defaultThinkingLevel;
   if (!model.thinkingLevels.includes(thinkingLevel))
     throw new Error(`Thinking level ${thinkingLevel} is not offered by ${model.id}.`);
@@ -72,15 +75,14 @@ async function runOne(
 ): Promise<ChatResult> {
   const started = Date.now();
   const finished = waitForIdle(client, options.timeoutMs);
-  const created = await client.command("chat.create", {
-    title: prompt.slice(0, 80),
-    initialSubmit: { text: prompt, ...selection },
-  });
+  const created = await client.command("chat.create", { title: prompt.slice(0, 80) });
   const chatId = String((created.chat as { chatId: string }).chatId);
   finished.track(chatId);
   options.onStarted?.(index, chatId);
   if (!options.quiet) await client.openChat(chatId);
   options.onProgress?.(`[${index + 1}] started ${chatId}`);
+  // The daemon submits it directly, so quiet runs need no tab and an unloaded tab cannot hold it up.
+  await client.submit(chatId, prompt, selection);
   const outcome = await finished.done;
   const view = await client.command("chat.get", { chatId });
   const result = summarize(chatId, prompt, view.snapshot, Date.now() - started, outcome);

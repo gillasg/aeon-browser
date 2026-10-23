@@ -64,13 +64,7 @@ async function complete(data: Record<string, unknown>, deps: Deps): Promise<{ te
     thinking: typeof data.thinking === "string" ? data.thinking : "high",
   };
   const system = String(data.system ?? "");
-  const text = await deps.service
-    .modelComplete(system, messages, choice)
-    .catch((error: unknown) =>
-      choice.model === COMPANION_MODEL && /not available/.test(String(error))
-        ? deps.service.modelComplete(system, messages, { thinking: choice.thinking })
-        : Promise.reject(error),
-    );
+  const text = await deps.service.modelComplete(system, messages, choice);
   return { text };
 }
 

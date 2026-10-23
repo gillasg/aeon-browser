@@ -5,16 +5,23 @@ import { handleCompanionMessage } from "../dist/companion-requests.js";
 
 const SITE_BOOSTS = "kcfodpkdfapojnbhkgdlpkikipneejpf";
 
-function harness() {
+function harness({ failCompanion = false } = {}) {
   const sent = [];
   const prompts = [];
   const opened = [];
+  const completions = [];
   const socket = { readyState: 1, send: (text) => sent.push(JSON.parse(text)) };
   const service = {
     createDraft: async (title) => ({ chatId: "chat-" + prompts.length, title }),
     submitPrompt: async (chatId, prompt) => prompts.push({ chatId, prompt }),
-    modelComplete: async (system, messages) =>
-      `${system}|${messages.map((m) => m.content).join(",")}`,
+    modelComplete: async (system, messages, choice) => {
+      completions.push({ system, messages, choice });
+      if (failCompanion && choice?.model === "opencode-go/deepseek-v4.1-flash")
+        throw new Error(
+          "opencode-go/deepseek-v4.1-flash isn't available. Sign in to opencode-go again from the model picker.",
+        );
+      return `${system}|${messages.map((m) => m.content).join(",")}`;
+    },
   };
   const browserControl = { openChatTab: (chatId) => opened.push(chatId) };
   const ask = async (request, data) => {
@@ -29,8 +36,19 @@ function harness() {
       await new Promise((done) => setTimeout(done, 5));
     return sent.find((m) => m.requestId === requestId);
   };
-  return { ask, prompts, opened, socket, service, browserControl };
+  return { ask, prompts, opened, socket, service, browserControl, completions };
 }
+
+test("a companion model that is gone fails instead of quietly using another", async () => {
+  const { ask, completions } = harness({ failCompanion: true });
+  const reply = await ask("model.complete", {
+    system: "S",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  assert.equal(reply.ok, false);
+  assert.match(reply.error, /deepseek-v4\.1-flash isn't available/);
+  assert.equal(completions.length, 1, "no retry with a different model");
+});
 
 test("other extensions get completions with the user's model", async () => {
   const { ask } = harness();

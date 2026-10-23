@@ -229,9 +229,9 @@ export class ChatService {
       });
   }
   async getControls(chatId: ChatId): Promise<PiSessionControlState | null> {
-    const chat = this.requireChat(chatId);
-    if (chat.status === "failed") return null;
-    const { session } = await this.resolveSession(chat);
+    // A Chat whose last activation failed is opened again, so the page gets the real reason
+    // (an unavailable model, say) instead of sitting on "Starting…" with no picker.
+    const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
     return session.controls();
   }

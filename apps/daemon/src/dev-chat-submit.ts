@@ -31,7 +31,7 @@ export function beginSubmit(
         ...(payload.browserContext ? { browserContext: payload.browserContext } : {}),
         ...(payload.browserContexts ? { browserContexts: payload.browserContexts } : {}),
       },
-      selection,
+      selection ?? payload.selection,
     )
     .then(() => completeSubmit(socket, service, request))
     .catch((error: unknown) => failSubmit(socket, service, request, error));

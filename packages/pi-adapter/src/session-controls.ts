@@ -9,6 +9,7 @@ import {
 import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@aeon/domain";
 import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
+import { modelUnavailable } from "./model-unavailable.js";
 
 type Controls = Pick<
   PiSessionHandle,
@@ -54,7 +55,7 @@ export function createSessionControls(session: AgentSession): Controls {
           : session.modelRuntime
               .getAvailableSnapshot()
               .find((item) => item.provider === provider && item.id === id);
-      if (!model) throw new Error("The requested model is not available in this Pi session.");
+      if (!model) throw modelUnavailable(provider, id);
       await session.setModel(model, { persist: false });
     },
     setThinkingLevel: (level) => {

@@ -1,5 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { OpenPiSessionInput, PiSessionHandle } from "@aeon/domain";
+import { modelUnavailable } from "./model-unavailable.js";
 export function verifyCachedHandle(
   handle: PiSessionHandle,
   input: OpenPiSessionInput,
@@ -21,7 +22,7 @@ export async function setInitialModel(
       .find((candidate) => candidate.provider === provider && candidate.id === id);
     if (!model) {
       session.dispose();
-      throw new Error(`Aeon's preferred Pi model ${provider}/${id} is not available.`);
+      throw modelUnavailable(provider, id);
     }
     await session.setModel(model, { persist: false });
   }
