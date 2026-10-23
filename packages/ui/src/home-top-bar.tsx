@@ -67,7 +67,8 @@ export function HomeTopBar({
 function useHomeEscape(view: HomeView, onView: (view: HomeView) => void): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape" && view !== "home") onView("home");
+      if (event.key !== "Escape" || event.defaultPrevented || view === "home") return;
+      onView("home");
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
