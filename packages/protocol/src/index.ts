@@ -1,5 +1,5 @@
 // Aeon's messages, on top of the browser engine's own (re-exported here).
-export * from "@browser-use-extension/protocol";
+export * from "@browserkit/protocol";
 export {
   ClientRoleSchema,
   HelloAckSchema,

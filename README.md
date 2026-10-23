@@ -3,7 +3,7 @@
 A browser agent that lives in your Chrome.
 
 ```sh
-node scripts/link-repos.mjs   # fetches and builds the Browser Use Extension next to this folder
+node scripts/link-repos.mjs   # fetches and builds browserkit next to this folder
 pnpm install --ignore-scripts
 pnpm build
 ```
@@ -25,10 +25,10 @@ packages/
   ui              the shared React UI
 ```
 
-Everything browser-related comes from the **Browser Use Extension** (BUE), which Aeon builds in: the engine (browser control), boosts, the site API and the crawl tool. BUE stands alone, so any agent can use it without Aeon.
+Everything browser-related comes from **browserkit**, which Aeon builds in: the engine (browser control), boosts, the site API and the crawl tool. browserkit stands alone, so any agent can use it without Aeon.
 
 ```
-BUE ─► Aeon
+browserkit ─► Aeon
 ```
 
 The repos use each other through links to sibling folders, not copies: a change is committed only in the repo where it was made, and everything that uses it picks it up at its next build. `node scripts/link-repos.mjs --revisions` prints which revision of each one is in use.

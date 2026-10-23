@@ -1,4 +1,4 @@
-import { clearAgentCursors } from "@browser-use-extension/engine/native-browser-cursor";
+import { clearAgentCursors } from "@browserkit/engine/native-browser-cursor";
 import {
   CoreAttentionAlertSchema,
   CoreAttentionClaimSchema,

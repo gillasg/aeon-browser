@@ -15,10 +15,7 @@ async function load(source, directory) {
     entryPoints: [
       [
         new URL("../src/" + source + ".ts", import.meta.url),
-        new URL(
-          "../node_modules/@browser-use-extension/engine/src/" + source + ".ts",
-          import.meta.url,
-        ),
+        new URL("../node_modules/@browserkit/engine/src/" + source + ".ts", import.meta.url),
       ]
         .map((url) => url.pathname.replace(/^\/(\w:)/, "$1"))
         .find((path) => existsSync(path)),

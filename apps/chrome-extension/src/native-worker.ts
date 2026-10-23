@@ -1,9 +1,9 @@
 import { askCore, handleCompanionResult, listenToCompanions } from "./companion-requests.js";
-import { authenticate } from "@browser-use-extension/engine/native-authenticate";
-import { configureEngine } from "@browser-use-extension/engine/engine-config";
-import { presentBrowserTask } from "@browser-use-extension/engine/native-browser-layout";
-import { installBoosts } from "@browser-use-extension/engine/native-browser-boosts";
-import { installEngineListeners } from "@browser-use-extension/engine/native-engine-install";
+import { authenticate } from "@browserkit/engine/native-authenticate";
+import { configureEngine } from "@browserkit/engine/engine-config";
+import { presentBrowserTask } from "@browserkit/engine/native-browser-layout";
+import { installBoosts } from "@browserkit/engine/native-browser-boosts";
+import { installEngineListeners } from "@browserkit/engine/native-engine-install";
 import {
   AGENT_IN_FRONT_KEY,
   HIDE_AGENT_CURSOR_KEY,
@@ -15,12 +15,12 @@ import { installOrb } from "./orb/orb-worker.js";
 import { installSiteAnswers } from "./orb/orb-site.js";
 import { installBrowseLearning } from "./browse-learning.js";
 import { handleSettingsMessage } from "./native-worker-settings.js";
-import { migrateLegacyChromeStorage } from "@browser-use-extension/engine/legacy-storage-migration";
+import { migrateLegacyChromeStorage } from "@browserkit/engine/legacy-storage-migration";
 import {
   installNativeStartup,
   scheduleExecutorReconnect,
   startExecutorHeartbeat,
-} from "@browser-use-extension/engine/native-executor-lifecycle";
+} from "@browserkit/engine/native-executor-lifecycle";
 import { handleContextPicker } from "./context-picker-handler.js";
 import { withConnectionTimeout } from "./connection-timeout.js";
 import {
@@ -32,7 +32,7 @@ import {
   installCoreAttentionBridge,
   handleCoreAttentionMessage,
 } from "./completion-notifications.js";
-import { installBrowserPopupGuard } from "@browser-use-extension/engine/native-browser-popup";
+import { installBrowserPopupGuard } from "@browserkit/engine/native-browser-popup";
 import {
   BrowserExecutorHeartbeatReplySchema,
   AuthHelloSchema,
@@ -50,22 +50,19 @@ import {
   NativeOpenChatResponseSchema,
   NativePageGrantResponseSchema,
 } from "./native-extension-message.js";
-import { synchronizeBrowserInventory } from "@browser-use-extension/engine/native-inventory-client";
+import { synchronizeBrowserInventory } from "@browserkit/engine/native-inventory-client";
 import {
   handleBrowserExecutorMessage,
   releaseBrowserExecutor,
-} from "@browser-use-extension/engine/native-browser-executor";
-import {
-  handleBrowserCodeMessage,
-  resetRealm,
-} from "@browser-use-extension/engine/code-runtime-host";
+} from "@browserkit/engine/native-browser-executor";
+import { handleBrowserCodeMessage, resetRealm } from "@browserkit/engine/code-runtime-host";
 import {
   getBrowserIdentity,
   hostErrorCode,
   nativeErrorCode,
   sameScope,
   type BrowserIdentity,
-} from "@browser-use-extension/engine/native-worker-identity";
+} from "@browserkit/engine/native-worker-identity";
 import {
   isOpenChatSender,
   isPageScopeAllowed,

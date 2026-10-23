@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
-      # The Browser Use Extension, next to this checkout.
+      # browserkit, next to this checkout.
       - name: Set up linked repos
         run: node scripts/link-repos.mjs
       - run: pnpm install --frozen-lockfile --ignore-scripts

@@ -7,8 +7,7 @@ allowBuilds:
   esbuild: true
   protobufjs: false
 minimumReleaseAgeExclude:
-  - browser-crawl
-  - "@browser-use-extension/engine"
+  - "@browserkit/engine"
   - "@earendil-works/pi-ai@1.2.0"
   - "@earendil-works/pi-telemetry@1.2.0"
   - "@modelcontextprotocol/client@2.2.0"

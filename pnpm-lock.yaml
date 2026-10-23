@@ -37,9 +37,9 @@ importers:
       "@aeon/ui":
         specifier: workspace:*
         version: link:../../packages/ui
-      "@browser-use-extension/engine":
-        specifier: link:../../../browser-use-extension/packages/engine
-        version: link:../../../browser-use-extension/packages/engine
+      "@browserkit/engine":
+        specifier: link:../../../browserkit/packages/engine
+        version: link:../../../browserkit/packages/engine
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -134,9 +134,9 @@ importers:
       "@aeon/protocol":
         specifier: workspace:*
         version: link:../protocol
-      "@browser-use-extension/tools":
-        specifier: link:../../../browser-use-extension/packages/tools
-        version: link:../../../browser-use-extension/packages/tools
+      "@browserkit/tools":
+        specifier: link:../../../browserkit/packages/tools
+        version: link:../../../browserkit/packages/tools
       "@earendil-works/pi-ai":
         specifier: 0.99.1
         version: 0.99.1(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
@@ -149,9 +149,9 @@ importers:
 
   packages/protocol:
     dependencies:
-      "@browser-use-extension/protocol":
-        specifier: link:../../../browser-use-extension/packages/protocol
-        version: link:../../../browser-use-extension/packages/protocol
+      "@browserkit/protocol":
+        specifier: link:../../../browserkit/packages/protocol
+        version: link:../../../browserkit/packages/protocol
       zod:
         specifier: 4.6.5
         version: 4.6.5

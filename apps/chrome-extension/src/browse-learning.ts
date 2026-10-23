@@ -1,4 +1,4 @@
-import { learnUserTab, networkCall } from "@browser-use-extension/engine/native-browser-network";
+import { learnUserTab, networkCall } from "@browserkit/engine/native-browser-network";
 import { askCore } from "./companion-requests.js";
 
 // "Learn this site while I browse": a tab the user switches on from the orb records the site's

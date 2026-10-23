@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ProtocolVersionSchema } from "@browser-use-extension/protocol";
+import { ProtocolVersionSchema } from "@browserkit/protocol";
 
-export { ProtocolVersionSchema, type ProtocolVersion } from "@browser-use-extension/protocol";
+export { ProtocolVersionSchema, type ProtocolVersion } from "@browserkit/protocol";
 
 export const SUPPORTED_PROTOCOL_VERSION = { major: 1, minor: 7 } as const;
 

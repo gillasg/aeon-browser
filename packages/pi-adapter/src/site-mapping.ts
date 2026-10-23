@@ -1,11 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import {
-  explore,
-  loadModel,
-  siteName,
-  type ModelLike,
-} from "@browser-use-extension/tools/site-to-api";
+import { explore, loadModel, siteName, type ModelLike } from "@browserkit/tools/site-to-api";
 import { inChat } from "./site-browser.js";
 
 // Sites learn their APIs while the agent uses them (the learn-live loop in browser code), so

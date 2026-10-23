@@ -14,7 +14,7 @@ test("regular-chat browser work pairs tabs automatically and side-panel work kee
       entryPoints: [
         fileURLToPath(
           new URL(
-            "../node_modules/@browser-use-extension/engine/src/native-browser-layout.ts",
+            "../node_modules/@browserkit/engine/src/native-browser-layout.ts",
             import.meta.url,
           ),
         ),
@@ -117,7 +117,7 @@ test("the chat joins its agent's tab group, and thumbnail view never splits on i
   const folder = await mkdtemp(join(tmpdir(), "aeon-layout-")),
     old = globalThis.chrome;
   try {
-    const engine = new URL("../node_modules/@browser-use-extension/engine/src/", import.meta.url);
+    const engine = new URL("../node_modules/@browserkit/engine/src/", import.meta.url);
     const entry = join(folder, "entry.mjs");
     const { writeFile } = await import("node:fs/promises");
     await writeFile(

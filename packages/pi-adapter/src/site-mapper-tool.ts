@@ -16,7 +16,7 @@ import {
   siteName,
   watch,
   type ModelLike,
-} from "@browser-use-extension/tools/site-to-api";
+} from "@browserkit/tools/site-to-api";
 import { inChat } from "./site-browser.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
