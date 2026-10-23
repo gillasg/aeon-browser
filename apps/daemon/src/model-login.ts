@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { LoginServer } from "pi-ai-login";
 
-// The "Connect a model" page: every provider Pi supports, in the browser. Logins land in Pi's
-// own auth.json, so chats, the Pi CLI and other Pi apps all see them.
+// The sign-in service behind Aeon's Models page: every provider Pi supports. Aeon's page talks to
+// it on 127.0.0.1 with the token in the returned address and opens providers' sign-in pages as
+// Chrome tabs itself. Logins land in Pi's own auth.json, so chats, the Pi CLI and other Pi apps
+// all see them.
 const IDLE_CLOSE_MS = 30 * 60_000;
 let active: LoginServer | undefined;
 
-/** Starts (or reuses) the sign-in page and returns its address. `onChange` runs after each sign-in or sign-out. */
+/** Starts (or reuses) the sign-in service and returns its address. `onChange` runs after each sign-in or sign-out. */
 export async function openModelLogin(
   agentDir: string | undefined,
   onChange: () => void,
@@ -14,7 +16,10 @@ export async function openModelLogin(
   if (active) return active.url;
   // Loaded on first use: the provider SDKs are only needed while signing in.
   const { startLoginServer } = await import("pi-ai-login");
-  const server = await startLoginServer(agentDir ? { agentDir, openSignInPages: true } : {});
+  const server = await startLoginServer({
+    ...(agentDir ? { agentDir } : {}),
+    openSignInPages: false,
+  });
   active = server;
   server.service.on("change", onChange);
   const close = () => {
