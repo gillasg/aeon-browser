@@ -15,6 +15,13 @@ import {
 import { browserRuntimePrimer } from "./browser-code-guidance.js";
 import { browserAbilitySearch } from "./browser-ability-search.js";
 
+/** Skills written for agents outside Aeon (they drive Aeon from a shell). */
+const OUTSIDE_AGENT_SKILLS = new Set(["aeon"]);
+
+export function withoutOutsideAgentSkills<T extends { name: string }>(skills: readonly T[]): T[] {
+  return skills.filter((skill) => !OUTSIDE_AGENT_SKILLS.has(skill.name));
+}
+
 export function createPiResourceLoader(input: {
   workingDirectory: string;
   agentDirectory: string;
@@ -40,6 +47,9 @@ export function createPiResourceLoader(input: {
     settingsManager: input.settingsManager,
     appendSystemPromptOverride: (base) =>
       input.browserGuidance ? [...base, browserRuntimePrimer] : base,
+    // The `aeon` skill teaches other agents to reach Aeon from a shell; Aeon's own agent already
+    // has the browser tools, and reading it only costs context and confuses which tool to use.
+    skillsOverride: (base) => ({ ...base, skills: withoutOutsideAgentSkills(base.skills) }),
     extensionFactories: [
       createCodemodeExtension(),
       createToolSearchExtension(),
