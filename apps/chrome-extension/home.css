@@ -1267,26 +1267,12 @@ body[data-embedded="true"] .chat-navigation {
 .home-top-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--aeon-s-4);
   flex: none;
   height: 52px;
   padding: 0 var(--aeon-s-5);
   background: var(--aeon-canvas);
-}
-.home-top-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--aeon-s-2);
-  padding: 4px 8px 4px 2px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--aeon-text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
 }
 .home-top-nav {
   display: flex;

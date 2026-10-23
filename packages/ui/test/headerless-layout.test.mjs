@@ -35,6 +35,8 @@ test("new tab has no sidebar: a top bar, an empty composer and the dashboard", (
     }),
   );
   assert.match(html, /class="home-top-bar"/);
+  assert.doesNotMatch(html, /home-top-brand|aria-label="Aeon home"/);
+  assert.match(html, /class="home-top-nav"/);
   assert.match(html, /placeholder=""/);
   assert.doesNotMatch(html, /id="chat-sidebar"|id="pinned-label"|id="projects-label"/);
   for (const page of ["Chats", "Routines", "Activity"]) assert.match(html, new RegExp(`>${page}<`));

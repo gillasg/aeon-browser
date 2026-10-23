@@ -18,6 +18,8 @@ export interface ComposerPanelsProps {
   mode: "followUp" | "steer";
   running: boolean;
   controls: ComposerControls | null;
+  /** Why the Chat's Pi session could not start; kept so it is never only a passing toast. */
+  controlsError?: string | undefined;
   contextUsage?: PiContextUsage | null;
   attachments: readonly ComposerAttachment[];
   onMode(mode: "followUp" | "steer"): void;
@@ -31,26 +33,84 @@ export interface ComposerPanelsProps {
 
 export function ComposerPanels(props: ComposerPanelsProps): ReactElement {
   return (
+    <div className="composer-meta">
+      <PanelsContent props={props} />
+    </div>
+  );
+}
+
+function PanelsContent({ props }: { props: ComposerPanelsProps }): ReactElement {
+  const emptyCard = emptyModelsCard(props);
+  if (emptyCard) return emptyCard;
+  if (props.connected === false) return <ModelLoading connecting />;
+  if (!props.controls) {
+    if (props.controlsError) return <StartError props={props} />;
+    return <ModelLoading connecting={false} />;
+  }
+  if (!props.controls.effectiveModel) return <ModelLoading connecting={false} />;
+  return <WorkingPanels props={props} />;
+}
+
+function emptyModelsCard(props: ComposerPanelsProps): ReactElement | null {
+  if (!props.controls || props.controls.availableModels.length || !props.onManageModels)
+    return null;
+  return (
+    <ConnectModelCard
+      state={props.modelLogin ?? { waiting: false }}
+      onConnect={props.onManageModels}
+    />
+  );
+}
+
+function ModelLoading({ connecting }: { connecting: boolean }): ReactElement {
+  return (
+    <span className="model-loading" role="status">
+      {connecting ? "Connecting…" : "Starting…"}
+    </span>
+  );
+}
+
+function WorkingPanels({ props }: { props: ComposerPanelsProps }): ReactElement {
+  return (
     <>
-      <div className="composer-meta">
-        {props.controls && !props.controls.availableModels.length && props.onManageModels ? (
-          <ConnectModelCard
-            state={props.modelLogin ?? { waiting: false }}
-            onConnect={props.onManageModels}
-          />
-        ) : props.connected === false || !props.controls?.effectiveModel ? (
-          <span className="model-loading" role="status">
-            {props.connected === false ? "Connecting…" : "Starting…"}
-          </span>
-        ) : (
-          <>
-            <ComposerModelControls props={props} />
-            <PiContextUsageRing usage={props.contextUsage ?? null} />
-            <PiToolsButton {...props} />
-          </>
+      <ComposerModelControls props={props} />
+      {props.modelLogin?.error && <SignInError message={props.modelLogin.error} />}
+      <PiContextUsageRing usage={props.contextUsage ?? null} />
+      <PiToolsButton {...props} />
+    </>
+  );
+}
+
+/** A Chat whose Pi session could not start: say why, and reopen the same sign-in page. */
+function StartError({ props }: { props: ComposerPanelsProps }): ReactElement {
+  return (
+    <div className="connect-model" role="region" aria-label="This Chat cannot start">
+      <div className="connect-model-body">
+        <strong>This Chat can&apos;t start</strong>
+        <p>{props.controlsError}</p>
+        {props.modelLogin?.error && (
+          <p className="connect-model-error" role="alert">
+            {props.modelLogin.error}
+          </p>
         )}
       </div>
-    </>
+      {props.onManageModels && (
+        <button type="button" className="connect-model-button" onClick={props.onManageModels}>
+          Sign in again
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** A failed "Add or manage models…" next to the pickers, so it is never silent here either. */
+function SignInError({ message }: { message: string }): ReactElement {
+  return (
+    <div className="connect-model" role="alert">
+      <div className="connect-model-body">
+        <p className="connect-model-error">{message}</p>
+      </div>
+    </div>
   );
 }
 

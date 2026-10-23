@@ -1,8 +1,7 @@
-import type { ReactElement } from "react";
-import { MiniSwarm } from "./mini-swarm.js";
+import { useEffect, type ReactElement } from "react";
 
 // Home has no sidebar: Chrome's own tabs and sidebar already list open chats. A thin bar takes
-// you to each of Aeon's pages instead.
+// you to each of Aeon's pages instead. Escape, or the page you are on again, returns home.
 
 export type HomeView = "home" | "chats" | "watchers" | "activity" | "settings";
 
@@ -21,18 +20,9 @@ export function HomeTopBar({
   activityCount: number;
   onView(view: HomeView): void;
 }): ReactElement {
+  useHomeEscape(view, onView);
   return (
     <header className="home-top-bar">
-      <button
-        type="button"
-        className="home-top-brand"
-        aria-label="Aeon home"
-        aria-current={view === "home" ? "page" : undefined}
-        onClick={() => onView("home")}
-      >
-        <MiniSwarm size={22} />
-        <span>Aeon</span>
-      </button>
       <nav className="home-top-nav" aria-label="Aeon pages">
         {PAGES.map(([page, label]) => (
           <button
@@ -40,7 +30,7 @@ export function HomeTopBar({
             type="button"
             id={`home-${page}-link`}
             aria-current={view === page ? "page" : undefined}
-            onClick={() => onView(page)}
+            onClick={() => onView(view === page ? "home" : page)}
           >
             {label}
             {page === "activity" && activityCount > 0 && (
@@ -56,7 +46,7 @@ export function HomeTopBar({
           aria-label="Settings"
           title="Settings"
           aria-current={view === "settings" ? "page" : undefined}
-          onClick={() => onView("settings")}
+          onClick={() => onView(view === "settings" ? "home" : "settings")}
         >
           <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
             <circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -71,6 +61,17 @@ export function HomeTopBar({
       </nav>
     </header>
   );
+}
+
+/** Escape leaves any page for home, the way the browser's back arrow would. */
+function useHomeEscape(view: HomeView, onView: (view: HomeView) => void): void {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape" && view !== "home") onView("home");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [view, onView]);
 }
 
 /** `?view=` to a page. The page is Routines; "watchers" is its old name, still in old links. */

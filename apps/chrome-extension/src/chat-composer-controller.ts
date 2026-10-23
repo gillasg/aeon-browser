@@ -15,6 +15,7 @@ export class ChatComposerController {
   private submitting = false;
   private projectName: string | null = null;
   private controls: ComposerControls | null = null;
+  private controlsError: string | undefined;
   private attachments: ComposerAttachment[] = [];
   private editDraftInsertion: { id: number; text: string } | undefined;
   private editNotice: string | null = null;
@@ -59,6 +60,7 @@ export class ChatComposerController {
   setClient(client: UiClient): void {
     this.client = client;
     this.controls = null;
+    this.controlsError = undefined;
     client.socket.addEventListener(
       "close",
       () => {
@@ -86,6 +88,7 @@ export class ChatComposerController {
       running: this.isRunning() || this.submitting,
       starting: this.submitting,
       controls: this.controls,
+      controlsError: this.controlsError,
       modelLogin: this.modelSignIn.state,
       onManageModels: () => void this.modelSignIn.open(),
       attachments: this.attachments,
@@ -275,9 +278,13 @@ export class ChatComposerController {
       });
       if (response.kind !== "command.completed" || response.result.kind !== "chat.controls") return;
       this.controls = response.result.controls;
+      this.controlsError = undefined;
       this.onChange();
     } catch (error) {
+      // The composer keeps this, so a Chat whose model cannot start never sits on "Starting…".
+      this.controlsError = messageOf(error);
       this.onError(`Pi settings unavailable · ${messageOf(error)}`);
+      this.onChange();
     }
   }
 

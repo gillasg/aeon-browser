@@ -47,6 +47,8 @@ export interface ChatComposerProps {
   connecting?: boolean;
   preparing?: boolean;
   controls: ComposerControls | null;
+  /** Why the Chat's Pi session could not start, kept until a refresh succeeds. */
+  controlsError?: string | undefined;
   contextUsage?: PiContextUsage | null;
   modelLogin?: import("./connect-model-card.js").ModelLoginState;
   onManageModels?(): void;

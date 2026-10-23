@@ -183,14 +183,23 @@ function HomeModelControls({
   if (catalog && !catalog.models.length && onConnectModel)
     return <ConnectModelCard state={modelLogin ?? { waiting: false }} onConnect={onConnectModel} />;
   return (
-    <HomePickers
-      catalog={catalog}
-      model={model}
-      effort={effort}
-      onModel={onModel}
-      onEffort={onEffort}
-      onConnectModel={onConnectModel}
-    />
+    <>
+      <HomePickers
+        catalog={catalog}
+        model={model}
+        effort={effort}
+        onModel={onModel}
+        onEffort={onEffort}
+        onConnectModel={onConnectModel}
+      />
+      {modelLogin?.error && (
+        <div className="connect-model" role="alert">
+          <div className="connect-model-body">
+            <p className="connect-model-error">{modelLogin.error}</p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
