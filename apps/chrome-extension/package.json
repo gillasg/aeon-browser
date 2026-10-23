@@ -8,7 +8,7 @@
     "build:native": "node scripts/build-native-extension.mjs"
   },
   "dependencies": {
-    "@aeon/protocol": "link:../../../core/packages/protocol",
+    "@aeon/protocol": "workspace:*",
     "@aeon/ui": "workspace:*",
     "@browser-use-extension/engine": "link:../../../browser-use-extension/packages/engine",
     "acorn": "8.18.0",

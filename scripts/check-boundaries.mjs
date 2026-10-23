@@ -6,10 +6,23 @@ import ts from "typescript";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRules = new Map([
   ["@aeon/protocol", []],
+  ["@aeon/domain", []],
+  ["@aeon/store", ["@aeon/domain"]],
+  ["@aeon/daemon", ["@aeon/protocol", "@aeon/domain", "@aeon/store", "@aeon/pi-adapter"]],
+  ["@aeon/pi-adapter", ["@aeon/domain", "@aeon/protocol"]],
+  ["@aeon/native-host", []],
+  ["@aeon/cli", ["@aeon/protocol"]],
   ["@aeon/chrome-extension", ["@aeon/protocol", "@aeon/ui"]],
   ["@aeon/ui", ["@aeon/protocol"]],
 ]);
 const packagePaths = new Map([
+  ["@aeon/protocol", "packages/protocol"],
+  ["@aeon/domain", "packages/domain"],
+  ["@aeon/store", "packages/store"],
+  ["@aeon/daemon", "apps/daemon"],
+  ["@aeon/pi-adapter", "packages/pi-adapter"],
+  ["@aeon/native-host", "apps/native-host"],
+  ["@aeon/cli", "apps/cli"],
   ["@aeon/chrome-extension", "apps/chrome-extension"],
   ["@aeon/ui", "packages/ui"],
 ]);
@@ -74,7 +87,7 @@ for (const [name, relativePath] of packagePaths) {
         if (!packageRules.get(name)?.includes(targetName)) {
           violations.push(`${name} is not allowed to depend on ${targetName}.`);
         }
-        if (targetName !== "@aeon/protocol" && declared[targetName] !== "workspace:*") {
+        if (declared[targetName] !== "workspace:*") {
           violations.push(`${name} must use workspace:* for ${targetName}.`);
         }
       }

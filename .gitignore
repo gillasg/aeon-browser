@@ -2,6 +2,7 @@ node_modules/
 **/dist/
 *.tsbuildinfo
 apps/chrome-extension/native-dist/
+apps/chrome-extension/dev-dist/
 .slice0-audit/
 coverage/
 

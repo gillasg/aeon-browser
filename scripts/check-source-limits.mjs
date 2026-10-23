@@ -6,7 +6,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoots = ["apps", "packages", "scripts"].map((path) => join(root, path));
 const maxLines = 800;
 const maxBytes = 40 * 1024;
-const generatedDirectories = new Set(["dist", "node_modules"]);
+const generatedDirectories = new Set(["dist", "dev-dist", "node_modules"]);
+const notices = [];
 const failures = [];
 
 async function visit(path, files = []) {
@@ -30,6 +31,7 @@ for (const path of sourceRoots) {
   }
 }
 
+if (notices.length > 0) process.stdout.write(`${notices.join("\n")}\n`);
 if (failures.length > 0) {
   process.stderr.write(`Source limits exceeded (800 lines or 40 KiB):\n${failures.join("\n")}\n`);
   process.exitCode = 1;

@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@aeon/protocol": "link:../../../core/packages/protocol",
+    "@aeon/protocol": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",

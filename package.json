@@ -1,5 +1,5 @@
 {
-  "name": "aeon-browser",
+  "name": "aeon",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.4.0",
@@ -7,13 +7,19 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "pnpm exec tsc -b packages/ui && pnpm --filter @aeon/chrome-extension build",
-    "typecheck": "pnpm exec tsc -b packages/ui --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
+    "build": "pnpm build:core && pnpm exec tsc -b packages/ui && pnpm --filter @aeon/chrome-extension build",
+    "build:core": "pnpm exec tsc -b packages/domain packages/protocol apps/daemon packages/pi-adapter packages/store apps/cli && pnpm --filter @aeon/native-host build",
+    "build:native-host": "pnpm --filter @aeon/native-host build",
+    "typecheck": "pnpm exec tsc -b packages/domain packages/protocol apps/daemon packages/pi-adapter packages/store apps/cli packages/ui --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
     "lint": "eslint apps packages scripts --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "test": "pnpm build && node --test",
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "dev:handshake": "pnpm build:core && node apps/daemon/dist/main.js --dev-handshake",
+    "dev:chat": "pnpm build:core && node apps/daemon/dist/main.js --dev-chat",
+    "start": "node apps/daemon/dist/main.js --core",
+    "aeon": "node apps/cli/dist/cli.js",
     "links": "node scripts/link-repos.mjs"
   },
   "devDependencies": {
