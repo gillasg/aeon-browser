@@ -129,7 +129,7 @@ attempt("storage migration", () => void migrateLegacyChromeStorage());
 attempt("boosts", () =>
   installBoosts(undefined, {
     // Boost scripts call mapped site APIs (sb.api) through Aeon's own site-to-api.
-    siteApi: (site, operation, params) => askCore("siteApi", { site, operation, params }),
+    siteMapper: (site, operation, params) => askCore("siteMapper", { site, operation, params }),
   }),
 );
 attempt(

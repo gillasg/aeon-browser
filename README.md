@@ -54,4 +54,4 @@ Setup also installs an `aeon` command and an Aeon skill (in `~/.agents/skills` a
 Other agents (Claude Code, Codex, any MCP client) can use Aeon two ways through its MCP server (`node apps/cli/dist/cli.js mcp`):
 
 - **Hand Aeon a task**: `aeon_run`, then `aeon_run_status` / `aeon_result` / `aeon_trace`.
-- **Drive the browser themselves**: `browser_code`, `browser_tabs`, `crawl` and `site_api`, the same tools Aeon's chats use. Calls with the same `session` share variables, tabs and files.
+- **Drive the browser themselves**: `browser_code`, `browser_tabs`, `crawl` and `site_mapper`, the same tools Aeon's chats use. Calls with the same `session` share variables, tabs and files.

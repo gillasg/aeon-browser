@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { getSavedRead, putSavedRead, siteApiRequest } from "@aeon/pi-adapter";
+import { getSavedRead, putSavedRead, siteMapperRequest } from "@aeon/pi-adapter";
 
 // Requests from Aeon's own extension (never forwarded from other extensions) about the site in
 // a tab: the operations a site learned (the orb's chips), learning while the user browses a tab
@@ -20,7 +20,7 @@ const text = (value: unknown, what: string): string => {
 };
 
 function site(request: Record<string, unknown>): Promise<unknown> {
-  const pending = siteApiRequest(SESSION, request);
+  const pending = siteMapperRequest(SESSION, request);
   if (!pending) throw new Error("Unsupported site request");
   return pending;
 }
@@ -34,19 +34,19 @@ function values(data: Record<string, unknown>): Record<string, unknown> {
 export async function answerSiteRequest(data: Record<string, unknown>): Promise<unknown> {
   const action = data.action;
   if (action === "operations")
-    return site({ siteApi: "operations", site: text(data.site, "the site") }).catch(() => []);
+    return site({ siteMapper: "operations", site: text(data.site, "the site") }).catch(() => []);
   if (action === "learn")
-    return site({ siteApi: "learn-live", site: text(data.site, "the site"), har: data.har });
+    return site({ siteMapper: "learn-live", site: text(data.site, "the site"), har: data.har });
   if (action === "write")
     return site({
-      siteApi: "write",
+      siteMapper: "write",
       site: text(data.site, "the site"),
       operation: text(data.operation, "the operation"),
       params: values(data),
     });
   if (action === "undo")
     return site({
-      siteApi: "undo",
+      siteMapper: "undo",
       site: text(data.site, "the site"),
       operation: text(data.operation, "the operation"),
       params: values(data),

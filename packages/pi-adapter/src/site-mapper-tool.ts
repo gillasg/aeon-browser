@@ -12,7 +12,7 @@ import {
   listSites,
   loadModel,
   rebuild,
-  siteApi,
+  siteMapper,
   siteName,
   watch,
   type ModelLike,
@@ -20,7 +20,7 @@ import {
 import { inChat } from "./site-browser.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
-// site_api: sites mapped with site-to-api become APIs the agent calls directly, with the user's
+// site_mapper: sites mapped with site-to-api become APIs the agent calls directly, with the user's
 // logins, instead of clicking through pages. Mapping happens from network captures the agent
 // saves while using a site in browser_code.
 
@@ -59,7 +59,7 @@ type Input = Static<typeof Parameters>;
 
 const GUIDELINES = [
   "Sites learn their APIs while you work: every page action's requests are built into the site's API after each browser_code call, and the call's output says when something new can be called ('Learned on <site>: ...'). Check `sites` / `operations` before working on a site you have used before; one call replaces many page actions.",
-  "Reads go through `call` here or siteApi.call in browser_code. Writes: do one in the page; once it worked, siteApi.write repeats it and siteApi.batch runs it over many items (paced, stops at the first error; continue what is left in the page). Paying, ordering, sending, posting, deleting and account changes always stay in the page.",
+  "Reads go through `call` here or siteMapper.call in browser_code. Writes: do one in the page; once it worked, siteMapper.write repeats it and siteMapper.batch runs it over many items (paced, stops at the first error; continue what is left in the page). Paying, ordering, sending, posting, deleting and account changes always stay in the page.",
   "watch: like call, but returns only items new or changed since the last watch of the same operation and params; the first returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
   "explore maps sites you have not used yet (sites: ['a.com']) in background tabs, looking only. The system runs it when a routine or watcher needs a site with no read that fits; use it yourself only when a task needs a part of a site that no page you can reach shows.",
   "import adds capture files from outside the browser (HAR exports, mitmproxy flows from phone or desktop apps, saved in the workspace) to a site's API.",
@@ -128,9 +128,9 @@ async function operations(input: Input): Promise<unknown> {
 async function call(input: Input, workspace: string | undefined): Promise<ToolText> {
   const site = requireSite(input);
   if (!input.operation) throw new Error("Give the operation id (see the operations action)");
-  const api = await siteApi(site, { transport: input.transport ?? "auto" });
+  const api = await siteMapper(site, { transport: input.transport ?? "auto" });
   const value = await api.call(input.operation, (input.params ?? {}) as never);
-  return boundedResult(value, workspace, "site-api", `${site}-${input.operation}`);
+  return boundedResult(value, workspace, "site-mapper", `${site}-${input.operation}`);
 }
 
 async function importFiles(input: Input, workspace: string | undefined): Promise<unknown> {
@@ -169,7 +169,7 @@ async function watchAction(input: Input, workspace: string | undefined): Promise
     transport: input.transport ?? "auto",
     ...(input.key ? { key: input.key } : {}),
   });
-  return boundedResult(result, workspace, "site-api", `${site}-watch-${input.operation}`);
+  return boundedResult(result, workspace, "site-mapper", `${site}-watch-${input.operation}`);
 }
 
 async function exploreAction(input: Input, model?: () => Promise<ModelLike>): Promise<ToolText> {
@@ -197,7 +197,7 @@ async function runAction(
         ...(input.folder && workspace ? { folder: resolve(workspace, input.folder) } : {}),
       }),
       workspace,
-      "site-api",
+      "site-mapper",
       `${requireSite(input)}-${input.action}`,
     );
   if (input.action === "explore") return exploreAction(input, model);
@@ -217,17 +217,17 @@ async function runAction(
   return textResult(await importFiles(input, workspace));
 }
 
-export function createSiteApiTool(
+export function createSiteMapperTool(
   chatId: string,
   workspace?: string,
   model?: () => Promise<ModelLike>,
 ): ReturnType<typeof defineTool> {
   return defineTool({
-    name: "site_api",
+    name: "site_mapper",
     label: "Site API",
     description:
       "Call the API a site learned while you used it (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). Calls use the user's logins.",
-    promptSnippet: "Use site_api for mapped sites: one API call instead of many page actions.",
+    promptSnippet: "Use site_mapper for mapped sites: one API call instead of many page actions.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,
     execute: async (_toolCallId, input) => {

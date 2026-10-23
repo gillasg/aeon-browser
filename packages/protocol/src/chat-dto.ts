@@ -303,8 +303,8 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
       result: z.string().max(24_020),
       isError: z.boolean(),
       /** Which fast path the tool used, for the speed chip and the orb. */
-      path: z.enum(["recipe", "site-api", "data", "url", "read", "ui"]).optional(),
-      /** Writes the step sent through sites' APIs (siteApi.write / batch), for Activity. */
+      path: z.enum(["recipe", "site-mapper", "data", "url", "read", "ui"]).optional(),
+      /** Writes the step sent through sites' APIs (siteMapper.write / batch), for Activity. */
       writes: z
         .array(
           z

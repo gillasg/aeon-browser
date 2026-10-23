@@ -27,7 +27,7 @@ const usage = `aeon: run and inspect Aeon chats from the terminal or another age
                                 browser actions, promptAt and finishedAt
   open <chatId>                 show a chat as a tab in Chrome
   tools [--json]                the browser tools and their full guidance
-  tool <name> '<json>'          run one: browser_code, browser_tabs, crawl, site_api, extract
+  tool <name> '<json>'          run one: browser_code, browser_tabs, crawl, site_mapper, extract
                                 (or key=value pairs: action=scrape url=https://...)
       --session name            calls in one session share variables, tabs and files
                                 (the input can also be @file.json, or - for stdin)

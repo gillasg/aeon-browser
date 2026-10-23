@@ -14,12 +14,12 @@ test("the step timeline shows each step's path and time, dashed when the path wa
       steps: [
         {
           toolCallId: "a",
-          toolName: "site_api",
+          toolName: "site_mapper",
           label: "Price",
           startedAt: 0,
           done: true,
           durationMs: 1200,
-          path: "site-api",
+          path: "site-mapper",
           pathMocked: false,
         },
         {
@@ -32,7 +32,7 @@ test("the step timeline shows each step's path and time, dashed when the path wa
       ],
     }),
   );
-  assert.match(html, /data-path="site-api" data-mocked="false"[^>]*>site API</);
+  assert.match(html, /data-path="site-mapper" data-mocked="false"[^>]*>site API</);
   assert.match(html, />1\.2s</);
   assert.match(html, /data-state="running"/);
 });

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ChatId, RoutineRecord } from "@aeon/domain";
-import { siteApiRequest } from "@aeon/pi-adapter";
+import { siteMapperRequest } from "@aeon/pi-adapter";
 
 // Pinned results: answers the user wants to keep on the new-tab home, with their history. A pin
 // backed by a site API call refreshes itself with no model; a watcher (a routine with a check)
@@ -109,8 +109,8 @@ export class PinnedResults {
   async refresh(pinId: string): Promise<void> {
     const pin = (await this.load()).find((item) => item.pinId === pinId);
     if (!pin || pin.source !== "api" || !pin.site || !pin.operation) return;
-    const pending = siteApiRequest("aeon-pins", {
-      siteApi: "call",
+    const pending = siteMapperRequest("aeon-pins", {
+      siteMapper: "call",
       site: pin.site,
       operation: pin.operation,
       params: pin.params ?? {},

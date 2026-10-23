@@ -1,4 +1,4 @@
-// Writes a browser_code cell sent through a site's API (siteApi.write / siteApi.batch), counted
+// Writes a browser_code cell sent through a site's API (siteMapper.write / siteMapper.batch), counted
 // per operation so the step can say what it changed: the Activity log lists them, with the
 // items, and the orb shows them on the result.
 
@@ -22,14 +22,14 @@ export class SiteWrites {
 
   track(request: unknown, sent: Promise<unknown>): Promise<unknown> {
     const call = request as {
-      siteApi?: string;
+      siteMapper?: string;
       site?: string;
       operation?: string;
       params?: unknown;
     };
-    if (call.siteApi === "call" || call.siteApi === "write" || call.siteApi === "watch")
+    if (call.siteMapper === "call" || call.siteMapper === "write" || call.siteMapper === "watch")
       this.usedApi = true;
-    if (call.siteApi !== "write" || !call.site || !call.operation) return sent;
+    if (call.siteMapper !== "write" || !call.site || !call.operation) return sent;
     const key = call.site + "|" + call.operation;
     const write = this.writes.get(key) ?? {
       site: call.site,

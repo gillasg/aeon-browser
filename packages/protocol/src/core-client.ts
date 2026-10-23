@@ -108,7 +108,14 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("core.tool.call"),
       requestId: z.string().uuid(),
-      tool: z.enum(["browser_code", "browser_tabs", "crawl", "site_api", "extract", "chat_review"]),
+      tool: z.enum([
+        "browser_code",
+        "browser_tabs",
+        "crawl",
+        "site_mapper",
+        "extract",
+        "chat_review",
+      ]),
       session: z.string().min(1).max(100),
       arguments: z.record(z.string(), z.unknown()),
     })

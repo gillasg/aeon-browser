@@ -40,7 +40,7 @@ import { createClockTool } from "./clock-tool.js";
 import { completeWithDefaultModel, siteToolModel } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createExtractTool } from "./extract-tool.js";
-import { createSiteApiTool } from "./site-api-tool.js";
+import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { installAeonBrowser } from "./site-browser.js";
 import { installSiteMapping } from "./site-mapping.js";
 import { externalToolDefinitions, runExternalTool } from "./external-tools.js";
@@ -117,7 +117,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     return this.agentDirectory;
   }
 
-  /** browser_code, browser_tabs, crawl and site_api for agents outside Aeon (the Aeon MCP). */
+  /** browser_code, browser_tabs, crawl and site_mapper for agents outside Aeon (the Aeon MCP). */
   externalTools(): unknown[] {
     return externalToolDefinitions(this.completionOptions(), this.browserTool);
   }
@@ -314,7 +314,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),
         createClockTool(),
-        createSiteApiTool(
+        createSiteMapperTool(
           input.chatId,
           input.workingDirectory,
           siteToolModel(this.completionOptions()),

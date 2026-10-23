@@ -2,13 +2,20 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AeonClient, dataDirectory } from "./client.js";
 
-// aeon tool / aeon tools: the chat tools (browser_code, browser_tabs, crawl, site_api, extract)
+// aeon tool / aeon tools: the chat tools (browser_code, browser_tabs, crawl, site_mapper, extract)
 // from a shell, one call at a time, so an agent can use them in the same session without MCP.
 
 type Json = Record<string, unknown>;
 type Content = { type: string; text?: string; data?: string; mimeType?: string };
 
-const TOOL_NAMES = ["browser_code", "browser_tabs", "crawl", "site_api", "extract", "chat_review"];
+const TOOL_NAMES = [
+  "browser_code",
+  "browser_tabs",
+  "crawl",
+  "site_mapper",
+  "extract",
+  "chat_review",
+];
 
 /** Every tool with its full guidance, as the daemon describes it. */
 export async function listTools(client: AeonClient, asJson: boolean): Promise<number> {

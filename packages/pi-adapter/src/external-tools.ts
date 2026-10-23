@@ -7,11 +7,11 @@ import type { BrowserToolRunner } from "./browser-tool.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createExtractTool } from "./extract-tool.js";
 import { siteToolModel, type CompletionOptions } from "./text-completion.js";
-import { createSiteApiTool } from "./site-api-tool.js";
+import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { inChat, sessionChatId } from "./site-browser.js";
 
 // Tools for agents outside Aeon, through the Aeon MCP server: the same browser_code, crawl and
-// site_api a chat gets, so another agent can do in Aeon everything the Browser Use Extension
+// site_mapper a chat gets, so another agent can do in Aeon everything the Browser Use Extension
 // offers. Each outside session has its own browser runtime, tabs and workspace.
 
 type Tool = ReturnType<typeof defineTool>;
@@ -52,7 +52,7 @@ function toolsFor(
   return {
     browser_code: createBrowserCodeTool(chatId, run, workspace, skills),
     crawl: createCrawlTool(chatId, workspace),
-    site_api: createSiteApiTool(chatId, workspace, siteToolModel(options)),
+    site_mapper: createSiteMapperTool(chatId, workspace, siteToolModel(options)),
     extract: createExtractTool(options, workspace),
   };
 }

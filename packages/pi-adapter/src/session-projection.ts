@@ -265,17 +265,19 @@ function projectToolEvent(
   };
 }
 
-type ToolPath = "recipe" | "site-api" | "data" | "url" | "read" | "ui";
+type ToolPath = "recipe" | "site-mapper" | "data" | "url" | "read" | "ui";
 
 function toolPath(toolName: string, result: unknown): ToolPath | undefined {
-  if (toolName === "site_api" || usedSiteApi(result)) return "site-api";
+  if (toolName === "site_mapper" || usedSiteMapper(result)) return "site-mapper";
   if (toolName === "skills" || toolName === "site_skill") return "recipe";
   return stepsPath(result);
 }
 
 /** A browser_code step that called a site's API went the site-API way, whatever else it did. */
-function usedSiteApi(result: unknown): boolean {
-  return (result as { details?: { siteApi?: boolean } } | undefined)?.details?.siteApi === true;
+function usedSiteMapper(result: unknown): boolean {
+  return (
+    (result as { details?: { siteMapper?: boolean } } | undefined)?.details?.siteMapper === true
+  );
 }
 
 function stepsPath(result: unknown): ToolPath | undefined {
@@ -364,7 +366,7 @@ function toolProgress(value: unknown): {
   };
 }
 
-/** API writes a browser_code step made (siteApi.write / batch), for the Activity log. */
+/** API writes a browser_code step made (siteMapper.write / batch), for the Activity log. */
 function toolWrites(value: unknown): ToolWrite[] | undefined {
   const writes = (value as { details?: { writes?: unknown } } | null)?.details?.writes;
   if (!Array.isArray(writes) || !writes.length) return undefined;
