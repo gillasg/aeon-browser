@@ -1766,3 +1766,38 @@ body[data-host="panel"] .home-top-nav button {
 body[data-embedded="true"] .home-top-bar {
   display: none;
 }
+.settings-inline-form {
+  display: flex;
+  gap: var(--aeon-s-2);
+  margin: var(--aeon-s-3) 0;
+}
+.settings-inline-form input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--aeon-s-3);
+  border: 1px solid var(--aeon-swatch-38343c);
+  border-radius: var(--aeon-r-md);
+  background: var(--aeon-swatch-262329);
+  color: var(--aeon-home-text);
+  font: inherit;
+}
+.settings-inline-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.settings-site-list {
+  display: grid;
+  gap: var(--aeon-s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-site-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--aeon-s-2) var(--aeon-s-3);
+  border: 1px solid var(--aeon-swatch-38343c);
+  border-radius: var(--aeon-r-md);
+}
