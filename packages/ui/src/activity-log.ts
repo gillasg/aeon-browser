@@ -64,7 +64,7 @@ export function useActivityLog(): ActivityEntry[] {
 }
 
 /**
- * Logs the writes a step sent through sites' APIs (siteApi.write / batch). Each chat page that
+ * Logs the writes a step sent through sites' APIs (siteMapper.write / batch). Each chat page that
  * sees the step logs it; the id keeps it to one entry.
  */
 export function logApiWrites(

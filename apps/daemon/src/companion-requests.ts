@@ -4,7 +4,7 @@ import {
   type CompanionResult,
 } from "@aeon/protocol";
 import { WebSocket } from "ws";
-import { siteApiRequest } from "@aeon/pi-adapter";
+import { siteMapperRequest } from "@aeon/pi-adapter";
 import type { BrowserControlService } from "./browser-control-service.js";
 import type { ChatService } from "./chat-service.js";
 import { answerSiteRequest } from "./site-requests.js";
@@ -31,7 +31,7 @@ function watchPrompt(data: Record<string, unknown>): string {
     ...(data.price !== undefined ? [`- Price now: ${quote(data.price)}`] : []),
     ...(data.below !== undefined ? [`- Notify below: ${quote(data.below)}`] : []),
     ...(data.note ? [`- Note: ${quote(data.note)}`] : []),
-    "Set up a routine that checks it regularly (with site_api if the site is mapped, otherwise crawl or browser_code) and tells the user when the price drops, or when it falls below the amount given. Confirm what you set up in one or two sentences.",
+    "Set up a routine that checks it regularly (with site_mapper if the site is mapped, otherwise crawl or browser_code) and tells the user when the price drops, or when it falls below the amount given. Confirm what you set up in one or two sentences.",
   ];
   return lines.join("\n");
 }
@@ -69,12 +69,12 @@ async function complete(data: Record<string, unknown>, deps: Deps): Promise<{ te
 }
 
 // A boost calling a mapped site's API (sb.api): Aeon's site-to-api answers, no model involved.
-function callSiteApi(data: Record<string, unknown>): Promise<unknown> {
+function callSiteMapper(data: Record<string, unknown>): Promise<unknown> {
   if (typeof data.site !== "string" || typeof data.operation !== "string")
     throw new Error("A site API call needs the site and operation");
   const params = typeof data.params === "object" && data.params !== null ? data.params : {};
-  const call = { siteApi: "call", site: data.site, operation: data.operation, params };
-  const pending = siteApiRequest("site-boosts", call);
+  const call = { siteMapper: "call", site: data.site, operation: data.operation, params };
+  const pending = siteMapperRequest("site-boosts", call);
   if (!pending) throw new Error("Unsupported site API call");
   return pending;
 }
@@ -82,7 +82,7 @@ function callSiteApi(data: Record<string, unknown>): Promise<unknown> {
 async function answer(request: CompanionRequest, deps: Deps): Promise<unknown> {
   const data = request.data;
   if (request.request === "model.complete") return complete(data, deps);
-  if (request.request === "siteApi") return callSiteApi(data);
+  if (request.request === "siteMapper") return callSiteMapper(data);
   // Aeon's own extension never forwards this kind from other extensions.
   if (request.request === "site") return answerSiteRequest(data);
   if (typeof data.url !== "string" && request.request === "watch")

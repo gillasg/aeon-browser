@@ -9,7 +9,7 @@ const ALLOWED_KEY = "companionExtensions";
 const TRUSTED = new Set(["kcfodpkdfapojnbhkgdlpkikipneejpf"]);
 const APPROVAL_TIMEOUT_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 180_000;
-const FORWARDED = new Set(["model.complete", "watch", "task", "siteApi"]);
+const FORWARDED = new Set(["model.complete", "watch", "task", "siteMapper"]);
 
 interface CompanionMessage {
   type?: string;
@@ -95,7 +95,10 @@ async function handle(
   connect: () => Promise<Socket>,
 ): Promise<Reply> {
   if (message.kind === "ping")
-    return { ok: true, value: { name: "Aeon", features: ["model", "watch", "task", "siteApi"] } };
+    return {
+      ok: true,
+      value: { name: "Aeon", features: ["model", "watch", "task", "siteMapper"] },
+    };
   if (!FORWARDED.has(String(message.kind)))
     return { ok: false, error: `Unsupported request: ${String(message.kind)}` };
   if (!(await permitted(senderId)))

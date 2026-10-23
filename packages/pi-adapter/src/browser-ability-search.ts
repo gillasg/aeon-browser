@@ -38,7 +38,7 @@ const ABILITIES: Ability[] = [
     words: "google search web results query",
   },
   {
-    call: "siteApi.call / watch / write / batch",
+    call: "siteMapper.call / watch / write / batch",
     what: "a site's own API, learned while using it",
     words: "api site endpoint json bulk batch many items fast mapped operations",
   },

@@ -10,7 +10,7 @@ import type {
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
-import { siteApiRequest } from "@aeon/pi-adapter";
+import { siteMapperRequest } from "@aeon/pi-adapter";
 import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
 
 const TICK_MS = 10_000;
@@ -228,7 +228,7 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
         timeoutMs,
         // Checks can call and watch mapped site APIs; workspace files stay with the chat.
         onCall: (request: unknown) =>
-          siteApiRequest(checkRealm(routine.routineId), request) ??
+          siteMapperRequest(checkRealm(routine.routineId), request) ??
           Promise.reject(new Error("Workspace calls are unavailable in routine checks")),
         onProgress: () => undefined,
       },

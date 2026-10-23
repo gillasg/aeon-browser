@@ -19,7 +19,7 @@ test("outside agents get the chat tools, each session in its own runtime and wor
   const tools = externalToolDefinitions(sessions, run);
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["browser_code", "crawl", "site_api", "extract", "browser_tabs"],
+    ["browser_code", "crawl", "site_mapper", "extract", "browser_tabs"],
   );
   for (const tool of tools) assert.ok(tool.inputSchema.properties.session, tool.name);
   assert.match(tools[0].description, /browser\.openTab/);

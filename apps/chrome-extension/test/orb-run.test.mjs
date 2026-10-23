@@ -62,14 +62,14 @@ const toolMessage = (id, actions) => ({
 
 test("tool-end path and durationMs are used as sent", () => {
   const run = play([
-    [start("a", "site_api", { description: "Search Amazon" })],
-    [end("a", "site_api", { path: "site-api", durationMs: 1234 }), 9999],
+    [start("a", "site_mapper", { description: "Search Amazon" })],
+    [end("a", "site_mapper", { path: "site-mapper", durationMs: 1234 }), 9999],
   ]);
   assert.equal(run.status, "working");
   assert.equal(run.label, "Search Amazon");
   assert.deepEqual(
     { path: run.steps[0].path, ms: run.steps[0].durationMs, mocked: run.steps[0].pathMocked },
-    { path: "site-api", ms: 1234, mocked: false },
+    { path: "site-mapper", ms: 1234, mocked: false },
   );
   assert.equal(run.steps[0].durationMocked, false);
 });
@@ -95,8 +95,8 @@ test("missing path is inferred and missing durationMs comes from start and end",
 test("nested tool calls do not become steps", () => {
   const run = play([
     [start("a", "browser_code")],
-    [start("n", "site_api", {}, { parentToolCallId: "a" })],
-    [end("n", "site_api", { parentToolCallId: "a" })],
+    [start("n", "site_mapper", {}, { parentToolCallId: "a" })],
+    [end("n", "site_mapper", { parentToolCallId: "a" })],
   ]);
   assert.equal(run.steps.length, 1);
 });
@@ -196,11 +196,11 @@ async function loadWatch() {
 
 const watch = await loadWatch();
 const action = (kind) => ({ toolCallId: "a", kind, tStart: 0 });
-const read = (path = "site-api") => ({
+const read = (path = "site-mapper") => ({
   ...orb.initialRun(),
   status: "done",
   answer: "$39.99",
-  steps: [{ toolCallId: "a", toolName: "site_api", label: "", startedAt: 0, done: true, path }],
+  steps: [{ toolCallId: "a", toolName: "site_mapper", label: "", startedAt: 0, done: true, path }],
 });
 
 test("watch: a read-only check with a stable read is created directly", () => {
@@ -259,15 +259,15 @@ test("the island's step line names the step, the site and the last path taken", 
   const view = await import(pathToFileURL(outfile).href);
   await rm(directory, { recursive: true, force: true });
   const run = play([
-    [{ kind: "tool-start", toolCallId: "1", toolName: "site_api", arguments: {} }, 0],
+    [{ kind: "tool-start", toolCallId: "1", toolName: "site_mapper", arguments: {} }, 0],
     [
       {
         kind: "tool-end",
         toolCallId: "1",
-        toolName: "site_api",
+        toolName: "site_mapper",
         result: "",
         isError: false,
-        path: "site-api",
+        path: "site-mapper",
       },
       900,
     ],

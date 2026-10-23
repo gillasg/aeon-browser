@@ -12,7 +12,7 @@ import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { noteVisits, visitedUrls } from "./site-mapping.js";
-import { siteApiRequest } from "./site-browser.js";
+import { siteMapperRequest } from "./site-browser.js";
 
 const CELL_TIMEOUT_MS = 60_000;
 
@@ -79,7 +79,7 @@ export function createBrowserCodeTool(
                 update();
                 return Promise.resolve({ ok: true });
               }
-              const site = siteApiRequest(chatId, request);
+              const site = siteMapperRequest(chatId, request);
               return site
                 ? rememberApiRead(skills, request, writes.track(request, site))
                 : serveCall(request, workspace, steps, skills);
@@ -115,7 +115,7 @@ export function createBrowserCodeTool(
       const details = {
         ...(actions.length ? { actions } : {}),
         ...(writes.list().length ? { writes: writes.list() } : {}),
-        ...(writes.usedApi ? { siteApi: true } : {}),
+        ...(writes.usedApi ? { siteMapper: true } : {}),
       };
       return {
         content: modelContent(body),
@@ -301,7 +301,7 @@ function rememberApiRead(
   sent: Promise<unknown>,
 ): Promise<unknown> {
   const call = request as {
-    siteApi?: string;
+    siteMapper?: string;
     site?: string;
     operation?: string;
     params?: unknown;
@@ -309,7 +309,7 @@ function rememberApiRead(
   const site = call.site;
   const operation = call.operation;
   if (!skills || !site || !operation) return sent;
-  if (call.siteApi !== "call" && call.siteApi !== "watch") return sent;
+  if (call.siteMapper !== "call" && call.siteMapper !== "watch") return sent;
   return sent.then(async (value) => {
     const text = JSON.stringify(value) ?? "null";
     await putSavedRead(

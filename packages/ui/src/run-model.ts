@@ -11,7 +11,7 @@ import type { PiMessageDto, PiSessionEventDto } from "@aeon/protocol";
 // - Action tab: actions without tabId are assumed to be in the viewer's tab.
 // - Spotlight target: the last action with a box (or point) before the run asked for the user.
 
-export type RunPath = "recipe" | "site-api" | "data" | "url" | "read" | "ui";
+export type RunPath = "recipe" | "site-mapper" | "data" | "url" | "read" | "ui";
 export type RunStatus = "idle" | "thinking" | "working" | "needs" | "done" | "error";
 
 export interface RunStep {
@@ -212,7 +212,7 @@ function finish(run: AgentRun): AgentRun {
 }
 
 export function inferPath(toolName: string): RunPath {
-  if (toolName === "site_api") return "site-api";
+  if (toolName === "site_mapper") return "site-mapper";
   if (toolName === "crawl" || toolName === "extract") return "data";
   if (toolName === "read" || toolName === "web_fetch") return "read";
   return "ui";
@@ -222,7 +222,7 @@ const TOOL_LABELS: Record<string, string> = {
   browser_code: "Working in the page",
   browser_tabs: "Switching tabs",
   crawl: "Reading the site",
-  site_api: "Using the site's API",
+  site_mapper: "Using the site's API",
   extract: "Pulling out the data",
 };
 
@@ -286,7 +286,7 @@ export function spotlightBox(actions: readonly RunAction[], tabId: number): RunB
 
 export const PATH_NAMES: Record<RunPath, string> = {
   recipe: "saved recipe",
-  "site-api": "site API",
+  "site-mapper": "site API",
   data: "data",
   url: "direct link",
   read: "reading",

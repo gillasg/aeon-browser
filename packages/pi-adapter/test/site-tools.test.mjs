@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { aeonBridge, inChat, sessionChatId } from "../dist/site-browser.js";
-import { createSiteApiTool } from "../dist/site-api-tool.js";
+import { createSiteMapperTool } from "../dist/site-mapper-tool.js";
 import { createCrawlTool } from "../dist/crawl-tool.js";
 
 async function site(t) {
@@ -66,7 +66,7 @@ test("browser calls from site tools run in a runtime of their own per chat and s
   );
 });
 
-test("site_api maps a site from a capture in the workspace, then calls it", async (t) => {
+test("site_mapper maps a site from a capture in the workspace, then calls it", async (t) => {
   const origin = await site(t);
   const workspace = await home(t);
   const har = {
@@ -93,7 +93,7 @@ test("site_api maps a site from a capture in the workspace, then calls it", asyn
     },
   };
   await writeFile(join(workspace, "shop.har"), JSON.stringify(har));
-  const tool = createSiteApiTool("chat", workspace);
+  const tool = createSiteMapperTool("chat", workspace);
   const learned = JSON.parse(
     text(await tool.execute("1", { action: "import", site: origin, files: ["shop.har"] })),
   );
