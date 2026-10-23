@@ -10,6 +10,7 @@ import {
 import { summarize, type OrbRun } from "./orb-run.js";
 import { watchPlan } from "./orb-watch.js";
 import type { SiteVerb } from "./orb-verbs.js";
+import type { OrbPreview } from "./orb-preview.js";
 
 // The island: one black pill that grows into whatever the run needs. Compose at the mouse,
 // a live step while working, an approval when it needs you, the result when it's done.
@@ -32,6 +33,8 @@ export interface OrbViewModel {
   verbs: readonly SiteVerb[];
   /** This tab records the site's requests while the user browses ("Learn this site"). */
   learning: boolean;
+  /** A live frame of the other tab this run is working in, if any. */
+  preview: OrbPreview | undefined;
 }
 
 export interface OrbViewActions {
@@ -47,6 +50,7 @@ export interface OrbViewActions {
   toggleDetails(): void;
   useVerb(verb: SiteVerb): void;
   toggleLearning(): void;
+  showPreview(): void;
 }
 
 export type IslandState = "compose" | "working" | "paused" | "needs" | "done" | "error";
@@ -212,9 +216,20 @@ function Working({
           ↗
         </Button>
       </div>
+      {model.preview && <LivePreview preview={model.preview} onShow={actions.showPreview} />}
       {model.expanded && <StepTimeline steps={run.steps} />}
       <ProgressLine progress={currentProgress(run)} />
     </>
+  );
+}
+
+/** Live view of the background tab the run works in; a click brings that tab forward. */
+function LivePreview({ preview, onShow }: { preview: OrbPreview; onShow(): void }): ReactElement {
+  return (
+    <button type="button" className="isl-preview" title="Show this tab" onClick={onShow}>
+      <img src={preview.image} alt="" />
+      <span>{preview.title}</span>
+    </button>
   );
 }
 

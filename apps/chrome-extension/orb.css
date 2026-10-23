@@ -191,6 +191,43 @@ textarea::placeholder {
   color: var(--muted);
 }
 
+/* Live view of the other tab the run is working in. */
+.isl-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.isl-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.isl-preview span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.isl-preview:hover img {
+  border-color: rgba(155, 140, 255, 0.6);
+}
+
 /* The endless progress line along the bottom edge while it works. */
 .isl-progress {
   position: absolute;

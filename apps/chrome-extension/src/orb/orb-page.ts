@@ -18,6 +18,7 @@ import { playSound } from "./orb-sounds.js";
 import { Island, islandState, type IslandState, type OrbViewModel } from "./orb-view.js";
 import { WATCH_EVERY_MINUTES, routineEditorUrl, watchPlan, watchRoutine } from "./orb-watch.js";
 import { siteVerbs, type SiteVerb } from "./orb-verbs.js";
+import { followPreviews, showPreviewTab } from "./orb-preview.js";
 
 // orb.html: the island. Framed by the content script; talks to the daemon and drives the overlay.
 
@@ -37,6 +38,7 @@ const model: OrbViewModel = {
   needsCount: 0,
   verbs: [],
   learning: false,
+  preview: undefined,
 };
 const tab = new TabControl(tabId);
 let lastVisual = "";
@@ -106,6 +108,14 @@ function listen(): void {
   chrome.storage.session.onChanged.addListener((changes) => {
     if (Object.keys(changes).some(isNeedsKey)) void refreshNeeds();
   });
+  followPreviews(
+    tabId,
+    () => session.chatId,
+    (preview) => {
+      model.preview = preview;
+      render();
+    },
+  );
 }
 
 async function submit(text: string): Promise<void> {
@@ -127,6 +137,7 @@ function reset(): void {
   model.watch = { state: "idle", note: "" };
   model.paused = false;
   model.expanded = false;
+  model.preview = undefined;
   sentActions = 0;
   sync();
 }
@@ -331,6 +342,7 @@ function view(): ReactNode {
       resume,
       useVerb,
       toggleLearning: () => void toggleLearning(),
+      showPreview: () => showPreviewTab(model.preview),
       toggleDetails: () => {
         model.expanded = !model.expanded;
         render();
