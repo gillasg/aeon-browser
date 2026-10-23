@@ -353,9 +353,9 @@ function applySnapshot(
   transcript.setSnapshot(snapshot.entries);
   document.title = `${snapshot.chat.title} · Aeon`;
   title = document.title;
-  if (snapshot.omittedEntryCount > 0)
+  if (snapshot.omittedEntryCount > 0 && !omittedNoticeDismissed)
     showError(`${snapshot.omittedEntryCount} earlier Pi entries are outside this view.`);
-  else notice = "";
+  else if (snapshot.omittedEntryCount === 0) notice = "";
   render();
 }
 function setConnection(label: string, state: "connecting" | "connected" | "error"): void {
@@ -363,6 +363,8 @@ function setConnection(label: string, state: "connecting" | "connected" | "error
   render();
 }
 let noticeTimer = 0;
+/** The "earlier entries" note is informational; once dismissed it stays away for this page. */
+let omittedNoticeDismissed = false;
 function showError(message: string): void {
   notice = message;
   clearTimeout(noticeTimer);
@@ -376,6 +378,7 @@ function showError(message: string): void {
   render();
 }
 function dismissNotice(): void {
+  if (notice.endsWith("outside this view.")) omittedNoticeDismissed = true;
   clearTimeout(noticeTimer);
   notice = "";
   render();
