@@ -11,7 +11,7 @@ import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { inChat, sessionChatId } from "./site-browser.js";
 
 // Tools for agents outside Aeon, through the Aeon MCP server: the same browser_code, crawl and
-// site_mapper a chat gets, so another agent can do in Aeon everything the Browser Use Extension
+// site_mapper a chat gets, so another agent can do in Aeon everything browserkit
 // offers. Each outside session has its own browser runtime, tabs and workspace.
 
 type Tool = ReturnType<typeof defineTool>;

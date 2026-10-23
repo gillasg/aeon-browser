@@ -53,7 +53,7 @@ test("legacy extension storage moves to the Aeon keys without overwriting newer 
       entryPoints: [
         fileURLToPath(
           new URL(
-            "../node_modules/@browser-use-extension/engine/src/legacy-storage-migration.ts",
+            "../node_modules/@browserkit/engine/src/legacy-storage-migration.ts",
             import.meta.url,
           ),
         ),

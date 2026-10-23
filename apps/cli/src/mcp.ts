@@ -6,7 +6,7 @@ import type { ChatResult } from "./results.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
-// (browser_code, browser_tabs, crawl, site_mapper, extract), as with the Browser Use Extension. Runs start in the background and are polled, because a
+// (browser_code, browser_tabs, crawl, site_mapper, extract), as with browserkit. Runs start in the background and are polled, because a
 // browser task can take far longer than an MCP client waits for one call.
 type Json = Record<string, unknown>;
 interface Run {

@@ -15,7 +15,7 @@ test("browser locators reject ambiguous names and never choose the first matchin
       entryPoints: [
         fileURLToPath(
           new URL(
-            "../node_modules/@browser-use-extension/engine/src/native-browser-debugger.ts",
+            "../node_modules/@browserkit/engine/src/native-browser-debugger.ts",
             import.meta.url,
           ),
         ),

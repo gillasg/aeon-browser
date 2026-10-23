@@ -6,7 +6,7 @@ import {
   isSiteMapperRequest,
   useBrowser,
   type Bridge,
-} from "@browser-use-extension/tools/site-to-api";
+} from "@browserkit/tools/site-to-api";
 import type { BrowserToolRunner } from "./browser-tool.js";
 
 // site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they

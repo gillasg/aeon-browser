@@ -10,7 +10,7 @@
   "dependencies": {
     "@aeon/protocol": "workspace:*",
     "@aeon/ui": "workspace:*",
-    "@browser-use-extension/engine": "link:../../../browser-use-extension/packages/engine",
+    "@browserkit/engine": "link:../../../browserkit/packages/engine",
     "acorn": "8.18.0",
     "monaco-editor": "0.57.0",
     "react": "19.3.0",

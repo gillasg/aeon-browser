@@ -7,7 +7,7 @@ import {
 import {
   currentInventoryTabs,
   refreshInventoryTab,
-} from "@browser-use-extension/engine/native-inventory-client";
+} from "@browserkit/engine/native-inventory-client";
 import { handoffKey, clearAutoPrompt, readChatContext } from "./browser-context-storage.js";
 import { NativeClaimBrowserContextSubmitResponseSchema } from "./native-extension-message.js";
 import { isPageScopeAllowed } from "./native-worker-tabs.js";

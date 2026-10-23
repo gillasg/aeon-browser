@@ -115,10 +115,10 @@ async function buildLayer(folder) {
       ]
         .map(
           (name) =>
-            `export * from './apps/chrome-extension/node_modules/@browser-use-extension/engine/src/native-browser-${name}.ts';`,
+            `export * from './apps/chrome-extension/node_modules/@browserkit/engine/src/native-browser-${name}.ts';`,
         )
         .concat(
-          "export { installEngineListeners } from './apps/chrome-extension/node_modules/@browser-use-extension/engine/src/native-engine-install.ts';",
+          "export { installEngineListeners } from './apps/chrome-extension/node_modules/@browserkit/engine/src/native-engine-install.ts';",
         )
         .join("\n"),
       resolveDir: resolve("."),

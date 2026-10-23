@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PiBrowserContextRecordSchema } from "@browser-use-extension/protocol";
+import { PiBrowserContextRecordSchema } from "@browserkit/protocol";
 import { ChatCatalogItemSchema, ChatIdSchema, ChatSummarySchema } from "./chat-catalog-dto.js";
 export {
   ChatIdSchema,

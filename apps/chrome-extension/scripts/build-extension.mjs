@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 
 const require = createRequire(import.meta.url);
-const engine = (file) => require.resolve("@browser-use-extension/engine/" + file);
+const engine = (file) => require.resolve("@browserkit/engine/" + file);
 
 const appRoot = fileURLToPath(new URL("../", import.meta.url));
 
@@ -104,7 +104,7 @@ async function buildEntries(shared, output, entries) {
   );
 }
 
-// Which revision of each linked repo (the Browser Use Extension, ...) this build used.
+// Which revision of each linked repo (the browserkit, ...) this build used.
 async function writeBuildInfo(output) {
   const revisions = execFileSync(
     process.execPath,

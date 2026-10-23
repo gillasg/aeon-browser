@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "zod": "4.6.5",
-    "@browser-use-extension/protocol": "link:../../../browser-use-extension/packages/protocol"
+    "@browserkit/protocol": "link:../../../browserkit/packages/protocol"
   },
   "files": [
     "dist",
