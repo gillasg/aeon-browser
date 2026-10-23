@@ -1,0 +1,45 @@
+node_modules/
+**/dist/
+*.tsbuildinfo
+apps/chrome-extension/dev-dist/
+apps/chrome-extension/native-dist/
+.slice0-audit/
+coverage/
+
+# Local documentation, planning, and reference material
+*.md
+*.markdown
+*.mdx
+/architecture/
+/artifacts/
+/planning/
+/plans/
+/a-refer/
+/reference/
+/references/
+
+# Local configuration and generated output
+.env
+.env.*
+!.env.example
+*.log
+
+# Archived planning and reference material
+/archive/
+
+# Minimal public project introduction
+!/README.md
+
+# Private runtime state
+core-connection.json
+core-attention.json*
+**/*.sqlite*
+**/pi-sessions/
+**/data/
+
+# Local planning notes and agent instructions stay out of the repo
+AGENTS.md
+PLAN*.md
+*.plan.md
+plans/
+notes/

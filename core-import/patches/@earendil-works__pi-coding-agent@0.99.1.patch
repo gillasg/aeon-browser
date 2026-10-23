@@ -1,0 +1,155 @@
+diff --git a/dist/core/extensions/loader.js b/dist/core/extensions/loader.js
+index 249c08239d522482217cdd51c0973d94c24bfb8c..1797c2772bac5f7bc1badefc914255bd6fde377f 100644
+--- a/dist/core/extensions/loader.js
++++ b/dist/core/extensions/loader.js
+@@ -92,10 +92,10 @@ export function clearExtensionCache() {
+     extensionCacheGeneration++;
+ }
+ function useExtensionCacheCwd(cwd) {
++    // Aeon: cached entries are module factories keyed by absolute path; every session still
++    // creates fresh extension instances, so a daemon serving many working directories keeps
++    // the cache instead of re-importing every extension whenever the directory changes.
+     const resolvedCwd = resolvePath(cwd);
+-    if (extensionCacheCwd !== undefined && extensionCacheCwd !== resolvedCwd) {
+-        clearExtensionCache();
+-    }
+     extensionCacheCwd = resolvedCwd;
+     return { cwd: resolvedCwd, generation: extensionCacheGeneration };
+ }
+@@ -437,9 +437,7 @@ function createExtensionAPI(extension, runtime, cwd, eventBus) {
+     };
+ }
+ function isCurrentCacheToken(cacheToken) {
+-    return (cacheToken !== undefined &&
+-        extensionCacheCwd === cacheToken.cwd &&
+-        extensionCacheGeneration === cacheToken.generation);
++    return cacheToken !== undefined && extensionCacheGeneration === cacheToken.generation;
+ }
+ async function loadExtensionModule(extensionPath, cacheToken) {
+     if (isCurrentCacheToken(cacheToken)) {
+diff --git a/dist/core/sdk.js b/dist/core/sdk.js
+index 29557fe153df9b7d1852d029d868ec27728e5688..7e35cb56b67a182c4f34b2c05c10a6994bb15123 100644
+--- a/dist/core/sdk.js
++++ b/dist/core/sdk.js
+@@ -81,7 +81,9 @@ export async function createAgentSession(options = {}) {
+     }
+     // Check if session has existing data to restore
+     const existingSession = sessionManager.buildSessionContext();
+-    const hasExistingSession = existingSession.messages.length > 0;
++    // Pippin considers the initial model/thinking entries to be a materialized
++    // session, even before the first user or assistant message exists.
++    const hasExistingSession = sessionManager.getEntries().length > 0;
+     const hasThinkingEntry = sessionManager.getBranch().some((entry) => entry.type === "thinking_level_change");
+     let model = options.model;
+     let modelFallbackMessage;
+diff --git a/dist/core/session-manager.js b/dist/core/session-manager.js
+index 62b469b5dc3fcea2aa8f52218cbdfe892d9abed4..bc1ed9576e5e042d268dbf7755c643dd87cd1980 100644
+--- a/dist/core/session-manager.js
++++ b/dist/core/session-manager.js
+@@ -783,10 +783,7 @@ export class SessionManager {
+         return this.sessionFile;
+     }
+     /**
+-     * A new session file is created only once the session contains a user or assistant message.
+-     * Setup entries alone (model, thinking level, system prompt) stay in memory so opening and
+-     * closing pi without chatting leaves no file behind. Starting at the user message (not the
+-     * first assistant reply) keeps the prompt on disk if the first turn never completes (#10000).
++     * Whether this branch contains a user or assistant message.
+      */
+     _hasConversation() {
+         return this.fileEntries.some((e) => e.type === "message" && (e.message.role === "user" || e.message.role === "assistant"));
+@@ -795,8 +792,6 @@ export class SessionManager {
+         if (!this.persist || !this.sessionFile)
+             return;
+         if (!this.flushed) {
+-            if (!this._hasConversation())
+-                return;
+             const fd = openSync(this.sessionFile, "wx");
+             try {
+                 for (const e of this.fileEntries) {
+diff --git a/dist/extensions/mcp/index.d.ts b/dist/extensions/mcp/index.d.ts
+index 7fc6441bca5f7751ab6c28b2aa341999d2980f96..b19081953bd59d00d966354243dd1f0339b93d17 100644
+--- a/dist/extensions/mcp/index.d.ts
++++ b/dist/extensions/mcp/index.d.ts
+@@ -27,6 +27,14 @@ import { type LoadedMcpConfig, type McpServerConfigPatch, type McpServerEntry }
+ import type { McpOAuthCredentialStore } from "./oauth.ts";
+ import type { McpTransportFactory } from "./runtime.ts";
+ export type { McpTransportFactory } from "./runtime.ts";
++export type McpServerStatusState = "disabled" | "starting" | "connecting" | "connected" | "disconnected" | "needs-auth" | "failed" | "closed";
++export interface McpServerStatus {
++    name: string;
++    enabled: boolean;
++    state: McpServerStatusState;
++    toolCount: number;
++    resourceCount: number;
++}
+ export interface McpExtensionOptions {
+     /** Defaults to reading `mcp.json` from the agent directory and the trusted project. */
+     loadConfig?: (ctx: ExtensionContext) => LoadedMcpConfig;
+@@ -40,6 +48,8 @@ export interface McpExtensionOptions {
+     openUrl?: (url: string) => void;
+     /** Saves `/mcp` changes to the server's config file. Defaults to editing its `mcp.json`. */
+     updateConfig?: (entry: McpServerEntry, patch: McpServerConfigPatch) => void;
++    /** Receives bounded, secret-free server status whenever the MCP manager changes. */
++    onStatusChange?: (servers: readonly McpServerStatus[]) => void;
+     /**
+      * How long the first prompt waits for servers that are still connecting at startup, in
+      * milliseconds. Their tools become available when they connect. Default: 10000.
+diff --git a/dist/extensions/mcp/index.js b/dist/extensions/mcp/index.js
+index 12b4e7c0956509928e9b0d2e56779687abf11c03..b17cab8b1890a72eff11ef7ffebc8a41f1906776 100644
+--- a/dist/extensions/mcp/index.js
++++ b/dist/extensions/mcp/index.js
+@@ -128,6 +128,26 @@ export function createMcpExtension(options = {}) {
+         const emitChange = () => {
+             for (const listener of listeners)
+                 listener();
++            if (options.onStatusChange) {
++                const snapshot = servers.map((server) => {
++                    const connection = server.connection;
++                    const enabled = isEnabled(server);
++                    const state = !enabled ? "disabled" : connection?.state ?? "starting";
++                    return {
++                        name: server.entry.name,
++                        enabled,
++                        state,
++                        toolCount: state === "connected" ? connection.tools.length : 0,
++                        resourceCount: state === "connected" ? connection.resources.length : 0,
++                    };
++                });
++                try {
++                    options.onStatusChange(snapshot);
++                }
++                catch {
++                    // Status observers must not interfere with Pi's MCP connection lifecycle.
++                }
++            }
+         };
+         const subscribe = (listener) => {
+             listeners.add(listener);
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 045ddb2aaa9dc0b2f1dc9c4cd81e4278a08131d2..0f079feea4eb3fc8a53502ea28464cc6c6b7dc72 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -28,8 +28,8 @@ export { hasTrustRequiringProjectResources, type ProjectTrustDecision, ProjectTr
+ export { type ModelRoute, type ModelRouteReason, type ModelRouteRequest, VIRTUAL_MODEL_STATE_ENTRY, type VirtualModelDefinition, type VirtualModelStateData, } from "./core/virtual-models.ts";
+ export { type CodemodeExtensionOptions, createCodemodeExtension } from "./extensions/codemode/index.ts";
+ export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/codemode/tool.ts";
+-export type { LoadedMcpConfig, McpExposure, McpServerConfig, McpServerEntry } from "./extensions/mcp/config.ts";
+-export { createMcpExtension, type McpExtensionOptions, type McpTransportFactory } from "./extensions/mcp/index.ts";
++export { loadMcpConfig, type LoadedMcpConfig, type McpExposure, type McpServerConfig, type McpServerEntry } from "./extensions/mcp/config.ts";
++export { createMcpExtension, type McpExtensionOptions, type McpServerStatus, type McpServerStatusState, type McpTransportFactory } from "./extensions/mcp/index.ts";
+ export { createToolSearchExtension } from "./extensions/tool-search/index.ts";
+ export { type MainOptions, main } from "./main.ts";
+ export { InteractiveMode, type InteractiveModeOptions, type JsonAgentSessionEvent, type ModelInfo, type PrintModeOptions, RpcClient, type RpcClientOptions, type RpcCommand, type RpcEventListener, type RpcExtensionUIRequest, type RpcExtensionUIResponse, type RpcResponse, type RpcSessionState, runPrintMode, runRpcMode, } from "./modes/index.ts";
+diff --git a/dist/index.js b/dist/index.js
+index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..1963fb34957a1958b11a5d69d19f0cad7aabcfc9 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -33,6 +33,7 @@ export { VIRTUAL_MODEL_STATE_ENTRY, } from "./core/virtual-models.js";
+ // Built-in extensions. The CLI loads them; SDK sessions add them to their extension factories.
+ export { createCodemodeExtension } from "./extensions/codemode/index.js";
+ export { createMcpExtension } from "./extensions/mcp/index.js";
++export { loadMcpConfig } from "./extensions/mcp/config.js";
+ export { createToolSearchExtension } from "./extensions/tool-search/index.js";
+ // Main entry point
+ export { main } from "./main.js";
