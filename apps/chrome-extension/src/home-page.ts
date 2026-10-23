@@ -106,6 +106,7 @@ function createView() {
     catalogPending: catalog.pending,
     searchWarnings: catalog.searchWarnings,
     error: errorMessage,
+    onDismissError: clearError,
     onAsk: (
       query: string,
       model: ComposerModel,

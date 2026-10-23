@@ -755,6 +755,37 @@ summary:focus-visible {
 .message-markdown > :first-child {
   margin-top: 0;
 }
+.message-markdown .markdown-table-wrap {
+  margin: var(--aeon-s-3) 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--aeon-r-md);
+}
+.message-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--aeon-fs-md);
+  line-height: 1.45;
+}
+.message-markdown th,
+.message-markdown td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.message-markdown th {
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.message-markdown tbody tr:last-child td {
+  border-bottom: 0;
+}
+.message-markdown td code {
+  white-space: nowrap;
+}
 .message-markdown > :last-child {
   margin-bottom: 0;
 }
@@ -1569,10 +1600,31 @@ summary:focus-visible {
   font-size: var(--aeon-fs-lg);
 }
 .sync-notice {
+  display: flex;
   width: min(100% - 72px, 940px);
+  align-items: flex-start;
+  gap: var(--aeon-s-3);
   margin: var(--aeon-s-3) auto 0;
   color: var(--aeon-swatch-9b9b95);
   font-size: var(--aeon-fs-md);
+}
+.sync-notice > span {
+  flex: 1;
+}
+.sync-notice > button {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.sync-notice > button:hover {
+  opacity: 1;
 }
 .sync-notice[data-error="true"] {
   color: var(--aeon-swatch-c78b84);
@@ -2780,12 +2832,6 @@ body[data-host="panel"] .queue-view {
 .thinking-detail summary:focus-visible,
 .thinking-detail[open] summary {
   color: var(--aeon-muted);
-}
-.thinking-detail summary .picker-chevron-icon {
-  visibility: hidden;
-}
-.thinking-detail[open] summary .picker-chevron-icon {
-  visibility: visible;
 }
 
 .sidebar-brand {

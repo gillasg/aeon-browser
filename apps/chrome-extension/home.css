@@ -776,13 +776,34 @@
   position: fixed;
   right: 24px;
   bottom: 20px;
+  display: flex;
   max-width: min(580px, calc(100vw - 30px));
+  align-items: flex-start;
+  gap: var(--aeon-s-3);
   margin: 0;
   padding: var(--aeon-s-2) var(--aeon-s-3);
   border: 1px solid var(--aeon-swatch-55413c);
   border-radius: var(--aeon-r-md);
   background: var(--aeon-swatch-2e2422);
   color: var(--aeon-swatch-e3b2a9);
+}
+.home-error span {
+  flex: 1;
+}
+.home-error button {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.65;
+  cursor: pointer;
+}
+.home-error button:hover {
+  opacity: 1;
 }
 @media (max-width: 900px) {
   .home-shell {
@@ -1544,11 +1565,6 @@ body[data-embedded="true"] .chat-navigation {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.home-chip-count {
-  flex: none;
-  color: var(--aeon-muted);
-  font-variant-numeric: tabular-nums;
-}
 .home-chip[data-open="true"]::before {
   content: "";
   flex: none;
@@ -1557,26 +1573,69 @@ body[data-embedded="true"] .chat-navigation {
   border-radius: 50%;
   background: var(--aeon-success);
 }
-.home-settings-tabs {
-  display: flex;
-  gap: var(--aeon-s-1);
-  width: min(860px, 100%);
+.home-settings-layout {
+  display: grid;
+  grid-template-columns: minmax(148px, 190px) minmax(0, 1fr);
+  gap: var(--aeon-s-6);
+  width: min(960px, 100%);
   margin: var(--aeon-s-6) auto 0;
+  align-items: start;
 }
-.home-settings-tabs button {
-  padding: 6px var(--aeon-s-3);
+.home-settings-menu {
+  position: sticky;
+  top: var(--aeon-s-5);
+  display: grid;
+  gap: 2px;
+}
+.home-settings-menu button {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: var(--aeon-s-3);
+  padding: 0 var(--aeon-s-3);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--aeon-r-md);
   background: none;
   color: var(--aeon-muted);
   font: inherit;
   font-size: 13px;
+  text-align: left;
   cursor: pointer;
 }
-.home-settings-tabs button[aria-selected="true"] {
+.home-settings-menu button svg {
+  flex: none;
+  opacity: 0.75;
+}
+.home-settings-menu button:hover {
+  background: var(--aeon-swatch-29262d);
+  color: var(--aeon-text);
+}
+.home-settings-menu button[aria-selected="true"] {
   border-color: var(--aeon-line);
   background: var(--aeon-surface);
   color: var(--aeon-text);
+}
+.home-settings-body {
+  min-width: 0;
+}
+.home-settings-body .management-main {
+  width: 100%;
+  margin: 0;
+}
+@media (max-width: 700px) {
+  .home-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--aeon-s-4);
+  }
+  .home-settings-menu {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .home-settings-menu button {
+    flex: none;
+  }
 }
 .first-run-tour {
   position: fixed;

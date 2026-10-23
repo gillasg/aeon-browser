@@ -135,6 +135,7 @@ function createView() {
     title,
     connection,
     notice,
+    onDismissNotice: dismissNotice,
     rows: initialDisplay.rows(transcript.rows),
     loadToolImage: fetchToolImage,
     transcriptActionsDisabled: runState !== "idle",
@@ -372,6 +373,11 @@ function showError(message: string): void {
       notice = "";
       render();
     }, 4000);
+  render();
+}
+function dismissNotice(): void {
+  clearTimeout(noticeTimer);
+  notice = "";
   render();
 }
 function scheduleReconnect(): void {

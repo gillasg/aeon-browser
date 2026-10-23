@@ -22,6 +22,7 @@ export interface ChatSurfaceProps {
   title: string;
   connection: { label: string; state: "connecting" | "connected" | "error" };
   notice: string;
+  onDismissNotice?(): void;
   rows: readonly TranscriptRow[];
   chats: readonly ChatSummaryDto[];
   sidebarOpen: boolean;
@@ -108,15 +109,30 @@ export function ChatSurface(props: ChatSurfaceProps): ReactElement {
   );
 }
 
+function ChatNotice({
+  text,
+  onDismiss,
+}: {
+  text: string;
+  onDismiss?: (() => void) | undefined;
+}): ReactElement {
+  return (
+    <div className="sync-notice" role="status" aria-live="polite" data-error="true">
+      <span>{text}</span>
+      {onDismiss && (
+        <button type="button" aria-label="Dismiss message" onClick={onDismiss}>
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ChatContent(props: ChatSurfaceProps): ReactElement {
   if (isEmptyChat(props)) return <EmptyChatStart {...props} />;
   return (
     <main className="chat-main">
-      {props.notice && (
-        <div className="sync-notice" role="status" aria-live="polite" data-error="true">
-          {props.notice}
-        </div>
-      )}
+      {props.notice && <ChatNotice text={props.notice} onDismiss={props.onDismissNotice} />}
       <ChatPiOverlays {...props} />
       {props.resourcesOpen ? (
         <LoadedResources
