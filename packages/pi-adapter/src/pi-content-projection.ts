@@ -150,8 +150,10 @@ export function truncateText(value: string): string {
 
 function boundString(value: string): { text: string; truncated: boolean } {
   if (value.length > MAX_TEXT_CHARS) {
+    // The compact form can still be long (one entry per browser step); never pass the limit.
     const browserResult = compactBrowserResult(value, MAX_TEXT_CHARS);
-    if (browserResult) return { text: browserResult, truncated: true };
+    if (browserResult && browserResult.length <= MAX_TEXT_CHARS)
+      return { text: browserResult, truncated: true };
   }
   return value.length <= MAX_TEXT_CHARS
     ? { text: value, truncated: false }
