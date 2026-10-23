@@ -167,7 +167,7 @@ export class HomeModelAccounts {
   private async request(endpoint: Endpoint, path: string, body?: unknown): Promise<unknown> {
     const response = await fetch(`${endpoint.origin}/api/${path}`, {
       method: body === undefined ? "GET" : "POST",
-      headers: { "content-type": "application/json", "x-pi-ai-login-token": endpoint.token },
+      headers: { "content-type": "application/json", "x-aeon-login-token": endpoint.token },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const data = (await response.json().catch(() => ({}))) as { error?: string };
