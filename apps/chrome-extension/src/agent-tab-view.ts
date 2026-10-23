@@ -7,7 +7,44 @@ export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
 export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
 const FLAGS = [AGENT_IN_FRONT_KEY, HIDE_AGENT_CURSOR_KEY];
 
+// The Blocked sites setting: a JSON list in page localStorage, read by the browser engine from
+// chrome.storage.local under "blocked-sites".
+const BLOCKED_SITES_KEY = "aeonBlockedSites";
+const ENGINE_BLOCKED_SITES_KEY = "blocked-sites";
+
+function mirrorBlockedSites(): void {
+  const push = () => {
+    let sites: unknown = [];
+    try {
+      sites = JSON.parse(localStorage.getItem(BLOCKED_SITES_KEY) ?? "[]");
+    } catch {
+      /* Storage may be unavailable. */
+    }
+    if (Array.isArray(sites))
+      void chrome.storage.local
+        .set({ [ENGINE_BLOCKED_SITES_KEY]: sites.map(String) })
+        .catch(() => undefined);
+  };
+  void chrome.storage.local.get(ENGINE_BLOCKED_SITES_KEY).then((stored) => {
+    const value = stored[ENGINE_BLOCKED_SITES_KEY];
+    try {
+      if (Array.isArray(value) && localStorage.getItem(BLOCKED_SITES_KEY) === null) {
+        localStorage.setItem(BLOCKED_SITES_KEY, JSON.stringify(value));
+        window.dispatchEvent(new Event(BLOCKED_SITES_KEY));
+      }
+    } catch {
+      /* Storage may be unavailable. */
+    }
+    push();
+  }, push);
+  window.addEventListener("storage", (event) => {
+    if (event.key === BLOCKED_SITES_KEY) push();
+  });
+  window.addEventListener(BLOCKED_SITES_KEY, push);
+}
+
 export function mirrorAgentTabView(): void {
+  mirrorBlockedSites();
   const push = () => {
     let view: AgentTabView = "split";
     try {
