@@ -31,7 +31,7 @@ export function HomeDashboard(props: HomeDashboardProps): ReactElement {
   );
   // Waiting on you sorts first.
   live.sort((left, right) => Number(needs.has(right.chatId)) - Number(needs.has(left.chatId)));
-  const recent = repeatsCollapsed(props.chats.filter((chat) => !live.includes(chat))).slice(0, 8);
+  const recent = props.chats.filter((chat) => !live.includes(chat)).slice(0, 8);
   return (
     <div className="home-dashboard">
       <LiveRuns chats={live} needs={needs} onOpenChat={props.onOpenChat} />
@@ -281,32 +281,13 @@ function WatcherCards({
   );
 }
 
-interface RecentChat {
-  /** The newest chat with this title; the chip opens it. */
-  chat: ChatCatalogItemDto;
-  /** How many recent chats asked the same thing. */
-  count: number;
-}
-
-/** The same task asked again and again shows once, with a count ("×4"), newest first. */
-function repeatsCollapsed(chats: readonly ChatCatalogItemDto[]): RecentChat[] {
-  const groups = new Map<string, RecentChat>();
-  for (const chat of chats) {
-    const key = chat.title.trim().toLowerCase().replace(/\s+/g, " ");
-    const group = groups.get(key);
-    if (group) group.count += 1;
-    else groups.set(key, { chat, count: 1 });
-  }
-  return [...groups.values()];
-}
-
 function RecentChats({
   chats,
   openChatIds,
   onOpenChat,
   onChats,
 }: {
-  chats: readonly RecentChat[];
+  chats: readonly ChatCatalogItemDto[];
   openChatIds: ReadonlySet<string>;
   onOpenChat(chatId: string): void;
   onChats(): void;
@@ -321,20 +302,16 @@ function RecentChats({
       />
       {chats.length ? (
         <div className="home-chips" id="recent-chats">
-          {chats.map(({ chat, count }) => (
+          {chats.map((chat) => (
             <button
               type="button"
               key={chat.chatId}
               className="home-chip"
               data-open={String(openChatIds.has(chat.chatId))}
-              title={
-                (openChatIds.has(chat.chatId) ? `${chat.title} · open in a tab` : chat.title) +
-                (count > 1 ? ` · asked ${count} times` : "")
-              }
+              title={openChatIds.has(chat.chatId) ? `${chat.title} · open in a tab` : chat.title}
               onClick={() => onOpenChat(chat.chatId)}
             >
               <span className="home-chip-title">{chat.title}</span>
-              {count > 1 && <span className="home-chip-count">×{count}</span>}
             </button>
           ))}
         </div>

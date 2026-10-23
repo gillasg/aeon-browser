@@ -41,6 +41,7 @@ export interface NewTabHomeProps {
   catalogPending: boolean;
   searchWarnings: number;
   error: string;
+  onDismissError?(): void;
   onAsk(
     query: string,
     model: ComposerModel,
@@ -137,7 +138,12 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
         />
         {props.error && (
           <p id="home-error" className="home-error" role="status" aria-live="polite">
-            {props.error}
+            <span>{props.error}</span>
+            {props.onDismissError && (
+              <button type="button" aria-label="Dismiss error" onClick={props.onDismissError}>
+                ×
+              </button>
+            )}
           </p>
         )}
       </main>
@@ -171,20 +177,7 @@ function HomePage({
     );
   if (view === "watchers") return <Management props={props} section="routines" />;
   if (view === "settings")
-    return (
-      <>
-        <SettingsTabs section={settingsSection} onSection={onSettingsSection} />
-        {settingsSection === "models" ? (
-          props.modelAccounts ? (
-            <ModelAccounts {...props.modelAccounts} />
-          ) : (
-            <p className="aeon-page-empty">Models are not available here.</p>
-          )
-        ) : (
-          <Management props={props} section={settingsSection} />
-        )}
-      </>
-    );
+    return <SettingsPage props={props} section={settingsSection} onSection={onSettingsSection} />;
   return (
     <>
       <FirstRunTour />
@@ -212,7 +205,34 @@ const SETTINGS_TABS: ReadonlyArray<[SettingsSection, string]> = [
   ["capabilities", "MCPs / CLIs"],
 ];
 
-function SettingsTabs({
+function SettingsPage({
+  props,
+  section,
+  onSection,
+}: {
+  props: NewTabHomeProps;
+  section: SettingsSection;
+  onSection(section: SettingsSection): void;
+}): ReactElement {
+  return (
+    <div className="home-settings-layout">
+      <SettingsMenu section={section} onSection={onSection} />
+      <div className="home-settings-body" role="tabpanel">
+        {section === "models" ? (
+          props.modelAccounts ? (
+            <ModelAccounts {...props.modelAccounts} />
+          ) : (
+            <p className="aeon-page-empty">Models are not available here.</p>
+          )
+        ) : (
+          <Management props={props} section={section} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SettingsMenu({
   section,
   onSection,
 }: {
@@ -220,7 +240,7 @@ function SettingsTabs({
   onSection(section: SettingsSection): void;
 }): ReactElement {
   return (
-    <div className="home-settings-tabs" role="tablist" aria-label="Settings sections">
+    <nav className="home-settings-menu" role="tablist" aria-label="Settings sections">
       {SETTINGS_TABS.map(([value, label]) => (
         <button
           key={value}
@@ -229,10 +249,62 @@ function SettingsTabs({
           aria-selected={section === value}
           onClick={() => onSection(value)}
         >
-          {label}
+          <SettingsIcon section={value} />
+          <span>{label}</span>
         </button>
       ))}
-    </div>
+    </nav>
+  );
+}
+
+function SettingsIcon({ section }: { section: SettingsSection }): ReactElement {
+  if (section === "models")
+    return (
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <path
+          d="M10 2.8 12 7l4.4 2-4.4 2-2 4.2L8 11 3.6 9 8 7Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  if (section === "resources")
+    return (
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <path
+          d="M8 3h4v3.2a1.8 1.8 0 0 1 2.2 2.2H17v4h-2.8a1.8 1.8 0 0 1-2.2 2.2V17H8v-2.6a1.8 1.8 0 0 1-2.2-2.2H3v-4h2.8A1.8 1.8 0 0 1 8 6.2Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  if (section === "capabilities")
+    return (
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <path
+          d="M7 3v4m6-4v4M5 7h10v4a5 5 0 0 1-10 0Zm5 9v2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M4 6h12M4 10h12M4 14h12M7 4v4m6 0v4M5 12v4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

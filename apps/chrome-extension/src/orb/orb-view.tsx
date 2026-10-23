@@ -157,21 +157,6 @@ function ComposeSiteInfo({
 }): ReactElement {
   return (
     <>
-      {model.verbs.length > 0 && (
-        <div className="isl-verbs" role="group" aria-label={`What ${model.host} can do`}>
-          {model.verbs.map((verb) => (
-            <button
-              type="button"
-              key={verb.label}
-              className="isl-verb"
-              onClick={() => actions.useVerb(verb)}
-            >
-              {verb.label}
-              {verb.run ? "" : "…"}
-            </button>
-          ))}
-        </div>
-      )}
       <div className="isl-hint" data-warn={String(Boolean(model.notice))}>
         <span>{model.notice || "Enter to send · Esc to close"}</span>
         <button
