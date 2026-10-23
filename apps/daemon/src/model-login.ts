@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { LoginServer } from "pi-ai-login";
+import type { LoginServer } from "./model-accounts/server.js";
 
 // The sign-in service behind Aeon's Models page: every provider Pi supports. Aeon's page talks to
 // it on 127.0.0.1 with the token in the returned address and opens providers' sign-in pages as
@@ -15,11 +15,8 @@ export async function openModelLogin(
 ): Promise<string> {
   if (active) return active.url;
   // Loaded on first use: the provider SDKs are only needed while signing in.
-  const { startLoginServer } = await import("pi-ai-login");
-  const server = await startLoginServer({
-    ...(agentDir ? { agentDir } : {}),
-    openSignInPages: false,
-  });
+  const { startLoginServer } = await import("./model-accounts/server.js");
+  const server = await startLoginServer(agentDir ? { agentDir } : {});
   active = server;
   server.service.on("change", onChange);
   const close = () => {
@@ -43,8 +40,8 @@ export async function modelComplete(
   system: string,
   messages: { role: string; content: string }[],
 ): Promise<string> {
-  const { getModel } = await import("pi-ai-login");
-  const handle = await getModel(agentDir ? { agentDir } : {});
+  const { defaultModel } = await import("./model-accounts/model.js");
+  const handle = await defaultModel(agentDir ? { agentDir } : {});
   const last = messages.at(-1)?.content ?? "";
   const earlier = messages
     .slice(0, -1)

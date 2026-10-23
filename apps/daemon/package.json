@@ -13,10 +13,12 @@
     "@aeon/protocol": "workspace:*",
     "@aeon/store": "workspace:*",
     "ws": "8.22.0",
-    "pi-ai-login": "link:../../../pi-ai-login"
+    "@earendil-works/pi-ai": "1.2.0",
+    "proper-lockfile": "4.1.2"
   },
   "devDependencies": {
     "@types/node": "26.6.3",
-    "@types/ws": "8.18.1"
+    "@types/ws": "8.18.1",
+    "@types/proper-lockfile": "4.1.4"
   }
 }
