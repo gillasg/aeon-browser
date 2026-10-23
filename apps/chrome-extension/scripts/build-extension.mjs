@@ -104,7 +104,7 @@ async function buildEntries(shared, output, entries) {
   );
 }
 
-// Which revision of each linked repo (browser-crawl, the Browser Use Extension, ...) this build used.
+// Which revision of each linked repo (the Browser Use Extension, ...) this build used.
 async function writeBuildInfo(output) {
   const revisions = execFileSync(
     process.execPath,
