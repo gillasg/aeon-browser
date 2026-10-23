@@ -29,6 +29,16 @@ export default tseslint.config(
     },
   },
   {
+    // The daemon, CLI, native host and their packages (from core) keep their own function limit.
+    files: [
+      "apps/{daemon,cli,native-host}/**/*.{ts,tsx,mjs}",
+      "packages/{domain,pi-adapter,protocol,store}/**/*.{ts,tsx,mjs}",
+    ],
+    rules: {
+      "max-lines-per-function": ["error", { max: 100, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
     files: ["**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/explicit-module-boundary-types": "error",

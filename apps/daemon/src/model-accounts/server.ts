@@ -32,7 +32,7 @@ export async function startLoginServer(options: ModelAccountOptions = {}): Promi
   const presence = presenceTracker(() => events.emit("closed"));
   const context = { service, presence: presence.change, done: () => events.emit("done") };
   let origin = "";
-  const server = createServer((request, response) => {
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     void route(request, response).catch((error: unknown) => fail(response, error));
   });
   async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
