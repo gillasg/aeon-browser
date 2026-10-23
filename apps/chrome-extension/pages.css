@@ -1,0 +1,598 @@
+/* Aeon's pages (Chats, Routines, Activity, Settings, Models) share one layout with the new-tab
+   home: a centred 680px column, a quiet title, small uppercase section labels, hairlines instead
+   of boxes, and round quiet buttons. Loaded last so it settles the older page styles. */
+
+.home-main[data-screen="management"],
+.home-main[data-screen="catalog"] {
+  padding: 0 var(--aeon-s-6);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  background: var(--aeon-canvas);
+}
+
+/* ---- Column and title ---- */
+
+.management-main,
+.home-catalog,
+.aeon-page {
+  width: min(680px, 100%);
+  min-height: 0;
+  margin: 0 auto;
+  padding: var(--aeon-s-10) 0 var(--aeon-s-16);
+  background: none;
+  color: var(--aeon-text);
+}
+.home-settings-tabs + .management-main,
+.home-settings-tabs + .aeon-page {
+  padding-top: var(--aeon-s-6);
+}
+.management-heading {
+  margin-bottom: var(--aeon-s-6);
+}
+.management-heading h1,
+.home-catalog h1,
+.aeon-page-head h1 {
+  margin: 0;
+  color: var(--aeon-text);
+  font-size: var(--aeon-fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.aeon-page-head {
+  margin-bottom: var(--aeon-s-6);
+}
+.aeon-page-head p,
+.activity-page .activity-lede {
+  margin: var(--aeon-s-1) 0 0;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-md);
+}
+.home-catalog h1 {
+  margin-bottom: var(--aeon-s-5);
+}
+
+/* ---- Section labels: the home page's uppercase headings ---- */
+
+.aeon-page-section h2,
+.settings-group h2,
+.activity-day h2,
+.routine-detail h2 {
+  margin: 0 0 var(--aeon-s-3);
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.aeon-page-section {
+  padding: var(--aeon-s-5) 0;
+  border-top: 1px solid var(--aeon-line);
+}
+.aeon-page-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* ---- Settings: sections, not boxes ---- */
+
+.settings-groups {
+  display: block;
+}
+.settings-group {
+  padding: var(--aeon-s-5) 0;
+  border: 0;
+  border-top: 1px solid var(--aeon-line);
+  border-radius: 0;
+  background: none;
+}
+.settings-group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.settings-group p {
+  margin: var(--aeon-s-1) 0 0;
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+}
+.settings-group label,
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-3);
+  color: var(--aeon-text);
+  font-size: var(--aeon-fs-md);
+}
+.settings-group label + p,
+.settings-check + p {
+  margin-bottom: var(--aeon-s-3);
+}
+.settings-group input[type="checkbox"],
+.catalog-archived-toggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--aeon-text);
+}
+
+/* Settings tabs sit on the column, as a quiet segmented row. */
+.home-settings-tabs {
+  width: min(680px, 100%);
+  margin: var(--aeon-s-10) auto 0;
+  padding-bottom: var(--aeon-s-3);
+  gap: var(--aeon-s-1);
+  border-bottom: 1px solid var(--aeon-line);
+}
+.home-settings-tabs button {
+  padding: 5px var(--aeon-s-3);
+  border: 0;
+  border-radius: var(--aeon-r-full);
+  color: var(--aeon-muted);
+}
+.home-settings-tabs button:hover {
+  color: var(--aeon-text);
+}
+.home-settings-tabs button[aria-selected="true"] {
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+}
+
+/* ---- Controls ---- */
+
+.management-heading button,
+.management-card-heading button,
+.management-toolbar button,
+.management-tabs button,
+.management-back,
+.capability-actions button,
+.routine-actions button,
+.activity-row-actions button,
+.catalog-result-actions button,
+.settings-group button,
+.aeon-quiet-button {
+  height: 30px;
+  padding: 0 var(--aeon-s-3);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-full);
+  background: none;
+  color: var(--aeon-muted);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  cursor: pointer;
+  transition:
+    color var(--aeon-dur-fast) var(--aeon-ease),
+    background var(--aeon-dur-fast) var(--aeon-ease);
+}
+.management-heading button:hover,
+.management-card-heading button:hover,
+.management-toolbar button:hover,
+.management-tabs button:hover,
+.management-back:hover,
+.capability-actions button:hover,
+.routine-actions button:hover,
+.activity-row-actions button:hover,
+.catalog-result-actions button:hover,
+.settings-group button:hover,
+.aeon-quiet-button:hover {
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+}
+.settings-group button:disabled,
+.management-heading button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.management-toolbar [aria-pressed="true"],
+.management-tabs [aria-current="page"] {
+  border-color: var(--aeon-line);
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+}
+.aeon-primary-button {
+  height: 32px;
+  padding: 0 var(--aeon-s-4);
+  border: 0;
+  border-radius: var(--aeon-r-full);
+  background: var(--aeon-text);
+  color: var(--aeon-canvas);
+  font: inherit;
+  font-size: var(--aeon-fs-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+.aeon-primary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.aeon-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--aeon-text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.management-toolbar {
+  flex-wrap: wrap;
+  gap: var(--aeon-s-2);
+}
+.management-toolbar > input,
+.management-toolbar select,
+.settings-group select,
+.catalog-search-box,
+.aeon-search,
+.aeon-input,
+.aeon-select {
+  height: 34px;
+  min-width: 0;
+  padding: 0 var(--aeon-s-3);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-md);
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+  font: inherit;
+  font-size: var(--aeon-fs-md);
+}
+.management-toolbar > input {
+  flex: 1;
+}
+.aeon-search,
+.aeon-input {
+  width: 100%;
+  margin-bottom: var(--aeon-s-2);
+}
+.management-toolbar > input:focus,
+.catalog-search-box:focus-within,
+.aeon-search:focus,
+.aeon-input:focus,
+.aeon-select:focus,
+.settings-group select:focus {
+  outline: none;
+  border-color: var(--aeon-border-strong);
+}
+
+/* ---- Lists: hairline rows, no boxes ---- */
+
+.management-list,
+.catalog-results,
+.aeon-rows {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.management-list-row,
+.management-info-row,
+.catalog-result,
+.activity-row,
+.aeon-row {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-3);
+  width: 100%;
+  padding: var(--aeon-s-3) var(--aeon-s-2);
+  border: 0;
+  border-bottom: 1px solid var(--aeon-line);
+  border-radius: 0;
+  background: none;
+  color: var(--aeon-text);
+  font: inherit;
+  text-align: left;
+}
+.management-info-row {
+  display: block;
+}
+.aeon-rows .aeon-row:last-child {
+  border-bottom: 0;
+}
+.management-list-row,
+.catalog-result {
+  border-radius: var(--aeon-r-md);
+  border-bottom-color: transparent;
+  box-shadow: 0 1px 0 var(--aeon-line);
+}
+.management-list-row:hover,
+.catalog-result:hover {
+  background: var(--aeon-surface);
+}
+.aeon-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--aeon-fs-md);
+}
+.aeon-row-main strong {
+  font-weight: 500;
+}
+.aeon-row-main span,
+.management-list-row small,
+.management-info-row small,
+.management-info-row p {
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+}
+.management-empty,
+.catalog-empty,
+.home-block-empty,
+.aeon-page-empty {
+  margin: var(--aeon-s-2) 0;
+  padding: 0;
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-md);
+  list-style: none;
+}
+.management-error,
+.aeon-page-error {
+  margin: 0 0 var(--aeon-s-4);
+  padding: var(--aeon-s-3);
+  border: 1px solid var(--aeon-danger-bg);
+  border-radius: var(--aeon-r-md);
+  color: var(--aeon-danger-soft);
+  font-size: var(--aeon-fs-md);
+}
+.aeon-badge {
+  padding: 1px var(--aeon-s-2);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-full);
+  color: var(--aeon-success-soft);
+  font-size: var(--aeon-fs-xs);
+  white-space: nowrap;
+}
+
+/* ---- Chats ---- */
+
+.catalog-search-row {
+  margin-bottom: var(--aeon-s-3);
+}
+.catalog-search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-2);
+  width: 100%;
+}
+.catalog-search-box span {
+  color: var(--aeon-faint);
+}
+.catalog-search-box input {
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.catalog-archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aeon-s-2);
+  margin-bottom: var(--aeon-s-4);
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+}
+.catalog-result-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.catalog-result-title {
+  overflow: hidden;
+  font-size: var(--aeon-fs-base);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-result-preview,
+.catalog-result-meta {
+  overflow: hidden;
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-result-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-1);
+  opacity: 0;
+  transition: opacity var(--aeon-dur-fast) var(--aeon-ease);
+}
+.catalog-result:hover .catalog-result-actions,
+.catalog-result:focus-within .catalog-result-actions {
+  opacity: 1;
+}
+.catalog-result-actions .result-tab-open {
+  margin-right: var(--aeon-s-1);
+  color: var(--aeon-success-soft);
+  font-size: var(--aeon-fs-xs);
+}
+.catalog-footnote {
+  margin-top: var(--aeon-s-6);
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+}
+
+/* ---- Activity ---- */
+
+.activity-day {
+  margin-top: var(--aeon-s-6);
+}
+.activity-row time {
+  flex: none;
+  width: 52px;
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+}
+
+/* ---- Models ---- */
+
+.aeon-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aeon-s-4);
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+}
+.aeon-field-row .aeon-select {
+  flex: none;
+  width: 260px;
+}
+.model-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--aeon-s-2);
+}
+.model-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-3);
+  min-width: 0;
+  padding: var(--aeon-s-3);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
+  background: none;
+  color: var(--aeon-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--aeon-dur-fast) var(--aeon-ease);
+}
+.model-tile:hover {
+  background: var(--aeon-surface);
+}
+.model-tile-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--aeon-fs-md);
+}
+.model-tile-text strong {
+  font-weight: 500;
+}
+.model-tile-text span {
+  overflow: hidden;
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-flow {
+  padding: var(--aeon-s-5);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
+  background: var(--aeon-surface);
+}
+.model-flow-head {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-3);
+  margin-bottom: var(--aeon-s-4);
+}
+.model-flow-head h2 {
+  margin: 0;
+  font-size: var(--aeon-fs-lg);
+  font-weight: 600;
+}
+.model-flow-step {
+  margin-bottom: var(--aeon-s-4);
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-md);
+}
+.model-flow-step p {
+  margin: 0 0 var(--aeon-s-2);
+}
+.model-flow-actions {
+  display: flex;
+  gap: var(--aeon-s-2);
+}
+.model-flow-code {
+  margin: var(--aeon-s-2) 0 var(--aeon-s-3);
+  color: var(--aeon-text);
+  font:
+    600 26px/1.2 ui-monospace,
+    Consolas,
+    monospace;
+  letter-spacing: 0.12em;
+}
+.model-flow-options {
+  display: grid;
+  gap: var(--aeon-s-2);
+}
+.model-flow-options button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--aeon-s-3);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-md);
+  background: none;
+  color: var(--aeon-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.model-flow-options button:hover {
+  background: var(--aeon-surface-raised);
+}
+.model-flow-options span {
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+}
+.model-flow-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aeon-s-3);
+  padding-top: var(--aeon-s-4);
+  border-top: 1px solid var(--aeon-line);
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-md);
+}
+.model-flow-foot[data-result="done"] .model-flow-result {
+  color: var(--aeon-success-soft);
+}
+.model-flow-foot[data-result="error"] .model-flow-result {
+  color: var(--aeon-danger-soft);
+}
+.model-flow-progress::before {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--aeon-s-2);
+  border-radius: 50%;
+  background: var(--aeon-muted);
+  content: "";
+  animation: aeon-pulse 1.2s ease-in-out infinite;
+}
+@keyframes aeon-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-flow-progress::before {
+    animation: none;
+  }
+}
+@media (max-width: 560px) {
+  .aeon-field-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .aeon-field-row .aeon-select {
+    width: 100%;
+  }
+}

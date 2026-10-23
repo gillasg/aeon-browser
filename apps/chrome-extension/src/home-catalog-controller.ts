@@ -22,7 +22,7 @@ export class HomeCatalogController {
 
   show(): void {
     this.open = true;
-    document.title = "All Chats · Aeon";
+    document.title = "Chats · Aeon";
     this.options.onChange();
     void this.refresh();
   }

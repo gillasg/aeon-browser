@@ -19,6 +19,7 @@ import { markActivityUndone, type ActivityEntry } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { sendComposerCommand } from "./composer-command.js";
 import { ModelSignIn } from "./model-sign-in.js";
+import { HomeModelAccounts } from "./home-model-accounts.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
@@ -40,12 +41,16 @@ let runningChatIds: ReadonlySet<string> = new Set();
 let needsChatIds: ReadonlySet<string> = new Set();
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 const modelSignIn = new ModelSignIn(
-  (request) => sendComposerCommand(client, request),
   async () => {
     await loadModelCatalog();
     return Boolean(modelCatalog?.models.length);
   },
   () => render(),
+);
+const modelAccounts = new HomeModelAccounts(
+  (request) => sendComposerCommand(client, request),
+  () => render(),
+  () => void loadModelCatalog(),
 );
 const catalog = new HomeCatalogController({
   client: () => client,
@@ -92,6 +97,7 @@ function createView() {
     modelCatalog,
     modelLogin: modelSignIn.state,
     onConnectModel: () => void modelSignIn.open(),
+    modelAccounts: modelAccounts.viewProps(),
     openChatIds,
     catalogOpen: catalog.open,
     catalogQuery: catalog.query,
@@ -152,6 +158,7 @@ async function start(): Promise<void> {
   errorMessage = "";
   connectionLabel = "Connected";
   render();
+  modelAccounts.refresh();
   await Promise.all([
     management.readPreferences(),
     refreshHome(),

@@ -7,6 +7,7 @@ test("shared UI styles reference defined Aeon design tokens", async () => {
     "../chat.css",
     "../home.css",
     "../sidepanel.css",
+    "../pages.css",
     "../../../packages/ui/src/tokens.css",
   ];
   const styles = (

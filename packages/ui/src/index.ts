@@ -11,6 +11,12 @@ export {
 export { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 export { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 export { NewTabHome, type NewTabHomeProps } from "./home-surface.js";
+export type {
+  ModelAccountsProps,
+  ModelAccountsState,
+  ModelProvider,
+  ModelSignInFlow,
+} from "./model-accounts-types.js";
 export { ManagementSurface, type ManagementSurfaceProps } from "./management-surface.js";
 export type { ManagementActionName, ManagementSection } from "./management-types.js";
 export { SidePanel, type SidePanelProps } from "./side-panel.js";

@@ -26,8 +26,7 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
   }, []);
   return (
     <section id="home-catalog" className="home-catalog" aria-labelledby="catalog-heading">
-      <div className="catalog-kicker">YOUR CHATS</div>
-      <h1 id="catalog-heading">All Chats</h1>
+      <h1 id="catalog-heading">Chats</h1>
       <CatalogSearch
         refElement={search}
         query={props.catalogQuery}
@@ -48,7 +47,7 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
       )}
       <div className="catalog-results" aria-live="polite">
         {props.catalogPending ? (
-          <p className="catalog-empty">Searching Chats…</p>
+          <p className="catalog-empty">Searching chats…</p>
         ) : props.catalogResults.length ? (
           props.catalogResults.map((chat) => (
             <CatalogRow
@@ -63,7 +62,7 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
           ))
         ) : (
           <p className="catalog-empty">
-            {props.catalogQuery.trim() ? "No matching Chats" : "No Chats yet"}
+            {props.catalogQuery.trim() ? "No chats match that search." : "No chats yet."}
           </p>
         )}
       </div>
@@ -95,9 +94,6 @@ function CatalogSearch({
           onChange={(event) => onQuery(event.target.value)}
         />
       </label>
-      <button className="catalog-filter" type="button" disabled title="No Projects yet">
-        All projects
-      </button>
     </div>
   );
 }

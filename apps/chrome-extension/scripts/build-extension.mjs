@@ -56,6 +56,7 @@ export async function buildExtension() {
     "geist-latin.woff2",
     "atmosphere.css",
     "sidebar-layout.css",
+    "pages.css",
     "atmosphere-wallpaper.png",
   ];
   await Promise.all(

@@ -1,6 +1,6 @@
 /**
  * End to end: the built extension's Chat page, a fake Core, and real Chrome. Clicking
- * "Add or manage models…" asks Core for the sign-in page and opens it in a new tab.
+ * "Add or manage models…" opens Aeon's Models page in a new tab.
  */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -29,7 +29,7 @@ const model = {
 };
 
 test(
-  "Add or manage models opens the sign-in page from a Chat",
+  "Add or manage models opens the Models page from a Chat",
   { skip: process.platform !== "win32" || !existsSync(chromePath) || !existsSync(extension) },
   async () => {
     const profile = await mkdtemp(join(tmpdir(), "aeon-model-sign-in-"));
@@ -59,9 +59,9 @@ test(
         `ws://127.0.0.1:${core.port}/aeon/v1`,
       );
       await clickManageModels(browser, sessionId);
-      await withDeadline(core.loginSeen, "Chat never asked Core for the sign-in page");
-      const opened = await waitForTarget(port, (item) => item.url.startsWith(page.url));
-      assert.equal(opened.url, page.url);
+      const models = `chrome-extension://${extensionId}/home.html?view=models`;
+      const opened = await waitForTarget(port, (item) => item.url.startsWith(models));
+      assert.equal(opened.url, models);
     } finally {
       chrome.kill();
       core.close();
@@ -328,14 +328,4 @@ function connect(url) {
           }),
       );
   });
-}
-
-function withDeadline(promise, message, timeoutMs = 20_000) {
-  let timer;
-  return Promise.race([
-    promise.finally(() => clearTimeout(timer)),
-    new Promise((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-    }),
-  ]);
 }

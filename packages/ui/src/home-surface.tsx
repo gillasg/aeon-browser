@@ -14,6 +14,8 @@ import { HomeDashboard } from "./home-dashboard.js";
 import { ActivityPanel } from "./activity-panel.js";
 import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
 import { FirstRunTour } from "./first-run-tour.js";
+import { ModelAccounts } from "./model-accounts.js";
+import type { ModelAccountsProps } from "./model-accounts-types.js";
 
 export interface NewTabHomeProps {
   developmentFixture: boolean;
@@ -29,6 +31,8 @@ export interface NewTabHomeProps {
   modelLogin?: ModelLoginState;
   /** Opens the model sign-in page (every provider Pi supports). */
   onConnectModel?(): void;
+  /** The Models tab of Settings: sign-ins, API keys and the default model. */
+  modelAccounts?: ModelAccountsProps;
   openChatIds: ReadonlySet<string>;
   catalogOpen: boolean;
   catalogQuery: string;
@@ -77,12 +81,18 @@ export interface NewTabHomeProps {
   onSidebarDefault(open: boolean): void;
 }
 
-type SettingsSection = "settings" | "resources" | "capabilities";
+type SettingsSection = "settings" | "models" | "resources" | "capabilities";
+
+/** `?view=models` is the Models tab of Settings; every other view is the top bar's. */
+function homeRoute(): { view: HomeView; settingsSection?: SettingsSection } {
+  const route = new URLSearchParams(globalThis.location?.search ?? "").get("view");
+  return route === "models"
+    ? { view: "settings", settingsSection: "models" }
+    : viewFromRoute(route);
+}
 
 export function NewTabHome(props: NewTabHomeProps): ReactElement {
-  const [route] = useState(() =>
-    viewFromRoute(new URLSearchParams(globalThis.location?.search ?? "").get("view")),
-  );
+  const [route] = useState(homeRoute);
   const [view, setView] = useState<HomeView>(route.view);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(
     route.settingsSection ?? "settings",
@@ -164,7 +174,15 @@ function HomePage({
     return (
       <>
         <SettingsTabs section={settingsSection} onSection={onSettingsSection} />
-        <Management props={props} section={settingsSection} />
+        {settingsSection === "models" ? (
+          props.modelAccounts ? (
+            <ModelAccounts {...props.modelAccounts} />
+          ) : (
+            <p className="aeon-page-empty">Models are not available here.</p>
+          )
+        ) : (
+          <Management props={props} section={settingsSection} />
+        )}
       </>
     );
   return (
@@ -189,6 +207,7 @@ function HomePage({
 
 const SETTINGS_TABS: ReadonlyArray<[SettingsSection, string]> = [
   ["settings", "General"],
+  ["models", "Models"],
   ["resources", "Skills & extensions"],
   ["capabilities", "MCPs / CLIs"],
 ];

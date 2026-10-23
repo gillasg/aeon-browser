@@ -23,7 +23,6 @@ export class ChatComposerController {
   private browserContext: PiBrowserContextRecord | null = null;
   private readonly contextAssociations = new Map<string, Promise<void>>();
   private readonly modelSignIn = new ModelSignIn(
-    (request) => this.command(request),
     async () => {
       await this.refreshControls();
       return Boolean(this.controls?.availableModels.length);
