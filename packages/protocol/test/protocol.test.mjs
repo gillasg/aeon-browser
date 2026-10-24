@@ -122,6 +122,7 @@ function prepareProtocolCase1Stage1() {
     chatId,
     title: "Test Chat",
     projectId: null,
+    origin: "user",
     pinned: false,
     archived: false,
     status: "ready",
