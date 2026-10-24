@@ -104,9 +104,10 @@
   },
   {
     "name": "site_mapper",
-    "description": "Call the API a site learned while you used it (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). Calls use the user's logins.",
+    "description": "Call the API a site learned while you used it (actions: code, sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
     "actions": [
       "sites",
+      "code",
       "operations",
       "call",
       "import",
@@ -132,6 +133,7 @@
           "type": "string",
           "enum": [
             "sites",
+            "code",
             "operations",
             "call",
             "import",
@@ -238,6 +240,31 @@
           "type": "string",
           "maxLength": 100,
           "description": "For watch: the item identifier."
+        },
+        "grep": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20
+            }
+          ],
+          "description": "For code: a string or regex to match in chunks and manifests."
+        },
+        "maxFiles": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 8000000
         }
       },
       "required": ["action"],
