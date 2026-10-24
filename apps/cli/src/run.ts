@@ -6,6 +6,8 @@ import { summarize, type ChatResult } from "./results.js";
 export interface RunOptions {
   parallel: number;
   quiet: boolean;
+  /** What started these chats: the CLI's own run, or an outside MCP agent's. */
+  origin: "cli" | "mcp";
   model?: { provider: string; id: string };
   thinkingLevel?: string;
   timeoutMs: number;
@@ -75,7 +77,10 @@ async function runOne(
 ): Promise<ChatResult> {
   const started = Date.now();
   const finished = waitForIdle(client, options.timeoutMs);
-  const created = await client.command("chat.create", { title: prompt.slice(0, 80) });
+  const created = await client.command("chat.create", {
+    title: prompt.slice(0, 80),
+    origin: options.origin,
+  });
   const chatId = String((created.chat as { chatId: string }).chatId);
   finished.track(chatId);
   options.onStarted?.(index, chatId);

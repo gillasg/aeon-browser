@@ -5,6 +5,7 @@ import {
   asChatId,
   asActivationId,
   type ChatId,
+  type ChatOrigin,
   type ChatRecord,
   type ChatStore,
   type ThreadCoordinationStore,
@@ -35,6 +36,7 @@ export class ChatThreadSupport {
   async createDraft(
     title = "New Chat",
     project?: { projectId: string; folders: string[] },
+    origin: ChatOrigin = "unknown",
   ): Promise<ChatRecord> {
     if (!project && this.prepared) {
       const pending = this.prepared;
@@ -44,7 +46,8 @@ export class ChatThreadSupport {
       const now = new Date().toISOString();
       this.store.createDraft({
         ...draft,
-        title: this.makeDraft(draft.chatId, title, null).title,
+        title: this.makeDraft(draft.chatId, title, null, origin).title,
+        origin,
         createdAt: now,
         updatedAt: now,
       });
@@ -58,7 +61,7 @@ export class ChatThreadSupport {
       );
     }
     const chatId = asChatId(randomUUID());
-    const draft = this.makeDraft(chatId, title, project?.projectId ?? null);
+    const draft = this.makeDraft(chatId, title, project?.projectId ?? null, origin);
     if (project) draft.workingDirectory = project.folders[0] ?? draft.workingDirectory;
     await mkdir(draft.workingDirectory, { recursive: true });
     return this.store.createDraft(draft);
@@ -68,7 +71,7 @@ export class ChatThreadSupport {
     if (this.closed) return Promise.resolve();
     if (!this.pi.prepareResources) return Promise.resolve();
     if (!this.prepared) {
-      const draft = this.makeDraft(asChatId(randomUUID()), "New Chat", null);
+      const draft = this.makeDraft(asChatId(randomUUID()), "New Chat", null, "unknown");
       const pending = mkdir(draft.workingDirectory, { recursive: true }).then(async () => {
         await this.pi.prepareResources?.(draft.workingDirectory);
         const session = await this.pi.openOrCreate({
@@ -116,7 +119,7 @@ export class ChatThreadSupport {
       return { intent: existing, chat: this.requireChat(existing.targetChatId) };
     }
     const sender = this.requireChat(input.senderChatId);
-    const draft = this.makeDraft(input.targetChatId, input.title, sender.projectId);
+    const draft = this.makeDraft(input.targetChatId, input.title, sender.projectId, "agent");
     if (sender.projectId) draft.workingDirectory = sender.workingDirectory;
     await mkdir(draft.workingDirectory, { recursive: true });
     const intent: ThreadCreationIntent = {
@@ -138,7 +141,7 @@ export class ChatThreadSupport {
       return existing;
     }
     const source = this.requireChat(input.sourceChatId);
-    const draft = this.makeDraft(input.targetChatId, input.title, source.projectId);
+    const draft = this.makeDraft(input.targetChatId, input.title, source.projectId, "agent");
     await mkdir(draft.workingDirectory, { recursive: true });
     return this.store.createThreadFork(input, draft);
   }
@@ -184,7 +187,12 @@ export class ChatThreadSupport {
     });
   }
 
-  private makeDraft(chatId: ChatId, title: string, projectId: string | null): ChatRecord {
+  private makeDraft(
+    chatId: ChatId,
+    title: string,
+    projectId: string | null,
+    origin: ChatOrigin,
+  ): ChatRecord {
     const normalizedTitle = title.trim();
     if (!normalizedTitle || normalizedTitle.length > 120)
       throw new Error("Chat title must be 1–120 characters.");
@@ -193,6 +201,7 @@ export class ChatThreadSupport {
       chatId,
       title: normalizedTitle,
       projectId,
+      origin,
       pinned: false,
       archived: false,
       workingDirectory: join(this.dataDirectory, "workspaces", chatId),

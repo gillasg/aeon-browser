@@ -1,9 +1,10 @@
-import { type ActivationId, type ChatId, type ChatRecord } from "@aeon/domain";
+import { type ActivationId, type ChatId, type ChatOrigin, type ChatRecord } from "@aeon/domain";
 
 export interface ChatRow {
   chat_id: string;
   title: string;
   project_id: string | null;
+  origin: ChatOrigin;
   pinned: number;
   archived: number;
   working_directory: string;
@@ -21,6 +22,7 @@ export function toChatRecord(row: ChatRow): ChatRecord {
     chatId: row.chat_id as ChatId,
     title: row.title,
     projectId: row.project_id,
+    origin: row.origin,
     pinned: row.pinned === 1,
     archived: row.archived === 1,
     workingDirectory: row.working_directory,

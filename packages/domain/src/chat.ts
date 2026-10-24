@@ -35,6 +35,33 @@ export type ActivationId = string & { readonly __activationId: unique symbol };
 
 export type ChatStatus = "draft" | "creating" | "ready" | "failed" | "unavailable";
 
+/**
+ * What started a chat: the user's own UI, the CLI, an outside MCP agent, another extension,
+ * an agent's thread tool, or a routine run. Set once, when the chat is created.
+ */
+export const CHAT_ORIGINS = [
+  "user",
+  "cli",
+  "mcp",
+  "companion",
+  "agent",
+  "routine",
+  "unknown",
+] as const;
+export type ChatOrigin = (typeof CHAT_ORIGINS)[number];
+export function isChatOrigin(value: unknown): value is ChatOrigin {
+  return typeof value === "string" && (CHAT_ORIGINS as readonly string[]).includes(value);
+}
+
+/** Which chats a listing wants, by origin and by the day they were created. */
+export interface ChatListFilter {
+  origin?: ChatOrigin;
+  /** Inclusive ISO instant. */
+  since?: string;
+  /** Exclusive ISO instant. */
+  until?: string;
+}
+
 export interface PiSessionReference {
   sessionId: string;
   sessionFile: string;
@@ -44,6 +71,7 @@ export interface ChatRecord {
   chatId: ChatId;
   title: string;
   projectId: string | null;
+  origin: ChatOrigin;
   pinned: boolean;
   archived: boolean;
   workingDirectory: string;
@@ -59,6 +87,7 @@ export interface ChatSummary {
   chatId: ChatId;
   title: string;
   projectId: string | null;
+  origin: ChatOrigin;
   pinned: boolean;
   archived: boolean;
   status: ChatStatus;

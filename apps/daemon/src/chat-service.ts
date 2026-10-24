@@ -12,7 +12,9 @@ import {
   type ChatEventCursor,
   type ChatId,
   type ChatCatalogItem,
+  type ChatListFilter,
   type ChatMetadataPatch,
+  type ChatOrigin,
   type ChatRecord,
   type ChatSummary,
   type ChatStore,
@@ -70,7 +72,9 @@ export class ChatService {
     this.projects = new ProjectService(dataDirectory);
     this.threadSupport = new ChatThreadSupport(dataDirectory, this.store, this.pi);
     this.metadata = new ChatMetadataService(this.store, this.eventHub);
-    this.reviews = new ChatReviews(dataDirectory, (limit) => this.listChats(limit, true));
+    this.reviews = new ChatReviews(dataDirectory, (limit, filter) =>
+      this.listChats(limit, true, filter),
+    );
     this.management = new ChatManagementCommands(
       (chatId) => Boolean(this.store.getChat(chatId)),
       () => this.listChats(100),
@@ -79,8 +83,16 @@ export class ChatService {
   subscribeAllEvents(listener: (chatId: ChatId, event: PiSessionEvent) => void): () => void {
     return this.eventHub.subscribeAll(listener);
   }
-  createDraft = (title = "New Chat", projectId?: string): Promise<ChatRecord> =>
-    this.threadSupport.createDraft(title, projectId ? this.projects.get(projectId) : undefined);
+  createDraft = (
+    title = "New Chat",
+    projectId?: string,
+    origin: ChatOrigin = "unknown",
+  ): Promise<ChatRecord> =>
+    this.threadSupport.createDraft(
+      title,
+      projectId ? this.projects.get(projectId) : undefined,
+      origin,
+    );
   prepareNextDraft = (): Promise<void> => this.threadSupport.prepareNextDraft();
   closePreparation = (): void => this.threadSupport.closePreparation();
   async createThreadDraft(
@@ -124,8 +136,12 @@ export class ChatService {
     return this.threadSupport.findDetachedFork(input);
   }
   getChat = (chatId: ChatId): ChatRecord | undefined => this.store.getChat(chatId);
-  listChats(limit = 50, includeArchived = false): readonly ChatSummary[] {
-    return this.store.listChats(limit, includeArchived).map(toChatSummary);
+  listChats(
+    limit = 50,
+    includeArchived = false,
+    filter: ChatListFilter = {},
+  ): readonly ChatSummary[] {
+    return this.store.listChats(limit, includeArchived, filter).map(toChatSummary);
   }
   getModelCatalog = (): Promise<PiModelCatalog> => this.pi.getModelCatalog();
   /** Opens the model sign-in page; the catalog refreshes after every sign-in or sign-out. */
@@ -162,8 +178,9 @@ export class ChatService {
     query: string,
     limit = 50,
     includeArchived = true,
+    filter: ChatListFilter = {},
   ): Promise<{ chats: readonly ChatCatalogItem[]; searchWarnings: number }> {
-    return searchChatCatalog(this.store, this.pi, query, limit, includeArchived);
+    return searchChatCatalog(this.store, this.pi, query, limit, includeArchived, filter);
   }
   deleteChat = (chatId: ChatId): Promise<void> =>
     deleteStoredChat(this.store, this.observedSessions, this.commandGate, chatId);

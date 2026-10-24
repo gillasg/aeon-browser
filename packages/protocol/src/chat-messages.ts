@@ -22,6 +22,7 @@ import {
   PiAttachmentSchema,
   ChatViewSnapshotSchema,
 } from "./chat-dto.js";
+import { ChatOriginSchema } from "./chat-catalog-dto.js";
 import { PiBrowserContextRecordSchema } from "@browserkit/protocol";
 import { BrowserTargetKeySchema } from "@browserkit/protocol";
 import {
@@ -61,6 +62,8 @@ const ChatCreateRequestSchema = z
       .object({
         title: z.string().trim().min(1).max(120).optional(),
         projectId: z.string().uuid().optional(),
+        /** Set by callers that are not the user's own UI (the CLI, MCP); defaults to user. */
+        origin: ChatOriginSchema.optional(),
         initialSubmit: ChatInitialPromptSchema.optional(),
       })
       .strict(),
@@ -76,6 +79,12 @@ const ChatListRequestSchema = z
         limit: z.number().int().min(1).max(100),
         query: z.string().trim().max(200).optional(),
         includeArchived: z.boolean().optional(),
+        /** Only chats that started this way. */
+        origin: ChatOriginSchema.optional(),
+        /** Created at or after this instant (ISO 8601). */
+        since: z.string().datetime().optional(),
+        /** Created before this instant (ISO 8601). */
+        until: z.string().datetime().optional(),
       })
       .strict(),
   })

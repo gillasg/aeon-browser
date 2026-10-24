@@ -249,13 +249,18 @@ async function sendCreated(
   request: CommandRequest,
 ): Promise<void> {
   if (request.operation !== "chat.create") return;
-  const chat = await service.createDraft(request.payload.title, request.payload.projectId);
+  const chat = await service.createDraft(
+    request.payload.title,
+    request.payload.projectId,
+    request.payload.origin ?? "user",
+  );
   completeCommand(socket, request, {
     kind: "chat.created",
     chat: {
       chatId: chat.chatId,
       title: chat.title,
       projectId: chat.projectId,
+      origin: chat.origin,
       pinned: chat.pinned,
       archived: chat.archived,
       status: chat.status,
@@ -271,10 +276,20 @@ async function sendListed(
 ): Promise<void> {
   if (request.operation !== "chat.list") return;
   const query = request.payload.query?.trim() ?? "";
+  const filter = {
+    ...(request.payload.origin ? { origin: request.payload.origin } : {}),
+    ...(request.payload.since ? { since: request.payload.since } : {}),
+    ...(request.payload.until ? { until: request.payload.until } : {}),
+  };
   const catalog = query
-    ? await service.searchChats(query, request.payload.limit, request.payload.includeArchived)
+    ? await service.searchChats(
+        query,
+        request.payload.limit,
+        request.payload.includeArchived,
+        filter,
+      )
     : {
-        chats: service.listChats(request.payload.limit, request.payload.includeArchived),
+        chats: service.listChats(request.payload.limit, request.payload.includeArchived, filter),
         searchWarnings: 0,
       };
   completeCommand(socket, request, {

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const STORE_SCHEMA_VERSION = 10;
+export const STORE_SCHEMA_VERSION = 11;
 
 export function migrate(database: Database.Database): void {
   database.exec(`
@@ -12,41 +12,61 @@ export function migrate(database: Database.Database): void {
   let current = readVersion(database);
   if (current > STORE_SCHEMA_VERSION)
     throw new Error(`Database schema ${current} is newer than this daemon supports.`);
-  if (current < 1) {
-    migrateChats(database);
-    current = 1;
+  for (const [version, step] of MIGRATIONS) {
+    if (current >= version) continue;
+    step(database);
+    current = version;
   }
-  if (current < 2) {
-    migrateChatMetadata(database);
-    current = 2;
-  }
-  if (current < 3) {
-    migrateThreadCoordination(database);
-    current = 3;
-  }
-  if (current < 4) migrateThreadForkFailure(database);
-  if (current < 5) migrateDurableWork(database);
-  if (current < 6) migrateRoutineDeletion(database);
-  if (current < 7) migrateRoutineBrowserRequirement(database);
-  if (current < 8)
-    database.transaction(() => {
-      database.exec(
-        "CREATE TABLE deleted_chats (chat_id TEXT PRIMARY KEY REFERENCES chats(chat_id), deleted_at TEXT NOT NULL);",
-      );
-      markVersion(database, 8);
-    })();
-  if (current < 9)
-    database.transaction(() => {
-      // Optional watcher check: browser code run before the routine wakes the agent.
-      database.exec("ALTER TABLE routines ADD COLUMN check_code TEXT;");
-      markVersion(database, 9);
-    })();
-  if (current < 10)
-    database.transaction(() => {
-      // Optional "only these sites" list: what a routine may use in the browser.
-      database.exec("ALTER TABLE routines ADD COLUMN sites_json TEXT;");
-      markVersion(database, 10);
-    })();
+}
+
+/** Each schema change in order; the step records its own version row. */
+const MIGRATIONS: readonly [number, (database: Database.Database) => void][] = [
+  [1, migrateChats],
+  [2, migrateChatMetadata],
+  [3, migrateThreadCoordination],
+  [4, migrateThreadForkFailure],
+  [5, migrateDurableWork],
+  [6, migrateRoutineDeletion],
+  [7, migrateRoutineBrowserRequirement],
+  [8, migrateDeletedChats],
+  [9, migrateRoutineCheck],
+  [10, migrateRoutineSites],
+  [11, migrateChatOrigin],
+];
+
+function migrateDeletedChats(database: Database.Database): void {
+  database.transaction(() => {
+    database.exec(
+      "CREATE TABLE deleted_chats (chat_id TEXT PRIMARY KEY REFERENCES chats(chat_id), deleted_at TEXT NOT NULL);",
+    );
+    markVersion(database, 8);
+  })();
+}
+
+function migrateRoutineCheck(database: Database.Database): void {
+  database.transaction(() => {
+    // Optional watcher check: browser code run before the routine wakes the agent.
+    database.exec("ALTER TABLE routines ADD COLUMN check_code TEXT;");
+    markVersion(database, 9);
+  })();
+}
+
+function migrateRoutineSites(database: Database.Database): void {
+  database.transaction(() => {
+    // Optional "only these sites" list: what a routine may use in the browser.
+    database.exec("ALTER TABLE routines ADD COLUMN sites_json TEXT;");
+    markVersion(database, 10);
+  })();
+}
+
+function migrateChatOrigin(database: Database.Database): void {
+  database.transaction(() => {
+    // What started the chat. Existing chats are unknown until the backfill proves otherwise.
+    database.exec(
+      "ALTER TABLE chats ADD COLUMN origin TEXT NOT NULL DEFAULT 'unknown' CHECK (origin IN ('user', 'cli', 'mcp', 'companion', 'agent', 'routine', 'unknown'));",
+    );
+    markVersion(database, 11);
+  })();
 }
 
 function migrateRoutineDeletion(database: Database.Database): void {
