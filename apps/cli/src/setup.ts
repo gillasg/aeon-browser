@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { activeProvider } from "@browserkit/credentials";
-import { listSites, registryRoot } from "@browserkit/tools/site-to-api";
+import { listSites, registryRoot, bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 import { has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
 import { dataDirectory } from "./client.js";
@@ -37,7 +37,7 @@ async function doctor(host: DaemonHost): Promise<number> {
     await daemonCheck(data),
     await browserCheck(host),
     await sitesCheck(),
-    await signInCheck(data),
+    await signInCheck(),
   ];
   return report(checks);
 }
@@ -95,8 +95,8 @@ async function sitesCheck(): Promise<Check> {
   };
 }
 
-async function signInCheck(data: string): Promise<Check> {
-  const provider = await activeProvider(data).catch(() => undefined);
+async function signInCheck(): Promise<Check> {
+  const provider = await activeProvider(bridgeDataDirectory()).catch(() => undefined);
   const state = provider ? await provider.status().catch((error: unknown) => String(error)) : "";
   return {
     status: state === "unlocked" ? "ok" : "warn",
