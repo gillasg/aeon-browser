@@ -13,6 +13,7 @@ import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { noteVisits, visitedUrls } from "./site-mapping.js";
 import { siteMapperRequest } from "./site-browser.js";
+import { tallyCell, writeRunLog } from "./run-log.js";
 import {
   createAeonHostHandler,
   type HostRequestContext,
@@ -65,6 +66,7 @@ export function createBrowserCodeTool(
       let steps: Record<string, unknown>[] = [];
       let progress: ToolProgress | undefined;
       const writes = new SiteWrites();
+      const files: string[] = [];
       const envelope = () => ({
         operationId,
         toolCallId,
@@ -96,6 +98,7 @@ export function createBrowserCodeTool(
               skills,
               workspace,
               writes,
+              files,
               steps: () => steps,
               report: (next) => {
                 progress = next;
@@ -110,7 +113,7 @@ export function createBrowserCodeTool(
         },
         signal,
       );
-      return browserCodeResult({ chatId, output, steps, workspace, operationId, writes });
+      return browserCodeResult({ chatId, output, steps, workspace, operationId, writes, files });
     },
   });
 }
@@ -122,6 +125,7 @@ interface CellOutput {
   output?: string;
   steps?: Record<string, unknown>[];
   reset?: boolean;
+  opened?: { tabId?: number }[];
   tabStats?: {
     opened?: number;
     closed?: number;
@@ -129,6 +133,26 @@ interface CellOutput {
     total?: number;
     popups?: number;
   };
+}
+
+/** A cell's work goes into the run's log; the result names the file it keeps growing. */
+async function cellRunLog(
+  chatId: string,
+  workspace: string | undefined,
+  files: string[],
+  cell: CellOutput,
+): Promise<string | undefined> {
+  if (!workspace) return undefined;
+  const name = tallyCell(chatId, {
+    ...(cell.tabStats ? { tabStats: cell.tabStats } : {}),
+    ...(cell.opened ? { opened: cell.opened } : {}),
+    steps: cell.steps ?? [],
+    files,
+    value: cell.value,
+    ...(cell.output ? { output: cell.output } : {}),
+  });
+  await writeRunLog(chatId, workspace).catch(() => undefined);
+  return name;
 }
 
 /** The tool result the model and the trace keep: steps, output, value and what was written. */
@@ -139,14 +163,17 @@ async function browserCodeResult(options: {
   workspace: string | undefined;
   operationId: string;
   writes: SiteWrites;
+  files: string[];
 }) {
-  const { chatId, workspace, operationId, writes } = options;
+  const { chatId, workspace, operationId, writes, files } = options;
   let { steps } = options;
   const cell = JSON.parse(options.output) as CellOutput;
   if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
   noteVisits(chatId, visitedUrls(cell.steps ?? []));
   const result = { value: cell.value, output: cell.output ?? "" };
   await journalOutput(result, workspace, operationId);
+  // The run log grows with every cell; this result names it for the model and the trace.
+  const runLog = await cellRunLog(chatId, workspace, files, cell);
   const failed = Boolean(cell.error);
   const body = {
     steps,
@@ -154,17 +181,27 @@ async function browserCodeResult(options: {
     ...(cell.reset ? { reset: true } : {}),
     ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
     ...(cell.tabStats ? { tabStats: cell.tabStats } : {}),
+    ...(runLog ? { runLog } : {}),
   };
   const actions = traceActions(cell.steps ?? []);
-  const details = {
-    ...(actions.length ? { actions } : {}),
-    ...(writes.list().length ? { writes: writes.list() } : {}),
-    ...(writes.usedApi ? { siteMapper: true } : {}),
-  };
+  const details = resultDetails(actions, writes);
   return {
     content: modelContent(body),
     isError: failed,
     details: Object.keys(details).length ? details : undefined,
+  };
+}
+
+/** What the trace keeps besides the text: the actions, the site API writes, the site that answered. */
+function resultDetails(
+  actions: ReturnType<typeof traceActions>,
+  writes: SiteWrites,
+): Record<string, unknown> {
+  const written = writes.list();
+  return {
+    ...(actions.length ? { actions } : {}),
+    ...(written.length ? { writes: written } : {}),
+    ...(writes.usedApi ? { siteMapper: true } : {}),
   };
 }
 
@@ -177,6 +214,8 @@ function cellCall(context: {
   skills: string | undefined;
   workspace: string | undefined;
   writes: SiteWrites;
+  /** Workspace files the cell wrote, for the run log. */
+  files: string[];
   steps: () => Record<string, unknown>[];
   report: (progress: ToolProgress) => void;
 }): (request: unknown) => Promise<unknown> {
@@ -197,11 +236,18 @@ function cellCall(context: {
       context.report(reported);
       return { ok: true };
     }
+    // A file the cell wrote into the workspace, noted for the run log.
+    if (isWorkspaceRequest(request) && isWorkspaceWrite(request)) context.files.push(request.name);
     const answer = host(request, requestContext);
     if (answer)
       return context.writes.track(request, rememberApiRead(context.skills, request, answer));
     return Promise.reject(new Error("UNSUPPORTED: unknown browser runtime request"));
   };
+}
+
+/** checkpoint/artifact/append write; load, loadHelper and image only read. */
+function isWorkspaceWrite(request: { workspace: string }): boolean {
+  return !["load", "loadHelper", "image"].includes(request.workspace);
 }
 
 // The model rereads this on every later call, so it gets one line per step plus the cell's own
@@ -212,6 +258,7 @@ function modelContent(body: {
   value?: unknown;
   error?: string;
   reset?: boolean;
+  runLog?: string;
   tabStats?: {
     opened?: number;
     closed?: number;
@@ -227,6 +274,7 @@ function modelContent(body: {
   if (body.error) parts.push("error: " + body.error);
   if (body.reset) parts.push("runtime reset: top-level variables are gone");
   if (body.tabStats) parts.push(tabLine(body.tabStats));
+  if (body.runLog) parts.push("run log: " + body.runLog);
   return [{ type: "text", text: parts.join("\n") }, ...images];
 }
 

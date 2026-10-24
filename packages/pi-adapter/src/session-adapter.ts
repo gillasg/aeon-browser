@@ -352,7 +352,9 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     const { session } = await timeStartupStep("agent-session-created", () =>
       createAgentSession(options),
     );
-    installBrowserSessionLifecycle(session, input.chatId, this.browserTool);
+    installBrowserSessionLifecycle(session, input.chatId, this.browserTool, {
+      workspace: input.workingDirectory,
+    });
     await setInitialModel(session, input, this.preferredInitialModel, fixture);
     const reference = sessionReferenceFromManager(manager);
     if (reference.sessionId !== input.activationId) {
