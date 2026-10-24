@@ -33,6 +33,8 @@ coverage/
 
 # Minimal public project introduction
 !/README.md
+# The Aeon skill ships with the CLI: agents install it with `aeon install`.
+!/skills/aeon/SKILL.md
 
 core-connection.json
 core-attention.json*
