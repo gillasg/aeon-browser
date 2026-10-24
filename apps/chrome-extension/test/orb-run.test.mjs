@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 async function loadRun() {
   const directory = await mkdtemp(join(tmpdir(), "aeon-orb-run-"));
@@ -278,4 +280,56 @@ test("the island's step line names the step, the site and the last path taken", 
   assert.equal(view.islandState(base), "working");
   assert.equal(view.islandState({ ...base, paused: true }), "paused");
   assert.equal(view.islandState({ run: undefined }), "compose");
+});
+
+test("the compose island has a growing text box and no orb circle", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-compose-"));
+  const outfile = join(directory, "orb-view.mjs");
+  await build({
+    entryPoints: [fileURLToPath(new URL("../src/orb/orb-view.tsx", import.meta.url))],
+    outfile,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    jsx: "automatic",
+  });
+  const view = await import(pathToFileURL(outfile).href);
+  await rm(directory, { recursive: true, force: true });
+  const noop = () => undefined;
+  const html = renderToStaticMarkup(
+    createElement(view.Island, {
+      model: {
+        host: "x.com",
+        prompt: "",
+        run: undefined,
+        notice: "",
+        busy: false,
+        watch: { state: "idle", note: "" },
+        paused: false,
+        expanded: false,
+        needsCount: 0,
+        verbs: [],
+        learning: false,
+        preview: undefined,
+      },
+      actions: {
+        submit: noop,
+        close: noop,
+        stop: noop,
+        again: noop,
+        watch: noop,
+        pin: noop,
+        openChat: noop,
+        takeOver: noop,
+        resume: noop,
+        toggleDetails: noop,
+        useVerb: noop,
+        toggleLearning: noop,
+        showPreview: noop,
+      },
+    }),
+  );
+  assert.doesNotMatch(html, /class="isl-orb"/);
+  assert.match(html, /data-state="compose"/);
+  assert.match(html, /<textarea/);
 });
