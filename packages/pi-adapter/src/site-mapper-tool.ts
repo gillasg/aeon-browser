@@ -15,6 +15,7 @@ import { boundedResult, errorResult, textResult, type ToolText } from "./site-to
 
 export const SITE_MAPPER_ACTIONS = [
   "sites",
+  "code",
   "operations",
   "call",
   "import",
