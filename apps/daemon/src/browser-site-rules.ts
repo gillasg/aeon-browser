@@ -3,7 +3,7 @@ import type { SiteRulesAnswer } from "@aeon/pi-adapter";
 // What a chat's runs must stay off, answered to the extension once per cell. The block list
 // itself lives in the extension's settings and is merged in there, so this only says:
 //   only  — the sites the routine whose own run is executing may use;
-//   allow — hosts the user typed themselves (their message, or a routine's instruction), which
+//   allow — hosts the user typed themselves in a message (never a routine), which
 //           lift a block for that run. Page content, attachments and agent-written text never do.
 
 interface ActiveRoutineRun {
@@ -28,8 +28,8 @@ export class BrowserSiteRules {
   }
 
   /**
-   * A routine's own agent run is starting: its sites restrict this run, and the instruction the
-   * user wrote is the text allowed to lift a block. The check value appended to the run's prompt
+   * A routine's own agent run is starting: its sites restrict this run. It lifts no block: the
+   * instruction may have been written by the agent, and the check value appended to the prompt
    * is page content, so it is never the source here.
    */
   beginRoutineRun(
@@ -39,7 +39,10 @@ export class BrowserSiteRules {
     sites: readonly string[],
   ): void {
     const runs = this.routineRuns.get(chatId) ?? new Map<string, ActiveRoutineRun>();
-    runs.set(runId, { only: hostsOf(sites), allow: namedHosts(instruction) });
+    // The agent can write a routine itself, so its instruction is not the user typing: a
+    // routine never lifts a block. The user unblocks the site in settings instead.
+    void instruction;
+    runs.set(runId, { only: hostsOf(sites), allow: [] });
     // A run whose end was never seen must not restrict a chat forever.
     while (runs.size > MAX_ACTIVE_RUNS) {
       const oldest = runs.keys().next().value;
