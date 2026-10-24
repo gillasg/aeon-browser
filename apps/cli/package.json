@@ -12,6 +12,8 @@
   "dependencies": {
     "@aeon/protocol": "workspace:*",
     "@browserkit/credentials": "link:../../../browserkit/packages/credentials",
+    "@browserkit/tools": "link:../../../browserkit/packages/tools",
+    "browserkit": "link:../../../browserkit/apps/bridge",
     "ws": "8.22.0"
   },
   "devDependencies": {

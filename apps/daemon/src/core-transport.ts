@@ -16,6 +16,9 @@ import type { ThreadCoordinationService } from "./thread-coordination-service.js
 import { attachDevChatCommands } from "./dev-chat-connection.js";
 import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
+import { handleBlockedSites } from "./core-blocked-sites.js";
+import { handleBrowserRun } from "./core-browser.js";
+import { handleModelComplete } from "./core-model.js";
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
 
@@ -110,6 +113,9 @@ function authenticate(
         handleAttentionMessage(socket, candidate, attention) ||
         handleOpenChat(socket, candidate, service, browser) ||
         handleSettings(socket, candidate, browser) ||
+        handleBrowserRun(socket, candidate, browser) ||
+        handleModelComplete(socket, candidate, service) ||
+        handleBlockedSites(socket, candidate, browser) ||
         handleToolRequest(socket, candidate, service),
     );
   });

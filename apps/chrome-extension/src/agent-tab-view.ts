@@ -41,6 +41,20 @@ function mirrorBlockedSites(): void {
     if (event.key === BLOCKED_SITES_KEY) push();
   });
   window.addEventListener(BLOCKED_SITES_KEY, push);
+  // `aeon block|unblock` changes the list in chrome.storage from the worker: show it in settings.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || changes[ENGINE_BLOCKED_SITES_KEY] === undefined) return;
+    const value = changes[ENGINE_BLOCKED_SITES_KEY].newValue;
+    if (!Array.isArray(value)) return;
+    const text = JSON.stringify(value.map(String));
+    try {
+      if (localStorage.getItem(BLOCKED_SITES_KEY) === text) return;
+      localStorage.setItem(BLOCKED_SITES_KEY, text);
+      window.dispatchEvent(new Event(BLOCKED_SITES_KEY));
+    } catch {
+      /* Storage may be unavailable. */
+    }
+  });
 }
 
 export function mirrorAgentTabView(): void {

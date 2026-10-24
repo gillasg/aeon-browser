@@ -19,6 +19,7 @@ import { GrantAuthority, type GrantContext } from "./grant-authority.js";
 import { BrowserControlService } from "./browser-control-service.js";
 import { handleCompanionMessage } from "./companion-requests.js";
 import { handleAgentSettingsReply } from "./agent-settings.js";
+import { handleBlockedSitesReply } from "./core-blocked-sites.js";
 
 export function attachNativeExecutor(
   socket: WebSocket,
@@ -40,6 +41,7 @@ export function attachNativeExecutor(
     if (handleInventory(socket, candidate, executor, inventories, state, browserControl)) return;
     if (browserControl.handleExecutorResult(candidate, socket)) return;
     if (handleAgentSettingsReply(candidate)) return;
+    if (handleBlockedSitesReply(candidate)) return;
     if (handleCompanionMessage(socket, candidate, { service, browserControl })) return;
     // Page grants authenticate the UI independently of browser inventory.
     const request = PageGrantIssueRequestSchema.safeParse(candidate);

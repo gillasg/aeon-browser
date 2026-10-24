@@ -38,7 +38,11 @@ import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import type { SiteRulesProvider } from "./browser-host-requests.js";
 import { createClockTool } from "./clock-tool.js";
-import { completeWithDefaultModel, siteToolModel } from "./text-completion.js";
+import {
+  completeWithDefaultModel,
+  completeWithDefaultModelTools,
+  siteToolModel,
+} from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createExtractTool } from "./extract-tool.js";
 import { createSiteMapperTool } from "./site-mapper-tool.js";
@@ -159,6 +163,14 @@ export class PiSdkSessionAdapter implements PiSessionPort {
       messages,
       choice,
     );
+  }
+
+  completeTools(context: {
+    systemPrompt: string;
+    messages: Record<string, unknown>[];
+    tools: Record<string, unknown>[];
+  }): Promise<Record<string, unknown>> {
+    return completeWithDefaultModelTools(this.completionOptions(), context);
   }
 
   getModelCatalog(): Promise<PiModelCatalog> {
@@ -330,7 +342,11 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           input.workingDirectory,
           siteToolModel(this.completionOptions()),
         ),
-        createCrawlTool(input.chatId, input.workingDirectory),
+        createCrawlTool(
+          input.chatId,
+          input.workingDirectory,
+          siteToolModel(this.completionOptions()),
+        ),
         createExtractTool(this.completionOptions(), input.workingDirectory),
       ],
     };

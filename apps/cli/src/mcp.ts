@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
+import { runMcpServer as runSiteMcpServer, siteName } from "@browserkit/tools/site-to-api";
 import { AeonClient } from "./client.js";
 import { inspect, runTasks } from "./run.js";
 import type { ChatResult } from "./results.js";
@@ -109,7 +110,9 @@ function chatIdSchema() {
   };
 }
 
-export async function runMcpServer(): Promise<void> {
+export async function runMcpServer(site?: string): Promise<void> {
+  // One mapped site as its own MCP server: one tool per operation, called with the user's logins.
+  if (site) return runSiteMcpServer(siteName(site));
   let client: AeonClient | undefined;
   const aeon = async () => (client ??= await AeonClient.connect());
   const runs = new Map<string, Run>();

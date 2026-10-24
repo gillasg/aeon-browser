@@ -123,6 +123,87 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
 ]);
 export type CoreToolRequest = z.infer<typeof CoreToolRequestSchema>;
 
+/** A local client (the Aeon CLI) runs browser code in the user's Chrome, through Core. */
+export const CoreBrowserRunRequestSchema = z
+  .object({
+    kind: z.literal("core.browser.run"),
+    requestId: z.string().uuid(),
+    code: z.string().min(1).max(16000),
+    session: z.string().min(1).max(100),
+    timeoutMs: z.number().int().min(1000).max(600000).optional(),
+  })
+  .strict();
+export const CoreBrowserRunResultSchema = z
+  .object({
+    kind: z.literal("core.browser.result"),
+    requestId: z.string().uuid(),
+    value: z.unknown().optional(),
+    output: z.string().max(200000).optional(),
+    error: z.string().max(20000).optional(),
+    detail: z.string().max(20000).optional(),
+  })
+  .strict();
+export type CoreBrowserRunRequest = z.infer<typeof CoreBrowserRunRequestSchema>;
+export type CoreBrowserRunResult = z.infer<typeof CoreBrowserRunResultSchema>;
+
+/** A local client (the Aeon CLI) uses the user's default model for a tool-calling completion. */
+export const CoreModelCompleteRequestSchema = z
+  .object({
+    kind: z.literal("core.model.complete"),
+    requestId: z.string().uuid(),
+    systemPrompt: z.string().min(1).max(20000),
+    messages: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
+    tools: z.array(z.record(z.string(), z.unknown())).max(50),
+  })
+  .strict();
+export const CoreModelCompleteResultSchema = z
+  .object({
+    kind: z.literal("core.model.result"),
+    requestId: z.string().uuid(),
+    message: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().max(20000).optional(),
+  })
+  .strict();
+export type CoreModelCompleteRequest = z.infer<typeof CoreModelCompleteRequestSchema>;
+export type CoreModelCompleteResult = z.infer<typeof CoreModelCompleteResultSchema>;
+
+/** A local client (the Aeon CLI) reads or changes the sites agents may not use. */
+export const CoreBlockedSitesRequestSchema = z
+  .object({
+    kind: z.literal("core.blocked-sites"),
+    requestId: z.string().uuid(),
+    action: z.enum(["read", "add", "remove"]),
+    site: z.string().min(1).max(200).optional(),
+  })
+  .strict();
+export const CoreBlockedSitesResultSchema = z
+  .object({
+    kind: z.literal("core.blocked-sites.result"),
+    requestId: z.string().uuid(),
+    sites: z.array(z.string().max(200)).max(2000),
+    error: z.string().max(2000).optional(),
+  })
+  .strict();
+export type CoreBlockedSitesRequest = z.infer<typeof CoreBlockedSitesRequestSchema>;
+export type CoreBlockedSitesResult = z.infer<typeof CoreBlockedSitesResultSchema>;
+/** Core asks the extension for its blocked sites, changing them first if asked. */
+export const NativeBlockedSitesRequestSchema = z
+  .object({
+    kind: z.literal("native.blocked-sites"),
+    requestId: z.string().uuid(),
+    action: z.enum(["read", "add", "remove"]),
+    site: z.string().min(1).max(200).optional(),
+  })
+  .strict();
+export const NativeBlockedSitesReplySchema = z
+  .object({
+    kind: z.literal("native.blocked-sites.result"),
+    requestId: z.string().uuid(),
+    sites: z.array(z.string().max(200)).max(2000),
+    error: z.string().max(2000).optional(),
+  })
+  .strict();
+
 /**
  * Aeon's agent settings, read or changed from outside the settings page (the Aeon CLI). Screen
  * recorders (Aperture) switch these on for a recording and restore them after; keep the names.

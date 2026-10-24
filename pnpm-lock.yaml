@@ -77,6 +77,12 @@ importers:
       "@browserkit/credentials":
         specifier: link:../../../browserkit/packages/credentials
         version: link:../../../browserkit/packages/credentials
+      "@browserkit/tools":
+        specifier: link:../../../browserkit/packages/tools
+        version: link:../../../browserkit/packages/tools
+      browserkit:
+        specifier: link:../../../browserkit/apps/bridge
+        version: link:../../../browserkit/apps/bridge
       ws:
         specifier: 8.22.0
         version: 8.22.0
