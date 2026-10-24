@@ -1,12 +1,13 @@
 import { existsSync, lstatSync, readlinkSync } from "node:fs";
-import { chmod, mkdir, rmdir, symlink, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rmdir, symlink, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // aeon install: puts an `aeon` command on the PATH and links the Aeon skill where agents look for
 // skills (~/.agents/skills, and ~/.claude/skills unless it already links there), so every agent on
-// this machine knows Aeon exists and how to use it. Safe to run again.
+// this machine knows Aeon exists and how to use it. A browserkit skill link is removed (Aeon
+// covers the same browser), never a real folder. Safe to run again.
 
 const cli = fileURLToPath(new URL("./cli.js", import.meta.url));
 const skill = resolve(dirname(cli), "..", "..", "..", "skills", "aeon");
@@ -59,6 +60,25 @@ async function linkSkill(folder: string, source: string): Promise<string | undef
   return target;
 }
 
+/** Removes a browserkit skill junction; a real folder is left alone. */
+async function removeBrowserkitSkill(folder: string): Promise<string | undefined> {
+  const target = join(folder, "browserkit");
+  const current = linkTarget(target);
+  if (current === undefined || current === target) return undefined;
+  if (!(await isBrowserkitSkill(current))) return undefined;
+  await unlink(target).catch(() => rmdir(target));
+  return target;
+}
+
+async function isBrowserkitSkill(path: string): Promise<boolean> {
+  try {
+    const skill = await readFile(join(path, "SKILL.md"), "utf8");
+    return /^---[\s\S]*?^name:\s*browserkit\s*$/m.test(skill);
+  } catch {
+    return false;
+  }
+}
+
 export async function install(): Promise<number> {
   if (!existsSync(join(skill, "SKILL.md")))
     throw new Error(`The Aeon skill is missing at ${skill}`);
@@ -70,6 +90,11 @@ export async function install(): Promise<number> {
   const claude = await linkSkill(join(homedir(), ".claude", "skills"), join(shared, "aeon"));
   for (const path of [agents, claude])
     if (path) process.stdout.write(`Linked the Aeon skill at ${path}\n`);
+  // browserkit's skill duplicates what Aeon does; a link to it would show both. Only links go.
+  for (const folder of [shared, join(homedir(), ".claude", "skills")]) {
+    const removed = await removeBrowserkitSkill(folder);
+    if (removed) process.stdout.write(`Removed the browserkit skill link at ${removed}\n`);
+  }
   process.stdout.write("Agents started from now on see the skill. Try: aeon tools\n");
   return 0;
 }

@@ -9,6 +9,7 @@ import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
 import { runMcpServer } from "./mcp.js";
 import { inspect, runTasks, type RunOptions } from "./run.js";
+import { nextDay, searchAeon } from "./search.js";
 import type { ChatResult } from "./results.js";
 import { settingsCommand } from "./settings.js";
 import { signinCommand } from "./signin.js";
@@ -163,10 +164,6 @@ function dayValue(args: Args, name: string): string | undefined {
   return value;
 }
 
-function nextDay(date: string): string {
-  return new Date(Date.parse(`${date}T00:00:00.000Z`) + 86_400_000).toISOString();
-}
-
 /** Prints a chat.list result or a chat_review list result, with each chat's origin. */
 function printChats(result: unknown, json: boolean): number {
   const value = result as {
@@ -190,6 +187,35 @@ function printChats(result: unknown, json: boolean): number {
   }
   for (const chat of chats)
     process.stdout.write(`${chat.chatId}  ${chat.origin ?? "unknown"}  ${chat.title}\n`);
+  return 0;
+}
+
+async function searchChats(host: DaemonHost, args: Args): Promise<number> {
+  const text = args.positional.join(" ").trim();
+  if (!text)
+    throw new Error(
+      'Usage: aeon search "<text>" [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]',
+    );
+  const result = await searchAeon(
+    await host.connect(),
+    text,
+    chatFilter(args),
+    Math.min(100, Number(flag(args, "limit") ?? 20)),
+  );
+  if (has(args, "json")) {
+    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+    return 0;
+  }
+  if (!result.chats.length && !result.pins.length) {
+    process.stdout.write("No chats or saved answers match.\n");
+    return 0;
+  }
+  for (const chat of result.chats)
+    process.stdout.write(
+      `${chat.chatId}  ${chat.origin ?? "unknown"}  ${chat.title}${chat.matchExcerpt ? `  — ${chat.matchExcerpt}` : ""}\n`,
+    );
+  for (const pin of result.pins)
+    process.stdout.write(`pin  ${pin.pinId}  ${pin.title}  — ${pin.value}\n`);
   return 0;
 }
 
@@ -233,6 +259,14 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       help: `Usage: aeon chats [--limit 20] [--unreviewed] [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
        origin: user | cli | mcp | companion | agent | routine | unknown`,
       run: (args) => listChats(host, args),
+    },
+    {
+      name: "search",
+      group: "Aeon",
+      summary: "search chats and saved answers",
+      help: `Usage: aeon search "<text>" [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--limit 20] [--json]
+       origin: user | cli | mcp | companion | agent | routine | unknown`,
+      run: (args) => searchChats(host, args),
     },
     {
       name: "review",
