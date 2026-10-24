@@ -1,0 +1,41 @@
+[
+  {
+    "id": "deals-price",
+    "task": "Open {{base}}/deals and tell me the price of the Phone in the table.",
+    "startUrl": "/deals",
+    "script": "const p = await browser.openTab(base + '/deals'); const rows = await p.table('table'); const facts = rows.find((row) => row.some((cell) => String(cell).includes('Phone'))); ({ facts: { price: facts[1] }, steps: ['open /deals', 'read the table'] })",
+    "expected": { "price": "699" },
+    "fixture": {
+      "direct": { "facts": { "price": "699" }, "steps": ["open /deals", "read the table"] },
+      "agent": "The Phone costs 699 in the table on the deals page."
+    }
+  },
+  {
+    "id": "late-job",
+    "task": "Open {{base}}/virtual and tell me what job 120 says. The list draws only what is on screen.",
+    "startUrl": "/virtual",
+    "script": "const p = await browser.openTab(base + '/virtual'); const rows = await p.list('[data-index]'); const row = rows.find((text) => text.includes('Job 120')); ({ facts: { row }, steps: ['open /virtual', 'list every row'] })",
+    "expected": { "row": "Job 120 Yet to apply" },
+    "fixture": {
+      "direct": {
+        "facts": { "row": "Job 120 Yet to apply" },
+        "steps": ["open /virtual", "list every row"]
+      },
+      "agent": "Job 120 says: Job 120 Yet to apply."
+    }
+  },
+  {
+    "id": "apply-form",
+    "task": "Open {{base}}/form, apply as Ada (ada@example.com), and tell me the confirmation text.",
+    "startUrl": "/form",
+    "script": "const p = await browser.openTab(base + '/form'); await p.locator('input[name=name]').fill('Ada'); await p.locator('input[name=email]').fill('ada@example.com'); await p.getByRole('button', { name: 'Send' }).click(); const result = await p.locator('#result').innerText(); ({ facts: { confirmation: result }, steps: ['open /form', 'fill the fields', 'submit'] })",
+    "expected": { "confirmation": "Thanks Ada" },
+    "fixture": {
+      "direct": {
+        "facts": { "confirmation": "Thanks Ada" },
+        "steps": ["open /form", "fill the fields", "submit"]
+      },
+      "agent": "The confirmation says: Thanks Ada."
+    }
+  }
+]
