@@ -33,7 +33,12 @@ export function HomeDashboard(props: HomeDashboardProps): ReactElement {
   );
   // Waiting on you sorts first.
   live.sort((left, right) => Number(needs.has(right.chatId)) - Number(needs.has(left.chatId)));
-  const recent = props.chats.filter((chat) => !live.includes(chat)).slice(0, 8);
+  // Pinned chats stay on home above the latest ones.
+  const rest = props.chats.filter((chat) => !live.includes(chat));
+  const recent = [
+    ...rest.filter((chat) => chat.pinned),
+    ...rest.filter((chat) => !chat.pinned).slice(0, 5),
+  ];
   return (
     <div className="home-dashboard">
       <LiveRuns
