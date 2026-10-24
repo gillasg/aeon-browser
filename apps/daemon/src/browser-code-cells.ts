@@ -43,8 +43,14 @@ export class BrowserCodeCells {
           socket.send(JSON.stringify({ kind: "browser.code.cancel", cellId, reset }));
       };
       const expire = () => {
-        cancel(true);
-        finish(undefined, new Error("Browser code exceeded its deadline; runtime reset"));
+        // Only this cell fails: its variables and tabs stay for the next cell.
+        cancel(false);
+        finish(
+          undefined,
+          new Error(
+            "Browser code exceeded its deadline; that cell stopped, and its variables and tabs are still there.",
+          ),
+        );
       };
       let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(
         expire,
