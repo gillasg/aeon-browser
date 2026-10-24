@@ -16,4 +16,8 @@ export interface ManagementSurfaceProps {
   onAction(chatId: string, action: ManagementActionName, input: Record<string, unknown>): void;
   onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
   onSidebarDefault(open: boolean): void;
+  /** The shared blocked-sites list, loaded from the daemon. */
+  blockedSites?: readonly string[];
+  onBlockedSiteAdd?(site: string): void;
+  onBlockedSiteRemove?(site: string): void;
 }

@@ -31,6 +31,7 @@ import { applyStoredTheme } from "./theme-preferences.js";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { HomeCatalogController } from "./home-catalog-controller.js";
+import { HomeBlockedSites } from "./home-blocked-sites.js";
 import { HomeManagementController } from "./home-management-controller.js";
 import { createManagementClient } from "./management-client.js";
 
@@ -73,6 +74,11 @@ const management = new HomeManagementController(
   (chatId) => void openChat(chatId),
   createManagementClient(__AEON_NATIVE_TRANSPORT__, () => client),
 );
+const blockedSites = new HomeBlockedSites({
+  client: () => client,
+  onChange: render,
+  onError: showError,
+});
 
 /** Reverses an API write from Activity, one item at a time, through its learned reverse. */
 async function undoActivity(entry: ActivityEntry): Promise<void> {
@@ -134,6 +140,9 @@ function createView() {
     onArchive: (chat: ChatCatalogItemDto) => void catalog.toggleArchived(chat),
     onDelete: (chat: ChatCatalogItemDto) => void catalog.deleteChat(chat),
     onRename: (chat: ChatCatalogItemDto) => void catalog.rename(chat),
+    blockedSites: blockedSites.sites,
+    onBlockedSiteAdd: (site: string) => void blockedSites.add(site),
+    onBlockedSiteRemove: (site: string) => void blockedSites.remove(site),
     ...management.viewProps(),
   });
 }
@@ -178,6 +187,7 @@ async function start(): Promise<void> {
     refreshHome(),
     loadModelCatalog(),
     management.loadForHome(),
+    blockedSites.load(),
   ]);
   const selectedChat = new URL(location.href).searchParams.get("chatId");
   if (selectedChat) management.viewProps().onManagementSelectChat(selectedChat);

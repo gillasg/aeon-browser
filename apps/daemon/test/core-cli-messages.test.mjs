@@ -22,6 +22,8 @@ const ORIGIN = "chrome-extension://npcdopokfkpfmepknhoecppgdgmkmihh";
 
 test("browser code, the model and the blocked-sites list answer over Core", async () => {
   const directory = await mkdtemp(join(tmpdir(), "aeon-core-cli-"));
+  const previousHome = process.env.BROWSERKIT_HOME;
+  process.env.BROWSERKIT_HOME = join(directory, "browserkit");
   const store = openChatStore(directory);
   const pi = new FakePiPort();
   pi.completeTools = async () => ({
@@ -44,7 +46,8 @@ test("browser code, the model and the blocked-sites list answer over Core", asyn
 
     const blocked = await blockedSites(executor, core);
     assert.deepEqual(blocked.sites, ["bank.example"]);
-    assert.equal(blocked.site, "bank.example");
+    assert.equal(blocked.pushed.action, "replace");
+    assert.deepEqual(blocked.pushed.sites, ["bank.example"]);
 
     const message = await modelReply(core);
     assert.equal(message.content[0].text, "done");
@@ -57,6 +60,8 @@ test("browser code, the model and the blocked-sites list answer over Core", asyn
     await attention.close();
     service.projects.close();
     store.close();
+    if (previousHome === undefined) delete process.env.BROWSERKIT_HOME;
+    else process.env.BROWSERKIT_HOME = previousHome;
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -145,16 +150,9 @@ async function blockedSites(executor, core) {
     }),
   );
   await until(() => executor.history.some((item) => item.kind === "native.blocked-sites"));
-  const ask = executor.history.find((item) => item.kind === "native.blocked-sites");
-  executor.socket.send(
-    JSON.stringify({
-      kind: "native.blocked-sites.result",
-      requestId: ask.requestId,
-      sites: ["bank.example"],
-    }),
-  );
+  const pushed = executor.history.find((item) => item.kind === "native.blocked-sites");
   await until(() => core.history.some((item) => item.requestId === requestId));
-  return { ...core.history.find((item) => item.requestId === requestId), site: ask.site };
+  return { ...core.history.find((item) => item.requestId === requestId), pushed };
 }
 
 async function modelReply(core) {

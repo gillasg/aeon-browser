@@ -28,10 +28,16 @@ function mirrorBlockedSites(): void {
   void chrome.storage.local.get(ENGINE_BLOCKED_SITES_KEY).then((stored) => {
     const value = stored[ENGINE_BLOCKED_SITES_KEY];
     try {
-      if (Array.isArray(value) && localStorage.getItem(BLOCKED_SITES_KEY) === null) {
-        localStorage.setItem(BLOCKED_SITES_KEY, JSON.stringify(value));
-        window.dispatchEvent(new Event(BLOCKED_SITES_KEY));
-      }
+      // One list after the move to browserkit's site-rules.json: keep what either side had.
+      const local = JSON.parse(localStorage.getItem(BLOCKED_SITES_KEY) ?? "[]") as unknown;
+      const merged = [
+        ...new Set([
+          ...(Array.isArray(value) ? value.map(String) : []),
+          ...(Array.isArray(local) ? local.map(String) : []),
+        ]),
+      ].sort();
+      localStorage.setItem(BLOCKED_SITES_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new Event(BLOCKED_SITES_KEY));
     } catch {
       /* Storage may be unavailable. */
     }

@@ -14,7 +14,7 @@ import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { noteVisits, visitedUrls } from "./site-mapping.js";
 import { siteMapperRequest } from "./site-browser.js";
 import {
-  hostRequest,
+  createAeonHostHandler,
   type HostRequestContext,
   type SiteRulesProvider,
 } from "./browser-host-requests.js";
@@ -22,10 +22,10 @@ import {
 const CELL_TIMEOUT_MS = 60_000;
 
 export interface BrowserCodeOptions {
-  /** Aeon's data folder, for the password manager and the site rules. */
-  dataDirectory?: string;
   /** Which sites this chat's runs must stay off, answered by the daemon. */
   siteRules?: SiteRulesProvider;
+  /** A chat by default; an outside MCP session says so (no typed-user lift). */
+  source?: "chat" | "external";
 }
 
 export function createBrowserTools(
@@ -48,12 +48,6 @@ export function createBrowserCodeTool(
   skills?: string,
   options?: BrowserCodeOptions,
 ): ReturnType<typeof defineTool> {
-  const hostContext: HostRequestContext | undefined = options?.dataDirectory
-    ? {
-        dataDirectory: options.dataDirectory,
-        ...(options.siteRules ? { siteRules: options.siteRules } : {}),
-      }
-    : undefined;
   return defineTool({
     name: "browser_code",
     label: "Browser workflow",
@@ -97,7 +91,8 @@ export function createBrowserCodeTool(
             timeoutMs: CELL_TIMEOUT_MS,
             onCall: cellCall({
               chatId,
-              host: hostContext,
+              source: options?.source ?? "chat",
+              ...(options?.siteRules ? { siteRules: options.siteRules } : {}),
               skills,
               workspace,
               writes,
@@ -165,29 +160,39 @@ async function browserCodeResult(options: {
   };
 }
 
-// What a running cell may ask this side for. Passwords and site rules come from the machine and
-// are answered before anything else; none of those answers is a step, a result or a log line.
+// What a running cell may ask this side for. Credentials and site rules go through browserkit's
+// one host handler; Aeon adds its own storage through extra. No answer there is a step or a log.
 function cellCall(context: {
   chatId: string;
-  host: HostRequestContext | undefined;
+  source: "chat" | "external";
+  siteRules?: SiteRulesProvider;
   skills: string | undefined;
   workspace: string | undefined;
   writes: SiteWrites;
   steps: () => Record<string, unknown>[];
   report: (progress: ToolProgress) => void;
 }): (request: unknown) => Promise<unknown> {
-  return (request) => {
+  const host = createAeonHostHandler({
+    source: context.source,
+    ...(context.siteRules ? { siteRules: context.siteRules } : {}),
+    siteMapper: (request) => siteMapperRequest(context.chatId, request),
+    extra: (request) => serveCall(request, context.workspace, context.steps(), context.skills),
+  });
+  const requestContext: HostRequestContext = {
+    source: context.source,
+    scope: context.chatId,
+    ...(context.workspace ? { workspace: context.workspace } : {}),
+  };
+  return async (request) => {
     const reported = progressRequest(request);
     if (reported) {
       context.report(reported);
-      return Promise.resolve({ ok: true });
+      return { ok: true };
     }
-    const answer = context.host ? hostRequest(context.chatId, request, context.host) : undefined;
-    if (answer) return answer;
-    const site = siteMapperRequest(context.chatId, request);
-    return site
-      ? rememberApiRead(context.skills, request, context.writes.track(request, site))
-      : serveCall(request, context.workspace, context.steps(), context.skills);
+    const answer = host(request, requestContext);
+    if (answer)
+      return context.writes.track(request, rememberApiRead(context.skills, request, answer));
+    return Promise.reject(new Error("UNSUPPORTED: unknown browser runtime request"));
   };
 }
 

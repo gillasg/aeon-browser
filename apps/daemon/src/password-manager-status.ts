@@ -1,4 +1,5 @@
 import { activeProvider, providerFor, readConfig } from "@browserkit/credentials";
+import { bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 
 // Which password manager answers Aeon's sign-in requests, and whether it is unlocked. Only the
 // provider's name and state leave this module: never a session key, a password or an item.
@@ -15,9 +16,9 @@ let cached: { at: number; value: PasswordManagerStatus } | undefined;
 let pending: Promise<PasswordManagerStatus> | undefined;
 
 /** Cached for a minute: reading settings must not spawn a password-manager CLI every time. */
-export function readPasswordManagerStatus(directory: string): Promise<PasswordManagerStatus> {
+export function readPasswordManagerStatus(): Promise<PasswordManagerStatus> {
   if (cached && Date.now() - cached.at < TTL_MS) return Promise.resolve(cached.value);
-  pending ??= probe(directory)
+  pending ??= probe()
     .catch((): PasswordManagerStatus => ({ provider: null, state: "unavailable" }))
     .then((value) => {
       cached = { at: Date.now(), value };
@@ -29,7 +30,8 @@ export function readPasswordManagerStatus(directory: string): Promise<PasswordMa
   return pending;
 }
 
-async function probe(directory: string): Promise<PasswordManagerStatus> {
+async function probe(): Promise<PasswordManagerStatus> {
+  const directory = bridgeDataDirectory();
   const config = await readConfig(directory);
   if (!config.provider) {
     // Nothing chosen yet: report the one that answers by itself, if any.

@@ -19,6 +19,11 @@ export type {
   ModelSignInFlow,
 } from "./model-accounts-types.js";
 export { ManagementSurface, type ManagementSurfaceProps } from "./management-surface.js";
+export {
+  BlockedSitesSettings,
+  blockedSitesKey,
+  readBlockedSites,
+} from "./blocked-sites-settings.js";
 export type { ManagementActionName, ManagementSection } from "./management-types.js";
 export { SidePanel, type SidePanelProps } from "./side-panel.js";
 export { TranscriptModel, type TranscriptRow } from "./transcript-model.js";

@@ -2,7 +2,7 @@ export { PiSdkSessionAdapter } from "./session-adapter.js";
 export { resolvePiAgentDirectory } from "./session-adapter.js";
 export { siteMapperRequest, sessionChatId } from "./site-browser.js";
 export {
-  hostRequest,
+  createAeonHostHandler,
   type SiteRulesAnswer,
   type SiteRulesProvider,
 } from "./browser-host-requests.js";

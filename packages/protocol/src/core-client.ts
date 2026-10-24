@@ -191,8 +191,10 @@ export const NativeBlockedSitesRequestSchema = z
   .object({
     kind: z.literal("native.blocked-sites"),
     requestId: z.string().uuid(),
-    action: z.enum(["read", "add", "remove"]),
+    action: z.enum(["read", "add", "remove", "replace"]),
     site: z.string().min(1).max(200).optional(),
+    /** replace: the whole list, as browserkit's site-rules.json has it. */
+    sites: z.array(z.string().max(200)).max(2000).optional(),
   })
   .strict();
 export const NativeBlockedSitesReplySchema = z

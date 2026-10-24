@@ -19,6 +19,7 @@ import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
 import { readEnvironment } from "./environment.js";
 import { backfillChatOrigins } from "./chat-origin-backfill.js";
+import { migrateAeonSettings } from "./settings-migration.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -55,7 +56,7 @@ export function createProductionRuntime(dataDirectory: string): {
   configureSiteRequests(dataRoot);
   const pins = new PinnedResults(dataRoot);
   const threadCoordination = new ThreadCoordinationService(service, store);
-  const routines = new RoutineScheduler(store, service, browserControl, dataRoot);
+  const routines = new RoutineScheduler(store, service, browserControl);
   routines.onAlert = (chatId, title, message) => attention.alert(chatId, title, message);
   routines.onCheck = (routine, check) => void pins.recordCheck(routine, check);
   const capabilityTools = new CapabilityToolService(
@@ -153,7 +154,7 @@ async function readManagementSnapshot(
     capabilities,
     resources,
     resourceError,
-    signIn: await readPasswordManagerStatus(dataDirectory),
+    signIn: await readPasswordManagerStatus(),
   };
 }
 
@@ -187,6 +188,7 @@ async function initializeRuntime(
   store: ReturnType<typeof openChatStore>,
   dataRoot: string,
 ): Promise<void> {
+  await migrateAeonSettings(dataRoot);
   await backfillChatOrigins(store, dataRoot);
   await registry.initialize();
   await migration.migrate(await registry.snapshot());

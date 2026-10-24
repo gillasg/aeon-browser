@@ -52,9 +52,7 @@ function toolsFor(
   return {
     // An outside agent signs in the same way a chat does; it has no routines, so its runs never
     // carry an "only these sites" list. Credentials and rules answers still never reach a result.
-    browser_code: createBrowserCodeTool(chatId, run, workspace, skills, {
-      dataDirectory: resolve(options.sessionDirectory, ".."),
-    }),
+    browser_code: createBrowserCodeTool(chatId, run, workspace, skills, { source: "external" }),
     crawl: createCrawlTool(chatId, workspace, siteToolModel(options)),
     site_mapper: createSiteMapperTool(chatId, workspace, siteToolModel(options)),
     extract: createExtractTool(options, workspace),

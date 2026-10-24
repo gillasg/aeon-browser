@@ -82,6 +82,10 @@ export interface NewTabHomeProps {
     action: ManagementActionName,
     input: Record<string, unknown>,
   ): void;
+  /** The shared blocked-sites list (browserkit's site-rules.json), loaded through the daemon. */
+  blockedSites?: readonly string[];
+  onBlockedSiteAdd?(site: string): void;
+  onBlockedSiteRemove?(site: string): void;
   onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
   onSidebarDefault(open: boolean): void;
 }
@@ -349,6 +353,9 @@ function Management({
       onAction={props.onManagementAction}
       onTheme={props.onTheme}
       onSidebarDefault={props.onSidebarDefault}
+      {...(props.blockedSites ? { blockedSites: props.blockedSites } : {})}
+      {...(props.onBlockedSiteAdd ? { onBlockedSiteAdd: props.onBlockedSiteAdd } : {})}
+      {...(props.onBlockedSiteRemove ? { onBlockedSiteRemove: props.onBlockedSiteRemove } : {})}
     />
   );
 }
