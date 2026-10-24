@@ -34,12 +34,13 @@ test("turning it on returns titles and URLs of web tabs only", async (t) => {
   await writeOutsideContext(directory, true);
   assert.equal(await readOutsideContext(directory), true);
   const answer = await outsideContextAnswer(directory, async () => [
-    { title: "Inbox", url: "https://mail.example/", active: false },
-    { title: "Aeon", url: "chrome-extension://abc/sidepanel.html", active: true },
+    { title: "Inbox", url: "https://mail.example/", active: true },
+    { title: "Aeon", url: "chrome-extension://abc/sidepanel.html", active: false },
     { title: "New tab", url: "chrome://newtab/", active: false },
   ]);
   assert.equal(answer.enabled, true);
-  assert.deepEqual(answer.tabs, [{ title: "Inbox", url: "https://mail.example/", active: false }]);
+  assert.deepEqual(answer.tabs, [{ title: "Inbox", url: "https://mail.example/", active: true }]);
+  assert.deepEqual(answer.activeTab, answer.tabs[0]);
 });
 
 test("the daemon answers context and routine as external tools", async (t) => {

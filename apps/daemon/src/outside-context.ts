@@ -39,7 +39,7 @@ export async function writeOutsideContext(directory: string, enabled: boolean): 
 export async function outsideContextAnswer(
   directory: string,
   tabs: () => Promise<OutsideTab[]>,
-): Promise<{ enabled: boolean; tabs: OutsideTab[]; hint?: string }> {
+): Promise<{ enabled: boolean; tabs: OutsideTab[]; activeTab?: OutsideTab | null; hint?: string }> {
   if (!(await readOutsideContext(directory)))
     return {
       enabled: false,
@@ -54,5 +54,5 @@ export async function outsideContextAnswer(
     }))
     .filter((tab) => /^https?:\/\//i.test(tab.url))
     .slice(0, 100);
-  return { enabled: true, tabs: open };
+  return { enabled: true, tabs: open, activeTab: open.find((tab) => tab.active) ?? null };
 }
