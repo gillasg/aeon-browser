@@ -75,6 +75,11 @@ export class TranscriptModel {
   }
 
   apply(event: PiSessionEventDto): void {
+    this.applyAt(event, Date.now());
+  }
+
+  /** Applies one event with an explicit clock, so tests can control a turn's span. */
+  applyAt(event: PiSessionEventDto, now: number): void {
     if (event.kind === "view-replaced") {
       this.setSnapshot(event.entries);
       return;
@@ -108,7 +113,7 @@ export class TranscriptModel {
         changeDiff: event.changeDiff,
         ...pathAndDuration(event),
       });
-    updateTurnTiming(this.rows, event);
+    updateTurnTiming(this.rows, event, now);
     this.rows = [...this.rows];
   }
 

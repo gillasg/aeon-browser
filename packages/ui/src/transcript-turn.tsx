@@ -22,21 +22,17 @@ export function transcriptTurns(rows: readonly TranscriptRow[]): TranscriptRow[]
 export function TranscriptTurn({
   rows,
   actions,
+  live = false,
 }: {
   rows: readonly TranscriptRow[];
   actions: TranscriptActions;
+  /** The turn currently running; only it may tick. Earlier turns keep their duration. */
+  live?: boolean;
 }): ReactElement {
-  const state = turnState(rows);
+  const state = turnState(rows, live);
   const outer = useRef<HTMLDetailsElement>(null);
   const now = useTurnClock(state.active, outer);
   if (!state.hasWork) return <>{rows.map((row) => renderRow(row, actions))}</>;
-  const end = state.timing
-    ? state.timing.finished
-      ? state.timing.lastTokenAt
-      : now
-    : state.active
-      ? now
-      : undefined;
   return (
     <>
       {state.before.map((row) => renderRow(row, actions))}
@@ -48,7 +44,8 @@ export function TranscriptTurn({
       >
         <summary>
           <span className="activity-duration">
-            {state.active ? "Working" : "Worked"} for {duration(rows, state.steps, end)}
+            {state.active ? "Working" : "Worked"} for{" "}
+            {formatSeconds(secondsOf(rows, state.steps, state.active ? now : undefined))}
           </span>
           <DisclosureChevron />
         </summary>
@@ -66,13 +63,16 @@ export function TranscriptTurn({
     </>
   );
 }
-function turnState(rows: readonly TranscriptRow[]) {
+function turnState(rows: readonly TranscriptRow[], live: boolean) {
   const steps = rows.flatMap((row) => (row.kind === "tool-group" ? row.group.steps : []));
   const streaming = rows.some(
     (row) => row.kind === "transient" && row.message.role === "assistant",
   );
   const timing = rows.find((row) => row.timing)?.timing;
+  // Only the turn that is running now ticks. An earlier turn stays fixed even if its run's
+  // last events arrived after the next prompt was already queued.
   const active =
+    live &&
     !timing?.finished &&
     (Boolean(timing) || streaming || steps.some((step) => step.state === "running"));
   const userIndex = rows.findIndex(
@@ -143,15 +143,16 @@ function renderRow(
     return <ChatActivityGroup key={row.key} group={row.group} aggregateOnly />;
   return <TranscriptMessage key={row.key} row={row} hideThinking={hideThinking} {...actions} />;
 }
-function duration(
+/** The turn's own span: its start, and its last event unless it is still running. */
+function secondsOf(
   rows: readonly TranscriptRow[],
   steps: readonly ToolStep[],
   now?: number,
-): string {
+): number {
   const timing = rows.find((row) => row.timing)?.timing;
   const timestamps = rows.flatMap((row) =>
     row.kind === "entry" && row.entry.message?.role === "assistant"
-      ? [Date.parse(row.entry.timestamp)]
+      ? [Date.parse(row.entry.timestamp)].filter(Number.isFinite)
       : [],
   );
   const start =
@@ -159,13 +160,30 @@ function duration(
   const end =
     now ??
     Math.max(
+      timing?.lastTokenAt ?? 0,
       ...timestamps,
       ...steps.map((step) => step.endedAt ?? step.lastActivityAt ?? step.startedAt),
     );
-  const seconds = Math.max(0, Math.floor((end - start) / 1000) || 0);
+  return Math.max(0, Math.floor((end - start) / 1000) || 0);
+}
+
+function formatSeconds(seconds: number): string {
   return seconds < 60
     ? `${seconds}s`
     : `${Math.floor(seconds / 60)}m${seconds % 60 ? ` ${seconds % 60}s` : ""}`;
+}
+
+/** A turn's header for tests: whether it is ticking, and the seconds it shows. */
+export function turnSummary(
+  rows: readonly TranscriptRow[],
+  live: boolean,
+  now: number,
+): { active: boolean; seconds: number } {
+  const state = turnState(rows, live);
+  return {
+    active: state.active,
+    seconds: secondsOf(rows, state.steps, state.active ? now : undefined),
+  };
 }
 function useTurnClock(active: boolean, outer: React.RefObject<HTMLDetailsElement | null>): number {
   const initialized = useRef(false);

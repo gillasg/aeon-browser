@@ -49,8 +49,13 @@ export function ChatTranscript({
         aria-live="polite"
         onScroll={updateScrollState}
       >
-        {transcriptTurns(rows).map((turn) => (
-          <TranscriptTurn key={turn[0]?.key} rows={turn} actions={actions} />
+        {transcriptTurns(rows).map((turn, index, turns) => (
+          <TranscriptTurn
+            key={turn[0]?.key}
+            rows={turn}
+            actions={actions}
+            live={Boolean(running) && index === turns.length - 1}
+          />
         ))}
         <TranscriptTail
           rows={rows}
