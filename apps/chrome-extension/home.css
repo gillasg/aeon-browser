@@ -1826,66 +1826,28 @@ body[data-embedded="true"] .home-top-bar {
   --core-b: #ff7a59;
   --core-speed: 1.8s;
 }
-.home-core-orb {
+.home-core {
   position: relative;
-  width: 132px;
-  height: 132px;
-  margin-bottom: var(--aeon-s-4);
 }
-.home-core-orb > span {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
+.home-core > .mini-swarm {
+  position: relative;
 }
 .home-core-halo {
-  inset: -38px !important;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  border-radius: 50%;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--core-a) 34%, transparent) 0%,
+    color-mix(in srgb, var(--core-a) 30%, transparent) 0%,
     transparent 68%
   );
-  filter: blur(8px);
+  filter: blur(10px);
+  pointer-events: none;
   animation: home-core-breathe var(--core-speed) ease-in-out infinite;
-}
-.home-core-nucleus {
-  inset: 30px !important;
-  background:
-    radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.85), transparent 28%),
-    radial-gradient(circle at 60% 65%, var(--core-b), transparent 70%), var(--core-a);
-  box-shadow:
-    0 0 40px color-mix(in srgb, var(--core-a) 70%, transparent),
-    inset 0 0 18px rgb(0 0 0 / 0.35);
-  animation: home-core-pulse var(--core-speed) ease-in-out infinite;
-}
-.home-core-ring {
-  inset: 14px !important;
-  border: 1px solid color-mix(in srgb, var(--core-a) 55%, transparent);
-  border-top-color: transparent;
-  border-left-color: transparent;
-  animation: home-core-spin calc(var(--core-speed) * 2.2) linear infinite;
-}
-.home-core-ring-outer {
-  inset: 0 !important;
-  border-color: color-mix(in srgb, var(--core-b) 35%, transparent);
-  border-right-color: transparent;
-  border-bottom-color: transparent;
-  animation-duration: calc(var(--core-speed) * 3.6);
-  animation-direction: reverse;
-}
-.home-core-greeting {
-  margin: 0;
-  color: var(--aeon-text);
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}
-.home-core-status {
-  margin: 0;
-  color: var(--aeon-muted);
-  font-size: 15px;
-}
-.home-core[data-mode="needs"] .home-core-status {
-  color: var(--aeon-needs);
 }
 @keyframes home-core-breathe {
   0%,
@@ -2059,8 +2021,11 @@ body[data-embedded="true"] .home-top-bar {
   font-variant-numeric: tabular-nums;
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-core-orb > span,
+  .home-core-halo,
   .home-live-badge::before {
     animation: none;
   }
+}
+.home-recent-row[data-pinned="true"] {
+  color: var(--aeon-text);
 }

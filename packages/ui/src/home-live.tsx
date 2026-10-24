@@ -97,17 +97,20 @@ export function RecentChats({
         </button>
       </div>
       <ul className="home-recent-list" id="recent-chats">
-        {chats.slice(0, 5).map((chat) => (
+        {chats.map((chat) => (
           <li key={chat.chatId}>
             <button
               type="button"
               className="home-recent-row"
               data-open={String(openChatIds.has(chat.chatId))}
+              data-pinned={String(chat.pinned)}
               title={openChatIds.has(chat.chatId) ? `${chat.title} · open in a tab` : chat.title}
               onClick={() => onOpenChat(chat.chatId)}
             >
               <span className="home-recent-title">{chat.title}</span>
-              <span className="home-recent-time">{ago(chat.updatedAt)}</span>
+              <span className="home-recent-time">
+                {chat.pinned ? "Pinned" : ago(chat.updatedAt)}
+              </span>
             </button>
           </li>
         ))}
