@@ -6,15 +6,19 @@ import {
   NativeBlockedSitesRequestSchema,
 } from "@aeon/protocol";
 import { WebSocket } from "ws";
+import {
+  addBlockedSite,
+  readBlockedSites,
+  removeBlockedSite,
+  siteName,
+} from "@browserkit/tools/host";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { messageOf } from "./core-browser.js";
 
-// `aeon block|unblock|blocked`: the list lives in the extension (settings → Blocked sites), so
-// Core relays reads and changes to every connected Chrome, exactly like `aeon settings`. Only the
-// user runs these commands; no chat tool or agent-written code reaches this message.
-
-const TIMEOUT_MS = 5000;
-const waiting = new Map<string, (answer: { sites: string[]; error?: string }) => void>();
+// `aeon block|unblock|blocked`: one list, in browserkit's home (site-rules.json), owned by this
+// daemon. Changes are pushed to every connected Chrome so the engine's own chrome.storage
+// fallback stays the same list. Only the user runs these commands; no chat tool reaches this.
+// A site the user names in a request does not lift a block here: browserkit has no such lift.
 
 export function handleBlockedSites(
   socket: WebSocket,
@@ -24,17 +28,16 @@ export function handleBlockedSites(
   const request = CoreBlockedSitesRequestSchema.safeParse(candidate);
   if (!request.success) return false;
   const { requestId, action, site } = request.data;
-  void relay(browser.executorSockets(), { action, ...(site ? { site } : {}) }).then(
-    (answers) => {
-      const failure = answers.find((answer) => answer.error);
+  void apply(action, site).then(
+    (sites) => {
+      pushToExtensions(browser.executorSockets(), sites);
       if (socket.readyState !== WebSocket.OPEN) return;
       socket.send(
         JSON.stringify(
           CoreBlockedSitesResultSchema.parse({
             kind: "core.blocked-sites.result",
             requestId,
-            sites: merge(answers),
-            ...(failure?.error ? { error: failure.error } : {}),
+            sites,
           }),
         ),
       );
@@ -56,50 +59,36 @@ export function handleBlockedSites(
   return true;
 }
 
-/** The extension's answer to a relayed request (one per connected Chrome). */
-export function handleBlockedSitesReply(candidate: unknown): boolean {
-  const reply = NativeBlockedSitesReplySchema.safeParse(candidate);
-  if (!reply.success) return false;
-  waiting.get(reply.data.requestId)?.({
-    sites: reply.data.sites,
-    ...(reply.data.error ? { error: reply.data.error } : {}),
-  });
-  return true;
+async function apply(
+  action: "read" | "add" | "remove",
+  siteInput: string | undefined,
+): Promise<string[]> {
+  if (action === "read") return readBlockedSites();
+  const site = siteName(siteInput ?? "");
+  if (!site) throw new Error(`Not a site: ${siteInput ?? ""}`);
+  const changed = action === "add" ? await addBlockedSite(site) : await removeBlockedSite(site);
+  if (!changed) throw new Error(`Not a site: ${site}`);
+  return readBlockedSites();
 }
 
-async function relay(
-  sockets: WebSocket[],
-  body: { action: "read" | "add" | "remove"; site?: string },
-): Promise<{ sites: string[]; error?: string }[]> {
-  const open = sockets.filter((socket) => socket.readyState === WebSocket.OPEN);
-  if (!open.length) throw new Error("No connected Chrome has Aeon loaded.");
-  return Promise.all(open.map((socket) => ask(socket, body)));
-}
-
-function ask(
-  socket: WebSocket,
-  body: { action: "read" | "add" | "remove"; site?: string },
-): Promise<{ sites: string[]; error?: string }> {
-  const requestId = randomUUID();
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      waiting.delete(requestId);
-      resolve({ sites: [], error: "Chrome did not answer; reload Aeon and retry." });
-    }, TIMEOUT_MS);
-    waiting.set(requestId, (answer) => {
-      clearTimeout(timer);
-      waiting.delete(requestId);
-      resolve(answer);
-    });
+/** The extension's copy (chrome.storage) follows the file; the siteRules answer is the source. */
+function pushToExtensions(sockets: WebSocket[], sites: string[]): void {
+  for (const socket of sockets) {
+    if (socket.readyState !== WebSocket.OPEN) continue;
     socket.send(
       JSON.stringify(
-        NativeBlockedSitesRequestSchema.parse({ kind: "native.blocked-sites", requestId, ...body }),
+        NativeBlockedSitesRequestSchema.parse({
+          kind: "native.blocked-sites",
+          requestId: randomUUID(),
+          action: "replace",
+          sites,
+        }),
       ),
     );
-  });
+  }
 }
 
-/** Every browser keeps its own list; the answer is what the user blocks anywhere. */
-function merge(answers: { sites: string[] }[]): string[] {
-  return [...new Set(answers.flatMap((answer) => answer.sites))].sort();
+/** The extension's answer to a replace; it carries nothing the daemon needs. */
+export function handleBlockedSitesReply(candidate: unknown): boolean {
+  return NativeBlockedSitesReplySchema.safeParse(candidate).success;
 }

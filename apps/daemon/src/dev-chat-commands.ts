@@ -10,6 +10,7 @@ import { ChatService } from "./chat-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { beginSubmit } from "./dev-chat-submit.js";
 import { createAndSubmitChat } from "./chat-first-submit.js";
+import { applyBlockedSites } from "./blocked-sites-settings.js";
 import {
   type BrowserContextAttachStatus,
   type CommandRequest,
@@ -43,6 +44,10 @@ export async function handleDevChatCommand(
   try {
     if (request.operation === "chat.create" && request.payload.initialSubmit)
       return await createAndSubmitChat(socket, service, request, attachBrowserContext);
+    if (request.operation === "settings.blocked-sites") {
+      const sites = await applyBlockedSites(request.payload);
+      return completeCommand(socket, request, { kind: "settings.blocked-sites", sites });
+    }
     if (request.operation === "chat.delete") {
       await service.deleteChat(asChatId(request.payload.chatId));
       return completeCommand(socket, request, {

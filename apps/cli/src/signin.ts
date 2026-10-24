@@ -6,8 +6,8 @@ import {
   saveConfig,
   type ProviderName,
 } from "@browserkit/credentials";
+import { bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 import { spawn } from "node:child_process";
-import { dataDirectory } from "./client.js";
 
 // `aeon signin setup bitwarden|proton` picks the password manager Aeon signs in with;
 // `aeon signin status` says which one answers. The agent then calls bu.signIn() on a sign-in
@@ -25,7 +25,7 @@ export async function signinCommand(args: string[]): Promise<number> {
 }
 
 async function status(): Promise<number> {
-  const provider = await activeProvider(dataDirectory());
+  const provider = await activeProvider(bridgeDataDirectory());
   if (!provider) {
     process.stdout.write(
       "No password manager answers. Run `aeon signin setup bitwarden` or `aeon signin setup proton`.\n",
@@ -38,7 +38,7 @@ async function status(): Promise<number> {
 }
 
 async function setup(name: ProviderName): Promise<number> {
-  const directory = dataDirectory();
+  const directory = bridgeDataDirectory();
   const config = await readConfig(directory);
   if (name === "bitwarden") {
     process.stdout.write("Unlocking Bitwarden (`bw unlock --raw`); enter your master password.\n");

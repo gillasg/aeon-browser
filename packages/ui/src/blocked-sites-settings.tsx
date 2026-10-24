@@ -48,14 +48,27 @@ export function siteFromInput(value: string): string | undefined {
   }
 }
 
-export function BlockedSitesSettings(): ReactElement {
-  const [sites, setSites] = useBlockedSites();
+export function BlockedSitesSettings({
+  sites: given,
+  onAdd,
+  onRemove,
+}: {
+  sites?: readonly string[];
+  onAdd?(site: string): void;
+  onRemove?(site: string): void;
+} = {}): ReactElement {
+  const [local, setLocal] = useBlockedSites();
+  const sites = given ?? local;
   const [draft, setDraft] = useState("");
   const add = (event: FormEvent) => {
     event.preventDefault();
     const site = siteFromInput(draft);
-    if (!site) return;
-    if (!sites.includes(site)) setSites([...sites, site].sort());
+    if (!site || sites.includes(site)) {
+      setDraft("");
+      return;
+    }
+    if (onAdd) onAdd(site);
+    else setLocal([...local, site].sort());
     setDraft("");
   };
   return (
@@ -76,22 +89,34 @@ export function BlockedSitesSettings(): ReactElement {
           Block
         </button>
       </form>
-      {sites.length > 0 && (
-        <ul className="settings-site-list">
-          {sites.map((site) => (
-            <li key={site}>
-              <span>{site}</span>
-              <button
-                type="button"
-                aria-label={`Unblock ${site}`}
-                onClick={() => setSites(sites.filter((item) => item !== site))}
-              >
-                Unblock
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <BlockedSiteList
+        sites={sites}
+        onRemove={(site) =>
+          onRemove ? onRemove(site) : setLocal(local.filter((item) => item !== site))
+        }
+      />
     </section>
+  );
+}
+
+function BlockedSiteList({
+  sites,
+  onRemove,
+}: {
+  sites: readonly string[];
+  onRemove(site: string): void;
+}): ReactElement | null {
+  if (!sites.length) return null;
+  return (
+    <ul className="settings-site-list">
+      {sites.map((site) => (
+        <li key={site}>
+          <span>{site}</span>
+          <button type="button" aria-label={`Unblock ${site}`} onClick={() => onRemove(site)}>
+            Unblock
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

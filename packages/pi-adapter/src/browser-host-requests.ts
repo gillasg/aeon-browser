@@ -1,38 +1,38 @@
-import { handleCredentialRequest, isCredentialRequest } from "@browserkit/credentials";
+import {
+  createHostHandler,
+  type HostRequestContext,
+  type HostSiteRules,
+} from "@browserkit/tools/host";
 
-// Requests a running cell makes of this machine rather than of the browser: a login from the
-// user's password manager, and the sites this run must stay off. Both come from the engine, never
-// from agent code, and neither answer is ever written to a trace, a journal or a step list.
+// Aeon's side of the one host handler: credentials, site rules and mapped-site calls are
+// browserkit's; Aeon adds only its own storage (workspace, site skills, saved reads) through
+// `extra`. `source` decides whether a typed-user `allow` may lift a block; routines, checks and
+// outside sessions always get `allow: []`.
 
-export interface SiteRulesAnswer {
-  blocked: string[];
-  only: string[];
-  allow: string[];
-}
+export type { HostRequestContext };
 
-export type SiteRulesProvider = (chatId: string) => SiteRulesAnswer | Promise<SiteRulesAnswer>;
+export type SiteRulesAnswer = HostSiteRules;
 
-export function isSiteRulesRequest(value: unknown): boolean {
-  return (value as { siteRules?: unknown } | null)?.siteRules === true;
-}
+export type SiteRulesProvider = (scope: string) => SiteRulesAnswer | Promise<SiteRulesAnswer>;
 
-export interface HostRequestContext {
-  /** Aeon's data folder: password-manager.json lives here. */
-  dataDirectory: string;
+export interface HostHandlerOptions {
+  source: HostRequestContext["source"];
+  /** What this run must stay off. Only a chat's answer may carry `allow`. */
   siteRules?: SiteRulesProvider;
+  /** Aeon's mapped-site call path, so its browser calls stay attributed to this chat. */
+  siteMapper?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
+  /** Aeon-only requests: workspace files, site skills, saved reads. */
+  extra?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
 }
 
-/** The machine's answer to a host request, or undefined when the request is not one of these. */
-export function hostRequest(
-  chatId: string,
-  request: unknown,
-  context: HostRequestContext,
-): Promise<unknown> | undefined {
-  if (isCredentialRequest(request)) return handleCredentialRequest(request, context.dataDirectory);
-  if (!isSiteRulesRequest(request)) return undefined;
-  return Promise.resolve(context.siteRules?.(chatId)).then((rules) => ({
-    blocked: rules?.blocked ?? [],
-    only: rules?.only ?? [],
-    allow: rules?.allow ?? [],
-  }));
+/** The shared handler with Aeon's provider; the source goes in the context of every call. */
+export function createAeonHostHandler(
+  options: HostHandlerOptions,
+): (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined {
+  const siteRules = options.siteRules;
+  return createHostHandler({
+    ...(siteRules ? { siteRules: (context: HostRequestContext) => siteRules(context.scope) } : {}),
+    ...(options.siteMapper ? { siteMapper: options.siteMapper } : {}),
+    ...(options.extra ? { extra: options.extra } : {}),
+  });
 }

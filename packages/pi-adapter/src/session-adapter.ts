@@ -330,7 +330,6 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           input.workingDirectory,
           resolve(this.sessionDirectory, "..", "site-skills"),
           {
-            dataDirectory: resolve(this.sessionDirectory, ".."),
             ...(this.siteRulesHost ? { siteRules: this.siteRulesHost } : {}),
           },
         ),

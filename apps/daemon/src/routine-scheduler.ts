@@ -10,7 +10,7 @@ import type {
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
-import { hostRequest, siteMapperRequest } from "@aeon/pi-adapter";
+import { createAeonHostHandler, siteMapperRequest } from "@aeon/pi-adapter";
 import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
 
 const TICK_MS = 10_000;
@@ -40,8 +40,6 @@ export class RoutineScheduler {
     private readonly store: AeonProductStore,
     private readonly chats: ChatService,
     private readonly browser: BrowserControlService,
-    /** Aeon's data folder: the password manager answers credential requests from a check. */
-    private readonly dataDirectory: string,
   ) {}
 
   /** Told when a watcher's check passes, before its agent run (a notification, at once). */
@@ -236,6 +234,11 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
     id: string,
     timeoutMs = CHECK_TIMEOUT_MS,
   ): Promise<{ met: boolean; value?: unknown; error?: string }> {
+    const host = createAeonHostHandler({
+      source: "routine",
+      siteRules: () => ({ blocked: [], only: routine.sites ?? [], allow: [] }),
+      siteMapper: (request) => siteMapperRequest(checkRealm(routine.routineId), request),
+    });
     const raw = await this.browser.execute(checkRealm(routine.routineId), `routine-check:${id}`, {
       codeCell: {
         code: routine.check ?? "",
@@ -243,17 +246,14 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
         // A check may sign in from the password manager and must stay off blocked sites; the
         // answers are the machine's and never reach the check's code. Site API calls work;
         // workspace files stay with the chat. A check never lifts a block.
-        onCall: (request: unknown) =>
-          hostRequest(routine.chatId, request, {
-            dataDirectory: this.dataDirectory,
-            siteRules: () => ({
-              blocked: [],
-              only: routine.sites ?? [],
-              allow: [],
-            }),
-          }) ??
-          siteMapperRequest(checkRealm(routine.routineId), request) ??
-          Promise.reject(new Error("Workspace calls are unavailable in routine checks")),
+        onCall: async (request: unknown) => {
+          const answer = host(request, {
+            source: "routine",
+            scope: checkRealm(routine.routineId),
+          });
+          if (answer) return answer;
+          throw new Error("Workspace calls are unavailable in routine checks");
+        },
         onProgress: () => undefined,
       },
     });

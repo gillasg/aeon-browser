@@ -10,10 +10,10 @@ const BLOCKED_SITES_KEY = "blocked-sites";
 export function handleBlockedSitesMessage(candidate: unknown, socket: WebSocket): boolean {
   const request = NativeBlockedSitesRequestSchema.safeParse(candidate);
   if (!request.success) return false;
-  const { requestId, action, site } = request.data;
-  void apply(action, site).then(
-    (sites) =>
-      socket.send(JSON.stringify({ kind: "native.blocked-sites.result", requestId, sites })),
+  const { requestId, action, site, sites } = request.data;
+  void apply(action, site, sites).then(
+    (next) =>
+      socket.send(JSON.stringify({ kind: "native.blocked-sites.result", requestId, sites: next })),
     (error: unknown) =>
       socket.send(
         JSON.stringify({
@@ -28,9 +28,15 @@ export function handleBlockedSitesMessage(candidate: unknown, socket: WebSocket)
 }
 
 async function apply(
-  action: "read" | "add" | "remove",
+  action: "read" | "add" | "remove" | "replace",
   site: string | undefined,
+  sites: string[] | undefined,
 ): Promise<string[]> {
+  if (action === "replace") {
+    const next = [...new Set((sites ?? []).map(String))].sort();
+    await chrome.storage.local.set({ [BLOCKED_SITES_KEY]: next });
+    return next;
+  }
   const current = await read();
   if (action === "read") return current;
   if (!site) throw new Error("A site is required to block or unblock one.");

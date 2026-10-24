@@ -65,6 +65,12 @@ test("a credential or site-rules answer never lands in a result, step or progres
   const toolDirectory = await fakeBitwarden(t);
   const dataDirectory = await mkdtemp(join(tmpdir(), "aeon-signin-"));
   t.after(() => rm(dataDirectory, { recursive: true, force: true }));
+  const previousHome = process.env.BROWSERKIT_HOME;
+  process.env.BROWSERKIT_HOME = dataDirectory;
+  t.after(() => {
+    if (previousHome === undefined) delete process.env.BROWSERKIT_HOME;
+    else process.env.BROWSERKIT_HOME = previousHome;
+  });
   await writeFile(
     join(dataDirectory, "password-manager.json"),
     JSON.stringify({ provider: "bitwarden", bitwardenSession: "test-session" }),
@@ -95,7 +101,6 @@ test("a credential or site-rules answer never lands in a result, step or progres
     });
   };
   const tool = createBrowserCodeTool("chat-1", run, undefined, undefined, {
-    dataDirectory,
     siteRules: () => rules,
   });
 

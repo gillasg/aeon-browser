@@ -46,7 +46,11 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
       </section>
       <OrbSettings />
       <AgentTabSettings />
-      <BlockedSitesSettings />
+      <BlockedSitesSettings
+        {...(props.blockedSites ? { sites: props.blockedSites } : {})}
+        {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
+        {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
+      />
       <PasswordManagerSettings signIn={props.snapshot?.signIn ?? null} loading={props.loading} />
       <section className="settings-group">
         <h2>Connected Chrome</h2>

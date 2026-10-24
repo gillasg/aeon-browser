@@ -223,6 +223,22 @@ const ChatStopRequestSchema = z
   })
   .strict();
 
+const BlockedSitesSettingsRequestSchema = z
+  .object({
+    kind: z.literal("command"),
+    requestId: RequestIdSchema,
+    operation: z.literal("settings.blocked-sites"),
+    payload: z
+      .object({
+        action: z.enum(["read", "add", "remove"]),
+        site: z.string().min(1).max(200).optional(),
+        /** The extension's old local list, merged once when this page first reads it. */
+        local: z.array(z.string().max(200)).max(2000).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ProjectListRequestSchema,
   ProjectCreateRequestSchema,
@@ -255,6 +271,7 @@ export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ChatQueueRequestSchema,
   ChatQueueEditRequestSchema,
   ChatStopRequestSchema,
+  BlockedSitesSettingsRequestSchema,
 ]);
 
 export const ChatSubscribeRequestSchema = z
