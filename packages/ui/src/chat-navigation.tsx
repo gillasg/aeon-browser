@@ -1,22 +1,18 @@
 import { SidebarIcon } from "./sidebar-icons.js";
 import type { ReactElement } from "react";
-import type { ChatSurfaceProps } from "./chat-surface.js";
-export function ChatNavigation(
-  props: Pick<ChatSurfaceProps, "sidebarOpen" | "onToggleSidebar"> & {
-    onSettings(): void;
-    onNewChat?(): void;
-  },
-): ReactElement {
+
+// A chat page has no chat list of its own: home is the one place chats are listed. The corner
+// holds a way back home and a new chat.
+export function ChatNavigation(props: { onNewChat?(): void }): ReactElement {
   return (
     <nav className="chat-navigation" aria-label="Chat navigation">
       <button
-        id="sidebar-toggle"
+        id="chat-home"
         className="icon-button"
         type="button"
-        aria-label={props.sidebarOpen ? "Close Chat list" : "Open Chat list"}
-        aria-expanded={props.sidebarOpen}
-        aria-controls="chat-sidebar"
-        onClick={props.onToggleSidebar}
+        aria-label="Home"
+        title="Home"
+        onClick={goHome}
       >
         <svg
           viewBox="0 0 20 20"
@@ -25,14 +21,23 @@ export function ChatNavigation(
           fill="none"
           stroke="currentColor"
           strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
         >
-          <rect x="3" y="4" width="14" height="12" rx="2" />
-          <path d="M8 4v12" />
+          <path d="M3.5 9.5 10 4l6.5 5.5" />
+          <path d="M5.5 8.5V16h9V8.5" />
         </svg>
       </button>
-      {!props.sidebarOpen && props.onNewChat && <NewChatButton onClick={props.onNewChat} />}
+      {props.onNewChat && <NewChatButton onClick={props.onNewChat} />}
     </nav>
   );
+}
+
+/** Home in the same host: the side panel stays a side panel. */
+function goHome(): void {
+  const panel = document.body.dataset.host === "panel";
+  location.href = panel ? "home.html?host=panel" : "home.html";
 }
 
 function NewChatButton({ onClick }: { onClick(): void }): ReactElement {

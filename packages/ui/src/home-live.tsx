@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { MiniSwarm } from "./mini-swarm.js";
+import { SidebarIcon } from "./sidebar-icons.js";
 
 // Running work as live windows: each card shows the tab its agent is acting in, refreshed about
 // once a second by the engine. Recent chats sit underneath as a quiet list.
@@ -76,16 +77,22 @@ function LiveRunCard({
   );
 }
 
+type ChatAction = ((chat: ChatCatalogItemDto) => void) | undefined;
+
 export function RecentChats({
   chats,
   openChatIds,
   onOpenChat,
   onChats,
+  onPin,
+  onDelete,
 }: {
   chats: readonly ChatCatalogItemDto[];
   openChatIds: ReadonlySet<string>;
   onOpenChat(chatId: string): void;
   onChats(): void;
+  onPin?: ChatAction;
+  onDelete?: ChatAction;
 }): ReactElement | null {
   if (!chats.length) return null;
   return (
@@ -98,24 +105,68 @@ export function RecentChats({
       </div>
       <ul className="home-recent-list" id="recent-chats">
         {chats.map((chat) => (
-          <li key={chat.chatId}>
-            <button
-              type="button"
-              className="home-recent-row"
-              data-open={String(openChatIds.has(chat.chatId))}
-              data-pinned={String(chat.pinned)}
-              title={openChatIds.has(chat.chatId) ? `${chat.title} · open in a tab` : chat.title}
-              onClick={() => onOpenChat(chat.chatId)}
-            >
-              <span className="home-recent-title">{chat.title}</span>
-              <span className="home-recent-time">
-                {chat.pinned ? "Pinned" : ago(chat.updatedAt)}
-              </span>
-            </button>
-          </li>
+          <RecentRow
+            key={chat.chatId}
+            chat={chat}
+            open={openChatIds.has(chat.chatId)}
+            onOpen={() => onOpenChat(chat.chatId)}
+            onPin={onPin}
+            onDelete={onDelete}
+          />
         ))}
       </ul>
     </section>
+  );
+}
+
+function RecentRow({
+  chat,
+  open,
+  onOpen,
+  onPin,
+  onDelete,
+}: {
+  chat: ChatCatalogItemDto;
+  open: boolean;
+  onOpen(): void;
+  onPin: ChatAction;
+  onDelete: ChatAction;
+}): ReactElement {
+  return (
+    <li className="home-recent-item" data-open={String(open)} data-pinned={String(chat.pinned)}>
+      <button
+        type="button"
+        className="home-recent-row"
+        title={open ? `${chat.title} · open in a tab` : chat.title}
+        onClick={onOpen}
+      >
+        <span className="home-recent-title">{chat.title}</span>
+        <span className="home-recent-time">{chat.pinned ? "Pinned" : ago(chat.updatedAt)}</span>
+      </button>
+      <span className="home-recent-actions">
+        {onPin && (
+          <button
+            type="button"
+            aria-label={chat.pinned ? "Unpin chat" : "Pin chat"}
+            title={chat.pinned ? "Unpin" : "Pin"}
+            data-active={String(chat.pinned)}
+            onClick={() => onPin(chat)}
+          >
+            <SidebarIcon kind="pin" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            aria-label="Delete chat"
+            title="Delete chat"
+            onClick={() => onDelete(chat)}
+          >
+            <SidebarIcon kind="delete" />
+          </button>
+        )}
+      </span>
+    </li>
   );
 }
 

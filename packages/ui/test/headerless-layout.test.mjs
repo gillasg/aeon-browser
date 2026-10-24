@@ -5,18 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ChatNavigation } from "../dist/chat-navigation.js";
 import { NewTabHome } from "../dist/home-surface.js";
 
-test("headerless navigation offers sidebar without a title bar", () => {
-  const html = renderToStaticMarkup(
-    createElement(ChatNavigation, {
-      sidebarOpen: false,
-      resourcesOpen: false,
-      onToggleSidebar() {},
-      onToggleResources() {},
-      onSettings() {},
-    }),
-  );
-  assert.match(html, /id="sidebar-toggle"/);
-  assert.match(html, /aria-label="Open Chat list"/);
+test("a chat page has no chat list: home and new chat, no title bar", () => {
+  const html = renderToStaticMarkup(createElement(ChatNavigation, { onNewChat() {} }));
+  assert.match(html, /id="chat-home"/);
+  assert.match(html, /aria-label="New Chat"/);
+  assert.doesNotMatch(html, /sidebar-toggle|Open Chat list/);
   assert.doesNotMatch(html, /<header|Connected|Aeon/);
 });
 

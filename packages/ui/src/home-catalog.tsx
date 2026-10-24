@@ -2,20 +2,19 @@ import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import type { NewTabHomeProps } from "./home-surface.js";
 import { shortDate } from "./text.js";
+import { SidebarIcon } from "./sidebar-icons.js";
 
 type HomeCatalogProps = Pick<
   NewTabHomeProps,
   | "catalogQuery"
-  | "includeArchived"
   | "catalogPending"
   | "catalogResults"
   | "searchWarnings"
   | "openChatIds"
   | "onCatalogQuery"
-  | "onIncludeArchived"
   | "onOpenChat"
   | "onPin"
-  | "onArchive"
+  | "onDelete"
   | "onRename"
 >;
 
@@ -32,14 +31,6 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
         query={props.catalogQuery}
         onQuery={props.onCatalogQuery}
       />
-      <label className="catalog-archived-toggle">
-        <input
-          type="checkbox"
-          checked={props.includeArchived}
-          onChange={(event) => props.onIncludeArchived(event.target.checked)}
-        />{" "}
-        Include archived
-      </label>
       {props.searchWarnings > 0 && (
         <p className="catalog-warning">
           Some saved Pi sessions could not be searched ({props.searchWarnings}).
@@ -56,7 +47,7 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
               open={props.openChatIds.has(chat.chatId)}
               onOpen={props.onOpenChat}
               onPin={props.onPin}
-              onArchive={props.onArchive}
+              onDelete={props.onDelete}
               onRename={props.onRename}
             />
           ))
@@ -103,14 +94,14 @@ function CatalogRow({
   open,
   onOpen,
   onPin,
-  onArchive,
+  onDelete,
   onRename,
 }: {
   chat: ChatCatalogItemDto;
   open: boolean;
   onOpen(chatId: string): void;
   onPin(chat: ChatCatalogItemDto): void;
-  onArchive(chat: ChatCatalogItemDto): void;
+  onDelete(chat: ChatCatalogItemDto): void;
   onRename(chat: ChatCatalogItemDto): void;
 }) {
   return (
@@ -123,7 +114,6 @@ function CatalogRow({
         <span className="catalog-result-meta">
           {chat.status}
           {chat.pinned ? " · Pinned" : ""}
-          {chat.archived ? " · Archived" : ""}
         </span>
       </button>
       <div className="catalog-result-actions">
@@ -131,11 +121,17 @@ function CatalogRow({
         <button type="button" onClick={() => onPin(chat)}>
           {chat.pinned ? "Unpin" : "Pin"}
         </button>
-        <button type="button" onClick={() => onArchive(chat)}>
-          {chat.archived ? "Restore" : "Archive"}
-        </button>
         <button type="button" onClick={() => onRename(chat)}>
           Rename
+        </button>
+        <button
+          type="button"
+          className="catalog-delete"
+          aria-label="Delete chat"
+          title="Delete chat"
+          onClick={() => onDelete(chat)}
+        >
+          <SidebarIcon kind="delete" />
         </button>
       </div>
     </article>
