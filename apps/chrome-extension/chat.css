@@ -360,6 +360,88 @@ summary:focus-visible {
   stroke-linejoin: round;
   stroke-width: 1.5;
 }
+
+/* Earlier-user-message rail: a small notch per turn, with a preview on hover. */
+.transcript-rail {
+  position: absolute;
+  z-index: 4;
+  top: 84px;
+  bottom: 132px;
+  left: 12px;
+  width: 20px;
+  pointer-events: none;
+}
+.transcript-rail-tick {
+  position: absolute;
+  top: var(--rail-top);
+  left: 0;
+  width: 12px;
+  height: 2px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--aeon-muted) 55%, transparent);
+  opacity: 0.55;
+  pointer-events: auto;
+  cursor: pointer;
+  transition:
+    width 120ms ease,
+    opacity 120ms ease,
+    background 120ms ease;
+}
+.transcript-rail-tick:hover,
+.transcript-rail-tick:focus-visible,
+.transcript-rail-tick[data-active="true"] {
+  width: 20px;
+  background: var(--aeon-text);
+  opacity: 1;
+}
+.transcript-rail-tick:focus-visible {
+  outline: 2px solid var(--aeon-text);
+  outline-offset: 3px;
+}
+.transcript-rail-preview {
+  position: absolute;
+  top: clamp(42px, var(--rail-top), calc(100% - 52px));
+  left: 26px;
+  display: grid;
+  width: min(250px, calc(100vw - 90px));
+  gap: 4px;
+  padding: 10px 12px;
+  transform: translateY(-50%);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-md);
+  background: var(--aeon-surface);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 34%);
+  pointer-events: none;
+}
+.transcript-rail-preview strong {
+  overflow: hidden;
+  color: var(--aeon-text);
+  font-size: var(--aeon-fs-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transcript-rail-preview span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-xs);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+@media (max-width: 640px) {
+  .transcript-rail {
+    left: 6px;
+  }
+  .transcript-rail-preview {
+    left: 20px;
+  }
+}
 .message-row {
   position: relative;
   display: flex;
@@ -1653,11 +1735,11 @@ summary:focus-visible {
   display: flex;
   width: min(100%, 940px);
   min-height: 52px;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--aeon-s-3);
   padding: var(--aeon-s-2) var(--aeon-s-2) var(--aeon-s-2) var(--aeon-s-2);
   border: 1px solid var(--aeon-swatch-3b3b3b);
-  border-radius: var(--aeon-r-xl);
+  border-radius: 18px;
   background: var(--aeon-swatch-2d2d2d);
   box-shadow: none;
 }
@@ -1689,6 +1771,7 @@ summary:focus-visible {
 .composer-controls {
   display: flex;
   align-items: center;
+  align-self: flex-end;
   flex: none;
   min-height: 36px;
 }
@@ -2891,9 +2974,21 @@ body[data-host="panel"] .queue-view {
   font-size: 13px;
 }
 .turn-work .message-row {
-  margin: 8px 0;
+  margin: 0;
+}
+.turn-work .message-actions {
+  display: none;
 }
 .turn-work .thinking-detail {
+  margin: 0;
+}
+/* Work steps sit as one even list: each Thinking row and each tool row the same height. */
+.turn-work .thinking-detail > summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.turn-work .activity-group {
   margin: 0;
 }
 
