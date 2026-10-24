@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import type { ChatCatalogItemDto, HomeRoutineCardDto, ManagementSnapshotDto } from "@aeon/protocol";
-import { MiniSwarm } from "./mini-swarm.js";
+import { LiveRuns, RecentChats, type HomeRunPreview } from "./home-live.js";
 import { pauseReason } from "./management-routines.js";
 
 // Under the ask box, in order of urgency: what needs you, what's running, what's being watched,
@@ -19,6 +19,8 @@ export interface HomeDashboardProps {
   watchers?: readonly Routine[] | undefined;
   /** Answers kept on home, with their history. */
   pins?: readonly Pin[] | undefined;
+  /** Live frames of the tabs running chats act in, by chat. */
+  previews?: ReadonlyMap<string, HomeRunPreview>;
   onOpenChat(chatId: string): void;
   onChats(): void;
   onWatchers(): void;
@@ -34,7 +36,12 @@ export function HomeDashboard(props: HomeDashboardProps): ReactElement {
   const recent = props.chats.filter((chat) => !live.includes(chat)).slice(0, 8);
   return (
     <div className="home-dashboard">
-      <LiveRuns chats={live} needs={needs} onOpenChat={props.onOpenChat} />
+      <LiveRuns
+        chats={live}
+        needs={needs}
+        previews={props.previews ?? new Map()}
+        onOpenChat={props.onOpenChat}
+      />
       <PinnedCards pins={props.pins} onOpenChat={props.onOpenChat} onRoutines={props.onWatchers} />
       <WatcherCards
         routines={props.routines}
@@ -48,50 +55,6 @@ export function HomeDashboard(props: HomeDashboardProps): ReactElement {
         onChats={props.onChats}
       />
     </div>
-  );
-}
-
-function LiveRuns({
-  chats,
-  needs,
-  onOpenChat,
-}: {
-  chats: readonly ChatCatalogItemDto[];
-  needs: ReadonlySet<string>;
-  onOpenChat(chatId: string): void;
-}): ReactElement | null {
-  if (!chats.length) return null;
-  return (
-    <section className="home-block" aria-labelledby="home-running-heading">
-      <BlockHeading id="home-running-heading" title="Running now" />
-      <div className="home-grid">
-        {chats.map((chat) => {
-          const waiting = needs.has(chat.chatId);
-          return (
-            <button
-              type="button"
-              key={chat.chatId}
-              className="home-card home-run-card"
-              data-needs={String(waiting)}
-              onClick={() => onOpenChat(chat.chatId)}
-            >
-              <span className="home-card-title">
-                <MiniSwarm size={20} tone={waiting ? "needs" : "working"} />
-                <span>{chat.title}</span>
-              </span>
-              <span className="home-card-line">
-                {waiting ? "Needs you · open to answer" : "Working…"}
-              </span>
-              {waiting ? (
-                <span className="home-card-action">Review</span>
-              ) : (
-                <span className="home-card-progress" aria-hidden="true" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -232,7 +195,7 @@ function WatcherCards({
   routines: readonly HomeRoutineCardDto[];
   watchers: readonly Routine[] | undefined;
   onWatchers(): void;
-}): ReactElement {
+}): ReactElement | null {
   const cards = watchers?.length
     ? watchers.slice(0, 4).map((routine) => ({
         id: routine.routineId,
@@ -246,6 +209,7 @@ function WatcherCards({
         paused: !routine.enabled,
         line: routine.enabled ? nextLine(routine.nextDueAt) : "Paused",
       }));
+  if (!cards.length) return null;
   return (
     <section className="home-block" aria-labelledby="home-watchers-heading">
       <BlockHeading
@@ -254,7 +218,7 @@ function WatcherCards({
         more="All routines"
         onMore={onWatchers}
       />
-      {cards.length ? (
+      {cards.length > 0 && (
         <div className="home-grid">
           {cards.map((card) => (
             <button
@@ -271,52 +235,6 @@ function WatcherCards({
             </button>
           ))}
         </div>
-      ) : (
-        <p className="home-block-empty">
-          Press Watch on a result and Aeon checks it every 15 minutes, telling you only when it
-          changes.
-        </p>
-      )}
-    </section>
-  );
-}
-
-function RecentChats({
-  chats,
-  openChatIds,
-  onOpenChat,
-  onChats,
-}: {
-  chats: readonly ChatCatalogItemDto[];
-  openChatIds: ReadonlySet<string>;
-  onOpenChat(chatId: string): void;
-  onChats(): void;
-}): ReactElement {
-  return (
-    <section className="home-block" aria-labelledby="home-recent-heading">
-      <BlockHeading
-        id="home-recent-heading"
-        title="Recent chats"
-        more="All chats"
-        onMore={onChats}
-      />
-      {chats.length ? (
-        <div className="home-chips" id="recent-chats">
-          {chats.map((chat) => (
-            <button
-              type="button"
-              key={chat.chatId}
-              className="home-chip"
-              data-open={String(openChatIds.has(chat.chatId))}
-              title={openChatIds.has(chat.chatId) ? `${chat.title} · open in a tab` : chat.title}
-              onClick={() => onOpenChat(chat.chatId)}
-            >
-              <span className="home-chip-title">{chat.title}</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="home-block-empty">Your recent chats will appear here.</p>
       )}
     </section>
   );

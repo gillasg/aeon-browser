@@ -11,6 +11,8 @@ import { ManagementSurface } from "./management-surface.js";
 import type { ManagementActionName, ManagementSection } from "./management-types.js";
 import { HomeTopBar, viewFromRoute, type HomeView } from "./home-top-bar.js";
 import { HomeDashboard } from "./home-dashboard.js";
+import { HomeCore } from "./home-core.js";
+import type { HomeRunPreview } from "./home-live.js";
 import { ActivityPanel } from "./activity-panel.js";
 import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
 import { FirstRunTour } from "./first-run-tour.js";
@@ -24,6 +26,8 @@ export interface NewTabHomeProps {
   chats: readonly ChatCatalogItemDto[];
   /** Chats whose agent is working right now. */
   runningChatIds?: ReadonlySet<string>;
+  /** Live frames of the tabs running chats act in, by chat. */
+  previews?: ReadonlyMap<string, HomeRunPreview>;
   /** Chats waiting on the user (an approval or a question). */
   needsChatIds?: ReadonlySet<string>;
   modelCatalog: PiModelCatalogDto | null;
@@ -178,14 +182,26 @@ function HomePage({
   if (view === "watchers") return <Management props={props} section="routines" />;
   if (view === "settings")
     return <SettingsPage props={props} section={settingsSection} onSection={onSettingsSection} />;
+  return <HomeLanding props={props} onView={onView} />;
+}
+
+function HomeLanding({
+  props,
+  onView,
+}: {
+  props: NewTabHomeProps;
+  onView(view: HomeView): void;
+}): ReactElement {
   return (
     <>
       <FirstRunTour />
+      <HomeCore working={props.runningChatIds?.size ?? 0} waiting={props.needsChatIds?.size ?? 0} />
       <HomeStart props={props} />
       <HomeDashboard
         chats={props.chats.filter((chat) => !chat.archived)}
         runningChatIds={props.runningChatIds ?? new Set()}
         needsChatIds={props.needsChatIds ?? new Set()}
+        {...(props.previews ? { previews: props.previews } : {})}
         openChatIds={props.openChatIds}
         routines={props.homeRoutines}
         watchers={props.managementSnapshot?.routines}

@@ -41,7 +41,9 @@ test("new tab has no sidebar: a top bar, an empty composer and the dashboard", (
   assert.doesNotMatch(html, /id="chat-sidebar"|id="pinned-label"|id="projects-label"/);
   for (const page of ["Chats", "Routines", "Activity"]) assert.match(html, new RegExp(`>${page}<`));
   assert.match(html, /aria-label="Settings"/);
-  assert.match(html, /Recent chats/);
+  // A quiet home: the core and the ask box, with no empty sections under them.
+  assert.match(html, /class="home-core" data-mode="idle"/);
+  assert.doesNotMatch(html, /Recent|Press Watch/);
   assert.match(html, /role="dialog" aria-label="Welcome to Aeon"/);
   delete globalThis.localStorage;
   delete globalThis.location;
