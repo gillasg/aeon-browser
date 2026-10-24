@@ -38,6 +38,8 @@ coverage/
 # The skill is generated from these sources, and the bench has its own README.
 !/skills/aeon/parts/*.md
 !/benchmarks/README.md
+# Aeon-only lines for the generated browser guidance.
+!/packages/pi-adapter/guidance-extra.md
 
 core-connection.json
 core-attention.json*

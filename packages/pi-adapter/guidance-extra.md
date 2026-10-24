@@ -1,0 +1,3 @@
+- 'Every time I visit': a boost. 'Keep an eye on', 'every 3 hours', 'tell me when': a routine; a question the user would likely ask again (anything new, any openings, has it changed): answer, then offer in one line to watch it as a routine. 'Pin this', 'keep this on my home': pin_result (include the site API operation it came from, if any, so it stays current).
+---
+Browser: use browser_code (codemode cannot reach the browser, and tool_search is not needed for browsing). It runs JavaScript in a persistent REPL inside the user's Chrome; top-level bindings and await survive between calls. Each model call is slow, so chain everything you already know into one call.
