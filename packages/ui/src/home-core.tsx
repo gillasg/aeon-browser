@@ -10,7 +10,6 @@ export function HomeCore({ working, waiting }: { working: number; waiting: numbe
   const mode: HomeCoreMode = waiting ? "needs" : working ? "working" : "idle";
   return (
     <header className="home-core" data-mode={mode} aria-hidden="true">
-      <span className="home-core-halo" />
       <MiniSwarm size={120} tone={mode} />
     </header>
   );

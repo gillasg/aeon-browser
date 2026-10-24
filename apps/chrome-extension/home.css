@@ -1832,23 +1832,6 @@ body[data-embedded="true"] .home-top-bar {
 .home-core > .mini-swarm {
   position: relative;
 }
-.home-core-halo {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 260px;
-  height: 260px;
-  margin: -130px 0 0 -130px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--core-a) 30%, transparent) 0%,
-    transparent 68%
-  );
-  filter: blur(10px);
-  pointer-events: none;
-  animation: home-core-breathe var(--core-speed) ease-in-out infinite;
-}
 @keyframes home-core-breathe {
   0%,
   100% {
@@ -2021,7 +2004,6 @@ body[data-embedded="true"] .home-top-bar {
   font-variant-numeric: tabular-nums;
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-core-halo,
   .home-live-badge::before {
     animation: none;
   }
