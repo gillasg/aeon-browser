@@ -1,0 +1,247 @@
+[
+  {
+    "name": "crawl",
+    "description": "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search Google. Uses plain HTTP first and the user's browser (with their logins) when needed.",
+    "actions": ["scrape", "crawl", "map", "search", "find", "check"],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["scrape", "crawl", "map", "search", "find", "check"]
+        },
+        "columns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "For find: column name -> what to fill in."
+        },
+        "criteria": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "For find: what every row must be."
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "maxItems": 5000,
+          "description": "For check: hosts or URLs."
+        },
+        "file": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "For check: a workspace file listing hosts or URLs."
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Search terms, or what to look for: ranks pages and keeps relevant parts."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "description": "Only URLs matching these patterns."
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "description": "Never these URL patterns."
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "fitMarkdown",
+              "text",
+              "links",
+              "metadata",
+              "tables",
+              "pageData",
+              "product"
+            ]
+          },
+          "maxItems": 8
+        },
+        "render": {
+          "type": "string",
+          "enum": ["auto", "static", "browser"]
+        },
+        "via": {
+          "type": "string",
+          "enum": ["auto", "http"],
+          "description": "For check: http never starts Chrome."
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "site_mapper",
+    "description": "Call the API a site learned while you used it (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). Calls use the user's logins.",
+    "actions": [
+      "sites",
+      "operations",
+      "call",
+      "import",
+      "watch",
+      "explore",
+      "docs",
+      "actions",
+      "action",
+      "channel",
+      "session",
+      "export",
+      "heal",
+      "coverage",
+      "edit",
+      "name",
+      "describe",
+      "signing"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "sites",
+            "operations",
+            "call",
+            "import",
+            "watch",
+            "explore",
+            "docs",
+            "actions",
+            "action",
+            "channel",
+            "session",
+            "export",
+            "heal",
+            "coverage",
+            "edit",
+            "name",
+            "describe",
+            "signing"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "For action and channel: its name."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "description": "For actions: operation ids in order, to save an action."
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "change": {
+          "type": "string",
+          "maxLength": 4000,
+          "description": "For edit: the change in plain English."
+        },
+        "flow": {
+          "type": "string",
+          "maxLength": 4000,
+          "description": "For describe: the flow to perform."
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "For describe: the page to start at."
+        },
+        "folder": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "For export: the folder to write into."
+        },
+        "repair": {
+          "type": "boolean",
+          "description": "For heal: re-record failing operations."
+        },
+        "actions": {
+          "type": "boolean",
+          "description": "For explore: also map actions in dry run."
+        },
+        "site": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "maxItems": 10,
+          "description": "For explore: site names or URLs to map."
+        },
+        "goal": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "For explore: extra things to do."
+        },
+        "operation": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "params": {
+          "type": "object"
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["auto", "page", "direct"]
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "maxItems": 20,
+          "description": "For learn/import: capture files in the workspace."
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "For watch: the item identifier."
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    }
+  }
+]

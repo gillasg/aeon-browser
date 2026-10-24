@@ -1,67 +1,22 @@
-import { Type, type Static } from "typebox";
+import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import {
-  crawl,
-  findList,
-  mapSite,
-  scrape,
-  search,
-  writeOutput,
-  type Format,
-  type ModelLike,
-  type PageResult,
-} from "@browserkit/tools/browser-crawl";
+import { crawlTool, toolSchema, type CrawlToolInput } from "@browserkit/tools/definitions";
+import { writeOutput, type ModelLike, type PageResult } from "@browserkit/tools/browser-crawl";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { inChat } from "./site-browser.js";
 import { runCheck } from "./crawl-check.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
-// crawl: read pages and whole sites as Markdown and data. Plain HTTP first, the user's own
-// browser for pages that need JavaScript or a login, and mapped site APIs when they exist.
+// crawl: read pages and whole sites as Markdown and data. The actions and parameters come from
+// browserkit's definition; Aeon only saves results, scopes the browser call to the chat, and
+// keeps check's workspace evidence.
 
-const FORMATS = [
-  "markdown",
-  "fitMarkdown",
-  "text",
-  "links",
-  "metadata",
-  "tables",
-  "pageData",
-  "product",
-] as const;
+export const CRAWL_ACTIONS = ["scrape", "crawl", "map", "search", "find", "check"] as const;
 
-const Parameters = Type.Object(
-  {
-    action: Type.Union([
-      Type.Literal("scrape"),
-      Type.Literal("crawl"),
-      Type.Literal("map"),
-      Type.Literal("search"),
-      Type.Literal("find"),
-      Type.Literal("check"),
-    ]),
-    columns: Type.Optional(Type.Record(Type.String(), Type.String({ maxLength: 300 }))),
-    criteria: Type.Optional(Type.String({ maxLength: 1000 })),
-    url: Type.Optional(Type.String({ maxLength: 2000 })),
-    urls: Type.Optional(Type.Array(Type.String({ maxLength: 2000 }), { maxItems: 5000 })),
-    file: Type.Optional(Type.String({ maxLength: 500 })),
-    query: Type.Optional(Type.String({ maxLength: 500 })),
-    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 1000 })),
-    maxDepth: Type.Optional(Type.Integer({ minimum: 0, maximum: 20 })),
-    include: Type.Optional(Type.Array(Type.String({ maxLength: 200 }), { maxItems: 20 })),
-    exclude: Type.Optional(Type.Array(Type.String({ maxLength: 200 }), { maxItems: 20 })),
-    formats: Type.Optional(
-      Type.Array(Type.Union(FORMATS.map((f) => Type.Literal(f))), { maxItems: 8 }),
-    ),
-    render: Type.Optional(
-      Type.Union([Type.Literal("auto"), Type.Literal("static"), Type.Literal("browser")]),
-    ),
-    via: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("http")])),
-  },
-  { additionalProperties: false },
+const Parameters = Type.Unsafe<CrawlToolInput>(
+  toolSchema(crawlTool, CRAWL_ACTIONS, ["api"]) as never,
 );
-type Input = Static<typeof Parameters>;
 
 const GUIDELINES = [
   "crawl reads pages without driving tabs step by step: scrape one URL, crawl a site or a section (include ['/docs/**']), map a site's URLs, or search Google. Pages behind the user's logins work: they are fetched in their browser when plain HTTP is not enough.",
@@ -71,15 +26,6 @@ const GUIDELINES = [
   "find builds a list from the web: query, criteria (what every row must be) and columns ({founded: 'year founded'}); it searches, reads each result, keeps matches and fills the columns, with each row's source page.",
   "Give a query to rank pages by relevance and get fitMarkdown (only the relevant parts). Whole crawls are saved in the workspace as Markdown files plus pages.jsonl; the reply lists them with short previews.",
 ];
-
-function requireUrl(input: Input): string {
-  if (!input.url) throw new Error("Give the url");
-  return input.url;
-}
-
-const formatsOf = (input: Input): Format[] =>
-  (input.formats as Format[] | undefined) ??
-  (input.query ? ["fitMarkdown", "metadata"] : ["markdown", "metadata"]);
 
 function preview(page: PageResult, chars = 600): Record<string, unknown> {
   const text = page.fitMarkdown ?? page.markdown ?? page.text ?? "";
@@ -92,17 +38,7 @@ function preview(page: PageResult, chars = 600): Record<string, unknown> {
   };
 }
 
-async function runCrawl(input: Input, workspace: string | undefined): Promise<ToolText> {
-  const pages = await crawl({
-    url: requireUrl(input),
-    limit: input.limit ?? 25,
-    ...(input.maxDepth !== undefined ? { maxDepth: input.maxDepth } : {}),
-    ...(input.include ? { include: input.include } : {}),
-    ...(input.exclude ? { exclude: input.exclude } : {}),
-    ...(input.query ? { query: input.query, strategy: "best" as const } : {}),
-    formats: formatsOf(input),
-    render: input.render ?? "auto",
-  });
+async function saveCrawl(pages: PageResult[], workspace: string | undefined): Promise<ToolText> {
   let saved: string | undefined;
   if (workspace && pages.length) {
     const folder = join("crawls", new Date().toISOString().replace(/[:.]/g, "-"));
@@ -114,7 +50,7 @@ async function runCrawl(input: Input, workspace: string | undefined): Promise<To
     {
       pages: pages.length,
       ...(saved ? { savedIn: saved } : {}),
-      results: pages.map((p) => preview(p, 300)),
+      results: pages.map((page) => preview(page, 300)),
     },
     workspace,
     "crawls",
@@ -122,46 +58,19 @@ async function runCrawl(input: Input, workspace: string | undefined): Promise<To
   );
 }
 
-async function find(
-  query: string,
-  input: Input,
-  workspace: string | undefined,
-  model?: () => Promise<ModelLike>,
-): Promise<ToolText> {
-  const rows = await findList(query, {
-    columns: input.columns ?? { name: "name" },
-    ...(input.criteria ? { criteria: input.criteria } : {}),
-    perQuery: input.limit ?? 10,
-    ...(model ? { model: await model() } : {}),
-  });
-  return boundedResult(rows, workspace, "crawls", "find");
-}
-
 async function runAction(
-  input: Input,
+  input: CrawlToolInput,
   workspace: string | undefined,
   model?: () => Promise<ModelLike>,
 ): Promise<ToolText> {
-  if (input.action === "scrape") {
-    const page = await scrape(requireUrl(input), {
-      formats: formatsOf(input),
-      render: input.render ?? "auto",
-      ...(input.query ? { query: input.query } : {}),
-    });
-    return boundedResult(page, workspace, "crawls", new URL(page.url).hostname);
-  }
-  if (input.action === "crawl") return runCrawl(input, workspace);
   if (input.action === "check") return runCheck(input, workspace);
-  if (input.action === "map") {
-    const urls = await mapSite(requireUrl(input), {
-      limit: input.limit ?? 500,
-      ...(input.query ? { search: input.query } : {}),
-    });
-    return boundedResult(urls, workspace, "crawls", "map");
-  }
-  if (!input.query) throw new Error("Give the query to search for");
-  if (input.action === "find") return find(input.query, input, workspace, model);
-  return textResult(await search(input.query, { limit: input.limit ?? 10 }));
+  const value = await crawlTool.run(input, { ...(model ? { model } : {}) });
+  if (input.action === "crawl") return saveCrawl(value as PageResult[], workspace);
+  if (input.action === "scrape")
+    return boundedResult(value, workspace, "crawls", new URL((value as PageResult).url).hostname);
+  if (input.action === "map") return boundedResult(value, workspace, "crawls", "map");
+  if (input.action === "find") return boundedResult(value, workspace, "crawls", "find");
+  return textResult(value);
 }
 
 export function createCrawlTool(
@@ -170,10 +79,9 @@ export function createCrawlTool(
   model?: () => Promise<ModelLike>,
 ): ReturnType<typeof defineTool> {
   return defineTool({
-    name: "crawl",
+    name: crawlTool.name,
     label: "Crawl",
-    description:
-      "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search Google. Uses plain HTTP first and the user's browser (with their logins) when needed.",
+    description: crawlTool.description,
     promptSnippet: "Use crawl to read or collect content from pages and whole sites.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,
