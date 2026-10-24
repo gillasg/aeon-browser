@@ -1,6 +1,6 @@
 export { PiSdkSessionAdapter } from "./session-adapter.js";
 export { resolvePiAgentDirectory } from "./session-adapter.js";
-export { siteMapperRequest } from "./site-browser.js";
+export { siteMapperRequest, sessionChatId } from "./site-browser.js";
 export {
   hostRequest,
   type SiteRulesAnswer,

@@ -8,6 +8,7 @@ import {
   search,
   writeOutput,
   type Format,
+  type ModelLike,
   type PageResult,
 } from "@browserkit/tools/browser-crawl";
 import { mkdir } from "node:fs/promises";
@@ -115,16 +116,26 @@ async function runCrawl(input: Input, workspace: string | undefined): Promise<To
   );
 }
 
-async function find(query: string, input: Input, workspace: string | undefined): Promise<ToolText> {
+async function find(
+  query: string,
+  input: Input,
+  workspace: string | undefined,
+  model?: () => Promise<ModelLike>,
+): Promise<ToolText> {
   const rows = await findList(query, {
     columns: input.columns ?? { name: "name" },
     ...(input.criteria ? { criteria: input.criteria } : {}),
     perQuery: input.limit ?? 10,
+    ...(model ? { model: await model() } : {}),
   });
   return boundedResult(rows, workspace, "crawls", "find");
 }
 
-async function runAction(input: Input, workspace: string | undefined): Promise<ToolText> {
+async function runAction(
+  input: Input,
+  workspace: string | undefined,
+  model?: () => Promise<ModelLike>,
+): Promise<ToolText> {
   if (input.action === "scrape") {
     const page = await scrape(requireUrl(input), {
       formats: formatsOf(input),
@@ -142,11 +153,15 @@ async function runAction(input: Input, workspace: string | undefined): Promise<T
     return boundedResult(urls, workspace, "crawls", "map");
   }
   if (!input.query) throw new Error("Give the query to search for");
-  if (input.action === "find") return find(input.query, input, workspace);
+  if (input.action === "find") return find(input.query, input, workspace, model);
   return textResult(await search(input.query, { limit: input.limit ?? 10 }));
 }
 
-export function createCrawlTool(chatId: string, workspace?: string): ReturnType<typeof defineTool> {
+export function createCrawlTool(
+  chatId: string,
+  workspace?: string,
+  model?: () => Promise<ModelLike>,
+): ReturnType<typeof defineTool> {
   return defineTool({
     name: "crawl",
     label: "Crawl",
@@ -157,7 +172,7 @@ export function createCrawlTool(chatId: string, workspace?: string): ReturnType<
     parameters: Parameters,
     execute: async (_toolCallId, input) => {
       try {
-        return await inChat(chatId, () => runAction(input, workspace));
+        return await inChat(chatId, () => runAction(input, workspace, model));
       } catch (error) {
         return errorResult(error);
       }

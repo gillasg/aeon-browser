@@ -96,3 +96,22 @@ export function siteToolModel(
     };
   };
 }
+
+/**
+ * One tool-calling completion with the default model: the interface site-to-api, browser-crawl and
+ * the CLI's AI commands expect, returned as the plain message the caller reads.
+ */
+export async function completeWithDefaultModelTools(
+  options: CompletionOptions,
+  context: {
+    systemPrompt: string;
+    messages: Record<string, unknown>[];
+    tools: Record<string, unknown>[];
+  },
+): Promise<Record<string, unknown>> {
+  const { runtime, model } = await defaultModel(options, {});
+  const reply = await runtime.completeSimple(model, context as never, {
+    sessionId: randomUUID(),
+  });
+  return reply as unknown as Record<string, unknown>;
+}

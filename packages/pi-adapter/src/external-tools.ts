@@ -55,7 +55,7 @@ function toolsFor(
     browser_code: createBrowserCodeTool(chatId, run, workspace, skills, {
       dataDirectory: resolve(options.sessionDirectory, ".."),
     }),
-    crawl: createCrawlTool(chatId, workspace),
+    crawl: createCrawlTool(chatId, workspace, siteToolModel(options)),
     site_mapper: createSiteMapperTool(chatId, workspace, siteToolModel(options)),
     extract: createExtractTool(options, workspace),
   };

@@ -39,6 +39,8 @@ const Parameters = Type.Object(
     steps: Type.Optional(Type.Array(Type.String({ maxLength: 200 }), { maxItems: 20 })),
     description: Type.Optional(Type.String({ maxLength: 1000 })),
     change: Type.Optional(Type.String({ maxLength: 4000 })),
+    flow: Type.Optional(Type.String({ maxLength: 4000 })),
+    url: Type.Optional(Type.String({ maxLength: 2000 })),
     folder: Type.Optional(Type.String({ maxLength: 500 })),
     repair: Type.Optional(Type.Boolean()),
     actions: Type.Optional(Type.Boolean()),
@@ -194,6 +196,7 @@ async function runAction(
       await runSiteToolAction(input.action, {
         ...input,
         site: requireSite(input),
+        ...(model ? { model } : {}),
         ...(input.folder && workspace ? { folder: resolve(workspace, input.folder) } : {}),
       }),
       workspace,
@@ -226,7 +229,7 @@ export function createSiteMapperTool(
     name: "site_mapper",
     label: "Site API",
     description:
-      "Call the API a site learned while you used it (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). Calls use the user's logins.",
+      "Call the API a site learned while you used it (actions: sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). Calls use the user's logins.",
     promptSnippet: "Use site_mapper for mapped sites: one API call instead of many page actions.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,

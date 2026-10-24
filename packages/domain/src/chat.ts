@@ -315,6 +315,12 @@ export interface PiSessionPort {
     messages: { role: string; content: string }[],
     choice?: { model?: string; thinking?: string },
   ): Promise<string>;
+  /** One tool-calling completion with the model new chats use (the CLI's AI commands). */
+  completeTools?(context: {
+    systemPrompt: string;
+    messages: Record<string, unknown>[];
+    tools: Record<string, unknown>[];
+  }): Promise<Record<string, unknown>>;
   /** Chat tools for agents outside Aeon: definitions, and one call in a named session. */
   externalTools?(): unknown[];
   callExternalTool?(

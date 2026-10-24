@@ -226,6 +226,21 @@ test(
         assert.equal((await run("(await page.network.list('/api/')).length")).value, 1);
       });
 
+      await t.test("the CLI's block list is the extension's settings list", async () => {
+        const added = await core.blockedSites("add", "bank.example");
+        assert.deepEqual(added.sites, ["bank.example"], JSON.stringify(added));
+        const read = await core.blockedSites("read");
+        assert.deepEqual(read.sites, ["bank.example"]);
+        const stored = await cdp("Runtime.evaluate", {
+          expression: "chrome.storage.local.get('blocked-sites').then((v) => v['blocked-sites'])",
+          awaitPromise: true,
+          returnByValue: true,
+        });
+        assert.deepEqual(stored.result.result.value, ["bank.example"]);
+        const removed = await core.blockedSites("remove", "bank.example");
+        assert.deepEqual(removed.sites, []);
+      });
+
       await t.test("workspace calls are served by Core", async () => {
         const result = await run("await checkpoint('progress.json', {done: 3})");
         assert.equal(result.error, undefined);
@@ -271,6 +286,7 @@ async function fakeCore() {
   const calls = [];
   const waiting = [];
   const skills = new Map();
+  const blocked = new Map();
   const connected = new Promise((done) =>
     server.on("connection", (ws) => {
       socket = ws;
@@ -349,6 +365,8 @@ async function fakeCore() {
           );
         } else if (message.kind === "browser.code.progress") {
           if (message.waitingForUser !== undefined) waiting.push(message.waitingForUser);
+        } else if (message.kind === "native.blocked-sites.result") {
+          blocked.get(message.requestId)?.(message);
         } else if (message.kind === "browser.code.result") results.get(message.cellId)?.(message);
       });
     }),
@@ -381,6 +399,19 @@ async function fakeCore() {
         }),
       );
       return Promise.race([result, sleep(25000).then(() => ({ error: "test timeout" }))]);
+    },
+    blockedSites(action, site) {
+      const requestId = randomUUID();
+      const result = new Promise((done) => blocked.set(requestId, done));
+      socket.send(
+        JSON.stringify({
+          kind: "native.blocked-sites",
+          requestId,
+          action,
+          ...(site ? { site } : {}),
+        }),
+      );
+      return Promise.race([result, sleep(10000).then(() => ({ error: "blocked sites timeout" }))]);
     },
     close: () => server.close(),
   };

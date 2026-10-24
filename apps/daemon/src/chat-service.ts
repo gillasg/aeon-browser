@@ -139,6 +139,15 @@ export class ChatService {
     this.pi.completeText
       ? this.pi.completeText(system, messages, choice)
       : modelComplete(this.pi.modelAgentDirectory, system, messages);
+  /** One tool-calling completion with the user's default model, for the CLI's AI commands. */
+  modelCompleteTools = (context: {
+    systemPrompt: string;
+    messages: Record<string, unknown>[];
+    tools: Record<string, unknown>[];
+  }): Promise<Record<string, unknown>> => {
+    if (!this.pi.completeTools) throw new Error("Aeon's model is not available");
+    return this.pi.completeTools(context);
+  };
   externalTools = (): unknown[] => [...(this.pi.externalTools?.() ?? []), CHAT_REVIEW_TOOL];
   callExternalTool = (
     name: string,

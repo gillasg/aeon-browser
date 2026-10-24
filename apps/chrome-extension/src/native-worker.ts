@@ -15,6 +15,7 @@ import { installOrb } from "./orb/orb-worker.js";
 import { installSiteAnswers } from "./orb/orb-site.js";
 import { installBrowseLearning } from "./browse-learning.js";
 import { handleSettingsMessage } from "./native-worker-settings.js";
+import { handleBlockedSitesMessage } from "./native-worker-blocked-sites.js";
 import { migrateLegacyChromeStorage } from "@browserkit/engine/legacy-storage-migration";
 import {
   installNativeStartup,
@@ -343,6 +344,11 @@ function handleCoreMessage(candidate: unknown): boolean {
   );
 }
 
+/** Settings the CLI reads or changes: agent flags and the user's blocked-sites list. */
+function handleNativeSettings(candidate: unknown, socket: WebSocket): boolean {
+  return handleSettingsMessage(candidate, socket) || handleBlockedSitesMessage(candidate, socket);
+}
+
 function handleExecutorMessage(connection: ExecutorConnection, data: unknown): void {
   let candidate: unknown;
   try {
@@ -352,7 +358,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     return;
   }
   if (handleCoreMessage(candidate)) return;
-  if (handleSettingsMessage(candidate, connection.socket)) return;
+  if (handleNativeSettings(candidate, connection.socket)) return;
   const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
   if (heartbeat.success) {
     if (

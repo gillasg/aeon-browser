@@ -134,6 +134,66 @@ export class AeonClient {
     });
   }
 
+  /** Runs browser code in the user's Chrome and returns the cell's own value and output. */
+  browserRun(
+    body: { code: string; session: string; timeoutMs?: number },
+    timeoutMs = 11 * 60_000,
+  ): Promise<Json> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("The browser did not answer in time. Update Aeon and retry."));
+      }, timeoutMs);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.browser.result") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve(message);
+      });
+      this.socket.send(JSON.stringify({ kind: "core.browser.run", requestId, ...body }));
+    });
+  }
+
+  /** One tool-calling completion with Aeon's default model (the AI commands use this). */
+  modelComplete(
+    body: { systemPrompt: string; messages: unknown[]; tools: unknown[] },
+    timeoutMs = 5 * 60_000,
+  ): Promise<Json> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("The model did not answer in time."));
+      }, timeoutMs);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.model.result") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve(message);
+      });
+      this.socket.send(JSON.stringify({ kind: "core.model.complete", requestId, ...body }));
+    });
+  }
+
+  /** Reads or changes the sites agents may not use (the extension's settings list). */
+  blocked(body: { action: "read" | "add" | "remove"; site?: string }): Promise<Json> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+      }, 15_000);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.blocked-sites.result") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve(message);
+      });
+      this.socket.send(JSON.stringify({ kind: "core.blocked-sites", requestId, ...body }));
+    });
+  }
+
   /** Shows a chat as a tab in the connected Chrome; resolves with how many browsers were asked. */
   openChat(chatId: string, active = false): Promise<number> {
     return new Promise((resolve) => {
