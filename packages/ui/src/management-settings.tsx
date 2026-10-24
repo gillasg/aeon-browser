@@ -11,6 +11,7 @@ import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY } from "./orb-prefs.js";
 import { resetTour } from "./first-run-tour.js";
 import { BlockedSitesSettings } from "./blocked-sites-settings.js";
+import { PasswordManagerSettings } from "./password-manager-settings.js";
 
 export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
   const [mode, setMode] = useMessageSendMode();
@@ -46,6 +47,7 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
       <OrbSettings />
       <AgentTabSettings />
       <BlockedSitesSettings />
+      <PasswordManagerSettings signIn={props.snapshot?.signIn ?? null} loading={props.loading} />
       <section className="settings-group">
         <h2>Connected Chrome</h2>
         <p>

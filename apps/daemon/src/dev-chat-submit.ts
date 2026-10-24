@@ -32,6 +32,8 @@ export function beginSubmit(
         ...(payload.browserContexts ? { browserContexts: payload.browserContexts } : {}),
       },
       selection ?? payload.selection,
+      // Laid out before the typed one: the options argument comes after the selection.
+      { typedByUser: payload.typedByUser === true },
     )
     .then(() => completeSubmit(socket, service, request))
     .catch((error: unknown) => failSubmit(socket, service, request, error));

@@ -35,6 +35,8 @@ export async function submitInitialPrompt(
         chatId,
         browserContexts,
         text: initialSubmit.text,
+        // The panel's first prompt is what the user typed there; the page context is separate.
+        typedByUser: true,
         attachments: initialSubmit.attachments ?? [],
         ...(context ? { browserContext: context.context } : {}),
       },

@@ -19,6 +19,8 @@ interface RoutineDraft {
   setChatId: Dispatch<SetStateAction<string>>;
   instruction: string;
   setInstruction: Dispatch<SetStateAction<string>>;
+  sites: string;
+  setSites: Dispatch<SetStateAction<string>>;
   kind: ScheduleKind;
   setKind: Dispatch<SetStateAction<ScheduleKind>>;
   everyMinutes: string;
@@ -51,6 +53,10 @@ export function RoutineEditor({
     perform(props, draft.chatId, routine ? "update_routine" : "create_routine", {
       title: draft.title,
       instruction: draft.instruction,
+      sites: draft.sites
+        .split(/[\s,]+/)
+        .map((site) => site.trim())
+        .filter(Boolean),
       schedule: makeSchedule(draft),
       enabled: routine?.enabled ?? true,
       requiredBrowserInstanceId: draft.browserInstanceId.trim() || null,
@@ -86,6 +92,7 @@ function useRoutineDraft(
   const [title, setTitle] = useState(start.title);
   const [chatId, setChatId] = useState(start.chatId);
   const [instruction, setInstruction] = useState(start.instruction);
+  const [sites, setSites] = useState(routine?.sites.join(", ") ?? "");
   const [kind, setKind] = useState<ScheduleKind>(initialScheduleKind(routine));
   const [everyMinutes, setEveryMinutes] = useState(start.everyMinutes);
   const [daysOfWeek, setDaysOfWeek] = useState(initialDaysOfWeek(routine?.schedule));
@@ -101,6 +108,8 @@ function useRoutineDraft(
     setChatId,
     instruction,
     setInstruction,
+    sites,
+    setSites,
     kind,
     setKind,
     everyMinutes,
@@ -198,6 +207,15 @@ function RoutineIdentityFields({
           required
           maxLength={20_000}
           rows={5}
+        />
+      </label>
+      <label>
+        Only these sites (optional)
+        <input
+          value={draft.sites}
+          onChange={(event) => draft.setSites(event.target.value)}
+          maxLength={1000}
+          placeholder="example.com, shop.example.com"
         />
       </label>
     </>

@@ -8,6 +8,7 @@ import { runMcpServer } from "./mcp.js";
 import { install } from "./install.js";
 import { listTools, runTool } from "./tools.js";
 import { settingsCommand, settingsUsage } from "./settings.js";
+import { signinCommand, signinUsage } from "./signin.js";
 
 const usage = `aeon: run and inspect Aeon chats from the terminal or another agent.
 
@@ -32,6 +33,7 @@ const usage = `aeon: run and inspect Aeon chats from the terminal or another age
       --session name            calls in one session share variables, tabs and files
                                 (the input can also be @file.json, or - for stdin)
   ${settingsUsage.trimStart()}
+  ${signinUsage.trimStart()}
   install                       put the aeon command on the PATH and link the Aeon skill for agents
   mcp                           run the stdio MCP server`;
 
@@ -39,6 +41,8 @@ async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   if (command === "mcp") return runMcpServer().then(() => 0);
   if (command === "install") return install();
+  // Signing in needs no daemon: the password manager and its config live on this machine.
+  if (command === "signin") return signinCommand(rest);
   if (!command || command === "help" || command === "--help") {
     process.stdout.write(usage + "\n");
     return command ? 0 : 1;

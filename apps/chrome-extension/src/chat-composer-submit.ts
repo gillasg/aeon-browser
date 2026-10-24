@@ -16,6 +16,8 @@ interface SubmitComposerMessageInput {
   wasRunning: boolean;
   attachments: readonly ComposerAttachment[];
   browserContext: PiBrowserContextRecord | null;
+  /** False for a prompt Aeon built itself (a page summary request), which cannot lift a block. */
+  typedByUser: boolean;
   onError(message: string): void;
 }
 
@@ -53,6 +55,7 @@ function createRequest(input: SubmitComposerMessageInput) {
       (page) => page.target.tabId !== input.browserContext?.target.tabId,
     ),
     text: input.text,
+    ...(input.typedByUser ? { typedByUser: true } : {}),
     ...(input.attachments.length ? { attachments: [...input.attachments] } : {}),
     ...(input.browserContext ? { browserContext: input.browserContext } : {}),
   };

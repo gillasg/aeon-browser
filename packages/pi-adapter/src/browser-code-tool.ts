@@ -13,16 +13,32 @@ import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { noteVisits, visitedUrls } from "./site-mapping.js";
 import { siteMapperRequest } from "./site-browser.js";
+import {
+  hostRequest,
+  type HostRequestContext,
+  type SiteRulesProvider,
+} from "./browser-host-requests.js";
 
 const CELL_TIMEOUT_MS = 60_000;
+
+export interface BrowserCodeOptions {
+  /** Aeon's data folder, for the password manager and the site rules. */
+  dataDirectory?: string;
+  /** Which sites this chat's runs must stay off, answered by the daemon. */
+  siteRules?: SiteRulesProvider;
+}
 
 export function createBrowserTools(
   chatId: string,
   run?: BrowserToolRunner,
   workspace?: string,
   skills?: string,
+  options?: BrowserCodeOptions,
 ): ReturnType<typeof defineTool>[] {
-  return [createBrowserCodeTool(chatId, run, workspace, skills), createSiteScriptTool(chatId, run)];
+  return [
+    createBrowserCodeTool(chatId, run, workspace, skills, options),
+    createSiteScriptTool(chatId, run),
+  ];
 }
 
 export function createBrowserCodeTool(
@@ -30,7 +46,14 @@ export function createBrowserCodeTool(
   run?: BrowserToolRunner,
   workspace?: string,
   skills?: string,
+  options?: BrowserCodeOptions,
 ): ReturnType<typeof defineTool> {
+  const hostContext: HostRequestContext | undefined = options?.dataDirectory
+    ? {
+        dataDirectory: options.dataDirectory,
+        ...(options.siteRules ? { siteRules: options.siteRules } : {}),
+      }
+    : undefined;
   return defineTool({
     name: "browser_code",
     label: "Browser workflow",
@@ -72,18 +95,18 @@ export function createBrowserCodeTool(
           codeCell: {
             code,
             timeoutMs: CELL_TIMEOUT_MS,
-            onCall: (request) => {
-              const reported = progressRequest(request);
-              if (reported) {
-                progress = reported;
+            onCall: cellCall({
+              chatId,
+              host: hostContext,
+              skills,
+              workspace,
+              writes,
+              steps: () => steps,
+              report: (next) => {
+                progress = next;
                 update();
-                return Promise.resolve({ ok: true });
-              }
-              const site = siteMapperRequest(chatId, request);
-              return site
-                ? rememberApiRead(skills, request, writes.track(request, site))
-                : serveCall(request, workspace, steps, skills);
-            },
+              },
+            }),
             onProgress: (next) => {
               steps = next.map(compactStep);
               update();
@@ -92,38 +115,80 @@ export function createBrowserCodeTool(
         },
         signal,
       );
-      const cell = JSON.parse(output) as {
-        error?: string;
-        detail?: string;
-        value?: unknown;
-        output?: string;
-        steps?: Record<string, unknown>[];
-        reset?: boolean;
-      };
-      if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
-      noteVisits(chatId, visitedUrls(cell.steps ?? []));
-      const result = { value: cell.value, output: cell.output ?? "" };
-      await journalOutput(result, workspace, operationId);
-      const failed = Boolean(cell.error);
-      const body = {
-        steps,
-        ...result,
-        ...(cell.reset ? { reset: true } : {}),
-        ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
-      };
-      const actions = traceActions(cell.steps ?? []);
-      const details = {
-        ...(actions.length ? { actions } : {}),
-        ...(writes.list().length ? { writes: writes.list() } : {}),
-        ...(writes.usedApi ? { siteMapper: true } : {}),
-      };
-      return {
-        content: modelContent(body),
-        isError: failed,
-        details: Object.keys(details).length ? details : undefined,
-      };
+      return browserCodeResult({ chatId, output, steps, workspace, operationId, writes });
     },
   });
+}
+
+interface CellOutput {
+  error?: string;
+  detail?: string;
+  value?: unknown;
+  output?: string;
+  steps?: Record<string, unknown>[];
+  reset?: boolean;
+}
+
+/** The tool result the model and the trace keep: steps, output, value and what was written. */
+async function browserCodeResult(options: {
+  chatId: string;
+  output: string;
+  steps: Record<string, unknown>[];
+  workspace: string | undefined;
+  operationId: string;
+  writes: SiteWrites;
+}) {
+  const { chatId, workspace, operationId, writes } = options;
+  let { steps } = options;
+  const cell = JSON.parse(options.output) as CellOutput;
+  if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
+  noteVisits(chatId, visitedUrls(cell.steps ?? []));
+  const result = { value: cell.value, output: cell.output ?? "" };
+  await journalOutput(result, workspace, operationId);
+  const failed = Boolean(cell.error);
+  const body = {
+    steps,
+    ...result,
+    ...(cell.reset ? { reset: true } : {}),
+    ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
+  };
+  const actions = traceActions(cell.steps ?? []);
+  const details = {
+    ...(actions.length ? { actions } : {}),
+    ...(writes.list().length ? { writes: writes.list() } : {}),
+    ...(writes.usedApi ? { siteMapper: true } : {}),
+  };
+  return {
+    content: modelContent(body),
+    isError: failed,
+    details: Object.keys(details).length ? details : undefined,
+  };
+}
+
+// What a running cell may ask this side for. Passwords and site rules come from the machine and
+// are answered before anything else; none of those answers is a step, a result or a log line.
+function cellCall(context: {
+  chatId: string;
+  host: HostRequestContext | undefined;
+  skills: string | undefined;
+  workspace: string | undefined;
+  writes: SiteWrites;
+  steps: () => Record<string, unknown>[];
+  report: (progress: ToolProgress) => void;
+}): (request: unknown) => Promise<unknown> {
+  return (request) => {
+    const reported = progressRequest(request);
+    if (reported) {
+      context.report(reported);
+      return Promise.resolve({ ok: true });
+    }
+    const answer = context.host ? hostRequest(context.chatId, request, context.host) : undefined;
+    if (answer) return answer;
+    const site = siteMapperRequest(context.chatId, request);
+    return site
+      ? rememberApiRead(context.skills, request, context.writes.track(request, site))
+      : serveCall(request, context.workspace, context.steps(), context.skills);
+  };
 }
 
 // The model rereads this on every later call, so it gets one line per step plus the cell's own

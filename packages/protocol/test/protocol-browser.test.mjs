@@ -124,6 +124,7 @@ test("management DTO distinguishes environment references from manual Pi credent
       capabilities: [capability],
       resources: null,
       resourceError: null,
+      signIn: { provider: null, state: "not_set_up" },
     }).capabilities[0].credentialBinding,
     "manual_pi_binding_required",
   );
@@ -136,6 +137,7 @@ test("management DTO distinguishes environment references from manual Pi credent
       capabilities: [{ ...capability, credentialBinding: "secret_value" }],
       resources: null,
       resourceError: null,
+      signIn: { provider: null, state: "not_set_up" },
     }).success,
     false,
   );

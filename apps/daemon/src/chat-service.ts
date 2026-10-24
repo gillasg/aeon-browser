@@ -42,6 +42,7 @@ import {
   type ChatEventSubscription,
   type PublishedChatEvent,
 } from "./chat-event-hub.js";
+import type { BrowserSiteRules } from "./browser-site-rules.js";
 export class ChatService {
   private readonly store: ChatStore & ThreadCoordinationStore;
   private readonly pi: PiSessionPort;
@@ -55,14 +56,17 @@ export class ChatService {
   readonly projects: ProjectService;
   readonly management: ChatManagementCommands;
   private readonly reviews: ChatReviews;
+  private readonly siteRules: BrowserSiteRules | undefined;
   constructor(options: {
     dataDirectory: string;
     store: ChatStore & ThreadCoordinationStore;
     pi: PiSessionPort;
+    siteRules?: BrowserSiteRules;
   }) {
     const dataDirectory = resolve(options.dataDirectory);
     this.store = options.store;
     this.pi = options.pi;
+    this.siteRules = options.siteRules;
     this.projects = new ProjectService(dataDirectory);
     this.threadSupport = new ChatThreadSupport(dataDirectory, this.store, this.pi);
     this.metadata = new ChatMetadataService(this.store, this.eventHub);
@@ -205,9 +209,12 @@ export class ChatService {
     chatId: ChatId,
     input: PiSessionInput | string,
     selection?: InitialPromptSelection,
+    options?: { typedByUser?: boolean },
   ): Promise<ChatRecord> {
     const prompt = typeof input === "string" ? { text: input } : input;
     if (!prompt.text.trim()) return Promise.reject(new Error("Prompt text must not be empty."));
+    // Only text the user typed themselves can lift a block: not a prompt an agent or a page built.
+    if (options?.typedByUser) this.siteRules?.notePrompt(chatId, prompt.text);
     const pending = { stopped: false };
     this.starting.set(chatId, pending);
     return this.commandGate
@@ -249,12 +256,27 @@ export class ChatService {
     chatId: ChatId,
     input: PiSessionInput,
     mode: "followUp" | "steer",
+    options?: { typedByUser?: boolean },
   ): Promise<void> {
+    // A typed follow-up or steer is still the user naming a site themselves.
+    if (options?.typedByUser) this.siteRules?.notePrompt(chatId, input.text);
     const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
     if (!session.controls().active)
       throw new Error("Queue input is only available while Pi is running.");
     await session.queue(input, mode);
+  }
+  /** A routine's agent run starts: its own sites restrict it until it ends. */
+  beginRoutineRun(
+    chatId: string,
+    runId: string,
+    instruction: string,
+    sites: readonly string[],
+  ): void {
+    this.siteRules?.beginRoutineRun(chatId, runId, instruction, sites);
+  }
+  endRoutineRun(chatId: string, runId: string): void {
+    this.siteRules?.endRoutineRun(chatId, runId);
   }
   /** Queue edits skip the command gate, which a running submission holds until its run ends. */
   async editQueue(

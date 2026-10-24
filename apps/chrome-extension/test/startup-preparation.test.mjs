@@ -70,7 +70,7 @@ test("home first prompt uses one command with its project, files, and selected p
     assert.equal(commands[0].operation, "chat.create");
     assert.deepEqual(commands[0].payload, {
       projectId,
-      initialSubmit: { ...prompt, browserContexts: [] },
+      initialSubmit: { ...prompt, typedByUser: true, browserContexts: [] },
     });
   } finally {
     Object.assign(globalThis, previous);

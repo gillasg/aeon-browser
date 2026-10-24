@@ -18,5 +18,7 @@ export const ChatInitialPromptSchema = z
         "Combined attachment size must not exceed 2 MiB.",
       ),
     browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
+    /** True only when a person typed this in Aeon's own UI: never page or agent text. */
+    typedByUser: z.boolean().optional(),
   })
   .strict();

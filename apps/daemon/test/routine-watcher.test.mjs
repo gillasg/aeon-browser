@@ -17,6 +17,7 @@ async function runWatcher(checkResult) {
     title: "Flight price",
     instruction: "Tell me the price dropped.",
     check: "const p = await browser.openTab(url); 380 < 400 ? {price: 380} : false",
+    sites: [],
     enabled: true,
     deletedAt: null,
     requiredBrowserInstanceId: null,
@@ -39,8 +40,12 @@ async function runWatcher(checkResult) {
     },
   };
   const invoked = [];
+  const runs = [];
   const chats = {
     getChat: () => ({ status: "ready" }),
+    beginRoutineRun: (chatId, runId, instruction, sites) =>
+      runs.push({ chatId, runId, instruction, sites }),
+    endRoutineRun: (chatId, runId) => runs.push({ ended: true, chatId, runId }),
     withSession: async (_chatId, action) =>
       action({
         subscribeRoutineRuns: () => () => undefined,
@@ -51,13 +56,13 @@ async function runWatcher(checkResult) {
         },
       }),
   };
-  const scheduler = new RoutineScheduler(store, chats, browser);
+  const scheduler = new RoutineScheduler(store, chats, browser, "data");
   try {
     await scheduler.start();
   } finally {
     scheduler.close();
   }
-  return { updates, checks, invoked, routine };
+  return { updates, checks, invoked, routine, runs };
 }
 
 test("a watcher whose check is falsy is skipped without opening Pi", async () => {
@@ -80,9 +85,18 @@ test("a failing check is recorded as failed, not run", async () => {
 });
 
 test("a truthy check wakes the agent with the value it found", async () => {
-  const { updates, invoked } = await runWatcher({ value: { price: 380 }, output: "" });
+  const { updates, invoked, runs } = await runWatcher({ value: { price: 380 }, output: "" });
   assert.equal(invoked.length, 1);
   assert.match(invoked[0].instruction, /^Tell me the price dropped\./);
   assert.match(invoked[0].instruction, /check passed with: \{"price":380\}/);
   assert.equal(updates.at(-1).state, "accepted");
+  // Only this routine's own run is restricted, and only by the instruction the user wrote.
+  assert.deepEqual(runs, [
+    {
+      chatId: "chat-watch",
+      runId: "run-watch",
+      instruction: "Tell me the price dropped.",
+      sites: [],
+    },
+  ]);
 });

@@ -17,6 +17,7 @@ test("a required browser instance is checked before a routine opens Pi", async (
     enabled: true,
     deletedAt: null,
     requiredBrowserInstanceId: "browser-instance-smoke",
+    sites: [],
   };
   let update;
   const store = {
@@ -37,7 +38,7 @@ test("a required browser instance is checked before a routine opens Pi", async (
     },
   };
   const browser = { isInstanceAvailable: () => false };
-  const scheduler = new RoutineScheduler(store, chats, browser);
+  const scheduler = new RoutineScheduler(store, chats, browser, "data");
   try {
     await scheduler.start();
   } finally {

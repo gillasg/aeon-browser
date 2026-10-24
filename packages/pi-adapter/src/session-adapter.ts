@@ -36,6 +36,7 @@ import {
 } from "./session-resolver.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
+import type { SiteRulesProvider } from "./browser-host-requests.js";
 import { createClockTool } from "./clock-tool.js";
 import { completeWithDefaultModel, siteToolModel } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
@@ -66,6 +67,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   private readonly browserTool: BrowserToolRunner | undefined;
   private capabilityToolHost: CapabilityToolHost | undefined;
   private threadToolHost: ThreadToolHost | undefined;
+  private siteRulesHost: SiteRulesProvider | undefined;
   private readonly liveSessions = new Map<string, Promise<PiSessionHandle>>();
   private readonly pendingResourceReloads = new Set<string>();
   private readonly preparedRuntime: PreparedModelRuntime | undefined;
@@ -184,6 +186,11 @@ export class PiSdkSessionAdapter implements PiSessionPort {
 
   setThreadToolHost(host: ThreadToolHost): void {
     this.threadToolHost = host;
+  }
+
+  /** Which sites a chat's runs must stay off (its routine's sites, and what the user named). */
+  setSiteRulesHost(host: SiteRulesProvider): void {
+    this.siteRulesHost = host;
   }
 
   setCapabilityToolHost(host: CapabilityToolHost): void {
@@ -310,6 +317,10 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           this.browserTool,
           input.workingDirectory,
           resolve(this.sessionDirectory, "..", "site-skills"),
+          {
+            dataDirectory: resolve(this.sessionDirectory, ".."),
+            ...(this.siteRulesHost ? { siteRules: this.siteRulesHost } : {}),
+          },
         ),
         ...createThreadTools(input.chatId, this.threadToolHost),
         ...createCapabilityTools(input.chatId, this.capabilityToolHost),

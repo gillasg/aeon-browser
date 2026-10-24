@@ -55,7 +55,13 @@ export class OrbSession {
     const result = await command(this.requireCatalog(), {
       operation: "chat.create",
       payload: {
-        initialSubmit: { text, model, thinkingLevel, ...(page ? { browserContexts: [page] } : {}) },
+        initialSubmit: {
+          text,
+          typedByUser: true,
+          model,
+          thinkingLevel,
+          ...(page ? { browserContexts: [page] } : {}),
+        },
       },
     });
     if (result.kind !== "chat.created") throw new Error("The chat was not created.");
@@ -69,7 +75,12 @@ export class OrbSession {
     const page = await this.page();
     await command(this.chat, {
       operation: "chat.submit",
-      payload: { chatId: this.chatId, text, ...(page ? { browserContexts: [page] } : {}) },
+      payload: {
+        chatId: this.chatId,
+        text,
+        typedByUser: true,
+        ...(page ? { browserContexts: [page] } : {}),
+      },
     });
   }
 

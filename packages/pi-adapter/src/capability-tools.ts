@@ -29,6 +29,9 @@ const routineCreate = Type.Object(
     title: Type.String({ minLength: 1, maxLength: 120 }),
     instruction: Type.String({ minLength: 1, maxLength: 20_000 }),
     check: Type.Optional(Type.String({ minLength: 1, maxLength: 8000 })),
+    sites: Type.Optional(
+      Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 50 }),
+    ),
     schedule: record,
     requiredBrowserInstanceId: Type.Optional(Type.String({ format: "uuid" })),
   },
@@ -42,6 +45,9 @@ const routineUpdate = Type.Object(
     title: Type.String({ minLength: 1, maxLength: 120 }),
     instruction: Type.String({ minLength: 1, maxLength: 20_000 }),
     check: Type.Optional(Type.Union([Type.String({ minLength: 1, maxLength: 8000 }), Type.Null()])),
+    sites: Type.Optional(
+      Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 50 }),
+    ),
     schedule: record,
     enabled: Type.Boolean(),
     requiredBrowserInstanceId: Type.Optional(
@@ -176,6 +182,8 @@ function createRoutineTools(
         "a page changing (const t = (await browser.fetch(url, {as: 'text'})).text; " +
         "const changed = globalThis.last !== undefined && globalThis.last !== t; globalThis.last = t; changed). " +
         "Check variables persist between runs. " +
+        "When the user wants it kept to particular sites ('only example.com'), pass sites: ['example.com']: " +
+        "its own runs then use those sites and no others. " +
         'For instant triggers, start the check with "use listen"; and make it wait: it then runs continuously ' +
         "(each run up to a minute) and wakes you the moment it returns something truthy, e.g. " +
         "\"use listen\"; const p = await browser.openTab(url); await p.waitForChange('.inbox', {timeoutMs: 55000}) " +

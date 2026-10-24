@@ -48,6 +48,8 @@ const ManagementRoutineSchema = z
     schedule: RoutineScheduleSchema,
     /** It runs a check with no model first (a learned API, a page read); the agent only when it passes. */
     checks: z.boolean().optional(),
+    /** Sites this routine may use; empty means it is not restricted. */
+    sites: z.array(z.string().min(1).max(200)).max(50),
     nextDueAt: z.string().datetime().nullable(),
     requiredBrowserInstanceId: z.string().uuid().nullable(),
     enabled: z.boolean(),
@@ -79,6 +81,14 @@ const ManagementRoutineSchema = z
           .strict(),
       )
       .max(10),
+  })
+  .strict();
+
+const PasswordManagerSchema = z
+  .object({
+    /** The password manager that answers sign-in requests, by name; never its keys or items. */
+    provider: z.string().min(1).max(40).nullable(),
+    state: z.enum(["unlocked", "locked", "not_set_up", "unavailable"]),
   })
   .strict();
 
@@ -158,6 +168,8 @@ export const ManagementSnapshotSchema = z
     capabilities: z.array(ManagedCapabilitySchema).max(100),
     resources: EffectivePiResourcesSchema.nullable(),
     resourceError: z.string().max(300).nullable(),
+    /** Which password manager signs in, and whether it is unlocked. Name and state only. */
+    signIn: PasswordManagerSchema,
   })
   .strict();
 

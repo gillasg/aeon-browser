@@ -233,6 +233,7 @@ async function handleContextCommand(
             : {}),
         },
         request.payload.mode,
+        { typedByUser: request.payload.typedByUser === true },
       );
       completeCommand(socket, request, {
         kind: "chat.queued",

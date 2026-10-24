@@ -19,7 +19,7 @@ export async function startHomePrompt(
     operation: "chat.create",
     payload: {
       ...projectDraftPayload(),
-      initialSubmit: { ...initial, browserContexts: homePages() },
+      initialSubmit: { ...initial, typedByUser: true, browserContexts: homePages() },
     },
   });
   const response = await client.waitFor(

@@ -10,7 +10,8 @@ import type {
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
-import { siteMapperRequest } from "@aeon/pi-adapter";
+import { hostRequest, siteMapperRequest } from "@aeon/pi-adapter";
+import { namedHosts } from "./browser-site-rules.js";
 import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
 
 const TICK_MS = 10_000;
@@ -40,6 +41,8 @@ export class RoutineScheduler {
     private readonly store: AeonProductStore,
     private readonly chats: ChatService,
     private readonly browser: BrowserControlService,
+    /** Aeon's data folder: the password manager answers credential requests from a check. */
+    private readonly dataDirectory: string,
   ) {}
 
   /** Told when a watcher's check passes, before its agent run (a notification, at once). */
@@ -155,12 +158,15 @@ export class RoutineScheduler {
     const instruction = await this.instructionFor(routine, run);
     if (instruction === undefined) return;
     this.update(run.runId, "pending");
+    // Only this routine's own agent run carries its "only these sites" list; the user's own
+    // messages in the same chat stay unrestricted.
+    this.beginRun(routine, run);
     try {
       await this.chats.withSession(run.chatId, async (session) => {
-        this.watch(run.runId, session);
+        this.watch(run.runId, run.chatId, session);
         const evidence = session.findRoutineRun(run.runId);
         if (evidence.state !== "not-found") {
-          this.applyEvidence(run.runId, evidence);
+          this.applyEvidence(run.chatId, run.runId, evidence);
           return;
         }
         try {
@@ -174,13 +180,22 @@ export class RoutineScheduler {
           this.update(run.runId, "accepted", { piEntryId: accepted.piEntryId });
         } catch {
           const afterFailure = session.findRoutineRun(run.runId);
-          if (afterFailure.state !== "not-found") this.applyEvidence(run.runId, afterFailure);
-          else this.update(run.runId, "uncertain", { lastError: "ROUTINE_ACCEPTANCE_UNCERTAIN" });
+          if (afterFailure.state !== "not-found")
+            this.applyEvidence(run.chatId, run.runId, afterFailure);
+          else {
+            this.update(run.runId, "uncertain", { lastError: "ROUTINE_ACCEPTANCE_UNCERTAIN" });
+            this.chats.endRoutineRun(run.chatId, run.runId);
+          }
         }
       });
     } catch {
       this.update(run.runId, "uncertain", { lastError: "ROUTINE_ACCEPTANCE_UNCERTAIN" });
+      this.chats.endRoutineRun(run.chatId, run.runId);
     }
+  }
+
+  private beginRun(routine: RoutineRecord, run: RoutineRunRecord): void {
+    this.chats.beginRoutineRun(run.chatId, run.runId, routine.instruction, routine.sites ?? []);
   }
 
   /** The instruction to send, or undefined when a watcher's check did not pass (run recorded). */
@@ -226,8 +241,18 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
       codeCell: {
         code: routine.check ?? "",
         timeoutMs,
-        // Checks can call and watch mapped site APIs; workspace files stay with the chat.
+        // A check may sign in from the password manager and must stay off blocked sites; the
+        // answers are the machine's and never reach the check's code. Site API calls work;
+        // workspace files stay with the chat. Only the instruction the user wrote lifts a block.
         onCall: (request: unknown) =>
+          hostRequest(routine.chatId, request, {
+            dataDirectory: this.dataDirectory,
+            siteRules: () => ({
+              blocked: [],
+              only: routine.sites ?? [],
+              allow: namedHosts(routine.instruction),
+            }),
+          }) ??
           siteMapperRequest(checkRealm(routine.routineId), request) ??
           Promise.reject(new Error("Workspace calls are unavailable in routine checks")),
         onProgress: () => undefined,
@@ -245,21 +270,27 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
   private async reconcileOpenRuns(): Promise<void> {
     for (const run of this.store.listOpenRoutineRuns()) {
       if (run.state === "due") continue;
+      const routine = this.store.getRoutine(run.routineId);
       try {
         await this.chats.withSession(run.chatId, async (session) => {
-          this.watch(run.runId, session);
+          this.watch(run.runId, run.chatId, session);
           const evidence = session.findRoutineRun(run.runId);
+          if (evidence.state === "accepted" || evidence.state === "running") {
+            // The run may still be executing after a restart: it keeps its own sites.
+            if (routine) this.beginRun(routine, run);
+          }
           if (evidence.state === "not-found")
             this.update(run.runId, "uncertain", { lastError: "ROUTINE_RECOVERY_UNCERTAIN" });
-          else this.applyEvidence(run.runId, evidence);
+          else this.applyEvidence(run.chatId, run.runId, evidence);
         });
       } catch {
         this.update(run.runId, "uncertain", { lastError: "ROUTINE_RECOVERY_UNCERTAIN" });
+        this.chats.endRoutineRun(run.chatId, run.runId);
       }
     }
   }
 
-  private watch(runId: string, session: PiSessionHandle): void {
+  private watch(runId: string, chatId: string, session: PiSessionHandle): void {
     if (this.subscriptions.has(runId)) return;
     const unsubscribe = session.subscribeRoutineRuns((event) => {
       if (event.runId !== runId) return;
@@ -273,6 +304,7 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
       };
       this.update(runId, event.phase, patch);
       if (event.phase === "completed" || event.phase === "failed") {
+        this.chats.endRoutineRun(chatId, runId);
         unsubscribe();
         this.subscriptions.delete(runId);
       }
@@ -281,6 +313,7 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
   }
 
   private applyEvidence(
+    chatId: string,
     runId: string,
     evidence: Exclude<PiRoutineRunEvidence, { state: "not-found" }>,
   ): void {
@@ -296,6 +329,7 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
       ...(evidence.acceptedTurnId ? { acceptedTurnId: evidence.acceptedTurnId } : {}),
       completedAt: new Date().toISOString(),
     });
+    this.chats.endRoutineRun(chatId, runId);
   }
 
   private update(
