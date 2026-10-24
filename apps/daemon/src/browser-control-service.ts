@@ -197,8 +197,7 @@ export class BrowserControlService {
     if (!clientInstanceId) return this.codeUnavailable(available);
     const socket = this.executors.get(clientInstanceId);
     if (!socket) return JSON.stringify({ error: "BROWSER_OFFLINE" });
-    const associated = [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target);
-    const targets = associated.filter((t) => t.clientInstanceId === clientInstanceId);
+    const targets = this.liveTargets(chatId).filter((t) => t.clientInstanceId === clientInstanceId);
     try {
       return JSON.stringify(
         await this.cells.run(
@@ -446,6 +445,21 @@ export class BrowserControlService {
     let byTarget = this.associations.get(chatId);
     if (!byTarget) this.associations.set(chatId, (byTarget = new Map()));
     byTarget.set(targetIdentity(target), { target, ownership, source });
+  }
+  /**
+   * The chat's tabs that still exist, newest last, at most the protocol's 64. Closed tabs are
+   * forgotten here: a long session must never fill the list with tabs that are gone.
+   */
+  private liveTargets(chatId: string): BrowserTargetKey[] {
+    const byTarget = this.associations.get(chatId);
+    if (!byTarget) return [];
+    const inventories = this.inventories;
+    // A tab is gone only when its browser's tab list is known and no longer has it.
+    if (inventories)
+      for (const [key, { target }] of byTarget)
+        if (inventories.get(target.clientInstanceId) && !inventories.findTarget(target))
+          byTarget.delete(key);
+    return [...byTarget.values()].map((a) => a.target).slice(-64);
   }
   private getAssociation(chatId: string, target: BrowserTargetKey): Association | undefined {
     const association = this.associations.get(chatId)?.get(targetIdentity(target));
