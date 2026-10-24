@@ -161,7 +161,7 @@ aeon federate shop.example:search other.example:search --params '{"query":"lamp"
 aeon heal shop.example              # drift, breakage, sign-out, bot walls
 ```
 
-- `aeon` (or `siteMapper` in browser code) only works on sites that are mapped. Check `sites`
+- **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped. Check `sites`
   first. To map a site: `map`, `describe`, `learn`, or use it in `browser_code` so its requests are
   learned as you go.
 - `call` reads. A write the page made successfully can be repeated with `siteMapper.write`; the
@@ -175,7 +175,7 @@ aeon heal shop.example              # drift, breakage, sign-out, bot walls
 
 `--session <name>` keeps variables, tabs and files together; the default is `cli` (and `mcp` for
 the MCP server). Files (`page.saveMedia`, `page.network.save`, artifacts, crawls) land in the
-session's workspace under aeon's data folder (`%LOCALAPPDATA%\Aeon\data\external\<session>` on Windows). `aeon journal <session>`
+session's workspace under Aeon's data folder (`%LOCALAPPDATA%\Aeon\data\external\<session>` on Windows). `aeon journal <session>`
 shows what a session ran. `artifact(name, data)` writes a file; `checkpoint(name, value)` and
 `loadCheckpoint` persist JSON across resets.
 
