@@ -65,7 +65,7 @@ export interface NewTabHomeProps {
   onPin(chat: ChatCatalogItemDto): void;
   onArchive(chat: ChatCatalogItemDto): void;
   onRename(chat: ChatCatalogItemDto): void;
-  onDelete?(chat: ChatCatalogItemDto): void;
+  onDelete(chat: ChatCatalogItemDto): void;
   managementSnapshot: ManagementSnapshotDto | null;
   homeRoutines: readonly HomeRoutineCardDto[];
   managementLoading: boolean;
@@ -208,6 +208,8 @@ function HomeLanding({
         pins={props.managementSnapshot?.pins}
         onOpenChat={props.onOpenChat}
         onChats={() => onView("chats")}
+        onPin={props.onPin}
+        onDelete={props.onDelete}
         onWatchers={() => onView("watchers")}
       />
     </>

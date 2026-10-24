@@ -22,6 +22,8 @@ export interface HomeDashboardProps {
   /** Live frames of the tabs running chats act in, by chat. */
   previews?: ReadonlyMap<string, HomeRunPreview>;
   onOpenChat(chatId: string): void;
+  onPin?(chat: ChatCatalogItemDto): void;
+  onDelete?(chat: ChatCatalogItemDto): void;
   onChats(): void;
   onWatchers(): void;
 }
@@ -58,6 +60,8 @@ export function HomeDashboard(props: HomeDashboardProps): ReactElement {
         openChatIds={props.openChatIds ?? new Set()}
         onOpenChat={props.onOpenChat}
         onChats={props.onChats}
+        onPin={props.onPin}
+        onDelete={props.onDelete}
       />
     </div>
   );

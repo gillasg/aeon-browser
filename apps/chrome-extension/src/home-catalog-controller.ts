@@ -92,6 +92,7 @@ export class HomeCatalogController {
   }
 
   async deleteChat(chat: ChatCatalogItemDto): Promise<void> {
+    if (!window.confirm(`Delete "${chat.title}"? It is removed for good, with its files.`)) return;
     const client = this.options.client();
     if (!client) return;
     try {

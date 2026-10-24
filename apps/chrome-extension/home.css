@@ -1987,7 +1987,7 @@ body[data-embedded="true"] .home-top-bar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.home-recent-row[data-open="true"] .home-recent-title::before {
+.home-recent-item[data-open="true"] .home-recent-title::before {
   content: "";
   display: inline-block;
   width: 6px;
@@ -2008,6 +2008,51 @@ body[data-embedded="true"] .home-top-bar {
     animation: none;
   }
 }
-.home-recent-row[data-pinned="true"] {
+.home-recent-item[data-pinned="true"] .home-recent-row {
   color: var(--aeon-text);
+}
+.home-recent-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.home-recent-actions {
+  position: absolute;
+  right: var(--aeon-s-2);
+  display: none;
+  gap: 2px;
+}
+.home-recent-item:hover .home-recent-actions,
+.home-recent-item:focus-within .home-recent-actions {
+  display: inline-flex;
+}
+.home-recent-item:hover .home-recent-time,
+.home-recent-item:focus-within .home-recent-time {
+  visibility: hidden;
+}
+.home-recent-actions button,
+.catalog-delete {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--aeon-muted);
+  cursor: pointer;
+}
+.home-recent-actions button:hover,
+.catalog-delete:hover {
+  background: var(--aeon-surface-raised, var(--aeon-surface));
+  color: var(--aeon-text);
+}
+.home-recent-actions button[data-active="true"] {
+  color: var(--aeon-text);
+}
+.home-recent-actions svg,
+.catalog-delete svg {
+  width: 15px;
+  height: 15px;
 }

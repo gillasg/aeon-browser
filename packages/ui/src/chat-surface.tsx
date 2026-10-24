@@ -1,13 +1,10 @@
 import { EmptyChatStart } from "./empty-chat-start.js";
-import { SidebarResizer } from "./sidebar-resizer.js";
 import type { ChatSummaryDto, PiUiSnapshotDto } from "@aeon/protocol";
 import { AnnotationProvider } from "./transcript-annotations.js";
-import { useState, type ReactElement } from "react";
-import type { ManagementSection } from "./management-types.js";
+import type { ReactElement } from "react";
 import { invokePiCommand } from "./pi-native-command.js";
 import { ChatNavigation } from "./chat-navigation.js";
 import { ChatComposer, type ChatComposerProps } from "./chat-composer.js";
-import { ChatSidebar } from "./chat-sidebar.js";
 import { ChatTranscript } from "./chat-transcript.js";
 import { LoadedResources, type LoadedResourcesState } from "./loaded-resources.js";
 import type { TranscriptRow } from "./transcript-model.js";
@@ -55,51 +52,14 @@ export interface ChatSurfaceProps {
 }
 
 export function ChatSurface(props: ChatSurfaceProps): ReactElement {
-  const [section, setSection] = useState<ManagementSection | null>(null);
-  const openSection = (next: ManagementSection): void => {
-    if (!props.sidebarOpen) props.onToggleSidebar();
-    setSection(section === next ? null : next);
-  };
   return (
-    <div
-      className="app-shell"
-      data-chat-id={props.chatId}
-      data-sidebar-open={String(props.sidebarOpen)}
-    >
+    <div className="app-shell" data-chat-id={props.chatId} data-sidebar-open="false">
       <span id="connection-state" hidden data-state={props.connection.state}>
         {props.connection.label}
       </span>
-      <ChatNavigation {...props} onSettings={() => openSection("settings")} />
-      <ChatSidebar
-        developmentFixture={props.developmentFixture}
-        chats={props.chats}
-        currentChatId={props.chatId}
-        query={props.sidebarQuery}
-        open={props.sidebarOpen}
-        onQuery={props.onSidebarQuery}
-        onOpen={(id) => {
-          setSection(null);
-          props.onSelectChat(id);
-        }}
-        onClose={props.onCloseSidebar}
-        onNew={props.onNewChat}
-        {...(props.onPinChat ? { onPin: props.onPinChat } : {})}
-        {...(props.onDeleteChat ? { onDelete: props.onDeleteChat } : {})}
-        onManagement={openSection}
-        managementSection={section ?? undefined}
-      />
-      <SidebarResizer open={props.sidebarOpen} onCollapse={props.onCloseSidebar} />
+      <ChatNavigation onNewChat={props.onNewChat} />
       <ToolImageContext.Provider value={props.loadToolImage}>
-        {section && (
-          <main className="chat-main">
-            <iframe
-              className="chat-management-frame"
-              title={section}
-              src={"home.html?embedded=1&view=" + section + "&chatId=" + props.chatId}
-            />
-          </main>
-        )}
-        <div className="chat-content-host" hidden={Boolean(section)}>
+        <div className="chat-content-host">
           <AnnotationProvider key={props.chatId}>
             <ChatContent {...props} />
           </AnnotationProvider>
