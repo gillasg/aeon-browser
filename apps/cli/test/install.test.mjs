@@ -39,6 +39,9 @@ async function withHome(root, run) {
 test("install removes a linked browserkit skill and leaves a real folder alone", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "aeon-install-"));
   t.after(() => rm(root, { recursive: true, force: true }));
+  const skill = join(root, "skills", "aeon");
+  await mkdir(skill, { recursive: true });
+  await writeFile(join(skill, "SKILL.md"), "---\nname: aeon\ndescription: Aeon\n---\n");
   const shared = join(root, ".agents", "skills");
   await mkdir(shared, { recursive: true });
 
@@ -49,7 +52,7 @@ test("install removes a linked browserkit skill and leaves a real folder alone",
     join(shared, "browserkit"),
     process.platform === "win32" ? "junction" : "dir",
   );
-  await withHome(root, install);
+  await withHome(root, () => install(skill));
   await assert.rejects(() => lstat(join(shared, "browserkit")), /ENOENT/);
   assert.equal((await lstat(join(shared, "aeon"))).isSymbolicLink(), true);
 
@@ -57,7 +60,7 @@ test("install removes a linked browserkit skill and leaves a real folder alone",
   const real = join(root, "two", ".agents", "skills", "browserkit");
   await mkdir(real, { recursive: true });
   await writeFile(join(real, "SKILL.md"), "---\nname: browserkit\ndescription: mine\n---\n");
-  await withHome(join(root, "two"), install);
+  await withHome(join(root, "two"), () => install(skill));
   assert.equal(
     (await readFile(join(real, "SKILL.md"), "utf8")).includes("description: mine"),
     true,

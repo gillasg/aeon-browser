@@ -79,13 +79,18 @@ async function isBrowserkitSkill(path: string): Promise<boolean> {
   }
 }
 
-export async function install(): Promise<number> {
-  if (!existsSync(join(skill, "SKILL.md")))
-    throw new Error(`The Aeon skill is missing at ${skill}`);
+export async function install(skillDirectory = skill): Promise<number> {
+  const hasSkill = existsSync(join(skillDirectory, "SKILL.md"));
   const bin = await installCommand();
   process.stdout.write(`Installed the aeon command in ${bin}\n`);
+  if (!hasSkill) {
+    process.stdout.write(
+      `The Aeon skill is not in this checkout (${skillDirectory}); the command is installed without it.\n`,
+    );
+    return 0;
+  }
   const shared = join(homedir(), ".agents", "skills");
-  const agents = await linkSkill(shared, skill);
+  const agents = await linkSkill(shared, skillDirectory);
   // Claude Code reads ~/.claude/skills: link it to the shared copy.
   const claude = await linkSkill(join(homedir(), ".claude", "skills"), join(shared, "aeon"));
   for (const path of [agents, claude])
