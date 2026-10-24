@@ -4,6 +4,7 @@ import { runMcpServer as runSiteMcpServer, siteName } from "@browserkit/tools/si
 import { AeonClient } from "./client.js";
 import { inspect, runTasks } from "./run.js";
 import type { ChatResult } from "./results.js";
+import { searchAeon } from "./search.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -76,6 +77,25 @@ const tools = [
       additionalProperties: false,
     },
   },
+  {
+    name: "aeon_search",
+    description: "Search Aeon chats (titles and messages) and the answers kept on home. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string", minLength: 1, maxLength: 200 },
+        from: {
+          type: "string",
+          enum: ["user", "cli", "mcp", "companion", "agent", "routine", "unknown"],
+        },
+        since: { type: "string", description: "YYYY-MM-DD, by creation day." },
+        until: { type: "string", description: "YYYY-MM-DD, by creation day." },
+        limit: { type: "integer", minimum: 1, maximum: 100 },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const CHAT_TOOLS = new Set(["browser_code", "browser_tabs", "crawl", "site_mapper", "extract"]);
@@ -108,6 +128,20 @@ function chatIdSchema() {
     required: ["chatId"],
     additionalProperties: false,
   };
+}
+
+/** aeon_search: chats, messages and saved answers, read-only. */
+function searchTool(client: AeonClient, args: Json): Promise<unknown> {
+  return searchAeon(
+    client,
+    String(args.text ?? ""),
+    {
+      ...(typeof args.from === "string" ? { origin: args.from } : {}),
+      ...(typeof args.since === "string" ? { since: args.since } : {}),
+      ...(typeof args.until === "string" ? { until: args.until } : {}),
+    },
+    Number(args.limit ?? 20),
+  );
 }
 
 export async function runMcpServer(site?: string): Promise<void> {
@@ -176,6 +210,7 @@ async function callTool(
   }
   if (name === "aeon_chats")
     return (await client.command("chat.list", { limit: Number(args.limit ?? 20) })).chats;
+  if (name === "aeon_search") return searchTool(client, args);
   const result = await inspect(client, String(args.chatId));
   if (name === "aeon_trace") return result.trace;
   if (name === "aeon_result") {

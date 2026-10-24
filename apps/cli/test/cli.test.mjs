@@ -100,7 +100,7 @@ test("the MCP server lists its tools without a running Aeon", async () => {
   assert.equal(replies[0].result.serverInfo.name, "aeon");
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["aeon_run", "aeon_run_status", "aeon_result", "aeon_trace", "aeon_chats"],
+    ["aeon_run", "aeon_run_status", "aeon_result", "aeon_trace", "aeon_chats", "aeon_search"],
   );
 });
 
