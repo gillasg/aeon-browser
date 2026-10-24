@@ -64,6 +64,11 @@ const tools = [
     inputSchema: chatIdSchema(),
   },
   {
+    name: "aeon_stop",
+    description: "Stop a running Aeon chat and tidy the agent tabs it left open.",
+    inputSchema: chatIdSchema(),
+  },
+  {
     name: "aeon_trace",
     description: "A chat's tool calls with the start of each result, in order, marking errors.",
     inputSchema: chatIdSchema(),
@@ -223,6 +228,7 @@ async function callTool(
   runs: Map<string, Run>,
 ): Promise<unknown> {
   const client = await aeon();
+  if (name === "aeon_stop") return { stopped: await client.stop(String(args.chatId)) };
   if (name === "aeon_run" || name === "aeon_run_status") return runTool(client, name, args, runs);
   if (["aeon_chats", "aeon_search", "aeon_context", "aeon_routine"].includes(name))
     return chatTool(client, name, args);

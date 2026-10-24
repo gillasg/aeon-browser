@@ -47,6 +47,11 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
           codeCell: {
             code,
             timeoutMs,
+            ...(options.session?.startsWith("site-to-api")
+              ? { ownerTitle: "Mapping" }
+              : options.session === "browser-crawl-check"
+                ? { ownerTitle: "Site check" }
+                : {}),
             onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
             onProgress: () => undefined,
           },

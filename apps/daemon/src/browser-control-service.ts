@@ -40,11 +40,18 @@ export class BrowserControlService {
   private readonly actionClients = new Map<string, boolean>();
   private readonly runtimeClients = new Set<string>();
   private readonly codeClients = new Set<string>();
+  private startupTidied = new Set<string>();
+  private startupTidy = false;
+  private ownerTitles: ((chatId: string) => string | undefined) | undefined;
   private readonly cells = new BrowserCodeCells((chatId, target) =>
     this.setAssociation(chatId, target, "agent-created", "agent-open"),
   );
   useSiteScripts(scripts: SiteScriptService): void {
     this.scripts = scripts;
+  }
+  /** How a chat names its tab group; routines and sessions prefix themselves. */
+  useOwnerTitles(lookup: (chatId: string) => string | undefined): void {
+    this.ownerTitles = lookup;
   }
   resyncScripts(clientId: string): void {
     const socket = this.executors.get(clientId);
@@ -95,6 +102,7 @@ export class BrowserControlService {
     else this.scriptClients.delete(clientInstanceId);
     this.executors.set(clientInstanceId, socket);
     this.resyncScripts(clientInstanceId);
+    this.tidyOnStartup(clientInstanceId, socket);
     socket.once("close", () => {
       if (this.executors.get(clientInstanceId) === socket) {
         this.executors.delete(clientInstanceId);
@@ -185,29 +193,69 @@ export class BrowserControlService {
     input: BrowserCodeCellInput,
     signal?: AbortSignal,
   ): Promise<string> {
-    const associated = [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target);
-    const available = [...this.codeClients].filter((id) => this.isInstanceAvailable(id));
-    const preferred = associated
-      .map((t) => t.clientInstanceId)
-      .find((id) => available.includes(id));
-    const clientInstanceId = preferred ?? (available.length === 1 ? available[0] : undefined);
-    if (!clientInstanceId)
-      return JSON.stringify({
-        error: available.length ? "AMBIGUOUS_BROWSER" : "BROWSER_OFFLINE",
-        detail: available.length
-          ? "Several browsers are connected; attach a tab from the intended browser first."
-          : "No connected browser can run browser_code. Reload Aeon in chrome://extensions.",
-      });
+    const { clientInstanceId, available } = this.pickCodeClient(chatId);
+    if (!clientInstanceId) return this.codeUnavailable(available);
     const socket = this.executors.get(clientInstanceId);
     if (!socket) return JSON.stringify({ error: "BROWSER_OFFLINE" });
+    const associated = [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target);
     const targets = associated.filter((t) => t.clientInstanceId === clientInstanceId);
     try {
       return JSON.stringify(
-        await this.cells.run(socket, chatId, toolCallId, targets, input, signal),
+        await this.cells.run(
+          socket,
+          chatId,
+          toolCallId,
+          targets,
+          this.namedCell(chatId, input),
+          signal,
+        ),
       );
     } catch (error) {
       return JSON.stringify({ error: error instanceof Error ? error.message : String(error) });
     }
+  }
+  private pickCodeClient(chatId: string): { clientInstanceId?: string; available: string[] } {
+    const associated = [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target);
+    const available = [...this.codeClients].filter((id) => this.isInstanceAvailable(id));
+    const preferred = associated
+      .map((target) => target.clientInstanceId)
+      .find((id) => available.includes(id));
+    return {
+      available,
+      ...(preferred
+        ? { clientInstanceId: preferred }
+        : available.length === 1
+          ? { clientInstanceId: available[0] }
+          : {}),
+    };
+  }
+  private codeUnavailable(available: string[]): string {
+    return JSON.stringify({
+      error: available.length ? "AMBIGUOUS_BROWSER" : "BROWSER_OFFLINE",
+      detail: available.length
+        ? "Several browsers are connected; attach a tab from the intended browser first."
+        : "No connected browser can run browser_code. Reload Aeon in chrome://extensions.",
+    });
+  }
+  private namedCell(chatId: string, input: BrowserCodeCellInput): BrowserCodeCellInput {
+    const title = input.ownerTitle ?? this.ownerTitles?.(chatId);
+    return title ? { ...input, ownerTitle: title } : input;
+  }
+  /** After a stop (or a daemon restart), close the tabs a finished run no longer needs. */
+  tidyChat(chatId: string): void {
+    for (const socket of this.executors.values())
+      if (socket.readyState === WebSocket.OPEN)
+        socket.send(JSON.stringify({ kind: "browser.release", chatId, reset: false, tidy: true }));
+  }
+  /** One daemon start: tidying is safe only for runs this process never had. */
+  tidyOnStartup(clientInstanceId: string, socket: WebSocket): void {
+    if (!this.startupTidy || this.startupTidied.has(clientInstanceId)) return;
+    this.startupTidied.add(clientInstanceId);
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ kind: "browser.tidy" }));
+  }
+  /** Production calls this once; a bare service in tests leaves executors untouched. */
+  enableStartupTidy(): void {
+    this.startupTidy = true;
   }
   /** The sockets of the connected browsers, for messages every browser answers on its own. */
   executorSockets(): WebSocket[] {
@@ -255,7 +303,11 @@ export class BrowserControlService {
   ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const socket = this.executors.get(step.clientInstanceId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return { code: "BROWSER_OFFLINE" };
-    const opened = await this.dispatch(socket, chatId, toolCallId, operationId, step, timeoutMs);
+    const named =
+      step.ownerTitle || !this.ownerTitles?.(chatId)
+        ? step
+        : { ...step, ownerTitle: this.ownerTitles(chatId) };
+    const opened = await this.dispatch(socket, chatId, toolCallId, operationId, named, timeoutMs);
     if (opened.result?.kind === "tab")
       this.setAssociation(chatId, opened.result.tab.target, "agent-created", "agent-open");
     return opened;

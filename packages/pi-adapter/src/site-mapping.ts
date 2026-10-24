@@ -208,9 +208,12 @@ function finishExplore(state: State, site: string, at: number, outcome: Outcome)
 async function runExplore(current: Config, site: string): Promise<Outcome> {
   try {
     const browse = await current.model();
-    const [found] = await inChat(BACKGROUND, () => explore([site], { model: browse, parallel: 1 }));
+    const [found] = await inChat(BACKGROUND, () =>
+      explore([site], { model: browse, concurrency: 1 }),
+    );
     if (!found) return { error: "explore returned no result" };
-    if (found.error) return { error: reason(found.error) };
+    if (found.error)
+      return { error: found.kind ? `${found.kind}: ${found.error}` : reason(found.error) };
     const operations = found.operations ?? 0;
     return { result: `${operations} operation${operations === 1 ? "" : "s"}` };
   } catch (error) {

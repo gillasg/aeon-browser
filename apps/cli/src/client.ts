@@ -202,6 +202,26 @@ export class AeonClient {
     });
   }
 
+  /** Stops a running chat; the daemon tidies its tabs. */
+  stop(chatId: string): Promise<boolean> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not stop the chat in time."));
+      }, 30_000);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.chat.stopped") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        if (message.stopped !== true)
+          reject(new Error(String(message.error ?? "Aeon could not stop that chat.")));
+        else resolve(true);
+      });
+      this.socket.send(JSON.stringify({ kind: "core.chat.stop", requestId, chatId }));
+    });
+  }
+
   /**
    * Sends a Chat's first prompt through the daemon, the same path its tab uses: no tab has to
    * open, and the prompt does not depend on one finishing loading. Resolves once the daemon

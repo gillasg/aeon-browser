@@ -94,7 +94,7 @@ configureEngine({
   controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
   idleTitle: "Open Aeon Chat",
   notificationIcon: "completion-icon.png",
-  tabGroupTitle: () => "Aeon",
+  tabGroupTitle: (_owner, title) => title ?? "Aeon",
   agentView: readAgentTabView,
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
