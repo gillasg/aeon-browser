@@ -64,6 +64,7 @@ test("Pi context usage is typed in snapshots and live events, including unknown 
       chatId: "1c8e73dc-f996-4aac-94ae-198773512ab3",
       title: "Example",
       projectId: null,
+      origin: "user",
       pinned: false,
       archived: false,
       status: "ready",

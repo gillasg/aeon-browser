@@ -23,6 +23,7 @@ test("native UI fork projects a closed summary instead of leaking its internal c
           chatId: target,
           title: "Branch",
           projectId: null,
+          origin: "agent",
           pinned: false,
           archived: false,
           status: "ready",
