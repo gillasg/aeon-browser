@@ -8,12 +8,17 @@ import { boundedResult, type ToolText } from "./site-tool-output.js";
 // saved with its evidence; the reply is the counts and the hosts per verdict.
 
 export async function runCheck(
-  input: { urls?: string[] | undefined; file?: string | undefined; limit?: number | undefined },
+  input: {
+    urls?: string[] | undefined;
+    file?: string | undefined;
+    limit?: number | undefined;
+    via?: "auto" | "http" | undefined;
+  },
   workspace: string | undefined,
 ): Promise<ToolText> {
   const urls = [...(input.urls ?? []), ...(await urlsFromFile(input.file, workspace))];
   if (!urls.length) throw new Error("Give urls (hosts or URLs) or a workspace file listing them");
-  const report = await checkSites(urls.slice(0, 5000));
+  const report = await checkSites(urls.slice(0, 5000), { via: input.via ?? "auto" });
   const saved = workspace ? await save(report.results, workspace) : undefined;
   const byVerdict: Record<string, string[]> = {};
   for (const result of report.results) (byVerdict[result.verdict] ??= []).push(result.host);
@@ -22,6 +27,7 @@ export async function runCheck(
       checked: report.results.length,
       counts: report.counts,
       chromeUsed: report.browserUsed,
+      chromePages: report.chromePages,
       spotCheck: report.spotCheck,
       ...(saved ? { savedIn: saved } : {}),
       hosts: byVerdict,

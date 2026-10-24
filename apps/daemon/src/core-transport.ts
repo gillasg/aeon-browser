@@ -3,6 +3,8 @@ import { mkdir, writeFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { once } from "node:events";
 import {
+  CoreChatStopReplySchema,
+  CoreChatStopRequestSchema,
   CoreHelloSchema,
   CoreOpenChatRequestSchema,
   CoreSettingsRequestSchema,
@@ -112,6 +114,7 @@ function authenticate(
       (candidate) =>
         handleAttentionMessage(socket, candidate, attention) ||
         handleOpenChat(socket, candidate, service, browser) ||
+        handleChatStop(socket, candidate, service, browser) ||
         handleSettings(socket, candidate, browser) ||
         handleBrowserRun(socket, candidate, browser) ||
         handleModelComplete(socket, candidate, service) ||
@@ -133,6 +136,45 @@ function handleOpenChat(
   );
   const browsers = known ? browser.openChatTab(request.data.chatId, request.data.active) : 0;
   socket.send(JSON.stringify({ kind: "core.chat.opened", chatId: request.data.chatId, browsers }));
+  return true;
+}
+
+/** `aeon stop`: stop the chat's Pi run and tidy the tabs it left open. */
+function handleChatStop(
+  socket: WebSocket,
+  candidate: unknown,
+  service: ChatService,
+  browser: BrowserControlService,
+): boolean {
+  const request = CoreChatStopRequestSchema.safeParse(candidate);
+  if (!request.success) return false;
+  const { requestId, chatId } = request.data;
+  void service.stop(chatId as Parameters<ChatService["stop"]>[0]).then(
+    () => {
+      browser.tidyChat(chatId);
+      socket.send(
+        JSON.stringify(
+          CoreChatStopReplySchema.parse({
+            kind: "core.chat.stopped",
+            requestId,
+            chatId,
+            stopped: true,
+          }),
+        ),
+      );
+    },
+    (error: unknown) => {
+      socket.send(
+        JSON.stringify({
+          kind: "core.chat.stopped",
+          requestId,
+          chatId,
+          stopped: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    },
+  );
   return true;
 }
 /** `aeon settings`: read or change the agent settings in every connected Chrome. */

@@ -12,6 +12,7 @@ import {
 export interface BrowserCodeCellInput {
   code: string;
   timeoutMs: number;
+  ownerTitle?: string;
   onCall: (request: unknown) => Promise<unknown>;
   onProgress: (steps: Record<string, unknown>[]) => void;
 }
@@ -88,6 +89,7 @@ export class BrowserCodeCells {
             code: input.code,
             targets,
             timeoutMs: input.timeoutMs,
+            ...(input.ownerTitle ? { ownerTitle: input.ownerTitle } : {}),
           }),
         ),
       );

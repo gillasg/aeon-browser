@@ -25,6 +25,10 @@ test("regular-chat browser work pairs tabs automatically and side-panel work kee
       format: "esm",
     });
     const api = await import(pathToFileURL(outfile).href);
+    assert.equal(api.presentsBrowserTask("read"), false);
+    assert.equal(api.presentsBrowserTask("evaluate"), false);
+    assert.equal(api.presentsBrowserTask("click"), true);
+    assert.equal(api.presentsBrowserTask("navigate"), true);
     const mock = layoutChrome();
     globalThis.chrome = mock.chrome;
     await api.presentBrowserTask("test", 20);

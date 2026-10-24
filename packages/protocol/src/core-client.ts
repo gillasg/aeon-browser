@@ -92,6 +92,23 @@ export const CoreOpenChatReplySchema = z
     browsers: z.number().int().nonnegative(),
   })
   .strict();
+/** A local client (the Aeon CLI/MCP) stops a running chat. */
+export const CoreChatStopRequestSchema = z
+  .object({
+    kind: z.literal("core.chat.stop"),
+    requestId: z.string().uuid(),
+    chatId: z.string().uuid(),
+  })
+  .strict();
+export const CoreChatStopReplySchema = z
+  .object({
+    kind: z.literal("core.chat.stopped"),
+    requestId: z.string().uuid(),
+    chatId: z.string().uuid(),
+    stopped: z.boolean(),
+    error: z.string().max(2000).optional(),
+  })
+  .strict();
 /** Core asks the extension to open (or reuse) a chat tab, in the background unless active. */
 export const NativeOpenChatSchema = z
   .object({

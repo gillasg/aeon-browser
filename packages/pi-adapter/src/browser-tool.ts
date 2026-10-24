@@ -1,6 +1,7 @@
 export type BrowserCodeCell = {
   code: string;
   timeoutMs: number;
+  ownerTitle?: string;
   onCall: (request: unknown) => Promise<unknown>;
   onProgress: (steps: Record<string, unknown>[]) => void;
 };

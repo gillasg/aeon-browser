@@ -388,6 +388,24 @@ them with "aeon pack enable" after reviewing it.`,
   ];
 }
 
+function stopCommand(host: DaemonHost): Command {
+  return {
+    name: "stop",
+    group: "Aeon",
+    summary: "stop a running chat",
+    help: `Usage: aeon stop <chatId>
+
+Stops the chat's current run and closes the agent tabs it no longer needs.`,
+    run: async (args) => {
+      const chatId = args.positional[0];
+      if (!chatId) throw new Error("Usage: aeon stop <chatId>");
+      await (await host.connect()).stop(chatId);
+      process.stdout.write("Stopped.\n");
+      return 0;
+    },
+  };
+}
+
 function aeonOnlyCommands(host: DaemonHost): Command[] {
   return [
     {
@@ -415,6 +433,7 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       run: (args) => searchChats(host, args),
     },
     ...outsideAgentCommands(host),
+    stopCommand(host),
     {
       name: "review",
       group: "Aeon",

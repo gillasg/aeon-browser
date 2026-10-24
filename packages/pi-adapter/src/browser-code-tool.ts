@@ -122,6 +122,13 @@ interface CellOutput {
   output?: string;
   steps?: Record<string, unknown>[];
   reset?: boolean;
+  tabStats?: {
+    opened?: number;
+    closed?: number;
+    mine?: number[];
+    total?: number;
+    popups?: number;
+  };
 }
 
 /** The tool result the model and the trace keep: steps, output, value and what was written. */
@@ -146,6 +153,7 @@ async function browserCodeResult(options: {
     ...result,
     ...(cell.reset ? { reset: true } : {}),
     ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
+    ...(cell.tabStats ? { tabStats: cell.tabStats } : {}),
   };
   const actions = traceActions(cell.steps ?? []);
   const details = {
@@ -204,6 +212,13 @@ function modelContent(body: {
   value?: unknown;
   error?: string;
   reset?: boolean;
+  tabStats?: {
+    opened?: number;
+    closed?: number;
+    mine?: number[];
+    total?: number;
+    popups?: number;
+  };
 }): ReturnType<typeof browserContent> {
   const images = browserContent(JSON.stringify({ steps: body.steps })).slice(1);
   const parts = [stepSummary(body.steps)];
@@ -211,7 +226,17 @@ function modelContent(body: {
   if (body.value !== undefined) parts.push("value: " + (JSON.stringify(body.value) ?? "undefined"));
   if (body.error) parts.push("error: " + body.error);
   if (body.reset) parts.push("runtime reset: top-level variables are gone");
+  if (body.tabStats) parts.push(tabLine(body.tabStats));
   return [{ type: "text", text: parts.join("\n") }, ...images];
+}
+
+function tabLine(stats: NonNullable<CellOutput["tabStats"]>): string {
+  const ids = stats.mine ?? [];
+  return (
+    `tabs: opened ${stats.opened ?? 0}, closed ${stats.closed ?? 0}, mine ${ids.length}` +
+    `${ids.length ? ` (${ids.join(", ")})` : ""}, total ${stats.total ?? 0}` +
+    `${stats.popups ? `; popups: ${stats.popups} parked` : ""}`
+  );
 }
 
 function stepSummary(steps: Record<string, unknown>[]): string {

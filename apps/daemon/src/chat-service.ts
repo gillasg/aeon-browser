@@ -58,6 +58,7 @@ export class ChatService {
   private readonly threadSupport: ChatThreadSupport;
   private readonly metadata: ChatMetadataService;
   private externalContextReader: (() => Promise<unknown>) | undefined;
+  private stoppedListener: ((chatId: ChatId) => void) | undefined;
   private readonly commandGate = new ChatCommandGate();
   private readonly eventHub = new ChatEventHub();
   private readonly observedSessions = new Map<ChatId, ObservedSession>();
@@ -182,6 +183,10 @@ export class ChatService {
   /** The daemon's reader for the opt-in open-tabs answer (set in the production runtime). */
   setExternalContextReader(reader: (() => Promise<unknown>) | undefined): void {
     this.externalContextReader = reader;
+  }
+  /** A stop (from the panel, CLI or MCP) tidies the tabs its run no longer needs. */
+  setStoppedListener(listener: (chatId: ChatId) => void): void {
+    this.stoppedListener = listener;
   }
   outsideContextSetting = (): Promise<boolean> => readOutsideContext(this.dataDirectory);
   setOutsideContextSetting = (enabled: boolean): Promise<void> =>
@@ -356,8 +361,12 @@ export class ChatService {
     if (pending) pending.stopped = true;
     const { session } = await this.resolveSession(this.requireChat(chatId));
     this.observeSession(chatId, session);
-    await session.abort();
-    if (pending) await this.abortLateStart(chatId, pending, session);
+    try {
+      await session.abort();
+      if (pending) await this.abortLateStart(chatId, pending, session);
+    } finally {
+      this.stoppedListener?.(chatId);
+    }
   }
   // A stop pressed while the prompt was still being prepared finds no run to abort, and the run
   // starts right after: abort it once it does, for as long as that submission is pending.

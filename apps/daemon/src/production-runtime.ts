@@ -46,11 +46,19 @@ export function createProductionRuntime(dataDirectory: string): {
     },
   });
   const browserControl = new BrowserControlService();
+  browserControl.enableStartupTidy();
   const siteScripts = attachSiteScripts(dataRoot, browserControl);
   const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
   warmModels(pi);
   const siteRules = new BrowserSiteRules();
   const service = new ChatService({ dataDirectory: dataRoot, store, pi, siteRules });
+  service.setStoppedListener((chatId) => browserControl.tidyChat(chatId));
+  browserControl.useOwnerTitles((chatId) => {
+    const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
+    if (!chat) return undefined;
+    const title = chat.title.trim().slice(0, 80) || "Chat";
+    return chat.origin === "routine" ? `Routine · ${title}` : title;
+  });
   service.setExternalContextReader(() =>
     outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
   );
