@@ -15,7 +15,7 @@ test("a routine's sites restrict its own run, never the chat's other runs", () =
   assert.deepEqual(rules.answer("chat-1"), {
     blocked: [],
     only: ["shop.example"],
-    allow: ["shop.example"],
+    allow: [],
   });
 
   // The user's own next message in the same chat is not restricted by a routine that merely exists.
@@ -27,10 +27,10 @@ test("a routine's sites restrict its own run, never the chat's other runs", () =
   });
 });
 
-test("a routine's instruction is its allow list; a check value never is", () => {
+test("a routine run lifts no block, even when its instruction names a site", () => {
   const rules = new BrowserSiteRules();
   rules.beginRoutineRun("chat-1", "run-1", "Tell me when example.com changes", []);
-  assert.deepEqual(rules.answer("chat-1").allow, ["example.com"]);
+  assert.deepEqual(rules.answer("chat-1").allow, []);
   rules.endRoutineRun("chat-1", "run-1");
   assert.deepEqual(rules.answer("chat-1"), { blocked: [], only: [], allow: [] });
 });
