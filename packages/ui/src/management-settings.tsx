@@ -51,6 +51,10 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
         {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
         {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
       />
+      <OutsideAgentsSettings
+        {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
+        {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
+      />
       <PasswordManagerSettings signIn={props.snapshot?.signIn ?? null} loading={props.loading} />
       <section className="settings-group">
         <h2>Connected Chrome</h2>
@@ -180,6 +184,29 @@ function AgentTabSettings(): ReactElement {
       <p>
         Hides the agent's cursor and its captions on pages, e.g. while a screen recorder draws its
         own.
+      </p>
+    </section>
+  );
+}
+
+function OutsideAgentsSettings(props: {
+  outsideContext?: boolean;
+  onOutsideContext?(enabled: boolean): void;
+}) {
+  return (
+    <section className="settings-group">
+      <h2>Outside agents</h2>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={props.outsideContext === true}
+          onChange={(event) => props.onOutsideContext?.(event.target.checked)}
+        />{" "}
+        Let outside agents see my open tabs
+      </label>
+      <p>
+        Only tab titles and URLs, never page contents. Off by default. The CLI and MCP expose it as{" "}
+        <code>aeon context</code> / <code>aeon_context</code>.
       </p>
     </section>
   );

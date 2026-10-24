@@ -238,6 +238,14 @@ const BlockedSitesSettingsRequestSchema = z
       .strict(),
   })
   .strict();
+const OutsideContextSettingsRequestSchema = z
+  .object({
+    kind: z.literal("command"),
+    requestId: RequestIdSchema,
+    operation: z.literal("settings.outside-context"),
+    payload: z.object({ enabled: z.boolean().optional() }).strict(),
+  })
+  .strict();
 
 export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ProjectListRequestSchema,
@@ -272,6 +280,7 @@ export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ChatQueueEditRequestSchema,
   ChatStopRequestSchema,
   BlockedSitesSettingsRequestSchema,
+  OutsideContextSettingsRequestSchema,
 ]);
 
 export const ChatSubscribeRequestSchema = z

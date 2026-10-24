@@ -86,6 +86,9 @@ export interface NewTabHomeProps {
   blockedSites?: readonly string[];
   onBlockedSiteAdd?(site: string): void;
   onBlockedSiteRemove?(site: string): void;
+  /** Outside agents may see the user's open tabs (opt-in, stored by the daemon). */
+  outsideContext?: boolean;
+  onOutsideContext?(enabled: boolean): void;
   onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
   onSidebarDefault(open: boolean): void;
 }
@@ -356,6 +359,8 @@ function Management({
       {...(props.blockedSites ? { blockedSites: props.blockedSites } : {})}
       {...(props.onBlockedSiteAdd ? { onBlockedSiteAdd: props.onBlockedSiteAdd } : {})}
       {...(props.onBlockedSiteRemove ? { onBlockedSiteRemove: props.onBlockedSiteRemove } : {})}
+      {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
+      {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
     />
   );
 }

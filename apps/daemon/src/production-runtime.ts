@@ -5,7 +5,7 @@ import { installChatPreparation, prepareChat } from "./chat-preparation.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
-import { PiSdkSessionAdapter, resolvePiAgentDirectory } from "@aeon/pi-adapter";
+import { PiSdkSessionAdapter, resolvePiAgentDirectory, sessionChatId } from "@aeon/pi-adapter";
 import { openChatStore } from "@aeon/store";
 import { SiteScriptService } from "./site-script-service.js";
 import { BrowserControlService } from "./browser-control-service.js";
@@ -20,6 +20,7 @@ import { piMcpServerName } from "./mcp-registry-mapping.js";
 import { readEnvironment } from "./environment.js";
 import { backfillChatOrigins } from "./chat-origin-backfill.js";
 import { migrateAeonSettings } from "./settings-migration.js";
+import { outsideContextAnswer, type OutsideTab } from "./outside-context.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -50,6 +51,9 @@ export function createProductionRuntime(dataDirectory: string): {
   warmModels(pi);
   const siteRules = new BrowserSiteRules();
   const service = new ChatService({ dataDirectory: dataRoot, store, pi, siteRules });
+  service.setExternalContextReader(() =>
+    outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
+  );
   pi.setSiteRulesHost((chatId) => siteRules.answer(chatId));
   const stopPreparing = installChatPreparation(service);
   const attention = new CoreAttention(dataRoot, service);
@@ -253,6 +257,20 @@ function warmModels(pi: PiSdkSessionAdapter): void {
 function closeRuntimeStores(service: ChatService, store: ReturnType<typeof openChatStore>): void {
   service.projects.close();
   store.close();
+}
+
+async function readOpenTabs(browser: BrowserControlService): Promise<OutsideTab[]> {
+  const raw = await browser.execute(sessionChatId("external", "context"), "context-tool", {
+    codeCell: {
+      code: "const tabs = await browser.tabs(); tabs.map((tab) => ({ title: tab.title, url: tab.url, active: tab.active === true }))",
+      timeoutMs: 10_000,
+      onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+      onProgress: () => undefined,
+    },
+  });
+  const cell = JSON.parse(raw) as { value?: OutsideTab[]; error?: string; detail?: string };
+  if (cell.error) throw new Error(cell.detail ? `${cell.error}: ${cell.detail}` : cell.error);
+  return Array.isArray(cell.value) ? cell.value : [];
 }
 
 function attachSiteScripts(directory: string, browser: BrowserControlService): SiteScriptService {

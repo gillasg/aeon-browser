@@ -14,6 +14,7 @@ import type { ChatResult } from "./results.js";
 import { settingsCommand } from "./settings.js";
 import { signinCommand } from "./signin.js";
 import { setupCommands } from "./setup.js";
+import { packCommand } from "./pack.js";
 import { listTools, runTool } from "./tools.js";
 
 // Every command Aeon has: its own chat commands, then browserkit's commands in the same groups,
@@ -219,6 +220,111 @@ async function searchChats(host: DaemonHost, args: Args): Promise<number> {
   return 0;
 }
 
+const ROUTINE_ACTIONS = new Set(["create", "list", "pause", "delete"]);
+
+function routinePayload(args: Args): Record<string, unknown> {
+  const action = args.positional[0];
+  if (!action || !ROUTINE_ACTIONS.has(action))
+    throw new Error(
+      'Usage: aeon routine create "<instruction>" [--schedule "every 15 minutes"] [--title t] [--check code] [--sites a,b] | list | pause <id> | delete <id>',
+    );
+  if (action === "create") return { action, ...routineCreateFields(args) };
+  if (action === "list") return { action };
+  const routineId = args.positional[1];
+  if (!routineId) throw new Error(`Usage: aeon routine ${action} <routineId>`);
+  return { action, routineId };
+}
+
+function routineCreateFields(args: Args): Record<string, unknown> {
+  const fields: Record<string, unknown> = {
+    instruction: args.positional.slice(1).join(" ").trim(),
+  };
+  for (const name of ["title", "schedule", "check"] as const) {
+    const value = flag(args, name);
+    if (value) fields[name] = value;
+  }
+  const sites = flag(args, "sites");
+  if (sites)
+    fields.sites = sites
+      .split(",")
+      .map((site) => site.trim())
+      .filter(Boolean);
+  const chat = flag(args, "chat");
+  if (chat) fields.chatId = chat;
+  return fields;
+}
+
+async function routineCommand(host: DaemonHost, args: Args): Promise<number> {
+  const value = await callAeonTool(host, "routine", routinePayload(args), "routine");
+  if (has(args, "json")) process.stdout.write(JSON.stringify(value, null, 2) + "\n");
+  else
+    for (const item of Array.isArray(value) ? value : [value])
+      process.stdout.write(routineLine(item) + "\n");
+  return 0;
+}
+
+async function callAeonTool(
+  host: DaemonHost,
+  tool: string,
+  input: Record<string, unknown>,
+  label: string,
+): Promise<unknown> {
+  const client = await host.connect();
+  const reply = await client.tool({
+    kind: "core.tool.call",
+    tool,
+    session: "cli",
+    arguments: input,
+  });
+  const text = ((reply.content as { text?: string }[] | undefined) ?? [])
+    .map((part) => part.text ?? "")
+    .join("");
+  if (reply.isError === true) throw new Error(text || `The ${label} command failed.`);
+  return JSON.parse(text || "null") as unknown;
+}
+
+function routineLine(value: unknown): string {
+  const routine = value as {
+    routineId?: string;
+    title?: string;
+    enabled?: boolean;
+    nextDueAt?: string | null;
+    chatId?: string;
+    deleted?: boolean;
+  };
+  if (routine.deleted) return `Deleted ${routine.routineId}`;
+  const state = routine.enabled === false ? "paused" : "active";
+  const next = routine.nextDueAt ? ` · next ${routine.nextDueAt}` : "";
+  return `${routine.routineId}  ${state}  ${routine.title ?? ""}  (chat ${routine.chatId ?? "?"}${next})`;
+}
+
+async function contextCommand(host: DaemonHost, args: Args): Promise<number> {
+  const value = (await callAeonTool(host, "context", {}, "context")) as {
+    enabled?: boolean;
+    tabs?: { title?: string; url?: string; active?: boolean }[];
+    hint?: string;
+  };
+  if (has(args, "json")) {
+    process.stdout.write(JSON.stringify(value, null, 2) + "\n");
+    return 0;
+  }
+  printContext(value);
+  return 0;
+}
+
+function printContext(value: {
+  enabled?: boolean;
+  tabs?: { title?: string; url?: string; active?: boolean }[];
+  hint?: string;
+}): void {
+  if (!value.enabled) {
+    process.stdout.write(`${value.hint ?? "Outside agents cannot see the open tabs."}\n`);
+    return;
+  }
+  for (const tab of value.tabs ?? [])
+    process.stdout.write(`${tab.active ? "*" : " "} ${tab.title ?? ""}  ${tab.url ?? ""}\n`);
+}
+
 async function review(host: DaemonHost, [action, value, note]: string[]): Promise<number> {
   const client = await host.connect();
   const payload: Record<string, unknown> =
@@ -240,6 +346,46 @@ async function review(host: DaemonHost, [action, value, note]: string[]): Promis
   for (const chat of JSON.parse(text.join("")) as { chatId: string; title: string }[])
     process.stdout.write(`${chat.chatId}  ${chat.title}\n`);
   return 0;
+}
+
+function outsideAgentCommands(host: DaemonHost): Command[] {
+  return [
+    {
+      name: "routine",
+      group: "Aeon",
+      summary: "create, list, pause or delete routines",
+      help: `Usage: aeon routine create "<instruction>" [--schedule "every 15 minutes"] [--title t]
+         [--check "<browser code>"] [--sites a.com,b.com] [--chat <chatId>]
+       aeon routine list [--json] | pause <routineId> | delete <routineId>
+
+Creates the routine in a new chat (or --chat, one this CLI created). Alerts go to Aeon only.`,
+      run: (args) => routineCommand(host, args),
+    },
+    {
+      name: "context",
+      group: "Aeon",
+      summary: "the user's open tabs, when they allowed it",
+      help: `Usage: aeon context [--json]
+
+Returns tab titles and URLs and which is active, only after the user turns on
+"Let outside agents see my open tabs" in Aeon Settings. Never page contents.`,
+      run: (args) => contextCommand(host, args),
+    },
+    {
+      name: "pack",
+      group: "Use sites",
+      summary: "export or import a site with its flows, skills and boosts",
+      help: `Usage: aeon pack export <site> --out <file.zip> [--no-boosts] [--json]
+       aeon pack import <file.zip> [--json]
+       aeon pack enable <site> [--json]
+
+A pack holds a mapped site's model, OpenAPI, client and recorded flows, plus the site skills and
+boosts written for it. Export strips sessions, cookies and credential-bearing request headers and
+bodies. Import writes the site, then saves skills and boosts DISABLED and prints their code; enable
+them with "aeon pack enable" after reviewing it.`,
+      run: (args) => packCommand(host, args),
+    },
+  ];
 }
 
 function aeonOnlyCommands(host: DaemonHost): Command[] {
@@ -268,6 +414,7 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
        origin: user | cli | mcp | companion | agent | routine | unknown`,
       run: (args) => searchChats(host, args),
     },
+    ...outsideAgentCommands(host),
     {
       name: "review",
       group: "Aeon",
