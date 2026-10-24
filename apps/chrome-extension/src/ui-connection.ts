@@ -26,11 +26,19 @@ export type PageConnection =
     }
   | { kind: "failed"; code: string };
 
+/** A daemon restart takes a few seconds; pages wait through it instead of showing an error. */
+const TRANSIENT = new Set(["DAEMON_OFFLINE", "CONNECTION_TIMEOUT"]);
+const PATIENCE_MS = 60_000;
+
 export async function connectPage(scope: PageGrantScope): Promise<PageConnection> {
-  const result = await connectNativeUi(scope);
-  return result.kind === "connected"
-    ? { kind: "connected", client: result.client }
-    : { kind: "failed", code: result.code };
+  const giveUpAt = Date.now() + PATIENCE_MS;
+  for (;;) {
+    const result = await connectNativeUi(scope);
+    if (result.kind === "connected") return { kind: "connected", client: result.client };
+    if (!TRANSIENT.has(result.code) || Date.now() > giveUpAt)
+      return { kind: "failed", code: result.code };
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
 }
 
 export async function openExtensionChat(
