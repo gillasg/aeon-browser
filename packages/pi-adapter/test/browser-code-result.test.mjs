@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { createBrowserCodeTool } from "../dist/browser-code-tool.js";
 
@@ -9,10 +12,41 @@ const target = {
   tabIncarnation: "fc62115c-286f-47c7-a018-1ef92f81e8a1",
 };
 
-async function runCell(cell) {
-  const tool = createBrowserCodeTool("chat-1", async () => JSON.stringify(cell));
+async function runCell(cell, workspace) {
+  const tool = createBrowserCodeTool("chat-1", async () => JSON.stringify(cell), workspace);
   return tool.execute("call-1", { code: "x" }, undefined, undefined);
 }
+
+test("a cell with a workspace names the run log it keeps", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "aeon-cell-run-"));
+  try {
+    const result = await runCell(
+      {
+        output: "",
+        steps: [
+          {
+            index: 0,
+            action: {
+              op: "openTab",
+              clientInstanceId: target.clientInstanceId,
+              url: "https://a.test/",
+            },
+            disposition: "completed",
+            result: { kind: "tab", tab: { target, url: "https://a.test/" } },
+          },
+        ],
+      },
+      workspace,
+    );
+    const text = result.content[0].text;
+    assert.match(text, /run log: runs\/.+\.json/);
+    const [file] = await readdir(join(workspace, "runs"));
+    const log = JSON.parse(await readFile(join(workspace, "runs", file), "utf8"));
+    assert.deepEqual(log.hosts, ["a.test"]);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
 
 test("the model gets one line per step and the cell output, not the raw envelope", async () => {
   const result = await runCell({

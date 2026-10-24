@@ -96,6 +96,20 @@
           "type": "string",
           "enum": ["auto", "http"],
           "description": "For check: http never starts Chrome."
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "maxItems": 20,
+          "description": "For check: paths to probe on every host, e.g. [\"/api/x\"]."
+        },
+        "expect": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "For check: what those paths should answer (json, html, m3u8, xml, text or a content type); the body's real shape is checked."
         }
       },
       "required": ["action"],

@@ -1,5 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { BrowserToolRunner } from "./browser-tool.js";
+import { finishRunLog, startRunLog } from "./run-log.js";
 
 // A follow-up often arrives seconds after the previous answer. Keep the tabs and their variables
 // alive through a short gap: release the run now, but tidy only after this delay, and cancel the
@@ -10,6 +11,8 @@ const tidyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 export interface BrowserSessionLifecycleOptions {
   /** Tests shorten the delay; production uses two minutes. */
   tidyDelayMs?: number;
+  /** The chat's workspace: each run's log is written under runs/ there. */
+  workspace?: string;
 }
 
 export function installBrowserSessionLifecycle(
@@ -22,10 +25,14 @@ export function installBrowserSessionLifecycle(
   session.subscribe((event) => {
     if (event.type === "agent_start") {
       cancelTidy(chatId);
+      startRunLog(chatId);
       return;
     }
-    if (event.type !== "agent_end" || !run) return;
+    if (event.type !== "agent_end") return;
     cancelTidy(chatId);
+    // The run's log is finished first: it is what the user and a later agent read back.
+    void finishRunLog(chatId, options.workspace).catch(() => undefined);
+    if (!run) return;
     // Release the finished run immediately; closing its tabs waits so a quick follow-up can
     // reuse its variables and pages.
     void run(chatId, "browser-turn-cleanup", { release: true }).catch(() => undefined);

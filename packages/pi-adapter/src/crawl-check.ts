@@ -7,7 +7,7 @@ import { boundedResult, type ToolText } from "./site-tool-output.js";
 // crawl action=check: Aeon's override around the shared check handler is only the workspace
 // evidence bundle; reading the input file and running the checks lives in browserkit.
 
-type CheckInput = Pick<CrawlToolInput, "urls" | "file" | "limit" | "via">;
+type CheckInput = Pick<CrawlToolInput, "urls" | "file" | "limit" | "via" | "paths" | "expect">;
 
 export async function runCheck(
   input: CheckInput,
@@ -28,6 +28,7 @@ export async function runCheck(
       chromePages: report.chromePages,
       spotCheck: report.spotCheck,
       ...(saved ? { savedIn: saved } : {}),
+      ...(report.paths?.length ? { paths: pathSummary(report.paths) } : {}),
       hosts: byVerdict,
       note: "Each verdict's evidence (status, title, reason, http or chrome) is in the saved file.",
     },
@@ -35,6 +36,29 @@ export async function runCheck(
     "checks",
     "summary",
   );
+}
+
+/** What the path probes found, host by host, with why the failing ones failed. */
+function pathSummary(lines: NonNullable<Awaited<ReturnType<typeof checkSites>>["paths"]>) {
+  return lines.map((line) => ({
+    host: line.host,
+    ok: line.ok,
+    failed: line.failed,
+    ...(line.expectation ? { expect: line.expectation } : {}),
+    ...(line.failed
+      ? {
+          failing: line.probes
+            .filter((probe) => !probe.ok)
+            .slice(0, 3)
+            .map((probe) => ({
+              path: probe.path,
+              shape: probe.shape,
+              ...(probe.contentType ? { contentType: probe.contentType } : {}),
+              ...(probe.reason ? { reason: probe.reason } : {}),
+            })),
+        }
+      : {}),
+  }));
 }
 
 async function save(results: readonly SiteCheck[], workspace: string): Promise<string> {
