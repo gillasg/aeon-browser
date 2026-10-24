@@ -11,6 +11,7 @@ export {
 export { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 export { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 export { NewTabHome, type NewTabHomeProps } from "./home-surface.js";
+export type { HomeRunPreview } from "./home-live.js";
 export type {
   ModelAccountsProps,
   ModelAccountsState,

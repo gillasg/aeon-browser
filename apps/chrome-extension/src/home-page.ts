@@ -14,7 +14,14 @@ import {
   PiAttachmentSchema,
   type PiAttachmentDto,
 } from "@aeon/protocol";
-import { mountAeonUi, NewTabHome, type ComposerModel, type ComposerAttachment } from "@aeon/ui";
+import {
+  mountAeonUi,
+  NewTabHome,
+  type ComposerModel,
+  type ComposerAttachment,
+  type HomeRunPreview,
+} from "@aeon/ui";
+import { followHomePreviews } from "./home-previews.js";
 import { markActivityUndone, type ActivityEntry } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { sendComposerCommand } from "./composer-command.js";
@@ -39,6 +46,7 @@ let errorMessage = "";
 let openChatIds: ReadonlySet<string> = new Set();
 let runningChatIds: ReadonlySet<string> = new Set();
 let needsChatIds: ReadonlySet<string> = new Set();
+let previews: ReadonlyMap<string, HomeRunPreview> = new Map();
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 const modelSignIn = new ModelSignIn(
   async () => {
@@ -94,6 +102,7 @@ function createView() {
     chats,
     runningChatIds,
     needsChatIds,
+    previews,
     modelCatalog,
     modelLogin: modelSignIn.state,
     onConnectModel: () => void modelSignIn.open(),
@@ -139,6 +148,10 @@ if (new URL(location.href).searchParams.get("embedded") === "1")
 render();
 void restoreModelCatalog();
 void watchRunningChats();
+followHomePreviews((next) => {
+  previews = next;
+  render();
+});
 const reconnect = new PageReconnect(start, (message) => {
   connectionLabel = "Reconnecting";
   showError(message);

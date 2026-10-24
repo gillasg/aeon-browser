@@ -13,7 +13,6 @@ import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 import { PromptField } from "./prompt-field.js";
-import { MiniSwarm } from "./mini-swarm.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
 type HomeStartProps = Pick<
@@ -122,7 +121,6 @@ function HomePrompt({
   };
   return (
     <form id="home-form" className="home-query-form" onSubmit={submit}>
-      <MiniSwarm size={34} />
       <HomeAttachmentPicker onFiles={onFiles} contextId={contextId} />
       <PromptField
         multiline
