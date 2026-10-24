@@ -361,59 +361,78 @@ summary:focus-visible {
   stroke-width: 1.5;
 }
 
-/* Earlier-user-message rail: a small notch per turn, with a preview on hover. */
+/* Earlier-user-message rail: notches stacked at an even pitch, centred on the left edge. The
+   notch under the pointer is longest and its two neighbours on each side step down; the turn
+   in view is lit. A preview of the turn sits beside the hovered notch. */
 .transcript-rail {
+  --rail-pitch: 7px;
   position: absolute;
   z-index: 4;
-  top: 84px;
-  bottom: 132px;
-  left: 12px;
-  width: 20px;
-  pointer-events: none;
+  top: 50%;
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transform: translateY(-50%);
 }
 .transcript-rail-tick {
-  position: absolute;
-  top: var(--rail-top);
-  left: 0;
-  width: 12px;
-  height: 2px;
+  flex: 0 0 var(--rail-pitch);
+  width: 22px;
   padding: 0;
-  transform: translateY(-50%);
   border: 0;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--aeon-muted) 55%, transparent);
-  opacity: 0.55;
-  pointer-events: auto;
+  background: none;
   cursor: pointer;
-  transition:
-    width 120ms ease,
-    opacity 120ms ease,
-    background 120ms ease;
 }
-.transcript-rail-tick:hover,
-.transcript-rail-tick:focus-visible,
-.transcript-rail-tick[data-active="true"] {
-  width: 20px;
+.transcript-rail-tick::before {
+  display: block;
+  width: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--aeon-muted);
+  content: "";
+  opacity: 0.45;
+  transition:
+    width 140ms ease,
+    opacity 140ms ease,
+    background 140ms ease;
+}
+.transcript-rail-tick[data-near="2"]::before {
+  width: 12px;
+  opacity: 0.65;
+}
+.transcript-rail-tick[data-near="1"]::before {
+  width: 16px;
+  opacity: 0.8;
+}
+.transcript-rail-tick[data-active="true"]::before {
+  width: 22px;
+  background: var(--aeon-text);
+  opacity: 1;
+}
+.transcript-rail-tick[data-current="true"]::before {
   background: var(--aeon-text);
   opacity: 1;
 }
 .transcript-rail-tick:focus-visible {
-  outline: 2px solid var(--aeon-text);
-  outline-offset: 3px;
+  outline: none;
+}
+.transcript-rail-tick:focus-visible::before {
+  background: var(--aeon-text);
+  opacity: 1;
 }
 .transcript-rail-preview {
   position: absolute;
-  top: clamp(42px, var(--rail-top), calc(100% - 52px));
-  left: 26px;
+  top: calc(var(--rail-index) * var(--rail-pitch) + var(--rail-pitch) / 2);
+  left: 34px;
   display: grid;
-  width: min(250px, calc(100vw - 90px));
-  gap: 4px;
-  padding: 10px 12px;
+  width: min(300px, calc(100vw - 90px));
+  gap: 6px;
+  padding: 12px 14px;
   transform: translateY(-50%);
   border: 1px solid var(--aeon-line);
-  border-radius: var(--aeon-r-md);
+  border-radius: 14px;
   background: var(--aeon-surface);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 34%);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 40%);
   pointer-events: none;
 }
 .transcript-rail-preview strong {
@@ -430,7 +449,7 @@ summary:focus-visible {
   overflow: hidden;
   color: var(--aeon-muted);
   font-size: var(--aeon-fs-xs);
-  line-height: 1.4;
+  line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
@@ -439,7 +458,7 @@ summary:focus-visible {
     left: 6px;
   }
   .transcript-rail-preview {
-    left: 20px;
+    left: 28px;
   }
 }
 .message-row {
@@ -4077,4 +4096,49 @@ body[data-host="panel"] .composer-meta {
 }
 .run-duration {
   font-variant-numeric: tabular-nums;
+}
+
+/* Work steps: one even rhythm. Tool rows and Thinking rows are each 32px tall with no margins,
+   so the gap between any two steps is the same. Pressing Thinking swaps the label for the
+   reasoning; pressing the reasoning swaps it back. */
+.turn-work > *,
+.turn-work .message-row,
+.turn-work .message-content,
+.turn-work .activity-group,
+.turn-work .activity-bundle,
+.turn-work .thinking-detail {
+  margin: 0;
+}
+.turn-work .activity-bundle > summary,
+.turn-work .activity-step > summary {
+  min-height: 32px;
+}
+.thinking-detail {
+  cursor: pointer;
+  color: var(--aeon-faint);
+}
+.thinking-detail .thinking-label {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+}
+.thinking-detail:hover,
+.thinking-detail:focus-visible {
+  color: var(--aeon-text);
+}
+.thinking-detail[data-open="true"] {
+  padding: 5px 0;
+  color: var(--aeon-muted);
+}
+.thinking-detail[data-open="true"] .message-markdown > :first-child {
+  margin-top: 0;
+}
+.thinking-detail[data-open="true"] .message-markdown > :last-child {
+  margin-bottom: 0;
+}
+.thinking-detail:focus-visible {
+  outline: none;
+}
+.thinking-detail [hidden] {
+  display: none;
 }
