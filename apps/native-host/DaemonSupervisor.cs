@@ -188,7 +188,7 @@ internal static class DaemonSupervisor
 
         // One server pipe per daemon lifetime: a pending accept is cancelled rather than
         // disposed, because a disposed pipe with a pending accept keeps its name reserved.
-        using (var pipe = CreateServerPipe())
+        using (var pipe = CreateServerPipeWithRetry(daemon))
         {
             while (!daemon.HasExited)
             {
@@ -330,6 +330,28 @@ internal static class DaemonSupervisor
         catch { }
     }
 
+    /// <summary>
+    /// The previous daemon's pipe can hold its name for a few seconds after that daemon dies.
+    /// A ready daemon must never be killed for that: wait for the name instead.
+    /// </summary>
+    private static NamedPipeServerStream CreateServerPipeWithRetry(Process daemon)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true)
+        {
+            try { return CreateServerPipe(); }
+            catch (UnauthorizedAccessException)
+            {
+                if (daemon.HasExited || DateTime.UtcNow > deadline) throw;
+            }
+            catch (IOException)
+            {
+                if (daemon.HasExited || DateTime.UtcNow > deadline) throw;
+            }
+            Thread.Sleep(250);
+        }
+    }
+
     private static NamedPipeServerStream CreateServerPipe()
     {
         var security = new PipeSecurity();
@@ -340,7 +362,7 @@ internal static class DaemonSupervisor
             AccessControlType.Allow));
         return new NamedPipeServerStream(
             HostConfiguration.PipeName(), PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
-            PipeOptions.None, MaxMessageBytes, MaxMessageBytes, security);
+            PipeOptions.Asynchronous, MaxMessageBytes, MaxMessageBytes, security);
     }
 
     private static Mutex CreateUserMutex(out bool created)

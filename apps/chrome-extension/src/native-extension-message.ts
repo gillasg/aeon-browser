@@ -145,7 +145,7 @@ export function pageGrantErrorMessage(code: string): string {
     case "HOST_CONFIG_INVALID":
       return "Aeon's native host registration is broken. Run Aeon's setup again to repair it.";
     case "DAEMON_OFFLINE":
-      return "Aeon's daemon isn't answering. It restarts by itself within a minute; if it doesn't, sign out of Windows and back in, or run start-daemon.ps1 in %LOCALAPPDATA%\\Aeon. Retrying…";
+      return "Aeon's daemon hasn't answered for a minute. Run start-daemon.ps1 in %LOCALAPPDATA%\\Aeon to start it. Retrying…";
     case "CONNECTION_TIMEOUT":
       return "Aeon's daemon is starting or busy and didn't answer in time. Retrying…";
     case "UPDATE_REQUIRED":
