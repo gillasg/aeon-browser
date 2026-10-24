@@ -3,6 +3,7 @@ import { PiBrowserContextRecordSchema } from "@browserkit/protocol";
 import { ChatCatalogItemSchema, ChatIdSchema, ChatSummarySchema } from "./chat-catalog-dto.js";
 export {
   ChatIdSchema,
+  ChatOriginSchema,
   ChatStatusSchema,
   ChatSummarySchema,
   ChatCatalogItemSchema,

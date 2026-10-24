@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isChatOrigin, type ChatListFilter } from "@aeon/domain";
 
 // Marks which chats have been reviewed (their traces and tool calls read), with the findings saved
 // next to the mark. A chat used again after its review counts as unreviewed again.
@@ -11,6 +12,7 @@ interface ReviewEntry {
 interface ReviewableChat {
   chatId: string;
   title: string;
+  origin: string;
   updatedAt: string;
 }
 type Content = { content: { type: "text"; text: string }[]; isError: boolean };
@@ -20,6 +22,7 @@ export const CHAT_REVIEW_TOOL = {
   description: [
     "Track which Aeon chats have been reviewed (trace and tool calls read).",
     "action=list: of the 100 most recent chats, those not reviewed yet, or used again since their review (newest first; limit, default 20; all=true lists reviewed ones too).",
+    "Narrow the list with origin (user, cli, mcp, companion, agent, routine, unknown) and since/until (YYYY-MM-DD, by creation day).",
     "action=mark: mark chatId reviewed; note is saved as the findings (reviews/<chatId>.md in Aeon's data folder).",
     "action=get: the review for chatId. action=unmark: clear it.",
   ].join("\n"),
@@ -31,6 +34,12 @@ export const CHAT_REVIEW_TOOL = {
       note: { type: "string", maxLength: 50000 },
       limit: { type: "number", minimum: 1, maximum: 100 },
       all: { type: "boolean" },
+      origin: {
+        type: "string",
+        enum: ["user", "cli", "mcp", "companion", "agent", "routine", "unknown"],
+      },
+      since: { type: "string", maxLength: 10 },
+      until: { type: "string", maxLength: 10 },
       session: { type: "string", maxLength: 100 },
     },
     required: ["action"],
@@ -49,7 +58,7 @@ export class ChatReviews {
   private readonly folder: string;
   constructor(
     dataDirectory: string,
-    private readonly chats: (limit: number) => readonly ReviewableChat[],
+    private readonly chats: (limit: number, filter?: ChatListFilter) => readonly ReviewableChat[],
   ) {
     this.folder = join(dataDirectory, "reviews");
   }
@@ -57,7 +66,13 @@ export class ChatReviews {
   async run(args: Record<string, unknown>): Promise<Content> {
     const chatId = typeof args.chatId === "string" ? args.chatId : "";
     if (args.action === "list")
-      return text(await this.list(Number(args.limit) || 20, args.all === true));
+      return text(
+        await this.list(
+          Number(args.limit) || 20,
+          args.all === true,
+          dayFilter(args.since, args.until, args.origin),
+        ),
+      );
     if (!chatId) return text("chatId is required", true);
     if (!this.chats(100).some((chat) => chat.chatId === chatId))
       return text(`No chat ${chatId}`, true);
@@ -67,9 +82,9 @@ export class ChatReviews {
     return text("action must be list, mark, get or unmark", true);
   }
 
-  private async list(limit: number, all: boolean) {
+  private async list(limit: number, all: boolean, filter: ChatListFilter) {
     const index = await this.index();
-    const rows = this.chats(100).map((chat) => {
+    const rows = this.chats(100, filter).map((chat) => {
       const review = index[chat.chatId];
       const reviewed = Boolean(review && review.reviewedAt >= chat.updatedAt);
       return { ...chat, reviewed, reviewedAt: review?.reviewedAt };
@@ -120,4 +135,21 @@ export class ChatReviews {
   private save(index: Record<string, ReviewEntry>): Promise<void> {
     return writeFile(join(this.folder, "index.json"), JSON.stringify(index, null, 1));
   }
+}
+
+/** The origin and creation-day range a listing asks for. */
+function dayFilter(since: unknown, until: unknown, origin: unknown): ChatListFilter {
+  const filter: ChatListFilter = {};
+  if (isChatOrigin(origin)) filter.origin = origin;
+  const from = dayStart(since);
+  if (from) filter.since = from;
+  const to = dayStart(until);
+  if (to) filter.until = new Date(Date.parse(to) + 86_400_000).toISOString();
+  return filter;
+}
+
+function dayStart(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const at = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isNaN(at) ? undefined : new Date(at).toISOString();
 }

@@ -3,6 +3,7 @@ import { ChatService } from "./chat-service.js";
 import { PiSdkSessionAdapter } from "@aeon/pi-adapter";
 import { openChatStore } from "@aeon/store";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
+import { backfillChatOrigins } from "./chat-origin-backfill.js";
 
 export function createLocalFixtureRuntime(dataDirectory: string): {
   service: ChatService;
@@ -20,7 +21,10 @@ export function createLocalFixtureRuntime(dataDirectory: string): {
   const service = new ChatService({ dataDirectory: dataRoot, store, pi });
   const threadCoordination = new ThreadCoordinationService(service, store);
   pi.setThreadToolHost(threadCoordination);
-  const ready = threadCoordination.recover();
+  const ready = (async () => {
+    await backfillChatOrigins(store, dataRoot);
+    await threadCoordination.recover();
+  })();
   return {
     service,
     threadCoordination,

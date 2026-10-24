@@ -2,11 +2,22 @@ import { z } from "zod";
 
 export const ChatIdSchema = z.string().uuid();
 export const ChatStatusSchema = z.enum(["draft", "creating", "ready", "failed", "unavailable"]);
+/** What started a chat; see the domain's ChatOrigin. */
+export const ChatOriginSchema = z.enum([
+  "user",
+  "cli",
+  "mcp",
+  "companion",
+  "agent",
+  "routine",
+  "unknown",
+]);
 export const ChatSummarySchema = z
   .object({
     chatId: ChatIdSchema,
     title: z.string().min(1).max(120),
     projectId: z.string().min(1).max(200).nullable(),
+    origin: ChatOriginSchema,
     pinned: z.boolean(),
     archived: z.boolean(),
     status: ChatStatusSchema,

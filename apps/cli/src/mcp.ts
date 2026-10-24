@@ -193,6 +193,7 @@ function startRun(client: AeonClient, args: Json, runs: Map<string, Run>): { run
   void runTasks(client, tasks, {
     parallel: Number(args.parallel ?? 5),
     quiet: args.quiet === true,
+    origin: "mcp",
     ...(provider && id.length ? { model: { provider, id: id.join("/") } } : {}),
     ...(typeof args.thinking === "string" ? { thinkingLevel: args.thinking } : {}),
     timeoutMs: Number(args.timeoutMinutes ?? 20) * 60_000,

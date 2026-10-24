@@ -5,6 +5,7 @@ export function toChatSummary(chat: ChatRecord): ChatSummary {
     chatId: chat.chatId,
     title: chat.title,
     projectId: chat.projectId,
+    origin: chat.origin,
     pinned: chat.pinned,
     archived: chat.archived,
     status: chat.status,

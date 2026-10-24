@@ -14,11 +14,13 @@ import { FakePiPort } from "./fake-pi-port.mjs";
 function fixture() {
   const messages = [],
     submissions = [],
-    deleted = [];
+    deleted = [],
+    origins = [];
   const chat = {
     chatId: randomUUID(),
     title: "New Chat",
     projectId: null,
+    origin: "user",
     pinned: false,
     archived: false,
     status: "draft",
@@ -31,7 +33,10 @@ function fixture() {
   };
   let finish;
   const service = {
-    createDraft: async (_title, projectId) => ({ ...chat, projectId: projectId ?? null }),
+    createDraft: async (_title, projectId, origin) => {
+      origins.push(origin);
+      return { ...chat, projectId: projectId ?? null, origin };
+    },
     submitPrompt: (...args) => {
       submissions.push(args);
       return new Promise((resolve) => {
@@ -57,7 +62,16 @@ function fixture() {
       },
     },
   });
-  return { service, socket, request, messages, submissions, deleted, finish: () => finish() };
+  return {
+    service,
+    socket,
+    request,
+    messages,
+    submissions,
+    deleted,
+    origins,
+    finish: () => finish(),
+  };
 }
 test("one create command accepts and starts the first prompt before session setup finishes", async () => {
   const f = fixture();
@@ -71,6 +85,7 @@ test("one create command accepts and starts the first prompt before session setu
   assert.deepEqual(f.submissions[0][1], { text: "hello", attachments: [], browserContexts: [] });
   assert.equal(f.submissions[0][2].thinkingLevel, "low");
   assert.equal(f.messages[0].result.chat.projectId, f.request.payload.projectId);
+  assert.deepEqual(f.origins, ["user"], "a first prompt from the UI is a user chat");
   for (const key of ["workingDirectory", "activationId", "piReference", "piMaterialized"])
     assert.equal(key in f.messages[0].result.chat, false);
   // Navigation closes the creator socket; the accepted prompt continues without replay.

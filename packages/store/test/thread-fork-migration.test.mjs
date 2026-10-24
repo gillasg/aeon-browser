@@ -17,7 +17,7 @@ test("schema 3 fork intents migrate without losing rows and allow terminal failu
 
   migrate(database);
 
-  assert.equal(STORE_SCHEMA_VERSION, 10);
+  assert.equal(STORE_SCHEMA_VERSION, 11);
   assert.equal(
     database.prepare("SELECT MAX(version) AS version FROM schema_migrations").get().version,
     STORE_SCHEMA_VERSION,

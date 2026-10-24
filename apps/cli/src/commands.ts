@@ -29,6 +29,7 @@ async function run(host: DaemonHost, args: Args): Promise<number> {
   );
   const results = await runTasks(client, prompts, {
     ...options,
+    origin: "cli",
     onProgress: (line) => process.stderr.write(line + "\n"),
   });
   const report = await saveReport(results);
@@ -38,7 +39,7 @@ async function run(host: DaemonHost, args: Args): Promise<number> {
   return results.every((result) => result.status === "finished") ? 0 : 1;
 }
 
-function runOptions(args: Args): RunOptions {
+function runOptions(args: Args): Omit<RunOptions, "origin" | "onProgress" | "onStarted"> {
   const model = flag(args, "model");
   const [provider, ...id] = (model ?? "").split("/");
   const thinking = flag(args, "thinking");
@@ -108,13 +109,87 @@ function cacheLine(result: ChatResult): string {
   return `Prompt cache: ${Math.round(cache.hitRate * 100)}% of prompt tokens over ${cache.turns} turns${fell}`;
 }
 
+const CHAT_ORIGINS = new Set(["user", "cli", "mcp", "companion", "agent", "routine", "unknown"]);
+
+interface ChatFilter {
+  origin?: string;
+  since?: string;
+  until?: string;
+}
+
 async function listChats(host: DaemonHost, args: Args): Promise<number> {
+  const limit = Math.min(100, Number(flag(args, "limit") ?? 20));
+  const filter = chatFilter(args);
   const client = await host.connect();
-  const limit = flag(args, "limit") ?? "20";
-  if (has(args, "unreviewed")) return review(host, ["list", limit]);
-  const listed = await client.command("chat.list", { limit: Math.min(100, Number(limit)) });
-  for (const chat of listed.chats as { chatId: string; title: string }[])
-    process.stdout.write(`${chat.chatId}  ${chat.title}\n`);
+  if (has(args, "unreviewed"))
+    return printChats(
+      await client.tool({
+        kind: "core.tool.call",
+        tool: "chat_review",
+        session: "cli",
+        arguments: { action: "list", limit, ...filter },
+      }),
+      has(args, "json"),
+    );
+  return printChats(
+    await client.command("chat.list", {
+      limit,
+      ...(filter.origin ? { origin: filter.origin } : {}),
+      ...(filter.since ? { since: `${filter.since}T00:00:00.000Z` } : {}),
+      ...(filter.until ? { until: nextDay(filter.until) } : {}),
+    }),
+    has(args, "json"),
+  );
+}
+
+function chatFilter(args: Args): ChatFilter {
+  const origin = flag(args, "from");
+  if (origin && !CHAT_ORIGINS.has(origin))
+    throw new Error(`--from must be one of ${[...CHAT_ORIGINS].join(", ")}`);
+  const since = dayValue(args, "since");
+  const until = dayValue(args, "until");
+  return {
+    ...(origin ? { origin } : {}),
+    ...(since ? { since } : {}),
+    ...(until ? { until } : {}),
+  };
+}
+
+function dayValue(args: Args, name: string): string | undefined {
+  const value = flag(args, name);
+  if (!value) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`)))
+    throw new Error(`--${name} must be YYYY-MM-DD`);
+  return value;
+}
+
+function nextDay(date: string): string {
+  return new Date(Date.parse(`${date}T00:00:00.000Z`) + 86_400_000).toISOString();
+}
+
+/** Prints a chat.list result or a chat_review list result, with each chat's origin. */
+function printChats(result: unknown, json: boolean): number {
+  const value = result as {
+    chats?: unknown;
+    content?: { text?: string }[];
+    isError?: boolean;
+  };
+  let chats: { chatId: string; title: string; origin?: string }[];
+  if (Array.isArray(value.chats)) chats = value.chats as typeof chats;
+  else {
+    const text = (value.content ?? []).map((part) => part.text ?? "").join("");
+    if (value.isError) {
+      process.stderr.write(text + "\n");
+      return 1;
+    }
+    chats = JSON.parse(text || "[]") as typeof chats;
+  }
+  if (json) {
+    process.stdout.write(JSON.stringify(chats, null, 2) + "\n");
+    return 0;
+  }
+  for (const chat of chats)
+    process.stdout.write(`${chat.chatId}  ${chat.origin ?? "unknown"}  ${chat.title}\n`);
   return 0;
 }
 
@@ -155,7 +230,8 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       name: "chats",
       group: "Aeon",
       summary: "recent chats, or the ones not reviewed yet",
-      help: `Usage: aeon chats [--limit 20] [--unreviewed]`,
+      help: `Usage: aeon chats [--limit 20] [--unreviewed] [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
+       origin: user | cli | mcp | companion | agent | routine | unknown`,
       run: (args) => listChats(host, args),
     },
     {

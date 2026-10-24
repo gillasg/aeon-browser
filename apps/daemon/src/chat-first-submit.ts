@@ -22,7 +22,11 @@ export async function createAndSubmitChat(
 ): Promise<void> {
   const initial = request.payload.initialSubmit;
   if (!initial) throw new Error("Missing initial prompt.");
-  const chat = await service.createDraft(request.payload.title, request.payload.projectId);
+  const chat = await service.createDraft(
+    request.payload.title,
+    request.payload.projectId,
+    request.payload.origin ?? "user",
+  );
   try {
     for (const page of initial.browserContexts ?? []) {
       if (attach?.(chat.chatId, page.target, page.url) !== "attached")

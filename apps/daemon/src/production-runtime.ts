@@ -18,6 +18,7 @@ import { CapabilityToolService } from "./capability-tool-service.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
 import { readEnvironment } from "./environment.js";
+import { backfillChatOrigins } from "./chat-origin-backfill.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -81,6 +82,8 @@ export function createProductionRuntime(dataDirectory: string): {
     routines,
     pins,
     service,
+    store,
+    dataRoot,
   );
 
   return {
@@ -181,7 +184,10 @@ async function initializeRuntime(
   routines: RoutineScheduler,
   pins: PinnedResults,
   service: ChatService,
+  store: ReturnType<typeof openChatStore>,
+  dataRoot: string,
 ): Promise<void> {
+  await backfillChatOrigins(store, dataRoot);
   await registry.initialize();
   await migration.migrate(await registry.snapshot());
   await threads.recover();

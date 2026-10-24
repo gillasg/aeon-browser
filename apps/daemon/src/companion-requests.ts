@@ -45,7 +45,7 @@ function taskPrompt(data: Record<string, unknown>): string {
 }
 
 async function startChat(deps: Deps, title: string, prompt: string): Promise<{ chatId: string }> {
-  const chat = await deps.service.createDraft(title);
+  const chat = await deps.service.createDraft(title, undefined, "companion");
   await deps.service.submitPrompt(chat.chatId, prompt);
   deps.browserControl.openChatTab(chat.chatId, false);
   return { chatId: chat.chatId };

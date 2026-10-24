@@ -180,14 +180,15 @@ export function insertDraft(database: Database.Database, draft: ChatRecord): voi
   database
     .prepare(
       `INSERT INTO chats
-      (chat_id, title, project_id, working_directory, status, activation_id,
+      (chat_id, title, project_id, origin, working_directory, status, activation_id,
        pi_session_id, pi_session_file, pi_materialized, created_at, updated_at, pinned, archived)
-      VALUES (?, ?, ?, ?, 'draft', NULL, NULL, NULL, 0, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, 'draft', NULL, NULL, NULL, 0, ?, ?, ?, ?)`,
     )
     .run(
       draft.chatId,
       draft.title,
       draft.projectId,
+      draft.origin ?? "unknown",
       draft.workingDirectory,
       draft.createdAt,
       draft.updatedAt,

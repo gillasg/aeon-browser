@@ -20,6 +20,7 @@ export {
   ChatEventSchema,
   ChatIdSchema,
   ChatCatalogItemSchema,
+  ChatOriginSchema,
   ChatStatusSchema,
   ChatSummarySchema,
   ChatViewSnapshotSchema,

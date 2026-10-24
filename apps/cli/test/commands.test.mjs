@@ -121,6 +121,23 @@ test("help groups commands like browserkit, and every command has its own help",
   }
 });
 
+test("chat listings reject an unknown origin or a malformed day", async () => {
+  const home = await mkdtemp(join(tmpdir(), "aeon-cli-"));
+  try {
+    const origin = await aeon(home, ["chats", "--from", "robot"]);
+    assert.equal(origin.code, 1);
+    assert.match(origin.stderr, /--from must be one of/);
+    const day = await aeon(home, ["chats", "--since", "2026/10/01"]);
+    assert.equal(day.code, 1);
+    assert.match(day.stderr, /--since must be YYYY-MM-DD/);
+    const until = await aeon(home, ["chats", "--until", "yesterday"]);
+    assert.equal(until.code, 1);
+    assert.match(until.stderr, /--until must be YYYY-MM-DD/);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test("a mapped site is callable over direct transport, and its operations are listed", async (t) => {
   const home = await mkdtemp(join(tmpdir(), "aeon-call-"));
   const site = await startSite();

@@ -4,7 +4,9 @@ import { join, resolve } from "node:path";
 import {
   type ActivationId,
   type ChatId,
+  type ChatListFilter,
   type ChatMetadataPatch,
+  type ChatOrigin,
   type ChatRecord,
   type ChatStore,
   type ThreadCoordinationStore,
@@ -52,14 +54,15 @@ class SqliteChatStore implements ChatStore, ThreadCoordinationStore {
     this.database
       .prepare(
         `INSERT INTO chats
-        (chat_id, title, project_id, working_directory, status, activation_id,
+        (chat_id, title, project_id, origin, working_directory, status, activation_id,
          pi_session_id, pi_session_file, pi_materialized, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'draft', NULL, NULL, NULL, 0, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, 'draft', NULL, NULL, NULL, 0, ?, ?)`,
       )
       .run(
         record.chatId,
         record.title,
         record.projectId,
+        record.origin ?? "unknown",
         record.workingDirectory,
         record.createdAt,
         record.updatedAt,
@@ -76,16 +79,44 @@ class SqliteChatStore implements ChatStore, ThreadCoordinationStore {
     return row ? toChatRecord(row) : undefined;
   }
 
-  listChats(limit: number, includeArchived = false): readonly ChatRecord[] {
+  listChats(
+    limit: number,
+    includeArchived = false,
+    filter: ChatListFilter = {},
+  ): readonly ChatRecord[] {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new Error("Chat list limit must be between 1 and 100.");
     }
     const rows = this.database
-      .prepare(
-        "SELECT * FROM chats WHERE chat_id NOT IN (SELECT chat_id FROM deleted_chats) AND (? = 1 OR archived = 0) ORDER BY updated_at DESC, created_at DESC LIMIT ?",
-      )
-      .all(includeArchived ? 1 : 0, limit) as ChatRow[];
+      .prepare(CHAT_LIST_QUERY)
+      .all(...chatListParams(includeArchived, filter), limit) as ChatRow[];
     return rows.map(toChatRecord);
+  }
+
+  listAllChats(): readonly ChatRecord[] {
+    const rows = this.database
+      .prepare(
+        "SELECT * FROM chats WHERE chat_id NOT IN (SELECT chat_id FROM deleted_chats) ORDER BY created_at",
+      )
+      .all() as ChatRow[];
+    return rows.map(toChatRecord);
+  }
+
+  setChatOriginIfUnknown(chatId: ChatId, origin: ChatOrigin): boolean {
+    const result = this.database
+      .prepare("UPDATE chats SET origin = ? WHERE chat_id = ? AND origin = 'unknown'")
+      .run(origin, chatId);
+    return result.changes > 0;
+  }
+
+  listAgentCreatedChatIds(): readonly ChatId[] {
+    const rows = this.database
+      .prepare(
+        `SELECT target_chat_id AS chatId FROM thread_creations
+         UNION SELECT target_chat_id AS chatId FROM thread_forks`,
+      )
+      .all() as { chatId: string }[];
+    return rows.map((row) => row.chatId as ChatId);
   }
 
   deleteChat(chatId: ChatId): void {
@@ -313,4 +344,28 @@ class SqliteChatStore implements ChatStore, ThreadCoordinationStore {
 
 function sameReference(left: PiSessionReference | null, right: PiSessionReference): boolean {
   return left?.sessionId === right.sessionId && left.sessionFile === right.sessionFile;
+}
+
+const CHAT_LIST_QUERY = `SELECT * FROM chats
+  WHERE chat_id NOT IN (SELECT chat_id FROM deleted_chats)
+    AND (? = 1 OR archived = 0)
+    AND (? IS NULL OR origin = ?)
+    AND (? IS NULL OR created_at >= ?)
+    AND (? IS NULL OR created_at < ?)
+  ORDER BY updated_at DESC, created_at DESC LIMIT ?`;
+
+/** The origin and day range as query parameters; each filter is passed twice for `? IS NULL`. */
+function chatListParams(
+  includeArchived: boolean,
+  filter: ChatListFilter,
+): (string | number | null)[] {
+  return [
+    includeArchived ? 1 : 0,
+    filter.origin ?? null,
+    filter.origin ?? null,
+    filter.since ?? null,
+    filter.since ?? null,
+    filter.until ?? null,
+    filter.until ?? null,
+  ];
 }
