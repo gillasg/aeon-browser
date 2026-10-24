@@ -57,6 +57,8 @@ let writing: Promise<unknown> = Promise.resolve();
 let visiting: Promise<void> = Promise.resolve();
 /** Explores, one at a time. */
 let exploring: Promise<void> = Promise.resolve();
+/** Hosts tracked by an earlier version have been looked at since mapping was installed. */
+let caughtUp = false;
 
 /** The URLs a browser_code cell opened or moved to. */
 export function visitedUrls(steps: Record<string, unknown>[]): string[] {
@@ -72,10 +74,7 @@ export function visitedUrls(steps: Record<string, unknown>[]): string[] {
 /** Where explore keeps its notes, and the model it browses with. */
 export function installSiteMapping(file: string, model: () => Promise<ModelLike>): void {
   config = { file, model };
-  const current = config;
-  // State written by earlier versions tracked hosts but nothing read it back: catch up on what
-  // is already eligible, without waiting for the host to be visited again.
-  visiting = visiting.then(() => catchUp(current)).catch(() => undefined);
+  caughtUp = false;
 }
 
 /** Kept for the existing call site; visits are recorded by noteVisits. */
@@ -86,6 +85,12 @@ export function noteVisits(chatId: string, urls: string[]): void {
   const current = config;
   visiting = visiting
     .then(async () => {
+      // State written by earlier versions tracked hosts but nothing read it back. Catch up the
+      // first time the browser is really in use, not while the daemon is still starting.
+      if (!caughtUp) {
+        caughtUp = true;
+        await catchUp(current);
+      }
       const eligible = await mutate(current, (state) => recordVisit(state, chatId, hosts));
       for (const site of eligible) queueExplore(site);
     })
