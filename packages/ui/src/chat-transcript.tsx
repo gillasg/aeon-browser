@@ -11,6 +11,7 @@ import { AnnotationSelection } from "./annotation-selection.js";
 import { HandoffCard, pendingHandoff } from "./handoff-card.js";
 import type { TranscriptRow } from "./transcript-model.js";
 import { TranscriptTurn, transcriptTurns, type TranscriptActions } from "./transcript-turn.js";
+import { TranscriptRail } from "./transcript-rail.js";
 
 export function ChatTranscript({
   rows,
@@ -65,6 +66,7 @@ export function ChatTranscript({
           preparing={preparing}
         />
       </section>
+      <TranscriptRail rows={rows} root={root} />
       <AnnotationSelection root={root} />
       {awayFromLatest && <JumpToLatest onClick={jumpToLatest} />}
     </div>

@@ -7,7 +7,6 @@ export interface MessageActionProps {
   entry?: PiEntryDto | undefined;
   onEditEntry?: ((entryId: string) => Promise<void> | void) | undefined;
   onBranchEntry?: ((entryId: string) => Promise<void> | void) | undefined;
-  onPin?: ((text: string) => Promise<void> | void) | undefined;
   actionsDisabled: boolean;
   text: string;
 }
@@ -18,7 +17,6 @@ export function MessageActions(props: MessageActionProps): ReactElement {
     <div className={`message-actions ${isUser ? "for-user" : "for-assistant"}`}>
       {isUser && <MessageTime entry={props.entry} />}
       <CopyAction text={props.text} isUser={isUser} />
-      {!isUser && <PinAction text={props.text} onPin={props.onPin} />}
       <RoleAction props={props} isUser={isUser} />
       {!isUser && <MessageTime entry={props.entry} />}
     </div>
@@ -89,49 +87,6 @@ function CopyIcon(): ReactElement {
   );
 }
 
-function PinAction({
-  text,
-  onPin,
-}: {
-  text: string;
-  onPin?: ((text: string) => Promise<void> | void) | undefined;
-}): ReactElement | null {
-  const [state, setState] = useState<"Pin" | "Pinned" | "Pin failed">("Pin");
-  if (!onPin || !text.trim()) return null;
-  const run = async (): Promise<void> => {
-    try {
-      await onPin(text.trim());
-      setState("Pinned");
-    } catch {
-      setState("Pin failed");
-    }
-  };
-  return (
-    <button
-      type="button"
-      className="message-copy message-pin"
-      aria-label="Pin answer to home"
-      title={state === "Pin" ? "Keep this answer on the new-tab home" : state}
-      onClick={() => void run()}
-    >
-      {state === "Pin failed" ? <span className="message-copy-state">{state}</span> : null}
-      <PinIcon pinned={state === "Pinned"} />
-    </button>
-  );
-}
-
-function PinIcon({ pinned }: { pinned: boolean }): ReactElement {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      {pinned ? (
-        <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-      ) : (
-        <path d="M12.5 3.5 16.5 7.5 13.5 9 11 14 6 9l5-2.5zM8.5 11.5 4 16" />
-      )}
-    </svg>
-  );
-}
-
 function EntryAction({
   kind,
   entryId,
@@ -173,13 +128,9 @@ function EntryAction({
       ) : (
         <svg viewBox="0 0 20 20" aria-hidden="true">
           {kind === "edit" ? (
-            <>
-              <path d="m13 3 4 4-9 9H4v-4zM11 5l4 4" />
-            </>
+            <path d="m13 3 4 4-9 9H4v-4zM11 5l4 4" />
           ) : (
-            <>
-              <path d="M10 17V9m0 0L4 3m6 6 6-6M4 3v4m0-4h4m8 0v4m0-4h-4" />
-            </>
+            <path d="M10 17V9m0 0L4 3m6 6 6-6M4 3v4m0-4h4m8 0v4m0-4h-4" />
           )}
         </svg>
       )}

@@ -133,7 +133,6 @@ function Compose({
   return (
     <>
       <div className="isl-row">
-        <span className="isl-orb" aria-hidden="true" />
         <textarea
           id="prompt"
           rows={1}
