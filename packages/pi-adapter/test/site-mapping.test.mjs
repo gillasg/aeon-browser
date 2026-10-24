@@ -83,7 +83,7 @@ test("a site used in two chats is explored once; a failure keeps a short reason 
   assert.equal(asked, 2, "a failed explore is tried again after a week");
 });
 
-test("older state that tracked a host in two chats is explored on install", async (t) => {
+test("older state that tracked a host in two chats is explored on the next visit", async (t) => {
   const file = await tempMapping(t);
   await writeFile(
     file,
@@ -101,6 +101,7 @@ test("older state that tracked a host in two chats is explored on install", asyn
     asked += 1;
     throw new Error("no model in tests");
   });
+  noteVisits("chat-4", ["https://elsewhere.example/"]);
   await mappingSettled();
 
   assert.equal(asked, 1, "only the host used in two or more chats is explored");
