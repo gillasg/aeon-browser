@@ -49,6 +49,7 @@ const ChatCommandResultSchema = z.discriminatedUnion("kind", [
       sites: z.array(z.string().max(200)).max(2000),
     })
     .strict(),
+  z.object({ kind: z.literal("settings.outside-context"), enabled: z.boolean() }).strict(),
   z.object({ kind: z.literal("chat.pi-ui"), piUi: PiUiSnapshotSchema }).strict(),
   z
     .object({
@@ -226,6 +227,7 @@ export const ChatCommandCompletedSchema = z
       "chat.queue-edit",
       "chat.stop",
       "settings.blocked-sites",
+      "settings.outside-context",
     ]),
     result: ChatCommandResultSchema,
   })
@@ -268,6 +270,7 @@ export const ChatCommandFailedSchema = z
       "chat.stop",
       "chat.submit",
       "settings.blocked-sites",
+      "settings.outside-context",
     ]),
     code: z.enum(["CHAT_NOT_FOUND", "PI_UNAVAILABLE", "PI_PROMPT_FAILED", "INVALID_COMMAND"]),
     message: z.string().min(1).max(300),

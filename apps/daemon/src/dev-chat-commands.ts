@@ -30,6 +30,20 @@ import {
 import { executeExtensionUiAnswer, executePiUiAction, sendPiUiSnapshot } from "./pi-ui-commands.js";
 import { sendControls, sendEffectiveResources } from "./dev-chat-read-commands.js";
 import { type WebSocket } from "ws";
+
+async function answerOutsideContext(
+  socket: WebSocket,
+  service: ChatService,
+  request: Extract<CommandRequest, { operation: "settings.outside-context" }>,
+): Promise<void> {
+  const { enabled } = request.payload;
+  if (enabled !== undefined) await service.setOutsideContextSetting(enabled);
+  return completeCommand(socket, request, {
+    kind: "settings.outside-context",
+    enabled: await service.outsideContextSetting(),
+  });
+}
+
 export async function handleDevChatCommand(
   socket: WebSocket,
   service: ChatService,
@@ -48,6 +62,8 @@ export async function handleDevChatCommand(
       const sites = await applyBlockedSites(request.payload);
       return completeCommand(socket, request, { kind: "settings.blocked-sites", sites });
     }
+    if (request.operation === "settings.outside-context")
+      return await answerOutsideContext(socket, service, request);
     if (request.operation === "chat.delete") {
       await service.deleteChat(asChatId(request.payload.chatId));
       return completeCommand(socket, request, {

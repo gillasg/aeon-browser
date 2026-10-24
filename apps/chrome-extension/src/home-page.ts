@@ -32,6 +32,7 @@ import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { HomeCatalogController } from "./home-catalog-controller.js";
 import { HomeBlockedSites } from "./home-blocked-sites.js";
+import { HomeOutsideContext } from "./home-outside-context.js";
 import { HomeManagementController } from "./home-management-controller.js";
 import { createManagementClient } from "./management-client.js";
 
@@ -75,6 +76,11 @@ const management = new HomeManagementController(
   createManagementClient(__AEON_NATIVE_TRANSPORT__, () => client),
 );
 const blockedSites = new HomeBlockedSites({
+  client: () => client,
+  onChange: render,
+  onError: showError,
+});
+const outsideContext = new HomeOutsideContext({
   client: () => client,
   onChange: render,
   onError: showError,
@@ -143,6 +149,8 @@ function createView() {
     blockedSites: blockedSites.sites,
     onBlockedSiteAdd: (site: string) => void blockedSites.add(site),
     onBlockedSiteRemove: (site: string) => void blockedSites.remove(site),
+    outsideContext: outsideContext.enabled,
+    onOutsideContext: (enabled: boolean) => void outsideContext.set(enabled),
     ...management.viewProps(),
   });
 }
@@ -188,6 +196,7 @@ async function start(): Promise<void> {
     loadModelCatalog(),
     management.loadForHome(),
     blockedSites.load(),
+    outsideContext.load(),
   ]);
   const selectedChat = new URL(location.href).searchParams.get("chatId");
   if (selectedChat) management.viewProps().onManagementSelectChat(selectedChat);

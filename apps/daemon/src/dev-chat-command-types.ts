@@ -34,7 +34,8 @@ export type ReadCommandRequest = Extract<
       | "chat.queue"
       | "chat.queue-edit"
       | "chat.stop"
-      | "settings.blocked-sites";
+      | "settings.blocked-sites"
+      | "settings.outside-context";
   }
 >;
 export type NonSubmitCommand = Exclude<

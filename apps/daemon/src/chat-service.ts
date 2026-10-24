@@ -4,6 +4,12 @@ import { boundedChatEntries, type ObservedSession } from "./bounded-chat-entries
 import { ProjectService } from "./project-service.js";
 import { deleteStoredChat } from "./chat-deletion.js";
 import { ChatReviews, CHAT_REVIEW_TOOL } from "./chat-reviews.js";
+import {
+  EXTERNAL_ROUTINE_TOOL,
+  runExternalRoutine,
+  type ExternalRoutineOptions,
+} from "./external-routine-tool.js";
+import { CONTEXT_TOOL, readOutsideContext, writeOutsideContext } from "./outside-context.js";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import {
@@ -48,8 +54,10 @@ import type { BrowserSiteRules } from "./browser-site-rules.js";
 export class ChatService {
   private readonly store: ChatStore & ThreadCoordinationStore;
   private readonly pi: PiSessionPort;
+  private readonly dataDirectory: string;
   private readonly threadSupport: ChatThreadSupport;
   private readonly metadata: ChatMetadataService;
+  private externalContextReader: (() => Promise<unknown>) | undefined;
   private readonly commandGate = new ChatCommandGate();
   private readonly eventHub = new ChatEventHub();
   private readonly observedSessions = new Map<ChatId, ObservedSession>();
@@ -66,6 +74,7 @@ export class ChatService {
     siteRules?: BrowserSiteRules;
   }) {
     const dataDirectory = resolve(options.dataDirectory);
+    this.dataDirectory = dataDirectory;
     this.store = options.store;
     this.pi = options.pi;
     this.siteRules = options.siteRules;
@@ -164,13 +173,41 @@ export class ChatService {
     if (!this.pi.completeTools) throw new Error("Aeon's model is not available");
     return this.pi.completeTools(context);
   };
-  externalTools = (): unknown[] => [...(this.pi.externalTools?.() ?? []), CHAT_REVIEW_TOOL];
+  externalTools = (): unknown[] => [
+    ...(this.pi.externalTools?.() ?? []),
+    CHAT_REVIEW_TOOL,
+    EXTERNAL_ROUTINE_TOOL,
+    CONTEXT_TOOL,
+  ];
+  /** The daemon's reader for the opt-in open-tabs answer (set in the production runtime). */
+  setExternalContextReader(reader: (() => Promise<unknown>) | undefined): void {
+    this.externalContextReader = reader;
+  }
+  outsideContextSetting = (): Promise<boolean> => readOutsideContext(this.dataDirectory);
+  setOutsideContextSetting = (enabled: boolean): Promise<void> =>
+    writeOutsideContext(this.dataDirectory, enabled);
   callExternalTool = (
     name: string,
     session: string,
     args: Record<string, unknown>,
   ): Promise<{ content: unknown[]; isError: boolean }> => {
     if (name === CHAT_REVIEW_TOOL.name) return this.reviews.run(args);
+    if (name === CONTEXT_TOOL.name)
+      return this.externalContextReader
+        ? this.externalContextReader().then((value) => externalToolAnswer(value))
+        : Promise.resolve(externalToolAnswer({ enabled: false, tabs: [] }));
+    if (name === EXTERNAL_ROUTINE_TOOL.name)
+      return runExternalRoutine({
+        // openChatStore() always provides the product (routines) half as well.
+        store: this.store as unknown as ExternalRoutineOptions["store"],
+        createChat: (title, origin) => this.createDraft(title, undefined, origin),
+        getChat: (chatId) => this.store.getChat(chatId),
+        session,
+        args,
+      }).then((value) => ({
+        content: [{ type: "text", text: JSON.stringify(value, null, 1) }],
+        isError: false,
+      }));
     if (!this.pi.callExternalTool) throw new Error("Aeon's tools are not available");
     return this.pi.callExternalTool(name, session, args);
   };
@@ -423,4 +460,8 @@ export class ChatService {
     if (!chat) throw new Error(`Chat ${chatId} does not exist.`);
     return chat;
   }
+}
+
+function externalToolAnswer(value: unknown): { content: unknown[]; isError: boolean } {
+  return { content: [{ type: "text", text: JSON.stringify(value, null, 1) }], isError: false };
 }

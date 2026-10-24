@@ -20,4 +20,7 @@ export interface ManagementSurfaceProps {
   blockedSites?: readonly string[];
   onBlockedSiteAdd?(site: string): void;
   onBlockedSiteRemove?(site: string): void;
+  /** Outside agents may see the user's open tabs (opt-in, stored by the daemon). */
+  outsideContext?: boolean;
+  onOutsideContext?(enabled: boolean): void;
 }

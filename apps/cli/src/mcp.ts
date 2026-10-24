@@ -96,6 +96,35 @@ const tools = [
       additionalProperties: false,
     },
   },
+  {
+    name: "aeon_context",
+    description:
+      "The user's open tabs (title, URL) and which is active, when they allowed it in Aeon Settings. Titles and URLs only, never page contents. When it is off, returns how to turn it on.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "aeon_routine",
+    description:
+      "Create, list, pause or delete an Aeon routine (a scheduled agent task). Its alerts appear in Aeon, not here. Only routines this origin created are listed or changed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["create", "list", "pause", "delete"] },
+        routineId: { type: "string", maxLength: 100 },
+        chatId: { type: "string", maxLength: 100 },
+        title: { type: "string", maxLength: 120 },
+        instruction: { type: "string", maxLength: 20000 },
+        schedule: {
+          description: 'A schedule object, or text such as "every 15 minutes".',
+          anyOf: [{ type: "string", maxLength: 200 }, { type: "object" }],
+        },
+        check: { type: "string", maxLength: 20000 },
+        sites: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 10 },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const CHAT_TOOLS = new Set(["browser_code", "browser_tabs", "crawl", "site_mapper", "extract"]);
@@ -194,28 +223,63 @@ async function callTool(
   runs: Map<string, Run>,
 ): Promise<unknown> {
   const client = await aeon();
+  if (name === "aeon_run" || name === "aeon_run_status") return runTool(client, name, args, runs);
+  if (["aeon_chats", "aeon_search", "aeon_context", "aeon_routine"].includes(name))
+    return chatTool(client, name, args);
+  return inspectTool(client, name, args);
+}
+
+function runTool(
+  client: AeonClient,
+  name: string,
+  args: Json,
+  runs: Map<string, Run>,
+): { runId: string } | Record<string, unknown> {
   if (name === "aeon_run") return startRun(client, args, runs);
-  if (name === "aeon_run_status") {
-    const run = runs.get(String(args.runId));
-    if (!run) throw new Error("Unknown runId");
-    return run.results
-      ? { done: true, results: run.results.map(withoutTrace) }
-      : {
-          done: false,
-          error: run.error,
-          started: run.chats.filter(Boolean).length,
-          total: run.total,
-          chats: run.chats,
-        };
-  }
+  const run = runs.get(String(args.runId));
+  if (!run) throw new Error("Unknown runId");
+  return run.results
+    ? { done: true, results: run.results.map(withoutTrace) }
+    : {
+        done: false,
+        error: run.error,
+        started: run.chats.filter(Boolean).length,
+        total: run.total,
+        chats: run.chats,
+      };
+}
+
+async function chatTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
   if (name === "aeon_chats")
     return (await client.command("chat.list", { limit: Number(args.limit ?? 20) })).chats;
   if (name === "aeon_search") return searchTool(client, args);
+  if (name === "aeon_context") return toolValue(client, "context", {}, "context");
+  return toolValue(client, "routine", args, "routine");
+}
+
+async function toolValue(
+  client: AeonClient,
+  tool: string,
+  args: Json,
+  label: string,
+): Promise<unknown> {
+  const reply = await client.tool({
+    kind: "core.tool.call",
+    tool,
+    session: "mcp",
+    arguments: args,
+  });
+  const output = ((reply.content as { text?: string }[] | undefined) ?? [])
+    .map((part) => part.text ?? "")
+    .join("");
+  if (reply.isError === true) throw new Error(output || `The ${label} command failed.`);
+  return JSON.parse(output || "null") as unknown;
+}
+
+async function inspectTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
   const result = await inspect(client, String(args.chatId));
   if (name === "aeon_trace") return result.trace;
-  if (name === "aeon_result") {
-    return withoutTrace(result);
-  }
+  if (name === "aeon_result") return withoutTrace(result);
   throw new Error("Unknown tool " + name);
 }
 
