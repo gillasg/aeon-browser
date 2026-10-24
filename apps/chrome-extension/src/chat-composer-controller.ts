@@ -54,7 +54,7 @@ export class ChatComposerController {
   private readonly send = (text: string, mode: "followUp" | "steer"): Promise<boolean> =>
     !this.attachments.length && this.runCommand(text.trim())
       ? Promise.resolve(true)
-      : this.sendMessage(text, mode);
+      : this.sendMessage(text, mode, true);
 
   setClient(client: UiClient): void {
     this.client = client;
@@ -121,7 +121,7 @@ export class ChatComposerController {
             payload: { chatId: this.chatId, level: thinking },
           });
           this.attachments = [...files];
-          return this.sendMessage(text, "followUp");
+          return this.sendMessage(text, "followUp", true);
         } catch (error) {
           this.onError(messageOf(error));
           return false;
@@ -152,7 +152,9 @@ export class ChatComposerController {
   }
 
   sendPrompt(text: string): Promise<boolean> {
-    return this.sendMessage(text, "followUp");
+    // A prompt Aeon built from a page (a summary request) is not the user typing: it never
+    // lifts a block.
+    return this.sendMessage(text, "followUp", false);
   }
 
   loadEditDraft(
@@ -180,7 +182,11 @@ export class ChatComposerController {
       void this.refreshControls();
   }
 
-  private async sendMessage(text: string, mode: "followUp" | "steer"): Promise<boolean> {
+  private async sendMessage(
+    text: string,
+    mode: "followUp" | "steer",
+    typedByUser: boolean,
+  ): Promise<boolean> {
     const client = this.client;
     if (!text || !client) return false;
     const requestId = crypto.randomUUID();
@@ -204,6 +210,7 @@ export class ChatComposerController {
         wasRunning,
         attachments: this.attachments,
         browserContext,
+        typedByUser,
         onError: this.onError,
       });
       if (!accepted) return false;

@@ -23,6 +23,8 @@ export interface RoutineRecord {
   instruction: string;
   /** Watcher check: browser code the daemon runs first; the agent only wakes on a truthy result. */
   check: string | null;
+  /** Sites this routine may use (browserkit's "only" list); empty means no restriction. */
+  sites: string[];
   schedule: RoutineSchedule;
   nextDueAt: string | null;
   requiredBrowserInstanceId: string | null;
@@ -180,6 +182,7 @@ export interface AeonProductStore {
       | "title"
       | "instruction"
       | "check"
+      | "sites"
       | "schedule"
       | "nextDueAt"
       | "requiredBrowserInstanceId"

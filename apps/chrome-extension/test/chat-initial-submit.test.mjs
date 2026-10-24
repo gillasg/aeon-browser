@@ -105,5 +105,6 @@ function assertInitialCommands(submitted, chatId) {
     text: "First prompt",
     attachments: [],
     browserContexts: [],
+    typedByUser: true,
   });
 }

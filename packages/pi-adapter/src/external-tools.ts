@@ -50,7 +50,11 @@ function toolsFor(
   );
   const skills = resolve(options.sessionDirectory, "..", "site-skills");
   return {
-    browser_code: createBrowserCodeTool(chatId, run, workspace, skills),
+    // An outside agent signs in the same way a chat does; it has no routines, so its runs never
+    // carry an "only these sites" list. Credentials and rules answers still never reach a result.
+    browser_code: createBrowserCodeTool(chatId, run, workspace, skills, {
+      dataDirectory: resolve(options.sessionDirectory, ".."),
+    }),
     crawl: createCrawlTool(chatId, workspace),
     site_mapper: createSiteMapperTool(chatId, workspace, siteToolModel(options)),
     extract: createExtractTool(options, workspace),

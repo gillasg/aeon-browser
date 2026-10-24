@@ -46,6 +46,7 @@ export async function createAndSubmitChat(
       payload: {
         chatId: chat.chatId,
         text: initial.text,
+        typedByUser: initial.typedByUser === true,
         attachments: initial.attachments ?? [],
         browserContexts: initial.browserContexts ?? [],
       },

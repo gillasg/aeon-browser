@@ -7,6 +7,7 @@ export interface RoutineRow {
   title: string;
   instruction: string;
   check_code: string | null;
+  sites_json: string | null;
   schedule_json: string;
   next_due_at: string | null;
   required_browser_instance_id: string | null;
@@ -39,6 +40,7 @@ export function toRoutine(row: RoutineRow): RoutineRecord {
     title: row.title,
     instruction: row.instruction,
     check: row.check_code ?? null,
+    sites: sitesOf(row.sites_json),
     schedule: JSON.parse(row.schedule_json) as RoutineRecord["schedule"],
     nextDueAt: row.next_due_at,
     requiredBrowserInstanceId: row.required_browser_instance_id,
@@ -65,6 +67,19 @@ export function toRoutineRun(row: RoutineRunRow): RoutineRunRecord {
     completedAt: row.completed_at,
     lastError: row.last_error,
   };
+}
+
+/** The optional "only these sites" list; a database from before it has null. */
+function sitesOf(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function mayAdvance(

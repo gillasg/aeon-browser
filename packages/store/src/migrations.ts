@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const STORE_SCHEMA_VERSION = 9;
+export const STORE_SCHEMA_VERSION = 10;
 
 export function migrate(database: Database.Database): void {
   database.exec(`
@@ -40,6 +40,12 @@ export function migrate(database: Database.Database): void {
       // Optional watcher check: browser code run before the routine wakes the agent.
       database.exec("ALTER TABLE routines ADD COLUMN check_code TEXT;");
       markVersion(database, 9);
+    })();
+  if (current < 10)
+    database.transaction(() => {
+      // Optional "only these sites" list: what a routine may use in the browser.
+      database.exec("ALTER TABLE routines ADD COLUMN sites_json TEXT;");
+      markVersion(database, 10);
     })();
 }
 

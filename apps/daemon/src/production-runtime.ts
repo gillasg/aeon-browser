@@ -12,6 +12,8 @@ import { BrowserControlService } from "./browser-control-service.js";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { CapabilityRegistry } from "./capability-registry.js";
 import { RoutineScheduler } from "./routine-scheduler.js";
+import { BrowserSiteRules } from "./browser-site-rules.js";
+import { readPasswordManagerStatus } from "./password-manager-status.js";
 import { CapabilityToolService } from "./capability-tool-service.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
@@ -44,13 +46,15 @@ export function createProductionRuntime(dataDirectory: string): {
   const siteScripts = attachSiteScripts(dataRoot, browserControl);
   const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
   warmModels(pi);
-  const service = new ChatService({ dataDirectory: dataRoot, store, pi });
+  const siteRules = new BrowserSiteRules();
+  const service = new ChatService({ dataDirectory: dataRoot, store, pi, siteRules });
+  pi.setSiteRulesHost((chatId) => siteRules.answer(chatId));
   const stopPreparing = installChatPreparation(service);
   const attention = new CoreAttention(dataRoot, service);
   configureSiteRequests(dataRoot);
   const pins = new PinnedResults(dataRoot);
   const threadCoordination = new ThreadCoordinationService(service, store);
-  const routines = new RoutineScheduler(store, service, browserControl);
+  const routines = new RoutineScheduler(store, service, browserControl, dataRoot);
   routines.onAlert = (chatId, title, message) => attention.alert(chatId, title, message);
   routines.onCheck = (routine, check) => void pins.recordCheck(routine, check);
   const capabilityTools = new CapabilityToolService(
@@ -67,7 +71,7 @@ export function createProductionRuntime(dataDirectory: string): {
     capabilityTools.executeManagementAction(chatId, action, input),
   );
   service.management.setReader((selectedChatId) =>
-    readManagementSnapshot(service, store, capabilityTools, pins, selectedChatId),
+    readManagementSnapshot(service, store, capabilityTools, pins, dataRoot, selectedChatId),
   );
   service.management.setHomeReader(() => readHomeManagementSnapshot(service, store));
   const ready = initializeRuntime(
@@ -103,6 +107,7 @@ async function readManagementSnapshot(
   store: ReturnType<typeof openChatStore>,
   capabilityTools: CapabilityToolService,
   pins: PinnedResults,
+  dataDirectory: string,
   selectedChatId?: import("@aeon/domain").ChatId,
 ): Promise<unknown> {
   let resources = null;
@@ -145,6 +150,7 @@ async function readManagementSnapshot(
     capabilities,
     resources,
     resourceError,
+    signIn: await readPasswordManagerStatus(dataDirectory),
   };
 }
 
@@ -202,6 +208,7 @@ function managementRoutines(
       instruction: routine.instruction,
       schedule: routine.schedule,
       ...(routine.check ? { checks: true } : {}),
+      sites: routine.sites,
       nextDueAt: routine.nextDueAt,
       requiredBrowserInstanceId: routine.requiredBrowserInstanceId,
       enabled: routine.enabled,

@@ -177,6 +177,7 @@ function toggled(routine: Routine): Record<string, unknown> {
     expectedRevision: routine.revision,
     title: routine.title,
     instruction: routine.instruction,
+    sites: routine.sites,
     schedule: routine.schedule,
     enabled: !routine.enabled,
     requiredBrowserInstanceId: routine.requiredBrowserInstanceId,

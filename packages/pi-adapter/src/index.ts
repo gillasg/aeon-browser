@@ -1,6 +1,11 @@
 export { PiSdkSessionAdapter } from "./session-adapter.js";
 export { resolvePiAgentDirectory } from "./session-adapter.js";
 export { siteMapperRequest } from "./site-browser.js";
+export {
+  hostRequest,
+  type SiteRulesAnswer,
+  type SiteRulesProvider,
+} from "./browser-host-requests.js";
 export { exploreForRoutine } from "./site-mapping.js";
 export { getSavedRead, putSavedRead, type SavedRead } from "./saved-reads.js";
 export type { PiSdkSessionAdapterOptions } from "./session-adapter.js";

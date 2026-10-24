@@ -74,6 +74,9 @@ importers:
       "@aeon/protocol":
         specifier: workspace:*
         version: link:../../packages/protocol
+      "@browserkit/credentials":
+        specifier: link:../../../browserkit/packages/credentials
+        version: link:../../../browserkit/packages/credentials
       ws:
         specifier: 8.22.0
         version: 8.22.0
@@ -99,6 +102,9 @@ importers:
       "@aeon/store":
         specifier: workspace:*
         version: link:../../packages/store
+      "@browserkit/credentials":
+        specifier: link:../../../browserkit/packages/credentials
+        version: link:../../../browserkit/packages/credentials
       "@earendil-works/pi-ai":
         specifier: 1.2.0
         version: 1.2.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(undici@8.10.2)(ws@8.22.0)(zod@4.6.5)
@@ -134,6 +140,9 @@ importers:
       "@aeon/protocol":
         specifier: workspace:*
         version: link:../protocol
+      "@browserkit/credentials":
+        specifier: link:../../../browserkit/packages/credentials
+        version: link:../../../browserkit/packages/credentials
       "@browserkit/tools":
         specifier: link:../../../browserkit/packages/tools
         version: link:../../../browserkit/packages/tools

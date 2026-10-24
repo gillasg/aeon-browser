@@ -35,10 +35,12 @@ export class ChatManagementCommands {
       Promise.resolve({
         chats: this.listChats(),
         routines: [],
+        pins: [],
         capabilityRevision: 0,
         capabilities: [],
         resources: null,
         resourceError: null,
+        signIn: { provider: null, state: "not_set_up" },
       })
     );
   }

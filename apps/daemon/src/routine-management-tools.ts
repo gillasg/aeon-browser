@@ -56,6 +56,7 @@ export class RoutineManagementTools {
       title: requiredString(args.title, "title"),
       instruction: requiredString(args.instruction, "instruction"),
       check,
+      sites: optionalSites(args.sites, []),
       schedule,
       nextDueAt: nextRoutineOccurrence(schedule, now),
       requiredBrowserInstanceId: optionalNullableUuid(
@@ -89,6 +90,7 @@ export class RoutineManagementTools {
         title: requiredString(args.title, "title"),
         instruction: requiredString(args.instruction, "instruction"),
         check,
+        sites: optionalSites(args.sites, current.sites),
         schedule,
         requiredBrowserInstanceId: optionalNullableUuid(
           args.requiredBrowserInstanceId,
@@ -156,6 +158,24 @@ function optionalCheck(value: unknown, fallback: string | null): string | null {
   if (typeof value !== "string" || !value.trim() || value.length > 8000)
     throw new Error("check must be browser code of at most 8000 characters, or null.");
   return value;
+}
+
+/** Omitted keeps the current list (editors that do not know about sites); an array replaces it. */
+function optionalSites(value: unknown, fallback: string[]): string[] {
+  if (value === undefined) return fallback;
+  if (!Array.isArray(value)) throw new Error("sites must be an array of site names.");
+  return [...new Set(value.map((item) => optionalSite(item)))];
+}
+
+function optionalSite(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 200)
+    throw new Error("sites must be site names such as example.com.");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
 }
 
 function integer(value: unknown): number {
