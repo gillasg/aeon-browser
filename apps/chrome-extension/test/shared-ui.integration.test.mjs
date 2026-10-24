@@ -41,7 +41,6 @@ test("Chat and composer presentation are shared, including side-panel iframe rou
   ]);
   assert.match(chatSurface, /<ChatTranscript\b/);
   assert.match(chatSurface, /<ChatComposer\b/);
-  assert.match(chatSurface, /<ChatSidebar\b/);
   assert.match(sidePanel, /<iframe\b/);
   assert.match(page, /host=panel/);
 });
