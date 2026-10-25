@@ -84,45 +84,48 @@ async function providers(args: Args): Promise<number> {
   return 0;
 }
 
-async function media(host: DaemonHost, args: Args): Promise<number> {
-  const action = args.positional[0] ?? "image";
-  if (action === "image") {
-    const prompt = args.positional.slice(1).join(" ");
-    if (!prompt)
-      throw new Error('Usage: aeon media image "<prompt>" [--image file] [--out name.png]');
-    const images = flag(args, "image")
-      ? String(flag(args, "image"))
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean)
-      : [];
-    const timeout = flag(args, "timeout");
-    const result = await generateImageWith(runner(host), prompt, {
-      images,
-      ...(flag(args, "out") ? { out: String(flag(args, "out")) } : {}),
-      ...(timeout ? { timeoutMs: Number(timeout) } : {}),
-    });
-    if (has(args, "json")) printJson(result);
-    else out(`Saved ${result.saved}.`);
-    return 0;
-  }
-  if (action === "youtube") {
-    const url = args.positional[1];
-    if (!url) throw new Error('Usage: aeon media youtube <url> [--ask "question"] [--json]');
-    const question = String(
-      flag(args, "ask") ?? "Summarise the video with timestamps for the key points.",
-    );
-    const timeout = flag(args, "timeout");
-    const result = await analyseYoutubeWith(runner(host), url, question, {
-      ...(timeout ? { timeoutMs: Number(timeout) } : {}),
-    });
-    if (has(args, "json")) printJson({ url, question, ...result });
-    else out(result.text);
-    return 0;
-  }
-  throw new Error("Usage: aeon media image|youtube ...");
+async function mediaImage(host: DaemonHost, args: Args): Promise<number> {
+  const prompt = args.positional.slice(1).join(" ");
+  if (!prompt)
+    throw new Error('Usage: aeon media image "<prompt>" [--image file] [--out name.png]');
+  const images = flag(args, "image")
+    ? String(flag(args, "image"))
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+  const timeout = flag(args, "timeout");
+  const result = await generateImageWith(runner(host), prompt, {
+    images,
+    ...(flag(args, "out") ? { out: String(flag(args, "out")) } : {}),
+    ...(timeout ? { timeoutMs: Number(timeout) } : {}),
+  });
+  if (has(args, "json")) printJson(result);
+  else out(`Saved ${result.saved}.`);
+  return 0;
 }
 
+async function mediaYoutube(host: DaemonHost, args: Args): Promise<number> {
+  const url = args.positional[1];
+  if (!url) throw new Error('Usage: aeon media youtube <url> [--ask "question"] [--json]');
+  const question = String(
+    flag(args, "ask") ?? "Summarise the video with timestamps for the key points.",
+  );
+  const timeout = flag(args, "timeout");
+  const result = await analyseYoutubeWith(runner(host), url, question, {
+    ...(timeout ? { timeoutMs: Number(timeout) } : {}),
+  });
+  if (has(args, "json")) printJson({ url, question, ...result });
+  else out(result.text);
+  return 0;
+}
+
+async function media(host: DaemonHost, args: Args): Promise<number> {
+  const action = args.positional[0] ?? "image";
+  if (action === "image") return mediaImage(host, args);
+  if (action === "youtube") return mediaYoutube(host, args);
+  throw new Error("Usage: aeon media image|youtube ...");
+}
 export function providerCommands(host: DaemonHost): Command[] {
   return [
     {

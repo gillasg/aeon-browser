@@ -7,6 +7,7 @@ export function SidebarIcon({
     | "routines"
     | "automations"
     | "sites"
+    | "sessions"
     | "resources"
     | "capabilities"
     | "pin"
@@ -22,6 +23,7 @@ export function SidebarIcon({
     automations: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m-2 5 6 4-6 4z",
     sites:
       "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18",
+    sessions: "M14 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8h5M19.5 5.5v5",
     resources: "m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5",
     capabilities: "m7 7-5 5 5 5m10-10 5 5-5 5M14 4l-4 16",
     pin: "M16 9V3H8v6l-3 3v3h14v-3l-3-3M12 15v6",

@@ -15,6 +15,7 @@ export function SidebarManagementLinks({
           ["routines", "Routines"],
           ["automations", "Automations"],
           ["sites", "Sites"],
+          ["sessions", "Site sessions"],
           ["resources", "Skills & extensions"],
           ["capabilities", "MCPs / CLIs"],
           ["settings", "Settings"],

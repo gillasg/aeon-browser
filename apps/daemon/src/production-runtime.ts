@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { configureSiteRequests } from "./site-requests.js";
 import { PinnedResults } from "./pinned-results.js";
 import { CoreAttention } from "./core-attention.js";
@@ -14,7 +15,8 @@ import { CapabilityRegistry } from "./capability-registry.js";
 import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
-import { siteCards, workflowCards } from "./management-library.js";
+import { lastActionNote, siteCards, workflowCards } from "./management-library.js";
+import { LibraryActions, isLibraryAction } from "./library-actions.js";
 import { CapabilityToolService } from "./capability-tool-service.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
@@ -82,9 +84,7 @@ export function createProductionRuntime(dataDirectory: string): {
   );
   pi.setThreadToolHost(threadCoordination);
   pi.setCapabilityToolHost(capabilityTools);
-  service.management.setActionRunner((chatId, action, input) =>
-    capabilityTools.executeManagementAction(chatId, action, input),
-  );
+  installManagementActions(service, browserControl, capabilityTools);
   service.management.setReader((selectedChatId) =>
     readManagementSnapshot(service, store, capabilityTools, pins, dataRoot, selectedChatId),
   );
@@ -172,6 +172,7 @@ async function readManagementSnapshot(
     // with health and whether a session is stored. They read the shared browserkit folders.
     workflows: await workflowCards(),
     sites: await siteCards(),
+    lastAction: lastActionNote(),
   };
 }
 
@@ -310,4 +311,34 @@ function createPiAdapter(
     browserTool: browserControl.execute.bind(browserControl),
   });
   return pi;
+}
+
+function installManagementActions(
+  service: ChatService,
+  browserControl: BrowserControlService,
+  capabilityTools: CapabilityToolService,
+): void {
+  // Workflow and site actions run browser cells through this daemon; routine and capability
+  // actions stay with the capability service.
+  const library = new LibraryActions(async (code, options = {}) => {
+    const session = options.session ?? "management";
+    const chatId = sessionChatId("external", session);
+    const output = await browserControl.execute(chatId, `management-${randomUUID()}`, {
+      codeCell: {
+        code,
+        timeoutMs: options.timeoutMs ?? 60_000,
+        ownerTitle: `Management - ${session}`,
+        onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+        onProgress: () => undefined,
+      },
+    });
+    const parsed = JSON.parse(output) as { value?: unknown; error?: string };
+    if (parsed.error) throw new Error(parsed.error);
+    return parsed.value;
+  });
+  service.management.setActionRunner((chatId, action, input) =>
+    isLibraryAction(action)
+      ? library.execute(action, input)
+      : capabilityTools.executeManagementAction(chatId, action, input),
+  );
 }

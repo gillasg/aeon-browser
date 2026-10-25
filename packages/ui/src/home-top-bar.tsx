@@ -4,13 +4,14 @@ import { useEffect, type ReactElement } from "react";
 // you to each of Aeon's pages instead. Escape, or the page you are on again, returns home.
 
 export type HomeView =
-  "home" | "chats" | "watchers" | "automations" | "sites" | "activity" | "settings";
+  "home" | "chats" | "watchers" | "automations" | "sites" | "sessions" | "activity" | "settings";
 
 const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings">, string]> = [
   ["chats", "Chats"],
   ["watchers", "Routines"],
   ["automations", "Automations"],
   ["sites", "Sites"],
+  ["sessions", "Sessions"],
   ["activity", "Activity"],
 ];
 
@@ -84,7 +85,13 @@ export function viewFromRoute(route: string | null): {
   settingsSection?: "settings" | "resources" | "capabilities";
 } {
   if (route === "routines" || route === "watchers") return { view: "watchers" };
-  if (route === "chats" || route === "activity" || route === "automations" || route === "sites")
+  if (
+    route === "chats" ||
+    route === "activity" ||
+    route === "automations" ||
+    route === "sites" ||
+    route === "sessions"
+  )
     return { view: route };
   if (route === "settings" || route === "resources" || route === "capabilities")
     return { view: "settings", settingsSection: route };

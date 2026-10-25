@@ -7,4 +7,17 @@ export type ManagementActionName =
   | "update_capability"
   | "remove_capability"
   | "recheck_capability"
-  | "pin_result";
+  | "pin_result"
+  | "run_workflow"
+  | "cancel_workflow"
+  | "import_workflow"
+  | "export_workflow"
+  | "run_site_operation"
+  | "run_site_recipe"
+  | "export_site"
+  | "import_site"
+  | "export_recipes"
+  | "import_recipes"
+  | "clear_site_session"
+  | "switch_site_account"
+  | "test_site_logged_out";

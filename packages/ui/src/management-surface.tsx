@@ -4,6 +4,7 @@ import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutinesPanel } from "./management-routines.js";
 import { AutomationsPanel } from "./management-automations.js";
 import { SitesPanel } from "./management-sites.js";
+import { SiteSessionsPanel } from "./management-sessions.js";
 import { ResourcesPanel } from "./management-resources.js";
 import { CapabilitiesPanel } from "./management-capabilities.js";
 import { SettingsPanel } from "./management-settings.js";
@@ -15,6 +16,7 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
     routines: "Routines",
     automations: "Automations",
     sites: "Sites",
+    sessions: "Site sessions",
     resources: "Skills & extensions",
     capabilities: "MCPs / CLIs",
     settings: "Settings",
@@ -39,6 +41,7 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
       {props.section === "routines" && <RoutinesPanel {...props} />}
       {props.section === "automations" && <AutomationsPanel {...props} />}
       {props.section === "sites" && <SitesPanel {...props} />}
+      {props.section === "sessions" && <SiteSessionsPanel {...props} />}
       {props.section === "resources" && <ResourcesPanel {...props} />}
       {props.section === "capabilities" && <CapabilitiesPanel {...props} />}
       {props.section === "settings" && <SettingsPanel {...props} />}

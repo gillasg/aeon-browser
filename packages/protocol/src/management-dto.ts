@@ -167,6 +167,20 @@ export const ManagementWorkflowSchema = z
     steps: z.number().int().nonnegative(),
     description: z.string().max(1000).optional(),
     updatedAt: z.string().datetime(),
+    /** What the workflow expects; defaults are shown in the run form. */
+    inputs: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(120),
+            required: z.boolean(),
+            description: z.string().max(500).optional(),
+            default: z.unknown().optional(),
+          })
+          .strict(),
+      )
+      .max(50),
+    running: z.boolean(),
     lastRun: z
       .object({
         state: z.enum(["ok", "failed", "running", "cancelled"]),
@@ -186,6 +200,29 @@ export const ManagementSiteSchema = z
     updatedAt: z.string().max(40),
     health: z.string().max(40),
     session: z.boolean(),
+    sessionAccount: z.string().max(200).nullable(),
+    sessionSavedAt: z.string().max(60).nullable(),
+    recipes: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(200),
+            kind: z.enum(["items", "single"]),
+            fields: z.number().int().nonnegative(),
+            updatedAt: z.string().max(60),
+          })
+          .strict(),
+      )
+      .max(100),
+  })
+  .strict();
+
+/** What the last library action did, so the page can say it without another channel. */
+export const ManagementActionNoteSchema = z
+  .object({
+    ok: z.boolean(),
+    at: z.string().datetime(),
+    message: z.string().max(2000),
   })
   .strict();
 
@@ -202,8 +239,10 @@ export const ManagementSnapshotSchema = z
     signIn: PasswordManagerSchema,
     /** Saved workflows; empty when browserkit's data folder has none. */
     workflows: z.array(ManagementWorkflowSchema).max(100).optional(),
-    /** Mapped sites, with health and whether a stored session exists. */
+    /** Mapped sites, with health, recipes and the stored session. */
     sites: z.array(ManagementSiteSchema).max(200).optional(),
+    /** The result of the last run/import/export/session action, for the page to show. */
+    lastAction: ManagementActionNoteSchema.nullable().optional(),
   })
   .strict();
 

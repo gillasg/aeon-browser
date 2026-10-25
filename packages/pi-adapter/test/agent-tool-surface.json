@@ -110,6 +110,10 @@
           "type": "string",
           "maxLength": 60,
           "description": "For check: what those paths should answer (json, html, m3u8, xml, text or a content type); the body's real shape is checked."
+        },
+        "readiness": {
+          "type": "boolean",
+          "description": "For check: open each site and report typed readiness (ready, empty, loading, login, challenge, not-found, error) with evidence."
         }
       },
       "required": ["action"],
@@ -118,7 +122,7 @@
   },
   {
     "name": "site_mapper",
-    "description": "Call the API a site learned while you used it (actions: code, sites, operations, call, watch, action, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
+    "description": "Call the API a site learned while you used it (actions: code, sites, operations, call, watch, action, recipe, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). recipe lists or runs the site's named recipes (API first, then the page). code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
     "actions": [
       "sites",
       "code",
@@ -130,6 +134,7 @@
       "docs",
       "actions",
       "action",
+      "recipe",
       "channel",
       "session",
       "export",
@@ -156,6 +161,7 @@
             "docs",
             "actions",
             "action",
+            "recipe",
             "channel",
             "session",
             "export",

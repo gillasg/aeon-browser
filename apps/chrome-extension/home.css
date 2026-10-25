@@ -2103,3 +2103,71 @@ body[data-embedded="true"] .home-top-bar {
 .management-health-challenged {
   color: var(--warning, #d9a441);
 }
+
+.management-note {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--surface-raised, rgb(255 255 255 / 4%));
+  font-size: 13px;
+}
+.management-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 420px;
+}
+.management-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #8b8f98);
+}
+.management-form input,
+.management-form textarea,
+.management-form select {
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle, rgb(255 255 255 / 12%));
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.management-actions button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.management-inputs {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+.management-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8b8f98);
+}
+.management-path input {
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle, rgb(255 255 255 / 12%));
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+.management-run-running {
+  color: var(--accent, #6aa9ff);
+}
+
+.management-subheading {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #8b8f98);
+}
