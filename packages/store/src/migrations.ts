@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const STORE_SCHEMA_VERSION = 11;
+export const STORE_SCHEMA_VERSION = 12;
 
 export function migrate(database: Database.Database): void {
   database.exec(`
