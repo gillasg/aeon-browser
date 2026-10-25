@@ -117,7 +117,7 @@ function initialTabs() {
   ]);
 }
 
-test("the chat joins its agent's tab group, and thumbnail view never splits on its own", async () => {
+test("the chat stays out of the agent group, and thumbnail view never splits on its own", async () => {
   const folder = await mkdtemp(join(tmpdir(), "aeon-layout-")),
     old = globalThis.chrome;
   try {
@@ -141,8 +141,8 @@ test("the chat joins its agent's tab group, and thumbnail view never splits on i
     assert.equal(mock.splits(), 0, "Thumbnail view leaves the layout alone");
     await api.presentBrowserTask("test", 20, true);
     assert.equal(mock.splits(), 1, "A clicked thumbnail opens Split View");
-    assert.equal(mock.rows.get(10).groupId, 3, "The chat joins its agent's group");
-    assert.equal(mock.rows.get(20).groupId, 3);
+    assert.equal(mock.rows.get(10).groupId, -1, "The chat never joins the agent group");
+    assert.equal(mock.rows.get(20).groupId, -1, "The agent tab is taken out for the split");
   } finally {
     globalThis.chrome = old;
     await rm(folder, { recursive: true, force: true });
