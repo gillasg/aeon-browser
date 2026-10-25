@@ -474,20 +474,29 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       name: "tools",
       group: "Aeon",
       summary: "the browser tools and their full guidance",
-      help: `Usage: aeon tools [--json]`,
-      run: async (args) => listTools(await host.connect(), has(args, "json")),
+      help: `Usage: aeon tools [--find <topic>] [--json]
+
+Searches every tool's name, guidance and input schema, so "what can you do about media" is one
+call instead of 40 KB of prose. --json prints the matching tools.`,
+      run: async (args) => listTools(await host.connect(), has(args, "json"), flag(args, "find")),
     },
     {
       name: "tool",
       group: "Aeon",
       summary: "run one chat tool",
-      help: `Usage: aeon tool <browser_code|browser_tabs|crawl|site_mapper|extract> '<json>' [--session name]`,
+      help: `Usage: aeon tool <browser_code|browser_tabs|crawl|site_mapper|extract> '<json>'
+       [--session name] [--json] [--no-color]
+
+--json prints one machine-readable envelope (no ANSI); output is plain automatically when stdout
+is not a terminal.`,
       run: async (args) => {
         const session = flag(args, "session");
-        return runTool(
-          await host.connect(),
-          session ? [...args.positional, "--session", session] : args.positional,
-        );
+        return runTool(await host.connect(), [
+          ...args.positional,
+          ...(session ? ["--session", session] : []),
+          ...(has(args, "json") ? ["--json"] : []),
+          ...(has(args, "no-color") ? ["--no-color"] : []),
+        ]);
       },
     },
     {
