@@ -19,6 +19,9 @@ export type {
   ModelSignInFlow,
 } from "./model-accounts-types.js";
 export { ManagementSurface, type ManagementSurfaceProps } from "./management-surface.js";
+export { AutomationsPanel } from "./management-automations.js";
+export { SitesPanel } from "./management-sites.js";
+export { SiteSessionsPanel } from "./management-sessions.js";
 export {
   BlockedSitesSettings,
   blockedSitesKey,

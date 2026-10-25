@@ -189,6 +189,7 @@ function HomePage({
   if (view === "watchers") return <Management props={props} section="routines" />;
   if (view === "automations") return <Management props={props} section="automations" />;
   if (view === "sites") return <Management props={props} section="sites" />;
+  if (view === "sessions") return <Management props={props} section="sessions" />;
   if (view === "settings")
     return <SettingsPage props={props} section={settingsSection} onSection={onSettingsSection} />;
   return <HomeLanding props={props} onView={onView} />;

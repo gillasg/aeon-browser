@@ -13,6 +13,7 @@ export type { EffectivePiResourcesDto } from "./chat-catalog-dto.js";
 export {
   HomeManagementSnapshotSchema,
   HomeRoutineCardSchema,
+  ManagementActionNoteSchema,
   ManagementSiteSchema,
   ManagementSnapshotSchema,
   ManagementWorkflowSchema,
