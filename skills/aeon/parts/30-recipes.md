@@ -1,8 +1,13 @@
 ## Recipes
 
 - **Long jobs.** One `aeon tool` call runs up to 60 seconds, but a shell loop can run for hours:
-  call `aeon tool browser_code @step.json --session job` per item and keep state with
-  `checkpoint`/`loadCheckpoint`. First check your shell can run `aeon` (`aeon tools`).
+  start a durable `browser.sweep`/`browser.job` and check it with `aeon job` (or run `aeon sweep
+@urls.txt`), keeping state with `checkpoint`/`loadCheckpoint` for anything else. First check your
+  shell can run `aeon` (`aeon tools`).
+- **Bulk site scans.** `aeon sweep @urls.txt --capture media --play` gives one record per URL with
+  `outcome` (`ok`, `gated`, `shell`, `dead`, `parked`, `redirected`, `blocked`, `error`), a
+  `warning` when nothing worked, and `--pilot 5`/`--checkpoint` to look first and resume. `aeon
+check @hosts.txt --media` is the liveness version. `aeon tools --find media` searches guidance.
 - **Several accounts on one site.** Save each account's cookies and storage with `page.session()`,
   then switch by clearing and setting cookies through `page.cdp('Network.clearBrowserCookies')` and
   `page.cdp('Network.setCookies', {cookies})`.

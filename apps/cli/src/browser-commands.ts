@@ -48,20 +48,55 @@ async function tabs(host: DaemonHost, args: Args): Promise<number> {
 }
 
 async function repl(host: DaemonHost, args: Args): Promise<number> {
-  const code = args.positional.join(" ");
-  if (!code) throw new Error('Usage: aeon repl "<code>" [--session name] [--timeout ms]');
-  const timeout = flag(args, "timeout");
+  const given = args.positional.join(" ");
+  const code =
+    given === "-"
+      ? await readStdin()
+      : given.startsWith("@")
+        ? await readFile(given.slice(1), "utf8")
+        : given;
+  if (!code.trim())
+    throw new Error(
+      'Usage: aeon repl "<code>" | @file.js | - [--session name] [--timeout s] [--quiet]',
+    );
+  const session = flag(args, "session") ?? "cli";
+  // Seconds, as the help says; 500ms and 2s also read as written.
+  const timeout = timeoutMs(flag(args, "timeout"));
   try {
     const value = await host.runInBrowser(code, {
-      session: flag(args, "session") ?? "cli",
-      ...(timeout ? { timeoutMs: Number(timeout) } : {}),
+      session,
+      ...(timeout ? { timeoutMs: timeout } : {}),
     });
-    out(cellText(value));
+    if (!has(args, "quiet")) out(cellText(value));
     return 0;
   } catch (error) {
-    out(error instanceof Error ? error.message : String(error));
+    // A timed-out cell can leave its tabs and jobs behind: close the session's own.
+    if (timeout && /timed?\s?out|timeout/i.test(String(error)))
+      await host
+        .runInBrowser("await browser.session.close()", { session, timeoutMs: 5000 })
+        .catch(() => undefined);
+    if (!has(args, "quiet")) out(error instanceof Error ? error.message : String(error));
     return 1;
   }
+}
+
+function timeoutMs(value: string | true | undefined): number | undefined {
+  if (value === undefined || value === true) return undefined;
+  const text = String(value).trim();
+  const seconds = /^(\d+(?:\.\d+)?)s$/i.exec(text);
+  const millis = /^(\d+)ms$/i.exec(text);
+  const number = seconds
+    ? Number(seconds[1]) * 1000
+    : millis
+      ? Number(millis[1])
+      : Number(text) * 1000;
+  return Number.isFinite(number) && number > 0 ? Math.round(number) : undefined;
+}
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 async function journal(args: Args): Promise<number> {
@@ -125,9 +160,12 @@ Prints tab id, title and URL, one tab per line; --json prints the browser's own 
       name: "repl",
       group: "Browser",
       summary: "run a browser_code cell",
-      help: `Usage: aeon repl "<code>" [--session name] [--timeout ms]
+      help: `Usage: aeon repl "<code>" | @file.js | - [--session name] [--timeout s] [--quiet]
 
-The last expression is returned. Variables and tabs persist per session.`,
+The last expression is returned. Variables and tabs persist per session. @file.js runs code from
+a file and - reads it from stdin, so long cells need no quoting. --timeout is in seconds (30,
+500ms and 2s also work); a timed-out cell closes the session's own tabs and jobs. --quiet prints
+nothing but keeps the exit code.`,
       run: (args) => repl(host, args),
     },
     {

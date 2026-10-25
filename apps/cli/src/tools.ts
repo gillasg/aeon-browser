@@ -17,17 +17,30 @@ const TOOL_NAMES = [
   "chat_review",
 ];
 
-/** Every tool with its full guidance, as the daemon describes it. */
-export async function listTools(client: AeonClient, asJson: boolean): Promise<number> {
+/** Every tool with its full guidance, as the daemon describes it; --find narrows to a topic. */
+export async function listTools(
+  client: AeonClient,
+  asJson: boolean,
+  find?: string,
+): Promise<number> {
   const reply = await client.tool({ kind: "core.tool.list" }, 15_000);
-  const tools = (reply.tools as { name: string; description: string; inputSchema: Json }[]) ?? [];
+  const all = (reply.tools as { name: string; description: string; inputSchema: Json }[]) ?? [];
+  const needle = find?.trim().toLowerCase();
+  const tools = needle
+    ? all.filter((tool) =>
+        `${tool.name}\n${tool.description}\n${JSON.stringify(tool.inputSchema)}`
+          .toLowerCase()
+          .includes(needle),
+      )
+    : all;
   if (asJson) process.stdout.write(JSON.stringify(tools, null, 2) + "\n");
+  else if (!tools.length) process.stdout.write(`No tool mentions ${JSON.stringify(find)}.\n`);
   else
     for (const tool of tools)
       process.stdout.write(
         `## ${tool.name}\n\n${tool.description}\n\nInput: ${JSON.stringify(tool.inputSchema)}\n\n`,
       );
-  return 0;
+  return tools.length ? 0 : 1;
 }
 
 async function readInput(raw: string | undefined): Promise<Json> {
@@ -51,10 +64,11 @@ async function readStdin(): Promise<string> {
 }
 
 /** Screenshots and other images are saved to files; their paths are printed instead. */
-async function print(content: Content[]): Promise<void> {
+async function print(content: Content[], options: { plain?: boolean } = {}): Promise<void> {
   const folder = join(dataDirectory(), "cli-images");
   for (const [index, part] of content.entries()) {
-    if (part.type === "text") process.stdout.write((part.text ?? "") + "\n");
+    if (part.type === "text")
+      process.stdout.write((options.plain ? plainText(part.text ?? "") : (part.text ?? "")) + "\n");
     else if (part.type === "image" && part.data) {
       await mkdir(folder, { recursive: true });
       const extension = (part.mimeType ?? "image/png").split("/")[1] ?? "png";
@@ -80,15 +94,19 @@ function fromPairs(pairs: string[]): Json {
   );
 }
 
-/** aeon tool <name> [json | @file | - | key=value ...] [--session s] */
+/** aeon tool <name> [json | @file | - | key=value ...] [--session s] [--json] [--no-color] */
 export async function runTool(client: AeonClient, rest: string[]): Promise<number> {
   const [name, ...others] = rest;
   if (!name || !TOOL_NAMES.includes(name))
-    throw new Error(`Usage: aeon tool <${TOOL_NAMES.join("|")}> '<json>' [--session name]`);
+    throw new Error(
+      `Usage: aeon tool <${TOOL_NAMES.join("|")}> '<json>' [--session name] [--json]`,
+    );
+  const asJson = others.includes("--json");
   const sessionIndex = others.indexOf("--session");
   const session = sessionIndex >= 0 ? others[sessionIndex + 1] : undefined;
+  const ignored = new Set(["--json", "--no-color", "--plain", "--session"]);
   const sessionValue = sessionIndex >= 0 ? sessionIndex + 1 : -1;
-  const inputs = others.filter((arg, index) => !arg.startsWith("--") && index !== sessionValue);
+  const inputs = others.filter((arg, index) => !ignored.has(arg) && index !== sessionValue);
   const pairs = inputs.filter((arg) => /^[A-Za-z_]\w*=/.test(arg));
   const input = pairs.length ? fromPairs(pairs) : await readInput(inputs[0]);
   const reply = await client.tool({
@@ -97,6 +115,20 @@ export async function runTool(client: AeonClient, rest: string[]): Promise<numbe
     session: session || "cli",
     arguments: input,
   });
-  await print((reply.content as Content[] | undefined) ?? []);
-  return reply.isError === true ? 1 : 0;
+  const content = (reply.content as Content[] | undefined) ?? [];
+  const isError = reply.isError === true;
+  if (asJson) {
+    process.stdout.write(
+      JSON.stringify({ tool: name, session: session || "cli", isError, content }, null, 2) + "\n",
+    );
+    return isError ? 1 : 0;
+  }
+  await print(content, { plain: others.includes("--no-color") || !process.stdout.isTTY });
+  return isError ? 1 : 0;
+}
+
+/** ANSI is a terminal's business; a piped caller gets plain text. */
+function plainText(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
 }
