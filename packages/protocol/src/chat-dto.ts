@@ -13,12 +13,16 @@ export type { EffectivePiResourcesDto } from "./chat-catalog-dto.js";
 export {
   HomeManagementSnapshotSchema,
   HomeRoutineCardSchema,
+  ManagementSiteSchema,
   ManagementSnapshotSchema,
+  ManagementWorkflowSchema,
 } from "./management-dto.js";
 export type {
   HomeManagementSnapshotDto,
   HomeRoutineCardDto,
+  ManagementSiteDto,
   ManagementSnapshotDto,
+  ManagementWorkflowDto,
 } from "./management-dto.js";
 
 export { PiAttachmentSchema } from "./pi-attachment-dto.js";

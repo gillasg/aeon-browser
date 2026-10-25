@@ -3,11 +3,14 @@ import { useEffect, type ReactElement } from "react";
 // Home has no sidebar: Chrome's own tabs and sidebar already list open chats. A thin bar takes
 // you to each of Aeon's pages instead. Escape, or the page you are on again, returns home.
 
-export type HomeView = "home" | "chats" | "watchers" | "activity" | "settings";
+export type HomeView =
+  "home" | "chats" | "watchers" | "automations" | "sites" | "activity" | "settings";
 
 const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings">, string]> = [
   ["chats", "Chats"],
   ["watchers", "Routines"],
+  ["automations", "Automations"],
+  ["sites", "Sites"],
   ["activity", "Activity"],
 ];
 
@@ -81,7 +84,8 @@ export function viewFromRoute(route: string | null): {
   settingsSection?: "settings" | "resources" | "capabilities";
 } {
   if (route === "routines" || route === "watchers") return { view: "watchers" };
-  if (route === "chats" || route === "activity") return { view: route };
+  if (route === "chats" || route === "activity" || route === "automations" || route === "sites")
+    return { view: route };
   if (route === "settings" || route === "resources" || route === "capabilities")
     return { view: "settings", settingsSection: route };
   return { view: "home" };

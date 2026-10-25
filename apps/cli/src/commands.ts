@@ -4,6 +4,7 @@ import { flag, has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
 import { blockedCommands } from "./blocked.js";
 import { browserCommands } from "./browser-commands.js";
+import { providerCommands } from "./provider-commands.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
@@ -538,6 +539,7 @@ export function aeonCommands(host: DaemonHost): Command[] {
   for (const command of [
     ...setupCommands(host),
     ...browserCommands(host),
+    ...providerCommands(host),
     ...blockedCommands(host),
   ])
     overrides.set(command.name, command);

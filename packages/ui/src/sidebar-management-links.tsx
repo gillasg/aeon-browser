@@ -13,6 +13,8 @@ export function SidebarManagementLinks({
       {(
         [
           ["routines", "Routines"],
+          ["automations", "Automations"],
+          ["sites", "Sites"],
           ["resources", "Skills & extensions"],
           ["capabilities", "MCPs / CLIs"],
           ["settings", "Settings"],

@@ -2056,3 +2056,50 @@ body[data-embedded="true"] .home-top-bar {
   width: 15px;
   height: 15px;
 }
+
+/* Automations and Sites: the same management frame, one plain table each. */
+.management-hint {
+  margin: 0 0 12px;
+  color: var(--text-muted, #8b8f98);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.management-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.management-table th,
+.management-table td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+}
+.management-table th {
+  color: var(--text-muted, #8b8f98);
+  font-weight: 500;
+  font-size: 12px;
+}
+.management-subtle {
+  margin: 2px 0 0;
+  color: var(--text-muted, #8b8f98);
+  font-size: 12px;
+}
+.management-run-ok {
+  color: var(--ok, #6bcf8e);
+}
+.management-run-failed {
+  color: var(--danger, #e36b6b);
+}
+.management-health-ok {
+  color: var(--ok, #6bcf8e);
+}
+.management-health-broken,
+.management-health-signed-out {
+  color: var(--danger, #e36b6b);
+}
+.management-health-drift,
+.management-health-challenged {
+  color: var(--warning, #d9a441);
+}
