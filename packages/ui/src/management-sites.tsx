@@ -88,6 +88,15 @@ function SiteRow({
       <td>
         <strong>{site.site}</strong>
         <p className="management-subtle">Updated {formatWhen(site.updatedAt)}</p>
+        {site.suggestions.length > 0 && (
+          <ul className="management-inputs">
+            {site.suggestions.map((suggestion) => (
+              <li key={suggestion} className="management-subtle">
+                {suggestion}
+              </li>
+            ))}
+          </ul>
+        )}
       </td>
       <td>
         {site.operations} operations
@@ -174,6 +183,15 @@ function SiteActions({
       <button type="button" onClick={() => act("switch_site_account", { site: site.site })}>
         Switch account
       </button>
+      {site.recording ? (
+        <button type="button" onClick={() => act("stop_site_recording", { site: site.site })}>
+          Stop recording
+        </button>
+      ) : (
+        <button type="button" onClick={() => act("start_site_recording", { site: site.site })}>
+          Record flow
+        </button>
+      )}
     </div>
   );
 }

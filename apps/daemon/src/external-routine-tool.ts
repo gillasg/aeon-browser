@@ -70,8 +70,13 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
   const instruction = requiredString(options.args.instruction, "instruction");
   const title = optionalString(options.args.title).slice(0, 120) || instruction.slice(0, 60);
   const check = optionalString(options.args.check) || null;
+  const checkShell = optionalString(options.args.checkShell) || null;
   const now = new Date();
-  const schedule = parseRoutineSchedule(scheduleValue(options.args.schedule), now, check ? 1 : 5);
+  const schedule = parseRoutineSchedule(
+    scheduleValue(options.args.schedule),
+    now,
+    check || checkShell ? 1 : 5,
+  );
   const sites = sitesOf(options.args.sites);
   const chatId = await chatFor(options, origin);
   const timestamp = now.toISOString();
@@ -81,6 +86,7 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
     title,
     instruction,
     check,
+    checkShell,
     sites,
     schedule,
     nextDueAt: nextRoutineOccurrence(schedule, now),
@@ -132,6 +138,7 @@ function pause(options: ExternalRoutineOptions, origin: Origin): unknown {
         title: routine.title,
         instruction: routine.instruction,
         check: routine.check ?? null,
+        checkShell: routine.checkShell ?? null,
         sites: routine.sites ?? [],
         schedule: routine.schedule,
         requiredBrowserInstanceId: routine.requiredBrowserInstanceId ?? null,

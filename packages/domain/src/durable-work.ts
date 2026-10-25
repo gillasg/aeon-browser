@@ -23,6 +23,11 @@ export interface RoutineRecord {
   instruction: string;
   /** Watcher check: browser code the daemon runs first; the agent only wakes on a truthy result. */
   check: string | null;
+  /**
+   * Opt-in local shell check: a command the daemon runs on this machine before the agent wakes.
+   * Exit 0 means met; stdout is the value. Never set by an agent without the user asking for it.
+   */
+  checkShell: string | null;
   /** Sites this routine may use (browserkit's "only" list); empty means no restriction. */
   sites: string[];
   schedule: RoutineSchedule;
@@ -182,6 +187,7 @@ export interface AeonProductStore {
       | "title"
       | "instruction"
       | "check"
+      | "checkShell"
       | "sites"
       | "schedule"
       | "nextDueAt"

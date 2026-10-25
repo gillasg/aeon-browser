@@ -1,7 +1,10 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   browserRecipeHost,
+  rebuild,
+  RecordingSession,
+  saveRecording,
   exportRecipes,
   exportSitePack,
   importRecipes,
@@ -11,6 +14,8 @@ import {
   runRecipe,
   siteDir,
 } from "@browserkit/site-mapper";
+import { PROVIDER_IDS, PROVIDERS, isProviderId } from "@browserkit/tools/providers";
+import { askProviderWith } from "@browserkit/tools/providers-run";
 import { runWorkflow, validateWorkflow } from "@browserkit/tools/workflow";
 import { workflowActions } from "@browserkit/tools/workflow-actions";
 import {
@@ -21,9 +26,16 @@ import {
 } from "@browserkit/tools/workflow-store";
 import {
   browserkitDataDirectory,
+  clearWorkflowProgress,
+  isSiteRecording,
   isWorkflowRunning,
+  markSiteRecording,
+  markWorkflowProgress,
   markWorkflowRunning,
   noteAction,
+  noteProviderTest,
+  providerCards,
+  setProviderCards,
 } from "./management-library.js";
 
 // What the Automations and Sites pages can do: run and cancel workflows, import and export
@@ -44,6 +56,11 @@ export const LIBRARY_ACTIONS = [
   "clear_site_session",
   "switch_site_account",
   "test_site_logged_out",
+  "record_workflow_from_run",
+  "start_site_recording",
+  "stop_site_recording",
+  "check_providers",
+  "test_provider",
 ] as const;
 
 export type LibraryAction = (typeof LIBRARY_ACTIONS)[number];
@@ -76,10 +93,19 @@ function preview(value: unknown): string {
 export class LibraryActions {
   private readonly running = new Map<string, AbortController>();
 
-  constructor(private readonly run: CodeCellRunner) {}
+  private readonly recordings = new Map<string, RecordingSession>();
 
-  async execute(action: LibraryAction, input: Record<string, unknown>): Promise<void> {
+  constructor(
+    private readonly run: CodeCellRunner,
+    private readonly dataDirectory?: string,
+  ) {}
+
+  async execute(action: LibraryAction, input: Record<string, unknown>, chatId = ""): Promise<void> {
     try {
+      if (action === "record_workflow_from_run") {
+        await this.recordWorkflowFromRun(input, chatId);
+        return;
+      }
       await this.dispatch(action, input);
     } catch (error) {
       noteAction(false, error instanceof Error ? error.message : String(error));
@@ -104,6 +130,10 @@ export class LibraryActions {
     ["clear_site_session", (input) => this.clearSession(required(input, "site"), false)],
     ["switch_site_account", (input) => this.clearSession(required(input, "site"), true)],
     ["test_site_logged_out", (input) => this.testLoggedOut(required(input, "site"))],
+    ["start_site_recording", (input) => this.startRecording(input)],
+    ["stop_site_recording", (input) => this.stopRecording(input)],
+    ["check_providers", () => this.checkProviders()],
+    ["test_provider", (input) => this.testProvider(input)],
   ]);
 
   private dispatch(action: LibraryAction, input: Record<string, unknown>): Promise<void> {
@@ -121,10 +151,27 @@ export class LibraryActions {
     this.running.set(name, controller);
     markWorkflowRunning(name, true);
     noteAction(true, `Running ${name}`);
+    const total = definition.steps.length;
     void runWorkflow(definition, {
       inputs: (input.inputs as Record<string, unknown>) ?? {},
       actions: workflowActions((code) => this.run(code, { session: SESSION })),
       signal: controller.signal,
+      onEvent: (event) => {
+        if (event.type === "step.started")
+          markWorkflowProgress(name, {
+            step: event.step + 1,
+            total,
+            id: event.id,
+            action: event.action,
+          });
+        if (event.type === "step.finished")
+          markWorkflowProgress(name, {
+            step: Math.max(1, event.step + 1),
+            total,
+            id: event.id,
+            action: "done",
+          });
+      },
     })
       .then(async (record) => {
         await writeRun(directory, record).catch(() => undefined);
@@ -136,6 +183,7 @@ export class LibraryActions {
       .finally(() => {
         this.running.delete(name);
         markWorkflowRunning(name, false);
+        clearWorkflowProgress(name);
       });
   }
 
@@ -289,8 +337,202 @@ export class LibraryActions {
     noteAction(true, `${site} as a signed-out visitor: ${preview(value)}`);
   }
 
+  /** Turn the browser actions of a chat's latest run log into a workflow. */
+  private async recordWorkflowFromRun(
+    input: Record<string, unknown>,
+    chatId: string,
+  ): Promise<void> {
+    const name = required(input, "name");
+    if (!this.dataDirectory) throw new Error("The run log folder is unavailable here");
+    if (!chatId) throw new Error("Select a chat with a browser run first");
+    const folder = join(this.dataDirectory, "workspaces", chatId, "runs");
+    const files = (await readdir(folder).catch(() => [] as string[]))
+      .filter((file) => file.endsWith(".json"))
+      .sort()
+      .reverse();
+    if (!files[0]) throw new Error("That chat has no run log yet; run it once with the browser");
+    const log = JSON.parse(await readFile(join(folder, files[0]), "utf8")) as {
+      actions?: unknown;
+    };
+    const actions = Array.isArray(log.actions) ? log.actions : [];
+    const definition = workflowFromActions(name, actions as Record<string, unknown>[]);
+    await saveWorkflow(browserkitDataDirectory(), definition);
+    noteAction(
+      true,
+      `Recorded ${definition.steps.length} step(s) from the last run into ${definition.name}`,
+    );
+  }
+
+  /** Start recording a site flow in a foreground tab; the user interacts, then stops it. */
+  private async startRecording(input: Record<string, unknown>): Promise<void> {
+    const site = required(input, "site");
+    if (isSiteRecording(site) || this.recordings.has(site))
+      throw new Error(`A recording for ${site} is already running`);
+    const url = typeof input.url === "string" && input.url ? input.url : `https://${site}/`;
+    const session = await RecordingSession.start({
+      url,
+      foreground: true,
+      session: "site-recording",
+      bridge: () =>
+        Promise.resolve({
+          run: (code: string, options?: { session?: string; timeoutMs?: number }) =>
+            this.run(code, options),
+          status: () => Promise.resolve({ browsers: 1 }),
+          close: () => undefined,
+        }),
+    });
+    this.recordings.set(site, session);
+    markSiteRecording(site, true);
+    noteAction(true, `Recording ${site}; use the tab, then press Stop recording`);
+  }
+
+  /** Stop the recording, save the flow and rebuild the site's API from it. */
+  private async stopRecording(input: Record<string, unknown>): Promise<void> {
+    const site = required(input, "site");
+    const session = this.recordings.get(site);
+    if (!session) throw new Error(`No recording is running for ${site}`);
+    const recording = await session.stop({ close: false });
+    this.recordings.delete(site);
+    markSiteRecording(site, false);
+    const name =
+      typeof input.name === "string" && input.name.trim()
+        ? input.name.trim()
+        : `flow-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    const file = await saveRecording(site, recording, { name });
+    const rebuilt = await rebuild(site).catch((error: unknown) => ({
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    noteAction(
+      "error" in rebuilt ? false : true,
+      `Saved ${file}` +
+        ("error" in rebuilt ? `; rebuild failed: ${rebuilt.error}` : `; ${site} rebuilt`),
+    );
+  }
+
+  /** Browser accounts: which providers have a session in Chrome, and an optional test query. */
+  private async checkProviders(): Promise<void> {
+    const cards = [];
+    for (const id of PROVIDER_IDS) {
+      const definition = PROVIDERS[id];
+      const cookies =
+        Number(
+          await this.run(
+            `(async () => {
+  const domains = ${JSON.stringify(definition.cookieDomains)};
+  let total = 0;
+  for (const domain of domains) {
+    const listed = await browser.cookies.list({ domain }).catch(() => ({ count: 0 }));
+    total += Number(listed.count || 0);
+  }
+  return total;
+})()`,
+            { session: SESSION, timeoutMs: 30_000 },
+          ),
+        ) || 0;
+      let account: string | null = null;
+      if (id === "chatgpt" && cookies > 0) {
+        const email = await this.run(
+          `(async () => {
+  const reply = await browser.fetch("https://chatgpt.com/api/auth/session").catch(() => null);
+  return reply && reply.json && reply.json.user ? reply.json.user.email ?? null : null;
+})()`,
+          { session: SESSION, timeoutMs: 30_000 },
+        ).catch(() => null);
+        account = typeof email === "string" ? email : null;
+      }
+      cards.push({
+        id,
+        name: definition.name,
+        host: definition.host,
+        signedIn: cookies > 0,
+        cookies,
+        account,
+        transport: "direct + page",
+        lastTest: providerCards().find((card) => card.id === id)?.lastTest ?? null,
+      });
+    }
+    setProviderCards(cards);
+    noteAction(true, `Checked ${cards.length} browser accounts`);
+  }
+
+  private async testProvider(input: Record<string, unknown>): Promise<void> {
+    const provider = required(input, "provider");
+    if (!isProviderId(provider)) throw new Error(`Unknown provider ${provider}`);
+    const prompt =
+      typeof input.prompt === "string" && input.prompt.trim()
+        ? input.prompt.trim()
+        : "Reply with the single word: ok";
+    const answer = await askProviderWith(
+      (code, options) => this.run(code, { session: SESSION, ...(options ?? {}) }),
+      provider,
+      prompt,
+      { timeoutMs: 60_000 },
+    );
+    noteProviderTest(
+      provider,
+      answer.ok ? answer.text : `${answer.reason ?? "failed"}: ${answer.detail ?? ""}`,
+    );
+    noteAction(
+      answer.ok,
+      `${provider}: ${answer.ok ? answer.text.slice(0, 200) : (answer.reason ?? "failed")}`,
+    );
+  }
+
   private exportPath(name: string, given: unknown): string {
     if (typeof given === "string" && given.trim()) return given.trim();
     return join(browserkitDataDirectory(), "exports", name.replace(/[^\w.-]+/g, "-"));
   }
+}
+
+/** The workflow a run's browser actions describe: opens, clicks, fills and key presses. */
+export function workflowFromActions(name: string, actions: Record<string, unknown>[]) {
+  const steps: { id: string; do: string; with: Record<string, unknown> }[] = [];
+  for (const action of actions) {
+    const op = String(action.op ?? "");
+    const element = action.element as Record<string, unknown> | undefined;
+    const id = `step-${steps.length + 1}`;
+    if ((op === "openTab" || op === "navigate") && typeof action.url === "string") {
+      steps.push({ id, do: "goto", with: { url: action.url } });
+      continue;
+    }
+    if (op === "click" || op === "fill") {
+      const target = targetOf(element);
+      if (!target) continue;
+      steps.push({
+        id,
+        do: op,
+        with: { ...target, ...(op === "fill" ? { value: String(action.value ?? "") } : {}) },
+      });
+      continue;
+    }
+    if (op === "press" && typeof action.key === "string")
+      steps.push({ id, do: "press", with: { key: action.key } });
+  }
+  if (!steps.length) throw new Error("That run has no browser actions to record");
+  return validateWorkflow({ name, steps });
+}
+
+function targetOf(
+  element: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!element) return undefined;
+  if (typeof element.css === "string") return { css: element.css };
+  if (typeof element.selector === "string") return { css: element.selector };
+  if (element.kind === "locator" && typeof element.role === "string")
+    return {
+      role: element.role,
+      ...(typeof element.name === "string" ? { name: element.name } : {}),
+    };
+  if (
+    element.kind === "query" &&
+    typeof element.by === "string" &&
+    typeof element.value === "string"
+  ) {
+    if (element.by === "css") return { css: element.value };
+    if (element.by === "text") return { text: element.value };
+    if (element.by === "label") return { label: element.value };
+    if (element.by === "placeholder") return { placeholder: element.value };
+    if (element.by === "role") return { role: element.value };
+  }
+  return undefined;
 }

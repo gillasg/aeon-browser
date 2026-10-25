@@ -22,4 +22,9 @@ export type ManagementActionName =
   | "import_recipes"
   | "clear_site_session"
   | "switch_site_account"
-  | "test_site_logged_out";
+  | "test_site_logged_out"
+  | "record_workflow_from_run"
+  | "start_site_recording"
+  | "stop_site_recording"
+  | "check_providers"
+  | "test_provider";

@@ -48,6 +48,8 @@ const ManagementRoutineSchema = z
     schedule: RoutineScheduleSchema,
     /** It runs a check with no model first (a learned API, a page read); the agent only when it passes. */
     checks: z.boolean().optional(),
+    /** The opt-in local command its check runs; shown so the editor can keep it. */
+    checkShell: z.string().max(2000).optional(),
     /** Sites this routine may use; empty means it is not restricted. */
     sites: z.array(z.string().min(1).max(200)).max(50),
     nextDueAt: z.string().datetime().nullable(),
@@ -181,6 +183,15 @@ export const ManagementWorkflowSchema = z
       )
       .max(50),
     running: z.boolean(),
+    progress: z
+      .object({
+        step: z.number().int().nonnegative(),
+        total: z.number().int().nonnegative(),
+        id: z.string().max(160),
+        action: z.string().max(160),
+      })
+      .strict()
+      .optional(),
     lastRun: z
       .object({
         state: z.enum(["ok", "failed", "running", "cancelled"]),
@@ -202,6 +213,8 @@ export const ManagementSiteSchema = z
     session: z.boolean(),
     sessionAccount: z.string().max(200).nullable(),
     sessionSavedAt: z.string().max(60).nullable(),
+    recording: z.boolean(),
+    suggestions: z.array(z.string().max(500)).max(10),
     recipes: z
       .array(
         z
@@ -241,6 +254,24 @@ export const ManagementSnapshotSchema = z
     workflows: z.array(ManagementWorkflowSchema).max(100).optional(),
     /** Mapped sites, with health, recipes and the stored session. */
     sites: z.array(ManagementSiteSchema).max(200).optional(),
+    /** Browser chat accounts: signed-in state, account when known, transport and last test. */
+    providers: z
+      .array(
+        z
+          .object({
+            id: z.string().max(40),
+            name: z.string().max(80),
+            host: z.string().max(200),
+            signedIn: z.boolean(),
+            cookies: z.number().int().nonnegative(),
+            account: z.string().max(200).nullable(),
+            transport: z.string().max(80),
+            lastTest: z.string().max(500).nullable(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
     /** The result of the last run/import/export/session action, for the page to show. */
     lastAction: ManagementActionNoteSchema.nullable().optional(),
   })

@@ -1,3 +1,4 @@
+import { exec } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type {
   PiRoutineRunEvidence,
@@ -234,6 +235,7 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
     id: string,
     timeoutMs = CHECK_TIMEOUT_MS,
   ): Promise<{ met: boolean; value?: unknown; error?: string }> {
+    if (routine.checkShell) return runShellCheck(routine.checkShell, timeoutMs);
     const host = createAeonHostHandler({
       source: "routine",
       siteRules: () => ({ blocked: [], only: routine.sites ?? [], allow: [] }),
@@ -367,4 +369,35 @@ function labelOf(value: unknown): string {
   );
   const price = record.price ?? record.amount;
   return [name, price === undefined ? "" : String(price)].filter(Boolean).join(" · ").slice(0, 200);
+}
+
+/**
+ * An opt-in local command check: exit 0 means the routine should wake, stdout is the value. It
+ * runs on this machine, never through the browser, with the routine timeout and bounded output.
+ * Only a routine whose checkShell was set explicitly takes this path.
+ */
+export function runShellCheck(
+  command: string,
+  timeoutMs = CHECK_TIMEOUT_MS,
+): Promise<{ met: boolean; value?: unknown; error?: string }> {
+  return new Promise((done) => {
+    exec(
+      command,
+      { timeout: Math.min(timeoutMs, 60_000), maxBuffer: 256_000, windowsHide: true },
+      (error, stdout, stderr) => {
+        const output = String(stdout).trim().slice(0, 2000);
+        if (error) {
+          const timedOut = (error as { killed?: boolean }).killed === true;
+          const detail = String(stderr).trim() || error.message;
+          done({
+            met: false,
+            ...(output ? { value: output } : {}),
+            error: `${timedOut ? "CHECK_TIMEOUT" : "CHECK_FAILED"}: ${detail.slice(0, 400)}`,
+          });
+          return;
+        }
+        done({ met: true, value: output || true });
+      },
+    );
+  });
 }

@@ -3,9 +3,19 @@ import { mkdir } from "node:fs/promises";
 import { workspaceCall } from "./browser-workspace.js";
 
 // A compact log of each agent run, in the chat's workspace: the tabs it opened and closed, the
-// hosts it contacted, the files it wrote and the jobs it started. Every browser_code result of the
-// run names the file it keeps growing ("run log: runs/<time>.json"), and the run's end writes the
-// final one. A user asking "what did it do?" or a later agent picking the work up reads this.
+// hosts it contacted, the files it wrote, the jobs it started and the browser actions it took.
+// Every browser_code result of the run names the file it keeps growing
+// ("run log: runs/<time>.json"), and the run's end writes the final one. A user asking "what did
+// it do?", a later agent picking the work up, or the Automations page recording a workflow from
+// the run reads it.
+
+export interface RunAction {
+  op: string;
+  url?: string;
+  element?: unknown;
+  value?: unknown;
+  key?: string;
+}
 
 export interface RunLogTotals {
   startedAt: number;
@@ -13,6 +23,7 @@ export interface RunLogTotals {
   hosts: Set<string>;
   files: Set<string>;
   jobs: Set<string>;
+  actions: RunAction[];
 }
 
 export interface CellTally {
@@ -31,6 +42,7 @@ export interface CellTally {
 }
 
 const MAX_HOSTS = 60;
+const MAX_ACTIONS = 300;
 const runs = new Map<string, RunLogTotals>();
 
 /** The log a run is keeping, started on the run's first cell. */
@@ -41,6 +53,7 @@ export function startRunLog(chatId: string, now = Date.now()): RunLogTotals {
     hosts: new Set(),
     files: new Set(),
     jobs: new Set(),
+    actions: [],
   };
   runs.set(chatId, totals);
   return totals;
@@ -56,6 +69,7 @@ export function tallyCell(chatId: string, cell: CellTally, at = Date.now()): str
   }
   for (const file of cell.files ?? []) totals.files.add(file);
   for (const job of jobIdsOf(cell)) totals.jobs.add(job);
+  addActions(totals, cell.steps ?? []);
   return runLogName(totals.startedAt);
 }
 
@@ -76,6 +90,7 @@ export async function writeRunLog(
     hosts: [...totals.hosts].sort(),
     files: [...totals.files],
     jobs: [...totals.jobs],
+    actions: totals.actions,
   };
   await mkdir(join(workspace, "runs"), { recursive: true });
   // checkpoint is an atomic overwrite: the log is rewritten as the run goes on.
@@ -141,6 +156,24 @@ export function hostOf(url: unknown): string | undefined {
     return host || undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** The browser actions a later workflow can replay: opens, clicks, fills and key presses. */
+function addActions(totals: RunLogTotals, steps: readonly Record<string, unknown>[]): void {
+  for (const entry of steps) {
+    if (totals.actions.length >= MAX_ACTIONS) return;
+    const action = entry.action as Record<string, unknown> | undefined;
+    const op = typeof action?.op === "string" ? action.op : "";
+    if (!["openTab", "navigate", "click", "fill", "press"].includes(op)) continue;
+    const element = action?.element as { kind?: string } | undefined;
+    totals.actions.push({
+      op,
+      ...(typeof action?.url === "string" ? { url: action.url } : {}),
+      ...(element && typeof element === "object" ? { element } : {}),
+      ...(action?.value === undefined ? {} : { value: action.value }),
+      ...(typeof action?.key === "string" ? { key: action.key } : {}),
+    });
   }
 }
 

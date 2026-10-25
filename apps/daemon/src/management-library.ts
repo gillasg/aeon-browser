@@ -1,6 +1,13 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { listRecipes, listSites, readHealth, readSession } from "@browserkit/site-mapper";
+import {
+  coverage,
+  listRecipes,
+  listSites,
+  loadModel,
+  readHealth,
+  readSession,
+} from "@browserkit/site-mapper";
 import { listRuns, listWorkflows, readWorkflow } from "@browserkit/tools/workflow-store";
 
 // What the Automations and Sites pages show: workflows with their inputs and last run, mapped
@@ -33,6 +40,7 @@ export interface WorkflowCard {
   updatedAt: string;
   inputs: WorkflowInputCard[];
   running: boolean;
+  progress?: { step: number; total: number; id: string; action: string };
   lastRun: {
     state: "ok" | "failed" | "running" | "cancelled";
     at: string;
@@ -50,6 +58,30 @@ export function markWorkflowRunning(name: string, value: boolean): void {
 
 export function isWorkflowRunning(name: string): boolean {
   return running.has(name);
+}
+
+const progress = new Map<string, { step: number; total: number; id: string; action: string }>();
+
+export function markWorkflowProgress(
+  name: string,
+  value: { step: number; total: number; id: string; action: string },
+): void {
+  progress.set(name, value);
+}
+
+export function clearWorkflowProgress(name: string): void {
+  progress.delete(name);
+}
+
+const recordingSites = new Set<string>();
+
+export function markSiteRecording(site: string, value: boolean): void {
+  if (value) recordingSites.add(site);
+  else recordingSites.delete(site);
+}
+
+export function isSiteRecording(site: string): boolean {
+  return recordingSites.has(site);
 }
 
 /** The last library action's outcome, carried in the snapshot so a page can show it. */
@@ -77,6 +109,7 @@ export async function workflowCards(): Promise<WorkflowCard[]> {
       ...(input.description ? { description: input.description } : {}),
       ...(input.default === undefined ? {} : { default: input.default }),
     }));
+    const current = progress.get(workflow.name);
     cards.push({
       name: workflow.name,
       slug: workflow.slug,
@@ -85,6 +118,7 @@ export async function workflowCards(): Promise<WorkflowCard[]> {
       updatedAt: new Date(workflow.updatedAt).toISOString(),
       inputs,
       running: running.has(workflow.name),
+      ...(current ? { progress: current } : {}),
       lastRun: last
         ? {
             state: last.status === "completed" ? "ok" : "failed",
@@ -113,6 +147,8 @@ export interface SiteCard {
   sessionAccount: string | null;
   sessionSavedAt: string | null;
   recipes: RecipeCard[];
+  recording: boolean;
+  suggestions: string[];
 }
 
 const HEALTH_ORDER = ["broken", "signed-out", "drift", "challenged", "skipped", "ok"];
@@ -121,10 +157,11 @@ export async function siteCards(): Promise<SiteCard[]> {
   const sites = await listSites().catch(() => []);
   const cards: SiteCard[] = [];
   for (const site of sites.slice(0, 200)) {
-    const [health, session, recipes] = await Promise.all([
+    const [health, session, recipes, model] = await Promise.all([
       readHealth(site.site).catch(() => undefined),
       readSession(site.site).catch(() => undefined),
       listRecipes(site.site).catch(() => []),
+      loadModel(site.site).catch(() => undefined),
     ]);
     const statuses = (health?.results ?? []).map((result) => result.status);
     const healthState =
@@ -152,7 +189,40 @@ export async function siteCards(): Promise<SiteCard[]> {
         fields: recipe.fields.length,
         updatedAt: recipe.updatedAt,
       })),
+      recording: isSiteRecording(site.site),
+      suggestions: model
+        ? coverage(model, [])
+            .slice(0, 5)
+            .map((item) => item.message)
+        : [],
     });
   }
   return cards;
+}
+
+export interface ProviderCard {
+  id: string;
+  name: string;
+  host: string;
+  signedIn: boolean;
+  cookies: number;
+  account: string | null;
+  transport: string;
+  lastTest: string | null;
+}
+
+let providerState: ProviderCard[] = [];
+
+export function setProviderCards(cards: ProviderCard[]): void {
+  providerState = cards;
+}
+
+export function providerCards(): ProviderCard[] {
+  return providerState;
+}
+
+export function noteProviderTest(id: string, text: string): void {
+  providerState = providerState.map((card) =>
+    card.id === id ? { ...card, lastTest: text.slice(0, 500) } : card,
+  );
 }

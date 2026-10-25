@@ -7,6 +7,7 @@ export interface RoutineRow {
   title: string;
   instruction: string;
   check_code: string | null;
+  check_shell: string | null;
   sites_json: string | null;
   schedule_json: string;
   next_due_at: string | null;
@@ -40,6 +41,7 @@ export function toRoutine(row: RoutineRow): RoutineRecord {
     title: row.title,
     instruction: row.instruction,
     check: row.check_code ?? null,
+    checkShell: row.check_shell ?? null,
     sites: sitesOf(row.sites_json),
     schedule: JSON.parse(row.schedule_json) as RoutineRecord["schedule"],
     nextDueAt: row.next_due_at,
