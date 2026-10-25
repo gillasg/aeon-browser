@@ -110,6 +110,7 @@ test("the MCP server lists its tools without a running Aeon", async () => {
       "aeon_search",
       "aeon_context",
       "aeon_routine",
+      "browser_action",
     ],
   );
 });

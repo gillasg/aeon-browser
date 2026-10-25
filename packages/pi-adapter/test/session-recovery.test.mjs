@@ -17,7 +17,7 @@ test("pinned Pi creates one stable session and flushes it without provider acces
     agentDirectory: paths.agentDirectory,
   });
   t.after(() => firstAdapter.closeAll());
-  t.after(() => rm(paths.root, { recursive: true, force: true }));
+  t.after(() => removeTree(paths.root));
   const [first, concurrent] = await Promise.all([
     firstAdapter.openOrCreate(input),
     firstAdapter.openOrCreate(input),
@@ -63,7 +63,7 @@ test("Pi's persisted reference reopens the same entries without a transcript mir
     agentDirectory: paths.agentDirectory,
   });
   t.after(() => firstAdapter.closeAll());
-  t.after(() => rm(paths.root, { recursive: true, force: true }));
+  t.after(() => removeTree(paths.root));
   const reference = { sessionId: input.activationId, sessionFile };
   assert.ok((await readdir(paths.sessionDirectory)).includes(sessionFile.split(/[\\/]/).at(-1)));
   const opened = await firstAdapter.openOrCreate({ ...input, reference, materialized: true });
@@ -166,7 +166,7 @@ async function createFixturePromptSession(t) {
     testModel: "local-faux",
   });
   t.after(() => adapter.closeAll());
-  t.after(() => rm(paths.root, { recursive: true, force: true }));
+  t.after(() => removeTree(paths.root));
   const session = await adapter.openOrCreate(input);
   const events = [];
   const unsubscribe = session.subscribe((event) => events.push(event));
@@ -269,7 +269,7 @@ test("a vanished materialized session is reported instead of silently replaced",
     agentDirectory: paths.agentDirectory,
   });
   t.after(() => adapter.closeAll());
-  t.after(() => rm(paths.root, { recursive: true, force: true }));
+  t.after(() => removeTree(paths.root));
   await assert.rejects(
     adapter.openOrCreate({
       ...input,
@@ -305,4 +305,17 @@ async function makeSandbox() {
   };
   await Promise.all(Object.values(paths).map((path) => mkdir(path, { recursive: true })));
   return paths;
+}
+
+/** Windows can hold a temp file open for a moment after a session closes; retry the tidy-up. */
+async function removeTree(path) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      await rm(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt === 19) throw error;
+      await new Promise((done) => setTimeout(done, 100));
+    }
+  }
 }

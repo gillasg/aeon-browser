@@ -55,7 +55,7 @@ test("thread delivery uses Pi custom entries and exact turn settlement receipts"
     testModel: "local-faux",
   });
   t.after(() => adapter.closeAll());
-  t.after(() => rm(paths.root, { recursive: true, force: true }));
+  t.after(() => removeTree(paths.root));
   const recipientChatId = asChatId(randomUUID());
   const session = await adapter.openOrCreate({
     chatId: recipientChatId,
@@ -124,7 +124,7 @@ async function prepareThreadCoordinationCase1Stage1(t) {
     testModel: "local-faux",
   });
   t.after(() => adapter.closeAll());
-  t.after(() => rm(paths.root, { recursive: true, force: true }));
+  t.after(() => removeTree(paths.root));
   const sourceSession = await adapter.openOrCreate({
     chatId: asChatId(randomUUID()),
     activationId: asActivationId(randomUUID()),
@@ -201,4 +201,17 @@ async function verifyThreadCoordinationCase1Stage3(
   const fork = SessionManager.open(forkReference.sessionFile);
   assert.equal(fork.getLeafId(), selectedEntryId);
   assert.equal(fork.getHeader()?.parentSession, sourceReference.sessionFile);
+}
+
+/** Windows can hold a temp file open for a moment after a session closes; retry the tidy-up. */
+async function removeTree(path) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      await rm(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt === 19) throw error;
+      await new Promise((done) => setTimeout(done, 100));
+    }
+  }
 }
