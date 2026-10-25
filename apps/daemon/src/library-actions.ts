@@ -16,7 +16,7 @@ import {
 } from "@browserkit/site-mapper";
 import { PROVIDER_IDS, PROVIDERS, isProviderId } from "@browserkit/tools/providers";
 import { askProviderWith } from "@browserkit/tools/providers-run";
-import { runWorkflow, validateWorkflow } from "@browserkit/tools/workflow";
+import { runWorkflow, validateWorkflow, type WorkflowDefinition } from "@browserkit/tools/workflow";
 import { workflowActions } from "@browserkit/tools/workflow-actions";
 import {
   readWorkflow,
@@ -485,37 +485,67 @@ export class LibraryActions {
 }
 
 /** The workflow a run's browser actions describe: opens, clicks, fills and key presses. */
-export function workflowFromActions(name: string, actions: Record<string, unknown>[]) {
+export function workflowFromActions(
+  name: string,
+  actions: Record<string, unknown>[],
+): WorkflowDefinition {
   const steps: { id: string; do: string; with: Record<string, unknown> }[] = [];
   for (const action of actions) {
-    const op = String(action.op ?? "");
-    const element = action.element as Record<string, unknown> | undefined;
-    const id = `step-${steps.length + 1}`;
-    if ((op === "openTab" || op === "navigate") && typeof action.url === "string") {
-      steps.push({ id, do: "goto", with: { url: action.url } });
-      continue;
-    }
-    if (op === "click" || op === "fill") {
-      const target = targetOf(element);
-      if (!target) continue;
-      steps.push({
-        id,
-        do: op,
-        with: { ...target, ...(op === "fill" ? { value: String(action.value ?? "") } : {}) },
-      });
-      continue;
-    }
-    if (op === "press" && typeof action.key === "string")
-      steps.push({ id, do: "press", with: { key: action.key } });
+    const step = stepFromAction(action, steps.length + 1);
+    if (step) steps.push(step);
   }
   if (!steps.length) throw new Error("That run has no browser actions to record");
   return validateWorkflow({ name, steps });
 }
 
+/** One action as a workflow step, or nothing when it is not a page action. */
+function stepFromAction(
+  action: Record<string, unknown>,
+  index: number,
+): { id: string; do: string; with: Record<string, unknown> } | undefined {
+  const op = String(action.op ?? "");
+  const id = `step-${index}`;
+  if ((op === "openTab" || op === "navigate") && typeof action.url === "string")
+    return { id, do: "goto", with: { url: action.url } };
+  if (op === "click" || op === "fill") {
+    const target = targetOf(action.element as Record<string, unknown> | undefined);
+    if (!target) return undefined;
+    return {
+      id,
+      do: op,
+      with: { ...target, ...(op === "fill" ? { value: String(action.value ?? "") } : {}) },
+    };
+  }
+  if (op === "press" && typeof action.key === "string")
+    return { id, do: "press", with: { key: action.key } };
+  return undefined;
+}
+
+const QUERY_TARGETS: Record<string, (value: string) => Record<string, unknown>> = {
+  css: (value) => ({ css: value }),
+  text: (value) => ({ text: value }),
+  label: (value) => ({ label: value }),
+  placeholder: (value) => ({ placeholder: value }),
+  role: (value) => ({ role: value }),
+};
+
 function targetOf(
   element: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
   if (!element) return undefined;
+  const direct = directTarget(element);
+  if (direct) return direct;
+  if (
+    element.kind !== "query" ||
+    typeof element.by !== "string" ||
+    typeof element.value !== "string"
+  )
+    return undefined;
+  return QUERY_TARGETS[element.by]?.(element.value);
+}
+
+/** A css/selector or locator target, before the query form. */
+function directTarget(element: Record<string, unknown>): Record<string, unknown> | undefined {
   if (typeof element.css === "string") return { css: element.css };
   if (typeof element.selector === "string") return { css: element.selector };
   if (element.kind === "locator" && typeof element.role === "string")
@@ -523,16 +553,5 @@ function targetOf(
       role: element.role,
       ...(typeof element.name === "string" ? { name: element.name } : {}),
     };
-  if (
-    element.kind === "query" &&
-    typeof element.by === "string" &&
-    typeof element.value === "string"
-  ) {
-    if (element.by === "css") return { css: element.value };
-    if (element.by === "text") return { text: element.value };
-    if (element.by === "label") return { label: element.value };
-    if (element.by === "placeholder") return { placeholder: element.value };
-    if (element.by === "role") return { role: element.value };
-  }
   return undefined;
 }

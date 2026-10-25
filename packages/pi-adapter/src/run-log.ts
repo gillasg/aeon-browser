@@ -159,22 +159,28 @@ export function hostOf(url: unknown): string | undefined {
   }
 }
 
+const REPLAYABLE = new Set(["openTab", "navigate", "click", "fill", "press"]);
+
 /** The browser actions a later workflow can replay: opens, clicks, fills and key presses. */
 function addActions(totals: RunLogTotals, steps: readonly Record<string, unknown>[]): void {
   for (const entry of steps) {
     if (totals.actions.length >= MAX_ACTIONS) return;
-    const action = entry.action as Record<string, unknown> | undefined;
-    const op = typeof action?.op === "string" ? action.op : "";
-    if (!["openTab", "navigate", "click", "fill", "press"].includes(op)) continue;
-    const element = action?.element as { kind?: string } | undefined;
-    totals.actions.push({
-      op,
-      ...(typeof action?.url === "string" ? { url: action.url } : {}),
-      ...(element && typeof element === "object" ? { element } : {}),
-      ...(action?.value === undefined ? {} : { value: action.value }),
-      ...(typeof action?.key === "string" ? { key: action.key } : {}),
-    });
+    const action = replayAction(entry);
+    if (action) totals.actions.push(action);
   }
+}
+
+function replayAction(entry: Record<string, unknown>): RunAction | undefined {
+  const action = entry.action as Record<string, unknown> | undefined;
+  const op = typeof action?.op === "string" ? action.op : "";
+  if (!REPLAYABLE.has(op) || !action) return undefined;
+  const replay: RunAction = { op };
+  if (typeof action.url === "string") replay.url = action.url;
+  const element = action.element as Record<string, unknown> | undefined;
+  if (element && typeof element === "object") replay.element = element;
+  if (action.value !== undefined) replay.value = action.value;
+  if (typeof action.key === "string") replay.key = action.key;
+  return replay;
 }
 
 /** Jobs a cell started: browser.job answers {jobId} in its value or its printed output. */

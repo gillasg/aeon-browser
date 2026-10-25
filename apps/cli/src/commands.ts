@@ -434,6 +434,13 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       run: (args) => searchChats(host, args),
     },
     ...outsideAgentCommands(host),
+    ...chatToolCommands(host),
+  ];
+}
+
+/** Inspecting and running one chat, the tools, settings and install: their own group of commands. */
+function chatToolCommands(host: DaemonHost): Command[] {
+  return [
     stopCommand(host),
     {
       name: "review",

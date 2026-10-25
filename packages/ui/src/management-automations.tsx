@@ -28,48 +28,77 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
         <code>aeon workflow run &lt;name&gt;</code>) runs the same engine.
       </p>
       <ActionNote note={props.snapshot?.lastAction} />
-      <div className="management-toolbar">
-        <button type="button" onClick={props.onRefresh} disabled={props.loading}>
-          Refresh
-        </button>
-        <button type="button" onClick={() => setImporting((value) => !value)}>
-          {importing ? "Close import" : "Import workflow"}
-        </button>
-        <button type="button" onClick={() => setRecording((value) => !value)}>
-          {recording ? "Close record" : "Record from last run"}
-        </button>
-      </div>
+      <AutomationToolbar
+        importing={importing}
+        recording={recording}
+        loading={props.loading}
+        onRefresh={props.onRefresh}
+        onImport={() => setImporting((value) => !value)}
+        onRecord={() => setRecording((value) => !value)}
+      />
       {importing && <ImportForm chatId={chatId} onAction={props.onAction} />}
       {recording && <RecordForm chatId={chatId} onAction={props.onAction} />}
-      {workflows.length === 0 ? (
-        <p className="management-empty">
-          No saved workflows yet. An agent can save one (workflow tool), or record the last run
-          here.
-        </p>
-      ) : (
-        <table className="management-table">
-          <thead>
-            <tr>
-              <th scope="col">Workflow</th>
-              <th scope="col">Steps</th>
-              <th scope="col">Inputs</th>
-              <th scope="col">Last run</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {workflows.map((workflow) => (
-              <WorkflowRow
-                key={workflow.slug}
-                workflow={workflow}
-                chatId={chatId}
-                onAction={props.onAction}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      <WorkflowTable workflows={workflows} chatId={chatId} onAction={props.onAction} />
     </div>
+  );
+}
+
+function AutomationToolbar(props: {
+  importing: boolean;
+  recording: boolean;
+  loading: boolean;
+  onRefresh: () => void;
+  onImport: () => void;
+  onRecord: () => void;
+}): ReactElement {
+  return (
+    <div className="management-toolbar">
+      <button type="button" onClick={props.onRefresh} disabled={props.loading}>
+        Refresh
+      </button>
+      <button type="button" onClick={props.onImport}>
+        {props.importing ? "Close import" : "Import workflow"}
+      </button>
+      <button type="button" onClick={props.onRecord}>
+        {props.recording ? "Close record" : "Record from last run"}
+      </button>
+    </div>
+  );
+}
+
+function WorkflowTable(props: {
+  workflows: Workflow[];
+  chatId: string;
+  onAction: ManagementSurfaceProps["onAction"];
+}): ReactElement {
+  if (!props.workflows.length)
+    return (
+      <p className="management-empty">
+        No saved workflows yet. An agent can save one (workflow tool), or record the last run here.
+      </p>
+    );
+  return (
+    <table className="management-table">
+      <thead>
+        <tr>
+          <th scope="col">Workflow</th>
+          <th scope="col">Steps</th>
+          <th scope="col">Inputs</th>
+          <th scope="col">Last run</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {props.workflows.map((workflow) => (
+          <WorkflowRow
+            key={workflow.slug}
+            workflow={workflow}
+            chatId={props.chatId}
+            onAction={props.onAction}
+          />
+        ))}
+      </tbody>
+    </table>
   );
 }
 

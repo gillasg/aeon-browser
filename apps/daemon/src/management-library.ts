@@ -153,51 +153,57 @@ export interface SiteCard {
 
 const HEALTH_ORDER = ["broken", "signed-out", "drift", "challenged", "skipped", "ok"];
 
+type SiteSummary = Awaited<ReturnType<typeof listSites>>[number];
+
 export async function siteCards(): Promise<SiteCard[]> {
   const sites = await listSites().catch(() => []);
-  const cards: SiteCard[] = [];
-  for (const site of sites.slice(0, 200)) {
-    const [health, session, recipes, model] = await Promise.all([
-      readHealth(site.site).catch(() => undefined),
-      readSession(site.site).catch(() => undefined),
-      listRecipes(site.site).catch(() => []),
-      loadModel(site.site).catch(() => undefined),
-    ]);
-    const statuses = (health?.results ?? []).map((result) => result.status);
-    const healthState =
-      statuses.length === 0
-        ? "unknown"
-        : (HEALTH_ORDER.find((state) => statuses.includes(state as never)) ?? "ok");
-    const stored = session as
-      { account?: unknown; savedAt?: unknown; updatedAt?: unknown } | undefined;
-    cards.push({
-      site: site.site,
-      operations: site.operations,
-      updatedAt: site.updated,
-      health: healthState,
-      session: session !== undefined,
-      sessionAccount: typeof stored?.account === "string" ? stored.account : null,
-      sessionSavedAt:
-        typeof stored?.savedAt === "string"
-          ? stored.savedAt
-          : typeof stored?.updatedAt === "string"
-            ? stored.updatedAt
-            : null,
-      recipes: recipes.map((recipe) => ({
-        name: recipe.name,
-        kind: recipe.kind,
-        fields: recipe.fields.length,
-        updatedAt: recipe.updatedAt,
-      })),
-      recording: isSiteRecording(site.site),
-      suggestions: model
-        ? coverage(model, [])
-            .slice(0, 5)
-            .map((item) => item.message)
-        : [],
-    });
-  }
-  return cards;
+  return Promise.all(sites.slice(0, 200).map((site) => siteCard(site)));
+}
+
+async function siteCard(site: SiteSummary): Promise<SiteCard> {
+  const [health, session, recipes, model] = await Promise.all([
+    readHealth(site.site).catch(() => undefined),
+    readSession(site.site).catch(() => undefined),
+    listRecipes(site.site).catch(() => []),
+    loadModel(site.site).catch(() => undefined),
+  ]);
+  const stored = session as
+    { account?: unknown; savedAt?: unknown; updatedAt?: unknown } | undefined;
+  return {
+    site: site.site,
+    operations: site.operations,
+    updatedAt: site.updated,
+    health: healthStateOf(health),
+    session: session !== undefined,
+    sessionAccount: typeof stored?.account === "string" ? stored.account : null,
+    sessionSavedAt: sessionSavedAt(stored),
+    recipes: recipes.map((recipe) => ({
+      name: recipe.name,
+      kind: recipe.kind,
+      fields: recipe.fields.length,
+      updatedAt: recipe.updatedAt,
+    })),
+    recording: isSiteRecording(site.site),
+    suggestions: suggestionsOf(model),
+  };
+}
+
+function healthStateOf(health: Awaited<ReturnType<typeof readHealth>> | undefined): string {
+  const statuses = (health?.results ?? []).map((result) => result.status);
+  if (!statuses.length) return "unknown";
+  return HEALTH_ORDER.find((state) => statuses.includes(state as never)) ?? "ok";
+}
+
+function sessionSavedAt(stored: { savedAt?: unknown; updatedAt?: unknown } | undefined) {
+  if (typeof stored?.savedAt === "string") return stored.savedAt;
+  return typeof stored?.updatedAt === "string" ? stored.updatedAt : null;
+}
+
+function suggestionsOf(model: Awaited<ReturnType<typeof loadModel>> | undefined): string[] {
+  if (!model) return [];
+  return coverage(model, [])
+    .slice(0, 5)
+    .map((item) => item.message);
 }
 
 export interface ProviderCard {
