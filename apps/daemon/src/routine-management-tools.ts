@@ -48,7 +48,8 @@ export class RoutineManagementTools {
   private create(args: Record<string, unknown>, chatId: ChatId): RoutineRecord {
     const now = new Date();
     const check = optionalCheck(args.check, null);
-    const schedule = parseRoutineSchedule(args.schedule, now, check ? 1 : 5);
+    const checkShell = optionalShellCheck(args.checkShell, null);
+    const schedule = parseRoutineSchedule(args.schedule, now, check || checkShell ? 1 : 5);
     const timestamp = now.toISOString();
     const saved = this.store.createRoutine({
       routineId: randomUUID(),
@@ -56,6 +57,7 @@ export class RoutineManagementTools {
       title: requiredString(args.title, "title"),
       instruction: requiredString(args.instruction, "instruction"),
       check,
+      checkShell,
       sites: optionalSites(args.sites, []),
       schedule,
       nextDueAt: nextRoutineOccurrence(schedule, now),
@@ -81,7 +83,8 @@ export class RoutineManagementTools {
     const id = requiredString(args.routineId, "routineId");
     const current = this.requireOwned(id, chatId);
     const check = optionalCheck(args.check, current.check);
-    const schedule = parseRoutineSchedule(args.schedule, new Date(), check ? 1 : 5);
+    const checkShell = optionalShellCheck(args.checkShell, current.checkShell);
+    const schedule = parseRoutineSchedule(args.schedule, new Date(), check || checkShell ? 1 : 5);
     const enabled = boolean(args.enabled, "enabled");
     const updated = this.store.updateRoutine(
       id,
@@ -90,6 +93,7 @@ export class RoutineManagementTools {
         title: requiredString(args.title, "title"),
         instruction: requiredString(args.instruction, "instruction"),
         check,
+        checkShell,
         sites: optionalSites(args.sites, current.sites),
         schedule,
         requiredBrowserInstanceId: optionalNullableUuid(
@@ -161,6 +165,14 @@ function optionalCheck(value: unknown, fallback: string | null): string | null {
 }
 
 /** Omitted keeps the current list (editors that do not know about sites); an array replaces it. */
+function optionalShellCheck(value: unknown, fallback: string | null): string | null {
+  if (value === undefined) return fallback;
+  if (value === null) return null;
+  if (typeof value !== "string" || !value.trim() || value.length > 2000)
+    throw new Error("checkShell must be a local command of at most 2000 characters, or null.");
+  return value;
+}
+
 function optionalSites(value: unknown, fallback: string[]): string[] {
   if (value === undefined) return fallback;
   if (!Array.isArray(value)) throw new Error("sites must be an array of site names.");

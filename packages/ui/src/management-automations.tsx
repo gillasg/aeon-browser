@@ -1,9 +1,10 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
-// Saved workflows: run one with its inputs, cancel a run, import or export its JSON, and see the
-// last run's health. Running happens in the daemon with the same engine and browser as the CLI.
+// Saved workflows: run one with its inputs, cancel a run, import its JSON, record a workflow from
+// a chat's last browser run, and watch each step as it runs. Running happens in the daemon with
+// the same engine and browser as the CLI.
 
 type Workflow = NonNullable<ManagementSnapshotDto["workflows"]>[number];
 type Action = Parameters<ManagementSurfaceProps["onAction"]>[1];
@@ -12,14 +13,21 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
   const workflows = props.snapshot?.workflows ?? [];
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
   const [importing, setImporting] = useState(false);
-  const note = props.snapshot?.lastAction;
+  const [recording, setRecording] = useState(false);
+  const running = workflows.some((workflow) => workflow.running);
+  // Steps change on the daemon while a run is going; refresh only while one is.
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(props.onRefresh, 2000);
+    return () => clearInterval(timer);
+  }, [running, props.onRefresh]);
   return (
     <div className="management-automations">
       <p className="management-hint">
         A workflow is a fixed sequence across sites. Running and cancelling happen here; the CLI (
         <code>aeon workflow run &lt;name&gt;</code>) runs the same engine.
       </p>
-      <ActionNote note={note} />
+      <ActionNote note={props.snapshot?.lastAction} />
       <div className="management-toolbar">
         <button type="button" onClick={props.onRefresh} disabled={props.loading}>
           Refresh
@@ -27,11 +35,16 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
         <button type="button" onClick={() => setImporting((value) => !value)}>
           {importing ? "Close import" : "Import workflow"}
         </button>
+        <button type="button" onClick={() => setRecording((value) => !value)}>
+          {recording ? "Close record" : "Record from last run"}
+        </button>
       </div>
       {importing && <ImportForm chatId={chatId} onAction={props.onAction} />}
+      {recording && <RecordForm chatId={chatId} onAction={props.onAction} />}
       {workflows.length === 0 ? (
         <p className="management-empty">
-          No saved workflows yet. An agent can save one (workflow tool), or import its JSON here.
+          No saved workflows yet. An agent can save one (workflow tool), or record the last run
+          here.
         </p>
       ) : (
         <table className="management-table">
@@ -95,6 +108,35 @@ function ImportForm({
         onClick={() => onAction(chatId, "import_workflow", { json })}
       >
         Import
+      </button>
+    </div>
+  );
+}
+
+function RecordForm({
+  chatId,
+  onAction,
+}: {
+  chatId: string;
+  onAction: ManagementSurfaceProps["onAction"];
+}): ReactElement {
+  const [name, setName] = useState("");
+  return (
+    <div className="management-form">
+      <label>
+        New workflow name
+        <input
+          value={name}
+          placeholder="Recorded from the last run"
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={!name.trim()}
+        onClick={() => onAction(chatId, "record_workflow_from_run", { name })}
+      >
+        Record
       </button>
     </div>
   );
@@ -172,7 +214,14 @@ function WorkflowInputs({ workflow }: { workflow: Workflow }): ReactElement {
 }
 
 function LastRun({ workflow }: { workflow: Workflow }): ReactElement {
-  if (workflow.running) return <span className="management-run-running">running</span>;
+  if (workflow.running)
+    return (
+      <span className="management-run-running">
+        running
+        {workflow.progress && ` · step ${workflow.progress.step}/${workflow.progress.total}`}
+        {workflow.progress && ` · ${workflow.progress.action}`}
+      </span>
+    );
   if (!workflow.lastRun) return <span className="management-subtle">Never run</span>;
   return (
     <span className={`management-run management-run-${workflow.lastRun.state}`}>

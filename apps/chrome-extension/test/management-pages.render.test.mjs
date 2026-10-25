@@ -48,6 +48,8 @@ const snapshot = {
       session: true,
       sessionAccount: "test@example.com",
       sessionSavedAt: new Date().toISOString(),
+      recording: false,
+      suggestions: ["Add a search operation"],
       recipes: [{ name: "search", kind: "items", fields: 4, updatedAt: new Date().toISOString() }],
     },
   ],

@@ -17,6 +17,7 @@ import { ActivityPanel } from "./activity-panel.js";
 import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
 import { FirstRunTour } from "./first-run-tour.js";
 import { ModelAccounts } from "./model-accounts.js";
+import { BrowserAccounts } from "./browser-accounts.js";
 import type { ModelAccountsProps } from "./model-accounts-types.js";
 
 export interface NewTabHomeProps {
@@ -248,7 +249,14 @@ function SettingsPage({
       <div className="home-settings-body" role="tabpanel">
         {section === "models" ? (
           props.modelAccounts ? (
-            <ModelAccounts {...props.modelAccounts} />
+            <>
+              <ModelAccounts {...props.modelAccounts} />
+              <BrowserAccounts
+                snapshot={props.managementSnapshot ?? null}
+                chatId={props.managementSelectedChatId}
+                onAction={props.onManagementAction}
+              />
+            </>
           ) : (
             <p className="aeon-page-empty">Models are not available here.</p>
           )

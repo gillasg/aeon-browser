@@ -32,7 +32,16 @@ const MIGRATIONS: readonly [number, (database: Database.Database) => void][] = [
   [9, migrateRoutineCheck],
   [10, migrateRoutineSites],
   [11, migrateChatOrigin],
+  [12, migrateRoutineShellCheck],
 ];
+
+function migrateRoutineShellCheck(database: Database.Database): void {
+  database.transaction(() => {
+    // Opt-in local shell check for a routine; null means none.
+    database.exec("ALTER TABLE routines ADD COLUMN check_shell TEXT;");
+    markVersion(database, 12);
+  })();
+}
 
 function migrateDeletedChats(database: Database.Database): void {
   database.transaction(() => {

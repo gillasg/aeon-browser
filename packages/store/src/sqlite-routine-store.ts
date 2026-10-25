@@ -21,9 +21,9 @@ export class SqliteRoutineStore {
     this.database
       .prepare(
         `INSERT INTO routines
-         (routine_id, chat_id, title, instruction, check_code, sites_json, schedule_json, next_due_at,
+         (routine_id, chat_id, title, instruction, check_code, check_shell, sites_json, schedule_json, next_due_at,
           required_browser_instance_id, enabled, revision, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.routineId,
@@ -31,6 +31,7 @@ export class SqliteRoutineStore {
         record.title,
         record.instruction,
         record.check ?? null,
+        record.checkShell ?? null,
         JSON.stringify(record.sites ?? []),
         JSON.stringify(record.schedule),
         record.nextDueAt,
@@ -84,6 +85,7 @@ export class SqliteRoutineStore {
       | "title"
       | "instruction"
       | "check"
+      | "checkShell"
       | "sites"
       | "schedule"
       | "nextDueAt"
@@ -94,7 +96,7 @@ export class SqliteRoutineStore {
   ): RoutineRecord {
     const result = this.database
       .prepare(
-        `UPDATE routines SET title = ?, instruction = ?, check_code = ?, sites_json = ?, schedule_json = ?, next_due_at = ?,
+        `UPDATE routines SET title = ?, instruction = ?, check_code = ?, check_shell = ?, sites_json = ?, schedule_json = ?, next_due_at = ?,
          required_browser_instance_id = ?, enabled = ?, revision = revision + 1, updated_at = ?
          WHERE routine_id = ? AND revision = ? AND deleted_at IS NULL`,
       )
@@ -102,6 +104,7 @@ export class SqliteRoutineStore {
         patch.title,
         patch.instruction,
         patch.check ?? null,
+        patch.checkShell ?? null,
         JSON.stringify(patch.sites ?? []),
         JSON.stringify(patch.schedule),
         patch.nextDueAt,

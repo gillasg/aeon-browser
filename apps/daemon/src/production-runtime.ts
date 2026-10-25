@@ -15,7 +15,7 @@ import { CapabilityRegistry } from "./capability-registry.js";
 import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
-import { lastActionNote, siteCards, workflowCards } from "./management-library.js";
+import { lastActionNote, providerCards, siteCards, workflowCards } from "./management-library.js";
 import { LibraryActions, isLibraryAction } from "./library-actions.js";
 import { CapabilityToolService } from "./capability-tool-service.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
@@ -84,7 +84,7 @@ export function createProductionRuntime(dataDirectory: string): {
   );
   pi.setThreadToolHost(threadCoordination);
   pi.setCapabilityToolHost(capabilityTools);
-  installManagementActions(service, browserControl, capabilityTools);
+  installManagementActions(service, browserControl, capabilityTools, dataRoot);
   service.management.setReader((selectedChatId) =>
     readManagementSnapshot(service, store, capabilityTools, pins, dataRoot, selectedChatId),
   );
@@ -172,6 +172,7 @@ async function readManagementSnapshot(
     // with health and whether a session is stored. They read the shared browserkit folders.
     workflows: await workflowCards(),
     sites: await siteCards(),
+    providers: providerCards(),
     lastAction: lastActionNote(),
   };
 }
@@ -233,7 +234,8 @@ function managementRoutines(
       title: routine.title,
       instruction: routine.instruction,
       schedule: routine.schedule,
-      ...(routine.check ? { checks: true } : {}),
+      ...(routine.check || routine.checkShell ? { checks: true } : {}),
+      ...(routine.checkShell ? { checkShell: routine.checkShell } : {}),
       sites: routine.sites,
       nextDueAt: routine.nextDueAt,
       requiredBrowserInstanceId: routine.requiredBrowserInstanceId,
@@ -317,6 +319,7 @@ function installManagementActions(
   service: ChatService,
   browserControl: BrowserControlService,
   capabilityTools: CapabilityToolService,
+  dataDirectory: string,
 ): void {
   // Workflow and site actions run browser cells through this daemon; routine and capability
   // actions stay with the capability service.
@@ -335,10 +338,10 @@ function installManagementActions(
     const parsed = JSON.parse(output) as { value?: unknown; error?: string };
     if (parsed.error) throw new Error(parsed.error);
     return parsed.value;
-  });
+  }, dataDirectory);
   service.management.setActionRunner((chatId, action, input) =>
     isLibraryAction(action)
-      ? library.execute(action, input)
+      ? library.execute(action, input, chatId)
       : capabilityTools.executeManagementAction(chatId, action, input),
   );
 }

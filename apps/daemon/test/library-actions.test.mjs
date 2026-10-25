@@ -56,3 +56,22 @@ test("clearing a site session removes its file and the site's cookies", async ()
   assert.match(calls[0], /cookies\.clear/);
   assert.match(calls[0], /shop\.example/);
 });
+
+test("a run's browser actions become workflow steps", async () => {
+  const { workflowFromActions } = await import("../dist/library-actions.js");
+  const definition = workflowFromActions("From a run", [
+    { op: "openTab", url: "https://shop.example/" },
+    { op: "click", element: { kind: "locator", role: "button", name: "Buy" } },
+    { op: "fill", element: { kind: "query", by: "css", value: "#q" }, value: "lamp" },
+    { op: "press", key: "Enter" },
+    { op: "observe" },
+  ]);
+  assert.equal(definition.name, "From a run");
+  assert.deepEqual(
+    definition.steps.map((step) => step.do),
+    ["goto", "click", "fill", "press"],
+  );
+  assert.deepEqual(definition.steps[1].with, { role: "button", name: "Buy" });
+  assert.deepEqual(definition.steps[2].with, { css: "#q", value: "lamp" });
+  await assert.rejects(async () => workflowFromActions("Empty", []), /no browser actions/);
+});
