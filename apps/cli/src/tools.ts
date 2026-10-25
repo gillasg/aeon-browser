@@ -94,36 +94,55 @@ function fromPairs(pairs: string[]): Json {
   );
 }
 
-/** aeon tool <name> [json | @file | - | key=value ...] [--session s] [--json] [--no-color] */
-export async function runTool(client: AeonClient, rest: string[]): Promise<number> {
+interface ToolInvocation {
+  name: string;
+  session: string;
+  input: Json;
+  asJson: boolean;
+  plain: boolean;
+}
+
+/** The tool name, its JSON input and the output flags, from the command's words. */
+async function invocationOf(rest: string[]): Promise<ToolInvocation> {
   const [name, ...others] = rest;
   if (!name || !TOOL_NAMES.includes(name))
     throw new Error(
       `Usage: aeon tool <${TOOL_NAMES.join("|")}> '<json>' [--session name] [--json]`,
     );
-  const asJson = others.includes("--json");
   const sessionIndex = others.indexOf("--session");
-  const session = sessionIndex >= 0 ? others[sessionIndex + 1] : undefined;
+  const session = (sessionIndex >= 0 ? others[sessionIndex + 1] : undefined) || "cli";
   const ignored = new Set(["--json", "--no-color", "--plain", "--session"]);
   const sessionValue = sessionIndex >= 0 ? sessionIndex + 1 : -1;
   const inputs = others.filter((arg, index) => !ignored.has(arg) && index !== sessionValue);
   const pairs = inputs.filter((arg) => /^[A-Za-z_]\w*=/.test(arg));
   const input = pairs.length ? fromPairs(pairs) : await readInput(inputs[0]);
+  return {
+    name,
+    session,
+    input,
+    asJson: others.includes("--json"),
+    plain: others.includes("--no-color") || !process.stdout.isTTY,
+  };
+}
+
+/** aeon tool <name> [json | @file | - | key=value ...] [--session s] [--json] [--no-color] */
+export async function runTool(client: AeonClient, rest: string[]): Promise<number> {
+  const call = await invocationOf(rest);
   const reply = await client.tool({
     kind: "core.tool.call",
-    tool: name,
-    session: session || "cli",
-    arguments: input,
+    tool: call.name,
+    session: call.session,
+    arguments: call.input,
   });
   const content = (reply.content as Content[] | undefined) ?? [];
   const isError = reply.isError === true;
-  if (asJson) {
+  if (call.asJson) {
     process.stdout.write(
-      JSON.stringify({ tool: name, session: session || "cli", isError, content }, null, 2) + "\n",
+      JSON.stringify({ tool: call.name, session: call.session, isError, content }, null, 2) + "\n",
     );
     return isError ? 1 : 0;
   }
-  await print(content, { plain: others.includes("--no-color") || !process.stdout.isTTY });
+  await print(content, { plain: call.plain });
   return isError ? 1 : 0;
 }
 

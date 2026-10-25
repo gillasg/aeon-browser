@@ -21,39 +21,54 @@ export function isWorkspaceRequest(value: unknown): value is Request {
   return typeof value === "object" && value !== null && "workspace" in value;
 }
 export async function workspaceCall(root: string, request: Request): Promise<unknown> {
-  if (request.workspace === "list") {
-    const base = await realpath(root).catch(() => root);
-    const folder = request.name ? await workspacePath(root, request.name) : base;
-    const entries = await readdir(folder, { withFileTypes: true });
-    return {
-      name: request.name || ".",
-      entries: entries
-        .slice(0, 500)
-        .map((entry) => ({ name: entry.name, dir: entry.isDirectory() }))
-        .sort(
-          (left, right) =>
-            Number(right.dir) - Number(left.dir) || left.name.localeCompare(right.name),
-        ),
-    };
-  }
+  if (request.workspace === "list") return await listWorkspace(root, request.name);
   const path = await workspacePath(root, request.name);
+  const read = await readAction(path, request);
+  if (read !== undefined) return read;
+  return await writeAction(root, path, request);
+}
+
+async function listWorkspace(root: string, name: string): Promise<unknown> {
+  const base = await realpath(root).catch(() => root);
+  const folder = name ? await workspacePath(root, name) : base;
+  const entries = await readdir(folder, { withFileTypes: true });
+  return {
+    name: name || ".",
+    entries: entries
+      .slice(0, 500)
+      .map((entry) => ({ name: entry.name, dir: entry.isDirectory() }))
+      .sort(
+        (left, right) =>
+          Number(right.dir) - Number(left.dir) || left.name.localeCompare(right.name),
+      ),
+  };
+}
+
+/** The read-only actions; undefined means this request is a write. */
+async function readAction(path: string, request: Request): Promise<unknown> {
   if (request.workspace === "read")
     return { name: request.name, text: await boundedRead(path, true) };
   if (request.workspace === "load") return JSON.parse(await boundedRead(path, true));
   if (request.workspace === "loadHelper") return boundedRead(path, true);
-  if (request.workspace === "image") {
-    const types: Record<string, string> = {
-      ".png": "image/png",
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".webp": "image/webp",
-      ".gif": "image/gif",
-    };
-    const mimeType = types[extname(path).toLowerCase()];
-    if (!mimeType) throw new Error("Unsupported image type");
-    const bytes = await boundedRead(path);
-    return { kind: "screenshot", screenshotId: randomUUID(), dataBase64: bytes, mimeType, path };
-  }
+  if (request.workspace === "image") return await imageWorkspace(path);
+  return undefined;
+}
+
+async function imageWorkspace(path: string): Promise<unknown> {
+  const types: Record<string, string> = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+  };
+  const mimeType = types[extname(path).toLowerCase()];
+  if (!mimeType) throw new Error("Unsupported image type");
+  const bytes = await boundedRead(path);
+  return { kind: "screenshot", screenshotId: randomUUID(), dataBase64: bytes, mimeType, path };
+}
+
+async function writeAction(root: string, path: string, request: Request): Promise<unknown> {
   const data = request.workspace === "checkpoint" ? JSON.stringify(request.value) : request.value;
   if (typeof data !== "string" && !Array.isArray(data))
     throw new Error("Workspace output must be text or bytes");
