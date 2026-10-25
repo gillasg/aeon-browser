@@ -159,6 +159,36 @@ export const PinnedResultSchema = z
   })
   .strict();
 
+/** A saved workflow and its last run: the Automations page. */
+export const ManagementWorkflowSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    slug: z.string().min(1).max(120),
+    steps: z.number().int().nonnegative(),
+    description: z.string().max(1000).optional(),
+    updatedAt: z.string().datetime(),
+    lastRun: z
+      .object({
+        state: z.enum(["ok", "failed", "running", "cancelled"]),
+        at: z.string().datetime(),
+        error: z.string().max(500).nullable(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+/** A mapped site and what this machine knows about it: the Sites page and its sessions. */
+export const ManagementSiteSchema = z
+  .object({
+    site: z.string().min(1).max(200),
+    operations: z.number().int().nonnegative(),
+    updatedAt: z.string().max(40),
+    health: z.string().max(40),
+    session: z.boolean(),
+  })
+  .strict();
+
 export const ManagementSnapshotSchema = z
   .object({
     chats: z.array(ChatSummarySchema).max(100),
@@ -170,7 +200,13 @@ export const ManagementSnapshotSchema = z
     resourceError: z.string().max(300).nullable(),
     /** Which password manager signs in, and whether it is unlocked. Name and state only. */
     signIn: PasswordManagerSchema,
+    /** Saved workflows; empty when browserkit's data folder has none. */
+    workflows: z.array(ManagementWorkflowSchema).max(100).optional(),
+    /** Mapped sites, with health and whether a stored session exists. */
+    sites: z.array(ManagementSiteSchema).max(200).optional(),
   })
   .strict();
 
 export type ManagementSnapshotDto = z.infer<typeof ManagementSnapshotSchema>;
+export type ManagementWorkflowDto = z.infer<typeof ManagementWorkflowSchema>;
+export type ManagementSiteDto = z.infer<typeof ManagementSiteSchema>;

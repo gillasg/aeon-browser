@@ -2,6 +2,8 @@ import type { ReactElement } from "react";
 import type { ManagementSection } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutinesPanel } from "./management-routines.js";
+import { AutomationsPanel } from "./management-automations.js";
+import { SitesPanel } from "./management-sites.js";
 import { ResourcesPanel } from "./management-resources.js";
 import { CapabilitiesPanel } from "./management-capabilities.js";
 import { SettingsPanel } from "./management-settings.js";
@@ -11,6 +13,8 @@ export type { ManagementSurfaceProps } from "./management-surface-props.js";
 export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
   const titles: Record<ManagementSection, string> = {
     routines: "Routines",
+    automations: "Automations",
+    sites: "Sites",
     resources: "Skills & extensions",
     capabilities: "MCPs / CLIs",
     settings: "Settings",
@@ -33,6 +37,8 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
         </p>
       )}
       {props.section === "routines" && <RoutinesPanel {...props} />}
+      {props.section === "automations" && <AutomationsPanel {...props} />}
+      {props.section === "sites" && <SitesPanel {...props} />}
       {props.section === "resources" && <ResourcesPanel {...props} />}
       {props.section === "capabilities" && <CapabilitiesPanel {...props} />}
       {props.section === "settings" && <SettingsPanel {...props} />}

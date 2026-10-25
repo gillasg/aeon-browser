@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import { runMcpServer as runSiteMcpServer, siteName } from "@browserkit/tools/site-to-api";
 import { AeonClient } from "./client.js";
+import {
+  browserActionCode,
+  browserActionDescription,
+  browserActionSchema,
+} from "@browserkit/tools/action";
 import { inspect, runTasks } from "./run.js";
 import type { ChatResult } from "./results.js";
 import { searchAeon } from "./search.js";
@@ -130,9 +135,21 @@ const tools = [
       additionalProperties: false,
     },
   },
+  {
+    name: "browser_action",
+    description: browserActionDescription,
+    inputSchema: browserActionSchema,
+  },
 ];
 
-const CHAT_TOOLS = new Set(["browser_code", "browser_tabs", "crawl", "site_mapper", "extract"]);
+const CHAT_TOOLS = new Set([
+  "browser_code",
+  "browser_tabs",
+  "crawl",
+  "site_mapper",
+  "extract",
+  "browser_action",
+]);
 
 /** The chat tools, described by the daemon itself; none while Aeon is not running. */
 async function chatTools(aeon: () => Promise<AeonClient>): Promise<unknown[]> {
@@ -146,6 +163,12 @@ async function chatTools(aeon: () => Promise<AeonClient>): Promise<unknown[]> {
 
 async function callChatTool(client: AeonClient, name: string, args: Json = {}): Promise<unknown> {
   const { session, ...rest } = args;
+  // One discrete action is one browser_code cell; the tool lists and the semantics are shared.
+  if (name === "browser_action")
+    return callChatTool(client, "browser_code", {
+      ...(typeof session === "string" ? { session } : {}),
+      code: browserActionCode(rest as never),
+    });
   const reply = await client.tool({
     kind: "core.tool.call",
     tool: name,
