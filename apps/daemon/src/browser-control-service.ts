@@ -13,6 +13,7 @@ import {
 import { executeBrowserBatch } from "./browser-batch.js";
 import { BrowserCodeCells, type BrowserCodeCellInput } from "./browser-code-cells.js";
 import type { SiteScriptService } from "./site-script-service.js";
+import { CdpService } from "./cdp-service.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import {
   listBrowserTabs,
@@ -44,6 +45,7 @@ export class BrowserControlService {
   private startupTidy = false;
   private ownerTitles: ((chatId: string) => string | undefined) | undefined;
   private spaceForChat: ((chatId: string) => "window" | "tabs" | undefined) | undefined;
+  private cdpService: CdpService | undefined;
   private readonly cells = new BrowserCodeCells((chatId, target) =>
     this.setAssociation(chatId, target, "agent-created", "agent-open"),
   );
@@ -121,6 +123,7 @@ export class BrowserControlService {
     });
   }
   handleExecutorResult(candidate: unknown, socket: WebSocket): boolean {
+    if (this.cdpService?.handle(candidate)) return true;
     if (this.cells.handle(candidate, socket)) return true;
     if (this.adoptPopup(candidate, socket)) return true;
     const parsed = BrowserOperationResultSchema.safeParse(candidate);
@@ -267,6 +270,22 @@ export class BrowserControlService {
   /** The sockets of the connected browsers, for messages every browser answers on its own. */
   executorSockets(): WebSocket[] {
     return [...this.executors.values()];
+  }
+  /** Starts or reports the daemon CDP endpoint; calls travel over the existing executor socket. */
+  async startCdp(port: number, directory: string): Promise<unknown> {
+    this.cdpService ??= new CdpService((body) => this.sendCdp(body), directory);
+    return this.cdpService.start(port);
+  }
+  cdpStatus(): Promise<unknown> {
+    return this.cdpService?.status() ?? Promise.resolve({ running: false });
+  }
+  stopCdp(): Promise<unknown> {
+    return this.cdpService?.stop() ?? Promise.resolve({ running: false });
+  }
+  private sendCdp(body: Record<string, unknown>): void {
+    const socket = [...this.executors.values()].find((item) => item.readyState === WebSocket.OPEN);
+    if (!socket) throw new Error("BROWSER_OFFLINE: no browser connected");
+    socket.send(JSON.stringify(body));
   }
   /** Ask every connected browser to show a chat as a tab; returns how many were asked. */
   openChatTab(chatId: string, active = false): number {

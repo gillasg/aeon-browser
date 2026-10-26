@@ -155,6 +155,27 @@ export class AeonClient {
     });
   }
 
+  /** Starts, reports or stops the daemon's DevTools endpoint. */
+  cdp(
+    body: { action: "start" | "status" | "stop"; port?: number },
+    timeoutMs = 20_000,
+  ): Promise<Json> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not answer the CDP request in time."));
+      }, timeoutMs);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.cdp.result") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve(message);
+      });
+      this.socket.send(JSON.stringify({ kind: "core.cdp", requestId, ...body }));
+    });
+  }
+
   /** One tool-calling completion with Aeon's default model (the AI commands use this). */
   modelComplete(
     body: { systemPrompt: string; messages: unknown[]; tools: unknown[] },
