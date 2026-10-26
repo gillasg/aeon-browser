@@ -67,8 +67,9 @@ const cases = [
       );
       assert.ok(node);
       const point = await api.actionablePoint(debuggee, node.backendDOMNodeId);
-      assert.ok(point.x > 80 && point.y > 150);
-      await api.clickAt(debuggee, point.x, point.y);
+      const top = await api.rootFramePoint(debuggee, node.frameId, point);
+      assert.ok(top.x > 80 && top.y > 150);
+      await api.clickAt(debuggee, top.x, top.y);
       assert.equal(await evaluate("window.frameClicked"), true);
     },
   ],
