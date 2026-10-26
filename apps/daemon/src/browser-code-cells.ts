@@ -15,6 +15,8 @@ export interface BrowserCodeCellInput {
   ownerTitle?: string;
   /** Where this cell's tabs go unless a step chooses; decided from the chat's origin. */
   space?: "window" | "tabs";
+  /** Human-verification assistance is only for cells the user started. */
+  challengeAssist?: boolean;
   onCall: (request: unknown) => Promise<unknown>;
   onProgress: (steps: Record<string, unknown>[]) => void;
 }
@@ -102,6 +104,7 @@ export class BrowserCodeCells {
             timeoutMs: input.timeoutMs,
             ...(input.ownerTitle ? { ownerTitle: input.ownerTitle } : {}),
             ...(input.space ? { space: input.space } : {}),
+            ...(input.challengeAssist ? { challengeAssist: true } : {}),
           }),
         ),
       );
