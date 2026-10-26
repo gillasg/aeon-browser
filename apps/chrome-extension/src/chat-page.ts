@@ -50,6 +50,20 @@ const { root, chatId, initialDisplay } = initializeChatPage();
 installBrowserPreview(chatId);
 mirrorAgentTabView();
 installHandoffBridge();
+// The engine says when the user takes a tab over; the chat says so instead of looking stuck.
+chrome.runtime.onMessage.addListener((message: unknown) => {
+  if (!message || typeof message !== "object") return;
+  const { kind, tabId, control } = message as { kind?: string; tabId?: number; control?: string };
+  if (kind !== "browserkit.control") return;
+  if (control === "user")
+    showError(
+      `You have control of tab ${tabId ?? "?"}. The agent is paused until it is given back.`,
+    );
+  else if (notice.startsWith("You have control")) {
+    notice = "";
+    render();
+  }
+});
 let client: UiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);
 let catalogClient: UiClient | undefined;
