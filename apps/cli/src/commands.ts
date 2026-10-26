@@ -550,6 +550,30 @@ function mcp(args: Args): Promise<number> {
   return runMcpServer(site).then(() => 0);
 }
 
+async function cdp(host: DaemonHost, args: Args): Promise<number> {
+  const client = await host.connect();
+  const action = has(args, "status") ? "status" : has(args, "stop") ? "stop" : "start";
+  const reply = await client.cdp({
+    action,
+    ...(action === "start" ? { port: Number(flag(args, "port") ?? 9333) } : {}),
+  });
+  if (reply.error) throw new Error(String(reply.error));
+  if (has(args, "json")) {
+    process.stdout.write(JSON.stringify(reply, null, 2) + "\n");
+    return reply.running ? 0 : 1;
+  }
+  if (!reply.running) {
+    process.stdout.write("The CDP endpoint is not running. Start it: aeon cdp\n");
+    return 1;
+  }
+  process.stdout.write(`CDP endpoint: ${String(reply.connectUrl ?? reply.url)}\n`);
+  process.stdout.write(`Browser WebSocket: ${String(reply.wsUrl)}\n`);
+  process.stdout.write(
+    `Playwright: chromium.connectOverCDP("${String(reply.connectUrl ?? reply.url)}")\n`,
+  );
+  return 0;
+}
+
 export function aeonCommands(host: DaemonHost): Command[] {
   const overrides = new Map<string, Command>();
   for (const command of [
@@ -580,6 +604,17 @@ export function aeonCommands(host: DaemonHost): Command[] {
 Without a site: Aeon's chats and its tools for another agent. With a site: one mapped site's
 operations as MCP tools, with the user's logins. (--site=<site> is accepted too.)`,
     run: mcp,
+  });
+  overrides.set("cdp", {
+    name: "cdp",
+    group: "Browser",
+    summary: "local DevTools Protocol endpoint for Playwright and Puppeteer",
+    help: `Usage: aeon cdp [--port 9333] [--status] [--stop] [--json]
+
+Starts a 127.0.0.1-only CDP endpoint over Aeon's agent tabs, through the running daemon. The
+printed URL carries a token. Playwright: chromium.connectOverCDP(url). Puppeteer:
+connect({browserURL: url}). Tabs opened through the endpoint close when the client disconnects.`,
+    run: (args) => cdp(host, args),
   });
   const commands = BROWSERKIT_COMMANDS.map((command) => overrides.get(command.name) ?? command);
   return [...aeonOnlyCommands(host), ...commands];

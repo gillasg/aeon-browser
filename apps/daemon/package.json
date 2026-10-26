@@ -12,6 +12,7 @@
     "@aeon/pi-adapter": "workspace:*",
     "@aeon/protocol": "workspace:*",
     "@aeon/store": "workspace:*",
+    "@browserkit/cdp": "link:../../../browserkit/packages/cdp",
     "@browserkit/credentials": "link:../../../browserkit/packages/credentials",
     "@browserkit/tools": "link:../../../browserkit/packages/tools",
     "@browserkit/site-mapper": "link:../../../browserkit/packages/site-mapper",

@@ -111,6 +111,9 @@ importers:
       "@aeon/store":
         specifier: workspace:*
         version: link:../../packages/store
+      "@browserkit/cdp":
+        specifier: link:../../../browserkit/packages/cdp
+        version: link:../../../browserkit/packages/cdp
       "@browserkit/credentials":
         specifier: link:../../../browserkit/packages/credentials
         version: link:../../../browserkit/packages/credentials

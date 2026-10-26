@@ -20,6 +20,7 @@ import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
 import { handleBlockedSites } from "./core-blocked-sites.js";
 import { handleBrowserRun } from "./core-browser.js";
+import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
@@ -42,7 +43,7 @@ export async function startCoreTransport(
       callback(!info.req.headers.origin, 403, "NATIVE_CLIENT_REQUIRED"),
   });
   server.on("connection", (socket) =>
-    authenticate(socket, token, service, browser, threads, attention),
+    authenticate(socket, token, service, browser, threads, attention, directory),
   );
   await once(server, "listening");
   const address = server.address();
@@ -80,6 +81,7 @@ function authenticate(
   browser: BrowserControlService,
   threads: ThreadCoordinationService,
   attention: CoreAttention,
+  directory: string,
 ): void {
   const timer = setTimeout(() => socket.close(1008, "AUTHENTICATION_TIMEOUT"), 3000);
   socket.once("close", () => clearTimeout(timer));
@@ -117,6 +119,7 @@ function authenticate(
         handleChatStop(socket, candidate, service, browser) ||
         handleSettings(socket, candidate, browser) ||
         handleBrowserRun(socket, candidate, browser) ||
+        handleCdpRequest(socket, candidate, browser, directory) ||
         handleModelComplete(socket, candidate, service) ||
         handleBlockedSites(socket, candidate, browser) ||
         handleToolRequest(socket, candidate, service),
