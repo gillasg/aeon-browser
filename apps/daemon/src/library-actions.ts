@@ -301,7 +301,7 @@ export class LibraryActions {
     }
     const value = await this.run(
       `(async () => {
-  page = await browser.openTab(${JSON.stringify(`https://${site}/`)}, { newTab: true });
+  page = await browser.openTab(${JSON.stringify(`https://${site}/`)}, { newTab: true, space: 'window' });
   await page.waitForTimeout(1500);
   return await bu.signIn();
 })()`,
@@ -328,7 +328,7 @@ export class LibraryActions {
     }
     const value = await this.run(
       `(async () => {
-  const tab = await browser.openTab(${JSON.stringify(`https://${site}/`)}, { newTab: true, quiet: true });
+  const tab = await browser.openTab(${JSON.stringify(`https://${site}/`)}, { newTab: true, quiet: true, space: 'window' });
   await tab.waitForTimeout(1200);
   return { readiness: await tab.readiness(), title: await tab.title(), url: tab.url };
 })()`,

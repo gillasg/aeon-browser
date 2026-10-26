@@ -62,6 +62,13 @@ export function createProductionRuntime(dataDirectory: string): {
     const title = chat.title.trim().slice(0, 80) || "Chat";
     return chat.origin === "routine" ? `Routine · ${title}` : title;
   });
+  // An interactive chat keeps tabs in the user's window; routines and outside sessions get their
+  // own background window, so their work never takes over the user's tabs.
+  browserControl.useDefaultSpaces((chatId) => {
+    const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
+    if (!chat) return "window";
+    return chat.origin === "user" || chat.origin === "agent" ? "tabs" : "window";
+  });
   service.setExternalContextReader(() =>
     outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
   );

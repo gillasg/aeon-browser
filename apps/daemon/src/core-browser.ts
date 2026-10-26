@@ -34,6 +34,7 @@ export function handleBrowserRun(
         code,
         timeoutMs,
         ownerTitle: "Session · " + session,
+        space: "window",
         onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
         onProgress: () => undefined,
       },
