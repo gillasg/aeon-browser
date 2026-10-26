@@ -43,6 +43,7 @@ export class BrowserControlService {
   private startupTidied = new Set<string>();
   private startupTidy = false;
   private ownerTitles: ((chatId: string) => string | undefined) | undefined;
+  private spaceForChat: ((chatId: string) => "window" | "tabs" | undefined) | undefined;
   private readonly cells = new BrowserCodeCells((chatId, target) =>
     this.setAssociation(chatId, target, "agent-created", "agent-open"),
   );
@@ -52,6 +53,10 @@ export class BrowserControlService {
   /** How a chat names its tab group; routines and sessions prefix themselves. */
   useOwnerTitles(lookup: (chatId: string) => string | undefined): void {
     this.ownerTitles = lookup;
+  }
+  /** Where a chat's tabs go: its own window for routines and outside sessions, else the user's. */
+  useDefaultSpaces(lookup: (chatId: string) => "window" | "tabs" | undefined): void {
+    this.spaceForChat = lookup;
   }
   resyncScripts(clientId: string): void {
     const socket = this.executors.get(clientId);
@@ -238,7 +243,10 @@ export class BrowserControlService {
   }
   private namedCell(chatId: string, input: BrowserCodeCellInput): BrowserCodeCellInput {
     const title = input.ownerTitle ?? this.ownerTitles?.(chatId);
-    return title ? { ...input, ownerTitle: title } : input;
+    const space = input.space ?? this.spaceForChat?.(chatId);
+    return title || space
+      ? { ...input, ...(title ? { ownerTitle: title } : {}), ...(space ? { space } : {}) }
+      : input;
   }
   /** After a stop (or a daemon restart), close the tabs a finished run no longer needs. */
   tidyChat(chatId: string): void {
@@ -302,10 +310,13 @@ export class BrowserControlService {
   ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const socket = this.executors.get(step.clientInstanceId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return { code: "BROWSER_OFFLINE" };
-    const named =
-      step.ownerTitle || !this.ownerTitles?.(chatId)
-        ? step
-        : { ...step, ownerTitle: this.ownerTitles(chatId) };
+    const title = step.ownerTitle ?? this.ownerTitles?.(chatId);
+    const space = step.space ?? this.spaceForChat?.(chatId);
+    const named = {
+      ...step,
+      ...(title ? { ownerTitle: title } : {}),
+      ...(space ? { space } : {}),
+    };
     const opened = await this.dispatch(socket, chatId, toolCallId, operationId, named, timeoutMs);
     if (opened.result?.kind === "tab")
       this.setAssociation(chatId, opened.result.tab.target, "agent-created", "agent-open");
