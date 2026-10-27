@@ -96,3 +96,22 @@ test("a short link drop keeps the cell and it answers on the new socket", async 
   const result = await running;
   assert.equal(result.value, 2);
 });
+
+test("a result carrying its run time finishes the cell; one the daemon can't read fails fast", async () => {
+  const messages = [];
+  const cells = new BrowserCodeCells(() => undefined);
+  const connection = socket(messages);
+  const input = {
+    code: "1+1",
+    timeoutMs: 60_000,
+    onCall: async () => ({}),
+    onProgress: () => undefined,
+  };
+  const ok = cells.run(connection, randomUUID(), randomUUID(), "call-1", [], input);
+  const base = { kind: "browser.code.result", output: "", steps: [], opened: [] };
+  cells.handle({ ...base, cellId: messages[0].cellId, value: 2, ms: 12 }, connection);
+  assert.equal((await ok).value, 2);
+  const bad = cells.run(connection, randomUUID(), randomUUID(), "call-2", [], input);
+  cells.handle({ ...base, cellId: messages[1].cellId, surprise: true }, connection);
+  await assert.rejects(bad, /BROWSER_RESULT_INVALID/);
+});

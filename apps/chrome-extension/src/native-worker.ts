@@ -395,6 +395,20 @@ function handleHeartbeatMessage(connection: ExecutorConnection, candidate: unkno
   return true;
 }
 
+/** Tells Core a cell reached the extension, so a deadline can say where it stopped. */
+function ackBrowserCodeRun(socket: WebSocket, candidate: unknown): void {
+  const arrival = candidate as { kind?: unknown; cellId?: unknown } | null;
+  if (arrival?.kind !== "browser.code.run" || typeof arrival.cellId !== "string") return;
+  socket.send(
+    JSON.stringify({
+      kind: "browser.code.progress",
+      cellId: arrival.cellId,
+      steps: [],
+      stage: "received",
+    }),
+  );
+}
+
 function handleExecutorMessage(connection: ExecutorConnection, data: unknown): void {
   let candidate: unknown;
   try {
@@ -403,16 +417,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     connection.socket.close(4002, "Invalid daemon response");
     return;
   }
-  const arrival = candidate as { kind?: unknown; cellId?: unknown } | null;
-  if (arrival?.kind === "browser.code.run" && typeof arrival.cellId === "string")
-    connection.socket.send(
-      JSON.stringify({
-        kind: "browser.code.progress",
-        cellId: arrival.cellId,
-        steps: [],
-        stage: "received",
-      }),
-    );
+  ackBrowserCodeRun(connection.socket, candidate);
   if (handleCoreMessage(candidate)) return;
   if (handleNativeSettings(candidate, connection.socket)) return;
   if (handleHeartbeatMessage(connection, candidate)) return;

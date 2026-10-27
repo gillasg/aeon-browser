@@ -170,9 +170,24 @@ export class BrowserCodeCells {
       return;
     }
     const result = BrowserCodeResultSchema.safeParse(candidate);
-    if (!result.success) return;
+    if (!result.success) return this.rejectUnreadable(candidate, result.error, socket);
     const cell = this.cells.get(result.data.cellId);
     if (cell?.socket === socket) cell.finish(result.data);
+  }
+
+  /** A result this daemon can't read fails its cell now, with the reason, instead of waiting
+   * out the deadline (the extension and the daemon disagree on the message shape). */
+  private rejectUnreadable(
+    candidate: unknown,
+    error: { issues: { message: string }[] },
+    socket: WebSocket,
+  ): void {
+    const message = candidate as { kind?: unknown; cellId?: unknown };
+    if (message.kind !== "browser.code.result" || typeof message.cellId !== "string") return;
+    const cell = this.cells.get(message.cellId);
+    if (cell?.socket !== socket) return;
+    const reason = error.issues[0]?.message ?? "bad shape";
+    cell.finish(undefined, new Error(`BROWSER_RESULT_INVALID: ${reason}`));
   }
 
   private serve(
