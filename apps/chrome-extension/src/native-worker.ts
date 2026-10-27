@@ -363,6 +363,20 @@ function handleNativeSettings(candidate: unknown, socket: WebSocket): boolean {
   return handleSettingsMessage(candidate, socket) || handleBlockedSitesMessage(candidate, socket);
 }
 
+const SELF_RELOAD_KEY = "aeon-last-self-reload";
+const SELF_RELOAD_GAP_MS = 10 * 60_000;
+
+// At most one self-reload per 10 minutes: an extension loaded from another folder never matches
+// the daemon's build, and must not reload on every heartbeat.
+async function reloadForNewBuild(): Promise<void> {
+  const stored = await chrome.storage.local.get(SELF_RELOAD_KEY).catch(() => ({}));
+  const last = Number((stored as Record<string, unknown>)[SELF_RELOAD_KEY] ?? 0);
+  if (Date.now() - last < SELF_RELOAD_GAP_MS) return;
+  await chrome.storage.local.set({ [SELF_RELOAD_KEY]: Date.now() }).catch(() => undefined);
+  reportLink("reconnecting", "extension build changed; reloading");
+  chrome.runtime.reload();
+}
+
 function handleHeartbeatMessage(connection: ExecutorConnection, candidate: unknown): boolean {
   const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
   if (!heartbeat.success) return false;
@@ -370,8 +384,7 @@ function handleHeartbeatMessage(connection: ExecutorConnection, candidate: unkno
     heartbeat.data.reload === true ||
     (heartbeat.data.build && extensionBuild() && heartbeat.data.build !== extensionBuild())
   ) {
-    reportLink("reconnecting", "extension build changed; reloading");
-    chrome.runtime.reload();
+    void reloadForNewBuild();
     return true;
   }
   if (
