@@ -44,11 +44,6 @@ export async function setNeeds(tabId: number, needs: boolean, chatId = ""): Prom
   else await chrome.storage.session.remove(needsKey(tabId));
 }
 
-export async function needsCount(): Promise<number> {
-  const values = await chrome.storage.session.get(null);
-  return Object.keys(values).filter((key) => key.startsWith(NEEDS_PREFIX)).length;
-}
-
 export function isNeedsKey(key: string): boolean {
   return key.startsWith(NEEDS_PREFIX);
 }

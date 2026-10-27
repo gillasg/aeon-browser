@@ -16,6 +16,7 @@ export type OrbToContent =
   | { kind: "aeon.orb.cursor"; steps: OrbCursorStep[] }
   | { kind: "aeon.orb.spotlight"; box: OrbBox | null }
   | { kind: "aeon.orb.panel"; width: number; height: number }
+  /** keepRunning: collapse to the orb. false: dismiss the orb unless a run is going. */
   | { kind: "aeon.orb.hide"; keepRunning: boolean }
   | { kind: "aeon.orb.prefs"; reduceMotion: boolean };
 

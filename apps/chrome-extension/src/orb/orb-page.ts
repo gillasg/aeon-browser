@@ -3,24 +3,15 @@ import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
 import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
-import { TabControl, isNeedsKey, markSeen, needsCount, setNeeds } from "./orb-control.js";
+import { TabControl, markSeen, setNeeds } from "./orb-control.js";
 import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
-import {
-  applyEvent,
-  cursorSteps,
-  initialRun,
-  spotlightBox,
-  type OrbAction,
-  type OrbRun,
-} from "./orb-run.js";
+import { applyEvent, cursorSteps, initialRun, spotlightBox, type OrbRun } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
-import { Island, islandState, type IslandState, type OrbViewModel } from "./orb-view.js";
-import { WATCH_EVERY_MINUTES, routineEditorUrl, watchPlan, watchRoutine } from "./orb-watch.js";
-import { siteVerbs, type SiteVerb } from "./orb-verbs.js";
-import { followPreviews, showPreviewTab } from "./orb-preview.js";
+import { OrbBox, type OrbViewModel } from "./orb-view.js";
 
-// orb.html: the island. Framed by the content script; talks to the daemon and drives the overlay.
+// orb.html: the orb's box. Framed by the content script. Starts the chat, then shows it (the same
+// chat page the side panel shows) and keeps following its events to drive the swarm.
 
 const params = new URLSearchParams(location.search);
 const tabId = Number(params.get("tabId"));
@@ -28,28 +19,24 @@ const viewId = crypto.randomUUID();
 const root = document.getElementById("root") as HTMLElement;
 const model: OrbViewModel = {
   host: "",
-  prompt: "",
-  run: undefined,
+  chatId: undefined,
+  chatUrl: "",
   notice: "",
   busy: false,
-  watch: { state: "idle", note: "" },
-  paused: false,
-  expanded: false,
-  needsCount: 0,
-  verbs: [],
   learning: false,
-  preview: undefined,
 };
 const tab = new TabControl(tabId);
+let run: OrbRun | undefined;
+let userControl = false;
 let lastVisual = "";
-let lastState: IslandState = "compose";
+let lastState = "";
 let sentActions = 0;
 let update: ((next: ReactNode) => void) | undefined;
 
 const session = new OrbSession(tabId, {
   event: (event) => onEvent(event),
   snapshot: (entries, runState) => onSnapshot(entries, runState),
-  closed: () => notice("Lost the connection to Aeon."),
+  closed: () => notice("Reconnecting to Aeon…"),
 });
 
 void boot();
@@ -65,7 +52,7 @@ async function boot(): Promise<void> {
   document.body.hidden = false;
   model.host = await tabHost();
   render();
-  void loadSite();
+  void loadLearning();
   listen();
   sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
@@ -74,7 +61,7 @@ async function boot(): Promise<void> {
 }
 
 // The orb opens and stays open across daemon restarts, so one failed attempt must not leave it
-// on "Connecting…" until the window is closed.
+// unable to send.
 async function connectSession(): Promise<void> {
   const started = Date.now();
   for (let attempt = 0; ; attempt += 1) {
@@ -84,7 +71,6 @@ async function connectSession(): Promise<void> {
       render();
       return;
     } catch (error) {
-      // After a few seconds, say which link is down instead of leaving "Connecting…".
       if (Date.now() - started > 5_000) notice(messageOf(error));
       await new Promise((resolve) =>
         globalThis.setTimeout(resolve, Math.min(500 * 2 ** Math.min(attempt, 3), 5000)),
@@ -102,49 +88,42 @@ function listen(): void {
     if (event.key === ORB_REDUCE_MOTION_KEY) sendPrefs();
   });
   addEventListener("pagehide", () => void setNeeds(tabId, false));
-  chrome.runtime.onMessage.addListener((message: { kind?: string; tabId?: number }) => {
-    if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) focusPrompt();
-  });
-  chrome.storage.session.onChanged.addListener((changes) => {
-    if (Object.keys(changes).some(isNeedsKey)) void refreshNeeds();
-  });
-  followPreviews(
-    tabId,
-    () => session.chatId,
-    (preview) => {
-      model.preview = preview;
-      render();
+  chrome.runtime.onMessage.addListener(
+    (message: { kind?: string; tabId?: number; control?: string }) => {
+      if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) focusPrompt();
+      // The engine says when the user takes this tab over; the swarm rests until it's given back.
+      if (message?.kind === "browserkit.control" && message.tabId === tabId) {
+        userControl = message.control === "user";
+        sync();
+      }
     },
   );
 }
 
 async function submit(text: string): Promise<void> {
-  model.prompt = text;
   model.busy = true;
-  reset();
+  run = initialRun();
+  sentActions = 0;
+  sync();
   playSound("start");
   try {
     await session.start(text);
+    showChat();
   } catch (error) {
-    fail(error);
+    run = undefined;
+    notice(messageOf(error));
   } finally {
     model.busy = false;
+    render();
   }
 }
 
-function reset(): void {
-  model.run = initialRun();
-  model.watch = { state: "idle", note: "" };
-  model.paused = false;
-  model.expanded = false;
-  model.preview = undefined;
-  sentActions = 0;
-  sync();
-}
-
-function fail(error: unknown): void {
-  model.run = { ...initialRun(), status: "error", error: messageOf(error) };
-  sync();
+function showChat(): void {
+  const chatId = session.chatId;
+  if (!chatId) return;
+  model.chatId = chatId;
+  model.chatUrl = `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=panel`;
+  render();
 }
 
 function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
@@ -153,51 +132,57 @@ function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
 }
 
 function onEvent(event: PiSessionEventDto, refresh = true): void {
-  if (session.chatId) logApiWrites(event, { chatId: session.chatId, task: model.prompt });
-  if (!model.run || model.paused) return;
-  const next = applyEvent(model.run, event, Date.now());
-  if (next === model.run) return;
-  model.run = next;
+  if (session.chatId) logApiWrites(event, { chatId: session.chatId, task: "" });
+  // A follow-up typed in the framed chat starts a new run in the same chat.
+  if (!run || (event.kind === "run-state" && event.state === "running-unconfirmed" && done(run))) {
+    run = initialRun();
+    sentActions = 0;
+  }
+  const next = applyEvent(run, event, Date.now());
+  if (next === run) return;
+  run = next;
   if (refresh) sync();
 }
 
-/** Pushes the run to the overlay (swarm, cursor, spotlight, glow) and redraws the island. */
-function sync(): void {
-  const run = model.run;
-  if (run) {
-    visual(visualState(run), model.paused ? "You're driving" : run.label);
-    sendNewActions(run.actions);
-    if (run.status === "needs" && !model.paused)
-      toContent({ kind: "aeon.orb.spotlight", box: spotlightBox(run.actions, tabId) ?? null });
-  }
-  changed(islandState(model));
-  render();
+function done(current: OrbRun): boolean {
+  return current.status === "done" || current.status === "error";
 }
 
-/** Things that happen once per change of state: sounds, the tab group, the needs count, the log. */
-function changed(state: IslandState): void {
+/** Pushes the run to the overlay: the swarm's state, where the agent acts, what needs the user. */
+function sync(): void {
+  if (!run) return;
+  const state = visualState(run);
+  visual(state, run.label);
+  sendNewActions(run);
+  if (run.status === "needs" && !userControl)
+    toContent({ kind: "aeon.orb.spotlight", box: spotlightBox(run.actions, tabId) ?? null });
+  changed(state);
+}
+
+/** Things that happen once per change of state: sounds, the tab group, the needs count. */
+function changed(state: OrbVisualState): void {
   if (state === lastState) return;
   lastState = state;
   void setNeeds(tabId, state === "needs", session.chatId ?? "");
-  if (state === "working") void tab.hold();
+  if (state === "working" || state === "thinking") void tab.hold();
   else void tab.release();
   if (state === "needs") playSound("needs");
-  if (state === "done" && model.run) {
+  if (state === "done") {
     playSound("done");
     if (session.chatId) void markSeen(session.chatId, viewId);
   }
 }
 
-function sendNewActions(actions: readonly OrbAction[]): void {
-  if (actions.length <= sentActions) return;
-  const steps = cursorSteps(actions.slice(sentActions), tabId);
-  sentActions = actions.length;
-  if (steps.length && !model.paused) toContent({ kind: "aeon.orb.cursor", steps });
+function sendNewActions(current: OrbRun): void {
+  if (current.actions.length <= sentActions) return;
+  const steps = cursorSteps(current.actions.slice(sentActions), tabId);
+  sentActions = current.actions.length;
+  if (steps.length && !userControl) toContent({ kind: "aeon.orb.cursor", steps });
 }
 
-function visualState(run: OrbRun): OrbVisualState {
-  if (model.paused) return "paused";
-  return run.status === "idle" ? "thinking" : run.status;
+function visualState(current: OrbRun): OrbVisualState {
+  if (userControl) return "paused";
+  return current.status === "idle" ? "thinking" : current.status;
 }
 
 function visual(state: OrbVisualState, label: string): void {
@@ -207,98 +192,11 @@ function visual(state: OrbVisualState, label: string): void {
   toContent({ kind: "aeon.orb.visual", state, label });
 }
 
-/**
- * Watch: makes this task a routine every 15 minutes. A read-only check is saved directly;
- * anything that clicked through the page opens the routine editor, prefilled, to confirm.
- */
-async function watch(): Promise<void> {
-  const plan = model.run ? watchPlan(model.run) : undefined;
-  if (!plan || plan.kind === "none" || !session.chatId || !model.prompt) return;
-  const routine = watchRoutine(model.prompt);
-  if (plan.kind === "editor") {
-    const url = routineEditorUrl(chrome.runtime.getURL("home.html"), session.chatId, routine);
-    await chrome.tabs.create({ url, openerTabId: tabId });
-    setWatch("idle", "Review the routine in the new tab and save it to start checking.");
-    return;
-  }
-  setWatch("saving", "Saving the routine…");
-  try {
-    await session.createRoutine({ ...routine });
-    setWatch(
-      "saved",
-      `Checking every ${WATCH_EVERY_MINUTES} minutes. You'll get a notification when it changes.`,
-    );
-  } catch (error) {
-    setWatch("idle", "Couldn't save the routine · " + messageOf(error));
-  }
-}
-
-function setWatch(state: OrbViewModel["watch"]["state"], note: string): void {
-  model.watch = { state, note };
-  render();
-}
-
-async function again(text = model.prompt): Promise<void> {
-  if (!text) return;
-  reset();
-  playSound("start");
-  await session.again(text).catch(fail);
-}
-
-/** The user takes the wheel: the run stops and the island waits for Resume. */
-function takeOver(): void {
-  model.paused = true;
-  model.expanded = false;
-  toContent({ kind: "aeon.orb.spotlight", box: null });
-  void session.stop().catch(() => undefined);
-  sync();
-}
-
-function resume(): void {
-  void again(
-    `Continue this task from where the page is now (I changed things myself): ${model.prompt}`,
-  );
-}
-
-/** What Aeon knows about this site: its learned verbs, and whether this tab is learning. */
-async function loadSite(): Promise<void> {
-  if (!model.host) return;
-  const [operations, learning] = await Promise.all([
-    chrome.runtime
-      .sendMessage({ kind: "aeon.site.operations", host: model.host })
-      .catch(() => []) as Promise<unknown>,
-    chrome.runtime.sendMessage({ kind: "aeon.learn.get", tabId }).catch(() => null) as Promise<{
-      on?: boolean;
-    } | null>,
-  ]);
-  model.verbs = siteVerbs(model.host, Array.isArray(operations) ? operations : []);
+async function loadLearning(): Promise<void> {
+  const learning = (await chrome.runtime
+    .sendMessage({ kind: "aeon.learn.get", tabId })
+    .catch(() => null)) as { on?: boolean } | null;
   model.learning = learning?.on === true;
-  render();
-}
-
-function useVerb(verb: SiteVerb): void {
-  if (verb.run) {
-    void submit(verb.prompt);
-    return;
-  }
-  const field = document.getElementById("prompt") as HTMLTextAreaElement | null;
-  if (!field) return;
-  field.value = verb.prompt;
-  field.focus();
-  field.setSelectionRange(field.value.length, field.value.length);
-}
-
-/** Keep this run's answer on the new-tab home (the same pin the agent can make). */
-async function pinResult(): Promise<void> {
-  if (!session.chatId) return;
-  const value = (model.run?.answer || model.prompt).trim().slice(0, 200);
-  if (!value) return;
-  try {
-    await session.createPin((model.prompt || "Pinned answer").slice(0, 120), value);
-    notice("Pinned to home.");
-  } catch (error) {
-    notice("Couldn't pin · " + messageOf(error));
-  }
   render();
 }
 
@@ -311,42 +209,40 @@ async function toggleLearning(): Promise<void> {
   render();
 }
 
-// The chat opens in the side panel beside the page; a tab only if the panel cannot open.
-function openChat(): void {
+/** Hand-off is manual: the chat moves to the side panel beside this page, and the box collapses. */
+function toSidePanel(): void {
   const chatId = session.chatId;
   if (!chatId) return;
   // Must run before any await: opening the side panel needs the click's user gesture.
   const opened = chrome.sidePanel.open({ tabId });
   void chrome.tabs
     .get(tabId)
-    .then((tab) => chrome.storage.session.set({ [sidePanelSelectionKey(tab.windowId)]: chatId }))
+    .then((current) =>
+      chrome.storage.session.set({ [sidePanelSelectionKey(current.windowId)]: chatId }),
+    )
     .catch(() => undefined);
   void opened.then(
     () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
-    () => openExtensionChat(chatId).catch(() => undefined),
+    () => toTab(),
   );
 }
 
+function toTab(): void {
+  const chatId = session.chatId;
+  if (!chatId) return;
+  void openExtensionChat(chatId).catch(() => undefined);
+  toContent({ kind: "aeon.orb.hide", keepRunning: true });
+}
+
 function view(): ReactNode {
-  return createElement(Island, {
+  return createElement(OrbBox, {
     model: { ...model },
     actions: {
       submit: (text) => void submit(text),
-      close: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
-      stop: () => void session.stop().catch(() => undefined),
-      again: () => void again(),
-      watch: () => void watch(),
-      pin: () => void pinResult(),
-      openChat,
-      takeOver,
-      resume,
-      useVerb,
+      close: () => toContent({ kind: "aeon.orb.hide", keepRunning: false }),
+      toSidePanel,
+      toTab,
       toggleLearning: () => void toggleLearning(),
-      showPreview: () => showPreviewTab(model.preview),
-      toggleDetails: () => {
-        model.expanded = !model.expanded;
-        render();
-      },
     },
   });
 }
@@ -354,11 +250,6 @@ function view(): ReactNode {
 function render(): void {
   if (update) update(view());
   else update = mountAeonUi(root, view());
-}
-
-async function refreshNeeds(): Promise<void> {
-  model.needsCount = await needsCount();
-  render();
 }
 
 function sendPrefs(): void {

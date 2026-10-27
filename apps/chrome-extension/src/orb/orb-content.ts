@@ -1,9 +1,7 @@
 import { isOrbToContent, isOrbToggle, type OrbShown } from "./orb-messages.js";
 import { OrbOverlay } from "./orb-overlay.js";
-import { watchPageChanges } from "./page-changes.js";
 
-// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed, except on
-// pages Aeon has read before, where it shows what changed since (page-changes.ts).
+// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed.
 
 declare global {
   interface Window {
@@ -17,18 +15,13 @@ if (!window.__aeonOrbLoaded) {
 }
 
 function start(): void {
-  if (window.top === window) watchPageChanges();
-  let pointer: { x: number; y: number } | undefined;
   let overlay: OrbOverlay | undefined;
-  addEventListener("pointermove", (event) => (pointer = { x: event.clientX, y: event.clientY }), {
-    capture: true,
-    passive: true,
-  });
-  const here = () => pointer ?? { x: innerWidth - 120, y: innerHeight - 120 };
 
+  // keepRunning: collapse to the orb (Esc, hand-off). Otherwise dismiss the orb, unless a run
+  // is still going, in which case it stays as an orb.
   const close = (keepRunning: boolean) => {
     if (!overlay) return;
-    if (keepRunning && overlay.running) overlay.hideBubble();
+    if (keepRunning || overlay.running) overlay.hideBubble();
     else {
       overlay.destroy();
       overlay = undefined;
@@ -38,9 +31,10 @@ function start(): void {
   chrome.runtime.onMessage.addListener((message: unknown, sender) => {
     if (sender.id !== chrome.runtime.id) return;
     if (isOrbToggle(message)) {
-      if (overlay?.bubbleOpen) return close(true);
-      overlay ??= new OrbOverlay(message.tabId, message.nonce, here());
-      overlay.showBubble(here());
+      // The shortcut toggles the box; the orb itself stays until it is dismissed.
+      if (overlay?.bubbleOpen) return overlay.hideBubble();
+      overlay ??= new OrbOverlay(message.tabId, message.nonce);
+      overlay.showBubble();
       const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId };
       void chrome.runtime.sendMessage(shown).catch(() => undefined);
       return;
@@ -53,7 +47,7 @@ function start(): void {
   addEventListener(
     "keydown",
     (event) => {
-      if (event.key === "Escape" && overlay?.bubbleOpen) close(true);
+      if (event.key === "Escape" && overlay?.bubbleOpen) overlay.hideBubble();
     },
     { capture: true },
   );

@@ -1,61 +1,38 @@
-// Styles for the overlay, scoped inside its closed shadow root so pages cannot restyle it.
+// Styles for the overlay, scoped inside its closed shadow root so pages cannot restyle it. The
+// engine draws the agent's cursor and the edge glow; the orb draws only the swarm and its box.
 export const OVERLAY_STYLE = `
 :host { all: initial; }
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
-canvas { position: fixed; inset: 0; pointer-events: none; }
+canvas {
+  position: fixed; inset: 0; pointer-events: none; opacity: 1;
+  transition: opacity .35s ease;
+}
+canvas.away { opacity: 0; }
 .spot {
   position: fixed; inset: 0; pointer-events: none; opacity: 0;
   transition: opacity .5s ease;
 }
 .spot.on { opacity: 1; }
-.edge {
-  position: fixed; inset: 0; pointer-events: none; opacity: 0;
-  box-shadow: inset 0 0 0 2px rgba(124, 92, 255, .55), inset 0 0 28px rgba(124, 92, 255, .35);
-  transition: opacity .6s ease;
+.hit {
+  all: unset; position: fixed; left: 0; top: 0; width: 64px; height: 64px; border-radius: 50%;
+  pointer-events: auto; cursor: grab; will-change: transform;
 }
-.edge.on { opacity: 1; animation: edge 2.4s ease-in-out infinite; }
-@keyframes edge { 50% { opacity: .55; } }
-.cursor {
-  position: fixed; left: 0; top: 0; pointer-events: none; opacity: 0;
-  transition: opacity .3s ease; will-change: transform;
-}
-.cursor.on { opacity: 1; }
-.cursor svg { display: block; filter: drop-shadow(0 0 6px rgba(124, 92, 255, .8)); }
-.label {
-  position: absolute; left: 18px; top: 18px; white-space: nowrap;
-  background: #7c5cff; color: #fff; border-radius: 999px; padding: 3px 10px;
-  font: 600 11.5px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-  box-shadow: 0 4px 14px rgba(40, 20, 120, .35);
-}
-.ring {
-  position: fixed; width: 10px; height: 10px; margin: -7px 0 0 -7px; border-radius: 50%;
-  border: 2px solid #7c5cff; pointer-events: none; opacity: 0;
-}
-.ring.go { animation: ring .6s ease-out; }
-@keyframes ring {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(4.6); }
-}
+.hit:active { cursor: grabbing; }
+.hit:focus-visible { outline: 2px solid rgba(124, 92, 255, .7); outline-offset: -8px; }
 iframe {
   position: fixed; left: 0; top: 0; border: 0; background: transparent;
   pointer-events: auto; color-scheme: normal; opacity: 0;
-  transform: scale(.2); transform-origin: 100% 100%;
+  transform: scale(.2); transform-origin: 0 100%;
   transition: opacity .3s ease, transform .45s cubic-bezier(.3, 1.3, .5, 1);
 }
 iframe.on { opacity: 1; transform: none; }
 iframe.off { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  iframe, .spot, .cursor, .edge { transition: none; }
-  .ring.go, .edge.on { animation: none; }
+  iframe, .spot, canvas { transition: none; }
 }
 :host([data-reduced-motion]) iframe, :host([data-reduced-motion]) .spot,
-:host([data-reduced-motion]) .cursor, :host([data-reduced-motion]) .edge { transition: none; }
-:host([data-reduced-motion]) .ring.go, :host([data-reduced-motion]) .edge.on { animation: none; }
+:host([data-reduced-motion]) canvas { transition: none; }
 `;
-
-export const CURSOR_SVG = `<svg width="20" height="24" viewBox="0 0 20 24" aria-hidden="true">
-<path d="M2 2 L2 19 L7 14.5 L10.5 22 L13.5 20.6 L10 13.3 L17 13.3 Z" fill="#7c5cff"
- stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 
 export function spotlightGradient(box: {
   x: number;
