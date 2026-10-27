@@ -20,6 +20,7 @@ import { BrowserControlService } from "./browser-control-service.js";
 import { handleCompanionMessage } from "./companion-requests.js";
 import { handleAgentSettingsReply } from "./agent-settings.js";
 import { handleBlockedSitesReply } from "./core-blocked-sites.js";
+import { installedExtensionBuild } from "./extension-build.js";
 
 export function attachNativeExecutor(
   socket: WebSocket,
@@ -64,15 +65,21 @@ function handleExecutorHeartbeat(
     socket.close(1008, "Invalid executor heartbeat identity");
     return true;
   }
-  socket.send(
-    JSON.stringify(
-      BrowserExecutorHeartbeatReplySchema.parse({
-        kind: "browser.executor.heartbeat.ack",
-        clientInstanceId: executor.clientInstanceId,
-        browserRunId: executor.browserRunId,
-      }),
-    ),
-  );
+  void installedExtensionBuild().then((build) => {
+    if (socket.readyState !== WebSocket.OPEN) return;
+    const stale = Boolean(build && heartbeat.data.build && build !== heartbeat.data.build);
+    socket.send(
+      JSON.stringify(
+        BrowserExecutorHeartbeatReplySchema.parse({
+          kind: "browser.executor.heartbeat.ack",
+          clientInstanceId: executor.clientInstanceId,
+          browserRunId: executor.browserRunId,
+          ...(build ? { build } : {}),
+          ...(stale ? { reload: true } : {}),
+        }),
+      ),
+    );
+  });
   return true;
 }
 

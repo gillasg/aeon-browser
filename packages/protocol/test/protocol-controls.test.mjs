@@ -176,7 +176,7 @@ test("browser tool input is a closed batch of at most eight safe operations", ()
   );
 });
 
-test("browser executor target actions require a one-use claim and semantic data is marked untrusted", () => {
+test("browser executor target actions: reads may omit or carry a claim, writes require one, and semantic data is marked untrusted", () => {
   const request = {
     kind: "browser.operation",
     requestId: "2a1e40f0-43fc-4797-a7ea-215f83c77f5c",
@@ -194,7 +194,7 @@ test("browser executor target actions require a one-use claim and semantic data 
       kind: "semantic",
     },
   };
-  assert.equal(BrowserExecutorRequestSchema.safeParse(request).success, false);
+  assert.equal(BrowserExecutorRequestSchema.safeParse(request).success, true);
   assert.equal(
     BrowserExecutorRequestSchema.safeParse({
       ...request,
