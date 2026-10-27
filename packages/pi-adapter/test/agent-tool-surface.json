@@ -122,7 +122,7 @@
   },
   {
     "name": "site_mapper",
-    "description": "Call the API a site learned while you used it (actions: code, sites, operations, call, watch, action, recipe, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). recipe lists or runs the site's named recipes (API first, then the page). code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
+    "description": "Call a site's abilities (actions: sites, operations, call, ability, watch, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). ability lists or runs one site ability (its API first, then replay steps, page code or node code). code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
     "actions": [
       "sites",
       "code",
@@ -133,9 +133,7 @@
       "import",
       "explore",
       "docs",
-      "actions",
-      "action",
-      "recipe",
+      "ability",
       "channel",
       "session",
       "export",
@@ -161,9 +159,7 @@
             "import",
             "explore",
             "docs",
-            "actions",
-            "action",
-            "recipe",
+            "ability",
             "channel",
             "session",
             "export",
@@ -179,18 +175,6 @@
           "type": "string",
           "maxLength": 200,
           "description": "For action and channel: its name."
-        },
-        "steps": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "maxItems": 20,
-          "description": "For actions: operation ids in order, to save an action."
-        },
-        "description": {
-          "type": "string",
-          "maxLength": 1000
         },
         "change": {
           "type": "string",
@@ -248,6 +232,10 @@
         "transport": {
           "type": "string",
           "enum": ["auto", "page", "direct"]
+        },
+        "via": {
+          "type": "string",
+          "enum": ["api", "steps", "script", "page"]
         },
         "files": {
           "type": "array",

@@ -431,11 +431,11 @@ function usePaletteItems(props: NewTabHomeProps, go: (view: HomeView) => void): 
       ] as const
     ).map(([view, label]) => ({ id: "page:" + view, label, hint: "Go", run: () => go(view) }));
     const siteActions: PaletteItem[] = sites.flatMap((site) =>
-      site.recipes.map((recipe) => ({
-        id: `site:${site.site}:${recipe.name}`,
-        label: humanize(recipe.name),
+      site.abilities.map((ability) => ({
+        id: `site:${site.site}:${ability.name}`,
+        label: humanize(ability.name),
         hint: site.site,
-        run: ask(`Run ${recipe.name} on ${site.site}`),
+        run: ask(`Run ${ability.name} on ${site.site}`),
       })),
     );
     const chats: PaletteItem[] = props.chats

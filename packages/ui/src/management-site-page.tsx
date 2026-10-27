@@ -5,7 +5,7 @@ import { ActionNote } from "./management-automations.js";
 import {
   ImportPath,
   SiteActions,
-  SiteRecipes,
+  SiteAbilities,
   SiteRunForm,
   formatWhen,
 } from "./management-sites.js";
@@ -109,7 +109,7 @@ function SiteList({
 export function siteSummary(entry: SiteEntry): string {
   const parts: string[] = [];
   if (entry.mapped) {
-    const can = entry.mapped.operations + entry.mapped.recipes.length;
+    const can = entry.mapped.operations + entry.mapped.abilities.length;
     parts.push(`${can} thing${can === 1 ? "" : "s"} it can do`);
     if (entry.mapped.session) parts.push(entry.mapped.sessionAccount ?? "signed in");
   }
@@ -184,7 +184,7 @@ function CanDo({
         <span className={`management-health management-health-${site.health}`}>{site.health}</span>
         <span className="management-subtle"> · updated {formatWhen(site.updatedAt)}</span>
       </p>
-      <SiteRecipes site={site} />
+      <SiteAbilities site={site} />
       {site.suggestions.length > 0 && (
         <ul className="management-inputs">
           {site.suggestions.map((suggestion) => (

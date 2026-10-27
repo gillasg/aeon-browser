@@ -1,4 +1,4 @@
-## Recipes
+## Abilities and long jobs
 
 - **Long jobs.** One `aeon tool` call runs up to 60 seconds, but a shell loop can run for hours:
   start a durable `browser.sweep`/`browser.job` and check it with `aeon job` (or run `aeon sweep
@@ -15,6 +15,6 @@
   client; `aeon mcp <site>` serves it as an MCP server.
 - **Live data.** `site_mapper action=channel` (WebSockets and event streams).
 - **Your own tools.** Register CLIs and MCP servers you install with Aeon's capability tools, and
-  save repeatable site flows as site skills (`skills.save`).
+  save repeatable site flows as abilities (`saveAbility`, preferring a steps way).
 - **Audio and video.** `yt-dlp` in the shell downloads whole videos; `page.recordMedia` records what
   is playing in a tab.

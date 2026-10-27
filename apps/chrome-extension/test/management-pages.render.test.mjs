@@ -27,16 +27,17 @@ const snapshot = {
   resources: null,
   resourceError: null,
   signIn: { provider: null, state: "not_set_up" },
-  workflows: [
+  abilities: [
     {
       name: "Daily prices",
-      slug: "daily-prices",
-      steps: 3,
+      site: "shop.example",
+      kind: "read",
+      ways: ["api", "page"],
       description: "Reads three shops",
       updatedAt: new Date().toISOString(),
-      inputs: [{ name: "query", required: true, default: "lamp" }],
+      inputs: [{ name: "query", required: true }],
+      stats: { runs: 2, failures: 0, lastOkAt: new Date().toISOString() },
       running: false,
-      lastRun: { state: "ok", at: new Date().toISOString(), error: null },
     },
   ],
   sites: [
@@ -50,7 +51,17 @@ const snapshot = {
       sessionSavedAt: new Date().toISOString(),
       recording: false,
       suggestions: ["Add a search operation"],
-      recipes: [{ name: "search", kind: "items", fields: 4, updatedAt: new Date().toISOString() }],
+      abilities: [
+        {
+          name: "search",
+          site: "shop.example",
+          kind: "read",
+          ways: ["api"],
+          inputs: [{ name: "q", required: false }],
+          stats: { runs: 1, failures: 0 },
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     },
   ],
   lastAction: { ok: true, at: new Date().toISOString(), message: "Exported to /tmp/x.json" },
