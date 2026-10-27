@@ -12,6 +12,16 @@ import { observePanelFrameTitle } from "./panel-frame-title.js";
 import { sidePanelSelectionKey as selectionKey } from "./sidebar-selection.js";
 
 const root = requiredElement("root");
+
+// Opening the side panel dismisses the orb on the page beside it: one Aeon at a time.
+void chrome.tabs
+  .query({ active: true, currentWindow: true })
+  .then(([tab]) =>
+    tab?.id === undefined
+      ? undefined
+      : chrome.tabs.sendMessage(tab.id, { kind: "aeon.orb.hide", keepRunning: false }),
+  )
+  .catch(() => undefined);
 let client: UiClient | undefined;
 let windowId: number | undefined;
 let chats: Array<{ chatId: string; title: string; updatedAt: string }> = [];

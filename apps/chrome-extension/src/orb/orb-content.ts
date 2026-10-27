@@ -17,11 +17,11 @@ if (!window.__aeonOrbLoaded) {
 function start(): void {
   let overlay: OrbOverlay | undefined;
 
-  // keepRunning: collapse to the orb (Esc, hand-off). Otherwise dismiss the orb, unless a run
-  // is still going, in which case it stays as an orb.
+  // keepRunning: collapse to the orb (Esc, click away). Otherwise the orb goes: the shortcut
+  // again, Close, or the chat moving to the side panel or a tab. A run keeps going there.
   const close = (keepRunning: boolean) => {
     if (!overlay) return;
-    if (keepRunning || overlay.running) overlay.hideBubble();
+    if (keepRunning) overlay.hideBubble();
     else {
       overlay.destroy();
       overlay = undefined;
@@ -31,9 +31,9 @@ function start(): void {
   chrome.runtime.onMessage.addListener((message: unknown, sender) => {
     if (sender.id !== chrome.runtime.id) return;
     if (isOrbToggle(message)) {
-      // The shortcut toggles the box; the orb itself stays until it is dismissed.
-      if (overlay?.bubbleOpen) return overlay.hideBubble();
-      overlay ??= new OrbOverlay(message.tabId, message.nonce);
+      // The shortcut summons the orb, and pressing it again dismisses it.
+      if (overlay) return close(false);
+      overlay = new OrbOverlay(message.tabId, message.nonce);
       overlay.showBubble();
       const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId };
       void chrome.runtime.sendMessage(shown).catch(() => undefined);

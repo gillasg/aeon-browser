@@ -222,7 +222,7 @@ function toSidePanel(): void {
     )
     .catch(() => undefined);
   void opened.then(
-    () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
+    () => toContent({ kind: "aeon.orb.hide", keepRunning: false }),
     () => toTab(),
   );
 }
@@ -231,7 +231,7 @@ function toTab(): void {
   const chatId = session.chatId;
   if (!chatId) return;
   void openExtensionChat(chatId).catch(() => undefined);
-  toContent({ kind: "aeon.orb.hide", keepRunning: true });
+  toContent({ kind: "aeon.orb.hide", keepRunning: false });
 }
 
 function view(): ReactNode {
