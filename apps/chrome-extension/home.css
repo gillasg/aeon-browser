@@ -2258,3 +2258,64 @@ body[data-embedded="true"] .home-top-bar {
   color: #ffd9d4;
   font-size: 13px;
 }
+
+/* ⌘K palette */
+.palette-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 14vh;
+}
+.palette {
+  width: min(560px, 92vw);
+  border-radius: 16px;
+  background: #0b0a10;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.palette input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+.palette ul {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.palette li button {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.palette li[aria-selected="true"] button {
+  background: rgba(124, 92, 255, 0.22);
+}
+.palette-hint {
+  color: #8f8b9e;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.palette li button .palette-hint {
+  padding: 0;
+}

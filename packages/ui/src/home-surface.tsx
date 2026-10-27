@@ -1,6 +1,7 @@
+import { CommandPalette, type PaletteItem } from "./command-palette.js";
 import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement, useMemo } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { HomeCatalog } from "./home-catalog.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
@@ -128,8 +129,10 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
       props.onManagementLoad();
     syncRoute(next, settingsSection);
   };
+  const palette = usePaletteItems(props, go);
   return (
     <div className="home-shell" data-view={shown}>
+      <CommandPalette items={palette} />
       <HomeTopBar view={shown} activityCount={recentActivityCount(activity)} onView={go} />
       <main className="home-main" data-screen={screenName(shown)}>
         <span id="home-connection" hidden>
@@ -408,6 +411,57 @@ function Management({
       {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
     />
   );
+}
+
+/** What ⌘K offers on home: the pages, a new chat, recent chats, and every site's saved actions. */
+function usePaletteItems(props: NewTabHomeProps, go: (view: HomeView) => void): PaletteItem[] {
+  const sites = props.managementSnapshot?.sites ?? [];
+  return useMemo(() => {
+    const ask = (text: string) => () => {
+      go("home");
+      setTimeout(() => window.dispatchEvent(new CustomEvent("aeon.home.seed", { detail: text })));
+    };
+    const pages: PaletteItem[] = (
+      [
+        ["chats", "Open chats"],
+        ["activity", "See what Aeon changed"],
+        ["automations", "Open automations"],
+        ["sites", "Open sites"],
+        ["settings", "Open settings"],
+      ] as const
+    ).map(([view, label]) => ({ id: "page:" + view, label, hint: "Go", run: () => go(view) }));
+    const siteActions: PaletteItem[] = sites.flatMap((site) =>
+      site.recipes.map((recipe) => ({
+        id: `site:${site.site}:${recipe.name}`,
+        label: humanize(recipe.name),
+        hint: site.site,
+        run: ask(`Run ${recipe.name} on ${site.site}`),
+      })),
+    );
+    const chats: PaletteItem[] = props.chats
+      .filter((chat) => !chat.archived)
+      .slice(0, 20)
+      .map((chat) => ({
+        id: "chat:" + chat.chatId,
+        label: chat.title,
+        hint: "Chat",
+        run: () => props.onOpenChat(chat.chatId),
+      }));
+    return [
+      { id: "new", label: "New chat", hint: "Ask Aeon", run: () => props.onNewChat() },
+      ...siteActions,
+      ...pages,
+      ...chats,
+    ];
+  }, [sites, props.chats, props.onOpenChat, props.onNewChat, go]);
+}
+
+function humanize(name: string): string {
+  const words = name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
 }
 
 /** "/" anywhere on home (outside a field) jumps to the ask box. */
