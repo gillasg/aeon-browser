@@ -1,6 +1,11 @@
 import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { crawlTool, toolSchema, type CrawlToolInput } from "@browserkit/tools/definitions";
+import {
+  AGENT_CRAWL_ACTIONS,
+  crawlTool,
+  toolSchema,
+  type CrawlToolInput,
+} from "@browserkit/tools/definitions";
 import { writeOutput, type ModelLike, type PageResult } from "@browserkit/tools/browser-crawl";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -12,7 +17,7 @@ import { boundedResult, errorResult, textResult, type ToolText } from "./site-to
 // browserkit's definition; Aeon only saves results, scopes the browser call to the chat, and
 // keeps check's workspace evidence.
 
-export const CRAWL_ACTIONS = ["scrape", "crawl", "map", "search", "find", "check"] as const;
+export const CRAWL_ACTIONS = AGENT_CRAWL_ACTIONS;
 
 const Parameters = Type.Unsafe<CrawlToolInput>(
   toolSchema(crawlTool, CRAWL_ACTIONS, ["api"]) as never,
