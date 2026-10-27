@@ -1727,6 +1727,35 @@ summary:focus-visible {
 .sync-notice > button:hover {
   opacity: 1;
 }
+.control-bar {
+  display: flex;
+  width: min(100% - 72px, 940px);
+  align-items: center;
+  gap: var(--aeon-s-3);
+  margin: var(--aeon-s-3) auto 0;
+  padding: var(--aeon-s-2) var(--aeon-s-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: var(--aeon-fs-md);
+}
+.control-bar > span {
+  flex: 1;
+}
+.control-bar > button {
+  flex: none;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--canvas);
+  font: inherit;
+  cursor: pointer;
+}
+.control-bar > button:hover {
+  opacity: 0.85;
+}
 .sync-notice[data-error="true"] {
   color: var(--aeon-swatch-c78b84);
 }

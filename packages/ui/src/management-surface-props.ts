@@ -1,3 +1,4 @@
+import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementActionName, ManagementSection } from "./management-types.js";
 
@@ -22,5 +23,7 @@ export interface ManagementSurfaceProps {
   onBlockedSiteRemove?(site: string): void;
   /** Outside agents may see the user's open tabs (opt-in, stored by the daemon). */
   outsideContext?: boolean;
+  /** Settings → Privacy. */
+  privacy?: PrivacySettingsProps | undefined;
   onOutsideContext?(enabled: boolean): void;
 }

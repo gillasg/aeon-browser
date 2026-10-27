@@ -22,6 +22,8 @@ import {
   type HomeRunPreview,
 } from "@aeon/ui";
 import { followHomePreviews } from "./home-previews.js";
+import { followHomeRunActions } from "./home-run-actions.js";
+import { followPrivacy } from "./home-privacy.js";
 import { markActivityUndone, type ActivityEntry } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { sendComposerCommand } from "./composer-command.js";
@@ -41,6 +43,11 @@ if (new URL(location.href).searchParams.get("host") === "panel")
   document.body.dataset.host = "panel";
 void applyStoredTheme();
 let client: UiClient | undefined;
+const privacy = followPrivacy(() => render());
+const runActions = followHomeRunActions({
+  client: () => client,
+  onChange: () => render(),
+});
 let chats: ChatCatalogItemDto[] = [];
 let modelCatalog: PiModelCatalogDto | null = null;
 let connectionLabel = "Starting";
@@ -115,6 +122,7 @@ function createView() {
     runningChatIds,
     needsChatIds,
     previews,
+    runActions: runActions(),
     modelCatalog,
     modelLogin: modelSignIn.state,
     onConnectModel: () => void modelSignIn.open(),
@@ -150,6 +158,7 @@ function createView() {
     onBlockedSiteAdd: (site: string) => void blockedSites.add(site),
     onBlockedSiteRemove: (site: string) => void blockedSites.remove(site),
     outsideContext: outsideContext.enabled,
+    privacy: privacy(),
     onOutsideContext: (enabled: boolean) => void outsideContext.set(enabled),
     ...management.viewProps(),
   });
