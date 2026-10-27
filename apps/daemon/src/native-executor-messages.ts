@@ -67,14 +67,17 @@ function handleExecutorHeartbeat(
   }
   void installedExtensionBuild().then((build) => {
     if (socket.readyState !== WebSocket.OPEN) return;
-    const stale = Boolean(build && heartbeat.data.build && build !== heartbeat.data.build);
+    // An extension from before this handshake has no build field and a strict ack parser:
+    // sending the new fields would break its link. Only answer in kind once it speaks build.
+    const speaksBuild = heartbeat.data.build !== undefined;
+    const stale = Boolean(speaksBuild && build && build !== heartbeat.data.build);
     socket.send(
       JSON.stringify(
         BrowserExecutorHeartbeatReplySchema.parse({
           kind: "browser.executor.heartbeat.ack",
           clientInstanceId: executor.clientInstanceId,
           browserRunId: executor.browserRunId,
-          ...(build ? { build } : {}),
+          ...(speaksBuild && build ? { build } : {}),
           ...(stale ? { reload: true } : {}),
         }),
       ),
