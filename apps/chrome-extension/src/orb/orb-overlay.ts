@@ -137,6 +137,9 @@ export class OrbOverlay {
     this.frame.setAttribute("allowtransparency", "true");
     layer.append(this.spot, this.canvas, this.hit, this.frame);
     shadow.append(style, layer);
+    // An extension reload leaves the old script's orb on the page with nothing driving it.
+    for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
+    this.host.setAttribute("data-aeon-orb", "");
     document.documentElement.append(this.host);
   }
 
