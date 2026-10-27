@@ -84,7 +84,7 @@ function AbilityRow({
   return (
     <tr>
       <td>
-        <strong>{ability.name}</strong>
+        <strong>{humanize(ability.name)}</strong>
         {ability.description && <p className="management-subtle">{ability.description}</p>}
         <p className="management-subtle">
           {ability.site} · {ability.kind === "write" ? "changes things" : "reads"} ·{" "}
@@ -180,6 +180,15 @@ function RunForm({
       </button>
     </div>
   );
+}
+
+/** search_videos → "Search videos": names are saved for code, shown for people. */
+export function humanize(name: string): string {
+  const words = name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
 }
 
 function parseValue(raw: string): unknown {
