@@ -41,7 +41,9 @@
     "history",
     "bookmarks",
     "declarativeNetRequest",
-    "contentSettings"
+    "contentSettings",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "icons": {

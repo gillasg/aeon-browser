@@ -37,4 +37,10 @@ jobs:
             Invoke-WebRequest "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/win64/chrome-win64.zip" -OutFile "$dir/chrome-win64.zip"
             Expand-Archive "$dir/chrome-win64.zip" -DestinationPath $dir -Force
           }
+      - name: Canary
+        working-directory: ../browserkit
+        run: node --test test/canary.e2e.test.mjs
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe
+          REQUIRE_E2E: "1"
       - run: pnpm check

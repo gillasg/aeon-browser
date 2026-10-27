@@ -42,6 +42,10 @@ export class CdpService {
     const server = new CdpServer(token, {
       openTab: (session, url) => this.openTab(session, url),
       closeTab: (session, tabId) => this.closeTab(session, tabId),
+      listTabs: async () => {
+        const reply = await this.request({ kind: "cdp.listTabs" });
+        return ((reply.result as Record<string, unknown> | undefined)?.tabs ?? []) as CdpTab[];
+      },
       command: (session, tabId, method, params, engineSessionId) =>
         this.command(session, tabId, method, params, engineSessionId),
     });

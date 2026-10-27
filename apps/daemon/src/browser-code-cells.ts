@@ -76,15 +76,6 @@ export class BrowserCodeCells {
         signal?.removeEventListener("abort", abort);
         socket.off("close", close);
         if (result) {
-          const flights = (result.flight ?? []) as { path?: unknown; frames?: unknown }[];
-          const note = flights
-            .filter((flight) => typeof flight.path === "string")
-            .map(
-              (flight) => `[flight] ${String(flight.path)} (${String(flight.frames ?? 0)} frames)`,
-            )
-            .join("\n");
-          if (note)
-            result = { ...result, output: [result.output, note].filter(Boolean).join("\n") };
           for (const target of result.opened) this.adopt(chatId, target);
           resolve(result);
         } else reject(error ?? new Error("OPERATION_FAILED"));
