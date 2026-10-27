@@ -2,69 +2,17 @@ import { useEffect, useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
-// Saved workflows: run one with its inputs, cancel a run, import its JSON, record a workflow from
-// a chat's last browser run, and watch each step as it runs. Running happens in the daemon with
-// the same engine and browser as the CLI.
+// Saved steps: every ability Aeon has saved across sites, with how it runs (api, steps, script,
+// page), its inputs and how often it worked. The agent saves, repairs and prunes these itself;
+// the user only runs them. Running happens in the daemon with the same engine as the CLI.
 
 type Ability = NonNullable<ManagementSnapshotDto["abilities"]>[number];
-type Workflow = {
-  name: string;
-  slug: string;
-  site: string;
-  kind: "read" | "write";
-  ways: string[];
-  steps: number;
-  description?: string;
-  updatedAt: string;
-  inputs: {
-    name: string;
-    required: boolean;
-    description?: string | undefined;
-    default?: unknown;
-  }[];
-  running: boolean;
-  stats?: {
-    runs: number;
-    failures: number;
-    lastOkAt?: string | undefined;
-    lastUsedAt?: string | undefined;
-  };
-  progress?: { step: number; total: number; action: string };
-  lastRun: {
-    state: "ok" | "failed" | "running" | "cancelled";
-    at: string;
-    error: string | null;
-  } | null;
-};
-type Action = Parameters<ManagementSurfaceProps["onAction"]>[1];
 
 export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
   const abilities = props.snapshot?.abilities ?? [];
-  const workflows: Workflow[] = abilities.map((ability: Ability) => ({
-    name: ability.name,
-    slug: `${ability.site}:${ability.name}`,
-    site: ability.site,
-    kind: ability.kind,
-    ways: ability.ways,
-    steps: ability.ways.length,
-    ...(ability.description ? { description: ability.description } : {}),
-    updatedAt: ability.updatedAt,
-    inputs: ability.inputs,
-    running: ability.running === true,
-    ...(ability.stats ? { stats: ability.stats } : {}),
-    lastRun: ability.stats?.lastOkAt
-      ? {
-          state: ability.stats.failures > 0 ? "failed" : "ok",
-          at: ability.stats.lastOkAt,
-          error: null,
-        }
-      : null,
-  }));
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
-  const [importing, setImporting] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const running = workflows.some((workflow) => workflow.running);
-  // Steps change on the daemon while a run is going; refresh only while one is.
+  const running = abilities.some((ability) => ability.running);
+  // Runs change on the daemon while one is going; refresh only while one is.
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(props.onRefresh, 2000);
@@ -73,81 +21,42 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
   return (
     <div className="management-automations">
       <p className="management-hint">
-        A workflow is a fixed sequence across sites. Running and cancelling happen here; the CLI (
-        <code>aeon workflow run &lt;name&gt;</code>) runs the same engine.
+        Things Aeon learned to do on a site. It saves one when a task works, fixes it when the site
+        changes and drops it when it keeps failing. <code>aeon abilities run</code> runs the same.
       </p>
       <ActionNote note={props.snapshot?.lastAction} />
-      <AutomationToolbar
-        importing={importing}
-        recording={recording}
-        loading={props.loading}
-        onRefresh={props.onRefresh}
-        onImport={() => setImporting((value) => !value)}
-        onRecord={() => setRecording((value) => !value)}
-      />
-      {importing && <ImportForm chatId={chatId} onAction={props.onAction} />}
-      {recording && <RecordForm chatId={chatId} onAction={props.onAction} />}
-      <WorkflowTable workflows={workflows} chatId={chatId} onAction={props.onAction} />
+      {abilities.length ? (
+        <table className="management-table">
+          <thead>
+            <tr>
+              <th scope="col">Ability</th>
+              <th scope="col">Inputs</th>
+              <th scope="col">Works</th>
+              <th scope="col" aria-label="Run" />
+            </tr>
+          </thead>
+          <tbody>
+            {abilities.map((ability) => (
+              <AbilityRow
+                key={`${ability.site}:${ability.name}`}
+                ability={ability}
+                onRun={(params) =>
+                  props.onAction(chatId, "run_site_ability", {
+                    site: ability.site,
+                    name: ability.name,
+                    params,
+                  })
+                }
+              />
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="management-empty">
+          Nothing saved yet. Aeon saves steps on its own once a task works.
+        </p>
+      )}
     </div>
-  );
-}
-
-function AutomationToolbar(props: {
-  importing: boolean;
-  recording: boolean;
-  loading: boolean;
-  onRefresh: () => void;
-  onImport: () => void;
-  onRecord: () => void;
-}): ReactElement {
-  return (
-    <div className="management-toolbar">
-      <button type="button" onClick={props.onRefresh} disabled={props.loading}>
-        Refresh
-      </button>
-      <button type="button" onClick={props.onImport}>
-        {props.importing ? "Close import" : "Import workflow"}
-      </button>
-      <button type="button" onClick={props.onRecord}>
-        {props.recording ? "Close record" : "Record from last run"}
-      </button>
-    </div>
-  );
-}
-
-function WorkflowTable(props: {
-  workflows: Workflow[];
-  chatId: string;
-  onAction: ManagementSurfaceProps["onAction"];
-}): ReactElement {
-  if (!props.workflows.length)
-    return (
-      <p className="management-empty">
-        No saved workflows yet. An agent can save one (workflow tool), or record the last run here.
-      </p>
-    );
-  return (
-    <table className="management-table">
-      <thead>
-        <tr>
-          <th scope="col">Workflow</th>
-          <th scope="col">Steps</th>
-          <th scope="col">Inputs</th>
-          <th scope="col">Last run</th>
-          <th scope="col">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {props.workflows.map((workflow) => (
-          <WorkflowRow
-            key={workflow.slug}
-            workflow={workflow}
-            chatId={props.chatId}
-            onAction={props.onAction}
-          />
-        ))}
-      </tbody>
-    </table>
   );
 }
 
@@ -164,115 +73,55 @@ export function ActionNote({
   );
 }
 
-function ImportForm({
-  chatId,
-  onAction,
+function AbilityRow({
+  ability,
+  onRun,
 }: {
-  chatId: string;
-  onAction: ManagementSurfaceProps["onAction"];
+  ability: Ability;
+  onRun(params: Record<string, unknown>): void;
 }): ReactElement {
-  const [json, setJson] = useState("");
-  return (
-    <div className="management-form">
-      <textarea
-        value={json}
-        onChange={(event) => setJson(event.target.value)}
-        placeholder='{"name": "...", "steps": [...]}'
-        rows={6}
-      />
-      <button
-        type="button"
-        disabled={!json.trim()}
-        onClick={() => onAction(chatId, "import_workflow", { json })}
-      >
-        Import
-      </button>
-    </div>
-  );
-}
-
-function RecordForm({
-  chatId,
-  onAction,
-}: {
-  chatId: string;
-  onAction: ManagementSurfaceProps["onAction"];
-}): ReactElement {
-  const [name, setName] = useState("");
-  return (
-    <div className="management-form">
-      <label>
-        New workflow name
-        <input
-          value={name}
-          placeholder="Recorded from the last run"
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <button
-        type="button"
-        disabled={!name.trim()}
-        onClick={() => onAction(chatId, "record_workflow_from_run", { name })}
-      >
-        Record
-      </button>
-    </div>
-  );
-}
-
-function WorkflowRow({
-  workflow,
-  chatId,
-  onAction,
-}: {
-  workflow: Workflow;
-  chatId: string;
-  onAction: ManagementSurfaceProps["onAction"];
-}): ReactElement {
-  const [running, setRunning] = useState(false);
-  const act = (action: Action, input: Record<string, unknown>) => onAction(chatId, action, input);
+  const [open, setOpen] = useState(false);
   return (
     <tr>
       <td>
-        <strong>{workflow.name}</strong>
-        {workflow.description && <p className="management-subtle">{workflow.description}</p>}
+        <strong>{ability.name}</strong>
+        {ability.description && <p className="management-subtle">{ability.description}</p>}
         <p className="management-subtle">
-          {workflow.site} · {workflow.kind} · {workflow.ways.join(" + ")}
+          {ability.site} · {ability.kind === "write" ? "changes things" : "reads"} ·{" "}
+          {ability.ways.join(" → ")}
         </p>
-        <p className="management-subtle">Updated {formatWhen(workflow.updatedAt)}</p>
-      </td>
-      <td>{workflow.steps}</td>
-      <td>
-        <WorkflowInputs workflow={workflow} />
       </td>
       <td>
-        <LastRun workflow={workflow} />
+        {ability.inputs.length ? (
+          <ul className="management-inputs">
+            {ability.inputs.map((input) => (
+              <li key={input.name}>
+                <code>{input.name}</code>
+                {input.required ? " *" : ""}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="management-subtle">none</span>
+        )}
       </td>
       <td>
-        <div className="management-actions">
-          {workflow.running ? (
-            <button type="button" onClick={() => act("cancel_workflow", { name: workflow.name })}>
-              Cancel
-            </button>
-          ) : (
-            <button type="button" onClick={() => setRunning((value) => !value)}>
-              Run
-            </button>
-          )}
-          <button type="button" onClick={() => act("export_workflow", { name: workflow.name })}>
-            Export
+        <Health ability={ability} />
+      </td>
+      <td>
+        {ability.running ? (
+          <span className="management-run-running">running</span>
+        ) : (
+          <button type="button" onClick={() => setOpen((value) => !value)}>
+            Run
           </button>
-        </div>
-        {running && (
+        )}
+        {open && (
           <RunForm
-            workflow={workflow}
-            onStart={(inputs) => {
-              act("run_site_ability", {
-                site: workflow.site,
-                name: workflow.name,
-                params: inputs,
-              });
-              setRunning(false);
+            ability={ability}
+            onStart={(params) => {
+              onRun(params);
+              setOpen(false);
             }}
           />
         )}
@@ -281,60 +130,37 @@ function WorkflowRow({
   );
 }
 
-function WorkflowInputs({ workflow }: { workflow: Workflow }): ReactElement {
-  if (workflow.inputs.length === 0) return <span className="management-subtle">none</span>;
+function Health({ ability }: { ability: Ability }): ReactElement {
+  const stats = ability.stats;
+  if (!stats?.runs) return <span className="management-subtle">Not run yet</span>;
+  const ok = stats.runs - stats.failures;
   return (
-    <ul className="management-inputs">
-      {workflow.inputs.map((input) => (
-        <li key={input.name}>
-          <code>{input.name}</code>
-          {input.required ? " *" : ""}
-          {input.default !== undefined && (
-            <span className="management-subtle"> default {JSON.stringify(input.default)}</span>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function LastRun({ workflow }: { workflow: Workflow }): ReactElement {
-  if (workflow.running)
-    return (
-      <span className="management-run-running">
-        running
-        {workflow.progress && ` · step ${workflow.progress.step}/${workflow.progress.total}`}
-        {workflow.progress && ` · ${workflow.progress.action}`}
-      </span>
-    );
-  if (!workflow.lastRun) return <span className="management-subtle">Never run</span>;
-  return (
-    <span className={`management-run management-run-${workflow.lastRun.state}`}>
-      {workflow.lastRun.state} · {formatWhen(workflow.lastRun.at)}
-      {workflow.lastRun.error && (
-        <span className="management-subtle"> — {workflow.lastRun.error}</span>
+    <span className={`management-run management-run-${stats.failures ? "failed" : "ok"}`}>
+      {ok}/{stats.runs}
+      {stats.lastOkAt && (
+        <span className="management-subtle"> · last worked {formatWhen(stats.lastOkAt)}</span>
       )}
     </span>
   );
 }
 
 function RunForm({
-  workflow,
+  ability,
   onStart,
 }: {
-  workflow: Workflow;
-  onStart(inputs: Record<string, unknown>): void;
+  ability: Ability;
+  onStart(params: Record<string, unknown>): void;
 }): ReactElement {
   const [values, setValues] = useState<Record<string, string>>({});
   return (
     <div className="management-form">
-      {workflow.inputs.map((input) => (
+      {ability.inputs.map((input) => (
         <label key={input.name}>
           {input.name}
           {input.required ? " *" : ""}
           <input
             value={values[input.name] ?? ""}
-            placeholder={input.default === undefined ? "" : JSON.stringify(input.default)}
+            placeholder={input.description ?? ""}
             onChange={(event) =>
               setValues((current) => ({ ...current, [input.name]: event.target.value }))
             }
@@ -344,12 +170,10 @@ function RunForm({
       <button
         type="button"
         onClick={() => {
-          const inputs: Record<string, unknown> = {};
-          for (const input of workflow.inputs) {
-            const raw = values[input.name];
-            if (raw !== undefined && raw !== "") inputs[input.name] = parseValue(raw);
-          }
-          onStart(inputs);
+          const params: Record<string, unknown> = {};
+          for (const [name, raw] of Object.entries(values))
+            if (raw !== "") params[name] = parseValue(raw);
+          onStart(params);
         }}
       >
         Start

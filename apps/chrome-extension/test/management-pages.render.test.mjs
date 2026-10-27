@@ -84,14 +84,13 @@ const props = {
   onSidebarDefault: () => undefined,
 };
 
-test("the Automations page renders workflows, inputs, last run and its actions", () => {
+test("the Automations page renders abilities, inputs, how often they worked and Run", () => {
   const html = renderToStaticMarkup(createElement(AutomationsPanel, props));
   assert.match(html, /Daily prices/);
   assert.match(html, /Reads three shops/);
   assert.match(html, /query/);
-  assert.match(html, /ok ·/);
+  assert.match(html, /2\/2/);
   assert.match(html, />Run</);
-  assert.match(html, />Export</);
   assert.match(html, /Exported to \/tmp\/x\.json/);
 });
 
