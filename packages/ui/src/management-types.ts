@@ -15,6 +15,7 @@ export type ManagementActionName =
   | "export_workflow"
   | "run_site_operation"
   | "run_site_recipe"
+  | "run_site_ability"
   | "export_site"
   | "import_site"
   | "export_recipes"

@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   coverage,
-  listRecipes,
+  listAbilities,
   listSites,
   loadModel,
   readHealth,
@@ -131,11 +131,16 @@ export async function workflowCards(): Promise<WorkflowCard[]> {
   return cards;
 }
 
-export interface RecipeCard {
+export interface AbilityCard {
   name: string;
-  kind: "items" | "single";
-  fields: number;
+  site: string;
+  description?: string;
+  kind: "read" | "write";
+  ways: string[];
+  inputs: { name: string; required: boolean; description?: string }[];
+  stats?: { runs: number; failures: number; lastOkAt?: string; lastUsedAt?: string };
   updatedAt: string;
+  running?: boolean;
 }
 
 export interface SiteCard {
@@ -146,7 +151,7 @@ export interface SiteCard {
   session: boolean;
   sessionAccount: string | null;
   sessionSavedAt: string | null;
-  recipes: RecipeCard[];
+  abilities: AbilityCard[];
   recording: boolean;
   suggestions: string[];
 }
@@ -160,11 +165,41 @@ export async function siteCards(): Promise<SiteCard[]> {
   return Promise.all(sites.slice(0, 200).map((site) => siteCard(site)));
 }
 
+export async function abilityCards(): Promise<AbilityCard[]> {
+  const sites = await listSites().catch(() => []);
+  return (
+    await Promise.all(
+      sites.slice(0, 200).map(async (item) =>
+        (await listAbilities(item.site).catch(() => [])).map((ability) => ({
+          name: ability.name,
+          site: item.site,
+          ...(ability.description ? { description: ability.description } : {}),
+          kind: ability.kind,
+          ways: ability.ways.map((way) => way.kind),
+          inputs: abilityInputs(ability.inputs),
+          stats: ability.stats,
+          updatedAt: ability.updatedAt,
+        })),
+      ),
+    )
+  ).flat();
+}
+
+function abilityInputs(schema: Record<string, unknown>): AbilityCard["inputs"] {
+  const properties = (schema.properties ?? {}) as Record<string, { description?: string }>;
+  const required = new Set(Array.isArray(schema.required) ? schema.required.map(String) : []);
+  return Object.entries(properties).map(([name, spec]) => ({
+    name,
+    required: required.has(name),
+    ...(spec?.description ? { description: spec.description } : {}),
+  }));
+}
+
 async function siteCard(site: SiteSummary): Promise<SiteCard> {
-  const [health, session, recipes, model] = await Promise.all([
+  const [health, session, abilities, model] = await Promise.all([
     readHealth(site.site).catch(() => undefined),
     readSession(site.site).catch(() => undefined),
-    listRecipes(site.site).catch(() => []),
+    listAbilities(site.site).catch(() => []),
     loadModel(site.site).catch(() => undefined),
   ]);
   const stored = session as
@@ -177,11 +212,15 @@ async function siteCard(site: SiteSummary): Promise<SiteCard> {
     session: session !== undefined,
     sessionAccount: typeof stored?.account === "string" ? stored.account : null,
     sessionSavedAt: sessionSavedAt(stored),
-    recipes: recipes.map((recipe) => ({
-      name: recipe.name,
-      kind: recipe.kind,
-      fields: recipe.fields.length,
-      updatedAt: recipe.updatedAt,
+    abilities: abilities.map((ability) => ({
+      name: ability.name,
+      site: site.site,
+      ...(ability.description ? { description: ability.description } : {}),
+      kind: ability.kind,
+      ways: ability.ways.map((way) => way.kind),
+      inputs: abilityInputs(ability.inputs),
+      stats: ability.stats,
+      updatedAt: ability.updatedAt,
     })),
     recording: isSiteRecording(site.site),
     suggestions: suggestionsOf(model),

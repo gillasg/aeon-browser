@@ -15,7 +15,13 @@ import { CapabilityRegistry } from "./capability-registry.js";
 import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
-import { lastActionNote, providerCards, siteCards, workflowCards } from "./management-library.js";
+import {
+  abilityCards,
+  lastActionNote,
+  providerCards,
+  siteCards,
+  workflowCards,
+} from "./management-library.js";
 import { LibraryActions, isLibraryAction } from "./library-actions.js";
 import { CapabilityToolService } from "./capability-tool-service.js";
 import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
@@ -181,8 +187,9 @@ async function readManagementSnapshot(
     resources,
     resourceError,
     signIn: await readPasswordManagerStatus(),
-    // The Automations and Sites pages: saved workflows with their last run, and mapped sites
-    // with health and whether a session is stored. They read the shared browserkit folders.
+    // The Automations and Sites pages: site abilities, and mapped sites with health and a
+    // stored session. They read the shared browserkit folders.
+    abilities: await abilityCards(),
     workflows: await workflowCards(),
     sites: await siteCards(),
     providers: providerCards(),

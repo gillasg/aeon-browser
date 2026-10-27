@@ -172,9 +172,9 @@ aeon federate shop.example:search other.example:search --params '{"query":"lamp"
 aeon heal shop.example              # drift, breakage, sign-out, bot walls
 ```
 
-- **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): one
-  list of what already exists on the site (operations, recipes, workflows, tools, skills, WebMCP),
-  reads first.
+- **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): the
+  site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
+  `site.run(name, inputs, {via})` or `site.<name>(inputs)`.
 - **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped. Check `sites`
   first. To map a site: `map`, `describe`, `learn`, or use it in `browser_code` so its requests are
   learned as you go.
@@ -236,9 +236,10 @@ aeon pack import shop.zip
 aeon pack enable shop.example
 ```
 
-A pack holds the mapped site, its skills, boosts and site tools. Export strips sessions, cookies and
-credentials; import saves skills, boosts and tools **disabled** until reviewed and enabled.
-`site.tools.<name>(args)` and `site.pageTools.<name>(args)` call enabled tools in browser code.
+A pack holds the mapped site, its abilities, notes, skills and boosts. Export strips sessions,
+cookies and credentials; import enables abilities, skills, tools and boosts.
+`site.<name>(args)` runs an ability; `site.tools.<name>(args)` and `site.pageTools.<name>(args)`
+remain for old pack tools in browser code.
 
 ## Chat providers and media
 
@@ -280,27 +281,6 @@ navigate, type, press, scroll, wait, extract, screenshot…). Anything with seve
 The `deep-x-research` skill does sourced X work: Grok searches, every post URL is opened and
 checked, a query budget keeps it from looping, and X search in a tab is the fallback. Use it for
 "what is X saying about", not for a single post the user already linked.
-
-## Recipes
-
-- **Long jobs.** One `aeon tool` call runs up to 60 seconds, but a shell loop can run for hours:
-  start a durable `browser.sweep`/`browser.job` and check it with `aeon job` (or run `aeon sweep
-@urls.txt`), keeping state with `checkpoint`/`loadCheckpoint` for anything else. First check your
-  shell can run `aeon` (`aeon tools`).
-- **Bulk site scans.** `aeon sweep @urls.txt --pilot 5` (see `help('sweep')`).
-- **Login codes.** Email codes: open the inbox in the browser and read the newest message. SMS
-  codes: open messages.google.com/web (Google Messages for web, once paired with the phone).
-- **Phone and desktop apps.** Proxy the app through mitmproxy, save the flows, then
-  `site_mapper action=import site=<app> files=[...]`.
-- **An MCP server or SDK for a site.** Map it (`explore`, add `actions: true` to also map actions in
-  dry run, or just use the site in `browser_code`), read `operations` and `docs`, save multi-step
-  actions, test calls, `heal` what breaks. `site_mapper action=export` writes OpenAPI and a typed
-  client; `aeon mcp <site>` serves it as an MCP server.
-- **Live data.** `site_mapper action=channel` (WebSockets and event streams).
-- **Your own tools.** Register CLIs and MCP servers you install with Aeon's capability tools, and
-  save repeatable site flows as site skills (`skills.save`).
-- **Audio and video.** `yt-dlp` in the shell downloads whole videos; `page.recordMedia` records what
-  is playing in a tab.
 
 ## Routines and chat history
 

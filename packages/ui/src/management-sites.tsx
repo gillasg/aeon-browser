@@ -30,15 +30,16 @@ export function ImportPath({
   );
 }
 
-export function SiteRecipes({ site }: { site: Site }): ReactElement {
-  if (site.recipes.length === 0) return <span className="management-subtle">no recipes</span>;
+export function SiteAbilities({ site }: { site: Site }): ReactElement {
+  if (site.abilities.length === 0) return <span className="management-subtle">no abilities</span>;
   return (
     <ul className="management-inputs">
-      {site.recipes.map((recipe) => (
-        <li key={recipe.name}>
-          <code>{recipe.name}</code>{" "}
+      {site.abilities.map((ability) => (
+        <li key={ability.name}>
+          <code>{ability.name}</code>{" "}
           <span className="management-subtle">
-            {recipe.kind}, {recipe.fields} fields
+            {ability.kind}, {ability.ways.join(" + ")}
+            {ability.description ? ` — ${ability.description}` : ""}
           </span>
         </li>
       ))}
@@ -101,7 +102,7 @@ export function SiteRunForm({
   onAction: ManagementSurfaceProps["onAction"];
 }): ReactElement {
   const [operation, setOperation] = useState("");
-  const [recipe, setRecipe] = useState("");
+  const [ability, setAbility] = useState("");
   const [params, setParams] = useState("");
   const act = (action: Parameters<typeof onAction>[1], input: Record<string, unknown>) =>
     onAction(chatId, action, input);
@@ -121,14 +122,18 @@ export function SiteRunForm({
           setOperation("");
         }}
       />
-      {site.recipes.length > 0 && (
+      {site.abilities.length > 0 && (
         <RecipePicker
           site={site}
-          recipe={recipe}
-          onRecipe={setRecipe}
+          recipe={ability}
+          onRecipe={setAbility}
           onRun={() => {
-            act("run_site_recipe", { site: site.site, name: recipe, params: parseObject(params) });
-            setRecipe("");
+            act("run_site_ability", {
+              site: site.site,
+              name: ability,
+              params: parseObject(params),
+            });
+            setAbility("");
           }}
         />
       )}
@@ -185,10 +190,10 @@ function RecipePicker({
   return (
     <>
       <label>
-        Recipe
+        Ability
         <select value={recipe} onChange={(event) => onRecipe(event.target.value)}>
-          <option value="">Choose a recipe</option>
-          {site.recipes.map((item) => (
+          <option value="">Choose an ability</option>
+          {site.abilities.map((item) => (
             <option key={item.name} value={item.name}>
               {item.name}
             </option>
@@ -196,7 +201,7 @@ function RecipePicker({
         </select>
       </label>
       <button type="button" disabled={!recipe} onClick={onRun}>
-        Run recipe
+        Run ability
       </button>
     </>
   );

@@ -6,11 +6,60 @@ import type { ManagementSurfaceProps } from "./management-surface-props.js";
 // a chat's last browser run, and watch each step as it runs. Running happens in the daemon with
 // the same engine and browser as the CLI.
 
-type Workflow = NonNullable<ManagementSnapshotDto["workflows"]>[number];
+type Ability = NonNullable<ManagementSnapshotDto["abilities"]>[number];
+type Workflow = {
+  name: string;
+  slug: string;
+  site: string;
+  kind: "read" | "write";
+  ways: string[];
+  steps: number;
+  description?: string;
+  updatedAt: string;
+  inputs: {
+    name: string;
+    required: boolean;
+    description?: string | undefined;
+    default?: unknown;
+  }[];
+  running: boolean;
+  stats?: {
+    runs: number;
+    failures: number;
+    lastOkAt?: string | undefined;
+    lastUsedAt?: string | undefined;
+  };
+  progress?: { step: number; total: number; action: string };
+  lastRun: {
+    state: "ok" | "failed" | "running" | "cancelled";
+    at: string;
+    error: string | null;
+  } | null;
+};
 type Action = Parameters<ManagementSurfaceProps["onAction"]>[1];
 
 export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
-  const workflows = props.snapshot?.workflows ?? [];
+  const abilities = props.snapshot?.abilities ?? [];
+  const workflows: Workflow[] = abilities.map((ability: Ability) => ({
+    name: ability.name,
+    slug: `${ability.site}:${ability.name}`,
+    site: ability.site,
+    kind: ability.kind,
+    ways: ability.ways,
+    steps: ability.ways.length,
+    ...(ability.description ? { description: ability.description } : {}),
+    updatedAt: ability.updatedAt,
+    inputs: ability.inputs,
+    running: ability.running === true,
+    ...(ability.stats ? { stats: ability.stats } : {}),
+    lastRun: ability.stats?.lastOkAt
+      ? {
+          state: ability.stats.failures > 0 ? "failed" : "ok",
+          at: ability.stats.lastOkAt,
+          error: null,
+        }
+      : null,
+  }));
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
   const [importing, setImporting] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -187,6 +236,9 @@ function WorkflowRow({
       <td>
         <strong>{workflow.name}</strong>
         {workflow.description && <p className="management-subtle">{workflow.description}</p>}
+        <p className="management-subtle">
+          {workflow.site} · {workflow.kind} · {workflow.ways.join(" + ")}
+        </p>
         <p className="management-subtle">Updated {formatWhen(workflow.updatedAt)}</p>
       </td>
       <td>{workflow.steps}</td>
@@ -215,7 +267,11 @@ function WorkflowRow({
           <RunForm
             workflow={workflow}
             onStart={(inputs) => {
-              act("run_workflow", { name: workflow.name, inputs });
+              act("run_site_ability", {
+                site: workflow.site,
+                name: workflow.name,
+                params: inputs,
+              });
               setRunning(false);
             }}
           />

@@ -11,6 +11,7 @@ import {
   installSitePack,
   readRecipe,
   readSitePack,
+  runAbility,
   runRecipe,
   siteDir,
 } from "@browserkit/site-mapper";
@@ -49,6 +50,7 @@ export const LIBRARY_ACTIONS = [
   "export_workflow",
   "run_site_operation",
   "run_site_recipe",
+  "run_site_ability",
   "export_site",
   "import_site",
   "export_recipes",
@@ -123,6 +125,7 @@ export class LibraryActions {
     ["export_workflow", (input) => this.exportWorkflow(input)],
     ["run_site_operation", (input) => this.runSiteOperation(input)],
     ["run_site_recipe", (input) => this.runSiteRecipe(input)],
+    ["run_site_ability", (input) => this.runSiteAbility(input)],
     ["export_site", (input) => this.exportSite(input)],
     ["import_site", (input) => this.importSite(input)],
     ["export_recipes", (input) => this.exportRecipes(input)],
@@ -254,6 +257,30 @@ export class LibraryActions {
       true,
       `${site}/${name}: ${result.count} record(s) via ${result.strategy ?? "recipe"}`,
     );
+  }
+
+  private async runSiteAbility(input: Record<string, unknown>): Promise<void> {
+    const site = required(input, "site");
+    const name = required(input, "name");
+    const host = await browserRecipeHost(site, {
+      session: SESSION,
+      bridge: {
+        run: (code, options) => this.run(code, options),
+        status: () => Promise.resolve({ browsers: 1 }),
+        close: () => undefined,
+      },
+    });
+    const answer = await runAbility(site, name, (input.params as Record<string, unknown>) ?? {}, {
+      host: {
+        call: host.call,
+        ...(host.write ? { write: host.write } : {}),
+        ...(host.open ? { open: host.open } : {}),
+        ...(host.collect ? { collect: host.collect } : {}),
+        ...(host.script ? { script: host.script } : {}),
+        ...(host.resolveOperation ? { resolveOperation: host.resolveOperation } : {}),
+      },
+    });
+    noteAction(true, `${site}/${name}: ${preview(answer.result)} via ${answer.via}`);
   }
 
   private async exportSite(input: Record<string, unknown>): Promise<void> {

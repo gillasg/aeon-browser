@@ -89,7 +89,7 @@ async function mapped(home, origin) {
 
 test("every browserkit command has an aeon command", async () => {
   const commands = await run(process.execPath, [cli, "--help"]).then(({ stdout }) => stdout);
-  for (const command of COMMANDS)
+  for (const command of COMMANDS.filter((item) => !item.hidden))
     assert.match(commands, new RegExp(`\\b${command.name}\\b`), `${command.name} is missing`);
 });
 
