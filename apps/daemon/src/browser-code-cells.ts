@@ -6,6 +6,7 @@ import {
   BrowserCodeResultSchema,
   BrowserCodeRunSchema,
   type BrowserCodeResult,
+  type BrowserCodeStage,
   type BrowserTargetKey,
 } from "@aeon/protocol";
 
@@ -29,6 +30,8 @@ interface Pending {
   waiting: (waiting: boolean) => void;
   /** A short link drop keeps the cell alive; this fails it only after the grace period. */
   closeTimer?: ReturnType<typeof setTimeout>;
+  /** The last hop the extension reported; a deadline names it. */
+  stage: BrowserCodeStage;
 }
 
 const LINK_GRACE_MS = 60_000;
@@ -54,12 +57,19 @@ export class BrowserCodeCells {
           socket.send(JSON.stringify({ kind: "browser.code.cancel", cellId, reset }));
       };
       const expire = () => {
-        // Only this cell fails: its variables and tabs stay for the next cell.
-        cancel(false);
+        const stage = this.cells.get(cellId)?.stage ?? "sent";
+        // A realm that never began evaluating cannot be trusted: drop it so the next cell starts
+        // clean. A cell that was evaluating keeps its variables, as before.
+        const neverEvaluated =
+          stage === "sent" ||
+          stage === "received" ||
+          stage === "offscreen" ||
+          stage === "realm-ready";
+        cancel(neverEvaluated);
         finish(
           undefined,
           new Error(
-            "Browser code exceeded its deadline; that cell stopped, and its variables and tabs are still there.",
+            `Browser code exceeded its deadline (last stage: ${stage}); that cell stopped, and its variables and tabs ${neverEvaluated ? "were reset" : "are still there"}.`,
           ),
         );
       };
@@ -95,7 +105,14 @@ export class BrowserCodeCells {
           resolve(result);
         } else reject(error ?? new Error("OPERATION_FAILED"));
       };
-      this.cells.set(cellId, { clientInstanceId, socket, input, finish, waiting });
+      this.cells.set(cellId, {
+        clientInstanceId,
+        socket,
+        input,
+        finish,
+        waiting,
+        stage: "sent",
+      });
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("close", close);
       socket.send(
@@ -147,6 +164,7 @@ export class BrowserCodeCells {
     if (progress.success) {
       const cell = this.cells.get(progress.data.cellId);
       if (cell?.socket !== socket) return;
+      if (progress.data.stage !== undefined) cell.stage = progress.data.stage;
       if (progress.data.waitingForUser !== undefined) cell.waiting(progress.data.waitingForUser);
       cell.input.onProgress(progress.data.steps);
       return;

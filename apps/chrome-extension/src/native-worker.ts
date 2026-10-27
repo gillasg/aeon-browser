@@ -403,6 +403,16 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     connection.socket.close(4002, "Invalid daemon response");
     return;
   }
+  const arrival = candidate as { kind?: unknown; cellId?: unknown } | null;
+  if (arrival?.kind === "browser.code.run" && typeof arrival.cellId === "string")
+    connection.socket.send(
+      JSON.stringify({
+        kind: "browser.code.progress",
+        cellId: arrival.cellId,
+        steps: [],
+        stage: "received",
+      }),
+    );
   if (handleCoreMessage(candidate)) return;
   if (handleNativeSettings(candidate, connection.socket)) return;
   if (handleHeartbeatMessage(connection, candidate)) return;
