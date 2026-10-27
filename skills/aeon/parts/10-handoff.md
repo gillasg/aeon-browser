@@ -21,5 +21,4 @@ Each task becomes a full Aeon chat with its own agent and model, opened as a bac
 takes minutes, and the command waits until every task has finished, then prints the answers. Use it
 for goals ("find", "compare", "book"), not for single steps; for those, `aeon tool` is faster.
 
-`--from` takes `user`, `cli`, `mcp`, `companion`, `agent`, `routine` or `unknown`, so a report can
-leave out test runs by agents. The plain listing and `--json` both show each chat's origin.
+`--from` takes `user`, `cli`, `mcp`, `companion`, `agent`, `routine` or `unknown`.
