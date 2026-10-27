@@ -1,3 +1,4 @@
+import { humanize } from "./management-automations.js";
 import { CommandPalette, type PaletteItem } from "./command-palette.js";
 import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
@@ -454,14 +455,6 @@ function usePaletteItems(props: NewTabHomeProps, go: (view: HomeView) => void): 
       ...chats,
     ];
   }, [sites, props.chats, props.onOpenChat, props.onNewChat, go]);
-}
-
-function humanize(name: string): string {
-  const words = name
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[-_]+/g, " ")
-    .trim();
-  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
 }
 
 /** "/" anywhere on home (outside a field) jumps to the ask box. */

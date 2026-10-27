@@ -263,6 +263,10 @@
   border-color: #8b4d45;
 }
 .routine-kind {
+  display: inline-block;
+  width: fit-content;
+  align-self: flex-start;
+  justify-self: start;
   margin-left: var(--aeon-s-2);
   padding: 1px 6px;
   border: 1px solid var(--aeon-line);

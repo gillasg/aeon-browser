@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
+import { humanize } from "./management-automations.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
 // Mapped sites: health, recipes, the stored session, and real actions — run an operation or a
@@ -36,7 +37,7 @@ export function SiteAbilities({ site }: { site: Site }): ReactElement {
     <ul className="management-inputs">
       {site.abilities.map((ability) => (
         <li key={ability.name}>
-          <code>{ability.name}</code>{" "}
+          <strong>{humanize(ability.name)}</strong>{" "}
           <span className="management-subtle">
             {ability.kind}, {ability.ways.join(" + ")}
             {ability.description ? ` — ${ability.description}` : ""}

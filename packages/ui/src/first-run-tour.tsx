@@ -8,19 +8,19 @@ export const TOUR_KEY = "aeonTour";
 const STEPS: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: "Call Aeon on any page",
-    body: "Press Ctrl+Shift+Space anywhere. Aeon opens at your mouse with the page as context.",
+    body: "Press Ctrl+Shift+Space on any page. Aeon opens bottom-left with the page as context; press it again to close.",
   },
   {
-    title: "Watch it work, or take over",
-    body: "The orb becomes Aeon's cursor so you can see each step. Press Take over to drive yourself, then Resume.",
+    title: "Watch it work",
+    body: "A purple glow marks every tab Aeon works in. Drag the orb anywhere; ⇱ moves the chat to the side panel.",
   },
   {
     title: "Chrome's “acting in this tab” bar is normal",
     body: "Chrome shows it while Aeon works in a tab. Cancel on that bar stops Aeon too.",
   },
   {
-    title: "Watch what changes",
-    body: "Press Watch on a result and Aeon checks it every 15 minutes, telling you only when something changes.",
+    title: "Everything in one box",
+    body: "Ctrl+K on the new tab page lists what Aeon can do on your sites. Ask it to tell you when something changes and it watches for you.",
   },
 ];
 
