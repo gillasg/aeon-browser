@@ -2,27 +2,13 @@
   {
     "name": "crawl",
     "description": "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search Google. Uses plain HTTP first and the user's browser (with their logins) when needed.",
-    "actions": [
-      "scrape",
-      "crawl",
-      "map",
-      "search",
-      "find",
-      "check"
-    ],
+    "actions": ["scrape", "crawl", "map", "search", "find", "check"],
     "parameters": {
       "type": "object",
       "properties": {
         "action": {
           "type": "string",
-          "enum": [
-            "scrape",
-            "crawl",
-            "map",
-            "search",
-            "find",
-            "check"
-          ]
+          "enum": ["scrape", "crawl", "map", "search", "find", "check"]
         },
         "columns": {
           "type": "object",
@@ -104,18 +90,11 @@
         },
         "render": {
           "type": "string",
-          "enum": [
-            "auto",
-            "static",
-            "browser"
-          ]
+          "enum": ["auto", "static", "browser"]
         },
         "via": {
           "type": "string",
-          "enum": [
-            "auto",
-            "http"
-          ],
+          "enum": ["auto", "http"],
           "description": "For check: http never starts Chrome."
         },
         "paths": {
@@ -137,9 +116,7 @@
           "description": "For check: open each site and report typed readiness (ready, empty, loading, login, challenge, not-found, error) with evidence."
         }
       },
-      "required": [
-        "action"
-      ],
+      "required": ["action"],
       "additionalProperties": false
     }
   },
@@ -270,11 +247,7 @@
         },
         "transport": {
           "type": "string",
-          "enum": [
-            "auto",
-            "page",
-            "direct"
-          ]
+          "enum": ["auto", "page", "direct"]
         },
         "files": {
           "type": "array",
@@ -316,9 +289,7 @@
           "maximum": 8000000
         }
       },
-      "required": [
-        "action"
-      ],
+      "required": ["action"],
       "additionalProperties": false
     }
   }
