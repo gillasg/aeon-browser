@@ -17,7 +17,7 @@ const target = {
   tabIncarnation: "a1759117-6a6e-407e-b43d-e6100d9ffbd3",
 };
 
-test("browser control binds a borrowed target to one Chat and sends claimed work to its exact executor", async () => {
+test("browser control binds a borrowed target to one Chat and sends work to its exact executor", async () => {
   const harness = await createHarness();
   try {
     const attached = await attachBorrowedTab(harness.service);
@@ -29,9 +29,8 @@ test("browser control binds a borrowed target to one Chat and sends claimed work
     assert.equal(request.toolCallId, "tool-observe");
     assert.equal(request.chatId, chatId);
     assert.equal(request.step.target.tabId, target.tabId);
-    assert.equal(request.expectedDocumentEpoch, 4);
-    assert.ok(request.claimId);
-    assert.ok(request.claimGeneration > 0);
+    assert.equal(request.claimId, undefined);
+    assert.equal(request.claimGeneration, undefined);
     const result = BrowserOperationResultSchema.parse({
       kind: "browser.operation.result",
       requestId: request.requestId,
@@ -65,7 +64,7 @@ test("browser control binds a borrowed target to one Chat and sends claimed work
   }
 });
 
-test("one exact tab can have two Chat context associations but only one live claim", async () => {
+test("one exact tab can have two Chat context associations and reads run in parallel", async () => {
   const harness = await createHarness();
   try {
     await attachBorrowedTab(harness.service);
@@ -77,34 +76,35 @@ test("one exact tab can have two Chat context associations but only one live cla
     assert.equal(secondAssociation.steps[0].disposition, "completed");
 
     const first = await startObserve(harness);
-    const conflict = JSON.parse(
-      await harness.service.execute(otherChatId, "tool-conflict", {
-        steps: [{ op: "observe", target, kind: "semantic" }],
-      }),
-    );
-    assert.equal(conflict.steps[0].code, "CLAIM_CONFLICT");
+    const second = harness.service.execute(otherChatId, "tool-read-too", {
+      steps: [{ op: "observe", target, kind: "semantic" }],
+    });
+    const secondRequest = JSON.parse((await nextMessage(harness.client)).toString());
+    assert.notEqual(secondRequest.requestId, first.request.requestId);
 
-    harness.client.send(
-      JSON.stringify({
-        kind: "browser.operation.result",
-        requestId: first.request.requestId,
-        operationId: first.request.operationId,
-        ok: true,
-        result: {
-          kind: "semantic",
-          source: "website",
-          trust: "untrusted",
-          target,
-          documentEpoch: 4,
-          snapshotId: "3d1d98ec-631c-4beb-b2f8-534b38ce34ce",
-          url: "https://example.test/synthetic",
-          nodes: [],
-          truncated: false,
-        },
-      }),
-    );
+    const answer = (request) => ({
+      kind: "browser.operation.result",
+      requestId: request.requestId,
+      operationId: request.operationId,
+      ok: true,
+      result: {
+        kind: "semantic",
+        source: "website",
+        trust: "untrusted",
+        target,
+        documentEpoch: 4,
+        snapshotId: "3d1d98ec-631c-4beb-b2f8-534b38ce34ce",
+        url: "https://example.test/synthetic",
+        nodes: [],
+        truncated: false,
+      },
+    });
+    harness.client.send(JSON.stringify(answer(first.request)));
+    harness.client.send(JSON.stringify(answer(secondRequest)));
     const firstResult = JSON.parse(await first.pending);
+    const secondResult = JSON.parse(await second);
     assert.equal(firstResult.steps[0].disposition, "completed");
+    assert.equal(secondResult.steps[0].disposition, "completed");
   } finally {
     await harness.close();
   }

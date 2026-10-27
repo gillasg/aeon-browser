@@ -52,11 +52,12 @@ import {
   NativePageGrantResponseSchema,
 } from "./native-extension-message.js";
 import { synchronizeBrowserInventory } from "@browserkit/engine/native-inventory-client";
+import { handleBrowserExecutorMessage } from "@browserkit/engine/native-browser-executor";
 import {
-  handleBrowserExecutorMessage,
-  releaseBrowserExecutor,
-} from "@browserkit/engine/native-browser-executor";
-import { handleBrowserCodeMessage, resetRealm } from "@browserkit/engine/code-runtime-host";
+  handleBrowserCodeMessage,
+  rebindBrowserCodeSocket,
+  resetRealm,
+} from "@browserkit/engine/code-runtime-host";
 import {
   getBrowserIdentity,
   hostErrorCode,
@@ -70,6 +71,8 @@ import {
   openNativeChat,
   takeNativeInitialSubmit,
 } from "./native-worker-tabs.js";
+import { extensionBuild, loadExtensionBuild } from "./extension-build.js";
+import { reportLink } from "./link-state.js";
 
 const NATIVE_HOST = "com.aeon.native_host";
 const GRANT_WAIT_MS = 5000;
@@ -87,8 +90,10 @@ interface ExecutorConnection extends BrowserIdentity {
 
 let executor: ExecutorConnection | undefined;
 let connecting: Promise<ExecutorConnection> | undefined;
+let linkDownTimer: number | undefined;
 /** Parts of the worker that failed to start; pages that can't connect report them. */
 const startupFailures: string[] = [];
+void loadExtensionBuild();
 
 configureEngine({
   controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
@@ -98,6 +103,8 @@ configureEngine({
   agentView: readAgentTabView,
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
+  agentGlow: () => Promise.resolve(true),
+  agentGlowColor: () => Promise.resolve("#7c5cff"),
 });
 // The worker's own handler is registered before anything else starts: one surface that fails
 // to install must not leave the extension unable to answer a page at all.
@@ -140,7 +147,10 @@ attempt("orb", () => installOrb());
 attempt("site answers", () => installSiteAnswers());
 attempt("browse learning", () => installBrowseLearning());
 attempt("native startup", () =>
-  installNativeStartup(ensureExecutor, () => scheduleExecutorReconnect(ensureExecutor)),
+  installNativeStartup(ensureExecutor, () => {
+    reportLink("reconnecting", "connect failed");
+    scheduleExecutorReconnect(ensureExecutor);
+  }),
 );
 
 function attempt(name: string, install: () => void): void {
@@ -298,10 +308,14 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   socket.addEventListener("message", (event) => handleExecutorMessage(connection, event.data));
   socket.addEventListener("close", () => dropExecutor(connection), { once: true });
   executor = connection;
+  rebindBrowserCodeSocket(socket);
+  if (linkDownTimer !== undefined) globalThis.clearTimeout(linkDownTimer);
+  linkDownTimer = undefined;
+  reportLink("up", "connected");
   installCoreAttentionBridge((request) => {
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(request));
   });
-  connection.heartbeatTimer = startExecutorHeartbeat(socket, identity);
+  connection.heartbeatTimer = startExecutorHeartbeat(socket, identity, extensionBuild);
   connection.inventoryReady = synchronizeBrowserInventory(socket, identity).then(() =>
     installBrowserPopupGuard(socket),
   );
@@ -349,6 +363,25 @@ function handleNativeSettings(candidate: unknown, socket: WebSocket): boolean {
   return handleSettingsMessage(candidate, socket) || handleBlockedSitesMessage(candidate, socket);
 }
 
+function handleHeartbeatMessage(connection: ExecutorConnection, candidate: unknown): boolean {
+  const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
+  if (!heartbeat.success) return false;
+  if (
+    heartbeat.data.reload === true ||
+    (heartbeat.data.build && extensionBuild() && heartbeat.data.build !== extensionBuild())
+  ) {
+    reportLink("reconnecting", "extension build changed; reloading");
+    chrome.runtime.reload();
+    return true;
+  }
+  if (
+    heartbeat.data.clientInstanceId !== connection.clientInstanceId ||
+    heartbeat.data.browserRunId !== connection.browserRunId
+  )
+    connection.socket.close(4003, "Invalid heartbeat acknowledgement");
+  return true;
+}
+
 function handleExecutorMessage(connection: ExecutorConnection, data: unknown): void {
   let candidate: unknown;
   try {
@@ -359,15 +392,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
   }
   if (handleCoreMessage(candidate)) return;
   if (handleNativeSettings(candidate, connection.socket)) return;
-  const heartbeat = BrowserExecutorHeartbeatReplySchema.safeParse(candidate);
-  if (heartbeat.success) {
-    if (
-      heartbeat.data.clientInstanceId !== connection.clientInstanceId ||
-      heartbeat.data.browserRunId !== connection.browserRunId
-    )
-      connection.socket.close(4003, "Invalid heartbeat acknowledgement");
-    return;
-  }
+  if (handleHeartbeatMessage(connection, candidate)) return;
   if (BrowserInventoryReplySchema.safeParse(candidate).success) return;
   if (handleBrowserCodeMessage(connection, connection.socket, candidate)) return;
   resetReleasedRealm(candidate);
@@ -385,10 +410,15 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
 }
 
 function dropExecutor(connection: ExecutorConnection): void {
-  if (executor === connection) releaseBrowserExecutor();
   if (connection.heartbeatTimer !== undefined) globalThis.clearInterval(connection.heartbeatTimer);
   if (executor === connection) {
     executor = undefined;
+    reportLink("reconnecting", "browser link closed");
+    if (linkDownTimer !== undefined) globalThis.clearTimeout(linkDownTimer);
+    linkDownTimer = globalThis.setTimeout(() => {
+      linkDownTimer = undefined;
+      if (!executor) reportLink("down", "still reconnecting");
+    }, 45_000);
     scheduleExecutorReconnect(ensureExecutor);
   }
   for (const [requestId, pending] of connection.pending) {

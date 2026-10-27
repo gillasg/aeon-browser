@@ -21,12 +21,17 @@ export interface BrowserCodeCellInput {
   onProgress: (steps: Record<string, unknown>[]) => void;
 }
 interface Pending {
+  clientInstanceId: string;
   socket: WebSocket;
   input: BrowserCodeCellInput;
   finish: (result?: BrowserCodeResult, error?: Error) => void;
   /** Stops the deadline while the user handles a hand-off; restarts it in full afterwards. */
   waiting: (waiting: boolean) => void;
+  /** A short link drop keeps the cell alive; this fails it only after the grace period. */
+  closeTimer?: ReturnType<typeof setTimeout>;
 }
+
+const LINK_GRACE_MS = 60_000;
 
 /** Runs browser_code cells inside a connected executor: one round trip per cell, not per step. */
 export class BrowserCodeCells {
@@ -35,6 +40,7 @@ export class BrowserCodeCells {
 
   run(
     socket: WebSocket,
+    clientInstanceId: string,
     chatId: string,
     toolCallId: string,
     targets: BrowserTargetKey[],
@@ -69,18 +75,27 @@ export class BrowserCodeCells {
         cancel(true);
         finish(undefined, new Error("Browser workflow cancelled; runtime reset"));
       };
-      const close = () => finish(undefined, new Error("BROWSER_OFFLINE"));
+      const close = () => {
+        const cell = this.cells.get(cellId);
+        if (!cell) return;
+        if (cell.closeTimer) clearTimeout(cell.closeTimer);
+        cell.closeTimer = setTimeout(() => {
+          finish(undefined, new Error("BROWSER_OFFLINE"));
+        }, LINK_GRACE_MS);
+      };
       const finish = (result?: BrowserCodeResult, error?: Error) => {
+        const cell = this.cells.get(cellId);
         if (!this.cells.delete(cellId)) return;
         clearTimeout(timer);
+        if (cell?.closeTimer) clearTimeout(cell.closeTimer);
         signal?.removeEventListener("abort", abort);
-        socket.off("close", close);
+        if (cell) cell.socket.off("close", close);
         if (result) {
           for (const target of result.opened) this.adopt(chatId, target);
           resolve(result);
         } else reject(error ?? new Error("OPERATION_FAILED"));
       };
-      this.cells.set(cellId, { socket, input, finish, waiting });
+      this.cells.set(cellId, { clientInstanceId, socket, input, finish, waiting });
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("close", close);
       socket.send(
@@ -100,6 +115,22 @@ export class BrowserCodeCells {
         ),
       );
     });
+  }
+
+  /** A browser reconnected: keep running cells alive and let them answer on the new socket. */
+  rebind(clientInstanceId: string, socket: WebSocket): void {
+    for (const [cellId, cell] of this.cells) {
+      if (cell.clientInstanceId !== clientInstanceId) continue;
+      if (cell.closeTimer) clearTimeout(cell.closeTimer);
+      delete cell.closeTimer;
+      cell.socket = socket;
+      socket.once("close", () => {
+        if (!this.cells.has(cellId)) return;
+        cell.closeTimer = setTimeout(() => {
+          cell.finish(undefined, new Error("BROWSER_OFFLINE"));
+        }, LINK_GRACE_MS);
+      });
+    }
   }
 
   handle(candidate: unknown, socket: WebSocket): boolean {

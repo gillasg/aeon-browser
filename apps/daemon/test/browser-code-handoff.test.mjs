@@ -22,7 +22,7 @@ test("a hand-off pauses the cell deadline until the user returns", async () => {
     const progress = [];
     let settled = false;
     const run = cells
-      .run(socket, chatId, toolCallId, [], {
+      .run(socket, chatId, chatId, toolCallId, [], {
         code: "await bu.handoff('Sign in')",
         timeoutMs: 1000,
         onCall: async () => undefined,
@@ -57,7 +57,7 @@ test("the deadline restarts in full once the hand-off ends", async () => {
   try {
     const cells = new BrowserCodeCells(() => undefined);
     const socket = fakeSocket();
-    const run = cells.run(socket, chatId, toolCallId, [], {
+    const run = cells.run(socket, chatId, chatId, toolCallId, [], {
       code: "1",
       timeoutMs: 1000,
       onCall: async () => undefined,

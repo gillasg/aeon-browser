@@ -11,6 +11,7 @@ import {
   type BrowserTargetKey,
 } from "@aeon/protocol";
 import { executeBrowserBatch } from "./browser-batch.js";
+import { isWriteStep } from "./browser-step-write.js";
 import { BrowserCodeCells, type BrowserCodeCellInput } from "./browser-code-cells.js";
 import type { SiteScriptService } from "./site-script-service.js";
 import { CdpService } from "./cdp-service.js";
@@ -108,6 +109,7 @@ export class BrowserControlService {
     if (supportsScripts) this.scriptClients.add(clientInstanceId);
     else this.scriptClients.delete(clientInstanceId);
     this.executors.set(clientInstanceId, socket);
+    this.cells.rebind(clientInstanceId, socket);
     this.resyncScripts(clientInstanceId);
     this.tidyOnStartup(clientInstanceId, socket);
     socket.once("close", () => {
@@ -119,7 +121,8 @@ export class BrowserControlService {
         this.codeClients.delete(clientInstanceId);
       }
       for (const pending of this.pending.values())
-        if (pending.socket === socket) pending.finish(undefined, "BROWSER_OFFLINE");
+        if (pending.socket === socket)
+          setTimeout(() => pending.finish(undefined, "BROWSER_OFFLINE"), 60_000);
     });
   }
   handleExecutorResult(candidate: unknown, socket: WebSocket): boolean {
@@ -201,7 +204,12 @@ export class BrowserControlService {
     input: BrowserCodeCellInput,
     signal?: AbortSignal,
   ): Promise<string> {
-    const { clientInstanceId, available } = this.pickCodeClient(chatId);
+    const deadline = Date.now() + 60_000;
+    let { clientInstanceId, available } = this.pickCodeClient(chatId);
+    while (!clientInstanceId && !signal?.aborted && Date.now() < deadline) {
+      await new Promise((done) => setTimeout(done, 250));
+      ({ clientInstanceId, available } = this.pickCodeClient(chatId));
+    }
     if (!clientInstanceId) return this.codeUnavailable(available);
     const socket = this.executors.get(clientInstanceId);
     if (!socket) return JSON.stringify({ error: "BROWSER_OFFLINE" });
@@ -210,6 +218,7 @@ export class BrowserControlService {
       return JSON.stringify(
         await this.cells.run(
           socket,
+          clientInstanceId,
           chatId,
           toolCallId,
           targets,
@@ -395,6 +404,38 @@ export class BrowserControlService {
         Math.max(1, this.claimGeneration),
         tab.documentEpoch,
       );
+    if (!isWriteStep(step))
+      return this.dispatch(
+        socket,
+        chatId,
+        toolCallId,
+        operationId,
+        step,
+        timeoutMs,
+        undefined,
+        undefined,
+        tab.documentEpoch,
+      );
+    return this.claimedDispatch(
+      socket,
+      chatId,
+      toolCallId,
+      operationId,
+      step,
+      timeoutMs,
+      tab.documentEpoch,
+    );
+  }
+
+  private async claimedDispatch(
+    socket: WebSocket,
+    chatId: string,
+    toolCallId: string,
+    operationId: string,
+    step: Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>,
+    timeoutMs: number,
+    documentEpoch: number,
+  ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const key = targetIdentity(step.target);
     if (this.claims.has(key)) return { code: "CLAIM_CONFLICT" };
     const claimId = randomUUID();
@@ -413,12 +454,13 @@ export class BrowserControlService {
         timeoutMs,
         claimId,
         claimGeneration,
-        tab.documentEpoch,
+        documentEpoch,
       );
     } finally {
       if (this.claims.get(key) === claimId) this.claims.delete(key);
     }
   }
+
   private async dispatch(
     socket: WebSocket,
     chatId: string,
