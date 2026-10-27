@@ -4171,3 +4171,13 @@ body[data-host="panel"] .composer-meta {
 .thinking-detail [hidden] {
   display: none;
 }
+
+.one-click-offer {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+.one-click-offer button {
+  border-radius: 999px;
+  font-size: 12px;
+}

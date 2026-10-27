@@ -203,6 +203,39 @@ export const ManagementWorkflowSchema = z
   })
   .strict();
 
+/** One named thing a site can do, for the Sites and Automations pages. */
+export const ManagementAbilitySchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    site: z.string().min(1).max(200),
+    description: z.string().max(1000).optional(),
+    kind: z.enum(["read", "write"]),
+    ways: z.array(z.enum(["api", "steps", "script", "page"])).max(8),
+    inputs: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(120),
+            required: z.boolean(),
+            description: z.string().max(500).optional(),
+          })
+          .strict(),
+      )
+      .max(50),
+    stats: z
+      .object({
+        runs: z.number().int().nonnegative(),
+        failures: z.number().int().nonnegative(),
+        lastOkAt: z.string().max(60).optional(),
+        lastUsedAt: z.string().max(60).optional(),
+      })
+      .strict()
+      .optional(),
+    updatedAt: z.string().max(60),
+    running: z.boolean().optional(),
+  })
+  .strict();
+
 /** A mapped site and what this machine knows about it: the Sites page and its sessions. */
 export const ManagementSiteSchema = z
   .object({
@@ -215,18 +248,7 @@ export const ManagementSiteSchema = z
     sessionSavedAt: z.string().max(60).nullable(),
     recording: z.boolean(),
     suggestions: z.array(z.string().max(500)).max(10),
-    recipes: z
-      .array(
-        z
-          .object({
-            name: z.string().min(1).max(200),
-            kind: z.enum(["items", "single"]),
-            fields: z.number().int().nonnegative(),
-            updatedAt: z.string().max(60),
-          })
-          .strict(),
-      )
-      .max(100),
+    abilities: z.array(ManagementAbilitySchema).max(100),
   })
   .strict();
 
@@ -250,7 +272,9 @@ export const ManagementSnapshotSchema = z
     resourceError: z.string().max(300).nullable(),
     /** Which password manager signs in, and whether it is unlocked. Name and state only. */
     signIn: PasswordManagerSchema,
-    /** Saved workflows; empty when browserkit's data folder has none. */
+    /** Site abilities for the Automations page. */
+    abilities: z.array(ManagementAbilitySchema).max(200).optional(),
+    /** Saved workflows; deprecated by abilities. */
     workflows: z.array(ManagementWorkflowSchema).max(100).optional(),
     /** Mapped sites, with health, recipes and the stored session. */
     sites: z.array(ManagementSiteSchema).max(200).optional(),
@@ -280,3 +304,4 @@ export const ManagementSnapshotSchema = z
 export type ManagementSnapshotDto = z.infer<typeof ManagementSnapshotSchema>;
 export type ManagementWorkflowDto = z.infer<typeof ManagementWorkflowSchema>;
 export type ManagementSiteDto = z.infer<typeof ManagementSiteSchema>;
+export type ManagementAbilityDto = z.infer<typeof ManagementAbilitySchema>;

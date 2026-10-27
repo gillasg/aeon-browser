@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { EmptyChatStart } from "./empty-chat-start.js";
 import type { ChatSummaryDto, PiUiSnapshotDto } from "@aeon/protocol";
 import { AnnotationProvider } from "./transcript-annotations.js";
@@ -108,6 +109,29 @@ function ControlBar({
   );
 }
 
+export const ONE_CLICK_TEXT =
+  "Save what you just did as an ability for this site, so next time it runs in one click without a model.";
+
+/** After a run that worked in the browser: offer to save it as an ability ("make it one click"). */
+function OneClickOffer(props: ChatSurfaceProps): ReactElement | null {
+  const [askedAt, setAskedAt] = useState(-1);
+  const usedBrowser = props.rows.some((row) => row.kind === "tool-group");
+  if (props.composer.running || !usedBrowser || askedAt === props.rows.length) return null;
+  return (
+    <div className="one-click-offer">
+      <button
+        type="button"
+        onClick={() => {
+          setAskedAt(props.rows.length);
+          void props.composer.onSend(ONE_CLICK_TEXT, "followUp", []);
+        }}
+      >
+        Make it one click
+      </button>
+    </div>
+  );
+}
+
 function ChatBanners(props: ChatSurfaceProps): ReactElement {
   return (
     <>
@@ -153,6 +177,7 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               <p>What would you like to work on?</p>
             </section>
           )}
+          <OneClickOffer {...props} />
           <ChatComposer
             {...props.composer}
             projectName={

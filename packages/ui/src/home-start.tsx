@@ -7,7 +7,7 @@ import {
   HomeAttachmentPicker,
   HomeAttachmentList,
 } from "./home-attachments.js";
-import { useState, type FormEvent, type ReactElement } from "react";
+import { useState, type FormEvent, type ReactElement, useEffect } from "react";
 import type { PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
@@ -30,6 +30,15 @@ type HomeStartProps = Pick<
 export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
   const panelPage = usePanelPage();
   const [query, setQuery] = useState("");
+  // The ⌘K palette puts a site action in the ask box ("aeon.home.seed").
+  useEffect(() => {
+    const seed = (event: Event): void => {
+      setQuery(String((event as CustomEvent<string>).detail ?? ""));
+      requestAnimationFrame(() => document.getElementById("home-query")?.focus());
+    };
+    window.addEventListener("aeon.home.seed", seed);
+    return () => window.removeEventListener("aeon.home.seed", seed);
+  }, []);
   const files = useHomeAttachments(props.onReadAttachments);
   const selection = useHomeSelection(props.modelCatalog);
   const ask = (value: string): void => {

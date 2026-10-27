@@ -1,5 +1,4 @@
 import type { ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
 
 // Site sessions: which sites have a stored session, and the three things the user needs from one
 // place — clear it, sign in as another account, and read the site as a signed-out visitor.
