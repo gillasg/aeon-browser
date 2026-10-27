@@ -1,3 +1,4 @@
+import { installLinkBanner } from "./link-banner.js";
 import { connectionSingleFlight } from "./connection-single-flight.js";
 import { installBrowserPreview } from "./chat-browser-preview.js";
 import { mirrorAgentTabView } from "./agent-tab-view.js";
@@ -417,3 +418,5 @@ function scheduleReconnect(): void {
     return connectAndSubscribe();
   });
 }
+
+installLinkBanner();

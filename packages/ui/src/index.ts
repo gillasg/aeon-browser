@@ -20,8 +20,7 @@ export type {
 } from "./model-accounts-types.js";
 export { ManagementSurface, type ManagementSurfaceProps } from "./management-surface.js";
 export { AutomationsPanel } from "./management-automations.js";
-export { SitesPanel } from "./management-sites.js";
-export { SiteSessionsPanel } from "./management-sessions.js";
+export { SitesPage, siteEntries, siteSummary } from "./management-site-page.js";
 export {
   BlockedSitesSettings,
   blockedSitesKey,

@@ -3,16 +3,13 @@ import { useEffect, type ReactElement } from "react";
 // Home has no sidebar: Chrome's own tabs and sidebar already list open chats. A thin bar takes
 // you to each of Aeon's pages instead. Escape, or the page you are on again, returns home.
 
-export type HomeView =
-  "home" | "chats" | "watchers" | "automations" | "sites" | "sessions" | "activity" | "settings";
+// Four sections: Chats (with Activity), Automations, Sites, and Settings behind the gear.
+export type HomeView = "home" | "chats" | "activity" | "automations" | "sites" | "settings";
 
-const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings">, string]> = [
+const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings" | "activity">, string]> = [
   ["chats", "Chats"],
-  ["watchers", "Routines"],
   ["automations", "Automations"],
   ["sites", "Sites"],
-  ["sessions", "Sessions"],
-  ["activity", "Activity"],
 ];
 
 export function HomeTopBar({
@@ -33,11 +30,13 @@ export function HomeTopBar({
             key={page}
             type="button"
             id={`home-${page}-link`}
-            aria-current={view === page ? "page" : undefined}
+            aria-current={
+              view === page || (page === "chats" && view === "activity") ? "page" : undefined
+            }
             onClick={() => onView(view === page ? "home" : page)}
           >
             {label}
-            {page === "activity" && activityCount > 0 && (
+            {page === "chats" && activityCount > 0 && (
               <span className="home-top-count" aria-label={`${activityCount} today`}>
                 {activityCount}
               </span>
@@ -79,21 +78,17 @@ function useHomeEscape(view: HomeView, onView: (view: HomeView) => void): void {
   }, [view, onView]);
 }
 
-/** `?view=` to a page. The page is Routines; "watchers" is its old name, still in old links. */
+/** `?view=` to a page. Old page names (routines, watchers, sessions, resources…) still land. */
 export function viewFromRoute(route: string | null): {
   view: HomeView;
-  settingsSection?: "settings" | "resources" | "capabilities";
+  settingsSection?: "settings" | "advanced";
 } {
-  if (route === "routines" || route === "watchers") return { view: "watchers" };
-  if (
-    route === "chats" ||
-    route === "activity" ||
-    route === "automations" ||
-    route === "sites" ||
-    route === "sessions"
-  )
-    return { view: route };
-  if (route === "settings" || route === "resources" || route === "capabilities")
-    return { view: "settings", settingsSection: route };
+  if (route === "routines" || route === "watchers" || route === "automations")
+    return { view: "automations" };
+  if (route === "sites" || route === "sessions") return { view: "sites" };
+  if (route === "chats" || route === "activity") return { view: route };
+  if (route === "settings") return { view: "settings", settingsSection: "settings" };
+  if (route === "advanced" || route === "resources" || route === "capabilities")
+    return { view: "settings", settingsSection: "advanced" };
   return { view: "home" };
 }

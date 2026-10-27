@@ -155,6 +155,7 @@ function AgentTabSettings(): ReactElement {
           value={tabView}
           onChange={(event) => setTabView(event.target.value as AgentTabView)}
         >
+          <option value="auto">Automatic: split in a chat tab, thumbnails elsewhere</option>
           <option value="split">Split screen beside the Chat</option>
           <option value="thumbnails">Live thumbnails beside the Chat</option>
         </select>

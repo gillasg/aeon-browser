@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 // How the full-tab Chat shows the tabs its agent works in. The extension mirrors this key into
 // chrome.storage so its worker can read it.
-export type AgentTabView = "split" | "thumbnails";
+export type AgentTabView = "auto" | "split" | "thumbnails";
 export const agentTabViewKey = "aeonAgentTabView";
 // On/off agent settings, mirrored the same way. Both are off by default. Screen recorders
 // (Aperture) rely on them (the agent's work in the visible tab, no second cursor); keep them.
@@ -35,11 +35,12 @@ export function useAgentFlag(key: string): [boolean, (on: boolean) => void] {
   ];
 }
 export function useAgentTabView(): [AgentTabView, (view: AgentTabView) => void] {
-  const [view, setView] = useState<AgentTabView>("split");
+  const [view, setView] = useState<AgentTabView>("auto");
   useEffect(() => {
     const read = () => {
       try {
-        setView(localStorage.getItem(agentTabViewKey) === "thumbnails" ? "thumbnails" : "split");
+        const stored = localStorage.getItem(agentTabViewKey);
+        setView(stored === "split" || stored === "thumbnails" ? stored : "auto");
       } catch {
         /* Storage may be unavailable in a preview. */
       }
