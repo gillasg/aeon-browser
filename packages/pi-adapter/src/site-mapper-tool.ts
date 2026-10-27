@@ -1,11 +1,12 @@
 import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import {
+  AGENT_SITE_MAPPER_ACTIONS,
   siteMapperTool,
   toolSchema,
   type SiteMapperToolInput,
 } from "@browserkit/tools/definitions";
-import { SITE_TOOL_ACTIONS, SITE_TOOL_HELP, type ModelLike } from "@browserkit/tools/site-to-api";
+import { SITE_TOOL_HELP, type ModelLike } from "@browserkit/tools/site-to-api";
 import { inChat } from "./site-browser.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
@@ -13,16 +14,7 @@ import { boundedResult, errorResult, textResult, type ToolText } from "./site-to
 // context, the chat workspace, a model and bounded previews; its allow-list keeps every browserkit
 // action that is not listed here off.
 
-export const SITE_MAPPER_ACTIONS = [
-  "sites",
-  "code",
-  "operations",
-  "call",
-  "import",
-  "watch",
-  "explore",
-  ...SITE_TOOL_ACTIONS,
-] as const;
+export const SITE_MAPPER_ACTIONS = AGENT_SITE_MAPPER_ACTIONS;
 
 const Parameters = Type.Unsafe<SiteMapperToolInput>(
   toolSchema(siteMapperTool, SITE_MAPPER_ACTIONS) as never,
