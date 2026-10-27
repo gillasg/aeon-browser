@@ -24,6 +24,7 @@ import { readEnvironment } from "./environment.js";
 import { backfillChatOrigins } from "./chat-origin-backfill.js";
 import { migrateAeonSettings } from "./settings-migration.js";
 import { outsideContextAnswer, type OutsideTab } from "./outside-context.js";
+import { migrateAllAbilities } from "@browserkit/site-mapper";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -105,8 +106,7 @@ export function createProductionRuntime(dataDirectory: string): {
     service,
     store,
     dataRoot,
-  );
-
+  ).then(() => migrateAbilitiesOnStartup(dataRoot));
   return {
     service,
     attention,
@@ -124,6 +124,12 @@ export function createProductionRuntime(dataDirectory: string): {
       closeRuntimeStores(service, store);
     },
   };
+}
+
+async function migrateAbilitiesOnStartup(dataRoot: string): Promise<void> {
+  await migrateAllAbilities({ skillsDirectory: join(dataRoot, "site-skills") }).catch(
+    () => undefined,
+  );
 }
 
 async function readManagementSnapshot(

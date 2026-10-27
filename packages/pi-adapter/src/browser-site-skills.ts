@@ -10,7 +10,7 @@ export interface SiteSkill {
   description: string;
   examples: string;
   code: string;
-  /** Imported skills start false; the user enables them explicitly. */
+  /** Imported skills are enabled, like every ability. */
   enabled?: boolean;
   updatedAt: number;
 }
@@ -117,14 +117,14 @@ export async function readSiteSkills(directory: string): Promise<SiteSkill[]> {
   return all(directory);
 }
 
-/** Saves skills from a site pack disabled; the user enables them explicitly. */
+/** Saves skills from a site pack; everything is enabled. */
 export async function importSiteSkills(
   directory: string,
   skills: Partial<SiteSkill>[],
 ): Promise<SiteSkill[]> {
   const saved: SiteSkill[] = [];
   for (const skill of skills) {
-    const valid = validSkill({ ...skill, enabled: false });
+    const valid = validSkill({ ...skill, enabled: true });
     await writeSkill(directory, valid);
     saved.push(valid);
   }
