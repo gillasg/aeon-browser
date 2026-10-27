@@ -66,15 +66,15 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
   };
   if (kind !== "browserkit.control") return;
   if (tabChatId && tabChatId !== chatId) return;
-  if (control === "user")
-    showError(
-      `You have control of tab ${tabId ?? "?"}. The agent is paused until it is given back.`,
-    );
-  else if (notice.startsWith("You have control")) {
-    notice = "";
-    render();
-  }
+  userControl = control === "user" && typeof tabId === "number" ? { tabId } : null;
+  render();
 });
+let userControl: { tabId: number } | null = null;
+function giveBack(tabId: number): void {
+  void chrome.runtime.sendMessage({ kind: "browserkit.control.giveback", tabId });
+  userControl = null;
+  render();
+}
 let client: UiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);
 let catalogClient: UiClient | undefined;
@@ -161,6 +161,8 @@ function createView() {
     connection,
     notice,
     onDismissNotice: dismissNotice,
+    userControl,
+    onGiveBack: giveBack,
     rows: initialDisplay.rows(transcript.rows),
     loadToolImage: fetchToolImage,
     transcriptActionsDisabled: runState !== "idle",

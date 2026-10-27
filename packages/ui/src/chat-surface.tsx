@@ -20,6 +20,9 @@ export interface ChatSurfaceProps {
   connection: { label: string; state: "connecting" | "connected" | "error" };
   notice: string;
   onDismissNotice?(): void;
+  /** A tab the user took over from the agent; the run waits until it is given back. */
+  userControl?: { tabId: number } | null | undefined;
+  onGiveBack?(tabId: number): void;
   rows: readonly TranscriptRow[];
   chats: readonly ChatSummaryDto[];
   sidebarOpen: boolean;
@@ -88,11 +91,39 @@ function ChatNotice({
   );
 }
 
+function ControlBar({
+  tabId,
+  onGiveBack,
+}: {
+  tabId: number;
+  onGiveBack?: ((tabId: number) => void) | undefined;
+}): ReactElement {
+  return (
+    <div className="control-bar" role="status" aria-live="polite">
+      <span>You have control. The agent waits until you give it back.</span>
+      <button type="button" onClick={() => onGiveBack?.(tabId)}>
+        Give back
+      </button>
+    </div>
+  );
+}
+
+function ChatBanners(props: ChatSurfaceProps): ReactElement {
+  return (
+    <>
+      {props.notice && <ChatNotice text={props.notice} onDismiss={props.onDismissNotice} />}
+      {props.userControl && (
+        <ControlBar tabId={props.userControl.tabId} onGiveBack={props.onGiveBack} />
+      )}
+    </>
+  );
+}
+
 function ChatContent(props: ChatSurfaceProps): ReactElement {
   if (isEmptyChat(props)) return <EmptyChatStart {...props} />;
   return (
     <main className="chat-main">
-      {props.notice && <ChatNotice text={props.notice} onDismiss={props.onDismissNotice} />}
+      <ChatBanners {...props} />
       <ChatPiOverlays {...props} />
       {props.resourcesOpen ? (
         <LoadedResources

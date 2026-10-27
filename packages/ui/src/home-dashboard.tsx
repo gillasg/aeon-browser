@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import type { ChatCatalogItemDto, HomeRoutineCardDto, ManagementSnapshotDto } from "@aeon/protocol";
-import { LiveRuns, RecentChats, type HomeRunPreview } from "./home-live.js";
+import { LiveRuns, RecentChats, type HomeRunActions, type HomeRunPreview } from "./home-live.js";
 import { pauseReason } from "./management-routines.js";
 
 // Under the ask box, in order of urgency: what needs you, what's running, what's being watched,
@@ -21,6 +21,7 @@ export interface HomeDashboardProps {
   pins?: readonly Pin[] | undefined;
   /** Live frames of the tabs running chats act in, by chat. */
   previews?: ReadonlyMap<string, HomeRunPreview>;
+  runActions?: HomeRunActions | undefined;
   onOpenChat(chatId: string): void;
   onPin?(chat: ChatCatalogItemDto): void;
   onDelete?(chat: ChatCatalogItemDto): void;
@@ -47,6 +48,7 @@ export function HomeDashboard(props: HomeDashboardProps): ReactElement {
         chats={live}
         needs={needs}
         previews={props.previews ?? new Map()}
+        actions={props.runActions}
         onOpenChat={props.onOpenChat}
       />
       <PinnedCards pins={props.pins} onOpenChat={props.onOpenChat} onRoutines={props.onWatchers} />

@@ -1862,6 +1862,30 @@ body[data-embedded="true"] .home-top-bar {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--aeon-s-3);
 }
+.home-live-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aeon-s-2);
+  min-width: 0;
+}
+.home-live-actions {
+  display: flex;
+  gap: var(--aeon-s-2);
+}
+.home-live-actions > button {
+  padding: 2px 10px;
+  border: 1px solid var(--aeon-line);
+  border-radius: 999px;
+  background: none;
+  color: var(--aeon-muted);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  cursor: pointer;
+}
+.home-live-actions > button:hover {
+  border-color: var(--aeon-muted);
+  color: var(--aeon-text);
+}
 .home-live-card {
   display: flex;
   flex-direction: column;

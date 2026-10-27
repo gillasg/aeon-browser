@@ -12,15 +12,25 @@ export interface HomeRunPreview {
   title: string;
 }
 
+/** What a running card can do besides open its chat. */
+export interface HomeRunActions {
+  /** Chats whose agent works in a window of its own. */
+  windows: ReadonlySet<string>;
+  onShowWindow(chatId: string): void;
+  onStop(chatId: string): void;
+}
+
 export function LiveRuns({
   chats,
   needs,
   previews,
+  actions,
   onOpenChat,
 }: {
   chats: readonly ChatCatalogItemDto[];
   needs: ReadonlySet<string>;
   previews: ReadonlyMap<string, HomeRunPreview>;
+  actions?: HomeRunActions | undefined;
   onOpenChat(chatId: string): void;
 }): ReactElement | null {
   if (!chats.length) return null;
@@ -36,6 +46,7 @@ export function LiveRuns({
             chat={chat}
             waiting={needs.has(chat.chatId)}
             preview={previews.get(chat.chatId)}
+            actions={actions}
             onOpen={() => onOpenChat(chat.chatId)}
           />
         ))}
@@ -45,6 +56,38 @@ export function LiveRuns({
 }
 
 function LiveRunCard({
+  chat,
+  waiting,
+  preview,
+  actions,
+  onOpen,
+}: {
+  chat: ChatCatalogItemDto;
+  waiting: boolean;
+  preview: HomeRunPreview | undefined;
+  actions: HomeRunActions | undefined;
+  onOpen(): void;
+}): ReactElement {
+  return (
+    <div className="home-live-item">
+      <LiveRunButton chat={chat} waiting={waiting} preview={preview} onOpen={onOpen} />
+      {actions && (
+        <span className="home-live-actions">
+          {actions.windows.has(chat.chatId) && (
+            <button type="button" onClick={() => actions.onShowWindow(chat.chatId)}>
+              Show window
+            </button>
+          )}
+          <button type="button" onClick={() => actions.onStop(chat.chatId)}>
+            Stop
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function LiveRunButton({
   chat,
   waiting,
   preview,

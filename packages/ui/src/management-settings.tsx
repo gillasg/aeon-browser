@@ -12,6 +12,7 @@ import { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY } from "./orb-prefs.js";
 import { resetTour } from "./first-run-tour.js";
 import { BlockedSitesSettings } from "./blocked-sites-settings.js";
 import { PasswordManagerSettings } from "./password-manager-settings.js";
+import { PrivacySettings } from "./privacy-settings.js";
 
 export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
   const [mode, setMode] = useMessageSendMode();
@@ -51,6 +52,7 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
         {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
         {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
       />
+      {props.privacy && <PrivacySettings {...props.privacy} />}
       <OutsideAgentsSettings
         {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
         {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}

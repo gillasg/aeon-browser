@@ -1,3 +1,4 @@
+import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
 import { useEffect, useState, type ReactElement } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
@@ -12,7 +13,7 @@ import type { ManagementActionName, ManagementSection } from "./management-types
 import { HomeTopBar, viewFromRoute, type HomeView } from "./home-top-bar.js";
 import { HomeDashboard } from "./home-dashboard.js";
 import { HomeCore } from "./home-core.js";
-import type { HomeRunPreview } from "./home-live.js";
+import type { HomeRunActions, HomeRunPreview } from "./home-live.js";
 import { ActivityPanel } from "./activity-panel.js";
 import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
 import { FirstRunTour } from "./first-run-tour.js";
@@ -29,6 +30,8 @@ export interface NewTabHomeProps {
   runningChatIds?: ReadonlySet<string>;
   /** Live frames of the tabs running chats act in, by chat. */
   previews?: ReadonlyMap<string, HomeRunPreview>;
+  /** Show a background run's window, or stop it. */
+  runActions?: HomeRunActions;
   /** Chats waiting on the user (an approval or a question). */
   needsChatIds?: ReadonlySet<string>;
   modelCatalog: PiModelCatalogDto | null;
@@ -87,6 +90,7 @@ export interface NewTabHomeProps {
   blockedSites?: readonly string[];
   onBlockedSiteAdd?(site: string): void;
   onBlockedSiteRemove?(site: string): void;
+  privacy?: PrivacySettingsProps;
   /** Outside agents may see the user's open tabs (opt-in, stored by the daemon). */
   outsideContext?: boolean;
   onOutsideContext?(enabled: boolean): void;
@@ -213,6 +217,7 @@ function HomeLanding({
         runningChatIds={props.runningChatIds ?? new Set()}
         needsChatIds={props.needsChatIds ?? new Set()}
         {...(props.previews ? { previews: props.previews } : {})}
+        runActions={props.runActions}
         openChatIds={props.openChatIds}
         routines={props.homeRoutines}
         watchers={props.managementSnapshot?.routines}
@@ -371,6 +376,7 @@ function Management({
       {...(props.onBlockedSiteAdd ? { onBlockedSiteAdd: props.onBlockedSiteAdd } : {})}
       {...(props.onBlockedSiteRemove ? { onBlockedSiteRemove: props.onBlockedSiteRemove } : {})}
       {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
+      privacy={props.privacy}
       {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
     />
   );
