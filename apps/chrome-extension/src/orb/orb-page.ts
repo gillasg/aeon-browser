@@ -3,7 +3,7 @@ import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
 import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
-import { TabControl, markSeen, setNeeds } from "./orb-control.js";
+import { markSeen, setNeeds } from "./orb-control.js";
 import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
 import { applyEvent, cursorSteps, initialRun, spotlightBox, type OrbRun } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
@@ -25,7 +25,6 @@ const model: OrbViewModel = {
   busy: false,
   learning: false,
 };
-const tab = new TabControl(tabId);
 let run: OrbRun | undefined;
 let userControl = false;
 let lastVisual = "";
@@ -159,13 +158,12 @@ function sync(): void {
   changed(state);
 }
 
-/** Things that happen once per change of state: sounds, the tab group, the needs count. */
+/** Things that happen once per change of state: sounds and the needs count. The user's own tab
+ * never joins a tab group; the engine's glow shows the agent is working in it. */
 function changed(state: OrbVisualState): void {
   if (state === lastState) return;
   lastState = state;
   void setNeeds(tabId, state === "needs", session.chatId ?? "");
-  if (state === "working" || state === "thinking") void tab.hold();
-  else void tab.release();
   if (state === "needs") playSound("needs");
   if (state === "done") {
     playSound("done");
