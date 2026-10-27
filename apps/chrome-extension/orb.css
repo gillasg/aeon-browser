@@ -5,8 +5,8 @@
   font-weight: 100 900;
 }
 
-/* The island: one black pill beside the swarm. Always dark, whatever the page or theme, because it
-   sits on other people's sites. The shared run cards (@aeon/ui run-cards) are skinned here too. */
+/* The orb's box. Always dark, whatever the page or theme, because it sits on other people's
+   sites. Compose is a small field; once the chat starts, the box frames the chat page itself. */
 html,
 body {
   margin: 0;
@@ -20,14 +20,12 @@ body {
 
 .island {
   --needs: #e5b567;
-  --done: #8ff5b8;
-  --failed: #ffb3a8;
   --muted: #8f8b9e;
   box-sizing: border-box;
   width: 360px;
   max-width: 360px;
   padding: 10px 12px;
-  border-radius: 26px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #050507;
   color: #eeeef4;
@@ -41,54 +39,19 @@ body {
     sans-serif;
 }
 
-.island[data-state="working"],
-.island[data-state="paused"] {
-  width: 330px;
-  border-radius: 999px;
-  padding: 7px 8px 9px 10px;
-}
-
-.island[data-state="compose"] {
-  border-radius: 18px;
-}
-
-.island[data-state="compose"] .isl-row {
-  align-items: flex-start;
-}
-
-.island[data-state="working"]:has(.run-timeline) {
-  border-radius: 24px;
+.island[data-state="chat"] {
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  max-width: 400px;
+  height: 560px;
+  padding: 0;
 }
 
 .isl-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-}
-
-.isl-orb {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #d9d2ff, #7c5cff 55%, #2a1680);
-  box-shadow: 0 0 12px rgba(124, 92, 255, 0.55);
-}
-
-.isl-orb[data-live="true"] {
-  animation: breathe 1.6s ease-in-out infinite;
-}
-
-.isl-orb[data-paused="true"] {
-  background: radial-gradient(circle at 35% 30%, #e7e4f0, #6d6880 60%, #2b2934);
-  box-shadow: none;
-}
-
-@keyframes breathe {
-  50% {
-    transform: scale(0.82);
-    box-shadow: 0 0 18px rgba(124, 92, 255, 0.85);
-  }
 }
 
 textarea {
@@ -155,290 +118,29 @@ textarea::placeholder {
   color: #9b8cff;
 }
 
-.isl-main {
+.box-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
+  padding: 4px 6px 4px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.box-title {
   flex: 1;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  text-align: left;
-}
-
-.isl-main:hover {
-  background: transparent;
-}
-
-.isl-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.isl-live,
-.isl-detail {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.isl-live {
-  font-weight: 600;
-}
-
-.island[data-state="working"] .isl-live {
-  background: linear-gradient(90deg, #8b87a0 0, #f2f0ff 40%, #8b87a0 80%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: shimmer 1.3s linear infinite;
-}
-
-.isl-detail {
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-/* Live view of the other tab the run is working in. */
-.isl-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 11.5px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.isl-preview img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  object-position: top;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.isl-preview span {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.isl-preview:hover img {
-  border-color: rgba(155, 140, 255, 0.6);
-}
-
-/* The endless progress line along the bottom edge while it works. */
-.isl-progress {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 0;
-  height: 2px;
-  overflow: hidden;
-  border-radius: 2px;
-}
-
-.isl-progress::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, #9b8cff, transparent);
-  animation: sweep 1.4s ease-in-out infinite;
-}
-
-.isl-progress[data-determinate="true"]::after {
-  width: calc(var(--isl-progress, 0) * 100%);
-  background: #9b8cff;
-  animation: none;
-  transition: width 0.3s ease-out;
-}
-
-@keyframes sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(250%);
-  }
-}
-
-@keyframes shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-/* Shared run cards, island skin. */
-.run-timeline {
-  list-style: none;
-  margin: 8px 4px 4px;
-  padding: 8px 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  max-height: 220px;
-  overflow: auto;
-}
-
-.run-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
   font-size: 12px;
-}
-
-.run-step-more {
   color: var(--muted);
-  padding-left: 14px;
 }
 
-.run-step-dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #9b8cff;
-}
-
-.run-step[data-state="done"] .run-step-dot {
-  background: var(--done);
-}
-
-.run-step[data-state="failed"] .run-step-dot {
-  background: var(--failed);
-}
-
-.run-step[data-state="running"] .run-step-dot {
-  animation: breathe 1.2s ease-in-out infinite;
-}
-
-.run-step-label {
+.box-chat {
   flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.run-step-meta {
-  display: inline-flex;
-  gap: 6px;
-  flex: none;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.run-path {
-  border-radius: 999px;
-  padding: 0 6px;
-  background: rgba(155, 140, 255, 0.14);
-  color: #cbbcff;
-}
-
-.run-path[data-mocked="true"] {
+  width: 100%;
+  border: 0;
   background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(155, 140, 255, 0.35);
-}
-
-.run-duration {
-  font-variant-numeric: tabular-nums;
-}
-
-.run-approval header,
-.run-result header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.run-eyebrow {
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.run-approval .run-eyebrow {
-  color: var(--needs);
-}
-
-.run-result[data-tone="done"] .run-eyebrow {
-  color: var(--done);
-}
-
-.run-result[data-tone="failed"] .run-eyebrow {
-  color: var(--failed);
-}
-
-.run-needs-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--needs);
-  box-shadow: 0 0 10px var(--needs);
-  animation: breathe 1.4s ease-in-out infinite;
-}
-
-.run-count {
-  min-width: 16px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--needs);
-  color: #1b1408;
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.run-approval h2 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.run-approval p {
-  margin: 4px 0 0;
-  color: #bdbac9;
-}
-
-.run-answer {
-  max-height: 220px;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.run-summary,
-.run-note {
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.run-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.run-actions .icon {
-  margin-left: auto;
 }
 
 button {
@@ -461,17 +163,6 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-button.primary {
-  border-color: transparent;
-  background: #f2f0f7;
-  color: #0b0a10;
-  font-weight: 600;
-}
-
-button.primary:hover {
-  background: #fff;
-}
-
 button.icon {
   flex: none;
   width: 28px;
@@ -479,35 +170,9 @@ button.icon {
   padding: 0;
   border: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 button.icon:hover {
   color: #fff;
-}
-
-button:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .isl-orb,
-  .run-needs-dot,
-  .run-step-dot,
-  .isl-progress::after {
-    animation: none !important;
-  }
-  .island[data-state="working"] .isl-live {
-    animation: none;
-    color: #e4e2ee;
-    background: none;
-  }
-}
-
-html[data-reduced-motion] .isl-orb,
-html[data-reduced-motion] .run-needs-dot,
-html[data-reduced-motion] .run-step-dot,
-html[data-reduced-motion] .isl-progress::after {
-  animation: none !important;
 }

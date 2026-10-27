@@ -181,155 +181,67 @@ test("an assistant error ends the run as an error", () => {
   assert.equal(run.error, "No model");
 });
 
-async function loadWatch() {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-watch-"));
-  const outfile = join(directory, "orb-watch.mjs");
+async function loadModule(source) {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-module-"));
+  const outfile = join(directory, "module.mjs");
   await build({
-    entryPoints: [fileURLToPath(new URL("../src/orb/orb-watch.ts", import.meta.url))],
+    entryPoints: [fileURLToPath(new URL(`../src/orb/${source}`, import.meta.url))],
     outfile,
     bundle: true,
     platform: "node",
     format: "esm",
+    jsx: "automatic",
   });
   const module = await import(pathToFileURL(outfile).href);
   await rm(directory, { recursive: true, force: true });
   return module;
 }
 
-const watch = await loadWatch();
-const action = (kind) => ({ toolCallId: "a", kind, tStart: 0 });
-const read = (path = "site-mapper") => ({
-  ...orb.initialRun(),
-  status: "done",
-  answer: "$39.99",
-  steps: [{ toolCallId: "a", toolName: "site_mapper", label: "", startedAt: 0, done: true, path }],
-});
+const noop = () => undefined;
+const boxActions = {
+  submit: noop,
+  close: noop,
+  toSidePanel: noop,
+  toTab: noop,
+  toggleLearning: noop,
+};
+const boxModel = {
+  host: "x.com",
+  chatId: undefined,
+  chatUrl: "",
+  notice: "",
+  busy: false,
+  learning: false,
+};
 
-test("watch: a read-only check with a stable read is created directly", () => {
-  assert.deepEqual(watch.watchPlan(read()), { kind: "direct" });
-  assert.deepEqual(watch.watchPlan({ ...read("data"), actions: [action("scroll")] }), {
-    kind: "direct",
-  });
-});
-
-test("watch: a read that clicked through the page opens the editor to confirm", () => {
-  assert.deepEqual(watch.watchPlan({ ...read(), actions: [action("click")] }), { kind: "editor" });
-});
-
-test("watch: writes and page-only reads cannot be watched, with a reason", () => {
-  for (const run of [
-    { ...read(), actions: [action("click"), action("fill")] },
-    { ...read(), asked: true },
-  ]) {
-    const plan = watch.watchPlan(run);
-    assert.equal(plan.kind, "none");
-    assert.match(plan.reason, /changes things/);
-  }
-  const plan = watch.watchPlan(read("ui"));
-  assert.equal(plan.kind, "none");
-  assert.match(plan.reason, /no stable read/);
-});
-
-test("watch: the routine is every 15 minutes and the editor URL carries the draft", () => {
-  const routine = watch.watchRoutine("Check the price of the Soundcore Q20");
-  assert.equal(routine.schedule.kind, "interval");
-  assert.equal(routine.schedule.everyMinutes, 15);
-  assert.match(routine.title, /^Watch: Check the price/);
-  assert.match(routine.instruction, /report only what changed/);
-  const url = new URL(watch.routineEditorUrl("chrome-extension://x/home.html", "chat-1", routine));
-  assert.equal(url.searchParams.get("view"), "routines");
-  assert.equal(url.searchParams.get("chatId"), "chat-1");
-  assert.deepEqual(JSON.parse(url.searchParams.get("routineDraft")), {
-    chatId: "chat-1",
-    title: routine.title,
-    instruction: routine.instruction,
-    everyMinutes: 15,
-  });
-});
-
-test("the island's step line names the step, the site and the last path taken", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-view-"));
-  const outfile = join(directory, "orb-view.mjs");
-  await build({
-    entryPoints: [fileURLToPath(new URL("../src/orb/orb-view.tsx", import.meta.url))],
-    outfile,
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    jsx: "automatic",
-  });
-  const view = await import(pathToFileURL(outfile).href);
-  await rm(directory, { recursive: true, force: true });
-  const run = play([
-    [{ kind: "tool-start", toolCallId: "1", toolName: "site_mapper", arguments: {} }, 0],
-    [
-      {
-        kind: "tool-end",
-        toolCallId: "1",
-        toolName: "site_mapper",
-        result: "",
-        isError: false,
-        path: "site-mapper",
-      },
-      900,
-    ],
-    [{ kind: "tool-start", toolCallId: "2", toolName: "browser_code", arguments: {} }, 1000],
-  ]);
-  assert.equal(view.stepLine(run, "kayak.com"), "Step 2 · kayak.com · site API");
-  const base = { run, paused: false };
-  assert.equal(view.islandState(base), "working");
-  assert.equal(view.islandState({ ...base, paused: true }), "paused");
-  assert.equal(view.islandState({ run: undefined }), "compose");
-});
-
-test("the compose island has a growing text box and no orb circle", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-compose-"));
-  const outfile = join(directory, "orb-view.mjs");
-  await build({
-    entryPoints: [fileURLToPath(new URL("../src/orb/orb-view.tsx", import.meta.url))],
-    outfile,
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    jsx: "automatic",
-  });
-  const view = await import(pathToFileURL(outfile).href);
-  await rm(directory, { recursive: true, force: true });
-  const noop = () => undefined;
-  const html = renderToStaticMarkup(
-    createElement(view.Island, {
+test("the orb box composes until a chat exists, then frames that chat with hand-off buttons", async () => {
+  const view = await loadModule("orb-view.tsx");
+  const compose = renderToStaticMarkup(
+    createElement(view.OrbBox, { model: boxModel, actions: boxActions }),
+  );
+  assert.match(compose, /data-state="compose"/);
+  assert.match(compose, /<textarea/);
+  assert.doesNotMatch(compose, /Run again/);
+  const chat = renderToStaticMarkup(
+    createElement(view.OrbBox, {
       model: {
-        host: "x.com",
-        prompt: "",
-        run: undefined,
-        notice: "",
-        busy: false,
-        watch: { state: "idle", note: "" },
-        paused: false,
-        expanded: false,
-        needsCount: 0,
-        verbs: [],
-        learning: false,
-        preview: undefined,
+        ...boxModel,
+        chatId: "c1",
+        chatUrl: "chrome-extension://x/chat.html?chatId=c1&host=panel",
       },
-      actions: {
-        submit: noop,
-        close: noop,
-        stop: noop,
-        again: noop,
-        watch: noop,
-        pin: noop,
-        openChat: noop,
-        takeOver: noop,
-        resume: noop,
-        toggleDetails: noop,
-        useVerb: noop,
-        toggleLearning: noop,
-        showPreview: noop,
-      },
+      actions: boxActions,
     }),
   );
-  assert.doesNotMatch(html, /class="isl-orb"/);
-  assert.match(html, /data-state="compose"/);
-  assert.match(html, /<textarea/);
+  assert.match(chat, /data-state="chat"/);
+  assert.match(chat, /<iframe[^>]+chat\.html\?chatId=c1/);
+  assert.match(chat, /Move to side panel/);
+  assert.match(chat, /Open in a tab/);
+  assert.doesNotMatch(chat, /Run again/);
+});
+
+test("the orb's position defaults to bottom-left and ignores junk", async () => {
+  const position = await loadModule("orb-position.ts");
+  assert.deepEqual(position.parseOrbPosition(undefined), { left: 56, bottom: 56 });
+  assert.deepEqual(position.parseOrbPosition({ left: "x", bottom: 2 }), { left: 56, bottom: 56 });
+  assert.deepEqual(position.parseOrbPosition({ left: 300, bottom: -4 }), { left: 300, bottom: 0 });
 });
