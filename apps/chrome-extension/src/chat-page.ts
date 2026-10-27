@@ -53,8 +53,19 @@ installHandoffBridge();
 // The engine says when the user takes a tab over; the chat says so instead of looking stuck.
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!message || typeof message !== "object") return;
-  const { kind, tabId, control } = message as { kind?: string; tabId?: number; control?: string };
+  const {
+    kind,
+    tabId,
+    control,
+    chatId: tabChatId,
+  } = message as {
+    kind?: string;
+    tabId?: number;
+    control?: string;
+    chatId?: string;
+  };
   if (kind !== "browserkit.control") return;
+  if (tabChatId && tabChatId !== chatId) return;
   if (control === "user")
     showError(
       `You have control of tab ${tabId ?? "?"}. The agent is paused until it is given back.`,
