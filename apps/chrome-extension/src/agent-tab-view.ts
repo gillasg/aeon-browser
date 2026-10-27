@@ -1,7 +1,7 @@
 // The Agent tabs setting lives in page localStorage (where the settings UI keeps its choices);
 // the worker cannot read that, so extension pages mirror it into chrome.storage.local.
 export const AGENT_TAB_VIEW_KEY = "aeonAgentTabView";
-export type AgentTabView = "split" | "thumbnails";
+export type AgentTabView = "auto" | "split" | "thumbnails";
 // On/off agent settings, off by default. Screen recorders (Aperture) rely on them; keep them.
 export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
 export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
@@ -66,9 +66,9 @@ function mirrorBlockedSites(): void {
 export function mirrorAgentTabView(): void {
   mirrorBlockedSites();
   const push = () => {
-    let view: AgentTabView = "split";
+    let view: AgentTabView = "auto";
     try {
-      if (localStorage.getItem(AGENT_TAB_VIEW_KEY) === "thumbnails") view = "thumbnails";
+      view = parseAgentTabView(localStorage.getItem(AGENT_TAB_VIEW_KEY));
     } catch {
       /* Storage may be unavailable. */
     }
@@ -116,7 +116,28 @@ export async function readAgentFlag(key: string): Promise<boolean> {
   return stored[key] === true;
 }
 
-export async function readAgentTabView(): Promise<AgentTabView> {
+export function parseAgentTabView(value: unknown): AgentTabView {
+  return value === "split" || value === "thumbnails" ? value : "auto";
+}
+
+export async function readAgentTabViewSetting(): Promise<AgentTabView> {
   const stored = await chrome.storage.local.get(AGENT_TAB_VIEW_KEY);
-  return stored[AGENT_TAB_VIEW_KEY] === "thumbnails" ? "thumbnails" : "split";
+  return parseAgentTabView(stored[AGENT_TAB_VIEW_KEY]);
+}
+
+/**
+ * The view for one chat. Automatic (the default) follows where the chat is: a full chat tab gets
+ * split screen beside it; the side panel and the orb get live thumbnails and leave the user's
+ * current tab alone. Background runs keep their own window either way (task spaces).
+ */
+export async function readAgentTabView(chatId: string): Promise<"split" | "thumbnails"> {
+  const setting = await readAgentTabViewSetting();
+  if (setting !== "auto") return setting;
+  const page = chrome.runtime.getURL("chat.html");
+  const tabs = await chrome.tabs.query({ url: page + "*" }).catch(() => []);
+  const inTab = tabs.some((tab) => {
+    const url = new URL(tab.url ?? tab.pendingUrl ?? page);
+    return url.searchParams.get("chatId") === chatId && url.searchParams.get("host") !== "panel";
+  });
+  return inTab ? "split" : "thumbnails";
 }

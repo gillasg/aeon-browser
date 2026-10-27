@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AutomationsPanel, SitesPanel, SiteSessionsPanel } from "@aeon/ui";
+import { AutomationsPanel, SitesPage, siteEntries, siteSummary } from "@aeon/ui";
 
 // A real render of the two management pages: server-rendered React with a fixture snapshot, so a
 // broken prop, a missing import or a template that throws fails here, not only in the browser.
@@ -84,27 +84,27 @@ test("the Automations page renders workflows, inputs, last run and its actions",
   assert.match(html, /Exported to \/tmp\/x\.json/);
 });
 
-test("the Site sessions page lists sessions and offers clear, switch and a logged-out check", () => {
+test("the Sites page lists every site with what Aeon can do, the account and rules", () => {
   const html = renderToStaticMarkup(
-    createElement(SiteSessionsPanel, { ...props, section: "sessions" }),
+    createElement(SitesPage, { ...props, section: "sites", blockedSites: ["bad.example"] }),
   );
   assert.match(html, /shop\.example/);
-  assert.match(html, /Stored/);
   assert.match(html, /test@example\.com/);
-  assert.match(html, /Clear session/);
-  assert.match(html, /Switch account/);
-  assert.match(html, /Test logged out/);
+  assert.match(html, /bad\.example/);
+  assert.match(html, /blocked/);
 });
 
-test("the Sites page renders recipes, health, the stored session and its actions", () => {
-  const html = renderToStaticMarkup(createElement(SitesPanel, { ...props, section: "sites" }));
-  assert.match(html, /shop\.example/);
-  assert.match(html, /12 operations/);
-  assert.match(html, /search/);
-  assert.match(html, /ok/);
-  assert.match(html, /Stored/);
-  assert.match(html, /test@example\.com/);
-  assert.match(html, />Clear session</);
-  assert.match(html, />Switch account</);
-  assert.match(html, /Export pack/);
+test("a site's entry joins its mapped API, routines and block rule", () => {
+  const entries = siteEntries(
+    snapshot.sites,
+    ["bad.example"],
+    [{ routineId: "r", sites: ["shop.example"], title: "Price" }],
+  );
+  assert.deepEqual(
+    entries.map((entry) => entry.host),
+    ["bad.example", "shop.example"],
+  );
+  assert.equal(entries[1].routines.length, 1);
+  assert.match(siteSummary(entries[1]), /1 watching/);
+  assert.equal(siteSummary(entries[0]), "blocked");
 });

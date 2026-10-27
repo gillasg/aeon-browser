@@ -32,7 +32,7 @@ test("new tab has no sidebar: a top bar, an empty composer and the dashboard", (
   assert.match(html, /class="home-top-nav"/);
   assert.match(html, /placeholder=""/);
   assert.doesNotMatch(html, /id="chat-sidebar"|id="pinned-label"|id="projects-label"/);
-  for (const page of ["Chats", "Routines", "Activity"]) assert.match(html, new RegExp(`>${page}<`));
+  for (const page of ["Chats", "Automations", "Sites"]) assert.match(html, new RegExp(`>${page}<`));
   assert.match(html, /aria-label="Settings"/);
   // A quiet home: the core and the ask box, with no empty sections under them.
   assert.match(html, /class="home-core" data-mode="idle"/);

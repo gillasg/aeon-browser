@@ -98,7 +98,7 @@ export interface NewTabHomeProps {
   onSidebarDefault(open: boolean): void;
 }
 
-type SettingsSection = "settings" | "models" | "resources" | "capabilities";
+type SettingsSection = "settings" | "models" | "advanced";
 
 /** `?view=models` is the Models tab of Settings; every other view is the top bar's. */
 function homeRoute(): { view: HomeView; settingsSection?: SettingsSection } {
@@ -124,7 +124,8 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
     setView(next);
     if (next === "chats") props.onCatalog();
     else props.onCloseCatalog?.();
-    if (next === "home" || next === "watchers" || next === "settings") props.onManagementLoad();
+    if (next === "home" || next === "automations" || next === "sites" || next === "settings")
+      props.onManagementLoad();
     syncRoute(next, settingsSection);
   };
   return (
@@ -182,19 +183,10 @@ function HomePage({
   onSettingsSection(section: SettingsSection): void;
   onView(view: HomeView): void;
 }): ReactElement {
-  if (view === "chats") return <HomeCatalog {...props} />;
-  if (view === "activity")
-    return (
-      <ActivityPanel
-        entries={activity}
-        onOpenChat={props.onOpenChat}
-        {...(props.onUndoActivity ? { onUndo: props.onUndoActivity } : {})}
-      />
-    );
-  if (view === "watchers") return <Management props={props} section="routines" />;
+  if (view === "chats" || view === "activity")
+    return <ChatsPage view={view} props={props} activity={activity} onView={onView} />;
   if (view === "automations") return <Management props={props} section="automations" />;
   if (view === "sites") return <Management props={props} section="sites" />;
-  if (view === "sessions") return <Management props={props} section="sessions" />;
   if (view === "settings")
     return <SettingsPage props={props} section={settingsSection} onSection={onSettingsSection} />;
   return <HomeLanding props={props} onView={onView} />;
@@ -226,8 +218,53 @@ function HomeLanding({
         onChats={() => onView("chats")}
         onPin={props.onPin}
         onDelete={props.onDelete}
-        onWatchers={() => onView("watchers")}
+        onWatchers={() => onView("automations")}
       />
+    </>
+  );
+}
+
+/** Chats and Activity (what Aeon changed on sites) share one section. */
+function ChatsPage({
+  view,
+  props,
+  activity,
+  onView,
+}: {
+  view: "chats" | "activity";
+  props: NewTabHomeProps;
+  activity: ReturnType<typeof useActivityLog>;
+  onView(view: HomeView): void;
+}): ReactElement {
+  return (
+    <>
+      <nav className="home-subtabs" role="tablist" aria-label="Chats">
+        {(
+          [
+            ["chats", "Chats"],
+            ["activity", "Activity"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            onClick={() => onView(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {view === "chats" ? (
+        <HomeCatalog {...props} />
+      ) : (
+        <ActivityPanel
+          entries={activity}
+          onOpenChat={props.onOpenChat}
+          {...(props.onUndoActivity ? { onUndo: props.onUndoActivity } : {})}
+        />
+      )}
     </>
   );
 }
@@ -235,8 +272,7 @@ function HomeLanding({
 const SETTINGS_TABS: ReadonlyArray<[SettingsSection, string]> = [
   ["settings", "General"],
   ["models", "Models"],
-  ["resources", "Skills & extensions"],
-  ["capabilities", "MCPs / CLIs"],
+  ["advanced", "Advanced"],
 ];
 
 function SettingsPage({
@@ -265,6 +301,11 @@ function SettingsPage({
           ) : (
             <p className="aeon-page-empty">Models are not available here.</p>
           )
+        ) : section === "advanced" ? (
+          <>
+            <Management props={props} section="resources" />
+            <Management props={props} section="capabilities" />
+          </>
         ) : (
           <Management props={props} section={section} />
         )}
@@ -311,7 +352,7 @@ function SettingsIcon({ section }: { section: SettingsSection }): ReactElement {
         />
       </svg>
     );
-  if (section === "resources")
+  if (section === "advanced")
     return (
       <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
         <path
@@ -319,19 +360,6 @@ function SettingsIcon({ section }: { section: SettingsSection }): ReactElement {
           fill="none"
           stroke="currentColor"
           strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  if (section === "capabilities")
-    return (
-      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-        <path
-          d="M7 3v4m6-4v4M5 7h10v4a5 5 0 0 1-10 0Zm5 9v2"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>

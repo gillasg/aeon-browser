@@ -12,12 +12,8 @@ export function SidebarManagementLinks({
     <nav className="sidebar-management-links" aria-label="Workspace">
       {(
         [
-          ["routines", "Routines"],
           ["automations", "Automations"],
           ["sites", "Sites"],
-          ["sessions", "Site sessions"],
-          ["resources", "Skills & extensions"],
-          ["capabilities", "MCPs / CLIs"],
           ["settings", "Settings"],
         ] as const
       ).map(([section, label]) => (

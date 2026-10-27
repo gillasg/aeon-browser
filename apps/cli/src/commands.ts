@@ -510,7 +510,7 @@ is not a terminal.`,
       name: "settings",
       group: "Aeon",
       summary: "the agent settings in the connected Chrome",
-      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true agentTabView=split|thumbnails`,
+      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true agentTabView=auto|split|thumbnails`,
       run: async (args) => settingsCommand(await host.connect(), args.positional),
     },
     {

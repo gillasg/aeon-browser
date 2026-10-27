@@ -104,10 +104,11 @@ test("home lists running chats first and routes old links to the new pages", () 
     }),
   );
   assert.match(html, /Running now.*Flights.*Watch: eggs.*Paused.*Groceries/s);
-  assert.deepEqual(viewFromRoute("routines"), { view: "watchers" });
+  assert.deepEqual(viewFromRoute("routines"), { view: "automations" });
+  assert.deepEqual(viewFromRoute("sessions"), { view: "sites" });
   assert.deepEqual(viewFromRoute("capabilities"), {
     view: "settings",
-    settingsSection: "capabilities",
+    settingsSection: "advanced",
   });
   assert.deepEqual(viewFromRoute(null), { view: "home" });
 });

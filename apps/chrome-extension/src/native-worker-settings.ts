@@ -2,9 +2,9 @@ import { NativeSettingsRequestSchema, type AgentSettings } from "@aeon/protocol"
 import {
   AGENT_IN_FRONT_KEY,
   AGENT_TAB_VIEW_KEY,
+  readAgentTabViewSetting,
   HIDE_AGENT_CURSOR_KEY,
   readAgentFlag,
-  readAgentTabView,
 } from "./agent-tab-view.js";
 
 // `aeon settings` from the CLI: Core asks for the agent settings, changing them first if asked.
@@ -33,6 +33,6 @@ async function applySettings(set: {
   return {
     agentInFront: await readAgentFlag(AGENT_IN_FRONT_KEY),
     hideAgentCursor: await readAgentFlag(HIDE_AGENT_CURSOR_KEY),
-    agentTabView: await readAgentTabView(),
+    agentTabView: await readAgentTabViewSetting(),
   };
 }

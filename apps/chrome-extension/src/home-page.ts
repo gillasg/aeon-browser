@@ -1,3 +1,4 @@
+import { installLinkBanner } from "./link-banner.js";
 import { mirrorAgentTabView } from "./agent-tab-view.js";
 import { savePanelContext } from "./panel-prompt-handoff.js";
 import { startHomePrompt } from "./home-first-submit.js";
@@ -396,3 +397,5 @@ async function restoreModelCatalog(): Promise<void> {
 }
 
 mirrorAgentTabView();
+
+installLinkBanner();

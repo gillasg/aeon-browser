@@ -2195,3 +2195,66 @@ body[data-embedded="true"] .home-top-bar {
   font-weight: 600;
   color: var(--text-muted, #8b8f98);
 }
+
+/* Sites pages and section sub-tabs. */
+.site-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.site-list button {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+.site-list button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.site-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.site-tabs,
+.home-subtabs {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 14px;
+}
+.site-tabs button,
+.home-subtabs button {
+  border-radius: 999px;
+}
+.site-tabs button[aria-selected="true"],
+.home-subtabs button[aria-selected="true"] {
+  background: rgba(124, 92, 255, 0.25);
+}
+.site-rule {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.link-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #2a1414;
+  color: #ffd9d4;
+  font-size: 13px;
+}
