@@ -14,6 +14,8 @@ import {
 // gathers beside anything that needs the user. The box (orb.html, framed so the page can't read
 // it) opens with the orb; clicking away collapses it to the orb, clicking the orb opens it again.
 // The orb sits bottom-left by default, can be dragged, and keeps one position for every site.
+// With the box folded away during a run, a pill under the orb says what the agent is doing;
+// clicking it opens the box again. While the tab is recorded on video the orb is hidden.
 
 const DEFAULT_PANEL = { width: 360, height: 96 };
 const TRAVEL_MS = 650;
@@ -31,6 +33,8 @@ export class OrbOverlay {
   private readonly spot = document.createElement("div");
   private readonly hit = document.createElement("button");
   private readonly frame = document.createElement("iframe");
+  private readonly pill = document.createElement("button");
+  private label = "";
   private readonly swarm: Swarm;
   private readonly systemReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   private reducedMotion = this.systemReducedMotion;
@@ -75,6 +79,7 @@ export class OrbOverlay {
 
   showBubble(focus = true): void {
     this.open = true;
+    this.updatePill();
     this.frame.classList.remove("off");
     requestAnimationFrame(() => this.frame.classList.add("on"));
     if (focus) this.frame.focus();
@@ -82,6 +87,7 @@ export class OrbOverlay {
 
   hideBubble(): void {
     this.open = false;
+    this.updatePill();
     this.frame.classList.remove("on");
     this.later(() => {
       if (!this.open) this.frame.classList.add("off");
@@ -89,8 +95,9 @@ export class OrbOverlay {
   }
 
   apply(message: OrbToContent): void {
-    if (message.kind === "aeon.orb.visual") this.setVisual(message.state);
+    if (message.kind === "aeon.orb.visual") this.setVisual(message.state, message.label);
     else if (message.kind === "aeon.orb.cursor") this.streamTo(message.steps);
+    else if (message.kind === "aeon.orb.elsewhere") this.swarm.elsewhere(performance.now());
     else if (message.kind === "aeon.orb.spotlight") this.spotlight(message.box);
     else if (message.kind === "aeon.orb.panel")
       this.panel = {
@@ -98,6 +105,18 @@ export class OrbOverlay {
         height: clampSize(message.height, 44, innerHeight - 16),
       };
     else if (message.kind === "aeon.orb.prefs") this.setReducedMotion(message.reduceMotion);
+  }
+
+  /** A video recording of this tab shows the page only. */
+  setRecording(on: boolean): void {
+    this.host.style.display = on ? "none" : "";
+  }
+
+  private updatePill(): void {
+    const show = !this.open && this.state !== "listening" && this.label !== "";
+    this.pill.hidden = !show;
+    this.pill.dataset.state = this.state;
+    this.pill.textContent = this.label;
   }
 
   /** The setting in Aeon adds to the system's reduce-motion; it never turns that off. */
@@ -135,7 +154,12 @@ export class OrbOverlay {
     this.frame.title = "Aeon";
     this.frame.className = "off";
     this.frame.setAttribute("allowtransparency", "true");
-    layer.append(this.spot, this.canvas, this.hit, this.frame);
+    this.pill.className = "pill";
+    this.pill.type = "button";
+    this.pill.hidden = true;
+    this.pill.title = "Open Aeon";
+    this.pill.addEventListener("click", () => this.showBubble());
+    layer.append(this.spot, this.canvas, this.hit, this.pill, this.frame);
     shadow.append(style, layer);
     // An extension reload leaves the old script's orb on the page with nothing driving it.
     for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
@@ -143,8 +167,10 @@ export class OrbOverlay {
     document.documentElement.append(this.host);
   }
 
-  private setVisual(state: OrbVisualState): void {
+  private setVisual(state: OrbVisualState, label: string): void {
     this.state = state;
+    this.label = state === "listening" ? "" : label;
+    this.updatePill();
     this.swarm.setState(state);
     if (state !== "working") this.showSwarm();
     if (state !== "needs") this.spotlight(null);
@@ -234,6 +260,8 @@ export class OrbOverlay {
     this.orb.y += (this.orbTarget.y - this.orb.y) * 0.12;
     this.swarm.setCenter(this.orb.x, this.orb.y);
     this.hit.style.transform = `translate(${this.orb.x - HIT_SIZE / 2}px, ${this.orb.y - HIT_SIZE / 2}px)`;
+    if (!this.pill.hidden)
+      this.pill.style.transform = `translate(-50%, 0) translate(${this.orb.x}px, ${this.orb.y + 30}px)`;
     this.placeFrame();
     this.swarm.draw(now, innerWidth, innerHeight);
     this.raf = requestAnimationFrame(this.tick);

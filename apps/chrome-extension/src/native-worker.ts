@@ -1,14 +1,17 @@
 import { askCore, handleCompanionResult, listenToCompanions } from "./companion-requests.js";
 import { authenticate } from "@browserkit/engine/native-authenticate";
 import { configureEngine } from "@browserkit/engine/engine-config";
+import { registerSetting } from "@browserkit/engine/native-browser-settings";
 import { presentBrowserTask } from "@browserkit/engine/native-browser-layout";
 import { installBoosts } from "@browserkit/engine/native-browser-boosts";
 import { installEngineListeners } from "@browserkit/engine/native-engine-install";
 import {
   AGENT_IN_FRONT_KEY,
+  AGENT_TAB_VIEW_KEY,
   HIDE_AGENT_CURSOR_KEY,
   readAgentFlag,
   readAgentTabView,
+  readAgentTabViewSetting,
 } from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
 import { installOrb } from "./orb/orb-worker.js";
@@ -105,6 +108,26 @@ configureEngine({
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
   agentGlow: () => Promise.resolve(true),
   agentGlowColor: () => Promise.resolve("#7c5cff"),
+});
+// Aeon's own view settings, beside the engine's, for browser.settings() when the user asks.
+registerSetting("agentView", {
+  about:
+    "How a chat shows the agent's tabs: auto (split view from a chat tab, thumbnails from the side panel), split, or thumbnails",
+  values: ["auto", "split", "thumbnails"],
+  read: readAgentTabViewSetting,
+  write: (value) => chrome.storage.local.set({ [AGENT_TAB_VIEW_KEY]: value }),
+});
+registerSetting("agentInFront", {
+  about: "Open the agent's tabs in front and switch to them as it works (for filming it)",
+  values: [true, false],
+  read: () => readAgentFlag(AGENT_IN_FRONT_KEY),
+  write: (value) => chrome.storage.local.set({ [AGENT_IN_FRONT_KEY]: value === true }),
+});
+registerSetting("cursor", {
+  about: "Show the agent's cursor and caption on the pages it works on",
+  values: ["shown", "hidden"],
+  read: async () => ((await readAgentFlag(HIDE_AGENT_CURSOR_KEY)) ? "hidden" : "shown"),
+  write: (value) => chrome.storage.local.set({ [HIDE_AGENT_CURSOR_KEY]: value === "hidden" }),
 });
 // The worker's own handler is registered before anything else starts: one surface that fails
 // to install must not leave the extension unable to answer a page at all.

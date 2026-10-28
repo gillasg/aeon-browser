@@ -173,9 +173,12 @@ function changed(state: OrbVisualState): void {
 
 function sendNewActions(current: OrbRun): void {
   if (current.actions.length <= sentActions) return;
-  const steps = cursorSteps(current.actions.slice(sentActions), tabId);
+  const fresh = current.actions.slice(sentActions);
+  const steps = cursorSteps(fresh, tabId);
   sentActions = current.actions.length;
   if (steps.length && !userControl) toContent({ kind: "aeon.orb.cursor", steps });
+  // Steps in the agent's own tab (not this page) show as sparks toward the tab strip.
+  else if (fresh.some((action) => !action.failed)) toContent({ kind: "aeon.orb.elsewhere" });
 }
 
 function visualState(current: OrbRun): OrbVisualState {
@@ -237,6 +240,7 @@ function view(): ReactNode {
     model: { ...model },
     actions: {
       submit: (text) => void submit(text),
+      minimize: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
       close: () => toContent({ kind: "aeon.orb.hide", keepRunning: false }),
       toSidePanel,
       toTab,
