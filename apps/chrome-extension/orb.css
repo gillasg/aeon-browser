@@ -27,7 +27,7 @@ body {
   padding: 10px 12px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #050507;
+  background: #0c0c10;
   color: #eeeef4;
   position: relative;
   overflow: hidden;
@@ -207,7 +207,7 @@ button.icon:hover,
   align-items: flex-end;
   gap: 8px;
   padding: 14px;
-  background: #050507;
+  background: #0c0c10;
 }
 .box-pending-message {
   margin: 0;

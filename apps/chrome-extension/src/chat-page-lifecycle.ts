@@ -60,8 +60,9 @@ export function initializeChatPage(): {
   const root = requiredChatPageElement("root");
   const parsed = ChatIdSchema.safeParse(new URL(location.href).searchParams.get("chatId"));
   const chatId = parsed.success ? parsed.data : "";
-  if (new URL(location.href).searchParams.get("host") === "panel")
-    document.body.dataset.host = "panel";
+  // The side panel, or the orb's box (a compact, always-dark chat on other people's pages).
+  const host = new URL(location.href).searchParams.get("host");
+  if (host === "panel" || host === "orb") document.body.dataset.host = host;
   return { root, chatId, initialDisplay: new InitialChatDisplay(chatId) };
 }
 
