@@ -73,24 +73,18 @@ function Compose({
     const text = event.currentTarget.value.trim();
     if (text) actions.submit(text);
   };
+  // The field has the whole width; everything else is one quiet line under it.
   return (
     <>
-      <div className="isl-row">
-        <textarea
-          id="prompt"
-          rows={1}
-          placeholder="Ask Aeon to do something on this page…"
-          aria-label="Ask Aeon"
-          disabled={model.busy}
-          onKeyDown={send}
-        />
-        <Switcher model={model} actions={actions} label="Chats" />
-        <Button kind="icon" label="Minimize (Esc)" onClick={actions.minimize}>
-          ⌄
-        </Button>
-      </div>
-      <div className="isl-hint" data-warn={String(Boolean(model.notice))}>
-        <span>{model.notice || "Enter to send · Esc to close"}</span>
+      <textarea
+        id="prompt"
+        rows={1}
+        placeholder="Ask Aeon about this page…"
+        aria-label="Ask Aeon"
+        disabled={model.busy}
+        onKeyDown={send}
+      />
+      <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
         <button
           type="button"
           className="isl-chip isl-learn"
@@ -104,6 +98,9 @@ function Compose({
         >
           {model.learning ? `Learning ${model.host || "this site"}` : model.host || "This page"}
         </button>
+        <span className="isl-notice">{model.notice}</span>
+        {model.chats.length > 0 && <Switcher model={model} actions={actions} icon />}
+        <Button label="Minimize (Esc)" onClick={actions.minimize} icon="minimize" />
       </div>
     </>
   );
@@ -122,18 +119,10 @@ function ChatBox({
       <div className="box-bar">
         <Switcher model={model} actions={actions} label={titleOf(model)} />
         <span className="box-title">{model.notice}</span>
-        <Button kind="icon" label="New chat" onClick={actions.newChat}>
-          +
-        </Button>
-        <Button kind="icon" label="Move to side panel" onClick={actions.toSidePanel}>
-          ⇱
-        </Button>
-        <Button kind="icon" label="Open in a tab" onClick={actions.toTab}>
-          ↗
-        </Button>
-        <Button kind="icon" label="Minimize (Esc)" onClick={actions.minimize}>
-          ⌄
-        </Button>
+        <Button label="New chat" onClick={actions.newChat} icon="new" />
+        <Button label="Move to side panel" onClick={actions.toSidePanel} icon="panel" />
+        <Button label="Open in a tab" onClick={actions.toTab} icon="tab" />
+        <Button label="Minimize (Esc)" onClick={actions.minimize} icon="minimize" />
       </div>
       <div className="box-body">
         {model.chatUrl && (
@@ -159,10 +148,12 @@ function Switcher({
   model,
   actions,
   label,
+  icon = false,
 }: {
   model: OrbViewModel;
   actions: OrbViewActions;
-  label: string;
+  label?: string;
+  icon?: boolean;
 }): ReactElement {
   return (
     <ChatSwitcher
@@ -172,7 +163,8 @@ function Switcher({
       needs={model.needs}
       onSelect={actions.selectChat}
       onOpen={actions.loadChats}
-      label={label}
+      icon={icon}
+      {...(label ? { label } : {})}
     />
   );
 }
@@ -181,26 +173,35 @@ function titleOf(model: OrbViewModel): string {
   return model.chats.find((chat) => chat.chatId === model.chatId)?.title ?? "This chat";
 }
 
+// 16px line icons in one stroke weight, so the bar reads as one set.
+const ICONS = {
+  new: "M8 3.5v9M3.5 8h9",
+  panel: "M3 3.5h10v9H3zM9.5 3.5v9",
+  tab: "M9 3.5h3.5V7M12.5 3.5 7.5 8.5M11 9.5v3H3.5V5h3",
+  minimize: "M4 6.5 8 10l4-3.5",
+} as const;
+
 function Button({
-  kind = "ghost",
   label,
   onClick,
-  children,
+  icon,
 }: {
-  kind?: "primary" | "ghost" | "icon";
-  label?: string;
+  label: string;
   onClick(): void;
-  children: string;
+  icon: keyof typeof ICONS;
 }): ReactElement {
   return (
-    <button
-      type="button"
-      className={kind}
-      title={label}
-      aria-label={kind === "icon" ? label : undefined}
-      onClick={onClick}
-    >
-      {children}
+    <button type="button" className="icon" title={label} aria-label={label} onClick={onClick}>
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path
+          d={ICONS[icon]}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </button>
   );
 }

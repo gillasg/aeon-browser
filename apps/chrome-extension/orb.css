@@ -48,15 +48,10 @@ body {
   padding: 0;
 }
 
-.isl-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
 textarea {
-  flex: 1;
-  min-width: 0;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
   min-height: 22px;
   resize: none;
   border: 0;
@@ -77,17 +72,26 @@ textarea::placeholder {
   color: #6f6b80;
 }
 
-.isl-hint {
+.isl-foot {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 6px 2px 0;
-  font-size: 11px;
+  gap: 2px;
+  margin-top: 8px;
+  font-size: 11.5px;
   color: var(--muted);
 }
 
-.isl-hint[data-warn="true"] span:first-child {
+.isl-notice {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.isl-foot[data-warn="true"] .isl-notice {
   color: var(--needs);
 }
 
@@ -122,7 +126,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px 4px 14px;
+  padding: 6px 6px 6px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -163,18 +167,28 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-button.icon {
+button.icon,
+.chat-switcher-pill.icon-button {
   flex: none;
+  display: grid;
+  place-items: center;
   width: 28px;
   height: 28px;
   padding: 0;
   border: 0;
+  border-radius: 8px;
   color: var(--muted);
-  font-size: 13px;
 }
 
-button.icon:hover {
+button.icon:hover,
+.chat-switcher-pill.icon-button:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.chat-switcher-pill.icon-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .box-body {
@@ -223,18 +237,33 @@ button.icon:hover {
 .chat-switcher {
   display: contents;
 }
-.isl-row,
 .box-bar {
   flex-wrap: wrap;
 }
-.chat-switcher-pill {
+.chat-switcher-pill:not(.icon-button) {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  max-width: 180px;
+  gap: 5px;
+  max-width: 200px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #e4e2ee;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.chat-switcher-pill:not(.icon-button):hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.chat-switcher-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.chat-switcher-pill svg {
+  flex: none;
+  color: var(--muted);
 }
 .chat-switcher-menu {
   order: 10;
