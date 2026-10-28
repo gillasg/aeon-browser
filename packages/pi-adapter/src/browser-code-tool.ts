@@ -11,7 +11,6 @@ import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browse
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
-import { noteVisits, visitedUrls } from "./site-mapping.js";
 import { siteMapperRequest } from "./site-browser.js";
 import { tallyCell, writeRunLog } from "./run-log.js";
 import {
@@ -169,7 +168,6 @@ async function browserCodeResult(options: {
   let { steps } = options;
   const cell = JSON.parse(options.output) as CellOutput;
   if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
-  noteVisits(chatId, visitedUrls(cell.steps ?? []));
   const result = { value: cell.value, output: cell.output ?? "" };
   await journalOutput(result, workspace, operationId);
   // The run log grows with every cell; this result names it for the model and the trace.

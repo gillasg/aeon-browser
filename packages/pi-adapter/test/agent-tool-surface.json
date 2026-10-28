@@ -2,13 +2,27 @@
   {
     "name": "crawl",
     "description": "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search Google. Uses plain HTTP first and the user's browser (with their logins) when needed.",
-    "actions": ["scrape", "crawl", "map", "search", "find", "check"],
+    "actions": [
+      "scrape",
+      "crawl",
+      "map",
+      "search",
+      "find",
+      "check"
+    ],
     "parameters": {
       "type": "object",
       "properties": {
         "action": {
           "type": "string",
-          "enum": ["scrape", "crawl", "map", "search", "find", "check"]
+          "enum": [
+            "scrape",
+            "crawl",
+            "map",
+            "search",
+            "find",
+            "check"
+          ]
         },
         "columns": {
           "type": "object",
@@ -90,11 +104,18 @@
         },
         "render": {
           "type": "string",
-          "enum": ["auto", "static", "browser"]
+          "enum": [
+            "auto",
+            "static",
+            "browser"
+          ]
         },
         "via": {
           "type": "string",
-          "enum": ["auto", "http"],
+          "enum": [
+            "auto",
+            "http"
+          ],
           "description": "For check: http never starts Chrome."
         },
         "paths": {
@@ -116,13 +137,15 @@
           "description": "For check: open each site and report typed readiness (ready, empty, loading, login, challenge, not-found, error) with evidence."
         }
       },
-      "required": ["action"],
+      "required": [
+        "action"
+      ],
       "additionalProperties": false
     }
   },
   {
     "name": "site_mapper",
-    "description": "Call a site's abilities (actions: sites, operations, call, ability, watch, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). ability lists or runs one site ability (its API first, then replay steps, page code or node code). code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
+    "description": "Call a site's abilities (actions: sites, operations, call, ability, watch, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). build makes one tested ability for a task (goal) by doing it once in a background tab; a write is learned in dry run. ability lists or runs one site ability (its API first, then replay steps, page code or node code); key makes a write apply once, limit/cursor page a list, test runs its stored cases. code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
     "actions": [
       "sites",
       "code",
@@ -132,6 +155,7 @@
       "learn",
       "import",
       "explore",
+      "build",
       "docs",
       "ability",
       "channel",
@@ -158,6 +182,7 @@
             "learn",
             "import",
             "explore",
+            "build",
             "docs",
             "ability",
             "channel",
@@ -220,7 +245,15 @@
         "goal": {
           "type": "string",
           "maxLength": 2000,
-          "description": "For explore: extra things to do."
+          "description": "For explore: extra things to do. For build: the task the ability does."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "read",
+            "write"
+          ],
+          "description": "For build: read (default) or write; a write is learned in dry run."
         },
         "operation": {
           "type": "string",
@@ -231,11 +264,20 @@
         },
         "transport": {
           "type": "string",
-          "enum": ["auto", "page", "direct"]
+          "enum": [
+            "auto",
+            "page",
+            "direct"
+          ]
         },
         "via": {
           "type": "string",
-          "enum": ["api", "steps", "script", "page"]
+          "enum": [
+            "api",
+            "steps",
+            "script",
+            "page"
+          ]
         },
         "files": {
           "type": "array",
@@ -249,7 +291,22 @@
         "key": {
           "type": "string",
           "maxLength": 100,
-          "description": "For watch: the item identifier."
+          "description": "For watch: the item identifier. For a write ability: an idempotency key; the same key never applies twice within a day."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "description": "For a list ability: rows per page; the answer is {items, next_cursor, has_more}."
+        },
+        "cursor": {
+          "type": "string",
+          "maxLength": 4000,
+          "description": "For a list ability: next_cursor from the previous page, exactly as returned."
+        },
+        "test": {
+          "type": "boolean",
+          "description": "For ability: run its stored test cases instead."
         },
         "grep": {
           "oneOf": [
@@ -277,7 +334,9 @@
           "maximum": 8000000
         }
       },
-      "required": ["action"],
+      "required": [
+        "action"
+      ],
       "additionalProperties": false
     }
   }

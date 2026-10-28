@@ -65,6 +65,18 @@ for goals ("find", "compare", "book"), not for single steps; for those, `aeon to
   before guessing from memory.
 - **Anything live or on a specific site** (prices, stock, listings, showtimes, reviews): open that
   site in the browser. Web search only finds which page to open.
+- **A lasting tool for one task on a site** ("make me something that checks X"): build an ability
+  (`aeon abilities build <site> "<task>"`); it is tested before it is saved, or says why the
+  site cannot do it.
+- **What a page sends** (the API behind it, a download link, a stream): network capture,
+  `help('network')`; live WebSockets and event streams, `help('live')`.
+- **Files and media**: save images, videos and files, or upload into a page, `help('media')`;
+  record a tab's screen and sound, `help('recording')`.
+- **Change a site on every visit** (hide parts, restyle, auto-click a banner): a boost,
+  `help('boosts')`.
+- **Long or wide work**: many pages, `browser.job` (`help('jobs')`); hundreds of sites, a sweep
+  (`help('sweep')`); a background window that never takes over the screen, `help('spaces')`.
+- **An AI the user already pays for** (ChatGPT, Gemini, Grok, Perplexity, Kimi): `aeon ask`.
 
 ## Browser code in one minute
 
@@ -170,11 +182,17 @@ aeon call shop.example search '{"query":"lamp"}' --param page=2
 aeon watch shop.example listings '{}' --key id     # only new/changed items since the last watch
 aeon federate shop.example:search other.example:search --params '{"query":"lamp"}'
 aeon heal shop.example              # drift, breakage, sign-out, bot walls
+aeon abilities build shop.example "find a product's price and stock"   # a tested ability
+aeon abilities run shop.example order --inputs '{"item":"tea"}' --key order-tea-1
+aeon abilities test shop.example search  # its stored cases; fails on constant output
 ```
 
 - **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
-  `site.run(name, inputs, {via})` or `site.<name>(inputs)`.
+  `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.
+- **Abilities keep their promises:** lists page with `limit`/`next_cursor`; a write with a `key`
+  never applies twice; a failed write says `possible_commit` and how to `retry`; an ignored filter
+  fails as `INPUT_NOT_APPLIED`. Details: `help('abilities')`.
 - **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped. Check `sites`
   first. To map a site: `map`, `describe`, `learn`, or use it in `browser_code` so its requests are
   learned as you go.
@@ -243,44 +261,38 @@ remain for old pack tools in browser code.
 
 ## Chat providers and media
 
-`aeon ask` talks to a chat product the user is already signed in to. It uses the session in
-Chrome, so there is no API key and no separate login:
-
 ```bash
-aeon providers                                   # what is available
-aeon ask chatgpt "Summarise this page: <url>"     # direct request first
-aeon ask gemini "Compare these two plans" --ui   # force the page
-aeon ask grok "What is X saying about <topic>?" --json
+aeon providers                                        # what is available
+aeon ask chatgpt|gemini|grok|perplexity|kimi "<question>" [--ui|--direct] [--json]
+aeon media image "<prompt>" [--image in.png] --out out.png   # Gemini, made or edited
+aeon media youtube "<url>" --ask "<question>"
 ```
 
-- It sends the provider's own request with the user's cookies and falls back to typing in the page
-  when that fails (`--direct` / `--ui` force one). Signed out says `signed-out`. The output carries
-  the answer only, never cookies or tokens.
+- `ask` uses the session the user is signed in to in Chrome (no API key, no separate login): it
+  sends the provider's own request and falls back to typing in the page. Signed out says
+  `signed-out`; the output carries the answer only, never cookies or tokens.
+- MCP clients that prefer single steps have `browser_action` (click, navigate, type, press, scroll,
+  wait, extract, screenshot…); anything with several steps stays in `browser_code`.
+- Sourced research on X ("what is X saying about"): the `deep-x-research` skill (Grok searches,
+  every post opened and checked, a query budget, X search in a tab as the fallback).
 
-Inside a chat, the primitive path is one browser_code cell (`browser.openTab(provider)`,
-locators, `page.inspect`).
+## Abilities and long jobs
 
-### Images and video
-
-```bash
-aeon media image "a red fox in snow" --out fox.png
-aeon media image "make it dusk" --image fox.png --out dusk.png
-aeon media youtube "https://youtu.be/<id>" --ask "What are the three main claims?"
-```
-
-Images are made or edited by Gemini and saved in the workspace; YouTube links are answered as text.
-
-### One action at a time
-
-MCP clients that prefer discrete calls have `browser_action` (`{action: "click", selector}`, plus
-navigate, type, press, scroll, wait, extract, screenshot…). Anything with several steps stays in
-`browser_code`.
-
-### Deep research on X
-
-The `deep-x-research` skill does sourced X work: Grok searches, every post URL is opened and
-checked, a query budget keeps it from looping, and X search in a tab is the fallback. Use it for
-"what is X saying about", not for a single post the user already linked.
+- **Long jobs.** One `aeon tool` call runs up to 60 seconds, but a shell loop can run for hours:
+  start a durable `browser.sweep`/`browser.job` and check it with `aeon job` (or run `aeon sweep
+@urls.txt`), keeping state with `checkpoint`/`loadCheckpoint` for anything else. First check your
+  shell can run `aeon` (`aeon tools`).
+- **Bulk site scans.** `aeon sweep @urls.txt --pilot 5` (see `help('sweep')`).
+- **Login codes.** Email codes: open the inbox in the browser and read the newest message. SMS
+  codes: open messages.google.com/web (Google Messages for web, once paired with the phone).
+- **Phone and desktop apps.** Proxy the app through mitmproxy, save the flows, then
+  `site_mapper action=import site=<app> files=[...]`.
+- **An MCP server or SDK for a site.** Map it (`explore`, add `actions: true` to also map actions in
+  dry run, or just use the site in `browser_code`), read `operations` and `docs`, save abilities,
+  test them, `heal` what breaks. `site_mapper action=export` writes OpenAPI and a typed
+  client; `aeon mcp <site>` serves it as an MCP server.
+- **Your own tools.** Register CLIs and MCP servers you install with Aeon's capability tools.
+- **Whole videos.** `yt-dlp` in the shell.
 
 ## Routines and chat history
 
@@ -302,29 +314,21 @@ checked, a query budget keeps it from looping, and X search in a tab is the fall
 
 ## Reviewing traces
 
-When reviewing a trace, check that the agent used the abilities that fit, and note each miss in the
-findings:
-
-- the user's history, bookmarks or open tabs for anything they visited, saved or have open;
-- the site in the browser, not web search, for anything live (prices, stock, listings);
-- `page.data()` before scraping a page by hand;
-- after the first of many identical changes, the learned operation with `siteMapper.batch`, in one
-  call with `bu.progress`, instead of clicking each item;
-- an existing skill, boost or learned API for the site (the `here:` line) before exploring;
-- the `Prompt cache` line at the end of `aeon trace`: a turn where it fell means something before
-  the cached part of the prompt changed.
-
-A miss seen in two reviewed chats changes the ability map or a hint in browser code, never a
-paragraph appended to the guidance.
+Check that the agent used the abilities that fit, and note each miss: the user's history,
+bookmarks or open tabs for what they visited or have open; the site, not web search, for anything
+live; `page.data()` before scraping by hand; `siteMapper.batch` after the first of many identical
+changes; `site.capabilities()` (abilities, learned API, boosts) before exploring; a `key` on every
+ability write; the `Prompt cache` line at the end of `aeon trace` (a turn where it fell means
+something before the cached part changed). A miss seen in two reviewed chats changes the ability
+map or a hint in browser code, never a paragraph appended to the guidance.
 
 ## If something fails
 
-- "Aeon is not running": the user must open Chrome with Aeon loaded; Aeon's background service
-  starts with it. Then retry.
-- "BROWSER_OFFLINE": Chrome is closed or Aeon is not loaded in it.
+- "Aeon is not running": the user must open Chrome with Aeon loaded (its background service starts
+  with it). "BROWSER_OFFLINE": Chrome is closed or Aeon is not loaded in it.
 - A step times out: split the work into smaller calls, or use `browser.pool` for many pages.
-- Ask for tabs and the user's context: `aeon context` (or the `aeon_context` MCP tool) returns titles
-  and URLs only when the user enabled "Let outside agents see my open tabs" in Aeon Settings.
-- MCP alternative: `aeon mcp` is a stdio MCP server with the same tools plus `aeon_run`,
-  `aeon_search`, `aeon_routine` and `aeon_context` (MCP tools usually appear in the agent's next
-  session; the shell commands work right away).
+- The user's tabs as context: `aeon context` (or `aeon_context`) returns titles and URLs only when
+  the user enabled "Let outside agents see my open tabs" in Aeon Settings.
+- `aeon mcp` is a stdio MCP server with the same tools plus `aeon_run`, `aeon_search`,
+  `aeon_routine` and `aeon_context` (MCP tools appear in the agent's next session; shell commands
+  work right away).
