@@ -10,11 +10,8 @@
 - **Phone and desktop apps.** Proxy the app through mitmproxy, save the flows, then
   `site_mapper action=import site=<app> files=[...]`.
 - **An MCP server or SDK for a site.** Map it (`explore`, add `actions: true` to also map actions in
-  dry run, or just use the site in `browser_code`), read `operations` and `docs`, save multi-step
-  actions, test calls, `heal` what breaks. `site_mapper action=export` writes OpenAPI and a typed
+  dry run, or just use the site in `browser_code`), read `operations` and `docs`, save abilities,
+  test them, `heal` what breaks. `site_mapper action=export` writes OpenAPI and a typed
   client; `aeon mcp <site>` serves it as an MCP server.
-- **Live data.** `site_mapper action=channel` (WebSockets and event streams).
-- **Your own tools.** Register CLIs and MCP servers you install with Aeon's capability tools, and
-  save repeatable site flows as abilities (`saveAbility`, preferring a steps way).
-- **Audio and video.** `yt-dlp` in the shell downloads whole videos; `page.recordMedia` records what
-  is playing in a tab.
+- **Your own tools.** Register CLIs and MCP servers you install with Aeon's capability tools.
+- **Whole videos.** `yt-dlp` in the shell.
