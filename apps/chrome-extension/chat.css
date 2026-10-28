@@ -4263,3 +4263,61 @@ body[data-host="panel"] .composer-meta {
   color: var(--muted);
   cursor: default;
 }
+
+/* The orb's box: one dark material with the orb's bar, a narrow transcript anchored to the top,
+   a small composer, and nothing else (no corner navigation, no model row, no start page). */
+body[data-host="orb"] {
+  --canvas: #0c0c10;
+  background: #0c0c10;
+}
+body[data-host="orb"] .chat-navigation,
+body[data-host="orb"] .composer-meta,
+body[data-host="orb"] .transcript-rail,
+body[data-host="orb"] .model-loading {
+  display: none;
+}
+body[data-host="orb"] .chat-main {
+  height: 100vh;
+}
+body[data-host="orb"] .transcript,
+body[data-host="orb"]:not([data-embedded="true"]) .transcript {
+  padding: 14px 16px 120px;
+}
+body[data-host="orb"] .transcript-wrap::after {
+  bottom: 64px;
+  height: 40px;
+}
+body[data-host="orb"] .message-markdown,
+body[data-host="orb"] .message-text,
+body[data-host="orb"] .user .message-content {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+body[data-host="orb"] .message-row.user .message-content {
+  max-width: 82%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 14px 14px 4px 14px;
+  background: rgb(255 255 255 / 0.08);
+}
+body[data-host="orb"] .message-row {
+  margin-bottom: 14px;
+}
+body[data-host="orb"] .composer-dock {
+  padding: 0 10px 10px;
+}
+body[data-host="orb"] .composer {
+  min-height: 0;
+  padding: 4px 4px 4px 4px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.05);
+}
+body[data-host="orb"] .composer textarea {
+  font-size: 13.5px;
+}
+body[data-host="orb"] .attach-button,
+body[data-host="orb"] .send-button {
+  width: 28px;
+  height: 28px;
+}

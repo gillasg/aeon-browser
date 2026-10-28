@@ -163,6 +163,7 @@ const applyBrowserContextDraft = createBrowserContextDraftHandler({
 function createView() {
   return createElement(ChatSurface, {
     developmentFixture: !__AEON_NATIVE_TRANSPORT__,
+    compact: document.body.dataset.host === "orb",
     chatId,
     title,
     connection,
@@ -236,7 +237,7 @@ function render(): void {
 }
 installFileViewerLinks(chatId);
 render();
-void initializeChatPreferences(sidebar, document.body.dataset.host === "panel");
+void initializeChatPreferences(sidebar, document.body.dataset.host !== undefined);
 if (notice) showError(notice);
 const onStorageChanged = subscribeChatContextDraft(chatId, applyBrowserContextDraft);
 const closeView = createChatPageCloser(() => ({

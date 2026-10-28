@@ -13,6 +13,11 @@ export async function applyStoredTheme(): Promise<void> {
     localStorage.setItem("aeon-wallpaper", JSON.stringify({ enabled: true }));
     await chrome.storage.sync.set({ "aeon-theme": "light" });
   }
+  // The orb's chat sits on other people's pages, so it is always dark like the orb.
+  if (new URLSearchParams(location.search).get("host") === "orb") {
+    document.documentElement.dataset.theme = "dark";
+    return;
+  }
   document.documentElement.dataset.theme =
     value === "light" || value === "system" || value === "midnight"
       ? value

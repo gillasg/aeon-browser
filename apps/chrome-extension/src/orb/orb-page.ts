@@ -12,9 +12,9 @@ import { playSound } from "./orb-sounds.js";
 import { OrbBox, type OrbViewModel } from "./orb-view.js";
 
 // orb.html: the orb's box. Framed by the content script. Starts the chat, then shows it (the same
-// chat page the side panel shows) and keeps following its events to drive the swarm. Each tab's
-// orb remembers its chat; a new page's orb opens on the chat used last. The switcher moves to
-// another chat and + starts a new one, so every tab can watch or start its own work.
+// chat page the side panel shows, in its compact orb mode) and keeps following its events to drive
+// the swarm. One chat per tab: each tab's orb keeps its own chat and a new tab starts fresh, so a
+// message never lands in another tab's work. The switcher shows another chat; + starts a new one.
 
 const params = new URLSearchParams(location.search);
 const tabId = Number(params.get("tabId"));
@@ -33,7 +33,6 @@ const model: OrbViewModel = {
   needs: new Set(),
 };
 const TAB_CHAT = "aeon-orb-chat:" + tabId;
-const LAST_CHAT = "aeon-orb-last-chat";
 let run: OrbRun | undefined;
 let userControl = false;
 let lastVisual = "";
@@ -76,19 +75,15 @@ async function boot(): Promise<void> {
   if (chatId && !model.chatId && !model.pending) await selectChat(chatId, false);
 }
 
-/** This tab's chat; a tab that never chose one opens on the chat used last. "" = a new chat. */
+/** This tab's chat, kept across navigations and reloads; a tab that never had one starts fresh. */
 async function rememberedChat(): Promise<string | undefined> {
-  const stored = await chrome.storage.session.get([TAB_CHAT, LAST_CHAT]).catch(() => ({}));
+  const stored = await chrome.storage.session.get(TAB_CHAT).catch(() => ({}));
   const own = (stored as Record<string, unknown>)[TAB_CHAT];
-  const last = (stored as Record<string, unknown>)[LAST_CHAT];
-  if (typeof own === "string") return own || undefined;
-  return typeof last === "string" && last ? last : undefined;
+  return typeof own === "string" && own ? own : undefined;
 }
 
 function remember(chatId: string | undefined): void {
-  void chrome.storage.session
-    .set({ [TAB_CHAT]: chatId ?? "", ...(chatId ? { [LAST_CHAT]: chatId } : {}) })
-    .catch(() => undefined);
+  void chrome.storage.session.set({ [TAB_CHAT]: chatId ?? "" }).catch(() => undefined);
 }
 
 /** Shows another chat in this orb (the switcher), or a blank one to start (+). */
@@ -173,6 +168,8 @@ async function submit(text: string): Promise<void> {
       model.chatUrl = chatUrlFor(chatId);
       remember(chatId);
       render();
+      // If the chat's own events are slow to arrive, the framed chat takes over anyway.
+      globalThis.setTimeout(shown, 8000);
     });
   } catch (error) {
     run = undefined;
@@ -185,15 +182,24 @@ async function submit(text: string): Promise<void> {
 }
 
 function chatUrlFor(chatId: string): string {
-  return `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=panel`;
+  return `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=orb`;
 }
 
 function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
+  if (entries.length) shown();
   for (const entry of entries) onEvent({ kind: "entry-added", entry }, false);
   onEvent({ kind: "run-state", state: runState as "idle" }, true);
 }
 
+// The sent message stays over the box until the chat has something of its own to show.
+function shown(): void {
+  if (!model.pending) return;
+  model.pending = "";
+  render();
+}
+
 function onEvent(event: PiSessionEventDto, refresh = true): void {
+  if (event.kind === "entry-added") shown();
   if (session.chatId) logApiWrites(event, { chatId: session.chatId, task: "" });
   // A follow-up typed in the framed chat starts a new run in the same chat.
   if (!run || (event.kind === "run-state" && event.state === "running-unconfirmed" && done(run))) {
@@ -307,10 +313,7 @@ function view(): ReactNode {
       selectChat: (chatId) => void selectChat(chatId),
       newChat: () => void selectChat(undefined),
       loadChats: () => void loadChats(),
-      chatShown: () => {
-        model.pending = "";
-        render();
-      },
+      chatShown: () => undefined,
       toSidePanel,
       toTab,
       toggleLearning: () => void toggleLearning(),

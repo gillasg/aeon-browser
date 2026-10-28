@@ -16,6 +16,8 @@ import { ToolImageContext, type ToolImageLoader } from "./tool-images.js";
 export interface ChatSurfaceProps {
   loadToolImage?: ToolImageLoader | undefined;
   developmentFixture: boolean;
+  /** The orb's box: no start page, the transcript and a small composer only. */
+  compact?: boolean | undefined;
   chatId: string;
   title: string;
   connection: { label: string; state: "connecting" | "connected" | "error" };
@@ -188,6 +190,8 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               {...(props.onBranchMessage ? { onBranchEntry: props.onBranchMessage } : {})}
               onPinMessage={props.onPinAnswer}
             />
+          ) : props.compact ? (
+            <div className="transcript-wrap" />
           ) : (
             <section className="welcome" aria-label="New Chat">
               <p>What would you like to work on?</p>
@@ -249,6 +253,7 @@ function ChatPiOverlays(props: ChatSurfaceProps): ReactElement | null {
 }
 
 function isEmptyChat(props: ChatSurfaceProps): boolean {
+  if (props.compact) return false;
   return !props.rows.length && !props.resourcesOpen && !props.notice && !props.composer.running;
 }
 
