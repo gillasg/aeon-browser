@@ -14,7 +14,9 @@ export function SidebarIcon({
     | "delete"
     | "plus"
     | "more"
-    | "copy";
+    | "copy"
+    | "edit"
+    | "open";
 }): ReactElement {
   const paths = {
     settings:
@@ -31,6 +33,8 @@ export function SidebarIcon({
     plus: "M12 5v14M5 12h14",
     more: "M5 12h.01M12 12h.01M19 12h.01",
     copy: "M8 8h12v12H8zM16 8V4H4v12h4",
+    edit: "M4 20h4L19 9l-4-4L4 16zM14 6l4 4",
+    open: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
   };
   return (
     <svg

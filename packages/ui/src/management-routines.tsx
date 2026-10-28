@@ -4,6 +4,8 @@ import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutineEditor } from "./management-routine-editor.js";
 import { forgetRoutineDraft, readRoutineDraft } from "./routine-draft-route.js";
+import { Segmented } from "./segmented.js";
+import { EmptyState } from "./empty-state.js";
 
 type Routine = ManagementSnapshotDto["routines"][number];
 type Filter = "all" | "active" | "paused";
@@ -70,20 +72,23 @@ function RoutineToolbar({
         placeholder="Search automations"
         aria-label="Search automations"
       />
-      <div role="group" aria-label="Automation status">
-        {(["all", "active", "paused"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={filter === value}
-            onClick={() => onFilter(value)}
-          >
-            {value[0]?.toUpperCase()}
-            {value.slice(1)}
-          </button>
-        ))}
-      </div>
-      <button type="button" disabled={!props.snapshot?.chats.length} onClick={onCreate}>
+      <Segmented<Filter>
+        label="Automation status"
+        value={filter}
+        options={[
+          ["all", "All"],
+          ["active", "Active"],
+          ["paused", "Paused"],
+        ]}
+        onChange={onFilter}
+      />
+      <button
+        type="button"
+        className="aeon-button"
+        data-tone="primary"
+        disabled={!props.snapshot?.chats.length}
+        onClick={onCreate}
+      >
         New routine
       </button>
     </div>
@@ -99,12 +104,18 @@ function RoutineList({
   routines: Routine[];
   onSelect(routineId: string): void;
 }): ReactElement {
-  if (!routines.length)
+  if (!routines.length) {
+    if (props.loading) return <p className="aeon-sr">Loading automations</p>;
+    if (props.snapshot?.routines.length)
+      return <p className="management-empty">No automations match this view.</p>;
     return (
-      <p className="management-empty">
-        {props.loading ? "Loading automations…" : "No automations match this view."}
-      </p>
+      <EmptyState
+        text="Routines run a task on a schedule, or tell you when a page changes."
+        action="Watch something"
+        {...(props.onSuggest ? { onAction: () => props.onSuggest?.("Tell me when ") } : {})}
+      />
     );
+  }
   return (
     <div className="management-list">
       {routines.map((routine) => (

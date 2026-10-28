@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
+import { ActionRow, AddRow, SettingsGroup } from "./settings-list.js";
 
 // Sites the agent must never touch. Kept in page localStorage like the other agent settings; the
 // extension mirrors it into chrome.storage, where the browser engine reads it at every step.
@@ -59,64 +60,34 @@ export function BlockedSitesSettings({
 } = {}): ReactElement {
   const [local, setLocal] = useBlockedSites();
   const sites = given ?? local;
-  const [draft, setDraft] = useState("");
-  const add = (event: FormEvent) => {
-    event.preventDefault();
-    const site = siteFromInput(draft);
-    if (!site || sites.includes(site)) {
-      setDraft("");
-      return;
-    }
+  const add = (value: string): void => {
+    const site = siteFromInput(value);
+    if (!site || sites.includes(site)) return;
     if (onAdd) onAdd(site);
     else setLocal([...local, site].sort());
-    setDraft("");
   };
+  const remove = (site: string): void =>
+    onRemove ? onRemove(site) : setLocal(local.filter((item) => item !== site));
   return (
-    <section className="settings-group">
-      <h2>Blocked sites</h2>
-      <p>
-        The agent never opens, reads or calls these sites (or their subdomains), even if a page
-        tells it to. Naming one in your own request lets that run use it.
-      </p>
-      <form className="settings-inline-form" onSubmit={add}>
-        <input
-          aria-label="Site to block"
-          placeholder="hdfcbank.com"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+    <div className="settings-groups">
+      <SettingsGroup
+        title="Blocked sites"
+        footer="Aeon never opens, reads or calls these sites or their subdomains, even if a page tells it to. Naming one in your own message lets that run use it."
+      >
+        {sites.map((site) => (
+          <ActionRow key={site} label={site} action="Unblock" onClick={() => remove(site)} />
+        ))}
+        <AddRow
+          label="Site to block"
+          placeholder="Block a site, e.g. mybank.com"
+          action="Block"
+          valid={(value) => {
+            const site = siteFromInput(value);
+            return Boolean(site && !sites.includes(site));
+          }}
+          onAdd={add}
         />
-        <button type="submit" disabled={!siteFromInput(draft)}>
-          Block
-        </button>
-      </form>
-      <BlockedSiteList
-        sites={sites}
-        onRemove={(site) =>
-          onRemove ? onRemove(site) : setLocal(local.filter((item) => item !== site))
-        }
-      />
-    </section>
-  );
-}
-
-function BlockedSiteList({
-  sites,
-  onRemove,
-}: {
-  sites: readonly string[];
-  onRemove(site: string): void;
-}): ReactElement | null {
-  if (!sites.length) return null;
-  return (
-    <ul className="settings-site-list">
-      {sites.map((site) => (
-        <li key={site}>
-          <span>{site}</span>
-          <button type="button" aria-label={`Unblock ${site}`} onClick={() => onRemove(site)}>
-            Unblock
-          </button>
-        </li>
-      ))}
-    </ul>
+      </SettingsGroup>
+    </div>
   );
 }

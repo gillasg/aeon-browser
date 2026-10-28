@@ -641,13 +641,13 @@ body[data-host="panel"] .home-start {
 
 :root[data-theme="midnight"] .home-sidebar,
 :root[data-theme="midnight"] .chat-sidebar {
-  background: #16161c;
+  background: #151521;
   border-right-color: #24242b;
 }
 :root[data-theme="midnight"] .composer,
 :root[data-theme="midnight"] .home-query-form {
   background: var(--aeon-surface);
-  border-color: #1c1c22;
+  border-color: #1b1b27;
 }
 .home-shell[data-sidebar-collapsed="false"] {
   --home-sidebar-width: min(var(--aeon-sidebar-width, 264px), calc(100vw - 100px));
@@ -805,7 +805,8 @@ body[data-host="panel"] .home-main[data-screen="new-tab"] .home-start {
   margin-top: auto;
   width: 100%;
 }
-body[data-host="panel"] .home-recent-section {
+body[data-host="panel"] .home-recent-section,
+body[data-host="panel"] .home-block {
   display: none;
 }
 body[data-host="panel"] .chat-main {
@@ -985,5 +986,10 @@ body[data-host="panel"] .composer-context-slot {
   margin: 0 auto;
 }
 .home-attachments:empty {
+  display: none;
+}
+
+/* The side panel has its own bar (switcher, new chat, open in a tab); home's page tabs stay out. */
+body[data-host="panel"] .home-top-bar {
   display: none;
 }

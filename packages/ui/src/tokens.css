@@ -317,3 +317,85 @@
   --aeon-line: #24242b;
   --aeon-accent: #b8afc7;
 }
+
+/* One material for every Aeon page: true neutral greys, the text colour as the accent (buttons,
+   switches, selection), purple only for Aeon itself (the swarm, a running dot), amber when it
+   needs you. */
+:root {
+  --aeon-font-body: 13.5px/1.5 Geist, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --aeon-r-sm: 8px;
+  --aeon-r-md: 10px;
+  --aeon-r-lg: 14px;
+  --aeon-r-xl: 18px;
+  --aeon-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --aeon-bg-0: #0d0d0d;
+  --aeon-bg-1: #121212;
+  --aeon-bg-2: #171717;
+  --aeon-bg-3: #1f1f1f;
+  --aeon-bg-4: #262626;
+  --aeon-border: #262626;
+  --aeon-border-strong: #333333;
+  --aeon-canvas: #0d0d0d;
+  --aeon-surface: #171717;
+  --aeon-surface-raised: #1f1f1f;
+  --aeon-text: #f2f2f2;
+  --aeon-muted: #9b9b9b;
+  --aeon-faint: #6b6b6b;
+  --aeon-line: #262626;
+  --aeon-accent: #f2f2f2;
+  --aeon-accent-ink: #0d0d0d;
+  --aeon-brand: #a78bfa;
+  --aeon-needs: #e5b567;
+  --aeon-warm: #e5b567;
+}
+:root[data-theme="light"],
+:root[data-theme="system"] {
+  --aeon-bg-0: light-dark(#f5f5f5, #0d0d0d);
+  --aeon-bg-1: light-dark(#efefef, #121212);
+  --aeon-bg-2: light-dark(#ffffff, #171717);
+  --aeon-bg-3: light-dark(#efefef, #1f1f1f);
+  --aeon-bg-4: light-dark(#e5e5e5, #262626);
+  --aeon-border: light-dark(#e3e3e3, #262626);
+  --aeon-border-strong: light-dark(#cfcfcf, #333333);
+  --aeon-canvas: light-dark(#f5f5f5, #0d0d0d);
+  --aeon-surface: light-dark(#ffffff, #171717);
+  --aeon-surface-raised: light-dark(#efefef, #1f1f1f);
+  --aeon-text: light-dark(#161616, #f2f2f2);
+  --aeon-muted: light-dark(#6b6b6b, #9b9b9b);
+  --aeon-faint: light-dark(#a3a3a3, #6b6b6b);
+  --aeon-line: light-dark(#e3e3e3, #262626);
+  --aeon-accent: light-dark(#161616, #f2f2f2);
+  --aeon-accent-ink: light-dark(#ffffff, #0d0d0d);
+  --aeon-brand: light-dark(#6d4ce6, #a78bfa);
+  --aeon-needs: light-dark(#a8741f, #e5b567);
+  --aeon-warm: light-dark(#a8741f, #e5b567);
+  --aeon-home-canvas: var(--aeon-canvas);
+  --aeon-home-text: var(--aeon-text);
+}
+/* Words for screen readers only, where motion carries the meaning on screen. */
+.aeon-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The swarm's two shades, near side then far side. On light pages the near side is the deeper
+   one, so the globe still reads as lit. MiniSwarm reads them from its canvas's color and
+   border color. */
+:root {
+  --aeon-swarm-near: light-dark(#5a3ad8, #c4b5fd);
+  --aeon-swarm-far: light-dark(#b8a7f7, #7c5cf0);
+  --aeon-swarm-needs-near: light-dark(#a45f00, #ffe2a8);
+  --aeon-swarm-needs-far: light-dark(#efbd70, #e08a00);
+}
+.mini-swarm {
+  color: var(--aeon-swarm-near);
+  border: 0 solid var(--aeon-swarm-far);
+}
+.mini-swarm[data-tone="needs"] {
+  color: var(--aeon-swarm-needs-near);
+  border-color: var(--aeon-swarm-needs-far);
+}

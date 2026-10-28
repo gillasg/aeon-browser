@@ -9,6 +9,7 @@ import type {
 import { PiModelPicker, PiThinkingPicker } from "./pi-model-picker.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 import { PiContextUsageRing } from "./pi-context-usage.js";
+import { QuietWait } from "./pending-work.js";
 import { AnnotationChips, useAnnotations } from "./transcript-annotations.js";
 
 export interface ComposerPanelsProps {
@@ -63,11 +64,7 @@ function emptyModelsCard(props: ComposerPanelsProps): ReactElement | null {
 }
 
 function ModelLoading({ connecting }: { connecting: boolean }): ReactElement {
-  return (
-    <span className="model-loading" role="status">
-      {connecting ? "Connecting…" : "Starting…"}
-    </span>
-  );
+  return <QuietWait label={connecting ? "Connecting…" : "Starting…"} />;
 }
 
 function WorkingPanels({ props }: { props: ComposerPanelsProps }): ReactElement {

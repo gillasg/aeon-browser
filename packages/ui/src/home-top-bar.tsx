@@ -3,13 +3,15 @@ import { useEffect, type ReactElement } from "react";
 // Home has no sidebar: Chrome's own tabs and sidebar already list open chats. A thin bar takes
 // you to each of Aeon's pages instead. Escape, or the page you are on again, returns home.
 
-// Four sections: Chats (with Activity), Automations, Sites, and Settings behind the gear.
-export type HomeView = "home" | "chats" | "activity" | "automations" | "sites" | "settings";
+// Chats (with Activity), Automations, Sites, Learn, and Settings behind the gear.
+export type HomeView =
+  "home" | "chats" | "activity" | "automations" | "sites" | "learn" | "settings";
 
 const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings" | "activity">, string]> = [
   ["chats", "Chats"],
   ["automations", "Automations"],
   ["sites", "Sites"],
+  ["learn", "Learn"],
 ];
 
 export function HomeTopBar({
@@ -79,16 +81,24 @@ function useHomeEscape(view: HomeView, onView: (view: HomeView) => void): void {
 }
 
 /** `?view=` to a page. Old page names (routines, watchers, sessions, resources…) still land. */
+const ROUTES: Record<string, { view: HomeView; settingsSection?: "settings" | "advanced" }> = {
+  routines: { view: "automations" },
+  watchers: { view: "automations" },
+  automations: { view: "automations" },
+  sites: { view: "sites" },
+  sessions: { view: "sites" },
+  chats: { view: "chats" },
+  activity: { view: "activity" },
+  learn: { view: "learn" },
+  settings: { view: "settings", settingsSection: "settings" },
+  advanced: { view: "settings", settingsSection: "advanced" },
+  resources: { view: "settings", settingsSection: "advanced" },
+  capabilities: { view: "settings", settingsSection: "advanced" },
+};
+
 export function viewFromRoute(route: string | null): {
   view: HomeView;
   settingsSection?: "settings" | "advanced";
 } {
-  if (route === "routines" || route === "watchers" || route === "automations")
-    return { view: "automations" };
-  if (route === "sites" || route === "sessions") return { view: "sites" };
-  if (route === "chats" || route === "activity") return { view: route };
-  if (route === "settings") return { view: "settings", settingsSection: "settings" };
-  if (route === "advanced" || route === "resources" || route === "capabilities")
-    return { view: "settings", settingsSection: "advanced" };
-  return { view: "home" };
+  return (route && Object.hasOwn(ROUTES, route) && ROUTES[route]) || { view: "home" };
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { PickerChevron } from "./picker-chevron.js";
+import { SidebarIcon } from "./sidebar-icons.js";
 
 export interface SidePanelProps {
   chats: readonly Pick<ChatCatalogItemDto, "chatId" | "title" | "updatedAt">[];
@@ -8,13 +9,11 @@ export interface SidePanelProps {
   status: string;
   pickerOpen: boolean;
   chatFrameSrc: string;
-  splitViewSupported: boolean;
   onTogglePicker(open: boolean): void;
   onSelect(chatId: string): void;
   onNew(): void;
   onAllChats(): void;
   onOpenFull(): void;
-  onOpenSplit(): void;
 }
 
 export function SidePanel(props: SidePanelProps): ReactElement {
@@ -94,34 +93,31 @@ function PanelHeader({
           aria-controls="chat-picker-menu"
           onClick={() => props.onTogglePicker(!props.pickerOpen)}
         >
-          <span id="selected-chat-title">{selectedTitle ?? "New Chat"}</span>
+          <span id="selected-chat-title">{selectedTitle ?? "New chat"}</span>
           <PickerChevron />
         </button>
         {props.pickerOpen && <PickerMenu props={props} />}
       </div>
       <button
-        id="open-split"
+        id="panel-new-chat"
+        className="panel-icon-button"
         type="button"
-        aria-label={props.splitViewSupported ? "Open Chat in Split View" : "Open Chat in a new tab"}
-        title={
-          props.splitViewSupported
-            ? "Open Chat in Split View"
-            : "Open Chat in a new tab · Chrome 155+ adds Split View"
-        }
-        disabled={!selectedTitle}
-        onClick={props.onOpenSplit}
+        aria-label="New chat"
+        title="New chat"
+        onClick={props.onNew}
       >
-        ◫
+        <SidebarIcon kind="plus" />
       </button>
       <button
         id="open-full"
+        className="panel-icon-button"
         type="button"
-        aria-label="Open full tab"
-        title="Open full tab"
+        aria-label="Open in a tab"
+        title="Open in a tab"
         disabled={!selectedTitle}
         onClick={props.onOpenFull}
       >
-        ↗
+        <SidebarIcon kind="open" />
       </button>
     </header>
   );
@@ -130,9 +126,6 @@ function PanelHeader({
 function PickerMenu({ props }: { props: SidePanelProps }): ReactElement {
   return (
     <div id="chat-picker-menu" className="picker-menu" role="dialog" aria-label="Choose a Chat">
-      <button className="picker-new-chat" type="button" onClick={props.onNew}>
-        <span aria-hidden="true">＋</span> New Chat
-      </button>
       <PickerOptions
         chats={props.chats}
         selectedId={props.selectedChatId}
@@ -144,7 +137,7 @@ function PickerMenu({ props }: { props: SidePanelProps }): ReactElement {
         type="button"
         onClick={props.onAllChats}
       >
-        All Chats <span aria-hidden="true">›</span>
+        All chats <span aria-hidden="true">›</span>
       </button>
     </div>
   );
@@ -185,7 +178,7 @@ function PickerOptions({
           </section>
         ))
       ) : (
-        <p className="picker-empty">No Chats yet</p>
+        <p className="picker-empty">No chats yet</p>
       )}
     </div>
   );

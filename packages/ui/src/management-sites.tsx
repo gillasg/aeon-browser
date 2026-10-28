@@ -18,9 +18,9 @@ export function ImportPath({
 }): ReactElement {
   return (
     <label className="management-path">
-      Import pack
+      Import a site pack
       <input
-        placeholder="path to a .zip"
+        placeholder="Path to a .zip, then Enter"
         onKeyDown={(event) => {
           if (event.key !== "Enter") return;
           const path = event.currentTarget.value.trim();

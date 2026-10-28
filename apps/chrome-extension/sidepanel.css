@@ -104,7 +104,6 @@ body {
 .picker-menu[hidden] {
   display: none;
 }
-.picker-new-chat,
 .picker-all-chats {
   display: flex;
   align-items: center;
@@ -115,15 +114,6 @@ body {
   border-color: transparent;
   background: transparent;
   text-align: left;
-}
-.picker-new-chat {
-  justify-content: flex-start;
-  gap: var(--aeon-s-2);
-  color: var(--panel-text);
-}
-.picker-new-chat > span {
-  color: var(--panel-muted);
-  font-size: var(--aeon-fs-lg);
 }
 .picker-chat-list {
   min-height: 0;
@@ -246,9 +236,10 @@ iframe {
   width: 100%;
   border: 0;
 }
-#open-full,
-#open-split {
+.panel-icon-button {
+  display: grid;
   flex: 0 0 28px;
+  place-items: center;
   width: 28px;
   height: 28px;
   padding: 0;
@@ -256,13 +247,21 @@ iframe {
   border-radius: var(--aeon-r-sm);
   background: transparent;
   color: var(--panel-muted);
-  font-size: var(--aeon-fs-base);
+  transition:
+    background 160ms var(--aeon-spring),
+    color 160ms var(--aeon-spring);
 }
-#open-full:hover:not(:disabled),
-#open-split:hover:not(:disabled) {
+.panel-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+.panel-icon-button:hover:not(:disabled) {
   border-color: transparent;
   background: var(--panel-surface);
   color: var(--panel-text);
+}
+.panel-icon-button:disabled {
+  opacity: 0.35;
 }
 @media (max-width: 370px) {
   .panel-header {

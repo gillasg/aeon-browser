@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from "react";
+import { EmptyState } from "./empty-state.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { ActionNote } from "./management-automations.js";
@@ -68,11 +69,10 @@ export function SitesPage(props: ManagementSurfaceProps): ReactElement {
         <SiteDetail entry={entry} props={props} chatId={chatId} onBack={() => setSelected("")} />
       ) : (
         <>
-          <div className="management-toolbar">
+          <SiteList entries={entries} onSelect={setSelected} onSuggest={props.onSuggest} />
+          <div className="management-footnote">
             <ImportPath chatId={chatId} onAction={props.onAction} />
-            <AddRule props={props} />
           </div>
-          <SiteList entries={entries} onSelect={setSelected} />
         </>
       )}
     </div>
@@ -82,15 +82,19 @@ export function SitesPage(props: ManagementSurfaceProps): ReactElement {
 function SiteList({
   entries,
   onSelect,
+  onSuggest,
 }: {
   entries: SiteEntry[];
   onSelect(host: string): void;
+  onSuggest: ((example: string) => void) | undefined;
 }): ReactElement {
   if (!entries.length)
     return (
-      <p className="management-empty">
-        No sites yet. Aeon learns a site as it works there; ask it to map one to learn it all.
-      </p>
+      <EmptyState
+        text="Aeon learns a site as it works there, and gets faster each time."
+        action="Learn a site"
+        {...(onSuggest ? { onAction: () => onSuggest("Learn how to search on ") } : {})}
+      />
     );
   return (
     <ul className="site-list">
@@ -294,26 +298,6 @@ function Rules({
           Agents never open, read or call it. Your own browsing is unaffected.
         </span>
       </span>
-    </label>
-  );
-}
-
-/** A rule for a site Aeon hasn't met yet: block it before any agent goes there. */
-function AddRule({ props }: { props: ManagementSurfaceProps }): ReactElement | null {
-  if (!props.onBlockedSiteAdd) return null;
-  return (
-    <label className="management-path">
-      Block a site
-      <input
-        placeholder="example.com"
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
-          const host = event.currentTarget.value.trim().toLowerCase();
-          if (!host) return;
-          props.onBlockedSiteAdd?.(host);
-          event.currentTarget.value = "";
-        }}
-      />
     </label>
   );
 }

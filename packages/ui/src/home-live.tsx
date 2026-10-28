@@ -215,7 +215,7 @@ function RecentRow({
   );
 }
 
-function ago(at: string): string {
+export function ago(at: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(at)) / 60_000));
   if (minutes < 1) return "now";
   if (minutes < 60) return `${minutes}m`;

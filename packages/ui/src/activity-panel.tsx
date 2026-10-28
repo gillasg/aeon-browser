@@ -14,16 +14,10 @@ export function ActivityPanel({
   onUndo?(entry: ActivityEntry): void;
 }): ReactElement {
   return (
-    <section className="management-main activity-page" aria-label="Activity">
-      <header className="management-heading">
-        <div>
-          <h1>Activity</h1>
-          <p className="activity-lede">
-            What Aeon changed on sites for you: forms sent, items changed in bulk, orders, messages,
-            bookings.
-          </p>
-        </div>
-      </header>
+    <section className="activity-page" aria-label="Activity">
+      <p className="activity-lede">
+        What Aeon changed on sites for you: forms sent, orders, messages, bookings.
+      </p>
       {entries.length ? (
         days(entries).map(([day, items]) => (
           <section key={day} className="activity-day" aria-label={day}>
