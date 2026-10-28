@@ -19,44 +19,33 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
     return () => clearInterval(timer);
   }, [running, props.onRefresh]);
   return (
-    <div className="management-automations">
-      <p className="management-hint">
+    <section className="settings-group management-automations">
+      <h2>Saved steps</h2>
+      <ActionNote note={props.snapshot?.lastAction} />
+      {abilities.length ? (
+        <ul className="aeon-list ability-list">
+          {abilities.map((ability) => (
+            <AbilityRow
+              key={`${ability.site}:${ability.name}`}
+              ability={ability}
+              onRun={(params) =>
+                props.onAction(chatId, "run_site_ability", {
+                  site: ability.site,
+                  name: ability.name,
+                  params,
+                })
+              }
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="management-empty">Nothing saved yet.</p>
+      )}
+      <p className="settings-footnote">
         Things Aeon learned to do on a site. It saves one when a task works, fixes it when the site
         changes and drops it when it keeps failing. <code>aeon actions run</code> runs the same.
       </p>
-      <ActionNote note={props.snapshot?.lastAction} />
-      {abilities.length ? (
-        <table className="management-table">
-          <thead>
-            <tr>
-              <th scope="col">Action</th>
-              <th scope="col">Inputs</th>
-              <th scope="col">Works</th>
-              <th scope="col" aria-label="Run" />
-            </tr>
-          </thead>
-          <tbody>
-            {abilities.map((ability) => (
-              <AbilityRow
-                key={`${ability.site}:${ability.name}`}
-                ability={ability}
-                onRun={(params) =>
-                  props.onAction(chatId, "run_site_ability", {
-                    site: ability.site,
-                    name: ability.name,
-                    params,
-                  })
-                }
-              />
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="management-empty">
-          Nothing saved yet. Aeon saves steps on its own once a task works.
-        </p>
-      )}
-    </div>
+    </section>
   );
 }
 
@@ -82,64 +71,50 @@ function AbilityRow({
 }): ReactElement {
   const [open, setOpen] = useState(false);
   return (
-    <tr>
-      <td>
-        <strong>{humanize(ability.name)}</strong>
-        {ability.description && <p className="management-subtle">{ability.description}</p>}
-        <p className="management-subtle">
-          {ability.site} · {ability.kind === "write" ? "changes things" : "reads"} ·{" "}
-          {ability.ways.join(" → ")}
-        </p>
-      </td>
-      <td>
-        {ability.inputs.length ? (
-          <ul className="management-inputs">
-            {ability.inputs.map((input) => (
-              <li key={input.name}>
-                <code>{input.name}</code>
-                {input.required ? " *" : ""}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <span className="management-subtle">none</span>
-        )}
-      </td>
-      <td>
+    <li className="ability-row">
+      <div className="ability-main">
+        <span className="ability-text">
+          <strong>{humanize(ability.name)}</strong>
+          {ability.description && <span className="ability-about">{ability.description}</span>}
+          <small>
+            {ability.site} · {ability.kind === "write" ? "Changes things" : "Reads"}
+            {ability.inputs.length > 0 &&
+              ` · ${ability.inputs.map((input) => input.name).join(", ")}`}
+          </small>
+        </span>
         <Health ability={ability} />
-      </td>
-      <td>
         {ability.running ? (
-          <span className="management-run-running">running</span>
+          <span className="management-run-running">Running</span>
         ) : (
-          <button type="button" onClick={() => setOpen((value) => !value)}>
-            Run
+          <button type="button" className="aeon-button" onClick={() => setOpen((value) => !value)}>
+            {open ? "Cancel" : "Run"}
           </button>
         )}
-        {open && (
-          <RunForm
-            ability={ability}
-            onStart={(params) => {
-              onRun(params);
-              setOpen(false);
-            }}
-          />
-        )}
-      </td>
-    </tr>
+      </div>
+      {open && (
+        <RunForm
+          ability={ability}
+          onStart={(params) => {
+            onRun(params);
+            setOpen(false);
+          }}
+        />
+      )}
+    </li>
   );
 }
 
 function Health({ ability }: { ability: Ability }): ReactElement {
   const stats = ability.stats;
-  if (!stats?.runs) return <span className="management-subtle">Not run yet</span>;
+  if (!stats?.runs) return <span className="ability-health">New</span>;
   const ok = stats.runs - stats.failures;
   return (
-    <span className={`management-run management-run-${stats.failures ? "failed" : "ok"}`}>
+    <span
+      className="ability-health"
+      data-tone={stats.failures ? "needs" : "ok"}
+      title={stats.lastOkAt ? `Last worked ${formatWhen(stats.lastOkAt)}` : undefined}
+    >
       {ok}/{stats.runs}
-      {stats.lastOkAt && (
-        <span className="management-subtle"> · last worked {formatWhen(stats.lastOkAt)}</span>
-      )}
     </span>
   );
 }
@@ -153,32 +128,33 @@ function RunForm({
 }): ReactElement {
   const [values, setValues] = useState<Record<string, string>>({});
   return (
-    <div className="management-form">
+    <form
+      className="ability-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const params: Record<string, unknown> = {};
+        for (const [name, raw] of Object.entries(values))
+          if (raw !== "") params[name] = parseValue(raw);
+        onStart(params);
+      }}
+    >
       {ability.inputs.map((input) => (
-        <label key={input.name}>
-          {input.name}
-          {input.required ? " *" : ""}
-          <input
-            value={values[input.name] ?? ""}
-            placeholder={input.description ?? ""}
-            onChange={(event) =>
-              setValues((current) => ({ ...current, [input.name]: event.target.value }))
-            }
-          />
-        </label>
+        <input
+          key={input.name}
+          className="settings-row-input"
+          aria-label={input.name}
+          placeholder={`${input.name}${input.required ? "" : " (optional)"}`}
+          title={input.description ?? undefined}
+          value={values[input.name] ?? ""}
+          onChange={(event) =>
+            setValues((current) => ({ ...current, [input.name]: event.target.value }))
+          }
+        />
       ))}
-      <button
-        type="button"
-        onClick={() => {
-          const params: Record<string, unknown> = {};
-          for (const [name, raw] of Object.entries(values))
-            if (raw !== "") params[name] = parseValue(raw);
-          onStart(params);
-        }}
-      >
+      <button type="submit" className="aeon-button" data-tone="primary">
         Start
       </button>
-    </div>
+    </form>
   );
 }
 

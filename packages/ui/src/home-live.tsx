@@ -148,7 +148,7 @@ export function RecentChats({
           All chats →
         </button>
       </div>
-      <ul className="home-recent-list" id="recent-chats">
+      <ul className="aeon-list home-recent-list" id="recent-chats">
         {chats.map((chat) => (
           <RecentRow
             key={chat.chatId}
@@ -186,7 +186,9 @@ function RecentRow({
         onClick={onOpen}
       >
         <span className="home-recent-title">{chat.title}</span>
-        <span className="home-recent-time">{chat.pinned ? "Pinned" : ago(chat.updatedAt)}</span>
+        <span className="home-recent-time" aria-label={chat.pinned ? "Pinned" : undefined}>
+          {chat.pinned ? <SidebarIcon kind="pin" /> : ago(chat.updatedAt)}
+        </span>
       </button>
       <span className="home-recent-actions">
         {onPin && (
