@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { COMMANDS as BROWSERKIT_COMMANDS } from "browserkit/dist/commands/index.js";
 import { flag, has, type Args } from "browserkit/dist/args.js";
@@ -349,19 +352,26 @@ async function review(host: DaemonHost, [action, value, note]: string[]): Promis
   return 0;
 }
 
+/** Automations are routines in the code; `aeon routine` stays as the same command. */
+function automationCommand(host: DaemonHost, name: string): Command {
+  return {
+    name,
+    group: "Aeon",
+    summary: "create, list, pause or delete automations (routines)",
+    help: `Usage: aeon automation create "<instruction>" [--schedule "every 15 minutes"] [--title t]
+         [--check "<browser code>"] [--sites a.com,b.com] [--chat <chatId>]
+       aeon automation list [--json] | pause <routineId> | delete <routineId>
+
+Creates the automation in a new chat (or --chat, one this CLI created). Alerts go to Aeon only.
+\`aeon routine\` is the same command.`,
+    run: (args) => routineCommand(host, args),
+  };
+}
+
 function outsideAgentCommands(host: DaemonHost): Command[] {
   return [
-    {
-      name: "routine",
-      group: "Aeon",
-      summary: "create, list, pause or delete routines",
-      help: `Usage: aeon routine create "<instruction>" [--schedule "every 15 minutes"] [--title t]
-         [--check "<browser code>"] [--sites a.com,b.com] [--chat <chatId>]
-       aeon routine list [--json] | pause <routineId> | delete <routineId>
-
-Creates the routine in a new chat (or --chat, one this CLI created). Alerts go to Aeon only.`,
-      run: (args) => routineCommand(host, args),
-    },
+    automationCommand(host, "automation"),
+    { ...automationCommand(host, "routine"), hidden: true },
     {
       name: "context",
       group: "Aeon",
@@ -616,6 +626,34 @@ printed URL carries a token. Playwright: chromium.connectOverCDP(url). Puppeteer
 connect({browserURL: url}). Tabs opened through the endpoint close when the client disconnects.`,
     run: (args) => cdp(host, args),
   });
+  overrides.set("update", {
+    name: "update",
+    group: "Browser",
+    summary: "update Aeon and browserkit, rebuild, and set everything up again",
+    help: `Usage: aeon update
+
+Runs scripts/setup.mjs in this checkout after pulling it (fast-forward only): it pulls and builds
+browserkit, rebuilds Aeon, updates the native host and waits for the extension to reconnect
+(reload it in chrome://extensions).`,
+    run: () => updateAeon(),
+  });
   const commands = BROWSERKIT_COMMANDS.map((command) => overrides.get(command.name) ?? command);
   return [...aeonOnlyCommands(host), ...commands];
+}
+
+/** aeon update: pull this checkout (fast-forward only), then run the one-command setup again. */
+function updateAeon(): Promise<number> {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const git = (args: string[]): string =>
+    execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  if (git(["status", "--porcelain"])) {
+    process.stdout.write(`Local changes in ${root}; commit or stash them first.\n`);
+    return Promise.resolve(1);
+  }
+  git(["pull", "--ff-only"]);
+  execFileSync(process.execPath, [join(root, "scripts", "setup.mjs"), "--no-agents"], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  return Promise.resolve(0);
 }

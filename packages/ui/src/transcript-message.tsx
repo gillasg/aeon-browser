@@ -223,7 +223,7 @@ function RoutineResult({
   const failed = block.state === "failed";
   return (
     <div className="routine-result" data-state={block.state} data-run-id={block.runId}>
-      <span>{failed ? "Routine failed" : "Routine completed"}</span>
+      <span>{failed ? "Automation failed" : "Automation completed"}</span>
       <span className={`activity-state-badge ${failed ? "is-error" : ""}`}>
         {failed ? "Error" : "Done"}
       </span>

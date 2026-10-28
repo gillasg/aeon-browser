@@ -182,7 +182,8 @@ test("an assistant error ends the run as an error", () => {
 });
 
 async function loadModule(source) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-module-"));
+  // Inside the repo, so the bundle's external react resolves to the copy the test renders with.
+  const directory = await mkdtemp(fileURLToPath(new URL("./.orb-module-", import.meta.url)));
   const outfile = join(directory, "module.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL(`../src/orb/${source}`, import.meta.url))],
@@ -191,6 +192,7 @@ async function loadModule(source) {
     platform: "node",
     format: "esm",
     jsx: "automatic",
+    external: ["react", "react-dom", "react/jsx-runtime"],
   });
   const module = await import(pathToFileURL(outfile).href);
   await rm(directory, { recursive: true, force: true });
@@ -212,6 +214,10 @@ const boxModel = {
   notice: "",
   busy: false,
   learning: false,
+  pending: "",
+  chats: [{ chatId: "c1", title: "Tokyo flight", updatedAt: "2026-10-28T10:00:00.000Z" }],
+  running: new Set(["c1"]),
+  needs: new Set(),
 };
 
 test("the orb box composes until a chat exists, then frames that chat with hand-off buttons", async () => {
@@ -236,7 +242,16 @@ test("the orb box composes until a chat exists, then frames that chat with hand-
   assert.match(chat, /<iframe[^>]+chat\.html\?chatId=c1/);
   assert.match(chat, /Move to side panel/);
   assert.match(chat, /Open in a tab/);
+  assert.match(chat, /Tokyo flight/, "the switcher names the chat");
+  assert.match(chat, /New chat/);
   assert.doesNotMatch(chat, /Run again/);
+  // A message just sent shows at once, before the chat exists.
+  const pending = renderToStaticMarkup(
+    createElement(view.OrbBox, { model: { ...boxModel, pending: "Book it" }, actions: boxActions }),
+  );
+  assert.match(pending, /data-state="chat"/);
+  assert.match(pending, /Book it/);
+  assert.match(pending, /Starting/);
 });
 
 test("the orb's position defaults to bottom-left and ignores junk", async () => {

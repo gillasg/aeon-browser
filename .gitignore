@@ -53,3 +53,4 @@ PLAN*.md
 *.plan.md
 plans/
 notes/
+apps/chrome-extension/test/.orb-module-*

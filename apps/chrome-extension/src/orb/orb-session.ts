@@ -26,6 +26,7 @@ type CompletedResult = Extract<DaemonUiResponse, { kind: "command.completed" }>[
 export class OrbSession {
   private catalog: UiClient | undefined;
   private chat: UiClient | undefined;
+  private modelChoice: ReturnType<OrbSession["model"]> | undefined;
   chatId: string | undefined;
 
   constructor(
@@ -37,6 +38,20 @@ export class OrbSession {
     const result = await connectPage({ kind: "catalog" });
     if (result.kind !== "connected") throw new Error(connectionErrorMessage(result.code));
     this.catalog = result.client;
+    // Chosen ahead, so sending does not wait for the model list.
+    this.modelChoice = this.model();
+    this.modelChoice.catch(() => (this.modelChoice = undefined));
+  }
+
+  /** Recent chats, for the orb's switcher. */
+  async listChats(): Promise<{ chatId: string; title: string; updatedAt: string }[]> {
+    const result = await command(this.requireCatalog(), {
+      operation: "chat.list",
+      payload: { limit: 50 },
+    });
+    return result.kind === "chat.listed"
+      ? result.chats.map(({ chatId, title, updatedAt }) => ({ chatId, title, updatedAt }))
+      : [];
   }
 
   async model(): Promise<{ model: { provider: string; id: string }; thinkingLevel: string }> {
@@ -48,10 +63,15 @@ export class OrbSession {
     return pickModel(result.catalog);
   }
 
-  /** Starts a new chat for this prompt with the orb's tab as context, then follows it. */
-  async start(text: string): Promise<void> {
-    const { model, thinkingLevel } = await this.model();
-    const page = await this.page();
+  /**
+   * Starts a new chat for this prompt with the orb's tab as context. `created` runs as soon as
+   * the chat exists, so the box can show it while the event stream connects.
+   */
+  async start(text: string, created?: (chatId: string) => void): Promise<void> {
+    const [{ model, thinkingLevel }, page] = await Promise.all([
+      this.modelChoice ?? this.model(),
+      this.page(),
+    ]);
     const result = await command(this.requireCatalog(), {
       operation: "chat.create",
       payload: {
@@ -66,7 +86,16 @@ export class OrbSession {
     });
     if (result.kind !== "chat.created") throw new Error("The chat was not created.");
     this.chatId = result.chat.chatId;
+    created?.(result.chat.chatId);
     await this.follow(result.chat.chatId);
+  }
+
+  /** Follows another chat (the switcher), or none (a new chat to compose). */
+  async switchTo(chatId: string | undefined): Promise<void> {
+    this.chat?.close();
+    this.chat = undefined;
+    this.chatId = chatId;
+    if (chatId) await this.follow(chatId);
   }
 
   /** Sends the same prompt again in the same chat. */
@@ -117,15 +146,23 @@ export class OrbSession {
   private async follow(chatId: string): Promise<void> {
     const result = await connectPage({ kind: "chat", chatId });
     if (result.kind !== "connected") throw new Error(connectionErrorMessage(result.code));
+    if (this.chatId !== chatId) return result.client.close();
     this.chat = result.client;
-    this.chat.socket.addEventListener("close", () => this.listener.closed(), { once: true });
-    const response = await subscribeSavedChat(this.chat, chatId, undefined);
+    const client = result.client;
+    client.socket.addEventListener(
+      "close",
+      () => {
+        if (this.chat === client) this.listener.closed();
+      },
+      { once: true },
+    );
+    const response = await subscribeSavedChat(client, chatId, undefined);
     if (response.kind !== "chat.snapshot" && response.kind !== "chat.resumed")
       throw new Error("Could not follow the chat.");
     if (response.kind === "chat.snapshot")
       this.listener.snapshot(response.snapshot.entries, response.snapshot.runState);
-    this.chat.subscribe((message) => {
-      if (message.kind === "chat.event" && message.chatId === chatId)
+    client.subscribe((message) => {
+      if (message.kind === "chat.event" && message.chatId === chatId && this.chatId === chatId)
         this.listener.event(message.event.event);
     });
   }

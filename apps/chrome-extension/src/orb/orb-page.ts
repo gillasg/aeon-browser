@@ -2,6 +2,7 @@ import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
 import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
 import { openExtensionChat } from "../ui-connection.js";
+import { watchChatRunState } from "../chat-run-state.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { markSeen, setNeeds } from "./orb-control.js";
 import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
@@ -11,7 +12,9 @@ import { playSound } from "./orb-sounds.js";
 import { OrbBox, type OrbViewModel } from "./orb-view.js";
 
 // orb.html: the orb's box. Framed by the content script. Starts the chat, then shows it (the same
-// chat page the side panel shows) and keeps following its events to drive the swarm.
+// chat page the side panel shows) and keeps following its events to drive the swarm. Each tab's
+// orb remembers its chat; a new page's orb opens on the chat used last. The switcher moves to
+// another chat and + starts a new one, so every tab can watch or start its own work.
 
 const params = new URLSearchParams(location.search);
 const tabId = Number(params.get("tabId"));
@@ -24,7 +27,13 @@ const model: OrbViewModel = {
   notice: "",
   busy: false,
   learning: false,
+  pending: "",
+  chats: [],
+  running: new Set(),
+  needs: new Set(),
 };
+const TAB_CHAT = "aeon-orb-chat:" + tabId;
+const LAST_CHAT = "aeon-orb-last-chat";
 let run: OrbRun | undefined;
 let userControl = false;
 let lastVisual = "";
@@ -56,7 +65,57 @@ async function boot(): Promise<void> {
   sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
   focusPrompt();
-  void connectSession();
+  watchChatRunState((state) => {
+    model.running = state.running;
+    model.needs = state.needs;
+    toContent({ kind: "aeon.orb.agents", count: state.running.size });
+    render();
+  });
+  await connectSession();
+  const chatId = await rememberedChat();
+  if (chatId && !model.chatId && !model.pending) await selectChat(chatId, false);
+}
+
+/** This tab's chat; a tab that never chose one opens on the chat used last. "" = a new chat. */
+async function rememberedChat(): Promise<string | undefined> {
+  const stored = await chrome.storage.session.get([TAB_CHAT, LAST_CHAT]).catch(() => ({}));
+  const own = (stored as Record<string, unknown>)[TAB_CHAT];
+  const last = (stored as Record<string, unknown>)[LAST_CHAT];
+  if (typeof own === "string") return own || undefined;
+  return typeof last === "string" && last ? last : undefined;
+}
+
+function remember(chatId: string | undefined): void {
+  void chrome.storage.session
+    .set({ [TAB_CHAT]: chatId ?? "", ...(chatId ? { [LAST_CHAT]: chatId } : {}) })
+    .catch(() => undefined);
+}
+
+/** Shows another chat in this orb (the switcher), or a blank one to start (+). */
+async function selectChat(chatId: string | undefined, store = true): Promise<void> {
+  run = undefined;
+  sentActions = 0;
+  lastVisual = "";
+  lastState = "";
+  model.pending = "";
+  model.chatId = chatId;
+  model.chatUrl = chatId ? chatUrlFor(chatId) : "";
+  if (store) remember(chatId);
+  render();
+  if (!chatId) {
+    toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
+    focusPrompt();
+  }
+  try {
+    await session.switchTo(chatId);
+  } catch (error) {
+    notice(messageOf(error));
+  }
+}
+
+async function loadChats(): Promise<void> {
+  model.chats = await session.listChats().catch(() => model.chats);
+  render();
 }
 
 // The orb opens and stays open across daemon restarts, so one failed attempt must not leave it
@@ -99,17 +158,25 @@ function listen(): void {
   );
 }
 
+// The message shows at once; the chat is created and framed behind it.
 async function submit(text: string): Promise<void> {
   model.busy = true;
+  model.pending = text;
   run = initialRun();
   sentActions = 0;
+  render();
   sync();
   playSound("start");
   try {
-    await session.start(text);
-    showChat();
+    await session.start(text, (chatId) => {
+      model.chatId = chatId;
+      model.chatUrl = chatUrlFor(chatId);
+      remember(chatId);
+      render();
+    });
   } catch (error) {
     run = undefined;
+    model.pending = "";
     notice(messageOf(error));
   } finally {
     model.busy = false;
@@ -117,12 +184,8 @@ async function submit(text: string): Promise<void> {
   }
 }
 
-function showChat(): void {
-  const chatId = session.chatId;
-  if (!chatId) return;
-  model.chatId = chatId;
-  model.chatUrl = `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=panel`;
-  render();
+function chatUrlFor(chatId: string): string {
+  return `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=panel`;
 }
 
 function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
@@ -241,7 +304,13 @@ function view(): ReactNode {
     actions: {
       submit: (text) => void submit(text),
       minimize: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
-      close: () => toContent({ kind: "aeon.orb.hide", keepRunning: false }),
+      selectChat: (chatId) => void selectChat(chatId),
+      newChat: () => void selectChat(undefined),
+      loadChats: () => void loadChats(),
+      chatShown: () => {
+        model.pending = "";
+        render();
+      },
       toSidePanel,
       toTab,
       toggleLearning: () => void toggleLearning(),

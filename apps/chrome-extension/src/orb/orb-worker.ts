@@ -1,18 +1,41 @@
 import { isNeedsKey } from "./orb-control.js";
-import { ORB_COMMAND, nonceKey, type OrbToggle, type OrbVerify } from "./orb-messages.js";
+import {
+  ORB_COMMAND,
+  ORB_DISMISS,
+  ORB_OFF,
+  ORB_ON_KEY,
+  ORB_RESTORE,
+  nonceKey,
+  type OrbToggle,
+  type OrbVerify,
+} from "./orb-messages.js";
 
 // The shortcut lives in the service worker. Pages Chrome keeps extensions out of
 // (chrome://, the Web Store, the PDF viewer) get the side panel instead. The worker also keeps
 // the toolbar badge: how many runs need the user, else how many finished results are unread.
+// The orb is a pet: once summoned it is on every web page (its box open where it was summoned,
+// folded elsewhere) and comes back after every navigation and reload, until the shortcut, or a
+// move to the side panel or a tab, dismisses it everywhere.
 
 export function installOrb(): void {
   chrome.commands.onCommand.addListener((command, tab) => {
     if (command === ORB_COMMAND) summon(tab);
   });
   chrome.runtime.onMessage.addListener((request: unknown, sender, sendResponse) => {
-    const message = request as Partial<OrbVerify> | null;
-    if (message?.kind !== "aeon.orb.verify" || sender.id !== chrome.runtime.id) return;
-    void verify(message, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    const message = request as Partial<OrbVerify> | { kind?: unknown } | null;
+    if (sender.id !== chrome.runtime.id) return;
+    if (message?.kind === ORB_RESTORE) {
+      void restore(sender.tab?.id).then(sendResponse, () => sendResponse(null));
+      return true;
+    }
+    if (message?.kind === ORB_OFF) {
+      void setOn(false);
+      return;
+    }
+    if (message?.kind !== "aeon.orb.verify") return;
+    void verify(message as Partial<OrbVerify>, sender).then(sendResponse, () =>
+      sendResponse({ ok: false }),
+    );
     return true;
   });
   chrome.storage.session.onChanged.addListener((changes) => {
@@ -53,11 +76,52 @@ function summon(tab: chrome.tabs.Tab | undefined): void {
 }
 
 async function toggle(tabId: number): Promise<void> {
+  if (await isOn()) return setOn(false);
+  await setOn(true);
+  await present(tabId, true);
+  // Every other web page gets the folded orb; frozen or unloaded tabs ask when they wake.
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }).catch(() => []);
+  for (const tab of tabs)
+    if (tab.id !== undefined && tab.id !== tabId && !tab.discarded)
+      void present(tab.id, false).catch(() => undefined);
+}
+
+async function isOn(): Promise<boolean> {
+  return (await chrome.storage.session.get(ORB_ON_KEY))[ORB_ON_KEY] === true;
+}
+
+async function setOn(on: boolean): Promise<void> {
+  await chrome.storage.session.set({ [ORB_ON_KEY]: on });
+  if (on) return;
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }).catch(() => []);
+  for (const tab of tabs)
+    if (tab.id !== undefined)
+      void chrome.tabs
+        .sendMessage(tab.id, { kind: ORB_DISMISS }, { frameId: 0 })
+        .catch(() => undefined);
+}
+
+async function nonceFor(tabId: number): Promise<string> {
   const nonce = crypto.randomUUID();
   await chrome.storage.session.set({ [nonceKey(nonce)]: tabId });
-  // Only the first summon in a tab frames orb.html and uses its nonce; drop the rest.
+  // A nonce frames orb.html once; an unused one expires.
   setTimeout(() => void chrome.storage.session.remove(nonceKey(nonce)), 30_000);
-  const message: OrbToggle = { kind: "aeon.orb.toggle", tabId, nonce };
+  return nonce;
+}
+
+/** A page that loaded (or woke) while the orb is on asks for it: a fresh nonce for that tab. */
+async function restore(tabId: number | undefined): Promise<OrbToggle | null> {
+  if (tabId === undefined || !(await isOn())) return null;
+  return { kind: "aeon.orb.toggle", tabId, nonce: await nonceFor(tabId), open: false };
+}
+
+async function present(tabId: number, open: boolean): Promise<void> {
+  const message: OrbToggle = {
+    kind: "aeon.orb.toggle",
+    tabId,
+    nonce: await nonceFor(tabId),
+    open,
+  };
   try {
     await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
   } catch {

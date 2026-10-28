@@ -176,3 +176,128 @@ button.icon {
 button.icon:hover {
   color: #fff;
 }
+
+.box-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The message just sent, shown at once while the chat is created and framed. */
+.box-pending {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 14px;
+  background: #050507;
+}
+.box-pending-message {
+  margin: 0;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f0f6;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.box-pending-status {
+  align-self: flex-start;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  animation: box-pending 1.6s ease-in-out infinite;
+}
+@keyframes box-pending {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* The chat switcher in the orb: a text pill whose list opens in place below its row (the box
+   clips anything floating), and the box grows to fit it. */
+.chat-switcher {
+  display: contents;
+}
+.isl-row,
+.box-bar {
+  flex-wrap: wrap;
+}
+.chat-switcher-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-switcher-menu {
+  order: 10;
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  max-height: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #1c1b25;
+  box-shadow: 0 16px 36px -16px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.chat-switcher-menu input {
+  margin: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f1f0f6;
+  font: inherit;
+  font-size: 12px;
+}
+.chat-switcher-menu ul {
+  margin: 0;
+  padding: 0 4px 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+.chat-switcher-menu li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: #e4e2ee;
+  cursor: pointer;
+}
+.chat-switcher-menu li[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.07);
+}
+.chat-switcher-menu li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-switcher-menu li small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.chat-switcher-menu li i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.chat-switcher-menu li i[data-state="running"] {
+  background: #9b8cff;
+}
+.chat-switcher-menu li i[data-state="needs"] {
+  background: #ffb347;
+}

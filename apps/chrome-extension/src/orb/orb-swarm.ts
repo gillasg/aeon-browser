@@ -37,7 +37,7 @@ const COLORS: Record<OrbVisualState, [string, string]> = {
 const ALPHA: Partial<Record<OrbVisualState, number>> = { paused: 0.55, error: 0.55, done: 0.85 };
 const RADIUS: Record<OrbVisualState, number> = {
   listening: 22,
-  thinking: 20,
+  thinking: 18,
   working: 18,
   needs: 21,
   done: 16,
@@ -46,7 +46,7 @@ const RADIUS: Record<OrbVisualState, number> = {
 };
 const SPEED: Record<OrbVisualState, number> = {
   listening: 0.9,
-  thinking: 2.2,
+  thinking: 1.4,
   working: 1.4,
   needs: 1,
   done: 0.25,
@@ -60,6 +60,7 @@ export class Swarm {
   private readonly sparks: Spark[] = [];
   private state: OrbVisualState = "listening";
   private center = { x: 0, y: 0 };
+  private groups = 1;
   private cursor: { x: number; y: number } | null = null;
 
   constructor(
@@ -105,6 +106,23 @@ export class Swarm {
     }
   }
 
+  /** Several chats working: the swarm splits into one small swarm each (up to four). */
+  setAgents(count: number): void {
+    this.groups = Math.max(1, Math.min(4, Math.round(count) || 1));
+  }
+
+  /** Where particle `index` gathers: the centre, or its satellite when the swarm is split. */
+  private anchorOf(index: number): { x: number; y: number; scale: number } {
+    if (this.groups === 1) return { ...this.center, scale: 1 };
+    const group = index % this.groups;
+    const angle = -Math.PI / 2 + (group * Math.PI * 2) / this.groups;
+    return {
+      x: this.center.x + Math.cos(angle) * 17,
+      y: this.center.y + Math.sin(angle) * 17,
+      scale: 0.55,
+    };
+  }
+
   /** A step finished in another tab: a few sparks fly up toward the tab strip. */
   elsewhere(now: number): void {
     if (this.reducedMotion) return;
@@ -126,12 +144,13 @@ export class Swarm {
     context.clearRect(0, 0, width, height);
     const [light, deep] = COLORS[this.state];
     const time = now / 1000;
-    const anchor = this.cursor ?? this.center;
     const radius = this.cursor ? 7 : this.radiusAt(time);
     const speed = this.reducedMotion ? 0 : SPEED[this.state] * (this.cursor ? 1.8 : 1);
-    for (const particle of this.particles) {
+    for (const [index, particle] of this.particles.entries()) {
+      const home = this.anchorOf(index);
+      const anchor = this.cursor ?? home;
       particle.theta += 0.016 * speed * particle.speed;
-      const r = radius + this.wobble(time, particle.phase);
+      const r = (radius + this.wobble(time, particle.phase)) * (this.cursor ? 1 : home.scale);
       const sinPhi = Math.sin(particle.phi);
       const tx = anchor.x + r * sinPhi * Math.cos(particle.theta);
       const ty = anchor.y + r * Math.cos(particle.phi);
@@ -154,7 +173,6 @@ export class Swarm {
 
   private wobble(time: number, phase: number): number {
     if (this.reducedMotion || this.cursor) return 0;
-    if (this.state === "thinking") return 7 * Math.sin(time * 3 + phase);
     if (this.state === "listening") return 2 * Math.sin(time * 8 + phase);
     return 0;
   }

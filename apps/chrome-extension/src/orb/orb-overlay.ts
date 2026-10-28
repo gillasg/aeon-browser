@@ -98,6 +98,7 @@ export class OrbOverlay {
     if (message.kind === "aeon.orb.visual") this.setVisual(message.state, message.label);
     else if (message.kind === "aeon.orb.cursor") this.streamTo(message.steps);
     else if (message.kind === "aeon.orb.elsewhere") this.swarm.elsewhere(performance.now());
+    else if (message.kind === "aeon.orb.agents") this.swarm.setAgents(message.count);
     else if (message.kind === "aeon.orb.spotlight") this.spotlight(message.box);
     else if (message.kind === "aeon.orb.panel")
       this.panel = {
