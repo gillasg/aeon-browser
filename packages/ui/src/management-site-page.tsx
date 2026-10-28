@@ -54,12 +54,9 @@ export function siteEntries(
 }
 
 export function SitesPage(props: ManagementSurfaceProps): ReactElement {
-  const entries = siteEntries(
-    props.snapshot?.sites ?? [],
-    props.blockedSites ?? [],
-    props.snapshot?.routines ?? [],
-  );
+  const entries = entriesOf(props);
   const [selected, setSelected] = useState("");
+  const [query, setQuery] = useState("");
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
   const entry = entries.find((item) => item.host === selected);
   return (
@@ -69,7 +66,13 @@ export function SitesPage(props: ManagementSurfaceProps): ReactElement {
         <SiteDetail entry={entry} props={props} chatId={chatId} onBack={() => setSelected("")} />
       ) : (
         <>
-          <SiteList entries={entries} onSelect={setSelected} onSuggest={props.onSuggest} />
+          {entries.length > 0 && <SiteSearch query={query} onQuery={setQuery} />}
+          <SiteList
+            entries={matching(entries, query)}
+            searching={query.trim() !== ""}
+            onSelect={setSelected}
+            onSuggest={props.onSuggest}
+          />
           <div className="management-footnote">
             <ImportPath chatId={chatId} onAction={props.onAction} />
           </div>
@@ -79,15 +82,45 @@ export function SitesPage(props: ManagementSurfaceProps): ReactElement {
   );
 }
 
+function entriesOf(props: ManagementSurfaceProps): SiteEntry[] {
+  return siteEntries(
+    props.snapshot?.sites ?? [],
+    props.blockedSites ?? [],
+    props.snapshot?.routines ?? [],
+  );
+}
+
+function SiteSearch({ query, onQuery }: { query: string; onQuery(value: string): void }) {
+  return (
+    <input
+      className="aeon-search"
+      type="search"
+      value={query}
+      placeholder="Search sites"
+      aria-label="Search sites"
+      onChange={(event) => onQuery(event.target.value)}
+    />
+  );
+}
+
+function matching(entries: SiteEntry[], query: string): SiteEntry[] {
+  const text = query.trim().toLowerCase();
+  return text ? entries.filter((entry) => entry.host.includes(text)) : entries;
+}
+
 function SiteList({
   entries,
+  searching,
   onSelect,
   onSuggest,
 }: {
   entries: SiteEntry[];
+  searching: boolean;
   onSelect(host: string): void;
   onSuggest: ((example: string) => void) | undefined;
 }): ReactElement {
+  if (!entries.length && searching)
+    return <p className="management-empty">No sites match that search.</p>;
   if (!entries.length)
     return (
       <EmptyState

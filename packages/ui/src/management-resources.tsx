@@ -77,7 +77,7 @@ function ResourcePane({
   if (resources) return <ResourceContent tab={tab} resources={resources} />;
   return (
     <p className="management-empty">
-      {props.loading ? "Loading Pi resources…" : "Refresh to load this Chat’s Pi resources."}
+      {props.loading ? "Loading Pi resources…" : "No Pi resources loaded for this chat."}
     </p>
   );
 }

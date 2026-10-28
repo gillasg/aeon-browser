@@ -27,6 +27,7 @@ export function HomeTopBar({
   return (
     <header className="home-top-bar">
       <nav className="home-top-nav" aria-label="Aeon pages">
+        <HomeButton view={view} onView={onView} />
         {PAGES.map(([page, label]) => (
           <button
             key={page}
@@ -101,4 +102,28 @@ export function viewFromRoute(route: string | null): {
   settingsSection?: "settings" | "advanced";
 } {
   return (route && Object.hasOwn(ROUTES, route) && ROUTES[route]) || { view: "home" };
+}
+
+function HomeButton({
+  view,
+  onView,
+}: {
+  view: HomeView;
+  onView(view: HomeView): void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      id="home-home-link"
+      className="home-top-home"
+      aria-label="Home"
+      title="Home"
+      aria-current={view === "home" ? "page" : undefined}
+      onClick={() => onView("home")}
+    >
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <path d="M3.5 9.5 10 4l6.5 5.5M5.5 8.5V16h9V8.5" />
+      </svg>
+    </button>
+  );
 }
