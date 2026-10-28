@@ -1,5 +1,8 @@
 ## Abilities and long jobs
 
+- **Words users use.** "Actions" are abilities (`aeon actions`), "automations" are routines
+  (`aeon automation`), and "teach Aeon a site" means mapping it.
+
 - **Long jobs.** One `aeon tool` call runs up to 60 seconds, but a shell loop can run for hours:
   start a durable `browser.sweep`/`browser.job` and check it with `aeon job` (or run `aeon sweep
 @urls.txt`), keeping state with `checkpoint`/`loadCheckpoint` for anything else. First check your

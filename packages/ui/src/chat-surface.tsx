@@ -26,6 +26,10 @@ export interface ChatSurfaceProps {
   onGiveBack?(tabId: number): void;
   rows: readonly TranscriptRow[];
   chats: readonly ChatSummaryDto[];
+  /** Chats working right now, and those waiting for the user (the switcher's dots). */
+  runningChatIds?: ReadonlySet<string> | undefined;
+  needsChatIds?: ReadonlySet<string> | undefined;
+  onRefreshChats?(): void;
   sidebarOpen: boolean;
   sidebarQuery: string;
   composer: ChatComposerProps;
@@ -61,7 +65,19 @@ export function ChatSurface(props: ChatSurfaceProps): ReactElement {
       <span id="connection-state" hidden data-state={props.connection.state}>
         {props.connection.label}
       </span>
-      <ChatNavigation onNewChat={props.onNewChat} />
+      <ChatNavigation
+        onNewChat={props.onNewChat}
+        switcher={{
+          chats: props.chats,
+          currentChatId: props.chatId,
+          running: props.runningChatIds,
+          needs: props.needsChatIds,
+          onSelect: props.onSelectChat,
+          onOpen: props.onRefreshChats,
+          shortcut: true,
+          icon: true,
+        }}
+      />
       <ToolImageContext.Provider value={props.loadToolImage}>
         <div className="chat-content-host">
           <AnnotationProvider key={props.chatId}>
@@ -110,7 +126,7 @@ function ControlBar({
 }
 
 export const ONE_CLICK_TEXT =
-  "Save what you just did as an ability for this site, so next time it runs in one click without a model.";
+  "Save what you just did as an action for this site, so next time it runs in one click without a model.";
 
 /** After a run that worked in the browser: offer to save it as an ability ("make it one click"). */
 function OneClickOffer(props: ChatSurfaceProps): ReactElement | null {

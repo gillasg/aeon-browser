@@ -22,14 +22,14 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
     <div className="management-automations">
       <p className="management-hint">
         Things Aeon learned to do on a site. It saves one when a task works, fixes it when the site
-        changes and drops it when it keeps failing. <code>aeon abilities run</code> runs the same.
+        changes and drops it when it keeps failing. <code>aeon actions run</code> runs the same.
       </p>
       <ActionNote note={props.snapshot?.lastAction} />
       {abilities.length ? (
         <table className="management-table">
           <thead>
             <tr>
-              <th scope="col">Ability</th>
+              <th scope="col">Action</th>
               <th scope="col">Inputs</th>
               <th scope="col">Works</th>
               <th scope="col" aria-label="Run" />

@@ -32,7 +32,7 @@ export function ImportPath({
 }
 
 export function SiteAbilities({ site }: { site: Site }): ReactElement {
-  if (site.abilities.length === 0) return <span className="management-subtle">no abilities</span>;
+  if (site.abilities.length === 0) return <span className="management-subtle">no actions</span>;
   return (
     <ul className="management-inputs">
       {site.abilities.map((ability) => (
@@ -191,9 +191,9 @@ function RecipePicker({
   return (
     <>
       <label>
-        Ability
+        Action
         <select value={recipe} onChange={(event) => onRecipe(event.target.value)}>
-          <option value="">Choose an ability</option>
+          <option value="">Choose an action</option>
           {site.abilities.map((item) => (
             <option key={item.name} value={item.name}>
               {item.name}
@@ -202,7 +202,7 @@ function RecipePicker({
         </select>
       </label>
       <button type="button" disabled={!recipe} onClick={onRun}>
-        Run ability
+        Run action
       </button>
     </>
   );

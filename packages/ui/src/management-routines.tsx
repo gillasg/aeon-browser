@@ -67,10 +67,10 @@ function RoutineToolbar({
       <input
         value={query}
         onChange={(event) => onQuery(event.target.value)}
-        placeholder="Search routines"
-        aria-label="Search routines"
+        placeholder="Search automations"
+        aria-label="Search automations"
       />
-      <div role="group" aria-label="Routine status">
+      <div role="group" aria-label="Automation status">
         {(["all", "active", "paused"] as const).map((value) => (
           <button
             key={value}
@@ -102,7 +102,7 @@ function RoutineList({
   if (!routines.length)
     return (
       <p className="management-empty">
-        {props.loading ? "Loading routines…" : "No routines match this view."}
+        {props.loading ? "Loading automations…" : "No automations match this view."}
       </p>
     );
   return (

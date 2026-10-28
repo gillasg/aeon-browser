@@ -1,7 +1,16 @@
-import { isOrbToContent, isOrbToggle, type OrbShown } from "./orb-messages.js";
+import {
+  ORB_DISMISS,
+  ORB_OFF,
+  ORB_RESTORE,
+  isOrbToContent,
+  isOrbToggle,
+  type OrbShown,
+  type OrbToggle,
+} from "./orb-messages.js";
 import { OrbOverlay } from "./orb-overlay.js";
 
-// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed.
+// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed. While the
+// orb is on, every page asks for it on load and when it becomes visible, so it follows the user.
 
 declare global {
   interface Window {
@@ -18,27 +27,40 @@ function start(): void {
   let overlay: OrbOverlay | undefined;
   let recording = false;
 
-  // keepRunning: collapse to the orb (Esc, click away). Otherwise the orb goes: the shortcut
-  // again, Close, or the chat moving to the side panel or a tab. A run keeps going there.
+  // keepRunning: fold to the orb (Esc, click away, Minimize). Otherwise the orb goes everywhere:
+  // the chat moved to the side panel or a tab. A run keeps going there.
   const close = (keepRunning: boolean) => {
-    if (!overlay) return;
-    if (keepRunning) overlay.hideBubble();
-    else {
-      overlay.destroy();
-      overlay = undefined;
-    }
+    if (keepRunning) overlay?.hideBubble();
+    else void chrome.runtime.sendMessage({ kind: ORB_OFF }).catch(() => undefined);
   };
+  const show = (message: OrbToggle) => {
+    if (!overlay) {
+      overlay = new OrbOverlay(message.tabId, message.nonce);
+      overlay.setRecording(recording);
+    }
+    if (!message.open) return;
+    overlay.showBubble();
+    const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId };
+    void chrome.runtime.sendMessage(shown).catch(() => undefined);
+  };
+  const restore = () => {
+    if (overlay || document.visibilityState !== "visible") return;
+    void chrome.runtime
+      .sendMessage({ kind: ORB_RESTORE })
+      .then((reply: unknown) => {
+        if (isOrbToggle(reply)) show(reply);
+      })
+      .catch(() => undefined);
+  };
+  restore();
+  document.addEventListener("visibilitychange", restore);
 
   chrome.runtime.onMessage.addListener((message: unknown, sender) => {
     if (sender.id !== chrome.runtime.id) return;
-    if (isOrbToggle(message)) {
-      // The shortcut summons the orb, and pressing it again dismisses it.
-      if (overlay) return close(false);
-      overlay = new OrbOverlay(message.tabId, message.nonce);
-      overlay.setRecording(recording);
-      overlay.showBubble();
-      const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId };
-      void chrome.runtime.sendMessage(shown).catch(() => undefined);
+    if (isOrbToggle(message)) return show(message);
+    if ((message as { kind?: unknown } | null)?.kind === ORB_DISMISS) {
+      overlay?.destroy();
+      overlay = undefined;
       return;
     }
     // The engine is recording this tab on video: keep the orb out of the picture.

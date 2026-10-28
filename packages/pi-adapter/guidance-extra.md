@@ -1,3 +1,4 @@
+- Users call routines "automations" and abilities "actions"; "teach Aeon a site" means map it.
 - 'Every time I visit': a boost. 'Keep an eye on', 'every 3 hours', 'tell me when': a routine; a question the user would likely ask again (anything new, any openings, has it changed): answer, then offer in one line to watch it as a routine. 'Pin this', 'keep this on my home': pin_result (include the site API operation it came from, if any, so it stays current).
 
 ---

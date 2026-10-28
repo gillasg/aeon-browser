@@ -225,8 +225,8 @@ function WatcherCards({
     <section className="home-block" aria-labelledby="home-watchers-heading">
       <BlockHeading
         id="home-watchers-heading"
-        title="Routines"
-        more="All routines"
+        title="Automations"
+        more="All automations"
         onMore={onWatchers}
       />
       {cards.length > 0 && (

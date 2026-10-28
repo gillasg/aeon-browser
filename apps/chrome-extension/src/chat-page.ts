@@ -29,6 +29,7 @@ import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
 import { ChatSidebarController } from "./chat-sidebar-controller.js";
+import { watchChatRunState, type ChatRunState } from "./chat-run-state.js";
 import { ChatComposerController } from "./chat-composer-controller.js";
 import {
   readChatContext,
@@ -109,6 +110,11 @@ const sidebar = new ChatSidebarController({
   onChange: () => render(),
   onError: showError,
 });
+let chatRuns: ChatRunState = { running: new Set(), needs: new Set() };
+watchChatRunState((state) => {
+  chatRuns = state;
+  render();
+});
 const catalogReconnect = connectSidebarCatalog(
   sidebar,
   () => catalogClient,
@@ -168,6 +174,9 @@ function createView() {
     loadToolImage: fetchToolImage,
     transcriptActionsDisabled: runState !== "idle",
     chats: sidebar.chats,
+    runningChatIds: chatRuns.running,
+    needsChatIds: chatRuns.needs,
+    onRefreshChats: () => void sidebar.refresh(),
     sidebarOpen: sidebar.open,
     sidebarQuery: sidebar.query,
     composer: {

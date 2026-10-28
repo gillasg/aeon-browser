@@ -1,9 +1,13 @@
 import { SidebarIcon } from "./sidebar-icons.js";
 import type { ReactElement } from "react";
+import { ChatSwitcher, type ChatSwitcherProps } from "./chat-switcher.js";
 
-// A chat page has no chat list of its own: home is the one place chats are listed. The corner
-// holds a way back home and a new chat.
-export function ChatNavigation(props: { onNewChat?(): void }): ReactElement {
+// The corner of a chat page: back home, a new chat, and the chat switcher (Ctrl+K) to jump
+// between chats without going home.
+export function ChatNavigation(props: {
+  onNewChat?(): void;
+  switcher?: ChatSwitcherProps | undefined;
+}): ReactElement {
   return (
     <nav className="chat-navigation" aria-label="Chat navigation">
       <button
@@ -30,6 +34,7 @@ export function ChatNavigation(props: { onNewChat?(): void }): ReactElement {
         </svg>
       </button>
       {props.onNewChat && <NewChatButton onClick={props.onNewChat} />}
+      {props.switcher && <ChatSwitcher {...props.switcher} />}
     </nav>
   );
 }

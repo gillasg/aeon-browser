@@ -39,7 +39,7 @@ test("the routine editor opens prefilled from a draft", () => {
       onCancel() {},
     }),
   );
-  assert.match(html, /New routine/);
+  assert.match(html, /New automation/);
   assert.match(html, /value="Watch: price of the Soundcore Q20"/);
   assert.match(html, /Check the price of the Soundcore Q20\./);
   assert.match(html, /value="15"/);
