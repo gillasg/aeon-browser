@@ -108,7 +108,9 @@ function LiveRunButton({
             <MiniSwarm size={28} tone={waiting ? "needs" : "working"} />
           </span>
         )}
-        <span className="home-live-badge">{waiting ? "Needs you" : "Live"}</span>
+        <span className="home-live-badge" aria-label={waiting ? "Needs you" : "Working"}>
+          {waiting ? "Needs you" : ""}
+        </span>
       </span>
       <span className="home-live-meta">
         <span className="home-live-title">{chat.title}</span>

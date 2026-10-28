@@ -14,6 +14,8 @@ export type OrbVisualState = Exclude<OrbStatus, "idle"> | "listening" | "paused"
 export type OrbToContent =
   | { kind: "aeon.orb.visual"; state: OrbVisualState; label: string }
   | { kind: "aeon.orb.cursor"; steps: OrbCursorStep[] }
+  /** A step finished in another tab (the agent's own). */
+  | { kind: "aeon.orb.elsewhere" }
   | { kind: "aeon.orb.spotlight"; box: OrbBox | null }
   | { kind: "aeon.orb.panel"; width: number; height: number }
   /** keepRunning: collapse to the orb. false: dismiss the orb unless a run is going. */
@@ -43,6 +45,7 @@ export interface OrbVerify {
 const CONTENT_KINDS = new Set([
   "aeon.orb.visual",
   "aeon.orb.cursor",
+  "aeon.orb.elsewhere",
   "aeon.orb.spotlight",
   "aeon.orb.panel",
   "aeon.orb.hide",

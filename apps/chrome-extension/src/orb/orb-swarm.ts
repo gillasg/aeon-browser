@@ -19,17 +19,22 @@ interface Spark {
   vx: number;
   vy: number;
   born: number;
+  /** Travels this far (px) instead of fading in place: a step done in another tab. */
+  reach?: number;
 }
 
+// One colour: Aeon's purple. Amber only when the agent needs the user; the user's own control
+// and a failed run read as a quiet, dimmed swarm rather than new colours.
 const COLORS: Record<OrbVisualState, [string, string]> = {
   listening: ["#9b8cff", "#4a2fd0"],
   working: ["#9b8cff", "#4a2fd0"],
-  thinking: ["#8fc0ff", "#7a3cff"],
+  thinking: ["#9b8cff", "#4a2fd0"],
   needs: ["#ffd27a", "#ff8a00"],
-  done: ["#8ff5b8", "#0fae5c"],
-  error: ["#ffb3a8", "#d2412f"],
+  done: ["#9b8cff", "#4a2fd0"],
+  error: ["#c9c4dc", "#5b5770"],
   paused: ["#c9c4dc", "#5b5770"],
 };
+const ALPHA: Partial<Record<OrbVisualState, number>> = { paused: 0.55, error: 0.55, done: 0.85 };
 const RADIUS: Record<OrbVisualState, number> = {
   listening: 22,
   thinking: 20,
@@ -100,6 +105,22 @@ export class Swarm {
     }
   }
 
+  /** A step finished in another tab: a few sparks fly up toward the tab strip. */
+  elsewhere(now: number): void {
+    if (this.reducedMotion) return;
+    for (let index = 0; index < 5; index += 1) {
+      const angle = -Math.PI / 2 - 0.35 + Math.random() * 0.3;
+      this.sparks.push({
+        x: this.center.x + (Math.random() - 0.5) * 10,
+        y: this.center.y - 12,
+        vx: Math.cos(angle) * 0.42,
+        vy: Math.sin(angle) * 0.42,
+        born: now + index * 50,
+        reach: 1,
+      });
+    }
+  }
+
   draw(now: number, width: number, height: number): void {
     const context = this.context;
     context.clearRect(0, 0, width, height);
@@ -116,7 +137,7 @@ export class Swarm {
       const ty = anchor.y + r * Math.cos(particle.phi);
       const depth = (sinPhi * Math.sin(particle.theta) + 1) / 2;
       this.follow(particle, tx, ty);
-      context.globalAlpha = 0.35 + 0.65 * depth;
+      context.globalAlpha = (0.35 + 0.65 * depth) * (ALPHA[this.state] ?? 1);
       context.fillStyle = particle.phase > Math.PI ? light : deep;
       context.beginPath();
       context.arc(particle.x, particle.y, 1.1 + depth * 1.6, 0, Math.PI * 2);
@@ -156,11 +177,12 @@ export class Swarm {
       const spark = this.sparks[index];
       if (!spark) continue;
       const age = now - spark.born;
-      if (age > SPARK_MS) {
+      if (age < 0) continue;
+      if (age > SPARK_MS * (spark.reach ? 2 : 1)) {
         this.sparks.splice(index, 1);
         continue;
       }
-      context.globalAlpha = 1 - age / SPARK_MS;
+      context.globalAlpha = 1 - age / (SPARK_MS * (spark.reach ? 2 : 1));
       context.fillStyle = color;
       context.beginPath();
       context.arc(spark.x + spark.vx * age, spark.y + spark.vy * age, 1.6, 0, Math.PI * 2);

@@ -17,6 +17,8 @@ export interface OrbViewModel {
 
 export interface OrbViewActions {
   submit(text: string): void;
+  /** Fold the chat away; the orb stays with a pill under it while the run goes on. */
+  minimize(): void;
   close(): void;
   toSidePanel(): void;
   toTab(): void;
@@ -72,7 +74,10 @@ function Compose({
           disabled={model.busy}
           onKeyDown={send}
         />
-        <Button kind="icon" label="Close (Esc)" onClick={actions.close}>
+        <Button kind="icon" label="Minimize (Esc)" onClick={actions.minimize}>
+          ⌄
+        </Button>
+        <Button kind="icon" label="Close" onClick={actions.close}>
           ✕
         </Button>
       </div>
@@ -114,7 +119,10 @@ function ChatBox({
         <Button kind="icon" label="Open in a tab" onClick={actions.toTab}>
           ↗
         </Button>
-        <Button kind="icon" label="Close (Esc)" onClick={actions.close}>
+        <Button kind="icon" label="Minimize (Esc)" onClick={actions.minimize}>
+          ⌄
+        </Button>
+        <Button kind="icon" label="Close" onClick={actions.close}>
           ✕
         </Button>
       </div>

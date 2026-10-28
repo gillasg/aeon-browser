@@ -19,6 +19,26 @@ canvas.away { opacity: 0; }
 }
 .hit:active { cursor: grabbing; }
 .hit:focus-visible { outline: 2px solid rgba(124, 92, 255, .7); outline-offset: -8px; }
+.pill {
+  all: unset; position: fixed; left: 0; top: 0; max-width: 240px; padding: 5px 11px;
+  border-radius: 999px; pointer-events: auto; cursor: pointer; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
+  font: 550 12px/16px system-ui, -apple-system, "Segoe UI", sans-serif; color: #1b1830;
+  background: rgba(255, 255, 255, .78); backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: 0 8px 22px -12px rgba(0, 0, 0, .45), 0 0 0 1px rgba(20, 16, 40, .1);
+}
+.pill[hidden] { display: none; }
+.pill::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px;
+  border-radius: 50%; background: #7c5cff; vertical-align: 1px;
+}
+.pill[data-state="needs"]::before { background: #e08a00; }
+.pill[data-state="done"]::before, .pill[data-state="paused"]::before,
+.pill[data-state="error"]::before { background: #9a98a8; }
+.pill:focus-visible { outline: 2px solid rgba(124, 92, 255, .7); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) {
+  .pill { color: #f1f0f6; background: rgba(34, 33, 44, .78); box-shadow: 0 8px 22px -12px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .1); }
+}
 iframe {
   position: fixed; left: 0; top: 0; border: 0; background: transparent;
   pointer-events: auto; color-scheme: normal; opacity: 0;
