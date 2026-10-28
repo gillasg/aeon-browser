@@ -54,7 +54,6 @@
 /* ---- Section labels: the home page's uppercase headings ---- */
 
 .aeon-page-section h2,
-.settings-group h2,
 .activity-day h2,
 .routine-detail h2 {
   margin: 0 0 var(--aeon-s-3);
@@ -71,47 +70,6 @@
 .aeon-page-section:first-of-type {
   border-top: 0;
   padding-top: 0;
-}
-
-/* ---- Settings: sections, not boxes ---- */
-
-.settings-groups {
-  display: block;
-}
-.settings-group {
-  padding: var(--aeon-s-5) 0;
-  border: 0;
-  border-top: 1px solid var(--aeon-line);
-  border-radius: 0;
-  background: none;
-}
-.settings-group:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-.settings-group p {
-  margin: var(--aeon-s-1) 0 0;
-  color: var(--aeon-faint);
-  font-size: var(--aeon-fs-sm);
-}
-.settings-group label,
-.settings-check {
-  display: flex;
-  align-items: center;
-  gap: var(--aeon-s-3);
-  color: var(--aeon-text);
-  font-size: var(--aeon-fs-md);
-}
-.settings-group label + p,
-.settings-check + p {
-  margin-bottom: var(--aeon-s-3);
-}
-.settings-group input[type="checkbox"],
-.catalog-archived-toggle input {
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  accent-color: var(--aeon-text);
 }
 
 /* Settings tabs sit on the column, as a quiet segmented row. */
@@ -147,7 +105,6 @@
 .routine-actions button,
 .activity-row-actions button,
 .catalog-result-actions button,
-.settings-group button,
 .aeon-quiet-button {
   height: 30px;
   padding: 0 var(--aeon-s-3);
@@ -171,12 +128,10 @@
 .routine-actions button:hover,
 .activity-row-actions button:hover,
 .catalog-result-actions button:hover,
-.settings-group button:hover,
 .aeon-quiet-button:hover {
   background: var(--aeon-surface);
   color: var(--aeon-text);
 }
-.settings-group button:disabled,
 .management-heading button:disabled {
   opacity: 0.5;
   cursor: default;
@@ -219,7 +174,6 @@
 }
 .management-toolbar > input,
 .management-toolbar select,
-.settings-group select,
 .catalog-search-box,
 .aeon-search,
 .aeon-input,
@@ -246,8 +200,7 @@
 .catalog-search-box:focus-within,
 .aeon-search:focus,
 .aeon-input:focus,
-.aeon-select:focus,
-.settings-group select:focus {
+.aeon-select:focus {
   outline: none;
   border-color: var(--aeon-border-strong);
 }
@@ -595,4 +548,420 @@
   .aeon-field-row .aeon-select {
     width: 100%;
   }
+}
+
+/* ---- One material: grouped lists, segmented controls, dots, empty states ---- */
+
+.aeon-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aeon-s-3);
+}
+.aeon-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--aeon-surface-raised);
+}
+.aeon-segmented button {
+  height: 26px;
+  padding: 0 var(--aeon-s-3);
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--aeon-muted);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  cursor: pointer;
+  transition:
+    background var(--aeon-dur) var(--aeon-spring),
+    color var(--aeon-dur-fast) var(--aeon-ease);
+}
+.aeon-segmented button:hover {
+  color: var(--aeon-text);
+}
+.aeon-segmented button[aria-selected="true"] {
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 22%);
+}
+
+/* An inset grouped list: one rounded surface, hairlines between rows. */
+.aeon-list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
+  background: var(--aeon-surface);
+  list-style: none;
+}
+.aeon-list > li + li {
+  border-top: 1px solid var(--aeon-line);
+}
+
+/* Purple: running. Amber: needs you. Quiet grey otherwise. */
+.aeon-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--aeon-border-strong);
+}
+.aeon-dot[data-state="running"] {
+  background: var(--aeon-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aeon-brand) 22%, transparent);
+}
+.aeon-dot[data-state="needs"] {
+  background: var(--aeon-needs);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aeon-needs) 22%, transparent);
+}
+
+.aeon-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--aeon-s-3);
+  padding: var(--aeon-s-6) 0;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-md);
+}
+.aeon-empty p {
+  margin: 0;
+}
+.aeon-button {
+  height: 30px;
+  padding: 0 var(--aeon-s-4);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-full);
+  background: var(--aeon-surface-raised);
+  color: var(--aeon-text);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.aeon-button[data-tone="primary"] {
+  border-color: transparent;
+  background: var(--aeon-accent);
+  color: var(--aeon-accent-ink);
+}
+.aeon-button:hover {
+  filter: brightness(1.08);
+}
+
+/* Chats: rows inside the grouped list. */
+.catalog-list .catalog-result {
+  position: relative;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.catalog-list .catalog-result:hover {
+  background: var(--aeon-surface-raised);
+}
+.catalog-list .catalog-result-main {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--aeon-s-3);
+  min-height: 46px;
+  padding: var(--aeon-s-2) var(--aeon-s-4);
+}
+.catalog-result-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.catalog-list .catalog-result-title {
+  font-size: var(--aeon-fs-md);
+}
+.catalog-list .catalog-result-meta {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.catalog-result[data-state="needs"] .catalog-result-meta {
+  color: var(--aeon-needs);
+}
+.catalog-result[data-state="running"] .catalog-result-meta {
+  color: var(--aeon-brand);
+}
+.catalog-list .catalog-result-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--aeon-s-3);
+  translate: 0 -50%;
+  padding-left: var(--aeon-s-6);
+  background: linear-gradient(to right, transparent, var(--aeon-surface-raised) 30%);
+}
+.catalog-list .catalog-result-actions button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--aeon-r-sm);
+  background: none;
+  color: var(--aeon-muted);
+}
+.catalog-list .catalog-result-actions button:hover {
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+}
+.catalog-list .catalog-result-actions button[data-active="true"] {
+  color: var(--aeon-accent);
+}
+.catalog-list .catalog-result-actions svg {
+  width: 15px;
+  height: 15px;
+}
+.catalog-search-box svg {
+  flex: none;
+  fill: none;
+  stroke: var(--aeon-faint);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.catalog-search-box {
+  border-color: transparent;
+  background: var(--aeon-surface-raised);
+}
+.aeon-page .home-catalog,
+.aeon-page .activity-page {
+  width: 100%;
+  padding: 0;
+}
+.aeon-page .catalog-results {
+  margin-top: var(--aeon-s-3);
+}
+
+/* ---- Settings: grouped lists ---- */
+
+.settings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aeon-s-6);
+}
+.settings-group,
+.settings-group:first-child {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.settings-group > h2 {
+  margin: 0 0 var(--aeon-s-2) var(--aeon-s-1);
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.settings-group .settings-footnote {
+  margin: var(--aeon-s-2) var(--aeon-s-1) 0;
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+  line-height: 1.45;
+}
+.settings-row > label,
+.settings-row > div,
+.settings-row > form {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-4);
+  min-height: 46px;
+  padding: var(--aeon-s-2) var(--aeon-s-4);
+  color: var(--aeon-text);
+  font-size: var(--aeon-fs-md);
+}
+.settings-row > label {
+  cursor: pointer;
+}
+.settings-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.settings-row-text small {
+  color: var(--aeon-faint);
+  font-size: var(--aeon-fs-sm);
+  line-height: 1.4;
+}
+.settings-row-value {
+  flex: none;
+  max-width: 60%;
+  color: var(--aeon-muted);
+  text-align: right;
+}
+.settings-row-value code {
+  font-size: var(--aeon-fs-sm);
+}
+.settings-row[data-tone="needs"] .settings-row-value {
+  color: var(--aeon-needs);
+}
+.settings-row[data-tone="ok"] .settings-row-value {
+  color: var(--aeon-success-soft);
+}
+.settings-row .aeon-button {
+  flex: none;
+}
+.settings-row .aeon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+.settings-row-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--aeon-text);
+  font: inherit;
+}
+.settings-row-input::placeholder {
+  color: var(--aeon-faint);
+}
+
+/* A switch is a checkbox drawn as a pill. */
+.aeon-switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 22px;
+  margin: 0;
+  border-radius: var(--aeon-r-full);
+  background: var(--aeon-bg-4);
+  box-shadow: inset 0 0 0 1px var(--aeon-line);
+  appearance: none;
+  cursor: pointer;
+  transition: background var(--aeon-dur) var(--aeon-spring);
+}
+.aeon-switch::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  content: "";
+  transition: translate var(--aeon-dur) var(--aeon-spring);
+}
+.aeon-switch:checked {
+  background: var(--aeon-accent);
+  box-shadow: none;
+}
+.aeon-switch:checked::after {
+  translate: 14px 0;
+}
+.aeon-switch:focus-visible {
+  outline: 2px solid var(--aeon-accent);
+  outline-offset: 2px;
+}
+
+/* A menu: the native select, drawn as its value and a chevron. */
+.aeon-menu {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 55%;
+}
+.aeon-menu select {
+  max-width: 100%;
+  height: 28px;
+  min-width: 0;
+  padding: 0 22px 0 var(--aeon-s-2);
+  border: 0;
+  border-radius: var(--aeon-r-sm);
+  background: none;
+  color: var(--aeon-muted);
+  font: inherit;
+  text-align: right;
+  appearance: none;
+  cursor: pointer;
+}
+.aeon-menu select:hover,
+.aeon-menu select:focus-visible {
+  background: var(--aeon-surface-raised);
+  color: var(--aeon-text);
+  outline: none;
+}
+.aeon-menu svg {
+  position: absolute;
+  right: 6px;
+  fill: none;
+  stroke: var(--aeon-faint);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.aeon-menu option {
+  background: var(--aeon-surface);
+  color: var(--aeon-text);
+}
+.catalog-search-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (prefers-reduced-motion: reduce) {
+  .aeon-switch,
+  .aeon-switch::after,
+  .aeon-segmented button {
+    transition: none;
+  }
+}
+
+/* ---- Learn: what Aeon can do, each with an example to try ---- */
+
+.learn-page .aeon-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aeon-s-3);
+}
+.learn-group + .learn-group {
+  margin-top: var(--aeon-s-6);
+}
+.learn-row {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-4);
+  padding: var(--aeon-s-3) var(--aeon-s-4);
+}
+.learn-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.learn-text strong {
+  color: var(--aeon-text);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+.learn-text span {
+  color: var(--aeon-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.learn-text small {
+  margin-top: 2px;
+  color: var(--aeon-faint);
+  font-size: 12.5px;
+}
+.learn-row .aeon-button {
+  flex: none;
 }

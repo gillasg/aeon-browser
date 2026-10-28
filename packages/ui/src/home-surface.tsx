@@ -2,7 +2,7 @@ import { humanize } from "./management-automations.js";
 import { CommandPalette, type PaletteItem } from "./command-palette.js";
 import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
-import { useEffect, useState, type ReactElement, useMemo } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode, useMemo } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { HomeCatalog } from "./home-catalog.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
@@ -21,6 +21,10 @@ import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activ
 import { FirstRunTour } from "./first-run-tour.js";
 import { ModelAccounts } from "./model-accounts.js";
 import { BrowserAccounts } from "./browser-accounts.js";
+import { Segmented } from "./segmented.js";
+import { LearnPage, seedHomeQuery } from "./learn-page.js";
+import { PasswordManagerSettings } from "./password-manager-settings.js";
+import { BlockedSitesSettings } from "./blocked-sites-settings.js";
 import type { ModelAccountsProps } from "./model-accounts-types.js";
 
 export interface NewTabHomeProps {
@@ -100,14 +104,14 @@ export interface NewTabHomeProps {
   onSidebarDefault(open: boolean): void;
 }
 
-type SettingsSection = "settings" | "models" | "advanced";
+type SettingsSection = "settings" | "models" | "signin" | "blocked" | "advanced";
 
 /** `?view=models` is the Models tab of Settings; every other view is the top bar's. */
 function homeRoute(): { view: HomeView; settingsSection?: SettingsSection } {
   const route = new URLSearchParams(globalThis.location?.search ?? "").get("view");
-  return route === "models"
-    ? { view: "settings", settingsSection: "models" }
-    : viewFromRoute(route);
+  if (route === "models" || route === "signin" || route === "blocked")
+    return { view: "settings", settingsSection: route };
+  return viewFromRoute(route);
 }
 
 export function NewTabHome(props: NewTabHomeProps): ReactElement {
@@ -189,8 +193,14 @@ function HomePage({
 }): ReactElement {
   if (view === "chats" || view === "activity")
     return <ChatsPage view={view} props={props} activity={activity} onView={onView} />;
-  if (view === "automations") return <Management props={props} section="automations" />;
-  if (view === "sites") return <Management props={props} section="sites" />;
+  const suggest = (example: string): void => {
+    onView("home");
+    seedHomeQuery(example);
+  };
+  if (view === "automations")
+    return <Management props={props} section="automations" onSuggest={suggest} />;
+  if (view === "sites") return <Management props={props} section="sites" onSuggest={suggest} />;
+  if (view === "learn") return <LearnPage onTry={suggest} />;
   if (view === "settings")
     return <SettingsPage props={props} section={settingsSection} onSection={onSettingsSection} />;
   return <HomeLanding props={props} onView={onView} />;
@@ -206,7 +216,11 @@ function HomeLanding({
   return (
     <>
       <FirstRunTour />
-      <HomeCore working={props.runningChatIds?.size ?? 0} waiting={props.needsChatIds?.size ?? 0} />
+      <HomeCore
+        working={props.runningChatIds?.size ?? 0}
+        waiting={props.needsChatIds?.size ?? 0}
+        connecting={props.connected === false}
+      />
       <HomeStart props={props} />
       <HomeDashboard
         chats={props.chats.filter((chat) => !chat.archived)}
@@ -241,25 +255,19 @@ function ChatsPage({
   onView(view: HomeView): void;
 }): ReactElement {
   return (
-    <>
-      <nav className="home-subtabs" role="tablist" aria-label="Chats">
-        {(
-          [
+    <div className="aeon-page">
+      <header className="aeon-page-head">
+        <h1 id="catalog-heading">{view === "chats" ? "Chats" : "Activity"}</h1>
+        <Segmented
+          label="Chats or activity"
+          value={view}
+          options={[
             ["chats", "Chats"],
             ["activity", "Activity"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={view === value}
-            onClick={() => onView(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+          ]}
+          onChange={onView}
+        />
+      </header>
       {view === "chats" ? (
         <HomeCatalog {...props} />
       ) : (
@@ -269,13 +277,15 @@ function ChatsPage({
           {...(props.onUndoActivity ? { onUndo: props.onUndoActivity } : {})}
         />
       )}
-    </>
+    </div>
   );
 }
 
 const SETTINGS_TABS: ReadonlyArray<[SettingsSection, string]> = [
   ["settings", "General"],
   ["models", "Models"],
+  ["signin", "Sign-in"],
+  ["blocked", "Blocked sites"],
   ["advanced", "Advanced"],
 ];
 
@@ -305,6 +315,21 @@ function SettingsPage({
           ) : (
             <p className="aeon-page-empty">Models are not available here.</p>
           )
+        ) : section === "signin" ? (
+          <SettingsSectionPage title="Sign-in">
+            <PasswordManagerSettings
+              signIn={props.managementSnapshot?.signIn ?? null}
+              loading={props.managementLoading}
+            />
+          </SettingsSectionPage>
+        ) : section === "blocked" ? (
+          <SettingsSectionPage title="Blocked sites">
+            <BlockedSitesSettings
+              {...(props.blockedSites ? { sites: props.blockedSites } : {})}
+              {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
+              {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
+            />
+          </SettingsSectionPage>
         ) : section === "advanced" ? (
           <>
             <Management props={props} section="resources" />
@@ -315,6 +340,23 @@ function SettingsPage({
         )}
       </div>
     </div>
+  );
+}
+
+function SettingsSectionPage({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}): ReactElement {
+  return (
+    <section className="management-main" aria-label={title}>
+      <header className="management-heading">
+        <h1>{title}</h1>
+      </header>
+      {children}
+    </section>
   );
 }
 
@@ -343,39 +385,25 @@ function SettingsMenu({
   );
 }
 
+const SETTINGS_ICONS: Record<SettingsSection, string> = {
+  settings: "M4 6h12M4 10h12M4 14h12M7 4v4m6 0v4M5 12v4",
+  models: "M10 2.8 12 7l4.4 2-4.4 2-2 4.2L8 11 3.6 9 8 7Z",
+  signin: "M6 9V6.5a4 4 0 0 1 8 0V9M4.5 9h11v8h-11zM10 12.2v1.8",
+  blocked: "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14M5 5l10 10",
+  advanced:
+    "M8 3h4v3.2a1.8 1.8 0 0 1 2.2 2.2H17v4h-2.8a1.8 1.8 0 0 1-2.2 2.2V17H8v-2.6a1.8 1.8 0 0 1-2.2-2.2H3v-4h2.8A1.8 1.8 0 0 1 8 6.2Z",
+};
+
 function SettingsIcon({ section }: { section: SettingsSection }): ReactElement {
-  if (section === "models")
-    return (
-      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-        <path
-          d="M10 2.8 12 7l4.4 2-4.4 2-2 4.2L8 11 3.6 9 8 7Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  if (section === "advanced")
-    return (
-      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-        <path
-          d="M8 3h4v3.2a1.8 1.8 0 0 1 2.2 2.2H17v4h-2.8a1.8 1.8 0 0 1-2.2 2.2V17H8v-2.6a1.8 1.8 0 0 1-2.2-2.2H3v-4h2.8A1.8 1.8 0 0 1 8 6.2Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
   return (
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
       <path
-        d="M4 6h12M4 10h12M4 14h12M7 4v4m6 0v4M5 12v4"
+        d={SETTINGS_ICONS[section]}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -384,9 +412,11 @@ function SettingsIcon({ section }: { section: SettingsSection }): ReactElement {
 function Management({
   props,
   section,
+  onSuggest,
 }: {
   props: NewTabHomeProps;
   section: ManagementSection;
+  onSuggest?(example: string): void;
 }): ReactElement {
   return (
     <ManagementSurface
@@ -410,6 +440,7 @@ function Management({
       {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
       privacy={props.privacy}
       {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
+      {...(onSuggest ? { onSuggest } : {})}
     />
   );
 }

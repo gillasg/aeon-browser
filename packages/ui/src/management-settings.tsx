@@ -10,133 +10,93 @@ import type { ReactElement } from "react";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY } from "./orb-prefs.js";
 import { resetTour } from "./first-run-tour.js";
-import { BlockedSitesSettings } from "./blocked-sites-settings.js";
-import { PasswordManagerSettings } from "./password-manager-settings.js";
 import { PrivacySettings } from "./privacy-settings.js";
+import { ActionRow, MenuRow, SettingsGroup, SwitchRow, ValueRow } from "./settings-list.js";
+
+// General settings. Sign-in and Blocked sites have their own sections in the Settings menu.
+
+type Theme = "dark" | "midnight" | "light" | "system";
 
 export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
-  const [mode, setMode] = useMessageSendMode();
   return (
     <div className="settings-groups">
       <AppearanceSettings {...props} />
-      <section className="settings-group">
-        <h2>Chat navigation</h2>
-        <label className="settings-check">
-          <input
-            type="checkbox"
-            checked={props.sidebarDefaultOpen}
-            onChange={(event) => props.onSidebarDefault(event.target.checked)}
-          />{" "}
-          Open the Chat list by default in full-tab Chats
-        </label>
-        <p>The default is closed. Chrome tabs and the side panel keep their own navigation.</p>
-      </section>
-      <section className="settings-group">
-        <h2>Messages during a response</h2>
-        <label>
-          Send behavior{" "}
-          <select
-            aria-label="Messages during a response"
-            value={mode}
-            onChange={(event) => setMode(event.target.value as "followUp" | "steer")}
-          >
-            <option value="followUp">Queue after the current response</option>
-            <option value="steer">Steer at the next interruption point</option>
-          </select>
-        </label>
-      </section>
-      <OrbSettings />
+      <ChatSettings {...props} />
       <AgentTabSettings />
-      <BlockedSitesSettings
-        {...(props.blockedSites ? { sites: props.blockedSites } : {})}
-        {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
-        {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
-      />
       {props.privacy && <PrivacySettings {...props.privacy} />}
       <OutsideAgentsSettings
         {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
         {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
       />
-      <PasswordManagerSettings signIn={props.snapshot?.signIn ?? null} loading={props.loading} />
-      <section className="settings-group">
-        <h2>Connected Chrome</h2>
-        <p>
-          <a href="site-scripts.html" target="_blank" rel="noreferrer">
-            Site customizations and permissions
-          </a>
-        </p>
-        <p>
-          Aeon bridge: <strong>{props.connectionLabel}</strong>
-        </p>
-        <p>Chrome profiles are managed by Chrome; Aeon does not enumerate or switch profiles.</p>
-      </section>
+      <HelperSettings connectionLabel={props.connectionLabel} />
     </div>
   );
 }
 
 function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
-  return (
-    <section className="settings-group">
-      <h2>Appearance</h2>
-      <label>
-        Theme{" "}
-        <select
-          value={props.theme}
-          onChange={(event) =>
-            props.onTheme(event.target.value as "dark" | "midnight" | "light" | "system")
-          }
-        >
-          <option value="dark">Dark</option>
-          <option value="midnight">Midnight</option>
-          <option value="light">Light</option>
-          <option value="system">System</option>
-        </select>
-      </label>
-      <p>System follows your operating system appearance.</p>
-    </section>
-  );
-}
-
-function OrbSettings(): ReactElement {
   const [reduceMotion, setReduceMotion] = useAgentFlag(ORB_REDUCE_MOTION_KEY);
   const [sounds, setSounds] = useAgentFlag(ORB_SOUNDS_KEY);
   return (
-    <section className="settings-group">
-      <h2>Orb</h2>
-      <p>Press Ctrl+Shift+Space on any page to call Aeon there.</p>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={reduceMotion}
-          onChange={(event) => setReduceMotion(event.target.checked)}
-        />{" "}
-        Reduce motion
-      </label>
-      <p>
-        The swarm holds still and the island stops animating. On already when your system asks for
-        less motion.
-      </p>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={sounds}
-          onChange={(event) => setSounds(event.target.checked)}
-        />{" "}
-        Sounds
-      </label>
-      <p>A soft tone when a run starts, when it needs you, and when it&rsquo;s done.</p>
-      <p>
-        <button
-          type="button"
-          onClick={() => {
-            resetTour();
-            location.assign("home.html");
-          }}
-        >
-          Show the tour again
-        </button>
-      </p>
-    </section>
+    <SettingsGroup
+      title="Appearance"
+      footer="Reduce motion is already on when your system asks for less motion."
+    >
+      <MenuRow<Theme>
+        label="Theme"
+        value={props.theme}
+        options={[
+          ["system", "Match system"],
+          ["light", "Light"],
+          ["dark", "Dark"],
+          ["midnight", "Midnight"],
+        ]}
+        onChange={props.onTheme}
+      />
+      <SwitchRow
+        label="Reduce motion"
+        detail="The swarm holds still and nothing slides."
+        checked={reduceMotion}
+        onChange={setReduceMotion}
+      />
+      <SwitchRow
+        label="Sounds"
+        detail="A soft tone when a run starts, needs you, and finishes."
+        checked={sounds}
+        onChange={setSounds}
+      />
+      <ActionRow
+        label="Tour"
+        detail="The four-step introduction from your first day."
+        action="Show again"
+        onClick={() => {
+          resetTour();
+          location.assign("home.html");
+        }}
+      />
+    </SettingsGroup>
+  );
+}
+
+function ChatSettings(props: ManagementSurfaceProps): ReactElement {
+  const [mode, setMode] = useMessageSendMode();
+  return (
+    <SettingsGroup title="Chats">
+      <MenuRow<"followUp" | "steer">
+        label="Messages sent while Aeon answers"
+        value={mode}
+        options={[
+          ["followUp", "Wait their turn"],
+          ["steer", "Steer the answer"],
+        ]}
+        onChange={setMode}
+      />
+      <SwitchRow
+        label="Show the chat list in full-tab chats"
+        detail="Tabs and the side panel keep their own switcher."
+        checked={props.sidebarDefaultOpen}
+        onChange={props.onSidebarDefault}
+      />
+    </SettingsGroup>
   );
 }
 
@@ -146,49 +106,31 @@ function AgentTabSettings(): ReactElement {
   const [inFront, setInFront] = useAgentFlag(agentInFrontKey);
   const [hideCursor, setHideCursor] = useAgentFlag(hideAgentCursorKey);
   return (
-    <section className="settings-group">
-      <h2>Agent tabs</h2>
-      <label>
-        While the agent works{" "}
-        <select
-          aria-label="Agent tabs view"
-          value={tabView}
-          onChange={(event) => setTabView(event.target.value as AgentTabView)}
-        >
-          <option value="auto">Automatic: split in a chat tab, thumbnails elsewhere</option>
-          <option value="split">Split screen beside the Chat</option>
-          <option value="thumbnails">Live thumbnails beside the Chat</option>
-        </select>
-      </label>
-      <p>
-        Split screen shows the tab the agent touched last. Thumbnails stack every tab it is working
-        in; click one to open it in split screen.
-      </p>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={inFront}
-          onChange={(event) => setInFront(event.target.checked)}
-        />{" "}
-        Agent works in front
-      </label>
-      <p>
-        Its tabs open in front and it switches to whichever tab it works in, so you can watch (or
-        record) every step. Off: it works in background tabs and leaves yours alone.
-      </p>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={hideCursor}
-          onChange={(event) => setHideCursor(event.target.checked)}
-        />{" "}
-        Hide agent cursor
-      </label>
-      <p>
-        Hides the agent's cursor and its captions on pages, e.g. while a screen recorder draws its
-        own.
-      </p>
-    </section>
+    <SettingsGroup title="Agent tabs">
+      <MenuRow<AgentTabView>
+        label="While Aeon works"
+        detail="Split shows the tab it touched last; thumbnails show every tab it works in."
+        value={tabView}
+        options={[
+          ["auto", "Automatic"],
+          ["split", "Split screen"],
+          ["thumbnails", "Thumbnails"],
+        ]}
+        onChange={setTabView}
+      />
+      <SwitchRow
+        label="Work in front"
+        detail="Its tabs open in front so you can watch or record each step. Off: background tabs."
+        checked={inFront}
+        onChange={setInFront}
+      />
+      <SwitchRow
+        label="Hide Aeon's cursor"
+        detail="For screen recorders that draw their own."
+        checked={hideCursor}
+        onChange={setHideCursor}
+      />
+    </SettingsGroup>
   );
 }
 
@@ -197,20 +139,43 @@ function OutsideAgentsSettings(props: {
   onOutsideContext?(enabled: boolean): void;
 }) {
   return (
-    <section className="settings-group">
-      <h2>Outside agents</h2>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={props.outsideContext === true}
-          onChange={(event) => props.onOutsideContext?.(event.target.checked)}
-        />{" "}
-        Let outside agents see my open tabs
-      </label>
-      <p>
-        Only tab titles and URLs, never page contents. Off by default. The CLI and MCP expose it as{" "}
-        <code>aeon context</code> / <code>aeon_context</code>.
-      </p>
-    </section>
+    <SettingsGroup
+      title="Other agents"
+      footer={
+        <>
+          Titles and addresses only, never page contents. Coding agents read them with{" "}
+          <code>aeon context</code>.
+        </>
+      }
+    >
+      <SwitchRow
+        label="Let other agents see my open tabs"
+        checked={props.outsideContext === true}
+        onChange={(enabled) => props.onOutsideContext?.(enabled)}
+      />
+    </SettingsGroup>
+  );
+}
+
+function HelperSettings({ connectionLabel }: { connectionLabel: string }): ReactElement {
+  const connected = /^connected/i.test(connectionLabel);
+  return (
+    <SettingsGroup
+      title="This computer"
+      footer="Aeon's helper app runs its agent and keeps your chats on this computer."
+    >
+      <ValueRow
+        label="Helper app"
+        value={connected ? "Connected" : "Not connected"}
+        tone={connected ? "ok" : "needs"}
+        {...(connected ? {} : { detail: "Run Aeon's setup again to repair it." })}
+      />
+      <ActionRow
+        label="Site customizations"
+        detail="Scripts and styles Aeon adds to sites, and their permissions."
+        action="Open"
+        onClick={() => window.open("site-scripts.html", "_blank", "noopener")}
+      />
+    </SettingsGroup>
   );
 }

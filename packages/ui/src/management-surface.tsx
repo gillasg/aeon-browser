@@ -25,8 +25,18 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
           <h1>{titles[props.section]}</h1>
         </div>
         {props.section !== "settings" && (
-          <button type="button" onClick={props.onRefresh} disabled={props.loading}>
-            {props.loading ? "Refreshing…" : "Refresh"}
+          <button
+            type="button"
+            className="management-refresh"
+            aria-label="Refresh"
+            title="Refresh"
+            aria-busy={props.loading}
+            onClick={props.onRefresh}
+            disabled={props.loading}
+          >
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+              <path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" />
+            </svg>
           </button>
         )}
       </header>

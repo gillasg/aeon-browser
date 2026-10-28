@@ -25,12 +25,13 @@ interface Spark {
 
 // One colour: Aeon's purple. Amber only when the agent needs the user; the user's own control
 // and a failed run read as a quiet, dimmed swarm rather than new colours.
+// [near side, far side]
 const COLORS: Record<OrbVisualState, [string, string]> = {
-  listening: ["#9b8cff", "#4a2fd0"],
-  working: ["#9b8cff", "#4a2fd0"],
-  thinking: ["#9b8cff", "#4a2fd0"],
-  needs: ["#ffd27a", "#ff8a00"],
-  done: ["#9b8cff", "#4a2fd0"],
+  listening: ["#c4b5fd", "#7c5cf0"],
+  working: ["#c4b5fd", "#7c5cf0"],
+  thinking: ["#c4b5fd", "#7c5cf0"],
+  needs: ["#ffe2a8", "#e08a00"],
+  done: ["#c4b5fd", "#7c5cf0"],
   error: ["#c9c4dc", "#5b5770"],
   paused: ["#c9c4dc", "#5b5770"],
 };
@@ -68,10 +69,12 @@ export class Swarm {
     public reducedMotion: boolean,
     count = 80,
   ) {
-    this.particles = Array.from({ length: count }, () => ({
-      theta: Math.random() * Math.PI * 2,
-      phi: Math.acos(2 * Math.random() - 1),
-      speed: 0.4 + Math.random() * 0.8,
+    // Spread evenly on a Fibonacci spiral and turned as one body, so the swarm reads as a lit
+    // globe; each particle keeps its own chase rate for streaming into the cursor.
+    this.particles = Array.from({ length: count }, (_, index) => ({
+      theta: index * 2.39996,
+      phi: Math.acos(1 - (index / (count - 1)) * 2),
+      speed: 1,
       phase: Math.random() * Math.PI * 2,
       chase: 0.05 + Math.random() * 0.14,
       x: Number.NaN,
@@ -156,10 +159,10 @@ export class Swarm {
       const ty = anchor.y + r * Math.cos(particle.phi);
       const depth = (sinPhi * Math.sin(particle.theta) + 1) / 2;
       this.follow(particle, tx, ty);
-      context.globalAlpha = (0.35 + 0.65 * depth) * (ALPHA[this.state] ?? 1);
-      context.fillStyle = particle.phase > Math.PI ? light : deep;
+      context.globalAlpha = (0.25 + 0.75 * depth) * (ALPHA[this.state] ?? 1);
+      context.fillStyle = depth > 0.6 ? light : deep;
       context.beginPath();
-      context.arc(particle.x, particle.y, 1.1 + depth * 1.6, 0, Math.PI * 2);
+      context.arc(particle.x, particle.y, 0.7 + depth * 1.6, 0, Math.PI * 2);
       context.fill();
     }
     this.drawSparks(now, light);

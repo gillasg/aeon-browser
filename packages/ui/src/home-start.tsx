@@ -1,7 +1,7 @@
 import { PageContextTray } from "./page-context-tray.js";
 import { usePanelPage } from "./panel-page-chip.js";
 import { ProjectChip } from "./project-chip.js";
-import { PendingWork } from "./pending-work.js";
+import { QuietWait } from "./pending-work.js";
 import {
   useHomeAttachments,
   HomeAttachmentPicker,
@@ -77,7 +77,6 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
         onModel={selection.setModel}
         onEffort={selection.setEffort}
       />
-      {props.connected === false && <PendingWork connecting />}
     </section>
   );
 }
@@ -135,7 +134,7 @@ function HomePrompt({
         multiline
         id="home-query"
         value={query}
-        placeholder=""
+        placeholder="Ask Aeon to do anything"
         ariaLabel="Ask Aeon anything"
         onChange={onQuery}
         onFiles={onFiles}
@@ -143,11 +142,6 @@ function HomePrompt({
           if (query.trim() && canSubmit) onSubmit(query.trim());
         }}
       />
-      {!query && (
-        <kbd className="home-summon-hint" title="Call Aeon on any page">
-          ctrl ⇧ space
-        </kbd>
-      )}
       <button
         className="home-send-button"
         type="submit"
@@ -181,10 +175,11 @@ function HomeModelControls({
   onModel(value: ComposerModel): void;
   onEffort(value: string): void;
 }): ReactElement {
+  // While connecting, the swarm above the field is the only sign; this row stays empty.
   if (connected === false)
     return (
       <div className="home-model-controls" role="status">
-        Connecting…
+        <span className="aeon-sr">Connecting…</span>
       </div>
     );
   if (catalog && !catalog.models.length && onConnectModel)
@@ -229,9 +224,7 @@ function HomePickers({
     <div className="home-model-controls" role="group" aria-label="Pi model and effort">
       <div className="home-model-control">
         {!catalog ? (
-          <span className="model-loading" role="status">
-            Loading models…
-          </span>
+          <QuietWait label="Loading models…" />
         ) : (
           <PiModelPicker
             id="home-model-picker"

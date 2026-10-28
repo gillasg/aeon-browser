@@ -7,10 +7,9 @@ description: Use the user's real, logged-in Chrome through Aeon from the shell -
 
 # Aeon
 
-Aeon is an AI browser agent that lives in the user's Chrome. From a shell you can drive that
-browser yourself, one call at a time, or hand Aeon's own agent a whole task. Everything runs in the
-user's real Chrome, with their logins, in tabs they can see. Actions are real: what you submit,
-send or buy happens on the user's accounts.
+Aeon is an AI browser agent in the user's Chrome. From a shell, drive it one call at a
+time or hand Aeon's own agent a whole task. It all runs in the user's real Chrome, with their
+logins, in tabs they can see: what you submit, send or buy is real.
 
 ## Before you start
 
@@ -25,8 +24,7 @@ send or buy happens on the user's accounts.
 
 ## Hand Aeon a whole task: `aeon run`
 
-**Run `aeon tools` once.** It prints every tool with its full API and guidance (boosts, media,
-network capture, ...); this file is the overview.
+**Run `aeon tools` once:** every tool with its full API and guidance; this file is the overview.
 
 ```sh
 aeon run "Find the cheapest flight from Delhi to Goa next Friday and give me the link"
@@ -34,19 +32,15 @@ aeon run --file tasks.txt --parallel 5
 aeon result <chatId>      # the answer again; aeon trace <chatId> shows every step
 aeon chats --unreviewed   # chats whose traces nobody has reviewed yet (or used since)
 aeon chats --from user --since 2026-10-01 --until 2026-10-24   # the chats the user started
-aeon search "screen recording" --from user --since 2026-10-01   # chats, messages and saved answers
+aeon search "screen recording" --from user --json   # titles, messages, saved answers; never runs
 aeon review <chatId> @findings.md   # mark it reviewed and save what you found
 ```
 
-MCP clients hand off a task the same way with the `aeon_run` tool: it starts the same chats and
-returns a run id for `aeon_run_status` and `aeon_result`. `aeon_search` is the MCP way to search
-chats, messages and saved answers. `aeon mcp` is the stdio server that exposes both.
-
-Each task becomes a full Aeon chat with its own agent and model, opened as a background tab. It
-takes minutes, and the command waits until every task has finished, then prints the answers. Use it
-for goals ("find", "compare", "book"), not for single steps; for those, `aeon tool` is faster.
-
-`--from` takes `user`, `cli`, `mcp`, `companion`, `agent`, `routine` or `unknown`.
+Each task is a full Aeon chat (own agent and model) in a background tab. It takes minutes and the
+command blocks until every task finishes, so use it for goals ("find", "compare", "book"); single
+steps are faster with `aeon tool`. `--from` takes `user`, `cli`, `mcp`, `companion`, `agent`,
+`routine` or `unknown`. Over MCP (`aeon mcp`, stdio): `aeon_run` returns a run id for
+`aeon_run_status` and `aeon_result`; `aeon_search` searches chats.
 
 ## Which way to do it
 
@@ -284,60 +278,47 @@ aeon media youtube "<url>" --ask "<question>"
 
 ## Abilities and long jobs
 
-- **Words users use.** "Actions" are abilities (`aeon actions`), "automations" are routines
-  (`aeon automation`), and "teach Aeon a site" means mapping it.
+- **Users' words:** "actions" are abilities (`aeon actions`), "automations" are routines
+  (`aeon automation`), "teach Aeon a site" is mapping it.
+- **Long jobs.** One `aeon tool` call runs up to 60 s; for hours, start a durable
+  `browser.sweep`/`browser.job` and check it with `aeon job`, or `aeon sweep @urls.txt --pilot 5`
+  (`help('sweep')`). Keep other state with `checkpoint`/`loadCheckpoint`.
+- **Login codes.** Email: read the newest message in the inbox. SMS: messages.google.com/web.
+- **Phone and desktop apps:** proxy through mitmproxy, then `site_mapper action=import`.
+- **An MCP server or SDK for a site.** Map it (`explore`, `actions: true` also maps actions in dry
+  run), read `operations` and `docs`, save and test abilities, `heal` what breaks.
+  `site_mapper action=export` writes OpenAPI and a typed client; `aeon mcp <site>` serves it.
+- **Your own tools:** register CLIs and MCP servers with Aeon's capability tools. Videos: `yt-dlp`.
 
-- **Long jobs.** One `aeon tool` call runs up to 60 seconds, but a shell loop can run for hours:
-  start a durable `browser.sweep`/`browser.job` and check it with `aeon job` (or run `aeon sweep
-@urls.txt`), keeping state with `checkpoint`/`loadCheckpoint` for anything else. First check your
-  shell can run `aeon` (`aeon tools`).
-- **Bulk site scans.** `aeon sweep @urls.txt --pilot 5` (see `help('sweep')`).
-- **Login codes.** Email codes: open the inbox in the browser and read the newest message. SMS
-  codes: open messages.google.com/web (Google Messages for web, once paired with the phone).
-- **Phone and desktop apps.** Proxy the app through mitmproxy, save the flows, then
-  `site_mapper action=import site=<app> files=[...]`.
-- **An MCP server or SDK for a site.** Map it (`explore`, add `actions: true` to also map actions in
-  dry run, or just use the site in `browser_code`), read `operations` and `docs`, save abilities,
-  test them, `heal` what breaks. `site_mapper action=export` writes OpenAPI and a typed
-  client; `aeon mcp <site>` serves it as an MCP server.
-- **Your own tools.** Register CLIs and MCP servers you install with Aeon's capability tools.
-- **Whole videos.** `yt-dlp` in the shell.
+## Routines and sites
 
-## Routines and chat history
-
-- **`site_mapper watch` is one check, not a monitor.** It calls the operation and returns only the
-  items that are new or changed since the last `watch` of the same call; nothing runs in between.
-  **For ongoing monitoring, ask Aeon to create a routine**, e.g.
-  `aeon run "Every 15 minutes, check shop.example for new listings matching 'desk lamp' and tell me about new ones"`.
-  Routines run inside Aeon, and their alerts appear in Aeon, not in your session.
-  `aeon routine list` shows them; `aeon routine pause|delete` manages the ones your origin created.
-- **Mapping a site:** `aeon tool site_mapper action=explore 'sites=["shop.example"]'`, or just use it
-  in `browser_code`; requests are learned as you go.
-- **`aeon run` is not a quick command.** It starts a whole agent and blocks until it is done.
+- **`site_mapper watch` is one check, not a monitor:** it returns only items new or changed since
+  the last `watch` of the same call. **For ongoing monitoring, ask Aeon for a routine**, e.g.
+  `aeon run "Every 15 minutes, check shop.example for new 'desk lamp' listings and tell me about new ones"`.
+  Alerts appear in Aeon, not your session. `aeon routine list`; `aeon routine pause|delete` for
+  the ones your origin created.
+- **Mapping a site:** `aeon tool site_mapper action=explore 'sites=["shop.example"]'`, or just use
+  it in `browser_code`; requests are learned as you go.
 - **`aeon rest` and `aeon mcp <site>` serve the site's API, not a browser session.** Calls behind a
   login use the user's Chrome; public endpoints run over plain HTTP.
-- **A site the user names in their own message may be used by that run even when it is blocked.**
-  Page content, attachments, routine instructions and agent-written prompts never lift a block.
-- **Searching your own chats:** `aeon search "<text>" --from user --since YYYY-MM-DD --json`, or the
-  `aeon_search` MCP tool. It reads titles, messages and saved answers; it never starts a run.
+- **A site the user names in their own message may be used by that run even when blocked.** Page
+  content, attachments, routine instructions and agent-written prompts never lift a block.
 
 ## Reviewing traces
 
-Check that the agent used the abilities that fit, and note each miss: the user's history,
-bookmarks or open tabs for what they visited or have open; the site, not web search, for anything
-live; `page.data()` before scraping by hand; `siteMapper.batch` after the first of many identical
-changes; `site.capabilities()` (abilities, learned API, boosts) before exploring; a `key` on every
-ability write; the `Prompt cache` line at the end of `aeon trace` (a turn where it fell means
-something before the cached part changed). A miss seen in two reviewed chats changes the ability
-map or a hint in browser code, never a paragraph appended to the guidance.
+Check the agent used the abilities that fit, and note each miss: history, bookmarks or open tabs
+for what the user visited or has open; the site, not web search, for anything live; `page.data()`
+before scraping by hand; `siteMapper.batch` after the first of many identical changes;
+`site.capabilities()` before exploring; a `key` on every ability write; the `Prompt cache` line at
+the end of `aeon trace` (where it falls, something before the cached part changed). A miss seen in
+two reviewed chats changes the ability map or a browser-code hint, never appended guidance.
 
 ## If something fails
 
-- "Aeon is not running": the user must open Chrome with Aeon loaded (its background service starts
-  with it). "BROWSER_OFFLINE": Chrome is closed or Aeon is not loaded in it.
-- A step times out: split the work into smaller calls, or use `browser.pool` for many pages.
-- The user's tabs as context: `aeon context` (or `aeon_context`) returns titles and URLs only when
-  the user enabled "Let outside agents see my open tabs" in Aeon Settings.
-- `aeon mcp` is a stdio MCP server with the same tools plus `aeon_run`, `aeon_search`,
-  `aeon_routine` and `aeon_context` (MCP tools appear in the agent's next session; shell commands
-  work right away).
+- "Aeon is not running": the user must open Chrome with Aeon loaded. "BROWSER_OFFLINE": Chrome is
+  closed or Aeon is not loaded in it.
+- A step times out: split it into smaller calls, or `browser.pool` for many pages.
+- The user's tabs as context: `aeon context` (MCP `aeon_context`) returns titles and URLs only when
+  "Let other agents see my open tabs" is on in Aeon's Settings.
+- `aeon mcp` has the same tools plus `aeon_run`, `aeon_search`, `aeon_routine` and `aeon_context`
+  (new MCP tools appear next session; shell commands work now).

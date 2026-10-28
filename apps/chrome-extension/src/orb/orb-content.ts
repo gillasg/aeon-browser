@@ -77,7 +77,10 @@ function start(): void {
   addEventListener(
     "keydown",
     (event) => {
-      if (event.key === "Escape" && overlay?.bubbleOpen) overlay.hideBubble();
+      if (event.key !== "Escape" || !overlay?.bubbleOpen) return;
+      // Handled here, so browserkit does not also read this Esc as taking the tab over.
+      event.preventDefault();
+      overlay.hideBubble();
     },
     { capture: true },
   );

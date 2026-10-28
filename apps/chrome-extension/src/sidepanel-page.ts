@@ -31,13 +31,6 @@ let pickerOpen = false;
 let status = "Loading Chats…";
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 let routingContext = false;
-const splitTabs = chrome.tabs as unknown as {
-  create(properties: { url: string; windowId?: number; splitWithTabId?: number }): Promise<unknown>;
-  createSplit?: (tabIds: [number, number]) => Promise<number>;
-  unsplit?: (splitViewId: number) => Promise<void>;
-};
-const splitViewSupported =
-  typeof splitTabs.createSplit === "function" && typeof splitTabs.unsplit === "function";
 
 window.addEventListener("message", (event) => {
   if (
@@ -71,13 +64,11 @@ function createView() {
     status,
     pickerOpen,
     chatFrameSrc: chatUrl,
-    splitViewSupported,
     onTogglePicker: (open) => setPickerOpen(open),
     onSelect: (chatId) => void selectChat(chatId),
     onNew: () => void selectChat(""),
     onAllChats: () => void openAllChats(),
     onOpenFull: () => void openSelectedChat(),
-    onOpenSplit: () => void openSelectedInSplitView(),
   };
   return createElement(SidePanel, props);
 }
@@ -258,25 +249,6 @@ async function openSelectedChat(): Promise<void> {
   } catch (error) {
     status = `Could not open this Chat · ${messageOf(error)}`;
   }
-  render();
-}
-
-async function openSelectedInSplitView(): Promise<void> {
-  if (!selectedChatId || windowId === undefined) return;
-  const url = `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(selectedChatId)}`;
-  const active = (await chrome.tabs.query({ active: true, windowId }))[0];
-  try {
-    if (!splitViewSupported || active?.id === undefined)
-      throw new Error("Split View requires Chrome 155 and an active tab.");
-    await splitTabs.create({ url, windowId, splitWithTabId: active.id });
-    status = "";
-  } catch {
-    await chrome.tabs.create({ url, windowId });
-    status = splitViewSupported
-      ? "Chrome couldn’t pair these tabs. Chat opened in a new tab."
-      : "Split View requires Chrome 155+. Chat opened in a new tab.";
-  }
-  await closePanel();
   render();
 }
 

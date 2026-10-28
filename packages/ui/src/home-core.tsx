@@ -6,8 +6,17 @@ import { MiniSwarm } from "./mini-swarm.js";
 
 export type HomeCoreMode = "idle" | "working" | "needs";
 
-export function HomeCore({ working, waiting }: { working: number; waiting: number }): ReactElement {
-  const mode: HomeCoreMode = waiting ? "needs" : working ? "working" : "idle";
+export function HomeCore({
+  working,
+  waiting,
+  connecting = false,
+}: {
+  working: number;
+  waiting: number;
+  /** Still reaching the helper app: the swarm stirs instead of a "Connecting…" line. */
+  connecting?: boolean;
+}): ReactElement {
+  const mode: HomeCoreMode = waiting ? "needs" : working || connecting ? "working" : "idle";
   return (
     <header className="home-core" data-mode={mode} aria-hidden="true">
       <MiniSwarm size={120} tone={mode} />

@@ -1,4 +1,5 @@
-import { useState, type FormEvent, type ReactElement } from "react";
+import type { ReactElement } from "react";
+import { ActionRow, AddRow, SettingsGroup, SwitchRow } from "./settings-list.js";
 
 // Privacy: whether the agent may reach this computer and the local network, and the sites the
 // password manager was told never to save logins for.
@@ -25,89 +26,59 @@ function parsePort(value: string): number | undefined {
 }
 
 export function PrivacySettings(props: PrivacySettingsProps): ReactElement {
-  return (
-    <section className="settings-group">
-      <h2>Privacy</h2>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={props.state.privateNetwork}
-          onChange={(event) => props.onPrivateNetwork(event.target.checked)}
-        />{" "}
-        Keep the agent off this computer and your local network
-      </label>
-      <p>
-        Blocks localhost, router pages and other private addresses, so a web page cannot steer the
-        agent into them. Allow the ports you use for local development below.
-      </p>
-      <PortList {...props} />
-      <NeverSaveList {...props} />
-    </section>
-  );
-}
-
-function PortList({ state, onPorts }: PrivacySettingsProps): ReactElement {
-  const [draft, setDraft] = useState("");
-  const add = (event: FormEvent) => {
-    event.preventDefault();
-    const port = parsePort(draft);
-    if (port !== undefined && !state.ports.includes(port))
-      onPorts([...state.ports, port].sort((left, right) => left - right));
-    setDraft("");
-  };
+  const { state, onPorts } = props;
   return (
     <>
-      <form className="settings-inline-form" onSubmit={add}>
-        <input
-          aria-label="Allowed local port"
-          placeholder="3000"
-          inputMode="numeric"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+      <SettingsGroup
+        title="Privacy"
+        footer="Stops a web page from steering Aeon into your router or local apps. Allow the ports you use for local development."
+      >
+        <SwitchRow
+          label="Keep Aeon off this computer and your local network"
+          checked={state.privateNetwork}
+          onChange={props.onPrivateNetwork}
         />
-        <button type="submit" disabled={parsePort(draft) === undefined}>
-          Allow port
-        </button>
-      </form>
-      {state.ports.length > 0 && (
-        <ul className="settings-site-list">
-          {state.ports.map((port) => (
-            <li key={port}>
-              <span>localhost:{port}</span>
-              <button
-                type="button"
-                aria-label={`Remove port ${port}`}
+        {state.privateNetwork && (
+          <>
+            {state.ports.map((port) => (
+              <ActionRow
+                key={port}
+                label={`localhost:${port}`}
+                action="Remove"
                 onClick={() => onPorts(state.ports.filter((item) => item !== port))}
-              >
-                Remove
-              </button>
-            </li>
+              />
+            ))}
+            <AddRow
+              label="Allowed local port"
+              placeholder="Allow a port, e.g. 3000"
+              action="Allow"
+              inputMode="numeric"
+              valid={(value) => {
+                const port = parsePort(value);
+                return port !== undefined && !state.ports.includes(port);
+              }}
+              onAdd={(value) =>
+                onPorts([...state.ports, parsePort(value) ?? 0].sort((left, right) => left - right))
+              }
+            />
+          </>
+        )}
+      </SettingsGroup>
+      {state.neverSave.length > 0 && (
+        <SettingsGroup
+          title="Never save logins for"
+          footer="Your password manager won't offer to save logins on these sites."
+        >
+          {state.neverSave.map((site) => (
+            <ActionRow
+              key={site}
+              label={site}
+              action="Remove"
+              onClick={() => props.onNeverSaveRemove(site)}
+            />
           ))}
-        </ul>
+        </SettingsGroup>
       )}
-    </>
-  );
-}
-
-function NeverSaveList({ state, onNeverSaveRemove }: PrivacySettingsProps): ReactElement | null {
-  if (!state.neverSave.length) return null;
-  return (
-    <>
-      <p>The password manager never offers to save logins for:</p>
-      <ul className="settings-site-list">
-        {state.neverSave.map((site) => (
-          <li key={site}>
-            <span>{site}</span>
-            <button
-              type="button"
-              aria-label={`Allow saving logins for ${site}`}
-              onClick={() => onNeverSaveRemove(site)}
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
     </>
   );
 }
