@@ -49,6 +49,8 @@ export class OrbOverlay {
   private readonly timers = new Set<number>();
   private readonly stopWatching: () => void;
   private raf = 0;
+  /** False until the saved position loads, so a new page never shows the orb sliding in. */
+  private placed = false;
 
   constructor(
     readonly tabId: number,
@@ -60,7 +62,12 @@ export class OrbOverlay {
     this.buildDom(nonce);
     this.orb = this.orbTarget = this.home();
     this.swarm.setCenter(this.orb.x, this.orb.y);
-    void loadOrbPosition().then((position) => this.moveHome(position));
+    void loadOrbPosition().then((position) => {
+      this.position = position;
+      this.orb = { ...this.home() };
+      this.orbTarget = this.home();
+      this.placed = true;
+    });
     this.stopWatching = watchOrbPosition((position) => this.moveHome(position));
     addEventListener("resize", this.resize);
     addEventListener("pointerdown", this.clickAway, { capture: true });
@@ -264,7 +271,7 @@ export class OrbOverlay {
     if (!this.pill.hidden)
       this.pill.style.transform = `translate(-50%, 0) translate(${this.orb.x}px, ${this.orb.y + 30}px)`;
     this.placeFrame();
-    this.swarm.draw(now, innerWidth, innerHeight);
+    if (this.placed) this.swarm.draw(now, innerWidth, innerHeight);
     this.raf = requestAnimationFrame(this.tick);
   };
 

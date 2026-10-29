@@ -1,6 +1,6 @@
 import type { OrbVisualState } from "./orb-messages.js";
 
-// The swarm: a nebula of about 200 particles on a tilted, rotating sphere over a small dark disc, drawn on a full-viewport canvas so they can
+// The swarm: a nebula of about 320 particles on a tilted, rotating sphere in a soft violet glow, drawn on a full-viewport canvas so they can
 // stream across the page into the agent cursor. Numbers follow orb-candidates.html (Swarm spec).
 
 interface Particle {
@@ -70,11 +70,13 @@ export class Swarm {
   private center = { x: 0, y: 0 };
   private groups = 1;
   private cursor: { x: number; y: number } | null = null;
+  /** The page behind is light: draw in normal blending with the deep shade in front. */
+  onLight = pageIsLight();
 
   constructor(
     private readonly context: CanvasRenderingContext2D,
     public reducedMotion: boolean,
-    count = 200,
+    count = 320,
   ) {
     // Spread evenly on a Fibonacci spiral and turned as one body, so the swarm reads as a lit
     // globe; each particle keeps its own chase rate for streaming into the cursor.
@@ -156,10 +158,8 @@ export class Swarm {
     const time = now / 1000;
     const radius = this.cursor ? 7 : this.radiusAt(time);
     const speed = this.reducedMotion ? 0 : SPEED[this.state] * (this.cursor ? 1.8 : 1);
-    // At rest the nebula sits on its own dark disc so it reads on any page; streaming to the
-    // cursor it flies bare.
-    if (!this.cursor) this.drawDisc(this.groups > 1 ? 34 : radius + 12);
-    context.globalCompositeOperation = this.cursor ? "source-over" : "lighter";
+    if (!this.cursor) this.drawGlow(this.groups > 1 ? 40 : radius * 2.1);
+    context.globalCompositeOperation = this.onLight ? "source-over" : "lighter";
     for (const [index, particle] of this.particles.entries()) {
       const home = this.anchorOf(index);
       particle.theta += 0.016 * speed * particle.speed;
@@ -188,19 +188,27 @@ export class Swarm {
     );
     const context = this.context;
     context.globalAlpha = (0.06 + 0.9 * depth * depth) * (ALPHA[this.state] ?? 1);
-    context.fillStyle = depth > 0.72 ? near : depth > 0.4 ? middle : far;
+    // On light pages the near side is the deepest shade, so the globe still reads as lit.
+    const front = depth > 0.72 ? near : depth > 0.4 ? middle : far;
+    context.fillStyle = this.onLight
+      ? front === near
+        ? far
+        : front === far
+          ? near
+          : middle
+      : front;
     context.beginPath();
-    context.arc(particle.x, particle.y, 0.45 + depth * 1.05, 0, Math.PI * 2);
+    context.arc(particle.x, particle.y, 0.4 + depth * 0.95, 0, Math.PI * 2);
     context.fill();
   }
 
-  private drawDisc(size: number): void {
+  private drawGlow(size: number): void {
     const context = this.context;
     const { x, y } = this.center;
     const glow = context.createRadialGradient(x, y, 0, x, y, size);
-    glow.addColorStop(0, "rgba(46, 34, 92, 0.95)");
-    glow.addColorStop(0.72, "rgba(11, 10, 16, 0.92)");
-    glow.addColorStop(1, "rgba(11, 10, 16, 0)");
+    const tint = this.state === "needs" ? "232, 176, 92" : "130, 100, 255";
+    glow.addColorStop(0, `rgba(${tint}, ${this.onLight ? 0.16 : 0.22})`);
+    glow.addColorStop(1, `rgba(${tint}, 0)`);
     context.globalAlpha = ALPHA[this.state] ?? 1;
     context.fillStyle = glow;
     context.beginPath();
@@ -249,4 +257,16 @@ export class Swarm {
       context.fill();
     }
   }
+}
+
+/** Whether the page under the orb is light, from its body (or root) background. */
+function pageIsLight(): boolean {
+  for (const element of [document.body, document.documentElement]) {
+    if (!element) continue;
+    const match = getComputedStyle(element).backgroundColor.match(/[d.]+/g);
+    if (!match || (match.length > 3 && Number(match[3]) === 0)) continue;
+    const [r = 255, g = 255, b = 255] = match.map(Number);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140;
+  }
+  return true;
 }

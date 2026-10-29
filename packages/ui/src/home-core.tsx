@@ -1,8 +1,8 @@
 import type { ReactElement } from "react";
 import { LatticeMark } from "./lattice-mark.js";
 
-// The top of home, where a logo would sit: the lattice. Large and still at rest, turning while
-// agents work, and smaller when many run so their cards have room.
+// The top of home, where a logo would sit: the lattice. Large and slow at rest, turning faster
+// while agents work, and smaller when many run so their cards have room.
 
 export type HomeCoreMode = "idle" | "working" | "needs";
 

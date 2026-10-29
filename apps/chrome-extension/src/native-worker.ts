@@ -102,7 +102,8 @@ configureEngine({
   controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
   idleTitle: "Open Aeon Chat",
   notificationIcon: "completion-icon.png",
-  tabGroupTitle: (_owner, title) => title ?? "Aeon",
+  // The shared group is simply "Aeon"; a chat's own group carries its title.
+  tabGroupTitle: (owner, title) => (owner.startsWith("shared") ? "Aeon" : (title ?? "Aeon")),
   agentView: readAgentTabView,
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
