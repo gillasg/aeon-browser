@@ -24,7 +24,7 @@ import { BrowserControlService } from "./browser-control-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
 
 const MAX_BOOTSTRAP_BYTES = 16 * 1024;
-// Matches the browserkit bridge; the extension refuses messages over 3.5 MB itself.
+// Matches the browserkit bridge; the extension refuses messages over 24 MB itself.
 const MAX_SOCKET_BYTES = 32 * 1024 * 1024;
 
 export interface NativeTransport {
