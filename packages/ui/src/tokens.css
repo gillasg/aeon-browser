@@ -391,6 +391,10 @@
   --aeon-swarm-needs-near: light-dark(#a45f00, #ffe2a8);
   --aeon-swarm-needs-far: light-dark(#efbd70, #e08a00);
 }
+.lattice-mark {
+  color: light-dark(#141416, #f1eefc);
+  border: 0 solid light-dark(#b8a7f7, #7c5cf0);
+}
 .mini-swarm {
   color: var(--aeon-swarm-near);
   border: 0 solid var(--aeon-swarm-far);

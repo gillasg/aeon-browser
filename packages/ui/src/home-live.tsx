@@ -1,10 +1,10 @@
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
-import { MiniSwarm } from "./mini-swarm.js";
+import { LatticeMark } from "./lattice-mark.js";
 import { SidebarIcon } from "./sidebar-icons.js";
 
 // Running work as live windows: each card shows the tab its agent is acting in, refreshed about
-// once a second by the engine. Recent chats sit underneath as a quiet list.
+// once a second by the engine. Recent chats sit underneath as a quiet list that folds away.
 
 /** The latest frame of the tab a chat's agent is working in. */
 export interface HomeRunPreview {
@@ -36,9 +36,12 @@ export function LiveRuns({
   if (!chats.length) return null;
   return (
     <section className="home-block" aria-labelledby="home-running-heading">
-      <div className="home-block-heading">
-        <h2 id="home-running-heading">Running now</h2>
-      </div>
+      <h2 id="home-running-heading" className="home-live-caption">
+        <RunningCaption
+          total={chats.length}
+          waiting={chats.filter((chat) => needs.has(chat.chatId)).length}
+        />
+      </h2>
       <div className="home-live-grid">
         {chats.map((chat) => (
           <LiveRunCard
@@ -105,7 +108,7 @@ function LiveRunButton({
           <img src={preview.image} alt={`Live view: ${preview.title}`} />
         ) : (
           <span className="home-live-idle">
-            <MiniSwarm size={28} tone={waiting ? "needs" : "working"} />
+            <LatticeMark size={32} turning />
           </span>
         )}
         <span className="home-live-badge" aria-label={waiting ? "Needs you" : "Working"}>
@@ -113,13 +116,48 @@ function LiveRunButton({
         </span>
       </span>
       <span className="home-live-meta">
-        <span className="home-live-title">{chat.title}</span>
+        <span className="home-live-title">
+          <span className="home-live-dot" aria-hidden="true" />
+          {chat.title}
+        </span>
         <span className="home-live-line">
-          {waiting ? "Open to answer" : (preview?.title ?? "Working…")}
+          {waiting ? "Needs you · open to answer" : (preview?.title ?? "Working…")}
         </span>
       </span>
     </button>
   );
+}
+
+function RunningCaption({ total, waiting }: { total: number; waiting: number }): ReactElement {
+  return (
+    <>
+      Running · {total}
+      {waiting > 0 && <b> · {waiting} needs you</b>}
+    </>
+  );
+}
+
+const RECENT_OPEN_KEY = "aeon.home.recent-open";
+
+/** Whether Recent is unfolded, remembered on this device. */
+function useRecentOpen(): [boolean, () => void] {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(RECENT_OPEN_KEY) !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const toggle = (): void =>
+    setOpen((current) => {
+      try {
+        localStorage.setItem(RECENT_OPEN_KEY, String(!current));
+      } catch {
+        // Not remembered; still toggles for this visit.
+      }
+      return !current;
+    });
+  return [open, toggle];
 }
 
 type ChatAction = ((chat: ChatCatalogItemDto) => void) | undefined;
@@ -139,16 +177,32 @@ export function RecentChats({
   onPin?: ChatAction;
   onDelete?: ChatAction;
 }): ReactElement | null {
+  const [open, toggle] = useRecentOpen();
   if (!chats.length) return null;
   return (
-    <section className="home-block home-recent" aria-labelledby="home-recent-heading">
+    <section
+      className="home-block home-recent"
+      data-open={String(open)}
+      aria-labelledby="home-recent-heading"
+    >
       <div className="home-block-heading">
-        <h2 id="home-recent-heading">Recent</h2>
+        <h2 id="home-recent-heading">
+          <button
+            type="button"
+            className="home-recent-toggle"
+            aria-expanded={open}
+            aria-controls="recent-chats"
+            onClick={toggle}
+          >
+            <span className="home-recent-chevron" aria-hidden="true" />
+            Recent
+          </button>
+        </h2>
         <button type="button" onClick={onChats}>
           All chats →
         </button>
       </div>
-      <ul className="aeon-list home-recent-list" id="recent-chats">
+      <ul className="aeon-list home-recent-list" id="recent-chats" hidden={!open}>
         {chats.map((chat) => (
           <RecentRow
             key={chat.chatId}

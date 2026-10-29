@@ -1142,3 +1142,133 @@
   color: var(--aeon-text);
   font: inherit;
 }
+
+/* ---- Home: the lattice in the logo spot, running chats as page cards, Recent folds ---- */
+
+.home-core {
+  padding-top: clamp(28px, 7vh, 72px);
+}
+.home-core > .lattice-mark {
+  transition:
+    width 320ms var(--aeon-spring),
+    height 320ms var(--aeon-spring);
+}
+.home-live-caption {
+  margin: 0 0 var(--aeon-s-3) var(--aeon-s-1);
+  color: var(--aeon-faint);
+  font:
+    500 11px/1 ui-monospace,
+    "Cascadia Mono",
+    Consolas,
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.home-live-caption b {
+  color: var(--aeon-needs);
+  font-weight: 500;
+}
+.home-live-grid {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.home-live-card {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--aeon-line);
+  border-radius: 12px;
+  background: var(--aeon-surface);
+  transition: border-color 160ms var(--aeon-spring);
+}
+.home-live-card:hover {
+  border-color: var(--aeon-muted);
+}
+.home-live-card[data-needs="true"] {
+  border-color: color-mix(in srgb, var(--aeon-needs) 55%, var(--aeon-line));
+}
+.home-live-window,
+.home-live-card:hover .home-live-window,
+.home-live-card[data-needs="true"] .home-live-window {
+  border: 0;
+  border-bottom: 1px solid var(--aeon-line);
+  border-radius: 0;
+  transform: none;
+}
+.home-live-badge {
+  display: none;
+}
+.home-live-meta {
+  gap: 3px;
+  padding: 10px 12px 11px;
+}
+.home-live-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 500;
+}
+.home-live-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--aeon-brand);
+  animation: home-core-breathe 2.4s ease-in-out infinite;
+}
+.home-live-card[data-needs="true"] .home-live-dot {
+  background: var(--aeon-needs);
+}
+.home-live-line {
+  color: var(--aeon-faint);
+  font:
+    11px/1.4 ui-monospace,
+    "Cascadia Mono",
+    Consolas,
+    monospace;
+}
+.home-live-card[data-needs="true"] .home-live-line {
+  color: var(--aeon-needs);
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-live-dot {
+    animation: none;
+  }
+}
+.home-recent-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.home-recent-toggle:hover {
+  color: var(--aeon-text);
+}
+.home-recent-toggle:focus-visible {
+  outline: 2px solid var(--aeon-muted);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.home-recent-chevron {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform 160ms var(--aeon-spring);
+}
+.home-recent[data-open="true"] .home-recent-chevron {
+  transform: rotate(90deg);
+}
+.home-recent[data-open="false"] .home-block-heading {
+  margin-bottom: 0;
+  padding-top: var(--aeon-s-2);
+  border-top: 1px solid var(--aeon-line);
+}
+/* Four or more running: shorter windows so the whole wall fits under the box. */
+.home-live-grid:has(> :nth-child(4)) .home-live-window {
+  aspect-ratio: 16 / 7;
+}
