@@ -1,6 +1,6 @@
 import type { OrbVisualState } from "./orb-messages.js";
 
-// The swarm: about 80 particles on a rotating sphere, drawn on a full-viewport canvas so they can
+// The swarm: a nebula of about 200 particles on a tilted, rotating sphere over a small dark disc, drawn on a full-viewport canvas so they can
 // stream across the page into the agent cursor. Numbers follow orb-candidates.html (Swarm spec).
 
 interface Particle {
@@ -25,16 +25,23 @@ interface Spark {
 
 // One colour: Aeon's purple. Amber only when the agent needs the user; the user's own control
 // and a failed run read as a quiet, dimmed swarm rather than new colours.
-// [near side, far side]
-const COLORS: Record<OrbVisualState, [string, string]> = {
-  listening: ["#c4b5fd", "#7c5cf0"],
-  working: ["#c4b5fd", "#7c5cf0"],
-  thinking: ["#c4b5fd", "#7c5cf0"],
-  needs: ["#ffe2a8", "#e08a00"],
-  done: ["#c4b5fd", "#7c5cf0"],
-  error: ["#c9c4dc", "#5b5770"],
-  paused: ["#c9c4dc", "#5b5770"],
+// [near side, middle, far side]
+type Shades = [string, string, string];
+const VIOLET: Shades = ["#f3efff", "#b9a6ff", "#6d4ce6"];
+const GREY: Shades = ["#e4e2ec", "#9a98a8", "#5b5770"];
+const COLORS: Record<OrbVisualState, Shades> = {
+  listening: VIOLET,
+  working: VIOLET,
+  thinking: VIOLET,
+  needs: ["#fff1d6", "#e8b05c", "#a8620a"],
+  done: VIOLET,
+  error: GREY,
+  paused: GREY,
 };
+/** The sphere leans toward the viewer, so the nebula reads as a globe seen from a little above. */
+const TILT = 0.35;
+const TILT_COS = Math.cos(TILT);
+const TILT_SIN = Math.sin(TILT);
 const ALPHA: Partial<Record<OrbVisualState, number>> = { paused: 0.55, error: 0.55, done: 0.85 };
 const RADIUS: Record<OrbVisualState, number> = {
   listening: 22,
@@ -67,7 +74,7 @@ export class Swarm {
   constructor(
     private readonly context: CanvasRenderingContext2D,
     public reducedMotion: boolean,
-    count = 80,
+    count = 200,
   ) {
     // Spread evenly on a Fibonacci spiral and turned as one body, so the swarm reads as a lit
     // globe; each particle keeps its own chase rate for streaming into the cursor.
@@ -145,28 +152,60 @@ export class Swarm {
   draw(now: number, width: number, height: number): void {
     const context = this.context;
     context.clearRect(0, 0, width, height);
-    const [light, deep] = COLORS[this.state];
+    const shades = COLORS[this.state];
     const time = now / 1000;
     const radius = this.cursor ? 7 : this.radiusAt(time);
     const speed = this.reducedMotion ? 0 : SPEED[this.state] * (this.cursor ? 1.8 : 1);
+    // At rest the nebula sits on its own dark disc so it reads on any page; streaming to the
+    // cursor it flies bare.
+    if (!this.cursor) this.drawDisc(this.groups > 1 ? 34 : radius + 12);
+    context.globalCompositeOperation = this.cursor ? "source-over" : "lighter";
     for (const [index, particle] of this.particles.entries()) {
       const home = this.anchorOf(index);
-      const anchor = this.cursor ?? home;
       particle.theta += 0.016 * speed * particle.speed;
       const r = (radius + this.wobble(time, particle.phase)) * (this.cursor ? 1 : home.scale);
-      const sinPhi = Math.sin(particle.phi);
-      const tx = anchor.x + r * sinPhi * Math.cos(particle.theta);
-      const ty = anchor.y + r * Math.cos(particle.phi);
-      const depth = (sinPhi * Math.sin(particle.theta) + 1) / 2;
-      this.follow(particle, tx, ty);
-      context.globalAlpha = (0.25 + 0.75 * depth) * (ALPHA[this.state] ?? 1);
-      context.fillStyle = depth > 0.6 ? light : deep;
-      context.beginPath();
-      context.arc(particle.x, particle.y, 0.7 + depth * 1.6, 0, Math.PI * 2);
-      context.fill();
+      this.drawParticle(particle, this.cursor ?? home, r, shades);
     }
-    this.drawSparks(now, light);
+    context.globalCompositeOperation = "source-over";
+    this.drawSparks(now, shades[1]);
     context.globalAlpha = 1;
+  }
+
+  private drawParticle(
+    particle: Particle,
+    anchor: { x: number; y: number },
+    r: number,
+    [near, middle, far]: Shades,
+  ): void {
+    const sinPhi = Math.sin(particle.phi);
+    const y = Math.cos(particle.phi);
+    const z = sinPhi * Math.sin(particle.theta);
+    const depth = (y * TILT_SIN + z * TILT_COS + 1) / 2;
+    this.follow(
+      particle,
+      anchor.x + r * sinPhi * Math.cos(particle.theta),
+      anchor.y + r * (y * TILT_COS - z * TILT_SIN),
+    );
+    const context = this.context;
+    context.globalAlpha = (0.06 + 0.9 * depth * depth) * (ALPHA[this.state] ?? 1);
+    context.fillStyle = depth > 0.72 ? near : depth > 0.4 ? middle : far;
+    context.beginPath();
+    context.arc(particle.x, particle.y, 0.45 + depth * 1.05, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  private drawDisc(size: number): void {
+    const context = this.context;
+    const { x, y } = this.center;
+    const glow = context.createRadialGradient(x, y, 0, x, y, size);
+    glow.addColorStop(0, "rgba(46, 34, 92, 0.95)");
+    glow.addColorStop(0.72, "rgba(11, 10, 16, 0.92)");
+    glow.addColorStop(1, "rgba(11, 10, 16, 0)");
+    context.globalAlpha = ALPHA[this.state] ?? 1;
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(x, y, size, 0, Math.PI * 2);
+    context.fill();
   }
 
   private radiusAt(time: number): number {

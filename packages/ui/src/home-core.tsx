@@ -1,10 +1,13 @@
 import type { ReactElement } from "react";
-import { MiniSwarm } from "./mini-swarm.js";
+import { LatticeMark } from "./lattice-mark.js";
 
-// The top of home: Aeon's presence. A large swarm that stirs while an agent works and turns warm
-// when one is waiting on you.
+// The top of home, where a logo would sit: the lattice. Large and still at rest, turning while
+// agents work, and smaller when many run so their cards have room.
 
 export type HomeCoreMode = "idle" | "working" | "needs";
+
+/** From this many running chats the lattice steps down to its small size. */
+const BUSY = 4;
 
 export function HomeCore({
   working,
@@ -13,13 +16,14 @@ export function HomeCore({
 }: {
   working: number;
   waiting: number;
-  /** Still reaching the helper app: the swarm stirs instead of a "Connecting…" line. */
+  /** Still reaching the helper app: the lattice turns instead of a "Connecting…" line. */
   connecting?: boolean;
 }): ReactElement {
   const mode: HomeCoreMode = waiting ? "needs" : working || connecting ? "working" : "idle";
+  const size = working + waiting >= BUSY ? 84 : mode === "idle" ? 168 : 132;
   return (
     <header className="home-core" data-mode={mode} aria-hidden="true">
-      <MiniSwarm size={120} tone={mode} />
+      <LatticeMark size={size} turning={mode !== "idle"} />
     </header>
   );
 }
