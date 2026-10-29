@@ -100,7 +100,6 @@ function Compose({
         </button>
         <span className="isl-notice">{model.notice}</span>
         {model.chats.length > 0 && <Switcher model={model} actions={actions} icon />}
-        <Button label="Minimize (Esc)" onClick={actions.minimize} icon="minimize" />
       </div>
     </>
   );
@@ -122,7 +121,6 @@ function ChatBox({
         <Button label="New chat" onClick={actions.newChat} icon="new" />
         <Button label="Move to side panel" onClick={actions.toSidePanel} icon="panel" />
         <Button label="Open in a tab" onClick={actions.toTab} icon="tab" />
-        <Button label="Minimize (Esc)" onClick={actions.minimize} icon="minimize" />
       </div>
       <div className="box-body">
         {model.chatUrl && (
@@ -178,7 +176,6 @@ const ICONS = {
   new: "M8 3.5v9M3.5 8h9",
   panel: "M3 3.5h10v9H3zM9.5 3.5v9",
   tab: "M9 3.5h3.5V7M12.5 3.5 7.5 8.5M11 9.5v3H3.5V5h3",
-  minimize: "M4 6.5 8 10l4-3.5",
 } as const;
 
 function Button({

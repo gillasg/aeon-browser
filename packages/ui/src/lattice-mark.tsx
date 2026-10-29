@@ -1,16 +1,16 @@
 import { useEffect, useRef, type ReactElement } from "react";
 
-// Aeon's mark on home: a globe drawn as dotted latitude and longitude lines. It turns while
-// agents work and holds still at rest. The orb on web pages stays the nebula swarm.
+// Aeon's mark on home: a globe drawn as dotted latitude and longitude lines. It turns very slowly
+// at rest and faster while agents work. The orb on web pages stays the nebula swarm.
 
 type Point = readonly [number, number, number];
 
 /** [near side, far side], used when the page has no lattice tokens. */
 const FALLBACK: [string, string] = ["#f1eefc", "#7c5cf0"];
 const TILT = -0.42;
-/** Milliseconds per radian of turn. */
-const PACE = 6000;
-/** The angle a still lattice rests at, so its lines don't sit edge-on. */
+/** Milliseconds per radian of turn: at rest, and while agents work. */
+const PACE = { rest: 24000, working: 6000 };
+/** The starting angle, so its lines don't sit edge-on. */
 const REST = 0.3;
 
 export function LatticeMark({
@@ -75,12 +75,12 @@ function animate(
 ): () => void {
   const points = latticePoints(size);
   context.setTransform(2, 0, 0, 2, 0, 0);
-  const still =
-    !turning || (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+  const still = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const pace = turning ? PACE.working : PACE.rest;
   let frame = 0;
   const start = performance.now();
   const draw = (time: number): void => {
-    paint(context, points, size, colors, REST + (time - start) / PACE);
+    paint(context, points, size, colors, REST + (time - start) / pace);
     if (!still) frame = requestAnimationFrame(draw);
   };
   draw(start);

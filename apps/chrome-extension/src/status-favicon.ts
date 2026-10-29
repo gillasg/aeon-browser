@@ -14,9 +14,19 @@ let timer = 0;
 let frame = 0;
 let working = false;
 let chatFilter = "";
-// Spinner frames are drawn once and stepped evenly, so the turn stays smooth when timers jitter.
+// Tab icons: the lattice (Aeon's mark) at rest, a turning violet nebula while the chat works, and
+// a still blue nebula once it finished unseen. Frames are drawn once and stepped evenly, so the
+// turn stays smooth when timers jitter.
 const FRAMES = 24;
 const spinnerFrames: string[] = [];
+const VIOLET = ["#f3efff", "#b9a6ff", "#6d4ce6"] as const;
+const BLUE = ["#eaf4ff", "#7db7ff", "#2f6fe0"] as const;
+const NEBULA = Array.from({ length: 140 }, (_, index) => {
+  const y = 1 - (index / 139) * 2;
+  const ring = Math.sqrt(1 - y * y);
+  const turn = index * 2.39996;
+  return [Math.cos(turn) * ring, y, Math.sin(turn) * ring] as const;
+});
 /** Limits this tab's icon to one chat's status (chat pages); other pages show any chat's. */
 export function showStatusForChat(chatId: string): void {
   chatFilter = chatId;
@@ -82,15 +92,37 @@ function refresh(): void {
 }
 function spinnerFrame(index: number): string {
   if (spinnerFrames[index] || !context) return spinnerFrames[index] ?? "";
-  const angle = (index / FRAMES) * Math.PI * 2;
-  context.clearRect(0, 0, 32, 32);
-  context.strokeStyle = "#737373";
-  context.lineWidth = 3;
-  context.lineCap = "round";
-  context.beginPath();
-  context.arc(16, 16, 12, angle, angle + Math.PI * 1.5);
-  context.stroke();
+  drawNebula(context, (index / FRAMES) * Math.PI * 2, VIOLET);
   return (spinnerFrames[index] = canvas.toDataURL("image/png"));
+}
+/** A small nebula on a dark disc, so it reads on light and dark tab strips. */
+function drawNebula(
+  target: CanvasRenderingContext2D,
+  angle: number,
+  [near, middle, far]: readonly [string, string, string],
+): void {
+  target.clearRect(0, 0, 32, 32);
+  target.globalCompositeOperation = "source-over";
+  target.globalAlpha = 1;
+  target.fillStyle = "#0b0a10";
+  target.beginPath();
+  target.arc(16, 16, 15.5, 0, Math.PI * 2);
+  target.fill();
+  target.globalCompositeOperation = "lighter";
+  const tilt = 0.35;
+  for (const [x, y0, z0] of NEBULA) {
+    const y = y0 * Math.cos(tilt) - z0 * Math.sin(tilt);
+    const z = y0 * Math.sin(tilt) + z0 * Math.cos(tilt);
+    const depth = (x * Math.sin(angle) + z * Math.cos(angle) + 1) / 2;
+    target.globalAlpha = 0.1 + 0.9 * depth * depth;
+    target.fillStyle = depth > 0.72 ? near : depth > 0.4 ? middle : far;
+    const px = 16 + (x * Math.cos(angle) - z * Math.sin(angle)) * 11;
+    target.beginPath();
+    target.arc(px, 16 + y * 11, 0.5 + depth * 0.9, 0, Math.PI * 2);
+    target.fill();
+  }
+  target.globalCompositeOperation = "source-over";
+  target.globalAlpha = 1;
 }
 function draw(): void {
   if (!context) return;
@@ -99,12 +131,7 @@ function draw(): void {
     return;
   }
   context.clearRect(0, 0, 32, 32);
-  if (done) {
-    context.fillStyle = "#4299ff";
-    context.beginPath();
-    context.arc(16, 16, 6, 0, Math.PI * 2);
-    context.fill();
-  }
+  if (done) drawNebula(context, 0.6, BLUE);
   if (!working && !done && orbit.complete && orbit.naturalWidth)
     context.drawImage(orbit, 0, 0, 32, 32);
   icon.href = canvas.toDataURL("image/png");

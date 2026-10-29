@@ -33,6 +33,7 @@ const model: OrbViewModel = {
   needs: new Set(),
 };
 const TAB_CHAT = "aeon-orb-chat:" + tabId;
+const LAST_CHAT = "aeon-orb-chat:last";
 let run: OrbRun | undefined;
 let userControl = false;
 let lastVisual = "";
@@ -75,15 +76,21 @@ async function boot(): Promise<void> {
   if (chatId && !model.chatId && !model.pending) await selectChat(chatId, false);
 }
 
-/** This tab's chat, kept across navigations and reloads; a tab that never had one starts fresh. */
+/** This tab's chat, kept across navigations and reloads; a tab that never had one opens the chat
+ * last used in the orb anywhere, so switching tabs keeps the same conversation. */
 async function rememberedChat(): Promise<string | undefined> {
-  const stored = await chrome.storage.session.get(TAB_CHAT).catch(() => ({}));
-  const own = (stored as Record<string, unknown>)[TAB_CHAT];
-  return typeof own === "string" && own ? own : undefined;
+  const stored = await chrome.storage.session.get([TAB_CHAT, LAST_CHAT]).catch(() => ({}));
+  const values = stored as Record<string, unknown>;
+  const own = values[TAB_CHAT];
+  if (typeof own === "string") return own || undefined;
+  const last = values[LAST_CHAT];
+  return typeof last === "string" && last ? last : undefined;
 }
 
 function remember(chatId: string | undefined): void {
-  void chrome.storage.session.set({ [TAB_CHAT]: chatId ?? "" }).catch(() => undefined);
+  void chrome.storage.session
+    .set({ [TAB_CHAT]: chatId ?? "", [LAST_CHAT]: chatId ?? "" })
+    .catch(() => undefined);
 }
 
 /** Shows another chat in this orb (the switcher), or a blank one to start (+). */

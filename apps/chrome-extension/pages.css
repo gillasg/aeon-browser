@@ -1272,3 +1272,7 @@
 .home-live-grid:has(> :nth-child(4)) .home-live-window {
   aspect-ratio: 16 / 7;
 }
+/* Icons sit on the bar's centre line, not the text baseline. */
+.home-top-nav svg {
+  display: block;
+}
