@@ -70,6 +70,8 @@ export interface AgentRun {
   dialog?: { title: string; message: string | null };
   /** The run stopped to ask the user something (approvals are for writes: pay, order, send). */
   asked?: boolean;
+  /** The user stopped the run (Pi recorded it as aborted). */
+  stopped?: boolean;
   error?: string;
 }
 
@@ -175,6 +177,8 @@ function applyMessage(run: AgentRun, message: PiMessageDto): AgentRun {
     .flatMap((block) => (block.type === "text" ? [block.text] : []))
     .join("\n")
     .trim();
+  // A run the user stopped settles like any other, but says so in every view.
+  if (message.stopReason === "aborted") return { ...run, stopped: true };
   if (message.stopReason === "error")
     return { ...run, status: "error", error: message.errorMessage ?? "The run failed." };
   return text ? { ...run, answer: text } : run;
@@ -208,7 +212,7 @@ function finish(run: AgentRun): AgentRun {
   if (run.status === "error" || run.status === "needs") return run;
   // An idle chat before the prompt has started is not a finished run.
   if (!run.steps.length && !run.answer) return run;
-  return { ...run, status: "done", label: "Done" };
+  return { ...run, status: "done", label: run.stopped ? "Stopped" : "Done" };
 }
 
 export function inferPath(toolName: string): RunPath {

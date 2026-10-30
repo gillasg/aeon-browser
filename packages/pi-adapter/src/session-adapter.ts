@@ -5,6 +5,7 @@ import { startupTiming, timeStartupStep } from "./startup-timing.js";
 import { PreparedSessionResources } from "./prepared-session-resources.js";
 import { installBrowserControlRequestProjection } from "./browser-provider-projection.js";
 import { waitForMcpConnectionState } from "./session-mcp-status.js";
+import { EXPECTED_PI_SDK_VERSION } from "./probe.js";
 import {
   SessionManager,
   VERSION,
@@ -105,7 +106,8 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle> {
     const current = this.liveSessions.get(input.chatId);
     if (current) return current.then((handle) => verifyCachedHandle(handle, input));
-    if (VERSION !== "0.99.1") throw new Error(`Unsupported Pi SDK version ${VERSION}.`);
+    if (VERSION !== EXPECTED_PI_SDK_VERSION)
+      throw new Error(`Unsupported Pi SDK version ${VERSION}.`);
 
     const startedAt = Date.now();
     const opening: Promise<PiSessionHandle> = this.createHandle(input).then((handle) => {

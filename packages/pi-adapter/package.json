@@ -16,8 +16,8 @@
   "dependencies": {
     "@aeon/domain": "workspace:*",
     "@aeon/protocol": "workspace:*",
-    "@earendil-works/pi-ai": "0.99.1",
-    "@earendil-works/pi-coding-agent": "0.99.1",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-coding-agent": "1.4.0",
     "typebox": "1.3.27",
     "@browserkit/tools": "link:../../../browserkit/packages/tools",
     "@browserkit/credentials": "link:../../../browserkit/packages/credentials"
