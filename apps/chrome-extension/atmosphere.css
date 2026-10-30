@@ -809,6 +809,13 @@ body[data-host="panel"] .home-recent-section,
 body[data-host="panel"] .home-block {
   display: none;
 }
+/* Nothing under the side panel composer: the dashboard below it keeps no margin there. */
+body[data-host="panel"] .home-dashboard {
+  margin: 0;
+}
+body[data-host="panel"] .home-main[data-screen="new-tab"] {
+  padding-bottom: 12px;
+}
 body[data-host="panel"] .chat-main {
   height: 100dvh;
   min-height: 0;

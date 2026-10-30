@@ -216,6 +216,8 @@ const boxModel = {
   learning: false,
   pending: "",
   chats: [{ chatId: "c1", title: "Tokyo flight", updatedAt: "2026-10-28T10:00:00.000Z" }],
+  context: [{ tabId: 7, title: "Home / X", host: "x.com" }],
+  tabChoices: null,
   running: new Set(["c1"]),
   needs: new Set(),
 };
@@ -228,6 +230,29 @@ test("the orb box composes until a chat exists, then frames that chat with hand-
   assert.match(compose, /data-state="compose"/);
   assert.match(compose, /<textarea/);
   assert.doesNotMatch(compose, /Run again/);
+  // The page goes with the message as a chip that can be removed; + adds another tab.
+  assert.match(compose, /x.com/);
+  assert.match(compose, /Remove x.com/);
+  assert.match(compose, /Add a tab/);
+  assert.match(compose, /chat-switcher/, "the switcher shows before any chat is open");
+  const choices = renderToStaticMarkup(
+    createElement(view.OrbBox, {
+      model: {
+        ...boxModel,
+        tabChoices: [
+          { tabId: 7, title: "Home / X", host: "x.com" },
+          { tabId: 8, title: "Docs", host: "docs.dev" },
+        ],
+      },
+      actions: boxActions,
+    }),
+  );
+  assert.match(choices, /Docs/);
+  assert.doesNotMatch(
+    choices,
+    /<button[^>]*title="x.com"/,
+    "tabs already chosen are not offered again",
+  );
   const chat = renderToStaticMarkup(
     createElement(view.OrbBox, {
       model: {

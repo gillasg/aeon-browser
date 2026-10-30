@@ -398,6 +398,9 @@ function selectorHint(text: string): string | undefined {
   return "That is not a valid CSS selector: use page.getByRole/page.getByText, or a plain CSS selector.";
 }
 
+/** A value up to this size comes back whole, so one page.read (40k by default) needs one call. */
+const RESULT_INLINE_LIMIT = 48_000;
+
 async function journalOutput(
   cell: { output: string; value?: unknown },
   workspace: string | undefined,
@@ -405,7 +408,7 @@ async function journalOutput(
 ) {
   if (workspace && cell.value !== undefined) {
     const encoded = JSON.stringify(cell.value);
-    if (encoded && encoded.length > 16000) {
+    if (encoded && encoded.length > RESULT_INLINE_LIMIT) {
       const saved = await workspaceCall(workspace, {
         workspace: "artifact",
         name: "browser-results/" + operationId + ".json",

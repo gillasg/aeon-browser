@@ -330,3 +330,93 @@ button.icon:hover,
 .chat-switcher-menu li i[data-state="needs"] {
   background: #ffb347;
 }
+
+/* The tabs the first message carries: a chip per tab with ×, + lists other open tabs. */
+.isl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px 1px 8px;
+}
+.isl-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.isl-chip-x,
+.isl-add {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+}
+.isl-add {
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 15px;
+}
+.isl-chip-x:hover,
+.isl-add:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.isl-learn {
+  width: 26px;
+  height: 26px;
+}
+.isl-learn[aria-pressed="true"] {
+  color: #b9a6ff;
+  background: rgba(155, 140, 255, 0.18);
+}
+.isl-learn[aria-pressed="true"]::before {
+  content: none;
+}
+.isl-tabs {
+  order: 10;
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  padding: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #1c1b25;
+}
+.isl-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  text-align: left;
+  color: #e4e2ee;
+}
+.isl-tabs button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.isl-tabs img,
+.isl-tabs i {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.isl-tabs-empty {
+  padding: 6px 8px;
+  color: var(--muted);
+}
