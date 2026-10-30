@@ -17,7 +17,7 @@
     "@browserkit/tools": "link:../../../browserkit/packages/tools",
     "@browserkit/site-mapper": "link:../../../browserkit/packages/site-mapper",
     "ws": "8.22.0",
-    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-ai": "1.4.0",
     "proper-lockfile": "4.1.2"
   },
   "devDependencies": {

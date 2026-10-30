@@ -80,7 +80,7 @@ export interface ThreadForkIntent {
 export class PiForkUnsupportedEntryError extends Error {
   constructor() {
     super(
-      "Pi 0.99.1 cannot persist an exact fork at this entry because its branch has no assistant message. Choose an entry whose branch contains an assistant response.",
+      "Pi cannot persist an exact fork at this entry because its branch has no assistant message. Choose an entry whose branch contains an assistant response.",
     );
     this.name = "PiForkUnsupportedEntryError";
   }

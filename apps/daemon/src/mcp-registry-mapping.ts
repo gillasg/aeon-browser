@@ -8,6 +8,8 @@ export type PiMcpServerConfig =
       args: string[];
       cwd: string;
       env?: Record<string, string>;
+      /** What the server is for: Pi shows it to the model and ranks the server's tools by it. */
+      description?: string;
       enabled: boolean;
       exposure: "codemode";
     }
@@ -15,6 +17,7 @@ export type PiMcpServerConfig =
       type: "http";
       url: string;
       headers?: Record<string, string>;
+      description?: string;
       enabled: boolean;
       exposure: "codemode";
     };
@@ -47,6 +50,7 @@ export function mapMcpCapabilityToPi(
         args: [...capability.args],
         cwd: resolve(defaultWorkingDirectory, capability.workingDirectory ?? "."),
         ...(envCredential ? { env: { [envCredential]: envReference(envCredential) } } : {}),
+        ...describe(capability),
         enabled: !manualCredential,
         exposure: "codemode",
       },
@@ -62,6 +66,7 @@ export function mapMcpCapabilityToPi(
       ...(envCredential
         ? { headers: { Authorization: `Bearer ${envReference(envCredential)}` } }
         : {}),
+      ...describe(capability),
       enabled: !manualCredential,
       exposure: "codemode",
     },
@@ -86,10 +91,21 @@ export function mapRegisteredCliBridge(
       command: bridge.command,
       args: [bridge.scriptPath, "--registry", bridge.registryPath],
       cwd: resolve(defaultWorkingDirectory),
+      description: "The command-line tools the user registered in Aeon.",
       enabled: true,
       exposure: "codemode",
     },
   };
+}
+
+/** The server names are opaque ids, so the description carries its name and purpose. */
+function describe(capability: McpCapability): { description?: string } {
+  const text = [capability.displayName, capability.description]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(": ")
+    .slice(0, 300);
+  return text ? { description: text } : {};
 }
 
 function envReference(name: string): string {

@@ -32,11 +32,7 @@ export function TranscriptMessage({
         {visibleMessage && (
           <MessageBody message={visibleMessage} streaming={row.kind === "transient"} />
         )}
-        {message?.errorMessage && (
-          <p className="message-error" role="alert">
-            {message.errorMessage}
-          </p>
-        )}
+        <MessageNote message={message} />
       </div>
       {messageActionsVisible(message, text, Boolean(entry)) && (
         <MessageActions
@@ -266,8 +262,20 @@ function messagePresentation(row: Exclude<TranscriptRow, { kind: "tool-group" }>
   return { message, entry, isUser, isAssistant, text, className };
 }
 
+/** A stopped run is a quiet note; a failed one shows its error. */
+function MessageNote({ message }: { message: PiMessageDto | null }): ReactElement | null {
+  if (message?.stopReason === "aborted") return <p className="message-stopped">Stopped</p>;
+  if (!message?.errorMessage) return null;
+  return (
+    <p className="message-error" role="alert">
+      {message.errorMessage}
+    </p>
+  );
+}
+
 function messageIsEmpty(message: PiMessageDto | null, hideThinking: boolean): boolean {
-  if (message?.role !== "assistant" || message.errorMessage) return false;
+  if (message?.role !== "assistant" || message.errorMessage || message.stopReason === "aborted")
+    return false;
   return !message.content.some((block) => {
     if (block.type === "tool-call") return false;
     if (block.type === "thinking") return !hideThinking && Boolean(block.text.trim());

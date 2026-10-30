@@ -999,6 +999,12 @@ summary:focus-visible {
   color: var(--aeon-swatch-c78b84);
   white-space: pre-wrap;
 }
+/* A run the user stopped: a quiet note, not an error. */
+.message-stopped {
+  margin: 0;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+}
 .message-image {
   color: var(--muted);
   font-size: var(--aeon-fs-base);

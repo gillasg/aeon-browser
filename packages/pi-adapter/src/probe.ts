@@ -14,7 +14,7 @@ import {
   readStoredCredential,
 } from "@earendil-works/pi-coding-agent";
 
-export const EXPECTED_PI_SDK_VERSION = "0.99.1" as const;
+export const EXPECTED_PI_SDK_VERSION = "1.4.0" as const;
 
 function inspectMethods(target: object, names: readonly string[]): Record<string, boolean> {
   return Object.fromEntries(

@@ -232,7 +232,11 @@ export class TranscriptModel {
     if (!message || message.role !== "assistant") return;
     const calls = message.content.filter((block) => block.type === "tool-call");
     if (!calls.length || separatesToolBatch(message)) this.activeGroup = undefined;
-    if (hasRenderableContent(message.content) || message.stopReason === "error")
+    if (
+      hasRenderableContent(message.content) ||
+      message.stopReason === "error" ||
+      message.stopReason === "aborted"
+    )
       insertAssistantEntry(this.rows, entry);
     const timestamp = timestampMs(entry.timestamp) ?? Date.now();
     for (const block of calls) {

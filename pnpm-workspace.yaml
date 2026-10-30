@@ -7,18 +7,15 @@ allowBuilds:
   esbuild: true
   protobufjs: false
 minimumReleaseAgeExclude:
+  - "@earendil-works/pi-agent-core@1.4.0"
+  - "@earendil-works/pi-ai@1.4.0"
+  - "@earendil-works/pi-codemode@1.4.0"
+  - "@earendil-works/pi-coding-agent@1.4.0"
+  - "@earendil-works/pi-mcp@1.4.0"
+  - "@earendil-works/pi-telemetry@1.4.0"
+  - "@earendil-works/pi-tui@1.4.0"
   - "@browserkit/engine"
-  - "@earendil-works/pi-ai@1.2.0"
-  - "@earendil-works/pi-telemetry@1.2.0"
   - "@modelcontextprotocol/client@2.2.0"
   - "@modelcontextprotocol/core@2.2.0"
-  - "@earendil-works/chord@0.99.1"
-  - "@earendil-works/pi-agent-core@0.99.1"
-  - "@earendil-works/pi-ai@0.99.1"
-  - "@earendil-works/pi-codemode@0.99.1"
-  - "@earendil-works/pi-coding-agent@0.99.1"
-  - "@earendil-works/pi-mcp@0.99.1"
-  - "@earendil-works/pi-telemetry@0.99.1"
-  - "@earendil-works/pi-tui@0.99.1"
 patchedDependencies:
-  "@earendil-works/pi-coding-agent@0.99.1": patches/@earendil-works__pi-coding-agent@0.99.1.patch
+  "@earendil-works/pi-coding-agent@1.4.0": patches/@earendil-works__pi-coding-agent@1.4.0.patch

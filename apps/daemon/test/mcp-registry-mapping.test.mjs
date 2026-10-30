@@ -30,6 +30,7 @@ test("legacy stdio MCP records map to Pi config without materializing credential
       args: ["--read-only"],
       cwd: "C:\\aeon\\relative\\project",
       env: { DOCS_TOKEN: "${DOCS_TOKEN}" },
+      description: "Documentation: Read documentation.",
       enabled: true,
       exposure: "codemode",
     },
@@ -70,6 +71,7 @@ function prepareMcpRegistryMappingCase1Stage1() {
     type: "http",
     url: "https://example.test/mcp",
     headers: { Authorization: "Bearer ${REMOTE_DOCS_TOKEN}" },
+    description: "Remote documentation: Read remote docs.",
     enabled: true,
     exposure: "codemode",
   });

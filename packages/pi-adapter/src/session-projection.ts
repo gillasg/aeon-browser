@@ -261,6 +261,10 @@ function projectToolEvent(
     toolName: event.toolName,
     result: resultText(event.result),
     isError: event.isError,
+    // Pi measures how long the tool ran; the UI otherwise estimates it from event times.
+    ...(typeof event.durationMs === "number"
+      ? { durationMs: Math.max(0, Math.round(event.durationMs)) }
+      : {}),
     ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
   };
 }

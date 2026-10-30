@@ -26,7 +26,7 @@ export function editSessionQueue(session: AgentSession, input: Input): void {
   }));
   const groups = { steer: items.slice(0, steering.length), followUp: items.slice(steering.length) };
   updateItems(groups, input);
-  // Pi 0.99.1 exposes no queue replacement API. Its internal enqueue methods
+  // Pi exposes no queue replacement API. Its internal enqueue methods
   // retain expanded text and image attachments without expanding commands twice.
   type Images = Parameters<AgentSession["steer"]>[1];
   const enqueue = session as unknown as {
