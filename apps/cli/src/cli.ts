@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { closeSharedBridge as closeCrawlBridge } from "@browserkit/tools/browser-crawl";
 import { closeSharedBridge, errorKind } from "@browserkit/tools/site-to-api";
 import { has, parseArgs } from "browserkit/dist/args.js";
@@ -21,11 +22,23 @@ const EXIT_CODES: Record<string, number> = {
 };
 
 const HELP = new Set(["help", "--help", "-h"]);
+const VERSION = new Set(["version", "--version", "-v"]);
+
+function printVersion(): number {
+  const manifest = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as {
+    version?: string;
+  };
+  out(`aeon ${manifest.version ?? "unknown"}`);
+  return 0;
+}
 const host = new DaemonHost();
 
 async function main(argv: string[]): Promise<number> {
   installAeonCliHost(host);
   const commands = aeonCommands(host);
+  if (VERSION.has(argv[0] ?? "")) return printVersion();
   if (HELP.has(argv[0] ?? "")) return printHelp(commands, argv.slice(1));
   const args = parseArgs(argv);
   const [name, ...rest] = args.positional;

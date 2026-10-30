@@ -75,7 +75,8 @@ async function repl(host: DaemonHost, args: Args): Promise<number> {
       await host
         .runInBrowser("await browser.session.close()", { session, timeoutMs: 5000 })
         .catch(() => undefined);
-    if (!has(args, "quiet")) out(error instanceof Error ? error.message : String(error));
+    // --quiet drops the output, never the error: it goes to stderr.
+    process.stderr.write((error instanceof Error ? error.message : String(error)) + "\n");
     return 1;
   }
 }
@@ -165,7 +166,7 @@ Prints tab id, title and URL, one tab per line; --json prints the browser's own 
 The last expression is returned. Variables and tabs persist per session. @file.js runs code from
 a file and - reads it from stdin, so long cells need no quoting. --timeout is in seconds (30,
 500ms and 2s also work); a timed-out cell closes the session's own tabs and jobs. --quiet prints
-nothing but keeps the exit code.`,
+only errors (on stderr) and keeps the exit code.`,
       run: (args) => repl(host, args),
     },
     {
