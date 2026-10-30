@@ -5,6 +5,7 @@ import type { defineTool } from "@earendil-works/pi-coding-agent";
 import { createBrowserCodeTool } from "./browser-code-tool.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { createCrawlTool } from "./crawl-tool.js";
+import { createBrowserContextTool } from "./browser-context-tool.js";
 import { createExtractTool } from "./extract-tool.js";
 import { siteToolModel, type CompletionOptions } from "./text-completion.js";
 import { createSiteMapperTool } from "./site-mapper-tool.js";
@@ -49,10 +50,12 @@ function toolsFor(
     session.replace(/[^\w.-]+/g, "-"),
   );
   const skills = resolve(options.sessionDirectory, "..", "site-skills");
+  const browserCode = createBrowserCodeTool(chatId, run, workspace, skills, { source: "external" });
   return {
     // An outside agent signs in the same way a chat does; it has no routines, so its runs never
     // carry an "only these sites" list. Credentials and rules answers still never reach a result.
-    browser_code: createBrowserCodeTool(chatId, run, workspace, skills, { source: "external" }),
+    browser_code: browserCode,
+    browser_context: createBrowserContextTool(browserCode),
     crawl: createCrawlTool(chatId, workspace, siteToolModel(options)),
     site_mapper: createSiteMapperTool(chatId, workspace, siteToolModel(options)),
     extract: createExtractTool(options, workspace),

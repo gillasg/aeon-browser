@@ -146,6 +146,14 @@ const ChatSubmitRequestSchema = z
         browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
         /** True only when a person typed this in Aeon's own UI: never page or agent text. */
         typedByUser: z.boolean().optional(),
+        budget: z
+          .object({
+            maxSteps: z.number().int().min(1).max(10_000).optional(),
+            maxMinutes: z.number().min(0.1).max(1440).optional(),
+            maxCost: z.number().min(0.001).max(1000).optional(),
+          })
+          .strict()
+          .optional(),
         selection: z
           .object({
             model: z

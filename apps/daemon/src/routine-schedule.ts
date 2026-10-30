@@ -31,24 +31,36 @@ export function parseRoutineSchedule(
       timeZone,
     };
   }
-  if (value.kind === "calendar") {
-    if (!Array.isArray(value.daysOfWeek) || !value.daysOfWeek.length)
-      throw new Error("Calendar schedules need at least one weekday.");
-    const daysOfWeek = [
-      ...new Set(value.daysOfWeek.map((day) => integer(day, 0, 6, "weekday"))),
-    ].sort();
-    const localTime = requiredString(value.localTime, 5);
-    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(localTime))
-      throw new Error("localTime must use 24-hour HH:mm format.");
-    return { kind: "calendar", daysOfWeek, localTime, timeZone };
+  if (value.kind === "calendar") return parseCalendar(value, timeZone);
+  if (value.kind === "once") {
+    const atUtc = requiredString(value.atUtc, 40);
+    if (!Number.isFinite(Date.parse(atUtc))) throw new Error("atUtc must be an ISO date-time.");
+    return { kind: "once", atUtc: new Date(atUtc).toISOString(), timeZone };
   }
-  throw new Error("Routine schedule kind must be interval or calendar.");
+  throw new Error("Routine schedule kind must be interval, calendar or once.");
 }
+
+function parseCalendar(value: Record<string, unknown>, timeZone: string): RoutineSchedule {
+  if (!Array.isArray(value.daysOfWeek) || !value.daysOfWeek.length)
+    throw new Error("Calendar schedules need at least one weekday.");
+  const daysOfWeek = [
+    ...new Set(value.daysOfWeek.map((day) => integer(day, 0, 6, "weekday"))),
+  ].sort();
+  const localTime = requiredString(value.localTime, 5);
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(localTime))
+    throw new Error("localTime must use 24-hour HH:mm format.");
+  return { kind: "calendar", daysOfWeek, localTime, timeZone };
+}
+
+/** A one-time routine's next run once it has run: never. */
+export const NEVER = "9999-12-31T00:00:00.000Z";
 
 export function nextRoutineOccurrence(schedule: RoutineSchedule, after: string | Date): string {
   const afterMs = typeof after === "string" ? Date.parse(after) : after.getTime();
   if (!Number.isFinite(afterMs)) throw new Error("Routine reference time is invalid.");
   if (schedule.kind === "interval") return nextInterval(schedule, afterMs);
+  if (schedule.kind === "once")
+    return Date.parse(schedule.atUtc) > afterMs ? schedule.atUtc : NEVER;
   return nextCalendar(schedule, afterMs);
 }
 

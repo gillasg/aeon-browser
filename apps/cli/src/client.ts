@@ -252,6 +252,7 @@ export class AeonClient {
     chatId: string,
     text: string,
     selection: { model: { provider: string; id: string }; thinkingLevel: string },
+    budget?: { maxSteps?: number; maxMinutes?: number; maxCost?: number },
   ): Promise<void> {
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
@@ -276,7 +277,7 @@ export class AeonClient {
           kind: "command",
           requestId,
           operation: "chat.submit",
-          payload: { chatId, text, selection },
+          payload: { chatId, text, selection, ...(budget ? { budget } : {}) },
         }),
       );
     });

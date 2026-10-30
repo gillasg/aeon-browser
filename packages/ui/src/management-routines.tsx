@@ -345,6 +345,8 @@ function perform(
 }
 
 function scheduleLabel(schedule: Routine["schedule"]): string {
+  if (schedule.kind === "once")
+    return `Once at ${new Date(schedule.atUtc).toLocaleString()} · ${schedule.timeZone}`;
   return schedule.kind === "interval"
     ? `Every ${schedule.everyMinutes} minutes · ${schedule.timeZone}`
     : `${schedule.daysOfWeek.join(", ")} at ${schedule.localTime} · ${schedule.timeZone}`;

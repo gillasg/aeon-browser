@@ -10,6 +10,7 @@ import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@aeon/dom
 import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
 import { modelUnavailable } from "./model-unavailable.js";
+import { watchBudget } from "./run-budget.js";
 
 type Controls = Pick<
   PiSessionHandle,
@@ -90,6 +91,7 @@ export async function submitToPi(
       { deliverAs: "nextTurn" },
     );
   }
+  if (input.budget) watchBudget(session, input.budget);
   await session.prompt(
     `${decoded.text}${decoded.attachmentText}`,
     decoded.images.length ? { images: decoded.images } : undefined,

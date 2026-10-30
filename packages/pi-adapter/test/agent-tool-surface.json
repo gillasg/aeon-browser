@@ -1,7 +1,7 @@
 [
   {
     "name": "crawl",
-    "description": "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search Google. Uses plain HTTP first and the user's browser (with their logins) when needed.",
+    "description": "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search the web (keyless search providers, or Google in the user's browser for local, live and personal queries). Uses plain HTTP first and the user's browser (with their logins) when needed.",
     "actions": ["scrape", "crawl", "map", "search", "find", "check"],
     "parameters": {
       "type": "object",

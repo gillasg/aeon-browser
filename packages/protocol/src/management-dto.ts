@@ -36,6 +36,13 @@ const RoutineScheduleSchema = z.discriminatedUnion("kind", [
       timeZone: z.string().min(1).max(100),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("once"),
+      atUtc: z.string().datetime(),
+      timeZone: z.string().min(1).max(100),
+    })
+    .strict(),
 ]);
 
 const ManagementRoutineSchema = z

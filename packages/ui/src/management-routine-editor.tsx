@@ -148,7 +148,9 @@ function initialChatId(props: ManagementSurfaceProps, routine?: Routine): string
 }
 
 function initialScheduleKind(routine?: Routine): ScheduleKind {
-  return routine?.schedule.kind ?? "interval";
+  // A one-time routine (a snipe) is made by the agent; the editor offers the repeating kinds.
+  const kind = routine?.schedule.kind;
+  return kind === "calendar" ? "calendar" : "interval";
 }
 
 function initialIntervalMinutes(schedule?: Routine["schedule"]): string {

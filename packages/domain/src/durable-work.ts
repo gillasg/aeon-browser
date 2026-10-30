@@ -2,7 +2,9 @@ import type { ChatId } from "./chat.js";
 
 export type RoutineSchedule =
   | { kind: "interval"; everyMinutes: number; anchorUtc: string; timeZone: string }
-  | { kind: "calendar"; daysOfWeek: number[]; localTime: string; timeZone: string };
+  | { kind: "calendar"; daysOfWeek: number[]; localTime: string; timeZone: string }
+  /** One run at an exact time: a snipe starts a little before its moment to warm up. */
+  | { kind: "once"; atUtc: string; timeZone: string };
 
 export type RoutineRunState =
   | "due"
