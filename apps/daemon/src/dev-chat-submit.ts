@@ -30,6 +30,7 @@ export function beginSubmit(
         ...(payload.attachments ? { attachments: payload.attachments } : {}),
         ...(payload.browserContext ? { browserContext: payload.browserContext } : {}),
         ...(payload.browserContexts ? { browserContexts: payload.browserContexts } : {}),
+        ...(payload.budget ? { budget: payload.budget } : {}),
       },
       selection ?? payload.selection,
       // Laid out before the typed one: the options argument comes after the selection.

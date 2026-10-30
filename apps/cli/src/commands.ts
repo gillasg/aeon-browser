@@ -55,7 +55,24 @@ function runOptions(args: Args): Omit<RunOptions, "origin" | "onProgress" | "onS
     ...(model && provider && id.length ? { model: { provider, id: id.join("/") } } : {}),
     ...(thinking ? { thinkingLevel: thinking } : {}),
     timeoutMs: Number(flag(args, "timeout") ?? 20) * 60_000,
+    ...budgetOptions(args),
   };
+}
+
+/** --max-steps, --max-minutes and --max-cost: the run's limits, when any is given. */
+function budgetOptions(args: Args): Pick<RunOptions, "budget"> {
+  const budget: NonNullable<RunOptions["budget"]> = {};
+  const read = (name: string) => {
+    const value = Number(flag(args, name));
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  };
+  const steps = read("max-steps");
+  const minutes = read("max-minutes");
+  const cost = read("max-cost");
+  if (steps) budget.maxSteps = Math.floor(steps);
+  if (minutes) budget.maxMinutes = minutes;
+  if (cost) budget.maxCost = cost;
+  return Object.keys(budget).length ? { budget } : {};
 }
 
 async function readPrompts(args: Args): Promise<string[]> {
@@ -424,7 +441,11 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       group: "Aeon",
       summary: "run tasks as Aeon chats",
       help: `Usage: aeon run "<task>" ["<task>" ...] [--file tasks.txt|json] [--parallel 5]
-       [--quiet] [--model provider/id] [--thinking level] [--timeout 20] [--json]`,
+       [--quiet] [--model provider/id] [--thinking level] [--timeout 20] [--json]
+       [--max-steps n] [--max-minutes m] [--max-cost usd]
+
+The limits apply to each chat: when one is reached the agent stops using tools and answers
+with what it has.`,
       run: (args) => run(host, args),
     },
     {

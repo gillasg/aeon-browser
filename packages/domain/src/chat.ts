@@ -1,5 +1,5 @@
 import type { PiSessionInput } from "./pi-session-input.js";
-export type { PiBrowserContextRecord, PiSessionInput } from "./pi-session-input.js";
+export type { PiBrowserContextRecord, PiRunBudget, PiSessionInput } from "./pi-session-input.js";
 import type {
   PiThreadDeliveryEvent,
   PiThreadDeliveryEvidence,

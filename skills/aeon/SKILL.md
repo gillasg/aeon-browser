@@ -30,6 +30,7 @@ logins, in tabs they can see: what you submit, send or buy is real.
 ```sh
 aeon run "Find the cheapest flight from Delhi to Goa next Friday and give me the link"
 aeon run --file tasks.txt --parallel 5
+aeon run "Collect every open role at these 40 startups" --max-steps 60 --max-minutes 15
 aeon result <chatId>      # the answer again; aeon trace <chatId> shows every step
 aeon chats --unreviewed   # chats whose traces nobody has reviewed yet (or used since)
 aeon chats --from user --since 2026-10-01 --until 2026-10-24   # the chats the user started
@@ -39,7 +40,8 @@ aeon review <chatId> @findings.md   # mark it reviewed and save what you found
 
 Each task is a full Aeon chat (own agent and model) in a background tab. It takes minutes and the
 command blocks until every task finishes, so use it for goals ("find", "compare", "book"); single
-steps are faster with `aeon tool`. `--from` takes `user`, `cli`, `mcp`, `companion`, `agent`,
+steps are faster with `aeon tool`. `--max-steps`, `--max-minutes` and `--max-cost` cap each chat; at the limit
+the agent stops using tools and answers with what it has (`aeon_run` takes `budget`). `--from` takes `user`, `cli`, `mcp`, `companion`, `agent`,
 `routine` or `unknown`. Over MCP (`aeon mcp`, stdio): `aeon_run` returns a run id for
 `aeon_run_status` and `aeon_result`; `aeon_search` searches chats.
 
@@ -59,10 +61,12 @@ check <urls|--file f>`, with evidence per site. Far cheaper than opening each on
 - **A site used repeatedly**, where the answer must keep coming: map it, then `call`, `watch`,
   `federate` (several sites at once, with provenance).
 - **What the user visited, saved or has open**: their history, bookmarks and open tabs, not a
-  search engine. A site, page or thing they name without a link: look in those three together
-  before guessing from memory.
+  search engine. A site, page or thing they name without a link: `browser_context` (or
+  `browser.context(request)`) looks in all three at once before guessing from memory.
+  "My most visited …": `browser.history.top({by, match, days})`.
 - **Anything live or on a specific site** (prices, stock, listings, showtimes, reviews): open that
-  site in the browser. Web search only finds which page to open.
+  site in the browser. Web search only finds which page to open (`search` uses keyless
+  providers, and Google in the user's browser for local, live and personal queries).
 - **A lasting tool for one task on a site** ("make me something that checks X"): build an ability
   (`aeon actions build <site> "<task>"`); it is tested before it is saved, or says why the
   site cannot do it.
@@ -145,7 +149,11 @@ type, wait for the suggestion list, then click the matching option; read each fi
 before the next.
 
 `page.controls.inspect()` gives every field's state; `page.batch(steps)` fills, selects, checks and
-submits in one call, ending with a read of the result (`help("forms")`). `TARGET_BLOCKED` names what
+submits in one call, ending with a read of the result (`help("forms")`). Fields about the
+user: `await bu.fillProfile()` fills them from their form profile without you seeing the values;
+for each field it reports `missing`, ask the user, then offer to keep the answer and on yes
+`bu.profile.save({field: value})` (`help("profile")`). A code sent by email or text:
+`await bu.fillCode()`. `TARGET_BLOCKED` names what
 covers the control: act inside that dialog or close it. If something seems missing, scroll, search
 the page or try another URL before concluding it is not there. Never repeat a failing action more
 than twice; change strategy.
@@ -159,7 +167,8 @@ await bu.signIn(); // {signedIn, site, provider, account, reason}
 await bu.signIn({ account: "me@example.com" });
 ```
 
-It fills the username, password and, when the password manager has one, the one-time code, across
+It fills the username, password and the one-time code (the password manager's, else one the site
+just sent to the user's Gmail or Google Messages), across
 multi-step forms. You never see the password or the code, and there is no approval step: calling it
 signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`, `CHOOSE_ACCOUNT`
 (call again with `account`), `NEEDS_CODE` (a code by SMS or email), `CAPTCHA`, or `REJECTED`.
@@ -310,7 +319,8 @@ aeon media youtube "<url>" --ask "<question>"
   the last `watch` of the same call. **For ongoing monitoring, ask Aeon for a routine**, e.g.
   `aeon run "Every 15 minutes, check shop.example for new 'desk lamp' listings and tell me about new ones"`.
   Alerts appear in Aeon, not your session. `aeon routine list`; `aeon routine pause|delete` for
-  the ones your origin created.
+  the ones your origin created. Exact moments (a drop, a release, a booking slot): a one-time
+  routine (`schedule: "at 2026-11-02T09:57:00+05:30"`) that runs `browser.snipe` a few minutes ahead.
 - **Mapping a site:** `aeon tool site_mapper action=explore 'sites=["shop.example"]'`, or just use
   it in `browser_code`; requests are learned as you go.
 - **`aeon rest` and `aeon mcp <site>` serve the site's API, not a browser session.** Calls behind a

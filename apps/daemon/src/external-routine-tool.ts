@@ -196,6 +196,9 @@ function scheduleValue(value: unknown): unknown {
     const minutes = Number(every[1] ?? 0) * ((every[2] ?? "").startsWith("h") ? 60 : 1);
     return { kind: "interval", everyMinutes: minutes };
   }
+  // "at 2026-11-02T10:00:00+05:30" or "once at …": one run at that moment.
+  const once = /^(?:once\s+)?at\s+(\d{4}-\d\d-\d\dt\S+)$/.exec(text);
+  if (once) return { kind: "once", atUtc: value.trim().replace(/^(?:once\s+)?at\s+/i, "") };
   const daily = /^(?:daily|every day)(?:\s+at\s+([0-2]?\d:[0-5]\d))?$/.exec(text);
   if (daily)
     return {

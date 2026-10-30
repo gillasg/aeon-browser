@@ -7,6 +7,7 @@ import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { browserContent, type BrowserToolRunner } from "./browser-tool.js";
 import { createSiteScriptTool } from "./site-script-tool.js";
+import { createBrowserContextTool } from "./browser-context-tool.js";
 import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 import { SiteWrites } from "./browser-site-writes.js";
@@ -35,10 +36,8 @@ export function createBrowserTools(
   skills?: string,
   options?: BrowserCodeOptions,
 ): ReturnType<typeof defineTool>[] {
-  return [
-    createBrowserCodeTool(chatId, run, workspace, skills, options),
-    createSiteScriptTool(chatId, run),
-  ];
+  const browserCode = createBrowserCodeTool(chatId, run, workspace, skills, options);
+  return [browserCode, createBrowserContextTool(browserCode), createSiteScriptTool(chatId, run)];
 }
 
 export function createBrowserCodeTool(
@@ -183,11 +182,21 @@ async function browserCodeResult(options: {
   };
   const actions = traceActions(cell.steps ?? []);
   const details = resultDetails(actions, writes);
+  const delivered = !failed && isDelivery(cell.value);
   return {
     content: modelContent(body),
     isError: failed,
     details: Object.keys(details).length ? details : undefined,
+    // finish_from_js handed the answer over: the run ends after this call.
+    ...(delivered ? { terminate: true } : {}),
   };
+}
+
+function isDelivery(value: unknown): boolean {
+  const record = value as { delivered?: unknown; answer?: unknown } | null;
+  return Boolean(
+    record && typeof record === "object" && record.delivered === true && "answer" in record,
+  );
 }
 
 /** What the trace keeps besides the text: the actions, the site API writes, the site that answered. */

@@ -11,6 +11,8 @@ export interface RunOptions {
   model?: { provider: string; id: string };
   thinkingLevel?: string;
   timeoutMs: number;
+  /** Limits per chat: steps, minutes and cost, then one last turn to deliver. */
+  budget?: { maxSteps?: number; maxMinutes?: number; maxCost?: number };
   onProgress?: (line: string) => void;
   onStarted?: (index: number, chatId: string) => void;
 }
@@ -87,7 +89,7 @@ async function runOne(
   if (!options.quiet) await client.openChat(chatId);
   options.onProgress?.(`[${index + 1}] started ${chatId}`);
   // The daemon submits it directly, so quiet runs need no tab and an unloaded tab cannot hold it up.
-  await client.submit(chatId, prompt, selection);
+  await client.submit(chatId, prompt, selection, options.budget);
   const outcome = await finished.done;
   const view = await client.command("chat.get", { chatId });
   const result = summarize(chatId, prompt, view.snapshot, Date.now() - started, outcome);

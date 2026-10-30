@@ -7,7 +7,7 @@ import {
   browserActionDescription,
   browserActionSchema,
 } from "@browserkit/tools/action";
-import { inspect, runTasks } from "./run.js";
+import { inspect, runTasks, type RunOptions } from "./run.js";
 import type { ChatResult } from "./results.js";
 import { searchAeon } from "./search.js";
 
@@ -47,6 +47,17 @@ const tools = [
         model: { type: "string", description: "provider/id; default is Pi's default model." },
         thinking: { type: "string", description: "Thinking level; default is the model's." },
         timeoutMinutes: { type: "number", minimum: 1, maximum: 120 },
+        budget: {
+          type: "object",
+          description:
+            "Limits per chat; when one is reached the agent stops using tools and answers with what it has.",
+          properties: {
+            maxSteps: { type: "integer", minimum: 1, maximum: 10000 },
+            maxMinutes: { type: "number", minimum: 0.1, maximum: 1440 },
+            maxCost: { type: "number", minimum: 0.001, maximum: 1000 },
+          },
+          additionalProperties: false,
+        },
       },
       required: ["tasks"],
       additionalProperties: false,
@@ -145,6 +156,7 @@ const tools = [
 const CHAT_TOOLS = new Set([
   "browser_code",
   "browser_tabs",
+  "browser_context",
   "crawl",
   "site_mapper",
   "extract",
@@ -325,6 +337,9 @@ function startRun(client: AeonClient, args: Json, runs: Map<string, Run>): { run
     ...(provider && id.length ? { model: { provider, id: id.join("/") } } : {}),
     ...(typeof args.thinking === "string" ? { thinkingLevel: args.thinking } : {}),
     timeoutMs: Number(args.timeoutMinutes ?? 20) * 60_000,
+    ...(args.budget && typeof args.budget === "object"
+      ? { budget: args.budget as NonNullable<RunOptions["budget"]> }
+      : {}),
     onStarted: (index, chatId) => (run.chats[index] = chatId),
   }).then(
     (results) => (run.results = results),
