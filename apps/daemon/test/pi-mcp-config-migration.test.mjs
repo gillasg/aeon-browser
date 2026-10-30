@@ -146,6 +146,7 @@ test("Pi MCP migration registers one dynamic bridge for explicitly registered CL
     command: "C:/runtime/node.exe",
     args: ["C:/aeon/cli-mcp-bridge.js", "--registry", paths.registryPath],
     cwd: "C:\\aeon",
+    description: "The command-line tools the user registered in Aeon.",
     enabled: true,
     exposure: "codemode",
   });
@@ -259,6 +260,7 @@ async function verifyPiMcpConfigMigrationCase1Stage2(
     args: ["--read-only"],
     cwd: "C:\\aeon",
     env: { DOCS_TOKEN: "${DOCS_TOKEN}" },
+    description: "Documentation: Read local docs.",
     enabled: true,
     exposure: "codemode",
   });
