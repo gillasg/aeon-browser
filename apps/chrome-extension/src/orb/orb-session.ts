@@ -64,14 +64,19 @@ export class OrbSession {
   }
 
   /**
-   * Starts a new chat for this prompt with the orb's tab as context. `created` runs as soon as
+   * Starts a new chat for this prompt with the chosen tabs (the orb's own, unless removed) as context. `created` runs as soon as
    * the chat exists, so the box can show it while the event stream connects.
    */
-  async start(text: string, created?: (chatId: string) => void): Promise<void> {
-    const [{ model, thinkingLevel }, page] = await Promise.all([
+  async start(
+    text: string,
+    tabIds: readonly number[] = [this.tabId],
+    created?: (chatId: string) => void,
+  ): Promise<void> {
+    const [{ model, thinkingLevel }, ...captured] = await Promise.all([
       this.modelChoice ?? this.model(),
-      this.page(),
+      ...tabIds.map((tabId) => this.page(tabId)),
     ]);
+    const pages = captured.filter((page): page is PiBrowserContextRecord => Boolean(page));
     const result = await command(this.requireCatalog(), {
       operation: "chat.create",
       payload: {
@@ -80,7 +85,7 @@ export class OrbSession {
           typedByUser: true,
           model,
           thinkingLevel,
-          ...(page ? { browserContexts: [page] } : {}),
+          ...(pages.length ? { browserContexts: pages } : {}),
         },
       },
     });
@@ -167,9 +172,9 @@ export class OrbSession {
     });
   }
 
-  private async page(): Promise<PiBrowserContextRecord | undefined> {
+  private async page(tabId = this.tabId): Promise<PiBrowserContextRecord | undefined> {
     const raw: unknown = await chrome.runtime
-      .sendMessage({ kind: "aeon.native.capture-page", tabId: this.tabId })
+      .sendMessage({ kind: "aeon.native.capture-page", tabId })
       .catch(() => null);
     const parsed = PiBrowserContextRecordSchema.safeParse(raw);
     return parsed.success ? parsed.data : undefined;

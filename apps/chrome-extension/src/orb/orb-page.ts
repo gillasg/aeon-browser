@@ -9,12 +9,13 @@ import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js"
 import { applyEvent, cursorSteps, initialRun, spotlightBox, type OrbRun } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
-import { OrbBox, type OrbViewModel } from "./orb-view.js";
+import { OrbBox, type OrbTab, type OrbViewModel } from "./orb-view.js";
 
 // orb.html: the orb's box. Framed by the content script. Starts the chat, then shows it (the same
 // chat page the side panel shows, in its compact orb mode) and keeps following its events to drive
-// the swarm. One chat per tab: each tab's orb keeps its own chat and a new tab starts fresh, so a
-// message never lands in another tab's work. The switcher shows another chat; + starts a new one.
+// the swarm. Each tab's orb keeps its own chat. A tab that never had one shows the chat last used
+// in the orb, but only until the orb is closed there: opened again, it starts fresh, so a message
+// never lands in work running in another tab. The switcher shows another chat; + starts a new one.
 
 const params = new URLSearchParams(location.search);
 const tabId = Number(params.get("tabId"));
@@ -29,6 +30,8 @@ const model: OrbViewModel = {
   learning: false,
   pending: "",
   chats: [],
+  context: [],
+  tabChoices: null,
   running: new Set(),
   needs: new Set(),
 };
@@ -40,6 +43,9 @@ let lastVisual = "";
 let lastState = "";
 let sentActions = 0;
 let update: ((next: ReactNode) => void) | undefined;
+/** The chat shown came from another tab's orb, not this tab's own. */
+let borrowed = false;
+let bootedAt = Number.POSITIVE_INFINITY;
 
 const session = new OrbSession(tabId, {
   event: (event) => onEvent(event),
@@ -58,7 +64,9 @@ async function boot(): Promise<void> {
   // Only the content script for this tab may show the orb; anything else gets a blank frame.
   if (!Number.isSafeInteger(tabId) || !verified?.ok) return;
   document.body.hidden = false;
-  model.host = await tabHost();
+  const own = await tabInfo(tabId);
+  model.host = own?.host ?? "";
+  model.context = own ? [own] : [];
   render();
   void loadLearning();
   listen();
@@ -72,19 +80,32 @@ async function boot(): Promise<void> {
     render();
   });
   await connectSession();
-  const chatId = await rememberedChat();
-  if (chatId && !model.chatId && !model.pending) await selectChat(chatId, false);
+  void loadChats();
+  const remembered = await rememberedChat();
+  bootedAt = Date.now();
+  if (remembered.chatId && !model.chatId && !model.pending) {
+    await selectChat(remembered.chatId, false);
+    borrowed = remembered.borrowed;
+  }
 }
 
 /** This tab's chat, kept across navigations and reloads; a tab that never had one opens the chat
  * last used in the orb anywhere, so switching tabs keeps the same conversation. */
-async function rememberedChat(): Promise<string | undefined> {
+async function rememberedChat(): Promise<{ chatId?: string; borrowed: boolean }> {
   const stored = await chrome.storage.session.get([TAB_CHAT, LAST_CHAT]).catch(() => ({}));
   const values = stored as Record<string, unknown>;
   const own = values[TAB_CHAT];
-  if (typeof own === "string") return own || undefined;
+  if (typeof own === "string") return own ? { chatId: own, borrowed: false } : { borrowed: false };
   const last = values[LAST_CHAT];
-  return typeof last === "string" && last ? last : undefined;
+  return typeof last === "string" && last ? { chatId: last, borrowed: true } : { borrowed: false };
+}
+
+/** Opened again after closing: a chat borrowed from another tab gives way to a fresh one. */
+function reopened(): void {
+  focusPrompt();
+  if (!borrowed || Date.now() - bootedAt < 1500) return;
+  borrowed = false;
+  void selectChat(undefined);
 }
 
 function remember(chatId: string | undefined): void {
@@ -96,12 +117,14 @@ function remember(chatId: string | undefined): void {
 /** Shows another chat in this orb (the switcher), or a blank one to start (+). */
 async function selectChat(chatId: string | undefined, store = true): Promise<void> {
   run = undefined;
+  borrowed = false;
   sentActions = 0;
   lastVisual = "";
   lastState = "";
   model.pending = "";
   model.chatId = chatId;
   model.chatUrl = chatId ? chatUrlFor(chatId) : "";
+  model.tabChoices = null;
   if (store) remember(chatId);
   render();
   if (!chatId) {
@@ -150,7 +173,7 @@ function listen(): void {
   addEventListener("pagehide", () => void setNeeds(tabId, false));
   chrome.runtime.onMessage.addListener(
     (message: { kind?: string; tabId?: number; control?: string }) => {
-      if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) focusPrompt();
+      if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) reopened();
       // The engine says when the user takes this tab over; the swarm rests until it's given back.
       if (message?.kind === "browserkit.control" && message.tabId === tabId) {
         userControl = message.control === "user";
@@ -164,20 +187,26 @@ function listen(): void {
 async function submit(text: string): Promise<void> {
   model.busy = true;
   model.pending = text;
+  model.tabChoices = null;
+  borrowed = false;
   run = initialRun();
   sentActions = 0;
   render();
   sync();
   playSound("start");
   try {
-    await session.start(text, (chatId) => {
-      model.chatId = chatId;
-      model.chatUrl = chatUrlFor(chatId);
-      remember(chatId);
-      render();
-      // If the chat's own events are slow to arrive, the framed chat takes over anyway.
-      globalThis.setTimeout(shown, 8000);
-    });
+    await session.start(
+      text,
+      model.context.map((tab) => tab.tabId),
+      (chatId) => {
+        model.chatId = chatId;
+        model.chatUrl = chatUrlFor(chatId);
+        remember(chatId);
+        render();
+        // If the chat's own events are slow to arrive, the framed chat takes over anyway.
+        globalThis.setTimeout(shown, 8000);
+      },
+    );
   } catch (error) {
     run = undefined;
     model.pending = "";
@@ -311,6 +340,35 @@ function toTab(): void {
   toContent({ kind: "aeon.orb.hide", keepRunning: false });
 }
 
+/** Open tabs that can be pages for the message (the + list). */
+async function pickTabs(): Promise<void> {
+  if (model.tabChoices) {
+    model.tabChoices = null;
+    return render();
+  }
+  const tabs = await chrome.tabs.query({}).catch(() => []);
+  model.tabChoices = tabs.flatMap((tab) => {
+    const info = tab.id === undefined ? undefined : describeTab(tab);
+    return info ? [info] : [];
+  });
+  render();
+}
+
+async function addContext(id: number): Promise<void> {
+  const info = await tabInfo(id);
+  if (info && !model.context.some((tab) => tab.tabId === id))
+    model.context = [...model.context, info];
+  model.tabChoices = null;
+  render();
+  focusPrompt();
+}
+
+function removeContext(id: number): void {
+  model.context = model.context.filter((tab) => tab.tabId !== id);
+  render();
+  focusPrompt();
+}
+
 function view(): ReactNode {
   return createElement(OrbBox, {
     model: { ...model },
@@ -324,6 +382,9 @@ function view(): ReactNode {
       toSidePanel,
       toTab,
       toggleLearning: () => void toggleLearning(),
+      pickTabs: () => void pickTabs(),
+      addContext: (id) => void addContext(id),
+      removeContext,
     },
   });
 }
@@ -359,13 +420,26 @@ function notice(text: string): void {
   render();
 }
 
-async function tabHost(): Promise<string> {
-  const current = await chrome.tabs.get(tabId).catch(() => undefined);
+async function tabInfo(id: number): Promise<OrbTab | undefined> {
+  const tab = await chrome.tabs.get(id).catch(() => undefined);
+  return tab ? describeTab(tab) : undefined;
+}
+
+/** Only web pages can be read as context. */
+function describeTab(tab: chrome.tabs.Tab): OrbTab | undefined {
+  if (tab.id === undefined || !tab.url || !/^https?:/.test(tab.url)) return undefined;
+  let host: string;
   try {
-    return current?.url ? new URL(current.url).hostname.replace(/^www\./, "") : "";
+    host = new URL(tab.url).hostname.replace(/^www\./, "");
   } catch {
-    return "";
+    return undefined;
   }
+  return {
+    tabId: tab.id,
+    title: tab.title ?? host,
+    host,
+    ...(tab.favIconUrl ? { favIconUrl: tab.favIconUrl } : {}),
+  };
 }
 
 function messageOf(error: unknown): string {

@@ -17,8 +17,19 @@ export interface OrbViewModel {
   /** The message just sent, shown at once while the chat is created and framed. */
   pending: string;
   chats: { chatId: string; title: string; updatedAt: string }[];
+  /** Tabs the first message carries as context; this tab to start with. */
+  context: OrbTab[];
+  /** Open tabs to add, while the + list is open. */
+  tabChoices: OrbTab[] | null;
   running: ReadonlySet<string>;
   needs: ReadonlySet<string>;
+}
+
+export interface OrbTab {
+  tabId: number;
+  title: string;
+  host: string;
+  favIconUrl?: string;
 }
 
 export interface OrbViewActions {
@@ -33,6 +44,10 @@ export interface OrbViewActions {
   toSidePanel(): void;
   toTab(): void;
   toggleLearning(): void;
+  removeContext(tabId: number): void;
+  /** Opens (or closes) the list of open tabs to add as context. */
+  pickTabs(): void;
+  addContext(tabId: number): void;
 }
 
 export type BoxState = "compose" | "chat";
@@ -73,7 +88,8 @@ function Compose({
     const text = event.currentTarget.value.trim();
     if (text) actions.submit(text);
   };
-  // The field has the whole width; everything else is one quiet line under it.
+  // The field has the whole width; everything else is one quiet line under it: the tabs this
+  // message carries (× drops one, + adds another), then learning and the chat switcher.
   return (
     <>
       <textarea
@@ -85,23 +101,98 @@ function Compose({
         onKeyDown={send}
       />
       <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
+        {model.context.map((tab) => (
+          <ContextChip key={tab.tabId} tab={tab} actions={actions} />
+        ))}
         <button
           type="button"
-          className="isl-chip isl-learn"
-          aria-pressed={model.learning}
-          title={
-            model.learning
-              ? "Aeon is learning this site while you browse this tab. Click to stop."
-              : "Teach Aeon this site: it learns while you browse this tab (Chrome shows a debugger bar)"
-          }
-          onClick={actions.toggleLearning}
+          className="isl-add"
+          title="Add a tab"
+          aria-label="Add a tab"
+          aria-expanded={model.tabChoices !== null}
+          onClick={actions.pickTabs}
         >
-          {model.learning ? `Learning ${model.host || "this site"}` : model.host || "This page"}
+          +
         </button>
         <span className="isl-notice">{model.notice}</span>
-        {model.chats.length > 0 && <Switcher model={model} actions={actions} icon />}
+        <LearnButton model={model} actions={actions} />
+        <Switcher model={model} actions={actions} icon />
+        {model.tabChoices && <TabChoices model={model} actions={actions} />}
       </div>
     </>
+  );
+}
+
+function ContextChip({ tab, actions }: { tab: OrbTab; actions: OrbViewActions }): ReactElement {
+  return (
+    <span className="isl-chip" title={tab.title}>
+      <span className="isl-chip-label">{tab.host || tab.title || "Tab"}</span>
+      <button
+        type="button"
+        className="isl-chip-x"
+        aria-label={`Remove ${tab.host || "this tab"}`}
+        onClick={() => actions.removeContext(tab.tabId)}
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+function LearnButton({
+  model,
+  actions,
+}: {
+  model: OrbViewModel;
+  actions: OrbViewActions;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      className="icon isl-learn"
+      aria-pressed={model.learning}
+      aria-label={model.learning ? "Stop learning this site" : "Learn this site"}
+      title={
+        model.learning
+          ? `Aeon is learning ${model.host || "this site"} while you browse this tab. Click to stop.`
+          : "Teach Aeon this site: it learns while you browse this tab (Chrome shows a debugger bar)"
+      }
+      onClick={actions.toggleLearning}
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <circle cx="8" cy="8" r="2" fill="currentColor" />
+      </svg>
+    </button>
+  );
+}
+
+/** Open tabs not already in the message, below the row (the box clips anything floating). */
+function TabChoices({
+  model,
+  actions,
+}: {
+  model: OrbViewModel;
+  actions: OrbViewActions;
+}): ReactElement {
+  const taken = new Set(model.context.map((tab) => tab.tabId));
+  const tabs = (model.tabChoices ?? []).filter((tab) => !taken.has(tab.tabId));
+  return (
+    <ul className="isl-tabs" aria-label="Open tabs">
+      {tabs.map((tab) => (
+        <li key={tab.tabId}>
+          <button type="button" title={tab.host} onClick={() => actions.addContext(tab.tabId)}>
+            {tab.favIconUrl && /^https?:/.test(tab.favIconUrl) ? (
+              <img src={tab.favIconUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <i aria-hidden="true" />
+            )}
+            <span>{tab.title || tab.host}</span>
+          </button>
+        </li>
+      ))}
+      {!tabs.length && <li className="isl-tabs-empty">No other tabs open.</li>}
+    </ul>
   );
 }
 
