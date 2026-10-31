@@ -75,9 +75,9 @@ void chrome.storage.session.get(null).then((values) => {
 });
 function refresh(): void {
   const values = [...statuses].filter(([key]) => relevant(key)).map(([, value]) => value);
-  // Only a chat's own tab spins while that chat works; other Aeon pages keep their normal icon.
+  // Only a chat's own tab spins or turns blue; home and other Aeon pages always show the lattice.
   working = Boolean(chatFilter) && values.includes("working");
-  done = !working && values.includes("done");
+  done = Boolean(chatFilter) && !working && values.includes("done");
   if (working && !timer)
     timer = window.setInterval(() => {
       frame = (frame + 1) % FRAMES;
