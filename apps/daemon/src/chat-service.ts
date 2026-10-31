@@ -123,6 +123,19 @@ export class ChatService {
       return operation(session, activeChat);
     });
   }
+  /**
+   * Runs on the chat's open session without queueing behind the command gate. A running turn
+   * holds the gate until it ends, and it may be waiting on a question: the questions it shows and
+   * the answers to them must not wait behind it. With no open session it is withSession.
+   */
+  withOpenSession<T>(
+    chatId: ChatId,
+    operation: (session: PiSessionHandle) => Promise<T> | T,
+  ): Promise<T> {
+    const open = this.observedSessions.get(chatId)?.session;
+    if (!open) return this.withSession(chatId, (session) => operation(session));
+    return Promise.resolve().then(() => operation(open));
+  }
   async readToolImage(
     chatId: ChatId,
     toolCallId: string,
