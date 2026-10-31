@@ -1,0 +1,38 @@
+{
+  "name": "@browserkit/engine",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser control engine for Chrome extensions: a persistent code runtime, tab ownership, input, observation, hand-off and network learning.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./boosts-build": "./boosts-build.mjs"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "acorn": "8.18.0",
+    "zod": "4.6.5",
+    "@browserkit/protocol": "workspace:*",
+    "site-boosts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.0"
+  },
+  "files": [
+    "src",
+    "assets",
+    "boosts-build.mjs"
+  ]
+}

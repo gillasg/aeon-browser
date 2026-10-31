@@ -104,12 +104,19 @@ async function buildEntries(shared, output, entries) {
   );
 }
 
-// Which revision of each linked repo (the browserkit, ...) this build used.
+// Which revision of Aeon this build used.
 async function writeBuildInfo(output) {
-  const revisions = execFileSync(
-    process.execPath,
-    [join(appRoot, "../../scripts/link-repos.mjs"), "--revisions"],
-    { encoding: "utf8" },
+  let revision = null;
+  try {
+    revision = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: appRoot,
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    // Not a git checkout.
+  }
+  await writeFile(
+    join(output, "build-info.json"),
+    JSON.stringify({ aeon: revision }, null, 2) + "\n",
   );
-  await writeFile(join(output, "build-info.json"), revisions);
 }

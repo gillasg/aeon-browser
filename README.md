@@ -2,20 +2,19 @@
 
 A browser agent that lives in your Chrome.
 
-```sh
-git clone https://github.com/gillasg/aeon-browser && cd aeon-browser && node scripts/setup.mjs
+## Install (Windows)
+
+In PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 | iex
 ```
 
-`setup.mjs` (Windows; needs Node.js 22+, pnpm and Chrome):
+It installs Git, Node.js and pnpm if they are missing, fetches Aeon into `%LOCALAPPDATA%\Aeon\aeon-browser` (set `AEON_DIR` to choose another folder), builds it, installs the native host and the background service that starts at login, puts the `aeon` command and skill in place, adds Aeon's MCP server to the coding agents it finds (Claude Code, Codex, opencode, Cursor, Gemini CLI, Claude Desktop), and opens `chrome://extensions` with the extension folder on your clipboard.
 
-- fetches and builds browserkit next to this folder, then builds Aeon;
-- installs the native host and the background service that starts at login;
-- puts the `aeon` command and skill in place, and adds Aeon's MCP server to the coding agents it finds (Claude Code, Codex, opencode, Cursor, Gemini CLI, Claude Desktop);
-- opens `chrome://extensions` with the extension folder on your clipboard, and waits.
+Then, in Chrome: turn on **Developer mode**, click **Load unpacked**, paste the folder (Ctrl+V), press Enter and click **Select Folder**. The installer sees Aeon connect and finishes. Run the same line again to update.
 
-One step is yours: turn on **Developer mode**, click **Load unpacked** and choose that folder (`apps/chrome-extension/native-dist`). Setup sees Aeon connect and finishes. Run it again after pulling changes. On macOS and Linux, use browserkit (`npx browserkit setup`) for now.
-
-The manual steps, if you prefer: `node scripts/link-repos.mjs`, `pnpm install --ignore-scripts`, `pnpm build`, `scripts/setup-core.ps1`, then load `apps/chrome-extension/native-dist` in Chrome. The daemon (`apps/daemon`) supplies Pi sessions, the agent and local storage; the extension supplies the side panel, chat and browser control. `native-dist/build-info.json` lists the revision of every repo the build used. Run `pnpm start` for a standalone daemon, or use the Windows login supervisor.
+From a clone instead: `node scripts/setup.mjs` does the same from this folder. By hand: `pnpm install --ignore-scripts`, `pnpm build`, `scripts/setup-core.ps1`, then load `apps/chrome-extension/native-dist` in Chrome. The daemon (`apps/daemon`) supplies Pi sessions, the agent and local storage; the extension supplies the side panel, chat and browser control. Run `pnpm start` for a standalone daemon, or use the Windows login supervisor.
 
 ## What is in this repo
 
@@ -32,13 +31,7 @@ packages/
   ui              the shared React UI
 ```
 
-Everything browser-related comes from **browserkit**, which Aeon builds in: the engine (browser control), boosts, the site API and the crawl tool. browserkit stands alone, so any agent can use it without Aeon.
-
-```
-browserkit ─► Aeon
-```
-
-The repos use each other through links to sibling folders, not copies: a change is committed only in the repo where it was made, and everything that uses it picks it up at its next build. `node scripts/link-repos.mjs --revisions` prints which revision of each one is in use.
+Everything browser-related lives in `browser/`: the engine (browser control), the protocol, the tools, boosts, the site API, the crawl tool and the command line Aeon's CLI builds on. It is part of this workspace and builds first.
 
 ## CLI and MCP
 

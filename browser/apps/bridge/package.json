@@ -1,0 +1,23 @@
+{
+  "name": "browserkit",
+  "version": "0.1.0",
+  "description": "Let coding agents and any MCP client use your real Chrome through browserkit.",
+  "type": "module",
+  "bin": {
+    "browserkit": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "ws": "8.22.0",
+    "@browserkit/tools": "workspace:*",
+    "@browserkit/site-mapper": "workspace:*",
+    "@browserkit/cdp": "workspace:*",
+    "@browserkit/credentials": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "@types/ws": "8.18.1"
+  }
+}

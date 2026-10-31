@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@aeon/protocol": "workspace:*",
-    "@browserkit/credentials": "link:../../../browserkit/packages/credentials",
-    "@browserkit/site-mapper": "link:../../../browserkit/packages/site-mapper",
-    "@browserkit/tools": "link:../../../browserkit/packages/tools",
-    "browserkit": "link:../../../browserkit/apps/bridge",
+    "@browserkit/credentials": "workspace:*",
+    "@browserkit/site-mapper": "workspace:*",
+    "@browserkit/tools": "workspace:*",
+    "browserkit": "workspace:*",
     "ws": "8.22.0"
   },
   "devDependencies": {
