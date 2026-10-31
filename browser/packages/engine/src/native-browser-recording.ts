@@ -170,13 +170,14 @@ onEngineInstall(() => {
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (method !== "Page.screencastFrame" || source.tabId === undefined) return;
     if (recordings.get(source.tabId)?.mode !== "screencast") return;
-    const frame = params as { data?: string };
+    const frame = params as { data?: string; metadata?: { timestamp?: number } };
     if (frame.data)
       void toOffscreen({
         target: OFFSCREEN,
         kind: "recordFrame",
         tabId: source.tabId,
         data: frame.data,
+        capturedAt: frame.metadata?.timestamp,
       }).catch(() => undefined);
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
