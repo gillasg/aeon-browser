@@ -46,9 +46,9 @@ export const EFFECTS = [
   {
     name: "net.fetch",
     call: "browser.fetch(url, options)",
-    does: "fetches with the user's cookies and no tab",
+    does: "fetches with the user's cookies and no tab; the first fetch to a mapped site lists its operations as mapped, and the third not-found address on one site stops with URL_GUESSING unless {expectMissing: true}",
     needs: ["site"],
-    errors: ["NETWORK", "BOT_WALL", "TIMEOUT"],
+    errors: ["NETWORK", "BOT_WALL", "TIMEOUT", "URL_GUESSING"],
   },
   {
     name: "site.call",
