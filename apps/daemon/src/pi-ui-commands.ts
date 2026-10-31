@@ -24,7 +24,7 @@ export async function sendPiUiSnapshot(
   const piUi =
     chat.status === "draft"
       ? { tree: [], slashCommands: [], extensionDialogs: [], notices: [] }
-      : await service.withSession(chatId, (session) => {
+      : await service.withOpenSession(chatId, (session) => {
           const extensionUi = session.extensionUiSnapshot();
           return {
             tree: session.tree(),
@@ -99,7 +99,7 @@ export async function executeExtensionUiAnswer(
   service: ChatService,
   request: Extract<SessionCommand, { operation: "chat.extension-ui-answer" }>,
 ): Promise<void> {
-  const accepted = await service.withSession(asChatId(request.payload.chatId), (session) =>
+  const accepted = await service.withOpenSession(asChatId(request.payload.chatId), (session) =>
     session.answerExtensionUi(request.payload.dialogRequestId, request.payload.value),
   );
   sendComplete(socket, request, {
