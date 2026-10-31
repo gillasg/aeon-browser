@@ -20,3 +20,20 @@ test("a Chat page still cannot touch another Chat or start a different one", () 
   assert.equal(authorizeNativeUiScope(scope, request("chat.list", { limit: 10 })), false);
   assert.equal(authorizeNativeUiScope(scope, request("chat.create", { title: "New" })), false);
 });
+
+test("home (the catalog page) may read and change every Settings section", () => {
+  const home = { role: "ui", scope: { kind: "catalog" } };
+  assert.equal(
+    authorizeNativeUiScope(home, request("settings.blocked-sites", { action: "read" })),
+    true,
+  );
+  assert.equal(
+    authorizeNativeUiScope(home, request("settings.form-profile", { action: "read" })),
+    true,
+  );
+  assert.equal(authorizeNativeUiScope(home, request("settings.outside-context", {})), true);
+  assert.equal(
+    authorizeNativeUiScope(scope, request("settings.form-profile", { action: "read" })),
+    false,
+  );
+});

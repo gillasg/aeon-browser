@@ -1252,12 +1252,11 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
+/* The same arrow as "All chats →", in front of "Recent"; it points down while Recent is open. */
 .home-recent-chevron {
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-left: 5px solid currentColor;
+  order: -1;
+  display: inline-block;
+  line-height: 1;
   transition: transform 160ms var(--aeon-spring);
 }
 .home-recent[data-open="true"] .home-recent-chevron {

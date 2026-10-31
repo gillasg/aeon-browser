@@ -58,7 +58,6 @@ export class HomeFormProfile {
       this.refused = response.result.refused;
       this.options.onChange();
     } catch (error) {
-      this.loaded = false;
       this.options.onError(error instanceof Error ? error.message : String(error));
     }
   }

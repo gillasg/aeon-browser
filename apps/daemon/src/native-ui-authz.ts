@@ -15,6 +15,10 @@ const CATALOG_OPERATIONS = [
   "chat.update",
   "chat.delete",
   "management.home",
+  // Home is the Settings page: blocked sites, the form profile and outside context.
+  "settings.blocked-sites",
+  "settings.form-profile",
+  "settings.outside-context",
 ];
 const MANAGEMENT_OPERATIONS = ["management.home", "management.get", "management.action"];
 
