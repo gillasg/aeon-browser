@@ -12,14 +12,39 @@ interface Recording {
   fps: number;
   canvas?: HTMLCanvasElement;
   audio?: AudioContext;
+  screencast?: Screencast;
 }
+
+// A screencast recording places every frame at the moment the page captured it, not when it
+// arrived here: frames decode one at a time, in order, and are drawn on a fixed delay behind
+// capture time, so a slow decode never reorders or bunches them. A frame that cannot be placed
+// (it arrived later than the delay allows, or decoding failed) is counted as lost, and a
+// recording that lost any frame fails rather than producing a choppy video.
+interface Screencast {
+  chain: Promise<void>;
+  /** The first frame's capture time and the moment it is drawn; later frames keep that spacing. */
+  origin?: { capture: number; wall: number };
+  lastCapture: number;
+  received: number;
+  drawn: number;
+  lost: number;
+  /** Frames received and not yet drawn or dropped. */
+  waiting: number;
+  /** Why frames were lost, for the failure message: reordered, late (and by how much), undecodable. */
+  reordered: number;
+  late: number;
+  worstLateMs: number;
+  track?: CanvasCaptureMediaStreamTrack;
+}
+const PLACEMENT_DELAY_MS = 1000;
 const recordings = new Map<number, Recording>();
 
 type Message = Record<string, unknown> & { kind: string; tabId: number };
 
 export function recordingMessage(message: Message): Promise<unknown> | undefined {
   if (message.kind === "recordStart") return start(message);
-  if (message.kind === "recordFrame") return frame(message.tabId, String(message.data ?? ""));
+  if (message.kind === "recordFrame")
+    return frame(message.tabId, String(message.data ?? ""), Number(message.capturedAt));
   if (message.kind === "recordStop") return stop(message.tabId);
   if (message.kind === "recordRead")
     return read(message.tabId, Number(message.offset), Number(message.size));
@@ -47,6 +72,17 @@ async function start(message: Message): Promise<unknown> {
     if (message.canvas === true) {
       // The size comes from the first frame; the recorder starts then.
       recording.canvas = document.createElement("canvas");
+      recording.screencast = {
+        chain: Promise.resolve(),
+        lastCapture: 0,
+        received: 0,
+        drawn: 0,
+        lost: 0,
+        waiting: 0,
+        reordered: 0,
+        late: 0,
+        worstLateMs: 0,
+      };
       recordings.set(message.tabId, recording);
       return { ok: true, mimeType: recording.mimeType };
     }
@@ -90,20 +126,89 @@ function begin(recording: Recording, stream: MediaStream): Promise<void> {
   });
 }
 
-async function frame(tabId: number, data: string): Promise<unknown> {
+/** capturedAt: the frame's capture time in seconds (Page.screencastFrame metadata.timestamp). */
+function frame(tabId: number, data: string, capturedAt: number): Promise<unknown> {
   const recording = recordings.get(tabId);
-  const canvas = recording?.canvas;
-  if (!recording || !canvas || !data) return false;
-  const bytes = Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
-  const image = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }));
-  if (!recording.recorder) {
-    canvas.width = image.width - (image.width % 2);
-    canvas.height = image.height - (image.height % 2);
-    await begin(recording, canvas.captureStream(recording.fps));
+  const cast = recording?.screencast;
+  if (!recording || !cast || !data) return Promise.resolve(false);
+  cast.received++;
+  // Frames wait compressed and decode only when their turn comes, so a fast page never piles up
+  // full-size pictures in memory; a queue longer than two seconds of video is already a failure.
+  if (cast.waiting >= recording.fps * 2) {
+    cast.lost++;
+    cast.late++;
+    return Promise.resolve(false);
   }
+  cast.waiting++;
+  const jpeg = new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], {
+    type: "image/jpeg",
+  });
+  cast.chain = cast.chain
+    .then(() => place(recording, cast, createImageBitmap(jpeg), capturedAt))
+    .finally(() => cast.waiting--);
+  return Promise.resolve(true);
+}
+
+async function place(
+  recording: Recording,
+  cast: Screencast,
+  decoded: Promise<ImageBitmap>,
+  capturedAt: number,
+): Promise<void> {
+  const image = await decoded.catch(() => undefined);
+  const canvas = recording.canvas;
+  if (!image || !canvas) {
+    cast.lost++;
+    return;
+  }
+  const captureMs = Number.isFinite(capturedAt) && capturedAt > 0 ? capturedAt * 1000 : Date.now();
+  const origin = cast.origin ?? (await startCanvas(recording, cast, canvas, image, captureMs));
+  const wait = origin.wall + (captureMs - origin.capture) - performance.now();
+  // Timer jitter under one frame is invisible; only a frame that misses its slot by more is lost.
+  const tolerance = 1000 / recording.fps;
+  if (captureMs < cast.lastCapture || wait < -tolerance) {
+    image.close();
+    cast.lost++;
+    if (captureMs < cast.lastCapture) cast.reordered++;
+    else {
+      cast.late++;
+      cast.worstLateMs = Math.max(cast.worstLateMs, Math.round(-wait));
+    }
+    return;
+  }
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  cast.lastCapture = captureMs;
   canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+  cast.track?.requestFrame();
+  cast.drawn++;
   image.close();
-  return true;
+}
+
+/** The first frame sizes the canvas and starts the encoder; frames are then pushed one by one. */
+async function startCanvas(
+  recording: Recording,
+  cast: Screencast,
+  canvas: HTMLCanvasElement,
+  image: ImageBitmap,
+  captureMs: number,
+): Promise<{ capture: number; wall: number }> {
+  canvas.width = image.width - (image.width % 2);
+  canvas.height = image.height - (image.height % 2);
+  const stream = canvas.captureStream(0);
+  cast.track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
+  // MediaRecorder reports started only once the track has a frame: give it the first one.
+  canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const started = begin(recording, stream);
+  cast.track.requestFrame();
+  await started;
+  cast.origin = { capture: captureMs, wall: performance.now() + PLACEMENT_DELAY_MS };
+  return cast.origin;
+}
+
+/** Holds the last picture until the recording's real end, so the video is as long as the take. */
+async function settle(cast: Screencast): Promise<void> {
+  await cast.chain;
+  cast.track?.requestFrame();
 }
 
 async function stop(tabId: number): Promise<unknown> {
@@ -118,6 +223,32 @@ async function stop(tabId: number): Promise<unknown> {
         "no frames: Chrome only paints visible windows; keep the tab's window open and unminimized",
     };
   }
+  const cast = recording.screencast;
+  if (cast) await settle(cast);
+  await finishRecorder(recording, recorder);
+  const frames = cast && {
+    received: cast.received,
+    drawn: cast.drawn,
+    lost: cast.lost,
+    reordered: cast.reordered,
+    late: cast.late,
+    worstLateMs: cast.worstLateMs,
+  };
+  if (cast?.lost) {
+    drop(tabId);
+    return {
+      ok: false,
+      error: `${cast.lost} of ${cast.received} frames could not be placed on time (${cast.reordered} out of order, ${cast.late} late by up to ${cast.worstLateMs} ms), so the video would stutter; record again (fewer tabs at once, or a smaller window)`,
+      frames,
+    };
+  }
+  const mimeType = recorder.mimeType || recording.mimeType || "video/webm";
+  recording.blob = new Blob(recording.chunks, { type: mimeType });
+  recording.chunks = [];
+  return { ok: true, bytes: recording.blob.size, mimeType, ...(frames ? { frames } : {}) };
+}
+
+async function finishRecorder(recording: Recording, recorder: MediaRecorder): Promise<void> {
   if (recorder.state !== "inactive")
     await new Promise<void>((resolve) => {
       recorder.onstop = () => resolve();
@@ -125,10 +256,6 @@ async function stop(tabId: number): Promise<unknown> {
     });
   for (const track of recording.stream?.getTracks() ?? []) track.stop();
   void recording.audio?.close().catch(() => undefined);
-  const mimeType = recorder.mimeType || recording.mimeType || "video/webm";
-  recording.blob = new Blob(recording.chunks, { type: mimeType });
-  recording.chunks = [];
-  return { ok: true, bytes: recording.blob.size, mimeType };
 }
 
 async function read(tabId: number, offset: number, size: number): Promise<unknown> {
