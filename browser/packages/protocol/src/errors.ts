@@ -68,6 +68,10 @@ export const ERRORS = {
   ],
   INVALID_INPUT: ["model", "a required input is missing or malformed: fix it and call again"],
   CODE_ERROR: ["model", "your code threw: fix the code (read the message), not the page"],
+  URL_GUESSING: [
+    "model",
+    "several addresses on this site were not found: stop guessing; open a page that shows the data and read page.network.list(), or use siteMapper",
+  ],
   NOT_MAPPED: [
     "model",
     "that site has no learned API yet: use the page, or site_mapper explore it first",

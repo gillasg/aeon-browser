@@ -25,6 +25,7 @@ import { rulesCall } from "./native-browser-rules.js";
 import { permissionCall } from "./native-browser-permissions.js";
 import { googleCall } from "./native-browser-google.js";
 import { fetchCall, isFetchRequest } from "./native-browser-fetch.js";
+import { mappedNotice, noteFetchStatus } from "./native-browser-fetch-guard.js";
 
 type Value = Record<string, unknown>;
 
@@ -83,6 +84,18 @@ function secretEffects(host: EffectHost): Effect<Cell>[] {
   ];
 }
 
+async function guardedFetch(host: EffectHost, cell: Cell, value: Value): Promise<unknown> {
+  const request = value.fetch as { url?: unknown; expectMissing?: unknown };
+  const url = String(request.url);
+  const chatId = cell.run.chatId;
+  const result = (await fetchCall(value)) as Value;
+  noteFetchStatus(chatId, url, Number(result.status), request.expectMissing === true);
+  const mapped = await mappedNotice(chatId, url, (site) =>
+    host.callCore(cell, { siteMapper: "operations", site }),
+  );
+  return mapped ? { ...result, mapped } : result;
+}
+
 function webEffects(host: EffectHost): Effect<Cell>[] {
   return [
     {
@@ -96,7 +109,7 @@ function webEffects(host: EffectHost): Effect<Cell>[] {
       name: "net.fetch",
       match: (value) => isFetchRequest(value),
       site: (value) => (value.fetch as { url?: unknown }).url,
-      run: (_, value) => fetchCall(value),
+      run: (cell, value) => guardedFetch(host, cell, value),
     },
     {
       name: "site.call",
