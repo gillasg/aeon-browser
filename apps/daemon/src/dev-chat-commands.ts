@@ -11,6 +11,7 @@ import type { ThreadCoordinationService } from "./thread-coordination-service.js
 import { beginSubmit } from "./dev-chat-submit.js";
 import { createAndSubmitChat } from "./chat-first-submit.js";
 import { applyBlockedSites } from "./blocked-sites-settings.js";
+import { applyFormProfile } from "./form-profile-settings.js";
 import {
   type BrowserContextAttachStatus,
   type CommandRequest,
@@ -30,6 +31,22 @@ import {
 import { executeExtensionUiAnswer, executePiUiAction, sendPiUiSnapshot } from "./pi-ui-commands.js";
 import { sendControls, sendEffectiveResources } from "./dev-chat-read-commands.js";
 import { type WebSocket } from "ws";
+
+/** Settings → Blocked sites, Forms and outside context. */
+async function answerSettings(
+  socket: WebSocket,
+  service: ChatService,
+  request: CommandRequest,
+): Promise<void> {
+  if (request.operation === "settings.blocked-sites") {
+    const sites = await applyBlockedSites(request.payload);
+    return completeCommand(socket, request, { kind: "settings.blocked-sites", sites });
+  }
+  if (request.operation === "settings.form-profile")
+    return completeCommand(socket, request, await applyFormProfile(request.payload));
+  if (request.operation === "settings.outside-context")
+    return answerOutsideContext(socket, service, request);
+}
 
 async function answerOutsideContext(
   socket: WebSocket,
@@ -58,12 +75,8 @@ export async function handleDevChatCommand(
   try {
     if (request.operation === "chat.create" && request.payload.initialSubmit)
       return await createAndSubmitChat(socket, service, request, attachBrowserContext);
-    if (request.operation === "settings.blocked-sites") {
-      const sites = await applyBlockedSites(request.payload);
-      return completeCommand(socket, request, { kind: "settings.blocked-sites", sites });
-    }
-    if (request.operation === "settings.outside-context")
-      return await answerOutsideContext(socket, service, request);
+    if (request.operation.startsWith("settings."))
+      return await answerSettings(socket, service, request);
     if (request.operation === "chat.delete") {
       await service.deleteChat(asChatId(request.payload.chatId));
       return completeCommand(socket, request, {

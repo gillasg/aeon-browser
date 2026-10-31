@@ -81,6 +81,11 @@ async function boot(): Promise<void> {
   });
   await connectSession();
   void loadChats();
+  chrome.storage.session.onChanged.addListener((changes) => {
+    const handed = changes[TAB_CHAT]?.newValue;
+    if (typeof handed === "string" && handed && handed !== model.chatId)
+      void selectChat(handed, false);
+  });
   const remembered = await rememberedChat();
   bootedAt = Date.now();
   if (remembered.chatId && !model.chatId && !model.pending) {

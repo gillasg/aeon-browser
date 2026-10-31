@@ -109,7 +109,7 @@ export class ExtensionUiBridge {
     signal?: AbortSignal,
   ): Promise<string | boolean | undefined> {
     if (signal?.aborted || this.pending.size >= 8) return Promise.resolve(defaultAnswer(candidate));
-    const timeout = Math.max(1000, Math.min(requestedTimeout ?? 120_000, 300_000));
+    const timeout = Math.max(1000, Math.min(requestedTimeout ?? 120_000, 900_000));
     const request: PiExtensionUiRequest = {
       ...candidate,
       requestId: randomUUID(),

@@ -47,6 +47,8 @@ export const CoreAttentionSnapshotSchema = z
           working: z.boolean(),
           completionId: z.string().uuid().nullable(),
           unread: z.boolean(),
+          /** The question this chat is waiting on the user for (ask_user), if any. */
+          asking: z.string().max(200).nullable().optional(),
         })
         .strict(),
     ),

@@ -35,6 +35,7 @@ export type ReadCommandRequest = Extract<
       | "chat.queue-edit"
       | "chat.stop"
       | "settings.blocked-sites"
+      | "settings.form-profile"
       | "settings.outside-context";
   }
 >;

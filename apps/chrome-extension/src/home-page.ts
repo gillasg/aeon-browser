@@ -35,6 +35,7 @@ import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { HomeCatalogController } from "./home-catalog-controller.js";
 import { HomeBlockedSites } from "./home-blocked-sites.js";
+import { HomeFormProfile } from "./home-form-profile.js";
 import { HomeOutsideContext } from "./home-outside-context.js";
 import { HomeManagementController } from "./home-management-controller.js";
 import { createManagementClient } from "./management-client.js";
@@ -84,6 +85,11 @@ const management = new HomeManagementController(
   createManagementClient(__AEON_NATIVE_TRANSPORT__, () => client),
 );
 const blockedSites = new HomeBlockedSites({
+  client: () => client,
+  onChange: render,
+  onError: showError,
+});
+const formProfile = new HomeFormProfile({
   client: () => client,
   onChange: render,
   onError: showError,
@@ -158,6 +164,10 @@ function createView() {
     blockedSites: blockedSites.sites,
     onBlockedSiteAdd: (site: string) => void blockedSites.add(site),
     onBlockedSiteRemove: (site: string) => void blockedSites.remove(site),
+    formProfile: formProfile.fields,
+    ...(formProfile.refused ? { formProfileRefused: formProfile.refused } : {}),
+    onFormFieldSave: (field: string, value: string) => void formProfile.save(field, value),
+    onFormFieldRemove: (field: string) => void formProfile.remove(field),
     outsideContext: outsideContext.enabled,
     privacy: privacy(),
     onOutsideContext: (enabled: boolean) => void outsideContext.set(enabled),
@@ -206,6 +216,7 @@ async function start(): Promise<void> {
     loadModelCatalog(),
     management.loadForHome(),
     blockedSites.load(),
+    formProfile.load(),
     outsideContext.load(),
   ]);
   const selectedChat = new URL(location.href).searchParams.get("chatId");

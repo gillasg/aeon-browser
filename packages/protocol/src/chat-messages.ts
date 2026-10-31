@@ -246,6 +246,21 @@ const BlockedSitesSettingsRequestSchema = z
       .strict(),
   })
   .strict();
+/** The form profile bu.fillProfile() fills from: shown and edited only by the user, in Settings. */
+const FormProfileSettingsRequestSchema = z
+  .object({
+    kind: z.literal("command"),
+    requestId: RequestIdSchema,
+    operation: z.literal("settings.form-profile"),
+    payload: z
+      .object({
+        action: z.enum(["read", "save", "remove"]),
+        field: z.string().min(1).max(60).optional(),
+        value: z.string().max(2000).optional(),
+      })
+      .strict(),
+  })
+  .strict();
 const OutsideContextSettingsRequestSchema = z
   .object({
     kind: z.literal("command"),
@@ -288,6 +303,7 @@ export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ChatQueueEditRequestSchema,
   ChatStopRequestSchema,
   BlockedSitesSettingsRequestSchema,
+  FormProfileSettingsRequestSchema,
   OutsideContextSettingsRequestSchema,
 ]);
 

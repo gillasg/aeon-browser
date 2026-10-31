@@ -78,3 +78,4 @@ export {
   type PrivacySettingsProps,
   type PrivacyState,
 } from "./privacy-settings.js";
+export { FormsSettings, fieldLabel, type FormField } from "./forms-settings.js";
