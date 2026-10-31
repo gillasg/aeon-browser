@@ -15,6 +15,9 @@ interface Recording {
   mode: "tab" | "screencast";
   audio: boolean;
   startedAt: number;
+  fps: number;
+  /** Capture time (s) of the last screencast frame sent to the encoder. */
+  lastSent: number;
 }
 const recordings = new Map<number, Recording>();
 const OFFSCREEN = "aeon-code-offscreen";
@@ -63,7 +66,13 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
     const result = captured.ok ? captured : await startScreencast(tabId, options);
     if (!result.ok) throw new Error("RECORDING_FAILED: " + result.error);
     const mode = captured.ok ? "tab" : "screencast";
-    recordings.set(tabId, { mode, audio: mode === "tab" && options.audio, startedAt: Date.now() });
+    recordings.set(tabId, {
+      mode,
+      audio: mode === "tab" && options.audio,
+      startedAt: Date.now(),
+      fps: options.fps,
+      lastSent: 0,
+    });
     return {
       mode,
       audio: mode === "tab" && options.audio,
@@ -169,8 +178,14 @@ async function finish(tabId: number): Promise<void> {
 onEngineInstall(() => {
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (method !== "Page.screencastFrame" || source.tabId === undefined) return;
-    if (recordings.get(source.tabId)?.mode !== "screencast") return;
+    const recording = recordings.get(source.tabId);
+    if (recording?.mode !== "screencast") return;
     const frame = params as { data?: string; metadata?: { timestamp?: number } };
+    // Chrome can send 100+ frames a second; the encoder needs one per frame slot, so the rest are
+    // never sent (that is the frame rate, not a loss).
+    const capturedAt = frame.metadata?.timestamp ?? 0;
+    if (capturedAt && capturedAt - recording.lastSent < (1 / recording.fps) * 0.97) return;
+    recording.lastSent = capturedAt;
     if (frame.data)
       void toOffscreen({
         target: OFFSCREEN,
