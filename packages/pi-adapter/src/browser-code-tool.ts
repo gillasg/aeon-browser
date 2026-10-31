@@ -390,7 +390,7 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
   return "result" in step ? { ...step, result: compactBrowserTrace(step.result) } : step;
 }
 
-function browserCodeError(message = "OPERATION_FAILED", detail?: string): string {
+function browserCodeError(message = "INTERNAL", detail?: string): string {
   const text = detail ? `${message}: ${detail}` : message;
   const selector = selectorHint(text);
   if (selector) return text.split("\n")[0] + "\nHint: " + selector;

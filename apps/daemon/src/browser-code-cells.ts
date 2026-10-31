@@ -35,6 +35,8 @@ interface Pending {
 }
 
 const LINK_GRACE_MS = 60_000;
+/** A browser answers a run at once; silence past this means the connection stalled. */
+const ACK_MS = 10_000;
 
 /** Runs browser_code cells inside a connected executor: one round trip per cell, not per step. */
 export class BrowserCodeCells {
@@ -69,7 +71,7 @@ export class BrowserCodeCells {
         finish(
           undefined,
           new Error(
-            `Browser code exceeded its deadline (last stage: ${stage}); that cell stopped, and its variables and tabs ${neverEvaluated ? "were reset" : "are still there"}.`,
+            `${neverEvaluated ? "INTERNAL: the browser never started this code; " : "TIMEOUT: "}browser code exceeded its deadline (last stage: ${stage}); that cell stopped, and its variables and tabs ${neverEvaluated ? "were reset" : "are still there"}.`,
           ),
         );
       };
@@ -83,7 +85,7 @@ export class BrowserCodeCells {
       };
       const abort = () => {
         cancel(true);
-        finish(undefined, new Error("Browser workflow cancelled; runtime reset"));
+        finish(undefined, new Error("RUN_RESET: browser workflow cancelled; runtime reset"));
       };
       const close = () => {
         const cell = this.cells.get(cellId);
@@ -103,7 +105,7 @@ export class BrowserCodeCells {
         if (result) {
           for (const target of result.opened) this.adopt(chatId, target);
           resolve(result);
-        } else reject(error ?? new Error("OPERATION_FAILED"));
+        } else reject(error ?? new Error("INTERNAL: the cell ended without a result"));
       };
       this.cells.set(cellId, {
         clientInstanceId,
@@ -115,6 +117,7 @@ export class BrowserCodeCells {
       });
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("close", close);
+      this.watchAck(cellId);
       socket.send(
         JSON.stringify(
           BrowserCodeRunSchema.parse({
@@ -132,6 +135,24 @@ export class BrowserCodeCells {
         ),
       );
     });
+  }
+
+  /**
+   * An open socket the browser no longer reads (a suspended worker, a half-open link) held every
+   * cell to its full deadline. Unanswered after ACK_MS: drop it so the browser reconnects, and say so.
+   */
+  private watchAck(cellId: string): void {
+    setTimeout(() => {
+      const cell = this.cells.get(cellId);
+      if (cell?.stage !== "sent") return;
+      cell.socket.terminate();
+      cell.finish(
+        undefined,
+        new Error(
+          `INTERNAL: the browser did not pick up this code within ${ACK_MS / 1000} s (its connection stalled); it is reconnecting, so run the cell again once`,
+        ),
+      );
+    }, ACK_MS).unref?.();
   }
 
   /** A browser reconnected: keep running cells alive and let them answer on the new socket. */
@@ -164,7 +185,8 @@ export class BrowserCodeCells {
     if (progress.success) {
       const cell = this.cells.get(progress.data.cellId);
       if (cell?.socket !== socket) return;
-      if (progress.data.stage !== undefined) cell.stage = progress.data.stage;
+      // Any word from the browser about this cell proves it arrived.
+      cell.stage = progress.data.stage ?? (cell.stage === "sent" ? "received" : cell.stage);
       if (progress.data.waitingForUser !== undefined) cell.waiting(progress.data.waitingForUser);
       cell.input.onProgress(progress.data.steps);
       return;

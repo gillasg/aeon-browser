@@ -35,7 +35,7 @@ export async function executeBrowserBatch(
         : {
             index,
             disposition: "failed",
-            code: outcome.code ?? "OPERATION_FAILED",
+            code: outcome.code ?? "INTERNAL",
             detail: outcome.detail,
           },
     );
