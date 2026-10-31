@@ -49,6 +49,15 @@ const ChatCommandResultSchema = z.discriminatedUnion("kind", [
       sites: z.array(z.string().max(200)).max(2000),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("settings.form-profile"),
+      fields: z
+        .array(z.object({ name: z.string().max(60), value: z.string().max(2000) }).strict())
+        .max(500),
+      refused: z.string().max(300).optional(),
+    })
+    .strict(),
   z.object({ kind: z.literal("settings.outside-context"), enabled: z.boolean() }).strict(),
   z.object({ kind: z.literal("chat.pi-ui"), piUi: PiUiSnapshotSchema }).strict(),
   z
@@ -227,6 +236,7 @@ export const ChatCommandCompletedSchema = z
       "chat.queue-edit",
       "chat.stop",
       "settings.blocked-sites",
+      "settings.form-profile",
       "settings.outside-context",
     ]),
     result: ChatCommandResultSchema,
@@ -270,6 +280,7 @@ export const ChatCommandFailedSchema = z
       "chat.stop",
       "chat.submit",
       "settings.blocked-sites",
+      "settings.form-profile",
       "settings.outside-context",
     ]),
     code: z.enum(["CHAT_NOT_FOUND", "PI_UNAVAILABLE", "PI_PROMPT_FAILED", "INVALID_COMMAND"]),

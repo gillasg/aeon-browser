@@ -189,8 +189,9 @@ function createRoutineTools(
         "\"use listen\"; const p = await browser.openTab(url); await p.waitForChange('.inbox', {timeoutMs: 55000}) " +
         "(also p.waitForResponse('/api/messages'), p.waitForMessage(/new_message/) for WebSockets). " +
         "Schedules: {kind: 'interval', everyMinutes}, {kind: 'calendar', daysOfWeek, localTime} or {kind: 'once', atUtc} for one run at an exact time. " +
-        "To act at an exact moment (a drop, a ticket or booking release, a slot opening): if it is under 55 minutes away call browser.snipe now; " +
-        "otherwise create a routine with {kind: 'once', atUtc: about 3 minutes before} whose instruction calls browser.snipe({at, url, prepare, fire, done}) (help('snipe')).",
+        "A watcher waits for a condition (its check) or for a moment: to act at an exact moment (a drop, a ticket or booking release, a slot opening) " +
+        "under 55 minutes away call browser.snipe now; later, create a watcher with schedule {kind: 'once', atUtc: 3 minutes before} " +
+        "whose check is return await browser.snipe({at, url, prepare, fire, done, wait: true}): it fires with no model call and its result wakes you (help('snipe')).",
       routineCreate,
     ),
     tool(

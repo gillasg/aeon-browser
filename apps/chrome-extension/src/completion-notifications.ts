@@ -1,4 +1,5 @@
 import { clearAgentCursors } from "@browserkit/engine/native-browser-cursor";
+import { presentAsk } from "./orb/orb-worker.js";
 import {
   CoreAttentionAlertSchema,
   CoreAttentionClaimSchema,
@@ -35,6 +36,10 @@ async function mirror(
   const existing = await chrome.storage.session.get(null);
   const values: Record<string, string> = {};
   for (const chat of snapshot.chats) {
+    if (chat.asking) {
+      values["aeon-asking-" + chat.chatId] = chat.asking;
+      if (existing["aeon-asking-" + chat.chatId] !== chat.asking) void presentAsk(chat.chatId);
+    }
     // The turn is over: the agent cursor leaves its tabs.
     if (!chat.working && existing["aeon-chat-working-" + chat.chatId] === "working")
       void clearAgentCursors(chat.chatId);
@@ -51,8 +56,8 @@ async function mirror(
   }
   const stale = Object.keys(existing).filter(
     (key) =>
-      ["aeon-chat-working-", "piper-unread-", "aeon-completion-id-"].some((prefix) =>
-        key.startsWith(prefix),
+      ["aeon-chat-working-", "piper-unread-", "aeon-completion-id-", "aeon-asking-"].some(
+        (prefix) => key.startsWith(prefix),
       ) && !(key in values),
   );
   if (stale.length) await chrome.storage.session.remove(stale);

@@ -46,6 +46,7 @@ import {
 } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createExtractTool } from "./extract-tool.js";
+import { createAskUserTool } from "./ask-user-tool.js";
 import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { installAeonBrowser } from "./site-browser.js";
 import { installSiteMapping } from "./site-mapping.js";
@@ -349,6 +350,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           siteToolModel(this.completionOptions()),
         ),
         createExtractTool(this.completionOptions(), input.workingDirectory),
+        createAskUserTool(),
       ],
     };
     const { session } = await timeStartupStep("agent-session-created", () =>

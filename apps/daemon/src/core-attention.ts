@@ -25,6 +25,8 @@ export class CoreAttention {
   private pending = Promise.resolve();
   private readonly path: string;
   private readonly unsubscribe: () => void;
+  /** Questions each chat is waiting on the user for, by request id. */
+  private readonly asks = new Map<string, Map<string, string>>();
   /** The last thing each chat said, for a notification that says what happened. */
   private readonly answers = new Map<string, string>();
 
@@ -66,6 +68,7 @@ export class CoreAttention {
         working,
         completionId,
         unread,
+        asking: [...(this.asks.get(chatId)?.values() ?? [])][0] ?? null,
       })),
     };
   }
@@ -150,6 +153,8 @@ export class CoreAttention {
 
   private observe(chatId: string, event: PiSessionEvent): void {
     if (event.kind === "message-end") this.noteAnswer(chatId, event.message);
+    if (event.kind === "extension-ui-request" || event.kind === "extension-ui-resolved")
+      return this.noteAsk(chatId, event);
     if (event.kind !== "run-state") return;
     const previous = this.records.get(chatId) ?? {
       chatId,
@@ -170,6 +175,28 @@ export class CoreAttention {
     this.records.set(chatId, previous);
     this.changed();
   }
+  /** A question opened or answered: the extension shows it on the orb in the user's tab. */
+  private noteAsk(
+    chatId: string,
+    event: Extract<PiSessionEvent, { kind: "extension-ui-request" | "extension-ui-resolved" }>,
+  ): void {
+    const asks = this.asks.get(chatId) ?? new Map<string, string>();
+    if (event.kind === "extension-ui-request")
+      asks.set(event.request.requestId, event.request.title.slice(0, 200));
+    else asks.delete(event.requestId);
+    if (asks.size) this.asks.set(chatId, asks);
+    else this.asks.delete(chatId);
+    if (!this.records.has(chatId))
+      this.records.set(chatId, {
+        chatId,
+        working: true,
+        completionId: null,
+        unread: false,
+        notified: false,
+      });
+    this.changed();
+  }
+
   /** "Price dropped to ₹2,999": the first sentence of the chat's latest reply. */
   private noteAnswer(chatId: string, message: PiMessageProjection): void {
     if (message.role !== "assistant") return;

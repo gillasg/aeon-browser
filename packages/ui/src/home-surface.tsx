@@ -25,6 +25,7 @@ import { Segmented } from "./segmented.js";
 import { LearnPage, seedHomeQuery } from "./learn-page.js";
 import { PasswordManagerSettings } from "./password-manager-settings.js";
 import { BlockedSitesSettings } from "./blocked-sites-settings.js";
+import { FormsSettings, type FormField } from "./forms-settings.js";
 import type { ModelAccountsProps } from "./model-accounts-types.js";
 
 export interface NewTabHomeProps {
@@ -96,6 +97,11 @@ export interface NewTabHomeProps {
   blockedSites?: readonly string[];
   onBlockedSiteAdd?(site: string): void;
   onBlockedSiteRemove?(site: string): void;
+  /** Settings → Forms: the form profile, its last refusal, and the user's edits. */
+  formProfile?: readonly FormField[];
+  formProfileRefused?: string;
+  onFormFieldSave?(field: string, value: string): void;
+  onFormFieldRemove?(field: string): void;
   privacy?: PrivacySettingsProps;
   /** Outside agents may see the user's open tabs (opt-in, stored by the daemon). */
   outsideContext?: boolean;
@@ -104,7 +110,7 @@ export interface NewTabHomeProps {
   onSidebarDefault(open: boolean): void;
 }
 
-type SettingsSection = "settings" | "models" | "signin" | "blocked" | "advanced";
+type SettingsSection = "settings" | "models" | "signin" | "forms" | "blocked" | "advanced";
 
 /** `?view=models` is the Models tab of Settings; every other view is the top bar's. */
 function homeRoute(): { view: HomeView; settingsSection?: SettingsSection } {
@@ -285,6 +291,7 @@ const SETTINGS_TABS: ReadonlyArray<[SettingsSection, string]> = [
   ["settings", "General"],
   ["models", "Models"],
   ["signin", "Sign-in"],
+  ["forms", "Forms"],
   ["blocked", "Blocked sites"],
   ["advanced", "Advanced"],
 ];
@@ -302,45 +309,76 @@ function SettingsPage({
     <div className="home-settings-layout">
       <SettingsMenu section={section} onSection={onSection} />
       <div className="home-settings-body" role="tabpanel">
-        {section === "models" ? (
-          props.modelAccounts ? (
-            <>
-              <ModelAccounts {...props.modelAccounts} />
-              <BrowserAccounts
-                snapshot={props.managementSnapshot ?? null}
-                chatId={props.managementSelectedChatId}
-                onAction={props.onManagementAction}
-              />
-            </>
-          ) : (
-            <p className="aeon-page-empty">Models are not available here.</p>
-          )
-        ) : section === "signin" ? (
-          <SettingsSectionPage title="Sign-in">
-            <PasswordManagerSettings
-              signIn={props.managementSnapshot?.signIn ?? null}
-              loading={props.managementLoading}
-            />
-          </SettingsSectionPage>
-        ) : section === "blocked" ? (
-          <SettingsSectionPage title="Blocked sites">
-            <BlockedSitesSettings
-              {...(props.blockedSites ? { sites: props.blockedSites } : {})}
-              {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
-              {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
-            />
-          </SettingsSectionPage>
-        ) : section === "advanced" ? (
-          <>
-            <Management props={props} section="resources" />
-            <Management props={props} section="capabilities" />
-          </>
-        ) : (
-          <Management props={props} section={section} />
-        )}
+        <SettingsSectionBody props={props} section={section} />
       </div>
     </div>
   );
+}
+
+function FormsSection({ props }: { props: NewTabHomeProps }): ReactElement {
+  return (
+    <SettingsSectionPage title="Forms">
+      <FormsSettings
+        fields={props.formProfile ?? []}
+        refused={props.formProfileRefused}
+        onSave={(field, value) => props.onFormFieldSave?.(field, value)}
+        onRemove={(field) => props.onFormFieldRemove?.(field)}
+      />
+    </SettingsSectionPage>
+  );
+}
+
+function BlockedSection({ props }: { props: NewTabHomeProps }): ReactElement {
+  return (
+    <SettingsSectionPage title="Blocked sites">
+      <BlockedSitesSettings
+        {...(props.blockedSites ? { sites: props.blockedSites } : {})}
+        {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
+        {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
+      />
+    </SettingsSectionPage>
+  );
+}
+
+function SettingsSectionBody({
+  props,
+  section,
+}: {
+  props: NewTabHomeProps;
+  section: SettingsSection;
+}): ReactElement {
+  if (section === "models")
+    return props.modelAccounts ? (
+      <>
+        <ModelAccounts {...props.modelAccounts} />
+        <BrowserAccounts
+          snapshot={props.managementSnapshot ?? null}
+          chatId={props.managementSelectedChatId}
+          onAction={props.onManagementAction}
+        />
+      </>
+    ) : (
+      <p className="aeon-page-empty">Models are not available here.</p>
+    );
+  if (section === "signin")
+    return (
+      <SettingsSectionPage title="Sign-in">
+        <PasswordManagerSettings
+          signIn={props.managementSnapshot?.signIn ?? null}
+          loading={props.managementLoading}
+        />
+      </SettingsSectionPage>
+    );
+  if (section === "forms") return <FormsSection props={props} />;
+  if (section === "blocked") return <BlockedSection props={props} />;
+  if (section === "advanced")
+    return (
+      <>
+        <Management props={props} section="resources" />
+        <Management props={props} section="capabilities" />
+      </>
+    );
+  return <Management props={props} section={section} />;
 }
 
 function SettingsSectionPage({
@@ -389,6 +427,7 @@ const SETTINGS_ICONS: Record<SettingsSection, string> = {
   settings: "M4 6h12M4 10h12M4 14h12M7 4v4m6 0v4M5 12v4",
   models: "M10 2.8 12 7l4.4 2-4.4 2-2 4.2L8 11 3.6 9 8 7Z",
   signin: "M6 9V6.5a4 4 0 0 1 8 0V9M4.5 9h11v8h-11zM10 12.2v1.8",
+  forms: "M5 3h10v14H5zM7.5 6.5h5M7.5 9h5M7.5 11.5h5v3h-5z",
   blocked: "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14M5 5l10 10",
   advanced:
     "M8 3h4v3.2a1.8 1.8 0 0 1 2.2 2.2H17v4h-2.8a1.8 1.8 0 0 1-2.2 2.2V17H8v-2.6a1.8 1.8 0 0 1-2.2-2.2H3v-4h2.8A1.8 1.8 0 0 1 8 6.2Z",

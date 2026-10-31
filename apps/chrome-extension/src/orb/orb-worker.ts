@@ -115,6 +115,20 @@ async function restore(tabId: number | undefined): Promise<OrbToggle | null> {
   return { kind: "aeon.orb.toggle", tabId, nonce: await nonceFor(tabId), open: false };
 }
 
+/**
+ * A chat asked the user something (ask_user): the orb opens on the tab they are looking at,
+ * showing that chat, so the question reaches them wherever they are. Pages Chrome keeps
+ * extensions out of get the side panel's badge instead.
+ */
+export async function presentAsk(chatId: string): Promise<void> {
+  const [tab] = await chrome.tabs
+    .query({ active: true, lastFocusedWindow: true })
+    .catch(() => [] as chrome.tabs.Tab[]);
+  if (tab?.id === undefined || !/^https?:/.test(tab.url ?? "")) return;
+  await chrome.storage.session.set({ ["aeon-orb-chat:" + tab.id]: chatId });
+  await present(tab.id, true).catch(() => undefined);
+}
+
 async function present(tabId: number, open: boolean): Promise<void> {
   const message: OrbToggle = {
     kind: "aeon.orb.toggle",
