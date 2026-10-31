@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ExtensionUiBridge } from "../dist/extension-ui-bridge.js";
+import { ExtensionUiBridge, fitTitle } from "../dist/extension-ui-bridge.js";
 
 test("extension UI bridge projects and resolves native Pi dialogs", async () => {
   let context;
@@ -53,4 +53,16 @@ test("extension UI bridge projects and resolves native Pi dialogs", async () => 
     ],
   );
   bridge.close();
+});
+
+test("a long question keeps every word: its first sentence leads, the rest is the message", () => {
+  const question =
+    "I don't see any captcha open in your tabs. Which page or site is it on? Your open tabs are: a YouTube video, a Slate Star Codex essay, an Anthropic research page and two more pages besides those.";
+  const fitted = fitTitle(question, null);
+  assert.equal(fitted.title, "I don't see any captcha open in your tabs.");
+  assert.ok(fitted.message.endsWith("two more pages besides those."));
+  assert.deepEqual(fitTitle("Short question?", "detail"), {
+    title: "Short question?",
+    message: "detail",
+  });
 });

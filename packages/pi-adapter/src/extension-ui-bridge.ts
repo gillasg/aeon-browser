@@ -112,8 +112,8 @@ export class ExtensionUiBridge {
     const timeout = Math.max(1000, Math.min(requestedTimeout ?? 120_000, 900_000));
     const request: PiExtensionUiRequest = {
       ...candidate,
+      ...fitTitle(candidate.title, candidate.message),
       requestId: randomUUID(),
-      title: candidate.title.slice(0, 200),
       expiresAt: new Date(Date.now() + timeout).toISOString(),
     };
     return new Promise((resolve) => {
@@ -172,4 +172,20 @@ function isValidAnswer(request: PiExtensionUiRequest, value: DialogValue): boole
   if (request.kind === "confirm") return typeof value === "boolean";
   if (typeof value !== "string") return false;
   return request.kind === "input" || request.kind === "editor" || request.options.includes(value);
+}
+
+/**
+ * A question longer than a title (ask_user puts the whole question there) keeps every word: its
+ * first sentence leads, the rest moves into the message instead of being cut mid-word.
+ */
+export function fitTitle(
+  title: string,
+  message: string | null,
+): { title: string; message: string | null } {
+  if (title.length <= 120 && !title.includes("\n")) return { title, message };
+  const first = /^[^\n]*?[.?!:](?=\s|$)/.exec(title)?.[0] ?? "";
+  const head = first && first.length <= 200 ? first : "A question for you";
+  const rest = title.slice(head === first ? first.length : 0).trim();
+  const body = [rest, message ?? ""].filter(Boolean).join("\n\n").slice(0, 1000);
+  return { title: head, message: body || null };
 }
