@@ -194,7 +194,9 @@ export function RecentChats({
             aria-controls="recent-chats"
             onClick={toggle}
           >
-            <span className="home-recent-chevron" aria-hidden="true" />
+            <span className="home-recent-chevron" aria-hidden="true">
+              →
+            </span>
             Recent
           </button>
         </h2>
