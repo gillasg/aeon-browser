@@ -1,0 +1,82 @@
+{
+  "name": "@browserkit/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "site-to-api and browser-crawl, for everything built on browserkit.",
+  "exports": {
+    "./site-to-api": {
+      "types": "./dist/site-to-api.d.ts",
+      "import": "./dist/site-to-api.js"
+    },
+    "./site-to-api/runtime": {
+      "types": "./dist/site-to-api-runtime.d.ts",
+      "import": "./dist/site-to-api-runtime.js"
+    },
+    "./browser-crawl": {
+      "types": "./dist/browser-crawl.d.ts",
+      "import": "./dist/browser-crawl.js"
+    },
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "import": "./dist/host.js"
+    },
+    "./definitions": {
+      "types": "./dist/definitions.d.ts",
+      "import": "./dist/definitions.js"
+    },
+    "./workflow": {
+      "types": "./dist/workflow.d.ts",
+      "import": "./dist/workflow.js"
+    },
+    "./workflow-actions": {
+      "types": "./dist/workflow-actions.d.ts",
+      "import": "./dist/workflow-actions.js"
+    },
+    "./workflow-store": {
+      "types": "./dist/workflow-store.d.ts",
+      "import": "./dist/workflow-store.js"
+    },
+    "./providers": {
+      "types": "./dist/providers.d.ts",
+      "import": "./dist/providers.js"
+    },
+    "./providers-run": {
+      "types": "./dist/providers-run.d.ts",
+      "import": "./dist/providers-run.js"
+    },
+    "./action": {
+      "types": "./dist/action.d.ts",
+      "import": "./dist/action.js"
+    },
+    "./context": {
+      "types": "./dist/context.d.ts",
+      "import": "./dist/context.js"
+    },
+    "./jobs": {
+      "types": "./dist/jobs.d.ts",
+      "import": "./dist/jobs.js"
+    },
+    "./profile": {
+      "types": "./dist/profile.d.ts",
+      "import": "./dist/profile.js"
+    },
+    "./tables": {
+      "types": "./dist/tables.d.ts",
+      "import": "./dist/tables.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "browser-crawl": "workspace:*",
+    "@browserkit/site-mapper": "workspace:*",
+    "@browserkit/credentials": "workspace:*",
+    "@browserkit/protocol": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ]
+}

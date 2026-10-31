@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "zod": "4.6.5",
-    "@browserkit/protocol": "link:../../../browserkit/packages/protocol"
+    "@browserkit/protocol": "workspace:*"
   },
   "files": [
     "dist",

@@ -19,9 +19,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
-      # browserkit, next to this checkout.
-      - name: Set up linked repos
-        run: node scripts/link-repos.mjs
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Cache Chrome for Testing
         uses: actions/cache@v4
@@ -38,7 +35,7 @@ jobs:
             Expand-Archive "$dir/chrome-win64.zip" -DestinationPath $dir -Force
           }
       - name: Canary
-        working-directory: ../browserkit
+        working-directory: browser
         run: node --test test/canary.e2e.test.mjs
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe
