@@ -88,7 +88,6 @@ export function createBrowserCodeTool(
           codeCell: {
             code,
             timeoutMs: CELL_TIMEOUT_MS,
-            challengeAssist: (options?.source ?? "chat") === "chat",
             onCall: cellCall({
               chatId,
               source: options?.source ?? "chat",
