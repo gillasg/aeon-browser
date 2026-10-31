@@ -2,6 +2,7 @@
 // says which tab and which site it reaches, and the kernel authorizes and guards them before it
 // runs. Anything no effect claims goes to Core.
 import { isObject, type Effect } from "./kernel.js";
+import { checkDeclared } from "./kernel-effects.js";
 import type { Cell } from "./code-runtime-host.js";
 import { jobs, saveJobs } from "./code-runtime-jobs.js";
 import { jobCall, cancelJobs } from "./code-runtime-job-control.js";
@@ -219,14 +220,19 @@ function browserEffects(host: EffectHost): Effect<Cell>[] {
   ];
 }
 
-/** Every effect a cell can ask for, secrets first so nothing else can claim a secret request. */
+/**
+ * Every effect a cell can ask for, secrets first so nothing else can claim a secret request.
+ * Throws at startup unless they match their declarations in kernel-effects.ts.
+ */
 export function cellEffects(host: EffectHost): Effect<Cell>[] {
-  return [
+  const effects = [
     ...secretEffects(host),
     ...webEffects(host),
     ...tabEffects(host),
     ...browserEffects(host),
   ];
+  checkDeclared(effects);
+  return effects;
 }
 
 async function progressCall(host: EffectHost, cell: Cell, value: Value): Promise<unknown> {

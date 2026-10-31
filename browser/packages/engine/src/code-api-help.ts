@@ -2,6 +2,7 @@
 // tool guidance stays short. __hint(message) turns a failed cell's error into a "did you mean"
 // from the real API surface, plus fixes for the Playwright habits that do not apply here.
 
+import { effectsHelp } from "./kernel-effects.js";
 import { KERNEL_ERRORS } from "./kernel-errors.js";
 
 const TOPICS: Record<string, string> = {
@@ -9,6 +10,8 @@ const TOPICS: Record<string, string> = {
     "await bu.signIn({account?}) signs in to the current page with a login from the user's password manager (Bitwarden or Proton Pass): it fills the username, password and the one-time code (the saved authenticator code, else one the site just sent to the user's Gmail or, when Google Messages for web is paired, their phone), across multi-step forms, and returns {signedIn, site, provider, account, reason?, accounts?}. You never see the password and there is no approval step: calling it is the instruction. reason CHOOSE_ACCOUNT lists accounts: call again with {account}. A code field on any other form (a sign-up or email check): await bu.fillCode({waitMs}) waits for the code in Gmail or Google Messages, types and submits it, and returns {filled, from: 'gmail'|'messages', reason: 'NO_CODE_FIELD'|'NO_CODE'}; you never see the code, and payment or transfer approvals are never used. NO_PASSWORD_MANAGER, NO_SAVED_LOGIN, NEEDS_CODE (no code arrived) or CAPTCHA: bu.handoff('Please sign in'). REJECTED: the site refused the login; tell the user, do not retry. FOREIGN_FORM: the form sends the login to another site (detail names it); nothing was typed; tell the user, never retry or type it by hand. APPROVE_ON_DEVICE: the site waited a minute for approval on the user's phone or app; ask the user to approve, then call bu.signIn() again. Cookie banners over the form are cleared (reject first), and codes split across one-digit boxes are typed box by box. Open the site's sign-in page first. bu.handoff(message, {selector?, start?}) asks the user to do a step in the tab: the cursor turns amber and points at selector, a card carries Done and Cancel (a notification instead while the tab records). {start: true} returns {wait, cancel} at once: start it before the click that opens a passkey, WebAuthn, 2FA or payment prompt the page blocks on, then await wait(). PROTECTED_UI on any step: a password manager's menu (another extension's frame) keeps blocking the tab after it was removed twice; ask the user to close it, then continue.",
   gated:
     "Sites behind a sign-in or a bot wall. Opening or navigating to a page with a Cloudflare, DataDome, PerimeterX or Akamai check logs a '[warn] challenge:' line. Signed out: await bu.signIn(), see help('signin'). A check the page shows to people: await bu.handoff('Please finish the check', {wait: true}) asks the user and returns once it is gone (it watches the page as well as the Done button): {solved, by: 'cleared'|'done'|'cancelled'|'timeout', waitedMs}; {timeoutMs} up to 30 minutes, 10 by default. Never solve or click through a check yourself. Once through, page.session() returns the cookies (HttpOnly too) and storage, and the command line's session export <site> or cookies export <site> saves them for scripts, mapped or not.",
+  // Generated from the kernel's effect declarations.
+  effects: effectsHelp(),
   // Generated from the kernel's error table, so the reference and the errors never drift.
   errors:
     "Error codes and what to do. " +
@@ -94,7 +97,7 @@ const HABITS: Record<string, string> = {
 export const browserHelpApi = `
 var __helpTopics = ${JSON.stringify(TOPICS)};
 var __habits = ${JSON.stringify(HABITS)};
-var __helpAliases = {map: 'api', mapping: 'api', mapped: 'sites', login: 'signin', challenge: 'gated', captcha: 'gated', error: 'errors', screenshots: 'screenshot', context: 'history', bookmarks: 'history', forms: 'profile', drop: 'snipe', table: 'tables', proxy: 'identity', accounts: 'identity', release: 'snipe', form: 'profile', code: 'signin', otp: 'signin'};
+var __helpAliases = {map: 'api', mapping: 'api', mapped: 'sites', login: 'signin', challenge: 'gated', captcha: 'gated', error: 'errors', kernel: 'effects', effect: 'effects', screenshots: 'screenshot', context: 'history', bookmarks: 'history', forms: 'profile', drop: 'snipe', table: 'tables', proxy: 'identity', accounts: 'identity', release: 'snipe', form: 'profile', code: 'signin', otp: 'signin'};
 // help(topic) is synchronous: it prints the text and returns it as a string.
 function help(topic) {
   var key = topic && String(topic).toLowerCase();
