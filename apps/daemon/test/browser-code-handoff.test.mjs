@@ -80,3 +80,54 @@ test("the deadline restarts in full once the hand-off ends", async () => {
     mock.timers.reset();
   }
 });
+
+test("a run the browser never picks up fails in seconds and drops the stalled link", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const cells = new BrowserCodeCells(() => undefined);
+    const socket = fakeSocket();
+    let terminated = false;
+    socket.terminate = () => (terminated = true);
+    const run = cells.run(socket, chatId, chatId, toolCallId, [], {
+      code: "1+1",
+      timeoutMs: 60_000,
+      onCall: async () => undefined,
+      onProgress: () => undefined,
+    });
+    mock.timers.tick(10_001);
+    await assert.rejects(run, /^Error: INTERNAL: the browser did not pick up this code/);
+    assert.equal(terminated, true);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test("a run the browser acknowledged keeps its full deadline", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const cells = new BrowserCodeCells(() => undefined);
+    const socket = fakeSocket();
+    socket.terminate = () => assert.fail("an answered link must stay");
+    let settled = false;
+    const run = cells
+      .run(socket, chatId, chatId, toolCallId, [], {
+        code: "1+1",
+        timeoutMs: 60_000,
+        onCall: async () => undefined,
+        onProgress: () => undefined,
+      })
+      .finally(() => (settled = true));
+    const cellId = socket.sent[0].cellId;
+    cells.handle({ kind: "browser.code.progress", cellId, steps: [], stage: "received" }, socket);
+    mock.timers.tick(30_000);
+    await Promise.resolve();
+    assert.equal(settled, false);
+    cells.handle(
+      { kind: "browser.code.result", cellId, output: "", steps: [], opened: [] },
+      socket,
+    );
+    await run;
+  } finally {
+    mock.timers.reset();
+  }
+});

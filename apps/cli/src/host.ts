@@ -128,7 +128,7 @@ function stringify(value: unknown): string | undefined {
 }
 
 function browserError(result: BrowserCell): Error {
-  const code = result.error ?? "OPERATION_FAILED";
+  const code = result.error ?? "INTERNAL";
   if (code === "BROWSER_OFFLINE" || code === "AMBIGUOUS_BROWSER") {
     const detail =
       code === "AMBIGUOUS_BROWSER"

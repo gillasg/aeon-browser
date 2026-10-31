@@ -308,7 +308,7 @@ export class BrowserControlService {
   }
   private release(chatId: string, reset = false, tidy = false): void {
     for (const pending of this.pending.values())
-      if (pending.chatId === chatId) pending.finish(undefined, "OPERATION_FAILED");
+      if (pending.chatId === chatId) pending.finish(undefined, "RUN_RESET");
     for (const socket of this.executors.values())
       if (socket.readyState === WebSocket.OPEN)
         socket.send(

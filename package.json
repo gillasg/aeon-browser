@@ -14,8 +14,8 @@
     "lint": "eslint apps packages scripts --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
-    "test": "pnpm build && node --test",
-    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm agent-text:check",
+    "test": "node scripts/run-tests.mjs \"apps/*/test/*.test.mjs\" \"packages/*/test/*.test.mjs\" \"scripts/*.test.mjs\" \"benchmarks/*.test.mjs\"",
+    "check": "pnpm format:check && pnpm lint && pnpm agent-text:check && pnpm typecheck && pnpm build && pnpm test",
     "agent-text": "node ../browserkit/scripts/build-agent-text.mjs",
     "agent-text:check": "node ../browserkit/scripts/build-agent-text.mjs --check",
     "bench": "node benchmarks/run.mjs --dry-run",
@@ -24,7 +24,9 @@
     "dev:chat": "pnpm build:core && node apps/daemon/dist/main.js --dev-chat",
     "start": "node apps/daemon/dist/main.js --core",
     "aeon": "node apps/cli/dist/cli.js",
-    "links": "node scripts/link-repos.mjs"
+    "links": "node scripts/link-repos.mjs",
+    "test:browser": "node scripts/run-tests.mjs --browser \"apps/*/test/*.test.mjs\" \"packages/*/test/*.test.mjs\" \"scripts/*.test.mjs\" \"benchmarks/*.test.mjs\"",
+    "check:browser": "pnpm build && pnpm test:browser"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { namedErrorText } from "@browserkit/tools/definitions";
 
 // Results from site APIs and crawls can be large: the model sees a bounded preview, and the
 // whole result is saved in the chat's workspace for browser_code or later tools to read.
@@ -17,8 +18,9 @@ export function textResult(value: unknown, isError = false): ToolText {
   return { content: [{ type: "text", text }], details: undefined, ...(isError ? { isError } : {}) };
 }
 
+/** Every failure is led by its shared code and recovery hint, as browserkit's tools name it. */
 export function errorResult(error: unknown): ToolText {
-  return textResult({ error: error instanceof Error ? error.message : String(error) }, true);
+  return textResult({ error: namedErrorText(error) }, true);
 }
 
 const safeName = (text: string): string =>
