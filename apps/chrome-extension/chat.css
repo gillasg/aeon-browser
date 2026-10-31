@@ -2582,37 +2582,58 @@ body[data-host="panel"] .queue-view {
   margin-inline: var(--aeon-s-2);
   width: calc(100% - 18px);
 }
+/* ask_user and other agent questions: one quiet card with an amber dot, the question as plain
+   reading text, and the same buttons as the hand-off card (filled answer, text-only Cancel). */
 .extension-dialog {
-  margin: 12px auto;
+  flex: none;
+  margin: var(--aeon-s-2) auto;
   width: min(720px, calc(100% - 32px));
-  padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--aeon-needs) 45%, var(--aeon-line));
-  border-radius: var(--aeon-r-md);
+  padding: 14px 16px;
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
   background: var(--aeon-surface);
-  box-shadow: var(--aeon-elev-2);
 }
 .extension-dialog h2 {
-  margin: 0 0 8px;
-  font-size: 15px;
+  margin: 0 0 4px;
+  color: var(--aeon-text);
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .extension-dialog p {
-  margin: 0 0 12px;
-  color: var(--text-secondary, #586273);
+  margin: 0 0 4px;
+  color: var(--aeon-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 .extension-dialog form {
   display: grid;
   gap: 10px;
+  margin-top: 10px;
 }
 .extension-dialog input,
 .extension-dialog textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle, #d8dce2);
+  padding: 9px 12px;
+  border: 1px solid var(--aeon-line);
   border-radius: var(--aeon-r-md);
-  color: var(--text-primary, #1c2533);
-  background: var(--surface, #fff);
+  color: var(--aeon-text);
+  background: var(--aeon-canvas);
   font: inherit;
+  font-size: 14px;
+}
+.extension-dialog input::placeholder,
+.extension-dialog textarea::placeholder {
+  color: var(--aeon-faint);
+}
+.extension-dialog input:focus-visible,
+.extension-dialog textarea:focus-visible {
+  outline: none;
+  border-color: var(--aeon-border-strong);
 }
 .extension-dialog textarea {
   resize: vertical;
@@ -2620,24 +2641,43 @@ body[data-host="panel"] .queue-view {
 .extension-dialog-options {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  margin-top: 10px;
+}
+.extension-dialog form .extension-dialog-options {
+  margin-top: 0;
 }
 .extension-dialog-options button {
-  padding: 7px 12px;
-  border: 1px solid var(--border-subtle, #d8dce2);
+  padding: 6px 14px;
+  border: 1px solid var(--aeon-line);
   border-radius: var(--aeon-r-md);
-  color: var(--text-primary, #1c2533);
-  background: var(--surface, #fff);
+  color: var(--aeon-text);
+  background: transparent;
   font: inherit;
+  font-size: 13.5px;
   cursor: pointer;
 }
-.extension-dialog-options button:first-child {
-  border-color: var(--accent, #596fca);
+.extension-dialog-options button:hover {
+  background: var(--aeon-accent-wash);
 }
-.extension-dialog small {
-  display: block;
-  margin-top: 10px;
-  color: var(--text-secondary, #586273);
+.extension-dialog-options .extension-dialog-primary {
+  border-color: transparent;
+  background: var(--aeon-text);
+  color: var(--aeon-surface);
+}
+.extension-dialog-options .extension-dialog-primary:hover {
+  background: var(--aeon-text);
+  opacity: 0.9;
+}
+.extension-dialog-options button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.extension-dialog-options .quiet-button {
+  margin-left: auto;
+  border-color: transparent;
+  color: var(--aeon-muted);
 }
 .pi-extension-notice {
   width: min(720px, calc(100% - 32px));

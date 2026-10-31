@@ -198,6 +198,7 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
             </section>
           )}
           <OneClickOffer {...props} />
+          <ChatQuestions {...props} />
           <ChatComposer
             {...props.composer}
             projectName={
@@ -236,17 +237,25 @@ function ChatPiOverlays(props: ChatSurfaceProps): ReactElement | null {
           onCompact={props.onCompact}
         />
       )}
+      {props.piUi?.notices.map((item) => (
+        <p key={item.noticeId} className="pi-extension-notice" role="status" data-type={item.type}>
+          {item.message}
+        </p>
+      ))}
+    </>
+  );
+}
+
+/** Questions the agent is waiting on sit right above the composer, where the answer is typed. */
+function ChatQuestions(props: ChatSurfaceProps): ReactElement {
+  return (
+    <>
       {props.piUi?.extensionDialogs.map((dialog) => (
         <ExtensionDialogs
           key={dialog.requestId}
           dialog={dialog}
           onAnswer={props.onAnswerExtensionUi}
         />
-      ))}
-      {props.piUi?.notices.map((item) => (
-        <p key={item.noticeId} className="pi-extension-notice" role="status" data-type={item.type}>
-          {item.message}
-        </p>
       ))}
     </>
   );

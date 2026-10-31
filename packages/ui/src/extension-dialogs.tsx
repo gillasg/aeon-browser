@@ -17,7 +17,6 @@ export function ExtensionDialogs({
     <div className="extension-dialog">
       <ApprovalCard title={dialog.title} message={dialog.message}>
         <DialogFields dialog={dialog} value={value} setValue={setValue} onAnswer={onAnswer} />
-        <small>Expires {new Date(dialog.expiresAt).toLocaleTimeString()}</small>
       </ApprovalCard>
     </div>
   );
@@ -73,15 +72,19 @@ function ConfirmActions({
 }): ReactElement {
   return (
     <div className="extension-dialog-options">
-      <button type="button" onClick={() => onAnswer(dialog.requestId, true)}>
-        Confirm
+      <button
+        type="button"
+        className="extension-dialog-primary"
+        onClick={() => onAnswer(dialog.requestId, true)}
+      >
+        Yes
       </button>
       <button
         type="button"
         className="quiet-button"
         onClick={() => onAnswer(dialog.requestId, false)}
       >
-        Cancel
+        No
       </button>
     </div>
   );
@@ -121,7 +124,9 @@ function TextAnswer({
         />
       )}
       <div className="extension-dialog-options">
-        <button type="submit">Submit</button>
+        <button type="submit" className="extension-dialog-primary" disabled={!value.trim()}>
+          Answer
+        </button>
         <button
           type="button"
           className="quiet-button"
