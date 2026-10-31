@@ -28,6 +28,8 @@ interface Screencast {
   received: number;
   drawn: number;
   lost: number;
+  /** Capture time of the last frame kept for decoding. */
+  lastAccepted: number;
   /** Frames received and not yet drawn or dropped. */
   waiting: number;
   /** Why frames were lost, for the failure message: reordered, late (and by how much), undecodable. */
@@ -79,6 +81,7 @@ async function start(message: Message): Promise<unknown> {
         drawn: 0,
         lost: 0,
         waiting: 0,
+        lastAccepted: 0,
         reordered: 0,
         late: 0,
         worstLateMs: 0,
@@ -132,6 +135,12 @@ function frame(tabId: number, data: string, capturedAt: number): Promise<unknown
   const cast = recording?.screencast;
   if (!recording || !cast || !data) return Promise.resolve(false);
   cast.received++;
+  // Chrome can send 100+ frames a second; a video needs one per frame slot. The rest are skipped
+  // before decoding: that is the frame rate, not a loss.
+  const captureMs = capturedAt * 1000;
+  if (captureMs > 0 && captureMs - cast.lastAccepted < 1000 / recording.fps - 1)
+    return Promise.resolve(false);
+  if (captureMs > 0) cast.lastAccepted = captureMs;
   // Frames wait compressed and decode only when their turn comes, so a fast page never piles up
   // full-size pictures in memory; a queue longer than two seconds of video is already a failure.
   if (cast.waiting >= recording.fps * 2) {
