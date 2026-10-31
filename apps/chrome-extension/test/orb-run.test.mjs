@@ -137,6 +137,14 @@ test("a question for the user is needs-you until it is answered", () => {
   );
   assert.equal(resolved.status, "working");
   assert.equal("dialog" in resolved, false);
+  // A missed "resolved" (the orb was disconnected) is corrected by the daemon's settled state.
+  const settled = orb.applyEvent(
+    orb.applyEvent(asked, assistant("Placed it."), 0),
+    { kind: "run-state", state: "idle" },
+    0,
+  );
+  assert.equal(settled.status, "done");
+  assert.equal("dialog" in settled, false);
 });
 
 test("trace actions drive the cursor and the spotlight for this tab only", () => {

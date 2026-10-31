@@ -143,6 +143,17 @@ export class OrbSession {
     if (result.kind !== "management.snapshot") throw new Error("The answer was not pinned.");
   }
 
+  /** After the link dropped (the daemon restarted): connect again and follow the same chat, which
+   * sends a fresh snapshot. */
+  async reconnect(): Promise<void> {
+    const chat = this.chat;
+    this.chat = undefined;
+    chat?.close();
+    this.catalog?.close();
+    await this.connect();
+    if (this.chatId) await this.follow(this.chatId);
+  }
+
   close(): void {
     this.catalog?.close();
     this.chat?.close();

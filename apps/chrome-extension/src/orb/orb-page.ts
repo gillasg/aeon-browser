@@ -50,8 +50,9 @@ let bootedAt = Number.POSITIVE_INFINITY;
 const session = new OrbSession(tabId, {
   event: (event) => onEvent(event),
   snapshot: (entries, runState) => onSnapshot(entries, runState),
-  closed: () => notice("Reconnecting to Aeon…"),
+  closed: () => void reconnectSession(),
 });
+let reconnecting = false;
 
 void boot();
 
@@ -226,10 +227,34 @@ function chatUrlFor(chatId: string): string {
   return `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=orb`;
 }
 
+/** A snapshot replaces the run, so the orb shows what the chat page shows; steps it already
+ * played do not move the cursor again. */
 function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
   if (entries.length) shown();
+  run = initialRun();
   for (const entry of entries) onEvent({ kind: "entry-added", entry }, false);
-  onEvent({ kind: "run-state", state: runState as "idle" }, true);
+  onEvent({ kind: "run-state", state: runState as "idle" }, false);
+  sentActions = run.actions.length;
+  sync();
+}
+
+/** The link to the daemon dropped: connect again until it answers, then take a fresh snapshot. */
+async function reconnectSession(): Promise<void> {
+  if (reconnecting) return;
+  reconnecting = true;
+  notice("Reconnecting to Aeon…");
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await session.reconnect();
+      break;
+    } catch {
+      await new Promise((resolve) =>
+        globalThis.setTimeout(resolve, Math.min(500 * 2 ** Math.min(attempt, 3), 5000)),
+      );
+    }
+  }
+  reconnecting = false;
+  notice("");
 }
 
 // The sent message stays over the box until the chat has something of its own to show.

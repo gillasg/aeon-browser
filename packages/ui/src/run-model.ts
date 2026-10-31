@@ -204,8 +204,15 @@ function addActions(run: AgentRun, message: PiMessageDto): AgentRun {
 
 function applyRunState(run: AgentRun, state: string): AgentRun {
   if (state === "needs_attention") return { ...run, status: "needs", label: "Needs you" };
-  if (state === "idle") return finish(run);
+  // The daemon says the chat is settled with nothing waiting: a question it showed is gone.
+  if (state === "idle") return finish(run.status === "needs" ? withoutQuestion(run) : run);
   return run.status === "idle" || run.status === "done" ? { ...run, status: "thinking" } : run;
+}
+
+function withoutQuestion(run: AgentRun): AgentRun {
+  const next: AgentRun = { ...run, status: "thinking", label: "Thinking" };
+  delete next.dialog;
+  return next;
 }
 
 function finish(run: AgentRun): AgentRun {
