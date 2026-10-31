@@ -1,5 +1,6 @@
 {
   "name": "aeon",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.4.0",
