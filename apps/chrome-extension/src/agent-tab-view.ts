@@ -99,6 +99,9 @@ async function adoptStored(): Promise<void> {
 }
 
 function adopt(changes: Record<string, { newValue?: unknown }>): void {
+  // Store every changed value before announcing any: each announcement pushes the page's whole
+  // copy back, which would undo a change not stored yet.
+  const changed: string[] = [];
   for (const key of [AGENT_TAB_VIEW_KEY, ...FLAGS]) {
     const value = changes[key]?.newValue;
     if (value === undefined) continue;
@@ -106,11 +109,12 @@ function adopt(changes: Record<string, { newValue?: unknown }>): void {
     try {
       if (localStorage.getItem(key) === text) continue;
       localStorage.setItem(key, text);
-      window.dispatchEvent(new Event(key));
+      changed.push(key);
     } catch {
       /* Storage may be unavailable. */
     }
   }
+  for (const key of changed) window.dispatchEvent(new Event(key));
 }
 
 export async function readAgentFlag(key: string): Promise<boolean> {
