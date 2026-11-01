@@ -9,6 +9,7 @@ import {
   AGENT_IN_FRONT_KEY,
   AGENT_TAB_VIEW_KEY,
   HIDE_AGENT_CURSOR_KEY,
+  RECORD_AGENT_TABS_KEY,
   readAgentFlag,
   readAgentTabView,
   readAgentTabViewSetting,
@@ -107,6 +108,7 @@ configureEngine({
   agentView: readAgentTabView,
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
+  recordAgentTabs: () => readAgentFlag(RECORD_AGENT_TABS_KEY),
   agentGlow: () => Promise.resolve(true),
   agentGlowColor: () => Promise.resolve("#7c5cff"),
 });
