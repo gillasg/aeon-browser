@@ -71,6 +71,17 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
   userControl = control === "user" && typeof tabId === "number" ? { tabId } : null;
   render();
 });
+// aeon run --typed: the worker asks this page to type the prompt into its composer on camera.
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  const request = message as { kind?: string; chatId?: string; text?: unknown } | null;
+  if (request?.kind !== "aeon.chat.type" || request.chatId !== chatId) return;
+  if (typeof request.text !== "string") return;
+  void composer.typeForCamera(request.text).then(
+    () => sendResponse({ typed: true }),
+    () => sendResponse({ typed: false }),
+  );
+  return true;
+});
 let userControl: { tabId: number } | null = null;
 function giveBack(tabId: number): void {
   void chrome.runtime.sendMessage({ kind: "browserkit.control.giveback", tabId });

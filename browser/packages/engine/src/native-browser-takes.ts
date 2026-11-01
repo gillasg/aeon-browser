@@ -5,7 +5,11 @@
 import { toOffscreen } from "./code-offscreen-host.js";
 import { engineConfig } from "./engine-config.js";
 import { startRecording, stopTake, takeTabs } from "./native-browser-recording.js";
-import { browserSessionOwner, onBrowserDebuggerAttached } from "./native-browser-session.js";
+import {
+  browserSessionOwner,
+  holdBrowserDebugger,
+  onBrowserDebuggerAttached,
+} from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
 const OFFSCREEN = "aeon-code-offscreen";
@@ -21,9 +25,29 @@ async function recordAgentTab(tabId: number): Promise<void> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   const take = { chatId, url: tab?.url ?? "", startedAt: Date.now() };
   takeTabs.set(tabId, take);
+  // An idle detach would end the screencast mid-take: keep the debugger on while it records.
+  holdBrowserDebugger(tabId, true);
   await startRecording(tabId, { fps: 30 }).catch((error: unknown) => {
     takeTabs.set(tabId, { ...take, error: String(error instanceof Error ? error.message : error) });
   });
+}
+
+/**
+ * Records a chat's own tab (Aeon's chat page) as one of the chat's takes, so a screen recorder
+ * gets the prompt being typed and the answer alongside the pages. Only while recordAgentTabs is on.
+ */
+export async function recordChatTab(tabId: number, chatId: string): Promise<boolean> {
+  if (takeTabs.has(tabId) || !(await engineConfig.recordAgentTabs().catch(() => false)))
+    return false;
+  const take = { chatId, url: "chat", startedAt: Date.now(), chat: true };
+  takeTabs.set(tabId, take);
+  try {
+    await startRecording(tabId, { fps: 30, direct: true });
+    return true;
+  } catch (error) {
+    takeTabs.set(tabId, { ...take, error: String(error instanceof Error ? error.message : error) });
+    return false;
+  }
 }
 
 onEngineInstall(() => {
@@ -35,6 +59,7 @@ onEngineInstall(() => {
 
 async function dropTake(tabId: number): Promise<unknown> {
   takeTabs.delete(tabId);
+  holdBrowserDebugger(tabId, false);
   return toOffscreen({ target: OFFSCREEN, kind: "recordDrop", tabId });
 }
 

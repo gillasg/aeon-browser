@@ -8,6 +8,8 @@ export interface RunOptions {
   quiet: boolean;
   /** What started these chats: the CLI's own run, or an outside MCP agent's. */
   origin: "cli" | "mcp";
+  /** Type each prompt into its chat's composer on camera before sending it (screen recordings). */
+  typed?: boolean;
   model?: { provider: string; id: string };
   thinkingLevel?: string;
   timeoutMs: number;
@@ -40,7 +42,10 @@ export async function runTasks(
   return results;
 }
 
-async function chooseModel(client: AeonClient, options: RunOptions): Promise<Selection> {
+export async function chooseModel(
+  client: AeonClient,
+  options: Pick<RunOptions, "model" | "thinkingLevel">,
+): Promise<Selection> {
   const result = await client.command("chat.model-catalog", {});
   const catalog = result.catalog as {
     defaultModel: { provider: string; id: string } | null;
@@ -86,7 +91,13 @@ async function runOne(
   const chatId = String((created.chat as { chatId: string }).chatId);
   finished.track(chatId);
   options.onStarted?.(index, chatId);
-  if (!options.quiet) await client.openChat(chatId);
+  if (options.typed) {
+    const typed = await client.openTypedChat(chatId, prompt);
+    if (!typed.typed)
+      options.onProgress?.(
+        `[${index + 1}] could not type the prompt on camera: ${typed.error ?? "no browser"}`,
+      );
+  } else if (!options.quiet) await client.openChat(chatId);
   options.onProgress?.(`[${index + 1}] started ${chatId}`);
   // The daemon submits it directly, so quiet runs need no tab and an unloaded tab cannot hold it up.
   await client.submit(chatId, prompt, selection, options.budget);

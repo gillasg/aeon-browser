@@ -10,6 +10,7 @@ import {
 import { inspect, runTasks, type RunOptions } from "./run.js";
 import type { ChatResult } from "./results.js";
 import { searchAeon } from "./search.js";
+import { answer, questions, send, waitForChange } from "./converse.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -71,6 +72,51 @@ const tools = [
       type: "object",
       properties: { runId: { type: "string" } },
       required: ["runId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "aeon_send",
+    description:
+      "Send another message into an existing Aeon chat. While the chat works, it waits as a follow-up (steer: true changes the current turn instead); when idle, it starts a new turn. Then use aeon_wait.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chatId: { type: "string" },
+        message: { type: "string", minLength: 1, maxLength: 50000 },
+        steer: { type: "boolean" },
+      },
+      required: ["chatId", "message"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "aeon_answer",
+    description:
+      "Answer the question an Aeon chat's agent is waiting on (aeon_wait and aeon_run_status list them). confirm: yes or no; select: one of its choices or its number; input: any text.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chatId: { type: "string" },
+        answer: { type: "string", maxLength: 20000 },
+        questionId: { type: "string", description: "Only when several are pending." },
+      },
+      required: ["chatId", "answer"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "aeon_wait",
+    description:
+      "Wait until an Aeon chat changes: new steps after `since`, a question for you, or it finishes (then its answer). Returns steps (pass back as since), newSteps, questions, working and answer; changed is false on timeout.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chatId: { type: "string" },
+        since: { type: "integer", minimum: 0, description: "Steps already seen; default now." },
+        timeoutSeconds: { type: "number", minimum: 1, maximum: 600, description: "Default 50." },
+      },
+      required: ["chatId"],
       additionalProperties: false,
     },
   },
@@ -265,29 +311,61 @@ async function callTool(
   const client = await aeon();
   if (name === "aeon_stop") return { stopped: await client.stop(String(args.chatId)) };
   if (name === "aeon_run" || name === "aeon_run_status") return runTool(client, name, args, runs);
+  if (["aeon_send", "aeon_answer", "aeon_wait"].includes(name))
+    return converseTool(client, name, args);
   if (["aeon_chats", "aeon_search", "aeon_context", "aeon_routine"].includes(name))
     return chatTool(client, name, args);
   return inspectTool(client, name, args);
 }
 
-function runTool(
+async function runTool(
   client: AeonClient,
   name: string,
   args: Json,
   runs: Map<string, Run>,
-): { runId: string } | Record<string, unknown> {
+): Promise<{ runId: string } | Record<string, unknown>> {
   if (name === "aeon_run") return startRun(client, args, runs);
   const run = runs.get(String(args.runId));
   if (!run) throw new Error("Unknown runId");
-  return run.results
-    ? { done: true, results: run.results.map(withoutTrace) }
-    : {
-        done: false,
-        error: run.error,
-        started: run.chats.filter(Boolean).length,
-        total: run.total,
-        chats: run.chats,
-      };
+  if (run.results) return { done: true, results: run.results.map(withoutTrace) };
+  return {
+    done: false,
+    error: run.error,
+    started: run.chats.filter(Boolean).length,
+    total: run.total,
+    chats: run.chats,
+    waiting: await waitingChats(client, run.chats),
+  };
+}
+
+/** The run's chats whose agent is waiting on a question, with the questions (answer with aeon_answer). */
+async function waitingChats(client: AeonClient, chats: (string | undefined)[]): Promise<Json[]> {
+  const asked = await Promise.all(
+    chats
+      .filter((chatId): chatId is string => !!chatId)
+      .map(async (chatId) => ({
+        chatId,
+        questions: await questions(client, chatId).catch(() => []),
+      })),
+  );
+  return asked.filter((item) => item.questions.length > 0);
+}
+
+async function converseTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
+  const chatId = String(args.chatId);
+  if (name === "aeon_send")
+    return send(client, chatId, String(args.message), { steer: args.steer === true });
+  if (name === "aeon_answer")
+    return answer(
+      client,
+      chatId,
+      String(args.answer),
+      typeof args.questionId === "string" ? args.questionId : undefined,
+    );
+  return waitForChange(client, chatId, {
+    ...(typeof args.since === "number" ? { since: args.since } : {}),
+    timeoutMs: Number(args.timeoutSeconds ?? 50) * 1000,
+  });
 }
 
 async function chatTool(client: AeonClient, name: string, args: Json): Promise<unknown> {

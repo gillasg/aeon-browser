@@ -137,8 +137,24 @@ function handleOpenChat(
   const known = Boolean(
     service.getChat(request.data.chatId as Parameters<ChatService["getChat"]>[0]),
   );
-  const browsers = known ? browser.openChatTab(request.data.chatId, request.data.active) : 0;
-  socket.send(JSON.stringify({ kind: "core.chat.opened", chatId: request.data.chatId, browsers }));
+  const { chatId, active, typed } = request.data;
+  if (known && typed) {
+    void browser.openTypedChat(chatId, typed).then((result) =>
+      socket.send(
+        JSON.stringify({
+          kind: "core.chat.opened",
+          chatId,
+          browsers: result.ok ? 1 : 0,
+          typed: result.ok,
+          ...(result.recording !== undefined ? { recording: result.recording } : {}),
+          ...(result.error ? { error: result.error } : {}),
+        }),
+      ),
+    );
+    return true;
+  }
+  const browsers = known ? browser.openChatTab(chatId, active) : 0;
+  socket.send(JSON.stringify({ kind: "core.chat.opened", chatId, browsers }));
   return true;
 }
 

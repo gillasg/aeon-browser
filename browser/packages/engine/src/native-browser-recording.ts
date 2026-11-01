@@ -18,6 +18,8 @@ interface Recording {
   fps: number;
   /** Capture time (s) of the last screencast frame sent to the encoder. */
   lastSent: number;
+  /** Attached for this recording alone (a page no chat drives, like Aeon's own chat tab). */
+  direct: boolean;
 }
 const recordings = new Map<number, Recording>();
 
@@ -31,6 +33,8 @@ export interface TakeTab {
   startedAt: number;
   error?: string;
   stopped?: Record<string, unknown>;
+  /** The chat's own tab (the prompt and the answer), not a page the agent drove. */
+  chat?: boolean;
   /** When the take stopped or failed (for dropping uncollected takes). */
   endedAt?: number;
 }
@@ -92,8 +96,9 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
     .sendMessage(tabId, { kind: "browserkit.recording", recording: true })
     .catch(() => undefined);
   try {
+    const direct = value.direct === true;
     const captured = await startTabCapture(tabId, options);
-    const result = captured.ok ? captured : await startScreencast(tabId, options);
+    const result = captured.ok ? captured : await startScreencast(tabId, options, direct);
     if (!result.ok) throw new Error("RECORDING_FAILED: " + result.error);
     const mode = captured.ok ? "tab" : "screencast";
     recordings.set(tabId, {
@@ -102,6 +107,7 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
       startedAt: Date.now(),
       fps: options.fps,
       lastSent: 0,
+      direct: !captured.ok && direct,
     });
     return {
       mode,
@@ -141,9 +147,37 @@ async function startTabCapture(
   }
 }
 
+/**
+ * A debugger command for the recording. Agent tabs go through the chat's session; a direct
+ * recording attaches on its own (no chat owns the tab, so no agent can drive it through this).
+ */
+async function debug(
+  tabId: number,
+  direct: boolean,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<unknown> {
+  if (!direct)
+    return withBrowserDebugger(tabId, (debuggee) =>
+      chrome.debugger.sendCommand(debuggee, method, params),
+    );
+  return chrome.debugger.sendCommand({ tabId }, method, params);
+}
+
+async function attachDirect(tabId: number): Promise<void> {
+  await chrome.debugger.attach({ tabId }, "1.3").catch((error: unknown) => {
+    if (!/already attached/i.test(String(error))) throw error;
+  });
+  // Paint as if focused, so a background tab keeps producing frames.
+  await chrome.debugger
+    .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true })
+    .catch(() => undefined);
+}
+
 async function startScreencast(
   tabId: number,
   options: { format: string; fps: number },
+  direct: boolean,
 ): Promise<Started> {
   const started = (await toOffscreen({
     target: OFFSCREEN,
@@ -155,15 +189,14 @@ async function startScreencast(
   })) as Started;
   if (!started.ok) return started;
   beginManualScreencast(tabId);
-  await withBrowserDebugger(tabId, (debuggee) =>
-    chrome.debugger.sendCommand(debuggee, "Page.startScreencast", {
-      format: "jpeg",
-      quality: 85,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      everyNthFrame: 1,
-    }),
-  );
+  if (direct) await attachDirect(tabId);
+  await debug(tabId, direct, "Page.startScreencast", {
+    format: "jpeg",
+    quality: 85,
+    maxWidth: 1920,
+    maxHeight: 1080,
+    everyNthFrame: 1,
+  });
   return started;
 }
 
@@ -195,9 +228,8 @@ async function finish(tabId: number): Promise<void> {
   recordings.delete(tabId);
   setTabRecording(tabId, undefined);
   if (entry?.mode === "screencast")
-    await withBrowserDebugger(tabId, (debuggee) =>
-      chrome.debugger.sendCommand(debuggee, "Page.stopScreencast", {}),
-    ).catch(() => undefined);
+    await debug(tabId, entry.direct, "Page.stopScreencast", {}).catch(() => undefined);
+  if (entry?.direct) await chrome.debugger.detach({ tabId }).catch(() => undefined);
   await endManualScreencast(tabId);
   void chrome.tabs
     .sendMessage(tabId, { kind: "browserkit.recording", recording: false })

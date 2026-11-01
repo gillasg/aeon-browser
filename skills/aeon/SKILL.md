@@ -45,6 +45,14 @@ the agent stops using tools and answers with what it has (`aeon_run` takes `budg
 `routine` or `unknown`. Over MCP (`aeon mcp`, stdio): `aeon_run` returns a run id for
 `aeon_run_status` and `aeon_result`; `aeon_search` searches chats.
 
+**Keep talking to a chat.** `aeon send <chatId> "<message>"` adds a message (a follow-up while it
+works, `--steer` to change the current turn, a new turn when idle; `--wait` follows it). When the
+chat's agent asks something, `aeon watch <chatId>` prints it (`{question}` with its id, kind and
+choices) alongside each new step and the final answer, as JSON lines; reply with
+`aeon answer <chatId> "<answer>"` (yes/no for confirm, a choice or its number for select). Over
+MCP: `aeon_send`, `aeon_answer`, and `aeon_wait` (blocks until new steps, a question or the end;
+pass back `steps` as `since`); `aeon_run_status` lists chats waiting on a question.
+
 ## Which way to do it
 
 - **Act on a page** (click, fill, submit, read what is on screen): browser control. `aeon repl`

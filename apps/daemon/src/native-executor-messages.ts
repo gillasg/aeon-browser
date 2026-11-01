@@ -41,6 +41,7 @@ export function attachNativeExecutor(
     if (handleExecutorHeartbeat(candidate, socket, executor)) return;
     if (handleInventory(socket, candidate, executor, inventories, state, browserControl)) return;
     if (browserControl.handleExecutorResult(candidate, socket)) return;
+    if (browserControl.handleChatTyped(candidate)) return;
     if (handleAgentSettingsReply(candidate)) return;
     if (handleBlockedSitesReply(candidate)) return;
     if (handleCompanionMessage(socket, candidate, { service, browserControl })) return;
