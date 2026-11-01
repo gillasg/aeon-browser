@@ -254,14 +254,18 @@ export function showAgentCaption(debuggee: chrome.debugger.Debuggee, caption: st
 }
 
 // Tabs being recorded on video: nothing of ours is drawn, or only the cursor when asked for.
-const recording = new Map<number, { cursor: boolean }>();
-export function setTabRecording(tabId: number, state: { cursor: boolean } | undefined): void {
+const recording = new Map<number, { cursor: boolean; pill?: boolean }>();
+/** cursor: Aeon's cursor shows in the recording; pill: its pill, callouts and keys too (no glow). */
+export function setTabRecording(
+  tabId: number,
+  state: { cursor: boolean; pill?: boolean } | undefined,
+): void {
   if (state) recording.set(tabId, state);
   else recording.delete(tabId);
   if (state && !state.cursor) void removeAgentCursor(tabId);
   if (state?.cursor) updateAgentCursor({ tabId }, { glow: false });
 }
-export function tabRecording(tabId: number): { cursor: boolean } | undefined {
+export function tabRecording(tabId: number): { cursor: boolean; pill?: boolean } | undefined {
   return recording.get(tabId);
 }
 
@@ -345,7 +349,8 @@ export function showAgentKeys(debuggee: chrome.debugger.Debuggee, keys: string[]
 function updateAgentCursor(debuggee: chrome.debugger.Debuggee, update: CursorUpdate): void {
   const recorded = debuggee.tabId === undefined ? undefined : recording.get(debuggee.tabId);
   if (recorded && !recorded.cursor) return;
-  if (recorded) update = { ...update, clean: true, glow: false };
+  if (recorded)
+    update = recorded.pill ? { ...update, glow: false } : { ...update, clean: true, glow: false };
   void engineConfig
     .hideAgentCursor()
     .catch(() => false)

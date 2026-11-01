@@ -23,13 +23,20 @@ async function recordAgentTab(tabId: number): Promise<void> {
   const chatId = browserSessionOwner(tabId);
   if (!chatId || !(await engineConfig.recordAgentTabs().catch(() => false))) return;
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-  const take = { chatId, url: tab?.url ?? "", startedAt: Date.now() };
+  const take = { chatId, url: tab?.url ?? "", startedAt: Date.now(), ...tabLook(tab) };
   takeTabs.set(tabId, take);
   // An idle detach would end the screencast mid-take: keep the debugger on while it records.
   holdBrowserDebugger(tabId, true);
-  await startRecording(tabId, { fps: 30 }).catch((error: unknown) => {
-    takeTabs.set(tabId, { ...take, error: String(error instanceof Error ? error.message : error) });
-  });
+  // With "Hide agent cursor" off, the take shows Aeon's own cursor and pill (never the glow).
+  const shown = !(await engineConfig.hideAgentCursor().catch(() => true));
+  await startRecording(tabId, { fps: 30, ...(shown ? { cursor: true, pill: true } : {}) }).catch(
+    (error: unknown) => {
+      takeTabs.set(tabId, {
+        ...take,
+        error: String(error instanceof Error ? error.message : error),
+      });
+    },
+  );
 }
 
 /**
@@ -50,7 +57,20 @@ export async function recordChatTab(tabId: number, chatId: string): Promise<bool
   }
 }
 
+function tabLook(tab: chrome.tabs.Tab | undefined): { title?: string; favicon?: string } {
+  return {
+    ...(tab?.title ? { title: tab.title.slice(0, 200) } : {}),
+    ...(tab?.favIconUrl && /^https?:/.test(tab.favIconUrl) ? { favicon: tab.favIconUrl } : {}),
+  };
+}
+
 onEngineInstall(() => {
+  // A take keeps its tab's latest title and favicon, for a recorder drawing the tab.
+  chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
+    const take = takeTabs.get(tabId);
+    if (take && !take.chat && (change.title || change.favIconUrl))
+      Object.assign(take, tabLook(tab));
+  });
   // Started after the attach finishes: the recording itself needs the debugger.
   onBrowserDebuggerAttached((tabId) => {
     setTimeout(() => void recordAgentTab(tabId), 0);
