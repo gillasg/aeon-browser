@@ -69,12 +69,13 @@ export function createProductionRuntime(dataDirectory: string): {
     const title = chat.title.trim().slice(0, 80) || "Chat";
     return chat.origin === "routine" ? `Routine · ${title}` : title;
   });
-  // An interactive chat keeps tabs in the user's window; routines and outside sessions get their
-  // own background window, so their work never takes over the user's tabs.
+  // An Aeon agent chat keeps its tabs in the user's window, however it was started (the panel,
+  // `aeon run`, MCP's aeon_run, another chat). Routines, other extensions and outside tool sessions
+  // (`aeon tool`, MCP's browser_code) get their own background window.
   browserControl.useDefaultSpaces((chatId) => {
     const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
     if (!chat) return "window";
-    return chat.origin === "user" || chat.origin === "agent" ? "tabs" : "window";
+    return ["user", "agent", "cli", "mcp"].includes(chat.origin) ? "tabs" : "window";
   });
   service.setExternalContextReader(() =>
     outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),

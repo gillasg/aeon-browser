@@ -76,12 +76,27 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
   const request = message as { kind?: string; chatId?: string; text?: unknown } | null;
   if (request?.kind !== "aeon.chat.type" || request.chatId !== chatId) return;
   if (typeof request.text !== "string") return;
+  cameraColumn();
   void composer.typeForCamera(request.text).then(
     () => sendResponse({ typed: true }),
     () => sendResponse({ typed: false }),
   );
   return true;
 });
+/**
+ * On camera the chat draws as one centred column (as narrow as the side panel's), so a demo can
+ * show it beside a page without cropping. The first click or key from the user restores it.
+ */
+function cameraColumn(): void {
+  document.documentElement.classList.add("camera-column");
+  const restore = () => {
+    document.documentElement.classList.remove("camera-column");
+    removeEventListener("pointerdown", restore, true);
+    removeEventListener("keydown", restore, true);
+  };
+  addEventListener("pointerdown", restore, true);
+  addEventListener("keydown", restore, true);
+}
 let userControl: { tabId: number } | null = null;
 function giveBack(tabId: number): void {
   void chrome.runtime.sendMessage({ kind: "browserkit.control.giveback", tabId });
