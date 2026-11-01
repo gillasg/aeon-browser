@@ -22,7 +22,7 @@ export function dataDirectory(): string {
 export class AeonClient {
   private readonly waiting = new Map<string, (message: Json) => void>();
   private readonly attentionListeners = new Set<(chats: AttentionChat[]) => void>();
-  private openWaiters = new Map<string, (browsers: number) => void>();
+  private openWaiters = new Map<string, (reply: Json) => void>();
   private pinger: ReturnType<typeof setInterval> | undefined;
 
   private constructor(private readonly socket: WebSocket) {
@@ -218,8 +218,28 @@ export class AeonClient {
   /** Shows a chat as a tab in the connected Chrome; resolves with how many browsers were asked. */
   openChat(chatId: string, active = false): Promise<number> {
     return new Promise((resolve) => {
-      this.openWaiters.set(chatId, resolve);
+      this.openWaiters.set(chatId, (reply) => resolve(Number(reply.browsers)));
       this.socket.send(JSON.stringify({ kind: "core.chat.open", chatId, active }));
+    });
+  }
+
+  /**
+   * Opens the chat's tab and types the prompt into its composer on camera; resolves once it is
+   * typed. The caller still submits the prompt (it is never the user's own typing).
+   */
+  openTypedChat(
+    chatId: string,
+    prompt: string,
+  ): Promise<{ typed: boolean; recording: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      this.openWaiters.set(chatId, (reply) =>
+        resolve({
+          typed: reply.typed === true,
+          recording: reply.recording === true,
+          ...(typeof reply.error === "string" ? { error: reply.error } : {}),
+        }),
+      );
+      this.socket.send(JSON.stringify({ kind: "core.chat.open", chatId, typed: prompt }));
     });
   }
 
@@ -300,7 +320,7 @@ export class AeonClient {
     }
     if (message.kind === "core.chat.opened") {
       const chatId = String(message.chatId);
-      this.openWaiters.get(chatId)?.(Number(message.browsers));
+      this.openWaiters.get(chatId)?.(message);
       this.openWaiters.delete(chatId);
       return;
     }

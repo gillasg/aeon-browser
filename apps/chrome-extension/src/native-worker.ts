@@ -376,11 +376,11 @@ async function sendNativeBootstrap(identity: BrowserIdentity) {
 }
 
 /** Messages core sends on its own: attention, companion results, chats to open. */
-function handleCoreMessage(candidate: unknown): boolean {
+function handleCoreMessage(candidate: unknown, socket: WebSocket): boolean {
   return (
     handleCoreAttentionMessage(candidate) ||
     handleCompanionResult(candidate) ||
-    handleOpenChatMessage(candidate)
+    handleOpenChatMessage(candidate, socket)
   );
 }
 
@@ -444,7 +444,7 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
     return;
   }
   ackBrowserCodeRun(connection.socket, candidate);
-  if (handleCoreMessage(candidate)) return;
+  if (handleCoreMessage(candidate, connection.socket)) return;
   if (handleNativeSettings(candidate, connection.socket)) return;
   if (handleHeartbeatMessage(connection, candidate)) return;
   if (BrowserInventoryReplySchema.safeParse(candidate).success) return;

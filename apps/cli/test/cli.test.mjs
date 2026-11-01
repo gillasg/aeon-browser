@@ -103,6 +103,9 @@ test("the MCP server lists its tools without a running Aeon", async () => {
     [
       "aeon_run",
       "aeon_run_status",
+      "aeon_send",
+      "aeon_answer",
+      "aeon_wait",
       "aeon_result",
       "aeon_stop",
       "aeon_trace",

@@ -157,6 +157,29 @@ export class ChatComposerController {
     return this.sendMessage(text, "followUp", false);
   }
 
+  /**
+   * aeon run --typed: types a prompt into the composer at a person's pace, for screen recordings,
+   * then clears it as if sent. It never submits: the caller sends the prompt itself, so a typed
+   * prompt never counts as the user's own.
+   */
+  async typeForCamera(text: string): Promise<void> {
+    const show = (value: string) => {
+      // An empty chat shows the start box (its "aeon.home.seed" event), a running one the composer.
+      window.dispatchEvent(new CustomEvent("aeon.home.seed", { detail: value }));
+      this.editDraftInsertion = { id: ++this.editDraftId, text: value };
+      this.onChange();
+    };
+    const per = Math.min(55, 4200 / Math.max(1, text.length));
+    for (let i = 1; i <= text.length; i++) {
+      show(text.slice(0, i));
+      // Slightly uneven keystrokes, a little longer after spaces and punctuation.
+      const pause = /[\s,.?!]/.test(text[i - 1] ?? "") ? 1.6 : 0.7 + Math.random() * 0.6;
+      await new Promise((resolve) => setTimeout(resolve, per * pause));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    show("");
+  }
+
   loadEditDraft(
     text: string,
     attachments: readonly PiAttachmentDto[],

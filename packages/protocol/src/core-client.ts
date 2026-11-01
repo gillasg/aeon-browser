@@ -85,6 +85,8 @@ export const CoreOpenChatRequestSchema = z
     kind: z.literal("core.chat.open"),
     chatId: z.string().uuid(),
     active: z.boolean().optional(),
+    /** Type this prompt into the chat's composer on camera before it is sent (aeon run --typed). */
+    typed: z.string().min(1).max(8000).optional(),
   })
   .strict();
 export const CoreOpenChatReplySchema = z
@@ -92,6 +94,10 @@ export const CoreOpenChatReplySchema = z
     kind: z.literal("core.chat.opened"),
     chatId: z.string().uuid(),
     browsers: z.number().int().nonnegative(),
+    /** typed: whether the prompt was typed into the chat's composer, and why not. */
+    typed: z.boolean().optional(),
+    recording: z.boolean().optional(),
+    error: z.string().max(2000).optional(),
   })
   .strict();
 /** A local client (the Aeon CLI/MCP) stops a running chat. */
@@ -117,6 +123,18 @@ export const NativeOpenChatSchema = z
     kind: z.literal("native.chat.open"),
     chatId: z.string().uuid(),
     active: z.boolean(),
+    typed: z.string().min(1).max(8000).optional(),
+  })
+  .strict();
+/** The extension typed a prompt into a chat's composer (native.chat.open with typed). */
+export const NativeChatTypedSchema = z
+  .object({
+    kind: z.literal("native.chat.typed"),
+    chatId: z.string().uuid(),
+    ok: z.boolean(),
+    /** The chat tab is recording as one of the chat's takes. */
+    recording: z.boolean().optional(),
+    error: z.string().max(2000).optional(),
   })
   .strict();
 

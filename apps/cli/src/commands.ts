@@ -6,6 +6,7 @@ import { COMMANDS as BROWSERKIT_COMMANDS } from "browserkit/dist/commands/index.
 import { flag, has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
 import { blockedCommands } from "./blocked.js";
+import { converseCommands } from "./converse-commands.js";
 import { browserCommands } from "./browser-commands.js";
 import { providerCommands } from "./provider-commands.js";
 import { dataDirectory } from "./client.js";
@@ -52,6 +53,7 @@ function runOptions(args: Args): Omit<RunOptions, "origin" | "onProgress" | "onS
   return {
     parallel: Math.max(1, Math.min(20, Number(flag(args, "parallel") ?? 5))),
     quiet: has(args, "quiet"),
+    ...(has(args, "typed") ? { typed: true } : {}),
     ...(model && provider && id.length ? { model: { provider, id: id.join("/") } } : {}),
     ...(thinking ? { thinkingLevel: thinking } : {}),
     timeoutMs: Number(flag(args, "timeout") ?? 20) * 60_000,
@@ -442,7 +444,10 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       summary: "run tasks as Aeon chats",
       help: `Usage: aeon run "<task>" ["<task>" ...] [--file tasks.txt|json] [--parallel 5]
        [--quiet] [--model provider/id] [--thinking level] [--timeout 20] [--json]
-       [--max-steps n] [--max-minutes m] [--max-cost usd]
+       [--max-steps n] [--max-minutes m] [--max-cost usd] [--typed]
+
+--typed types each prompt into its chat's composer on camera before sending it (for screen
+recordings; with the recordAgentTabs setting on, the chat tab is recorded too).
 
 The limits apply to each chat: when one is reached the agent stops using tools and answers
 with what it has.`,
@@ -473,6 +478,7 @@ with what it has.`,
 function chatToolCommands(host: DaemonHost): Command[] {
   return [
     stopCommand(host),
+    ...converseCommands(host),
     {
       name: "review",
       group: "Aeon",

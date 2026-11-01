@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import {
   BrowserExecutorRequestSchema,
+  NativeChatTypedSchema,
   BrowserPopupSchema,
   BrowserOperationResultSchema,
   type BrowserExecutorResult,
@@ -295,6 +296,46 @@ export class BrowserControlService {
     const socket = [...this.executors.values()].find((item) => item.readyState === WebSocket.OPEN);
     if (!socket) throw new Error("BROWSER_OFFLINE: no browser connected");
     socket.send(JSON.stringify(body));
+  }
+  private typing = new Map<
+    string,
+    (result: { ok: boolean; recording?: boolean; error?: string }) => void
+  >();
+  /**
+   * aeon run --typed: one browser opens the chat's tab and types the prompt into its composer;
+   * resolves once it is typed (the caller then submits it, so it never counts as the user typing).
+   */
+  openTypedChat(
+    chatId: string,
+    typed: string,
+  ): Promise<{ ok: boolean; recording?: boolean; error?: string }> {
+    const socket = [...this.executors.values()].find((item) => item.readyState === WebSocket.OPEN);
+    if (!socket)
+      return Promise.resolve({ ok: false, error: "BROWSER_OFFLINE: no browser connected" });
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.typing.delete(chatId);
+        resolve({ ok: false, error: "TIMEOUT: the chat tab did not type the prompt in 45 s" });
+      }, 45_000);
+      this.typing.set(chatId, (result) => {
+        clearTimeout(timer);
+        this.typing.delete(chatId);
+        resolve(result);
+      });
+      socket.send(JSON.stringify({ kind: "native.chat.open", chatId, active: false, typed }));
+    });
+  }
+  /** The extension's native.chat.typed answer to openTypedChat. */
+  handleChatTyped(candidate: unknown): boolean {
+    const message = NativeChatTypedSchema.safeParse(candidate);
+    if (!message.success) return false;
+    const { ok, recording, error } = message.data;
+    this.typing.get(message.data.chatId)?.({
+      ok,
+      ...(recording !== undefined ? { recording } : {}),
+      ...(error !== undefined ? { error } : {}),
+    });
+    return true;
   }
   /** Ask every connected browser to show a chat as a tab; returns how many were asked. */
   openChatTab(chatId: string, active = false): number {
