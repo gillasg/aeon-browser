@@ -38,6 +38,14 @@ body {
   overflow: hidden;
   background: var(--canvas);
 }
+/* aeon run --typed: the chat filmed as one centred column (chat-page.ts cameraColumn). */
+html.camera-column {
+  background: var(--canvas);
+}
+html.camera-column body {
+  width: 760px;
+  margin: 0 auto;
+}
 button,
 input,
 textarea {

@@ -104,8 +104,7 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
   try {
     const direct = value.direct === true;
     const captured = await startTabCapture(tabId, options);
-    const width = direct && Number(value.width) > 0 ? Math.round(Number(value.width)) : undefined;
-    const result = captured.ok ? captured : await startScreencast(tabId, options, direct, width);
+    const result = captured.ok ? captured : await startScreencast(tabId, options, direct);
     if (!result.ok) throw new Error("RECORDING_FAILED: " + result.error);
     const mode = captured.ok ? "tab" : "screencast";
     recordings.set(tabId, {
@@ -185,7 +184,6 @@ async function startScreencast(
   tabId: number,
   options: { format: string; fps: number },
   direct: boolean,
-  width?: number,
 ): Promise<Started> {
   const started = (await toOffscreen({
     target: OFFSCREEN,
@@ -198,17 +196,6 @@ async function startScreencast(
   if (!started.ok) return started;
   beginManualScreencast(tabId);
   if (direct) await attachDirect(tabId);
-  // A narrower layout for this recording alone (Aeon's chat beside a page); the detach at the end
-  // puts the tab back.
-  if (direct && width)
-    await chrome.debugger
-      .sendCommand({ tabId }, "Emulation.setDeviceMetricsOverride", {
-        width,
-        height: 0,
-        deviceScaleFactor: 0,
-        mobile: false,
-      })
-      .catch(() => undefined);
   await debug(tabId, direct, "Page.startScreencast", {
     format: "jpeg",
     quality: 85,

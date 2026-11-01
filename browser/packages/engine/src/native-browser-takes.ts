@@ -39,8 +39,6 @@ async function recordAgentTab(tabId: number): Promise<void> {
   );
 }
 
-const CHAT_WIDTH = 720;
-
 /**
  * Records a chat's own tab (Aeon's chat page) as one of the chat's takes, so a screen recorder
  * gets the prompt being typed and the answer alongside the pages. Only while recordAgentTabs is on.
@@ -51,8 +49,7 @@ export async function recordChatTab(tabId: number, chatId: string): Promise<bool
   const take = { chatId, url: "chat", startedAt: Date.now(), chat: true };
   takeTabs.set(tabId, take);
   try {
-    // Laid out like a chat column, so it sits beside a page in a split without cropping.
-    await startRecording(tabId, { fps: 30, direct: true, width: CHAT_WIDTH });
+    await startRecording(tabId, { fps: 30, direct: true });
     return true;
   } catch (error) {
     takeTabs.set(tabId, { ...take, error: String(error instanceof Error ? error.message : error) });
