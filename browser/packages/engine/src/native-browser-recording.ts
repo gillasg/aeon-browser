@@ -37,6 +37,9 @@ export interface TakeTab {
   chat?: boolean;
   /** When the take stopped or failed (for dropping uncollected takes). */
   endedAt?: number;
+  /** The tab's latest title and favicon (http only), so a recorder can draw its tab. */
+  title?: string;
+  favicon?: string;
 }
 export const takeTabs = new Map<number, TakeTab>();
 
@@ -91,7 +94,10 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
     format: value.format === "webm" ? "webm" : "mp4",
     fps: Math.max(5, Math.min(60, Number(value.fps) || 30)),
   };
-  setTabRecording(tabId, { cursor: value.cursor === true });
+  setTabRecording(tabId, {
+    cursor: value.cursor === true,
+    ...(value.pill === true ? { pill: true } : {}),
+  });
   void chrome.tabs
     .sendMessage(tabId, { kind: "browserkit.recording", recording: true })
     .catch(() => undefined);

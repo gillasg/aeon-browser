@@ -250,7 +250,7 @@ var browser = Object.freeze({
         await __call({workspace: offset ? 'append' : 'artifact', name: file, value: part.base64, base64: true});
       }
     } finally { await __call({takes: 'drop', tabId}).catch(() => {}); }
-    return {saved: file, chatId: take.chatId, url: take.url, ...(take.chat ? {chat: true} : {}), mode: done.mode, bytes: done.bytes, ms: done.ms, firstFrameAt: done.firstFrameAt, width: done.width, height: done.height};
+    return {saved: file, chatId: take.chatId, url: take.url, ...(take.chat ? {chat: true} : {}), ...(take.title ? {title: take.title} : {}), ...(take.favicon ? {favicon: take.favicon} : {}), mode: done.mode, bytes: done.bytes, ms: done.ms, firstFrameAt: done.firstFrameAt, width: done.width, height: done.height};
   },
   dropTake: async (tabId) => __call({takes: 'drop', tabId}),
   // The chat's workspace, read as well as written: a path is relative to the session's folder and
