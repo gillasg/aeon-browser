@@ -152,13 +152,23 @@ function frame(tabId: number, data: string, capturedAt: number): Promise<unknown
     return Promise.resolve(false);
   }
   cast.waiting++;
-  const jpeg = new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], {
-    type: "image/jpeg",
-  });
+  const jpeg = new Blob([fromBase64(data)], { type: "image/jpeg" });
   cast.chain = cast.chain
     .then(() => place(recording, cast, createImageBitmap(jpeg), capturedAt))
     .finally(() => cast.waiting--);
   return Promise.resolve(true);
+}
+
+// Native base64 decoding: a character-by-character copy takes ~15 ms a frame, enough on its own
+// for two tabs at 30 fps to fall behind.
+const nativeBase64 = (Uint8Array as unknown as { fromBase64?: (text: string) => Uint8Array })
+  .fromBase64;
+function fromBase64(data: string): Uint8Array<ArrayBuffer> {
+  if (nativeBase64) return nativeBase64.call(Uint8Array, data) as Uint8Array<ArrayBuffer>;
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 async function place(
