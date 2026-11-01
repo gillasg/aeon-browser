@@ -93,6 +93,13 @@ export const EFFECTS = [
     errors: ["UNSUPPORTED", "INVALID_INPUT"],
   },
   {
+    name: "tab.takes",
+    call: "browser.takes(chatId?), browser.saveTake(tabId, name), browser.dropTake(tabId)",
+    does: "the recordings the recordAgentTabs setting made of chats' tabs, saved to the workspace; one nobody collects is dropped 30 minutes after it stops",
+    needs: [],
+    errors: ["INVALID_INPUT"],
+  },
+  {
     name: "net.capture",
     call: "page.network.list/waitFor/get/body/save, page.replay()",
     does: "the tab's recorded requests, and replaying one",

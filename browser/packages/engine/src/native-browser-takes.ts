@@ -1,0 +1,79 @@
+// Takes: while the recordAgentTabs setting is on, every tab a chat drives is recorded from the
+// moment the engine attaches to it, with nothing of ours drawn on it. A screen recorder
+// switches the setting on for a run, then lists the recordings with browser.takes() and saves them
+// with browser.saveTake(); with the run's trace they make a take it can edit. Keep it.
+import { toOffscreen } from "./code-offscreen-host.js";
+import { engineConfig } from "./engine-config.js";
+import { startRecording, stopTake, takeTabs } from "./native-browser-recording.js";
+import { browserSessionOwner, onBrowserDebuggerAttached } from "./native-browser-session.js";
+import { onEngineInstall } from "./native-engine-install.js";
+
+const OFFSCREEN = "aeon-code-offscreen";
+const SLICE = 750_000;
+/** A take nobody saved is dropped this long after its tab closed or its recording stopped. */
+const KEEP_MS = 30 * 60_000;
+
+async function recordAgentTab(tabId: number): Promise<void> {
+  void sweep();
+  if (takeTabs.has(tabId)) return;
+  const chatId = browserSessionOwner(tabId);
+  if (!chatId || !(await engineConfig.recordAgentTabs().catch(() => false))) return;
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  const take = { chatId, url: tab?.url ?? "", startedAt: Date.now() };
+  takeTabs.set(tabId, take);
+  await startRecording(tabId, { fps: 30 }).catch((error: unknown) => {
+    takeTabs.set(tabId, { ...take, error: String(error instanceof Error ? error.message : error) });
+  });
+}
+
+onEngineInstall(() => {
+  // Started after the attach finishes: the recording itself needs the debugger.
+  onBrowserDebuggerAttached((tabId) => {
+    setTimeout(() => void recordAgentTab(tabId), 0);
+  });
+});
+
+async function dropTake(tabId: number): Promise<unknown> {
+  takeTabs.delete(tabId);
+  return toOffscreen({ target: OFFSCREEN, kind: "recordDrop", tabId });
+}
+
+/** Drops takes that stopped long ago, and stops the ones still running once the setting is off. */
+async function sweep(): Promise<void> {
+  const on = await engineConfig.recordAgentTabs().catch(() => false);
+  for (const [tabId, take] of takeTabs) {
+    if (!on && !take.stopped && !take.error) await stopTake(tabId);
+    const ended = take.endedAt ?? (take.stopped || take.error ? Date.now() : undefined);
+    if (ended !== undefined) take.endedAt = ended;
+    if (ended !== undefined && Date.now() - ended > KEEP_MS)
+      await dropTake(tabId).catch(() => undefined);
+  }
+}
+
+export async function takesCall(value: Record<string, unknown>): Promise<unknown> {
+  await sweep();
+  const tabId = Number(value.tabId);
+  if (value.takes === "list") {
+    const chatId = typeof value.chatId === "string" ? value.chatId : undefined;
+    return (
+      [...takeTabs]
+        // A tab another chat adopted mid-recording belongs to both.
+        .filter(
+          ([id, take]) => !chatId || take.chatId === chatId || browserSessionOwner(id) === chatId,
+        )
+        .map(([id, take]) => ({ tabId: id, ...take, recording: !take.stopped && !take.error }))
+    );
+  }
+  if (!takeTabs.has(tabId)) throw new Error("INVALID_INPUT: no take for that tab");
+  if (value.takes === "stop") return stopTake(tabId);
+  if (value.takes === "read")
+    return toOffscreen({
+      target: OFFSCREEN,
+      kind: "recordRead",
+      tabId,
+      offset: Number(value.offset) || 0,
+      size: SLICE,
+    });
+  if (value.takes === "drop") return dropTake(tabId);
+  throw new Error("INVALID_INPUT: takes is list, stop, read or drop");
+}

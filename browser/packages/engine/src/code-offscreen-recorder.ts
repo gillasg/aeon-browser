@@ -13,6 +13,8 @@ interface Recording {
   canvas?: HTMLCanvasElement;
   audio?: AudioContext;
   screencast?: Screencast;
+  /** Wall-clock ms when the encoder started (tab capture), to line a take's trace up with the video. */
+  startedWall?: number;
 }
 
 // A screencast recording places every frame at the moment the page captured it, not when it
@@ -122,6 +124,7 @@ function begin(recording: Recording, stream: MediaStream): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("MediaRecorder did not start")), 5000);
     recorder.onstart = () => {
+      recording.startedWall = Date.now();
       clearTimeout(timer);
       resolve();
     };
@@ -254,7 +257,24 @@ async function stop(tabId: number): Promise<unknown> {
   const mimeType = recorder.mimeType || recording.mimeType || "video/webm";
   recording.blob = new Blob(recording.chunks, { type: mimeType });
   recording.chunks = [];
-  return { ok: true, bytes: recording.blob.size, mimeType, ...(frames ? { frames } : {}) };
+  return {
+    ok: true,
+    bytes: recording.blob.size,
+    mimeType,
+    ...(frames ? { frames } : {}),
+    ...clipTiming(recording),
+  };
+}
+
+/** When the clip's first frame was captured (epoch ms) and its size: a take aligns its trace to it. */
+function clipTiming(recording: Recording): Record<string, number | undefined> {
+  const canvas = recording.canvas;
+  const track = recording.stream?.getVideoTracks()[0]?.getSettings();
+  return {
+    firstFrameAt: recording.screencast?.origin?.capture ?? recording.startedWall,
+    width: canvas?.width ?? track?.width,
+    height: canvas?.height ?? track?.height,
+  };
 }
 
 async function finishRecorder(recording: Recording, recorder: MediaRecorder): Promise<void> {

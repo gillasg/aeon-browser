@@ -235,6 +235,24 @@ var browser = Object.freeze({
     try { return await __call({fetch: {...request, url: String(url)}}); }
     catch (error) { throw __fetchFailure(error); }
   },
+  // Recordings the recordAgentTabs setting made of chats' tabs; a screen recorder saves each one
+  // with saveTake and edits them with the chat's trace.
+  takes: async (chatId) => __call({takes: 'list', ...(chatId ? {chatId: String(chatId)} : {})}),
+  saveTake: async (tabId, name) => {
+    var take = await __call({takes: 'stop', tabId});
+    var done = take && take.stopped;
+    if (!done) throw Error('RECORDING_FAILED: ' + ((take && take.error) || 'no video'));
+    var base = String(name || 'take-' + tabId).replace(/[^A-Za-z0-9._-]+/g, '-');
+    var file = /[.](mp4|webm)$/.test(base) ? base : base + (String(done.mimeType).includes('mp4') ? '.mp4' : '.webm');
+    try {
+      for (var offset = 0; offset < done.bytes; offset += 750000) {
+        var part = await __call({takes: 'read', tabId, offset});
+        await __call({workspace: offset ? 'append' : 'artifact', name: file, value: part.base64, base64: true});
+      }
+    } finally { await __call({takes: 'drop', tabId}).catch(() => {}); }
+    return {saved: file, chatId: take.chatId, url: take.url, mode: done.mode, bytes: done.bytes, ms: done.ms, firstFrameAt: done.firstFrameAt, width: done.width, height: done.height};
+  },
+  dropTake: async (tabId) => __call({takes: 'drop', tabId}),
   // The chat's workspace, read as well as written: a path is relative to the session's folder and
   // can never leave it. write is artifact().
   workspace: Object.freeze({

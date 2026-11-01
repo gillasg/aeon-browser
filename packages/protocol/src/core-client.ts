@@ -234,6 +234,7 @@ export const AgentSettingsSchema = z
     agentInFront: z.boolean(),
     hideAgentCursor: z.boolean(),
     agentTabView: z.enum(["auto", "split", "thumbnails"]),
+    recordAgentTabs: z.boolean().default(false),
   })
   .strict();
 export type AgentSettings = z.infer<typeof AgentSettingsSchema>;

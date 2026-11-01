@@ -19,6 +19,7 @@ import { isLibraryRequest, libraryCall } from "./native-browser-library.js";
 import { windowsCall } from "./native-browser-windows.js";
 import { tabGroupsCall } from "./native-browser-groups.js";
 import { recordingCall } from "./native-browser-recording.js";
+import { takesCall } from "./native-browser-takes.js";
 import { settingsCall } from "./native-browser-settings.js";
 import { closeTabCall } from "./code-tab-close.js";
 import { rulesCall } from "./native-browser-rules.js";
@@ -145,6 +146,11 @@ function tabEffects(host: EffectHost): Effect<Cell>[] {
       match: has("quiet"),
       tab: inner("quiet"),
       run: (_, value, tabId = 0) => quietCall(tabId, value.quiet as { enabled?: unknown }),
+    },
+    {
+      name: "tab.takes",
+      match: named("takes"),
+      run: (_, value) => takesCall(value),
     },
     {
       name: "page.recording",

@@ -4,6 +4,7 @@ import {
   AGENT_TAB_VIEW_KEY,
   readAgentTabViewSetting,
   HIDE_AGENT_CURSOR_KEY,
+  RECORD_AGENT_TABS_KEY,
   readAgentFlag,
 } from "./agent-tab-view.js";
 
@@ -28,11 +29,13 @@ async function applySettings(set: {
   const changes: Record<string, unknown> = {};
   if (set.agentInFront !== undefined) changes[AGENT_IN_FRONT_KEY] = set.agentInFront;
   if (set.hideAgentCursor !== undefined) changes[HIDE_AGENT_CURSOR_KEY] = set.hideAgentCursor;
+  if (set.recordAgentTabs !== undefined) changes[RECORD_AGENT_TABS_KEY] = set.recordAgentTabs;
   if (set.agentTabView !== undefined) changes[AGENT_TAB_VIEW_KEY] = set.agentTabView;
   if (Object.keys(changes).length) await chrome.storage.local.set(changes);
   return {
     agentInFront: await readAgentFlag(AGENT_IN_FRONT_KEY),
     hideAgentCursor: await readAgentFlag(HIDE_AGENT_CURSOR_KEY),
     agentTabView: await readAgentTabViewSetting(),
+    recordAgentTabs: await readAgentFlag(RECORD_AGENT_TABS_KEY),
   };
 }

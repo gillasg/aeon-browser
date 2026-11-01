@@ -20,6 +20,36 @@ interface Recording {
   lastSent: number;
 }
 const recordings = new Map<number, Recording>();
+
+/**
+ * Tabs the recordAgentTabs setting records (native-browser-takes.ts). Their recording is stopped and
+ * kept, not cancelled, when the tab closes, so a screen recorder can still collect it.
+ */
+export interface TakeTab {
+  chatId: string;
+  url: string;
+  startedAt: number;
+  error?: string;
+  stopped?: Record<string, unknown>;
+  /** When the take stopped or failed (for dropping uncollected takes). */
+  endedAt?: number;
+}
+export const takeTabs = new Map<number, TakeTab>();
+
+/** Stops a take's recording once and remembers the result (the video stays in the offscreen document). */
+export async function stopTake(tabId: number): Promise<TakeTab | undefined> {
+  const take = takeTabs.get(tabId);
+  if (!take || take.stopped || take.error) return take;
+  try {
+    take.stopped = (await stop(tabId)) as Record<string, unknown>;
+  } catch (error) {
+    take.error = String(error instanceof Error ? error.message : error);
+  }
+  return take;
+}
+
+export const startRecording = (tabId: number, value: Record<string, unknown>): Promise<unknown> =>
+  start(tabId, value);
 const OFFSCREEN = "aeon-code-offscreen";
 const SLICE = 750_000;
 
@@ -196,6 +226,7 @@ onEngineInstall(() => {
       }).catch(() => undefined);
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
-    if (recordings.has(tabId)) void cancel(tabId);
+    if (takeTabs.has(tabId)) void stopTake(tabId);
+    else if (recordings.has(tabId)) void cancel(tabId);
   });
 });

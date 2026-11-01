@@ -19,6 +19,11 @@ export interface EngineConfig {
    */
   agentInFront: () => Promise<boolean>;
   /**
+   * Whether every tab a chat drives is recorded (native-browser-takes.ts). Off by default. Screen
+   * recorders (Aperture) switch it on for a run and collect the takes; keep it.
+   */
+  recordAgentTabs: () => Promise<boolean>;
+  /**
    * Where a new tab goes when the caller did not choose: its own background window for bulk or
    * outside work, or the user's window for an interactive chat. Hosts decide from their origin.
    */
@@ -45,6 +50,7 @@ export const engineConfig: EngineConfig = {
   tabGroupTitle: (_owner, title) => title ?? "Agent",
   agentView: () => Promise.resolve("split"),
   agentInFront: () => Promise.resolve(false),
+  recordAgentTabs: () => Promise.resolve(false),
   hideAgentCursor: async () =>
     (
       (await chrome.storage.local.get("browserkit-hide-agent-cursor").catch(() => ({}))) as Record<

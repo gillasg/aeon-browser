@@ -5,7 +5,9 @@ export type AgentTabView = "auto" | "split" | "thumbnails";
 // On/off agent settings, off by default. Screen recorders (Aperture) rely on them; keep them.
 export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
 export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
-const FLAGS = [AGENT_IN_FRONT_KEY, HIDE_AGENT_CURSOR_KEY];
+// Record every tab a chat drives, for screen recorders (Aperture) that build takes; keep it.
+export const RECORD_AGENT_TABS_KEY = "aeonRecordAgentTabs";
+const FLAGS = [AGENT_IN_FRONT_KEY, HIDE_AGENT_CURSOR_KEY, RECORD_AGENT_TABS_KEY];
 
 // The Blocked sites setting: a JSON list in page localStorage, read by the browser engine from
 // chrome.storage.local under "blocked-sites".
