@@ -19,9 +19,9 @@ interface Recording {
 
 // A screencast recording places every frame at the moment the page captured it, not when it
 // arrived here: frames decode one at a time, in order, and are drawn on a fixed delay behind
-// capture time, so a slow decode never reorders or bunches them. A frame that cannot be placed
-// (it arrived later than the delay allows, or decoding failed) is counted as lost, and a
-// recording that lost any frame fails rather than producing a choppy video.
+// capture time, so a slow decode never reorders or bunches them. A frame that arrives later than
+// the delay allows is still drawn, just late, and counted; the recording is kept and reports how
+// many frames were late (out-of-order or undecodable frames are skipped and counted as lost).
 interface Screencast {
   chain: Promise<void>;
   /** The first frame's capture time and the moment it is drawn; later frames keep that spacing. */
@@ -145,7 +145,7 @@ function frame(tabId: number, data: string, capturedAt: number): Promise<unknown
     return Promise.resolve(false);
   if (captureMs > 0) cast.lastAccepted = captureMs;
   // Frames wait compressed and decode only when their turn comes, so a fast page never piles up
-  // full-size pictures in memory; a queue longer than two seconds of video is already a failure.
+  // full-size pictures in memory; past two seconds of video waiting, new frames are skipped (lost).
   if (cast.waiting >= recording.fps * 2) {
     cast.lost++;
     cast.late++;
@@ -186,17 +186,17 @@ async function place(
   const captureMs = Number.isFinite(capturedAt) && capturedAt > 0 ? capturedAt * 1000 : Date.now();
   const origin = cast.origin ?? (await startCanvas(recording, cast, canvas, image, captureMs));
   const wait = origin.wall + (captureMs - origin.capture) - performance.now();
-  // Timer jitter under one frame is invisible; only a frame that misses its slot by more is lost.
+  // Timer jitter under one frame is invisible; a frame that misses its slot by more counts as late.
   const tolerance = 1000 / recording.fps;
-  if (captureMs < cast.lastCapture || wait < -tolerance) {
+  if (captureMs < cast.lastCapture) {
     image.close();
     cast.lost++;
-    if (captureMs < cast.lastCapture) cast.reordered++;
-    else {
-      cast.late++;
-      cast.worstLateMs = Math.max(cast.worstLateMs, Math.round(-wait));
-    }
+    cast.reordered++;
     return;
+  }
+  if (wait < -tolerance) {
+    cast.late++;
+    cast.worstLateMs = Math.max(cast.worstLateMs, Math.round(-wait));
   }
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
   cast.lastCapture = captureMs;
@@ -256,14 +256,6 @@ async function stop(tabId: number): Promise<unknown> {
     late: cast.late,
     worstLateMs: cast.worstLateMs,
   };
-  if (cast?.lost) {
-    drop(tabId);
-    return {
-      ok: false,
-      error: `${cast.lost} of ${cast.received} frames could not be placed on time (${cast.reordered} out of order, ${cast.late} late by up to ${cast.worstLateMs} ms), so the video would stutter; record again (fewer tabs at once, or a smaller window)`,
-      frames,
-    };
-  }
   const mimeType = recorder.mimeType || recording.mimeType || "video/webm";
   recording.blob = new Blob(recording.chunks, { type: mimeType });
   recording.chunks = [];
