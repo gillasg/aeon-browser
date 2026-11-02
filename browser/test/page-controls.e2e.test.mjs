@@ -31,6 +31,17 @@ test(
     const env = { ...process.env, BROWSERKIT_HOME: home, SITE_TO_API_HOME: join(home, "s2a") };
     const site = createServer((request, response) => {
       response.setHeader("content-type", "text/html");
+      if (request.url === "/item") {
+        response.end(
+          "<title>Lamp</title><main><h1>Desk lamp</h1><p>A warm brass desk lamp with a heavy base, a soft fabric shade and a long cord, ready to ship today.</p></main>",
+        );
+        return;
+      }
+      if (request.url === "/missing") {
+        response.statusCode = 404;
+        response.end("<title>Not found</title>404 Not Found");
+        return;
+      }
       if (request.url === "/form") {
         response.end(`<title>Apply</title><form onsubmit="event.preventDefault();document.body.innerHTML='Thanks, '+this.email.value+' from '+this.country.value+(this.agree.checked?' (agreed)':'')">
           <label>Email <input name="email"></label>
@@ -130,6 +141,12 @@ test(
         [{ name: "cart", count: 1 }],
         tools.stdout,
       );
+      // A sweep names each URL's outcome: a real page is ok, a 404 is dead.
+      const swept =
+        await cell(`const s = await browser.sweep([${JSON.stringify(siteUrl + "item")}, ${JSON.stringify(siteUrl + "missing")}], {wait: true});
+        console.log("SWEEP " + JSON.stringify((s.results || []).map((r) => r.value?.outcome ?? r.outcome)));`);
+      const outcomes = JSON.parse(/SWEEP (.*)/.exec(swept.stdout)?.[1] ?? "null");
+      assert.deepEqual(outcomes, ["ok", "dead"], swept.stdout + swept.stderr);
       // A watcher's keyed diff: the first call is the baseline, later calls name what moved.
       const diff = await cell(`browser.changes('rows', [{id: 1, p: 5}, {id: 2}]);
         console.log("DIFF " + JSON.stringify(browser.changes('rows', [{id: 1, p: 4}, {id: 3}])));`);
