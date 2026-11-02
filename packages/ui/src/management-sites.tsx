@@ -3,7 +3,7 @@ import type { ManagementSnapshotDto } from "@aeon/protocol";
 import { humanize } from "./management-automations.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
-// Mapped sites: health, recipes, the stored session, and real actions — run an operation or a
+// Mapped sites: health, recipes, the stored session, and real abilities — run an operation or a
 // recipe, export or import a pack or its recipes, clear or switch the stored session. Everything
 // runs in the daemon with the user's browser session.
 
@@ -32,7 +32,7 @@ export function ImportPath({
 }
 
 export function SiteAbilities({ site }: { site: Site }): ReactElement {
-  if (site.abilities.length === 0) return <span className="management-subtle">no actions</span>;
+  if (site.abilities.length === 0) return <span className="management-subtle">no abilities</span>;
   return (
     <ul className="management-inputs">
       {site.abilities.map((ability) => (
@@ -193,7 +193,7 @@ function RecipePicker({
       <label>
         Action
         <select value={recipe} onChange={(event) => onRecipe(event.target.value)}>
-          <option value="">Choose an action</option>
+          <option value="">Choose an ability</option>
           {site.abilities.map((item) => (
             <option key={item.name} value={item.name}>
               {item.name}

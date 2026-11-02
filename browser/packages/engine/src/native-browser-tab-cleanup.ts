@@ -1,12 +1,15 @@
 // Close tabs an agent opened once they are no longer needed. Only tabs the agent created are
 // tracked; user tabs and tabs the user pins are never closed. When a run ends, its chat keeps
 // only the tab it used last and tabs the user switched to; during a run a chat keeps at most
-// MAX_CHAT_TABS; any left over close after DEFAULT_IDLE_MINUTES untouched. A tab is touched when
-// an agent sends it a command or the user switches to it. Tabs held for a hand-off or recording,
-// playing audio, or in front of the user stay open; page.keep() hands a tab to the user for good.
+// MAX_CHAT_TABS; any left over close after DEFAULT_IDLE_MINUTES untouched, but only while they
+// sit in an agent tab group or an agent's background window (a tab the user moved out is
+// theirs). A tab is touched when an agent sends it a command or the user switches to it. Tabs
+// held for a hand-off or recording, playing audio, or in front of the user stay open;
+// page.keep() hands a tab to the user for good.
 import { collapseAgentGroups, agentGroupsReady, isAgentGroupId } from "./native-browser-groups.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { spaceWindowIds } from "./native-browser-spaces.js";
 
 type Tracked = {
   touched: number;
@@ -175,10 +178,16 @@ export async function cleanupAgentTabs(options: { minutes?: number } = {}): Prom
   await restore();
   const idle = (options.minutes ?? DEFAULT_IDLE_MINUTES) * 60_000;
   const now = Date.now();
-  return closeTabs(
-    [...tracked].filter(([, entry]) => now - entry.touched >= idle),
-    { keepSeen: false },
+  const stale = [...tracked].filter(([, entry]) => now - entry.touched >= idle);
+  const windows = spaceWindowIds();
+  const tabs = await Promise.all(
+    stale.map(([tabId]) => chrome.tabs.get(tabId).catch(() => undefined)),
   );
+  const agentPlaced = stale.filter((_, i) => {
+    const tab = tabs[i];
+    return !tab || isAgentGroupId(tab.groupId) || windows.has(tab.windowId);
+  });
+  return closeTabs(agentPlaced, { keepSeen: false });
 }
 
 /** After a chat's run: close its tabs except the one it used last and ones the user looked at. */

@@ -145,8 +145,8 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   },
   {
     topic: "sites",
-    title: "Make a one-tap action",
-    body: "Describe it once and Aeon builds and tests an action you can run any time.",
+    title: "Make a one-tap ability",
+    body: "Describe it once and Aeon builds and tests an ability you can run any time.",
     example: "Make me a 'prescription ready?' check for my pharmacy",
   },
   {

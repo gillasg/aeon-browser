@@ -72,8 +72,10 @@ export function controlError(tabId: number): string {
   return "USER_HAS_CONTROL";
 }
 
-const QUIET_MS = 3000;
-const MAX_PAUSE_MS = 60_000;
+// A quiet takeover only pauses: the agent goes on once the user has been still QUIET_MS, and
+// never waits longer than MAX_PAUSE_MS in all (Esc is the way to keep the tab).
+const QUIET_MS = 2000;
+const MAX_PAUSE_MS = 15_000;
 const lastUserInput = new Map<number, number>();
 
 /** The user clicked or typed in an agent's tab: steps wait until they have been still a moment. */
@@ -109,7 +111,7 @@ export async function waitForGiveBack(tabId: number, timeoutMs: number): Promise
 
 /**
  * Before a step: while the user is acting in the tab, wait until they have been still for
- * QUIET_MS (at most a minute), then go on. Returns whether the user acted since the agent's
+ * QUIET_MS (at most MAX_PAUSE_MS), then go on. Returns whether the user acted since the agent's
  * previous step, so the step can tell the agent to look at the page again.
  */
 export async function waitForQuietUser(tabId: number): Promise<boolean> {
@@ -163,13 +165,36 @@ async function injectWatcher(tabId: number): Promise<void> {
     .catch(() => undefined);
 }
 
-// The watcher: reports trusted pointer, key and wheel events; its marker lives in the isolated
-// world, so the page never sees a global.
+// The watcher: reports trusted clicks and typing that can change the page; its marker lives in
+// the isolated world, so the page never sees a global. Looking around is not taking part:
+// scrolling, clicks on plain text or empty space, selecting, arrow and page keys outside a field,
+// and shortcuts with Ctrl, Alt or Meta are ignored.
 function watchUserInput(): void {
   const state = globalThis as unknown as { __browserkitUserWatch?: boolean };
   if (state.__browserkitUserWatch) return;
   state.__browserkitUserWatch = true;
   const modifiers = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "OS"]);
+  const interactive =
+    "a[href],button,input,select,textarea,label,summary,[contenteditable=''],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=option],[role=menuitem],[role=tab],[role=combobox],[role=textbox],[onclick]";
+  const editable = (node: EventTarget | null): boolean => {
+    const el = node as HTMLElement | null;
+    if (!el || typeof el.closest !== "function") return false;
+    return !!el.closest(
+      "input,select,textarea,[contenteditable=''],[contenteditable=true],[role=textbox],[role=combobox]",
+    );
+  };
+  const changesPage = (event: Event): boolean => {
+    if (event instanceof KeyboardEvent) {
+      if (event.key === "Escape") return true;
+      if (event.ctrlKey || event.metaKey || event.altKey) return false;
+      const target = document.activeElement ?? event.target;
+      if (editable(target)) return true;
+      if (event.key !== "Enter" && event.key !== " ") return false;
+      return !!(target as HTMLElement | null)?.closest?.(interactive);
+    }
+    const el = event.target as HTMLElement | null;
+    return !!el && typeof el.closest === "function" && !!el.closest(interactive);
+  };
   const report = (event: Event): void => {
     if (!event.isTrusted) return;
     if (
@@ -187,6 +212,7 @@ function watchUserInput(): void {
       return;
     if (event instanceof KeyboardEvent && (modifiers.has(event.key) || !document.hasFocus()))
       return;
+    if (!changesPage(event)) return;
     const send = (takeOver: boolean): void =>
       void chrome.runtime
         .sendMessage({ kind: "browserkit.user-input", at: Date.now(), takeOver })

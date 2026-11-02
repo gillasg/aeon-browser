@@ -1,6 +1,6 @@
 ## Abilities and long jobs
 
-- **Users' words:** "actions" are abilities (`aeon actions`), "automations" are routines
+- **Users' words:** "automations" are routines
   (`aeon automation`), "teach Aeon a site" is mapping it.
 - **Long jobs.** One `aeon tool` call runs up to 60 s; for hours, start a durable
   `browser.sweep`/`browser.job` and check it with `aeon job`, or `aeon sweep @urls.txt --pilot 5`

@@ -46,6 +46,9 @@ test("the injected input watcher carries its own overlay check", async () => {
     composedPath: () => [{ hasAttribute: (name) => name === "data-browserkit-overlay" }],
   });
   assert.equal(sent.length, 0);
-  listener({ isTrusted: true, composedPath: () => [] });
+  // Looking around (a click on plain text) is not taking part; a click on a control is.
+  listener({ isTrusted: true, composedPath: () => [], target: { closest: () => null } });
+  assert.equal(sent.length, 0);
+  listener({ isTrusted: true, composedPath: () => [], target: { closest: () => ({}) } });
   assert.equal(sent.length, 1);
 });

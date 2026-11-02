@@ -354,7 +354,6 @@ export const BrowserOperationResultSchema = z.discriminatedUnion("ok", [
         "OPERATION_FAILED",
         "TAB_DEAD",
         "DEBUGGER_DETACHED",
-        "USER_TAB",
         "USER_HAS_CONTROL",
         "RUN_RESET",
         "SITE_BLOCKED",

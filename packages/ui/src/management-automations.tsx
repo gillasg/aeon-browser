@@ -43,7 +43,7 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
       )}
       <p className="settings-footnote">
         Things Aeon learned to do on a site. It saves one when a task works, fixes it when the site
-        changes and drops it when it keeps failing. <code>aeon actions run</code> runs the same.
+        changes and drops it when it keeps failing. <code>aeon abilities run</code> runs the same.
       </p>
     </section>
   );

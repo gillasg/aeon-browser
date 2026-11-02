@@ -76,7 +76,7 @@ check <urls|--file f>`, with evidence per site. Far cheaper than opening each on
   site in the browser. Web search only finds which page to open (`search` uses keyless
   providers, and Google in the user's browser for local, live and personal queries).
 - **A lasting tool for one task on a site** ("make me something that checks X"): build an ability
-  (`aeon actions build <site> "<task>"`); it is tested before it is saved, or says why the
+  (`aeon abilities build <site> "<task>"`); it is tested before it is saved, or says why the
   site cannot do it.
 - **What a page sends** (the API behind it, a download link, a stream): network capture,
   `help('network')`; live WebSockets and event streams, `help('live')`.
@@ -109,8 +109,8 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   (`{newTab: true}` for another tab). `browser.activeTab()` is the tab the user is on;
   `browser.tabs(query?)` lists tabs (`mine:true` only for tabs this chat or session opened),
   `browser.attachTab(tabId)` takes over one, `bu.use(tabId)` switches. Work through the user's tabs
-  in place, all at once with `Promise.all`; they are read and filled but never navigated away
-  (`USER_TAB`): to go somewhere else, open your own tab.
+  in place, all at once with `Promise.all`, navigating them too when the task is about them; for
+  anything else open your own tab, so what the user is watching stays put.
 - `bu.state()` prints `[id] role "name" = value` and visible text (`*` marks changes; scope with
   `{selector}` or `{query}`). Act on apps that redraw themselves by visible text, role or bu id,
   never `document.querySelector`. Controls inside a cross-origin iframe appear under their iframe
@@ -185,13 +185,16 @@ signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`,
 The password manager is set up once by the user: `aeon signin setup bitwarden` (Bitwarden's
 `bw` CLI) or `signin setup proton` (Proton Pass's `pass-cli`).
 
-Hand back to the user with `bu.handoff("...")` only for what no agent can do: a 2FA code by SMS or
-email, a CAPTCHA, a payment, or a choice that is theirs. Before a click that opens a passkey or 2FA
-prompt the page blocks on, start it first with `{start: true}` (help('signin')).
+Do it yourself first, every time: sign-in with `bu.signIn()`, codes with `bu.fillCode()`, banners
+and pop-ups with `page.overlays.dismiss()`, a checkbox check with one click like a person. Hand
+back with `bu.handoff("...")` only for what is left: a code that never arrived, a passkey or
+approval on the user's device, a payment confirmation, a check that is still there after your
+try, or a choice that is theirs. Before a click that opens a passkey or 2FA prompt the page
+blocks on, start it first with `{start: true}` (help('signin')).
 
 A bot wall (Cloudflare, DataDome and the like) logs a `[warn] challenge:` line when the page opens.
-Never click through it yourself: `await bu.handoff("Please finish the check", {wait: true})` returns
-once the page is clear. To reuse the signed-in session from a script, `aeon session export
+Try its checkbox once (`clickAt` on it); if the check is still there,
+`await bu.handoff("Please finish the check", {wait: true})` returns once the page is clear. To reuse the signed-in session from a script, `aeon session export
 <site>` or `aeon cookies export <site>` saves the cookies, mapped site or not.
 `help('gated')`.
 
@@ -204,7 +207,7 @@ user changes the list, with `aeon block|unblock|blocked`.
 
 ## Mapped sites
 
-Users say "actions" for abilities (the `actions` command).
+Users call them abilities too (`abilities`; `actions` is an old alias).
 
 ```sh
 aeon sites                          # which sites are mapped
@@ -213,9 +216,9 @@ aeon call shop.example search '{"query":"lamp"}' --param page=2
 aeon watch shop.example listings '{}' --key id     # only new/changed items since the last watch
 aeon federate shop.example:search other.example:search --params '{"query":"lamp"}'
 aeon heal shop.example              # drift, breakage, sign-out, bot walls
-aeon actions build shop.example "find a product's price and stock"   # a tested ability
-aeon actions run shop.example order --inputs '{"item":"tea"}' --key order-tea-1
-aeon actions test shop.example search  # its stored cases; fails on constant output
+aeon abilities build shop.example "find a product's price and stock"   # a tested ability
+aeon abilities run shop.example order --inputs '{"item":"tea"}' --key order-tea-1
+aeon abilities test shop.example search  # its stored cases; fails on constant output
 ```
 
 - **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): the
@@ -312,7 +315,7 @@ aeon media youtube "<url>" --ask "<question>"
 
 ## Abilities and long jobs
 
-- **Users' words:** "actions" are abilities (`aeon actions`), "automations" are routines
+- **Users' words:** "automations" are routines
   (`aeon automation`), "teach Aeon a site" is mapping it.
 - **Long jobs.** One `aeon tool` call runs up to 60 s; for hours, start a durable
   `browser.sweep`/`browser.job` and check it with `aeon job`, or `aeon sweep @urls.txt --pilot 5`

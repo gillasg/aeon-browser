@@ -158,9 +158,9 @@ export const EFFECTS = [
   {
     name: "tab.close",
     call: "browser.closeTab(id), page.close()",
-    does: "closes a tab this chat opened",
+    does: "closes a tab",
     needs: [],
-    errors: ["USER_TAB", "INVALID_TARGET"],
+    errors: ["INVALID_TARGET"],
   },
   {
     name: "browser.settings",
