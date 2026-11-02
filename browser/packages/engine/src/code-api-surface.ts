@@ -408,6 +408,72 @@ function __extendPageSurface(target, base) {
       await artifact(name, JSON.stringify({ traceEvents: events }));
       return { saved: name, events: events.length };
     },
+    // Sources panel: the page's script files, or where a string or regex appears in them (a
+    // signing function, an API path, a key name) with its file, line and the code around it.
+    sources: async (options = {}) => {
+      var listed = await page.evaluate(() => ({
+        files: [...new Set([...document.scripts].map((s) => s.src).filter(Boolean)
+          .concat(performance.getEntriesByType('resource').filter((e) => e.initiatorType === 'script').map((e) => e.name)))],
+        inline: [...document.scripts].filter((s) => !s.src).map((s) => s.textContent || ''),
+      }));
+      if (options.search == null) return {files: listed.files, inline: listed.inline.length};
+      var max = Math.min(Number(options.max) || 20, 100), hits = [], nl = String.fromCharCode(10);
+      var pattern = options.search instanceof RegExp
+        ? new RegExp(options.search.source, options.search.flags.includes('g') ? options.search.flags : options.search.flags + 'g')
+        : null;
+      var scan = (file, text) => {
+        var at = 0;
+        while (hits.length < max) {
+          var index;
+          if (pattern) { pattern.lastIndex = at; var found = pattern.exec(text); index = found ? found.index : -1; }
+          else index = text.indexOf(String(options.search), at);
+          if (index < 0) return;
+          hits.push({file, line: text.slice(0, index).split(nl).length, code: text.slice(Math.max(0, index - 150), index + 250)});
+          at = index + 1;
+        }
+      };
+      listed.inline.forEach((text, i) => scan('inline #' + (i + 1), text));
+      var files = listed.files.slice(0, 60), unread = [];
+      for (var i = 0; i < files.length && hits.length < max; i += 6) {
+        await Promise.all(files.slice(i, i + 6).map(async (file) => {
+          try { scan(file, String((await browser.fetch(file, {as: 'text'})).text || '')); }
+          catch { unread.push(file); }
+        }));
+      }
+      return {hits, searched: files.length + listed.inline.length, ...(unread.length ? {unread} : {})};
+    },
+    // Application panel: storage, IndexedDB databases and their stores, Cache Storage and service
+    // workers; {db, store, limit} reads one store's records.
+    storage: async (options = {}) => page.evaluate(async (options) => {
+      var open = (name) => new Promise((resolve, reject) => { var r = indexedDB.open(name); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+      if (options.db) {
+        var db = await open(options.db);
+        try {
+          var store = db.transaction(options.store, 'readonly').objectStore(options.store);
+          var rows = await new Promise((resolve) => { var r = store.getAll(null, Math.min(options.limit || 50, 500)); r.onsuccess = () => resolve(r.result); r.onerror = () => resolve([]); });
+          return {db: options.db, store: options.store, records: JSON.parse(JSON.stringify(rows))};
+        } finally { db.close(); }
+      }
+      var databases = [];
+      for (var info of (await indexedDB.databases?.()) || []) {
+        try {
+          var handle = await open(info.name), stores = [];
+          for (var name of handle.objectStoreNames) {
+            var count = await new Promise((resolve) => { var r = handle.transaction(name, 'readonly').objectStore(name).count(); r.onsuccess = () => resolve(r.result); r.onerror = () => resolve(null); });
+            stores.push({name, count});
+          }
+          handle.close();
+          databases.push({name: info.name, version: info.version, stores});
+        } catch { databases.push({name: info.name, version: info.version}); }
+      }
+      var caches = [];
+      if (self.caches) for (var key of await self.caches.keys()) caches.push({name: key, entries: (await (await self.caches.open(key)).keys()).length});
+      var workers = navigator.serviceWorker ? (await navigator.serviceWorker.getRegistrations()).map((w) => ({scope: w.scope, script: (w.active || w.waiting || w.installing || {}).scriptURL})) : [];
+      return {
+        localStorage: Object.keys(localStorage), sessionStorage: Object.keys(sessionStorage),
+        indexedDB: databases, caches, serviceWorkers: workers,
+      };
+    }, options),
     // Small screenshots of icon-only controls, not the whole page.
     iconTiles: async (options = {}) => {
       var boxes = (await __step({op:'evaluate', target, expression: '(' + __iconBoxes.toString() + ')(' + JSON.stringify(options.max || 30) + ',' + JSON.stringify(options.selector || '') + ')'})).data.value || [];
