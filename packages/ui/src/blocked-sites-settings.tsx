@@ -74,6 +74,11 @@ export function BlockedSitesSettings({
         title="Blocked sites"
         footer="Aeon never opens, reads or calls these sites or their subdomains, even if a page tells it to. Naming one in your own message lets that run use it."
       >
+        {sites.length === 0 && (
+          <li className="settings-row settings-row-text">
+            <span>Nothing blocked: Aeon may use any site you are signed in to.</span>
+          </li>
+        )}
         {sites.map((site) => (
           <ActionRow key={site} label={site} action="Unblock" onClick={() => remove(site)} />
         ))}

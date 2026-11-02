@@ -2,7 +2,6 @@ import type { ReactElement } from "react";
 import type { ManagementSection } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutinesPanel } from "./management-routines.js";
-import { AutomationsPanel } from "./management-automations.js";
 import { SitesPage } from "./management-site-page.js";
 import { ResourcesPanel } from "./management-resources.js";
 import { CapabilitiesPanel } from "./management-capabilities.js";
@@ -40,14 +39,10 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
 }
 
 /**
- * Automations: everything that runs without you typing. Routines (an instruction on a schedule or
- * when something changes) and saved steps (a fixed sequence, no model) on one page.
+ * Automations: everything that runs without you typing: an instruction on a schedule, a watcher
+ * that checks a page or site API and wakes the agent when it changes, and a snipe that acts at an
+ * exact moment. What a site can do on request (its abilities) lives on Sites.
  */
 function Automations(props: ManagementSurfaceProps): ReactElement {
-  return (
-    <>
-      <RoutinesPanel {...props} />
-      <AutomationsPanel {...props} />
-    </>
-  );
+  return <RoutinesPanel {...props} />;
 }

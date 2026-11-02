@@ -2,7 +2,7 @@ import { useState, type ReactElement } from "react";
 import { EmptyState } from "./empty-state.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
-import { ActionNote } from "./management-automations.js";
+import { AbilitiesPanel, ActionNote } from "./management-automations.js";
 import {
   ImportPath,
   SiteActions,
@@ -73,6 +73,7 @@ export function SitesPage(props: ManagementSurfaceProps): ReactElement {
             onSelect={setSelected}
             onSuggest={props.onSuggest}
           />
+          <AbilitiesPanel {...props} />
           <div className="management-footnote">
             <ImportPath chatId={chatId} onAction={props.onAction} />
           </div>

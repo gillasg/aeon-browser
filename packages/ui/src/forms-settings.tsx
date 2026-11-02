@@ -20,9 +20,32 @@ const SECTIONS: ReadonlyArray<[string, RegExp]> = [
 
 /** "middleName" → "Middle name". */
 export function fieldLabel(name: string): string {
+  const named: Record<string, string> = {
+    address1: "Street address",
+    address2: "Address line 2",
+    birthday: "Date of birth",
+  };
+  if (named[name]) return named[name];
   const words = name.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+// Fields almost every form asks for, shown blank until filled so the profile is quick to start.
+const COMMON = [
+  "firstName",
+  "lastName",
+  "email",
+  "phone",
+  "birthday",
+  "address1",
+  "city",
+  "state",
+  "postalCode",
+  "country",
+  "company",
+  "jobTitle",
+  "website",
+];
 
 function sectionOf(name: string): string {
   return SECTIONS.find(([, pattern]) => pattern.test(name))?.[0] ?? "Other";
@@ -39,20 +62,31 @@ export function FormsSettings({
   onSave(field: string, value: string): void;
   onRemove(field: string): void;
 }): ReactElement {
+  const known = new Set(fields.map((field) => field.name.toLowerCase()));
+  const blank = COMMON.filter((name) => !known.has(name.toLowerCase())).map((name) => ({
+    name,
+    value: "",
+  }));
+  const all = [...fields, ...blank];
   const groups = [...SECTIONS.map(([title]) => title), "Other"]
-    .map((title) => ({ title, items: fields.filter((field) => sectionOf(field.name) === title) }))
+    .map((title) => ({ title, items: all.filter((field) => sectionOf(field.name) === title) }))
     .filter((group) => group.items.length);
   return (
     <div className="settings-groups">
       {groups.map((group) => (
         <SettingsGroup key={group.title} title={group.title}>
           {group.items.map((field) => (
-            <FieldRow key={field.name} field={field} onSave={onSave} onRemove={onRemove} />
+            <FieldRow
+              key={field.name}
+              field={field}
+              onSave={onSave}
+              {...(field.value ? { onRemove } : {})}
+            />
           ))}
         </SettingsGroup>
       ))}
       <SettingsGroup
-        title={groups.length ? "Add a field" : "Your form profile"}
+        title="Add a field"
         footer={
           refused
             ? `Not kept: ${refused}.`
@@ -72,7 +106,8 @@ function FieldRow({
 }: {
   field: FormField;
   onSave(field: string, value: string): void;
-  onRemove(field: string): void;
+  /** Absent for a blank common field: there is nothing to remove yet. */
+  onRemove?(field: string): void;
 }): ReactElement {
   const [draft, setDraft] = useState(field.value);
   const save = (): void => {
@@ -95,10 +130,13 @@ function FieldRow({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={save}
+          {...(field.value ? {} : { placeholder: "Not set" })}
         />
-        <button type="button" className="aeon-button" onClick={() => onRemove(field.name)}>
-          Remove
-        </button>
+        {onRemove && (
+          <button type="button" className="aeon-button" onClick={() => onRemove(field.name)}>
+            Remove
+          </button>
+        )}
       </form>
     </li>
   );
