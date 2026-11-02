@@ -312,8 +312,9 @@ aeon media youtube "<url>" --ask "<question>"
 ```
 
 - `ask` uses the session the user is signed in to in Chrome (no API key, no separate login): it
-  sends the provider's own request and falls back to typing in the page. Signed out says
-  `signed-out`; the output carries the answer only, never cookies or tokens.
+  sends the provider's own request and falls back to typing in the page (15–25 s). Signed out
+  fails with `SIGNED_OUT` and names the site to sign in to; the output carries the answer only,
+  never cookies or tokens.
 - MCP clients that prefer single steps have `browser_action` (click, navigate, type, press, scroll,
   wait, extract, screenshot…); anything with several steps stays in `browser_code`.
 - Sourced research on X ("what is X saying about"): the `deep-x-research` skill (Grok searches,

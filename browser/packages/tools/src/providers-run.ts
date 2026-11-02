@@ -60,8 +60,9 @@ export async function askProviderWith(
   const model = validateModel(provider.id, options.model).model;
   const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 120_000, 5000), 300_000);
   if (options.transport !== "ui") {
-    const cookies = await providerCookiesWith(run, provider.id);
-    if (!cookies)
+    const cookies = await providerCookiesWith(run, provider.id).catch(() => "");
+    // No cookies: only a direct-only call stops here; auto still tries the page, which knows.
+    if (!cookies && options.transport === "direct")
       return {
         ok: false,
         provider: provider.id,
@@ -71,9 +72,11 @@ export async function askProviderWith(
         reason: "signed-out",
         elapsedMs: 0,
       };
-    const direct = await askDirect(provider.id, { prompt, model, cookies, timeoutMs });
-    if (direct.ok || options.transport === "direct") return direct;
-    if (options.transport === "auto") {
+    const direct = cookies
+      ? await askDirect(provider.id, { prompt, model, cookies, timeoutMs })
+      : undefined;
+    if (direct && (direct.ok || options.transport === "direct")) return direct;
+    if (direct && options.transport === "auto") {
       const started = Date.now();
       const text = await uiAnswerWith(run, provider.id, prompt, timeoutMs);
       return {
@@ -127,23 +130,7 @@ export async function analyseYoutubeWith(
 ): Promise<{ text: string; prompt: string }> {
   const prompt = youtubePrompt(url, question);
   const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 180_000, 10_000), 300_000);
-  const code = `page = await browser.openTab(${JSON.stringify(PROVIDERS.gemini.chatUrl)}, { newTab: true });
-await page.waitForTimeout(1200);
-const prompt = ${JSON.stringify(prompt)};
-const composer = page.locator(".ql-editor[contenteditable='true']").first();
-await composer.click();
-await composer.fill(prompt);
-await page.locator("button[aria-label*='Send']").first().click();
-let last = "", stable = 0;
-const deadline = Date.now() + ${timeoutMs};
-while (Date.now() < deadline) {
-  await page.waitForTimeout(1000);
-  const text = (await page.locator("model-response message-content, .model-response-text").allTextContents()).join("\\n").trim();
-  if (text && text === last) { if (++stable >= 3) break; } else { last = text; stable = 0; }
-}
-if (!last) throw new Error("PROVIDER_TIMEOUT: Gemini returned no analysis; the page may have changed");
-last`;
-  const text = await run(code, { timeoutMs: timeoutMs + 30_000 });
+  const text = await uiAnswerWith(run, "gemini", prompt, timeoutMs);
   if (!text) throw new Error("MEDIA_EMPTY: Gemini returned no analysis");
   return { text: String(text), prompt };
 }
