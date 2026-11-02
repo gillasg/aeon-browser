@@ -165,11 +165,12 @@ test(
         response.setHeader("content-type", "text/html");
         response.end(
           `<title>Provider</title>
-          <div class="ql-editor" contenteditable="true"></div>
-          <button aria-label="Send message" onclick="setTimeout(() => {
-            document.querySelector('message-content').textContent = 'answer: ' + document.querySelector('.ql-editor').innerText;
-          }, 200)">Send</button>
-          <model-response><message-content></message-content></model-response>`,
+          <div class="ql-editor" contenteditable="true" style="min-height:24px"></div>
+          <button aria-label="Send message" onclick="const editor = document.querySelector('.ql-editor');
+            const sent = editor.innerText.trim(); editor.innerText = '';
+            setTimeout(() => { const reply = document.createElement('model-response');
+              reply.innerHTML = '<message-content></message-content>'; reply.firstChild.textContent = 'answer: ' + sent;
+              document.body.append(reply); }, 200)">Send</button>`,
         );
         return;
       }
@@ -1319,7 +1320,7 @@ test(
         assert.equal(field("Notes").role, "textbox");
         assert.deepEqual(result.directory, ["button Continue"]);
         assert.match(result.unchecked, /ends with a check/);
-        assert.match(result.ambiguous, /AMBIGUOUS: 2 elements match/);
+        assert.match(result.ambiguous, /AMBIGUOUS: .*2 elements match/);
         assert.deepEqual(result.steps, ["1", "2", "3", "4", "5", "6", "7"]);
         assert.equal(result.message, "Pasted in");
         assert.equal(result.done, "Thanks, a@b.co from fr (agreed) Ring twice");

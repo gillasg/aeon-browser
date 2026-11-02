@@ -50,6 +50,13 @@ test(
           <button>Continue</button></form><script src="/app.js"></script>`);
         return;
       }
+      if (request.url === "/login") {
+        // The button stands in for a person typing their password into the page.
+        response.end(`<title>Sign in</title><label>New password <input type="password" id="mine"></label>
+          <label>Password <input type="password" id="pw"></label>
+          <button onclick="pw.value='typed-by-a-person-123'">Remember me</button>`);
+        return;
+      }
       if (request.url === "/app.js") {
         response.setHeader("content-type", "text/javascript");
         response.end(
@@ -140,6 +147,20 @@ test(
         found.store.indexedDB[0]?.stores,
         [{ name: "cart", count: 1 }],
         tools.stdout,
+      );
+      // A page holding a password the agent did not type runs none of its code until reloaded.
+      const locked = await cell(`await page.goto(${JSON.stringify(siteUrl + "login")});
+        const trial = async () => { try { return await page.evaluate(() => document.title); } catch (error) { return String(error.message).slice(0, 13); } };
+        await page.fill('#mine', 'agent-chosen-pass');
+        const own = await trial();
+        await page.getByRole('button', {name: 'Remember me'}).click();
+        const person = await trial();
+        await page.reload();
+        console.log("LOCK " + JSON.stringify({own, person, reloaded: await trial()}));`);
+      assert.deepEqual(
+        JSON.parse(/LOCK (.*)/.exec(locked.stdout)?.[1] ?? "null"),
+        { own: "Sign in", person: "PASSWORD_PAGE", reloaded: "Sign in" },
+        locked.stdout + locked.stderr,
       );
       // A sweep names each URL's outcome: a real page is ok, a 404 is dead.
       const swept =

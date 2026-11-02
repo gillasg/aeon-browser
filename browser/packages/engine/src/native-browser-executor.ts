@@ -104,6 +104,7 @@ import {
   type StoreFilter,
 } from "./network-store.js";
 import { scheduleStep, schedulerStatus } from "./native-browser-scheduler.js";
+import { guardPageCode, notePlantedScript } from "./native-browser-password-lock.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 type Capability = Extract<
   BrowserStep,
@@ -260,9 +261,12 @@ export async function performExtra(
           !String((step.params as { worldName?: unknown }).worldName ?? "").startsWith("browserkit")
         )
           noteInjectedScript(tabId, "a page script runs on every document");
-        return withManualScreencast(tabId, step.op === "cdp" ? step.method : "", () =>
+        const result = await withManualScreencast(tabId, step.op === "cdp" ? step.method : "", () =>
           executePageCode(debuggee, { ...request, step }, () => revalidate(request, tabId)),
         );
+        if (step.op === "cdp" && step.method === "Page.addScriptToEvaluateOnNewDocument")
+          notePlantedScript(tabId, (result as { value?: unknown } | undefined)?.value);
+        return result;
       }
       if (step.op === "press")
         return pressElement(debuggee, request, () => revalidate(request, tabId));
@@ -561,6 +565,7 @@ async function dispatchStep(
   step: BrowserStep,
   tab: chrome.tabs.Tab,
 ): Promise<BrowserExecutorResult> {
+  await guardPageCode(step);
   if (isCapabilityStep(step)) return performCapability({ ...request, step }, revalidateTarget);
   if (step.op === "observe" || step.op === "navigate")
     showAgentCaption(

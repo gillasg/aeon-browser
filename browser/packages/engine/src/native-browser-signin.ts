@@ -9,6 +9,7 @@ import {
   type SignInFields,
 } from "./native-browser-signin-page.js";
 import { rememberSecrets } from "./native-browser-secrets.js";
+import { finishSignIn, prepareSignIn } from "./native-browser-password-lock.js";
 import { messagesSnapshot, waitForInboxCode } from "./native-browser-inbox-code.js";
 
 // bu.signIn(): sign in to the page the agent is on with a login from the user's password
@@ -35,7 +36,9 @@ export interface SignInResult {
     /** The form posts the login to another site: nothing was typed. */
     | "FOREIGN_FORM"
     /** The site wants approval on the user's phone or app, and none came within a minute. */
-    | "APPROVE_ON_DEVICE";
+    | "APPROVE_ON_DEVICE"
+    /** A boost or site script runs on this page and could read the password: nothing was typed. */
+    | "PAGE_SCRIPTS";
   accounts?: string[];
   detail?: string;
 }
@@ -83,16 +86,14 @@ export async function signInToPage(
   const chosen = pickLogin(site, answer, account);
   if (!("login" in chosen)) return chosen;
   const { login, provider } = chosen;
+  const base = { site, provider, account: login.username || login.name };
+  const scripts = await prepareSignIn(tabId, url);
+  if (scripts)
+    return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
   rememberSecrets([login.password]);
-  return fill(
-    tabId,
-    { login, ask, url, inbox },
-    {
-      site,
-      provider,
-      account: login.username || login.name,
-    },
-  );
+  const result = await fill(tabId, { login, ask, url, inbox }, base);
+  if (result.signedIn) await finishSignIn(tabId);
+  return result;
 }
 
 function pickLogin(
