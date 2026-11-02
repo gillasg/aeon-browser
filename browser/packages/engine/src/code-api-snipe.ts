@@ -60,4 +60,25 @@ async function __snipe(options = {}) {
   }
   return browser.job.result(started.jobId);
 }
+// browser.changes(name, items, {key}): what is new, changed or gone since the last call with that
+// name in this runtime (a watcher's check keeps it between runs). The first call is the baseline.
+// An item is known by key (a field name or a function), else its id, url, href or key, else itself.
+function __changes(name, items, options = {}) {
+  var store = globalThis.__changeSets || (globalThis.__changeSets = new Map());
+  var list = Array.isArray(items) ? items : items && Array.isArray(items.items) ? items.items : [items];
+  var keyOf = (item) => String(typeof options.key === 'function' ? options.key(item)
+    : options.key ? item && item[options.key]
+    : item && typeof item === 'object' ? item.id ?? item.url ?? item.href ?? item.key ?? JSON.stringify(item) : item);
+  var now = new Map(list.map((item) => [keyOf(item), item]));
+  var before = store.get(String(name));
+  store.set(String(name), now);
+  if (!before) return {first: true, new: [], changed: [], gone: [], count: now.size};
+  var fresh = [], changed = [], gone = [];
+  for (var [key, item] of now) {
+    if (!before.has(key)) fresh.push(item);
+    else if (JSON.stringify(before.get(key)) !== JSON.stringify(item)) changed.push({before: before.get(key), after: item});
+  }
+  for (var [key, item] of before) if (!now.has(key)) gone.push(item);
+  return {first: false, new: fresh, changed, gone, count: now.size};
+}
 `;

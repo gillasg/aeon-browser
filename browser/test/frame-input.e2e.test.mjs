@@ -20,7 +20,7 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const run = promisify(execFile);
 
 test(
-  "a click inside a cross-origin iframe lands",
+  "controls in frames, nested frames and shadow DOM show in state and take clicks; read covers frames",
   {
     skip:
       !process.env.REQUIRE_E2E &&
@@ -32,7 +32,9 @@ test(
     const inner = createServer((_request, response) => {
       response.setHeader("content-type", "text/html");
       response.end(
-        `<title>Inner</title><button onclick="parent.postMessage('inner-clicked','*')">Inside</button>`,
+        `<title>Inner</title><button onclick="parent.postMessage('inner-clicked','*')">Inside</button>
+         <p>Inner frame text</p>
+         <iframe srcdoc="<button onclick=&quot;top.postMessage('nested-clicked','*')&quot;>Nested</button>"></iframe>`,
       );
     });
     await new Promise((done) => inner.listen(0, "127.0.0.1", done));
@@ -41,7 +43,13 @@ test(
       response.setHeader("content-type", "text/html");
       response.end(
         `<title>Frames</title><iframe src="${innerUrl}" width="420" height="180"></iframe>
-         <script>addEventListener('message', (event) => { if (event.data === 'inner-clicked') document.title = 'inner-clicked'; });</script>`,
+         <iframe srcdoc="<button onclick=&quot;parent.document.title='same-clicked'&quot;>Same origin</button><p>Same frame text</p>"></iframe>
+         <div id="host"></div>
+         <script>
+           const root = document.getElementById('host').attachShadow({mode: 'open'});
+           root.innerHTML = '<button onclick="document.title=&quot;shadow-clicked&quot;">In shadow</button>';
+           addEventListener('message', (event) => { if (typeof event.data === 'string') document.title = event.data; });
+         </script>`,
       );
     });
     await new Promise((done) => outer.listen(0, "127.0.0.1", done));
@@ -82,6 +90,31 @@ test(
         await page.waitForTimeout(400);
         await page.title()`);
       assert.match(clicked.stdout, /inner-clicked/, clicked.stdout + clicked.stderr);
+      // Every kind of embedded control shows in one state and takes a click.
+      for (const [name, title] of [
+        ["Same origin", "same-clicked"],
+        ["Nested", "nested-clicked"],
+        ["In shadow", "shadow-clicked"],
+      ]) {
+        const found = new RegExp(`\\[((?:f\\d+:e)?\\d+)\\] button "${name}"`).exec(
+          state.stdout,
+        )?.[1];
+        assert.ok(
+          found,
+          `${name} missing from state:
+${state.stdout}`,
+        );
+        const result = await cell(`
+          await page.click(${JSON.stringify(found)});
+          await page.waitForTimeout(400);
+          await page.title()`);
+        assert.match(result.stdout, new RegExp(title), `${name}: ${result.stdout}${result.stderr}`);
+      }
+      // One read covers the page and what its frames show.
+      const read = await cell(`JSON.stringify(await page.read())`);
+      assert.match(read.stdout, /Inner frame text/, read.stdout + read.stderr);
+      assert.match(read.stdout, /Same frame text/, read.stdout + read.stderr);
+      assert.match(read.stdout, /"kind":"shadow"/, read.stdout + read.stderr);
     } finally {
       chrome?.kill();
       bridge.kill();

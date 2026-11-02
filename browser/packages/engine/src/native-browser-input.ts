@@ -301,6 +301,14 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     Command: 4,
     Shift: 8,
   };
+  // Text that only looks like a combo ("C++", "a+b=c") is typed, not pressed.
+  if (
+    combo.length > 1 &&
+    !parts.every((part) => part in masks || part === "ControlOrMeta" || part === "Mod")
+  ) {
+    await humanType(debuggee, combo);
+    return { typed: combo.length };
+  }
   let modifiers = 0;
   for (const part of parts) {
     const mask = part === "ControlOrMeta" || part === "Mod" ? (IS_MAC ? 4 : 2) : masks[part];

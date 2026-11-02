@@ -163,6 +163,7 @@ function __extendPageControls(target, base) {
       directory: (options = {}) => __controlsList(target, {...(typeof options === 'string' ? {query: options} : options), actions: true}),
     }),
     batch: (steps, options = {}) => __batch(target, steps, options),
+    fillForm: (values, options = {}) => __fillForm(target, values, options),
     overlays: Object.freeze({dismiss: (options = {}) => __dismissOverlays(target, options)}),
     // Age, terms, region and "click to enter" gates, besides cookies: click the affirmative
     // control, return {gate, clicked}.
