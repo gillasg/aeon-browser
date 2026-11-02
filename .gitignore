@@ -40,6 +40,14 @@ coverage/
 !/benchmarks/README.md
 # Aeon-only lines for the generated browser guidance.
 !/packages/pi-adapter/guidance-extra.md
+# The engine's agent text sources, its skills and its package docs (public, generated from or
+# shipped with the code).
+!/browser/docs/agent-guide.md
+!/browser/docs/agent/
+!/browser/docs/agent/**/*.md
+!/browser/skills/**/SKILL.md
+!/browser/packages/*/README.md
+!/browser/packages/crawl/THIRD_PARTY_NOTICES.md
 
 core-connection.json
 core-attention.json*
