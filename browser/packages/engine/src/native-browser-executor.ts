@@ -35,13 +35,7 @@ import {
 } from "./native-browser-events.js";
 import { executeDownload } from "./native-browser-downloads.js";
 import { claimAgentTab, groupAgentTab, noteAgentStep } from "./native-browser-groups.js";
-import {
-  ensureAgentTabsRestored,
-  isAgentTab,
-  markAgentTabGrouped,
-  mineTabIds,
-  trackAgentTab,
-} from "./native-browser-tab-cleanup.js";
+import { markAgentTabGrouped, mineTabIds, trackAgentTab } from "./native-browser-tab-cleanup.js";
 import { ownerTitle } from "./native-browser-owner.js";
 import { enableQuietTab } from "./native-browser-quiet.js";
 import { showAgentCaption } from "./native-browser-cursor.js";
@@ -273,13 +267,6 @@ export async function performExtra(
       if (step.op === "press")
         return pressElement(debuggee, request, () => revalidate(request, tabId));
       if (step.op === "navigate") {
-        // A run reads and fills the user's own tabs but never sends one somewhere else.
-        await ensureAgentTabsRestored();
-        if (!isAgentTab(tabId))
-          throw new BrowserActionError(
-            "USER_TAB",
-            "this tab is the user's; a run never navigates it away",
-          );
         await assertBrowserNetwork(step.url);
         if (await engineConfig.privateNetwork())
           await guardPrivateTab(tabId, await engineConfig.privateNetworkPorts());

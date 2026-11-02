@@ -31,10 +31,6 @@ export const ERRORS = {
     "user",
     "Chrome dropped control of this tab (usually Cancel on its debugging bar): the next step takes it back; if it happens again, tell the user and stop",
   ],
-  USER_TAB: [
-    "model",
-    "this tab is the user's: read and fill it in place, but open your own with browser.openTab(url) to go anywhere else",
-  ],
   USER_HAS_CONTROL: ["user", "the user is using this tab: wait, or ask them"],
   USER_TOOK_CONTROL: [
     "user",

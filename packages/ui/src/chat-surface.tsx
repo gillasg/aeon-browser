@@ -128,7 +128,7 @@ function ControlBar({
 }
 
 export const ONE_CLICK_TEXT =
-  "Save what you just did as an action for this site, so next time it runs in one click without a model.";
+  "Save what you just did as an ability for this site, so next time it runs in one click without a model.";
 
 /** After a run that worked in the browser: offer to save it as an ability ("make it one click"). */
 function OneClickOffer(props: ChatSurfaceProps): ReactElement | null {

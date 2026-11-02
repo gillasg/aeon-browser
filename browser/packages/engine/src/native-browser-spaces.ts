@@ -79,6 +79,13 @@ function save(): void {
     void chrome.storage.local.set({ [STORAGE_KEY]: records }).catch(() => undefined);
 }
 
+/** The background windows agents work in (their tabs are fair game for idle cleanup). */
+export function spaceWindowIds(): Set<number> {
+  return new Set(
+    [...spaces.values()].flatMap((r) => (r.windowId !== undefined ? [r.windowId] : [])),
+  );
+}
+
 export function spaceOf(chatId: string): SpaceKind | undefined {
   return spaces.get(chatId)?.space;
 }

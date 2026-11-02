@@ -12,7 +12,6 @@ test("every failure is a kernel code, never a bare one", () => {
     "Cannot access a chrome:// URL; debugger refused": "UNSUPPORTED",
     "Something nobody planned for": "CHROME_ERROR",
     STALE_REF: "STALE_REF",
-    USER_TAB: "USER_TAB",
   };
   for (const [message, code] of Object.entries(cases))
     assert.equal(errorCode(new Error(message)), code, message);
