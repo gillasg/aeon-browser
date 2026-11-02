@@ -120,11 +120,11 @@ export function sweepCode(spec: {
           await tab.wait(1800);
           captured = options.capture === false ? [] : await grab(tab);
           if (options.capture === 'media') media = await tab.media().catch(() => null);
-          try { await __call({learn:{url: String(await tab.url().catch(() => url)), play: true}}); } catch {}
+          try { await __call({learn:{url: String(await Promise.resolve().then(() => tab.url()).catch(() => url)), play: true}}); } catch {}
         }
       }
-      const finalUrl = await tab.url().catch(() => url);
-      const title = await tab.title().catch(() => '');
+      const finalUrl = await Promise.resolve().then(() => tab.url()).catch(() => url);
+      const title = await Promise.resolve().then(() => tab.title()).catch(() => '');
       if (options.evidence) {
         const text = await tab.evaluate(() => document.body ? document.body.innerText.slice(0, 1200) : '').catch(() => '');
         let saved = null;
@@ -141,7 +141,7 @@ export function sweepCode(spec: {
       }
       let extra = null;
       if (options.each) extra = await (0, eval)('(' + options.each + ')')(tab, item);
-      const judged = judgeOutcome({readiness: ready && ready.state, captured: captured.length + (media && media.masters && media.masters.length ? 1 : 0), gate: gate && gate.gate, gateClicked: !!(gate && gate.clicked), challenge: ready && ready.state === 'challenge', requestedUrl: url, finalUrl});
+      const judged = judgeOutcome({readiness: ready && ready.state, found: options.capture !== 'media' && !!ready && ready.state === 'ready', captured: captured.length + (media && media.masters && media.masters.length ? 1 : 0), gate: gate && gate.gate, gateClicked: !!(gate && gate.clicked), challenge: ready && ready.state === 'challenge', requestedUrl: url, finalUrl});
       return {url, finalUrl, title, outcome: judged.outcome, reason: judged.reason, readiness: ready && ready.state, gate, playClicked, captured: captured.length, media, evidence, extra, ms: Date.now() - started};
     } catch (error) {
       return {url, outcome: 'error', reason: String(error && error.message || error).slice(0, 300), gate, playClicked, captured: captured.length, ms: Date.now() - started};
