@@ -166,6 +166,10 @@ function __extendPageControls(target, base) {
     }),
     batch: (steps, options = {}) => __batch(target, steps, options),
     fillForm: (values, options = {}) => __fillForm(target, values, options),
+    // The same as bu.signIn/fillProfile/fillCode, aimed at this tab.
+    signIn: (options = {}) => bu.signIn({...options, target}),
+    fillProfile: (options = {}) => bu.fillProfile({...options, target}),
+    fillCode: (options = {}) => bu.fillCode({...options, target}),
     overlays: Object.freeze({dismiss: (options = {}) => __dismissOverlays(target, options)}),
     // Age, terms, region and "click to enter" gates, besides cookies: click the affirmative
     // control, return {gate, clicked}.

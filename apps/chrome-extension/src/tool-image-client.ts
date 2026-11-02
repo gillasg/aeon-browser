@@ -7,16 +7,27 @@ export function createToolImageLoader(
   return (toolCallId, index) => {
     const client = getClient();
     return client
-      ? loadToolImage(client, chatId, toolCallId, index)
+      ? loadToolImage(client, { chatId, toolCallId, index })
+      : Promise.reject(new Error("Aeon is disconnected"));
+  };
+}
+
+/** Images saved in the chat's workspace (media/, charts), by path. */
+export function createWorkspaceImageLoader(
+  getClient: () => UiClient | undefined,
+  chatId: string,
+): (path: string) => Promise<Blob> {
+  return (path) => {
+    const client = getClient();
+    return client
+      ? loadToolImage(client, { chatId, path })
       : Promise.reject(new Error("Aeon is disconnected"));
   };
 }
 
 export function loadToolImage(
   client: UiClient,
-  chatId: string,
-  toolCallId: string,
-  index: number,
+  payload: { chatId: string; toolCallId: string; index: number } | { chatId: string; path: string },
 ): Promise<Blob> {
   const requestId = crypto.randomUUID();
   return new Promise((resolve, reject) => {
@@ -54,7 +65,7 @@ export function loadToolImage(
         kind: "command",
         requestId,
         operation: "chat.image",
-        payload: { chatId, toolCallId, index },
+        payload,
       });
     } catch (error) {
       finish(error instanceof Error ? error : new Error("Image request failed"));

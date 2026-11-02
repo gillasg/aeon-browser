@@ -15,15 +15,17 @@ export function runTool(
 ): Promise<string> {
   const unsafe = args.find((arg) => !SAFE_ARG.test(arg));
   if (unsafe !== undefined) return Promise.reject(new Error("UNSAFE_ARGUMENT"));
+  // Through the shell, Node wants one command line (the arguments were checked above).
+  const shell = process.platform === "win32";
   return new Promise((resolve, reject) => {
     execFile(
-      command,
-      [...args],
+      shell ? [command, ...args].join(" ") : command,
+      shell ? [] : [...args],
       {
         timeout: TIMEOUT_MS,
         maxBuffer: 32 * 1024 * 1024,
         windowsHide: true,
-        shell: process.platform === "win32",
+        shell,
         env: { ...process.env, ...env },
       },
       (error, stdout, stderr) => {

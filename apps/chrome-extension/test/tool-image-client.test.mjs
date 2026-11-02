@@ -49,7 +49,11 @@ test("tool image client verifies checksums and cleans up each request", async ()
           );
         },
       };
-      const pending = loadToolImage(client, "00000000-0000-4000-8000-000000000001", "tool-1", 0);
+      const pending = loadToolImage(client, {
+        chatId: "00000000-0000-4000-8000-000000000001",
+        toolCallId: "tool-1",
+        index: 0,
+      });
       if (corrupt) await assert.rejects(pending, /checksum mismatch/);
       else {
         const image = await pending;

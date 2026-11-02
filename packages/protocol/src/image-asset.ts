@@ -5,13 +5,17 @@ export const ChatImageRequestSchema = z
     kind: z.literal("command"),
     requestId: z.string().uuid(),
     operation: z.literal("chat.image"),
-    payload: z
-      .object({
-        chatId: z.string().uuid(),
-        toolCallId: z.string().min(1).max(200),
-        index: z.number().int().min(0).max(63),
-      })
-      .strict(),
+    // A tool's screenshot, or an image file in the chat's workspace (saved media, charts).
+    payload: z.union([
+      z
+        .object({
+          chatId: z.string().uuid(),
+          toolCallId: z.string().min(1).max(200),
+          index: z.number().int().min(0).max(63),
+        })
+        .strict(),
+      z.object({ chatId: z.string().uuid(), path: z.string().min(1).max(4096) }).strict(),
+    ]),
   })
   .strict();
 export const ImageAssetHeaderSchema = z

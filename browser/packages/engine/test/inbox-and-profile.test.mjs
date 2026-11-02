@@ -21,6 +21,9 @@ test("form fields map to profile fields by hint, label and saved names", () => {
   });
   assert.equal(profileFieldFor(field("Given", "given-name"), []), "firstName");
   assert.equal(profileFieldFor(field("Last name"), []), "lastName");
+  assert.equal(profileFieldFor(field("Customer name:"), []), "name");
+  assert.equal(profileFieldFor(field("E-mail address *"), []), "email");
+  assert.equal(profileFieldFor(field("Company name"), []), "company");
   assert.equal(profileFieldFor(field("ZIP / Postal code"), []), "postalCode");
   assert.equal(profileFieldFor(field("Passport city"), ["passportCity"]), "passportCity");
   assert.equal(profileFieldFor(field("Favourite colour"), []), undefined);

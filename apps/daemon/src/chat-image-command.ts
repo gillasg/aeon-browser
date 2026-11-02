@@ -1,18 +1,26 @@
 import { createHash } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
+import { extname } from "node:path";
 import { asChatId } from "@aeon/domain";
-import { encodeImageAsset, ImageAssetHeaderSchema, type DaemonUiRequest } from "@aeon/protocol";
+import {
+  encodeImageAsset,
+  ImageAssetHeaderSchema,
+  MAX_IMAGE_ASSET_BYTES,
+  type DaemonUiRequest,
+} from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
+import { IMAGE_TYPES, workspacePath } from "./workspace-file-command.js";
 export async function sendChatImage(
   socket: WebSocket,
   service: ChatService,
   request: Extract<DaemonUiRequest, { operation: "chat.image" }>,
 ): Promise<void> {
-  const image = await service.readToolImage(
-    asChatId(request.payload.chatId),
-    request.payload.toolCallId,
-    request.payload.index,
-  );
+  const payload = request.payload;
+  const image =
+    "path" in payload
+      ? await readWorkspaceImage(service, payload.chatId, payload.path)
+      : await service.readToolImage(asChatId(payload.chatId), payload.toolCallId, payload.index);
   const header = ImageAssetHeaderSchema.parse({
     kind: "image.asset",
     requestId: request.requestId,
@@ -21,4 +29,17 @@ export async function sendChatImage(
     checksum: createHash("sha256").update(image.bytes).digest("hex"),
   });
   if (socket.readyState === 1) socket.send(encodeImageAsset(header, image.bytes), { binary: true });
+}
+
+async function readWorkspaceImage(
+  service: ChatService,
+  chatId: string,
+  requested: string,
+): Promise<{ mimeType: string; bytes: Uint8Array }> {
+  const path = await workspacePath(service, chatId, requested);
+  const mimeType = IMAGE_TYPES[extname(path).slice(1).toLowerCase()];
+  if (!mimeType) throw new Error("Only PNG, JPEG, WebP and GIF images show in the chat.");
+  if ((await stat(path)).size > MAX_IMAGE_ASSET_BYTES)
+    throw new Error("This image is larger than 4 MB; open it from the chat's folder.");
+  return { mimeType, bytes: await readFile(path) };
 }

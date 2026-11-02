@@ -71,3 +71,50 @@ function ToolImage({
     </div>
   );
 }
+
+/** Loads an image file from the chat's workspace by its path (media/apple.png). */
+export type WorkspaceImageLoader = (path: string) => Promise<Blob>;
+export const WorkspaceImageContext = createContext<WorkspaceImageLoader | undefined>(undefined);
+export const IMAGE_PATH = /\.(png|jpe?g|webp|gif)$/i;
+
+/** A saved image shown in the message, as a thumbnail that opens full size. */
+export function WorkspaceImage({ path, alt }: { path: string; alt: string }): ReactElement {
+  const loader = useContext(WorkspaceImageContext);
+  const [url, setUrl] = useState<string>();
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | undefined;
+    if (loader)
+      void loader(path)
+        .then((blob) => {
+          if (!active) return;
+          objectUrl = URL.createObjectURL(blob);
+          setUrl(objectUrl);
+        })
+        .catch((reason: unknown) => {
+          if (active) setError(reason instanceof Error ? reason.message : "Image unavailable");
+        });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [loader, path]);
+  if (!url)
+    return (
+      <span className="activity-result-note" role="status">
+        {!loader ? path : error ? `${path}: ${error}` : `Loading ${path}…`}
+      </span>
+    );
+  return (
+    <img
+      className="markdown-image"
+      src={url}
+      alt={alt || path}
+      title={path}
+      onClick={(event) => {
+        if (!event.currentTarget.closest("a")) window.open(url, "_blank", "noreferrer");
+      }}
+    />
+  );
+}

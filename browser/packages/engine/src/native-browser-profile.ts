@@ -47,7 +47,7 @@ const LABELS: [RegExp, string][] = [
   [/first.?name|given.?name|fname|forename/i, "firstName"],
   [/last.?name|surname|family.?name|lname/i, "lastName"],
   [/middle.?name/i, "middleName"],
-  [/full.?name|^name$|your name/i, "name"],
+  [/full.?name|^(your |customer |contact |applicant |legal )?name$/i, "name"],
   [/e-?mail/i, "email"],
   [/phone|mobile|cell|^tel/i, "phone"],
   [/address.?(line)?.?2|apartment|apt|suite|unit/i, "address2"],
@@ -74,7 +74,9 @@ export function profileFieldFor(field: PageField, saved: readonly string[]): str
   const label = squash(field.label);
   const custom = saved.find((key) => squash(key) === label);
   if (custom) return custom;
-  for (const [pattern, key] of LABELS) if (pattern.test(field.label)) return key;
+  // "Name:" and "Email *" read as Name and Email.
+  const plain = field.label.replace(/[\s:*]+$/, "");
+  for (const [pattern, key] of LABELS) if (pattern.test(plain)) return key;
   return saved.find((key) => squash(key).length > 3 && label.includes(squash(key)));
 }
 
