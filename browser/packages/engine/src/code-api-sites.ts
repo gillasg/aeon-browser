@@ -30,8 +30,28 @@ async function __autoLoadSkills(url) {
   try { notes = String(await __call({siteNotes: url}) || '').trim(); } catch {}
   var parts = [];
   if (lines.length) parts.push('Site skills loaded: ' + lines.join('; '));
+  var mapped = await __mappedNote(url);
+  if (mapped) parts.push(mapped);
   if (notes) parts.push('Site notes for ' + url + ':\\n' + notes.slice(0, 6000));
   return parts.join('\\n\\n');
+}
+// The first look at a mapped site names what it can already do, so the agent calls an ability or
+// the site's API instead of clicking through pages it does not need. Once per site per runtime.
+var __announcedSites = new Set();
+async function __mappedNote(url) {
+  var host = '';
+  try { host = new URL(url).hostname.replace(/^www\\./, ''); } catch { return ''; }
+  if (!host || __announcedSites.has(host)) return '';
+  __announcedSites.add(host);
+  var caps;
+  try { caps = await __call({siteCapabilities: {host}}); } catch { return ''; }
+  var call = (item) => item.name + '(' + (item.inputs || []).join(', ') + ')';
+  var abilities = ((caps && caps.abilities) || []).slice(0, 12).map(call);
+  var reads = ((caps && caps.operations) || []).filter((op) => op.does === 'read');
+  var said = [];
+  if (abilities.length) said.push('abilities ' + abilities.join(', ') + ': site.<name>(inputs)');
+  if (reads.length) said.push('API reads ' + reads.slice(0, 8).map(call).join(', ') + (reads.length > 8 ? ' and ' + (reads.length - 8) + ' more' : '') + ": siteMapper.call('" + host + "', name, params)");
+  return said.length ? host + ' is mapped; prefer these over clicking through pages: ' + said.join('; ') + '. site.capabilities() has the details.' : '';
 }
 var skills = Object.freeze({
   list: (url) => __call({siteSkill:'list', url: url ?? (__lastTarget ? browser.page(__lastTarget).url : undefined)}),

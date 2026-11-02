@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -87,11 +87,28 @@ test(
         { stdio: "ignore" },
       );
       await connectExtension(profile, env);
+      const abilities = join(home, "s2a", "sites", "127.0.0.1", "abilities");
+      await mkdir(abilities, { recursive: true });
+      await writeFile(
+        join(abilities, "find_lamp.json"),
+        JSON.stringify({
+          name: "find_lamp",
+          kind: "read",
+          inputs: { type: "object", properties: { query: { type: "string" } } },
+          ways: [{ kind: "page", collect: {} }],
+        }),
+      );
       const cell = (code) =>
         run(process.execPath, [cli, "repl", "--session", "controls", code], { env });
       const cleared = await cell(`page = await browser.openTab(${JSON.stringify(siteUrl)});
         const result = await page.overlays.dismiss();
         console.log("CLEARED " + JSON.stringify({result, choice: await page.evaluate(() => window.choice ?? null), left: await page.evaluate(() => document.querySelectorAll('#cookies,#promo').length)}));`);
+      // Opening a mapped site names its abilities, so the agent need not click through it.
+      assert.match(
+        cleared.stdout,
+        /\[site\] 127\.0\.0\.1 is mapped.*find_lamp\(query\)/,
+        cleared.stdout,
+      );
       const out = JSON.parse(/CLEARED (.*)/.exec(cleared.stdout)?.[1] ?? "null");
       assert.ok(out, cleared.stdout + cleared.stderr);
       assert.equal(out.choice, "reject", cleared.stdout);
