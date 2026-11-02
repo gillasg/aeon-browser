@@ -19,6 +19,8 @@ import { stepFailure } from "./code-step-errors.js";
 import { jobs } from "./code-runtime-jobs.js";
 import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
+import { noteAgentText } from "./native-browser-password-lock.js";
+import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
 import { browserSessionOwner } from "./native-browser-session.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { notePreviewActivity } from "./native-browser-preview.js";
@@ -280,7 +282,8 @@ const CHECKS: KernelChecks<Cell> = {
 
 async function serveCall(cell: Cell, value: Record<string, unknown> | null): Promise<unknown> {
   const done = value ? await runEffect(EFFECTS, CHECKS, cell, value) : undefined;
-  return done ? done.value : callCore(cell, value);
+  // Nothing that reaches agent code carries a password, whatever answered it.
+  return scrubSecrets(done ? done.value : await callCore(cell, value));
 }
 
 function siteRulesFor(cell: Cell): Promise<SiteRules> {
@@ -309,6 +312,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   const step = await prepare(cell, value);
   authorize(cell, step);
   await enforceSites(cell, step);
+  noteAgentText(step);
   const entry: Record<string, unknown> = {
     index: cell.steps.length,
     action: step,
@@ -323,12 +327,14 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   if (isSubmitLike(step) && "target" in step)
     await captureTypedPassword(step.target.tabId).catch(() => undefined);
   try {
-    const result = await executeLocalBrowserStep(
-      cell.identity,
-      cell.run.chatId,
-      cell.run.toolCallId,
-      cell.operationId,
-      step,
+    const result = await scrubSecrets(
+      await executeLocalBrowserStep(
+        cell.identity,
+        cell.run.chatId,
+        cell.run.toolCallId,
+        cell.operationId,
+        step,
+      ),
     );
     if (result.kind === "tab") {
       await guardCellTab(cell, result.tab.target.tabId);
@@ -357,7 +363,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     return result;
   } catch (error) {
     Object.assign(entry, { disposition: "failed", code: describe(error) });
-    throw await stepFailure(step, error);
+    throw await scrubError(await stepFailure(step, error));
   } finally {
     entry.tEnd = Date.now();
     entry.ms = Math.max(0, Number(entry.tEnd) - Number(entry.tStart ?? entry.tEnd));

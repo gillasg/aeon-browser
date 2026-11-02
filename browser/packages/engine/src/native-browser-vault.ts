@@ -1,6 +1,7 @@
 import { onEngineInstall } from "./native-engine-install.js";
 import { onNode } from "./native-browser-dom.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
+import { rememberSecrets } from "./native-browser-secrets.js";
 
 // Vault login capture: after a password form is filled and submitted, remember the values only
 // long enough to ask the password manager to save them. Success comes from the page itself (the
@@ -109,6 +110,8 @@ export function rememberVaultCandidate(
   source: "agent" | "user",
 ): void {
   if (!form.password) return;
+  // A password a person typed is kept out of everything agent code reads from now on.
+  if (source === "user") rememberSecrets([form.password]);
   candidates.set(tabId, { ...form, source, at: Date.now() });
 }
 

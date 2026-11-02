@@ -57,6 +57,10 @@ export const ERRORS = {
     "user",
     "the user blocked this site for agents: do not try another route; tell them",
   ],
+  PASSWORD_PAGE: [
+    "user",
+    "a password was typed in this page, so no code runs in it: carry on with clicks, or page.reload() to read it again",
+  ],
   UNSUPPORTED: ["page", "this browser cannot do that here: use another way"],
   INVALID_TARGET: ["model", "the target is malformed: pass a tab, a page or a bu id"],
   BROWSER_OFFLINE: ["user", "the browser is not connected: ask the user to open Chrome"],

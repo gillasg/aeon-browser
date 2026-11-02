@@ -603,7 +603,10 @@ export function uiScript(
     let items = [];
     try { items = [...document.querySelectorAll(sel)]; } catch {}
     // New answer elements, minus the user's own bubble (some sites style both alike).
-    const fresh = items.slice(before).filter((el) => !el.innerText.includes(prompt));
+    // The bubble is the prompt with at most a button label after it; an answer that repeats the
+    // question still has its own text.
+    const own = (el) => { const t = el.innerText.trim(); return t.startsWith(prompt) && t.length - prompt.length < 40; };
+    const fresh = items.slice(before).filter((el) => !own(el));
     let text = fresh.length ? fresh[fresh.length - 1].innerText : "";
     // No answer selector matches on this page at all: fall back to the text after the prompt.
     if (!text && !items.length) { const body = document.body.innerText; const at = body.lastIndexOf(prompt); text = at >= 0 ? body.slice(at + prompt.length) : ""; }
