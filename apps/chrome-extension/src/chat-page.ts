@@ -11,7 +11,7 @@ import "./project-bridge.js";
 import { installFileViewerLinks } from "./file-viewer-launch.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import { createElement } from "react";
-import { createToolImageLoader } from "./tool-image-client.js";
+import { createToolImageLoader, createWorkspaceImageLoader } from "./tool-image-client.js";
 import {
   type ChatViewSnapshotDto,
   type DaemonUiResponse,
@@ -105,6 +105,7 @@ function giveBack(tabId: number): void {
 }
 let client: UiClient | undefined;
 const fetchToolImage = createToolImageLoader(() => client, chatId);
+const fetchWorkspaceImage = createWorkspaceImageLoader(() => client, chatId);
 let catalogClient: UiClient | undefined;
 let subscriptionId = "";
 let cursor: { epoch: string; revision: number } | undefined;
@@ -199,6 +200,7 @@ function createView() {
     onGiveBack: giveBack,
     rows: initialDisplay.rows(transcript.rows),
     loadToolImage: fetchToolImage,
+    loadWorkspaceImage: fetchWorkspaceImage,
     transcriptActionsDisabled: runState !== "idle",
     chats: sidebar.chats,
     runningChatIds: chatRuns.running,

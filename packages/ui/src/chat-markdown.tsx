@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { useState, type ReactElement, type ReactNode, isValidElement } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { copyTextToClipboard } from "./clipboard.js";
+import { IMAGE_PATH, WorkspaceImage } from "./tool-images.js";
 
 const components: Components = {
   a: ({ children, href }) =>
@@ -31,7 +32,9 @@ const components: Components = {
   // Images stay thumbnails (several sit side by side); a click opens the full image, unless the
   // image is itself a link.
   img: ({ src, alt }) =>
-    typeof src === "string" && src ? (
+    typeof src === "string" && localFilePath(src) && IMAGE_PATH.test(src) ? (
+      <WorkspaceImage path={localFilePath(src) ?? src} alt={alt ?? ""} />
+    ) : typeof src === "string" && src ? (
       <img
         className="markdown-image"
         src={src}

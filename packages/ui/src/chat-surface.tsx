@@ -11,10 +11,16 @@ import { LoadedResources, type LoadedResourcesState } from "./loaded-resources.j
 import type { TranscriptRow } from "./transcript-model.js";
 import { PiSessionPanel } from "./pi-session-panel.js";
 import { ExtensionDialogs } from "./extension-dialogs.js";
-import { ToolImageContext, type ToolImageLoader } from "./tool-images.js";
+import {
+  ToolImageContext,
+  WorkspaceImageContext,
+  type ToolImageLoader,
+  type WorkspaceImageLoader,
+} from "./tool-images.js";
 
 export interface ChatSurfaceProps {
   loadToolImage?: ToolImageLoader | undefined;
+  loadWorkspaceImage?: WorkspaceImageLoader | undefined;
   developmentFixture: boolean;
   /** The orb's box: no start page, the transcript and a small composer only. */
   compact?: boolean | undefined;
@@ -81,11 +87,13 @@ export function ChatSurface(props: ChatSurfaceProps): ReactElement {
         }}
       />
       <ToolImageContext.Provider value={props.loadToolImage}>
-        <div className="chat-content-host">
-          <AnnotationProvider key={props.chatId}>
-            <ChatContent {...props} />
-          </AnnotationProvider>
-        </div>
+        <WorkspaceImageContext.Provider value={props.loadWorkspaceImage}>
+          <div className="chat-content-host">
+            <AnnotationProvider key={props.chatId}>
+              <ChatContent {...props} />
+            </AnnotationProvider>
+          </div>
+        </WorkspaceImageContext.Provider>
       </ToolImageContext.Provider>
     </div>
   );

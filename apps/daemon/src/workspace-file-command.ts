@@ -12,15 +12,9 @@ export async function sendWorkspaceFile(
   service: ChatService,
   request: Extract<DaemonUiRequest, { operation: "workspace.file" }>,
 ): Promise<void> {
-  const chat = service.getChat(asChatId(request.payload.chatId));
-  if (!chat) throw new Error("Chat not found.");
-  const root = await realpath(chat.workingDirectory);
-  const path = await realpath(resolve(root, request.payload.path));
-  const child = relative(root, path);
-  if (child === ".." || child.startsWith("../") || child.startsWith("..\\") || isAbsolute(child))
-    throw new Error(
-      "This file is outside the chat workspace. Open it from a chat in that project.",
-    );
+  const path = await workspacePath(service, request.payload.chatId, request.payload.path);
+  if (IMAGE_TYPES[extname(path).slice(1).toLowerCase()])
+    throw new Error("Images open in the chat, not as text.");
   const file = await open(path, "r");
   try {
     const stat = await file.stat();
@@ -49,6 +43,27 @@ export async function sendWorkspaceFile(
   } finally {
     await file.close();
   }
+}
+
+export const IMAGE_TYPES: Record<string, "image/png" | "image/jpeg" | "image/webp" | "image/gif"> =
+  { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
+
+/** A path inside the chat's workspace, resolved; anything outside it is refused. */
+export async function workspacePath(
+  service: ChatService,
+  chatId: string,
+  requested: string,
+): Promise<string> {
+  const chat = service.getChat(asChatId(chatId));
+  if (!chat) throw new Error("Chat not found.");
+  const root = await realpath(chat.workingDirectory);
+  const path = await realpath(resolve(root, requested));
+  const child = relative(root, path);
+  if (child === ".." || child.startsWith("../") || child.startsWith("..\\") || isAbsolute(child))
+    throw new Error(
+      "This file is outside the chat workspace. Open it from a chat in that project.",
+    );
+  return path;
 }
 
 function language(path: string): string {
