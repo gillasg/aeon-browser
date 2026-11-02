@@ -177,3 +177,28 @@ test("MCP: scrape, map and crawl tools over stdio", async (t) => {
   });
   assert.equal(JSON.parse(pages.result.content[0].text).length, 2);
 });
+
+test("a .md export is the whole site as one Markdown file with its contents first", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "crawl-md-"));
+  const file = join(dir, "site.md");
+  await writeOutput(
+    [
+      { url: "https://docs.example/", title: "Home", status: 200, depth: 0, markdown: "Welcome." },
+      { url: "https://docs.example/gone", status: 404, depth: 1 },
+      {
+        url: "https://docs.example/start",
+        title: "Start",
+        status: 200,
+        depth: 1,
+        markdown: "Install it.",
+      },
+    ],
+    file,
+  );
+  const text = await readFile(file, "utf8");
+  assert.match(
+    text,
+    /^# docs\.example\n\n2 pages\.\n\n- \[Home\]\(https:\/\/docs\.example\/\)\n- \[Start\]/,
+  );
+  assert.match(text, /## Start\n\nSource: https:\/\/docs\.example\/start\n\nInstall it\.\n$/);
+});

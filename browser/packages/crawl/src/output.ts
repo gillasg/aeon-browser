@@ -2,7 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { PageResult } from "./types.js";
 
-// Exports: JSON lines, CSV, or a dataset folder (one Markdown and one JSON file per page, plus an index).
+// Exports: JSON lines, CSV, one Markdown file for a whole site (llms.txt style: contents, then every
+// page under its own heading), or a dataset folder (one Markdown and one JSON file per page, plus an index).
 
 const CSV_COLUMNS = [
   "url",
@@ -78,11 +79,28 @@ export async function writeDataset(results: PageResult[], dir: string): Promise<
   await writeFile(join(dir, "index.json"), JSON.stringify(index, null, 2));
 }
 
-/** Writes results by file type: .jsonl, .csv, .json, or a folder. */
+/** The whole crawl as one Markdown file: a contents list, then each page under its title. */
+export function toMarkdownBundle(results: PageResult[]): string {
+  const pages = results.flatMap((result) =>
+    result.markdown?.trim() ? [{ ...result, text: result.markdown.trim() }] : [],
+  );
+  const first = pages[0];
+  if (!first) return "";
+  const host = new URL(first.url).host;
+  const title = (result: PageResult) => (result.title?.trim() || result.url).replace(/\s+/g, " ");
+  const contents = pages.map((result) => `- [${title(result)}](${result.url})`);
+  const body = pages.map(
+    (result) => `## ${title(result)}\n\nSource: ${result.url}\n\n${result.text}`,
+  );
+  return [`# ${host}`, `${pages.length} pages.`, contents.join("\n"), ...body].join("\n\n") + "\n";
+}
+
+/** Writes results by file type: .jsonl, .csv, .json, .md (one file), or a folder. */
 export async function writeOutput(results: PageResult[], target: string): Promise<void> {
   const extension = extname(target).toLowerCase();
   if (extension === ".jsonl") await writeFile(target, toJsonl(results));
   else if (extension === ".csv") await writeFile(target, toCsv(results));
   else if (extension === ".json") await writeFile(target, JSON.stringify(results, null, 2));
+  else if (extension === ".md") await writeFile(target, toMarkdownBundle(results));
   else await writeDataset(results, target);
 }

@@ -4,7 +4,8 @@
   or the `browser_code` MCP tool.
 - **Read a lot of pages** (a page, a section, a whole site, a sitemap, search results): `crawl`,
   `scrape`, `map-urls`, `search`. Plain HTTP first, the browser only when a page needs it. Much
-  cheaper than driving each page.
+  cheaper than driving each page. A whole site as one Markdown file for any AI (docs, a wiki, a
+  blog): `browserkit crawl <url> --out site.md`.
 - **Which of many sites load** (dead links, parked domains, which answer an API path): `browserkit
 check <urls|--file f>`, with evidence per site. Far cheaper than opening each one.
 - **Call a site's API**: only if the site is mapped (`browserkit sites`). One call replaces many
