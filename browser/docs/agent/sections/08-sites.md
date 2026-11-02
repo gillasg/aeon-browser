@@ -14,6 +14,8 @@ browserkit abilities run shop.example order --inputs '{"item":"tea"}' --key orde
 browserkit abilities test shop.example search  # its stored cases; fails on constant output
 ```
 
+- **A `[site]` line** appears when you open a mapped site: it names the site's abilities and API
+  reads. Use them instead of clicking through the pages.
 - **Start with `site.capabilities()`** in browser code (or `browserkit capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
   `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.

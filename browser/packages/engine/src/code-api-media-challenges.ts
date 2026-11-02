@@ -125,6 +125,8 @@ async function __handoffUntilClear(message, target, options) {
 async function __noteChallenge(target, url) {
   var note = await __challengeNote(target, url, 'open').catch(() => '');
   if (note) console.log('[warn] ' + note.split('\\n').join('\\n[warn] ') + ' (or bu.handoff(message, {wait: true}) and continue when it clears)');
+  var mapped = await __mappedNote(url).catch(() => '');
+  if (mapped) console.log('[site] ' + mapped);
 }
 // A line for bu.state (and one for opening the page), once per page and kind.
 async function __challengeNote(target, url, scope = 'state') {
