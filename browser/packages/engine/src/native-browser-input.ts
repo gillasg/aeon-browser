@@ -292,6 +292,11 @@ const MAC_COMMANDS: Record<string, string> = {
 async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Promise<unknown> {
   const parts = combo.split("+"),
     key = parts.pop();
+  if (!key && combo.length > 1) {
+    // "C++": text ending in a plus is typed, not read as a combo.
+    await humanType(debuggee, combo);
+    return { typed: combo.length };
+  }
   if (!key) throw new Error("INVALID_TARGET");
   const masks: Record<string, number> = {
     Alt: 1,

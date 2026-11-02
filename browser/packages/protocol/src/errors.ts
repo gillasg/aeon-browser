@@ -253,6 +253,8 @@ const NAMED: ReadonlyArray<[RegExp, ErrorCode]> = [
   ],
   [/^(SITE_TOOL_UNKNOWN|SITE_PAGE_TOOL_UNKNOWN|ABILITY_UNKNOWN)\b/, "NOT_MAPPED"],
   [/^(ABILITY_TIMEOUT|PROVIDER_TIMEOUT)\b/, "TIMEOUT"],
+  [/^PROVIDER_NOT_SENT\b/, "SIGNED_OUT"],
+  [/^PROVIDER_UI\b/, "SITE_BROKEN"],
   [/^(INPUT_NOT_APPLIED|MEDIA_EMPTY|ABILITY_FAILED)\b/, "SITE_BROKEN"],
   [/^Challenged|bot (wall|check)|captcha|cloudflare|datadome|perimeterx|akamai/i, "BOT_WALL"],
   [/signed[ -]out|not signed in|log ?in required|session (expired|missing)/i, "SIGNED_OUT"],

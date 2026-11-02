@@ -83,9 +83,13 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     defaultModel: "auto",
     direct: "chatgpt",
     ui: {
-      composer: ["#prompt-textarea", "div[contenteditable='true']"],
+      composer: [
+        ".ProseMirror[contenteditable='true']",
+        "#prompt-textarea",
+        "div[contenteditable='true']",
+      ],
       send: ["[data-testid='send-button']", "button[aria-label*='Send']"],
-      answer: ["[data-message-author-role='assistant']"],
+      answer: ["[data-markdown-copy='contents']", "[data-message-author-role='assistant']"],
       stop: ["[data-testid='stop-button']"],
     },
   },
@@ -131,7 +135,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     defaultModel: "auto",
     direct: "grok",
     ui: {
-      composer: ["textarea", "div[contenteditable='true']"],
+      composer: [".ProseMirror[contenteditable='true']", "div[contenteditable='true']", "textarea"],
       send: ["button[type='submit']", "button[aria-label*='Submit']"],
       answer: [".message-bubble", "[data-testid='assistant-message']"],
       stop: ["button[aria-label*='Stop']"],
@@ -140,15 +144,15 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
   kimi: {
     id: "kimi",
     name: "Kimi",
-    host: "kimi.moonshot.cn",
-    chatUrl: "https://kimi.moonshot.cn/",
-    cookieDomains: ["kimi.moonshot.cn", ".moonshot.cn"],
+    host: "www.kimi.com",
+    chatUrl: "https://www.kimi.com/",
+    cookieDomains: ["kimi.com", ".kimi.com", "kimi.moonshot.cn", ".moonshot.cn"],
     models: ["auto", "kimi-k2", "kimi-k1.5"],
     defaultModel: "auto",
     direct: "kimi",
     ui: {
-      composer: ["div[contenteditable='true']", "textarea"],
-      send: ["button[class*='send']", "button[type='submit']"],
+      composer: [".chat-input-editor", "div[contenteditable='true']", "textarea"],
+      send: ["[class*='send-button']", "button[class*='send']", "button[type='submit']"],
       answer: [".markdown", "[class*='message'] .markdown"],
       stop: ["button[aria-label*='Stop']"],
     },
@@ -538,7 +542,48 @@ export async function askDirect(
   }
 }
 
-/** The page fallback: open the provider, type the prompt, read the answer element. */
+// Finds the page's message box (the provider's own selectors first, then any visible text box),
+// marks it, types the prompt and sends it with Enter, clicking Send only if the text is still
+// there. Chat sites redesign often; this survives a renamed class or a new editor.
+function sendPromptCode(definition: ProviderDefinition, prompt: string): string {
+  return `const prompt = ${JSON.stringify(prompt)};
+  const composers = ${JSON.stringify([...definition.ui.composer, "[role='textbox']", "textarea", "[contenteditable='true']"])};
+  let marked = false;
+  for (let i = 0; i < 30 && !marked; i++) {
+    marked = await page.evaluate((list) => {
+      // A real message box is at least a line tall; hidden mirror textareas are not.
+      const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height >= 20; };
+      for (const selector of list) {
+        let found;
+        try { found = [...document.querySelectorAll(selector)].find(shown); } catch { continue; }
+        if (found) { document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer")); found.setAttribute("data-aeon-composer", ""); return true; }
+      }
+      return false;
+    }, composers);
+    if (!marked) await page.waitForTimeout(500);
+  }
+  if (!marked) throw new Error("PROVIDER_UI: no message box on the page; the user may be signed out, or the page changed");
+  const box = page.locator("[data-aeon-composer]").first();
+  await box.click();
+  // Some sites keep an unsent draft in the box: clear it so only this prompt is sent.
+  await page.keyboard("Control+a");
+  await page.keyboard("Backspace");
+  await page.cdp("Input.insertText", { text: prompt });
+  await page.waitForTimeout(400);
+  await box.press("Enter");
+  await page.waitForTimeout(1500);
+  const left = () => page.evaluate(() => { const el = document.querySelector("[data-aeon-composer]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
+  if (await left()) {
+    for (const selector of ${JSON.stringify(definition.ui.send)}) {
+      const send = page.locator(selector).first();
+      if (await send.count().catch(() => 0)) { await send.click().catch(() => {}); break; }
+    }
+    await page.waitForTimeout(1500);
+    if (await left()) throw new Error("PROVIDER_NOT_SENT: the prompt stayed in ${definition.name}'s message box; the user is probably signed out there (sign in to ${definition.host} in Chrome), or the page changed");
+  }`;
+}
+
+/** The page fallback: open the provider, type the prompt, read the newest answer. */
 export function uiScript(
   provider: ProviderId,
   prompt: string,
@@ -547,22 +592,39 @@ export function uiScript(
   const definition = PROVIDERS[provider];
   const timeout = Math.min(options.timeoutMs ?? 120000, 300000);
   const poll = Math.min(Math.max(options.pollMs ?? 700, 100), 5000);
-  const first = (selectors: string[]) => JSON.stringify(selectors[0] ?? "");
   return `(async () => {
-  const prompt = ${JSON.stringify(prompt)};
   const deadline = Date.now() + ${timeout};
-  const textOf = async () => (await page.locator(${first(definition.ui.answer)}).allTextContents())
-    .map((item) => item.trim()).filter(Boolean).join("\\n");
-  const composer = page.locator(${first(definition.ui.composer)}).first();
-  await composer.click();
-  await composer.fill(prompt);
-  await page.locator(${first(definition.ui.send)}).first().click();
+  const answers = ${JSON.stringify(definition.ui.answer.join(", "))};
+  const stops = ${JSON.stringify((definition.ui.stop ?? []).join(", "))};
+  const before = await page.evaluate((sel) => { try { return document.querySelectorAll(sel).length; } catch { return 0; } }, answers);
+  ${sendPromptCode(definition, prompt)}
+  // The newest answer element, else the page text after the prompt; never the prompt itself.
+  const read = () => page.evaluate(({ sel, stop, before, prompt, label }) => {
+    let items = [];
+    try { items = [...document.querySelectorAll(sel)]; } catch {}
+    // New answer elements, minus the user's own bubble (some sites style both alike).
+    const fresh = items.slice(before).filter((el) => !el.innerText.includes(prompt));
+    let text = fresh.length ? fresh[fresh.length - 1].innerText : "";
+    // No answer selector matches on this page at all: fall back to the text after the prompt.
+    if (!text && !items.length) { const body = document.body.innerText; const at = body.lastIndexOf(prompt); text = at >= 0 ? body.slice(at + prompt.length) : ""; }
+    text = text.trim();
+    if (text.startsWith(prompt)) text = text.slice(prompt.length).trim();
+    // Some sites head the answer with their own name ("Grok").
+    const head = text.split("\\n")[0].trim();
+    if (head.toLowerCase() === label.toLowerCase()) text = text.slice(text.indexOf(head) + head.length).trim();
+    // A copy for screen readers can repeat the whole answer.
+    const half = (text.length - 1) / 2;
+    if (Number.isInteger(half) && text.slice(0, half) === text.slice(half + 1)) text = text.slice(0, half);
+    let busy = false;
+    try { busy = Boolean(stop && document.querySelector(stop)); } catch {}
+    return { text, busy };
+  }, { sel: answers, stop: stops, before, prompt, label: ${JSON.stringify(definition.name)} });
   let last = "", stable = 0;
   while (Date.now() < deadline) {
     await page.waitForTimeout(${poll});
-    const text = await textOf();
-    if (text && text === last) { if (++stable >= 3) return text; }
-    else { last = text; stable = 0; }
+    const now = await read();
+    if (now.text && now.text === last && !now.busy) { if (++stable >= 3) return now.text; }
+    else { last = now.text; stable = 0; }
   }
   if (last) return last;
   throw new Error("PROVIDER_TIMEOUT: no answer appeared; the provider's page may have changed");
@@ -604,27 +666,33 @@ export function imageScript(
   const out = (options.out ?? "gemini-image.png").replace(/[^A-Za-z0-9._/-]+/g, "-");
   const files = options.images?.length ? JSON.stringify(options.images) : undefined;
   return `(async () => {
-  const prompt = ${JSON.stringify(prompt)};
   const deadline = Date.now() + ${Math.min(options.timeoutMs ?? 180000, 300000)};
-  const composer = page.locator(${firstOf(PROVIDERS.gemini.ui.composer)}).first();
-  await composer.click();
-  await composer.fill(prompt);
   ${files ? `await page.upload("input[type=file]", ${files});` : ""}
-  await page.locator(${firstOf(PROVIDERS.gemini.ui.send)}).first().click();
+  // Images already on the page (avatar, uploads, older answers) are never the answer.
+  await page.evaluate(() => document.querySelectorAll("img").forEach((img) => img.setAttribute("data-aeon-old", "")));
+  ${sendPromptCode(PROVIDERS.gemini, prompt)}
   while (Date.now() < deadline) {
     await page.waitForTimeout(1000);
-    const image = await page.locator("img[src^='data:image'], img[src*='googleusercontent']").last();
-    if (await image.count()) {
-      const saved = await page.saveMedia(${JSON.stringify("img[src^='data:image'], img[src*='googleusercontent']")}, { name: ${JSON.stringify(out)} });
+    const found = await page.evaluate(() => {
+      const fresh = [...document.querySelectorAll("img:not([data-aeon-old])")].filter((img) => {
+        const box = img.getBoundingClientRect();
+        return img.complete && img.naturalWidth >= 256 && box.width >= 150 && box.height >= 150;
+      });
+      const image = fresh[fresh.length - 1];
+      if (!image) return "";
+      // Gemini shows a blob it may already have revoked: read the pixels on screen.
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      try { canvas.getContext("2d").drawImage(image, 0, 0); return canvas.toDataURL("image/jpeg", 0.92); } catch { return image.currentSrc || image.src; }
+    });
+    if (found) {
+      const saved = await page.saveMedia(found, { name: ${JSON.stringify(out)} });
       return { saved };
     }
   }
   throw new Error("PROVIDER_TIMEOUT: Gemini returned no image; the page may have changed");
 })()`;
-}
-
-function firstOf(selectors: string[]): string {
-  return JSON.stringify(selectors[0] ?? "");
 }
 
 /** What a provider call can do right now, for "providers" and the ask command's errors. */

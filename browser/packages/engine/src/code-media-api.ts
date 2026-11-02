@@ -64,9 +64,17 @@ async function __mediaSources(args) {
     }
     if (!url) continue;
     url = new URL(url, location.href).href;
-    out.push(url.startsWith('blob:') ? {url, data: await asData(url)} : {url});
+    out.push(url.startsWith('blob:') ? {url, data: await asData(url).catch(() => __pixels(item))} : {url});
   }
   return out;
+  // A revoked blob: the image still on screen, redrawn (same-origin pixels are readable).
+  function __pixels(img) {
+    if (!(img instanceof HTMLImageElement) || !img.naturalWidth) throw Error('DOWNLOAD_FAILED: the page no longer serves ' + img.src);
+    var canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    return canvas.toDataURL('image/png');
+  }
 }
 function __mediaName(url, mime, index, options) {
   var base = 'file';
