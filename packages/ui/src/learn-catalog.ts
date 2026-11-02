@@ -83,6 +83,24 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
     example: "Save every image from the Instagram post I have open",
   },
   {
+    topic: "browse",
+    title: "Fills in your details",
+    body: "Name, address and other details go into forms from a profile kept on this computer; the AI never reads them. Anything missing, Aeon asks you and can keep.",
+    example: "Fill in the sign-up form I have open with my details",
+  },
+  {
+    topic: "browse",
+    title: "Make an image",
+    body: "Any image model you have connected makes it, and the image is saved with the chat.",
+    example: "Make a wide banner image for the page I have open",
+  },
+  {
+    topic: "browse",
+    title: "Turn a file into data",
+    body: "An invoice, a PDF or a pasted page, turned into exact rows and fields.",
+    example: "Turn the invoice I just downloaded into a table of line items with prices",
+  },
+  {
     topic: "watch",
     title: "Tell me when it changes",
     body: "Aeon checks a page for you and only tells you about what's new.",
@@ -105,6 +123,19 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
     title: "Repeat a chore without AI",
     body: "Once Aeon knows the steps, a routine runs them with no model calls at all.",
     example: "Fill in my timesheet every Friday at 5pm",
+  },
+  {
+    topic: "watch",
+    title: "Grab it the moment it opens",
+    body: "Aeon gets the page ready early and acts the second a slot, drop or sign-up opens.",
+    example: "Book the 7am spin class the moment booking opens at 9:00 tomorrow",
+  },
+  {
+    topic: "watch",
+    title: "A table that fills itself",
+    body: "Give it a list and the columns you want; Aeon fills them from the web and keeps them current.",
+    example:
+      "Make a table of these startups with their latest funding round and refresh it every week: ",
   },
   {
     topic: "sites",
@@ -138,6 +169,18 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
       "Find the API behind Google Flights and get prices to Tokyo for every weekend in March",
   },
   {
+    topic: "sites",
+    title: "Ask several shops at once",
+    body: "One question to the sites Aeon knows, one answer showing where each part came from.",
+    example: "Which of Amazon, Flipkart and Croma has the Sony WH-1000XM5 cheapest right now?",
+  },
+  {
+    topic: "sites",
+    title: "Use a site from your other apps",
+    body: "Any site Aeon knows can become an API or an MCP server that other tools call, signed in as you.",
+    example: "Turn Goodreads into an MCP server I can use from Claude Desktop",
+  },
+  {
     topic: "shortcuts",
     title: "Call Aeon on any page",
     body: "Ctrl+Shift+Space opens Aeon with the page you're on as context.",
@@ -154,6 +197,12 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
     title: "Clear the clutter",
     body: "Cookie banners, newsletter pop-ups and overlays, gone in one step.",
     example: "Open the New York Times homepage and clear every pop-up",
+  },
+  {
+    topic: "shortcuts",
+    title: "Change how Aeon works",
+    body: "Ask in chat to change its tab view, cursor or tab groups, and it sticks.",
+    example: "From now on, show the agent's tabs in split view next to the chat",
   },
   {
     topic: "shortcuts",
