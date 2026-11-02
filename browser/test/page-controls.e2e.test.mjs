@@ -36,7 +36,18 @@ test(
           <label>Email <input name="email"></label>
           <label>Country <select name="country"><option>Canada</option><option>India</option></select></label>
           <label><input type="checkbox" name="agree"> I agree</label>
-          <button>Continue</button></form>`);
+          <button>Continue</button></form><script src="/app.js"></script>`);
+        return;
+      }
+      if (request.url === "/app.js") {
+        response.setHeader("content-type", "text/javascript");
+        response.end(
+          [
+            "var x = 1;",
+            "function signRequest(body) { return 'sig-' + body.length; }",
+            "indexedDB.open('shop', 1).onupgradeneeded = (e) => e.target.result.createObjectStore('cart').put({sku: 7}, 'a');",
+          ].join("\n"),
+        );
         return;
       }
       const mobile = /iPhone|Mobile/.test(request.headers["user-agent"] ?? "");
@@ -91,6 +102,17 @@ test(
       const sent = JSON.parse(/FORM (.*)/.exec(form.stdout)?.[1] ?? "null");
       assert.ok(sent?.ok, form.stdout + form.stderr);
       assert.match(sent.text, /Thanks, a@b\.c from India \(agreed\)/, form.stdout);
+      // DevTools: sources search finds where a site builds its signature; storage lists IndexedDB.
+      const tools = await cell(`await page.waitForTimeout(300);
+        console.log("TOOLS " + JSON.stringify({src: await page.sources({search: 'signRequest('}), store: await page.storage()}));`);
+      const found = JSON.parse(/TOOLS (.*)/.exec(tools.stdout)?.[1] ?? "null");
+      assert.equal(found?.src.hits[0]?.line, 2, tools.stdout + tools.stderr);
+      assert.match(found.src.hits[0].file, /app\.js/, tools.stdout);
+      assert.deepEqual(
+        found.store.indexedDB[0]?.stores,
+        [{ name: "cart", count: 1 }],
+        tools.stdout,
+      );
       // A watcher's keyed diff: the first call is the baseline, later calls name what moved.
       const diff = await cell(`browser.changes('rows', [{id: 1, p: 5}, {id: 2}]);
         console.log("DIFF " + JSON.stringify(browser.changes('rows', [{id: 1, p: 4}, {id: 3}])));`);
