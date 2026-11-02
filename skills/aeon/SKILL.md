@@ -59,7 +59,8 @@ pass back `steps` as `since`); `aeon_run_status` lists chats waiting on a questi
   or the `browser_code` MCP tool.
 - **Read a lot of pages** (a page, a section, a whole site, a sitemap, search results): `crawl`,
   `scrape`, `map-urls`, `search`. Plain HTTP first, the browser only when a page needs it. Much
-  cheaper than driving each page.
+  cheaper than driving each page. A whole site as one Markdown file for any AI (docs, a wiki, a
+  blog): `aeon crawl <url> --out site.md`.
 - **Which of many sites load** (dead links, parked domains, which answer an API path): `aeon
 check <urls|--file f>`, with evidence per site. Far cheaper than opening each one.
 - **Call a site's API**: only if the site is mapped (`aeon sites`). One call replaces many

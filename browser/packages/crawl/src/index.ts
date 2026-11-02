@@ -15,7 +15,7 @@ export { findList, type FindOptions, type FoundRow } from "./find.js";
 export { syncSite, type SyncReport } from "./sync.js";
 export { startServer, type CrawlServer, type ServerOptions } from "./server.js";
 export { runMcpServer } from "./mcp.js";
-export { writeOutput, writeDataset, toCsv, toJsonl } from "./output.js";
+export { writeOutput, writeDataset, toCsv, toJsonl, toMarkdownBundle } from "./output.js";
 export { AutoFetcher, needsBrowser, type AutoOptions } from "./fetch/auto.js";
 export { botCheck, isNetworkRefusal, isDnsFailure } from "./challenge.js";
 export {

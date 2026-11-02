@@ -23,7 +23,7 @@ const usage = `browser-crawl: crawl anything, including behind your logins.
   map <url>                  list URLs   [--search phrase] [--limit n]
   crawl <url>                a site      [--limit n] [--max-depth n] [--include /blog/**] [--exclude ...]
                                          [--query text --adaptive] [--strategy bfs|dfs|best] [--source all|sitemaps|links]
-                                         [--out results.jsonl|.csv|.json|folder] [--state dir] [--hooks file.mjs]
+                                         [--out results.jsonl|.csv|.json|site.md|folder] [--state dir] [--hooks file.mjs]
   crawl --prompt "<request>" describe the crawl in plain English (needs a model)
   crawl --api <site>:<operation>         every item of a site mapped with site-to-api
   crawl --resume <job id or state dir>   continue a paused or interrupted crawl
