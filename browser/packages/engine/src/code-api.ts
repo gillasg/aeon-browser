@@ -320,6 +320,8 @@ var browser = Object.freeze({
   job: __job,
   // Act at an exact moment with a warmed tab, a prefilled form and retries: browser.snipe({at, url, prepare, fire, done}).
   snipe: (options) => __snipe(options),
+  // What is new, changed or gone since the last call with that name: browser.changes(name, items, {key}).
+  changes: (name, items, options) => __changes(name, items, options),
   // Bulk capture over many URLs (a job mode): browser.sweep(urls, {gate, capture, play, evidence}).
   sweep: __sweep,
   // Stop a running job: browser.jobCancel(jobId), then browser.job(id) reports cancelled.
@@ -493,10 +495,14 @@ var browser = Object.freeze({
         return {reset: true};
       }
       if (options.device && !device) throw Error('Unknown device; use one of ' + Object.keys(__devices).join(', '));
-      // Reload before emulating: a reload can reconnect the debugger, and a reconnected session
-      // starts without the overrides it had.
-      if (device && options.reload !== false) await page.cdp('Page.reload', {});
+      // Emulate, reload so sites that pick a layout from the user agent serve the mobile one, then
+      // emulate again: a reload can reconnect the debugger, and a new session starts without them.
       await apply();
+      if (device && options.reload !== false) {
+        await page.cdp('Page.reload', {});
+        await page.waitForLoadState('domcontentloaded').catch(() => {});
+        await apply();
+      }
       return {device: options.device, colorScheme: options.colorScheme, timezone: options.timezone, locale: options.locale};
     },
     popups: () => __step({op:"popups", target}),

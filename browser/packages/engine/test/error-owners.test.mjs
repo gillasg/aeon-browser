@@ -33,6 +33,12 @@ test("the model's own JavaScript errors are the model's; ours stay ours", () => 
     classifyError(new Error("Cannot read properties of undefined (reading 'id')"), "model-code"),
     "CODE_ERROR",
   );
+  // The model's own throw, or a helper refusing its input, is the model's too, never ours.
+  assert.equal(
+    classifyError(new Error("page.batch takes a list of steps"), "model-code"),
+    "CODE_ERROR",
+  );
+  assert.equal(classifyError(new Error("page.batch takes a list of steps")), "INTERNAL");
 });
 
 test("failures found in real traces each get their owner's code", () => {

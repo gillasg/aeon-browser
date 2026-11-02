@@ -308,6 +308,20 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
             })
             .strict()
             .optional(),
+          /** fetch/XHR calls the action caused, failures first. */
+          requests: z
+            .array(
+              z
+                .object({
+                  method: z.string().max(20),
+                  url: z.string().max(500),
+                  status: z.number().int().optional(),
+                  error: z.string().max(200).optional(),
+                })
+                .strict(),
+            )
+            .max(8)
+            .optional(),
         })
         .strict()
         .optional(),

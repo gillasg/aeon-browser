@@ -1,14 +1,26 @@
 import { onEngineInstall } from "./native-engine-install.js";
 
 // Per-tab receipts for one action: popups it opened, a dialog it raised, a download it started,
-// and whether the page navigated. Subscribers are intentionally not the source: they are per
+// the fetch/XHR calls it caused (so a submit shows whether the server took it), and whether the
+// page navigated. Subscribers are intentionally not the source: they are per
 // chat and would also report work started outside the action being measured.
 export interface ActionReceipt {
   popups: { tabId: number; url: string }[];
   dialog?: { type: string; message: string; accepted: boolean };
   navigated: boolean;
   download?: { url: string; filename: string; token?: string };
+  requests?: ReceiptRequest[];
 }
+export interface ReceiptRequest {
+  method: string;
+  url: string;
+  status?: number;
+  error?: string;
+}
+
+/** Calls kept per receipt; failures are always kept over successes. */
+const MAX_REQUESTS = 8;
+const pending = new Map<string, ReceiptRequest>();
 
 const receipts = new Map<number, ActionReceipt>();
 
@@ -25,7 +37,44 @@ export function noteReceiptPopup(openerId: number, tabId: number, url = ""): voi
 export function takeReceipt(tabId: number): ActionReceipt {
   const receipt = receipts.get(tabId) ?? { popups: [], navigated: false };
   receipts.delete(tabId);
+  if (receipt.requests) {
+    for (const [id, item] of pending) if (receipt.requests.includes(item)) pending.delete(id);
+    receipt.requests = keptRequests(receipt.requests);
+  }
   return receipt;
+}
+
+function keptRequests(requests: ReceiptRequest[]): ReceiptRequest[] {
+  const failed = requests.filter((item) => item.error || (item.status ?? 0) >= 400);
+  const rest = requests.filter((item) => !failed.includes(item));
+  return [...failed, ...rest].slice(0, MAX_REQUESTS);
+}
+
+function noteNetwork(
+  receipt: ActionReceipt,
+  method: string,
+  params: Record<string, unknown>,
+): void {
+  const id = String(params.requestId ?? "");
+  if (method === "Network.requestWillBeSent") {
+    if (params.type !== "XHR" && params.type !== "Fetch") return;
+    const request = (params.request ?? {}) as { method?: string; url?: string };
+    const item = {
+      method: String(request.method ?? "GET"),
+      url: String(request.url ?? "").slice(0, 500),
+    };
+    (receipt.requests ??= []).push(item);
+    pending.set(id, item);
+    return;
+  }
+  const item = pending.get(id);
+  if (!item) return;
+  if (method === "Network.responseReceived")
+    item.status = Number((params.response as { status?: number } | undefined)?.status ?? 0);
+  else if (method === "Network.loadingFailed") {
+    item.error = String(params.errorText ?? "failed").slice(0, 200);
+    pending.delete(id);
+  } else if (method === "Network.loadingFinished") pending.delete(id);
 }
 
 onEngineInstall(() => {
@@ -33,6 +82,10 @@ onEngineInstall(() => {
     if (source.tabId === undefined) return;
     const receipt = receipts.get(source.tabId);
     if (!receipt) return;
+    if (method.startsWith("Network.")) {
+      noteNetwork(receipt, method, (params ?? {}) as Record<string, unknown>);
+      return;
+    }
     if (method === "Page.javascriptDialogOpening") {
       const value = params as { type?: string; message?: string };
       receipt.dialog = {

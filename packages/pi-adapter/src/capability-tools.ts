@@ -179,8 +179,8 @@ function createRoutineTools(
         "Use them as event triggers: new items from a mapped API " +
         "(const r = await siteMapper.watch('shop.com', 'searchListings', {q: 'lamp'}); r.new.length ? r.new : false), " +
         "a new message or email (siteMapper.watch on the inbox's API, or count unread on the page), " +
-        "a page changing (const t = (await browser.fetch(url, {as: 'text'})).text; " +
-        "const changed = globalThis.last !== undefined && globalThis.last !== t; globalThis.last = t; changed). " +
+        "new rows on a page (const r = browser.changes('lamps', (await p.list()).items); r.new.length ? r.new : false; " +
+        "browser.changes returns {new, changed, gone} against its last run, keyed by id, url or href). " +
         "Check variables persist between runs. " +
         "When the user wants it kept to particular sites ('only example.com'), pass sites: ['example.com']: " +
         "its own runs then use those sites and no others. " +

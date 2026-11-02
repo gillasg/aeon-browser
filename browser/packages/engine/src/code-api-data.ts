@@ -337,6 +337,9 @@ function __extendPageData(target, base) {
       var scrollers = options.scrollers === false
         ? []
         : await __readScrollers(base, {deadline, maxChars: Math.floor(max / 2)}).catch(() => []);
+      var embedded = options.frames === false
+        ? []
+        : await __readEmbedded(base, target, {deadline, maxChars: Math.floor(max / 4)}).catch(() => []);
       // A panel whose text did not grow while scrolling is already in the Markdown.
       var panels = scrollers.filter((panel) => panel.grew).map(({grew, height, view, ...panel}) => panel);
       var notes = [
@@ -354,6 +357,7 @@ function __extendPageData(target, base) {
         list,
         markdown: markdown.markdown,
         ...(panels.length ? {scrollers: panels} : {}),
+        ...(embedded.length ? {embedded} : {}),
         wait: waited,
         expand: expanded,
         partial,
@@ -372,11 +376,12 @@ function __extendPageData(target, base) {
         if (result.list) result.list = {...result.list, items: result.list.items.slice(0, 30), partial: true, note: 'list cut to 30 items; full read saved as ' + where};
         serialized = JSON.stringify(result);
         if (serialized.length > max) {
-          var skeleton = {...result, markdown: '', list: null, data: null, scrollers: undefined};
+          var skeleton = {...result, markdown: '', list: null, data: null, scrollers: undefined, embedded: undefined};
           var room = Math.max(0, max - JSON.stringify(skeleton).length - 250);
           result.markdown = result.markdown.slice(0, room);
           result.list = null;
           delete result.scrollers;
+          delete result.embedded;
           result.data = {partial: true, note: 'omitted to keep the read under ' + max + ' characters'};
           result.notes.push('list and data omitted to keep the read under ' + max + ' characters');
         }
@@ -398,6 +403,42 @@ function __extendPageData(target, base) {
       return result;
     },
   });
+}
+
+// What the Markdown cannot see: the text of the page's frames (same-origin or not, nested too)
+// and of open shadow roots (web components). Empty and tiny ones (ads, trackers) are left out.
+async function __readEmbedded(base, target, options) {
+  var out = [], room = options.maxChars, nl = String.fromCharCode(10);
+  var take = (entry) => {
+    var text = String(entry.text || '').replace(/[ \\t]+/g, ' ').trim();
+    // Frames under a dozen characters are ads and trackers; a component's label can be short.
+    if (text.length < (entry.kind === 'frame' ? 12 : 3) || room <= 0) return;
+    var cut = text.slice(0, Math.min(room, 8000));
+    room -= cut.length;
+    out.push({...entry, text: cut, ...(cut.length < text.length ? {partial: true} : {})});
+  };
+  var shadows = await base.inspect(() => {
+    var found = [];
+    var walk = (root) => {
+      for (var el of root.querySelectorAll('*')) {
+        if (!el.shadowRoot) continue;
+        var text = Array.from(el.shadowRoot.children).map((child) => child.innerText || '').join(String.fromCharCode(10)).trim();
+        if (text) found.push({kind: 'shadow', where: el.tagName.toLowerCase() + (el.id ? '#' + el.id : ''), text});
+        walk(el.shadowRoot);
+      }
+    };
+    walk(document);
+    return found.slice(0, 30);
+  }).catch(() => []);
+  shadows.forEach(take);
+  var frames = ((await __step({op: 'frames', target, action: 'list'}).catch(() => ({data: []}))).data || []).slice(1, 16);
+  for (var frame of frames) {
+    if (Date.now() > options.deadline - 3000 || room <= 0) break;
+    var text = await __step({op: 'frames', target, action: 'evaluate', frameId: frame.frameId, frameKey: frame.frameKey,
+      expression: '(document.body && document.body.innerText) || ""'}).then((r) => r.data).catch(() => '');
+    take({kind: 'frame', where: frame.url || frame.name || frame.frameId, text: String(text || '').split(nl).filter(Boolean).join(nl)});
+  }
+  return out;
 }
 
 var __sleep = (ms) => new Promise((done) => setTimeout(done, ms));

@@ -27,16 +27,21 @@ test("page.scroll sends a glide of wheel frames, not one jump", async () => {
   assert.ok(deltas.at(-1) < deltas[0], JSON.stringify(deltas));
 });
 
-test("keyboard text is paced one insertText frame per character", async () => {
+test("keyboard text is typed as real key presses, one character at a time", async () => {
   calls.length = 0;
   await executeInteraction(
     { tabId: 1 },
-    { op: "keys", keys: "ab", target: { tabId: 1, clientInstanceId: "x" } },
+    { op: "keys", keys: "aB", target: { tabId: 1, clientInstanceId: "x" } },
   );
-  const frames = calls.filter((call) => call.method === "Input.insertText");
-  assert.equal(frames.length, 2, JSON.stringify(calls));
+  const downs = calls.filter(
+    (call) => call.method === "Input.dispatchKeyEvent" && call.params.type === "keyDown",
+  );
   assert.deepEqual(
-    frames.map((call) => call.params.text),
-    ["a", "b"],
+    downs.map((call) => call.params.text),
+    ["a", "B"],
+    JSON.stringify(calls),
   );
+  // Shift is held for a capital, as a person types it.
+  assert.equal(downs[1].params.modifiers, 8);
+  assert.equal(calls.filter((call) => call.params?.type === "keyUp").length, 2);
 });

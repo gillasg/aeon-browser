@@ -234,8 +234,10 @@ function __extendLocator(target, element, base, index) {
     } : {
       dblclick: async () => __clickIndexed(target, element, 0, {clickCount: 2}),
     }),
-    type: (value) => self().fill(value),
-    pressSequentially: (value) => self().fill(value),
+    // Key by key, like Playwright: for fields that react to keystrokes (autocomplete, search
+    // as you type, code boxes). fill() stays the fast way to set a value.
+    type: async (value) => { await self().click(); return browser.page(target).keyboard(String(value)); },
+    pressSequentially: async (value) => { await self().click(); return browser.page(target).keyboard(String(value)); },
     selectOption: (value) => self().fill(Array.isArray(value) ? value[0] : (value && value.label) || (value && value.value) || value),
     check: async () => { if (!(await self().isChecked())) await self().click(); },
     uncheck: async () => { if (await self().isChecked()) await self().click(); },

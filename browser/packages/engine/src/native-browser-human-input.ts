@@ -209,13 +209,73 @@ export async function paceKey(debuggee: chrome.debugger.Debuggee): Promise<void>
   tab.lastKeyAt = Date.now();
 }
 
-/** Type one character at a time, with key spacing. */
+// US-layout keys for typed characters, so a typed letter is a real key press (keydown, input,
+// keyup) with its code and key code, the way detectors expect, not a bare text insertion.
+const PUNCT: Record<string, [string, number]> = {
+  "`": ["Backquote", 192],
+  "-": ["Minus", 189],
+  "=": ["Equal", 187],
+  "[": ["BracketLeft", 219],
+  "]": ["BracketRight", 221],
+  "\\": ["Backslash", 220],
+  ";": ["Semicolon", 186],
+  "'": ["Quote", 222],
+  ",": ["Comma", 188],
+  ".": ["Period", 190],
+  "/": ["Slash", 191],
+  " ": ["Space", 32],
+};
+// Each Shift character and the key that types it.
+const SHIFTED: Record<string, string> = Object.fromEntries(
+  [...'~!@#$%^&*()_+{}|:"<>?'].map((char, i) => [char, [..."`1234567890-=[]\\;',./"][i]!]),
+);
+
+type KeyEvent = {
+  key: string;
+  code: string;
+  windowsVirtualKeyCode: number;
+  modifiers: number;
+  text: string;
+};
+
+function unshiftedKey(char: string): [string, number] | undefined {
+  if (/^[a-z]$/i.test(char)) return [`Key${char.toUpperCase()}`, char.toUpperCase().charCodeAt(0)];
+  if (/^[0-9]$/.test(char)) return [`Digit${char}`, char.charCodeAt(0)];
+  return PUNCT[char];
+}
+
+/** The key event for one character, or undefined when only a text insertion can type it. */
+export function keyFor(char: string): KeyEvent | undefined {
+  if (char === "\n" || char === "\r")
+    return { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, modifiers: 0, text: "\r" };
+  const base = SHIFTED[char] ?? char;
+  const found = unshiftedKey(base);
+  if (!found) return undefined;
+  const shift = char in SHIFTED || /^[A-Z]$/.test(char);
+  return {
+    key: char,
+    code: found[0],
+    windowsVirtualKeyCode: found[1],
+    modifiers: shift ? 8 : 0,
+    text: char,
+  };
+}
+
+/** The pause before a character: quicker within a word, longer after a space or punctuation. */
+function gapBefore(previous: string | undefined): number {
+  if (previous === undefined) return 0;
+  if (previous === " ") return random(70, 170);
+  if (/[.,;:!?]/.test(previous)) return random(120, 260);
+  return random(35, 110);
+}
+
+/** Type one character at a time as real key presses, with key spacing and hold times. */
 export async function humanType(debuggee: chrome.debugger.Debuggee, text: string): Promise<void> {
   if (!enabled) {
     await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text });
     return;
   }
-  // Long text is sent in chunks with pacing between chunks, not per character.
+  // Long text is sent in chunks with pacing between chunks, not per character: speed first.
   if (text.length > 120) {
     for (let index = 0; index < text.length; index += 32) {
       await paceKey(debuggee);
@@ -225,8 +285,26 @@ export async function humanType(debuggee: chrome.debugger.Debuggee, text: string
     }
     return;
   }
+  let previous: string | undefined;
   for (const char of text) {
-    await paceKey(debuggee);
-    await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text: char });
+    await sleep(gapBefore(previous));
+    previous = char;
+    const key = keyFor(char);
+    if (!key) {
+      await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text: char });
+      continue;
+    }
+    const { text: typed, ...event } = key;
+    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+      type: "keyDown",
+      ...event,
+      text: typed,
+      unmodifiedText: typed,
+    });
+    await sleep(random(40, 110));
+    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+      type: "keyUp",
+      ...event,
+    });
   }
 }

@@ -352,12 +352,50 @@ async function __batchRun(target, op) {
   await __batchAct(target, found, 'fill', op.value);
   return {filled: found.control.label || found.control.placeholder || found.control.name};
 }
+// page.fillForm({label: value}, {submit, expect}): page.batch for the common case. Each key names
+// a field by label (or placeholder); the field decides the action: a list with options is
+// selected, a checkbox, switch or radio is checked for true and unchecked for false, anything
+// else is filled.
+async function __fillForm(target, values, options = {}) {
+  if (!values || typeof values !== 'object' || Array.isArray(values))
+    throw Error('page.fillForm takes {label: value}, e.g. {Email: "a@b.c", Country: "India", "I agree": true}');
+  var steps = [], exact = options.exact ? {exact: true} : {};
+  for (var [label, value] of Object.entries(values)) {
+    var where = {label, frame: options.frame, ...exact}, found;
+    try { found = await __batchFind(target, {target: where, timeout: options.timeout ?? 4000}); }
+    catch (error) {
+      if (!/TARGET_NOT_FOUND/.test(String(error.message))) throw error;
+      where = {placeholder: label, frame: options.frame, ...exact};
+      found = await __batchFind(target, {target: where, timeout: 300});
+    }
+    var role = found.control.role;
+    var action = ['checkbox', 'switch', 'radio'].includes(role) ? (value === false ? 'uncheck' : 'check')
+      : found.control.options ? 'select' : 'fill';
+    steps.push({action, target: where, ...(action === 'fill' || action === 'select' ? {value} : {})});
+  }
+  if (options.submit) steps.push({action: 'click', target: {role: 'button', name: String(options.submit), frame: options.frame}});
+  var url = options.expect != null && String(options.expect).startsWith('/');
+  if (url) steps.push({action: 'readUrl', expect: options.expect});
+  var result = await __batch(target, steps, {pace: options.pace, observe: options.expect == null, __checked: true});
+  if (options.expect != null && !url) result.expect = await __waitText(target, String(options.expect), options.timeout ?? 10000);
+  return result;
+}
+// Waits until the page's text shows the given words (case and spacing ignored).
+async function __waitText(target, text, timeout) {
+  var deadline = Date.now() + Math.min(30000, timeout), seen = '';
+  do {
+    seen = await browser.page(target).inspect(() => document.body ? document.body.innerText : '');
+    if (__expected(seen, text)) return {seen: text};
+    await __sleep(250);
+  } while (Date.now() < deadline);
+  throw Error('EXPECTATION_FAILED: the page never showed ' + JSON.stringify(text) + '; it shows ' + JSON.stringify(String(seen).replace(/\\s+/g, ' ').slice(0, 300)));
+}
 async function __batch(target, ops, options = {}) {
   if (!Array.isArray(ops) || !ops.length) throw Error('page.batch takes a list of steps: [{action, target, value}]');
   if (ops.length > 40) throw Error('page.batch takes at most 40 steps; split it');
   ops = ops.map(__batchStep);
   var last = ops[ops.length - 1], changes = ops.some((op) => __BATCH_WRITES.includes(op.action));
-  if (changes && !options.observe && !(['read', 'readUrl'].includes(last.action) && last.expect != null))
+  if (changes && !options.observe && !options.__checked && !(['read', 'readUrl'].includes(last.action) && last.expect != null))
     throw Error('A page.batch that changes the page ends with a check of the result: {action: "read", target, expect: "text you should now see"} or {action: "readUrl", expect: "/done"}; or pass {observe: true} to get what changed instead');
   var started = Date.now(), steps = [];
   try {
@@ -365,7 +403,8 @@ async function __batch(target, ops, options = {}) {
       var at = Date.now();
       try { steps.push({id: op.id, action: op.action, ...(await __batchRun(target, op)), ms: Date.now() - at}); }
       catch (error) {
-        throw Error('page.batch step ' + op.id + ' (' + op.action + ') failed: ' + String(error && error.message || error) +
+        var message = String(error && error.message || error), code = /^([A-Z_]+): /.exec(message);
+        throw Error((code ? code[0] : '') + 'page.batch step ' + op.id + ' (' + op.action + ') failed: ' + (code ? message.slice(code[0].length) : message) +
           '. Done before it: ' + (steps.map((step) => step.id).join(', ') || 'nothing') + ' (those changes stay). Look at the page before retrying.');
       }
       if (options.pace) await __sleep(Math.min(1000, options.pace));

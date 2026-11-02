@@ -44,7 +44,10 @@ export const ERRORS = {
     "user",
     "another extension's popup (usually a password manager's menu) keeps blocking this tab: ask the user to close it or finish the step (bu.handoff), then continue",
   ],
-  CLAIM_CONFLICT: ["model", "another run holds this tab: open your own"],
+  CLAIM_CONFLICT: [
+    "model",
+    "another chat is using that tab; browser.attachTab(tab) gives this chat its own copy, or browser.openTab(url, {newTab: true})",
+  ],
   RUN_RESET: [
     "user",
     "this chat was stopped or reset while the step ran: start again from a fresh read",
@@ -152,6 +155,7 @@ export const ERROR_ALIASES: Readonly<Record<string, ErrorCode>> = {
   FRAME: "TARGET_NOT_FOUND",
   FRAME_NOT_FOUND: "TARGET_NOT_FOUND",
   AMBIGUOUS_PDF: "AMBIGUOUS_TARGET",
+  AMBIGUOUS: "AMBIGUOUS_TARGET",
   NO_TAB: "INVALID_TARGET",
   NO_CONTEXT: "INVALID_TARGET",
   // The page or the site.
@@ -199,8 +203,9 @@ export function classifyError(error: unknown, source: ErrorSource = "tool"): Err
   const named = leadingCode(message);
   if (named) return named;
   for (const [pattern, code] of NAMED) if (pattern.test(message)) return code;
-  if (source === "model-code" && (jsErrorName(error) || JS_ERROR.test(message)))
-    return "CODE_ERROR";
+  // Anything else thrown inside the model's browser code without a code is that code's failure:
+  // its own throw, or a browser-code helper refusing the input it was given.
+  if (source === "model-code") return "CODE_ERROR";
   return "INTERNAL";
 }
 

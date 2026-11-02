@@ -33,14 +33,18 @@ test(
     const env = { ...process.env, BROWSERKIT_HOME: home, SITE_TO_API_HOME: join(home, "s2a") };
     const site = createServer((request, response) => {
       response.setHeader("content-type", "text/html");
-      if (request.url === "/popup") response.end("<title>Popup</title>popup");
+      if (request.url === "/save") {
+        response.statusCode = 422;
+        response.end("{}");
+      } else if (request.url === "/popup") response.end("<title>Popup</title>popup");
       else if (request.url === "/file") {
         response.setHeader("content-disposition", "attachment; filename=receipt.txt");
         response.end("receipt");
       } else
         response.end(`<title>Receipt</title>
         <button id="all" onclick="window.open('/popup','_blank'); confirm('sure'); const a=document.createElement('a'); a.href='/file'; a.download='receipt.txt'; a.click()">all</button>
-        <button id="none">none</button>`);
+        <button id="none">none</button>
+        <button id="save" onclick="fetch('/save', {method: 'POST', body: '{}'})">save</button>`);
     });
     await new Promise((done) => site.listen(0, "127.0.0.1", done));
     const siteUrl = `http://127.0.0.1:${site.address().port}/`;
@@ -85,6 +89,14 @@ test(
       assert.equal(empty.popups.length, 0, second.stdout);
       assert.equal(empty.dialog, undefined, second.stdout);
       assert.equal(empty.download, undefined, second.stdout);
+      assert.equal(empty.requests, undefined, second.stdout);
+      // A submit says whether the server took it.
+      const third = await cell(
+        `const saved = await page.click("#save"); console.log("THIRD " + JSON.stringify(saved.receipt || saved));`,
+      );
+      const saved = JSON.parse(/THIRD (.*)/.exec(third.stdout)[1]);
+      assert.equal(saved.requests?.[0]?.method, "POST", third.stdout);
+      assert.equal(saved.requests?.[0]?.status, 422, third.stdout);
       assert.match(first.stdout + first.stderr, /never used/);
     } finally {
       chrome?.kill();

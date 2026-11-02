@@ -157,8 +157,10 @@ Use the site's own search, filters and sort (or its filter URL once seen). Autoc
 type, wait for the suggestion list, then click the matching option; read each field's value back
 before the next.
 
-`page.controls.inspect()` gives every field's state; `page.batch(steps)` fills, selects, checks and
-submits in one call, ending with a read of the result (`help("forms")`). Fields about the
+A whole form is one call: `await page.fillForm({Email: 'a@b.c', Country: 'India', 'I agree': true},
+{submit: 'Continue', expect: 'Thank you'})`; each key is a field's label and the field picks fill,
+select or check. `page.controls.inspect()` gives every field's state; `page.batch(steps)` mixes
+any steps in one call (`help("forms")`). Fields about the
 user: `await bu.fillProfile()` fills them from their form profile without you seeing the values;
 for each field it reports `missing`, ask the user, then offer to keep the answer and on yes
 `bu.profile.save({field: value})` (`help("profile")`). A code sent by email or text:
