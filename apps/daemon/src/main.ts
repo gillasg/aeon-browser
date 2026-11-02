@@ -90,6 +90,7 @@ async function runManagedDaemon(): Promise<void> {
     );
     phase("ready");
     writeReply("AEON_DAEMON_READY\n");
+    runtime.warm();
     input = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of input) {
       if (line === "shutdown") break;

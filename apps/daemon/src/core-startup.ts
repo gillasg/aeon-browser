@@ -47,6 +47,7 @@ export async function startStandaloneCore(): Promise<void> {
         "Browser bootstrap requires the installed native supervisor; omit AEON_BROWSER_ORIGIN.",
       );
     process.stdout.write("Core ready. Native clients can discover it in the data directory.\n");
+    runtime.warm();
     await new Promise<void>((resolveStop) => {
       process.once("SIGINT", resolveStop);
       process.once("SIGTERM", resolveStop);

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { configureSiteRequests } from "./site-requests.js";
 import { PinnedResults } from "./pinned-results.js";
 import { CoreAttention } from "./core-attention.js";
-import { installChatPreparation, prepareChat } from "./chat-preparation.js";
+import { installChatPreparation, warmAfterReady } from "./chat-preparation.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
@@ -38,6 +38,8 @@ export function createProductionRuntime(dataDirectory: string): {
   threadCoordination: ThreadCoordinationService;
   browserControl: BrowserControlService;
   ready: Promise<void>;
+  /** Warms the next chat's resources once the daemon answers (see warmAfterReady). */
+  warm(): void;
   close(): Promise<void>;
 } {
   const dataRoot = resolve(dataDirectory);
@@ -120,6 +122,7 @@ export function createProductionRuntime(dataDirectory: string): {
     threadCoordination,
     browserControl,
     ready,
+    warm: () => warmAfterReady(service),
     close: async () => {
       stopPreparing();
       await attention.close();
@@ -235,9 +238,6 @@ async function initializeRuntime(
   await threads.recover();
   await routines.start();
   await pins.start();
-  // Warm the next chat's resources in the background: readiness must not wait on compiling
-  // extensions (seconds when cold), and the first chat joins this same preparation.
-  void prepareChat(service);
 }
 
 function managementRoutines(

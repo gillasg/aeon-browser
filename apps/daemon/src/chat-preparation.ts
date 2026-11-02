@@ -24,3 +24,12 @@ export async function prepareChat(service: ChatService): Promise<void> {
     );
   }
 }
+
+/**
+ * Loading the user's Pi extensions and packages is mostly synchronous and takes tens of seconds
+ * when cold, which starves the event loop. Started during startup it held back readiness by
+ * that long, so it starts only after the daemon answers and the extension has connected.
+ */
+export function warmAfterReady(service: ChatService, delayMs = 2000): void {
+  setTimeout(() => void prepareChat(service), delayMs).unref();
+}
