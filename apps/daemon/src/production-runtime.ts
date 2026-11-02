@@ -256,6 +256,7 @@ function managementRoutines(
       instruction: routine.instruction,
       schedule: routine.schedule,
       ...(routine.check || routine.checkShell ? { checks: true } : {}),
+      ...(routine.check?.includes("browser.snipe(") ? { kind: "snipe" as const } : {}),
       ...(routine.checkShell ? { checkShell: routine.checkShell } : {}),
       sites: routine.sites,
       nextDueAt: routine.nextDueAt,

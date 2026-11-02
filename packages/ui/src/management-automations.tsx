@@ -2,13 +2,13 @@ import { useEffect, useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
-// Saved steps: every ability Aeon has saved across sites, with how it runs (api, steps, script,
+// Abilities: every ability Aeon has saved across sites, with how it runs (api, steps, script,
 // page), its inputs and how often it worked. The agent saves, repairs and prunes these itself;
 // the user only runs them. Running happens in the daemon with the same engine as the CLI.
 
 type Ability = NonNullable<ManagementSnapshotDto["abilities"]>[number];
 
-export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
+export function AbilitiesPanel(props: ManagementSurfaceProps): ReactElement {
   const abilities = props.snapshot?.abilities ?? [];
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
   const running = abilities.some((ability) => ability.running);
@@ -20,7 +20,7 @@ export function AutomationsPanel(props: ManagementSurfaceProps): ReactElement {
   }, [running, props.onRefresh]);
   return (
     <section className="settings-group management-automations">
-      <h2>Saved steps</h2>
+      <h2>Abilities</h2>
       <ActionNote note={props.snapshot?.lastAction} />
       {abilities.length ? (
         <ul className="aeon-list ability-list">

@@ -55,6 +55,8 @@ const ManagementRoutineSchema = z
     schedule: RoutineScheduleSchema,
     /** It runs a check with no model first (a learned API, a page read); the agent only when it passes. */
     checks: z.boolean().optional(),
+    /** snipe: its check acts at an exact moment (browser.snipe) rather than watching. */
+    kind: z.literal("snipe").optional(),
     /** The opt-in local command its check runs; shown so the editor can keep it. */
     checkShell: z.string().max(2000).optional(),
     /** Sites this routine may use; empty means it is not restricted. */

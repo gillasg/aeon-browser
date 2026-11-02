@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AutomationsPanel, SitesPage, siteEntries, siteSummary } from "@aeon/ui";
+import { AbilitiesPanel, SitesPage, siteEntries, siteSummary } from "@aeon/ui";
 
 // A real render of the two management pages: server-rendered React with a fixture snapshot, so a
 // broken prop, a missing import or a template that throws fails here, not only in the browser.
@@ -84,8 +84,8 @@ const props = {
   onSidebarDefault: () => undefined,
 };
 
-test("the Automations page renders abilities, inputs, how often they worked and Run", () => {
-  const html = renderToStaticMarkup(createElement(AutomationsPanel, props));
+test("the Abilities list renders abilities, inputs, how often they worked and Run", () => {
+  const html = renderToStaticMarkup(createElement(AbilitiesPanel, props));
   assert.match(html, /Daily prices/);
   assert.match(html, /Reads three shops/);
   assert.match(html, /query/);

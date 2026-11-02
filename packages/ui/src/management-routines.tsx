@@ -110,7 +110,7 @@ function RoutineList({
       return <p className="management-empty">No automations match this view.</p>;
     return (
       <EmptyState
-        text="Routines run a task on a schedule, or tell you when a page changes."
+        text="Automations run a task on a schedule, tell you when a page or site changes, or act at an exact moment (a drop or a booking opening)."
         action="Watch something"
         {...(props.onSuggest ? { onAction: () => props.onSuggest?.("Tell me when ") } : {})}
       />
@@ -154,8 +154,9 @@ function RoutineList({
  * Everything recurring is a routine; the label says what it costs to run: a check with no model
  * (the agent only wakes when it finds something), or the agent on every run.
  */
-export function routineKind(routine: Pick<Routine, "checks">): string {
-  return routine.checks ? "Checks, no AI" : "Runs the agent";
+export function routineKind(routine: Pick<Routine, "checks" | "kind">): string {
+  if (routine.kind === "snipe") return "At an exact moment";
+  return routine.checks ? "Watches, no AI" : "Runs the agent";
 }
 
 /** Next check, or why it's paused, then the last check. */
