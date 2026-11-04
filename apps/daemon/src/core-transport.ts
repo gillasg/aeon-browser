@@ -19,6 +19,7 @@ import { attachDevChatCommands } from "./dev-chat-connection.js";
 import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
 import { handleBlockedSites } from "./core-blocked-sites.js";
+import { handleBrowsers, handleChatPin } from "./core-browsers.js";
 import { handleBrowserRun } from "./core-browser.js";
 import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
@@ -122,6 +123,8 @@ function authenticate(
         handleCdpRequest(socket, candidate, browser, directory) ||
         handleModelComplete(socket, candidate, service) ||
         handleBlockedSites(socket, candidate, browser) ||
+        handleBrowsers(socket, candidate, browser, directory) ||
+        handleChatPin(socket, candidate, browser, directory) ||
         handleToolRequest(socket, candidate, service),
     );
   });

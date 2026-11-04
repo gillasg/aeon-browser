@@ -279,3 +279,55 @@ export const NativeSettingsReplySchema = z
     settings: AgentSettingsSchema,
   })
   .strict();
+
+/**
+ * A local client (`aeon browsers`) lists the connected browsers (one per Chrome profile) and can
+ * name one. A name is how `aeon run --browser <name>` keeps a chat in that one browser.
+ */
+export const CoreBrowsersRequestSchema = z
+  .object({
+    kind: z.literal("core.browsers"),
+    requestId: z.string().uuid(),
+    /** browser: an id (or its first characters) or a current name; name "" clears it. */
+    rename: z
+      .object({ browser: z.string().min(1).max(100), name: z.string().max(40) })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export const CoreBrowserSummarySchema = z
+  .object({
+    clientInstanceId: z.string().max(100),
+    name: z.string().max(40).optional(),
+    tabs: z.number().int().nonnegative(),
+    /** The sites open in it, most tabs first, so a person can tell the profiles apart. */
+    sites: z.array(z.string().max(200)).max(10),
+  })
+  .strict();
+export const CoreBrowsersResultSchema = z
+  .object({
+    kind: z.literal("core.browsers.result"),
+    requestId: z.string().uuid(),
+    browsers: z.array(CoreBrowserSummarySchema).max(50),
+    error: z.string().max(2000).optional(),
+  })
+  .strict();
+/** A local client keeps a chat in one named browser: its tab opens and its steps run only there. */
+export const CoreChatPinRequestSchema = z
+  .object({
+    kind: z.literal("core.chat.pin"),
+    requestId: z.string().uuid(),
+    chatId: z.string().uuid(),
+    browser: z.string().min(1).max(40),
+  })
+  .strict();
+export const CoreChatPinnedSchema = z
+  .object({
+    kind: z.literal("core.chat.pinned"),
+    requestId: z.string().uuid(),
+    chatId: z.string().uuid(),
+    ok: z.boolean(),
+    error: z.string().max(2000).optional(),
+  })
+  .strict();
+export type CoreBrowserSummary = z.infer<typeof CoreBrowserSummarySchema>;

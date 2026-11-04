@@ -92,6 +92,10 @@ export class DaemonHost {
     };
   }
 
+  async browsers(rename?: { browser: string; name: string }): Promise<Json> {
+    return (await this.connect()).browsers(rename);
+  }
+
   close(): void {
     this.client?.close();
     this.client = undefined;
