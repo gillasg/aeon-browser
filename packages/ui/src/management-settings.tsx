@@ -165,7 +165,7 @@ function PiSettings(props: { piExtensions?: boolean; onPiExtensions?(enabled: bo
   return (
     <SettingsGroup
       title="Pi"
-      footer="Off: Aeon's agent uses only its own tools, and starts fast. On: new chats also load the extensions, packages, skills and prompts from your Pi setup (~/.pi/agent), which can take a while to start."
+      footer="New chats also load the extensions, packages and skills in ~/.pi/agent. Off keeps startup fast."
     >
       <SwitchRow
         label="Load my Pi extensions"
