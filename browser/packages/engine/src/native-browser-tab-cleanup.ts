@@ -64,10 +64,32 @@ export function touchAgentTab(tabId: number): void {
   save();
 }
 
+// Activations Aeon causes itself (pairing a tab with the chat in Split View, working in front)
+// fire the same Chrome event as the user's own clicks. They must not count as the user looking:
+// a tab only Aeon showed is still the agent's, grouped while kept and closed at the run's end.
+const SELF_ACTIVATION_MS = 2_000;
+const selfActivated = new Map<number, number>();
+
+/** Aeon is about to activate (or show in Split View) these tabs itself. */
+export function expectAgentActivation(...tabIds: (number | undefined)[]): void {
+  const now = Date.now();
+  for (const id of tabIds) if (id !== undefined) selfActivated.set(id, now);
+}
+
+function activatedByAeon(tabId: number): boolean {
+  const at = selfActivated.get(tabId);
+  if (at === undefined) return false;
+  if (Date.now() - at > SELF_ACTIVATION_MS) {
+    selfActivated.delete(tabId);
+    return false;
+  }
+  return true;
+}
+
 /** The user switched to the tab: they may want it after the run, so the run's tidy-up keeps it. */
 function seeAgentTab(tabId: number): void {
   const entry = tracked.get(tabId);
-  if (!entry) return;
+  if (!entry || activatedByAeon(tabId)) return;
   entry.seen = true;
   entry.touched = Date.now();
   save();

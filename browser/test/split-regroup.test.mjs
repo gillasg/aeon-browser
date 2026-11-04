@@ -37,7 +37,11 @@ globalThis.chrome = {
   },
   alarms: { create() {}, onAlarm: { addListener() {} }, clear: async () => true },
   storage: { session: storage, local: storage, onChanged: { addListener() {} } },
-  windows: { getAll: async () => [{ id: 1, type: "normal" }] },
+  action: { onClicked: { addListener() {} } },
+  windows: {
+    getAll: async () => [{ id: 1, type: "normal" }],
+    getLastFocused: async () => ({ id: 99 }),
+  },
   tabs: {
     get: async (id) => {
       const found = tabs.get(id);
@@ -85,12 +89,51 @@ globalThis.chrome = {
   },
 };
 
+// Every Chrome event the engine listens to: missing ones are stubbed, and onActivated is kept so
+// the test can fire the user's (or Aeon's) tab switches.
+const activated = [];
+const stubEvents = (node) => {
+  for (const value of Object.values(node))
+    if (value && typeof value === "object" && !Array.isArray(value)) stubEvents(value);
+};
+stubEvents(globalThis.chrome);
+globalThis.chrome.tabs.onActivated = { addListener: (listener) => activated.push(listener) };
+globalThis.chrome = new Proxy(globalThis.chrome, {
+  get: (target, key) => target[key] ?? eventSpace(),
+});
+function eventSpace() {
+  return new Proxy(
+    {},
+    {
+      get: (_, key) =>
+        String(key).startsWith("on") ? { addListener() {} } : async () => undefined,
+    },
+  );
+}
+for (const name of [
+  "onRemoved",
+  "onUpdated",
+  "onCreated",
+  "onAttached",
+  "onDetached",
+  "onReplaced",
+])
+  globalThis.chrome.tabs[name] ??= { addListener() {} };
+const userSwitches = (tabId) => {
+  for (const listener of activated) listener({ tabId, windowId: 1 });
+};
 const { configureEngine } = await import("../packages/engine/dist/engine-config.js");
 configureEngine({ tabGroupTitle: () => "Aeon" });
 const { trackAgentTab } = await import("../packages/engine/dist/native-browser-tab-cleanup.js");
 const { groupAgentTab, isAgentGroupId } =
   await import("../packages/engine/dist/native-browser-groups.js");
 const { presentBrowserTask } = await import("../packages/engine/dist/native-browser-layout.js");
+const { installEngineListeners } = await import("../packages/engine/dist/native-engine-install.js");
+try {
+  installEngineListeners();
+} catch {
+  // Listeners for APIs this fake lacks; the tab ones are what the test needs.
+}
 
 test("a split-paired agent tab returns to the agent group when the chat moves on", async () => {
   const chatId = "chat-1";
@@ -117,4 +160,30 @@ test("a split-paired agent tab returns to the agent group when the chat moves on
   await presentBrowserTask(chatId, 4);
   await presentBrowserTask(chatId, 3);
   assert.equal(tabs.get(4).groupId, -1, "a tab the agent did not open is never grouped");
+});
+
+test("a tab only Aeon showed is not the user's: the run's tidy-up still closes it", async () => {
+  const { tidyChatTabs } = await import("../packages/engine/dist/native-browser-tab-cleanup.js");
+  const closed = [];
+  globalThis.chrome.tabs.remove = async (id) => {
+    closed.push(id);
+    tabs.delete(id);
+  };
+  const chatId = "chat-2";
+  tab(11, { url: `chrome-extension://aeon/chat.html?chatId=${chatId}`, active: true });
+  for (const id of [12, 13, 14]) {
+    tab(id, { url: `https://store-${id}.example/` });
+    trackAgentTab(id, chatId);
+  }
+  // Aeon pairs each tab with the chat in turn; Chrome reports each as activated.
+  for (const id of [12, 13, 14]) {
+    await presentBrowserTask(chatId, id);
+    userSwitches(id);
+  }
+  // The user really switches to 13 a while later, so 13 is theirs to keep.
+  await new Promise((done) => setTimeout(done, 2100));
+  userSwitches(13);
+  await tidyChatTabs(chatId);
+  assert.ok(closed.includes(12) || closed.includes(14), "an Aeon-only tab was closed");
+  assert.ok(!closed.includes(13), "the tab the user switched to stays");
 });

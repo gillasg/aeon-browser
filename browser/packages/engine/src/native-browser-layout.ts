@@ -1,6 +1,6 @@
 import { engineConfig } from "./engine-config.js";
 import { groupAgentTab, isAgentGroupId } from "./native-browser-groups.js";
-import { isAgentTab } from "./native-browser-tab-cleanup.js";
+import { expectAgentActivation, isAgentTab } from "./native-browser-tab-cleanup.js";
 
 type SplitTab = chrome.tabs.Tab & { splitViewId?: number };
 type SplitTabs = typeof chrome.tabs & {
@@ -26,8 +26,10 @@ export async function presentBrowserTask(
 ): Promise<void> {
   const tabs = chrome.tabs as SplitTabs;
   // Working in front: whichever tab the agent works in becomes the visible one.
-  if (await engineConfig.agentInFront().catch(() => false))
+  if (await engineConfig.agentInFront().catch(() => false)) {
+    expectAgentActivation(tabId);
     await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
+  }
   if (!tabs.createSplit || !tabs.unsplit) return;
   if (!force && (await engineConfig.agentView(chatId).catch(() => "split")) === "thumbnails")
     return;
@@ -62,6 +64,8 @@ async function pairChat(
   const front =
     force || chat.active || target.active || (await engineConfig.agentInFront().catch(() => false));
   await alignTabs(tabs, chat, target);
+  // Pairing and bringing the pair forward activate the agent's tab: that is Aeon, not the user.
+  expectAgentActivation(target.id);
   const splitId = await tabs.createSplit?.([chat.id, target.id]);
   if (splitId !== undefined) pairs.set(chatId, { targetId: target.id, splitId });
   if (prior && prior.targetId !== target.id) await regroupUnpaired(tabs, prior.targetId, chatId);
