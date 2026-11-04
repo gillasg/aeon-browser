@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import type { ModelLike } from "@browserkit/tools/site-to-api";
 import { traceActions } from "./browser-trace-actions.js";
 import { browserCodeGuidelines, browserCodeSummary } from "./browser-code-guidance.js";
 import { compactBrowserTrace } from "./browser-recovery.js";
@@ -27,6 +28,8 @@ export interface BrowserCodeOptions {
   siteRules?: SiteRulesProvider;
   /** A chat by default; an outside MCP session says so (no typed-user lift). */
   source?: "chat" | "external";
+  /** The fast model page.observe / page.act use; without one they say so. */
+  model?: () => Promise<ModelLike | undefined>;
 }
 
 export function createBrowserTools(
@@ -92,6 +95,7 @@ export function createBrowserCodeTool(
               chatId,
               source: options?.source ?? "chat",
               ...(options?.siteRules ? { siteRules: options.siteRules } : {}),
+              ...(options?.model ? { model: options.model } : {}),
               skills,
               workspace,
               writes,
@@ -217,6 +221,7 @@ function cellCall(context: {
   chatId: string;
   source: "chat" | "external";
   siteRules?: SiteRulesProvider;
+  model?: () => Promise<ModelLike | undefined>;
   skills: string | undefined;
   workspace: string | undefined;
   writes: SiteWrites;
@@ -229,6 +234,7 @@ function cellCall(context: {
     source: context.source,
     ...(context.siteRules ? { siteRules: context.siteRules } : {}),
     siteMapper: (request) => siteMapperRequest(context.chatId, request),
+    ...(context.model ? { model: context.model } : {}),
     extra: (request) => serveCall(request, context.workspace, context.steps(), context.skills),
   });
   const requestContext: HostRequestContext = {

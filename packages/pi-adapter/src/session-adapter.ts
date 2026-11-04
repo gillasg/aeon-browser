@@ -43,6 +43,7 @@ import {
   completeWithDefaultModel,
   completeWithDefaultModelTools,
   siteToolModel,
+  fastToolModel,
 } from "./text-completion.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createExtractTool } from "./extract-tool.js";
@@ -335,6 +336,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           resolve(this.sessionDirectory, "..", "site-skills"),
           {
             ...(this.siteRulesHost ? { siteRules: this.siteRulesHost } : {}),
+            model: fastToolModel(this.completionOptions()),
           },
         ),
         ...createThreadTools(input.chatId, this.threadToolHost),

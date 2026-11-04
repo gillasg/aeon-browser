@@ -120,6 +120,13 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   with a frame prefix (`f2:e14`); acting on one goes through that frame, and
   `bu.state({root: "f2:e14"})` / `page.snapshot({root})` scopes to that subtree (an iframe ref
   means its whole document).
+- On crowded or unfamiliar pages, `await page.act("add the large size to the cart")` does one step
+  from plain words: a fast model picks the element (one quick call), the next run on that site
+  replays it from a local cache with no model call, and a changed page makes it ask again and
+  re-cache. `await page.observe("every field of the shipping form")` returns actions that
+  `page.act(action)` runs with no further model call. Pass values as `{variables: {email}}`: that
+  model, the cache and the result only see `%email%`. With a known id or selector, act on it
+  directly. `help('act')`.
 - `page.console()` reads console messages and errors (capture is off until asked for).
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
