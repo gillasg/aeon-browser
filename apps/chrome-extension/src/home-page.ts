@@ -99,6 +99,12 @@ const outsideContext = new HomeOutsideContext({
   onChange: render,
   onError: showError,
 });
+const piExtensions = new HomeOutsideContext({
+  client: () => client,
+  onChange: render,
+  onError: showError,
+  operation: "settings.pi-extensions",
+});
 
 /** Reverses an API write from Activity, one item at a time, through its learned reverse. */
 async function undoActivity(entry: ActivityEntry): Promise<void> {
@@ -171,6 +177,8 @@ function createView() {
     outsideContext: outsideContext.enabled,
     privacy: privacy(),
     onOutsideContext: (enabled: boolean) => void outsideContext.set(enabled),
+    piExtensions: piExtensions.enabled,
+    onPiExtensions: (enabled: boolean) => void piExtensions.set(enabled),
     ...management.viewProps(),
   });
 }
@@ -218,6 +226,7 @@ async function start(): Promise<void> {
     blockedSites.load(),
     formProfile.load(),
     outsideContext.load(),
+    piExtensions.load(),
   ]);
   const selectedChat = new URL(location.href).searchParams.get("chatId");
   if (selectedChat) management.viewProps().onManagementSelectChat(selectedChat);

@@ -270,6 +270,15 @@ const OutsideContextSettingsRequestSchema = z
   })
   .strict();
 
+const PiExtensionsSettingsRequestSchema = z
+  .object({
+    kind: z.literal("command"),
+    requestId: RequestIdSchema,
+    operation: z.literal("settings.pi-extensions"),
+    payload: z.object({ enabled: z.boolean().optional() }).strict(),
+  })
+  .strict();
+
 export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   ProjectListRequestSchema,
   ProjectCreateRequestSchema,
@@ -305,6 +314,7 @@ export const ChatCommandRequestSchema = z.discriminatedUnion("operation", [
   BlockedSitesSettingsRequestSchema,
   FormProfileSettingsRequestSchema,
   OutsideContextSettingsRequestSchema,
+  PiExtensionsSettingsRequestSchema,
 ]);
 
 export const ChatSubscribeRequestSchema = z

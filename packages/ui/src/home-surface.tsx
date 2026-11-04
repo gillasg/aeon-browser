@@ -106,6 +106,8 @@ export interface NewTabHomeProps {
   /** Outside agents may see the user's open tabs (opt-in, stored by the daemon). */
   outsideContext?: boolean;
   onOutsideContext?(enabled: boolean): void;
+  piExtensions?: boolean;
+  onPiExtensions?(enabled: boolean): void;
   onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
   onSidebarDefault(open: boolean): void;
 }
@@ -479,6 +481,8 @@ function Management({
       {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
       privacy={props.privacy}
       {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
+      {...(props.piExtensions !== undefined ? { piExtensions: props.piExtensions } : {})}
+      {...(props.onPiExtensions ? { onPiExtensions: props.onPiExtensions } : {})}
       {...(onSuggest ? { onSuggest } : {})}
     />
   );

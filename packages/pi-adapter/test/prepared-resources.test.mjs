@@ -12,7 +12,10 @@ test("prepared resources are consumed once, stay workspace-specific, and invalid
     second = join(root, "second");
   await mkdir(agent);
   let loads = 0;
-  const pool = new PreparedSessionResources(agent, true, async (cwd) => ({ cwd, id: ++loads }));
+  const pool = new PreparedSessionResources(agent, true, undefined, async (cwd) => ({
+    cwd,
+    id: ++loads,
+  }));
   try {
     await Promise.all([pool.prepare(first), pool.prepare(first)]);
     assert.equal(loads, 1);

@@ -3,6 +3,7 @@ import type { PiMcpServerStatus } from "@aeon/domain";
 import { createPiResourceLoader, enablePiNativeDefaultTools } from "./sdk-resources.js";
 import { projectMcpStatuses } from "./session-mcp-status.js";
 import { startupTiming } from "./startup-timing.js";
+import { PERSONAL_EXTENSIONS_FILE, personalExtensionsEnabled } from "./personal-extensions.js";
 import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -10,6 +11,7 @@ async function loadResources(
   workingDirectory: string,
   agentDirectory: string,
   browserGuidance: boolean,
+  personal = false,
 ) {
   const startedAt = Date.now();
   const settingsManager = SettingsManager.create(workingDirectory, agentDirectory);
@@ -19,6 +21,7 @@ async function loadResources(
     agentDirectory,
     settingsManager,
     browserGuidance,
+    personal,
     onMcpStatusChange: (current) => {
       servers = projectMcpStatuses(current);
     },
@@ -36,14 +39,24 @@ export class PreparedSessionResources {
   constructor(
     private readonly agentDirectory: string,
     private readonly browserGuidance: boolean,
+    /** Where the "load my Pi extensions" setting lives (Aeon's data folder). */
+    private readonly dataDirectory?: string,
     private readonly load = loadResources,
   ) {}
+  private personal(): boolean {
+    return this.dataDirectory ? personalExtensionsEnabled(this.dataDirectory) : false;
+  }
   prepare(workingDirectory: string): Promise<void> {
     const directory = resolve(workingDirectory);
     const signature = this.signature(directory);
     if (this.reserved?.directory === directory && this.reserved.signature === signature)
       return this.reserved.pending.then(() => undefined);
-    const pending = this.load(directory, this.agentDirectory, this.browserGuidance);
+    const pending = this.load(
+      directory,
+      this.agentDirectory,
+      this.browserGuidance,
+      this.personal(),
+    );
     this.reserved = { directory, signature, pending };
     void pending.catch(() => {
       if (this.reserved?.pending === pending) this.reserved = undefined;
@@ -57,13 +70,18 @@ export class PreparedSessionResources {
       this.reserved = undefined;
       if (current.signature === this.signature(directory)) return current.pending;
     }
-    return this.load(directory, this.agentDirectory, this.browserGuidance);
+    return this.load(directory, this.agentDirectory, this.browserGuidance, this.personal());
   }
   clear(): void {
     this.reserved = undefined;
   }
   private signature(directory: string): string {
-    return [join(this.agentDirectory, "settings.json"), join(directory, ".pi", "settings.json")]
+    // Changing the setting, or either settings file, makes a prepared set stale.
+    return [
+      join(this.agentDirectory, "settings.json"),
+      join(directory, ".pi", "settings.json"),
+      ...(this.dataDirectory ? [join(this.dataDirectory, PERSONAL_EXTENSIONS_FILE)] : []),
+    ]
       .map((path) => {
         try {
           const info = statSync(path);

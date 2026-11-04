@@ -46,6 +46,14 @@ async function answerSettings(
     return completeCommand(socket, request, await applyFormProfile(request.payload));
   if (request.operation === "settings.outside-context")
     return answerOutsideContext(socket, service, request);
+  if (request.operation === "settings.pi-extensions") {
+    const { enabled } = request.payload;
+    if (enabled !== undefined) await service.setPiExtensionsSetting(enabled);
+    return completeCommand(socket, request, {
+      kind: "settings.pi-extensions",
+      enabled: await service.piExtensionsSetting(),
+    });
+  }
 }
 
 async function answerOutsideContext(

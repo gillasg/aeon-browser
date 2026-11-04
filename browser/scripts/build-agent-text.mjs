@@ -4,9 +4,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { format } from "prettier";
 
-// One source for the agent-facing text. browserkit/docs/agent/sections holds the common Markdown;
-// this writes browserkit's skill, Aeon's skill (same sections, browserkit→aeon, plus Aeon-only
-// parts) and Aeon's shared browser-code guidance. Run with --check in CI to fail on stale output.
+// One source for the agent-facing text. browserkit/docs/agent/sections holds the skill's Markdown;
+// this writes Aeon's skill (those sections, browserkit→aeon, plus Aeon-only parts) and the
+// browser-code guidance both tools carry. Run with --check in CI to fail on stale output.
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const aeonRepo = resolve(repo, "..");
@@ -18,17 +18,6 @@ const TS_HEADER =
 
 const outputs = [];
 const sections = await readSections(join(repo, "docs", "agent", "sections"));
-const browserkitFront = await read(join(repo, "docs", "agent", "frontmatter-browserkit.md"));
-const browserkitSkill = assemble([
-  browserkitFront,
-  MARKDOWN_HEADER,
-  sections.get("00-intro"),
-  sections.get("01-setup"),
-  ...commonSections(sections),
-]).replaceAll("{{workspace}}", browserkitWorkspace());
-assertNoAeon(browserkitSkill);
-outputs.push({ path: join(repo, "skills", "browserkit", "SKILL.md"), content: browserkitSkill });
-
 if (existsSync(join(aeonRepo, "skills", "aeon"))) {
   const parts = await readSections(join(aeonRepo, "skills", "aeon", "parts"));
   const aeonSkill = assemble([
@@ -117,9 +106,6 @@ function rewriteForAeon(text) {
     .replaceAll("aeon's", "Aeon's");
 }
 
-function browserkitWorkspace() {
-  return "`%LOCALAPPDATA%\\browserkit\\workspaces\\<session>` on Windows, `~/.local/share/browserkit/...` elsewhere";
-}
 
 function assemble(parts) {
   const text = parts
@@ -134,10 +120,6 @@ async function read(path) {
   return readFile(path, "utf8");
 }
 
-function assertNoAeon(text) {
-  if (/\baeon\b/i.test(text))
-    throw new Error("browserkit's generated skill mentions Aeon; fix docs/agent/sections");
-}
 
 async function guidanceSource() {
   const shared = split(await read(join(repo, "docs", "agent", "guidance.md")));
