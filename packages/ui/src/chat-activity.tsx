@@ -93,10 +93,10 @@ function ToolStepRow({
   group: ToolGroup;
   ancestors: ReadonlySet<string>;
 }): ReactElement {
-  const browserActions = browserActionValues(
-    step.arguments,
-    step.toolName === "browser_code" ? step.result || step.partialResult : undefined,
-  );
+  // A browser_code cell is one row with a live label; its engine steps (every evaluate, click
+  // and read) stay in its details instead of becoming a row each while it runs.
+  const browserActions =
+    step.toolName === "browser_code" ? [] : browserActionValues(step.arguments);
   if (browserActions.length > 0) return <BrowserCallRows step={step} actions={browserActions} />;
   const nextAncestors = new Set(ancestors).add(step.toolCallId);
   const children = group.steps.filter(

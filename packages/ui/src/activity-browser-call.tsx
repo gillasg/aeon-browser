@@ -73,29 +73,13 @@ function browserActionIconName(action: Record<string, unknown>): string {
 
 export function browserActionValues(
   arguments_: Record<string, unknown>,
-  result?: string,
 ): Record<string, unknown>[] {
-  const value = arguments_.steps ?? arguments_.actions ?? workflowActions(result);
+  const value = arguments_.steps ?? arguments_.actions;
   if (!Array.isArray(value)) return [];
   return value.filter(
     (action): action is Record<string, unknown> =>
       typeof action === "object" && action !== null && !Array.isArray(action),
   );
-}
-
-function workflowActions(result?: string): unknown {
-  if (!result) return [];
-  try {
-    const imageMarker = result.lastIndexOf("Image output · ");
-    const parsed: unknown = JSON.parse(
-      imageMarker < 0 ? result : result.slice(0, imageMarker).trimEnd(),
-    );
-    return isRecord(parsed) && Array.isArray(parsed.steps)
-      ? parsed.steps.map((entry: unknown) => (isRecord(entry) ? entry.action : undefined))
-      : [];
-  } catch {
-    return [];
-  }
 }
 
 function browserOperationOutcomes(

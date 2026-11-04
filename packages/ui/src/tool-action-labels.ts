@@ -229,6 +229,7 @@ const browserLabels: ReadonlyArray<readonly [RegExp, string]> = [
   [/navigate|goto|openurl|opentab|newtab|createtab/, "Opening"],
   [/attach/, "Attaching browser tab"],
   [/observe/, "Observing page"],
+  [/evaluate|runcode/, "Working in the page"],
   [/read|snapshot|extract|getpage/, "Reading page"],
   [/screenshot|capture/, "Capturing screenshot"],
   [/search|find/, "Searching the web"],
