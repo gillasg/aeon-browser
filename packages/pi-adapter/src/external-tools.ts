@@ -7,7 +7,7 @@ import type { BrowserToolRunner } from "./browser-tool.js";
 import { createCrawlTool } from "./crawl-tool.js";
 import { createBrowserContextTool } from "./browser-context-tool.js";
 import { createExtractTool } from "./extract-tool.js";
-import { siteToolModel, type CompletionOptions } from "./text-completion.js";
+import { fastToolModel, siteToolModel, type CompletionOptions } from "./text-completion.js";
 import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { inChat, sessionChatId } from "./site-browser.js";
 
@@ -50,7 +50,10 @@ function toolsFor(
     session.replace(/[^\w.-]+/g, "-"),
   );
   const skills = resolve(options.sessionDirectory, "..", "site-skills");
-  const browserCode = createBrowserCodeTool(chatId, run, workspace, skills, { source: "external" });
+  const browserCode = createBrowserCodeTool(chatId, run, workspace, skills, {
+    source: "external",
+    model: fastToolModel(options),
+  });
   return {
     // An outside agent signs in the same way a chat does; it has no routines, so its runs never
     // carry an "only these sites" list. Credentials and rules answers still never reach a result.

@@ -98,6 +98,31 @@ export function siteToolModel(
 }
 
 /**
+ * The model page.observe / page.act use inside browser code: the default model with the least
+ * thinking it takes, so picking an element costs one quick call. Loaded once per tool.
+ */
+export function fastToolModel(
+  options: CompletionOptions,
+): () => Promise<{ complete(context: unknown): Promise<never> }> {
+  let loaded: ReturnType<typeof defaultModel> | undefined;
+  return async () => {
+    loaded ??= defaultModel(options, {});
+    const { runtime, model } = await loaded.catch((error: unknown) => {
+      loaded = undefined;
+      throw error;
+    });
+    const reasoning = model.reasoning ? ("minimal" as SimpleStreamOptions["reasoning"]) : undefined;
+    return {
+      complete: (context) =>
+        runtime.completeSimple(model, context as never, {
+          ...(reasoning ? { reasoning } : {}),
+          sessionId: randomUUID(),
+        }) as never,
+    };
+  };
+}
+
+/**
  * One tool-calling completion with the default model: the interface site-to-api, browser-crawl and
  * the CLI's AI commands expect, returned as the plain message the caller reads.
  */

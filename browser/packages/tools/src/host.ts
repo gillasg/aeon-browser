@@ -6,6 +6,13 @@ import { handleProfileRequest, isProfileRequest } from "./profile.js";
 export { readProfile, removeProfileField, saveProfileValues } from "./profile.js";
 import { handleTableRequest, isTableRequest } from "./tables.js";
 import {
+  answerLocate,
+  handleActionCache,
+  isActionCacheRequest,
+  isLocateRequest,
+} from "./locate.js";
+import type { ModelLike } from "@browserkit/site-mapper";
+import {
   isSiteToolRequest,
   listSiteTools,
   readPageTool,
@@ -64,6 +71,8 @@ export interface HostHandlerOptions {
   siteRules?: (context: HostRequestContext) => HostSiteRules | Promise<HostSiteRules>;
   /** A host's own mapped-site call path (Aeon attributes it to a chat); default: the shared one. */
   siteMapper?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
+  /** The small fast model page.observe / page.act use, when the host has one. */
+  model?: () => Promise<ModelLike | undefined>;
   /** A host's own requests: workspace files, site skills, saved reads, upload checks. */
   extra?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
 }
@@ -143,6 +152,8 @@ export function createHostHandler(
     if (isCredentialRequest(request)) return handleCredentialRequest(request, home);
     if (isProfileRequest(request)) return handleProfileRequest(request, home);
     if (isTableRequest(request)) return handleTableRequest(request, home);
+    if (isLocateRequest(request)) return answerLocate(request, options.model);
+    if (isActionCacheRequest(request)) return handleActionCache(request, home);
     if (isSiteRulesRequest(request)) return answerSiteRules(context, options, home);
     if (isSiteToolRequest(request)) return handleSiteTool(request);
     if (isSiteCapabilitiesRequest(request))

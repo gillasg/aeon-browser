@@ -3,6 +3,7 @@ import {
   type HostRequestContext,
   type HostSiteRules,
 } from "@browserkit/tools/host";
+import type { ModelLike } from "@browserkit/tools/site-to-api";
 
 // Aeon's side of the one host handler: credentials, site rules and mapped-site calls are
 // browserkit's; Aeon adds only its own storage (workspace, site skills, saved reads) through
@@ -21,6 +22,8 @@ export interface HostHandlerOptions {
   siteRules?: SiteRulesProvider;
   /** Aeon's mapped-site call path, so its browser calls stay attributed to this chat. */
   siteMapper?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
+  /** The fast model page.observe / page.act use. */
+  model?: () => Promise<ModelLike | undefined>;
   /** Aeon-only requests: workspace files, site skills, saved reads. */
   extra?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
 }
@@ -34,5 +37,6 @@ export function createAeonHostHandler(
     ...(siteRules ? { siteRules: (context: HostRequestContext) => siteRules(context.scope) } : {}),
     ...(options.siteMapper ? { siteMapper: options.siteMapper } : {}),
     ...(options.extra ? { extra: options.extra } : {}),
+    ...(options.model ? { model: options.model } : {}),
   });
 }

@@ -21,6 +21,7 @@ import { browserControlsApi } from "./code-api-controls.js";
 import { browserMediaChallengesApi } from "./code-api-media-challenges.js";
 import { browserMediaApi } from "./code-media-api.js";
 import { browserSurfaceApi, browserWindowApi } from "./code-api-surface.js";
+import { browserActApi } from "./code-api-act.js";
 
 type Waiter = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 const scope = globalThis as unknown as Record<string, unknown>;
@@ -107,6 +108,7 @@ evaluate(
     browserDemonstrationApi,
     browserControlsApi,
     browserMediaChallengesApi,
+    browserActApi,
   ].join("\n"),
 );
 
