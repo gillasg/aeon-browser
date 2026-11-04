@@ -42,13 +42,17 @@ function agentText() {
 // a page's own JS, a CLI word).
 const NOT_METHODS = new Set(["example", "com", "md", "json", "ts", "js", "in", "co"]);
 
+// Calls on the realm's globals, nested ones too (page.network.waitFor(, browser.job.status():
+// keyed by the whole chain, checked by the last name.
 function namedCalls(text) {
   const found = new Map();
-  const pattern = /\b(page|browser|bu|site|siteMapper)\.([A-Za-z_$][\w$]*)\s*\(/g;
+  const pattern =
+    /\b(page|browser|bu|site|siteMapper|google|tables|skills)((?:\.[A-Za-z_$][\w$]*)+)\s*\(/g;
   for (const match of text.matchAll(pattern)) {
-    const name = match[2];
-    if (NOT_METHODS.has(name)) continue;
-    const key = `${match[1]}.${name}`;
+    const names = match[2].slice(1).split(".");
+    const name = names[names.length - 1];
+    if (names.some((part) => NOT_METHODS.has(part))) continue;
+    const key = `${match[1]}.${names.join(".")}`;
     if (!found.has(key)) found.set(key, name);
   }
   return found;
@@ -113,4 +117,25 @@ test("every call the skill teaches reaches Aeon's own agent (guidance or help)",
   ].join("\n");
   const missing = [...namedCalls(skill).keys()].filter((call) => !own.includes(call));
   assert.deepEqual(missing, [], `the skill teaches calls Aeon's agent never hears of: ${missing}`);
+});
+
+// help(topic) names in the agent text are real topics (or aliases), and the topic list the tool
+// guidance gives is exactly the runtime's.
+test("every help topic the agent text names exists, and guidance lists them all", async () => {
+  const { HELP_TOPICS } = await import("../dist/code-api-help.js");
+  const topics = Object.keys(HELP_TOPICS);
+  const helpSource = read(join(engine, "src", "code-api-help.ts"));
+  const aliasText = /var __helpAliases = \{([^}]*)\}/.exec(helpSource)[1];
+  const aliases = [...aliasText.matchAll(/(\w+): '(\w+)'/g)];
+  for (const [, alias, target] of aliases) {
+    assert.ok(topics.includes(target), `help alias ${alias} points at missing topic ${target}`);
+    assert.ok(!topics.includes(alias), `help alias ${alias} is shadowed by a topic of that name`);
+  }
+  const known = new Set([...topics, ...aliases.map((match) => match[1])]);
+  const named = [...agentText().matchAll(/help\(\s*['"]([\w-]+)['"]/g)].map((match) => match[1]);
+  const unknown = [...new Set(named.filter((name) => !known.has(name.toLowerCase())))];
+  assert.deepEqual(unknown, [], `agent text names help topics that do not exist: ${unknown}`);
+  const guidance = read(join(browserRoot, "docs", "agent", "guidance.md"));
+  const listed = /help\(\) lists topics \(([^)]*)\)/.exec(guidance)[1].split(/,\s*/);
+  assert.deepEqual([...listed].sort(), [...topics].sort(), "guidance.md's help() topic list");
 });

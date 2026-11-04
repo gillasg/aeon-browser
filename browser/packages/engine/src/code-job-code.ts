@@ -15,7 +15,7 @@ export function jobOptions(value: unknown): JobOptions {
     return Number.isFinite(number) ? Math.min(max, Math.max(1, number)) : fallback;
   };
   return {
-    concurrency: count(options.concurrency, 1, 10),
+    concurrency: count(options.concurrency, 4, 10),
     maxTabs: count(options.maxTabs, 4, 10),
     timeoutMs: count(options.timeoutMs, 120_000, 600_000),
     quiet: options.quiet !== false,

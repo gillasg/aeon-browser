@@ -171,7 +171,7 @@ function __stealthProbe() {
   try { geolocationShim = !native.test(Function.prototype.toString.call(navigator.geolocation.getCurrentPosition)); } catch {}
   return {webdriver: navigator.webdriver === true, globals, overlays, wrapped, geolocationShim, leaks};
 }
-function __beginCell() { __dirty.clear(); __hasDelivered=false; __deliveryValue=undefined; }
+function __beginCell() { __speedBegin(); __dirty.clear(); __hasDelivered=false; __deliveryValue=undefined; }
 async function __step(step, readOnly = false) {
   var startedAt = Date.now();
   if (step.target && __closedTabs.has(step.target.tabId)) {
@@ -208,6 +208,8 @@ async function __step(step, readOnly = false) {
       (result.data && result.data.settle ? ' (' + result.data.settle.why + ')' : '') + ' ' + (Date.now() - startedAt) + ' ms' + (result.note ? ' - ' + result.note : ''));
   }
   if (action && step.target) __noteActed(step.target);
+  if (step.target) __speedNote(result.url || before || (__tabs.get(__key(step.target)) || {}).url, action);
+  else if (result.kind === 'tab') __speedNote(result.tab && result.tab.url, false);
   if (action && step.op !== 'observe' && step.target) { try { await __autoAfter(step.target, step); } catch {} }
   if (action && step.target) await __noteSiteTime(step.target).catch(() => {});
   return result;
@@ -450,6 +452,7 @@ async function __fastProbe(target, url) {
   return text;
 }
 async function __finishCell() {
+  __speedEnd();
   for (var target of [...__dirty.values()]) {
     try { await bu.state({target, final: true}); }
     catch (error) { if (!/UNSUPPORTED/.test(String(error && error.message))) console.log('Final observation unavailable: ' + error.message); }

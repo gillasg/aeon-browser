@@ -43,7 +43,9 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   returns its last expression: end with one object holding what you found, and print only what you
   will use. Close tabs you are done with (`await page.close()`, or `browser.closeTab(id)`; any tab,
   then unsplit first); `page.keep()` hands one to the user when they need it
-  (a result, cart or form). For more than a few pages or sites use
+  (a result, cart or form). The same steps on a few sites or pages run together: one tab each and
+  `Promise.all` over the tabs, or `browser.pool(urls, async (page, url) => …)` (`help('parallel')`);
+  a `Tip:` after a cell names a faster way. Dozens of pages or over a minute of work:
   `browser.job(items, async (page, item) => …)`, which returns a job id and keeps running after
   the cell; check `browser.job.status(id)` or `browser.job.result(id)` later. `browser.reset()`
   closes every tab the chat opened except kept ones.

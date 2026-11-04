@@ -88,7 +88,8 @@ check <urls|--file f>`, with evidence per site. Far cheaper than opening each on
   `browser.settings()` lists them; `browser.settings({name: value})` changes them.
 - **Change a site on every visit** (hide parts, restyle, auto-click a banner): a boost,
   `help('boosts')`.
-- **Long or wide work**: many pages, `browser.job` (`help('jobs')`); hundreds of sites, a sweep
+- **Long or wide work**: the same steps on a few sites, `Promise.all` or `browser.pool`
+  (`help('parallel')`); many pages, `browser.job` (`help('jobs')`); hundreds of sites, a sweep
   (`help('sweep')`); a background window that never takes over the screen, `help('spaces')`.
 - **An AI the user already pays for** (ChatGPT, Gemini, Grok, Perplexity, Kimi): `aeon ask`.
 
@@ -137,7 +138,9 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   returns its last expression: end with one object holding what you found, and print only what you
   will use. Close tabs you are done with (`await page.close()`, or `browser.closeTab(id)`; any tab,
   then unsplit first); `page.keep()` hands one to the user when they need it
-  (a result, cart or form). For more than a few pages or sites use
+  (a result, cart or form). The same steps on a few sites or pages run together: one tab each and
+  `Promise.all` over the tabs, or `browser.pool(urls, async (page, url) => …)` (`help('parallel')`);
+  a `Tip:` after a cell names a faster way. Dozens of pages or over a minute of work:
   `browser.job(items, async (page, item) => …)`, which returns a job id and keeps running after
   the cell; check `browser.job.status(id)` or `browser.job.result(id)` later. `browser.reset()`
   closes every tab the chat opened except kept ones.
@@ -292,6 +295,9 @@ or another session's; actions in one tab queue, reads run in parallel.
 ## Habits that save turns
 
 - Batch: chain everything you already know into one call; each model round trip is slow.
+- Parallel: work that does not depend on other work runs at once. Steps in different tabs run
+  together (`Promise.all` over the tabs, `browser.pool(urls, fn)`); steps in one tab queue.
+  `help('parallel')`.
 - Use the site's own search, filters and sort before reading by hand.
 - Never repeat a failing action more than twice; change strategy.
 - Big jobs: try a small sample first, report it, then scale up. Many pages or sites: `browser.sweep`

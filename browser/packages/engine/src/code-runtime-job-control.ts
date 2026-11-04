@@ -108,7 +108,7 @@ function watchJob(job: Job): void {
   clearJobTimer(job);
   const options = job.options;
   const perItem = options?.timeoutMs ?? 120_000;
-  const concurrency = options?.concurrency ?? 1;
+  const concurrency = options?.concurrency ?? 4;
   const budget = Math.min(
     3_600_000,
     Math.max(60_000, perItem * Math.ceil(job.total / Math.max(1, concurrency)) + 30_000),
