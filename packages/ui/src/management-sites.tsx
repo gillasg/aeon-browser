@@ -31,7 +31,14 @@ export function ImportPath({
   );
 }
 
-export function SiteAbilities({ site }: { site: Site }): ReactElement {
+export function SiteAbilities({
+  site,
+  onTry,
+}: {
+  site: Site;
+  /** Starts a chat that uses the ability, so a user sees what it does. */
+  onTry?: ((ability: Site["abilities"][number]) => void) | undefined;
+}): ReactElement {
   if (site.abilities.length === 0) return <span className="management-subtle">no abilities</span>;
   return (
     <ul className="management-inputs">
@@ -42,6 +49,11 @@ export function SiteAbilities({ site }: { site: Site }): ReactElement {
             {ability.kind}, {ability.ways.join(" + ")}
             {ability.description ? ` — ${ability.description}` : ""}
           </span>
+          {onTry && (
+            <button type="button" className="site-try" onClick={() => onTry(ability)}>
+              Try it
+            </button>
+          )}
         </li>
       ))}
     </ul>

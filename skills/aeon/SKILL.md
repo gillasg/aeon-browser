@@ -231,6 +231,9 @@ aeon abilities test shop.example search  # its stored cases; fails on constant o
 
 - **A `[site]` line** appears when you open a mapped site: it names the site's abilities and API
   reads. Use them instead of clicking through the pages.
+- **A `[site] … not learned yet` line** appears after 90 s of page work on a site with no
+  abilities or API reads: end your answer with the one-line offer it gives, and learn the site
+  (`abilities build`) if the user says yes.
 - **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
   `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.

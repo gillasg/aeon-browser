@@ -190,7 +190,9 @@ function SiteDetail({
         ))}
       </nav>
       <div role="tabpanel">
-        {tab === "can" && <CanDo site={entry.mapped} chatId={chatId} props={props} />}
+        {tab === "can" && (
+          <CanDo host={entry.host} site={entry.mapped} chatId={chatId} props={props} />
+        )}
         {tab === "account" && <Account site={entry.mapped} chatId={chatId} props={props} />}
         {tab === "watching" && <Watching routines={entry.routines} props={props} />}
         {tab === "rules" && <Rules entry={entry} props={props} />}
@@ -199,22 +201,23 @@ function SiteDetail({
   );
 }
 
+// Changes people often want on a site, offered as boosts so a page is better on every visit.
+const BOOST_IDEAS = ["Hide ads and sponsored items", "Dark mode", "Hide distractions"];
+
 function CanDo({
+  host,
   site,
   chatId,
   props,
 }: {
+  host: string;
   site: Site | undefined;
   chatId: string;
   props: ManagementSurfaceProps;
 }): ReactElement {
   const [running, setRunning] = useState(false);
-  if (!site)
-    return (
-      <p className="management-empty">
-        Aeon hasn&rsquo;t learned this site yet. It learns as it works here, or ask it to map it.
-      </p>
-    );
+  const suggest = props.onSuggest;
+  if (!site) return <NotLearned host={host} suggest={suggest} />;
   return (
     <>
       <p>
@@ -222,7 +225,14 @@ function CanDo({
         <span className={`management-health management-health-${site.health}`}>{site.health}</span>
         <span className="management-subtle"> · updated {formatWhen(site.updatedAt)}</span>
       </p>
-      <SiteAbilities site={site} />
+      <SiteAbilities
+        site={site}
+        onTry={
+          suggest &&
+          ((ability) =>
+            suggest(`On ${host}, ${ability.description || ability.name.replace(/_/g, " ")}: `))
+        }
+      />
       {site.suggestions.length > 0 && (
         <ul className="management-inputs">
           {site.suggestions.map((suggestion) => (
@@ -240,6 +250,62 @@ function CanDo({
         onToggle={() => setRunning((value) => !value)}
       />
       {running && <SiteRunForm site={site} chatId={chatId} onAction={props.onAction} />}
+      <BoostIdeas host={host} suggest={suggest} />
+    </>
+  );
+}
+
+function NotLearned({
+  host,
+  suggest,
+}: {
+  host: string;
+  suggest: ((example: string) => void) | undefined;
+}): ReactElement {
+  return (
+    <>
+      <p className="management-empty">
+        Aeon hasn&rsquo;t learned this site yet. It learns as it works here; learning it now takes
+        about two minutes in a background tab, and makes the next task a few seconds.
+      </p>
+      {suggest && (
+        <div className="management-actions">
+          <button
+            type="button"
+            onClick={() => suggest(`Learn ${host} so the things I do there are quick next time`)}
+          >
+            Learn it
+          </button>
+        </div>
+      )}
+      <BoostIdeas host={host} suggest={suggest} />
+    </>
+  );
+}
+
+function BoostIdeas({
+  host,
+  suggest,
+}: {
+  host: string;
+  suggest: ((example: string) => void) | undefined;
+}): ReactElement | null {
+  if (!suggest) return null;
+  const ask = (idea: string) =>
+    suggest(`Make a boost for ${host}: ${idea.toLowerCase()}, on every visit`);
+  return (
+    <>
+      <h3 className="management-subheading">Make it better</h3>
+      <div className="management-actions">
+        {BOOST_IDEAS.map((idea) => (
+          <button key={idea} type="button" onClick={() => ask(idea)}>
+            {idea}
+          </button>
+        ))}
+        <button type="button" onClick={() => suggest(`Make a boost for ${host} that `)}>
+          Something else…
+        </button>
+      </div>
     </>
   );
 }
