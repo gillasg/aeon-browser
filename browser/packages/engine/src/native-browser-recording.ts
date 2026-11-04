@@ -22,6 +22,33 @@ interface Recording {
   direct: boolean;
 }
 const recordings = new Map<number, Recording>();
+const STORE = "aeon-recordings";
+
+/**
+ * Takes and recordings live in the service worker, which Chrome may restart mid-run; the videos
+ * themselves are safe in the offscreen document. Both maps are mirrored to session storage and
+ * read back at start, so a restart neither loses a take nor stops its frames reaching the encoder.
+ */
+let saving: ReturnType<typeof setTimeout> | undefined;
+export function saveRecordings(): void {
+  if (saving || !chrome.storage?.session) return;
+  saving = setTimeout(() => {
+    saving = undefined;
+    void chrome.storage.session
+      .set({ [STORE]: { takes: [...takeTabs], recordings: [...recordings] } })
+      .catch(() => undefined);
+  }, 200);
+}
+async function restoreRecordings(): Promise<void> {
+  if (!chrome.storage?.session) return;
+  const all: Record<string, unknown> = await chrome.storage.session.get(STORE).catch(() => ({}));
+  const stored = all[STORE] as
+    { takes?: [number, TakeTab][]; recordings?: [number, Recording][] } | undefined;
+  for (const [tabId, take] of stored?.takes ?? [])
+    if (!takeTabs.has(tabId)) takeTabs.set(tabId, take);
+  for (const [tabId, entry] of stored?.recordings ?? [])
+    if (!recordings.has(tabId)) recordings.set(tabId, entry);
+}
 
 /**
  * Tabs the recordAgentTabs setting records (native-browser-takes.ts). Their recording is stopped and
@@ -52,6 +79,7 @@ export async function stopTake(tabId: number): Promise<TakeTab | undefined> {
   } catch (error) {
     take.error = String(error instanceof Error ? error.message : error);
   }
+  saveRecordings();
   return take;
 }
 
@@ -86,14 +114,18 @@ export async function recordingCall(
   throw new Error("UNSUPPORTED");
 }
 
-async function start(tabId: number, value: Record<string, unknown>): Promise<unknown> {
-  if (recordings.has(tabId))
-    throw new Error("RECORDING_ACTIVE: this tab is already recording; stop it first");
-  const options = {
+function recordingOptions(value: Record<string, unknown>) {
+  return {
     audio: value.audio !== false,
     format: value.format === "webm" ? "webm" : "mp4",
     fps: Math.max(5, Math.min(60, Number(value.fps) || 30)),
   };
+}
+
+async function start(tabId: number, value: Record<string, unknown>): Promise<unknown> {
+  if (recordings.has(tabId))
+    throw new Error("RECORDING_ACTIVE: this tab is already recording; stop it first");
+  const options = recordingOptions(value);
   setTabRecording(tabId, {
     cursor: value.cursor === true,
     ...(value.pill === true ? { pill: true } : {}),
@@ -115,6 +147,7 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
       lastSent: 0,
       direct: !captured.ok && direct,
     });
+    saveRecordings();
     return {
       mode,
       audio: mode === "tab" && options.audio,
@@ -232,6 +265,7 @@ async function cancel(tabId: number): Promise<unknown> {
 async function finish(tabId: number): Promise<void> {
   const entry = recordings.get(tabId);
   recordings.delete(tabId);
+  saveRecordings();
   setTabRecording(tabId, undefined);
   if (entry?.mode === "screencast")
     await debug(tabId, entry.direct, "Page.stopScreencast", {}).catch(() => undefined);
@@ -244,6 +278,7 @@ async function finish(tabId: number): Promise<void> {
 }
 
 onEngineInstall(() => {
+  void restoreRecordings();
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (method !== "Page.screencastFrame" || source.tabId === undefined) return;
     const recording = recordings.get(source.tabId);
