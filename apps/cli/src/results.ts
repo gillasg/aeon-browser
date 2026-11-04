@@ -19,7 +19,13 @@ interface Entry {
     stopReason?: string;
     errorMessage?: string;
     actions?: TraceAction[];
-    usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+    usage?: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheWrite: number;
+      cost?: { total?: number };
+    };
   } | null;
 }
 interface Snapshot {
@@ -75,11 +81,39 @@ export interface ChatResult {
   cache?: CacheReport;
   /** Where the latest run's time went: model turns, each tool, sleeps cut, speed tips given. */
   speed?: SpeedReport;
+  /** Tokens and estimated cost over the chat's model turns (eval harnesses report these). */
+  usage?: UsageTotals;
   /** When the latest prompt was submitted and when the chat finished it (ISO; finishedAt only
    * once finished). Screen recorders (Aperture) frame recordings with these; keep them. */
   promptAt: string | null;
   finishedAt: string | null;
   trace: TraceStep[];
+}
+
+export interface UsageTotals {
+  turns: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  /** USD as the provider's price list estimates it; subscriptions report list prices too. */
+  cost: number;
+}
+
+/** Tokens and cost summed over every assistant turn that reported usage. */
+export function usageTotals(entries: Entry[]): UsageTotals | undefined {
+  const turns = entries.flatMap((entry) => (entry.message?.usage ? [entry.message.usage] : []));
+  if (!turns.length) return undefined;
+  const sum = (pick: (usage: (typeof turns)[number]) => number) =>
+    turns.reduce((total, usage) => total + pick(usage), 0);
+  return {
+    turns: turns.length,
+    input: sum((usage) => usage.input),
+    output: sum((usage) => usage.output),
+    cacheRead: sum((usage) => usage.cacheRead),
+    cacheWrite: sum((usage) => usage.cacheWrite),
+    cost: Math.round(sum((usage) => usage.cost?.total ?? 0) * 1e6) / 1e6,
+  };
 }
 
 export interface CacheReport {
@@ -132,6 +166,7 @@ export function summarize(
     contextTokens: snapshot.contextUsage?.tokens ?? null,
     ...cacheOf(snapshot.entries),
     ...speedOf(snapshot.entries),
+    ...usageOf(snapshot.entries),
     promptAt: lastOf(snapshot.entries, "user")?.timestamp ?? null,
     finishedAt:
       outcome === "timeout" || snapshot.runState !== "idle"
@@ -149,6 +184,11 @@ function cacheOf(entries: Entry[]): { cache?: CacheReport } {
 function speedOf(entries: Entry[]): { speed?: SpeedReport } {
   const speed = speedReport(entries);
   return speed ? { speed } : {};
+}
+
+function usageOf(entries: Entry[]): { usage?: UsageTotals } {
+  const usage = usageTotals(entries);
+  return usage ? { usage } : {};
 }
 
 function lastOf(entries: Entry[], role: string): Entry | undefined {
