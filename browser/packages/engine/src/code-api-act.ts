@@ -161,8 +161,20 @@ async function __act(target, input, options) {
   console.log('[act] ' + said.join(' -> ') + (cached ? ' (cached)' : '') + ' ' + (Date.now() - startedAt) + ' ms');
   return {ok: true, cached, steps: said};
 }
+// page.extract('the price and delivery date', {schema}): the page's Markdown to a fast model,
+// shaped by an optional JSON schema. page.extract({script}) is the scripted read, unchanged.
+async function __extractAsk(target, base, instruction, options) {
+  var startedAt = Date.now();
+  var page = await base.markdown({max: 60000});
+  var url = await base.url();
+  var value = await __call({pageExtract: {instruction: String(instruction), schema: options.schema, url: String(url), page: String(page)}});
+  console.log('[extract] ' + JSON.stringify(String(instruction).slice(0, 80)) + ' ' + (Date.now() - startedAt) + ' ms');
+  return value;
+}
 function __extendPageAct(target, base) {
+  var scripted = base.extract;
   return Object.assign(base, {
+    extract: (spec, options = {}) => typeof spec === 'string' ? __extractAsk(target, base, spec, options || {}) : scripted(spec),
     observe: (instruction, options = {}) => __observe(target, instruction, options || {}),
     act: (input, options = {}) => __act(target, input, options || {}),
   });

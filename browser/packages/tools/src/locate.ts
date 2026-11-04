@@ -183,6 +183,82 @@ export async function answerLocate(
   return { actions, twoStep: acting && picked?.twoStep === true };
 }
 
+// ---------- page.extract(instruction, {schema}) ----------
+
+interface PageExtractRequest {
+  pageExtract: { instruction?: unknown; schema?: unknown; url?: unknown; page?: unknown };
+}
+
+export function isPageExtractRequest(value: unknown): value is PageExtractRequest {
+  const extract = (value as { pageExtract?: unknown } | null)?.pageExtract;
+  return Boolean(extract && typeof extract === "object");
+}
+
+const EXTRACT_SYSTEM = [
+  "You read a web page for a browser agent and answer only by calling `answer`.",
+  "Use only what the page says; a value the page does not show is null, never a guess.",
+  "Copy numbers, prices and dates exactly as shown.",
+].join("\n");
+
+function extractSchema(schema: unknown): Record<string, unknown> {
+  if (schema && typeof schema === "object" && !Array.isArray(schema)) {
+    const given = schema as Record<string, unknown>;
+    if (given.type === "object") return given;
+    return { type: "object", properties: { value: given }, required: ["value"] };
+  }
+  return {
+    type: "object",
+    properties: { value: { description: "The answer: a string, number, object or list." } },
+    required: ["value"],
+  };
+}
+
+/** One fast-model call over the page's text, shaped by the caller's JSON schema. */
+export async function answerPageExtract(
+  request: PageExtractRequest,
+  model: (() => Promise<ModelLike | undefined>) | undefined,
+): Promise<unknown> {
+  const chosen = await model?.();
+  if (!chosen)
+    throw new Error(
+      "NEEDS_MODEL: page.extract(instruction) needs a model and this host has none; use page.read()",
+    );
+  const given = request.pageExtract;
+  const parameters = extractSchema(given.schema);
+  const reply = await chosen.complete({
+    systemPrompt: EXTRACT_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `${text(given.instruction, 2000)}
+
+Page ${text(given.url, 500)}:
+
+${text(given.page, 60_000)}`,
+          },
+        ],
+        timestamp: Date.now(),
+      },
+    ],
+    tools: [{ name: "answer", description: "The data asked for.", parameters }],
+  });
+  if (reply.stopReason === "error" || reply.stopReason === "aborted")
+    throw new Error(`MODEL_FAILED: ${String(reply.errorMessage ?? "the model failed")}`);
+  const content = Array.isArray(reply.content) ? reply.content : [];
+  const call = content.find(
+    (part): part is ToolCall =>
+      Boolean(part) &&
+      (part as ToolCall).type === "toolCall" &&
+      (part as ToolCall).name === "answer",
+  );
+  if (!call) throw new Error("MODEL_FAILED: the model gave no answer");
+  const wrapped = !(given.schema && (given.schema as { type?: unknown }).type === "object");
+  return wrapped ? (call.arguments.value ?? null) : call.arguments;
+}
+
 // ---------- the action cache ----------
 
 /** A step as replayed: the element by role and name (ids change every load), never a value. */

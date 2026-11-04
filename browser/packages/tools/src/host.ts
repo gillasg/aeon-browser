@@ -7,9 +7,11 @@ export { readProfile, removeProfileField, saveProfileValues } from "./profile.js
 import { handleTableRequest, isTableRequest } from "./tables.js";
 import {
   answerLocate,
+  answerPageExtract,
   handleActionCache,
   isActionCacheRequest,
   isLocateRequest,
+  isPageExtractRequest,
 } from "./locate.js";
 import type { ModelLike } from "@browserkit/site-mapper";
 import {
@@ -153,6 +155,7 @@ export function createHostHandler(
     if (isProfileRequest(request)) return handleProfileRequest(request, home);
     if (isTableRequest(request)) return handleTableRequest(request, home);
     if (isLocateRequest(request)) return answerLocate(request, options.model);
+    if (isPageExtractRequest(request)) return answerPageExtract(request, options.model);
     if (isActionCacheRequest(request)) return handleActionCache(request, home);
     if (isSiteRulesRequest(request)) return answerSiteRules(context, options, home);
     if (isSiteToolRequest(request)) return handleSiteTool(request);

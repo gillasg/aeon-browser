@@ -61,7 +61,8 @@ async function cell(setup, model) {
     "browser",
     "__call",
     "console",
-    browserActApi + "\nreturn __extendPageAct('t', {});",
+    "__base",
+    browserActApi + "\nreturn __extendPageAct('t', __base);",
   );
   const api = make(
     states,
@@ -69,6 +70,11 @@ async function cell(setup, model) {
     { page: () => page },
     (request) => host(request, { source: "chat", scope: "c" }),
     { log: (line) => logs.push(line) },
+    {
+      markdown: async () => "# Nord 6\nPrice: ₹44,999\nDelivery by 8 Nov",
+      url: async () => "https://shop.test/p/1",
+      extract: async (spec) => ({ scripted: Boolean(spec.script) }),
+    },
   );
   return { api, seen, done, logs, home };
 }
@@ -197,4 +203,41 @@ test("nothing that fits is a named error, not a guess", async () => {
     twoStep: false,
   }));
   await assert.rejects(run.api.act("delete my account"), /ACT_NOT_FOUND/);
+});
+
+test("page.extract(instruction) asks the fast model about the page; the script form is unchanged", async () => {
+  const run = await cell({ nodes: () => [] }, () => ({}));
+  const seen = [];
+  const home = await mkdtemp(join(tmpdir(), "page-act-"));
+  const host = createHostHandler({
+    dataDirectory: home,
+    model: async () => ({
+      complete: async (request) => {
+        seen.push(request);
+        return {
+          content: [
+            {
+              type: "toolCall",
+              id: "1",
+              name: "answer",
+              arguments: { price: 44999, delivery: "8 Nov" },
+            },
+          ],
+        };
+      },
+    }),
+  });
+  const schema = {
+    type: "object",
+    properties: { price: { type: "number" }, delivery: { type: "string" } },
+  };
+  const answer = await host(
+    {
+      pageExtract: { instruction: "price and delivery", schema, page: "Price: ₹44,999", url: "u" },
+    },
+    { source: "chat", scope: "c" },
+  );
+  assert.deepEqual(answer, { price: 44999, delivery: "8 Nov" });
+  assert.equal(seen[0].tools[0].parameters, schema);
+  assert.deepEqual(await run.api.extract({ script: "x" }), { scripted: true });
 });

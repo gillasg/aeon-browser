@@ -31,7 +31,9 @@ Check every part of the request (each site, field, filter, count and format) aga
 if a part is missing, try another route. Never conclude from part of a list: read all of it, or say
 you only saw the top. An empty result on a URL you built, or a page that contradicts itself ("9
 orders" beside "no orders"), means the URL is wrong, not the data: drop the parameters you added
-(`page=1` empties some lists) or use the site's own filter, then read again. Lead the answer with what is most urgent. Never invent values. If something
+(`page=1` empties some lists) or use the site's own filter, then read again. Before a summary or bottom line, check each claim in it (cheapest, fastest, only,
+full price, in stock) against your own table or notes: a summary that contradicts your data is
+wrong. Lead the answer with what is most urgent. Never invent values. If something
 cannot be done, say what you tried and give the closest verified facts with their sources; say
 which facts came from search and which you saw on a site. `STALE_REF` means call `bu.state()` again;
 `TARGET_LOST` means the tab is gone; every other code is in `help('errors')`. `help()` lists topics
