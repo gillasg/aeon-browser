@@ -4,7 +4,7 @@
 // with browser.saveTake(); with the run's trace they make a take it can edit. Keep it.
 import { toOffscreen } from "./code-offscreen-host.js";
 import { engineConfig } from "./engine-config.js";
-import { startRecording, stopTake, takeTabs } from "./native-browser-recording.js";
+import { saveRecordings, startRecording, stopTake, takeTabs } from "./native-browser-recording.js";
 import {
   browserSessionOwner,
   holdBrowserDebugger,
@@ -25,6 +25,7 @@ async function recordAgentTab(tabId: number): Promise<void> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   const take = { chatId, url: tab?.url ?? "", startedAt: Date.now(), ...tabLook(tab) };
   takeTabs.set(tabId, take);
+  saveRecordings();
   // An idle detach would end the screencast mid-take: keep the debugger on while it records.
   holdBrowserDebugger(tabId, true);
   // With "Hide agent cursor" off, the take shows Aeon's own cursor and pill (never the glow).
@@ -48,6 +49,7 @@ export async function recordChatTab(tabId: number, chatId: string): Promise<bool
     return false;
   const take = { chatId, url: "chat", startedAt: Date.now(), chat: true };
   takeTabs.set(tabId, take);
+  saveRecordings();
   try {
     await startRecording(tabId, { fps: 30, direct: true });
     return true;
@@ -79,6 +81,7 @@ onEngineInstall(() => {
 
 async function dropTake(tabId: number): Promise<unknown> {
   takeTabs.delete(tabId);
+  saveRecordings();
   holdBrowserDebugger(tabId, false);
   return toOffscreen({ target: OFFSCREEN, kind: "recordDrop", tabId });
 }

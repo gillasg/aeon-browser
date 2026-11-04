@@ -38,8 +38,15 @@ interface Screencast {
   reordered: number;
   late: number;
   worstLateMs: number;
+  /**
+   * Capture time of the first frame after the screencast's warm-up: Chrome sends one frame, then
+   * often nothing for about a second. A take's picture is live from here on.
+   */
+  steadyAt?: number;
   track?: CanvasCaptureMediaStreamTrack;
 }
+/** A gap this long after the first frame is the screencast warming up, not a still page. */
+const WARMUP_GAP_MS = 250;
 const PLACEMENT_DELAY_MS = 1000;
 const recordings = new Map<number, Recording>();
 
@@ -199,11 +206,17 @@ async function place(
     cast.worstLateMs = Math.max(cast.worstLateMs, Math.round(-wait));
   }
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  if (cast.drawn === 1) noteSteady(cast, origin.capture, captureMs);
   cast.lastCapture = captureMs;
   canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
   cast.track?.requestFrame();
   cast.drawn++;
   image.close();
+}
+
+/** The second frame drawn ends the warm-up, if it came long after the first. */
+function noteSteady(cast: Screencast, first: number, captureMs: number): void {
+  cast.steadyAt = captureMs - first > WARMUP_GAP_MS ? captureMs : first;
 }
 
 /** The first frame sizes the canvas and starts the encoder; frames are then pushed one by one. */
@@ -270,13 +283,21 @@ async function stop(tabId: number): Promise<unknown> {
 
 /** When the clip's first frame was captured (epoch ms) and its size: a take aligns its trace to it. */
 function clipTiming(recording: Recording): Record<string, number | undefined> {
-  const canvas = recording.canvas;
-  const track = recording.stream?.getVideoTracks()[0]?.getSettings();
+  const first = recording.screencast?.origin?.capture ?? recording.startedWall;
   return {
-    firstFrameAt: recording.screencast?.origin?.capture ?? recording.startedWall,
-    width: canvas?.width ?? track?.width,
-    height: canvas?.height ?? track?.height,
+    firstFrameAt: first,
+    steadyAt: recording.screencast?.steadyAt ?? first,
+    ...clipSize(recording),
   };
+}
+
+function clipSize(recording: Recording): {
+  width?: number | undefined;
+  height?: number | undefined;
+} {
+  if (recording.canvas) return { width: recording.canvas.width, height: recording.canvas.height };
+  const track = recording.stream?.getVideoTracks()[0]?.getSettings();
+  return { width: track?.width, height: track?.height };
 }
 
 async function finishRecorder(recording: Recording, recorder: MediaRecorder): Promise<void> {
