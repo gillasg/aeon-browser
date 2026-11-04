@@ -22,6 +22,7 @@ import { browserMediaChallengesApi } from "./code-api-media-challenges.js";
 import { browserMediaApi } from "./code-media-api.js";
 import { browserSurfaceApi, browserWindowApi } from "./code-api-surface.js";
 import { browserActApi } from "./code-api-act.js";
+import { browserSleepApi } from "./code-api-sleep.js";
 
 type Waiter = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 const scope = globalThis as unknown as Record<string, unknown>;
@@ -109,6 +110,7 @@ evaluate(
     browserControlsApi,
     browserMediaChallengesApi,
     browserActApi,
+    browserSleepApi,
   ].join("\n"),
 );
 
@@ -140,7 +142,8 @@ async function run(message: Record<string, unknown>): Promise<void> {
     if (message.attached) scope.__attachedTarget = message.attached;
     if (message.attached && !evaluate("__lastTarget"))
       (scope.bu as { use(target: unknown): unknown }).use(message.attached);
-    value = await evaluate(toReplScript(String(message.code)));
+    // Named, so a timer the cell's own code sets can be told from the runtime's (code-api-sleep).
+    value = await evaluate(toReplScript(String(message.code)) + "\n//# sourceURL=aeon-cell.js");
     const delivered = evaluate("__hasDelivered ? {value: __deliveryValue} : null") as {
       value: unknown;
     } | null;
@@ -156,6 +159,12 @@ async function run(message: Record<string, unknown>): Promise<void> {
   // Calls the cell started but did not await still finish before the final observation.
   for (let waited = 0; pending.size && waited < 10_000; waited += 5)
     await new Promise((resolve) => setTimeout(resolve, 5));
+  try {
+    const slept = String(evaluate("__sleepReport()") || "");
+    if (slept) print(slept);
+  } catch {
+    // The report is a hint; a cell never fails on it.
+  }
   try {
     await evaluate("__finishCell()");
   } catch (caught) {
