@@ -75,7 +75,11 @@ const TOPICS: Record<string, string> = {
     "browser.sweep(urls, {gate: true, capture: 'media', play: true, pilot?, checkpoint?, retry?, concurrency = 4, evidence?}) is the open-wait-capture-close loop as one durable job. Each URL gets {outcome, reason, gate, captured, media, evidence, ms}; outcomes are ok (a page that loaded with content; with capture: 'media', only when media was found), gated, shell (loaded empty), dead, parked, redirected, blocked and error, and a run with no ok items returns a warning that the method is probably incomplete. pilot: 5 runs five and stops so you can look first; checkpoint: 'name' resumes, re-running only ambiguous items (retry adds outcomes); evidence: true keeps a screenshot, DOM text and network summary per item. It is browser.job underneath (status, cancel, resume). One site: await page.enterSite(), then page.network.list({since}) and page.media() ({masters, playlists, headers} from the manifests the tab requested).",
   workspace:
     "artifact(name, data) writes a file (strings, bytes, Blobs; other objects as JSON); checkpoint(name, value) / loadCheckpoint(name) persist JSON across resets; showImage(path) shows an image.",
-  jobs: "browser.job(urlsOrItems, async (page, item, index) => …, {concurrency = 1, maxTabs = 4, timeoutMs = 120000, quiet = true, label}) returns {jobId} at once and runs the pages in the extension past the cell deadline. Each item is a URL or {url}, opens in its own tab, and closes after the item unless page.keep() was called. One failure does not stop the rest; results include {ok, item, value|error, kind, ms}. browser.job.status(jobId) shows done/total (status lost means the browser or worker restarted, so start it again); browser.jobCancel(jobId) stops it; browser.job.result(jobId) returns results and saves them as jobs/<jobId>.json. page is already on the item's URL (openTab + navigation done) when your function runs. Jobs are quiet by default (no popunders or autoplay).",
+  playwright:
+    "page is Playwright-style, there is no page.playwright. Page: goto(url), reload(), goBack(), goForward(), url(), title(), content(), evaluate(fn, arg), waitForSelector(css), waitForURL(part), waitForLoadState(), waitForTimeout(ms) (pacing on purpose only), keyboard.press('Enter'), keyboard.type(text), mouse.move(x, y), $$eval(css, fn), $(css) (awaited; a handle or null). Locators: page.locator(css | 'xpath=//…'), getByRole(role, {name}), getByText(text), getByLabel(label); chain .first() .nth(i) .filter({hasText}) .and() .or(); act with .click() .dblclick() .fill(v) .pressSequentially(v) (real keystrokes for autocomplete) .press(key) .check() .uncheck() .selectOption(v) .hover(); read with .innerText() .textContent() .inputValue() .getAttribute(name) .isVisible() .isChecked() .count() .all() .allInnerTexts() .boundingBox(); .waitFor() waits for it. Locators wait for their element; page.$ does not.",
+  parallel:
+    "Work that does not depend on other work runs at the same time: steps in different tabs run together, steps in one tab queue. A few sites or pages: open them in one cell, const pages = await Promise.all(urls.map((url) => browser.openTab(url, {newTab: true}))), then run each shared step over all of them at once: await Promise.all(pages.map((p) => p.read())), or p.act(…), p.extract(…). The same steps over a list of URLs: results = await browser.pool(urls, async (page, url, index) => …, {concurrency = 4, retries = 2, perHostDelayMs, keepTabs}) reuses up to concurrency tabs, retries failures, backs off when a site answers 429 or 503, and closes its tabs (keepTabs: true leaves them in Aeon's tab group); it returns [{ok, item, value | error}] in input order. Assign it to a top-level variable: if the cell hits its 60 s deadline, the pool keeps going and the variable holds the results in the next cell. Longer than a minute, or dozens of pages: browser.job(items, fn) (help('jobs')). Sites that differ: give each its first look (one cell across all tabs is fine), then run what is alike across all of them together. Two or more sites worked one after another prints a Tip, so does a run of tiny cells: each cell costs a model turn of several seconds.",
+  jobs: "browser.job(urlsOrItems, async (page, item, index) => …, {concurrency = 4, maxTabs = 4, timeoutMs = 120000, quiet = true, label}) returns {jobId} at once and runs the pages in the extension past the cell deadline. Each item is a URL or {url}, opens in its own tab, and closes after the item unless page.keep() was called. One failure does not stop the rest; results include {ok, item, value|error, kind, ms}. browser.job.status(jobId) shows done/total (status lost means the browser or worker restarted, so start it again); browser.jobCancel(jobId) stops it; browser.job.result(jobId) returns results and saves them as jobs/<jobId>.json. page is already on the item's URL (openTab + navigation done) when your function runs. Jobs are quiet by default (no popunders or autoplay).",
 };
 
 export const HELP_TOPICS = TOPICS;
@@ -86,7 +90,7 @@ const HABITS: Record<string, string> = {
   $: "page.$(css) is awaited and returns a handle or null, not a promise chain: use page.locator(css) and its methods",
   $x: "for XPath use page.locator('xpath=//...')",
   waitForTimeout:
-    "never sleep blindly: page.waitForSelector(css), page.waitForChange(selector) or page.waitForResponse(urlPart)",
+    "page.waitForTimeout(ms) is only for pacing on purpose; to wait for the page use page.waitForSelector(css), page.waitForChange(selector) or page.waitForResponse(urlPart)",
   type: "use locator.fill(text), or bu.type(id, text, {enter: true})",
   content: "use page.markdown() or page.data(), not the raw HTML",
   evaluateHandle: "use page.evaluate(fn, arg); it returns JSON",
@@ -100,7 +104,7 @@ const HABITS: Record<string, string> = {
 export const browserHelpApi = `
 var __helpTopics = ${JSON.stringify(TOPICS)};
 var __habits = ${JSON.stringify(HABITS)};
-var __helpAliases = {map: 'api', mapping: 'api', mapped: 'sites', login: 'signin', challenge: 'gated', captcha: 'gated', error: 'errors', kernel: 'effects', effect: 'effects', screenshots: 'screenshot', context: 'history', bookmarks: 'history', forms: 'profile', observe: 'act', stagehand: 'act', drop: 'snipe', table: 'tables', proxy: 'identity', accounts: 'identity', release: 'snipe', form: 'profile', code: 'signin', otp: 'signin'};
+var __helpAliases = {map: 'api', mapping: 'api', mapped: 'sites', login: 'signin', challenge: 'gated', captcha: 'gated', error: 'errors', kernel: 'effects', effect: 'effects', screenshots: 'screenshot', context: 'history', bookmarks: 'history', observe: 'act', stagehand: 'act', drop: 'snipe', table: 'tables', proxy: 'identity', accounts: 'identity', release: 'snipe', form: 'profile', code: 'signin', otp: 'signin'};
 // help(topic) is synchronous: it prints the text and returns it as a string.
 function help(topic) {
   var key = topic && String(topic).toLowerCase();
@@ -169,7 +173,7 @@ var __TIPS = [
 function __tip(code) {
   for (var [pattern, text] of __TIPS)
     if (pattern.test(String(code || '')) && !__tipsShown.has(text)) { __tipsShown.add(text); return text; }
-  return '';
+  return typeof __speedTip === 'function' ? __speedTip() : '';
 }
 // "page.playwright.click is not a function", "foo is not defined", "reading 'x'".
 function __hint(message, code) {

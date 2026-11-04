@@ -1,6 +1,9 @@
 ## Habits that save turns
 
 - Batch: chain everything you already know into one call; each model round trip is slow.
+- Parallel: work that does not depend on other work runs at once. Steps in different tabs run
+  together (`Promise.all` over the tabs, `browser.pool(urls, fn)`); steps in one tab queue.
+  `help('parallel')`.
 - Use the site's own search, filters and sort before reading by hand.
 - Never repeat a failing action more than twice; change strategy.
 - Big jobs: try a small sample first, report it, then scale up. Many pages or sites: `browser.sweep`

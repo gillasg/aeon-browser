@@ -33,6 +33,7 @@ check <urls|--file f>`, with evidence per site. Far cheaper than opening each on
   `browser.settings()` lists them; `browser.settings({name: value})` changes them.
 - **Change a site on every visit** (hide parts, restyle, auto-click a banner): a boost,
   `help('boosts')`.
-- **Long or wide work**: many pages, `browser.job` (`help('jobs')`); hundreds of sites, a sweep
+- **Long or wide work**: the same steps on a few sites, `Promise.all` or `browser.pool`
+  (`help('parallel')`); many pages, `browser.job` (`help('jobs')`); hundreds of sites, a sweep
   (`help('sweep')`); a background window that never takes over the screen, `help('spaces')`.
 - **An AI the user already pays for** (ChatGPT, Gemini, Grok, Perplexity, Kimi): `browserkit ask`.
