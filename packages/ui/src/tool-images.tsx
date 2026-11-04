@@ -100,18 +100,20 @@ export function WorkspaceImage({ path, alt }: { path: string; alt: string }): Re
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [loader, path]);
+  // An image inside a message has an id, not a file name: name it by its alt text.
+  const label = path.startsWith("image:") ? alt || "Image" : path;
   if (!url)
     return (
       <span className="activity-result-note" role="status">
-        {!loader ? path : error ? `${path}: ${error}` : `Loading ${path}…`}
+        {!loader ? label : error ? `${label}: ${error}` : `Loading ${label}…`}
       </span>
     );
   return (
     <img
       className="markdown-image"
       src={url}
-      alt={alt || path}
-      title={path}
+      alt={alt || label}
+      title={label}
       onClick={(event) => {
         if (!event.currentTarget.closest("a")) window.open(url, "_blank", "noreferrer");
       }}

@@ -17,9 +17,13 @@ export async function sendChatImage(
   request: Extract<DaemonUiRequest, { operation: "chat.image" }>,
 ): Promise<void> {
   const payload = request.payload;
+  // "image:<id>" is an image inside a message (an attachment the user sent), not a file.
+  const messageImage = "path" in payload ? /^image:([a-f0-9]{32})$/.exec(payload.path) : null;
   const image =
     "path" in payload
-      ? await readWorkspaceImage(service, payload.chatId, payload.path)
+      ? messageImage
+        ? await service.readMessageImage(asChatId(payload.chatId), messageImage[1] as string)
+        : await readWorkspaceImage(service, payload.chatId, payload.path)
       : await service.readToolImage(asChatId(payload.chatId), payload.toolCallId, payload.index);
   const header = ImageAssetHeaderSchema.parse({
     kind: "image.asset",

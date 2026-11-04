@@ -40,6 +40,7 @@ export function wrapPiSession(
   const closeSession = createCloseSession(session, extensionUi, threadDelivery, routineSupport);
   return {
     readToolImage: (toolCallId, index) => readToolImage(manager, toolCallId, index),
+    readMessageImage: (imageId) => readMessageImage(manager, imageId),
     reference,
     submit: (input) => submitToPi(session, input),
     ...threadDelivery,
@@ -352,7 +353,7 @@ function createCloseSession(
   };
   return closeSession;
 }
-import { readToolImage } from "./session-image.js";
+import { readMessageImage, readToolImage } from "./session-image.js";
 
 /** The progress a tool reported in its partial result's details (browser_code's bu.progress). */
 function toolProgress(value: unknown): {

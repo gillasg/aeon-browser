@@ -426,9 +426,11 @@ export class BrowserControlService {
   ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const outdated = this.outdatedRuntime(step);
     if (outdated) return outdated;
-    if (!this.getAssociation(chatId, step.target)) return { code: "TARGET_LOST" };
     const tab = this.inventories?.findTarget(step.target);
     if (!tab || !safeUrl(tab.url)) return { code: "TARGET_LOST" };
+    // Any open tab is the agent's to use: the first step in one borrows it, as attachTab did.
+    if (!this.getAssociation(chatId, step.target))
+      this.setAssociation(chatId, step.target, "borrowed", "user-picker");
     const socket = this.executors.get(step.target.clientInstanceId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return { code: "BROWSER_OFFLINE" };
     // Polling an event subscription only reads its buffer, so it neither takes nor waits for the

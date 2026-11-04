@@ -135,6 +135,11 @@ const PiContentBlockSchema = z.discriminatedUnion("type", [
       type: z.literal("image"),
       mimeType: z.string().max(120),
       byteLength: z.number().int().nonnegative(),
+      // Loads the image itself: chat.image with path "image:<imageId>".
+      imageId: z
+        .string()
+        .regex(/^[a-f0-9]{32}$/)
+        .optional(),
     })
     .strict(),
   z

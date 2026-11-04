@@ -85,7 +85,7 @@ export function externalToolDefinitions(
     {
       name: "browser_tabs",
       description:
-        "List the open tabs of the user's Chrome, with the target to pass to browser.attachTab() in browser_code.",
+        "List the open tabs of the user's Chrome, with the ids to use in browser_code (bu.use(id); no attaching needed).",
       inputSchema: {
         type: "object",
         properties: { session: SESSION },

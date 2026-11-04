@@ -1,5 +1,8 @@
 ## Reading pages
 
+**One `page.read()` per page, every tab at once with `Promise.all`.** It returns the whole page;
+never `page.evaluate(() => document.body.innerText)`, and never slice a page across cells.
+
 Start with `page.read({max})`: data, the main repeated list and Markdown in one answer, with
 `partial: true` and notes when it saw less. It expands "Show more"/"Show replies" controls, waits
 up to 5 s for the content to settle, and scrolls every panel that scrolls on its own (a transcript,

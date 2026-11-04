@@ -187,8 +187,27 @@ var __saveAbility = async (spec = {}) => {
   return __call({abilitySave: value});
 };
 var saveAbility = __saveAbility;
+// Runs an ability's page code in this cell. Built-in code opens its own tab and gets the
+// caller's page (for withPage); other page code gets a tab on its site.
+var __runPageAbility = async (plan) => {
+  var fn = await (0, eval)('(' + plan.code + ')');
+  var current = globalThis.page;
+  var tab = current;
+  if (!plan.opensOwnTab) {
+    try { if (!tab || !new URL(String(await tab.url())).hostname.endsWith(plan.host)) tab = undefined; } catch (error) { tab = undefined; }
+    if (!tab) tab = await browser.openTab('https://' + plan.host + '/');
+  }
+  try { return await fn(tab, bu, plan.input); }
+  finally { if (current) globalThis.page = current; }
+};
 var __siteAbilities = {
-  run: async (name, inputs = {}, options = {}) => __call({abilityRun: {site: await __siteHostName(options.site), name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {})}}),
+  run: async (name, inputs = {}, options = {}) => {
+    var host = await __siteHostName(options.site);
+    // Page code (built-in abilities, page-script reads) runs right here, in this cell's tabs.
+    var plan = await __call({abilityRun: {site: host, name, inputs, plan: true, ...(options.via ? {via: options.via} : {})}});
+    if (plan && plan.local) return {result: await __runPageAbility(plan), via: 'script', tried: []};
+    return __call({abilityRun: {site: host, name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {})}});
+  },
   test: async (name, site) => __call({abilityRun: {site: await __siteHostName(site), name, test: true}}),
   // Moves an ability to the site's trash/ (nothing is hard-deleted); returns {removed}.
   remove: async (name, site) => __call({abilityRemove: {site: await __siteHostName(site), name}}),

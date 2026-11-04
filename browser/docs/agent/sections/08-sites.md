@@ -19,6 +19,10 @@ browserkit abilities test shop.example search  # its stored cases; fails on cons
 - **A `[site] … not learned yet` line** appears after 90 s of page work on a site with no
   abilities or API reads: end your answer with the one-line offer it gives, and learn the site
   (`abilities build`) if the user says yes.
+- **Built-in abilities** come with AI sites, Gemini and X (`ask`, `make_image`, `thread`,
+  `research`…; see AI sites below). A saved ability with the same name replaces one.
+- **Anything can be an ability:** an API call or chain, a workflow of steps, a script (node or in
+  the page), or a page read. Save whatever you will do again on a site.
 - **Start with `site.capabilities()`** in browser code (or `browserkit capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
   `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.

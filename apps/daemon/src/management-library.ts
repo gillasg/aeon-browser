@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   coverage,
+  builtinSites,
   listAbilities,
   listSites,
   loadModel,
@@ -160,13 +161,23 @@ const HEALTH_ORDER = ["broken", "signed-out", "drift", "challenged", "skipped", 
 
 type SiteSummary = Awaited<ReturnType<typeof listSites>>[number];
 
-export async function siteCards(): Promise<SiteCard[]> {
+/** Mapped sites, then the sites Aeon has built-in abilities for (AI sites, X). */
+async function allSites(): Promise<SiteSummary[]> {
   const sites = await listSites().catch(() => []);
+  const known = new Set(sites.map((item) => item.site));
+  const builtin = builtinSites()
+    .filter((site) => !known.has(site))
+    .map((site) => ({ site, operations: 0, updated: "" }));
+  return [...sites, ...builtin];
+}
+
+export async function siteCards(): Promise<SiteCard[]> {
+  const sites = await allSites();
   return Promise.all(sites.slice(0, 200).map((site) => siteCard(site)));
 }
 
 export async function abilityCards(): Promise<AbilityCard[]> {
-  const sites = await listSites().catch(() => []);
+  const sites = await allSites();
   return (
     await Promise.all(
       sites.slice(0, 200).map(async (item) =>

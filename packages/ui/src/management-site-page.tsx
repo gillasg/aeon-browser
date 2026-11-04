@@ -220,11 +220,17 @@ function CanDo({
   if (!site) return <NotLearned host={host} suggest={suggest} />;
   return (
     <>
-      <p>
-        {site.operations} learned calls ·{" "}
-        <span className={`management-health management-health-${site.health}`}>{site.health}</span>
-        <span className="management-subtle"> · updated {formatWhen(site.updatedAt)}</span>
-      </p>
+      {site.updatedAt ? (
+        <p>
+          {site.operations} learned calls ·{" "}
+          <span className={`management-health management-health-${site.health}`}>
+            {site.health}
+          </span>
+          <span className="management-subtle"> · updated {formatWhen(site.updatedAt)}</span>
+        </p>
+      ) : (
+        <p className="management-subtle">Comes with Aeon: these work on your own account.</p>
+      )}
       <SiteAbilities
         site={site}
         onTry={

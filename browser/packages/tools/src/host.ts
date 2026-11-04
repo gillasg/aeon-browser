@@ -17,6 +17,7 @@ import {
   handleSiteMapperRequest,
   isSiteMapperRequest,
   siteCapabilities,
+  abilityPlan,
   listAbilities,
   readSiteNotes,
   readAbility,
@@ -186,6 +187,8 @@ interface AbilityRunRequest {
     cursor?: unknown;
     /** Run the ability's stored test cases instead. */
     test?: unknown;
+    /** Only say how to run it (in the cell, for page code), without running it. */
+    plan?: unknown;
   };
 }
 
@@ -252,6 +255,13 @@ function answerAbilityRun(request: AbilityRunRequest): Promise<unknown> {
   const site = String(run.site ?? "");
   const name = String(run.name ?? "");
   if (run.test) return testAbility(site, name);
+  if (run.plan)
+    return abilityPlan(
+      site,
+      name,
+      (run.inputs ?? {}) as Record<string, unknown>,
+      run.via ? (run.via as AbilityVia) : undefined,
+    );
   return runAbility(site, name, (run.inputs ?? {}) as Record<string, unknown>, {
     ...(run.via ? { via: run.via as AbilityVia } : {}),
     ...(typeof run.key === "string" ? { key: run.key } : {}),
