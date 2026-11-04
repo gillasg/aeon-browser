@@ -208,6 +208,7 @@ async function __step(step, readOnly = false) {
       (result.data && result.data.settle ? ' (' + result.data.settle.why + ')' : '') + ' ' + (Date.now() - startedAt) + ' ms' + (result.note ? ' - ' + result.note : ''));
   }
   if (action && step.op !== 'observe' && step.target) { try { await __autoAfter(step.target, step); } catch {} }
+  if (action && step.target) await __noteSiteTime(step.target).catch(() => {});
   return result;
 }
 function __element(target, element) {
