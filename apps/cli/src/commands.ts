@@ -626,7 +626,6 @@ export function aeonCommands(host: DaemonHost): Command[] {
     ...browserCommands(host),
     ...providerCommands(host),
     ...blockedCommands(host),
-    ...browsersCommands(host),
   ])
     overrides.set(command.name, command);
   overrides.set("signin", {
@@ -674,7 +673,7 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
     run: () => updateAeon(),
   });
   const commands = BROWSERKIT_COMMANDS.map((command) => overrides.get(command.name) ?? command);
-  return [...aeonOnlyCommands(host), ...commands];
+  return [...aeonOnlyCommands(host), ...browsersCommands(host), ...commands];
 }
 
 /** aeon update: pull this checkout (fast-forward only), then run the one-command setup again. */
