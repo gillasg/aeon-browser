@@ -207,6 +207,7 @@ async function __step(step, readOnly = false) {
     console.log('[ok] ' + step.op + (result.outcome ? ' ' + result.outcome : '') + (result.url ? ' -> ' + result.url : '') + (moved ? ' (page changed from ' + before + ')' : '') +
       (result.data && result.data.settle ? ' (' + result.data.settle.why + ')' : '') + ' ' + (Date.now() - startedAt) + ' ms' + (result.note ? ' - ' + result.note : ''));
   }
+  if (action && step.target) __noteActed(step.target);
   if (action && step.op !== 'observe' && step.target) { try { await __autoAfter(step.target, step); } catch {} }
   if (action && step.target) await __noteSiteTime(step.target).catch(() => {});
   return result;
