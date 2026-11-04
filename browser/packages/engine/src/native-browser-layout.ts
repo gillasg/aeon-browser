@@ -1,5 +1,6 @@
 import { engineConfig } from "./engine-config.js";
-import { isAgentGroupId } from "./native-browser-groups.js";
+import { groupAgentTab, isAgentGroupId } from "./native-browser-groups.js";
+import { isAgentTab } from "./native-browser-tab-cleanup.js";
 
 type SplitTab = chrome.tabs.Tab & { splitViewId?: number };
 type SplitTabs = typeof chrome.tabs & {
@@ -63,9 +64,19 @@ async function pairChat(
   await alignTabs(tabs, chat, target);
   const splitId = await tabs.createSplit?.([chat.id, target.id]);
   if (splitId !== undefined) pairs.set(chatId, { targetId: target.id, splitId });
+  if (prior && prior.targetId !== target.id) await regroupUnpaired(tabs, prior.targetId, chatId);
   if (front) await tabs.update(chat.id, { active: true });
   else if (previous?.id !== undefined && previous.id !== chat.id && previous.id !== target.id)
     await tabs.update(previous.id, { active: true }).catch(() => undefined);
+}
+// Pairing took the agent's previous tab out of its group (Chrome pairs tabs in one group). Once
+// the chat pairs with another tab, a tab the agent opened goes back to the agent group, so it is
+// kept out of the user's way instead of left loose among their tabs. The user's own tabs stay put.
+async function regroupUnpaired(tabs: SplitTabs, tabId: number, chatId: string): Promise<void> {
+  if (!isAgentTab(tabId)) return;
+  const tab = (await tabs.get(tabId).catch(() => undefined)) as SplitTab | undefined;
+  if (!tab?.id || hasSplit(tab) || tab.groupId >= 0) return;
+  await groupAgentTab(tab.id, tab.windowId, chatId);
 }
 async function alignTabs(tabs: SplitTabs, chat: SplitTab, target: SplitTab): Promise<void> {
   if (chat.id === undefined || target.id === undefined) return;
