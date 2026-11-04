@@ -1,5 +1,6 @@
 // Turns a finished chat's view into what a caller needs: the final answer and a compact trace of
 // tool calls, errors and tabs, enough to judge the run and find where it went wrong.
+import { speedReport, type SpeedReport } from "./speed.js";
 interface Block {
   type: string;
   text?: string;
@@ -52,6 +53,8 @@ export interface TraceStep {
   tool: string;
   summary: string;
   error: boolean;
+  /** Seconds from the call to its result. */
+  seconds?: number;
   actions?: TraceAction[];
 }
 export interface ChatResult {
@@ -70,6 +73,8 @@ export interface ChatResult {
    * and money). Every turn after the first should mostly hit the cache.
    */
   cache?: CacheReport;
+  /** Where the latest run's time went: model turns, each tool, sleeps cut, speed tips given. */
+  speed?: SpeedReport;
   /** When the latest prompt was submitted and when the chat finished it (ISO; finishedAt only
    * once finished). Screen recorders (Aperture) frame recordings with these; keep them. */
   promptAt: string | null;
@@ -126,6 +131,7 @@ export function summarize(
     tabsOpened: trace.reduce((count, step) => count + countOpened(step.summary), 0),
     contextTokens: snapshot.contextUsage?.tokens ?? null,
     ...cacheOf(snapshot.entries),
+    ...speedOf(snapshot.entries),
     promptAt: lastOf(snapshot.entries, "user")?.timestamp ?? null,
     finishedAt:
       outcome === "timeout" || snapshot.runState !== "idle"
@@ -138,6 +144,11 @@ export function summarize(
 function cacheOf(entries: Entry[]): { cache?: CacheReport } {
   const cache = cacheReport(entries);
   return cache ? { cache } : {};
+}
+
+function speedOf(entries: Entry[]): { speed?: SpeedReport } {
+  const speed = speedReport(entries);
+  return speed ? { speed } : {};
 }
 
 function lastOf(entries: Entry[], role: string): Entry | undefined {
@@ -175,7 +186,7 @@ function traceOf(entries: Entry[]): TraceStep[] {
   const byCall = new Map<string, TraceStep>();
   for (const entry of entries) {
     if (entry.message?.role === "assistant") addCalls(entry, steps, byCall);
-    else if (entry.message?.role === "tool") addResult(entry.message, byCall);
+    else if (entry.message?.role === "tool") addResult(entry, byCall);
   }
   return steps;
 }
@@ -194,11 +205,15 @@ function addCalls(entry: Entry, steps: TraceStep[], byCall: Map<string, TraceSte
   }
 }
 
-function addResult(message: NonNullable<Entry["message"]>, byCall: Map<string, TraceStep>): void {
+function addResult(entry: Entry, byCall: Map<string, TraceStep>): void {
+  const message = entry.message;
+  if (!message) return;
   const step = message.toolCallId ? byCall.get(message.toolCallId) : undefined;
   if (!step) return;
   const text = message.content.map((block) => block.text ?? "").join("\n");
   step.summary += "\n" + text.slice(0, 600);
   step.error = Boolean(message.isError);
+  const ms = Date.parse(entry.timestamp) - Date.parse(step.at);
+  if (Number.isFinite(ms) && ms >= 0) step.seconds = Math.round(ms / 100) / 10;
   if (message.actions?.length) step.actions = message.actions;
 }
