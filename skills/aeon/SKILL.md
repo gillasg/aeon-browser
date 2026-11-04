@@ -124,13 +124,16 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   from plain words: a fast model picks the element (one quick call), the next run on that site
   replays it from a local cache with no model call, and a changed page makes it ask again and
   re-cache. `await page.observe("every field of the shipping form")` returns actions that
-  `page.act(action)` runs with no further model call. Pass values as `{variables: {email}}`: that
+  `page.act(action)` runs with no further model call, and
+  `await page.extract("price, stock and delivery date", {schema})` reads values off the page the
+  same way instead of slicing `innerText`. Pass values as `{variables: {email}}`: that
   model, the cache and the result only see `%email%`. With a known id or selector, act on it
   directly. `help('act')`.
 - `page.console()` reads console messages and errors (capture is off until asked for).
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
-- After a cell with actions the new page state prints automatically; never add blind sleeps. A cell
+- After a cell with actions the new page state prints automatically; never add blind sleeps (one right
+  after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A cell
   returns its last expression: end with one object holding what you found, and print only what you
   will use. Close tabs you are done with (`await page.close()`, or `browser.closeTab(id)`; any tab,
   then unsplit first); `page.keep()` hands one to the user when they need it
@@ -319,7 +322,9 @@ Check every part of the request (each site, field, filter, count and format) aga
 if a part is missing, try another route. Never conclude from part of a list: read all of it, or say
 you only saw the top. An empty result on a URL you built, or a page that contradicts itself ("9
 orders" beside "no orders"), means the URL is wrong, not the data: drop the parameters you added
-(`page=1` empties some lists) or use the site's own filter, then read again. Lead the answer with what is most urgent. Never invent values. If something
+(`page=1` empties some lists) or use the site's own filter, then read again. Before a summary or bottom line, check each claim in it (cheapest, fastest, only,
+full price, in stock) against your own table or notes: a summary that contradicts your data is
+wrong. Lead the answer with what is most urgent. Never invent values. If something
 cannot be done, say what you tried and give the closest verified facts with their sources; say
 which facts came from search and which you saw on a site. `STALE_REF` means call `bu.state()` again;
 `TARGET_LOST` means the tab is gone; every other code is in `help('errors')`. `help()` lists topics
