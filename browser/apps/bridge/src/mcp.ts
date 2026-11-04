@@ -42,7 +42,7 @@ const tools = [
   {
     name: "browser_tabs",
     description:
-      "List the open tabs of the connected browser, with the target to pass to browser.attachTab().",
+      "List the open tabs of the connected browser, with the ids to use in browser code (bu.use(id); no attaching needed).",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {

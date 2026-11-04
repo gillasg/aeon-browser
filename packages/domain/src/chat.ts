@@ -286,6 +286,7 @@ export type PiForkEntryCheck =
 
 export interface PiSessionHandle {
   readToolImage?(toolCallId: string, index: number): { mimeType: string; bytes: Uint8Array };
+  readMessageImage?(imageId: string): { mimeType: string; bytes: Uint8Array };
   readonly reference: PiSessionReference;
   submit(input: PiSessionInput | string): Promise<void>;
   queue(input: PiSessionInput, mode: "followUp" | "steer"): Promise<void>;

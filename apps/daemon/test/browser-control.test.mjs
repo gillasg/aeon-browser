@@ -53,12 +53,21 @@ test("browser control binds a borrowed target to one Chat and sends work to its 
     assert.equal(observed.steps[0].disposition, "completed");
     assert.equal(observed.steps[0].result.trust, "untrusted");
 
-    const denied = JSON.parse(
-      await harness.service.execute(otherChatId, "tool-other-chat", {
-        steps: [{ op: "observe", target, kind: "semantic" }],
+    // Any open tab is every agent's to use: another chat's first step borrows it, no attaching.
+    const borrowing = harness.service.execute(otherChatId, "tool-other-chat", {
+      steps: [{ op: "observe", target, kind: "semantic" }],
+    });
+    const borrowed = JSON.parse((await nextMessage(harness.client)).toString());
+    assert.equal(borrowed.chatId, otherChatId);
+    assert.equal(borrowed.step.target.tabId, target.tabId);
+    harness.client.send(
+      JSON.stringify({
+        ...result,
+        requestId: borrowed.requestId,
+        operationId: borrowed.operationId,
       }),
     );
-    assert.equal(denied.steps[0].code, "TARGET_LOST");
+    assert.equal(JSON.parse(await borrowing).steps[0].disposition, "completed");
   } finally {
     await harness.close();
   }

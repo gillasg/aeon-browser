@@ -543,18 +543,13 @@ function authorize(cell: Cell, step: BrowserStep): void {
   const target = step.target;
   if (target.clientInstanceId !== cell.identity.clientInstanceId) throw new Error("TARGET_LOST");
   const key = targetIdentity(target);
-  if (step.op === "attachTab") {
-    // Attaching a listed tab is an explicit agent choice; Core records it after the cell.
-    if (!currentInventoryTabs().some((tab) => targetIdentity(tab.target) === key))
-      throw new Error("TARGET_LOST");
-    cell.allowed.set(key, target);
-    cell.opened.set(key, target);
-    return;
-  }
   if (cell.allowed.has(key) || browserSessionOwner(target.tabId) === cell.run.chatId) return;
-  throw new Error(
-    `INVALID_TARGET: tab ${target.tabId} is not this run's: attach it first with browser.attachTab, or open your own with browser.openTab(url)`,
-  );
+  // Any open tab is the agent's to use, no attaching needed: the first step in it attaches it.
+  // A blocked site still answers SITE_BLOCKED (enforceSites runs next).
+  if (!currentInventoryTabs().some((tab) => targetIdentity(tab.target) === key))
+    throw new Error(`TARGET_LOST: tab ${target.tabId} is not open; browser.tabs() lists open tabs`);
+  cell.allowed.set(key, target);
+  cell.opened.set(key, target);
 }
 
 function recordScreenshot(cell: Cell, step: BrowserStep, result: unknown): void {

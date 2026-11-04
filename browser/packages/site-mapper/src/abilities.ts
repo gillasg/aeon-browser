@@ -34,12 +34,13 @@ import {
   type ReadBack,
   type WriteOutcome,
 } from "./ability-writes.js";
+import { builtinAbilities, builtinWay } from "./builtin-abilities.js";
 import { siteDir, siteName, writeAtomic } from "./registry.js";
 import type { CollectRecipe, RecipePagination } from "./recipes.js";
 import type { Json } from "./types.js";
 
 export type AbilityKind = "read" | "write";
-export type AbilityCreatedBy = "agent" | "user" | "import";
+export type AbilityCreatedBy = "agent" | "user" | "import" | "builtin";
 export type AbilityVia = "api" | "steps" | "script" | "page";
 
 export interface AbilityApiStep {
@@ -185,10 +186,15 @@ export async function listAbilities(site: string): Promise<Ability[]> {
   const files = (await readdir(folder).catch(() => [] as string[])).filter((file) =>
     file.endsWith(".json"),
   );
-  const abilities = await Promise.all(files.map((file) => readAbilityFile(join(folder, file))));
-  return abilities
-    .filter((ability): ability is Ability => !!ability)
-    .sort((left, right) => left.name.localeCompare(right.name));
+  const abilities = (
+    await Promise.all(files.map((file) => readAbilityFile(join(folder, file))))
+  ).filter((ability): ability is Ability => !!ability);
+  // Built-in abilities come with Aeon; a stored one of the same name replaces it.
+  const stored = new Set(abilities.map((ability) => ability.name));
+  return [
+    ...abilities,
+    ...builtinAbilities(site).filter((ability) => !stored.has(ability.name)),
+  ].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 export async function readAbility(site: string, name: string): Promise<Ability | undefined> {
@@ -338,7 +344,7 @@ export async function runAbility(
   inputs: Record<string, unknown> = {},
   options: AbilityRunOptions = {},
 ): Promise<AbilityRunResult> {
-  const ability = await readAbility(site, name);
+  const ability = withBuiltinWay(await readAbility(site, name), inputs);
   if (!ability) throw new Error(`ABILITY_UNKNOWN: ${siteName(site)} has no ability ${name}`);
   const host = options.host ?? defaultHost(site);
   if (ability.kind === "write") return runWrite(ability, inputs, host, options);
@@ -668,7 +674,19 @@ function once<T>(make: () => Promise<T>): () => Promise<T> {
   return () => (value ??= make());
 }
 
+/** A built-in ability runs the code written for these inputs. */
+export function withBuiltinWay(
+  ability: Ability | undefined,
+  inputs: Record<string, unknown>,
+): Ability | undefined {
+  if (ability?.createdBy !== "builtin") return ability;
+  const way = builtinWay(ability.site, ability.name, inputs);
+  return way ? { ...ability, ways: [way] } : ability;
+}
+
 async function recordAbilityRun(ability: Ability, ok: boolean): Promise<void> {
+  // Built-in abilities are not stored: saving their stats would freeze a copy that shadows them.
+  if (ability.createdBy === "builtin") return;
   const now = new Date().toISOString();
   const next: Ability = {
     ...ability,

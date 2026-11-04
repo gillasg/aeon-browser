@@ -15,8 +15,9 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
 
 - One `page` per site: `browser.openTab` on a site you already have a tab for navigates it
   (`{newTab: true}` for another tab). `browser.activeTab()` is the tab the user is on;
-  `browser.tabs(query?)` lists tabs (`mine:true` only for tabs this chat or session opened),
-  `browser.attachTab(tabId)` takes over one, `bu.use(tabId)` switches. Work through the user's tabs
+  `browser.tabs(query?)` lists tabs (`mine:true` only for tabs this chat or session opened). Any
+  open tab works directly, no attaching: `bu.use(tabId)` or `browser.tab(tabId)`; a tab on a site
+  the user blocked answers `SITE_BLOCKED`, so tell them. Work through the user's tabs
   in place, all at once with `Promise.all`, navigating them too when the task is about them; for
   anything else open your own tab, so what the user is watching stays put.
 - `bu.state()` prints `[id] role "name" = value` and visible text (`*` marks changes; scope with

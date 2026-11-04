@@ -145,6 +145,14 @@ export class ChatService {
     if (!session.readToolImage) throw new Error("Image retrieval is unavailable");
     return session.readToolImage(toolCallId, index);
   }
+  async readMessageImage(
+    chatId: ChatId,
+    imageId: string,
+  ): Promise<{ mimeType: string; bytes: Uint8Array }> {
+    const { session } = await this.resolveSession(this.requireChat(chatId));
+    if (!session.readMessageImage) throw new Error("Image retrieval is unavailable");
+    return session.readMessageImage(imageId);
+  }
   forkFromEntry(
     input: Parameters<ChatThreadSupport["forkFromEntry"]>[0],
   ): ReturnType<ChatThreadSupport["forkFromEntry"]> {

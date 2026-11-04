@@ -33,6 +33,15 @@ function __wire(element) {
   for (var key of keys) if (element[key] !== undefined) out[key] = element[key];
   return out;
 }
+// Reading a whole page by hand (body innerText, outerHTML) is slower and loses what page.read
+// gets (embedded data, lists, frames, Show more): say so once a minute, the call still runs.
+var __readNudgedAt = 0;
+var __readNudge = (fn) => {
+  if (!/document[.](body|documentElement)[?]?[.](innerText|textContent|outerHTML|innerHTML)/.test(String(fn))) return;
+  if (Date.now() - __readNudgedAt < 60000) return;
+  __readNudgedAt = Date.now();
+  console.log('[tip] page.read() reads the whole page in one call (text, embedded data, lists, frames, Show more), every tab at once with Promise.all; use it instead of document.body.innerText, and never slice a page across cells.');
+};
 var __pressKeys = ['Enter','Tab','Escape','Backspace','Delete','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','Space'];
 // Named keys go to the engine; any other key or chord is typed after clicking the element.
 async function __press(target, element, key, options, locator) {
@@ -520,7 +529,7 @@ var browser = Object.freeze({
     click: (element) => { var loc = __locatorFor(target, element); return loc ? loc.click() : __step({op:'click',target,element:__wire(__element(target,element)),observe:false}); },
     fill: (element, value) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false}); },
     paste: (element, html, text = '') => __step({op:'paste',target,element:__wire(__element(target,element)),html:String(html),text:String(text || html.replace(/<[^>]+>/g, ' ')),observe:false}),
-    evaluate: async (fn, arg) => (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value,
+    evaluate: async (fn, arg) => (__readNudge(fn), (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value),
     control: async () => (await __step({op:'control', target, action:'status'})).data,
     waitForControl: async (options = {}) =>
       (await __step({op:'control', target, action:'wait', timeoutMs: Math.min(Number(options.timeoutMs ?? options.timeout ?? 30000) || 0, 120000)})).data,

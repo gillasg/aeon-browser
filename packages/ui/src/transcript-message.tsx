@@ -1,3 +1,4 @@
+import { WorkspaceImage } from "./tool-images.js";
 import type { ReactElement } from "react";
 import type { PiContentBlockDto, PiMessageDto } from "@aeon/protocol";
 import { BrowserContextCard, BrowserContextTranscriptChip } from "./browser-context-view.js";
@@ -149,10 +150,12 @@ function MessageBlock({
     case "routine-result":
       return <RoutineResult block={block} />;
     case "image":
-      return (
+      return block.imageId ? (
         <p className="message-image">
-          Image attached · {block.mimeType} · {block.byteLength} bytes
+          <WorkspaceImage path={`image:${block.imageId}`} alt="Attached image" />
         </p>
+      ) : (
+        <p className="message-image">Image attached</p>
       );
     case "thinking":
       return <ThinkingDisclosure text={block.text} streaming={streaming} />;

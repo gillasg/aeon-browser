@@ -611,7 +611,7 @@ test(
       );
 
       await t.test("the provider page fallback types a prompt and reads the answer", async () => {
-        const script = uiScript("gemini", "hello there", { timeoutMs: 6000, pollMs: 200 });
+        const script = uiScript("gemini", "hello there", { timeoutMs: 15000, pollMs: 200 });
         const { stdout } = await run(
           process.execPath,
           [

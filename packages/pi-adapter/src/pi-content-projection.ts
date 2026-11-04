@@ -1,3 +1,4 @@
+import { imageIdOf } from "./session-image.js";
 import { Buffer } from "node:buffer";
 import { type PiContentBlock, type PiJsonValue } from "@aeon/domain";
 import { compactBrowserResult } from "./browser-result-projection.js";
@@ -60,6 +61,7 @@ function projectImageBlock(block: Record<string, unknown>): PiContentBlock | und
     type: "image",
     mimeType: typeof block.mimeType === "string" ? block.mimeType : "application/octet-stream",
     byteLength: Buffer.byteLength(block.data, "base64"),
+    imageId: imageIdOf(block.data),
   };
 }
 

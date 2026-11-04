@@ -36,7 +36,7 @@ export type PiContentBlock =
       inReplyTo?: string;
     }
   | { type: "thinking"; text: string; redacted?: boolean; truncated?: boolean }
-  | { type: "image"; mimeType: string; byteLength: number }
+  | { type: "image"; mimeType: string; byteLength: number; imageId?: string }
   | {
       type: "tool-call";
       toolCallId: string;
