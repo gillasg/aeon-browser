@@ -10,6 +10,8 @@ export interface RunOptions {
   origin: "cli" | "mcp";
   /** Type each prompt into its chat's composer on camera before sending it (screen recordings). */
   typed?: boolean;
+  /** The named browser (`aeon browsers`) each chat opens and runs in; else any connected one. */
+  browser?: string;
   model?: { provider: string; id: string };
   thinkingLevel?: string;
   timeoutMs: number;
@@ -91,6 +93,7 @@ async function runOne(
   const chatId = String((created.chat as { chatId: string }).chatId);
   finished.track(chatId);
   options.onStarted?.(index, chatId);
+  if (options.browser) await client.pinChat(chatId, options.browser);
   if (options.typed) {
     const typed = await client.openTypedChat(chatId, prompt);
     if (!typed.typed)

@@ -37,6 +37,8 @@ export class BrowserControlService {
   private readonly pending = new Map<string, BrowserPending>();
   private readonly associations = new Map<string, Map<string, Association>>();
   private readonly claims = new Map<string, string>();
+  /** aeon run --browser: chat id → the one browser (clientInstanceId) the chat may use. */
+  private readonly pins = new Map<string, string>();
   private claimGeneration = 0;
   private scripts: SiteScriptService | undefined;
   private readonly scriptClients = new Set<string>();
@@ -76,6 +78,28 @@ export class BrowserControlService {
   }
   useInventories(inventories: BrowserInventoryRegistry): void {
     this.inventories = inventories;
+  }
+  /** Keeps a chat in one browser: its tab opens and its code runs only there. */
+  pinChat(chatId: string, clientInstanceId: string): void {
+    this.pins.set(chatId, clientInstanceId);
+  }
+  /** The connected browsers, one per Chrome profile, with their inventory. */
+  connectedBrowsers(): { clientInstanceId: string; urls: string[] }[] {
+    return [...this.executors.keys()].map((clientInstanceId) => ({
+      clientInstanceId,
+      urls: this.inventories?.get(clientInstanceId)?.tabs.map((tab) => tab.url) ?? [],
+    }));
+  }
+  /** The open sockets a chat may use: only its pinned browser, else every connected one. */
+  private socketsFor(chatId: string): WebSocket[] {
+    const pin = this.pins.get(chatId);
+    const sockets = pin ? [this.executors.get(pin)] : [...this.executors.values()];
+    return sockets.filter((socket): socket is WebSocket => socket?.readyState === WebSocket.OPEN);
+  }
+  /** Browser ids a chat may use, of those given: only its pinned one when it has one. */
+  private allowedFor(chatId: string, ids: string[]): string[] {
+    const pin = this.pins.get(chatId);
+    return pin ? ids.filter((id) => id === pin) : ids;
   }
   isInstanceAvailable(clientInstanceId: string): boolean {
     return this.executors.has(clientInstanceId) && !!this.inventories?.get(clientInstanceId);
@@ -176,7 +200,7 @@ export class BrowserControlService {
     if ("browserInfo" in raw && raw.browserInfo === true)
       return Promise.resolve(
         JSON.stringify({
-          clientInstanceIds: [...this.executors.keys()].filter((id) =>
+          clientInstanceIds: this.allowedFor(chatId, [...this.executors.keys()]).filter((id) =>
             this.isInstanceAvailable(id),
           ),
         }),
@@ -233,7 +257,9 @@ export class BrowserControlService {
   }
   private pickCodeClient(chatId: string): { clientInstanceId?: string; available: string[] } {
     const associated = [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target);
-    const available = [...this.codeClients].filter((id) => this.isInstanceAvailable(id));
+    const available = this.allowedFor(chatId, [...this.codeClients]).filter((id) =>
+      this.isInstanceAvailable(id),
+    );
     const preferred = associated
       .map((target) => target.clientInstanceId)
       .find((id) => available.includes(id));
@@ -309,7 +335,7 @@ export class BrowserControlService {
     chatId: string,
     typed: string,
   ): Promise<{ ok: boolean; recording?: boolean; error?: string }> {
-    const socket = [...this.executors.values()].find((item) => item.readyState === WebSocket.OPEN);
+    const socket = this.socketsFor(chatId)[0];
     if (!socket)
       return Promise.resolve({ ok: false, error: "BROWSER_OFFLINE: no browser connected" });
     return new Promise((resolve) => {
@@ -337,15 +363,12 @@ export class BrowserControlService {
     });
     return true;
   }
-  /** Ask every connected browser to show a chat as a tab; returns how many were asked. */
+  /** Ask the chat's browsers (its pinned one, else all) to show it as a tab; returns how many. */
   openChatTab(chatId: string, active = false): number {
-    let asked = 0;
-    for (const socket of this.executors.values())
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ kind: "native.chat.open", chatId, active }));
-        asked++;
-      }
-    return asked;
+    const sockets = this.socketsFor(chatId);
+    for (const socket of sockets)
+      socket.send(JSON.stringify({ kind: "native.chat.open", chatId, active }));
+    return sockets.length;
   }
   private release(chatId: string, reset = false, tidy = false): void {
     for (const pending of this.pending.values())
@@ -379,6 +402,8 @@ export class BrowserControlService {
   ): Promise<{ result?: BrowserExecutorResult; code?: string; detail?: string }> {
     const socket = this.executors.get(step.clientInstanceId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return { code: "BROWSER_OFFLINE" };
+    if (!this.allowedFor(chatId, [step.clientInstanceId]).length)
+      return { code: "BROWSER_OFFLINE", detail: "This chat runs only in its own browser." };
     const title = step.ownerTitle ?? this.ownerTitles?.(chatId);
     const space = step.space ?? this.spaceForChat?.(chatId);
     const named = {

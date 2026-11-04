@@ -197,6 +197,35 @@ export class AeonClient {
     });
   }
 
+  /** One request with its own reply kind (core.browsers, core.chat.pin). */
+  private ask(kind: string, body: Json, replyKind: string, timeoutMs = 15_000): Promise<Json> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+      }, timeoutMs);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== replyKind) return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve(message);
+      });
+      this.socket.send(JSON.stringify({ kind, requestId, ...body }));
+    });
+  }
+
+  /** Lists the connected browsers (one per Chrome profile), naming one first if asked. */
+  browsers(rename?: { browser: string; name: string }): Promise<Json> {
+    return this.ask("core.browsers", rename ? { rename } : {}, "core.browsers.result");
+  }
+
+  /** Keeps a chat in the named browser: its tab opens and its steps run only there. */
+  async pinChat(chatId: string, browser: string): Promise<void> {
+    const reply = await this.ask("core.chat.pin", { chatId, browser }, "core.chat.pinned");
+    if (reply.ok !== true) throw new Error(String(reply.error ?? `Could not use ${browser}.`));
+  }
+
   /** Reads or changes the sites agents may not use (the extension's settings list). */
   blocked(body: { action: "read" | "add" | "remove"; site?: string }): Promise<Json> {
     const requestId = randomUUID();

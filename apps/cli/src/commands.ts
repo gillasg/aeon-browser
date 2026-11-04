@@ -6,6 +6,7 @@ import { COMMANDS as BROWSERKIT_COMMANDS } from "browserkit/dist/commands/index.
 import { flag, has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
 import { blockedCommands } from "./blocked.js";
+import { browsersCommands } from "./browsers.js";
 import { speedLine } from "./speed.js";
 import { converseCommands } from "./converse-commands.js";
 import { browserCommands } from "./browser-commands.js";
@@ -55,6 +56,7 @@ function runOptions(args: Args): Omit<RunOptions, "origin" | "onProgress" | "onS
     parallel: Math.max(1, Math.min(20, Number(flag(args, "parallel") ?? 5))),
     quiet: has(args, "quiet"),
     ...(has(args, "typed") ? { typed: true } : {}),
+    ...(flag(args, "browser") ? { browser: String(flag(args, "browser")) } : {}),
     ...(model && provider && id.length ? { model: { provider, id: id.join("/") } } : {}),
     ...(thinking ? { thinkingLevel: thinking } : {}),
     timeoutMs: Number(flag(args, "timeout") ?? 20) * 60_000,
@@ -447,7 +449,10 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
       summary: "run tasks as Aeon chats",
       help: `Usage: aeon run "<task>" ["<task>" ...] [--file tasks.txt|json] [--parallel 5]
        [--quiet] [--model provider/id] [--thinking level] [--timeout 20] [--json]
-       [--max-steps n] [--max-minutes m] [--max-cost usd] [--typed]
+       [--max-steps n] [--max-minutes m] [--max-cost usd] [--typed] [--browser name]
+
+--browser keeps each chat in one Chrome profile, named with \`aeon browsers name\`: its tab
+opens and its steps run only there (other connected profiles never see it).
 
 --typed types each prompt into its chat's composer on camera before sending it (for screen
 recordings; with the recordAgentTabs setting on, the chat tab is recorded too).
@@ -621,6 +626,7 @@ export function aeonCommands(host: DaemonHost): Command[] {
     ...browserCommands(host),
     ...providerCommands(host),
     ...blockedCommands(host),
+    ...browsersCommands(host),
   ])
     overrides.set(command.name, command);
   overrides.set("signin", {
