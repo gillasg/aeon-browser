@@ -6,6 +6,7 @@ import { COMMANDS as BROWSERKIT_COMMANDS } from "browserkit/dist/commands/index.
 import { flag, has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
 import { blockedCommands } from "./blocked.js";
+import { speedLine } from "./speed.js";
 import { converseCommands } from "./converse-commands.js";
 import { browserCommands } from "./browser-commands.js";
 import { providerCommands } from "./provider-commands.js";
@@ -112,6 +113,7 @@ function formatResult(result: ChatResult): string {
     `── ${result.status.toUpperCase()} · ${Math.round(result.seconds)}s · ${result.toolCalls} tool calls` +
       ` (${result.toolErrors} errors) · ${result.tabsOpened} tabs · chat ${result.chatId}`,
     `Task: ${result.prompt}`,
+    ...(result.speed ? [speedLine(result.speed)] : []),
     result.answer || "(no answer)",
   ].join("\n");
 }
@@ -120,10 +122,11 @@ function formatTrace(result: ChatResult): string {
   const steps = result.trace
     .map(
       (step, index) =>
-        `${index + 1}. ${step.tool}${step.error ? " [ERROR]" : ""} ${step.at}\n${step.summary}`,
+        `${index + 1}. ${step.tool}${step.error ? " [ERROR]" : ""} ${step.at}` +
+        `${step.seconds === undefined ? "" : ` (${step.seconds} s)`}\n${step.summary}`,
     )
     .join("\n\n");
-  return [steps, cacheLine(result)].filter(Boolean).join("\n\n");
+  return [steps, cacheLine(result), speedLine(result.speed)].filter(Boolean).join("\n\n");
 }
 
 /** "Prompt cache: 94% of prompt tokens over 12 turns; fell on turn 5, 9", for reviews. */
