@@ -1,8 +1,10 @@
 import type { DaemonUiResponse } from "@aeon/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
-// "Let outside agents see my open tabs" is an opt-in setting owned by the daemon. The home page
-// reads and changes it; nothing else in the extension needs the value.
+// On/off settings owned by the daemon ("Let outside agents see my open tabs", "Load my Pi
+// extensions"). The home page reads and changes them; nothing else in the extension needs them.
+
+type SwitchOperation = "settings.outside-context" | "settings.pi-extensions";
 
 export class HomeOutsideContext {
   enabled = false;
@@ -13,6 +15,7 @@ export class HomeOutsideContext {
       client(): UiClient | undefined;
       onChange(): void;
       onError(message: string): void;
+      operation?: SwitchOperation;
     },
   ) {}
 
@@ -26,6 +29,10 @@ export class HomeOutsideContext {
     await this.send(enabled);
   }
 
+  private get operation(): SwitchOperation {
+    return this.options.operation ?? "settings.outside-context";
+  }
+
   private async send(enabled?: boolean): Promise<void> {
     const client = this.options.client();
     if (!client) return;
@@ -34,7 +41,7 @@ export class HomeOutsideContext {
       const after = client.send({
         kind: "command",
         requestId,
-        operation: "settings.outside-context",
+        operation: this.operation,
         payload: enabled === undefined ? {} : { enabled },
       });
       const response = await client.waitFor(
@@ -42,11 +49,8 @@ export class HomeOutsideContext {
         after,
       );
       if (response.kind === "command.failed") throw new Error(response.message);
-      if (
-        response.kind !== "command.completed" ||
-        response.result.kind !== "settings.outside-context"
-      )
-        throw new Error("Unexpected outside-context answer.");
+      if (response.kind !== "command.completed" || response.result.kind !== this.operation)
+        throw new Error("Unexpected settings answer.");
       this.enabled = response.result.enabled;
       this.options.onChange();
     } catch (error) {

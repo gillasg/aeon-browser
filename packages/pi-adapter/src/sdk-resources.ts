@@ -30,6 +30,8 @@ export function createPiResourceLoader(input: {
   onMcpStatusChange?: (servers: readonly McpServerStatus[]) => void;
   additionalFactories?: readonly InlineExtension[];
   browserGuidance?: boolean;
+  /** Load the user's own Pi extensions, packages, skills and prompts (Settings, off by default). */
+  personal?: boolean;
 }): ResourceLoader {
   const onMcpStatusChange = input.onMcpStatusChange;
   const existingStatusListener = input.mcpOptions?.onStatusChange;
@@ -41,36 +43,63 @@ export function createPiResourceLoader(input: {
         cwd: context.cwd,
         projectTrusted: context.isProjectTrusted(),
       }));
+  const extensionFactories = [
+    createCodemodeExtension(),
+    createToolSearchExtension(),
+    createMcpExtension({
+      // Browser and local tools can run while optional MCP servers connect in the background.
+      startupWaitMs: 0,
+      ...input.mcpOptions,
+      loadConfig,
+      ...(onMcpStatusChange || existingStatusListener
+        ? {
+            onStatusChange: (servers) => {
+              existingStatusListener?.(servers);
+              onMcpStatusChange?.(servers);
+            },
+          }
+        : {}),
+    }),
+    ...(input.browserGuidance ? [browserAbilitySearch()] : []),
+    ...(input.additionalFactories ?? []),
+  ];
   return new DefaultResourceLoader({
     cwd: input.workingDirectory,
     agentDir: input.agentDirectory,
-    settingsManager: input.settingsManager,
+    settingsManager: input.personal
+      ? input.settingsManager
+      : withoutPackages(input.settingsManager),
+    ...(input.personal ? {} : personalOff(extensionFactories)),
     appendSystemPromptOverride: (base) =>
       input.browserGuidance ? [...base, browserRuntimePrimer] : base,
     // The `aeon` skill teaches other agents to reach Aeon from a shell; Aeon's own agent already
     // has the browser tools, and reading it only costs context and confuses which tool to use.
     skillsOverride: (base) => ({ ...base, skills: withoutOutsideAgentSkills(base.skills) }),
-    extensionFactories: [
-      createCodemodeExtension(),
-      createToolSearchExtension(),
-      createMcpExtension({
-        // Browser and local tools can run while optional MCP servers connect in the background.
-        startupWaitMs: 0,
-        ...input.mcpOptions,
-        loadConfig,
-        ...(onMcpStatusChange || existingStatusListener
-          ? {
-              onStatusChange: (servers) => {
-                existingStatusListener?.(servers);
-                onMcpStatusChange?.(servers);
-              },
-            }
-          : {}),
-      }),
-      ...(input.browserGuidance ? [browserAbilitySearch()] : []),
-      ...(input.additionalFactories ?? []),
-    ],
+    extensionFactories,
   });
+}
+
+/** Only Aeon's own extensions: the built-in ones still load by name, the user's do not. */
+function personalOff(factories: readonly InlineExtension[]) {
+  const builtin = factories
+    .filter((factory) => typeof factory !== "function" && factory.builtin === true)
+    .map((factory) => `builtin:${(factory as { name: string }).name}`);
+  return {
+    noExtensions: true,
+    additionalExtensionPaths: builtin,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+  };
+}
+
+/** The user's Pi packages stay unresolved (resolving one can install it from npm). */
+function withoutPackages(settings: SettingsManager): SettingsManager {
+  const global = settings.getGlobalSettings.bind(settings);
+  const project = settings.getProjectSettings.bind(settings);
+  settings.getGlobalSettings = () => ({ ...global(), packages: [] });
+  settings.getProjectSettings = () => ({ ...project(), packages: [] });
+  return settings;
 }
 
 export async function bindPiExtensions(

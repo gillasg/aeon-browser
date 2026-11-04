@@ -95,6 +95,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.resources = new PreparedSessionResources(
       this.agentDirectory ?? resolvePiAgentDirectory(),
       Boolean(this.browserTool),
+      resolve(this.sessionDirectory, ".."),
     );
     if (this.testModel && !this.agentDirectory) {
       throw new Error("The local faux model requires a separate, explicit Pi agent directory.");

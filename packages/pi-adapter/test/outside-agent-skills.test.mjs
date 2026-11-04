@@ -30,11 +30,20 @@ test("Aeon's own agent never sees the skill written for agents outside Aeon", as
       workingDirectory: cwd,
       agentDirectory: agent,
       settingsManager: SettingsManager.create(cwd, agent),
+      personal: true,
     });
     await loader.reload();
     const names = loader.getSkills().skills.map((item) => item.name);
     assert.ok(names.includes("notes"), `other skills still load (got ${names.join(", ")})`);
     assert.ok(!names.includes("aeon"));
+    // Off (the default): none of the user's own skills load at all.
+    const plain = createPiResourceLoader({
+      workingDirectory: cwd,
+      agentDirectory: agent,
+      settingsManager: SettingsManager.create(cwd, agent),
+    });
+    await plain.reload();
+    assert.deepEqual(plain.getSkills().skills, []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

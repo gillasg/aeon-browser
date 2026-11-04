@@ -97,3 +97,20 @@ test("every error code named in the agent text is one the engine can raise", () 
     `agent text names codes the engine never raises: ${missing.join(", ")}`,
   );
 });
+
+// Outside agents read the skill sections; Aeon's own agent reads guidance.md, its extra text and
+// help(). Whatever the skill teaches must reach Aeon's agent too, by one of those.
+test("every call the skill teaches reaches Aeon's own agent (guidance or help)", () => {
+  const docs = join(browserRoot, "docs", "agent");
+  const sections = join(docs, "sections");
+  const skill = readdirSync(sections)
+    .map((name) => read(join(sections, name)))
+    .join("\n");
+  const own = [
+    read(join(docs, "guidance.md")),
+    read(join(repo, "packages", "pi-adapter", "guidance-extra.md")),
+    read(join(engine, "src", "code-api-help.ts")),
+  ].join("\n");
+  const missing = [...namedCalls(skill).keys()].filter((call) => !own.includes(call));
+  assert.deepEqual(missing, [], `the skill teaches calls Aeon's agent never hears of: ${missing}`);
+});

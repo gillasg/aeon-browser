@@ -9,6 +9,7 @@ import {
   runExternalRoutine,
   type ExternalRoutineOptions,
 } from "./external-routine-tool.js";
+import { personalExtensionsEnabled, writePersonalExtensions } from "@aeon/pi-adapter";
 import { CONTEXT_TOOL, readOutsideContext, writeOutsideContext } from "./outside-context.js";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
@@ -209,6 +210,11 @@ export class ChatService {
   setStoppedListener(listener: (chatId: ChatId) => void): void {
     this.stoppedListener = listener;
   }
+  /** Whether new chats load the user's own Pi extensions, packages, skills and prompts. */
+  piExtensionsSetting = (): Promise<boolean> =>
+    Promise.resolve(personalExtensionsEnabled(this.dataDirectory));
+  setPiExtensionsSetting = (enabled: boolean): Promise<void> =>
+    writePersonalExtensions(this.dataDirectory, enabled);
   outsideContextSetting = (): Promise<boolean> => readOutsideContext(this.dataDirectory);
   setOutsideContextSetting = (enabled: boolean): Promise<void> =>
     writeOutsideContext(this.dataDirectory, enabled);

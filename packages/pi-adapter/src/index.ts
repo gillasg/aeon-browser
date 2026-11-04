@@ -29,3 +29,4 @@ export type {
   PiSessionSnapshot,
   PiSessionUnavailableError,
 } from "@aeon/domain";
+export { personalExtensionsEnabled, writePersonalExtensions } from "./personal-extensions.js";

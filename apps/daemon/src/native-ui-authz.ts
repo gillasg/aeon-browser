@@ -19,6 +19,7 @@ const CATALOG_OPERATIONS = [
   "settings.blocked-sites",
   "settings.form-profile",
   "settings.outside-context",
+  "settings.pi-extensions",
 ];
 const MANAGEMENT_OPERATIONS = ["management.home", "management.get", "management.action"];
 

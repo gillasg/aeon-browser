@@ -4,7 +4,6 @@ import { spillText } from "../spill.js";
 import { startBridge } from "../bridge-server.js";
 import { runDoctor } from "../doctor.js";
 import { formatResult } from "../format.js";
-import { installSkill } from "../install-skill.js";
 import { runMcpServer } from "../mcp.js";
 import { connectAgents } from "../connect-agents.js";
 import { mcpCommand, nextSteps, setup } from "../setup.js";
@@ -136,7 +135,6 @@ async function register(args: Args): Promise<number> {
       out(`${result.done ? "Connected" : "Could not connect"} ${result.agent} (${result.detail})`);
     if (!results.length) out(nextSteps());
   }
-  for (const path of await installSkill()) out(`Linked the browserkit skill at ${path}`);
   // Only a person at a terminal gets the page opened and the wait; scripts get the steps.
   const interactive = process.stdout.isTTY === true && !has(args, "no-wait");
   if (interactive && (await browserConnected())) {
