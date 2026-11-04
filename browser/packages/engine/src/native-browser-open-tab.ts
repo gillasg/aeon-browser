@@ -18,7 +18,7 @@ import { markAgentTabGrouped, trackAgentTab } from "./native-browser-tab-cleanup
 import { ownerTitle } from "./native-browser-owner.js";
 import { enableQuietTab } from "./native-browser-quiet.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
-import { safePage, sameIdentity } from "./native-browser-common.js";
+import { BrowserActionError, safePage, sameIdentity } from "./native-browser-common.js";
 import { navigateReady } from "./native-browser-navigation.js";
 import { captureFromTabStart } from "./native-browser-network.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
@@ -85,7 +85,9 @@ async function navigateOpenedTab(
     });
     return undefined;
   } catch (error) {
-    return (error instanceof Error ? error.message : String(error)).slice(0, 400);
+    // The reason names Chrome's own error (net::ERR_CONNECTION_REFUSED…), not just our code.
+    const detail = error instanceof BrowserActionError ? error.detail : undefined;
+    return (detail ?? (error instanceof Error ? error.message : String(error))).slice(0, 400);
   }
 }
 

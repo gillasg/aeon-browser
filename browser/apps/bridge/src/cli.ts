@@ -72,7 +72,7 @@ function printHelp(rest: string[]): number {
 main(process.argv.slice(2)).then(
   async (code) => {
     await Promise.all([closeSharedBridge(), closeCrawlBridge()]);
-    process.exit(code);
+    exitSoon(code);
   },
   async (error: unknown) => {
     const soft = process.argv.includes("--soft-fail");
@@ -91,6 +91,16 @@ main(process.argv.slice(2)).then(
       printError(error);
     }
     await Promise.all([closeSharedBridge(), closeCrawlBridge()]);
-    process.exit(soft ? 0 : (EXIT_CODES[errorKind(error)] ?? 1));
+    exitSoon(soft ? 0 : (EXIT_CODES[errorKind(error)] ?? 1));
   },
 );
+
+/**
+ * Exits once the event loop drains. process.exit() while a socket or fetch handle is still
+ * closing aborts Node on Windows (libuv "UV_HANDLE_CLOSING" assertion); a short unref'd timer
+ * still ends a run that something keeps open.
+ */
+function exitSoon(code: number): void {
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1500).unref();
+}
