@@ -83,6 +83,10 @@ export class BrowserControlService {
   pinChat(chatId: string, clientInstanceId: string): void {
     this.pins.set(chatId, clientInstanceId);
   }
+  /** Pins a chat to the browser it was typed in, unless it already has one (aeon run --browser). */
+  claimChat(chatId: string, clientInstanceId: string): void {
+    if (!this.pins.has(chatId)) this.pins.set(chatId, clientInstanceId);
+  }
   /** The connected browsers, one per Chrome profile, with their inventory. */
   connectedBrowsers(): { clientInstanceId: string; urls: string[] }[] {
     return [...this.executors.keys()].map((clientInstanceId) => ({

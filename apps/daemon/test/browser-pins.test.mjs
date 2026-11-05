@@ -34,6 +34,12 @@ test("a pinned chat's tab opens only in its browser; other chats still open ever
         .then((text) => JSON.parse(text).clientInstanceIds.sort());
     assert.deepEqual(await info(pinned), [evalBrowser]);
     assert.deepEqual(await info(loose), [main, evalBrowser].sort());
+
+    // A prompt typed in a profile's own chat claims the chat for it; --browser pins win.
+    harness.service.claimChat(pinned, main);
+    assert.deepEqual(await info(pinned), [evalBrowser]);
+    harness.service.claimChat(loose, main);
+    assert.deepEqual(await info(loose), [main]);
   } finally {
     await harness.close();
   }
