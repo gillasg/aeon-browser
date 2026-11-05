@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import test from "node:test";
 import {
+  configFor,
   handleCredentialRequest,
   hostOf,
   isCredentialRequest,
@@ -167,4 +168,16 @@ test("no password manager set up: says so instead of failing", async () => {
   } finally {
     process.env.PATH = saved;
   }
+});
+
+test("a named browser uses its own password manager; every other browser the main one", () => {
+  const config = {
+    provider: "proton",
+    browsers: { eval: { provider: "bitwarden", bitwardenSession: "s" } },
+  };
+  assert.deepEqual(configFor(config, "eval"), { provider: "bitwarden", bitwardenSession: "s" });
+  assert.deepEqual(configFor(config, "main"), { provider: "proton" });
+  assert.deepEqual(configFor(config), { provider: "proton" });
+  // An entry for one browser never leaks into the others, nor the top level into it.
+  assert.deepEqual(configFor({ browsers: { eval: { provider: "bitwarden" } } }, "work"), {});
 });

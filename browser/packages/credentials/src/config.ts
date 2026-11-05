@@ -9,10 +9,29 @@ import type { Login, SaveLogin } from "./match.js";
 
 export type ProviderName = "bitwarden" | "proton";
 
-export interface CredentialConfig {
+export interface BrowserCredentials {
   provider?: ProviderName;
   /** Bitwarden session key from `bw unlock --raw`; the file is readable only by the user. */
   bitwardenSession?: string;
+}
+
+export interface CredentialConfig extends BrowserCredentials {
+  /**
+   * A named Chrome profile's own password manager (`aeon browsers name`), e.g. an eval profile
+   * on a test vault while the main profile keeps the user's own. Unnamed or unlisted profiles
+   * use the top-level choice.
+   */
+  browsers?: Record<string, BrowserCredentials>;
+}
+
+/** The choice that applies to one browser: its own entry when it has one, else the top level. */
+export function configFor(config: CredentialConfig, browser?: string): BrowserCredentials {
+  const own = browser ? config.browsers?.[browser] : undefined;
+  if (own) return own;
+  return {
+    ...(config.provider ? { provider: config.provider } : {}),
+    ...(config.bitwardenSession ? { bitwardenSession: config.bitwardenSession } : {}),
+  };
 }
 
 export interface Provider {
@@ -42,7 +61,7 @@ export async function saveConfig(directory: string, config: CredentialConfig): P
   await chmod(path, 0o600).catch(() => undefined);
 }
 
-export function providerFor(name: ProviderName, config: CredentialConfig): Provider {
+export function providerFor(name: ProviderName, config: BrowserCredentials): Provider {
   return name === "bitwarden" ? new Bitwarden(config.bitwardenSession) : protonProvider();
 }
 
@@ -58,8 +77,11 @@ function protonProvider(): Provider {
 }
 
 /** The configured provider, or the first one that answers unlocked. */
-export async function activeProvider(directory: string): Promise<Provider | undefined> {
-  const config = await readConfig(directory);
+export async function activeProvider(
+  directory: string,
+  browser?: string,
+): Promise<Provider | undefined> {
+  const config = configFor(await readConfig(directory), browser);
   if (config.provider) return providerFor(config.provider, config);
   for (const name of ["bitwarden", "proton"] as const) {
     const provider = providerFor(name, config);

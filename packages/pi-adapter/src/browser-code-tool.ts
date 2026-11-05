@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import type { ModelLike } from "@browserkit/tools/site-to-api";
+import { isCredentialRequest } from "@browserkit/credentials";
 import { traceActions } from "./browser-trace-actions.js";
 import { browserCodeGuidelines, browserCodeSummary } from "./browser-code-guidance.js";
 import { compactBrowserTrace } from "./browser-recovery.js";
@@ -30,7 +31,11 @@ export interface BrowserCodeOptions {
   source?: "chat" | "external";
   /** The fast model page.observe / page.act use; without one they say so. */
   model?: () => Promise<ModelLike | undefined>;
+  /** The name of the Chrome profile this chat runs in, so it signs in with that profile's vault. */
+  browserName?: BrowserNameProvider;
 }
+
+export type BrowserNameProvider = (chatId: string) => Promise<string | undefined>;
 
 export function createBrowserTools(
   chatId: string,
@@ -96,6 +101,7 @@ export function createBrowserCodeTool(
               source: options?.source ?? "chat",
               ...(options?.siteRules ? { siteRules: options.siteRules } : {}),
               ...(options?.model ? { model: options.model } : {}),
+              ...(options?.browserName ? { browserName: options.browserName } : {}),
               skills,
               workspace,
               writes,
@@ -222,6 +228,7 @@ function cellCall(context: {
   source: "chat" | "external";
   siteRules?: SiteRulesProvider;
   model?: () => Promise<ModelLike | undefined>;
+  browserName?: BrowserNameProvider;
   skills: string | undefined;
   workspace: string | undefined;
   writes: SiteWrites;
@@ -250,7 +257,12 @@ function cellCall(context: {
     }
     // A file the cell wrote into the workspace, noted for the run log.
     if (isWorkspaceRequest(request) && isWorkspaceWrite(request)) context.files.push(request.name);
-    const answer = host(request, requestContext);
+    // Only a sign-in needs to know the profile: it may have its own password manager.
+    const browser =
+      isCredentialRequest(request) && context.browserName
+        ? await context.browserName(context.chatId).catch(() => undefined)
+        : undefined;
+    const answer = host(request, browser ? { ...requestContext, browser } : requestContext);
     if (answer)
       return context.writes.track(request, rememberApiRead(context.skills, request, answer));
     return Promise.reject(new Error("UNSUPPORTED: unknown browser runtime request"));

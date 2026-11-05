@@ -65,6 +65,8 @@ export interface HostRequestContext {
   scope: string;
   /** The host's workspace for this request, when it serves workspace files. */
   workspace?: string;
+  /** The named Chrome profile the run is in (Aeon's `aeon browsers name`), when it has one. */
+  browser?: string;
 }
 
 export interface HostHandlerOptions {
@@ -151,7 +153,8 @@ export function createHostHandler(
 ): (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined {
   const home = options.dataDirectory ?? browserkitHome();
   return (request, context) => {
-    if (isCredentialRequest(request)) return handleCredentialRequest(request, home);
+    if (isCredentialRequest(request))
+      return handleCredentialRequest(request, home, undefined, context.browser);
     if (isProfileRequest(request)) return handleProfileRequest(request, home);
     if (isTableRequest(request)) return handleTableRequest(request, home);
     if (isLocateRequest(request)) return answerLocate(request, options.model);

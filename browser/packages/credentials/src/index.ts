@@ -2,8 +2,15 @@ import { activeProvider } from "./config.js";
 import { hostOf, loginsFor } from "./match.js";
 import { ToolMissing } from "./run.js";
 
-export { activeProvider, readConfig, saveConfig, configPath, providerFor } from "./config.js";
-export type { CredentialConfig, Provider, ProviderName } from "./config.js";
+export {
+  activeProvider,
+  configFor,
+  readConfig,
+  saveConfig,
+  configPath,
+  providerFor,
+} from "./config.js";
+export type { BrowserCredentials, CredentialConfig, Provider, ProviderName } from "./config.js";
 export { hostOf, loginsFor, sameSite, type Login, type SaveLogin } from "./match.js";
 
 // What the browser engine asks the machine for when the agent signs in. The engine sends the
@@ -37,10 +44,12 @@ export async function handleCredentialRequest(
   request: CredentialRequest,
   directory: string,
   providerOverride?: import("./config.js").Provider,
+  /** The named Chrome profile the sign-in runs in, which may have its own password manager. */
+  browser?: string,
 ): Promise<LoginAnswer | { code: string | null } | { saved: boolean; provider: string | null }> {
   const host = hostOf(request.url);
   if (!host) throw new Error("INVALID_TARGET: sign-in needs an http(s) page");
-  const provider = providerOverride ?? (await activeProvider(directory));
+  const provider = providerOverride ?? (await activeProvider(directory, browser));
   if (request.credential === "totp") {
     if (!provider) return { code: null };
     const known = loginsFor(await provider.logins(host), host).some((l) => l.id === request.id);

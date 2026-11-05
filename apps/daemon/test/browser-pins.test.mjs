@@ -133,3 +133,14 @@ function inventoryOf(clientInstanceId) {
     ],
   });
 }
+
+test("a chat's browser is its pin, else the only one connected, else unknown", () => {
+  const service = new BrowserControlService();
+  const executors = service["executors"];
+  executors.set("one", {});
+  assert.equal(service.browserOf("c1"), "one");
+  executors.set("two", {});
+  assert.equal(service.browserOf("c1"), undefined);
+  service.pinChat("c1", "two");
+  assert.equal(service.browserOf("c1"), "two");
+});

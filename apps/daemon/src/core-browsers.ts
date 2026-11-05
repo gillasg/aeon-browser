@@ -28,6 +28,16 @@ export async function readBrowserNames(directory: string): Promise<Names> {
   }
 }
 
+/** The name the user gave the browser a chat runs in, for its own password manager. */
+export async function chatBrowserName(
+  directory: string,
+  browserControl: Pick<BrowserControlService, "browserOf">,
+  chatId: string,
+): Promise<string | undefined> {
+  const id = browserControl.browserOf(chatId);
+  return id ? (await readBrowserNames(directory))[id] : undefined;
+}
+
 async function writeBrowserNames(directory: string, names: Names): Promise<void> {
   const path = join(directory, FILE);
   await writeFile(path + ".tmp", JSON.stringify(names, null, 2));
