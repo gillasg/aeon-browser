@@ -27,6 +27,7 @@ import { notePreviewActivity } from "./native-browser-preview.js";
 import {
   captureTypedPassword,
   finishVaultCapture,
+  UNSAVED_LOGIN_NOTE,
   vaultCandidate,
 } from "./native-browser-vault.js";
 import {
@@ -352,8 +353,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
           ? step.target.tabId
           : undefined);
     if (tabId !== undefined) {
-      if (step.op === "click" || step.op === "press")
-        void finishVaultCapture(tabId, (request) => callCore(cell, request)).catch(() => undefined);
+      if (step.op === "click" || step.op === "press") await vaultAfterSubmit(cell, tabId, result);
       void notePreviewActivity(cell.run.chatId, tabId);
       // Only work in a tab (not reads) brings its chat and the tab together in Split View.
       if (presentsBrowserTask(step.op) && !("present" in step && step.present === false))
@@ -372,6 +372,19 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
       Object.assign(entry, await stepTrace(tabId, INPUT_OPS.has(step.op)).catch(() => ({})));
     progress(cell);
   }
+}
+/**
+ * Saves a login the agent typed once its form went through. Waited for only when there is one,
+ * so the step's note can tell the agent that only Chrome's own prompt can keep it.
+ */
+async function vaultAfterSubmit(cell: Cell, tabId: number, result: unknown): Promise<void> {
+  if (!vaultCandidate(tabId)) return;
+  const outcome = await finishVaultCapture(tabId, (request) => callCore(cell, request)).catch(
+    () => undefined,
+  );
+  const action = result as { kind?: string; note?: string };
+  if (outcome === "unsaved" && action.kind === "action")
+    action.note = action.note ? `${action.note}; ${UNSAVED_LOGIN_NOTE}` : UNSAVED_LOGIN_NOTE;
 }
 function isSubmitLike(step: BrowserStep): boolean {
   if (step.op === "press") return /^(Enter|NumpadEnter)$/i.test(step.key);

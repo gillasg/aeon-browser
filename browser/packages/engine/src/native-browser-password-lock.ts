@@ -23,7 +23,7 @@ const LEAVES_PAGE_ALONE = new Set([
 const READ_ONLY_FRAME_ACTIONS = new Set(["list", "click", "fill", "snapshot"]);
 
 export const PASSWORD_PAGE =
-  "PASSWORD_PAGE: a password was typed in this page, so code cannot run in it; carry on with clicks, or reload it (page.reload()) to read it again";
+  "PASSWORD_PAGE: this page holds a password your code did not type (bu.signIn, Chrome's autofill or the user filled it), so code cannot run in it; carry on with clicks, or reload it (page.reload()) to read it again";
 
 /** Steps that run the agent's own code (or raw DevTools commands) inside the page. */
 export function runsPageCode(step: BrowserStep): boolean {
