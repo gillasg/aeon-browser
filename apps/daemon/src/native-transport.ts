@@ -159,7 +159,13 @@ function authenticateSocket(
       attachDevChatCommands(
         socket,
         service,
-        (request) => authorizeNativeUiScope(check.context, request),
+        (request) => {
+          const allowed = authorizeNativeUiScope(check.context, request);
+          // A prompt sent from a profile's own chat keeps that chat in that profile.
+          if (allowed && request.kind === "command" && request.operation === "chat.submit")
+            browserControl.claimChat(request.payload.chatId, check.context.clientInstanceId);
+          return allowed;
+        },
         (chatId, target, url) => browserControl.attachContext(chatId, target, url),
         threadCoordination,
       );
