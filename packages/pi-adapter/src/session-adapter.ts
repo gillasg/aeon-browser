@@ -36,7 +36,7 @@ import {
   storedThinkingLevel,
 } from "./session-resolver.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
-import { createBrowserTools } from "./browser-code-tool.js";
+import { createBrowserTools, type BrowserNameProvider } from "./browser-code-tool.js";
 import type { SiteRulesProvider } from "./browser-host-requests.js";
 import { createClockTool } from "./clock-tool.js";
 import {
@@ -75,6 +75,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   private capabilityToolHost: CapabilityToolHost | undefined;
   private threadToolHost: ThreadToolHost | undefined;
   private siteRulesHost: SiteRulesProvider | undefined;
+  private browserNameHost: BrowserNameProvider | undefined;
   private readonly liveSessions = new Map<string, Promise<PiSessionHandle>>();
   private readonly pendingResourceReloads = new Set<string>();
   private readonly preparedRuntime: PreparedModelRuntime | undefined;
@@ -210,6 +211,11 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.siteRulesHost = host;
   }
 
+  /** The named Chrome profile a chat runs in, so its sign-ins use that profile's vault. */
+  setBrowserNameHost(host: BrowserNameProvider): void {
+    this.browserNameHost = host;
+  }
+
   setCapabilityToolHost(host: CapabilityToolHost): void {
     this.capabilityToolHost = host;
   }
@@ -336,6 +342,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           resolve(this.sessionDirectory, "..", "site-skills"),
           {
             ...(this.siteRulesHost ? { siteRules: this.siteRulesHost } : {}),
+            ...(this.browserNameHost ? { browserName: this.browserNameHost } : {}),
             model: fastToolModel(this.completionOptions()),
           },
         ),

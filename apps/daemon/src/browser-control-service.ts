@@ -100,6 +100,13 @@ export class BrowserControlService {
     const sockets = pin ? [this.executors.get(pin)] : [...this.executors.values()];
     return sockets.filter((socket): socket is WebSocket => socket?.readyState === WebSocket.OPEN);
   }
+  /** The browser a chat runs in: its pinned one, else the only connected one, else none. */
+  browserOf(chatId: string): string | undefined {
+    const pin = this.pins.get(chatId);
+    if (pin) return pin;
+    const connected = [...this.executors.keys()];
+    return connected.length === 1 ? connected[0] : undefined;
+  }
   /** Browser ids a chat may use, of those given: only its pinned one when it has one. */
   private allowedFor(chatId: string, ids: string[]): string[] {
     const pin = this.pins.get(chatId);

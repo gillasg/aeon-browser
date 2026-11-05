@@ -587,7 +587,7 @@ async function inspectChat(
 }
 
 function signin(args: Args): Promise<number> {
-  return signinCommand(args.positional);
+  return signinCommand(args.positional, flag(args, "browser"));
 }
 
 function mcp(args: Args): Promise<number> {

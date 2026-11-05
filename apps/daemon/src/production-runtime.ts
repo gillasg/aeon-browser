@@ -15,6 +15,7 @@ import { CapabilityRegistry } from "./capability-registry.js";
 import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
+import { chatBrowserName } from "./core-browsers.js";
 import {
   abilityCards,
   lastActionNote,
@@ -83,6 +84,7 @@ export function createProductionRuntime(dataDirectory: string): {
     outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
   );
   pi.setSiteRulesHost((chatId) => siteRules.answer(chatId));
+  pi.setBrowserNameHost((chatId) => chatBrowserName(dataRoot, browserControl, chatId));
   const stopPreparing = installChatPreparation(service);
   const attention = new CoreAttention(dataRoot, service);
   configureSiteRequests(dataRoot);
