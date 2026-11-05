@@ -153,19 +153,33 @@ export function vaultSubmissionSucceeded(after: VaultForm | undefined): boolean 
   return Boolean(after && !after.hasPassword);
 }
 
+/**
+ * What happened to a login the agent typed: `unsaved` when no external password manager took
+ * it, so only Chrome's own "Save password?" prompt (browser UI agent code cannot click) can keep it.
+ */
+export type VaultOutcome = "saved" | "unsaved" | "skipped";
+
+export const UNSAVED_LOGIN_NOTE =
+  'no password manager saved the password you typed; Chrome offers to save it in a prompt beside the address bar that your code cannot click: ask the user now with bu.handoff("Please click Save in Chrome\'s password prompt") before moving on, or the password is lost';
+
 /** After a submit-like action: save the login unless the user's never-save list names the site. */
-export async function finishVaultCapture(tabId: number, ask: VaultAsk): Promise<void> {
+export async function finishVaultCapture(
+  tabId: number,
+  ask: VaultAsk,
+): Promise<VaultOutcome | undefined> {
   const candidate = vaultCandidate(tabId);
-  if (!candidate) return;
+  if (!candidate) return undefined;
   const after = await probeVaultForm(tabId).catch(() => undefined);
   if (!vaultSubmissionSucceeded(after)) {
     // The form is still there: the site refused it, so there is nothing worth saving.
     forgetVaultCandidate(tabId);
-    return;
+    return undefined;
   }
   candidates.delete(tabId);
-  if (await neverSave(candidate.site || new URL(candidate.url).hostname)) return;
-  await saveVaultCandidate(candidate, ask);
+  if (await neverSave(candidate.site || new URL(candidate.url).hostname)) return "skipped";
+  if (await saveVaultCandidate(candidate, ask)) return "saved";
+  // A person who typed their own password sees Chrome's prompt themselves.
+  return candidate.source === "agent" ? "unsaved" : "skipped";
 }
 
 async function saveVaultCandidate(candidate: VaultCandidate, ask: VaultAsk): Promise<boolean> {

@@ -11,10 +11,12 @@ import {
 import { rememberSecrets } from "./native-browser-secrets.js";
 import { finishSignIn, prepareSignIn } from "./native-browser-password-lock.js";
 import { messagesSnapshot, waitForInboxCode } from "./native-browser-inbox-code.js";
+import { chromeFill } from "./native-browser-signin-chrome.js";
 
 // bu.signIn(): sign in to the page the agent is on with a login from the user's password
 // manager. The machine looks the login up by the tab's real address; the engine types it into
 // the page; the agent's code only ever gets the outcome below, never the password or the code.
+// With no external login for the site, Chrome's own saved password fills it instead.
 // There is no approval step: calling bu.signIn() is the user's instruction to sign in.
 
 export interface SignInResult {
@@ -61,7 +63,8 @@ interface LoginAnswer {
 type Ask = (request: unknown) => Promise<unknown>;
 type Inbox = { since: number; before: Set<string> };
 interface Attempt {
-  login: Login;
+  /** The external manager's login; none means Chrome's own saved password fills each screen. */
+  login?: Login;
   ask: Ask;
   url: string;
   inbox: Inbox;
@@ -84,7 +87,10 @@ export async function signInToPage(
   const answer = (await ask({ credential: "login", url, ...(account ? { account } : {}) })) as
     LoginAnswer | undefined;
   const chosen = pickLogin(site, answer, account);
-  if (!("login" in chosen)) return chosen;
+  if (!("login" in chosen))
+    return CHROME_FALLBACK.has(chosen.reason)
+      ? signInWithChrome(tabId, { ask, url, inbox }, chosen)
+      : chosen;
   const { login, provider } = chosen;
   const base = { site, provider, account: login.username || login.name };
   const scripts = await prepareSignIn(tabId, url);
@@ -92,6 +98,31 @@ export async function signInToPage(
     return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
   rememberSecrets([login.password]);
   const result = await fill(tabId, { login, ask, url, inbox }, base);
+  if (result.signedIn) await finishSignIn(tabId);
+  return result;
+}
+
+/** No external login for the site: Chrome's own saved passwords get a turn. */
+const CHROME_FALLBACK = new Set<SignInResult["reason"]>(["NO_PASSWORD_MANAGER", "NO_SAVED_LOGIN"]);
+
+async function signInWithChrome(
+  tabId: number,
+  attempt: Attempt,
+  missed: SignInResult,
+): Promise<SignInResult> {
+  const base = { site: missed.site, provider: "chrome" };
+  const scripts = await prepareSignIn(tabId, attempt.url);
+  if (scripts)
+    return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
+  const result = await fill(tabId, attempt, base);
+  if (result.reason === "NO_SAVED_LOGIN")
+    // Neither manager knows the site: answer as the external manager did.
+    return {
+      ...missed,
+      detail: [missed.detail, "Chrome has no saved password for this site either"]
+        .filter(Boolean)
+        .join("; "),
+    };
   if (result.signedIn) await finishSignIn(tabId);
   return result;
 }
@@ -130,7 +161,9 @@ async function fill(tabId: number, attempt: Attempt, base: Base): Promise<SignIn
   if (fields.foreign)
     return { ...base, signedIn: false, reason: "FOREIGN_FORM", detail: fields.foreign };
   for (let stage = 0; stage < MAX_STAGES && fields; stage++) {
-    const stop = await step(tabId, fields, attempt);
+    const stop = attempt.login
+      ? await step(tabId, fields, attempt, attempt.login)
+      : await chromeStep(tabId, fields, attempt, base);
     if (stop) return { ...base, signedIn: false, reason: stop };
     if (!(fields.user || fields.password || fields.code)) break;
     let next = await waitForChange(tabId, fields);
@@ -146,8 +179,8 @@ async function step(
   tabId: number,
   fields: SignInFields,
   attempt: Attempt,
+  login: Login,
 ): Promise<SignInResult["reason"] | undefined> {
-  const { login } = attempt;
   if (fields.captcha) return "CAPTCHA";
   if (fields.foreign) return "FOREIGN_FORM";
   if (fields.covered) await clearCover(tabId);
@@ -159,10 +192,28 @@ async function step(
   return undefined;
 }
 
+/** One screen filled from Chrome's saved passwords; the account is what Chrome put in the field. */
+async function chromeStep(
+  tabId: number,
+  fields: SignInFields,
+  attempt: Attempt,
+  base: Base,
+): Promise<SignInResult["reason"] | undefined> {
+  if (fields.captcha) return "CAPTCHA";
+  if (fields.foreign) return "FOREIGN_FORM";
+  if (fields.covered) await clearCover(tabId);
+  if (fields.code) return enterCode(tabId, attempt, fields.codeBoxes ?? 0);
+  const filled = await chromeFill(tabId, fields);
+  if (!filled) return "NO_SAVED_LOGIN";
+  if (filled.userValue && !base.account) base.account = filled.userValue;
+  await submitForm(tabId);
+  return undefined;
+}
+
 /** The saved authenticator code, else one the site just sent to the user's email or phone. */
 async function oneTimeCode(attempt: Attempt): Promise<string | undefined> {
   const { login, ask, url, inbox } = attempt;
-  if (login.hasTotp && login.id) {
+  if (login?.hasTotp && login.id) {
     const reply = (await ask({ credential: "totp", url, id: login.id })) as {
       code?: string | null;
     };

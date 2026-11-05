@@ -19,6 +19,10 @@ export interface SignInFields {
   approve?: boolean;
   /** Something covers the sign-in field (a cookie or promo banner). */
   covered?: boolean;
+  /** The password field holds a value (only whether, never the value). */
+  passwordFilled?: boolean;
+  /** Chrome shows (or filled) one of its saved logins in the username or password field. */
+  autofill?: boolean;
 }
 
 const MARK = "data-signin-field";
@@ -71,7 +75,8 @@ const SCAN = `(() => {
   const captcha = Boolean(document.querySelector('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"], iframe[src*="arkoselabs"]'));
   return { user: Boolean(user), userValue: user ? user.value : "", password: Boolean(password),
     code: Boolean(code) || codeBoxes.length > 0, submit: Boolean(submit), captcha, url: location.href,
-    codeBoxes: codeBoxes.length, foreign, approve, covered };
+    codeBoxes: codeBoxes.length, foreign, approve, covered, passwordFilled: Boolean(password && password.value),
+    autofill: [user, password].some((el) => { try { return Boolean(el && el.matches(":-webkit-autofill")); } catch { return false; } }) };
 })()`;
 
 const FOCUS = (name: string) => `(() => {
@@ -165,6 +170,26 @@ export async function submitForm(tabId: number): Promise<void> {
         ...(type === "keyDown" ? { text: "\r" } : {}),
       });
   });
+}
+
+const CENTER = (name: string) => `(() => {
+  const el = document.querySelector('[${MARK}="${name}"]');
+  if (!el) return null;
+  el.scrollIntoView({ block: "center", inline: "nearest" });
+  const box = el.getBoundingClientRect();
+  return { x: box.left + Math.min(box.width / 2, 40), y: box.top + box.height / 2 };
+})()`;
+
+/** Where to click in the marked field, in viewport pixels, after scrolling it into view. */
+export async function fieldPoint(
+  tabId: number,
+  field: string,
+): Promise<{ x: number; y: number } | undefined> {
+  const point = (await evaluate(tabId, CENTER(field)).catch(() => undefined)) as
+    { x?: unknown; y?: unknown } | null | undefined;
+  return typeof point?.x === "number" && typeof point.y === "number"
+    ? { x: point.x, y: point.y }
+    : undefined;
 }
 
 export function clearPasswords(tabId: number): Promise<void> {
