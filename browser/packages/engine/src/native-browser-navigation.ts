@@ -1,6 +1,7 @@
 import { noteDeviceEmulation } from "./native-browser-session.js";
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
+import { isKernelErrorCode } from "./kernel-errors.js";
 import { refusedCdp } from "./native-browser-guards.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
@@ -435,9 +436,21 @@ async function evaluatePage(
       result.exceptionDetails.text ??
       "Page evaluation failed";
     if (isEvaluationTimeout(detail)) throw await evaluationTimeout(debuggee, timeout, detail);
-    throw new BrowserActionError("CHROME_ERROR", hintEvaluateError(detail).slice(0, 1800));
+    throw new BrowserActionError(
+      pageExceptionCode(detail),
+      hintEvaluateError(detail).slice(0, 1800),
+    );
   }
   return result.result?.value;
+}
+
+/**
+ * An exception thrown by code running in the page: a coded one ("Error: TARGET_NOT_FOUND: …",
+ * thrown by the page helpers) keeps its code; any other is the code's own error, not Chrome's.
+ */
+export function pageExceptionCode(detail: string): string {
+  const head = /^(?:[A-Za-z]*Error: )?([A-Z][A-Z_]+)(?::|$)/.exec(detail)?.[1] ?? "";
+  return isKernelErrorCode(head) ? head : "CODE_ERROR";
 }
 
 function isEvaluationTimeout(text: string): boolean {

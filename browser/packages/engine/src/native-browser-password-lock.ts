@@ -126,16 +126,39 @@ async function probeTab(
 /** Refuses a step that would run code in a page that has held a password. */
 export async function guardPageCode(step: BrowserStep): Promise<void> {
   if (!runsPageCode(step) || !("target" in step)) return;
-  let state: { password: boolean };
-  try {
-    state = await probeTab(step.target.tabId, { agent: true });
-  } catch (error) {
-    // A page Aeon cannot check is treated as holding a password.
-    throw new Error(
-      `PASSWORD_PAGE: could not check this page for a typed password, so code cannot run in it (${error instanceof Error ? error.message : String(error)})`,
-    );
-  }
+  const state = await checkedProbe(step.target.tabId);
   if (state.password) throw new Error(PASSWORD_PAGE);
+}
+
+/** Chrome's answer when the page's document went away mid-check (it navigated, reloaded or was discarded). */
+export function documentReplaced(message: string): boolean {
+  return /frame with id \d+ was removed|frame was removed|no top frame|no frame with id/i.test(
+    message,
+  );
+}
+
+/**
+ * The probe, once more after a moment when the page was being replaced. A page Aeon still
+ * cannot check runs no code either way; only the reason differs.
+ */
+async function checkedProbe(tabId: number): Promise<{ password: boolean }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await probeTab(tabId, { agent: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const replaced = documentReplaced(message);
+      if (replaced && attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
+      }
+      throw new Error(
+        replaced
+          ? `TARGET_LOST: the page was being replaced (it navigated, reloaded or was discarded), so no code ran in it; wait for it to load (page.waitForLoadState()) and try again (${message})`
+          : `PASSWORD_PAGE: could not check this page for a typed password, so code cannot run in it (${message})`,
+      );
+    }
+  }
 }
 
 async function reload(tabId: number): Promise<void> {

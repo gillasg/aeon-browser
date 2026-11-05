@@ -6,7 +6,7 @@ import {
   scrubError,
   scrubSecrets,
 } from "../dist/native-browser-secrets.js";
-import { runsPageCode } from "../dist/native-browser-password-lock.js";
+import { documentReplaced, runsPageCode } from "../dist/native-browser-password-lock.js";
 
 const target = { tabId: 1, windowId: 1, documentId: "d" };
 
@@ -41,4 +41,10 @@ test("code that runs in the page is what a password page refuses; clicks and rea
   assert.equal(runsPageCode({ op: "frames", target, action: "click", params: {} }), false);
   assert.equal(runsPageCode({ op: "click", target }), false);
   assert.equal(runsPageCode({ op: "read", target }), false);
+});
+
+test("a page replaced mid-check is told apart from one that could not be checked", () => {
+  assert.equal(documentReplaced("Frame with ID 0 was removed."), true);
+  assert.equal(documentReplaced("no top frame"), true);
+  assert.equal(documentReplaced("Cannot access contents of the page"), false);
 });
