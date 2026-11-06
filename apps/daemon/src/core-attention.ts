@@ -17,6 +17,8 @@ interface AttentionRecord {
   unread: boolean;
   notified: boolean;
 }
+const PROGRAM_ORIGINS = new Set<string>(["cli", "mcp", "agent", "companion"]);
+
 export class CoreAttention {
   private readonly records = new Map<string, AttentionRecord>();
   private readonly views = new Map<object, Map<string, { chatId: string; until: number }>>();
@@ -128,13 +130,21 @@ export class CoreAttention {
     }
     return this.claim(record, request);
   }
+  /** Unread and not yet announced, and started by the user (a program's chat reports to it). */
+  private notifies(
+    record: AttentionRecord | undefined,
+    chatId: string,
+    completionId: string,
+  ): boolean {
+    if (!record?.unread || record.notified || record.completionId !== completionId) return false;
+    const origin = this.service.getChat(chatId as ChatId)?.origin;
+    return !PROGRAM_ORIGINS.has(origin ?? "unknown");
+  }
   private claim(
     record: AttentionRecord | undefined,
     request: Extract<CoreAttentionRequest, { kind: "core.attention.claim" }>,
   ): unknown {
-    const granted = Boolean(
-      record?.unread && !record.notified && record.completionId === request.completionId,
-    );
+    const granted = this.notifies(record, request.chatId, request.completionId);
     if (record && granted) {
       record.notified = true;
       this.changed();

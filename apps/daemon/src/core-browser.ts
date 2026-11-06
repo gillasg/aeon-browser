@@ -3,6 +3,7 @@ import { CoreBrowserRunRequestSchema, CoreBrowserRunResultSchema } from "@aeon/p
 import { sessionChatId } from "@aeon/pi-adapter";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
+import { pin } from "./core-browsers.js";
 
 // `aeon repl`, and every command that needs the browser, run browser code in the user's Chrome
 // through the same executor as browser_code. The CLI gets the cell's own value and output back
@@ -22,23 +23,27 @@ export function handleBrowserRun(
   socket: WebSocket,
   candidate: unknown,
   browser: BrowserControlService,
+  directory: string,
 ): boolean {
   const request = CoreBrowserRunRequestSchema.safeParse(candidate);
   if (!request.success) return false;
   const { requestId, code, session } = request.data;
   const timeoutMs = request.data.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const chatId = sessionChatId("external", session);
-  void browser
-    .execute(chatId, `cli-${randomUUID()}`, {
-      codeCell: {
-        code,
-        timeoutMs,
-        ownerTitle: "Session · " + session,
-        space: "window",
-        onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
-        onProgress: () => undefined,
-      },
-    })
+  const named = request.data.browser;
+  void (named ? pin(browser, directory, chatId, named) : Promise.resolve())
+    .then(() =>
+      browser.execute(chatId, `cli-${randomUUID()}`, {
+        codeCell: {
+          code,
+          timeoutMs,
+          ownerTitle: "Session · " + session,
+          space: "window",
+          onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+          onProgress: () => undefined,
+        },
+      }),
+    )
     .then(
       (output) => reply(socket, requestId, parseCell(output)),
       (error: unknown) => reply(socket, requestId, { error: messageOf(error) }),

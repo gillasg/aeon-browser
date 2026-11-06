@@ -136,7 +136,7 @@ export class AeonClient {
 
   /** Runs browser code in the user's Chrome and returns the cell's own value and output. */
   browserRun(
-    body: { code: string; session: string; timeoutMs?: number },
+    body: { code: string; session: string; timeoutMs?: number; browser?: string },
     timeoutMs = 11 * 60_000,
   ): Promise<Json> {
     const requestId = randomUUID();

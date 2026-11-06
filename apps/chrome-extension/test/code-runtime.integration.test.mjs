@@ -417,7 +417,7 @@ async function fakeCore() {
   };
 }
 
-// Finds the fixture tab showing the hand-off banner and answers it as the user would.
+// Finds the fixture tab waiting on a hand-off (the cursor pill's Done/Cancel) and answers it as the user would.
 async function handoffPage(port, url) {
   for (let i = 0; i < 80; i++) {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
@@ -426,7 +426,7 @@ async function handoffPage(port, url) {
       const check = async () =>
         (
           await page("Runtime.evaluate", {
-            expression: "!!document.getElementById('aeon-handoff')",
+            expression: "globalThis[Symbol.for('aeon.handoff')] === 'waiting'",
             returnByValue: true,
           })
         ).result?.result?.value === true;
@@ -441,7 +441,7 @@ async function handoffPage(port, url) {
     }
     await sleep(100);
   }
-  throw new Error("Hand-off banner never appeared");
+  throw new Error("Hand-off never appeared");
 }
 
 async function debugPort(profile) {

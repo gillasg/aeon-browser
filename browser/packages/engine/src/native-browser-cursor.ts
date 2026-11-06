@@ -66,6 +66,9 @@ const OVERLAY = `(update) => {
       '.g{position:fixed;inset:0;border-radius:18px;pointer-events:none;opacity:0;transform:none;box-shadow:inset 0 0 0 1.5px rgba(139,147,167,.85),inset 0 0 22px rgba(139,147,167,.5),inset 0 0 80px rgba(139,147,167,.22);transition:opacity .3s ease;animation:edge 2.8s ease-in-out infinite}' +
       '.g.on{opacity:1}.g.user{animation:none;opacity:.35}@keyframes edge{50%{opacity:.7}}' +
       '.needs .g{opacity:0!important}.needs .a path{fill:#e08a00}.needs .t path{stroke:#e08a00}.needs .p{background:#e08a00!important}.needs .s{border-color:rgba(224,138,0,.95)}' +
+      '.needs .p{white-space:normal;max-width:340px;padding:8px 8px 8px 12px;border-radius:14px;pointer-events:auto;line-height:17px}' +
+      '.p .ask{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}.p .ask button{border:0;border-radius:999px;padding:4px 11px;font:600 12px/16px system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer}' +
+      '.p .ask .done{background:#fff;color:#7a4a00}.p .ask .cancel{background:rgba(255,255,255,.18);color:#fff}' +
       '.clean .g,.clean .p,.clean .s,.clean .co,.clean .k,.clean svg.trail{display:none!important}' +
       '.c{position:absolute;left:0;top:0;will-change:transform;transition:opacity .18s ease}' +
       '.a,.t{position:absolute;left:-3px;top:-2px;filter:drop-shadow(0 2px 4px rgba(15,23,42,.35));transition:transform 120ms ease,opacity 120ms ease}' +
@@ -126,6 +129,8 @@ const OVERLAY = `(update) => {
   if (update.clean !== undefined) s.wrap.classList.toggle("clean", update.clean);
   if (update.needs !== undefined) {
     s.wrap.classList.toggle("needs", Boolean(update.needs));
+    // An ask has buttons: it joins the accessibility tree while it is up.
+    host.setAttribute("aria-hidden", update.needs ? "false" : "true");
     if (update.needs) { s.cursor.style.opacity = "1"; s.cursorShown = true; }
     else { s.spotlight.classList.remove("on"); s.pill.classList.remove("on"); }
   }
@@ -196,7 +201,7 @@ const OVERLAY = `(update) => {
   else if (update.caption && s.wrap.classList.contains("needs")) update.caption = undefined;
   if (update.caption && !(update.soft && Date.now() - (s.captionAt || 0) < 1500)) {
     s.captionAt = Date.now();
-    const text = String(update.caption).slice(0, 120);
+    const text = String(update.caption).slice(0, update.needs ? 300 : 120);
     clearTimeout(s.hide); clearInterval(s.type);
     s.pill.classList.add("on");
     if (update.typing) {
@@ -209,6 +214,19 @@ const OVERLAY = `(update) => {
         if (prefix + shown >= text.length) clearInterval(s.type);
       }, 22);
     } else s.pill.textContent = text;
+    // A hand-off asks in the pill itself: its Done and Cancel answer the agent's wait.
+    if (update.needs) {
+      const ask = document.createElement("div");
+      ask.className = "ask";
+      for (const [name, label] of [["cancel", "Cancel"], ["done", "Done"]]) {
+        const button = document.createElement("button");
+        button.className = name;
+        button.textContent = label;
+        button.onclick = (event) => { event.stopPropagation(); globalThis[Symbol.for("aeon.handoff")] = name === "done" ? "done" : "cancelled"; s.wrap.classList.remove("needs"); s.pill.classList.remove("on"); };
+        ask.append(button);
+      }
+      s.pill.append(ask);
+    }
     if (!update.needs) s.hide = setTimeout(() => s.pill.classList.remove("on"), update.transient ? 2000 : 6000);
   }
   function toRgb(color) {
