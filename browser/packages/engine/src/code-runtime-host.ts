@@ -31,6 +31,8 @@ import {
   SAVE_IN_CHROME,
   UNSAVED_LOGIN_NOTE,
   UNSAVED_LOGIN_SAVED,
+  VAULT_SAVED,
+  VAULT_SAVING,
   vaultCandidate,
 } from "./native-browser-vault.js";
 import {
@@ -413,12 +415,17 @@ async function vaultAfterSubmit(
     void saving.then((outcome) =>
       outcome === "unsaved" ? askToSaveLater(cell, target) : undefined,
     );
-    return;
+    return addNote(result, VAULT_SAVING);
   }
+  // Every outcome is said on the click itself, so the model never has to check a save.
+  if (early === "saved") return addNote(result, VAULT_SAVED);
   if (early !== "unsaved") return;
   const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
+  addNote(result, asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE);
+}
+
+function addNote(result: unknown, note: string): void {
   const action = result as { kind?: string; note?: string };
-  const note = asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE;
   if (action.kind === "action") action.note = action.note ? `${action.note}; ${note}` : note;
 }
 

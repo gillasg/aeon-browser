@@ -51,6 +51,15 @@ export function noteAgentText(step: BrowserStep): void {
   typed.set(step.target.tabId, values);
 }
 
+/**
+ * Whether the agent typed this value into the tab itself, in one step or across several
+ * (keyboard.type, pressSequentially, a fill): a password it chose for a new account.
+ */
+export function agentTyped(tabId: number, value: string): boolean {
+  const values = [...(typed.get(tabId) ?? [])];
+  return values.includes(value) || values.join("").includes(value);
+}
+
 /** A script the agent registered to run on every new document of this tab. */
 export function notePlantedScript(tabId: number, result: unknown): void {
   const id = (result as { identifier?: unknown } | undefined)?.identifier;
