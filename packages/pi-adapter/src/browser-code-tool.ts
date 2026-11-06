@@ -122,8 +122,14 @@ export function createBrowserCodeTool(
           },
         },
         wait.signal,
-      ).finally(wait.close);
-      if (wait.steered())
+      )
+        // A steer cancels the cell, which rejects: that is the steer's answer, not a failure.
+        .catch((error: unknown) => {
+          if (wait.steered()) return undefined;
+          throw error;
+        })
+        .finally(wait.close);
+      if (wait.steered() || output === undefined)
         return {
           content: browserContent(JSON.stringify({ ...envelope(), error: STEERED_NOTE })),
           isError: true,

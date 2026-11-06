@@ -11,7 +11,7 @@ import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
-import { endUserWaits } from "./user-waits.js";
+import { endUserWaits, waitingOnUser } from "./user-waits.js";
 
 type Controls = Pick<
   PiSessionHandle,
@@ -25,7 +25,8 @@ export function createSessionControls(session: AgentSession, chatId: string): Co
       if (decoded.browserContext || decoded.browserContexts?.length)
         throw new Error("Wait for Pi to finish before sending a message with page context.");
       const text = `${decoded.text}${decoded.attachmentText}`;
-      if (mode === "steer") {
+      // A message sent while the chat waits on the user answers that wait, whatever the send mode.
+      if (mode === "steer" || waitingOnUser(chatId)) {
         await session.steer(text, decoded.images);
         // The model reads a steer only between tools: end any wait on the user so it reads it now.
         endUserWaits(chatId);

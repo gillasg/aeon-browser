@@ -57,3 +57,39 @@ test("a steer in one chat never ends another chat's wait", () => {
   assert.equal(other.signal.aborted, false);
   other.close();
 });
+
+test("a steer during a browser hand-off ends the cell with the steer note, not an error", async () => {
+  const { createBrowserCodeTool } = await import("../dist/browser-code-tool.js");
+  const run = (_chatId, _toolCallId, input, signal) =>
+    new Promise((_resolve, reject) => {
+      input.codeCell.onProgress([{ action: { op: "handoff" }, disposition: "running" }]);
+      signal.addEventListener("abort", () =>
+        reject(new Error("RUN_RESET: browser workflow cancelled; runtime reset")),
+      );
+    });
+  const tool = createBrowserCodeTool("chat-handoff", run);
+  const pending = tool.execute("call", { code: "await bu.handoff('x')" }, undefined, undefined, {});
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 10));
+  assert.equal(endUserWaits("chat-handoff"), 1);
+  const result = await pending;
+  assert.match(result.content[0].text, /sent a message instead of answering/);
+});
+
+test("a follow-up sent while the chat waits on the user is delivered as a steer and ends the wait", async () => {
+  const { createSessionControls } = await import("../dist/session-controls.js");
+  const sent = [];
+  const session = {
+    steer: async (text) => sent.push(["steer", text]),
+    followUp: async (text) => sent.push(["followUp", text]),
+  };
+  const controls = createSessionControls(session, "chat-followup");
+  await controls.queue({ text: "later" }, "followUp");
+  const wait = openUserWait("chat-followup");
+  await controls.queue({ text: "do the captcha yourself later" }, "followUp");
+  assert.deepEqual(sent, [
+    ["followUp", "later"],
+    ["steer", "do the captcha yourself later"],
+  ]);
+  assert.equal(wait.steered(), true);
+  wait.close();
+});

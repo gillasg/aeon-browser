@@ -2,7 +2,8 @@
 // chat: a stop aborts the tool's signal, and a steer ends every wait open in that chat, so the
 // message reaches the model now instead of after the wait times out.
 
-const open = new Map<string, Set<AbortController>>();
+type Wait = AbortController & { steer: () => boolean; live: () => boolean };
+const open = new Map<string, Set<Wait>>();
 
 export const STEERED_NOTE =
   "The user sent a message instead of answering: read it and follow it; do not ask again.";
@@ -30,9 +31,10 @@ export function openUserWait(
   const stop = () => controller.abort(signal?.reason);
   if (signal?.aborted) stop();
   else signal?.addEventListener("abort", stop, { once: true });
-  const waits = open.get(chatId) ?? new Set<AbortController>();
+  const waits = open.get(chatId) ?? new Set<Wait>();
   open.set(chatId, waits);
-  const entry = Object.assign(controller, {
+  const entry: Wait = Object.assign(controller, {
+    live: gate,
     steer: () => {
       if (!gate()) return false;
       steered = true;
@@ -52,11 +54,15 @@ export function openUserWait(
   };
 }
 
+/** Whether the chat is waiting on the user right now (a question, or a cell handing off). */
+export function waitingOnUser(chatId: string): boolean {
+  return [...(open.get(chatId) ?? [])].some((wait) => wait.live());
+}
+
 /** The user steered the chat: end every wait open in it. Returns how many ended. */
 export function endUserWaits(chatId: string): number {
   let ended = 0;
-  for (const wait of [...(open.get(chatId) ?? [])])
-    if ((wait as AbortController & { steer: () => boolean }).steer()) ended++;
+  for (const wait of [...(open.get(chatId) ?? [])]) if (wait.steer()) ended++;
   return ended;
 }
 
