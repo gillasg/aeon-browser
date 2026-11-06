@@ -237,9 +237,19 @@ function controlBanner(): void {
   host.style.cssText =
     "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483647;";
   const root = host.attachShadow({ mode: "closed" });
-  root.innerHTML =
-    "<style>div{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;background:#17181c;color:#f3f4f6;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.08)}b{display:block;font-size:12px;color:#a5b4fc}button{border:0;border-radius:9px;padding:7px 12px;font:600 13px system-ui,sans-serif;cursor:pointer;background:#4f46e5;color:#fff}</style>" +
-    "<div><b>You have control</b><span>The agent is paused.</span><button>Give back to agent</button></div>";
+  // Built from nodes, not an HTML string: pages enforcing Trusted Types refuse innerHTML.
+  const style = document.createElement("style");
+  style.textContent =
+    "div{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;background:#17181c;color:#f3f4f6;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.08)}b{display:block;font-size:12px;color:#a5b4fc}button{border:0;border-radius:9px;padding:7px 12px;font:600 13px system-ui,sans-serif;cursor:pointer;background:#4f46e5;color:#fff}";
+  const box = document.createElement("div");
+  const title = document.createElement("b");
+  title.textContent = "You have control";
+  const note = document.createElement("span");
+  note.textContent = "The agent is paused.";
+  const button = document.createElement("button");
+  button.textContent = "Give back to agent";
+  box.append(title, note, button);
+  root.append(style, box);
   root.querySelector("button")?.addEventListener("click", () => {
     void chrome.runtime.sendMessage({ kind: "browserkit.control.giveback" }).catch(() => undefined);
     host.remove();

@@ -2,7 +2,8 @@ import type { AeonClient, AttentionChat } from "./client.js";
 import { summarize, type ChatResult } from "./results.js";
 
 // Runs tasks as real Aeon chats, a batch at a time. Each chat opens as a background tab in the
-// connected Chrome (unless quiet) so the user can watch, and finishes when Core reports it idle.
+// connected Chrome, quiet or not: a chat can stop to ask the user (a hand-off, a question), and
+// the user can only answer one they can find. It finishes when Core reports it idle.
 export interface RunOptions {
   parallel: number;
   quiet: boolean;
@@ -100,9 +101,9 @@ async function runOne(
       options.onProgress?.(
         `[${index + 1}] could not type the prompt on camera: ${typed.error ?? "no browser"}`,
       );
-  } else if (!options.quiet) await client.openChat(chatId);
+  } else await client.openChat(chatId);
   options.onProgress?.(`[${index + 1}] started ${chatId}`);
-  // The daemon submits it directly, so quiet runs need no tab and an unloaded tab cannot hold it up.
+  // The daemon submits it directly, so a tab that has not loaded yet cannot hold it up.
   await client.submit(chatId, prompt, selection, options.budget);
   const outcome = await finished.done;
   const view = await client.command("chat.get", { chatId });

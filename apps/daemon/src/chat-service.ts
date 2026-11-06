@@ -293,6 +293,10 @@ export class ChatService {
     });
     return { ...view, cursor: published.cursor };
   }
+  /** Tool calls still running, for a view opened mid-call (see ChatEventHub.runningTools). */
+  runningTools(chatId: ChatId): PiSessionEvent[] {
+    return this.eventHub.runningTools(chatId);
+  }
   subscribeFrom(
     chatId: ChatId,
     cursor: ChatEventCursor | undefined,

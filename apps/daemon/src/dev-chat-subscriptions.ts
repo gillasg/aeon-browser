@@ -93,6 +93,9 @@ async function sendSnapshot(
       }),
     );
     buffer.prepare(result.subscriptionId, view.cursor.revision);
+    // The snapshot holds finished entries only: replay calls still running (a waiting hand-off)
+    // at the snapshot's cursor, so the page's cursor never moves back.
+    for (const event of service.runningTools(chatId)) buffer.sendAt(event, view.cursor);
     for (const event of result.events) buffer.send(event);
     buffer.flush();
     return;
@@ -208,8 +211,18 @@ class BufferedEvents {
     this.lastSentRevision = lastSentRevision;
   }
 
+  /** Sends an earlier event stamped with the cursor the view already has. */
+  sendAt(event: PublishedChatEvent["event"], cursor: PublishedChatEvent["cursor"]): void {
+    this.write({ cursor, event });
+  }
+
   send(event: PublishedChatEvent): void {
     if (event.cursor.revision <= this.lastSentRevision) return;
+    this.write(event);
+    this.lastSentRevision = event.cursor.revision;
+  }
+
+  private write(event: PublishedChatEvent): void {
     sendDevChatMessage(
       this.socket,
       ChatEventMessageSchema.parse({
@@ -219,7 +232,6 @@ class BufferedEvents {
         event,
       }),
     );
-    this.lastSentRevision = event.cursor.revision;
   }
 
   flush(): void {

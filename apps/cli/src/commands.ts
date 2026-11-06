@@ -33,8 +33,7 @@ async function run(host: DaemonHost, args: Args): Promise<number> {
   const options = runOptions(args);
   const client = await host.connect();
   process.stderr.write(
-    `Running ${prompts.length} task(s), ${options.parallel} at a time` +
-      (options.quiet ? ".\n" : "; each opens as a background tab in Chrome.\n"),
+    `Running ${prompts.length} task(s), ${options.parallel} at a time; each opens as a background tab in Chrome.\n`,
   );
   const results = await runTasks(client, prompts, {
     ...options,

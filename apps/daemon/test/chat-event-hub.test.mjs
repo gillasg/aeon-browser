@@ -53,3 +53,39 @@ test("event cursors inside the retained range replay only newer events", () => {
     subscription.unsubscribe();
   }
 });
+
+test("a view opened mid-call gets the calls still running, with their latest update", () => {
+  const hub = new ChatEventHub();
+  const id = asChatId(randomUUID());
+  const start = (toolCallId) => ({
+    kind: "tool-start",
+    toolCallId,
+    toolName: "browser_code",
+    arguments: {},
+  });
+  const update = (toolCallId, partialResult) => ({
+    ...start(toolCallId),
+    kind: "tool-update",
+    partialResult,
+  });
+  hub.publish(id, start("done"));
+  hub.publish(id, {
+    kind: "tool-end",
+    toolCallId: "done",
+    toolName: "browser_code",
+    result: "",
+    isError: false,
+  });
+  hub.publish(id, start("waiting"));
+  hub.publish(id, update("waiting", "first"));
+  hub.publish(id, update("waiting", "handoff"));
+  assert.deepEqual(
+    hub.runningTools(id).map((item) => [item.kind, item.toolCallId, item.partialResult]),
+    [
+      ["tool-start", "waiting", undefined],
+      ["tool-update", "waiting", "handoff"],
+    ],
+  );
+  hub.publish(id, { kind: "run-state", state: "idle" });
+  assert.deepEqual(hub.runningTools(id), []);
+});
