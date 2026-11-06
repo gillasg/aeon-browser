@@ -362,14 +362,9 @@ export async function executePageCode(
   const readOnly = step.op === "cdp" && !cdpChangesPage(step.method, step.params);
   if (!readOnly) await primeBrowserSettle(debuggee);
   let value: unknown;
-  if (step.op === "evaluate") {
-    const before = await pageFingerprint(debuggee);
-    value = await evaluatePage(debuggee, step.expression, 8000);
-    const settle = await settleBrowserPage(debuggee, 800, Date.now(), 0);
-    // A read that left the page as it was needs no fresh observation afterwards.
-    const changed = before === undefined || before !== (await pageFingerprint(debuggee));
-    return { value, settle, changed };
-  } else {
+  if (step.op === "evaluate")
+    return answeredWithin(EVALUATE_WALL_MS, evaluateStep(debuggee, step.expression));
+  else {
     // This command operates on the claimed page session, never on a browser-wide or another target session.
     if (["Target", "Browser"].includes(step.method.split(".")[0] ?? ""))
       throw new BrowserActionError(
@@ -386,6 +381,41 @@ export async function executePageCode(
     ...(!readOnly ? { settle: await settleBrowserPage(debuggee, 800, Date.now(), 0) } : {}),
   };
 }
+async function evaluateStep(debuggee: chrome.debugger.Debuggee, expression: string) {
+  const before = await pageFingerprint(debuggee);
+  const value = await evaluatePage(debuggee, expression, 8000);
+  const settle = await settleBrowserPage(debuggee, 800, Date.now(), 0);
+  // A read that left the page as it was needs no fresh observation afterwards.
+  const changed = before === undefined || before !== (await pageFingerprint(debuggee));
+  return { value, settle, changed };
+}
+
+// Chrome can leave a command to a page unanswered (a busy or paused renderer): without a wall-clock
+// bound the step waits until its whole cell dies. 8 s of script time plus settling fits inside this.
+const EVALUATE_WALL_MS = 15_000;
+async function answeredWithin<T>(ms: number, work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new BrowserActionError(
+                "TIMEOUT",
+                `The page did not answer within ${ms / 1000} s (a busy page, or a background tab Chrome paused); the cell is still running: try the read again.`,
+              ),
+            ),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // URL, element count and text length: cheap, and enough to tell a read from a change.
 async function pageFingerprint(debuggee: chrome.debugger.Debuggee): Promise<string | undefined> {
   const result = (await chrome.debugger

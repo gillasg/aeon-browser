@@ -1,7 +1,7 @@
 import { measureBox, noteActionTiming } from "./native-browser-action-timing.js";
 import { showAgentCursor, showAgentKeys, type CursorUpdate } from "./native-browser-cursor.js";
 import { onNode, nodeState, fillTextNode } from "./native-browser-dom.js";
-import { beginReceipt, takeReceipt } from "./native-browser-receipts.js";
+import { beginReceipt, receiptQuiet, takeReceipt } from "./native-browser-receipts.js";
 import { noteVaultFill } from "./native-browser-vault.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
 import { toOffscreen } from "./code-offscreen-host.js";
@@ -659,6 +659,7 @@ export async function performAction(
           liveTab,
           revalidateTarget,
         );
+  await receiptQuiet(tabId);
   const receipt = takeReceipt(tabId);
   receipt.navigated ||= String(outcome) === "navigated";
   return BrowserExecutorResultSchema.parse({

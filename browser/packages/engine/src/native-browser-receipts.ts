@@ -23,8 +23,11 @@ const MAX_REQUESTS = 8;
 const pending = new Map<string, ReceiptRequest>();
 
 const receipts = new Map<number, ActionReceipt>();
+/** When each tab's dialog closed during the action: the page's code only goes on after that. */
+const dialogClosed = new Map<number, number>();
 
 export function beginReceipt(tabId: number): void {
+  dialogClosed.delete(tabId);
   receipts.set(tabId, { popups: [], navigated: false });
 }
 
@@ -34,7 +37,19 @@ export function noteReceiptPopup(openerId: number, tabId: number, url = ""): voi
   receipt.popups.push({ tabId, url });
 }
 
+/**
+ * Code after a dialog (a download, a request) runs only once the dialog is accepted, which can be
+ * after the page looked settled: give it a moment so the receipt names what it did.
+ */
+export async function receiptQuiet(tabId: number, quietMs = 500): Promise<void> {
+  const closed = dialogClosed.get(tabId);
+  if (closed === undefined) return;
+  const wait = closed + quietMs - Date.now();
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(wait, quietMs)));
+}
+
 export function takeReceipt(tabId: number): ActionReceipt {
+  dialogClosed.delete(tabId);
   const receipt = receipts.get(tabId) ?? { popups: [], navigated: false };
   receipts.delete(tabId);
   if (receipt.requests) {
@@ -96,6 +111,7 @@ onEngineInstall(() => {
     } else if (method === "Page.javascriptDialogClosed") {
       if (receipt.dialog)
         receipt.dialog.accepted = Boolean((params as { result?: unknown }).result);
+      dialogClosed.set(source.tabId, Date.now());
     } else if (method === "Page.downloadWillBegin") {
       const value = params as { url?: string; suggestedFilename?: string; guid?: string };
       receipt.download = {

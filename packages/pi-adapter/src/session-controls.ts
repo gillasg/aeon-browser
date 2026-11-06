@@ -33,7 +33,10 @@ export function createSessionControls(session: AgentSession, chatId: string): Co
       } else await session.followUp(text, decoded.images);
     },
     editQueue: (input) => editSessionQueue(session, input),
-    abort: () => session.abort(),
+    abort: async () => {
+      await session.abort();
+      sendQueuedAfterStop(session);
+    },
     controls: () => {
       const model = session.model;
       const availableModels = session.modelRuntime
@@ -73,6 +76,24 @@ export function createSessionControls(session: AgentSession, chatId: string): Co
       });
     },
   };
+}
+
+/**
+ * A stop ends the run, not what the user queued behind it: Pi keeps the queue after an abort and
+ * nothing would ever send it. The queued messages go out now, in order, as the next message.
+ */
+export function sendQueuedAfterStop(
+  session: Pick<AgentSession, "clearQueue" | "prompt">,
+  log: (message: string) => void = (message) => process.stderr.write(message + "\n"),
+): string | undefined {
+  const { steering, followUp } = session.clearQueue();
+  const queued = [...steering, ...followUp].filter((text) => text.trim());
+  if (!queued.length) return undefined;
+  const text = queued.join("\n\n");
+  void session.prompt(text).catch((error: unknown) => {
+    log("Aeon: could not send the queued message after a stop: " + String(error));
+  });
+  return text;
 }
 
 export async function submitToPi(
