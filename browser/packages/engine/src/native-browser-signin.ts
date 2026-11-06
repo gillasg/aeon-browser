@@ -11,7 +11,7 @@ import {
 import { rememberSecrets } from "./native-browser-secrets.js";
 import { finishSignIn, prepareSignIn } from "./native-browser-password-lock.js";
 import { messagesSnapshot, waitForInboxCode } from "./native-browser-inbox-code.js";
-import { chromeFill } from "./native-browser-signin-chrome.js";
+import { chromeFill, inFront } from "./native-browser-signin-chrome.js";
 
 // bu.signIn(): sign in to the page the agent is on with a login from the user's password
 // manager. The machine looks the login up by the tab's real address; the engine types it into
@@ -114,7 +114,7 @@ async function signInWithChrome(
   const scripts = await prepareSignIn(tabId, attempt.url);
   if (scripts)
     return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
-  const result = await fill(tabId, attempt, base);
+  const result = await inFront(tabId, () => fill(tabId, attempt, base));
   if (result.reason === "NO_SAVED_LOGIN")
     // Neither manager knows the site: answer as the external manager did.
     return {
@@ -203,10 +203,13 @@ async function chromeStep(
   if (fields.foreign) return "FOREIGN_FORM";
   if (fields.covered) await clearCover(tabId);
   if (fields.code) return enterCode(tabId, attempt, fields.codeBoxes ?? 0);
+  // A screen with nothing to sign in to (the page after signing in) is done, not a miss.
+  if (!(fields.user || fields.password)) return undefined;
   const filled = await chromeFill(tabId, fields);
   if (!filled) return "NO_SAVED_LOGIN";
-  if (filled.userValue && !base.account) base.account = filled.userValue;
-  await submitForm(tabId);
+  const user = filled.fields.userValue || fields.userValue;
+  if (user && !base.account) base.account = user;
+  if (!filled.submitted) await submitForm(tabId);
   return undefined;
 }
 

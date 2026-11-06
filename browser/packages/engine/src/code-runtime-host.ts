@@ -376,11 +376,15 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     progress(cell);
   }
 }
+/** How long a click waits for the password manager's answer before carrying on without it. */
+const SAVE_ANSWER_WAIT_MS = 1500;
+
 /**
  * Saves a login the agent typed once its form went through. When no password manager took it,
- * only Chrome's own "Save password?" prompt can keep it, and agent code cannot click browser UI:
- * the kernel asks the user itself, before the step returns, so no model can skip it and lose
- * the password. The step's note says how that went.
+ * only Chrome's own "Save password?" prompt can keep it, and agent code cannot click browser UI,
+ * so the kernel asks the user itself and no model can skip it. With no manager set up the answer
+ * is instant: the click waits for the user and its note says how it went. A manager still saving
+ * (a slow CLI) does not hold the click up; if that save fails, the user is asked all the same.
  */
 async function vaultAfterSubmit(
   cell: Cell,
@@ -388,15 +392,32 @@ async function vaultAfterSubmit(
   result: unknown,
 ): Promise<void> {
   if (!vaultCandidate(target.tabId)) return;
-  const outcome = await finishVaultCapture(target.tabId, (request) =>
-    callCore(cell, request),
-  ).catch(() => undefined);
-  if (outcome !== "unsaved") return;
+  const saving = finishVaultCapture(target.tabId, (request) => callCore(cell, request)).catch(
+    () => undefined,
+  );
+  const early = await Promise.race([
+    saving,
+    new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), SAVE_ANSWER_WAIT_MS)),
+  ]);
+  if (early === "pending") {
+    void saving.then((outcome) =>
+      outcome === "unsaved" ? askToSaveLater(cell, target) : undefined,
+    );
+    return;
+  }
+  if (early !== "unsaved") return;
   const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
   const action = result as { kind?: string; note?: string };
   const note = asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE;
   if (action.kind === "action") action.note = action.note ? `${action.note}; ${note}` : note;
 }
+
+/** The manager failed after the click returned: the card stays up past the cell that made the login. */
+async function askToSaveLater(cell: Cell, target: { tabId: number }): Promise<void> {
+  void presentBrowserTask(cell.run.chatId, target.tabId, true);
+  await handOffToUser(target.tabId, SAVE_IN_CHROME, () => true).catch(() => undefined);
+}
+
 function isSubmitLike(step: BrowserStep): boolean {
   if (step.op === "press") return /^(Enter|NumpadEnter)$/i.test(step.key);
   if (step.op !== "click") return false;

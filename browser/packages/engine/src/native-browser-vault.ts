@@ -71,7 +71,24 @@ const PROBE = `(() => {
 export async function noteVaultFill(debuggee: chrome.debugger.Debuggee, id: number): Promise<void> {
   if (debuggee.tabId === undefined) return;
   const form = await onNode<VaultForm | null>(debuggee, id, vaultFieldInfo).catch(() => null);
-  if (form?.hasPassword && form.password) rememberVaultCandidate(debuggee.tabId, form, "agent");
+  if (!form) return;
+  if (form.hasPassword && form.password) rememberVaultCandidate(debuggee.tabId, form, "agent");
+  await closeChromePopup(debuggee).catch(() => undefined);
+}
+
+/**
+ * Chrome opens its own password popup (saved logins, "use a strong password?") on a password
+ * field the window shows, and it takes the next click meant for the page. Escape closes it, and
+ * does nothing in a password field itself.
+ */
+async function closeChromePopup(debuggee: chrome.debugger.Debuggee): Promise<void> {
+  for (const type of ["rawKeyDown", "keyUp"] as const)
+    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+      type,
+      key: "Escape",
+      code: "Escape",
+      windowsVirtualKeyCode: 27,
+    });
 }
 
 function vaultFieldInfo(this: HTMLInputElement): VaultForm | null {
