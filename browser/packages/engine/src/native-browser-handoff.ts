@@ -3,7 +3,12 @@ import { guardAgentTab } from "./native-browser-tab-cleanup.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { handoffActive } from "./native-browser-control.js";
-import { showAgentNeeds, tabRecording } from "./native-browser-cursor.js";
+import {
+  agentNeedsExpression,
+  showAgentBadge,
+  showAgentNeeds,
+  tabRecording,
+} from "./native-browser-cursor.js";
 
 // Hand-off: the agent pauses and asks the user to do something in the real tab (sign in, 2FA,
 // pick an option). The cursor turns amber, points at the element when one is given, and its pill
@@ -79,7 +84,10 @@ export async function handOffToUser(
       if (answered) return answered;
       const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, STATE);
       if (state === "done" || state === "cancelled") return state;
-      if (state === "fresh") showAgentNeeds(tabId, message, spotlight);
+      if (state === "fresh") {
+        void showAgentBadge(tabId, true);
+        await evaluate(tabId, agentNeedsExpression(message, spotlight)).catch(() => undefined);
+      }
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     }
     return "cancelled";
