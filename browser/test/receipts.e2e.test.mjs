@@ -112,6 +112,15 @@ test(
       const closed = JSON.parse(/FOURTH (.*)/.exec(fourth.stdout)[1]);
       assert.equal(closed.outcome, "changed", fourth.stdout);
       assert.match(closed.note, /closed this tab itself/, fourth.stdout);
+      // A page whose main thread never answers fails the read in bounded time, not with the cell.
+      const fifth =
+        await cell(`page = await bu.use((await browser.tabs()).find((t) => t.title === "Receipt").id); await page.evaluate(() => setTimeout(() => { const end = Date.now() + 60000; while (Date.now() < end) {} }, 0)).catch(() => undefined);
+        const began = Date.now();
+        const err = await page.evaluate(() => 1).then(() => "answered", (e) => String(e.message || e));
+        console.log("FIFTH " + JSON.stringify({ err, ms: Date.now() - began }));`);
+      const hung = JSON.parse(/FIFTH (.*)/.exec(fifth.stdout)[1]);
+      assert.match(hung.err, /did not answer within/, fifth.stdout);
+      assert.ok(hung.ms < 25000, fifth.stdout);
     } finally {
       chrome?.kill();
       bridge.kill();

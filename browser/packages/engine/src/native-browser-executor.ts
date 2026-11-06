@@ -1,5 +1,5 @@
 import { noteActionTiming } from "./native-browser-action-timing.js";
-import { closedByAction } from "./native-browser-closed-tab.js";
+import { closedByAction, withWaitNote } from "./native-browser-closed-tab.js";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
@@ -547,9 +547,10 @@ async function executeStep(
   return scheduleStep(step, step.target.tabId, async () => {
     stepInput(step.target.tabId, true);
     try {
-      return await dispatchStep(request, step, tab).catch((error: unknown) =>
+      const result = await dispatchStep(request, step, tab).catch((error: unknown) =>
         closedByAction(request, step, tab, error),
       );
+      return withWaitNote(result, step.target.tabId);
     } finally {
       stepInput(step.target.tabId, false);
     }

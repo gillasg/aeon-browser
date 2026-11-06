@@ -1,4 +1,5 @@
 import type { BrowserStep } from "@browserkit/protocol";
+import { BrowserActionError } from "./native-browser-common.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
@@ -107,16 +108,65 @@ function probe(
   return { password: page.__aeonPasswordPage === true, agent: ran };
 }
 
+// executeScript over all frames answers only once every frame has run, so one stuck frame (an ad or
+// tracker iframe in a busy renderer) held every page command for a minute. All frames get a short
+// bound; past it, each frame is probed on its own and a frame from another site that still does not
+// answer is skipped: code in the top page could not read its fields anyway.
+const PROBE_MS = 2500;
+type ProbeResult = chrome.scripting.InjectionResult<{ password: boolean; agent: boolean }>;
+
+function within<T>(ms: number, work: Promise<T>): Promise<T | undefined> {
+  return Promise.race([work, new Promise<undefined>((done) => setTimeout(done, ms, undefined))]);
+}
+
+async function probeFrames(
+  tabId: number,
+  options: { mark?: boolean; agent?: boolean },
+): Promise<ProbeResult[]> {
+  const run = (target: chrome.scripting.InjectionTarget) =>
+    chrome.scripting.executeScript({
+      target,
+      world: "ISOLATED",
+      func: probe,
+      args: [[...(typed.get(tabId) ?? [])], options.mark ?? false, options.agent ?? false],
+    }) as Promise<ProbeResult[]>;
+  const all = await within(PROBE_MS, run({ tabId, allFrames: true }));
+  if (all) return all;
+  const frames = (await chrome.webNavigation.getAllFrames({ tabId })) ?? [];
+  const top = frames.find((frame) => frame.frameId === 0);
+  const origin = (url: string | undefined) => {
+    try {
+      return new URL(url ?? "").origin;
+    } catch {
+      return "";
+    }
+  };
+  const answers = await Promise.all(
+    frames.map(async (frame) => ({
+      frame,
+      result: await within(
+        PROBE_MS,
+        run({ tabId, frameIds: [frame.frameId] }).then(
+          (items) => items[0],
+          (error: unknown) => ({ frameId: frame.frameId, error }) as unknown as ProbeResult,
+        ),
+      ),
+    })),
+  );
+  const silent = answers.filter(
+    (item) =>
+      !item.result && (item.frame.frameId === 0 || origin(item.frame.url) === origin(top?.url)),
+  );
+  if (silent.length)
+    throw new Error(`the page did not answer the check within ${(2 * PROBE_MS) / 1000} s`);
+  return answers.flatMap((item) => (item.result ? [item.result] : []));
+}
+
 async function probeTab(
   tabId: number,
   options: { mark?: boolean; agent?: boolean },
 ): Promise<{ password: boolean; agent: boolean }> {
-  const results = await chrome.scripting.executeScript({
-    target: { tabId, allFrames: true },
-    world: "ISOLATED",
-    func: probe,
-    args: [[...(typed.get(tabId) ?? [])], options.mark ?? false, options.agent ?? false],
-  });
+  const results = await probeFrames(tabId, options);
   // The top page must answer; a frame the probe could not run in has nothing it could read.
   const top = results.find((item) => item.frameId === 0);
   if (!top?.result) {
@@ -156,6 +206,11 @@ async function checkedProbe(tabId: number): Promise<{ password: boolean }> {
       return await probeTab(tabId, { agent: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (/did not answer the check/.test(message))
+        throw new BrowserActionError(
+          "TIMEOUT",
+          `The page did not answer within ${(2 * PROBE_MS) / 1000} s (a busy page, or a background tab Chrome paused), so no code ran in it; the cell is still running: try again, or bring the tab to the front.`,
+        );
       const replaced = documentReplaced(message);
       if (replaced && attempt === 0) {
         await new Promise((resolve) => setTimeout(resolve, 500));

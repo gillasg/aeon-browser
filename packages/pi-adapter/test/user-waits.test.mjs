@@ -93,3 +93,20 @@ test("a follow-up sent while the chat waits on the user is delivered as a steer 
   assert.equal(wait.steered(), true);
   wait.close();
 });
+
+test("after a stop, what the user queued is sent as the next message, in order", async () => {
+  const { sendQueuedAfterStop } = await import("../dist/session-controls.js");
+  const prompted = [];
+  const session = {
+    clearQueue: () => ({ steering: ["first"], followUp: ["second", "  "] }),
+    prompt: async (text) => prompted.push(text),
+  };
+  assert.equal(sendQueuedAfterStop(session), "first\n\nsecond");
+  await Promise.resolve();
+  assert.deepEqual(prompted, ["first\n\nsecond"]);
+  const empty = {
+    clearQueue: () => ({ steering: [], followUp: [] }),
+    prompt: async () => assert.fail(),
+  };
+  assert.equal(sendQueuedAfterStop(empty), undefined);
+});

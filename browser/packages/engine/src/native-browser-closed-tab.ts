@@ -3,6 +3,7 @@ import type {
   BrowserExecutorResult,
   BrowserStep,
 } from "@browserkit/protocol";
+import { takeWriteWait } from "./native-browser-scheduler.js";
 
 /**
  * A click or key press that makes the page close its own tab (a "Continue with Google" pop-up
@@ -32,3 +33,11 @@ export async function closedByAction(
   };
 }
 const closingSteps = new Set<string>(["click", "press", "fill", "paste"]);
+
+/** A write that queued behind another session's says how long, so slow steps explain themselves. */
+export function withWaitNote(result: BrowserExecutorResult, tabId: number): BrowserExecutorResult {
+  const waited = takeWriteWait(tabId);
+  if (waited === undefined || result.kind !== "action") return result;
+  const note = `waited ${(waited / 1000).toFixed(1)} s for another session's action in this browser`;
+  return { ...result, note: (result.note ? `${result.note} (${note})` : note).slice(0, 1000) };
+}

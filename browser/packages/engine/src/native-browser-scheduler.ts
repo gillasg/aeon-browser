@@ -86,8 +86,22 @@ export async function scheduleStep<T>(
   tabId: number,
   dispatch: () => Promise<T>,
 ): Promise<T> {
-  if (isWriteStep(step)) return withWriteLock(() => inTabQueue(tabId, dispatch));
-  return dispatch();
+  if (!isWriteStep(step)) return dispatch();
+  const queued = Date.now();
+  return withWriteLock(() => {
+    const waited = Date.now() - queued;
+    if (waited >= WAIT_NOTE_MS) writeWaits.set(tabId, waited);
+    return inTabQueue(tabId, dispatch);
+  });
+}
+
+/** How long the last write in a tab waited for another session's write, when it was long. */
+const writeWaits = new Map<number, number>();
+const WAIT_NOTE_MS = 1000;
+export function takeWriteWait(tabId: number): number | undefined {
+  const waited = writeWaits.get(tabId);
+  writeWaits.delete(tabId);
+  return waited;
 }
 
 async function withDeadline<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {

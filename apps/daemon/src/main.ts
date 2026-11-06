@@ -10,6 +10,7 @@ import { createProductionRuntime } from "./production-runtime.js";
 import { startNativeTransport } from "./native-transport.js";
 import { readEnvironment } from "./environment.js";
 import { installProcessGuard } from "./process-guard.js";
+import { watchStalls } from "./stall-watch.js";
 import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 
 async function main(): Promise<void> {
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
 async function runManagedDaemon(): Promise<void> {
   const writeReply = reserveSupervisorOutput();
   installProcessGuard();
+  watchStalls();
   if (readEnvironment("NATIVE_SUPERVISED") !== "1")
     throw new Error("Managed daemon startup requires the Native Messaging supervisor.");
   const dataDirectory = readEnvironment("NATIVE_DATA_DIR");

@@ -205,11 +205,20 @@ export async function cleanupAgentTabs(options: { minutes?: number } = {}): Prom
   const tabs = await Promise.all(
     stale.map(([tabId]) => chrome.tabs.get(tabId).catch(() => undefined)),
   );
-  const agentPlaced = stale.filter((_, i) => {
+  const placed = (i: number) => {
     const tab = tabs[i];
     return !tab || isAgentGroupId(tab.groupId) || windows.has(tab.windowId);
-  });
-  return closeTabs(agentPlaced, { keepSeen: false });
+  };
+  // A tab outside any agent group (grouping off, or a profile Aeon never grouped in) is still the
+  // agent's while the user has not looked at it; without this every finished chat left one open.
+  const loose = stale.filter((_, i) => !placed(i));
+  return [
+    ...(await closeTabs(
+      stale.filter((_, i) => placed(i)),
+      { keepSeen: false },
+    )),
+    ...(await closeTabs(loose, { keepSeen: true })),
+  ];
 }
 
 /** After a chat's run: close its tabs except the one it used last and ones the user looked at. */

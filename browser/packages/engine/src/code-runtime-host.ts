@@ -14,7 +14,7 @@ import {
   type BrowserTargetKey,
 } from "@browserkit/protocol";
 import { browserErrorDetail, errorCode, targetIdentity } from "./native-browser-common.js";
-import { OFFSCREEN, toOffscreen } from "./code-offscreen-host.js";
+import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.js";
 import { stepFailure } from "./code-step-errors.js";
 import { jobs } from "./code-runtime-jobs.js";
 import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
@@ -122,6 +122,8 @@ export function rebindBrowserCodeSocket(socket: WebSocket): void {
   for (const job of jobs.values()) if (job.status === "running") job.socket = socket;
 }
 
+const RESET_ANSWER_MS = 5000;
+
 /** Drops a chat's REPL realm (session closed or runtime reset). */
 export async function resetRealm(chatId: string): Promise<void> {
   cancelJobs(chatId);
@@ -130,14 +132,20 @@ export async function resetRealm(chatId: string): Promise<void> {
     .sendMessage({ target: "aeon-code-offscreen", kind: "reset", chatId })
     .then(
       () => true,
-      () => false,
+      // No document listening: nothing is hung, so nothing to close.
+      () => true,
     );
+  // A synchronous infinite loop blocks the realm's thread; closing the document is the only kill.
+  // Closing it also ends every other chat's running cell, so only a thread that stays blocked for
+  // seconds (never one merely busy for a moment while other chats work) is killed this way.
   const answered = await Promise.race([
     reset,
-    new Promise((done) => setTimeout(done, 1000, false)),
+    new Promise((done) => setTimeout(done, RESET_ANSWER_MS, false)),
   ]);
-  // A synchronous infinite loop blocks the realm's thread; closing the document is the only kill.
-  if (!answered) await chrome.offscreen.closeDocument().catch(() => undefined);
+  if (!answered) {
+    await chrome.offscreen.closeDocument().catch(() => undefined);
+    offscreenClosed();
+  }
 }
 
 async function startCell(identity: BrowserIdentity, socket: WebSocket, run: BrowserCodeRun) {
