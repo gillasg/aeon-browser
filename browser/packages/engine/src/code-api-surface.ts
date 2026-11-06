@@ -510,7 +510,10 @@ function __annotateShim() {
     index += 1;
     var box = document.createElement('div');
     box.style.cssText = 'position:absolute;left:' + rect.left + 'px;top:' + rect.top + 'px;width:' + rect.width + 'px;height:' + rect.height + 'px;border:2px solid #ff2d55;border-radius:3px;font:12px/1 monospace;color:#fff';
-    box.innerHTML = '<span style="background:#ff2d55;padding:1px 3px;position:absolute;left:-2px;top:-16px">' + index + '</span>';
+    var tag = document.createElement('span');
+    tag.style.cssText = 'background:#ff2d55;padding:1px 3px;position:absolute;left:-2px;top:-16px';
+    tag.textContent = String(index);
+    box.appendChild(tag);
     layer.appendChild(box);
   }
   document.documentElement.appendChild(layer);

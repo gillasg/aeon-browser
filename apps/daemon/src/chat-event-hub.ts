@@ -77,6 +77,26 @@ export class ChatEventHub {
     };
   }
 
+  /**
+   * The start and latest update of every tool call still running, in order. A snapshot holds only
+   * finished entries, so a view opened mid-call needs these to show it (a hand-off waiting for
+   * the user lives in its call's partial result).
+   */
+  runningTools(chatId: ChatId): PiSessionEvent[] {
+    const running = new Map<string, PiSessionEvent[]>();
+    for (const { event } of this.stateFor(chatId).events) {
+      if (event.kind === "view-replaced" || (event.kind === "run-state" && event.state === "idle"))
+        running.clear();
+      else if (event.kind === "tool-start") running.set(event.toolCallId, [event]);
+      else if (event.kind === "tool-end") running.delete(event.toolCallId);
+      else if (event.kind === "tool-update") {
+        const start = running.get(event.toolCallId)?.[0];
+        running.set(event.toolCallId, start ? [start, event] : [event]);
+      }
+    }
+    return [...running.values()].flat();
+  }
+
   private hasGap(state: ChatEventState, after: ChatEventCursor): boolean {
     if (after.epoch !== this.epoch || after.revision > state.revision) return true;
     const firstRevision = state.events[0]?.cursor.revision ?? state.revision + 1;

@@ -129,7 +129,7 @@ test("the CLI says plainly when Aeon is not running", async () => {
   }
 });
 
-test("a quiet run submits the prompt through the daemon and opens no tab", async () => {
+test("a quiet run still opens its chat as a tab, so the user can answer it, and submits through the daemon", async () => {
   const client = fakeClient();
   const [result] = await runTasks(client, ["Find the price"], {
     parallel: 1,
@@ -137,7 +137,7 @@ test("a quiet run submits the prompt through the daemon and opens no tab", async
     timeoutMs: 5_000,
   });
   assert.equal(result.status, "finished");
-  assert.deepEqual(client.opens, []);
+  assert.deepEqual(client.opens, ["chat-1"]);
   assert.deepEqual(client.submits, [
     {
       chatId: "chat-1",

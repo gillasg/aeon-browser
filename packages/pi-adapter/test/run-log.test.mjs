@@ -66,7 +66,10 @@ test("a whole run writes runs/<time>.json through the session lifecycle", async 
     await writeRunLog("chat-two", workspace);
     listener({ type: "agent_end" });
     await wait(50);
-    const [file] = await readdir(join(workspace, "runs"));
+    // A write in flight leaves its temp file beside the log; only the log itself counts.
+    const [file] = (await readdir(join(workspace, "runs"))).filter((name) =>
+      name.endsWith(".json"),
+    );
     assert.match(file, /\.json$/);
     const log = JSON.parse(await readFile(join(workspace, "runs", file), "utf8"));
     assert.deepEqual(log.hosts, ["other.example", "shop.example"]);

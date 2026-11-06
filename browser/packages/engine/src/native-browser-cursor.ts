@@ -53,6 +53,14 @@ export interface CursorUpdate {
 }
 
 const OVERLAY = `(update) => {
+  const make = (tag, attrs = {}, kids = [], ns) => {
+    const node = ns ? document.createElementNS(ns, tag) : document.createElement(tag);
+    for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
+    node.append(...kids);
+    return node;
+  };
+  const svg = (tag, attrs, kids) => make(tag, attrs, kids, "http://www.w3.org/2000/svg");
+  const sheet = (text) => { const style = document.createElement("style"); style.textContent = text; return style; };
   const id = "aeon-agent-cursor";
   let host = document.getElementById(id);
   if (!host) {
@@ -62,7 +70,10 @@ const OVERLAY = `(update) => {
     host.setAttribute("aria-hidden", "true");
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:strict";
     const root = host.attachShadow({ mode: "closed" });
-    root.innerHTML = '<style>' +
+    // Built node by node, never from an HTML string: pages that enforce Trusted Types
+    // (Google's, among others) refuse innerHTML, and the cursor and its asks would never draw.
+    root.append(
+      sheet(
       '.g{position:fixed;inset:0;border-radius:18px;pointer-events:none;opacity:0;transform:none;box-shadow:inset 0 0 0 1.5px rgba(139,147,167,.85),inset 0 0 22px rgba(139,147,167,.5),inset 0 0 80px rgba(139,147,167,.22);transition:opacity .3s ease;animation:edge 2.8s ease-in-out infinite}' +
       '.g.on{opacity:1}.g.user{animation:none;opacity:.35}@keyframes edge{50%{opacity:.7}}' +
       '.needs .g{opacity:0!important}.needs .a path{fill:#e08a00}.needs .t path{stroke:#e08a00}.needs .p{background:#e08a00!important}.needs .s{border-color:rgba(224,138,0,.95)}' +
@@ -80,21 +91,36 @@ const OVERLAY = `(update) => {
       '.p{position:absolute;left:18px;top:20px;max-width:320px;padding:5px 10px;border-radius:999px;background:rgba(17,24,39,.88);color:#fff;font:500 12px/16px system-ui,-apple-system,Segoe UI,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;transform:translateY(-3px);transition:opacity 160ms ease,transform 160ms ease}' +
       '.p.on{opacity:1;transform:none}' +
       'svg.trail{position:absolute;inset:0;width:100%;height:100%;overflow:visible}' +
-      '</style><div class="w"><div class="g"></div><svg class="trail"></svg><div class="c"><i></i>' +
-      '<svg class="a" width="22" height="24" viewBox="0 0 22 24"><path d="M2 2l7.5 19 2.6-7.6L20 10.8z" fill="#4f46e5" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
-      '<svg class="t" width="12" height="22" viewBox="0 0 12 22"><path d="M2 1.5h8M2 20.5h8M6 1.5v19" stroke="#4f46e5" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>' +
-      '<div class="p"></div></div></div>';
-    const extras = document.createElement("div");
-    extras.innerHTML = '<style>' +
+              ''),
+      make("div", { class: "w" }, [
+        make("div", { class: "g" }),
+        svg("svg", { class: "trail" }),
+        make("div", { class: "c" }, [
+          make("i"),
+          svg("svg", { class: "a", width: "22", height: "24", viewBox: "0 0 22 24" }, [
+            svg("path", { d: "M2 2l7.5 19 2.6-7.6L20 10.8z", fill: "#4f46e5", stroke: "#fff", "stroke-width": "1.6", "stroke-linejoin": "round" }),
+          ]),
+          svg("svg", { class: "t", width: "12", height: "22", viewBox: "0 0 12 22" }, [
+            svg("path", { d: "M2 1.5h8M2 20.5h8M6 1.5v19", stroke: "#4f46e5", "stroke-width": "2.2", "stroke-linecap": "round", fill: "none" }),
+          ]),
+          make("div", { class: "p" }),
+        ]),
+      ]),
+    );
+    const wrap = root.querySelector(".w");
+    wrap.append(
+      sheet(
       '.s{position:fixed;left:0;top:0;border-radius:12px;border:2px solid rgba(99,102,241,.9);box-shadow:0 0 0 9999px rgba(15,23,42,.55);opacity:0;pointer-events:none;transition:left .25s ease,top .25s ease,width .25s ease,height .25s ease,opacity .2s ease}' +
       '.s.on{opacity:1}' +
       '.co{position:fixed;max-width:280px;padding:7px 10px;border-radius:10px;background:#111827;color:#fff;font:500 12px/16px system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transform:translateY(4px);transition:opacity .18s ease,transform .18s ease;pointer-events:none}' +
       '.co.on{opacity:1;transform:none}.co b{display:block;font-weight:600}.co span{display:block;opacity:.75;font-size:11px;margin-top:2px}' +
       '.k{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(6px);padding:6px 10px;border-radius:8px;background:rgba(17,24,39,.9);color:#fff;font:600 11px/14px system-ui;opacity:0;transition:opacity .18s ease,transform .18s ease;pointer-events:none}' +
       '.k.on{opacity:1;transform:translateX(-50%)}' +
-      '</style><div class="s"></div><div class="co"></div><div class="k"></div>';
-    const wrap = root.querySelector(".w");
-    wrap.append(...extras.childNodes);
+              ''),
+      make("div", { class: "s" }),
+      make("div", { class: "co" }),
+      make("div", { class: "k" }),
+    );
     const state = host.__s = {
       root, wrap, cursor: root.querySelector(".c"), ripple: root.querySelector("i"),
       glow: root.querySelector(".g"), glowColor: "",
@@ -193,8 +219,8 @@ const OVERLAY = `(update) => {
     s.ripple.classList.remove("on"); void s.ripple.offsetWidth; s.ripple.classList.add("on");
   }
   function trail(x1, y1, x2, y2) {
-    s.trail.innerHTML = '<path d="M' + x1 + ' ' + y1 + ' L' + x2 + ' ' + y2 + '" stroke="rgba(99,102,241,.55)" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6" fill="none"/>';
-    setTimeout(() => { s.trail.innerHTML = ""; }, 900);
+    s.trail.replaceChildren(svg("path", { d: "M" + x1 + " " + y1 + " L" + x2 + " " + y2, stroke: "rgba(99,102,241,.55)", "stroke-width": "3", "stroke-linecap": "round", "stroke-dasharray": "6 6", fill: "none" }));
+    setTimeout(() => s.trail.replaceChildren(), 900);
   }
   if (update.needs) update.caption = update.needs;
   // While the agent waits for the user, its request stays the caption.
