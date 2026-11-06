@@ -44,6 +44,7 @@
     "cookies",
     "declarativeNetRequest",
     "contentSettings",
+    "privacy",
     "clipboardRead",
     "clipboardWrite"
   ],

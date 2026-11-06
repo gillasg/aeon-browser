@@ -13,6 +13,7 @@ import {
   type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { browserRuntimePrimer } from "./browser-code-guidance.js";
+import { browserProfileGuard } from "./browser-profile-guard.js";
 import { browserAbilitySearch } from "./browser-ability-search.js";
 
 /** Skills written for agents outside Aeon (they drive Aeon from a shell). */
@@ -61,6 +62,7 @@ export function createPiResourceLoader(input: {
         : {}),
     }),
     ...(input.browserGuidance ? [browserAbilitySearch()] : []),
+    browserProfileGuard(),
     ...(input.additionalFactories ?? []),
   ];
   return new DefaultResourceLoader({
