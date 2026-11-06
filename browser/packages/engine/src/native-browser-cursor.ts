@@ -297,6 +297,23 @@ export async function showAgentBadge(tabId: number, needs = false): Promise<void
 }
 const NEUTRAL_GLOW = "#8b93a7";
 
+/**
+ * Page code that draws a hand-off's ask (amber cursor, pill with Done and Cancel). Run by the
+ * hand-off itself, so an ask shows even with the cursor setting off or no debugger attached.
+ */
+export function agentNeedsExpression(
+  message: string,
+  spotlight?: { x: number; y: number; width: number; height: number },
+): string {
+  const point = spotlight
+    ? {
+        x: Math.round(spotlight.x + spotlight.width / 2),
+        y: Math.round(spotlight.y + spotlight.height / 2),
+      }
+    : {};
+  return `(${OVERLAY})(${JSON.stringify({ needs: message, glow: false, ...(spotlight ? { spotlight, ...point } : {}) })})`;
+}
+
 /** The agent waits for the user: the cursor turns amber, points (spotlight) and says why. */
 export function showAgentNeeds(
   tabId: number,
