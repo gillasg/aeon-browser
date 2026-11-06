@@ -159,8 +159,13 @@ export function vaultSubmissionSucceeded(after: VaultForm | undefined): boolean 
  */
 export type VaultOutcome = "saved" | "unsaved" | "skipped";
 
+/** What the kernel asks the user when no password manager saved a login the agent made. */
+export const SAVE_IN_CHROME =
+  "Aeon made a login no password manager saved. Click Save in Chrome's password prompt (the key icon in the address bar reopens it), then Done.";
+export const UNSAVED_LOGIN_SAVED =
+  "no password manager saved the password you typed, so the user was asked to save it in Chrome's prompt and said done";
 export const UNSAVED_LOGIN_NOTE =
-  'no password manager saved the password you typed; Chrome offers to save it in a prompt beside the address bar that your code cannot click: ask the user now with bu.handoff("Please click Save in Chrome\'s password prompt") before moving on, or the password is lost';
+  "no password manager saved the password you typed and the user did not confirm saving it in Chrome's prompt; tell them in your answer that the login may not be saved";
 
 /** After a submit-like action: save the login unless the user's never-save list names the site. */
 export async function finishVaultCapture(

@@ -27,7 +27,9 @@ import { notePreviewActivity } from "./native-browser-preview.js";
 import {
   captureTypedPassword,
   finishVaultCapture,
+  SAVE_IN_CHROME,
   UNSAVED_LOGIN_NOTE,
+  UNSAVED_LOGIN_SAVED,
   vaultCandidate,
 } from "./native-browser-vault.js";
 import {
@@ -353,7 +355,8 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
           ? step.target.tabId
           : undefined);
     if (tabId !== undefined) {
-      if (step.op === "click" || step.op === "press") await vaultAfterSubmit(cell, tabId, result);
+      if ((step.op === "click" || step.op === "press") && "target" in step)
+        await vaultAfterSubmit(cell, step.target, result);
       void notePreviewActivity(cell.run.chatId, tabId);
       // Only work in a tab (not reads) brings its chat and the tab together in Split View.
       if (presentsBrowserTask(step.op) && !("present" in step && step.present === false))
@@ -374,17 +377,25 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   }
 }
 /**
- * Saves a login the agent typed once its form went through. Waited for only when there is one,
- * so the step's note can tell the agent that only Chrome's own prompt can keep it.
+ * Saves a login the agent typed once its form went through. When no password manager took it,
+ * only Chrome's own "Save password?" prompt can keep it, and agent code cannot click browser UI:
+ * the kernel asks the user itself, before the step returns, so no model can skip it and lose
+ * the password. The step's note says how that went.
  */
-async function vaultAfterSubmit(cell: Cell, tabId: number, result: unknown): Promise<void> {
-  if (!vaultCandidate(tabId)) return;
-  const outcome = await finishVaultCapture(tabId, (request) => callCore(cell, request)).catch(
-    () => undefined,
-  );
+async function vaultAfterSubmit(
+  cell: Cell,
+  target: { tabId: number },
+  result: unknown,
+): Promise<void> {
+  if (!vaultCandidate(target.tabId)) return;
+  const outcome = await finishVaultCapture(target.tabId, (request) =>
+    callCore(cell, request),
+  ).catch(() => undefined);
+  if (outcome !== "unsaved") return;
+  const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
   const action = result as { kind?: string; note?: string };
-  if (outcome === "unsaved" && action.kind === "action")
-    action.note = action.note ? `${action.note}; ${UNSAVED_LOGIN_NOTE}` : UNSAVED_LOGIN_NOTE;
+  const note = asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE;
+  if (action.kind === "action") action.note = action.note ? `${action.note}; ${note}` : note;
 }
 function isSubmitLike(step: BrowserStep): boolean {
   if (step.op === "press") return /^(Enter|NumpadEnter)$/i.test(step.key);
