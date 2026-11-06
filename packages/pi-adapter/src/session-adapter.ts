@@ -360,7 +360,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           siteToolModel(this.completionOptions()),
         ),
         createExtractTool(this.completionOptions(), input.workingDirectory),
-        createAskUserTool(),
+        createAskUserTool(input.chatId),
       ],
     };
     const { session } = await timeStartupStep("agent-session-created", () =>

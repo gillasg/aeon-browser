@@ -1,4 +1,5 @@
 import { noteActionTiming } from "./native-browser-action-timing.js";
+import { closedByAction } from "./native-browser-closed-tab.js";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
@@ -546,12 +547,15 @@ async function executeStep(
   return scheduleStep(step, step.target.tabId, async () => {
     stepInput(step.target.tabId, true);
     try {
-      return await dispatchStep(request, step, tab);
+      return await dispatchStep(request, step, tab).catch((error: unknown) =>
+        closedByAction(request, step, tab, error),
+      );
     } finally {
       stepInput(step.target.tabId, false);
     }
   });
 }
+
 /** Every step that can change the page returns once it has settled, never mid-reaction. */
 async function afterSettle<T>(debuggee: chrome.debugger.Debuggee, run: () => Promise<T>) {
   await primeBrowserSettle(debuggee);
