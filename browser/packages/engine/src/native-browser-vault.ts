@@ -71,7 +71,11 @@ const PROBE = `(() => {
 export async function noteVaultFill(debuggee: chrome.debugger.Debuggee, id: number): Promise<void> {
   if (debuggee.tabId === undefined) return;
   const form = await onNode<VaultForm | null>(debuggee, id, vaultFieldInfo).catch(() => null);
-  if (!form) return;
+  if (!form) {
+    const typed = await onNode<Identity | null>(debuggee, id, identityInfo).catch(() => null);
+    if (typed) identities.set(debuggee.tabId, { ...typed, at: Date.now() });
+    return;
+  }
   if (form.hasPassword && form.password) rememberVaultCandidate(debuggee.tabId, form, "agent");
   await closeChromePopup(debuggee).catch(() => undefined);
 }
@@ -121,6 +125,32 @@ function vaultFieldInfo(this: HTMLInputElement): VaultForm | null {
   };
 }
 
+interface Identity {
+  site: string;
+  value: string;
+}
+
+// The email or username the agent last typed per tab. Sign-ups that ask for it on one screen
+// and the password on the next (X, Google) show no username beside the password, and a login
+// saved without one cannot sign in later.
+const identities = new Map<number, Identity & { at: number }>();
+
+function identityInfo(this: HTMLInputElement): Identity | null {
+  if (!["text", "email", "tel", ""].includes(this.type) || !this.value) return null;
+  const named = /user|email|login|account|identifier|phone|mobile/i.test(
+    [this.name, this.id, this.placeholder, this.getAttribute("aria-label") ?? ""].join(" "),
+  );
+  if (!(this.type === "email" || /username|email/.test(this.autocomplete) || named)) return null;
+  return { site: location.hostname.replace(/^www\./, ""), value: this.value };
+}
+
+/** The identity typed earlier on the same site in this tab, for a form that shows none. */
+export function earlierIdentity(tabId: number, site: string): string {
+  const typed = identities.get(tabId);
+  if (!typed || typed.site !== site || Date.now() - typed.at > MAX_AGE) return "";
+  return typed.value;
+}
+
 export function rememberVaultCandidate(
   tabId: number,
   form: VaultForm,
@@ -129,7 +159,8 @@ export function rememberVaultCandidate(
   if (!form.password) return;
   // A password a person typed is kept out of everything agent code reads from now on.
   if (source === "user") rememberSecrets([form.password]);
-  candidates.set(tabId, { ...form, source, at: Date.now() });
+  const username = form.username || earlierIdentity(tabId, form.site);
+  candidates.set(tabId, { ...form, username, source, at: Date.now() });
 }
 
 export function forgetVaultCandidate(tabId: number): void {
@@ -227,7 +258,10 @@ async function saveVaultCandidate(
 }
 
 onEngineInstall(() => {
-  chrome.tabs.onRemoved.addListener((tabId) => candidates.delete(tabId));
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    candidates.delete(tabId);
+    identities.delete(tabId);
+  });
 });
 
 export async function offerSaveCandidate(

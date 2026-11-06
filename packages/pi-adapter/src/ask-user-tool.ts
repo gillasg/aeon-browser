@@ -44,7 +44,8 @@ type Input = Static<typeof Parameters>;
 
 const GUIDELINES = [
   "ask_user asks the user and waits for the answer: yes/no (just question), one of choices, or a typed answer (input: true). Ask only what you cannot find yourself (their accounts, history, profile and pages come first), and ask once with everything you need.",
-  "Before submitting any form (the final Submit, Send, Apply, Book or Pay click), ask_user with what will be sent and where in detail, and submit only on yes.",
+  "The user's request is the go-ahead: submit what they asked for (sign up, apply, book, send) without asking to confirm. Ask before a final submit only when it goes beyond the request: a payment they did not mention, a message to people they did not name, or details about them you had to guess.",
+  "A test or throwaway account (the user says so): make up the name, birthday and any other detail the site asks for; never ask for them or use the user's real ones.",
   "A form field the profile lacks (bu.fillProfile() reports it missing): ask_user({question: 'Your middle name?', input: true, save: 'middleName'}) keeps it in their form profile without you seeing it; then bu.fillProfile() fills it, now and in every later form.",
 ];
 

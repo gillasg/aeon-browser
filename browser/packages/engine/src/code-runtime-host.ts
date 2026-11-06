@@ -24,6 +24,7 @@ import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
 import { browserSessionOwner } from "./native-browser-session.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { notePreviewActivity } from "./native-browser-preview.js";
+import { matchChromeSaving } from "./native-browser-chrome-saving.js";
 import {
   captureTypedPassword,
   finishVaultCapture,
@@ -327,8 +328,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   const stepTab = "target" in step ? step.target.tabId : undefined;
   if (stepTab !== undefined) takeActionTiming(stepTab);
   let resultTab: number | undefined;
-  if (isSubmitLike(step) && "target" in step)
-    await captureTypedPassword(step.target.tabId).catch(() => undefined);
+  if (isSubmitLike(step) && "target" in step) await beforeSubmit(cell, step.target.tabId);
   try {
     const result = await scrubSecrets(
       await executeLocalBrowserStep(
@@ -378,6 +378,16 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
 }
 /** How long a click waits for the password manager's answer before carrying on without it. */
 const SAVE_ANSWER_WAIT_MS = 1500;
+
+/** Keeps a password a person typed, and matches Chrome's own save offer to the profile's manager. */
+async function beforeSubmit(cell: Cell, tabId: number): Promise<void> {
+  await captureTypedPassword(tabId).catch(() => undefined);
+  const candidate = vaultCandidate(tabId);
+  if (candidate)
+    await matchChromeSaving((request) => callCore(cell, request), candidate.url).catch(
+      () => undefined,
+    );
+}
 
 /**
  * Saves a login the agent typed once its form went through. When no password manager took it,

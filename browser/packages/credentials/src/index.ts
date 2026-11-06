@@ -21,7 +21,9 @@ export { hostOf, loginsFor, sameSite, type Login, type SaveLogin } from "./match
 export type CredentialRequest =
   | { credential: "login"; url: string; account?: string }
   | { credential: "totp"; url: string; id: string }
-  | { credential: "save"; url: string; username: string; password: string; name?: string };
+  | { credential: "save"; url: string; username: string; password: string; name?: string }
+  /** Which manager this browser saves to (null: none, so Chrome's own prompt is the only way). */
+  | { credential: "manager"; url: string };
 
 export interface LoginAnswer {
   provider: string | null;
@@ -35,7 +37,8 @@ export function isCredentialRequest(value: unknown): value is CredentialRequest 
   return (
     (request?.credential === "login" ||
       request?.credential === "totp" ||
-      request?.credential === "save") &&
+      request?.credential === "save" ||
+      request?.credential === "manager") &&
     typeof request.url === "string"
   );
 }
@@ -46,10 +49,16 @@ export async function handleCredentialRequest(
   providerOverride?: import("./config.js").Provider,
   /** The named Chrome profile the sign-in runs in, which may have its own password manager. */
   browser?: string,
-): Promise<LoginAnswer | { code: string | null } | { saved: boolean; provider: string | null }> {
+): Promise<
+  | LoginAnswer
+  | { code: string | null }
+  | { saved: boolean; provider: string | null }
+  | { provider: string | null }
+> {
   const host = hostOf(request.url);
   if (!host) throw new Error("INVALID_TARGET: sign-in needs an http(s) page");
   const provider = providerOverride ?? (await activeProvider(directory, browser));
+  if (request.credential === "manager") return { provider: provider?.name ?? null };
   if (request.credential === "totp") {
     if (!provider) return { code: null };
     const known = loginsFor(await provider.logins(host), host).some((l) => l.id === request.id);
