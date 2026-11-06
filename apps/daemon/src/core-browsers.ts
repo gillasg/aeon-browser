@@ -127,7 +127,7 @@ export function handleBrowsers(
   return true;
 }
 
-async function pin(
+export async function pin(
   browser: BrowserControlService,
   directory: string,
   chatId: string,

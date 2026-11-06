@@ -45,7 +45,7 @@ export class DaemonHost {
   /** Runs browser code; throws with the cell's error so commands see what the page said. */
   async runInBrowser(
     code: string,
-    options: { session?: string; timeoutMs?: number } = {},
+    options: { session?: string; timeoutMs?: number; browser?: string } = {},
   ): Promise<unknown> {
     // A plain-HTTP read closes the crawler's tab when it is done; there is no tab and no reason
     // to reach the daemon for it. Only the crawler's own cleanup code looks like this.
@@ -58,6 +58,7 @@ export class DaemonHost {
       code,
       session,
       ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.browser ? { browser: options.browser } : {}),
     })) as BrowserCell;
     await this.record(session, result, Date.now() - started);
     if (result.error) throw browserError(result);

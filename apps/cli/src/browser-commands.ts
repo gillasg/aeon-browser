@@ -47,7 +47,7 @@ async function tabs(host: DaemonHost, args: Args): Promise<number> {
   return 0;
 }
 
-async function repl(host: DaemonHost, args: Args): Promise<number> {
+async function replCode(args: Args): Promise<string> {
   const given = args.positional.join(" ");
   const code =
     given === "-"
@@ -57,14 +57,21 @@ async function repl(host: DaemonHost, args: Args): Promise<number> {
         : given;
   if (!code.trim())
     throw new Error(
-      'Usage: aeon repl "<code>" | @file.js | - [--session name] [--timeout s] [--quiet]',
+      'Usage: aeon repl "<code>" | @file.js | - [--session name] [--browser name] [--timeout s] [--quiet]',
     );
+  return code;
+}
+
+async function repl(host: DaemonHost, args: Args): Promise<number> {
+  const code = await replCode(args);
   const session = flag(args, "session") ?? "cli";
+  const browser = flag(args, "browser");
+  const where = { session, ...(typeof browser === "string" ? { browser } : {}) };
   // Seconds, as the help says; 500ms and 2s also read as written.
   const timeout = timeoutMs(flag(args, "timeout"));
   try {
     const value = await host.runInBrowser(code, {
-      session,
+      ...where,
       ...(timeout ? { timeoutMs: timeout } : {}),
     });
     if (!has(args, "quiet")) out(cellText(value));
@@ -73,7 +80,7 @@ async function repl(host: DaemonHost, args: Args): Promise<number> {
     // A timed-out cell can leave its tabs and jobs behind: close the session's own.
     if (timeout && /timed?\s?out|timeout/i.test(String(error)))
       await host
-        .runInBrowser("await browser.session.close()", { session, timeoutMs: 5000 })
+        .runInBrowser("await browser.session.close()", { ...where, timeoutMs: 5000 })
         .catch(() => undefined);
     // --quiet drops the output, never the error: it goes to stderr.
     process.stderr.write((error instanceof Error ? error.message : String(error)) + "\n");
@@ -161,12 +168,13 @@ Prints tab id, title and URL, one tab per line; --json prints the browser's own 
       name: "repl",
       group: "Browser",
       summary: "run a browser_code cell",
-      help: `Usage: aeon repl "<code>" | @file.js | - [--session name] [--timeout s] [--quiet]
+      help: `Usage: aeon repl "<code>" | @file.js | - [--session name] [--browser name] [--timeout s] [--quiet]
 
 The last expression is returned. Variables and tabs persist per session. @file.js runs code from
 a file and - reads it from stdin, so long cells need no quoting. --timeout is in seconds (30,
-500ms and 2s also work); a timed-out cell closes the session's own tabs and jobs. --quiet prints
-only errors (on stderr) and keeps the exit code.`,
+500ms and 2s also work); a timed-out cell closes the session's own tabs and jobs. --browser keeps
+the session in one Chrome profile (a name from aeon browsers). --quiet prints only errors (on
+stderr) and keeps the exit code.`,
       run: (args) => repl(host, args),
     },
     {

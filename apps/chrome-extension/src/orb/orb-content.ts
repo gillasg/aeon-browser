@@ -45,6 +45,12 @@ function start(): void {
   };
   const restore = () => {
     if (overlay || document.visibilityState !== "visible") return;
+    // A reloaded or updated extension leaves this script behind with no runtime, and
+    // sendMessage then throws instead of rejecting.
+    if (!chrome.runtime?.id) {
+      document.removeEventListener("visibilitychange", restore);
+      return;
+    }
     void chrome.runtime
       .sendMessage({ kind: ORB_RESTORE })
       .then((reply: unknown) => {

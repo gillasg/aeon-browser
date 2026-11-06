@@ -168,6 +168,8 @@ export const CoreBrowserRunRequestSchema = z
     code: z.string().min(1).max(16000),
     session: z.string().min(1).max(100),
     timeoutMs: z.number().int().min(1000).max(600000).optional(),
+    /** A name from `aeon browsers`: the session runs only in that Chrome profile. */
+    browser: z.string().min(1).max(40).optional(),
   })
   .strict();
 export const CoreBrowserRunResultSchema = z

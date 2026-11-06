@@ -199,12 +199,19 @@ export async function finishVaultCapture(
   }
   candidates.delete(tabId);
   if (await neverSave(candidate.site || new URL(candidate.url).hostname)) return "skipped";
-  if (await saveVaultCandidate(candidate, ask)) return "saved";
+  const saved = await saveVaultCandidate(candidate, ask);
+  if (saved) return "saved";
+  // No answer (the run ended while a manager was still saving) is not a refusal: never nag.
+  if (saved === undefined) return "skipped";
   // A person who typed their own password sees Chrome's prompt themselves.
   return candidate.source === "agent" ? "unsaved" : "skipped";
 }
 
-async function saveVaultCandidate(candidate: VaultCandidate, ask: VaultAsk): Promise<boolean> {
+/** true saved, false refused (no manager, or it failed), undefined when no answer came. */
+async function saveVaultCandidate(
+  candidate: VaultCandidate,
+  ask: VaultAsk,
+): Promise<boolean | undefined> {
   try {
     const result = (await ask({
       credential: "save",
@@ -215,7 +222,7 @@ async function saveVaultCandidate(candidate: VaultCandidate, ask: VaultAsk): Pro
     })) as { saved?: boolean } | undefined;
     return Boolean(result?.saved);
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -229,5 +236,5 @@ export async function offerSaveCandidate(
   ask: VaultAsk,
 ): Promise<boolean> {
   void tabId;
-  return saveVaultCandidate(candidate, ask);
+  return Boolean(await saveVaultCandidate(candidate, ask));
 }

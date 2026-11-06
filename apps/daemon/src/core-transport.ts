@@ -119,7 +119,7 @@ function authenticate(
         handleOpenChat(socket, candidate, service, browser) ||
         handleChatStop(socket, candidate, service, browser) ||
         handleSettings(socket, candidate, browser) ||
-        handleBrowserRun(socket, candidate, browser) ||
+        handleBrowserRun(socket, candidate, browser, directory) ||
         handleCdpRequest(socket, candidate, browser, directory) ||
         handleModelComplete(socket, candidate, service) ||
         handleBlockedSites(socket, candidate, browser) ||
