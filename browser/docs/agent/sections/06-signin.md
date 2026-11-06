@@ -23,9 +23,9 @@ The password manager is set up once by the user: `browserkit signin setup bitwar
 `bw` CLI) or `signin setup proton` (Proton Pass's `pass-cli`).
 
 A password you type yourself (a new account) is saved to that manager once the form goes through.
-With none set up, the click's `[ok]` line says so: only Chrome's own "Save password?" prompt
-beside the address bar can keep it, and your code cannot click browser UI. Ask the user right away:
-`await bu.handoff("Please click Save in Chrome's password prompt")`.
+With none set up, Aeon asks the user to click Save in Chrome's own prompt before your click
+returns, and the click's `[ok]` line says how it went; if they did not confirm, say in your answer
+that the login may not be saved.
 
 Do it yourself first, every time: sign-in with `bu.signIn()`, codes with `bu.fillCode()`, banners
 and pop-ups with `page.overlays.dismiss()`, a checkbox check with one click like a person. Hand
