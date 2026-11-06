@@ -55,3 +55,14 @@ test("a login saved from a password-only screen keeps no username it never saw",
   );
   assert.equal(vaultCandidate(77).username, "");
 });
+
+test("a password the agent typed with the keyboard, in one go or in pieces, is the agent's own", async () => {
+  const { noteAgentText, agentTyped } =
+    await import("../packages/engine/dist/native-browser-password-lock.js");
+  const target = { tabId: 91 };
+  noteAgentText({ op: "keys", target, keys: "Xk9#" });
+  noteAgentText({ op: "keys", target, keys: "q2Lm" });
+  assert.equal(agentTyped(91, "Xk9#q2Lm"), true);
+  assert.equal(agentTyped(91, "someone-elses"), false);
+  assert.equal(agentTyped(92, "Xk9#q2Lm"), false);
+});

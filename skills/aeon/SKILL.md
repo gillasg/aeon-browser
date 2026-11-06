@@ -212,10 +212,11 @@ user's) runs none of your page code: it fails with `PASSWORD_PAGE`. Clicks still
 The password manager is set up once by the user: `aeon signin setup bitwarden` (Bitwarden's
 `bw` CLI) or `signin setup proton` (Proton Pass's `pass-cli`).
 
-A password you type yourself (a new account) is saved to that manager once the form goes through.
-With none set up, Aeon asks the user to click Save in Chrome's own prompt before your click
-returns, and the click's `[ok]` line says how it went; if they did not confirm, say in your answer
-that the login may not be saved.
+A password you type yourself (a new account), by fill or keyboard, is saved to that manager once
+the form goes through, and the submitting click's `[ok]` line says so: saved, being saved, or (with
+none set up) whether the user clicked Save in Chrome's prompt when Aeon asked. That line is the
+answer: never log out, reopen the form or look for the login elsewhere to check it. If the user did
+not confirm Chrome's prompt, say in your answer that the login may not be saved.
 
 Do it yourself first, every time: sign-in with `bu.signIn()`, codes with `bu.fillCode()`, banners
 and pop-ups with `page.overlays.dismiss()`, a checkbox check with one click like a person. Hand

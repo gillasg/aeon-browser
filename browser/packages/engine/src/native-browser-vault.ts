@@ -1,6 +1,7 @@
 import { onEngineInstall } from "./native-engine-install.js";
 import { onNode } from "./native-browser-dom.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
+import { agentTyped } from "./native-browser-password-lock.js";
 import { rememberSecrets } from "./native-browser-secrets.js";
 
 // Vault login capture: after a password form is filled and submitted, remember the values only
@@ -190,11 +191,13 @@ export async function probeVaultForm(tabId: number): Promise<VaultForm | undefin
   return form && typeof form === "object" ? form : undefined;
 }
 
-/** Before a click, keep a password a person typed; agent fills already recorded their own. */
+/** Before a click, keep a password typed without a fill: by the agent's keyboard or a person. */
 export async function captureTypedPassword(tabId: number): Promise<void> {
   if (vaultCandidate(tabId)) return;
   const form = await probeVaultForm(tabId).catch(() => undefined);
-  if (form?.hasPassword && form.password) rememberVaultCandidate(tabId, form, "user");
+  if (!form?.hasPassword || !form.password) return;
+  // Typed with the keyboard (keyboard.type, pressSequentially): the agent's own new password.
+  rememberVaultCandidate(tabId, form, agentTyped(tabId, form.password) ? "agent" : "user");
 }
 
 export function vaultSubmissionSucceeded(after: VaultForm | undefined): boolean {
@@ -210,6 +213,10 @@ export type VaultOutcome = "saved" | "unsaved" | "skipped";
 /** What the kernel asks the user when no password manager saved a login the agent made. */
 export const SAVE_IN_CHROME =
   "Aeon made a login no password manager saved. Click Save in Chrome's password prompt (the key icon in the address bar reopens it), then Done.";
+export const VAULT_SAVED =
+  "the login (the password you typed) was saved to the user's password manager; nothing to check";
+export const VAULT_SAVING =
+  "the login (the password you typed) is being saved to the user's password manager; if that fails Aeon asks the user itself, so nothing to check";
 export const UNSAVED_LOGIN_SAVED =
   "no password manager saved the password you typed, so the user was asked to save it in Chrome's prompt and said done";
 export const UNSAVED_LOGIN_NOTE =
