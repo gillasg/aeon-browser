@@ -20,6 +20,7 @@ import { installSiteAnswers } from "./orb/orb-site.js";
 import { installBrowseLearning } from "./browse-learning.js";
 import { handleSettingsMessage } from "./native-worker-settings.js";
 import { handleBlockedSitesMessage } from "./native-worker-blocked-sites.js";
+import { handlePasswordSavingMessage } from "./native-worker-password-saving.js";
 import { migrateLegacyChromeStorage } from "@browserkit/engine/legacy-storage-migration";
 import {
   installNativeStartup,
@@ -384,9 +385,13 @@ function handleCoreMessage(candidate: unknown, socket: WebSocket): boolean {
   );
 }
 
-/** Settings the CLI reads or changes: agent flags and the user's blocked-sites list. */
+/** Settings the daemon or CLI sets: agent flags, blocked sites, Chrome's own password saving. */
 function handleNativeSettings(candidate: unknown, socket: WebSocket): boolean {
-  return handleSettingsMessage(candidate, socket) || handleBlockedSitesMessage(candidate, socket);
+  return (
+    handleSettingsMessage(candidate, socket) ||
+    handleBlockedSitesMessage(candidate, socket) ||
+    handlePasswordSavingMessage(candidate)
+  );
 }
 
 const SELF_RELOAD_KEY = "aeon-last-self-reload";

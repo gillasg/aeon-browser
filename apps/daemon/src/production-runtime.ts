@@ -9,6 +9,7 @@ import { ChatService } from "./chat-service.js";
 import { PiSdkSessionAdapter, resolvePiAgentDirectory, sessionChatId } from "@aeon/pi-adapter";
 import { openChatStore } from "@aeon/store";
 import { SiteScriptService } from "./site-script-service.js";
+import { browserControlFor } from "./password-saving-sync.js";
 import { BrowserControlService } from "./browser-control-service.js";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { CapabilityRegistry } from "./capability-registry.js";
@@ -58,8 +59,7 @@ export function createProductionRuntime(dataDirectory: string): {
       registryPath: join(dataRoot, "capabilities.json"),
     },
   });
-  const browserControl = new BrowserControlService();
-  browserControl.enableStartupTidy();
+  const browserControl = browserControlFor(dataRoot);
   const siteScripts = attachSiteScripts(dataRoot, browserControl);
   const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
   warmModels(pi);

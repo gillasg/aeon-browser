@@ -148,6 +148,7 @@ export class BrowserControlService {
     this.cells.rebind(clientInstanceId, socket);
     this.resyncScripts(clientInstanceId);
     this.tidyOnStartup(clientInstanceId, socket);
+    this.connectedHook?.(clientInstanceId, socket);
     socket.once("close", () => {
       if (this.executors.get(clientInstanceId) === socket) {
         this.executors.delete(clientInstanceId);
@@ -311,6 +312,11 @@ export class BrowserControlService {
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ kind: "browser.tidy" }));
   }
   /** Production calls this once; a bare service in tests leaves executors untouched. */
+  private connectedHook: ((browserId: string, socket: WebSocket) => void) | undefined;
+  /** Runs each time a browser connects (or reconnects) as an executor. */
+  onBrowserConnected(hook: (browserId: string, socket: WebSocket) => void): void {
+    this.connectedHook = hook;
+  }
   enableStartupTidy(): void {
     this.startupTidy = true;
   }
