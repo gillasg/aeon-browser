@@ -48,4 +48,15 @@ test("a Chrome fill counts only when the screen's own field filled", async () =>
   assert.equal(chromeFilled(userOnly, { ...userOnly, userValue: "me@example.com" }), true);
   assert.equal(chromeFilled(userOnly, userOnly), false);
   assert.equal(chromeFilled(userOnly, undefined), false);
+  // A suggestion Chrome only shows is not filled: the page has no value until a real click.
+  assert.equal(chromeFilled(withPassword, { ...withPassword, autofill: true }), false);
+});
+
+test("Enter on a filled field that submitted the form counts as submitted", async () => {
+  const { screenLeft } = await import("../packages/engine/dist/native-browser-signin-chrome.js");
+  const before = { url: "http://x/login", user: true, userValue: "", password: true };
+  assert.equal(screenLeft(before, { ...before, url: "http://x/home", password: false }), true);
+  assert.equal(screenLeft(before, { ...before, password: false }), true);
+  assert.equal(screenLeft(before, undefined), true);
+  assert.equal(screenLeft(before, before), false);
 });
