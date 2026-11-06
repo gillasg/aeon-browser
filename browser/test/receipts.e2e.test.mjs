@@ -22,7 +22,7 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const run = promisify(execFile);
 
 test(
-  "a click receipt names the popup, dialog and download it caused",
+  "a click receipt names the popup, dialog and download it caused, and a self-closing pop-up is a success",
   {
     skip:
       !process.env.REQUIRE_E2E &&
@@ -37,6 +37,10 @@ test(
         response.statusCode = 422;
         response.end("{}");
       } else if (request.url === "/popup") response.end("<title>Popup</title>popup");
+      else if (request.url === "/closer")
+        response.end(
+          '<title>Closer</title><button id="done" onclick="window.close()">done</button>',
+        );
       else if (request.url === "/file") {
         response.setHeader("content-disposition", "attachment; filename=receipt.txt");
         response.end("receipt");
@@ -44,6 +48,7 @@ test(
         response.end(`<title>Receipt</title>
         <button id="all" onclick="window.open('/popup','_blank'); confirm('sure'); const a=document.createElement('a'); a.href='/file'; a.download='receipt.txt'; a.click()">all</button>
         <button id="none">none</button>
+        <button id="signin" onclick="window.open('/closer','_blank')">signin</button>
         <button id="save" onclick="fetch('/save', {method: 'POST', body: '{}'})">save</button>`);
     });
     await new Promise((done) => site.listen(0, "127.0.0.1", done));
@@ -98,6 +103,15 @@ test(
       assert.equal(saved.requests?.[0]?.method, "POST", third.stdout);
       assert.equal(saved.requests?.[0]?.status, 422, third.stdout);
       assert.match(first.stdout + first.stderr, /never used/);
+      // A pop-up that closes itself after a click (a sign-in window finishing) is a success.
+      const fourth =
+        await cell(`const opened = await page.click("#signin"); await page.waitForTimeout(400);
+        const popup = await bu.use(opened.receipt.popups[0].tabId);
+        const closed = await popup.click("#done");
+        console.log("FOURTH " + JSON.stringify({ outcome: closed.outcome, note: closed.note }));`);
+      const closed = JSON.parse(/FOURTH (.*)/.exec(fourth.stdout)[1]);
+      assert.equal(closed.outcome, "changed", fourth.stdout);
+      assert.match(closed.note, /closed this tab itself/, fourth.stdout);
     } finally {
       chrome?.kill();
       bridge.kill();

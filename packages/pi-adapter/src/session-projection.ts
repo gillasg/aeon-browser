@@ -45,7 +45,7 @@ export function wrapPiSession(
     submit: (input) => submitToPi(session, input),
     ...threadDelivery,
     ...routineSupport,
-    ...createSessionControls(session),
+    ...createSessionControls(session, chatId),
     ...createSessionTools(session, manager),
     extensionUiSnapshot: () => extensionUi.snapshot(),
     answerExtensionUi: (requestId, value) => extensionUi.respond(requestId, value),

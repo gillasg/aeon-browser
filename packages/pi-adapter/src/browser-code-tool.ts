@@ -16,6 +16,7 @@ import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { siteMapperRequest } from "./site-browser.js";
 import { tallyCell, writeRunLog } from "./run-log.js";
+import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
   type HostRequestContext,
@@ -89,6 +90,8 @@ export function createBrowserCodeTool(
           isError: true,
           details: undefined,
         };
+      // A steer while the cell hands off to the user ends the cell, so the model reads it now.
+      const wait = openUserWait(chatId, signal, () => steps.some(handingOff));
       const output = await run(
         chatId,
         toolCallId,
@@ -118,8 +121,14 @@ export function createBrowserCodeTool(
             },
           },
         },
-        signal,
-      );
+        wait.signal,
+      ).finally(wait.close);
+      if (wait.steered())
+        return {
+          content: browserContent(JSON.stringify({ ...envelope(), error: STEERED_NOTE })),
+          isError: true,
+          details: undefined,
+        };
       return browserCodeResult({ chatId, output, steps, workspace, operationId, writes, files });
     },
   });
@@ -401,6 +410,11 @@ function progressRequest(request: unknown): ToolProgress | undefined {
 
 function workspaceSteps(steps: Record<string, unknown>[]) {
   return steps.filter((step) => step.workspace === true);
+}
+
+function handingOff(step: Record<string, unknown>): boolean {
+  const action = step.action as { op?: unknown } | undefined;
+  return action?.op === "handoff" && step.disposition === "running";
 }
 
 function compactStep(step: Record<string, unknown>): Record<string, unknown> {
