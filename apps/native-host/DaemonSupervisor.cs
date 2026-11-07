@@ -235,7 +235,11 @@ internal static class DaemonSupervisor
             {
                 Task waiting;
                 try { waiting = pipe.WaitForConnectionAsync(cancellation.Token); }
-                catch (Exception) { return false; }
+                catch (Exception error)
+                {
+                    SupervisorLog.Write("Daemon restart: the pipe stopped accepting clients: " + error.Message);
+                    return false;
+                }
                 while (!waiting.Wait(500))
                 {
                     if (!daemon.HasExited) continue;
@@ -245,7 +249,14 @@ internal static class DaemonSupervisor
                     return false;
                 }
                 try { waiting.Wait(); return true; }
-                catch (AggregateException) { if (daemon.HasExited) return false; }
+                catch (AggregateException)
+                {
+                    if (daemon.HasExited) return false;
+                    // A client that connected and dropped at once leaves the pipe broken: reset it
+                    // for the next client rather than failing the next accept (a restart).
+                    try { pipe.Disconnect(); }
+                    catch { }
+                }
             }
         }
         return false;
@@ -275,40 +286,113 @@ internal static class DaemonSupervisor
             var line = ReadDaemonReply(daemon);
             if (line == null)
             {
+                // A daemon that answers a probe is alive, and its running chats with it: answer this
+                // client "retry" and keep the daemon. Only a daemon silent to the probe too is killed.
+                if (Resynced(daemon))
+                {
+                    SupervisorLog.Write("Daemon missed one bootstrap reply but answers; kept running.");
+                    return Failure("BOOTSTRAP_UNAVAILABLE", true);
+                }
+                SupervisorLog.Write("Daemon restart: no bootstrap reply and no answer to a probe.");
+                PoisonDaemon(daemon);
                 restartRequired = true;
                 return Failure("DAEMON_OFFLINE", true);
             }
             var response = Convert.FromBase64String(line);
             if (response.Length == 0 || response.Length > MaxMessageBytes)
             {
+                SupervisorLog.Write("Daemon restart: bootstrap reply of " + response.Length + " bytes.");
                 PoisonDaemon(daemon);
                 restartRequired = true;
                 return Failure("BOOTSTRAP_UNAVAILABLE", true);
             }
             return response;
         }
-        catch
+        catch (Exception error)
         {
+            SupervisorLog.Write("Daemon restart: bootstrap failed: " + error.GetType().Name + ": " + error.Message);
             PoisonDaemon(daemon);
             restartRequired = true;
             return Failure("BOOTSTRAP_UNAVAILABLE", true);
         }
     }
 
+    // One read of the daemon's stdout is outstanding at a time; a read that timed out stays pending
+    // and is the next one used, so no reply is lost or read twice.
+    private static Task<string> pendingRead;
+    private static Process pendingReadOwner;
+
+    private static string ReadLineWithin(Process daemon, TimeSpan timeout)
+    {
+        if (pendingRead == null || pendingReadOwner != daemon)
+        {
+            pendingRead = daemon.StandardOutput.ReadLineAsync();
+            pendingReadOwner = daemon;
+        }
+        try
+        {
+            if (!pendingRead.Wait(timeout)) return null;
+            var line = pendingRead.Result;
+            pendingRead = null;
+            return line ?? "";
+        }
+        catch
+        {
+            pendingRead = null;
+            return "";
+        }
+    }
+
+    // Every line the daemon reads gets one reply. A probe is a line it cannot parse, so its reply is
+    // a fixed failure; reading up to that reply drops any late reply and puts the stream back in step.
+    private const string Probe = "cHJvYmU=";
+
+    private static bool Resynced(Process daemon)
+    {
+        try
+        {
+            daemon.StandardInput.WriteLine(Probe);
+            daemon.StandardInput.Flush();
+        }
+        catch { return false; }
+        var probeReply = Convert.ToBase64String(Failure("BOOTSTRAP_UNAVAILABLE", true));
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var line = ReadLineWithin(daemon, deadline - DateTime.UtcNow);
+            if (line == null || line == "") return false;
+            if (IsBase64(line) && Encoding.UTF8.GetString(Convert.FromBase64String(line)).Contains("BOOTSTRAP_UNAVAILABLE"))
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>One reply line, skipping any progress marker the daemon still has in flight.</summary>
     private static string ReadDaemonReply(Process daemon)
     {
-        var pending = daemon.StandardOutput.ReadLineAsync();
         for (var attempt = 0; attempt < 20; attempt++)
         {
-            string line;
-            if (!DaemonOutputReader.TryReadLine(
-                pending, TimeSpan.FromSeconds(15), () => PoisonDaemon(daemon), out line))
-                return null;
-            if (PhaseOf(line) == null) return line;
-            pending = daemon.StandardOutput.ReadLineAsync();
+            var line = ReadLineWithin(daemon, TimeSpan.FromSeconds(15));
+            if (String.IsNullOrWhiteSpace(line)) return null;
+            // Only a base64 line is a reply. Anything else reached stdout some other way (a child
+            // process or a library writing to it directly): log it and keep reading. Treating it as a
+            // broken daemon killed it and every running chat.
+            if (PhaseOf(line) == null && IsBase64(line)) return line;
+            if (PhaseOf(line) == null)
+                SupervisorLog.Write("Daemon wrote a stray stdout line: " +
+                    (line.Length > 160 ? line.Substring(0, 160) : line));
         }
         return null;
+    }
+
+    private static bool IsBase64(string line)
+    {
+        if (line.Length == 0 || line.Length % 4 != 0) return false;
+        foreach (var c in line)
+            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+                  c == '+' || c == '/' || c == '='))
+                return false;
+        return true;
     }
 
     private static string PhaseOf(string line)

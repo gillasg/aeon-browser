@@ -21,7 +21,8 @@ export function curlExample(operation: Operation, redactor: Redactor): string | 
       continue;
     lines.push(`  -H ${shellQuote(`${name}: ${redactor.header(name, value)}`)}`);
   }
-  const body = redactor.body(sample.requestBody);
+  // A curl example shows the call, not a whole upload: long bodies are cut before redaction.
+  const body = redactor.body(sample.requestBody?.slice(0, 20_000));
   if (body) lines.push(`  --data-raw ${shellQuote(body)}`);
   return lines.join(" \\\n");
 }
@@ -39,7 +40,7 @@ export function redactedSamples(
         url: redactUrl(sample.url, redactor),
         status: sample.status,
         requestHeaders: redactor.headers(sample.requestHeaders),
-        requestBody: redactor.body(sample.requestBody),
+        requestBody: redactor.body(sample.requestBody?.slice(0, 20_000)),
         responseBody: redactor.body(sample.responseBody?.slice(0, 20_000)),
       })),
     ]),

@@ -2,16 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { watchStalls } from "../dist/stall-watch.js";
 
-test("a blocked event loop is logged with how long it lasted", async () => {
-  const lines = [];
-  const stop = watchStalls((line) => lines.push(line));
-  await new Promise((resolve) => globalThis.setTimeout(resolve, 300));
-  const until = Date.now() + 1400;
+function blockFor(ms) {
+  const until = Date.now() + ms;
   while (Date.now() < until) {
     // Block the loop on purpose.
   }
-  await new Promise((resolve) => globalThis.setTimeout(resolve, 400));
+}
+
+test("a blocked event loop is logged with how long it lasted and where it was", async () => {
+  const lines = [];
+  const stop = watchStalls((line) => lines.push(line));
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
+  blockFor(4500);
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 600));
   stop();
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /event loop blocked \d+ ms/);
+  assert.ok(
+    lines.some((line) => /event loop blocked \d+ ms \(heap/.test(line)),
+    lines.join("\n"),
+  );
+  assert.ok(
+    lines.some((line) => /so far, main thread is at:[\s\S]*blockFor/.test(line)),
+    lines.join("\n"),
+  );
 });
