@@ -3,6 +3,7 @@ import { onNode } from "./native-browser-dom.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { agentTyped } from "./native-browser-password-lock.js";
 import { rememberSecrets } from "./native-browser-secrets.js";
+import { SessionMap } from "./native-session-map.js";
 
 // Vault login capture: after a password form is filled and submitted, remember the values only
 // long enough to ask the password manager to save them. Success comes from the page itself (the
@@ -26,7 +27,8 @@ export interface VaultCandidate extends VaultForm {
 
 export type VaultAsk = (request: unknown) => Promise<unknown>;
 
-const candidates = new Map<number, VaultCandidate>();
+// Kept across service worker restarts, so a login made just before one is still saved.
+const candidates = new SessionMap<VaultCandidate>("aeon-vault-candidates");
 const MAX_AGE = 15 * 60_000;
 const NEVER_SAVE = "vault-never-save";
 
@@ -134,7 +136,7 @@ interface Identity {
 // The email or username the agent last typed per tab. Sign-ups that ask for it on one screen
 // and the password on the next (X, Google) show no username beside the password, and a login
 // saved without one cannot sign in later.
-const identities = new Map<number, Identity & { at: number }>();
+const identities = new SessionMap<Identity & { at: number }>("aeon-vault-identities");
 
 function identityInfo(this: HTMLInputElement): Identity | null {
   if (!["text", "email", "tel", ""].includes(this.type) || !this.value) return null;
@@ -193,6 +195,7 @@ export async function probeVaultForm(tabId: number): Promise<VaultForm | undefin
 
 /** Before a click, keep a password typed without a fill: by the agent's keyboard or a person. */
 export async function captureTypedPassword(tabId: number): Promise<void> {
+  await candidates.ready;
   if (vaultCandidate(tabId)) return;
   const form = await probeVaultForm(tabId).catch(() => undefined);
   if (!form?.hasPassword || !form.password) return;
@@ -227,6 +230,7 @@ export async function finishVaultCapture(
   tabId: number,
   ask: VaultAsk,
 ): Promise<VaultOutcome | undefined> {
+  await candidates.ready;
   const candidate = vaultCandidate(tabId);
   if (!candidate) return undefined;
   const after = await probeVaultForm(tabId).catch(() => undefined);

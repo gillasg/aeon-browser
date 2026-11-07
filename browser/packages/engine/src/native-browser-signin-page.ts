@@ -226,7 +226,7 @@ function changed(before: SignInFields, after: SignInFields): boolean {
   );
 }
 
-async function evaluate(tabId: number, expression: string): Promise<unknown> {
+export async function evaluate(tabId: number, expression: string): Promise<unknown> {
   const result = await withBrowserDebugger(tabId, (debuggee) =>
     chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
       expression,

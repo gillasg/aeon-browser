@@ -366,8 +366,8 @@ var browser = Object.freeze({
     remove: (id, options = {}) => __call({bookmarks:"remove", id, ...options}),
   }),
   // Agents sometimes ask for a tab object by id: browser.tab(tabId or a listed tab).
-  tab: async (tab) => bu.use(typeof tab === 'object' && tab ? (tab.target || tab) : tab),
-  getTab: async (tab) => browser.tab(tab),
+  tab: (tab) => __lazyPage(bu.use(typeof tab === 'object' && tab ? (tab.target || tab) : tab)),
+  getTab: (tab) => browser.tab(tab),
   // Attach any tab, whoever opened it or is driving it. Actions in one tab queue.
   attachTab: async (target) => {
     target = await __tabTarget(target);

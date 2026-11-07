@@ -54,6 +54,21 @@ function __listedTab(entry) {
     get: (object, key) => key in object || typeof key === 'symbol' || plain.has(key) ? object[key] : asPage()[key],
   });
 }
+// A page that is still being looked up: awaiting it gives the page, and calling a method on it
+// without await (const p = browser.tab(id); await p.evaluate(...)) waits for the page first.
+function __lazyPage(pending) {
+  var promise = Promise.resolve(pending);
+  return new Proxy(promise, {
+    get: (object, key) => {
+      if (key === 'then' || key === 'catch' || key === 'finally') return object[key].bind(object);
+      if (typeof key === 'symbol') return object[key];
+      return (...args) => promise.then((page) => {
+        var value = page[key];
+        return typeof value === 'function' ? value.apply(page, args) : value;
+      });
+    },
+  });
+}
 async function __tabTarget(target) {
   // A tab id, a tab from browser.tabs(), a page, or a target itself.
   if (target && typeof target === 'object' && target.target) return target.target;

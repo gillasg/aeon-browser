@@ -2,6 +2,7 @@ import type { BrowserStep } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { SessionMap } from "./native-session-map.js";
 
 // Agent code never runs in a page that holds, or has held, a password the agent did not type
 // itself: a password-manager sign-in or a person typing one. Reading a password field is plain
@@ -12,8 +13,17 @@ import { onEngineInstall } from "./native-engine-install.js";
 // it planted for new documents), and reloads it after signing in when the page stayed the same,
 // so nothing the page kept in memory outlives the sign-in.
 
-const typed = new Map<number, Set<string>>();
-const planted = new Map<number, Set<string>>();
+// Kept across service worker restarts: forgetting them locked the agent out of its own sign-up.
+const typed = new SessionMap<Set<string>>(
+  "aeon-agent-typed",
+  (values) => [...values],
+  (values) => new Set(Array.isArray(values) ? values.map(String) : []),
+);
+const planted = new SessionMap<Set<string>>(
+  "aeon-planted-scripts",
+  (ids) => [...ids],
+  (ids) => new Set(Array.isArray(ids) ? ids.map(String) : []),
+);
 /** DevTools calls that read nothing from the page: a screenshot shows a password as dots. */
 const LEAVES_PAGE_ALONE = new Set([
   "Page.captureScreenshot",
@@ -82,7 +92,7 @@ function probe(
   known: string[],
   mark: boolean,
   agent: boolean,
-): { password: boolean; agent: boolean } {
+): { password: boolean; agent: boolean; filled: boolean } {
   const page = window as unknown as Record<string, boolean | undefined>;
   const dom = (globalThis as { chrome?: { dom?: typeof chrome.dom } }).chrome?.dom;
   const shadowOf = (el: Element) => {
@@ -102,10 +112,11 @@ function probe(
     }
     return false;
   };
-  if (mark || filled(document)) page.__aeonPasswordPage = true;
+  const filledNow = filled(document);
+  if (mark || filledNow) page.__aeonPasswordPage = true;
   const ran = page.__aeonAgentCode === true;
   if (agent) page.__aeonAgentCode = true;
-  return { password: page.__aeonPasswordPage === true, agent: ran };
+  return { password: page.__aeonPasswordPage === true, agent: ran, filled: filledNow };
 }
 
 // executeScript over all frames answers only once every frame has run, so one stuck frame (an ad or
@@ -113,7 +124,12 @@ function probe(
 // bound; past it, each frame is probed on its own and a frame from another site that still does not
 // answer is skipped: code in the top page could not read its fields anyway.
 const PROBE_MS = 2500;
-type ProbeResult = chrome.scripting.InjectionResult<{ password: boolean; agent: boolean }>;
+interface ProbeState {
+  password: boolean;
+  agent: boolean;
+  filled: boolean;
+}
+type ProbeResult = chrome.scripting.InjectionResult<ProbeState>;
 
 function within<T>(ms: number, work: Promise<T>): Promise<T | undefined> {
   return Promise.race([work, new Promise<undefined>((done) => setTimeout(done, ms, undefined))]);
@@ -165,7 +181,7 @@ async function probeFrames(
 async function probeTab(
   tabId: number,
   options: { mark?: boolean; agent?: boolean },
-): Promise<{ password: boolean; agent: boolean }> {
+): Promise<ProbeState> {
   const results = await probeFrames(tabId, options);
   // The top page must answer; a frame the probe could not run in has nothing it could read.
   const top = results.find((item) => item.frameId === 0);
@@ -173,20 +189,30 @@ async function probeTab(
     const reason = (top as { error?: unknown } | undefined)?.error;
     throw new Error(top ? `the check failed in the page: ${String(reason)}` : "no top frame");
   }
-  const states = results.flatMap((item) =>
-    item.result ? [item.result as { password: boolean; agent: boolean }] : [],
-  );
+  const states = results.flatMap((item) => (item.result ? [item.result as ProbeState] : []));
   return {
     password: states.some((state) => state.password),
     agent: states.some((state) => state.agent),
+    filled: states.some((state) => state.filled),
   };
 }
 
-/** Refuses a step that would run code in a page that has held a password. */
+/**
+ * Refuses a step that would run code in a page that has held a password. Once no field holds
+ * one any more (the sign-in went through, often without a new document), the page is reloaded,
+ * which clears what it kept in memory, and the step runs: the agent is never left blind.
+ */
 export async function guardPageCode(step: BrowserStep): Promise<void> {
   if (!runsPageCode(step) || !("target" in step)) return;
-  const state = await checkedProbe(step.target.tabId);
-  if (state.password) throw new Error(PASSWORD_PAGE);
+  const tabId = step.target.tabId;
+  await typed.ready;
+  const state = await checkedProbe(tabId);
+  if (!state.password) return;
+  if (!state.filled) {
+    await reload(tabId);
+    if (!(await checkedProbe(tabId)).password) return;
+  }
+  throw new Error(PASSWORD_PAGE);
 }
 
 /** Chrome's answer when the page's document went away mid-check (it navigated, reloaded or was discarded). */
@@ -200,7 +226,7 @@ export function documentReplaced(message: string): boolean {
  * The probe, once more after a moment when the page was being replaced. A page Aeon still
  * cannot check runs no code either way; only the reason differs.
  */
-async function checkedProbe(tabId: number): Promise<{ password: boolean }> {
+async function checkedProbe(tabId: number): Promise<{ password: boolean; filled: boolean }> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await probeTab(tabId, { agent: true });
@@ -291,7 +317,11 @@ async function pageScripts(url: string): Promise<string[]> {
 export async function prepareSignIn(tabId: number, url: string): Promise<string[] | undefined> {
   const scripts = await pageScripts(url);
   if (scripts.length) return scripts;
-  const state = await probeTab(tabId, {}).catch(() => ({ password: false, agent: true }));
+  const state = await probeTab(tabId, {}).catch(() => ({
+    password: false,
+    agent: true,
+    filled: false,
+  }));
   if (state.agent || planted.get(tabId)?.size) {
     await removePlanted(tabId);
     await reload(tabId);
@@ -302,6 +332,10 @@ export async function prepareSignIn(tabId: number, url: string): Promise<string[
 
 /** After signing in: a page that is still the same document is reloaded, clearing its memory. */
 export async function finishSignIn(tabId: number): Promise<void> {
-  const state = await probeTab(tabId, {}).catch(() => ({ password: true, agent: false }));
+  const state = await probeTab(tabId, {}).catch(() => ({
+    password: true,
+    agent: false,
+    filled: true,
+  }));
   if (state.password) await reload(tabId);
 }

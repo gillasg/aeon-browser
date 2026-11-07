@@ -88,7 +88,7 @@ export function sameIdentity(target: BrowserTargetKey, identity: BrowserIdentity
 export function errorCode(error: unknown): string {
   const value = error instanceof Error ? error.message : "";
   // A message that leads with its code ("TARGET_BLOCKED: covered by …") is that code.
-  const head = /^([A-Z_]+)(?::|$)/.exec(value)?.[1] ?? "";
+  const head = /^(?:Error: )*([A-Z_]+)(?::|$)/.exec(value)?.[1] ?? "";
   if (head === "EXTENSION_BLOCKED" || isKernelErrorCode(head)) return head;
   const lower = value.toLowerCase();
   if (lower.includes("detached while handling command")) return "TARGET_LOST";
