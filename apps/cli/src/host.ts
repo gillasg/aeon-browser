@@ -47,9 +47,17 @@ export class DaemonHost {
     code: string,
     options: { session?: string; timeoutMs?: number; browser?: string } = {},
   ): Promise<unknown> {
+    return (await this.runCell(code, options)).value;
+  }
+
+  /** The whole cell: its value and what it logged. A failed cell throws with its log attached. */
+  async runCell(
+    code: string,
+    options: { session?: string; timeoutMs?: number; browser?: string } = {},
+  ): Promise<BrowserCell> {
     // A plain-HTTP read closes the crawler's tab when it is done; there is no tab and no reason
     // to reach the daemon for it. Only the crawler's own cleanup code looks like this.
-    if (!this.browserUsed && code.startsWith("if (globalThis.__crawlTab)")) return true;
+    if (!this.browserUsed && code.startsWith("if (globalThis.__crawlTab)")) return { value: true };
     this.browserUsed = true;
     const session = options.session ?? "cli";
     const started = Date.now();
@@ -61,8 +69,8 @@ export class DaemonHost {
       ...(options.browser ? { browser: options.browser } : {}),
     })) as BrowserCell;
     await this.record(session, result, Date.now() - started);
-    if (result.error) throw browserError(result);
-    return result.value;
+    if (result.error) throw Object.assign(browserError(result), { output: result.output });
+    return result;
   }
 
   /** Aeon's default model, as site-to-api and browser-crawl expect one. */

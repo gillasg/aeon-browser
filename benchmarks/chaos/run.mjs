@@ -48,7 +48,8 @@ export function parseResult(text) {
   } catch {
     value = undefined;
   }
-  const error = value === undefined ? text.trim().split("\n").slice(-3).join(" ").slice(0, 300) : undefined;
+  const error =
+    value === undefined ? text.trim().split("\n").slice(-3).join(" ").slice(0, 300) : undefined;
   return { value, ...(error ? { error } : {}) };
 }
 
@@ -76,15 +77,28 @@ export function judge(results) {
     const good = runs.filter((run) => run.value?.title === "chaos").length;
     add(good === runs.length, `concurrent: ${good}/${runs.length} sessions in ${wallMs} ms`);
   }
-  if (results.leak) add(results.leak.after === results.leak.before, `leak: ${results.leak.before} tabs before, ${results.leak.after} after`);
+  if (results.leak)
+    add(
+      results.leak.after === results.leak.before,
+      `leak: ${results.leak.before} tabs before, ${results.leak.after} after`,
+    );
   if (results.timeout) {
     const { hang, next, limitSeconds } = results.timeout;
-    add(hang.status !== 0 && hang.ms < (limitSeconds + 20) * 1000, `timeout: a hung cell ended after ${hang.ms} ms (limit ${limitSeconds} s)`);
-    add(next.value !== undefined, `timeout: the next cell ${next.value !== undefined ? "worked" : "failed: " + next.error}`);
+    add(
+      hang.status !== 0 && hang.ms < (limitSeconds + 20) * 1000,
+      `timeout: a hung cell ended after ${hang.ms} ms (limit ${limitSeconds} s)`,
+    );
+    add(
+      next.value !== undefined,
+      `timeout: the next cell ${next.value !== undefined ? "worked" : "failed: " + next.error}`,
+    );
   }
   if (results.daemon) {
     const { recoveredMs, boundMs } = results.daemon;
-    add(recoveredMs !== null && recoveredMs <= boundMs, `daemon: ${recoveredMs === null ? "never came back" : `answered again after ${recoveredMs} ms`} (bound ${boundMs} ms)`);
+    add(
+      recoveredMs !== null && recoveredMs <= boundMs,
+      `daemon: ${recoveredMs === null ? "never came back" : `answered again after ${recoveredMs} ms`} (bound ${boundMs} ms)`,
+    );
   }
   return { ok, lines };
 }
@@ -100,7 +114,11 @@ function servePage() {
 function daemonPids() {
   const out = execFileSync(
     "powershell.exe",
-    ["-NoProfile", "-Command", "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -like '*--managed-daemon*' } | ForEach-Object { $_.ProcessId }"],
+    [
+      "-NoProfile",
+      "-Command",
+      "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -like '*--managed-daemon*' } | ForEach-Object { $_.ProcessId }",
+    ],
     { encoding: "utf8" },
   );
   return out.split(/\s+/).filter(Boolean).map(Number);
@@ -111,7 +129,11 @@ async function killDaemon(browser) {
   for (const pid of daemonPids()) process.kill(pid);
   const killedAt = Date.now();
   while (Date.now() - killedAt < boundMs) {
-    const probe = await cell(tabCountCode, { browser, session: "chaos-daemon", timeoutSeconds: 15 });
+    const probe = await cell(tabCountCode, {
+      browser,
+      session: "chaos-daemon",
+      timeoutSeconds: 15,
+    });
     if (probe.value !== undefined) return { recoveredMs: Date.now() - killedAt, boundMs };
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
@@ -128,7 +150,8 @@ async function main() {
     },
   });
   const browser = values.browser;
-  const out = values.out ?? path.join(here, "results", new Date().toISOString().replace(/[:.]/g, "-"));
+  const out =
+    values.out ?? path.join(here, "results", new Date().toISOString().replace(/[:.]/g, "-"));
   const server = await servePage();
   const url = `http://127.0.0.1:${server.address().port}/`;
   const results = {};
@@ -136,11 +159,17 @@ async function main() {
     const before = (await cell(tabCountCode, { browser, session: "chaos-count" })).value;
     const started = Date.now();
     const runs = await Promise.all(
-      Array.from({ length: Number(values.sessions) }, (_, i) => cell(visitCode(url, i), { browser, session: `chaos-${i}` })),
+      Array.from({ length: Number(values.sessions) }, (_, i) =>
+        cell(visitCode(url, i), { browser, session: `chaos-${i}` }),
+      ),
     );
     results.concurrent = { runs, wallMs: Date.now() - started };
     const limitSeconds = 8;
-    const hang = await cell(hangCode, { browser, session: "chaos-hang", timeoutSeconds: limitSeconds });
+    const hang = await cell(hangCode, {
+      browser,
+      session: "chaos-hang",
+      timeoutSeconds: limitSeconds,
+    });
     const next = await cell(visitCode(url, "next"), { browser, session: "chaos-hang" });
     results.timeout = { hang, next, limitSeconds };
     const after = (await cell(tabCountCode, { browser, session: "chaos-count" })).value;
@@ -151,10 +180,14 @@ async function main() {
   }
   const verdict = judge(results);
   fs.mkdirSync(out, { recursive: true });
-  fs.writeFileSync(path.join(out, "results.json"), JSON.stringify({ ...results, verdict }, null, 2));
+  fs.writeFileSync(
+    path.join(out, "results.json"),
+    JSON.stringify({ ...results, verdict }, null, 2),
+  );
   console.log(verdict.lines.join("\n"));
   console.log(`results: ${out}`);
   process.exitCode = verdict.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  await main();

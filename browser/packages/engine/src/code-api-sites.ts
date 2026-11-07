@@ -73,7 +73,7 @@ async function __noteSiteTime(target) {
   try { caps = await __call({siteCapabilities: {host}}); } catch { return; }
   if ((caps?.abilities || []).length || (caps?.operations || []).some((op) => op.does === 'read')) return;
   var minutes = Math.max(1, Math.round((now - clock.first) / 60000));
-  console.log('[site] ' + minutes + ' min of page work on ' + host + ', which is not learned yet. When you answer, end with one line: "That took about ' + minutes + ' min. I can learn ' + host + ' so this is a few seconds next time. Want that?"');
+  console.log('[site] ' + minutes + ' min of page work on ' + host + ', which is not learned yet. When you answer, end with one line: "That took about ' + minutes + ' min. I can save this as an ability on ' + host + ' so next time it is one quick call. Want that?" (a yes: site_mapper build with this task; it learns the site on the way)');
 }
 var skills = Object.freeze({
   list: (url) => __call({siteSkill:'list', url: url ?? (__lastTarget ? browser.page(__lastTarget).url : undefined)}),

@@ -21,7 +21,7 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   in place, all at once with `Promise.all`, navigating them too when the task is about them; for
   anything else open your own tab, so what the user is watching stays put.
 - `bu.state()` prints `[id] role "name" = value` and visible text (`*` marks changes; scope with
-  `{selector}` or `{query}`). Act on apps that redraw themselves by visible text, role or bu id,
+  `{selector}` or `{query}`), led by any text the user selected on the page. Act on apps that redraw themselves by visible text, role or bu id,
   never `document.querySelector`. Controls inside a cross-origin iframe appear under their iframe
   with a frame prefix (`f2:e14`); acting on one goes through that frame, and
   `bu.state({root: "f2:e14"})` / `page.snapshot({root})` scopes to that subtree (an iframe ref

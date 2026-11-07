@@ -367,3 +367,11 @@ function banner(child) {
     child.on("error", reject);
   });
 }
+
+// Found comparing Aeon with another agent browser: repl printed the value and dropped every log line.
+test("repl prints what the cell logged, then its value", async () => {
+  const { replText } = await import("../dist/browser-commands.js");
+  assert.equal(replText({ output: "hi\nthere\n", value: 2 }), "hi\nthere\n2");
+  assert.equal(replText({ output: "", value: { a: 1 } }), '{\n  "a": 1\n}');
+  assert.equal(replText({ output: "only a log" }), "only a log");
+});

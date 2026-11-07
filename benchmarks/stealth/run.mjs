@@ -124,10 +124,22 @@ export const SWEEP = [
 ];
 
 /** One cell through Aeon's CLI; the cell prints `RESULT <json>`, warnings come back with it. */
-export function cell(code, { browser, session, timeoutSeconds = 120, cli = path.join(root, "apps/cli/dist/cli.js") }) {
+export function cell(
+  code,
+  { browser, session, timeoutSeconds = 120, cli = path.join(root, "apps/cli/dist/cli.js") },
+) {
   const run = spawnSync(
     process.execPath,
-    [cli, "repl", code, "--session", session, "--timeout", String(timeoutSeconds), ...(browser ? ["--browser", browser] : [])],
+    [
+      cli,
+      "repl",
+      code,
+      "--session",
+      session,
+      "--timeout",
+      String(timeoutSeconds),
+      ...(browser ? ["--browser", browser] : []),
+    ],
     { encoding: "utf8", timeout: (timeoutSeconds + 30) * 1000 },
   );
   const text = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
@@ -138,7 +150,12 @@ export function cell(code, { browser, session, timeoutSeconds = 120, cli = path.
   } catch {
     value = undefined;
   }
-  return { value, text, challenge: /challenge: ([^\n]+)/.exec(text)?.[1] ?? null, ok: run.status === 0 && value !== undefined };
+  return {
+    value,
+    text,
+    challenge: /challenge: ([^\n]+)/.exec(text)?.[1] ?? null,
+    ok: run.status === 0 && value !== undefined,
+  };
 }
 
 export function probeCode(url) {
@@ -183,7 +200,11 @@ export function probeLines(report) {
     `empty coalesced events on ${input.coalescedEmpty} of ${input.pointermoves} pointer moves; untrusted events ${input.untrusted}`,
     `mouse move gap ms ${JSON.stringify(input.mousemoveIntervalMs)}; key gap ms ${JSON.stringify(input.keyIntervalMs)}; key dwell ms ${JSON.stringify(input.keyDwellMs)}`,
     `window/worker mismatches ${JSON.stringify(report.workers?.mismatches ?? [])}`,
-    `patched natives ${JSON.stringify(Object.entries(report.native ?? {}).filter(([, v]) => v !== "native").map(([k]) => k))}`,
+    `patched natives ${JSON.stringify(
+      Object.entries(report.native ?? {})
+        .filter(([, v]) => v !== "native")
+        .map(([k]) => k),
+    )}`,
     `automation globals ${JSON.stringify(report.artifacts?.automationGlobals ?? [])}; foreign nodes ${JSON.stringify(report.artifacts?.foreignNodes ?? [])}; console serialized an Error (Runtime.enable) ${report.artifacts?.consoleSerializedStack}`,
     `visibility ${report.window?.visibilityState}; focus ${report.window?.hasFocus}; inner ${JSON.stringify(report.window?.inner)}; webdriver ${report.misc?.webdriver}; plugins ${report.misc?.pluginsLength}`,
   ];
@@ -191,12 +212,19 @@ export function probeLines(report) {
 
 async function serveProbe() {
   const server = http.createServer((request, response) => {
-    if (new URL(request.url ?? "/", "http://x").pathname !== "/") return void response.writeHead(404).end();
-    response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    if (new URL(request.url ?? "/", "http://x").pathname !== "/")
+      return void response.writeHead(404).end();
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+    });
     response.end(fs.readFileSync(path.join(here, "probe.html")));
   });
   await new Promise((done) => server.listen(0, "127.0.0.1", done));
-  return { url: `http://127.0.0.1:${server.address().port}/`, close: () => new Promise((done) => server.close(done)) };
+  return {
+    url: `http://127.0.0.1:${server.address().port}/`,
+    close: () => new Promise((done) => server.close(done)),
+  };
 }
 
 async function main() {
@@ -212,9 +240,17 @@ async function main() {
       out: { type: "string" },
     },
   });
-  const only = values["probe-only"] ? "probe" : values["sites-only"] ? "sites" : values["sweep-only"] ? "sweep" : null;
+  const only = values["probe-only"]
+    ? "probe"
+    : values["sites-only"]
+      ? "sites"
+      : values["sweep-only"]
+        ? "sweep"
+        : null;
   const options = { browser: values.browser, session: values.session };
-  const out = path.resolve(values.out ?? path.join(here, "results", new Date().toISOString().replace(/[:.]/g, "-")));
+  const out = path.resolve(
+    values.out ?? path.join(here, "results", new Date().toISOString().replace(/[:.]/g, "-")),
+  );
   fs.mkdirSync(out, { recursive: true });
   const results = { startedAt: new Date().toISOString(), browser: values.browser ?? null };
   const summary = [`# Stealth bench ${results.startedAt}`, ""];
@@ -235,23 +271,53 @@ async function main() {
     summary.push("## Detectors", "", "| Site | Verdict | Challenge |", "| --- | --- | --- |");
     for (const site of DETECTORS.filter((item) => !wanted || wanted.includes(item.id))) {
       process.stderr.write(`detector: ${site.id}\n`);
-      const run = cell(detectorCode(site), { ...options, timeoutSeconds: Math.ceil(site.waitMs / 1000) + 90 });
-      results.detectors.push({ id: site.id, ...(run.value ?? { error: run.text.slice(-600) }), challenge: run.challenge });
-      summary.push(`| ${site.id} | ${JSON.stringify(run.value?.verdict ?? run.text.slice(-120).replace(/\s+/g, " ")).slice(0, 240).replace(/\|/g, "/")} | ${run.challenge ?? ""} |`);
+      const run = cell(detectorCode(site), {
+        ...options,
+        timeoutSeconds: Math.ceil(site.waitMs / 1000) + 90,
+      });
+      results.detectors.push({
+        id: site.id,
+        ...(run.value ?? { error: run.text.slice(-600) }),
+        challenge: run.challenge,
+      });
+      summary.push(
+        `| ${site.id} | ${JSON.stringify(
+          run.value?.verdict ?? run.text.slice(-120).replace(/\s+/g, " "),
+        )
+          .slice(0, 240)
+          .replace(/\|/g, "/")} | ${run.challenge ?? ""} |`,
+      );
     }
     summary.push("");
   }
   if (!only || only === "sweep") {
-    const urls = values["sweep-file"] ? JSON.parse(fs.readFileSync(values["sweep-file"], "utf8")) : SWEEP;
+    const urls = values["sweep-file"]
+      ? JSON.parse(fs.readFileSync(values["sweep-file"], "utf8"))
+      : SWEEP;
     results.sweep = [];
     for (const url of urls) {
       process.stderr.write(`sweep: ${url}\n`);
       const run = cell(sweepCode(url), { ...options, timeoutSeconds: 60 });
       const status = run.challenge ? "bot wall" : run.ok ? "open" : "error";
-      results.sweep.push({ url, status, challenge: run.challenge, ...(run.value ?? { error: run.text.slice(-300) }) });
+      results.sweep.push({
+        url,
+        status,
+        challenge: run.challenge,
+        ...(run.value ?? { error: run.text.slice(-300) }),
+      });
     }
     const walled = results.sweep.filter((item) => item.status === "bot wall");
-    summary.push("## Sweep", "", `${results.sweep.filter((item) => item.status === "open").length} of ${results.sweep.length} open; walled: ${walled.map((item) => item.url).join(", ") || "none"}; errors: ${results.sweep.filter((item) => item.status === "error").map((item) => item.url).join(", ") || "none"}`, "");
+    summary.push(
+      "## Sweep",
+      "",
+      `${results.sweep.filter((item) => item.status === "open").length} of ${results.sweep.length} open; walled: ${walled.map((item) => item.url).join(", ") || "none"}; errors: ${
+        results.sweep
+          .filter((item) => item.status === "error")
+          .map((item) => item.url)
+          .join(", ") || "none"
+      }`,
+      "",
+    );
   }
   results.finishedAt = new Date().toISOString();
   fs.writeFileSync(path.join(out, "results.json"), JSON.stringify(results, null, 2) + "\n");
@@ -259,4 +325,5 @@ async function main() {
   process.stdout.write(summary.join("\n") + "\n" + out + "\n");
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  await main();

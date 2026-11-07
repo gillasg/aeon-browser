@@ -146,3 +146,38 @@ test("import writes site files, enables skills, and returns boosts disabled", as
   );
   assert.deepEqual(skillsForSite(pack.skills, "other.example"), []);
 });
+
+// Found building an eval task: export left the abilities out, so a pack arrived with none.
+test("a pack carries the site's abilities and notes, and installs them", async (t) => {
+  const home = await temp(t);
+  const site = join(home, "sites", "depot.example");
+  await write(join(site, "model.json"), { site: "depot.example", operations: [] });
+  await write(join(site, "notes.md"), "Stock is only in the API.");
+  const ability = {
+    name: "depotStock",
+    site: "depot.example",
+    kind: "read",
+    inputs: {},
+    ways: [{ kind: "script", runtime: "node", code: "return { count: 3 };" }],
+    options: {},
+    stats: { runs: 0, failures: 0 },
+    createdBy: "agent",
+    createdAt: "2026-11-01T00:00:00Z",
+    updatedAt: "2026-11-01T00:00:00Z",
+  };
+  await write(join(site, "abilities", "depotstock.json"), ability);
+  await write(join(site, "abilities", "migration.json"), { done: true });
+  process.env.SITE_TO_API_HOME = home;
+  const out = join(home, "depot.zip");
+  const exported = await exportSitePack({ site: "depot.example", out });
+  assert.ok(exported.files.includes("abilities/depotstock.json"), exported.files.join(", "));
+  assert.ok(exported.files.includes("notes.md"));
+  assert.ok(!exported.files.includes("abilities/migration.json"));
+  const target = await temp(t);
+  process.env.SITE_TO_API_HOME = target;
+  await installSitePack(await readSitePack(out));
+  const installed = JSON.parse(
+    await readFile(join(target, "sites", "depot.example", "abilities", "depotstock.json"), "utf8"),
+  );
+  assert.equal(installed.name, "depotStock");
+});

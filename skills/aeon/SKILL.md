@@ -116,7 +116,7 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   in place, all at once with `Promise.all`, navigating them too when the task is about them; for
   anything else open your own tab, so what the user is watching stays put.
 - `bu.state()` prints `[id] role "name" = value` and visible text (`*` marks changes; scope with
-  `{selector}` or `{query}`). Act on apps that redraw themselves by visible text, role or bu id,
+  `{selector}` or `{query}`), led by any text the user selected on the page. Act on apps that redraw themselves by visible text, role or bu id,
   never `document.querySelector`. Controls inside a cross-origin iframe appear under their iframe
   with a frame prefix (`f2:e14`); acting on one goes through that frame, and
   `bu.state({root: "f2:e14"})` / `page.snapshot({root})` scopes to that subtree (an iframe ref
@@ -267,12 +267,17 @@ aeon abilities test shop.example search  # its stored cases; fails on constant o
 - **A `[site]` line** appears when you open a mapped site: it names the site's abilities and API
   reads. Use them instead of clicking through the pages.
 - **A `[site] … not learned yet` line** appears after 90 s of page work on a site with no
-  abilities or API reads: end your answer with the one-line offer it gives, and learn the site
-  (`abilities build`) if the user says yes.
+  abilities or API reads: end your answer with the one-line offer it gives, and save the task as
+  an ability (`abilities build`, which learns the site's API on the way) if the user says yes.
+  Learning a site maps what it can do; an ability is one task saved to run in one call.
 - **Built-in abilities** come with AI sites, Gemini and X (`ask`, `make_image`, `thread`,
   `research`…; see AI sites below). A saved ability with the same name replaces one.
 - **Anything can be an ability:** an API call or chain, a workflow of steps, a script (node or in
-  the page), or a page read. Save whatever you will do again on a site.
+  the page), or a page read. Save whatever you will do again on a site. Ways run in order, each the
+  fallback for the one before: an `api` way first when a learned operation answers the task (no
+  tab, fastest), then a page way (`page` collect for lists, a `page` script when the data only
+  exists rendered) so a changed API still works; `steps` for click flows with no clean API (forms,
+  wizards, anything that pays or posts); a `node` script to combine several calls.
 - **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
   `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.

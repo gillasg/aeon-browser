@@ -12,6 +12,11 @@ import { readJournal } from "./host.js";
 
 const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url }))`;
 
+/** What `aeon repl` prints: the cell's log, then its value. */
+export function replText(cell: { output?: string; value?: unknown }): string {
+  return [cell.output?.trimEnd(), cellText(cell.value)].filter(Boolean).join("\n");
+}
+
 function cellText(value: unknown): string {
   if (value === undefined) return "";
   if (typeof value === "string") return value;
@@ -70,13 +75,16 @@ async function repl(host: DaemonHost, args: Args): Promise<number> {
   // Seconds, as the help says; 500ms and 2s also read as written.
   const timeout = timeoutMs(flag(args, "timeout"));
   try {
-    const value = await host.runInBrowser(code, {
+    const cell = await host.runCell(code, {
       ...where,
       ...(timeout ? { timeoutMs: timeout } : {}),
     });
-    if (!has(args, "quiet")) out(cellText(value));
+    // What the cell logged comes first, then its value, as in the engine's own repl.
+    if (!has(args, "quiet")) out(replText(cell));
     return 0;
   } catch (error) {
+    const logged = (error as { output?: string }).output?.trimEnd();
+    if (logged && !has(args, "quiet")) out(logged);
     // A timed-out cell can leave its tabs and jobs behind: close the session's own.
     if (timeout && /timed?\s?out|timeout/i.test(String(error)))
       await host
