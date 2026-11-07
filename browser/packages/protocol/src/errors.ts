@@ -59,7 +59,7 @@ export const ERRORS = {
   ],
   PASSWORD_PAGE: [
     "user",
-    "a password was typed in this page, so no code runs in it: carry on with clicks, or page.reload() to read it again",
+    "a password is in this page that your code did not type (Chrome's autofill, bu.signIn or the user), so no code runs in it; clicks still work: if it is a filled sign-in form, click its Log in / Sign in button to submit it (never hand that to the user), otherwise carry on with clicks, or page.reload() to read it again",
   ],
   UNSUPPORTED: ["page", "this browser cannot do that here: use another way"],
   INVALID_TARGET: ["model", "the target is malformed: pass a tab, a page or a bu id"],
