@@ -212,17 +212,15 @@ const boxActions = {
   submit: noop,
   close: noop,
   toSidePanel: noop,
-  toTab: noop,
   toggleLearning: noop,
 };
 const boxModel = {
   host: "x.com",
   chatId: undefined,
-  chatUrl: "",
   notice: "",
+  ask: "",
   busy: false,
   learning: false,
-  pending: "",
   chats: [{ chatId: "c1", title: "Tokyo flight", updatedAt: "2026-10-28T10:00:00.000Z" }],
   context: [{ tabId: 7, title: "Home / X", host: "x.com" }],
   tabChoices: null,
@@ -230,7 +228,7 @@ const boxModel = {
   needs: new Set(),
 };
 
-test("the orb box composes until a chat exists, then frames that chat with hand-off buttons", async () => {
+test("the cursor's box always composes: a chat continues there and its transcript opens in the side panel", async () => {
   const view = await loadModule("orb-view.tsx");
   const compose = renderToStaticMarkup(
     createElement(view.OrbBox, { model: boxModel, actions: boxActions }),
@@ -261,30 +259,25 @@ test("the orb box composes until a chat exists, then frames that chat with hand-
     /<button[^>]*title="x.com"/,
     "tabs already chosen are not offered again",
   );
+  // With a chat, the box still only composes: the next message goes to that chat, and the
+  // transcript is one click away in the side panel, never framed in the box.
   const chat = renderToStaticMarkup(
+    createElement(view.OrbBox, { model: { ...boxModel, chatId: "c1" }, actions: boxActions }),
+  );
+  assert.match(chat, /data-state="compose"/);
+  assert.doesNotMatch(chat, /<iframe/);
+  assert.match(chat, /Reply to Aeon/);
+  assert.match(chat, /Open the transcript in the side panel/);
+  assert.match(chat, /New chat/);
+  // A question shows above the field, and the answer is typed right there.
+  const ask = renderToStaticMarkup(
     createElement(view.OrbBox, {
-      model: {
-        ...boxModel,
-        chatId: "c1",
-        chatUrl: "chrome-extension://x/chat.html?chatId=c1&host=panel",
-      },
+      model: { ...boxModel, chatId: "c1", ask: "Which size?" },
       actions: boxActions,
     }),
   );
-  assert.match(chat, /data-state="chat"/);
-  assert.match(chat, /<iframe[^>]+chat\.html\?chatId=c1/);
-  assert.match(chat, /Move to side panel/);
-  assert.match(chat, /Open in a tab/);
-  assert.match(chat, /Tokyo flight/, "the switcher names the chat");
-  assert.match(chat, /New chat/);
-  assert.doesNotMatch(chat, /Run again/);
-  // A message just sent shows at once, before the chat exists.
-  const pending = renderToStaticMarkup(
-    createElement(view.OrbBox, { model: { ...boxModel, pending: "Book it" }, actions: boxActions }),
-  );
-  assert.match(pending, /data-state="chat"/);
-  assert.match(pending, /Book it/);
-  assert.match(pending, /Starting/);
+  assert.match(ask, /Which size\?/);
+  assert.match(ask, /Type the answer here/);
 });
 
 test("the orb's position defaults to bottom-left and ignores junk", async () => {

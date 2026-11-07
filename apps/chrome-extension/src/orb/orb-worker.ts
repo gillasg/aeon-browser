@@ -1,5 +1,8 @@
+import { chatUrl, findExistingChat } from "../native-worker-tabs.js";
+import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
 import {
+  CURSOR_TRANSCRIPT,
   ORB_COMMAND,
   ORB_DISMISS,
   ORB_OFF,
@@ -30,6 +33,10 @@ export function installOrb(): void {
     }
     if (message?.kind === ORB_OFF) {
       void setOn(false);
+      return;
+    }
+    if (message?.kind === CURSOR_TRANSCRIPT && sender.tab) {
+      openTranscript(sender.tab);
       return;
     }
     if (message?.kind !== "aeon.orb.verify") return;
@@ -99,6 +106,45 @@ async function setOn(on: boolean): Promise<void> {
       void chrome.tabs
         .sendMessage(tab.id, { kind: ORB_DISMISS }, { frameId: 0 })
         .catch(() => undefined);
+}
+
+/**
+ * The cursor's ☰: this tab's chat in the side panel beside it (the cursor never shows the
+ * transcript itself), showing the chat this tab's cursor started; for a run started elsewhere the
+ * side panel opens on the chat it already shows. Without the side panel (Chrome refused it), the
+ * chat opens in a tab.
+ */
+function openTranscript(tab: chrome.tabs.Tab): void {
+  if (tab.id === undefined) return;
+  const tabId = tab.id;
+  // Must run before any await: opening the side panel needs the click's user gesture.
+  const opened = chrome.sidePanel.open({ tabId });
+  void chatForTab(tabId).then(async (chatId) => {
+    if (!chatId) return;
+    await chrome.storage.session
+      .set({ [sidePanelSelectionKey(tab.windowId)]: chatId })
+      .catch(() => undefined);
+    await opened.catch(async () => {
+      const existing = await findExistingChat(chatId);
+      if (existing?.id !== undefined) await chrome.tabs.update(existing.id, { active: true });
+      else
+        await chrome.tabs.create({
+          url: chatUrl(chatId),
+          windowId: tab.windowId,
+          index: tab.index + 1,
+        });
+    });
+  });
+}
+
+async function chatForTab(tabId: number): Promise<string | undefined> {
+  const key = "aeon-orb-chat:" + tabId;
+  const values = (await chrome.storage.session.get(key).catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  const stored = values[key];
+  return typeof stored === "string" && stored ? stored : undefined;
 }
 
 async function nonceFor(tabId: number): Promise<string> {

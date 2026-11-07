@@ -8,11 +8,11 @@ export const TOUR_KEY = "aeonTour";
 const STEPS: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: "Call Aeon on any page",
-    body: "Press Ctrl+Shift+Space on any page. Aeon opens bottom-left with the page as context; press it again to close.",
+    body: "Press Ctrl+Shift+Space on any page. the Aeon cursor opens with the page as context; press it again to close.",
   },
   {
     title: "Watch it work",
-    body: "A purple glow marks every tab Aeon works in. Drag the orb anywhere, or move the chat to the side panel.",
+    body: "A soft glow marks every tab Aeon works in. Drag the cursor anywhere; ☰ on its pill opens the transcript in the side panel.",
   },
   {
     title: "Chrome's “acting in this tab” bar is normal",

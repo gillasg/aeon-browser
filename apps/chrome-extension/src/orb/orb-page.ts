@@ -5,15 +5,21 @@ import { openExtensionChat } from "../ui-connection.js";
 import { watchChatRunState } from "../chat-run-state.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { markSeen, setNeeds } from "./orb-control.js";
-import type { OrbToContent, OrbVerify, OrbVisualState } from "./orb-messages.js";
+import {
+  CURSOR_STOP,
+  type OrbToContent,
+  type OrbVerify,
+  type OrbVisualState,
+} from "./orb-messages.js";
 import { applyEvent, cursorSteps, initialRun, spotlightBox, type OrbRun } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
 import { OrbBox, type OrbTab, type OrbViewModel } from "./orb-view.js";
 
-// orb.html: the orb's box. Framed by the content script. Starts the chat, then shows it (the same
-// chat page the side panel shows, in its compact orb mode) and keeps following its events to drive
-// the swarm. Each tab's orb keeps its own chat. A tab that never had one shows the chat last used
+// orb.html: the cursor's ask box. Framed by the content script. Starts the chat (or sends the
+// next message in it), folds back to the cursor, and keeps following the chat's events to drive the
+// cursor's pill. The transcript is never shown here: ☰ opens it in the side panel. Each tab's
+// cursor keeps its own chat. A tab that never had one shows the chat last used
 // in the orb, but only until the orb is closed there: opened again, it starts fresh, so a message
 // never lands in work running in another tab. The switcher shows another chat; + starts a new one.
 
@@ -24,11 +30,10 @@ const root = document.getElementById("root") as HTMLElement;
 const model: OrbViewModel = {
   host: "",
   chatId: undefined,
-  chatUrl: "",
   notice: "",
+  ask: "",
   busy: false,
   learning: false,
-  pending: "",
   chats: [],
   context: [],
   tabChoices: null,
@@ -77,7 +82,6 @@ async function boot(): Promise<void> {
   watchChatRunState((state) => {
     model.running = state.running;
     model.needs = state.needs;
-    toContent({ kind: "aeon.orb.agents", count: state.running.size });
     render();
   });
   await connectSession();
@@ -89,7 +93,7 @@ async function boot(): Promise<void> {
   });
   const remembered = await rememberedChat();
   bootedAt = Date.now();
-  if (remembered.chatId && !model.chatId && !model.pending) {
+  if (remembered.chatId && !model.chatId) {
     await selectChat(remembered.chatId, false);
     borrowed = remembered.borrowed;
   }
@@ -127,9 +131,7 @@ async function selectChat(chatId: string | undefined, store = true): Promise<voi
   sentActions = 0;
   lastVisual = "";
   lastState = "";
-  model.pending = "";
   model.chatId = chatId;
-  model.chatUrl = chatId ? chatUrlFor(chatId) : "";
   model.tabChoices = null;
   if (store) remember(chatId);
   render();
@@ -178,8 +180,10 @@ function listen(): void {
   });
   addEventListener("pagehide", () => void setNeeds(tabId, false));
   chrome.runtime.onMessage.addListener(
-    (message: { kind?: string; tabId?: number; control?: string }) => {
+    (message: { kind?: string; tabId?: number; control?: string }, sender) => {
       if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) reopened();
+      // The cursor's ■ in this tab stops this cursor's chat.
+      if (message?.kind === CURSOR_STOP && sender.tab?.id === tabId) void session.stop();
       // The engine says when the user takes this tab over; the swarm rests until it's given back.
       if (message?.kind === "browserkit.control" && message.tabId === tabId) {
         userControl = message.control === "user";
@@ -189,10 +193,10 @@ function listen(): void {
   );
 }
 
-// The message shows at once; the chat is created and framed behind it.
+// Sent, the box folds back to the cursor, whose pill carries the run. A chat this cursor already
+// has gets the message as its next turn; otherwise a new chat starts with this tab as context.
 async function submit(text: string): Promise<void> {
   model.busy = true;
-  model.pending = text;
   model.tabChoices = null;
   borrowed = false;
   run = initialRun();
@@ -200,37 +204,33 @@ async function submit(text: string): Promise<void> {
   render();
   sync();
   playSound("start");
+  clearPrompt();
+  toContent({ kind: "aeon.orb.hide", keepRunning: true });
   try {
-    await session.start(
-      text,
-      model.context.map((tab) => tab.tabId),
-      (chatId) => {
-        model.chatId = chatId;
-        model.chatUrl = chatUrlFor(chatId);
-        remember(chatId);
-        render();
-        // If the chat's own events are slow to arrive, the framed chat takes over anyway.
-        globalThis.setTimeout(shown, 8000);
-      },
-    );
+    if (model.chatId && session.chatId === model.chatId) await session.again(text);
+    else
+      await session.start(
+        text,
+        model.context.map((tab) => tab.tabId),
+        (chatId) => {
+          model.chatId = chatId;
+          remember(chatId);
+          render();
+        },
+      );
   } catch (error) {
     run = undefined;
-    model.pending = "";
     notice(messageOf(error));
+    visual("error", "Couldn't send: " + messageOf(error));
   } finally {
     model.busy = false;
     render();
   }
 }
 
-function chatUrlFor(chatId: string): string {
-  return `${chrome.runtime.getURL("chat.html")}?chatId=${encodeURIComponent(chatId)}&host=orb`;
-}
-
 /** A snapshot replaces the run, so the orb shows what the chat page shows; steps it already
  * played do not move the cursor again. */
 function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
-  if (entries.length) shown();
   run = initialRun();
   for (const entry of entries) onEvent({ kind: "entry-added", entry }, false);
   onEvent({ kind: "run-state", state: runState as "idle" }, false);
@@ -257,17 +257,9 @@ async function reconnectSession(): Promise<void> {
   notice("");
 }
 
-// The sent message stays over the box until the chat has something of its own to show.
-function shown(): void {
-  if (!model.pending) return;
-  model.pending = "";
-  render();
-}
-
 function onEvent(event: PiSessionEventDto, refresh = true): void {
-  if (event.kind === "entry-added") shown();
   if (session.chatId) logApiWrites(event, { chatId: session.chatId, task: "" });
-  // A follow-up typed in the framed chat starts a new run in the same chat.
+  // A follow-up (from the box or the side panel) starts a new run in the same chat.
   if (!run || (event.kind === "run-state" && event.state === "running-unconfirmed" && done(run))) {
     run = initialRun();
     sentActions = 0;
@@ -286,6 +278,12 @@ function done(current: OrbRun): boolean {
 function sync(): void {
   if (!run) return;
   const state = visualState(run);
+  const ask = run.status === "needs" ? run.label : "";
+  if (ask !== model.ask) {
+    model.ask = ask;
+    render();
+    if (ask) focusPrompt();
+  }
   visual(state, run.label);
   sendNewActions(run);
   if (run.status === "needs" && !userControl)
@@ -312,8 +310,6 @@ function sendNewActions(current: OrbRun): void {
   const steps = cursorSteps(fresh, tabId);
   sentActions = current.actions.length;
   if (steps.length && !userControl) toContent({ kind: "aeon.orb.cursor", steps });
-  // Steps in the agent's own tab (not this page) show as sparks toward the tab strip.
-  else if (fresh.some((action) => !action.failed)) toContent({ kind: "aeon.orb.elsewhere" });
 }
 
 function visualState(current: OrbRun): OrbVisualState {
@@ -357,8 +353,9 @@ function toSidePanel(): void {
       chrome.storage.session.set({ [sidePanelSelectionKey(current.windowId)]: chatId }),
     )
     .catch(() => undefined);
+  // The cursor stays: only the transcript moves to the side panel.
   void opened.then(
-    () => toContent({ kind: "aeon.orb.hide", keepRunning: false }),
+    () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
     () => toTab(),
   );
 }
@@ -367,7 +364,7 @@ function toTab(): void {
   const chatId = session.chatId;
   if (!chatId) return;
   void openExtensionChat(chatId).catch(() => undefined);
-  toContent({ kind: "aeon.orb.hide", keepRunning: false });
+  toContent({ kind: "aeon.orb.hide", keepRunning: true });
 }
 
 /** Open tabs that can be pages for the message (the + list). */
@@ -408,9 +405,7 @@ function view(): ReactNode {
       selectChat: (chatId) => void selectChat(chatId),
       newChat: () => void selectChat(undefined),
       loadChats: () => void loadChats(),
-      chatShown: () => undefined,
       toSidePanel,
-      toTab,
       toggleLearning: () => void toggleLearning(),
       pickTabs: () => void pickTabs(),
       addContext: (id) => void addContext(id),
@@ -437,6 +432,11 @@ function reportSize(): void {
 
 function toContent(message: OrbToContent): void {
   void chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => undefined);
+}
+
+function clearPrompt(): void {
+  const prompt = document.getElementById("prompt") as HTMLTextAreaElement | null;
+  if (prompt) prompt.value = "";
 }
 
 function focusPrompt(): void {

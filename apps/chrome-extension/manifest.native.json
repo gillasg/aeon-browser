@@ -63,7 +63,7 @@
       "suggested_key": {
         "default": "Ctrl+Shift+Space"
       },
-      "description": "Summon the Aeon orb"
+      "description": "Summon the Aeon cursor"
     }
   },
   "content_scripts": [
