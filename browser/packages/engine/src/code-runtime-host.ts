@@ -19,7 +19,7 @@ import { stepFailure } from "./code-step-errors.js";
 import { jobs } from "./code-runtime-jobs.js";
 import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
-import { noteAgentText } from "./native-browser-password-lock.js";
+import { agentTypedIn, noteAgentText } from "./native-browser-password-lock.js";
 import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
 import { browserSessionOwner } from "./native-browser-session.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
@@ -395,7 +395,10 @@ const SAVE_ANSWER_WAIT_MS = 1500;
 
 /** Keeps a password a person typed, and matches Chrome's own save offer to the profile's manager. */
 async function beforeSubmit(cell: Cell, tabId: number): Promise<void> {
-  await captureTypedPassword(tabId).catch(() => undefined);
+  // Probing attaches the debugger, which costs a click its popup: skip tabs the agent typed nothing
+  // in (a person's login during a hand-off is caught by the hand-off itself).
+  if (agentTypedIn(tabId) && !vaultCandidate(tabId))
+    await captureTypedPassword(tabId).catch(() => undefined);
   const candidate = vaultCandidate(tabId);
   if (candidate)
     await matchChromeSaving((request) => callCore(cell, request), candidate.url).catch(
