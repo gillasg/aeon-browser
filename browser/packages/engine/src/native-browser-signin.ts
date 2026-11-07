@@ -12,6 +12,7 @@ import { rememberSecrets } from "./native-browser-secrets.js";
 import { finishSignIn, prepareSignIn } from "./native-browser-password-lock.js";
 import { messagesSnapshot, waitForInboxCode } from "./native-browser-inbox-code.js";
 import { chromeFill, inFront } from "./native-browser-signin-chrome.js";
+import { chooserShown, passAccountChooser } from "./native-browser-signin-chooser.js";
 
 // bu.signIn(): sign in to the page the agent is on with a login from the user's password
 // manager. The machine looks the login up by the tab's real address; the engine types it into
@@ -68,6 +69,8 @@ interface Attempt {
   ask: Ask;
   url: string;
   inbox: Inbox;
+  /** The account the agent asked for, used to pick it on an account chooser. */
+  account?: string | undefined;
 }
 const MAX_STAGES = 4;
 const APPROVE_WAIT_MS = 60_000;
@@ -89,7 +92,7 @@ export async function signInToPage(
   const chosen = pickLogin(site, answer, account);
   if (!("login" in chosen))
     return CHROME_FALLBACK.has(chosen.reason)
-      ? signInWithChrome(tabId, { ask, url, inbox }, chosen)
+      ? signInWithChrome(tabId, { ask, url, inbox, account }, chosen)
       : chosen;
   const { login, provider } = chosen;
   const base = { site, provider, account: login.username || login.name };
@@ -97,7 +100,7 @@ export async function signInToPage(
   if (scripts)
     return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
   rememberSecrets([login.password]);
-  const result = await fill(tabId, { login, ask, url, inbox }, base);
+  const result = await fill(tabId, { login, ask, url, inbox, account }, base);
   if (result.signedIn) await finishSignIn(tabId);
   return result;
 }
@@ -154,10 +157,40 @@ function pickLogin(
 
 type Base = Pick<SignInResult, "site" | "provider" | "account">;
 
+function hasForm(fields: SignInFields | undefined): fields is SignInFields {
+  return Boolean(fields && (fields.user || fields.password || fields.code));
+}
+
+/** The sign-in form, after getting past an account chooser when one stands in front of it. */
+async function openForm(
+  tabId: number,
+  attempt: Attempt,
+  base: Base,
+): Promise<SignInFields | SignInResult> {
+  const fields = await scanFields(tabId);
+  if (hasForm(fields)) return fields;
+  const chooser = await passAccountChooser(tabId, attempt.account ?? attempt.login?.username);
+  if (chooser.kind === "choose")
+    return {
+      ...base,
+      signedIn: false,
+      reason: "CHOOSE_ACCOUNT",
+      accounts: chooser.accounts,
+      detail: "the page lists remembered accounts: call bu.signIn({account}) with one of them",
+    };
+  if (chooser.kind === "picked") {
+    if (!base.account && chooser.account) base.account = chooser.account;
+    if (hasForm(chooser.fields)) return chooser.fields;
+    // Picking the account signed straight in (the session was still good).
+    if (!(await chooserShown(tabId))) return { ...base, signedIn: true };
+  }
+  return { ...base, signedIn: false, reason: "NO_SIGN_IN_FORM" };
+}
+
 async function fill(tabId: number, attempt: Attempt, base: Base): Promise<SignInResult> {
-  let fields = await scanFields(tabId);
-  if (!fields || !(fields.user || fields.password || fields.code))
-    return { ...base, signedIn: false, reason: "NO_SIGN_IN_FORM" };
+  const opened = await openForm(tabId, attempt, base);
+  if ("signedIn" in opened) return opened;
+  let fields: SignInFields | undefined = opened;
   if (fields.foreign)
     return { ...base, signedIn: false, reason: "FOREIGN_FORM", detail: fields.foreign };
   for (let stage = 0; stage < MAX_STAGES && fields; stage++) {

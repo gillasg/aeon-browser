@@ -197,7 +197,8 @@ export const ERROR_ALIASES: Readonly<Record<string, ErrorCode>> = {
 
 /** The shared code a message leads with ("TARGET_BLOCKED: covered by …"), aliases included. */
 export function leadingCode(message: string): ErrorCode | undefined {
-  const head = /^([A-Z_]+)(?::|\s|$)/.exec(message)?.[1] ?? "";
+  // A rethrown error can arrive wrapped ("Error: TARGET_NOT_FOUND: …"): the code still leads.
+  const head = /^(?:(?:Error|TypeError): )*([A-Z_]+)(?::|\s|$)/.exec(message)?.[1] ?? "";
   return isErrorCode(head) ? head : ERROR_ALIASES[head];
 }
 
@@ -215,6 +216,10 @@ export function classifyError(error: unknown, source: ErrorSource = "tool"): Err
   const message = error instanceof Error ? error.message : String(error);
   const named = leadingCode(message);
   if (named) return named;
+  // A JavaScript mistake is never a page condition, whatever words it holds ("waitForTimeout is
+  // not a function" is not a timeout).
+  if (jsErrorName(error) || JS_ERROR.test(message))
+    return source === "model-code" ? "CODE_ERROR" : "INTERNAL";
   for (const [pattern, code] of NAMED) if (pattern.test(message)) return code;
   // Anything else thrown inside the model's browser code without a code is that code's failure:
   // its own throw, or a browser-code helper refusing the input it was given.

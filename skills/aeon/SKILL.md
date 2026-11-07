@@ -199,7 +199,8 @@ await bu.signIn({ account: "me@example.com" });
 
 It fills the username, password and the one-time code (the password manager's, else one the site
 just sent to the user's Gmail or Google Messages), across
-multi-step forms. With no external manager, or no login saved in it for the site, it uses the
+multi-step forms, and past an account chooser (a list of remembered accounts): it clicks `account`, or
+the only one listed. With no external manager, or no login saved in it for the site, it uses the
 first login Chrome itself saved for the site (`provider: "chrome"`; `account` cannot pick one
 there, so hand off when it is the wrong account). You never see the password or the code, and there is no approval step: calling it
 signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`, `CHOOSE_ACCOUNT`
