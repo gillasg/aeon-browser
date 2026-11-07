@@ -16,6 +16,7 @@ import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { siteMapperRequest } from "./site-browser.js";
 import { tallyCell, writeRunLog } from "./run-log.js";
+import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
@@ -196,14 +197,9 @@ async function browserCodeResult(options: {
   // The run log grows with every cell; this result names it for the model and the trace.
   const runLog = await cellRunLog(chatId, workspace, files, cell);
   const failed = Boolean(cell.error);
-  const body = {
-    steps,
-    ...result,
-    ...(cell.reset ? { reset: true } : {}),
-    ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
-    ...(cell.tabStats ? { tabStats: cell.tabStats } : {}),
-    ...(runLog ? { runLog } : {}),
-  };
+  // Three tiny cells in a row get one line asking for fuller cells; an error never carries it.
+  const hint = failed ? undefined : noteBrowserCell(chatId, cellBehaviour(steps));
+  const body = resultBody({ cell, steps, result, runLog, hint, failed });
   const actions = traceActions(cell.steps ?? []);
   const details = resultDetails(actions, writes);
   const delivered = !failed && isDelivery(cell.value);
@@ -221,6 +217,27 @@ function isDelivery(value: unknown): boolean {
   return Boolean(
     record && typeof record === "object" && record.delivered === true && "answer" in record,
   );
+}
+
+/** Everything a cell's result carries besides the text: steps, value, output and what it left. */
+function resultBody(options: {
+  cell: CellOutput;
+  steps: Record<string, unknown>[];
+  result: { value: unknown; output: string };
+  runLog: string | undefined;
+  hint: string | undefined;
+  failed: boolean;
+}) {
+  const { cell, steps, result, runLog, hint, failed } = options;
+  return {
+    steps,
+    ...result,
+    ...(cell.reset ? { reset: true } : {}),
+    ...(failed ? { error: browserCodeError(cell.error, cell.detail) } : {}),
+    ...(cell.tabStats ? { tabStats: cell.tabStats } : {}),
+    ...(runLog ? { runLog } : {}),
+    ...(hint ? { hint } : {}),
+  };
 }
 
 /** What the trace keeps besides the text: the actions, the site API writes, the site that answered. */
@@ -298,6 +315,7 @@ function modelContent(body: {
   error?: string;
   reset?: boolean;
   runLog?: string;
+  hint?: string;
   tabStats?: {
     opened?: number;
     closed?: number;
@@ -314,6 +332,7 @@ function modelContent(body: {
   if (body.reset) parts.push("runtime reset: top-level variables are gone");
   if (body.tabStats) parts.push(tabLine(body.tabStats));
   if (body.runLog) parts.push("run log: " + body.runLog);
+  if (body.hint) parts.push("hint: " + body.hint);
   return [{ type: "text", text: parts.join("\n") }, ...images];
 }
 
