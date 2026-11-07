@@ -1,4 +1,4 @@
-import { hostOf, type Login, type SaveLogin } from "./match.js";
+import { hostOf, sameSite, type Login, type SaveLogin } from "./match.js";
 import { parseJson, runTool } from "./run.js";
 
 // Bitwarden through its official CLI, `bw`. The vault must be unlocked: the session key comes
@@ -8,6 +8,7 @@ interface BitwardenItem {
   id?: string;
   name?: string;
   type?: number;
+  revisionDate?: string;
   login?: {
     username?: string | null;
     password?: string | null;
@@ -33,6 +34,15 @@ export class Bitwarden {
 
   async saveLogin(login: SaveLogin): Promise<boolean> {
     const host = hostOf(login.url);
+    // The same account on the same site is updated in place (a new password), never duplicated.
+    const existing = host ? await this.sameAccount(host, login.username) : undefined;
+    if (existing?.id) {
+      if (existing.login?.password === login.password) return true;
+      const updated = { ...existing, login: { ...existing.login, password: login.password } };
+      const body = Buffer.from(JSON.stringify(updated), "utf8").toString("base64");
+      await this.run(["edit", "item", existing.id, body]);
+      return true;
+    }
     const item = {
       type: 1,
       name: login.name || host || "Saved login",
@@ -45,6 +55,22 @@ export class Bitwarden {
     const encoded = Buffer.from(JSON.stringify(item), "utf8").toString("base64");
     await this.run(["create", "item", encoded]);
     return true;
+  }
+
+  private async sameAccount(host: string, username: string): Promise<BitwardenItem | undefined> {
+    const items = parseJson(await this.run(["list", "items", "--url", "https://" + host]));
+    if (!Array.isArray(items)) return undefined;
+    const wanted = username.trim().toLowerCase();
+    const matches = (items as BitwardenItem[]).filter(
+      (item) =>
+        item.login &&
+        (item.login.username ?? "").trim().toLowerCase() === wanted &&
+        (item.login.uris ?? []).some((entry) => {
+          const saved = hostOf(entry.uri ?? "");
+          return saved !== undefined && sameSite(saved, host);
+        }),
+    );
+    return matches.sort((a, b) => (b.revisionDate ?? "").localeCompare(a.revisionDate ?? ""))[0];
   }
 
   async status(): Promise<string> {
@@ -67,5 +93,6 @@ function toLogin(item: BitwardenItem): Login {
     password: login.password ?? "",
     hasTotp: Boolean(login.totp),
     urls: (login.uris ?? []).map((entry) => entry.uri ?? "").filter(Boolean),
+    ...(item.revisionDate ? { updated: item.revisionDate } : {}),
   };
 }

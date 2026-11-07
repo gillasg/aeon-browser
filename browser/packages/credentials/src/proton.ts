@@ -82,6 +82,7 @@ function toLogin(node: Json, shareId: string | undefined): Login | undefined {
     password: text(content, ["password"]) ?? "",
     hasTotp: Boolean(text(content, ["totp", "totp_uri", "totpUri"])),
     urls: strings(content.urls ?? content.url ?? node.urls),
+    ...updatedOf(node),
   };
 }
 
@@ -134,4 +135,13 @@ function findCode(value: unknown): string | undefined {
     if (code) return code;
   }
   return undefined;
+}
+
+/** When the item last changed, under the names Proton uses for it. */
+function updatedOf(node: Json): { updated?: string | number } {
+  for (const key of ["modify_time", "modifyTime", "update_time", "updated_at", "revision_time"]) {
+    const value = node[key];
+    if (typeof value === "string" || typeof value === "number") return { updated: value };
+  }
+  return {};
 }

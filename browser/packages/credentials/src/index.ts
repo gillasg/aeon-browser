@@ -1,5 +1,5 @@
 import { activeProvider } from "./config.js";
-import { hostOf, loginsFor } from "./match.js";
+import { hostOf, loginsFor, newestPerAccount } from "./match.js";
 import { ToolMissing } from "./run.js";
 
 export {
@@ -52,7 +52,7 @@ export async function handleCredentialRequest(
 ): Promise<
   | LoginAnswer
   | { code: string | null }
-  | { saved: boolean; provider: string | null }
+  | { saved: boolean; provider: string | null; error?: LoginAnswer["error"] }
   | { provider: string | null }
 > {
   const host = hostOf(request.url);
@@ -74,12 +74,16 @@ export async function handleCredentialRequest(
         password: request.password,
       });
       return { saved: true, provider: provider.name };
-    } catch {
-      return { saved: false, provider: provider.name };
+    } catch (error) {
+      // Why it failed goes back, so the user is told what to do (unlock it) instead of waiting
+      // on a Chrome prompt that is switched off while a manager is set up.
+      // Only the reason: a CLI error can quote its own command line, which carries the password.
+      const { error: reason } = failure(provider.name, error);
+      return { saved: false, provider: provider.name, ...(reason ? { error: reason } : {}) };
     }
   }
   try {
-    const logins = loginsFor(await provider.logins(host), host, request.account);
+    const logins = newestPerAccount(loginsFor(await provider.logins(host), host, request.account));
     return {
       provider: provider.name,
       logins: logins.map(({ id, name, username, password, hasTotp }) => ({

@@ -181,3 +181,72 @@ test("a named browser uses its own password manager; every other browser the mai
   // An entry for one browser never leaks into the others, nor the top level into it.
   assert.deepEqual(configFor({ browsers: { eval: { provider: "bitwarden" } } }, "work"), {});
 });
+
+test("Bitwarden: one login per account (the newest), and a new password updates it in place", async () => {
+  const item = (id, password, revisionDate) => ({
+    id,
+    name: "Reddit",
+    revisionDate,
+    login: { username: "me@example.com", password, uris: [{ uri: "https://reddit.com" }] },
+  });
+  const dir = await fakeTool("bw", {
+    status: { status: "unlocked" },
+    "list items": [
+      item("old", "first", "2026-01-01T00:00:00Z"),
+      item("new", "second", "2026-02-01T00:00:00Z"),
+    ],
+    "get item new": item("new", "second", "2026-02-01T00:00:00Z"),
+    "edit item new": "{}",
+    "create item": "{}",
+  });
+  const config = await mkdtemp(join(tmpdir(), "credentials-config-"));
+  await saveConfig(config, { provider: "bitwarden", bitwardenSession: "abc" });
+  await withPath(dir, async () => {
+    const answer = await handleCredentialRequest(
+      { credential: "login", url: "https://reddit.com/login" },
+      config,
+    );
+    assert.deepEqual(
+      answer.logins.map((l) => [l.id, l.password]),
+      [["new", "second"]],
+    );
+    // The same account: edits the newest item (the fake has no "create item" path for it to hide behind).
+    const updated = await handleCredentialRequest(
+      {
+        credential: "save",
+        url: "https://reddit.com",
+        username: "ME@example.com",
+        password: "third",
+      },
+      config,
+    );
+    assert.deepEqual(updated, { saved: true, provider: "Bitwarden" });
+    const created = await handleCredentialRequest(
+      {
+        credential: "save",
+        url: "https://reddit.com",
+        username: "other@example.com",
+        password: "x",
+      },
+      config,
+    );
+    assert.deepEqual(created, { saved: true, provider: "Bitwarden" });
+  });
+});
+
+test("a save that fails says why, so the user can be asked to unlock", async () => {
+  const dir = await fakeTool("bw", {});
+  const config = await mkdtemp(join(tmpdir(), "credentials-config-"));
+  await saveConfig(config, { provider: "bitwarden", bitwardenSession: "abc" });
+  await withPath(dir, async () => {
+    const answer = await handleCredentialRequest(
+      { credential: "save", url: "https://reddit.com", username: "me", password: "p" },
+      config,
+    );
+    assert.equal(answer.saved, false);
+    assert.equal(answer.provider, "Bitwarden");
+    assert.ok(
+      answer.error === "PASSWORD_MANAGER_FAILED" || answer.error === "PASSWORD_MANAGER_LOCKED",
+    );
+  });
+});

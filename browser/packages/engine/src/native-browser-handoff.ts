@@ -3,6 +3,7 @@ import { guardAgentTab } from "./native-browser-tab-cleanup.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { handoffActive } from "./native-browser-control.js";
+import { noteUserLogin } from "./native-browser-vault.js";
 import {
   agentNeedsExpression,
   showAgentBadge,
@@ -82,6 +83,8 @@ export async function handOffToUser(
       if (!(await chrome.tabs.get(tabId).catch(() => undefined))) throw new Error("TARGET_LOST");
       const answered = answers.get(tabId);
       if (answered) return answered;
+      // A password the user types here is kept (never shown to the agent) so it can be saved.
+      await noteUserLogin(tabId);
       const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, STATE);
       if (state === "done" || state === "cancelled") return state;
       if (state === "fresh") {

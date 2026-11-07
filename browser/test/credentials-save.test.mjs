@@ -58,6 +58,10 @@ test("a failed save says so without echoing the password", async () => {
     "/tmp/unused",
     provider,
   );
-  assert.deepEqual(answer, { saved: false, provider: "Test Vault" });
+  assert.deepEqual(answer, {
+    saved: false,
+    provider: "Test Vault",
+    error: "PASSWORD_MANAGER_LOCKED",
+  });
   assert.ok(!JSON.stringify(answer).includes("vault-password-42"));
 });
