@@ -106,6 +106,7 @@ import {
 } from "./network-store.js";
 import { scheduleStep, schedulerStatus } from "./native-browser-scheduler.js";
 import { guardPageCode, notePlantedScript } from "./native-browser-password-lock.js";
+import { noteAgentClick, takeFedCmNote } from "./native-browser-fedcm.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 type Capability = Extract<
   BrowserStep,
@@ -546,11 +547,12 @@ async function executeStep(
   // into each other's page, and a session's own steps keep their order.
   return scheduleStep(step, step.target.tabId, async () => {
     stepInput(step.target.tabId, true);
+    if (step.op === "click" || step.op === "press") noteAgentClick(step.target.tabId);
     try {
       const result = await dispatchStep(request, step, tab).catch((error: unknown) =>
         closedByAction(request, step, tab, error),
       );
-      return withWaitNote(result, step.target.tabId);
+      return withFedCmNote(withWaitNote(result, step.target.tabId), step.target.tabId);
     } finally {
       stepInput(step.target.tabId, false);
     }
@@ -785,4 +787,12 @@ export async function executeLocalBrowserStep(
   } finally {
     completeBrowserRequest(request);
   }
+}
+
+/** What Aeon did with Chrome's own sign-in dialog rides on the next action's result. */
+function withFedCmNote(result: BrowserExecutorResult, tabId: number): BrowserExecutorResult {
+  if (result.kind !== "action") return result;
+  const note = takeFedCmNote(tabId);
+  if (!note) return result;
+  return { ...result, note: (result.note ? `${result.note} ${note}` : note).slice(0, 1000) };
 }
