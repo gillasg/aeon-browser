@@ -1,5 +1,4 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
 import {
   BrowserNotConnected,
   useBrowser,
@@ -7,7 +6,8 @@ import {
   type ModelLike,
 } from "@browserkit/tools/site-to-api";
 import { configureCliHost } from "browserkit/dist/host.js";
-import { AeonClient, dataDirectory } from "./client.js";
+import { AeonClient } from "./client.js";
+import { cellErrorMessage, journalPath, offline, runCellOn, type BrowserCell } from "./cell-run.js";
 
 // What browserkit's commands need from Aeon: the browser is the user's Chrome, reached through
 // the daemon's executor (the same runtime browser_code uses), and the model is Aeon's default.
@@ -15,12 +15,7 @@ import { AeonClient, dataDirectory } from "./client.js";
 // direct` and plain-HTTP reads work with Aeon closed, exactly like browserkit's own command line.
 
 type Json = Record<string, unknown>;
-export interface BrowserCell {
-  value?: unknown;
-  output?: string;
-  error?: string;
-  detail?: string;
-}
+export type { BrowserCell } from "./cell-run.js";
 
 export class DaemonHost {
   private client: AeonClient | undefined;
@@ -59,16 +54,7 @@ export class DaemonHost {
     // to reach the daemon for it. Only the crawler's own cleanup code looks like this.
     if (!this.browserUsed && code.startsWith("if (globalThis.__crawlTab)")) return { value: true };
     this.browserUsed = true;
-    const session = options.session ?? "cli";
-    const started = Date.now();
-    const client = await this.connect();
-    const result = (await client.browserRun({
-      code,
-      session,
-      ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
-      ...(options.browser ? { browser: options.browser } : {}),
-    })) as BrowserCell;
-    await this.record(session, result, Date.now() - started);
+    const result = await runCellOn(await this.connect(), code, options);
     if (result.error) throw Object.assign(browserError(result), { output: result.output });
     return result;
   }
@@ -110,50 +96,15 @@ export class DaemonHost {
     this.client = undefined;
     this.connecting = undefined;
   }
-
-  private async record(session: string, result: BrowserCell, durationMs: number): Promise<void> {
-    const preview =
-      result.error ??
-      result.detail ??
-      stringify(result.value) ??
-      result.output?.slice(0, 200) ??
-      "";
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
-      session,
-      isError: Boolean(result.error),
-      durationMs,
-      resultPreview: preview.slice(0, 200),
-    });
-    const file = journalPath();
-    await mkdir(dirname(file), { recursive: true });
-    await appendFile(file, line + "\n").catch(() => undefined);
-  }
-}
-
-function stringify(value: unknown): string | undefined {
-  if (value === undefined) return undefined;
-  try {
-    return JSON.stringify(value) ?? undefined;
-  } catch {
-    return String(value);
-  }
 }
 
 function browserError(result: BrowserCell): Error {
-  const code = result.error ?? "INTERNAL";
-  if (code === "BROWSER_OFFLINE" || code === "AMBIGUOUS_BROWSER") {
-    const detail =
-      code === "AMBIGUOUS_BROWSER"
-        ? "Several browsers are connected. Pick one with --browser <name> (see aeon browsers)."
-        : "Aeon's browser is not connected.";
-    // The site-to-api class carries the browser-offline exit code; say how Aeon recovers instead.
-    const error = new BrowserNotConnected(detail);
-    error.message =
-      code === "AMBIGUOUS_BROWSER" ? detail : `${detail} Open Chrome with Aeon loaded, then retry.`;
-    return error;
-  }
-  return new Error(result.detail ? `${code}: ${result.detail}` : code);
+  const message = cellErrorMessage(result);
+  if (!offline(result)) return new Error(message);
+  // The site-to-api class carries the browser-offline exit code; the message says how Aeon recovers.
+  const error = new BrowserNotConnected(message);
+  error.message = message;
+  return error;
 }
 
 /** The bridge site-to-api and browser-crawl use for their browser calls. */
@@ -174,7 +125,7 @@ export function installAeonCliHost(host: DaemonHost): void {
   });
 }
 
-export const journalPath = (): string => join(dataDirectory(), "cli-journal.jsonl");
+export { journalPath };
 
 export async function readJournal(
   session: string | undefined,

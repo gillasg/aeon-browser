@@ -55,11 +55,17 @@ function moduleSpecifiers(source) {
   return specifiers;
 }
 
+// Light entry points a package may expose beside its root: a constant a hot path needs without
+// loading the whole package (aeon repl starts ~100 ms faster without the protocol's schemas).
+const LIGHT_ENTRIES = ["@aeon/protocol/version"];
+
 for (const [name, relativePath] of packagePaths) {
   const packageRoot = join(root, relativePath);
   const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
   if (relativePath.startsWith("packages/")) {
-    const exports = Object.keys(manifest.exports ?? {});
+    const exports = Object.keys(manifest.exports ?? {}).filter(
+      (entry) => !LIGHT_ENTRIES.includes(`${name}/${entry.slice(2)}`),
+    );
     if (exports.length !== 1 || exports[0] !== ".") {
       violations.push(`${name} must expose only its package-root public API.`);
     }
@@ -75,7 +81,7 @@ for (const [name, relativePath] of packagePaths) {
         (candidate) => specifier === candidate || specifier.startsWith(`${candidate}/`),
       );
       if (targetName) {
-        if (specifier !== targetName) {
+        if (specifier !== targetName && !LIGHT_ENTRIES.includes(specifier)) {
           violations.push(`${relative(root, file)} deep-imports ${specifier}.`);
           continue;
         }
