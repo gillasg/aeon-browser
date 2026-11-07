@@ -6,7 +6,9 @@ async function __siteSkills(url) {
   var host; try { host = new URL(url).hostname; } catch { return []; }
   var cached = __skillCache.get(host);
   if (cached && Date.now() - cached.at < 60000) return cached.list;
-  var list = await __call({siteSkill:'list', url}).catch(() => []);
+  var answer = await __call({siteSkill:'list', url}).catch(() => []);
+  // A host without site skills answers something else: no skills, never a broken page read.
+  var list = Array.isArray(answer) ? answer : Array.isArray(answer && answer.skills) ? answer.skills : [];
   __skillCache.set(host, {at: Date.now(), list});
   return list;
 }

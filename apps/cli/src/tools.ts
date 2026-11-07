@@ -97,6 +97,7 @@ function fromPairs(pairs: string[]): Json {
 interface ToolInvocation {
   name: string;
   session: string;
+  browser?: string;
   input: Json;
   asJson: boolean;
   plain: boolean;
@@ -107,18 +108,24 @@ async function invocationOf(rest: string[]): Promise<ToolInvocation> {
   const [name, ...others] = rest;
   if (!name || !TOOL_NAMES.includes(name))
     throw new Error(
-      `Usage: aeon tool <${TOOL_NAMES.join("|")}> '<json>' [--session name] [--json]`,
+      `Usage: aeon tool <${TOOL_NAMES.join("|")}> '<json>' [--session name] [--browser name] [--json]`,
     );
-  const sessionIndex = others.indexOf("--session");
-  const session = (sessionIndex >= 0 ? others[sessionIndex + 1] : undefined) || "cli";
-  const ignored = new Set(["--json", "--no-color", "--plain", "--session"]);
-  const sessionValue = sessionIndex >= 0 ? sessionIndex + 1 : -1;
-  const inputs = others.filter((arg, index) => !ignored.has(arg) && index !== sessionValue);
+  const valueOf = (flag: string) => {
+    const index = others.indexOf(flag);
+    return index >= 0 ? { index: index + 1, value: others[index + 1] } : undefined;
+  };
+  const sessionFlag = valueOf("--session");
+  const browserFlag = valueOf("--browser");
+  const session = sessionFlag?.value || "cli";
+  const ignored = new Set(["--json", "--no-color", "--plain", "--session", "--browser"]);
+  const values = new Set([sessionFlag?.index, browserFlag?.index]);
+  const inputs = others.filter((arg, index) => !ignored.has(arg) && !values.has(index));
   const pairs = inputs.filter((arg) => /^[A-Za-z_]\w*=/.test(arg));
   const input = pairs.length ? fromPairs(pairs) : await readInput(inputs[0]);
   return {
     name,
     session,
+    ...(browserFlag?.value ? { browser: browserFlag.value } : {}),
     input,
     asJson: others.includes("--json"),
     plain: others.includes("--no-color") || !process.stdout.isTTY,
@@ -133,6 +140,7 @@ export async function runTool(client: AeonClient, rest: string[]): Promise<numbe
     tool: call.name,
     session: call.session,
     arguments: call.input,
+    ...(call.browser ? { browser: call.browser } : {}),
   });
   const content = (reply.content as Content[] | undefined) ?? [];
   const isError = reply.isError === true;

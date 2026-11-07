@@ -22,12 +22,14 @@ const MAX_WAIT_MS = 30 * 60_000;
 const KEY = "Symbol.for('aeon.handoff')";
 
 /**
- * The hand-off's state in the page: Done or Cancel in the cursor's pill sets it. "fresh" means a
- * new document (the site navigated), so the pill is shown again.
+ * The hand-off's state in the page: Done or Cancel in the cursor's pill sets it, and so does an
+ * answer typed into the pill instead ({answer}). "fresh" means a new document (the site
+ * navigated), so the pill is shown again.
  */
 const STATE = `(() => {
   const state = globalThis[${KEY}];
   if (state === "done" || state === "cancelled") return state;
+  if (state && typeof state === "object" && typeof state.answer === "string") return { answer: state.answer };
   if (!state) { globalThis[${KEY}] = "waiting"; return "fresh"; }
   return "waiting";
 })()`;
@@ -43,6 +45,15 @@ onEngineInstall(() => {
 });
 
 const CLEAR = `(() => { delete globalThis[${KEY}]; })()`;
+
+// What the user typed into the cursor's ask instead of acting in the tab, kept for the hand-off's
+// caller (bu.handoff returns it) until it is taken.
+const typed = new Map<number, string>();
+export function takeTypedAnswer(tabId: number): string | undefined {
+  const answer = typed.get(tabId);
+  typed.delete(tabId);
+  return answer;
+}
 
 /** Whether the user can see the tab now: active in a focused window, and not being recorded. */
 async function userSees(tabId: number, windowId: number): Promise<boolean> {
@@ -75,6 +86,7 @@ export async function handOffToUser(
       .catch(() => undefined);
   const deadline = Date.now() + MAX_WAIT_MS;
   answers.delete(tabId);
+  typed.delete(tabId);
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
   showAgentNeeds(tabId, message, spotlight);
@@ -87,6 +99,10 @@ export async function handOffToUser(
       await noteUserLogin(tabId);
       const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, STATE);
       if (state === "done" || state === "cancelled") return state;
+      if (typeof (state as { answer?: unknown } | null)?.answer === "string") {
+        typed.set(tabId, (state as { answer: string }).answer);
+        return "done";
+      }
       if (state === "fresh") {
         void showAgentBadge(tabId, true);
         await evaluate(tabId, agentNeedsExpression(message, spotlight)).catch(() => undefined);

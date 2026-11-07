@@ -19,7 +19,8 @@ import { attachDevChatCommands } from "./dev-chat-connection.js";
 import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
 import { handleBlockedSites } from "./core-blocked-sites.js";
-import { handleBrowsers, handleChatPin } from "./core-browsers.js";
+import { handleBrowsers, handleChatPin, pin } from "./core-browsers.js";
+import { sessionChatId } from "@aeon/pi-adapter";
 import { handleBrowserRun } from "./core-browser.js";
 import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
@@ -125,7 +126,9 @@ function authenticate(
         handleBlockedSites(socket, candidate, browser) ||
         handleBrowsers(socket, candidate, browser, directory) ||
         handleChatPin(socket, candidate, browser, directory) ||
-        handleToolRequest(socket, candidate, service),
+        handleToolRequest(socket, candidate, service, (session, name) =>
+          pin(browser, directory, sessionChatId("external", session), name),
+        ),
     );
   });
 }
@@ -214,7 +217,12 @@ function handleSettings(
   return true;
 }
 /** The chat tools for agents outside Aeon: listed, or called in a named session. */
-function handleToolRequest(socket: WebSocket, candidate: unknown, service: ChatService): boolean {
+function handleToolRequest(
+  socket: WebSocket,
+  candidate: unknown,
+  service: ChatService,
+  pinSession: (session: string, browser: string) => Promise<void>,
+): boolean {
   const request = CoreToolRequestSchema.safeParse(candidate);
   if (!request.success) return false;
   const { requestId } = request.data;
@@ -224,15 +232,17 @@ function handleToolRequest(socket: WebSocket, candidate: unknown, service: ChatS
     send({ tools: service.externalTools() });
     return true;
   }
-  const { tool, session } = request.data;
-  service.callExternalTool(tool, session, request.data.arguments).then(
-    (result) => send(result),
-    (error: unknown) =>
-      send({
-        content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
-        isError: true,
-      }),
-  );
+  const { tool, session, browser, arguments: input } = request.data;
+  (browser ? pinSession(session, browser) : Promise.resolve())
+    .then(() => service.callExternalTool(tool, session, input))
+    .then(
+      (result) => send(result),
+      (error: unknown) =>
+        send({
+          content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+          isError: true,
+        }),
+    );
   return true;
 }
 function equalToken(expected: string, actual: string): boolean {

@@ -155,7 +155,9 @@ function __resolveInPage(spec, within) {
       searchbox:'input[type=search],[role=searchbox]', heading:'h1,h2,h3,h4,h5,h6,[role=heading]', checkbox:'input[type=checkbox],[role=checkbox]',
       radio:'input[type=radio],[role=radio]', combobox:'select,[role=combobox]', option:'option,[role=option]', img:'img,[role=img]',
       listitem:'li,[role=listitem]', list:'ul,ol,[role=list]', row:'tr,[role=row]', cell:'td,[role=cell]', table:'table,[role=table]', tab:'[role=tab]', menuitem:'[role=menuitem]', dialog:'dialog,[role=dialog]'};
-    found = all(roles[spec.role] || '[role="' + spec.role + '"]');
+    // Like Playwright's getByRole: what the accessibility tree hides (display:none, visibility
+    // hidden, aria-hidden) is not a match, so first() lands on the copy the user can see.
+    found = all(roles[spec.role] || '[role="' + spec.role + '"]').filter((el) => !el.closest('[aria-hidden="true"]') && (!el.checkVisibility || el.checkVisibility({visibilityProperty: true})));
     var name = (el) => (el.getAttribute('aria-label') || text(el) || el.value || el.alt || el.title || '').replace(/\\s+/g, ' ').trim();
     if (pattern) found = found.filter((el) => pattern.test(name(el)));
     else if (spec.name) found = found.filter((el) => spec.exact ? name(el) === spec.name : name(el).toLowerCase().includes(spec.name.toLowerCase()));
@@ -189,16 +191,30 @@ function __locatorRead(target, element, index, op, arg) {
 }
 // An indexed locator (nth/first/last) cannot use the engine's unique-match targeting, so it is
 // clicked at the element's centre after scrolling it into view.
+// Like Playwright, it waits a moment for the element to be visible, and refuses a hidden one rather
+// than clicking empty space (a field collapsed behind a search button is 0×0).
 async function __clickIndexed(target, element, index, options) {
-  var box = await __locatorRead(target, element, index, (found) => {
-    var el = found[0];
-    if (!el) throw new Error('TARGET_NOT_FOUND: no element matches');
-    el.scrollIntoView({block: 'center', inline: 'center'});
-    var rect = el.getBoundingClientRect();
-    return {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2};
-  });
+  var box;
+  for (var waited = 0; ; waited += 250) {
+    box = await __locatorRead(target, element, index, (found) => {
+      var el = found[0];
+      if (!el) throw new Error('TARGET_NOT_FOUND: no element matches');
+      el.scrollIntoView({block: 'center', inline: 'center'});
+      var rect = el.getBoundingClientRect();
+      var hidden = !rect.width || !rect.height || getComputedStyle(el).visibility === 'hidden';
+      return {hidden, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2};
+    });
+    if (!box.hidden) break;
+    if (waited >= 2000) throw new Error('TARGET_HIDDEN: the element is not visible (0×0 or hidden); it may be collapsed behind a button or menu that opens it: open that first, then retry');
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
   var page = browser.page(target);
   return options && options.clickCount === 2 ? page.doubleClickAt(box.x, box.y) : page.clickAt(box.x, box.y);
+}
+// A fill is only done when the field reads back what was typed (Playwright's fill returns nothing).
+async function __checkFilled(target, element, index, value) {
+  var now = await __locatorRead(target, element, index, (found) => { var el = found[0]; return el ? ('value' in el ? String(el.value) : String(el.innerText || '')) : null; });
+  if (now !== null && value && !String(now).includes(value)) throw new Error('INPUT_FAILED: the field reads ' + JSON.stringify(String(now).slice(0, 80)) + ' after filling ' + JSON.stringify(value.slice(0, 80)) + ': check what has focus with bu.state()');
 }
 var __mouseAt = new Map();
 function __extendLocator(target, element, base, index) {
@@ -230,7 +246,7 @@ function __extendLocator(target, element, base, index) {
     ...(indexed ? {
       click: (options) => __clickIndexed(target, element, at0, options),
       dblclick: () => __clickIndexed(target, element, at0, {clickCount: 2}),
-      fill: async (value) => { await __clickIndexed(target, element, at0); await browser.page(target).keyboard('ControlOrMeta+a'); return browser.page(target).keyboard(String(value)); },
+      fill: async (value) => { await __clickIndexed(target, element, at0); await browser.page(target).keyboard('ControlOrMeta+a'); await browser.page(target).keyboard(String(value)); await __checkFilled(target, element, at0, String(value)); },
     } : {
       dblclick: async () => __clickIndexed(target, element, 0, {clickCount: 2}),
     }),

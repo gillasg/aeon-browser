@@ -198,16 +198,15 @@ function watchUserInput(): void {
   const report = (event: Event): void => {
     if (!event.isTrusted) return;
     if (
-      event
-        .composedPath()
-        .some(
-          (node) =>
-            node &&
-            typeof (node as unknown as { hasAttribute?: unknown }).hasAttribute === "function" &&
-            (node as unknown as { hasAttribute(name: string): boolean }).hasAttribute(
-              "data-browserkit-overlay",
-            ),
-        )
+      event.composedPath().some(
+        (node) =>
+          node &&
+          typeof (node as unknown as { hasAttribute?: unknown }).hasAttribute === "function" &&
+          // Aeon's own layers: the control banner, and the cursor's pill (☰, ■, an ask's field).
+          ["data-browserkit-overlay", "data-aeon-overlay"].some((name) =>
+            (node as unknown as { hasAttribute(name: string): boolean }).hasAttribute(name),
+          ),
+      )
     )
       return;
     if (event instanceof KeyboardEvent && (modifiers.has(event.key) || !document.hasFocus()))

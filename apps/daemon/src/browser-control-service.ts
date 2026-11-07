@@ -243,7 +243,8 @@ export class BrowserControlService {
   ): Promise<string> {
     const deadline = Date.now() + 60_000;
     let { clientInstanceId, available } = this.pickCodeClient(chatId);
-    while (!clientInstanceId && !signal?.aborted && Date.now() < deadline) {
+    // Waiting helps a browser that is reconnecting; several connected ones answer at once.
+    while (!clientInstanceId && !available.length && !signal?.aborted && Date.now() < deadline) {
       await new Promise((done) => setTimeout(done, 250));
       ({ clientInstanceId, available } = this.pickCodeClient(chatId));
     }
@@ -288,7 +289,7 @@ export class BrowserControlService {
     return JSON.stringify({
       error: available.length ? "AMBIGUOUS_BROWSER" : "BROWSER_OFFLINE",
       detail: available.length
-        ? "Several browsers are connected; attach a tab from the intended browser first."
+        ? "Several browsers are connected: pick one (aeon tool/repl --browser <name>, names from aeon browsers), or attach a tab from the intended browser first."
         : "No connected browser can run browser_code. Reload Aeon in chrome://extensions.",
     });
   }
