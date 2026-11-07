@@ -14,7 +14,9 @@ the only one listed. With no external manager, or no login saved in it for the s
 first login Chrome itself saved for the site (`provider: "chrome"`; `account` cannot pick one
 there, so hand off when it is the wrong account). You never see the password or the code, and there is no approval step: calling it
 signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`, `CHOOSE_ACCOUNT`
-(call again with `account`), `NEEDS_CODE` (a code by SMS or email), `CAPTCHA`, `REJECTED`, or
+(call again with `account`), `NEEDS_CODE` (a code by SMS or email), `CAPTCHA`,
+`SAVED_LOGIN_REJECTED` (the saved login looks stale: the site refused it; do not retry it, offer a
+password reset, or hand off so the user signs in and Aeon saves the new password), or
 `PAGE_SCRIPTS` (a boost or site script runs on the page; hand off). `PASSWORD_MANAGER_LOCKED` or
 `PASSWORD_MANAGER_FAILED`: hand off with "Your password manager is locked: unlock it (`aeon signin setup
 bitwarden`, or `pass-cli login` for Proton) and click Done, or sign in here yourself", then call

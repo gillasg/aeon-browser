@@ -345,6 +345,10 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
   }
   if (!windowsVirtualKeyCode) throw new Error("Unsupported key");
   const params = { key: key === "Space" ? " " : key, modifiers, windowsVirtualKeyCode };
+  // Enter and Space produce text, and Chrome submits a form only when the key event carries it;
+  // a keyDown without text left the form unsubmitted (page.keyboard.press('Enter')).
+  const text =
+    !modifiers && key === "Enter" ? "\r" : !modifiers && key === "Space" ? " " : undefined;
   // macOS runs Cmd shortcuts as editing commands, which synthetic key events do not trigger alone.
   const command = IS_MAC && modifiers === 4 ? MAC_COMMANDS[key.toLowerCase()] : undefined;
   showAgentKeys(debuggee, [combo]);
@@ -352,7 +356,8 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
   await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
     type: "keyDown",
     ...params,
-    ...(!modifiers && key.length === 1 ? { text: key } : {}),
+    ...(text ? { text, unmodifiedText: text } : {}),
+    ...(!modifiers && !text && key.length === 1 ? { text: key } : {}),
     ...(command ? { commands: [command] } : {}),
   });
   await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
