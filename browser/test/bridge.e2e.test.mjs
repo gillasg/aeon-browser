@@ -846,7 +846,7 @@ test(
             "closed-tab",
             `page = await browser.openTab(${JSON.stringify(siteUrl + "?closed")}, { newTab: true });
             const first = page.target.tabId;
-            await page.close();
+            await __call({ tabs: "close", tabId: first }); // as the user would: not through the agent's own close
             const fresh = await browser.openTab(${JSON.stringify(siteUrl + "?closed")}).then((tab) => tab.target.tabId, (error) => "error: " + error.message);
             const live = (await browser.tabs()).some((tab) => tab.id === fresh);
             console.log("CLOSED " + JSON.stringify({ first, fresh, live }));`,

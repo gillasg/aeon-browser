@@ -3,7 +3,7 @@ import { ProtocolVersionSchema } from "@browserkit/protocol";
 
 export { ProtocolVersionSchema, type ProtocolVersion } from "@browserkit/protocol";
 
-export const SUPPORTED_PROTOCOL_VERSION = { major: 1, minor: 7 } as const;
+export { SUPPORTED_PROTOCOL_VERSION } from "./version.js";
 
 export const ClientRoleSchema = z.enum(["ui", "extension-executor", "desktop-ui"]);
 export type ClientRole = z.infer<typeof ClientRoleSchema>;

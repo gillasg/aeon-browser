@@ -187,8 +187,9 @@ var browser = Object.freeze({
           console.log('[ok] openTab reused tab ' + known.tabId + ' for ' + (origin || url) + (same ? '' : ' (navigated)') + '; pass {newTab: true} for a separate tab');
           return __openResult(live, true);
         }
-        // A working tab the user closed is not a failure: open a fresh one and say so.
-        console.log('[warn] the working tab ' + known.tabId + ' for ' + (origin || url) + ' was closed; opened a fresh tab');
+        // A working tab the user closed is not a failure: open a fresh one and say so. One this
+        // session closed itself needs no word.
+        if (!__closedTabs.has(known.tabId)) console.log('[warn] the working tab ' + known.tabId + ' for ' + (origin || url) + ' was closed; opened a fresh tab');
       } finally { __busy.delete(__key(known)); }
     }
     const result = await __step({op:'openTab', clientInstanceId, url,

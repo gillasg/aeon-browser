@@ -328,13 +328,20 @@ function modelContent(body: {
   const images = browserContent(JSON.stringify({ steps: body.steps })).slice(1);
   const parts = [stepSummary(body.steps)];
   if (body.output) parts.push("output:\n" + body.output);
-  if (body.value !== undefined) parts.push("value: " + (JSON.stringify(body.value) ?? "undefined"));
+  // bu.state() logs its text and returns it: the value would repeat the output word for word.
+  if (body.value !== undefined && !echoed(body.output, body.value))
+    parts.push("value: " + (JSON.stringify(body.value) ?? "undefined"));
   if (body.error) parts.push("error: " + body.error);
   if (body.reset) parts.push("runtime reset: top-level variables are gone");
   if (body.tabStats) parts.push(tabLine(body.tabStats));
   if (body.runLog) parts.push("run log: " + body.runLog);
   if (body.hint) parts.push("hint: " + body.hint);
   return [{ type: "text", text: parts.join("\n") }, ...images];
+}
+
+/** A string value the output already shows in full. */
+function echoed(output: string, value: unknown): boolean {
+  return typeof value === "string" && value.length > 40 && output.includes(value);
 }
 
 function tabLine(stats: NonNullable<CellOutput["tabStats"]>): string {

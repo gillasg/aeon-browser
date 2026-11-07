@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol/version";
 import WebSocket from "ws";
 
 // One connection to the running Aeon daemon through its local Core endpoint. The daemon writes

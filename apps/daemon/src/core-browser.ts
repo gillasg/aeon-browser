@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CoreBrowserRunRequestSchema, CoreBrowserRunResultSchema } from "@aeon/protocol";
-import { sessionChatId } from "@aeon/pi-adapter";
+import { createAeonHostHandler, sessionChatId, siteMapperRequest } from "@aeon/pi-adapter";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { pin } from "./core-browsers.js";
@@ -39,7 +39,7 @@ export function handleBrowserRun(
           timeoutMs,
           ownerTitle: "Session · " + session,
           space: "window",
-          onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+          onCall: (call: unknown) => cliCall(chatId)(call),
           onProgress: () => undefined,
         },
       }),
@@ -49,6 +49,17 @@ export function handleBrowserRun(
       (error: unknown) => reply(socket, requestId, { error: messageOf(error) }),
     );
   return true;
+}
+
+// What a CLI cell may ask the daemon for: site notes, abilities, site APIs, learned hints and
+// sign-ins, as a chat's cells do. Only the chat workspace (files, checkpoints) stays with chats.
+function cliCall(chatId: string): (call: unknown) => Promise<unknown> {
+  const host = createAeonHostHandler({
+    source: "external",
+    siteMapper: (request) => siteMapperRequest(chatId, request),
+  });
+  return (call) =>
+    host(call, { source: "external", scope: chatId }) ?? Promise.resolve({ error: "UNSUPPORTED" });
 }
 
 function parseCell(output: string): Cell {

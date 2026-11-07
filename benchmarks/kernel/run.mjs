@@ -29,6 +29,7 @@ new IntersectionObserver(async (e, io) => { if (!e[0].isIntersecting || n >= 5) 
 <label for="s">Choice</label><select id="s" name="s"><option value="1">One</option><option value="2">Two</option></select>
 <button>Submit</button></form>`,
   "/done": `<!doctype html><title>Done</title><h1>Form submitted</h1>`,
+  "/links": `<!doctype html><title>Links</title><nav><a href="/a">Go to A</a> <a href="/b">Go to B</a></nav>`,
   "/a": `<!doctype html><title>Page A</title><p>A</p>`,
   "/b": `<!doctype html><title>Page B</title><p>B</p>`,
   "/c": `<!doctype html><title>Page C</title><p>C</p>`,
@@ -55,8 +56,8 @@ export function jobs(base) {
     },
     {
       id: "click-nav",
-      code: `page = await browser.openTab(${JSON.stringify(WIKI)}); await page.getByRole("link", {name: "Lamp", exact: true}).first().click(); const u = page.url(); await page.close(); u.endsWith("/wiki/Lamp")`,
-      expect: true,
+      code: `page = await browser.openTab(${at("/links")}); await page.getByRole("link", {name: "Go to B"}).click(); await page.waitForURL("**/b"); const t = await page.title(); await page.close(); t`,
+      expect: "Page B",
     },
     {
       id: "fill-form",
