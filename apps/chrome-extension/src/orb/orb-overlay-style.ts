@@ -1,58 +1,76 @@
 // Styles for the overlay, scoped inside its closed shadow root so pages cannot restyle it. The
-// engine draws the agent's cursor and the edge glow; the orb draws only the swarm and its box.
+// engine draws the agent's cursor while it acts and the edge glow; the overlay draws the same
+// cursor while it is summoned or between steps, its pill and its box.
 export const OVERLAY_STYLE = `
 :host { all: initial; }
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
-canvas {
-  position: fixed; inset: 0; pointer-events: none; opacity: 1;
-  transition: opacity .35s ease;
+.cursor {
+  position: fixed; left: 0; top: 0; width: 18px; height: 20px; pointer-events: none;
+  will-change: transform; opacity: 1; transition: opacity .25s ease;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
-canvas.away { opacity: 0; }
+.cursor.away { opacity: 0; }
 .spot {
   position: fixed; inset: 0; pointer-events: none; opacity: 0;
   transition: opacity .5s ease;
 }
 .spot.on { opacity: 1; }
 .hit {
-  all: unset; position: fixed; left: 0; top: 0; width: 64px; height: 64px; border-radius: 50%;
+  all: unset; position: fixed; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%;
   pointer-events: auto; cursor: grab; will-change: transform;
 }
 .hit:active { cursor: grabbing; }
-.hit:focus-visible { outline: 2px solid rgba(124, 92, 255, .7); outline-offset: -8px; }
+.hit:focus-visible { outline: 2px solid rgba(255, 255, 255, .8); outline-offset: -4px; }
 .pill {
-  all: unset; position: fixed; left: 0; top: 0; max-width: 240px; padding: 5px 11px;
-  border-radius: 999px; pointer-events: auto; cursor: pointer; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
-  font: 550 12px/16px system-ui, -apple-system, "Segoe UI", sans-serif; color: #1b1830;
-  background: rgba(255, 255, 255, .78); backdrop-filter: blur(18px) saturate(1.6);
-  box-shadow: 0 8px 22px -12px rgba(0, 0, 0, .45), 0 0 0 1px rgba(20, 16, 40, .1);
+  position: fixed; left: 0; top: 0; display: flex; align-items: center; gap: 8px;
+  max-width: 360px; padding: 5px 5px 5px 12px; box-sizing: border-box; border-radius: 999px;
+  pointer-events: auto; white-space: nowrap; will-change: transform;
+  font: 500 12.5px/17px system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff;
+  background: rgba(17, 24, 39, .92); box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+  transition: opacity .3s ease;
 }
 .pill[hidden] { display: none; }
-.pill::before {
-  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px;
-  border-radius: 50%; background: #7c5cff; vertical-align: 1px;
+.pill.fading { opacity: 0; }
+.pill[data-state="needs"] { background: #e08a00; }
+.pill[data-state="done"] { background: #2f3b2d; }
+.pill[data-state="error"] { background: #5a2f2c; }
+.pill .label {
+  all: unset; cursor: pointer; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
-.pill[data-state="needs"]::before { background: #e08a00; }
-.pill[data-state="done"]::before, .pill[data-state="paused"]::before,
-.pill[data-state="error"]::before { background: #9a98a8; }
-.pill:focus-visible { outline: 2px solid rgba(124, 92, 255, .7); outline-offset: 2px; }
-@media (prefers-color-scheme: dark) {
-  .pill { color: #f1f0f6; background: rgba(34, 33, 44, .78); box-shadow: 0 8px 22px -12px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .1); }
+.pill .spin {
+  width: 11px; height: 11px; flex: none; border-radius: 50%; box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, .3); border-top-color: #fff;
+  animation: spin .8s linear infinite;
 }
+.pill:not([data-state="thinking"]):not([data-state="working"]) .spin { display: none; }
+.pill:not([data-state="thinking"]):not([data-state="working"]):not([data-state="needs"]) .stop { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pill .ic {
+  all: unset; width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid;
+  place-items: center; cursor: pointer; background: rgba(255, 255, 255, .12);
+  font: 600 11px/1 system-ui, sans-serif;
+}
+.pill .ic:hover { background: rgba(255, 255, 255, .24); }
+.pill .ic:focus-visible, .pill .label:focus-visible { outline: 2px solid rgba(255, 255, 255, .8); outline-offset: 2px; }
 iframe {
   position: fixed; left: 0; top: 0; border: 0; background: transparent;
   pointer-events: auto; color-scheme: normal; opacity: 0;
-  transform: scale(.2); transform-origin: 0 100%;
+  transform: scale(.2); transform-origin: 0 0;
   transition: opacity .3s ease, transform .45s cubic-bezier(.3, 1.3, .5, 1);
 }
 iframe.on { opacity: 1; transform: none; }
 iframe.off { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  iframe, .spot, canvas { transition: none; }
+  iframe, .spot, .cursor, .pill { transition: none; }
+  .pill .spin { animation: none; }
 }
 :host([data-reduced-motion]) iframe, :host([data-reduced-motion]) .spot,
-:host([data-reduced-motion]) canvas { transition: none; }
+:host([data-reduced-motion]) .cursor, :host([data-reduced-motion]) .pill { transition: none; }
+:host([data-reduced-motion]) .pill .spin { animation: none; }
 `;
+
+/** The cursor itself: a plain white pointer without a stem (the engine draws the same one). */
+export const CURSOR_PATH = "M1.5 1.5 L1.5 16.5 L13.5 9.5 Z";
 
 export function spotlightGradient(box: {
   x: number;

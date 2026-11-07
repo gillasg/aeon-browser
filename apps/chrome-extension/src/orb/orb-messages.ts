@@ -2,7 +2,7 @@ import type { OrbBox, OrbCursorStep, OrbStatus } from "./orb-run.js";
 
 // Messages between the orb's three parts:
 // - the service worker (shortcut, nonce),
-// - the content script (swarm, cursor, spotlight, drawn over the page),
+// - the content script (the cursor, its pill and the spotlight, drawn over the page),
 // - orb.html (the island, framed by the content script; the page cannot read it).
 
 export const ORB_COMMAND = "summon-orb";
@@ -14,10 +14,6 @@ export type OrbVisualState = Exclude<OrbStatus, "idle"> | "listening" | "paused"
 export type OrbToContent =
   | { kind: "aeon.orb.visual"; state: OrbVisualState; label: string }
   | { kind: "aeon.orb.cursor"; steps: OrbCursorStep[] }
-  /** A step finished in another tab (the agent's own). */
-  | { kind: "aeon.orb.elsewhere" }
-  /** How many chats are working right now: the swarm splits into that many. */
-  | { kind: "aeon.orb.agents"; count: number }
   | { kind: "aeon.orb.spotlight"; box: OrbBox | null }
   | { kind: "aeon.orb.panel"; width: number; height: number }
   /** keepRunning: collapse to the orb. false: dismiss the orb unless a run is going. */
@@ -38,6 +34,10 @@ export const ORB_DISMISS = "aeon.orb.dismiss";
 export const ORB_RESTORE = "aeon.orb.restore";
 /** orb.html → service worker: turn the orb off everywhere. */
 export const ORB_OFF = "aeon.orb.off";
+/** Content script → service worker: open this tab's transcript in the side panel (the cursor's ☰). */
+export const CURSOR_TRANSCRIPT = "aeon.cursor.transcript";
+/** Content script → this tab's orb.html: stop its chat (the cursor's ■). */
+export const CURSOR_STOP = "aeon.cursor.stop";
 /** Session storage: the orb was summoned and follows the user across tabs until dismissed. */
 export const ORB_ON_KEY = "aeon-orb-on";
 
@@ -57,8 +57,6 @@ export interface OrbVerify {
 const CONTENT_KINDS = new Set([
   "aeon.orb.visual",
   "aeon.orb.cursor",
-  "aeon.orb.elsewhere",
-  "aeon.orb.agents",
   "aeon.orb.spotlight",
   "aeon.orb.panel",
   "aeon.orb.hide",

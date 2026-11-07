@@ -1,7 +1,11 @@
-import type { OrbToContent, OrbVisualState } from "./orb-messages.js";
+import {
+  CURSOR_STOP,
+  CURSOR_TRANSCRIPT,
+  type OrbToContent,
+  type OrbVisualState,
+} from "./orb-messages.js";
 import type { OrbBox, OrbCursorStep } from "./orb-run.js";
-import { OVERLAY_STYLE, spotlightGradient } from "./orb-overlay-style.js";
-import { Swarm } from "./orb-swarm.js";
+import { CURSOR_PATH, OVERLAY_STYLE, spotlightGradient } from "./orb-overlay-style.js";
 import {
   loadOrbPosition,
   saveOrbPosition,
@@ -9,18 +13,19 @@ import {
   type OrbPosition,
 } from "./orb-position.js";
 
-// Everything the orb draws over the page. The swarm is the orb: it is there whenever the orb is
-// summoned, streams into the engine's cursor when the agent acts and fades out while it does, and
-// gathers beside anything that needs the user. The box (orb.html, framed so the page can't read
-// it) opens with the orb; clicking away collapses it to the orb, clicking the orb opens it again.
-// The orb sits bottom-left by default, can be dragged, and keeps one position for every site.
-// With the box folded away during a run, a pill under the orb says what the agent is doing;
-// clicking it opens the box again. While the tab is recorded on video the orb is hidden.
+// Everything the cursor draws over the page. The cursor is one thing: a white pointer that sits
+// where it was left (bottom-left by default, dragged anywhere, one position for every site) with
+// its pill beside it. Summoned, the pill opens as the ask box (orb.html, framed so the page can't
+// read it). Working, the pill says what it is doing, with ☰ (the transcript, in the side panel)
+// and ■ (stop); when the agent acts in this page, the engine's identical cursor takes over and this
+// one steps aside. It needs you: the pill turns amber. Done or couldn't finish: one line, which
+// fades after a few seconds unless hovered. While the tab is recorded on video nothing is drawn.
 
 const DEFAULT_PANEL = { width: 360, height: 96 };
 const TRAVEL_MS = 650;
 const DRAG_SLOP = 4;
-const HIT_SIZE = 64;
+const HIT_SIZE = 32;
+const RESULT_MS = 6000;
 
 interface Point {
   x: number;
@@ -29,49 +34,46 @@ interface Point {
 
 export class OrbOverlay {
   private readonly host = document.createElement("div");
-  private readonly canvas = document.createElement("canvas");
+  private readonly cursor = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   private readonly spot = document.createElement("div");
   private readonly hit = document.createElement("button");
   private readonly frame = document.createElement("iframe");
-  private readonly pill = document.createElement("button");
+  private readonly pill = document.createElement("div");
+  private readonly pillLabel = document.createElement("button");
   private label = "";
-  private readonly swarm: Swarm;
   private readonly systemReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   private reducedMotion = this.systemReducedMotion;
   private state: OrbVisualState = "listening";
   private position: OrbPosition = { left: 56, bottom: 56 };
-  private orb: Point;
-  private orbTarget: Point;
+  private point: Point;
+  private target: Point;
   private panel = DEFAULT_PANEL;
   private open = false;
   private acting = false;
+  private hovered = false;
+  private fadeTimer = 0;
   private drag: { start: Point; moved: boolean } | undefined;
   private readonly timers = new Set<number>();
   private readonly stopWatching: () => void;
   private raf = 0;
-  /** False until the saved position loads, so a new page never shows the orb sliding in. */
+  /** False until the saved position loads, so a new page never shows the cursor sliding in. */
   private placed = false;
 
   constructor(
     readonly tabId: number,
     nonce: string,
   ) {
-    const context = this.canvas.getContext("2d");
-    if (!context) throw new Error("Canvas unavailable");
-    this.swarm = new Swarm(context, this.reducedMotion);
     this.buildDom(nonce);
-    this.orb = this.orbTarget = this.home();
-    this.swarm.setCenter(this.orb.x, this.orb.y);
+    this.point = this.target = this.home();
     void loadOrbPosition().then((position) => {
       this.position = position;
-      this.orb = { ...this.home() };
-      this.orbTarget = this.home();
+      this.point = { ...this.home() };
+      this.target = this.home();
       this.placed = true;
     });
     this.stopWatching = watchOrbPosition((position) => this.moveHome(position));
     addEventListener("resize", this.resize);
     addEventListener("pointerdown", this.clickAway, { capture: true });
-    this.resize();
     this.raf = requestAnimationFrame(this.tick);
   }
 
@@ -79,7 +81,7 @@ export class OrbOverlay {
     return this.open;
   }
 
-  /** Keeps the orb on screen after the box closes while a run is still going. */
+  /** Keeps the cursor on screen after the box closes while a run is still going. */
   get running(): boolean {
     return ["thinking", "working", "needs", "paused"].includes(this.state);
   }
@@ -104,8 +106,6 @@ export class OrbOverlay {
   apply(message: OrbToContent): void {
     if (message.kind === "aeon.orb.visual") this.setVisual(message.state, message.label);
     else if (message.kind === "aeon.orb.cursor") this.streamTo(message.steps);
-    else if (message.kind === "aeon.orb.elsewhere") this.swarm.elsewhere(performance.now());
-    else if (message.kind === "aeon.orb.agents") this.swarm.setAgents(message.count);
     else if (message.kind === "aeon.orb.spotlight") this.spotlight(message.box);
     else if (message.kind === "aeon.orb.panel")
       this.panel = {
@@ -121,22 +121,23 @@ export class OrbOverlay {
   }
 
   private updatePill(): void {
-    const show = !this.open && this.state !== "listening" && this.label !== "";
+    const show = !this.open && this.state !== "listening" && this.label !== "" && !this.acting;
     this.pill.hidden = !show;
     this.pill.dataset.state = this.state;
-    this.pill.textContent = this.label;
+    this.pillLabel.textContent = this.label;
+    this.pillLabel.title = this.label;
   }
 
   /** The setting in Aeon adds to the system's reduce-motion; it never turns that off. */
   private setReducedMotion(on: boolean): void {
     this.reducedMotion = on || this.systemReducedMotion;
-    this.swarm.reducedMotion = this.reducedMotion;
     this.host.toggleAttribute("data-reduced-motion", this.reducedMotion);
   }
 
   destroy(): void {
     cancelAnimationFrame(this.raf);
     for (const timer of this.timers) clearTimeout(timer);
+    clearTimeout(this.fadeTimer);
     removeEventListener("resize", this.resize);
     removeEventListener("pointerdown", this.clickAway, { capture: true });
     this.stopWatching();
@@ -150,9 +151,10 @@ export class OrbOverlay {
     const layer = document.createElement("div");
     layer.className = "layer";
     this.spot.className = "spot";
+    this.buildCursor();
     this.hit.className = "hit";
     this.hit.type = "button";
-    this.hit.title = "Aeon · click to open, drag to move";
+    this.hit.title = "Aeon · click to ask, drag to move";
     this.hit.setAttribute("aria-label", "Aeon");
     this.hit.addEventListener("pointerdown", this.dragStart);
     const url = new URL(chrome.runtime.getURL("orb.html"));
@@ -162,68 +164,116 @@ export class OrbOverlay {
     this.frame.title = "Aeon";
     this.frame.className = "off";
     this.frame.setAttribute("allowtransparency", "true");
-    this.pill.className = "pill";
-    this.pill.type = "button";
-    this.pill.hidden = true;
-    this.pill.title = "Open Aeon";
-    this.pill.addEventListener("click", () => this.showBubble());
-    layer.append(this.spot, this.canvas, this.hit, this.pill, this.frame);
+    this.buildPill();
+    layer.append(this.spot, this.cursor, this.hit, this.pill, this.frame);
     shadow.append(style, layer);
-    // An extension reload leaves the old script's orb on the page with nothing driving it.
+    // An extension reload leaves the old script's cursor on the page with nothing driving it.
     for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
     this.host.setAttribute("data-aeon-orb", "");
     document.documentElement.append(this.host);
   }
 
+  private buildCursor(): void {
+    this.cursor.setAttribute("class", "cursor");
+    this.cursor.setAttribute("viewBox", "0 0 18 20");
+    this.cursor.setAttribute("width", "18");
+    this.cursor.setAttribute("height", "20");
+    this.cursor.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", CURSOR_PATH);
+    path.setAttribute("fill", "#fff");
+    path.setAttribute("stroke", "#111");
+    path.setAttribute("stroke-width", "1.5");
+    path.setAttribute("stroke-linejoin", "round");
+    this.cursor.append(path);
+  }
+
+  /** The pill: what it is doing (click to ask again), ☰ the transcript, ■ stop. */
+  private buildPill(): void {
+    this.pill.className = "pill";
+    this.pill.hidden = true;
+    const spin = document.createElement("span");
+    spin.className = "spin";
+    this.pillLabel.className = "label";
+    this.pillLabel.type = "button";
+    this.pillLabel.addEventListener("click", () => this.showBubble());
+    const transcript = iconButton("☰", "Open the transcript in the side panel", () =>
+      send(CURSOR_TRANSCRIPT),
+    );
+    const stop = iconButton("■", "Stop", () => send(CURSOR_STOP));
+    stop.classList.add("stop");
+    this.pill.append(spin, this.pillLabel, transcript, stop);
+    this.pill.addEventListener("mouseenter", () => {
+      this.hovered = true;
+      this.pill.classList.remove("fading");
+    });
+    this.pill.addEventListener("mouseleave", () => {
+      this.hovered = false;
+      this.scheduleFade();
+    });
+  }
+
   private setVisual(state: OrbVisualState, label: string): void {
     this.state = state;
     this.label = state === "listening" ? "" : label;
-    this.updatePill();
-    this.swarm.setState(state);
-    if (state !== "working") this.showSwarm();
+    if (state !== "working") this.showCursor();
     if (state !== "needs") this.spotlight(null);
-    // Results and questions come to the user even if they closed the box; focus stays put.
-    if (!this.open && (state === "done" || state === "needs" || state === "error"))
-      this.showBubble(false);
+    this.updatePill();
+    this.pill.classList.remove("fading");
+    clearTimeout(this.fadeTimer);
+    this.scheduleFade();
+    // A question comes to the user even if they closed the box: its field opens, focus stays put.
+    if (state === "needs" && !this.open) this.showBubble(false);
   }
 
-  /** The agent acts: the swarm streams to where the engine's cursor is going, then fades out. */
+  /** A result or a failure is one line that goes after a few seconds, unless hovered. */
+  private scheduleFade(): void {
+    if (this.state !== "done" && this.state !== "error") return;
+    clearTimeout(this.fadeTimer);
+    this.fadeTimer = window.setTimeout(() => {
+      if (!this.hovered && !this.open) this.pill.classList.add("fading");
+    }, RESULT_MS);
+  }
+
+  /** The agent acts in this page: the engine's cursor takes over from here, this one steps aside. */
   private streamTo(steps: readonly OrbCursorStep[]): void {
     const first = steps[0];
     if (!first || this.acting) return;
-    this.acting = true;
-    this.swarm.setCursor(first);
+    this.target = this.clampPoint({ x: first.x, y: first.y });
     this.later(() => {
-      if (this.state === "working") this.canvas.classList.add("away");
+      if (this.state !== "working") return;
+      this.acting = true;
+      this.cursor.classList.add("away");
+      this.updatePill();
     }, TRAVEL_MS);
   }
 
-  private showSwarm(): void {
+  private showCursor(): void {
     this.acting = false;
-    this.swarm.setCursor(null);
-    this.canvas.classList.remove("away");
+    this.cursor.classList.remove("away");
+    if (!this.spot.classList.contains("on")) this.target = this.home();
   }
 
   private spotlight(box: OrbBox | null): void {
     if (!box) {
       this.spot.classList.remove("on");
-      this.orbTarget = this.home();
+      this.target = this.home();
       return;
     }
     this.spot.style.background = spotlightGradient(box);
     this.spot.classList.add("on");
-    this.showSwarm();
-    // The swarm waits beside what needs the user.
-    this.orbTarget = this.clampOrb({ x: box.x - 34, y: box.y + box.height / 2 });
+    this.showCursor();
+    // The cursor waits beside what needs the user.
+    this.target = this.clampPoint({ x: box.x - 26, y: box.y + box.height / 2 });
   }
 
   private home(): Point {
-    return this.clampOrb({ x: this.position.left, y: innerHeight - this.position.bottom });
+    return this.clampPoint({ x: this.position.left, y: innerHeight - this.position.bottom });
   }
 
   private moveHome(position: OrbPosition): void {
     this.position = position;
-    if (!this.spot.classList.contains("on")) this.orbTarget = this.home();
+    if (!this.spot.classList.contains("on") && !this.acting) this.target = this.home();
   }
 
   private readonly dragStart = (event: PointerEvent): void => {
@@ -241,7 +291,7 @@ export class OrbOverlay {
     const far = Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y);
     if (far > DRAG_SLOP) drag.moved = true;
     if (!drag.moved) return;
-    this.orbTarget = this.orb = this.clampOrb({ x: event.clientX, y: event.clientY });
+    this.target = this.point = this.clampPoint({ x: event.clientX, y: event.clientY });
   };
 
   private readonly dragEnd = (): void => {
@@ -253,58 +303,59 @@ export class OrbOverlay {
       else this.showBubble();
       return;
     }
-    this.position = { left: Math.round(this.orb.x), bottom: Math.round(innerHeight - this.orb.y) };
+    this.position = {
+      left: Math.round(this.point.x),
+      bottom: Math.round(innerHeight - this.point.y),
+    };
     void saveOrbPosition(this.position);
   };
 
-  /** A click anywhere on the page (not in the box or on the orb) collapses the box. */
+  /** A click anywhere on the page (not in the box or on the cursor) collapses the box. */
   private readonly clickAway = (event: PointerEvent): void => {
     if (!this.open || event.composedPath().includes(this.host)) return;
     this.hideBubble();
   };
 
-  private readonly tick = (now: number): void => {
-    this.orb.x += (this.orbTarget.x - this.orb.x) * 0.12;
-    this.orb.y += (this.orbTarget.y - this.orb.y) * 0.12;
-    this.swarm.setCenter(this.orb.x, this.orb.y);
-    this.hit.style.transform = `translate(${this.orb.x - HIT_SIZE / 2}px, ${this.orb.y - HIT_SIZE / 2}px)`;
-    if (!this.pill.hidden)
-      this.pill.style.transform = `translate(-50%, 0) translate(${this.orb.x}px, ${this.orb.y + 30}px)`;
+  private readonly tick = (): void => {
+    const ease = this.reducedMotion ? 1 : 0.16;
+    this.point.x += (this.target.x - this.point.x) * ease;
+    this.point.y += (this.target.y - this.point.y) * ease;
+    const { x, y } = this.point;
+    // The point is the cursor's tip; the hit area sits around it, the pill beside it.
+    this.cursor.style.transform = `translate(${x - 1}px, ${y - 1}px)`;
+    this.cursor.style.visibility = this.placed ? "" : "hidden";
+    this.hit.style.transform = `translate(${x - HIT_SIZE / 2 + 6}px, ${y - HIT_SIZE / 2 + 8}px)`;
+    if (!this.pill.hidden) {
+      const width = this.pill.offsetWidth;
+      const left = x + 18 + width > innerWidth - 8 ? x - 8 - width : x + 18;
+      this.pill.style.transform = `translate(${left}px, ${y + 14}px)`;
+    }
     this.placeFrame();
-    if (this.placed) this.swarm.draw(now, innerWidth, innerHeight);
     this.raf = requestAnimationFrame(this.tick);
   };
 
-  /** The box sits beside the orb on the side with room, its bottom level with the orb. */
+  /** The box opens beside the cursor's tip, where the pill would be, on the side with room. */
   private placeFrame(): void {
     const { width, height } = this.panel;
-    let left = this.orb.x + 34;
-    if (left + width > innerWidth - 8) left = this.orb.x - 34 - width;
-    const top = clampSize(this.orb.y + 26 - height, 8, innerHeight - height - 8);
+    let left = this.point.x + 18;
+    if (left + width > innerWidth - 8) left = this.point.x - 8 - width;
+    const top = clampSize(this.point.y + 14, 8, innerHeight - height - 8);
     this.frame.style.width = width + "px";
     this.frame.style.height = height + "px";
     this.frame.style.left = clampSize(left, 8, innerWidth - width - 8) + "px";
     this.frame.style.top = top + "px";
-    this.frame.style.transformOrigin = left > this.orb.x ? "0 100%" : "100% 100%";
+    this.frame.style.transformOrigin = left > this.point.x ? "0 0" : "100% 0";
   }
 
-  private clampOrb(point: Point): Point {
+  private clampPoint(point: Point): Point {
     return {
-      x: clampSize(point.x, 34, innerWidth - 34),
-      y: clampSize(point.y, 34, innerHeight - 34),
+      x: clampSize(point.x, 12, innerWidth - 24),
+      y: clampSize(point.y, 12, innerHeight - 40),
     };
   }
 
   private readonly resize = (): void => {
-    const ratio = Math.min(2, devicePixelRatio || 1);
-    this.canvas.width = Math.round(innerWidth * ratio);
-    this.canvas.height = Math.round(innerHeight * ratio);
-    this.canvas.style.width = innerWidth + "px";
-    this.canvas.style.height = innerHeight + "px";
-    this.canvas.getContext("2d")?.setTransform(ratio, 0, 0, ratio, 0, 0);
-    this.orbTarget = this.spot.classList.contains("on")
-      ? this.clampOrb(this.orbTarget)
-      : this.home();
+    this.target = this.spot.classList.contains("on") ? this.clampPoint(this.target) : this.home();
   };
 
   private later(run: () => void, ms: number): void {
@@ -314,6 +365,25 @@ export class OrbOverlay {
     }, ms);
     this.timers.add(timer);
   }
+}
+
+function iconButton(text: string, label: string, onClick: () => void): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.className = "ic";
+  button.type = "button";
+  button.textContent = text;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+  return button;
+}
+
+/** Runs in the click itself, so the side panel opens with the user's gesture. */
+function send(kind: string): void {
+  if (chrome.runtime?.id) void chrome.runtime.sendMessage({ kind }).catch(() => undefined);
 }
 
 function clampSize(value: number, min: number, max: number): number {

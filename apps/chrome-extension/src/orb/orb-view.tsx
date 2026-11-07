@@ -1,21 +1,19 @@
 import type { KeyboardEvent, ReactElement } from "react";
 import { ChatSwitcher } from "@aeon/ui";
 
-// The orb's box. Before a chat exists it is a compose field; after, it is the same chat the side
-// panel and the chat tab show (chat.html, framed), with hand-off buttons. One component, three sizes.
+// The cursor's ask box: always a compose field. The first message starts a chat with this tab as
+// context, later ones continue it; the transcript itself lives in the side panel (☰).
 
 export interface OrbViewModel {
   host: string;
   /** The chat this orb started, once the first message is sent. */
   chatId: string | undefined;
-  /** The chat page to frame (chat.html for chatId), built by the page that owns chrome APIs. */
-  chatUrl: string;
   notice: string;
+  /** The chat asks the user something: the question, answered by typing here (or in the side panel). */
+  ask: string;
   busy: boolean;
   /** This tab records the site's requests while the user browses ("Learn this site"). */
   learning: boolean;
-  /** The message just sent, shown at once while the chat is created and framed. */
-  pending: string;
   chats: { chatId: string; title: string; updatedAt: string }[];
   /** Tabs the first message carries as context; this tab to start with. */
   context: OrbTab[];
@@ -39,21 +37,13 @@ export interface OrbViewActions {
   selectChat(chatId: string): void;
   newChat(): void;
   loadChats(): void;
-  /** The framed chat finished loading: the pending message can go. */
-  chatShown(): void;
+  /** The transcript, in the side panel beside this page. */
   toSidePanel(): void;
-  toTab(): void;
   toggleLearning(): void;
   removeContext(tabId: number): void;
   /** Opens (or closes) the list of open tabs to add as context. */
   pickTabs(): void;
   addContext(tabId: number): void;
-}
-
-export type BoxState = "compose" | "chat";
-
-export function boxState(model: Pick<OrbViewModel, "chatId" | "pending">): BoxState {
-  return model.chatId || model.pending ? "chat" : "compose";
 }
 
 export function OrbBox({
@@ -63,14 +53,9 @@ export function OrbBox({
   model: OrbViewModel;
   actions: OrbViewActions;
 }): ReactElement {
-  const state = boxState(model);
   return (
-    <div className="island" data-state={state}>
-      {state === "compose" ? (
-        <Compose model={model} actions={actions} />
-      ) : (
-        <ChatBox model={model} actions={actions} />
-      )}
+    <div className="island" data-state="compose">
+      <Compose model={model} actions={actions} />
     </div>
   );
 }
@@ -90,12 +75,18 @@ function Compose({
   };
   // The field has the whole width; everything else is one quiet line under it: the tabs this
   // message carries (× drops one, + adds another), then learning and the chat switcher.
+  const placeholder = model.ask
+    ? "Type the answer here…"
+    : model.chatId
+      ? "Reply to Aeon…"
+      : "Ask Aeon about this page…";
   return (
     <>
+      {model.ask && <p className="isl-ask">{model.ask}</p>}
       <textarea
         id="prompt"
         rows={1}
-        placeholder="Ask Aeon about this page…"
+        placeholder={placeholder}
         aria-label="Ask Aeon"
         disabled={model.busy}
         onKeyDown={send}
@@ -116,6 +107,14 @@ function Compose({
         </button>
         <span className="isl-notice">{model.notice}</span>
         <LearnButton model={model} actions={actions} />
+        {model.chatId && (
+          <Button
+            label="Open the transcript in the side panel"
+            onClick={actions.toSidePanel}
+            icon="panel"
+          />
+        )}
+        {model.chatId && <Button label="New chat" onClick={actions.newChat} icon="new" />}
         <Switcher model={model} actions={actions} icon />
         {model.tabChoices && <TabChoices model={model} actions={actions} />}
       </div>
@@ -196,52 +195,13 @@ function TabChoices({
   );
 }
 
-/** The chat itself, framed, under a slim bar that moves it to the side panel or a tab. */
-function ChatBox({
-  model,
-  actions,
-}: {
-  model: OrbViewModel;
-  actions: OrbViewActions;
-}): ReactElement {
-  return (
-    <>
-      <div className="box-bar">
-        <Switcher model={model} actions={actions} label={titleOf(model)} />
-        <span className="box-title">{model.notice}</span>
-        <Button label="New chat" onClick={actions.newChat} icon="new" />
-        <Button label="Move to side panel" onClick={actions.toSidePanel} icon="panel" />
-        <Button label="Open in a tab" onClick={actions.toTab} icon="tab" />
-      </div>
-      <div className="box-body">
-        {model.chatUrl && (
-          <iframe
-            className="box-chat"
-            title="Aeon chat"
-            src={model.chatUrl}
-            onLoad={actions.chatShown}
-          />
-        )}
-        {model.pending && (
-          <div className="box-pending" aria-live="polite">
-            <p className="box-pending-message">{model.pending}</p>
-            <p className="box-pending-status">Starting…</p>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
 function Switcher({
   model,
   actions,
-  label,
   icon = false,
 }: {
   model: OrbViewModel;
   actions: OrbViewActions;
-  label?: string;
   icon?: boolean;
 }): ReactElement {
   return (
@@ -253,20 +213,14 @@ function Switcher({
       onSelect={actions.selectChat}
       onOpen={actions.loadChats}
       icon={icon}
-      {...(label ? { label } : {})}
     />
   );
-}
-
-function titleOf(model: OrbViewModel): string {
-  return model.chats.find((chat) => chat.chatId === model.chatId)?.title ?? "This chat";
 }
 
 // 16px line icons in one stroke weight, so the bar reads as one set.
 const ICONS = {
   new: "M8 3.5v9M3.5 8h9",
   panel: "M3 3.5h10v9H3zM9.5 3.5v9",
-  tab: "M9 3.5h3.5V7M12.5 3.5 7.5 8.5M11 9.5v3H3.5V5h3",
 } as const;
 
 function Button({

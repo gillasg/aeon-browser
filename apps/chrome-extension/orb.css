@@ -5,8 +5,9 @@
   font-weight: 100 900;
 }
 
-/* The orb's box. Always dark, whatever the page or theme, because it sits on other people's
-   sites. Compose is a small field; once the chat starts, the box frames the chat page itself. */
+/* The cursor's ask box, opened beside the cursor. Always dark, whatever the page or theme,
+   because it sits on other people's sites, in the cursor pill's colour. It is only ever a compose
+   field: the transcript lives in the side panel. */
 html,
 body {
   margin: 0;
@@ -25,9 +26,9 @@ body {
   width: 360px;
   max-width: 360px;
   padding: 10px 12px;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0c0c10;
+  background: rgba(17, 24, 39, 0.97);
   color: #eeeef4;
   position: relative;
   overflow: hidden;
@@ -37,15 +38,6 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
-}
-
-.island[data-state="chat"] {
-  display: flex;
-  flex-direction: column;
-  width: 400px;
-  max-width: 400px;
-  height: 560px;
-  padding: 0;
 }
 
 textarea {
@@ -62,10 +54,20 @@ textarea {
   font: inherit;
   font-size: 14px;
   line-height: 1.45;
-  caret-color: #b9a6ff;
+  caret-color: #fff;
   field-sizing: content;
   max-height: 120px;
   overflow-y: auto;
+}
+
+.isl-ask {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #e08a00;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 textarea::placeholder {
@@ -113,38 +115,13 @@ textarea::placeholder {
 }
 
 .isl-learn[aria-pressed="true"] {
-  background: rgba(155, 140, 255, 0.22);
-  color: #e4e0ff;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 
 .isl-learn[aria-pressed="true"]::before {
   content: "● ";
-  color: #9b8cff;
-}
-
-.box-bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 6px 6px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.box-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.box-chat {
-  flex: 1;
-  width: 100%;
-  border: 0;
-  background: transparent;
+  color: #fff;
 }
 
 button {
@@ -163,7 +140,7 @@ button:hover {
 }
 
 button:focus-visible {
-  outline: 2px solid #9b8cff;
+  outline: 2px solid rgba(255, 255, 255, 0.8);
   outline-offset: 1px;
 }
 
@@ -191,54 +168,12 @@ button.icon:hover,
   height: 16px;
 }
 
-.box-body {
-  position: relative;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
 /* The message just sent, shown at once while the chat is created and framed. */
-.box-pending {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 14px;
-  background: #0c0c10;
-}
-.box-pending-message {
-  margin: 0;
-  max-width: 85%;
-  padding: 8px 12px;
-  border-radius: 14px 14px 4px 14px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f1f0f6;
-  font-size: 13px;
-  white-space: pre-wrap;
-}
-.box-pending-status {
-  align-self: flex-start;
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  animation: box-pending 1.6s ease-in-out infinite;
-}
-@keyframes box-pending {
-  50% {
-    opacity: 0.45;
-  }
-}
 
 /* The chat switcher in the orb: a text pill whose list opens in place below its row (the box
    clips anything floating), and the box grows to fit it. */
 .chat-switcher {
   display: contents;
-}
-.box-bar {
-  flex-wrap: wrap;
 }
 .chat-switcher-pill:not(.icon-button) {
   display: inline-flex;
@@ -325,7 +260,7 @@ button.icon:hover,
   border-radius: 50%;
 }
 .chat-switcher-menu li i[data-state="running"] {
-  background: #9b8cff;
+  background: #d4d4d8;
 }
 .chat-switcher-menu li i[data-state="needs"] {
   background: #ffb347;
@@ -373,8 +308,8 @@ button.icon:hover,
   height: 26px;
 }
 .isl-learn[aria-pressed="true"] {
-  color: #b9a6ff;
-  background: rgba(155, 140, 255, 0.18);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
 }
 .isl-learn[aria-pressed="true"]::before {
   content: none;

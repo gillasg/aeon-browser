@@ -1,4 +1,6 @@
 import {
+  CURSOR_STOP,
+  CURSOR_TRANSCRIPT,
   ORB_DISMISS,
   ORB_OFF,
   ORB_RESTORE,
@@ -61,6 +63,8 @@ function start(): void {
   restore();
   document.addEventListener("visibilitychange", restore);
 
+  listenToCursorButtons(() => overlay !== undefined);
+
   chrome.runtime.onMessage.addListener((message: unknown, sender) => {
     if (sender.id !== chrome.runtime.id) return;
     if (isOrbToggle(message)) return show(message);
@@ -90,4 +94,17 @@ function start(): void {
     },
     { capture: true },
   );
+}
+
+/**
+ * The cursor's ☰ and ■ from the agent's cursor, which the engine draws in the page, so they arrive
+ * as page events. ☰ opens the transcript in the side panel; ■ stops the chat this tab's cursor
+ * started, and with no cursor summoned here it opens the transcript, where Stop is.
+ */
+function listenToCursorButtons(summoned: () => boolean): void {
+  const send = (kind: string) => {
+    if (chrome.runtime?.id) void chrome.runtime.sendMessage({ kind }).catch(() => undefined);
+  };
+  addEventListener("aeon-cursor-transcript", () => send(CURSOR_TRANSCRIPT));
+  addEventListener("aeon-cursor-stop", () => send(summoned() ? CURSOR_STOP : CURSOR_TRANSCRIPT));
 }
