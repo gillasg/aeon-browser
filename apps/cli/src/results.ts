@@ -53,6 +53,8 @@ export interface TraceAction {
   text?: string;
   scroll?: { direction: string; amount: number; before: number; after: number };
   failed?: boolean;
+  effect?: string;
+  evidence?: string;
 }
 export interface TraceStep {
   at: string;

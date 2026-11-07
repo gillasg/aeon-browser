@@ -39,7 +39,7 @@ test(
       }
       response.setHeader("content-type", "text/html");
       response.end(
-        `<title>Fixture</title><h1>Shop</h1><input aria-label="Search"><button onclick="document.title='clicked'">Go</button>`,
+        `<title>Fixture</title><h1>Shop</h1><input aria-label="Search"><button onclick="document.title='clicked';document.body.append(document.createElement('hr'))">Go</button><button>Nothing</button><button disabled>Disabled</button>`,
       );
     });
     await new Promise((done) => page.listen(0, "127.0.0.1", done));
@@ -108,6 +108,48 @@ test(
         assert.equal(clicked.error, undefined);
         assert.equal(clicked.value, "clicked");
         assert.ok(clicked.steps.some((step) => step.action?.op === "click"));
+      });
+
+      await t.test("every input step reports a closed effect with its evidence", async () => {
+        const state = await run("await bu.state()");
+        const id = (name) => {
+          const found = new RegExp(`\\[(\\d+)\\] button "${name}"`).exec(state.output);
+          assert.ok(found, `${name} is listed:\n${state.output.slice(0, 800)}`);
+          return found[1];
+        };
+        const field = /\[(\d+)\] textbox "Search"/.exec(state.output)[1];
+        const clickStep = async (code) => {
+          const result = await run(code);
+          return result.steps.filter((item) => item.action?.op === "click").at(-1);
+        };
+        const byOp = async (op, code) => {
+          const result = await run(code);
+          assert.equal(result.error, undefined, `${code}: ${result.error}`);
+          const step = result.steps.filter((item) => item.action?.op === op).at(-1);
+          assert.ok(step, `${op} step missing: ${JSON.stringify(result.steps).slice(0, 1200)}`);
+          return step;
+        };
+
+        const changed = await byOp("click", `await bu.click(${id("Go")})`);
+        assert.equal(changed.result.effect, "confirmed");
+        assert.match(changed.result.evidence, /DOM change|navigation/);
+
+        const filled = await byOp("fill", `await bu.type(${field}, "query")`);
+        assert.equal(filled.result.effect, "confirmed");
+        assert.match(filled.result.evidence, /value read back: "query"/);
+
+        const noop = await byOp("click", `await bu.click(${id("Nothing")})`);
+        assert.equal(noop.result.effect, "suspected_noop", noop.result.evidence);
+        assert.match(noop.result.evidence, /no navigation, DOM change or request/);
+        assert.match(String(noop.result.note), /nothing happened/);
+
+        // A step the engine refused never ran: refused, with its code as the evidence.
+        const refused = await clickStep(
+          `try { await bu.click(${id("Disabled")}) } catch (error) { String(error.message).split("\\n")[0] }`,
+        );
+        assert.equal(refused.disposition, "failed");
+        assert.equal(refused.effect, "refused");
+        assert.equal(refused.evidence, "TARGET_DISABLED");
       });
 
       await t.test("the agent cursor appears without entering the page state", async () => {

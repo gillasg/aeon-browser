@@ -286,6 +286,15 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
       observation: SemanticObservationSchema.optional(),
       scroll: BrowserScrollStateSchema.optional(),
       outcome: z.enum(["navigated", "changed", "unchanged", "unknown"]).optional(),
+      /**
+       * What the step caused, closed: confirmed has evidence (a value read back, a navigation, a
+       * DOM change); a step that ran without evidence is unverifiable; a bounded unchanged state
+       * is a suspected no-op; a step that did not run is refused. Never shown in the step line;
+       * the trace and eval rows read it.
+       */
+      effect: z.enum(["confirmed", "unverifiable", "suspected_noop", "refused"]),
+      /** The short readback the effect rests on. */
+      evidence: z.string().max(240),
       receipt: z
         .object({
           popups: z

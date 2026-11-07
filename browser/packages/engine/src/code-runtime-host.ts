@@ -16,6 +16,7 @@ import {
 import { browserErrorDetail, errorCode, targetIdentity } from "./native-browser-common.js";
 import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.js";
 import { stepFailure } from "./code-step-errors.js";
+import { refusedEffect } from "./native-browser-effect.js";
 import { jobs } from "./code-runtime-jobs.js";
 import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
@@ -377,7 +378,14 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     recordScreenshot(cell, step, result);
     return result;
   } catch (error) {
-    Object.assign(entry, { disposition: "failed", code: describe(error) });
+    // An input step that did not run says so in the closed effect vocabulary too: refused,
+    // with its code as the evidence. The step line the model reads is unchanged.
+    const refused = INPUT_OPS.has(step.op) ? refusedEffect(errorCode(error)) : undefined;
+    Object.assign(entry, {
+      disposition: "failed",
+      code: describe(error),
+      ...(refused ? { effect: refused.effect, evidence: refused.evidence } : {}),
+    });
     throw await scrubError(await stepFailure(step, error));
   } finally {
     entry.tEnd = Date.now();

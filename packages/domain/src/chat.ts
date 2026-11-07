@@ -243,6 +243,10 @@ export interface BrowserTraceAction {
   text?: string;
   scroll?: { direction: string; amount: number; before: number; after: number };
   failed?: boolean;
+  /** What the input step caused: confirmed, unverifiable, suspected_noop or refused. */
+  effect?: string;
+  /** The short readback the effect rests on. */
+  evidence?: string;
 }
 
 export interface PiNestedCallsProjection {

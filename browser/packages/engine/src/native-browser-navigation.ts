@@ -146,6 +146,8 @@ async function probe(debuggee: chrome.debugger.Debuggee): Promise<PageProbe | un
   return result.result?.value;
 }
 function domQuietProbe() {
+  // Aeon's own layers (labels, annotations, the agent cursor) are not the page changing.
+  const OVERLAY = "[data-aeon-overlay],[data-browserkit-overlay]";
   const host = window as unknown as {
     __aeonQuiet?: { last: number; changes: number; document: string; observer: MutationObserver };
   };
@@ -184,7 +186,15 @@ function domQuietProbe() {
       state.changes++;
     };
     document.addEventListener("input", changed, true);
-    document.addEventListener("change", changed, true);
+    // A text field's change fires late, when focus leaves it: that is the earlier typing
+    // committing, not the click that moved focus doing anything.
+    document.addEventListener(
+      "change",
+      (event) => {
+        if (event.target === document.activeElement || !blurCommit(event.target)) changed();
+      },
+      true,
+    );
     host.__aeonQuiet = state;
   }
   return {
@@ -194,16 +204,19 @@ function domQuietProbe() {
     document: host.__aeonQuiet.document,
     changes: host.__aeonQuiet.changes,
   };
+  function blurCommit(target: EventTarget | null) {
+    return (
+      target instanceof HTMLTextAreaElement ||
+      (target instanceof HTMLInputElement &&
+        !["checkbox", "radio", "file", "range", "color"].includes(target.type))
+    );
+  }
   function ownOverlay(record: MutationRecord) {
-    return !!(record.target as Element).closest?.("[data-aeon-overlay]");
+    return !!(record.target as Element).closest?.(OVERLAY);
   }
   function overlayNode(record: MutationRecord) {
     for (const node of [...record.addedNodes, ...record.removedNodes]) {
-      if (
-        node instanceof Element &&
-        (node.matches("[data-aeon-overlay]") || node.closest("[data-aeon-overlay]"))
-      )
-        return true;
+      if (node instanceof Element && (node.matches(OVERLAY) || node.closest(OVERLAY))) return true;
     }
     return false;
   }
