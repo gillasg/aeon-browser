@@ -66,3 +66,4 @@ apps/chrome-extension/test/.orb-module-*
 # Stealth bench runs stay on the machine that ran them.
 /benchmarks/stealth/results/
 /benchmarks/chaos/results/
+/benchmarks/kernel/results/

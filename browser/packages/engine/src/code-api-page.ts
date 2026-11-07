@@ -172,6 +172,15 @@ function __stealthProbe() {
   return {webdriver: navigator.webdriver === true, globals, overlays, wrapped, geolocationShim, leaks};
 }
 function __beginCell() { __speedBegin(); __dirty.clear(); __hasDelivered=false; __deliveryValue=undefined; }
+// Page-side: the text the user selected, unless it sits in a field (the agent's own typing selects
+// field contents).
+function __pageSelection() {
+  var selection = getSelection(), text = selection ? String(selection).trim() : '';
+  var node = selection && selection.anchorNode;
+  var element = node && (node.nodeType === 1 ? node : node.parentElement);
+  if (!text || (element && element.closest('input, textarea, [contenteditable=""], [contenteditable="true"]'))) return '';
+  return text.slice(0, 500);
+}
 async function __step(step, readOnly = false) {
   var startedAt = Date.now();
   if (step.target && __closedTabs.has(step.target.tabId)) {
@@ -349,6 +358,9 @@ var bu = Object.freeze({
     if (loaded) text = loaded + '\\n' + text;
     var challenge = await __challengeNote(target, state.url);
     if (challenge) text = challenge + String.fromCharCode(10) + text;
+    // Text the user selected on the page ("the post I selected"); never a field's own selection.
+    var picked = await browser.page(target).evaluate(__pageSelection).catch(() => '');
+    if (picked) text = 'The user has selected: ' + JSON.stringify(picked) + String.fromCharCode(10) + text;
     console.log(text);
     return text;
   },

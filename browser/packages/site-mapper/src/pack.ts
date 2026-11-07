@@ -26,6 +26,7 @@ const TOP_FILES = [
   "agents.json",
   "health.json",
   "docs.md",
+  "notes.md",
 ];
 const SKIP = /^(sessions?|cookies?|storage|auth|credentials?|versions?|\.git)$/i;
 
@@ -103,6 +104,11 @@ export async function exportSitePack(options: {
   for (const name of await flowFiles(join(root, "flows"))) {
     const path = join(root, "flows", name);
     add(`flows/${name}`, scrubFile(name, await readFile(path, "utf8"), redactor));
+  }
+  // The site's abilities travel with it (the migration bookkeeping does not).
+  for (const name of await abilityFiles(join(root, "abilities"))) {
+    const path = join(root, "abilities", name);
+    add(`abilities/${name}`, scrubFile(name, await readFile(path, "utf8"), redactor));
   }
   const skills = (options.skills ?? []).map(sanitizeSkill);
   for (const skill of skills)
@@ -353,6 +359,12 @@ function sanitizeBoost(boost: PackBoost): PackBoost {
   if (typeof copy.js === "string") copy.js = redactLiterals(redactor.text(copy.js));
   if (typeof copy.css === "string") copy.css = redactor.text(copy.css);
   return copy;
+}
+
+async function abilityFiles(folder: string): Promise<string[]> {
+  if (!existsSync(folder)) return [];
+  const names = await readdir(folder);
+  return names.filter((name) => name.endsWith(".json") && !/^migration/.test(name)).sort();
 }
 
 async function flowFiles(folder: string): Promise<string[]> {

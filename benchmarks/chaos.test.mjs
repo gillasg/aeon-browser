@@ -24,6 +24,9 @@ test("the verdict fails on a leak, a slow timeout and a lost daemon", () => {
   });
   assert.equal(good.ok, true, good.lines.join("\n"));
   assert.equal(judge({ leak: { before: 4, after: 5 } }).ok, false);
-  assert.equal(judge({ timeout: { hang: { status: 1, ms: 60000 }, next: { value: {} }, limitSeconds: 8 } }).ok, false);
+  assert.equal(
+    judge({ timeout: { hang: { status: 1, ms: 60000 }, next: { value: {} }, limitSeconds: 8 } }).ok,
+    false,
+  );
   assert.equal(judge({ daemon: { recoveredMs: null, boundMs: 90000 } }).ok, false);
 });
