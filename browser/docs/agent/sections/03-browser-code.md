@@ -39,7 +39,9 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
 - After a cell with actions the new page state prints automatically; never add blind sleeps (one right
-  after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A cell
+  after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A site
+  that says "too many attempts" or "try again later", or answers 429, is rate-limiting: stop that
+  path, use another way it offers, or end the task and report when to retry; never wait it out. A cell
   returns its last expression: end with one object holding what you found, and print only what you
   will use. Close tabs you are done with (`await page.close()`, or `browser.closeTab(id)`; any tab,
   then unsplit first); `page.keep()` hands one to the user when they need it

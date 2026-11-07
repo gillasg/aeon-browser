@@ -37,7 +37,6 @@ import {
   UNSAVED_LOGIN_NOTE,
   UNSAVED_LOGIN_SAVED,
   VAULT_SAVED,
-  VAULT_SAVING,
   vaultCandidate,
 } from "./native-browser-vault.js";
 import {
@@ -360,9 +359,8 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
       cell.allowed.set(key, result.tab.target);
       cell.opened.set(key, result.tab.target);
     }
-    if (step.op === "fill" && vaultCandidate(step.target.tabId)?.password === step.value)
-      entry.action = { ...step, value: "[hidden password]" };
     Object.assign(entry, { disposition: "completed", result });
+    if ("target" in step) hideTypedPassword(cell, step.target.tabId);
     const tabId = (resultTab =
       result.kind === "tab"
         ? result.tab.target.tabId
@@ -390,15 +388,14 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     progress(cell);
   }
 }
-/** How long a click waits for the password manager's answer before carrying on without it. */
-const SAVE_ANSWER_WAIT_MS = 1500;
-
 /** Keeps a password a person typed, and matches Chrome's own save offer to the profile's manager. */
 async function beforeSubmit(cell: Cell, tabId: number): Promise<void> {
   // Probing attaches the debugger, which costs a click its popup: skip tabs the agent typed nothing
   // in (a person's login during a hand-off is caught by the hand-off itself).
   if (agentTypedIn(tabId) && !vaultCandidate(tabId))
     await captureTypedPassword(tabId).catch(() => undefined);
+  // Keyboard typing carries the value in its step; the trace never keeps a password.
+  hideTypedPassword(cell, tabId);
   const candidate = vaultCandidate(tabId);
   if (candidate)
     await matchChromeSaving((request) => callCore(cell, request), candidate.url).catch(
@@ -407,11 +404,32 @@ async function beforeSubmit(cell: Cell, tabId: number): Promise<void> {
 }
 
 /**
- * Saves a login the agent typed once its form went through. When no password manager took it,
- * only Chrome's own "Save password?" prompt can keep it, and agent code cannot click browser UI,
- * so the kernel asks the user itself and no model can skip it. With no manager set up the answer
- * is instant: the click waits for the user and its note says how it went. A manager still saving
- * (a slow CLI) does not hold the click up; if that save fails, the user is asked all the same.
+ * Replaces the password a step typed (fill, keyboard.type, pressSequentially, paste) with a marker
+ * in the trace. The value is learned when the submit probes the form, so this runs over the steps
+ * already recorded, not only the current one.
+ */
+function hideTypedPassword(cell: Cell, tabId: number): void {
+  const secret = vaultCandidate(tabId)?.password;
+  if (!secret) return;
+  const holds = (text: string) => text === secret || (secret.length >= 4 && text.includes(secret));
+  for (const entry of cell.steps) {
+    if (entry.disposition === "running") continue;
+    const action = entry.action as Record<string, unknown> | undefined;
+    if (!action) continue;
+    for (const field of ["value", "keys", "text"])
+      if (typeof action[field] === "string" && holds(action[field]))
+        action[field] = "[hidden password]";
+  }
+}
+
+/**
+ * Saves a login the agent typed once its form went through. The capture waits for the page's own
+ * answer (a form that stays a few seconds before it moves still counts), because the host call
+ * that saves belongs to this cell: returning first and saving later lost slow successes when the
+ * cell was already gone. When no password manager took it, only Chrome's own "Save password?"
+ * prompt can keep it, and agent code cannot click browser UI, so the kernel asks the user itself
+ * and no model can skip it. With no manager set up the answer is instant: the click waits for the
+ * user and its note says how it went.
  */
 async function vaultAfterSubmit(
   cell: Cell,
@@ -419,24 +437,14 @@ async function vaultAfterSubmit(
   result: unknown,
 ): Promise<void> {
   if (!vaultCandidate(target.tabId)) return;
-  const saving = finishVaultCapture(target.tabId, (request) => callCore(cell, request)).catch(
-    () => undefined,
-  );
-  const early = await Promise.race([
-    saving,
-    new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), SAVE_ANSWER_WAIT_MS)),
-  ]);
-  if (early === "pending") {
-    void saving.then(async (outcome) => {
-      if (outcome === "unsaved") await askToSaveLater(cell, target);
-      if (outcome === "failed") await askToUnlock(cell, target, true);
-    });
-    return addNote(result, VAULT_SAVING);
-  }
+  const outcome = await finishVaultCapture(target.tabId, (request) =>
+    callCore(cell, request),
+  ).catch(() => undefined);
   // Every outcome is said on the click itself, so the model never has to check a save.
-  if (early === "saved") return addNote(result, VAULT_SAVED);
-  if (early === "failed") return addNote(result, await askToUnlock(cell, target, false));
-  if (early !== "unsaved") return;
+  if (outcome === "saved") return addNote(result, VAULT_SAVED);
+  if (outcome === "failed") return addNote(result, await askToUnlock(cell, target));
+  // Nothing saved (no answer, skipped or a person's own password): nothing to say.
+  if (outcome !== "unsaved") return;
   const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
   addNote(result, asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE);
 }
@@ -449,16 +457,14 @@ function addNote(result: unknown, note: string): void {
 /**
  * The password manager is set up but could not save (locked, or its CLI did not answer). Chrome's
  * prompt is off while a manager is set up, so the login would be lost: the kernel asks the user to
- * unlock it and saves it again on Done. `late`: the click already returned, the card outlives it.
+ * unlock it and saves it again on Done.
  */
-async function askToUnlock(cell: Cell, target: { tabId: number }, late: boolean): Promise<string> {
+async function askToUnlock(cell: Cell, target: { tabId: number }): Promise<string> {
   const provider = failedSave(target.tabId);
   if (!provider) return MANAGER_DID_NOT_SAVE;
-  const message = unlockToSave(provider);
-  if (late) void presentBrowserTask(cell.run.chatId, target.tabId, true);
-  const asked = late
-    ? await handOffToUser(target.tabId, message, () => true).catch(() => "cancelled")
-    : await handoff(cell, { target, message }).catch(() => "cancelled");
+  const asked = await handoff(cell, { target, message: unlockToSave(provider) }).catch(
+    () => "cancelled",
+  );
   if (asked !== "done") return MANAGER_DID_NOT_SAVE;
   const saved = await retryVaultSave(target.tabId, (request) => callCore(cell, request));
   return saved ? SAVED_AFTER_UNLOCK : MANAGER_DID_NOT_SAVE;
@@ -473,13 +479,7 @@ async function saveUserLogin(cell: Cell, target: { tabId: number }): Promise<voi
   const outcome = await finishVaultCapture(target.tabId, (request) =>
     callCore(cell, request),
   ).catch(() => undefined);
-  if (outcome === "failed") await askToUnlock(cell, target, false);
-}
-
-/** The manager failed after the click returned: the card stays up past the cell that made the login. */
-async function askToSaveLater(cell: Cell, target: { tabId: number }): Promise<void> {
-  void presentBrowserTask(cell.run.chatId, target.tabId, true);
-  await handOffToUser(target.tabId, SAVE_IN_CHROME, () => true).catch(() => undefined);
+  if (outcome === "failed") await askToUnlock(cell, target);
 }
 
 /**

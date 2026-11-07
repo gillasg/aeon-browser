@@ -35,7 +35,8 @@ export interface SignInResult {
     | "NO_SIGN_IN_FORM"
     | "NEEDS_CODE"
     | "CAPTCHA"
-    | "REJECTED"
+    /** The site refused the saved login: it looks stale (changed or reset elsewhere). */
+    | "SAVED_LOGIN_REJECTED"
     /** The form posts the login to another site: nothing was typed. */
     | "FOREIGN_FORM"
     /** The site wants approval on the user's phone or app, and none came within a minute. */
@@ -288,7 +289,7 @@ async function outcome(
   if (now?.code) return { ...base, signedIn: false, reason: "NEEDS_CODE" };
   if (now?.password) {
     await clearPasswords(tabId);
-    return { ...base, signedIn: false, reason: "REJECTED" };
+    return { ...base, signedIn: false, reason: "SAVED_LOGIN_REJECTED" };
   }
   return { ...base, signedIn: true };
 }

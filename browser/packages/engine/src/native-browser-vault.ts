@@ -61,8 +61,24 @@ const PROBE = `(() => {
   const fields = [...document.querySelectorAll("input")].filter(shown);
   const password = fields.find((el) => el.type === "password");
   const site = location.hostname.replace(/^www\\./, "");
-  const alerts = [...document.querySelectorAll('[role=alert], [aria-live=assertive], [aria-live=polite]')].filter(shown).map((el) => el.textContent || "").join(" ");
-  const refused = /(wrong|incorrect|invalid|doesn.?t match|didn.?t match|not match|try again|expired|too weak|not strong)/i.test(alerts);
+  // A refusal is written as text near the form: an alert, an error box, or a plain line of the
+  // page ("Incorrect code. Try again."). Only short text that is not a link or button counts, so
+  // a "Didn't get it? Try again" resend link on a good code step is not read as an error.
+  const interactive = (el) => el.closest("a, button, [role=button], [role=link]");
+  const inline = new Set(["SPAN", "STRONG", "B", "I", "EM", "BR", "A", "SMALL", "LABEL", "CODE", "U"]);
+  const leaf = (el) => [...el.children].every((child) => inline.has(child.tagName));
+  const ownText = (el) => [...el.childNodes]
+    .filter((node) => !(node.nodeType === 1 && /^(A|BUTTON)$/.test(node.tagName)))
+    .map((node) => node.textContent || "").join(" ").replace(/\\s+/g, " ").trim();
+  // Cheap text test first: styles are only read for the few elements whose words match.
+  const REFUSAL = /(wrong|incorrect|invalid|not valid|doesn.?t match|didn.?t match|not match|try again|expired|too weak|not strong|already (?:used|registered)|too many (?:attempts|tries|requests))/i;
+  const says = (el, max) => {
+    const text = ownText(el);
+    return Boolean(text) && text.length <= max && REFUSAL.test(text) && shown(el) && !interactive(el);
+  };
+  const refused =
+    [...document.querySelectorAll("[role=alert], [aria-live], [data-error], [class*=error i], [id*=error i], [class*=invalid i]")].some((el) => says(el, 300)) ||
+    [...document.querySelectorAll("p, span, div, h1, h2, h3, h4, li")].some((el) => leaf(el) && says(el, 200));
   if (!password) return {url: location.href, site, hasPassword: false, password: "", username: "", signup: false, refused};
   const form = password.form || password.closest("form");
   const inputs = [...(form || document).querySelectorAll("input")];
@@ -71,7 +87,7 @@ const PROBE = `(() => {
   const signup = password.autocomplete === "new-password" ||
     inputs.some((el) => el !== password && el.type === "password" && el.autocomplete === "new-password") ||
     Boolean(/(sign ?up|register|create account|join)/i.test(document.title + " " + location.pathname));
-  return {url: location.href, site, hasPassword: true, password: password.value || "", username: user ? user.value || "" : "", signup};
+  return {url: location.href, site, hasPassword: true, password: password.value || "", username: user ? user.value || "" : "", signup, refused};
 })()`;
 
 /** Records the values in a password field the agent just filled. */
@@ -219,6 +235,8 @@ async function formAfterSubmit(tabId: number): Promise<VaultForm | undefined> {
   let form = await probeVaultForm(tabId).catch(() => undefined);
   // undefined: the page is between documents (it navigated), so keep looking.
   while ((form === undefined || form.hasPassword) && Date.now() < deadline) {
+    // A refusal named beside the form is final: no need to wait out a slow site's silence.
+    if (form?.hasPassword && form.refused) return form;
     await new Promise((resolve) => setTimeout(resolve, 500));
     form = await probeVaultForm(tabId).catch(() => undefined);
   }
@@ -279,8 +297,6 @@ export const SAVE_IN_CHROME =
   "Aeon made a login no password manager saved. Click Save in Chrome's password prompt (the key icon in the address bar reopens it), then Done.";
 export const VAULT_SAVED =
   "the login (the password you typed) was saved to the user's password manager; nothing to check";
-export const VAULT_SAVING =
-  "the login (the password you typed) is being saved to the user's password manager; if that fails Aeon asks the user itself, so nothing to check";
 export const UNSAVED_LOGIN_SAVED =
   "no password manager saved the password you typed, so the user was asked to save it in Chrome's prompt and said done";
 export const UNSAVED_LOGIN_NOTE =
