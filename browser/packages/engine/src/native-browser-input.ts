@@ -11,6 +11,7 @@ import {
   type BrowserStep,
   BrowserExecutorResultSchema,
   type BrowserExecutorResult,
+  NOOP_NEXT_CALL,
 } from "@browserkit/protocol";
 import {
   resolveElement,
@@ -692,7 +693,7 @@ function silentClickNote(element: BrowserElementTarget): string {
           : element.kind === "point"
             ? "the clicked point"
             : `backend node ${element.backendNodeId}`;
-  return `clicked ${what}: nothing happened (no navigation, DOM change or network request). The card's link may be on a child element; try clicking the child, or a listener may need a pointer event: try page.clickAt(x, y).`;
+  return `clicked ${what}: nothing happened (no navigation, DOM change or network request). The card's link may be on a child element; try clicking the child, or a listener may need a pointer event: try page.clickAt(x, y). Next: ${NOOP_NEXT_CALL}`;
 }
 
 async function dispatchAction(

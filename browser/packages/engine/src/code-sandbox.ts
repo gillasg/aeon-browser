@@ -1,7 +1,7 @@
 // One chat's browser_code realm. Runs in a manifest sandbox page, where eval is allowed and
 // no extension APIs exist; every browser or workspace request goes to the parent document.
 import { toReplScript } from "./code-repl.js";
-import { errorHint, leadingCode, nameModelCodeError } from "@browserkit/protocol";
+import { errorHint, errorNextCall, leadingCode, nameModelCodeError } from "@browserkit/protocol";
 import { browserCodeApi } from "./code-api.js";
 import { browserFastApi } from "./code-api-page.js";
 import { browserCapabilityApi, browserDocumentApi } from "./code-api-hooks.js";
@@ -201,7 +201,9 @@ function withHint(message: string, raw: string, code: string): string {
   }
   // Without a hint of its own, the error's shared code still says how to recover.
   hint ||= message.includes("\nHint: ") ? "" : errorHint(leadingCode(message) ?? "");
-  return hint ? `${message}\nHint: ${hint}` : message;
+  const next = errorNextCall(leadingCode(message) ?? "");
+  const lines = [message, ...(hint ? [`Hint: ${hint}`] : []), ...(next ? [`Next: ${next}`] : [])];
+  return lines.join("\n");
 }
 
 function portable(value: unknown): unknown {
