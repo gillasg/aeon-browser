@@ -59,7 +59,7 @@ export const ERRORS = {
   ],
   PASSWORD_PAGE: [
     "user",
-    "a password is in this page that your code did not type (Chrome's autofill, bu.signIn or the user), so no code runs in it; clicks still work: if it is a filled sign-in form, click its Log in / Sign in button to submit it (never hand that to the user), otherwise carry on with clicks, or page.reload() to read it again",
+    "a password this code did not type is in the page, so no code runs in it; clicks still work: click the filled form's Log in / Sign in button, else page.reload() to read it again",
   ],
   UNSUPPORTED: ["page", "this browser cannot do that here: use another way"],
   INVALID_TARGET: ["model", "the target is malformed: pass a tab, a page or a bu id"],
@@ -112,11 +112,45 @@ export function errorHint(code: string): string {
   return isErrorCode(code) ? ERRORS[code][1] : "";
 }
 
-/** "CODE: detail" plus the recovery hint, as the model sees it. */
+/**
+ * The call a failure can run as it is to move forward, for the codes where one exists: a read, a
+ * harmless reload or a wait, never an action that could commit anything. A code with no safe
+ * next call (a site the user blocked, Chrome closed) is absent; its hint says what to do instead.
+ * One table, so the browser code runtime, the tools and the CLI all name the same call.
+ */
+export const NEXT_CALLS: Partial<Record<ErrorCode, string>> = {
+  TARGET_NOT_FOUND: "await bu.state()",
+  AMBIGUOUS_TARGET: "await bu.state()",
+  TARGET_HIDDEN: "await bu.state()",
+  TARGET_DISABLED: "await bu.state()",
+  TARGET_BLOCKED: "await bu.state()",
+  TARGET_LOST: "await bu.state()",
+  NOT_EDITABLE: "await bu.state()",
+  STALE_REF: "await bu.state()",
+  EXPECTATION_FAILED: "await bu.state()",
+  TIMEOUT: "await bu.state()",
+  BOT_WALL: "await bu.state()",
+  SITE_BROKEN: "await bu.state()",
+  NETWORK: "await bu.state()",
+  TAB_DEAD: "browser.tabs()",
+  PASSWORD_PAGE: "await page.reload()",
+  USER_TOOK_CONTROL: "await page.waitForControl()",
+};
+
+/** The safe read after a step that ran but left the page as it was. */
+export const NOOP_NEXT_CALL = "await bu.state()";
+
+/** The call to make after a failure, or "" when no call is safe. */
+export function errorNextCall(code: string): string {
+  return (isErrorCode(code) ? NEXT_CALLS[code] : undefined) ?? "";
+}
+
+/** "CODE: detail" plus the recovery hint and, when one exists, the safe call after it. */
 export function describeError(code: string, detail = ""): string {
   const head = detail && detail !== code ? `${code}: ${detail}` : code;
   const hint = errorHint(code);
-  return hint ? `${head}\nHint: ${hint}` : head;
+  const next = errorNextCall(code);
+  return [head, ...(hint ? [`Hint: ${hint}`] : []), ...(next ? [`Next: ${next}`] : [])].join("\n");
 }
 
 /**

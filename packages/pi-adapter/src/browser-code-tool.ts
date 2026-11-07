@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import { errorNextCall, leadingCode } from "@aeon/protocol";
 import type { ModelLike } from "@browserkit/tools/site-to-api";
 import { isCredentialRequest } from "@browserkit/credentials";
 import { traceActions } from "./browser-trace-actions.js";
@@ -448,11 +449,19 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
 
 function browserCodeError(message = "INTERNAL", detail?: string): string {
   const text = detail ? `${message}: ${detail}` : message;
+  if (/\nHint: /.test(text)) return withNextCall(text);
   const selector = selectorHint(text);
-  if (selector) return text.split("\n")[0] + "\nHint: " + selector;
+  if (selector) return withNextCall(text.split("\n")[0] + "\nHint: " + selector);
   // The runtime adds a "did you mean" from the real API when it can; otherwise point at help().
-  if (!/is not a function|is not defined/.test(text) || /\nHint: /.test(text)) return text;
-  return text.split("\n")[0] + "\nawait help() lists what browser code can do.";
+  if (!/is not a function|is not defined/.test(text)) return withNextCall(text);
+  return withNextCall(text.split("\n")[0] + "\nawait help() lists what browser code can do.");
+}
+
+/** Adds the shared code's safe call when the failure names one and no host added it already. */
+function withNextCall(text: string): string {
+  if (/\nNext: /.test(text)) return text;
+  const next = errorNextCall(leadingCode(text) ?? "");
+  return next ? `${text}\nNext: ${next}` : text;
 }
 
 /** Playwright habits that are not CSS: say what to use instead. */
