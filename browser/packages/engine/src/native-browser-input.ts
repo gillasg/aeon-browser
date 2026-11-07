@@ -1,6 +1,6 @@
 import { measureBox, noteActionTiming } from "./native-browser-action-timing.js";
 import { showAgentCursor, showAgentKeys, type CursorUpdate } from "./native-browser-cursor.js";
-import { onNode, nodeState, fillTextNode } from "./native-browser-dom.js";
+import { onNode, nodeState, fillTextNode, readFieldValue } from "./native-browser-dom.js";
 import { beginReceipt, receiptQuiet, takeReceipt } from "./native-browser-receipts.js";
 import { noteVaultFill } from "./native-browser-vault.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
@@ -11,7 +11,6 @@ import {
   type BrowserStep,
   BrowserExecutorResultSchema,
   type BrowserExecutorResult,
-  NOOP_NEXT_CALL,
 } from "@browserkit/protocol";
 import {
   resolveElement,
@@ -26,6 +25,19 @@ import {
   observeSemantic,
 } from "./native-browser-observation.js";
 import { type AxRef, BrowserActionError, safePage } from "./native-browser-common.js";
+import {
+  expectedValue,
+  inputStepEffect,
+  scrollEffect,
+  silentClickNote,
+} from "./native-browser-effect.js";
+import {
+  activateNode,
+  coveringElement,
+  framePoint,
+  hitPoint,
+  scrollNearest,
+} from "./native-browser-input-page.js";
 import {
   viewportFingerprint,
   primeBrowserSettle,
@@ -68,84 +80,6 @@ export async function actionablePoint(
   }
   const cover = await onNode<string>(debuggee, id, coveringElement).catch(() => "");
   throw cover ? new BrowserActionError("TARGET_BLOCKED", cover) : new Error("TARGET_BLOCKED");
-}
-// Names what sits on top of the target, so the agent acts in the open dialog or closes the
-// overlay instead of retrying the covered control.
-function coveringElement(this: HTMLElement): string {
-  const box = this.getBoundingClientRect();
-  const x = Math.min(Math.max(box.left + box.width / 2, 0), innerWidth - 1);
-  const y = Math.min(Math.max(box.top + box.height / 2, 0), innerHeight - 1);
-  const hit = (this.getRootNode() as Document | ShadowRoot).elementFromPoint(x, y);
-  if (!hit) return "";
-  const layer =
-    hit.closest(
-      "dialog,[role=dialog],[role=alertdialog],[role=listbox],[role=menu],[aria-modal]",
-    ) ?? hit;
-  const label = (el: Element) =>
-    (el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.textContent || "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 60);
-  const role = layer.getAttribute("role") || layer.tagName.toLowerCase();
-  const fields = [...layer.querySelectorAll("input,textarea,select,[role=combobox]")]
-    .slice(0, 5)
-    .map((el) => `"${label(el) || el.getAttribute("name") || "field"}"`);
-  const parts = [`covered by ${role} "${label(layer)}"`];
-  if (fields.length) parts.push(`its fields: ${fields.join(", ")}`);
-  parts.push("act inside it (bu.state() shows its ids) or close it first");
-  return parts.join("; ");
-}
-// DOM-level activation for a target that cannot be hit-tested and has no reachable label.
-function activateNode(this: HTMLElement): void {
-  if (typeof this.click === "function") this.click();
-  else this.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-}
-// Brings the target into view inside its nearest scrollable container (dialogs, panels, lists).
-function scrollNearest(this: HTMLElement): void {
-  this.scrollIntoView({ block: "nearest", inline: "nearest" });
-}
-function hitPoint(this: HTMLElement) {
-  const box = this.getBoundingClientRect();
-  const left = Math.max(0, box.left),
-    top = Math.max(0, box.top);
-  const right = Math.min(innerWidth, box.right),
-    bottom = Math.min(innerHeight, box.bottom);
-  const x = (left + right) / 2,
-    y = (top + bottom) / 2;
-  const root = this.getRootNode() as Document | ShadowRoot;
-  const hit = root.elementFromPoint(x, y);
-  const covered = right > left && bottom > top && !!hit;
-  const direct = covered && (hit === this || this.contains(hit));
-  // Coordinates stay in this frame; the engine adds each owner iframe's box when it sends Input
-  // on the root session (frameElement is null inside a cross-origin frame).
-  if (!covered || direct || !ancestorOf(hit, this)) return { x, y, hit: direct };
-  // The target sits inside the element that is hit but cannot be hit itself (hidden or
-  // pointer-events:none control): use its label if that is reachable, else activate it in the DOM.
-  const label = labelOf(this);
-  const lbox = label?.getBoundingClientRect();
-  const lx = lbox ? lbox.left + lbox.width / 2 : 0,
-    ly = lbox ? lbox.top + lbox.height / 2 : 0;
-  const lhit =
-    label && lbox && lbox.width > 0 && lbox.height > 0 ? root.elementFromPoint(lx, ly) : null;
-  if (label && lhit && (lhit === label || label.contains(lhit))) return { x: lx, y: ly, hit: true };
-  return { x, y, hit: true, activate: true };
-  function ancestorOf(other: Element | null, target: Element): boolean {
-    let node: Node | null = target;
-    while (node && other) {
-      if (node === other) return true;
-      const parent: Node | null = node.parentNode;
-      node = parent instanceof ShadowRoot ? parent.host : parent;
-    }
-    return false;
-  }
-  function labelOf(target: HTMLElement): HTMLElement | null {
-    const labels = (target as HTMLInputElement).labels;
-    if (labels?.length) return labels[0] as HTMLElement;
-    const wrapping = target.closest("label");
-    if (wrapping) return wrapping;
-    const ref = target.getAttribute("aria-labelledby")?.split(" ")[0];
-    return ref ? (root.getElementById?.(ref) ?? null) : null;
-  }
 }
 export async function fillNode(
   debuggee: chrome.debugger.Debuggee,
@@ -638,6 +572,8 @@ export async function performAction(
   const tabId = request.step.target.tabId;
   let outcome: "navigated" | "changed" | "unchanged" | "unknown" = "unknown";
   let note: string | undefined;
+  let changes: number | undefined;
+  let readback: string | undefined;
   beginReceipt(tabId);
   const scroll = await withDebugger(tabId, async (debuggee) => {
     await revalidateTarget(request, tabId);
@@ -645,9 +581,12 @@ export async function performAction(
       return scrollWithFeedback(debuggee, { ...request, step: request.step });
     const before = await primeBrowserSettle(debuggee);
     const since = Date.now();
-    await dispatchAction(debuggee, request, revalidateTarget);
+    const dispatched = await dispatchAction(debuggee, request, revalidateTarget);
+    readback = dispatched?.readback;
     const settled = await settleBrowserPage(debuggee, 800, since, 80);
     outcome = pageOutcome(before, settled.probe);
+    // The mutation count the page reported between the two probes: evidence for a DOM change.
+    if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
     if (request.step.op === "click" && outcome === "unchanged" && !settled.network)
       note = silentClickNote(request.step.element);
     return undefined;
@@ -668,12 +607,27 @@ export async function performAction(
   await receiptQuiet(tabId);
   const receipt = takeReceipt(tabId);
   receipt.navigated ||= String(outcome) === "navigated";
+  const effect = scroll
+    ? scrollEffect(scroll)
+    : inputStepEffect(
+        request.step.op,
+        {
+          outcome,
+          url: liveTab.url,
+          ...(changes !== undefined ? { changes } : {}),
+          ...(receipt.requests?.length ? { requests: receipt.requests.length } : {}),
+          ...(readback !== undefined ? { readback } : {}),
+        },
+        expectedValue(request.step),
+      );
   return BrowserExecutorResultSchema.parse({
     kind: "action",
     target: current.target,
     documentEpoch: current.documentEpoch,
     url: liveTab.url,
     outcome,
+    effect: effect.effect,
+    evidence: effect.evidence,
     receipt,
     ...(note ? { note } : {}),
     ...(observation ? { observation } : {}),
@@ -681,31 +635,20 @@ export async function performAction(
   });
 }
 
-/** A real click that produced no navigation, DOM change or request is usually a miss. */
-function silentClickNote(element: BrowserElementTarget): string {
-  const what =
-    element.kind === "locator"
-      ? `${element.role} "${element.name}"${element.scope ? ` in ${element.scope}` : ""}`
-      : element.kind === "query"
-        ? `${element.by} selector ${JSON.stringify(element.value)}`
-        : element.kind === "ref"
-          ? `element ${element.ref}`
-          : element.kind === "point"
-            ? "the clicked point"
-            : `backend node ${element.backendNodeId}`;
-  return `clicked ${what}: nothing happened (no navigation, DOM change or network request). The card's link may be on a child element; try clicking the child, or a listener may need a pointer event: try page.clickAt(x, y). Next: ${NOOP_NEXT_CALL}`;
-}
-
 async function dispatchAction(
   debuggee: chrome.debugger.Debuggee,
   request: ActionRequest,
   revalidateTarget: RevalidateTarget,
-): Promise<void> {
+): Promise<{ readback?: string } | undefined> {
   await revalidateTarget(request, request.step.target.tabId);
-  if (request.step.op === "click" && request.step.element.kind === "point")
-    return clickScreenshotPoint(debuggee, request);
-  if (request.step.op === "scroll" && !request.step.element)
-    return scrollViewport(debuggee, request);
+  if (request.step.op === "click" && request.step.element.kind === "point") {
+    await clickScreenshotPoint(debuggee, request);
+    return undefined;
+  }
+  if (request.step.op === "scroll" && !request.step.element) {
+    await scrollViewport(debuggee, request);
+    return undefined;
+  }
   if (!request.step.element) throw new Error("INVALID_TARGET");
   const {
     node,
@@ -731,11 +674,16 @@ async function dispatchAction(
     await (box.activate
       ? onNode(frame, node.backendNodeId, activateNode)
       : clickAt(debuggee, top.x, top.y));
-  else if (request.step.op === "fill")
+  else if (request.step.op === "fill") {
     await fillNode(frame, node.backendNodeId, request.step.value);
-  else if (request.step.op === "paste")
+    const readback = await readFieldValue(frame, node.backendNodeId);
+    return readback !== undefined ? { readback } : undefined;
+  } else if (request.step.op === "paste") {
     await pasteNode(frame, node.backendNodeId, request.step.text, request.step.html);
-  else await scrollAt(debuggee, top.x, top.y, request.step.direction, request.step.amount);
+    const readback = await readFieldValue(frame, node.backendNodeId);
+    return readback !== undefined ? { readback } : undefined;
+  } else await scrollAt(debuggee, top.x, top.y, request.step.direction, request.step.amount);
+  return undefined;
 }
 
 async function scrollViewport(
@@ -745,41 +693,4 @@ async function scrollViewport(
   if (request.step.op !== "scroll" || request.step.element) throw new Error("INVALID_TARGET");
   const center = await getViewportCenter(debuggee);
   await scrollAt(debuggee, center.x, center.y, request.step.direction, request.step.amount);
-}
-
-// Page-side: the point to click for an element in a frame. A target inside the element that is hit
-// (hidden or pointer-events:none control) is clicked through its label, else activated in the DOM.
-function framePoint(this: HTMLElement): { x: number; y: number; activated?: boolean } {
-  this.scrollIntoView({ block: "center", inline: "center" });
-  const box = this.getBoundingClientRect();
-  if (!box.width || !box.height || this.matches(':disabled,[aria-disabled="true"]'))
-    throw Error("TARGET_DISABLED");
-  const at = (x: number, y: number) => {
-    let hit = this.ownerDocument.elementFromPoint(x, y);
-    while (hit?.shadowRoot) {
-      const next = hit.shadowRoot.elementFromPoint(x, y);
-      if (!next || next === hit) break;
-      hit = next;
-    }
-    return hit;
-  };
-  const x = box.left + box.width / 2,
-    y = box.top + box.height / 2;
-  const hit = at(x, y);
-  if (hit === this || (hit && this.contains(hit))) return { x, y };
-  let ancestor = false;
-  for (let node: Node | null = this; node && hit; node = node.parentNode)
-    if (node === hit) ancestor = true;
-  if (!ancestor) throw Error("TARGET_BLOCKED");
-  const label =
-    (this as unknown as HTMLInputElement).labels?.[0] ?? this.closest("label") ?? undefined;
-  const lbox = label?.getBoundingClientRect();
-  if (label && lbox && lbox.width && lbox.height) {
-    const lx = lbox.left + lbox.width / 2,
-      ly = lbox.top + lbox.height / 2;
-    const lhit = at(lx, ly);
-    if (lhit && (lhit === label || label.contains(lhit))) return { x: lx, y: ly };
-  }
-  this.click();
-  return { x, y, activated: true };
 }

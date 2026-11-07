@@ -25,6 +25,8 @@ export async function closedByAction(
     documentEpoch: request.expectedDocumentEpoch ?? 0,
     url: tab.url ?? "",
     outcome: "changed",
+    effect: "confirmed",
+    evidence: "the page closed this tab itself after the action",
     note:
       "The page closed this tab itself after the action (a pop-up such as a sign-in window finishing); the action worked." +
       (opener !== undefined

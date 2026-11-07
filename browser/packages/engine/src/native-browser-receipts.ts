@@ -92,7 +92,37 @@ function noteNetwork(
   } else if (method === "Network.loadingFinished") pending.delete(id);
 }
 
+/**
+ * Chrome's own download list is the second witness: CDP's downloadWillBegin can miss a download
+ * that page code starts after a dialog. The download goes to the receipt whose tab's page started
+ * it (its referrer), and only when CDP did not already name one.
+ */
+async function noteCreatedDownload(item: chrome.downloads.DownloadItem): Promise<void> {
+  for (const [tabId, receipt] of receipts) {
+    if (receipt.download) continue;
+    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+    if (!tab?.url || !sameOrigin(tab.url, item.referrer || item.url)) continue;
+    receipt.download = {
+      url: item.url.slice(0, 2000),
+      filename: (item.filename.split(/[\\/]/).pop() || item.url.split("/").pop() || "").slice(
+        0,
+        300,
+      ),
+    };
+    return;
+  }
+}
+
+function sameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
 onEngineInstall(() => {
+  chrome.downloads?.onCreated.addListener((item) => void noteCreatedDownload(item));
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (source.tabId === undefined) return;
     const receipt = receipts.get(source.tabId);

@@ -32,8 +32,20 @@ function toAction(step: Record<string, unknown>, stored = false): BrowserTraceAc
       ...flags(step),
       ...geometry(step),
       ...texts(step, action, stored),
+      ...effectFields(step),
     },
   ];
+}
+
+/** The closed effect of an input step, on the result the engine recorded or the stored row. */
+function effectFields(step: Record<string, unknown>): Partial<BrowserTraceAction> {
+  const result = isRecord(step.result) ? step.result : undefined;
+  const effect = stringOf(step.effect) ?? stringOf(result?.effect);
+  const evidence = stringOf(step.evidence) ?? stringOf(result?.evidence);
+  return {
+    ...(effect ? { effect: effect.slice(0, 20) } : {}),
+    ...(evidence ? { evidence: evidence.slice(0, 240) } : {}),
+  };
 }
 
 function flags(step: Record<string, unknown>): Partial<BrowserTraceAction> {

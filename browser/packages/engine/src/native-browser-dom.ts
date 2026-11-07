@@ -1,6 +1,21 @@
 import { BrowserActionError } from "./native-browser-common.js";
 import { humanType, paceKey } from "./native-browser-human-input.js";
 
+/** What a filled field holds now: the readback a fill or paste rests on. */
+export function readFieldValue(
+  debuggee: chrome.debugger.Debuggee,
+  backendNodeId: number,
+): Promise<string | undefined> {
+  return onNode<string>(debuggee, backendNodeId, function (this: HTMLElement) {
+    if (this.tagName === "SELECT") {
+      const select = this as unknown as HTMLSelectElement;
+      return select.selectedOptions[0]?.text ?? select.value;
+    }
+    const field = this as unknown as HTMLInputElement;
+    return typeof field.value === "string" ? field.value : (this.textContent ?? "").trim();
+  }).catch(() => undefined);
+}
+
 export async function onNode<T>(
   debuggee: chrome.debugger.Debuggee,
   backendNodeId: number,
