@@ -109,7 +109,7 @@ internal static class DaemonSupervisor
         {
             job = CreateKillOnCloseJob();
             SupervisorStatus.SetPhase("spawn");
-            daemon = StartDaemon(config);
+            daemon = StartWithin(config, PhaseTimeoutSeconds);
             if (!AssignProcessToJobObject(job, daemon.Handle))
                 throw new InvalidOperationException("Unable to bind the daemon to its supervisor lifetime.");
             daemon.ErrorDataReceived += (sender, eventArgs) => SupervisorLog.Write(eventArgs.Data);
@@ -456,6 +456,23 @@ internal static class DaemonSupervisor
         security.AddAccessRule(new MutexAccessRule(
             HostConfiguration.CurrentUserSid(), MutexRights.FullControl, AccessControlType.Allow));
         return new Mutex(false, HostConfiguration.MutexName(), out created, security);
+    }
+
+    /// <summary>
+    /// Starting node can hang at boot (the stall timer only begins once it returns), which left
+    /// a supervisor stuck in "spawn" for an hour. A start that does not return in time ends this
+    /// supervisor: its stuck thread cannot be freed, and the launcher starts a fresh one within
+    /// a minute when none is running.
+    /// </summary>
+    private static Process StartWithin(HostConfiguration config, int seconds)
+    {
+        var starting = Task.Run(() => StartDaemon(config));
+        if (!starting.Wait(TimeSpan.FromSeconds(seconds)))
+        {
+            SupervisorLog.Write("Daemon spawn did not return in " + seconds + " s; supervisor exits so a fresh one starts.");
+            Environment.Exit(3);
+        }
+        return starting.GetAwaiter().GetResult();
     }
 
     private static Process StartDaemon(HostConfiguration config)
