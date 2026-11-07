@@ -18,6 +18,8 @@ export interface VaultForm {
   password: string;
   username: string;
   signup: boolean;
+  /** The page says the password was refused (an alert naming a wrong or expired password). */
+  refused?: boolean;
 }
 
 export interface VaultCandidate extends VaultForm {
@@ -59,7 +61,9 @@ const PROBE = `(() => {
   const fields = [...document.querySelectorAll("input")].filter(shown);
   const password = fields.find((el) => el.type === "password");
   const site = location.hostname.replace(/^www\\./, "");
-  if (!password) return {url: location.href, site, hasPassword: false, password: "", username: "", signup: false};
+  const alerts = [...document.querySelectorAll('[role=alert], [aria-live=assertive], [aria-live=polite]')].filter(shown).map((el) => el.textContent || "").join(" ");
+  const refused = /(wrong|incorrect|invalid|doesn.?t match|didn.?t match|not match|try again|expired|too weak|not strong)/i.test(alerts);
+  if (!password) return {url: location.href, site, hasPassword: false, password: "", username: "", signup: false, refused};
   const form = password.form || password.closest("form");
   const inputs = [...(form || document).querySelectorAll("input")];
   const user = inputs.find((el) => el !== password && ["text", "email", "tel", ""].includes(el.type) &&
@@ -203,8 +207,28 @@ export async function captureTypedPassword(tabId: number): Promise<void> {
   rememberVaultCandidate(tabId, form, agentTyped(tabId, form.password) ? "agent" : "user");
 }
 
+const SUBMIT_SETTLE_MS = 8000;
+
+/**
+ * The password form after a submit. Sites take a few seconds to move on (Instagram's reset page
+ * stayed for ~3 s), and reading it at once took a slow success for a refusal, so the login was
+ * never saved. The caller does not wait on this: a click returns after a short wait for the save.
+ */
+async function formAfterSubmit(tabId: number): Promise<VaultForm | undefined> {
+  const deadline = Date.now() + SUBMIT_SETTLE_MS;
+  let form = await probeVaultForm(tabId).catch(() => undefined);
+  // undefined: the page is between documents (it navigated), so keep looking.
+  while ((form === undefined || form.hasPassword) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    form = await probeVaultForm(tabId).catch(() => undefined);
+  }
+  return form;
+}
+
 export function vaultSubmissionSucceeded(after: VaultForm | undefined): boolean {
-  return Boolean(after && !after.hasPassword);
+  // A form gone with an error left in its place (a bounce to a code step that names a refusal) is
+  // not a success: saving then would keep a password the site never took.
+  return Boolean(after && !after.hasPassword && !after.refused);
 }
 
 /**
@@ -270,7 +294,7 @@ export async function finishVaultCapture(
   await candidates.ready;
   const candidate = vaultCandidate(tabId);
   if (!candidate) return undefined;
-  const after = await probeVaultForm(tabId).catch(() => undefined);
+  const after = await formAfterSubmit(tabId);
   if (!vaultSubmissionSucceeded(after)) {
     // The form is still there: the site refused it, so there is nothing worth saving.
     forgetVaultCandidate(tabId);

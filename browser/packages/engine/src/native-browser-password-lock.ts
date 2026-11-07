@@ -71,6 +71,11 @@ export function agentTyped(tabId: number, value: string): boolean {
   return values.includes(value) || values.join("").includes(value);
 }
 
+/** Whether the agent typed anything into the tab: only then can a click submit its password. */
+export function agentTypedIn(tabId: number): boolean {
+  return (typed.get(tabId)?.size ?? 0) > 0;
+}
+
 /** A script the agent registered to run on every new document of this tab. */
 export function notePlantedScript(tabId: number, result: unknown): void {
   const id = (result as { identifier?: unknown } | undefined)?.identifier;
