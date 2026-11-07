@@ -376,7 +376,8 @@ var bu = Object.freeze({
     var outcome = await __call({handoff: request});
     __states.delete(__key(target));
     if (outcome === 'cancelled') throw Error('HANDOFF_CANCELLED: the user cancelled the hand-off');
-    return 'done';
+    // The user may type the answer into the cursor instead of doing it in the tab: that text.
+    return outcome && typeof outcome === 'object' && typeof outcome.answer === 'string' ? outcome.answer : 'done';
   },
   // The user clicked or typed in this tab: the agent is paused until they give it back.
   control: async () => (await __step({op:'control', target, action:'status'})).data,

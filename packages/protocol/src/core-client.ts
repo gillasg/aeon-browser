@@ -155,6 +155,8 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
       ]),
       session: z.string().min(1).max(100),
       arguments: z.record(z.string(), z.unknown()),
+      /** A name from `aeon browsers`: the session's browser work runs only in that Chrome profile. */
+      browser: z.string().min(1).max(40).optional(),
     })
     .strict(),
 ]);

@@ -76,20 +76,24 @@ const OVERLAY = `(update) => {
       sheet(
       '.g{position:fixed;inset:0;border-radius:18px;pointer-events:none;opacity:0;transform:none;box-shadow:inset 0 0 0 1.5px rgba(139,147,167,.85),inset 0 0 22px rgba(139,147,167,.5),inset 0 0 80px rgba(139,147,167,.22);transition:opacity .3s ease;animation:edge 2.8s ease-in-out infinite}' +
       '.g.on{opacity:1}.g.user{animation:none;opacity:.35}@keyframes edge{50%{opacity:.7}}' +
-      '.needs .g{opacity:0!important}.needs .a path{fill:#e08a00}.needs .t path{stroke:#e08a00}.needs .p{background:#e08a00!important}.needs .s{border-color:rgba(224,138,0,.95)}' +
-      '.needs .p{white-space:normal;max-width:340px;padding:8px 8px 8px 12px;border-radius:14px;pointer-events:auto;line-height:17px}' +
-      '.p .ask{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}.p .ask button{border:0;border-radius:999px;padding:4px 11px;font:600 12px/16px system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer}' +
-      '.p .ask .done{background:#fff;color:#7a4a00}.p .ask .cancel{background:rgba(255,255,255,.18);color:#fff}' +
+      '.needs .g{opacity:0!important}.needs .p{background:#e08a00!important}.needs .s{border-color:rgba(224,138,0,.95)}' +
+      '.needs .p{display:block;white-space:normal;width:300px;max-width:min(340px,80vw);padding:10px 10px 8px 12px;border-radius:14px;pointer-events:auto;line-height:17px}' +
+      '.needs .p .sp,.needs .p > .tr,.needs .p > .stop{display:none}' +
+      '.p .ask{display:flex;align-items:center;gap:6px;margin-top:8px}.p .ask input{flex:1;min-width:0;height:28px;border:0;border-radius:999px;padding:0 12px;background:rgba(255,255,255,.22);color:#fff;font:500 12.5px/16px system-ui,-apple-system,Segoe UI,sans-serif;outline:none}' +
+      '.p .ask input::placeholder{color:rgba(255,255,255,.85)}.p .ask .done{border:0;border-radius:999px;padding:5px 13px;font:600 12px/16px system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer;background:#fff;color:#7a4a00}' +
       '.clean .g,.clean .p,.clean .s,.clean .co,.clean .k,.clean svg.trail{display:none!important}' +
       '.c{position:absolute;left:0;top:0;will-change:transform;transition:opacity .18s ease}' +
-      '.a,.t{position:absolute;left:-3px;top:-2px;filter:drop-shadow(0 2px 4px rgba(15,23,42,.35));transition:transform 120ms ease,opacity 120ms ease}' +
+      '.a,.t{position:absolute;left:-1px;top:-1px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));transition:transform 120ms ease,opacity 120ms ease}' +
       '.t{left:-6px;top:-11px;opacity:0}.c.text .a{opacity:0}.c.text .t{opacity:1}' +
       '.c.down .a,.c.down .t{transform:scale(.82)}' +
       '.c.idle .a{animation:b 2.4s ease-in-out infinite}@keyframes b{50%{transform:scale(1.06);opacity:.85}}' +
-      'i{position:absolute;left:-16px;top:-16px;width:32px;height:32px;border-radius:50%;border:2px solid rgba(99,102,241,.7);background:rgba(99,102,241,.18);transform:scale(0);opacity:0}' +
+      'i{position:absolute;left:-16px;top:-16px;width:32px;height:32px;border-radius:50%;border:2px solid rgba(17,24,39,.55);background:rgba(255,255,255,.35);transform:scale(0);opacity:0}' +
       'i.on{animation:r 520ms cubic-bezier(.2,.7,.2,1)}@keyframes r{0%{transform:scale(.25);opacity:1}100%{transform:scale(1.6);opacity:0}}' +
-      '.p{position:absolute;left:18px;top:20px;max-width:320px;padding:5px 10px;border-radius:999px;background:rgba(17,24,39,.88);color:#fff;font:500 12px/16px system-ui,-apple-system,Segoe UI,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;transform:translateY(-3px);transition:opacity 160ms ease,transform 160ms ease}' +
-      '.p.on{opacity:1;transform:none}' +
+      '.p{position:absolute;left:18px;top:20px;display:flex;align-items:center;gap:8px;max-width:360px;padding:5px 5px 5px 12px;border-radius:999px;background:rgba(17,24,39,.92);color:#fff;font:500 12.5px/17px system-ui,-apple-system,Segoe UI,sans-serif;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:0;transform:translateY(-3px);transition:opacity 160ms ease,transform 160ms ease}' +
+      '.p.on{opacity:1;transform:none}.p.on .ic{pointer-events:auto}' +
+      '.p .tx{overflow:hidden;text-overflow:ellipsis;min-width:0}.needs .p .tx{display:block;white-space:normal}' +
+      '.p .sp{width:11px;height:11px;flex:none;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}' +
+      '.p .ic{width:24px;height:24px;flex:none;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);color:#fff;font:600 11px/1 system-ui,sans-serif;cursor:pointer;padding:0}.p .ic:hover{background:rgba(255,255,255,.24)}' +
       'svg.trail{position:absolute;inset:0;width:100%;height:100%;overflow:visible}' +
               ''),
       make("div", { class: "w" }, [
@@ -97,13 +101,20 @@ const OVERLAY = `(update) => {
         svg("svg", { class: "trail" }),
         make("div", { class: "c" }, [
           make("i"),
-          svg("svg", { class: "a", width: "22", height: "24", viewBox: "0 0 22 24" }, [
-            svg("path", { d: "M2 2l7.5 19 2.6-7.6L20 10.8z", fill: "#4f46e5", stroke: "#fff", "stroke-width": "1.6", "stroke-linejoin": "round" }),
+          // The cursor: a plain white pointer without a stem, the same one the summoned cursor shows.
+          svg("svg", { class: "a", width: "18", height: "20", viewBox: "0 0 18 20" }, [
+            svg("path", { d: "M1.5 1.5 L1.5 16.5 L13.5 9.5 Z", fill: "#fff", stroke: "#111", "stroke-width": "1.5", "stroke-linejoin": "round" }),
           ]),
           svg("svg", { class: "t", width: "12", height: "22", viewBox: "0 0 12 22" }, [
-            svg("path", { d: "M2 1.5h8M2 20.5h8M6 1.5v19", stroke: "#4f46e5", "stroke-width": "2.2", "stroke-linecap": "round", fill: "none" }),
+            svg("path", { d: "M2 1.5h8M2 20.5h8M6 1.5v19", stroke: "#111", "stroke-width": "2.2", "stroke-linecap": "round", fill: "none" }),
           ]),
-          make("div", { class: "p" }),
+          // The pill: what it is doing, then the transcript (in the side panel) and stop.
+          make("div", { class: "p" }, [
+            make("span", { class: "sp" }),
+            make("span", { class: "tx" }),
+            make("button", { class: "ic tr", title: "Open the transcript in the side panel", "aria-label": "Open the transcript" }, ["☰"]),
+            make("button", { class: "ic stop", title: "Stop", "aria-label": "Stop" }, ["■"]),
+          ]),
         ]),
       ]),
     );
@@ -124,7 +135,7 @@ const OVERLAY = `(update) => {
     const state = host.__s = {
       root, wrap, cursor: root.querySelector(".c"), ripple: root.querySelector("i"),
       glow: root.querySelector(".g"), glowColor: "",
-      pill: root.querySelector(".p"), trail: root.querySelector("svg.trail"),
+      pill: root.querySelector(".p"), text: root.querySelector(".p .tx"), trail: root.querySelector("svg.trail"),
       spotlight: root.querySelector(".s"), callout: root.querySelector(".co"), keys: root.querySelector(".k"),
       pageX: update.start ? update.start.x + scrollX : innerWidth / 2 + scrollX,
       pageY: update.start ? update.start.y + scrollY : innerHeight / 2 + scrollY,
@@ -133,6 +144,15 @@ const OVERLAY = `(update) => {
     // Pinned to the page, not the viewport: when the page scrolls, the cursor scrolls with it.
     const place = () => { state.cursor.style.transform = "translate(" + (state.pageX - scrollX) + "px," + (state.pageY - scrollY) + "px)"; };
     state.place = place;
+    // The transcript and stop buttons reach the extension's content script as page events (names
+    // only, no data), which opens the side panel on this tab's chat or stops it. A page can send
+    // them too; neither gives it anything (a transcript it cannot read, a stopped run).
+    const tell = (name) => (event) => { event.stopPropagation(); event.preventDefault(); dispatchEvent(new Event(name)); };
+    root.querySelector(".p > .tr").addEventListener("click", tell("aeon-cursor-transcript"));
+    root.querySelector(".p > .stop").addEventListener("click", tell("aeon-cursor-stop"));
+    // Hovering the pill keeps it up, so its buttons can be reached.
+    state.pill.addEventListener("mouseenter", () => clearTimeout(state.hide));
+    state.pill.addEventListener("mouseleave", () => { if (!state.wrap.classList.contains("needs")) state.hide = setTimeout(() => state.pill.classList.remove("on"), 2500); });
     addEventListener("scroll", place, { passive: true, capture: true });
     (document.documentElement || document.body).append(host);
     place();
@@ -233,24 +253,30 @@ const OVERLAY = `(update) => {
     if (update.typing) {
       // Visual only: the real text is already in the field; the caption just reveals it.
       let shown = 0; const prefix = text.indexOf('"') + 1;
-      s.pill.textContent = text.slice(0, prefix);
+      s.text.textContent = text.slice(0, prefix);
       s.type = setInterval(() => {
         shown += Math.max(1, Math.ceil((text.length - prefix) / 12));
-        s.pill.textContent = text.slice(0, prefix + shown);
+        s.text.textContent = text.slice(0, prefix + shown);
         if (prefix + shown >= text.length) clearInterval(s.type);
       }, 22);
-    } else s.pill.textContent = text;
-    // A hand-off asks in the pill itself: its Done and Cancel answer the agent's wait.
+    } else s.text.textContent = text;
+    s.pill.querySelector(".ask")?.remove();
+    // A hand-off asks in the pill itself: do it in the tab and press Done, or type the answer
+    // instead (Enter or Done sends it). ✕ cancels; ☰ still opens the transcript.
     if (update.needs) {
-      const ask = document.createElement("div");
-      ask.className = "ask";
-      for (const [name, label] of [["cancel", "Cancel"], ["done", "Done"]]) {
-        const button = document.createElement("button");
-        button.className = name;
-        button.textContent = label;
-        button.onclick = (event) => { event.stopPropagation(); globalThis[Symbol.for("aeon.handoff")] = name === "done" ? "done" : "cancelled"; s.wrap.classList.remove("needs"); s.pill.classList.remove("on"); };
-        ask.append(button);
-      }
+      const ask = make("div", { class: "ask" });
+      const field = make("input", { type: "text", placeholder: "Or type the answer here…", "aria-label": "Type the answer" });
+      const answer = (value) => { globalThis[Symbol.for("aeon.handoff")] = value; s.wrap.classList.remove("needs"); s.pill.classList.remove("on"); };
+      const finish = () => answer(field.value.trim() ? { answer: field.value.trim().slice(0, 2000) } : "done");
+      field.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Enter" && !event.isComposing) finish(); });
+      for (const kind of ["keyup", "keypress", "input"]) field.addEventListener(kind, (event) => event.stopPropagation());
+      const done = make("button", { class: "done" }, ["Done"]);
+      done.onclick = (event) => { event.stopPropagation(); finish(); };
+      const transcript = make("button", { class: "ic", title: "Open the transcript in the side panel", "aria-label": "Open the transcript" }, ["☰"]);
+      transcript.onclick = (event) => { event.stopPropagation(); dispatchEvent(new Event("aeon-cursor-transcript")); };
+      const cancel = make("button", { class: "ic", title: "Cancel", "aria-label": "Cancel" }, ["✕"]);
+      cancel.onclick = (event) => { event.stopPropagation(); answer("cancelled"); };
+      ask.append(field, done, transcript, cancel);
       s.pill.append(ask);
     }
     if (!update.needs) s.hide = setTimeout(() => s.pill.classList.remove("on"), update.transient ? 2000 : 6000);

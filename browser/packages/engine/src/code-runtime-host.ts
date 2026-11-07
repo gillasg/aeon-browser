@@ -48,7 +48,7 @@ import {
   releaseTabs,
   type SiteRules,
 } from "./native-browser-site-rules.js";
-import { handOffToUser } from "./native-browser-handoff.js";
+import { handOffToUser, takeTypedAnswer } from "./native-browser-handoff.js";
 import { presentBrowserTask, presentsBrowserTask } from "./native-browser-layout.js";
 import { engineConfig } from "./engine-config.js";
 import { agentTabSummary, unusedAgentTabs } from "./native-browser-tab-cleanup.js";
@@ -581,7 +581,7 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
     const outcome = await handOffToUser(target.tabId, text, () => !cell.done, box);
     Object.assign(entry, { disposition: outcome === "done" ? "completed" : "failed" });
     if (outcome === "done") await saveUserLogin(cell, target);
-    return outcome;
+    return answered(target.tabId, outcome);
   } catch (error) {
     Object.assign(entry, { disposition: "failed", code: describe(error) });
     throw error;
@@ -590,16 +590,25 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
   }
 }
 
+/** A hand-off the user answered by typing into the cursor returns that text. */
+function answered(
+  tabId: number,
+  outcome: "done" | "cancelled",
+): "done" | "cancelled" | { answer: string } {
+  const answer = outcome === "done" ? takeTypedAnswer(tabId) : undefined;
+  return answer !== undefined ? { answer } : outcome;
+}
+
 async function waitForStarted(
   cell: Cell,
   tabId: number,
   run: Promise<"done" | "cancelled">,
-): Promise<"done" | "cancelled"> {
+): Promise<"done" | "cancelled" | { answer: string }> {
   setWaiting(cell, true);
   try {
     const outcome = await run;
     if (outcome === "done") await saveUserLogin(cell, { tabId });
-    return outcome;
+    return answered(tabId, outcome);
   } finally {
     setWaiting(cell, false);
     if (startedHandoffs.get(tabId)?.run === run) startedHandoffs.delete(tabId);

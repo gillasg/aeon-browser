@@ -131,14 +131,26 @@ export async function spaceWindow(
     if (window) return { windowId: existing };
   }
   const userWindow = currentFocusedWindowId();
-  const created = await chrome.windows.create({
-    url: "about:blank",
-    focused: false,
-    type: "normal",
-    state: "normal",
-    width: 1280,
-    height: 900,
-  });
+  // As big as the user's own window (at least 1280×900): the side panel can take a quarter of a
+  // 1280 window, and sites lay out a 1028px page as a tablet (search collapsed behind a button).
+  const size =
+    userWindow !== undefined
+      ? await chrome.windows.get(userWindow).catch(() => undefined)
+      : undefined;
+  const open = (width: number, height: number) =>
+    chrome.windows.create({
+      url: "about:blank",
+      focused: false,
+      type: "normal",
+      state: "normal",
+      width,
+      height,
+    });
+  // Chrome refuses a window mostly off its screen (a small or headless one): then the plain size.
+  const created = await open(
+    Math.max(1280, size?.width ?? 0),
+    Math.max(900, size?.height ?? 0),
+  ).catch(() => open(1280, 900));
   if (!created?.id) throw new Error("TARGET_LOST");
   noteSpace(chatId, "window", created.id);
   if (userWindow !== undefined)

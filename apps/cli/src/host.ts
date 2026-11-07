@@ -137,11 +137,12 @@ function browserError(result: BrowserCell): Error {
   if (code === "BROWSER_OFFLINE" || code === "AMBIGUOUS_BROWSER") {
     const detail =
       code === "AMBIGUOUS_BROWSER"
-        ? "Several browsers are connected. Attach a tab from the intended one first."
+        ? "Several browsers are connected. Pick one with --browser <name> (see aeon browsers)."
         : "Aeon's browser is not connected.";
     // The site-to-api class carries the browser-offline exit code; say how Aeon recovers instead.
     const error = new BrowserNotConnected(detail);
-    error.message = `${detail} Open Chrome with Aeon loaded, then retry.`;
+    error.message =
+      code === "AMBIGUOUS_BROWSER" ? detail : `${detail} Open Chrome with Aeon loaded, then retry.`;
     return error;
   }
   return new Error(result.detail ? `${code}: ${result.detail}` : code);

@@ -27,6 +27,10 @@ export const ERRORS = {
   INPUT_FAILED: ["ours", "typing did not land: click the field, then type again"],
   STALE_REF: ["model", "that bu id is from an older read: read bu.state() again"],
   TAB_DEAD: ["page", "the tab was closed or crashed: open a new one with browser.openTab(url)"],
+  TAB_UNRESPONSIVE: [
+    "page",
+    "the tab stopped answering (hung, or frozen by Chrome and would not wake): open the page again with browser.openTab(url)",
+  ],
   DEBUGGER_DETACHED: [
     "user",
     "Chrome dropped control of this tab (usually Cancel on its debugging bar): the next step takes it back; if it happens again, tell the user and stop",
@@ -133,6 +137,7 @@ export const NEXT_CALLS: Partial<Record<ErrorCode, string>> = {
   SITE_BROKEN: "await bu.state()",
   NETWORK: "await bu.state()",
   TAB_DEAD: "browser.tabs()",
+  TAB_UNRESPONSIVE: "browser.tabs()",
   PASSWORD_PAGE: "await page.reload()",
   USER_TOOK_CONTROL: "await page.waitForControl()",
 };

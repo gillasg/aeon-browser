@@ -536,15 +536,18 @@ call instead of 40 KB of prose. --json prints the matching tools.`,
       group: "Aeon",
       summary: "run one chat tool",
       help: `Usage: aeon tool <browser_code|browser_tabs|crawl|site_mapper|extract> '<json>'
-       [--session name] [--json] [--no-color]
+       [--session name] [--browser name] [--json] [--no-color]
 
---json prints one machine-readable envelope (no ANSI); output is plain automatically when stdout
+--browser keeps the session in one Chrome profile (a name from aeon browsers), needed when more
+than one is connected. --json prints one machine-readable envelope (no ANSI); output is plain automatically when stdout
 is not a terminal.`,
       run: async (args) => {
         const session = flag(args, "session");
+        const browser = flag(args, "browser");
         return runTool(await host.connect(), [
           ...args.positional,
           ...(session ? ["--session", session] : []),
+          ...(browser ? ["--browser", browser] : []),
           ...(has(args, "json") ? ["--json"] : []),
           ...(has(args, "no-color") ? ["--no-color"] : []),
         ]);
