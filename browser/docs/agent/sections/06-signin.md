@@ -15,7 +15,12 @@ first login Chrome itself saved for the site (`provider: "chrome"`; `account` ca
 there, so hand off when it is the wrong account). You never see the password or the code, and there is no approval step: calling it
 signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`, `CHOOSE_ACCOUNT`
 (call again with `account`), `NEEDS_CODE` (a code by SMS or email), `CAPTCHA`, `REJECTED`, or
-`PAGE_SCRIPTS` (a boost or site script runs on the page; hand off).
+`PAGE_SCRIPTS` (a boost or site script runs on the page; hand off). `PASSWORD_MANAGER_LOCKED` or
+`PASSWORD_MANAGER_FAILED`: hand off with "Your password manager is locked: unlock it (`aeon signin setup
+bitwarden`, or `pass-cli login` for Proton) and click Done, or sign in here yourself", then call
+`bu.signIn()` again if the form is still there. A login the user types during a hand-off is saved to
+the password manager like one you made. Never write a password into your answer, a file or a
+message, even one you made: say whether it was saved.
 
 A page that has held a password you did not type yourself (bu.signIn's, Chrome's autofill or the
 user's) runs none of your page code: it fails with `PASSWORD_PAGE`. Clicks still work, and `page.reload()` opens the page to code again.

@@ -65,13 +65,18 @@ test("a whole run writes runs/<time>.json through the session lifecycle", async 
     tallyCell("chat-two", { steps: steps(), files: [] });
     await writeRunLog("chat-two", workspace);
     listener({ type: "agent_end" });
-    await wait(50);
-    // A write in flight leaves its temp file beside the log; only the log itself counts.
-    const [file] = (await readdir(join(workspace, "runs"))).filter((name) =>
-      name.endsWith(".json"),
-    );
+    // The final write is asynchronous: wait for it (a fixed 50 ms failed on a busy machine).
+    let file;
+    let log;
+    for (let tries = 0; tries < 60 && !log?.endedAt; tries++) {
+      await wait(50);
+      // A write in flight leaves its temp file beside the log; only the log itself counts.
+      [file] = (await readdir(join(workspace, "runs"))).filter((name) => name.endsWith(".json"));
+      log = file
+        ? JSON.parse(await readFile(join(workspace, "runs", file), "utf8").catch(() => "{}"))
+        : undefined;
+    }
     assert.match(file, /\.json$/);
-    const log = JSON.parse(await readFile(join(workspace, "runs", file), "utf8"));
     assert.deepEqual(log.hosts, ["other.example", "shop.example"]);
     assert.ok(log.endedAt);
   } finally {

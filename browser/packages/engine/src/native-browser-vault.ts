@@ -211,7 +211,44 @@ export function vaultSubmissionSucceeded(after: VaultForm | undefined): boolean 
  * What happened to a login the agent typed: `unsaved` when no external password manager took
  * it, so only Chrome's own "Save password?" prompt (browser UI agent code cannot click) can keep it.
  */
-export type VaultOutcome = "saved" | "unsaved" | "skipped";
+export type VaultOutcome = "saved" | "unsaved" | "skipped" | "failed";
+
+// Logins a password manager failed to save (locked, or its CLI did not answer), kept until the
+// user unlocks it and Aeon saves them again. Chrome's own prompt is off while a manager is set up,
+// so without this the login would be lost with no way for the user to keep it.
+const retries = new SessionMap<VaultCandidate & { provider: string }>("aeon-vault-retries");
+
+/** What the kernel asks when the manager could not save: unlock it, then Done saves it. */
+export function unlockToSave(provider: string): string {
+  const command = /proton/i.test(provider) ? "pass-cli login" : "aeon signin setup bitwarden";
+  return `Aeon could not save this login to ${provider}: it is locked or not answering. Unlock it (in a terminal: ${command}), then click Done and Aeon saves it. Cancel leaves it unsaved.`;
+}
+export const SAVED_AFTER_UNLOCK =
+  "the password manager was locked; the user unlocked it and the login was saved; nothing to check";
+export const MANAGER_DID_NOT_SAVE =
+  "the password manager could not save the login (still locked or not answering); tell the user in your answer the login is not saved";
+
+/** The manager that failed to save this tab's login, if one is waiting to be saved again. */
+export function failedSave(tabId: number): string | undefined {
+  return retries.get(tabId)?.provider;
+}
+
+/** After the user unlocked the manager: save the waiting login once more. */
+export async function retryVaultSave(tabId: number, ask: VaultAsk): Promise<boolean> {
+  await retries.ready;
+  const waiting = retries.get(tabId);
+  if (!waiting) return false;
+  const answer = await saveVaultCandidate(waiting, ask);
+  if (answer?.saved) retries.delete(tabId);
+  return Boolean(answer?.saved);
+}
+
+/** A password the user is typing during a hand-off: kept so it can be saved once they submit. */
+export async function noteUserLogin(tabId: number): Promise<void> {
+  const form = await probeVaultForm(tabId).catch(() => undefined);
+  if (!form?.hasPassword || !form.password || agentTyped(tabId, form.password)) return;
+  rememberVaultCandidate(tabId, form, "user");
+}
 
 /** What the kernel asks the user when no password manager saved a login the agent made. */
 export const SAVE_IN_CHROME =
@@ -241,19 +278,24 @@ export async function finishVaultCapture(
   }
   candidates.delete(tabId);
   if (await neverSave(candidate.site || new URL(candidate.url).hostname)) return "skipped";
-  const saved = await saveVaultCandidate(candidate, ask);
-  if (saved) return "saved";
+  const answer = await saveVaultCandidate(candidate, ask);
+  if (answer?.saved) return "saved";
   // No answer (the run ended while a manager was still saving) is not a refusal: never nag.
-  if (saved === undefined) return "skipped";
-  // A person who typed their own password sees Chrome's prompt themselves.
+  if (!answer) return "skipped";
+  // A manager is set up but failed: keep the login and ask the user to unlock it.
+  if (answer.provider) {
+    retries.set(tabId, { ...candidate, provider: answer.provider });
+    return "failed";
+  }
+  // No manager: a person who typed their own password sees Chrome's prompt themselves.
   return candidate.source === "agent" ? "unsaved" : "skipped";
 }
 
-/** true saved, false refused (no manager, or it failed), undefined when no answer came. */
+/** The manager's answer (provider null: none is set up), or undefined when no answer came. */
 async function saveVaultCandidate(
   candidate: VaultCandidate,
   ask: VaultAsk,
-): Promise<boolean | undefined> {
+): Promise<{ saved: boolean; provider: string | null } | undefined> {
   try {
     const result = (await ask({
       credential: "save",
@@ -261,8 +303,8 @@ async function saveVaultCandidate(
       username: candidate.username,
       password: candidate.password,
       name: candidate.site || new URL(candidate.url).hostname,
-    })) as { saved?: boolean } | undefined;
-    return Boolean(result?.saved);
+    })) as { saved?: boolean; provider?: string | null } | undefined;
+    return { saved: Boolean(result?.saved), provider: result?.provider ?? null };
   } catch {
     return undefined;
   }
@@ -272,6 +314,7 @@ onEngineInstall(() => {
   chrome.tabs.onRemoved.addListener((tabId) => {
     candidates.delete(tabId);
     identities.delete(tabId);
+    retries.delete(tabId);
   });
 });
 
@@ -281,5 +324,5 @@ export async function offerSaveCandidate(
   ask: VaultAsk,
 ): Promise<boolean> {
   void tabId;
-  return Boolean(await saveVaultCandidate(candidate, ask));
+  return Boolean((await saveVaultCandidate(candidate, ask))?.saved);
 }

@@ -27,8 +27,13 @@ import { notePreviewActivity } from "./native-browser-preview.js";
 import { matchChromeSaving } from "./native-browser-chrome-saving.js";
 import {
   captureTypedPassword,
+  failedSave,
   finishVaultCapture,
+  MANAGER_DID_NOT_SAVE,
+  retryVaultSave,
   SAVE_IN_CHROME,
+  SAVED_AFTER_UNLOCK,
+  unlockToSave,
   UNSAVED_LOGIN_NOTE,
   UNSAVED_LOGIN_SAVED,
   VAULT_SAVED,
@@ -365,8 +370,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
           ? step.target.tabId
           : undefined);
     if (tabId !== undefined) {
-      if ((step.op === "click" || step.op === "press") && "target" in step)
-        await vaultAfterSubmit(cell, step.target, result);
+      if (isSubmitLike(step) && "target" in step) await vaultAfterSubmit(cell, step.target, result);
       void notePreviewActivity(cell.run.chatId, tabId);
       // Only work in a tab (not reads) brings its chat and the tab together in Split View.
       if (presentsBrowserTask(step.op) && !("present" in step && step.present === false))
@@ -420,13 +424,15 @@ async function vaultAfterSubmit(
     new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), SAVE_ANSWER_WAIT_MS)),
   ]);
   if (early === "pending") {
-    void saving.then((outcome) =>
-      outcome === "unsaved" ? askToSaveLater(cell, target) : undefined,
-    );
+    void saving.then(async (outcome) => {
+      if (outcome === "unsaved") await askToSaveLater(cell, target);
+      if (outcome === "failed") await askToUnlock(cell, target, true);
+    });
     return addNote(result, VAULT_SAVING);
   }
   // Every outcome is said on the click itself, so the model never has to check a save.
   if (early === "saved") return addNote(result, VAULT_SAVED);
+  if (early === "failed") return addNote(result, await askToUnlock(cell, target, false));
   if (early !== "unsaved") return;
   const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
   addNote(result, asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE);
@@ -437,24 +443,56 @@ function addNote(result: unknown, note: string): void {
   if (action.kind === "action") action.note = action.note ? `${action.note}; ${note}` : note;
 }
 
+/**
+ * The password manager is set up but could not save (locked, or its CLI did not answer). Chrome's
+ * prompt is off while a manager is set up, so the login would be lost: the kernel asks the user to
+ * unlock it and saves it again on Done. `late`: the click already returned, the card outlives it.
+ */
+async function askToUnlock(cell: Cell, target: { tabId: number }, late: boolean): Promise<string> {
+  const provider = failedSave(target.tabId);
+  if (!provider) return MANAGER_DID_NOT_SAVE;
+  const message = unlockToSave(provider);
+  if (late) void presentBrowserTask(cell.run.chatId, target.tabId, true);
+  const asked = late
+    ? await handOffToUser(target.tabId, message, () => true).catch(() => "cancelled")
+    : await handoff(cell, { target, message }).catch(() => "cancelled");
+  if (asked !== "done") return MANAGER_DID_NOT_SAVE;
+  const saved = await retryVaultSave(target.tabId, (request) => callCore(cell, request));
+  return saved ? SAVED_AFTER_UNLOCK : MANAGER_DID_NOT_SAVE;
+}
+
+/**
+ * A login the user finished themselves during a hand-off (the agent asked them to sign in) is
+ * saved like one the agent made; with no manager, Chrome's own prompt already asked them.
+ */
+async function saveUserLogin(cell: Cell, target: { tabId: number }): Promise<void> {
+  if (vaultCandidate(target.tabId)?.source !== "user") return;
+  const outcome = await finishVaultCapture(target.tabId, (request) =>
+    callCore(cell, request),
+  ).catch(() => undefined);
+  if (outcome === "failed") await askToUnlock(cell, target, false);
+}
+
 /** The manager failed after the click returned: the card stays up past the cell that made the login. */
 async function askToSaveLater(cell: Cell, target: { tabId: number }): Promise<void> {
   void presentBrowserTask(cell.run.chatId, target.tabId, true);
   await handOffToUser(target.tabId, SAVE_IN_CHROME, () => true).catch(() => undefined);
 }
 
+/**
+ * A step that may submit a password form. Clicks by id, Playwright-style clicks (pointer steps at
+ * the element's point) and Enter all count: naming only buttons called "Continue" missed the
+ * clicks agents mostly make, and their logins were never saved. A click on a page with no
+ * password form costs one quick probe and saves nothing.
+ */
 function isSubmitLike(step: BrowserStep): boolean {
   if (step.op === "press") return /^(Enter|NumpadEnter)$/i.test(step.key);
+  if (step.op === "keys") return /\n|\r|\{?Enter\}?/i.test(step.keys);
+  if (step.op === "pointer") return step.action === "click" || step.action === "doubleClick";
   if (step.op !== "click") return false;
   const element = step.element;
-  if (element.kind === "locator")
-    return (
-      element.role === "button" &&
-      /submit|sign|log|continue|next|create|register|join/i.test(element.name)
-    );
-  if (element.kind === "query")
-    return /submit|sign|log|continue|next|create|register|join/i.test(element.value);
-  return false;
+  if (element.kind === "locator" && element.role !== "button") return element.role === "link";
+  return true;
 }
 
 // Steps whose trace entries carry input timing, pixel ratio included.
@@ -531,6 +569,7 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
   try {
     const outcome = await handOffToUser(target.tabId, text, () => !cell.done, box);
     Object.assign(entry, { disposition: outcome === "done" ? "completed" : "failed" });
+    if (outcome === "done") await saveUserLogin(cell, target);
     return outcome;
   } catch (error) {
     Object.assign(entry, { disposition: "failed", code: describe(error) });
@@ -547,7 +586,9 @@ async function waitForStarted(
 ): Promise<"done" | "cancelled"> {
   setWaiting(cell, true);
   try {
-    return await run;
+    const outcome = await run;
+    if (outcome === "done") await saveUserLogin(cell, { tabId });
+    return outcome;
   } finally {
     setWaiting(cell, false);
     if (startedHandoffs.get(tabId)?.run === run) startedHandoffs.delete(tabId);

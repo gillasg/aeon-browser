@@ -10,6 +10,8 @@ export interface Login {
   password: string;
   hasTotp: boolean;
   urls: string[];
+  /** When the item last changed (ISO date or epoch), to prefer the newest of duplicates. */
+  updated?: string | number;
 }
 
 export interface SaveLogin {
@@ -45,4 +47,25 @@ export function loginsFor(logins: readonly Login[], pageHost: string, account?: 
       }) &&
       (!wanted || login.username.toLowerCase() === wanted || login.name.toLowerCase() === wanted),
   );
+}
+
+function time(value: string | number | undefined): number {
+  if (value === undefined || value === "") return 0;
+  const number = Number(value);
+  if (Number.isFinite(number)) return number < 1e12 ? number * 1000 : number;
+  return Date.parse(String(value)) || 0;
+}
+
+/**
+ * One login per account: a password change saved as a second item (or two saves of one account)
+ * must not make sign-in stop and ask which to use. The newest item for each username wins.
+ */
+export function newestPerAccount(logins: readonly Login[]): Login[] {
+  const best = new Map<string, Login>();
+  for (const login of logins) {
+    const key = login.username.trim().toLowerCase() || login.name.trim().toLowerCase();
+    const kept = best.get(key);
+    if (!kept || time(login.updated) > time(kept.updated)) best.set(key, login);
+  }
+  return [...best.values()];
 }
