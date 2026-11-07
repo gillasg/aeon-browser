@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aeon stealth probe</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 24px; }
+  .pad { display: inline-block; width: 120px; height: 80px; margin: 12px; background: #ddd; border-radius: 8px; }
+  #target { display: block; margin: 16px 0; padding: 10px 18px; }
+  #text { width: 420px; padding: 8px; }
+  #spacer { height: 1400px; }
+</style>
+</head>
+<body>
+<h1>Stealth probe</h1>
+<p>Records what a page can see of the agent's input and of the browser it runs in.</p>
+<div><span class="pad" id="pad-a"></span><span class="pad" id="pad-b"></span><span class="pad" id="pad-c"></span></div>
+<button id="target">Target</button>
+<input id="text" aria-label="Text" placeholder="Type here">
+<button id="finish">Finish</button>
+<pre id="report"></pre>
+<div id="spacer"></div>
+<script>
+// Everything is recorded from the page's main world, the way a site's own scripts would see it.
+const seen = { mouse: [], pointer: [], keys: [], clicks: [], untrusted: 0 };
+const now = () => performance.now();
+addEventListener("mousemove", (event) => {
+  seen.mouse.push({ t: now(), sx: event.screenX, sy: event.screenY, cx: event.clientX, cy: event.clientY });
+  if (!event.isTrusted) seen.untrusted++;
+}, true);
+addEventListener("pointermove", (event) => {
+  seen.pointer.push({
+    coalesced: event.getCoalescedEvents ? event.getCoalescedEvents().length : -1,
+    predicted: event.getPredictedEvents ? event.getPredictedEvents().length : -1,
+  });
+}, true);
+addEventListener("keydown", (event) => { seen.keys.push({ down: now() }); if (!event.isTrusted) seen.untrusted++; }, true);
+addEventListener("keyup", () => { const last = seen.keys.at(-1); if (last && !last.up) last.up = now(); }, true);
+addEventListener("click", (event) => {
+  seen.clicks.push({ detail: event.detail, trusted: event.isTrusted, sx: event.screenX, cx: event.clientX });
+}, true);
+
+// A debugger with Runtime.enable serializes logged objects: a getter on an Error's stack fires.
+let consoleSerializedStack = false;
+const bait = new Error("probe");
+Object.defineProperty(bait, "stack", { get() { consoleSerializedStack = true; return ""; } });
+console.debug(bait);
+
+const stats = (values) => {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return { n: values.length, min: Math.round(sorted[0]), median: Math.round(sorted[sorted.length >> 1]), max: Math.round(sorted.at(-1)) };
+};
+const gaps = (times) => times.slice(1).map((t, i) => t - times[i]);
+
+function snapshot(scope) {
+  const nav = scope.navigator;
+  return {
+    userAgent: nav.userAgent, platform: nav.platform, languages: (nav.languages || []).join(","),
+    hardwareConcurrency: nav.hardwareConcurrency, deviceMemory: nav.deviceMemory ?? null,
+    webdriver: nav.webdriver, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
+
+function workerSnapshot() {
+  const source = `postMessage((${snapshot.toString()})(self))`;
+  return new Promise((resolve) => {
+    try {
+      const worker = new Worker(URL.createObjectURL(new Blob([source], { type: "text/javascript" })));
+      const timer = setTimeout(() => resolve({ error: "timeout" }), 3000);
+      worker.onmessage = (event) => { clearTimeout(timer); resolve(event.data); worker.terminate(); };
+      worker.onerror = (event) => { clearTimeout(timer); resolve({ error: String(event.message) }); };
+    } catch (error) { resolve({ error: String(error) }); }
+  });
+}
+
+const NATIVE = /\{\s*\[native code\]\s*\}$/;
+function nativeChecks() {
+  const fns = {
+    "Function.prototype.toString": Function.prototype.toString,
+    "navigator.permissions.query": navigator.permissions?.query,
+    "HTMLCanvasElement.prototype.toDataURL": HTMLCanvasElement.prototype.toDataURL,
+    "WebGLRenderingContext.prototype.getParameter": WebGLRenderingContext.prototype.getParameter,
+    "Element.prototype.attachShadow": Element.prototype.attachShadow,
+    "window.fetch": window.fetch,
+    "history.pushState": history.pushState,
+  };
+  return Object.fromEntries(Object.entries(fns).map(([name, fn]) =>
+    [name, typeof fn !== "function" ? "missing" : NATIVE.test(Function.prototype.toString.call(fn)) ? "native" : "patched"]));
+}
+
+const KNOWN_AUTOMATION = ["__playwright", "__pwInitScripts", "__puppeteer_evaluation_script__", "cdc_adoQpoasnfa76pfcZLmcfl_Array", "domAutomation", "domAutomationController", "_selenium", "callPhantom", "__nightmare", "__webdriver_evaluate"];
+function artifacts() {
+  const globals = Object.getOwnPropertyNames(window);
+  return {
+    automationGlobals: KNOWN_AUTOMATION.filter((name) => name in window),
+    cdcGlobals: globals.filter((name) => /^cdc_|^\$cdc_/.test(name)),
+    // Anything an extension or driver left in the page: elements outside what this page built.
+    foreignNodes: [...document.querySelectorAll("body > *, html > *")]
+      .filter((el) => !["HEAD", "BODY", "H1", "P", "DIV", "BUTTON", "INPUT", "PRE", "SCRIPT", "STYLE"].includes(el.tagName))
+      .map((el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "")),
+  };
+}
+
+function webgl() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
+    return info ? { vendor: gl.getParameter(info.UNMASKED_VENDOR_WEBGL), renderer: gl.getParameter(info.UNMASKED_RENDERER_WEBGL) } : null;
+  } catch { return null; }
+}
+
+async function report() {
+  const win = snapshot(window);
+  const worker = await workerSnapshot();
+  const mismatches = worker.error ? [] : Object.keys(win).filter((key) => JSON.stringify(win[key]) !== JSON.stringify(worker[key]));
+  const offsets = seen.mouse.map((m) => ({ dx: m.sx - m.cx, dy: m.sy - m.cy }));
+  return {
+    input: {
+      mousemoves: seen.mouse.length,
+      screenEqualsClient: seen.mouse.filter((m) => m.sx === m.cx && m.sy === m.cy).length,
+      screenOffset: { dx: stats(offsets.map((o) => o.dx)), dy: stats(offsets.map((o) => o.dy)) },
+      expectedScreenOffset: { dx: screenX + (outerWidth - innerWidth), dy: screenY + (outerHeight - innerHeight) },
+      coalescedEmpty: seen.pointer.filter((p) => p.coalesced === 0).length,
+      predictedEmpty: seen.pointer.filter((p) => p.predicted === 0).length,
+      pointermoves: seen.pointer.length,
+      untrusted: seen.untrusted,
+      clicks: seen.clicks,
+      mousemoveIntervalMs: stats(gaps(seen.mouse.map((m) => m.t))),
+      keyIntervalMs: stats(gaps(seen.keys.map((k) => k.down))),
+      keyDwellMs: stats(seen.keys.filter((k) => k.up).map((k) => k.up - k.down)),
+    },
+    window: {
+      outerMinusInner: { width: outerWidth - innerWidth, height: outerHeight - innerHeight },
+      inner: { width: innerWidth, height: innerHeight },
+      visibilityState: document.visibilityState,
+      hasFocus: document.hasFocus(),
+    },
+    workers: { window: win, worker, mismatches },
+    native: nativeChecks(),
+    artifacts: { ...artifacts(), consoleSerializedStack },
+    misc: { webdriver: navigator.webdriver, pluginsLength: navigator.plugins.length, webgl: webgl() },
+  };
+}
+
+document.getElementById("finish").addEventListener("click", async () => {
+  const out = document.getElementById("report");
+  out.textContent = JSON.stringify(await report());
+  out.dataset.done = "1";
+});
+document.body.dataset.ready = "1";
+</script>
+</body>
+</html>
