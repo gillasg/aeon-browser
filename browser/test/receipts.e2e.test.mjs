@@ -1,5 +1,5 @@
-// One targeted real-Chrome check: a checkbox challenge is solved without touching a decoy box,
-// and a numbered grid clicks only the requested tiles.
+// One targeted real-Chrome check: a click receipt names the popup, dialog, download and requests
+// the click caused.
 // Run alone: node --test test/receipts.e2e.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -46,7 +46,8 @@ test(
         response.end("receipt");
       } else
         response.end(`<title>Receipt</title>
-        <button id="all" onclick="window.open('/popup','_blank'); confirm('sure'); const a=document.createElement('a'); a.href='/file'; a.download='receipt.txt'; a.click()">all</button>
+        <button id="all" onclick="window.open('/popup','_blank'); confirm('sure')">all</button>
+        <button id="file" onclick="confirm('save it'); const a=document.createElement('a'); a.href='/file'; a.download='receipt.txt'; a.click()">file</button>
         <button id="none">none</button>
         <button id="signin" onclick="window.open('/closer','_blank')">signin</button>
         <button id="save" onclick="fetch('/save', {method: 'POST', body: '{}'})">save</button>`);
@@ -84,8 +85,15 @@ test(
       assert.equal(receipt.dialog.type, "confirm", first.stdout);
       assert.equal(receipt.dialog.message, "sure", first.stdout);
       assert.equal(receipt.dialog.accepted, true, first.stdout);
-      assert.match(receipt.download.filename, /receipt\.txt/, first.stdout);
-      assert.match(receipt.download.url, /\/file/, first.stdout);
+      // Chrome may drop a script-started download once window.open used the click's gesture, so the
+      // download (after a dialog, like a "save it?" prompt) gets its own click.
+      const filed = await cell(
+        `const file = await page.click("#file"); console.log("FILE " + JSON.stringify(file.receipt || file));`,
+      );
+      const download = JSON.parse(/FILE (.*)/.exec(filed.stdout)[1]);
+      assert.equal(download.dialog?.message, "save it", filed.stdout);
+      assert.match(download.download?.filename ?? "", /receipt\.txt/, filed.stdout);
+      assert.match(download.download?.url ?? "", /\/file/, filed.stdout);
       assert.doesNotMatch(JSON.stringify(receipt), /popup<\/title>|receipt<\/title>/i);
       const second = await cell(
         `const again = await page.click("#none"); console.log("SECOND " + JSON.stringify(again.receipt || again));`,

@@ -19,7 +19,14 @@ if (files.length === 0) {
   process.exit(0);
 }
 const timeout = browser ? 900_000 : 90_000;
-const run = spawnSync(process.execPath, ["--test", `--test-timeout=${timeout}`, ...files], {
-  stdio: "inherit",
-});
+// Real-Chrome files run one at a time: a dozen headless Chromes and bridges at once starve each
+// other and stall the batch, while every file passes alone.
+const concurrency = browser ? ["--test-concurrency=1"] : [];
+const run = spawnSync(
+  process.execPath,
+  ["--test", `--test-timeout=${timeout}`, ...concurrency, ...files],
+  {
+    stdio: "inherit",
+  },
+);
 process.exit(run.status ?? 1);
