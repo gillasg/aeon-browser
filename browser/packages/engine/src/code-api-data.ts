@@ -271,7 +271,9 @@ function __waitRead(options) {
       var resources = performance.getEntriesByType('resource').length;
       if (text === lastText && resources === lastResources) stable += 1;
       else { stable = 0; lastText = text; lastResources = resources; }
-      if (stable >= 2 && Date.now() - started >= min) return finish(true);
+      // The floor counts from the page's own load, not this call: a page that loaded long ago and
+      // is quiet returns after two quiet ticks; a fresh one still gets time to render.
+      if (stable >= 2 && performance.now() >= min) return finish(true);
       if (Date.now() - started >= max) return finish(false);
       setTimeout(tick, 200);
     };

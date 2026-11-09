@@ -563,6 +563,12 @@ async function resolveFrameObject(
   return objectId;
 }
 
+function caused(receipt: ReturnType<typeof takeReceipt>): boolean {
+  return Boolean(
+    receipt.dialog || receipt.download || receipt.popups.length || receipt.requests?.length,
+  );
+}
+
 type RevalidateTarget = (request: BrowserExecutorRequest, tabId: number) => Promise<void>;
 
 export async function performAction(
@@ -574,6 +580,7 @@ export async function performAction(
   let note: string | undefined;
   let changes: number | undefined;
   let readback: string | undefined;
+  let silent = false;
   beginReceipt(tabId);
   const scroll = await withDebugger(tabId, async (debuggee) => {
     await revalidateTarget(request, tabId);
@@ -587,8 +594,7 @@ export async function performAction(
     outcome = pageOutcome(before, settled.probe);
     // The mutation count the page reported between the two probes: evidence for a DOM change.
     if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
-    if (request.step.op === "click" && outcome === "unchanged" && !settled.network)
-      note = silentClickNote(request.step.element);
+    silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
     return undefined;
   });
   if (scroll) await revalidateTarget(request, tabId);
@@ -607,6 +613,9 @@ export async function performAction(
   await receiptQuiet(tabId);
   const receipt = takeReceipt(tabId);
   receipt.navigated ||= String(outcome) === "navigated";
+  // A dialog, pop-up or download is something happening, even with no DOM change or request.
+  if (silent && !caused(receipt) && request.step.op === "click")
+    note = silentClickNote(request.step.element);
   const effect = scroll
     ? scrollEffect(scroll)
     : inputStepEffect(
