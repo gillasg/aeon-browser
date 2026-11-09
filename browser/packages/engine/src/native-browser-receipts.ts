@@ -26,9 +26,21 @@ const receipts = new Map<number, ActionReceipt>();
 /** When each tab's dialog closed during the action: the page's code only goes on after that. */
 const dialogClosed = new Map<number, number>();
 
+/** Each receipt's tab URL, read when the action begins, so a download is matched without a wait. */
+const tabUrls = new Map<number, Promise<string | undefined>>();
+/** Download lookups still matching a receipt: a receipt is not taken while one runs. */
+const lookups = new Set<Promise<void>>();
+
 export function beginReceipt(tabId: number): void {
   dialogClosed.delete(tabId);
   receipts.set(tabId, { popups: [], navigated: false });
+  tabUrls.set(
+    tabId,
+    chrome.tabs.get(tabId).then(
+      (tab) => tab.url,
+      () => undefined,
+    ),
+  );
 }
 
 export function noteReceiptPopup(openerId: number, tabId: number, url = ""): void {
@@ -46,10 +58,13 @@ export async function receiptQuiet(tabId: number, quietMs = 500): Promise<void> 
   if (closed === undefined) return;
   const wait = closed + quietMs - Date.now();
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(wait, quietMs)));
+  // A download Chrome reported in that window may still be matching its tab.
+  await Promise.all([...lookups]);
 }
 
 export function takeReceipt(tabId: number): ActionReceipt {
   dialogClosed.delete(tabId);
+  tabUrls.delete(tabId);
   const receipt = receipts.get(tabId) ?? { popups: [], navigated: false };
   receipts.delete(tabId);
   if (receipt.requests) {
@@ -97,11 +112,19 @@ function noteNetwork(
  * that page code starts after a dialog. The download goes to the receipt whose tab's page started
  * it (its referrer), and only when CDP did not already name one.
  */
-async function noteCreatedDownload(item: chrome.downloads.DownloadItem): Promise<void> {
-  for (const [tabId, receipt] of receipts) {
+function noteCreatedDownload(item: chrome.downloads.DownloadItem): void {
+  const lookup = matchDownload(item, [...receipts]).finally(() => lookups.delete(lookup));
+  lookups.add(lookup);
+}
+
+async function matchDownload(
+  item: chrome.downloads.DownloadItem,
+  open: [number, ActionReceipt][],
+): Promise<void> {
+  for (const [tabId, receipt] of open) {
     if (receipt.download) continue;
-    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-    if (!tab?.url || !sameOrigin(tab.url, item.referrer || item.url)) continue;
+    const url = await tabUrls.get(tabId);
+    if (!url || !sameOrigin(url, item.referrer || item.url)) continue;
     receipt.download = {
       url: item.url.slice(0, 2000),
       filename: (item.filename.split(/[\\/]/).pop() || item.url.split("/").pop() || "").slice(
@@ -122,7 +145,7 @@ function sameOrigin(a: string, b: string): boolean {
 }
 
 onEngineInstall(() => {
-  chrome.downloads?.onCreated.addListener((item) => void noteCreatedDownload(item));
+  chrome.downloads?.onCreated.addListener(noteCreatedDownload);
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (source.tabId === undefined) return;
     const receipt = receipts.get(source.tabId);
