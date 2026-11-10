@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 
@@ -61,11 +62,16 @@ async function frame(chatId: string, preview: Preview): Promise<void> {
     return schedule(chatId, preview, FRAME_MS);
   }
   const image = await withBrowserDebugger(preview.tabId, (debuggee) =>
-    chrome.debugger.sendCommand(debuggee, "Page.captureScreenshot", {
-      format: "jpeg",
-      quality: 40,
-      optimizeForSpeed: true,
-    }),
+    send(
+      debuggee,
+      "Page.captureScreenshot",
+      {
+        format: "jpeg",
+        quality: 40,
+        optimizeForSpeed: true,
+      },
+      { label: "frame" },
+    ),
   ).then(
     (result) => "data:image/jpeg;base64," + (result as { data: string }).data,
     () => null,

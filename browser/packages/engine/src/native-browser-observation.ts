@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { viewportFingerprint, settleBrowserPage } from "./native-browser-navigation.js";
 import {
   type BrowserSemanticNode,
@@ -27,7 +28,9 @@ interface Capture {
   dataBase64: string;
 }
 export async function captureViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture> {
-  const metrics = (await chrome.debugger.sendCommand(debuggee, "Page.getLayoutMetrics")) as {
+  const metrics = (await send(debuggee, "Page.getLayoutMetrics", undefined, {
+    label: "captureViewport",
+  })) as {
     cssVisualViewport?: {
       clientWidth?: number;
       clientHeight?: number;
@@ -35,13 +38,18 @@ export async function captureViewport(debuggee: chrome.debugger.Debuggee): Promi
       pageY?: number;
     };
   };
-  await chrome.debugger.sendCommand(debuggee, "Page.enable");
+  await send(debuggee, "Page.enable", undefined, { label: "captureViewport" });
   const fingerprint = await viewportFingerprint(debuggee);
-  const capture = (await chrome.debugger.sendCommand(debuggee, "Page.captureScreenshot", {
-    format: "jpeg",
-    quality: 60,
-    captureBeyondViewport: false,
-  })) as { data?: string };
+  const capture = (await send(
+    debuggee,
+    "Page.captureScreenshot",
+    {
+      format: "jpeg",
+      quality: 60,
+      captureBeyondViewport: false,
+    },
+    { label: "captureViewport" },
+  )) as { data?: string };
   const view = metrics.cssVisualViewport ?? {};
   const width = Math.floor(view.clientWidth ?? 0),
     height = Math.floor(view.clientHeight ?? 0);
@@ -305,10 +313,15 @@ function truncateToBudget(nodes: BrowserSemanticNode[], maxBytes?: number): void
 }
 
 export async function visiblePageText(debuggee: chrome.debugger.Debuggee): Promise<string> {
-  const response = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression: `(${collectVisibleText.toString()})()`,
-    returnByValue: true,
-  })) as { result?: { value?: string } };
+  const response = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    {
+      expression: `(${collectVisibleText.toString()})()`,
+      returnByValue: true,
+    },
+    { label: "visiblePageText", ms: 5_000 },
+  )) as { result?: { value?: string } };
   return response.result?.value ?? "";
 }
 function collectVisibleText() {

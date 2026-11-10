@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { BrowserActionError } from "./native-browser-common.js";
 import { humanType, paceKey } from "./native-browser-human-input.js";
 
@@ -22,26 +23,34 @@ export async function onNode<T>(
   fn: (...args: never[]) => unknown,
   args: unknown[] = [],
 ): Promise<T> {
-  const resolved = (await chrome.debugger.sendCommand(debuggee, "DOM.resolveNode", {
-    backendNodeId,
-  })) as {
+  const resolved = (await send(
+    debuggee,
+    "DOM.resolveNode",
+    { backendNodeId },
+    { label: "onNode" },
+  )) as {
     object?: { objectId?: string };
   };
   const objectId = resolved.object?.objectId;
   if (!objectId) throw new Error("STALE_REF");
   try {
-    const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.callFunctionOn", {
-      objectId,
-      functionDeclaration: fn.toString(),
-      arguments: args.map((value) => ({ value })),
-      returnByValue: true,
-    })) as { result?: { value?: T }; exceptionDetails?: unknown };
+    const result = (await send(
+      debuggee,
+      "Runtime.callFunctionOn",
+      {
+        objectId,
+        functionDeclaration: fn.toString(),
+        arguments: args.map((value) => ({ value })),
+        returnByValue: true,
+      },
+      { label: "onNode", ms: 5_000 },
+    )) as { result?: { value?: T }; exceptionDetails?: unknown };
     if (result.exceptionDetails) throw new Error("STALE_REF");
     return result.result?.value as T;
   } finally {
-    await chrome.debugger
-      .sendCommand(debuggee, "Runtime.releaseObject", { objectId })
-      .catch(() => undefined);
+    await send(debuggee, "Runtime.releaseObject", { objectId }, { label: "onNode" }).catch(
+      () => undefined,
+    );
   }
 }
 
@@ -93,11 +102,16 @@ export async function scopedBackendIds(
     shadowRoots?: DomNode[];
     contentDocument?: DomNode;
   }
-  const result = (await chrome.debugger.sendCommand(debuggee, "DOM.describeNode", {
-    backendNodeId: ids[0],
-    depth: -1,
-    pierce: true,
-  })) as { node?: DomNode };
+  const result = (await send(
+    debuggee,
+    "DOM.describeNode",
+    {
+      backendNodeId: ids[0],
+      depth: -1,
+      pierce: true,
+    },
+    { label: "scopedBackendIds" },
+  )) as { node?: DomNode };
   const selected = new Set<number>();
   const pending: DomNode[] = result.node ? [result.node] : [];
   while (pending.length) {
@@ -122,30 +136,46 @@ export async function queryNodes(
 ): Promise<number[]> {
   const group = `aeon-query-${crypto.randomUUID()}`;
   try {
-    const evaluated = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression: `(${findElements.toString()})(${JSON.stringify(query)})`,
-      objectGroup: group,
-    })) as { result?: { objectId?: string }; exceptionDetails?: unknown };
+    const evaluated = (await send(
+      debuggee,
+      "Runtime.evaluate",
+      {
+        expression: `(${findElements.toString()})(${JSON.stringify(query)})`,
+        objectGroup: group,
+      },
+      { label: "queryNodes", ms: 5_000 },
+    )) as { result?: { objectId?: string }; exceptionDetails?: unknown };
     if (evaluated.exceptionDetails) throw new Error("INVALID_TARGET");
     if (!evaluated.result?.objectId) return [];
     return await backendIds(debuggee, evaluated.result.objectId);
   } finally {
-    await chrome.debugger
-      .sendCommand(debuggee, "Runtime.releaseObjectGroup", { objectGroup: group })
-      .catch(() => undefined);
+    await send(
+      debuggee,
+      "Runtime.releaseObjectGroup",
+      { objectGroup: group },
+      { label: "queryNodes" },
+    ).catch(() => undefined);
   }
 }
 async function backendIds(debuggee: chrome.debugger.Debuggee, objectId: string) {
-  const properties = (await chrome.debugger.sendCommand(debuggee, "Runtime.getProperties", {
-    objectId,
-    ownProperties: true,
-  })) as { result?: { name: string; value?: { objectId?: string } }[] };
+  const properties = (await send(
+    debuggee,
+    "Runtime.getProperties",
+    {
+      objectId,
+      ownProperties: true,
+    },
+    { label: "backendIds" },
+  )) as { result?: { name: string; value?: { objectId?: string } }[] };
   const ids: number[] = [];
   for (const property of properties.result ?? []) {
     if (!/^\d+$/.test(property.name) || !property.value?.objectId) continue;
-    const described = (await chrome.debugger.sendCommand(debuggee, "DOM.describeNode", {
-      objectId: property.value.objectId,
-    })) as { node?: { backendNodeId?: number } };
+    const described = (await send(
+      debuggee,
+      "DOM.describeNode",
+      { objectId: property.value.objectId },
+      { label: "backendIds" },
+    )) as { node?: { backendNodeId?: number } };
     if (described.node?.backendNodeId !== undefined) ids.push(described.node.backendNodeId);
   }
   return ids;
@@ -207,10 +237,15 @@ function findElements(query: Query): Element[] {
 }
 
 export async function isFocusedInput(debuggee: chrome.debugger.Debuggee): Promise<boolean> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression: `(${focusedInput.toString()})()`,
-    returnByValue: true,
-  })) as { result?: { value?: boolean } };
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    {
+      expression: `(${focusedInput.toString()})()`,
+      returnByValue: true,
+    },
+    { label: "isFocusedInput", ms: 5_000 },
+  )) as { result?: { value?: boolean } };
   return result.result?.value === true;
 }
 function focusedInput() {
@@ -240,20 +275,30 @@ export async function fillTextNode(
 ): Promise<void> {
   const group = "aeon-fill-" + crypto.randomUUID();
   try {
-    const source = (await chrome.debugger.sendCommand(debuggee, "DOM.resolveNode", {
-      backendNodeId: id,
-      objectGroup: group,
-    })) as { object?: { objectId?: string } };
+    const source = (await send(
+      debuggee,
+      "DOM.resolveNode",
+      { backendNodeId: id, objectGroup: group },
+      { label: "fillTextNode" },
+    )) as { object?: { objectId?: string } };
     if (!source.object?.objectId) throw new Error("STALE_REF");
-    const selected = (await chrome.debugger.sendCommand(debuggee, "Runtime.callFunctionOn", {
-      objectId: source.object.objectId,
-      functionDeclaration: selectTextInput.toString(),
-      objectGroup: group,
-    })) as { result?: { objectId?: string }; exceptionDetails?: unknown };
+    const selected = (await send(
+      debuggee,
+      "Runtime.callFunctionOn",
+      {
+        objectId: source.object.objectId,
+        functionDeclaration: selectTextInput.toString(),
+        objectGroup: group,
+      },
+      { label: "fillTextNode", ms: 5_000 },
+    )) as { result?: { objectId?: string }; exceptionDetails?: unknown };
     if (selected.exceptionDetails || !selected.result?.objectId) throw new Error("NOT_EDITABLE");
-    const node = (await chrome.debugger.sendCommand(debuggee, "DOM.describeNode", {
-      objectId: selected.result.objectId,
-    })) as { node?: { backendNodeId?: number } };
+    const node = (await send(
+      debuggee,
+      "DOM.describeNode",
+      { objectId: selected.result.objectId },
+      { label: "fillTextNode" },
+    )) as { node?: { backendNodeId?: number } };
     if (!node.node?.backendNodeId) throw new Error("STALE_REF");
     if (value) await humanType(debuggee, value);
     else await clearSelection(debuggee);
@@ -271,9 +316,12 @@ export async function fillTextNode(
       "The focused input did not retain the requested value. Inspect it before continuing.",
     );
   } finally {
-    await chrome.debugger
-      .sendCommand(debuggee, "Runtime.releaseObjectGroup", { objectGroup: group })
-      .catch(() => undefined);
+    await send(
+      debuggee,
+      "Runtime.releaseObjectGroup",
+      { objectGroup: group },
+      { label: "fillTextNode" },
+    ).catch(() => undefined);
   }
 }
 function selectTextInput(this: HTMLInputElement | HTMLTextAreaElement) {
@@ -346,14 +394,18 @@ function pasteText(this: HTMLElement, text: string) {
 async function clearSelection(debuggee: chrome.debugger.Debuggee) {
   const event = { key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 };
   await paceKey(debuggee);
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    ...event,
-    type: "rawKeyDown",
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    ...event,
-    type: "keyUp",
-  });
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    { ...event, type: "rawKeyDown" },
+    { label: "clearSelection" },
+  );
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    { ...event, type: "keyUp" },
+    { label: "clearSelection" },
+  );
 }
 
 export function selectorState(selector: string, state: string): boolean {

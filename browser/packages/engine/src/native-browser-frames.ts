@@ -1,6 +1,7 @@
+import type { BrowserExecutorRequest } from "@browserkit/protocol";
+import { send } from "./cdp/send.js";
 import { BrowserActionError } from "./native-browser-common.js";
 import type { AxNode } from "./native-browser-common.js";
-import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { onNode } from "./native-browser-dom.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
@@ -17,7 +18,7 @@ interface FrameInfo {
 }
 const sessions = new Map<number, Map<string, string>>();
 onEngineInstall(() => {
-  chrome.debugger.onEvent.addListener((source, method, raw) => {
+  chrome.debugger.onEvent.addListener(function trackFrameTarget(source, method, raw) {
     if (source.tabId === undefined) return;
     const params = raw as { sessionId?: string; targetInfo?: { targetId: string; type: string } };
     if (
@@ -28,13 +29,16 @@ onEngineInstall(() => {
       const map = sessions.get(source.tabId) ?? new Map<string, string>();
       map.set(params.targetInfo.targetId, params.sessionId);
       sessions.set(source.tabId, map);
-      void chrome.debugger
-        .sendCommand({ tabId: source.tabId, sessionId: params.sessionId }, "Target.setAutoAttach", {
+      void send(
+        { tabId: source.tabId, sessionId: params.sessionId },
+        "Target.setAutoAttach",
+        {
           autoAttach: true,
           waitForDebuggerOnStart: false,
           flatten: true,
-        })
-        .catch(() => undefined);
+        },
+        { label: "trackFrameTarget" },
+      ).catch(() => undefined);
     }
     if (method === "Target.detachedFromTarget")
       for (const map of sessions.values())
@@ -45,11 +49,16 @@ onEngineInstall(() => {
   });
 });
 export async function discoverFrames(debuggee: chrome.debugger.Debuggee): Promise<FrameInfo[]> {
-  await chrome.debugger.sendCommand(debuggee, "Target.setAutoAttach", {
-    autoAttach: true,
-    waitForDebuggerOnStart: false,
-    flatten: true,
-  });
+  await send(
+    debuggee,
+    "Target.setAutoAttach",
+    {
+      autoAttach: true,
+      waitForDebuggerOnStart: false,
+      flatten: true,
+    },
+    { label: "discoverFrames" },
+  );
   const result: FrameInfo[] = [];
   const roots: (chrome.debugger.Debuggee & { sessionId?: string })[] = [
     debuggee,
@@ -60,7 +69,9 @@ export async function discoverFrames(debuggee: chrome.debugger.Debuggee): Promis
   ];
   for (const source of roots) {
     try {
-      const tree = (await chrome.debugger.sendCommand(source, "Page.getFrameTree")) as {
+      const tree = (await send(source, "Page.getFrameTree", undefined, {
+        label: "discoverFrames",
+      })) as {
         frameTree: FrameNode;
       };
       appendFrameTree(result, tree.frameTree, source);
@@ -93,10 +104,15 @@ export async function frameContext(
   debuggee: chrome.debugger.Debuggee,
   frameId: string,
 ): Promise<number> {
-  const context = (await chrome.debugger.sendCommand(debuggee, "Page.createIsolatedWorld", {
-    frameId,
-    worldName: "browserkit-frames",
-  })) as { executionContextId: number };
+  const context = (await send(
+    debuggee,
+    "Page.createIsolatedWorld",
+    {
+      frameId,
+      worldName: "browserkit-frames",
+    },
+    { label: "frameContext" },
+  )) as { executionContextId: number };
   return context.executionContextId;
 }
 export async function evaluateFrame(
@@ -105,13 +121,18 @@ export async function evaluateFrame(
   expression: string,
 ): Promise<unknown> {
   const contextId = await frameContext(debuggee, frameId);
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression,
-    contextId,
-    returnByValue: true,
-    awaitPromise: true,
-    timeout: 8000,
-  })) as {
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    {
+      expression,
+      contextId,
+      returnByValue: true,
+      awaitPromise: true,
+      timeout: 8000,
+    },
+    { label: "evaluateFrame", ms: 8_000 },
+  )) as {
     result?: { value?: unknown };
     exceptionDetails?: { text: string; exception?: { description: string } };
   };
@@ -184,10 +205,15 @@ export async function uploadFiles(
   if (!backendNodeId) {
     if (!step.selector)
       throw new Error("Choose an observed file input or file chooser backendNodeId");
-    const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression: fileInputExpression(step.selector),
-      ...(step.frameId ? { contextId: await frameContext(debuggee, step.frameId) } : {}),
-    })) as {
+    const result = (await send(
+      debuggee,
+      "Runtime.evaluate",
+      {
+        expression: fileInputExpression(step.selector),
+        ...(step.frameId ? { contextId: await frameContext(debuggee, step.frameId) } : {}),
+      },
+      { label: "uploadFiles", ms: 5_000 },
+    )) as {
       result?: { objectId?: string };
       exceptionDetails?: { exception?: { description?: string } };
     };
@@ -198,37 +224,46 @@ export async function uploadFiles(
           (result.exceptionDetails?.exception?.description?.split("\n")[0] ?? "no file input"),
       );
     try {
-      const node = (await chrome.debugger.sendCommand(debuggee, "DOM.describeNode", {
-        objectId,
-      })) as { node: { backendNodeId: number } };
+      const node = (await send(
+        debuggee,
+        "DOM.describeNode",
+        { objectId },
+        { label: "uploadFiles" },
+      )) as { node: { backendNodeId: number } };
       backendNodeId = node.node.backendNodeId;
     } finally {
-      await chrome.debugger
-        .sendCommand(debuggee, "Runtime.releaseObject", { objectId })
-        .catch(() => undefined);
+      await send(debuggee, "Runtime.releaseObject", { objectId }, { label: "uploadFiles" }).catch(
+        () => undefined,
+      );
     }
   }
   const state = await onNode<{ type: string; multiple: boolean; disabled: boolean }>(
     debuggee,
     backendNodeId,
-    function (this: HTMLInputElement) {
-      return { type: this.type, multiple: this.multiple, disabled: this.disabled };
-    },
+    fileInputState,
   );
   if (state.type !== "file" || state.disabled || (!state.multiple && step.files.length > 1))
     throw new Error("INVALID_TARGET");
-  await chrome.debugger.sendCommand(debuggee, "DOM.setFileInputFiles", {
-    backendNodeId,
-    files: step.files,
-  });
-  const files = await onNode<unknown>(debuggee, backendNodeId, function (this: HTMLInputElement) {
-    return [...(this.files ?? [])].map((file) => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    }));
-  });
+  await send(
+    debuggee,
+    "DOM.setFileInputFiles",
+    { backendNodeId, files: step.files },
+    { label: "uploadFiles" },
+  );
+  const files = await onNode(debuggee, backendNodeId, chosenFiles);
   return { files, selected: true };
+}
+
+function fileInputState(this: HTMLInputElement) {
+  return { type: this.type, multiple: this.multiple, disabled: this.disabled };
+}
+
+function chosenFiles(this: HTMLInputElement) {
+  return [...(this.files ?? [])].map((file) => ({
+    name: file.name,
+    size: file.size,
+    type: file.type,
+  }));
 }
 
 /**
@@ -259,6 +294,7 @@ export async function collectFrameAx(
       source,
       "Accessibility.getFullAXTree",
       frame.sessionId ? {} : { frameId: frame.frameId },
+      { label: "collectFrameAx" },
     ).catch(() => undefined);
     for (const node of tree?.nodes ?? []) {
       const key = (frame.sessionId ?? "root") + ":" + (node.backendDOMNodeId ?? node.nodeId);
@@ -294,20 +330,15 @@ async function frameOwnerId(
   frameId: string,
 ): Promise<number | undefined> {
   for (const source of sources) {
-    const result = await send<{ backendNodeId?: number }>(source, "DOM.getFrameOwner", {
-      frameId,
-    }).catch(() => undefined);
+    const result = await send<{ backendNodeId?: number }>(
+      source,
+      "DOM.getFrameOwner",
+      { frameId },
+      { label: "frameOwnerId" },
+    ).catch(() => undefined);
     if (result?.backendNodeId !== undefined) return result.backendNodeId;
   }
   return undefined;
-}
-
-function send<T>(
-  debuggee: chrome.debugger.Debuggee,
-  method: string,
-  params: Record<string, unknown>,
-): Promise<T> {
-  return chrome.debugger.sendCommand(debuggee, method, params) as Promise<T>;
 }
 
 export interface RootPoint {
@@ -350,6 +381,7 @@ export async function rootFramePoint(
       owner.source,
       "DOM.describeNode",
       { backendNodeId: owner.backendNodeId },
+      { label: "rootFramePoint" },
     ).catch(() => undefined);
     const parent = described?.node?.frameId;
     if (!parent || parent === current) break;
@@ -364,6 +396,7 @@ async function rootFrameId(debuggee: chrome.debugger.Debuggee): Promise<string |
     debuggee,
     "Page.getFrameTree",
     {},
+    { label: "rootFrameId" },
   ).catch(() => undefined);
   return tree?.frameTree?.frame?.id;
 }
@@ -380,15 +413,19 @@ async function frameOwner(
   | undefined
 > {
   for (const source of sources) {
-    await send(source, "DOM.enable", {}).catch(() => undefined);
-    const owner = await send<{ backendNodeId?: number }>(source, "DOM.getFrameOwner", {
-      frameId,
-    }).catch(() => undefined);
+    await send(source, "DOM.enable", {}, { label: "frameOwner" }).catch(() => undefined);
+    const owner = await send<{ backendNodeId?: number }>(
+      source,
+      "DOM.getFrameOwner",
+      { frameId },
+      { label: "frameOwner" },
+    ).catch(() => undefined);
     if (owner?.backendNodeId === undefined) continue;
     const box = await send<{ model?: { content?: number[]; border?: number[] } }>(
       source,
       "DOM.getBoxModel",
       { backendNodeId: owner.backendNodeId },
+      { label: "frameOwner" },
     ).catch(() => undefined);
     if (box?.model) return { source, backendNodeId: owner.backendNodeId, model: box.model };
   }
