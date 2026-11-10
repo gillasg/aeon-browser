@@ -13,6 +13,7 @@ import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom
 import { ambiguousError, hiddenError, notFoundError } from "./native-browser-candidates.js";
 import { collectFrameAx } from "./native-browser-frames.js";
 import { humanMouse } from "./native-browser-human-input.js";
+import { send } from "./cdp/send.js";
 export { withBrowserDebugger as withDebugger } from "./native-browser-session.js";
 
 export async function resolveElement(
@@ -36,11 +37,14 @@ export async function resolveElement(
     // A frame's node lives in that frame's session; its backend id means nothing on the tab's
     // own target, so revalidate it where it was read.
     if (prior.sessionId) {
-      const tree = (await chrome.debugger
-        .sendCommand({ ...debuggee, sessionId: prior.sessionId }, "Accessibility.getFullAXTree")
-        .catch(() => {
-          throw new Error("STALE_REF");
-        })) as { nodes?: AxNode[] };
+      const tree = (await send(
+        { ...debuggee, sessionId: prior.sessionId },
+        "Accessibility.getFullAXTree",
+        undefined,
+        { label: "resolveElement" },
+      ).catch(() => {
+        throw new Error("STALE_REF");
+      })) as { nodes?: AxNode[] };
       const live = tree.nodes?.find((node) => node.backendDOMNodeId === prior.backendNodeId);
       if (!sameSemanticNode(live, prior)) throw new Error("STALE_REF");
       return prior;
@@ -179,13 +183,15 @@ async function hiddenQuery(
 }
 
 export async function getAxTree(debuggee: chrome.debugger.Debuggee): Promise<AxNode[]> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Accessibility.getFullAXTree")) as {
+  const result = (await send(debuggee, "Accessibility.getFullAXTree", undefined, {
+    label: "getAxTree",
+  })) as {
     nodes?: AxNode[];
   };
   if (!Array.isArray(result.nodes)) throw new Error("UNSUPPORTED");
-  const frames = (await chrome.debugger
-    .sendCommand(debuggee, "Page.getFrameTree")
-    .catch(() => undefined)) as { frameTree?: { frame?: { id?: string } } } | undefined;
+  const frames = (await send(debuggee, "Page.getFrameTree", undefined, {
+    label: "getAxTree",
+  }).catch(() => undefined)) as { frameTree?: { frame?: { id?: string } } } | undefined;
   const rootFrameId = frames?.frameTree?.frame?.id;
   if (!rootFrameId) return result.nodes;
   return collectFrameAx(debuggee, rootFrameId, result.nodes);
@@ -201,7 +207,9 @@ export async function getViewportCenter(
 export async function getViewportSize(
   debuggee: chrome.debugger.Debuggee,
 ): Promise<{ width: number; height: number }> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Page.getLayoutMetrics")) as {
+  const result = (await send(debuggee, "Page.getLayoutMetrics", undefined, {
+    label: "getViewportSize",
+  })) as {
     cssVisualViewport?: { clientWidth?: number; clientHeight?: number };
   };
   const width = Math.floor(result.cssVisualViewport?.clientWidth ?? 0);
@@ -214,10 +222,15 @@ export async function getCenter(
   debuggee: chrome.debugger.Debuggee,
   backendNodeId: number,
 ): Promise<{ x: number; y: number }> {
-  await chrome.debugger.sendCommand(debuggee, "DOM.scrollIntoViewIfNeeded", { backendNodeId });
-  const result = (await chrome.debugger.sendCommand(debuggee, "DOM.getBoxModel", {
-    backendNodeId,
-  })) as { model?: { content?: number[] } };
+  await send(debuggee, "DOM.scrollIntoViewIfNeeded", { backendNodeId }, { label: "getCenter" });
+  const result = (await send(
+    debuggee,
+    "DOM.getBoxModel",
+    { backendNodeId },
+    {
+      label: "getCenter",
+    },
+  )) as { model?: { content?: number[] } };
   const quad = result.model?.content;
   if (!quad || quad.length < 8) throw new Error("STALE_REF");
   const x = [quad[0], quad[2], quad[4], quad[6]];
@@ -245,20 +258,18 @@ export async function clickAt(
 ): Promise<void> {
   showAgentCursor(debuggee, x, y, true);
   noteActionTiming(debuggee.tabId, { tAct: Date.now(), point: { x, y } });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", {
-    type: "mousePressed",
-    x,
-    y,
-    button: "left",
-    clickCount: 1,
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", {
-    type: "mouseReleased",
-    x,
-    y,
-    button: "left",
-    clickCount: 1,
-  });
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mousePressed", x, y, button: "left", clickCount: 1 },
+    { label: "clickAt" },
+  );
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mouseReleased", x, y, button: "left", clickCount: 1 },
+    { label: "clickAt" },
+  );
 }
 
 export async function scrollAt(
@@ -276,8 +287,10 @@ export async function scrollAt(
     deltaX: direction === "left" || direction === "right" ? amount * positive : 0,
     deltaY: direction === "up" || direction === "down" ? amount * positive : 0,
   });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", {
-    type: "mouseWheel",
-    ...params,
-  });
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mouseWheel", ...params },
+    { label: "scrollAt" },
+  );
 }

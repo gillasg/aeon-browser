@@ -336,6 +336,8 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
             )
             .max(8)
             .optional(),
+          /** An earlier input on this tab timed out and may still land. */
+          lateReply: z.string().max(300).optional(),
         })
         .strict()
         .optional(),

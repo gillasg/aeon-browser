@@ -10,6 +10,7 @@ import { browserSessionOwner } from "./native-browser-session.js";
 import { claimAgentTab, groupAgentTab } from "./native-browser-groups.js";
 import { markAgentTabGrouped, trackAgentTab } from "./native-browser-tab-cleanup.js";
 import { noteLabel, noteSpace, spaceWindow } from "./native-browser-spaces.js";
+import { callClass, send as cdpSend } from "./cdp/send.js";
 
 // A local CDP client (Playwright, Puppeteer) drives agent tabs through the debugger sessions the
 // engine already owns. The bridge speaks CDP; this module forwards one command at a time to
@@ -78,10 +79,11 @@ async function runCommand(
     if (!Number.isSafeInteger(tabId) || !chatId || !method) throw new Error("INVALID_CDP_COMMAND");
     bindBrowserSession(tabId, chatId);
     await ensureBrowserAttachment(tabId, chatId);
-    const result = await chrome.debugger.sendCommand(
+    const result = await cdpSend(
       sessionId ? { tabId, sessionId } : { tabId },
       method,
       params,
+      commandOptions(method, params),
     );
     send({ kind: "cdp.result", id, result });
   } catch (error) {
@@ -171,6 +173,17 @@ function enableTab(tabId: number, chatId: string): void {
   holdBrowserDebugger(tabId, true);
   enabled.set(tabId, chatId);
   void ensureBrowserAttachment(tabId, chatId).catch(() => undefined);
+}
+
+function commandOptions(
+  method: string,
+  params: Record<string, unknown>,
+): { label: string; ms?: number } {
+  if (callClass(method) !== "eval") return { label: "runCommand" };
+  const timeout = params.timeout;
+  const ms =
+    typeof timeout === "number" && Number.isFinite(timeout) && timeout > 0 ? timeout : 5_000;
+  return { label: "runCommand", ms };
 }
 
 function send(message: Record<string, unknown>): void {

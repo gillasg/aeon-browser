@@ -11,6 +11,7 @@ import {
   releaseBrowserEvents,
 } from "./native-browser-events.js";
 import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-navigation.js";
+import { bounded, send, sendWake } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { tidyAllChatTabs, tidyChatTabs, touchAgentTab } from "./native-browser-tab-cleanup.js";
@@ -206,37 +207,34 @@ function forget(tabId: number): void {
   void chrome.action.setTitle({ tabId, title: engineConfig.idleTitle }).catch(() => undefined);
 }
 
-// Every step of attaching has a time limit: a hung renderer or a tab Chrome froze answers no CDP
-// command, and an attach that waits forever wedges the whole cell. A frozen tab is woken once
-// (Page.setWebLifecycleState); one that still does not answer is TAB_UNRESPONSIVE, a named failure
-// the agent recovers from by opening the page again.
+// Every step of attaching has a time limit (cdp/send.ts): a hung renderer answers no command, and an
+// attach that waits forever wedges the whole cell. A frozen tab is woken once
+// (Page.setWebLifecycleState); one that still does not answer is TAB_UNRESPONSIVE.
 const ATTACH_MS = 10_000;
-const DOMAIN_MS = 8_000;
 
 async function attach(tabId: number): Promise<void> {
   // Memory Saver discards background tabs, agent tabs first: load it back before driving it.
   await reviveDiscardedTab(tabId);
   try {
-    await bounded(tabId, chrome.debugger.attach({ tabId }, "1.3"), ATTACH_MS);
+    await bounded(tabId, chrome.debugger.attach({ tabId }, "1.3"), ATTACH_MS, "attach");
   } catch (error) {
     if (!/already attached/i.test(String(error))) throw error;
-    // sendCommand succeeds only for our extension's attachment; do not take over DevTools.
-    await bounded(tabId, chrome.debugger.sendCommand({ tabId }, "Page.getFrameTree"), DOMAIN_MS);
+    // send succeeds only for our extension's attachment; do not take over DevTools.
+    await send({ tabId }, "Page.getFrameTree", undefined, { label: "attach", cls: "attach" });
   }
   trackBrowserActivity(tabId);
   await enablePage(tabId);
   void showAgentGlow(tabId);
-  await bounded(
-    tabId,
-    Promise.all([
-      chrome.debugger.sendCommand({ tabId }, "DOM.enable"),
-      chrome.debugger.sendCommand({ tabId }, "Accessibility.enable"),
-    ]),
-    DOMAIN_MS,
-  );
-  await chrome.debugger
-    .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true })
-    .catch(() => undefined);
+  await Promise.all([
+    send({ tabId }, "DOM.enable", undefined, { label: "attach", cls: "attach" }),
+    send({ tabId }, "Accessibility.enable", undefined, { label: "attach", cls: "attach" }),
+  ]);
+  await send(
+    { tabId },
+    "Emulation.setFocusEmulationEnabled",
+    { enabled: true },
+    { label: "attach" },
+  ).catch(() => undefined);
   await enableDiagnostics(tabId);
   for (const listener of attachListeners)
     await Promise.resolve(listener(tabId)).catch(() => undefined);
@@ -245,42 +243,19 @@ async function attach(tabId: number): Promise<void> {
 /** Page.enable, waking a tab Chrome froze when it does not answer in time. */
 async function enablePage(tabId: number): Promise<void> {
   try {
-    await bounded(tabId, chrome.debugger.sendCommand({ tabId }, "Page.enable"), DOMAIN_MS);
+    await send({ tabId }, "Page.enable", undefined, { label: "enablePage", cls: "attach" });
     return;
   } catch (error) {
     if (!String(error).includes("TAB_UNRESPONSIVE")) throw error;
   }
-  await chrome.debugger
-    .sendCommand({ tabId }, "Page.setWebLifecycleState", { state: "active" })
-    .catch(() => undefined);
-  await bounded(tabId, chrome.debugger.sendCommand({ tabId }, "Page.enable"), DOMAIN_MS);
-}
-
-// Single flight: a CDP call cannot be cancelled, so one that outlived its limit is still running in
-// Chrome. Until it settles, every bounded call on that tab fails at once instead of stacking another
-// call behind it (and waiting out another limit), so a retry is fast and says why.
-const stuck = new Map<number, Promise<unknown>>();
-
-function bounded<T>(tabId: number, work: Promise<T>, ms: number): Promise<T> {
-  if (stuck.has(tabId))
-    return Promise.reject(
-      new Error("TAB_UNRESPONSIVE: the tab has not answered an earlier call yet"),
-    );
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const limit = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      const late = work.then(
-        () => undefined,
-        () => undefined,
-      );
-      stuck.set(tabId, late);
-      void late.then(() => {
-        if (stuck.get(tabId) === late) stuck.delete(tabId);
-      });
-      reject(new Error(`TAB_UNRESPONSIVE: the tab did not answer within ${ms / 1000} s`));
-    }, ms);
-  });
-  return Promise.race([work, limit]).finally(() => clearTimeout(timer));
+  // The hung Page.enable still owns the tab. The wake has to go out anyway.
+  await sendWake(
+    { tabId },
+    "Page.setWebLifecycleState",
+    { state: "active" },
+    { label: "enablePage" },
+  ).catch(() => undefined);
+  await send({ tabId }, "Page.enable", undefined, { label: "enablePage", cls: "attach" });
 }
 
 function detach(tabId: number): Promise<void> {
@@ -294,9 +269,12 @@ function detach(tabId: number): Promise<void> {
       async () => {
         await restoreBrowserViewport(tabId);
         void removeAgentCursor(tabId);
-        await chrome.debugger
-          .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: false })
-          .catch(() => undefined);
+        await send(
+          { tabId },
+          "Emulation.setFocusEmulationEnabled",
+          { enabled: false },
+          { label: "detach" },
+        ).catch(() => undefined);
         await chrome.debugger.detach({ tabId }).catch(() => undefined);
       },
       () => undefined,
@@ -361,21 +339,26 @@ export async function ensureBrowserViewport(tabId: number): Promise<void> {
     await restoreBrowserViewport(tabId);
     return;
   }
-  await chrome.debugger.sendCommand({ tabId }, "Emulation.setDeviceMetricsOverride", {
-    width: 1280,
-    height: 800,
-    // 0 keeps the screen's own pixel ratio: a forced 1 on a scaled display is a tell pages read.
-    deviceScaleFactor: 0,
-    mobile: false,
-  });
+  await send(
+    { tabId },
+    "Emulation.setDeviceMetricsOverride",
+    {
+      width: 1280,
+      height: 800,
+      // 0 keeps the screen's own pixel ratio: a forced 1 on a scaled display is a tell pages read.
+      deviceScaleFactor: 0,
+      mobile: false,
+    },
+    { label: "ensureBrowserViewport" },
+  );
   overridden.add(tabId);
 }
 export async function restoreBrowserViewport(tabId: number): Promise<void> {
   if (emulated.has(tabId)) return;
   overridden.delete(tabId);
-  await chrome.debugger
-    .sendCommand({ tabId }, "Emulation.clearDeviceMetricsOverride")
-    .catch(() => undefined);
+  await send({ tabId }, "Emulation.clearDeviceMetricsOverride", undefined, {
+    label: "restoreBrowserViewport",
+  }).catch(() => undefined);
 }
 
 const chatEpochs = new Map<string, number>();
