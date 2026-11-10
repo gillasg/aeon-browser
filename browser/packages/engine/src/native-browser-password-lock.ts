@@ -1,5 +1,6 @@
 import type { BrowserStep } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
+import { send } from "./cdp/send.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { SessionMap } from "./native-session-map.js";
@@ -277,9 +278,12 @@ async function removePlanted(tabId: number): Promise<void> {
   if (!ids?.size) return;
   await withBrowserDebugger(tabId, async (debuggee) => {
     for (const identifier of ids)
-      await chrome.debugger
-        .sendCommand(debuggee, "Page.removeScriptToEvaluateOnNewDocument", { identifier })
-        .catch(() => undefined);
+      await send(
+        debuggee,
+        "Page.removeScriptToEvaluateOnNewDocument",
+        { identifier },
+        { label: "removePlanted" },
+      ).catch(() => undefined);
   });
   planted.delete(tabId);
 }

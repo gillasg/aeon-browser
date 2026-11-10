@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { guardAgentTab } from "./native-browser-tab-cleanup.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
@@ -138,11 +139,12 @@ onEngineInstall(() => {
 async function evaluate(tabId: number, expression: string): Promise<unknown> {
   // A page mid-navigation has no context to evaluate in; that poll just reports "waiting".
   const result = await withBrowserDebugger(tabId, (debuggee) =>
-    chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression,
-      returnByValue: true,
-      silent: true,
-    }),
+    send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression, returnByValue: true, silent: true },
+      { label: "evaluate", ms: 5_000 },
+    ),
   ).catch(() => undefined);
   return (result as { result?: { value?: unknown } } | undefined)?.result?.value ?? "waiting";
 }

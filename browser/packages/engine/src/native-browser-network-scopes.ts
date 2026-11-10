@@ -1,3 +1,5 @@
+import { send } from "./cdp/send.js";
+
 // Child debugger sessions: a tab's out-of-process iframes, dedicated/shared workers and service
 // workers each get their own session when Target.setAutoAttach is on. Kept here so the network
 // recorder can tag entries with where their request came from and read bodies from that session.
@@ -36,7 +38,7 @@ export function attachChild(tabId: number, params: Record<string, unknown>): voi
     ...(info?.url ? { frameUrl: info.url } : {}),
     ...(source ? { source } : {}),
   });
-  void chrome.debugger
-    .sendCommand({ tabId, sessionId }, "Network.enable", NETWORK_BUFFERS)
-    .catch(() => undefined);
+  void send({ tabId, sessionId }, "Network.enable", NETWORK_BUFFERS, {
+    label: "attachChild",
+  }).catch(() => undefined);
 }

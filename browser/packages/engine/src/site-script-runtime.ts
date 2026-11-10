@@ -3,6 +3,7 @@ import {
   type SiteScriptDefinition,
   BrowserScriptsSyncSchema,
 } from "@browserkit/protocol";
+import { send } from "./cdp/send.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
@@ -115,26 +116,36 @@ export async function previewSiteScript(
 ): Promise<unknown> {
   return withBrowserDebugger(tabId, async (debuggee) => {
     await assertActive();
-    const tree = (await chrome.debugger.sendCommand(debuggee, "Page.getFrameTree")) as {
-      frameTree: { frame: { id: string; url: string } };
-    };
+    const tree = (await send(debuggee, "Page.getFrameTree", undefined, {
+      label: "previewSiteScript",
+    })) as { frameTree: { frame: { id: string; url: string } } };
     const url = tree.frameTree.frame.url;
     if (!script.matches.some((pattern) => matches(pattern, url))) throw new Error("INVALID_TARGET");
-    const world = (await chrome.debugger.sendCommand(debuggee, "Page.createIsolatedWorld", {
-      frameId: tree.frameTree.frame.id,
-      worldName: "browserkit-site-" + script.scriptId,
-    })) as { executionContextId: number };
+    const world = (await send(
+      debuggee,
+      "Page.createIsolatedWorld",
+      { frameId: tree.frameTree.frame.id, worldName: "browserkit-site-" + script.scriptId },
+      { label: "previewSiteScript" },
+    )) as { executionContextId: number };
     worlds.set(tabId + ":" + script.scriptId, world.executionContextId);
     await assertActive();
-    const response = (await boundedPreview(
-      chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
+    const preview = send(
+      debuggee,
+      "Runtime.evaluate",
+      {
         expression: siteScriptSource(script),
         contextId: world.executionContextId,
         awaitPromise: true,
         returnByValue: true,
         timeout: 5000,
-      }),
-    )) as { result?: { value?: unknown }; exceptionDetails?: { text?: string } };
+      },
+      { label: "previewSiteScript", ms: 5_000 },
+    );
+    void preview.catch(() => undefined);
+    const response = (await boundedPreview(preview)) as {
+      result?: { value?: unknown };
+      exceptionDetails?: { text?: string };
+    };
     if (response.exceptionDetails)
       return { applied: false, error: response.exceptionDetails.text ?? "Preview failed" };
     return { installed: false, temporary: true, result: response.result?.value ?? null };
@@ -145,11 +156,12 @@ export async function removeScriptPreview(tabId: number, scriptId: string): Prom
     contextId = worlds.get(key);
   if (contextId === undefined) return false;
   await withBrowserDebugger(tabId, (debuggee) =>
-    chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression: siteScriptCleanup,
-      contextId,
-      returnByValue: true,
-    }),
+    send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression: siteScriptCleanup, contextId, returnByValue: true },
+      { label: "removeScriptPreview", ms: 5_000 },
+    ),
   ).catch(() => undefined);
   worlds.delete(key);
   return true;

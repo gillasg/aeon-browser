@@ -8,6 +8,7 @@ import { refreshInventoryTab } from "../native-inventory-client.js";
 import { safePage, sameTarget } from "../native-browser-common.js";
 import { notePageConsole } from "../native-browser-events.js";
 import { noteReceiptDialog } from "../native-browser-receipts.js";
+import { send } from "../cdp/send.js";
 import { onEngineInstall } from "../native-engine-install.js";
 
 /** Confirm/prompt counts as asked only inside this window after an agent action. */
@@ -166,12 +167,12 @@ export function onJavaScriptDialog(
   if (source.tabId === undefined || method !== "Page.javascriptDialogOpening") return;
   const data = (raw ?? {}) as { type?: string; message?: string; defaultPrompt?: string };
   const decision = answerDialogOpening(source.tabId, data);
-  void chrome.debugger
-    .sendCommand(source, "Page.handleJavaScriptDialog", {
-      accept: decision.accept,
-      promptText: decision.promptText,
-    })
-    .catch(() => undefined);
+  void send(
+    source,
+    "Page.handleJavaScriptDialog",
+    { accept: decision.accept, promptText: decision.promptText },
+    { label: "onJavaScriptDialog" },
+  ).catch(() => undefined);
 }
 
 function fromExpect(type: string, message: string, input: DialogInput): DialogDecision {

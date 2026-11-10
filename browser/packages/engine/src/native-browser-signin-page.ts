@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 
 // The page side of a password-manager sign-in: find the sign-in fields, type into them as real
@@ -140,19 +141,29 @@ export async function scanFields(tabId: number): Promise<SignInFields | undefine
 export async function typeInto(tabId: number, field: string, value: string): Promise<boolean> {
   if (!(await evaluate(tabId, FOCUS(field)).catch(() => false))) return false;
   await withBrowserDebugger(tabId, async (debuggee) => {
-    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-      type: "keyDown",
-      key: "Backspace",
-      code: "Backspace",
-      windowsVirtualKeyCode: 8,
-    });
-    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-      type: "keyUp",
-      key: "Backspace",
-      code: "Backspace",
-      windowsVirtualKeyCode: 8,
-    });
-    await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text: value });
+    await send(
+      debuggee,
+      "Input.dispatchKeyEvent",
+      {
+        type: "keyDown",
+        key: "Backspace",
+        code: "Backspace",
+        windowsVirtualKeyCode: 8,
+      },
+      { label: "typeInto" },
+    );
+    await send(
+      debuggee,
+      "Input.dispatchKeyEvent",
+      {
+        type: "keyUp",
+        key: "Backspace",
+        code: "Backspace",
+        windowsVirtualKeyCode: 8,
+      },
+      { label: "typeInto" },
+    );
+    await send(debuggee, "Input.insertText", { text: value }, { label: "typeInto" });
   });
   return true;
 }
@@ -162,13 +173,18 @@ export async function submitForm(tabId: number): Promise<void> {
   if (await evaluate(tabId, CLICK).catch(() => false)) return;
   await withBrowserDebugger(tabId, async (debuggee) => {
     for (const type of ["keyDown", "keyUp"] as const)
-      await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-        type,
-        key: "Enter",
-        code: "Enter",
-        windowsVirtualKeyCode: 13,
-        ...(type === "keyDown" ? { text: "\r" } : {}),
-      });
+      await send(
+        debuggee,
+        "Input.dispatchKeyEvent",
+        {
+          type,
+          key: "Enter",
+          code: "Enter",
+          windowsVirtualKeyCode: 13,
+          ...(type === "keyDown" ? { text: "\r" } : {}),
+        },
+        { label: "submitForm" },
+      );
   });
 }
 
@@ -228,11 +244,16 @@ function changed(before: SignInFields, after: SignInFields): boolean {
 
 export async function evaluate(tabId: number, expression: string): Promise<unknown> {
   const result = await withBrowserDebugger(tabId, (debuggee) =>
-    chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression,
-      returnByValue: true,
-      silent: true,
-    }),
+    send(
+      debuggee,
+      "Runtime.evaluate",
+      {
+        expression,
+        returnByValue: true,
+        silent: true,
+      },
+      { label: "evaluate", ms: 5_000 },
+    ),
   );
   return (result as { result?: { value?: unknown } } | undefined)?.result?.value;
 }
