@@ -621,3 +621,11 @@ test("a truncated observation points at page.state when the budget can hold the 
   });
   assert.match(view, /\[observation truncated; page\.state\(\{query\}\) for a focused look\]/);
 });
+
+test("Chrome's layout-table roles read as a table, row and cell", async () => {
+  const { canonicalRole } = await import("../dist/observe/tree.js");
+  assert.equal(canonicalRole("LayoutTable"), "table");
+  assert.equal(canonicalRole("layoutTableRow"), "row");
+  assert.equal(canonicalRole("LayoutTableCell"), "cell");
+  assert.equal(canonicalRole("button"), "button");
+});
