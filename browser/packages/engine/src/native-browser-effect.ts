@@ -32,6 +32,10 @@ export interface StepObservation {
   requests?: number;
   /** The field's value read back after a fill or paste. */
   readback?: string;
+  /** A JavaScript dialog this step raised. */
+  dialog?: { type: string; accepted: boolean };
+  /** A download this step started. */
+  download?: { filename: string };
 }
 
 const MAX_EVIDENCE = 200;
@@ -55,6 +59,16 @@ export function inputStepEffect(
   ctx?: EffectNextContext,
 ): EffectVerdict {
   return attachNext(inputVerdict(op, observation, expected), { ...ctx, op });
+}
+
+/** An accepted dialog or a download is evidence, so the step is not a suspected no-op. */
+function activityEffect(observation: StepObservation): EffectVerdict | undefined {
+  const parts: string[] = [];
+  if (observation.dialog?.accepted)
+    parts.push(`${observation.dialog.type || "dialog"} dialog accepted`);
+  if (observation.download?.filename) parts.push(`download ${observation.download.filename}`);
+  if (!parts.length) return undefined;
+  return { effect: "confirmed", evidence: shorten(parts.join("; ")) };
 }
 
 function attachNext(verdict: EffectVerdict, ctx: EffectNextContext): EffectVerdict {
@@ -87,6 +101,8 @@ function inputVerdict(op: string, observation: StepObservation, expected?: strin
         `${observation.changes && observation.changes > 0 ? `${observation.changes} DOM change${observation.changes === 1 ? "" : "s"}` : "DOM changed"} after ${op}`,
       ),
     };
+  const activity = activityEffect(observation);
+  if (activity) return activity;
   if (observation.outcome === "unchanged" && (observation.requests ?? 0) > 0)
     return {
       effect: "unverifiable",

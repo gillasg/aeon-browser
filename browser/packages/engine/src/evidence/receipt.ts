@@ -106,11 +106,24 @@ export function noteRequestEnd(
   if (removed || input.status !== undefined || input.error) touch(receipt, input.at);
 }
 
+const DOWNLOAD_REISSUE = "download-reissue";
+
 /** The download's name is the evidence, so it does not stay pending after it is known. */
 export function noteDownload(receipt: OpenReceipt, now: number): void {
   receipt.extended = true;
   receipt.sawDownload = true;
+  leave(receipt, DOWNLOAD_REISSUE, now);
   touch(receipt, now);
+}
+
+/** A reissued download has been asked for and has not arrived yet. */
+export function noteDownloadReissue(receipt: OpenReceipt, now: number): void {
+  join(receipt, DOWNLOAD_REISSUE, "download", now);
+}
+
+/** The reissue arrived, or it is not going to. */
+export function noteDownloadReissueDone(receipt: OpenReceipt, now: number): void {
+  leave(receipt, DOWNLOAD_REISSUE, now);
 }
 
 export function noteNavigationStart(receipt: OpenReceipt, now: number): void {

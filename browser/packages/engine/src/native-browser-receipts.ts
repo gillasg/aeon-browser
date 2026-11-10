@@ -4,6 +4,8 @@ import {
   noteDialogClose,
   noteDialogOpen,
   noteDownload,
+  noteDownloadReissue,
+  noteDownloadReissueDone,
   noteNavigationDone,
   noteNavigationStart,
   noteRequestEnd,
@@ -39,6 +41,51 @@ export interface ReceiptRequest {
 }
 
 const MAX_REQUESTS = 8;
+
+let beforeQuiet: ((actionId: string) => Promise<void>) | undefined;
+const reissuedNames = new Map<string, string>();
+
+/** Runs after the action, before the receipt waits out its quiet period. */
+export function onBeforeReceiptQuiet(fn: (actionId: string) => Promise<void>): void {
+  beforeQuiet = fn;
+}
+
+export interface ReceiptReissueState {
+  tabId: number;
+  startedAt: number;
+  hasDownload: boolean;
+}
+
+/** What a dropped download needs in order to decide whether to send it again. */
+export function receiptReissueState(actionId: string): ReceiptReissueState | undefined {
+  const live = lives.get(actionId);
+  if (!live) return undefined;
+  return {
+    tabId: live.open.tabId,
+    startedAt: live.open.startedAt,
+    hasDownload: Boolean(live.body.download),
+  };
+}
+
+/** Keeps the receipt open until a reissued download arrives, or the reissue is given up. */
+export function holdDownloadReissue(actionId: string): void {
+  const live = lives.get(actionId);
+  if (!live) return;
+  noteDownloadReissue(live.open, Date.now());
+}
+
+export function releaseDownloadReissue(actionId: string): void {
+  const live = lives.get(actionId);
+  if (!live) return;
+  noteDownloadReissueDone(live.open, Date.now());
+}
+
+/** The name to use when the download item does not have one yet. */
+export function rememberReissuedName(url: string, name: string): void {
+  if (!url || !name) return;
+  reissuedNames.set(url, name.slice(0, 300));
+  if (reissuedNames.size > 32) reissuedNames.delete(reissuedNames.keys().next().value ?? "");
+}
 
 interface LiveReceipt {
   open: OpenReceipt;
@@ -89,6 +136,7 @@ export function beginReceipt(tabId: number): string {
 export async function finishReceipt(actionId: string): Promise<ActionReceipt> {
   const live = lives.get(actionId);
   if (!live) return { popups: [], navigated: false };
+  if (beforeQuiet) await beforeQuiet(actionId).catch(() => releaseDownloadReissue(actionId));
   const closed = await closeWhenQuiet(live.open);
   await drainLookups();
   copyRequests(live);
@@ -207,12 +255,14 @@ function onDialogClosed(live: LiveReceipt, params: Record<string, unknown>): voi
 
 function onDownload(live: LiveReceipt, params: Record<string, unknown>): void {
   if (live.body.download) return;
+  const url = String(params.url ?? "").slice(0, 2000);
   live.body.download = {
-    url: String(params.url ?? "").slice(0, 2000),
-    filename: String(params.suggestedFilename ?? "").slice(0, 300),
+    url,
+    filename: downloadName(url, String(params.suggestedFilename ?? "")),
     ...(params.guid ? { token: String(params.guid).slice(0, 200) } : {}),
   };
   noteDownload(live.open, Date.now());
+  releaseDownloadReissue(live.open.actionId);
 }
 
 function onFrame(live: LiveReceipt, params: Record<string, unknown>): void {
@@ -243,23 +293,36 @@ function noteCreatedDownload(item: chrome.downloads.DownloadItem): void {
 async function matchDownload(item: chrome.downloads.DownloadItem): Promise<void> {
   for (const [actionId, live] of [...lives].reverse()) {
     if (live.body.download) continue;
-    const url = await tabUrls.get(actionId);
-    if (!url || !sameOrigin(url, item.referrer || item.url)) continue;
+    const tabUrl = await tabUrls.get(actionId);
+    if (!tabUrl || !downloadFromTab(tabUrl, item)) continue;
+    const downloadUrl = item.url.slice(0, 2000);
     live.body.download = {
-      url: item.url.slice(0, 2000),
-      filename: (item.filename.split(/[\\/]/).pop() || item.url.split("/").pop() || "").slice(
-        0,
-        300,
-      ),
+      url: downloadUrl,
+      filename: downloadName(downloadUrl, item.filename.split(/[\\/]/).pop() || "", item.finalUrl),
     };
     noteDownload(live.open, Date.now());
+    releaseDownloadReissue(actionId);
     return;
   }
+}
+
+function downloadName(url: string, suggested: string, finalUrl = ""): string {
+  if (suggested) return suggested.slice(0, 300);
+  return (reissuedNames.get(url) || (finalUrl ? reissuedNames.get(finalUrl) : "") || "").slice(
+    0,
+    300,
+  );
 }
 
 async function drainLookups(): Promise<void> {
   if (lookups.size) await Promise.all([...lookups]);
   if (lookups.size) await Promise.all([...lookups]);
+}
+
+function downloadFromTab(tabUrl: string, item: chrome.downloads.DownloadItem): boolean {
+  return [item.referrer, item.url, item.finalUrl].some(
+    (candidate) => !!candidate && sameOrigin(tabUrl, candidate),
+  );
 }
 
 function sameOrigin(a: string, b: string): boolean {
