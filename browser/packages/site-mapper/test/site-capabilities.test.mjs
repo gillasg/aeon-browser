@@ -82,3 +82,27 @@ test("capabilities merge abilities, operations and notes", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("an ability file with no options or inputs still lists", async () => {
+  const root = await mkdtemp(join(tmpdir(), "s2a-bare-"));
+  const old = process.env.SITE_TO_API_HOME;
+  process.env.SITE_TO_API_HOME = root;
+  try {
+    const dir = join(root, "sites", "bare.test", "abilities");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "find_lamp.json"),
+      JSON.stringify({ name: "find_lamp", kind: "read", ways: [{ kind: "page", collect: {} }] }),
+    );
+    const caps = await siteCapabilities("bare.test");
+    assert.deepEqual(
+      caps.abilities.map((item) => item.name),
+      ["find_lamp"],
+    );
+    assert.deepEqual(caps.abilities[0].inputs, []);
+  } finally {
+    if (old === undefined) delete process.env.SITE_TO_API_HOME;
+    else process.env.SITE_TO_API_HOME = old;
+    await rm(root, { recursive: true, force: true });
+  }
+});
