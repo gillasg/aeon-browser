@@ -9,9 +9,10 @@ import assert from "node:assert/strict";
 
 export async function browserFixture() {
   const folder = await mkdtemp(join(tmpdir(), "aeon-browser-fixture-"));
-  const chromePath = resolve(
-    ".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe",
-  );
+  // CHROME_PATH first: a worktree has no .slice0-audit folder of its own.
+  const chromePath =
+    process.env.CHROME_PATH ??
+    resolve(".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe");
   const child = spawn(
     chromePath,
     [
