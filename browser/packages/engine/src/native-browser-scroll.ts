@@ -8,6 +8,7 @@ import {
 } from "./native-browser-debugger.js";
 import { browserObservationRefs } from "./native-browser-observation.js";
 import { showAgentCursor } from "./native-browser-cursor.js";
+import { send } from "./cdp/send.js";
 
 export async function selectScrollContainer(
   debuggee: chrome.debugger.Debuggee,
@@ -27,10 +28,12 @@ export async function selectScrollContainer(
     }
     return document.scrollingElement || document.documentElement;
   })()`;
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression,
-    returnByValue: false,
-  })) as { result?: { objectId?: string } };
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression, returnByValue: false },
+    { label: "selectScrollContainer", ms: 5_000 },
+  )) as { result?: { objectId?: string } };
   if (!result.result?.objectId) throw new Error("UNSUPPORTED");
   return result.result.objectId;
 }
@@ -40,17 +43,22 @@ export async function measureScroll(
   objectId: string,
   horizontal: boolean,
 ): Promise<{ position: number; extent: number; viewport: number }> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.callFunctionOn", {
-    objectId,
-    returnByValue: true,
-    arguments: [{ value: horizontal }],
-    functionDeclaration: `function(horizontal) {
+  const result = (await send(
+    debuggee,
+    "Runtime.callFunctionOn",
+    {
+      objectId,
+      returnByValue: true,
+      arguments: [{ value: horizontal }],
+      functionDeclaration: `function(horizontal) {
       if (!this.isConnected) return null;
       return {position: horizontal ? this.scrollLeft : this.scrollTop,
         extent: horizontal ? this.scrollWidth : this.scrollHeight,
         viewport: horizontal ? this.clientWidth : this.clientHeight};
     }`,
-  })) as { result?: { value?: { position: number; extent: number; viewport: number } } };
+    },
+    { label: "measureScroll", ms: 5_000 },
+  )) as { result?: { value?: { position: number; extent: number; viewport: number } } };
   const value = result.result?.value;
   if (!value || ![value.position, value.extent, value.viewport].every(Number.isFinite))
     throw new Error("UNSUPPORTED");
@@ -103,9 +111,12 @@ export async function scrollWithFeedback(
         : after.position <= 2,
     };
   } finally {
-    await chrome.debugger
-      .sendCommand(debuggee, "Runtime.releaseObject", { objectId })
-      .catch(() => undefined);
+    await send(
+      debuggee,
+      "Runtime.releaseObject",
+      { objectId },
+      { label: "scrollWithFeedback" },
+    ).catch(() => undefined);
   }
 }
 

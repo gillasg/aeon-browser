@@ -1,5 +1,6 @@
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { send } from "./cdp/send.js";
 
 // Dry run: while a tab records with {dryRun: true}, requests that would change something (a like,
 // a message, a post, a purchase) are answered by the browser itself with an empty success and never
@@ -46,10 +47,10 @@ async function answer(tabId: number, sessionId: string | undefined, params: Para
     String(request.url ?? ""),
     typeof request.postData === "string" ? request.postData : undefined,
   );
-  const send = (command: string, body: Params) =>
-    chrome.debugger.sendCommand(debuggee, command, body).catch(() => undefined);
-  if (read) return void (await send("Fetch.continueRequest", { requestId }));
-  await send("Fetch.fulfillRequest", {
+  const deliver = (command: string, body: Params) =>
+    send(debuggee, command, body, { label: "answer" }).catch(() => undefined);
+  if (read) return void (await deliver("Fetch.continueRequest", { requestId }));
+  await deliver("Fetch.fulfillRequest", {
     requestId,
     responseCode: 200,
     responseHeaders: [
@@ -71,10 +72,11 @@ export async function setDryRun(tabId: number, enabled: boolean): Promise<void> 
   if (enabled) dryRunTabs.add(tabId);
   else dryRunTabs.delete(tabId);
   await withBrowserDebugger(tabId, (debuggee) =>
-    chrome.debugger.sendCommand(
+    send(
       debuggee,
       enabled ? "Fetch.enable" : "Fetch.disable",
       enabled ? { patterns: PATTERNS } : {},
+      { label: "setDryRun" },
     ),
   ).catch(() => undefined);
 }

@@ -1,4 +1,5 @@
 // Human-like pointer and keyboard timing for input sent through the debugger.
+import { send } from "./cdp/send.js";
 
 type Point = { x: number; y: number };
 type Params = Record<string, unknown>;
@@ -98,9 +99,12 @@ function state(tabId: number): TabState {
 }
 
 async function dispatch(debuggee: chrome.debugger.Debuggee, type: string, params: Params) {
-  await chrome.debugger
-    .sendCommand(debuggee, "Input.dispatchMouseEvent", { type, ...params })
-    .catch(() => undefined);
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type, ...params },
+    { label: "dispatch" },
+  ).catch(() => undefined);
 }
 
 /** Sends the curved movement leading up to a target and returns the adjusted params. */
@@ -272,16 +276,19 @@ function gapBefore(previous: string | undefined): number {
 /** Type one character at a time as real key presses, with key spacing and hold times. */
 export async function humanType(debuggee: chrome.debugger.Debuggee, text: string): Promise<void> {
   if (!enabled) {
-    await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text });
+    await send(debuggee, "Input.insertText", { text }, { label: "humanType" });
     return;
   }
   // Long text is sent in chunks with pacing between chunks, not per character: speed first.
   if (text.length > 120) {
     for (let index = 0; index < text.length; index += 32) {
       await paceKey(debuggee);
-      await chrome.debugger.sendCommand(debuggee, "Input.insertText", {
-        text: text.slice(index, index + 32),
-      });
+      await send(
+        debuggee,
+        "Input.insertText",
+        { text: text.slice(index, index + 32) },
+        { label: "humanType" },
+      );
     }
     return;
   }
@@ -291,20 +298,22 @@ export async function humanType(debuggee: chrome.debugger.Debuggee, text: string
     previous = char;
     const key = keyFor(char);
     if (!key) {
-      await chrome.debugger.sendCommand(debuggee, "Input.insertText", { text: char });
+      await send(debuggee, "Input.insertText", { text: char }, { label: "humanType" });
       continue;
     }
     const { text: typed, ...event } = key;
-    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-      type: "keyDown",
-      ...event,
-      text: typed,
-      unmodifiedText: typed,
-    });
+    await send(
+      debuggee,
+      "Input.dispatchKeyEvent",
+      { type: "keyDown", ...event, text: typed, unmodifiedText: typed },
+      { label: "humanType" },
+    );
     await sleep(random(40, 110));
-    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-      type: "keyUp",
-      ...event,
-    });
+    await send(
+      debuggee,
+      "Input.dispatchKeyEvent",
+      { type: "keyUp", ...event },
+      { label: "humanType" },
+    );
   }
 }

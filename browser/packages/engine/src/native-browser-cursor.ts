@@ -5,6 +5,7 @@
 import { engineConfig } from "./engine-config.js";
 import { browserSessionTabs } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { send } from "./cdp/send.js";
 export interface CursorUpdate {
   x?: number;
   y?: number;
@@ -462,10 +463,12 @@ function updateAgentCursor(debuggee: chrome.debugger.Debuggee, update: CursorUpd
     .then((hidden) =>
       hidden
         ? undefined
-        : chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-            expression: `(${OVERLAY})(${JSON.stringify(update)})`,
-            silent: true,
-          }),
+        : send(
+            debuggee,
+            "Runtime.evaluate",
+            { expression: `(${OVERLAY})(${JSON.stringify(update)})`, silent: true },
+            { label: "updateAgentCursor", ms: 5_000 },
+          ),
     )
     .catch(() => undefined);
 }
