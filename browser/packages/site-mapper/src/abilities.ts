@@ -239,7 +239,13 @@ export async function readAbility(site: string, name: string): Promise<Ability |
 async function readAbilityFile(path: string): Promise<Ability | undefined> {
   try {
     const value = JSON.parse(await readFile(path, "utf8")) as Ability;
-    return value && typeof value.name === "string" && Array.isArray(value.ways) ? value : undefined;
+    if (!value || typeof value.name !== "string" || !Array.isArray(value.ways)) return undefined;
+    // Hand-written or older files may leave out options and inputs; every reader expects them.
+    return {
+      ...value,
+      options: value.options ?? {},
+      inputs: value.inputs ?? { type: "object", properties: {} },
+    };
   } catch {
     return undefined;
   }

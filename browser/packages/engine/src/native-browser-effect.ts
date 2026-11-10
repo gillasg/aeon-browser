@@ -149,7 +149,8 @@ export function silentClickNote(element: BrowserElementTarget, child = false): s
   const why = child
     ? "nothing happened; a child element has the handler"
     : "nothing happened (no navigation, DOM change or network request)";
-  return `clicked ${what}: ${why}`;
+  // Keep the ways out: the handler may sit on a child, or need a real pointer event.
+  return `clicked ${what}: ${why}. The link may be on a child element; try clicking the child, or a listener may need a pointer event: try page.clickAt(x, y)`;
 }
 
 /** The name a state read should look for after this element missed. */
