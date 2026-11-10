@@ -1,4 +1,4 @@
-import type { BrowserTargetKey } from "@browserkit/protocol";
+import { usableCandidates, type BrowserTargetKey, type ErrorContext } from "@browserkit/protocol";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
@@ -101,13 +101,32 @@ export function errorCode(error: unknown): string {
 }
 
 export class BrowserActionError extends Error {
+  readonly recovery?: ErrorContext;
   constructor(
     code: string,
     readonly detail: string,
+    recovery?: ErrorContext,
   ) {
     super(code);
+    if (recovery) this.recovery = recoveryContext(recovery);
   }
 }
 export function browserErrorDetail(error: unknown): string | undefined {
   return error instanceof BrowserActionError ? error.detail.slice(0, 2000) : undefined;
+}
+
+/** The name, selector and candidates a failure was thrown with, for its next call. */
+export function browserErrorContext(error: unknown): ErrorContext | undefined {
+  return error instanceof BrowserActionError ? error.recovery : undefined;
+}
+
+function recoveryContext(recovery: ErrorContext): ErrorContext {
+  const candidates = usableCandidates(recovery.candidates);
+  return {
+    ...(recovery.target ? { target: recovery.target } : {}),
+    ...(recovery.tabId !== undefined ? { tabId: recovery.tabId } : {}),
+    ...(recovery.url ? { url: recovery.url } : {}),
+    ...(recovery.query ? { query: recovery.query } : {}),
+    ...(candidates.length ? { candidates } : {}),
+  };
 }

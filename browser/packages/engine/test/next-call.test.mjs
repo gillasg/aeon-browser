@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ERROR_CODES,
   ERRORS,
   NEXT_CALLS,
+  NO_NEXT_REASON,
   describeError,
+  effectNext,
   errorHint,
+  errorNext,
   errorNextCall,
+  isReadNext,
   leadingCode,
 } from "@browserkit/protocol";
 
@@ -33,16 +38,96 @@ test("the common refusals each have a short hint and a safe next call", () => {
   assert.equal(errorNextCall("SITE_BLOCKED"), "");
 });
 
-test("a next call is a read, a reload or a wait, never an action that commits", () => {
+test("a next call is a read, a reload, a wait or ask_user, never an action that commits", () => {
   for (const [code, call] of Object.entries(NEXT_CALLS)) {
     assert.ok(code in ERRORS, code);
-    assert.match(
-      call,
-      /^(await bu\.state\(\)|browser\.tabs\(\)|await page\.reload\(\)|await page\.waitForControl\(\))$/,
-      code,
-    );
+    assert.equal(isReadNext(call), true, `${code}: ${call}`);
+    assert.equal(/click|fill|type|press/.test(call), false, code);
   }
   assert.equal(errorNextCall("INTERNAL"), "", "an unexpected failure names no call");
+  assert.equal(isReadNext("await page.click(412)"), false);
+  assert.equal(isReadNext("await page.clickAt(1, 2)"), false);
+});
+
+test("every error class has a next call or a reason there is none", () => {
+  for (const code of ERROR_CODES) {
+    const next = errorNext(code);
+    if (next === null) {
+      assert.ok(NO_NEXT_REASON[code]?.length > 20, code);
+      assert.equal(errorNextCall(code), "", code);
+    } else {
+      assert.equal(isReadNext(next), true, `${code}: ${next}`);
+      assert.equal(NO_NEXT_REASON[code], undefined, code);
+    }
+  }
+});
+
+test("an ambiguous target names a state read, not a click, and lists the matches", () => {
+  const text = describeError("AMBIGUOUS_TARGET", '3 buttons named "Edit"', {
+    target: { role: "button", name: "Edit" },
+    candidates: [
+      { id: 412, role: "button", name: "Edit", context: "row: Order 1182" },
+      { id: 431, role: "button", name: "Edit", context: "row: Order 1175" },
+    ],
+  });
+  assert.match(text, /\[412\] button "Edit" \(row: Order 1182\)/);
+  assert.match(text, /\[431\] button "Edit" \(row: Order 1175\)/);
+  assert.match(text, /Next: await bu\.state\(\{query: "Edit"\}\)/);
+  assert.equal(text.includes("page.click"), false);
+});
+
+test("a non-confirmed effect names a read, and clickAt only when a child has the handler", () => {
+  assert.equal(effectNext("confirmed", { op: "click", childPoint: { x: 4, y: 5 } }), null);
+  assert.equal(effectNext("refused"), null);
+  assert.equal(
+    effectNext("suspected_noop", { op: "click", query: "Save" }),
+    'await bu.state({query: "Save"})',
+  );
+  assert.equal(
+    effectNext("suspected_noop", { op: "click", childPoint: { x: 12.4, y: 40 } }),
+    "await page.clickAt(12, 40)",
+  );
+  assert.equal(
+    effectNext("unverifiable", { op: "click", childPoint: { x: 12, y: 40 } }),
+    "await bu.state()",
+  );
+  assert.equal(
+    effectNext("suspected_noop", { op: "click", childPoint: { x: -1, y: 4 } }),
+    "await bu.state()",
+  );
+});
+
+test("random contexts never make next throw or return a write", () => {
+  const junk = [
+    "",
+    "click",
+    "await page.click(1)",
+    "\n",
+    '"',
+    "{",
+    "a".repeat(5000),
+    "Edit",
+    null,
+    1,
+    {},
+    [],
+  ];
+  for (const code of ERROR_CODES) {
+    for (const item of junk) {
+      const ctx = {
+        query: item,
+        target: { name: item, role: item, selector: item, id: item },
+        candidates: [{ id: item, role: item, name: item, context: item }],
+        url: item,
+        tabId: item,
+      };
+      let next = null;
+      assert.doesNotThrow(() => {
+        next = errorNext(code, ctx);
+      }, code);
+      if (next) assert.equal(isReadNext(next), true, `${code}: ${next}`);
+    }
+  }
 });
 
 test("every hint stays short enough to be read", () => {

@@ -32,6 +32,7 @@ test("a fill with its value read back is confirmed even when nothing else change
   assert.deepEqual(inputStepEffect("fill", { outcome: "changed", readback: "other" }, "query"), {
     effect: "unverifiable",
     evidence: 'value read back differs: "other"',
+    next: "await bu.state()",
   });
 });
 
@@ -39,15 +40,33 @@ test("an unchanged click is a suspected no-op; a request without a visible chang
   assert.deepEqual(inputStepEffect("click", { outcome: "unchanged" }), {
     effect: "suspected_noop",
     evidence: "no navigation, DOM change or request after click",
+    next: "await bu.state()",
   });
   assert.deepEqual(inputStepEffect("click", { outcome: "unchanged", requests: 1 }), {
     effect: "unverifiable",
     evidence: "1 request after click, no visible change",
+    next: "await bu.state()",
   });
   assert.deepEqual(inputStepEffect("press", { outcome: "unknown" }), {
     effect: "unverifiable",
     evidence: "the page could not be read after the step",
+    next: "await bu.state()",
   });
+});
+
+test("a missed click names clickAt only when a child holds the handler", () => {
+  assert.equal(
+    inputStepEffect("click", { outcome: "unchanged" }, undefined, {
+      query: "Save",
+      childPoint: { x: 8, y: 9 },
+    }).next,
+    "await page.clickAt(8, 9)",
+  );
+  assert.equal(
+    inputStepEffect("click", { outcome: "unchanged" }, undefined, { query: "Save" }).next,
+    'await bu.state({query: "Save"})',
+  );
+  assert.equal(inputStepEffect("click", { outcome: "navigated" }).next, undefined);
 });
 
 test("a refused step carries its code, and evidence stays short", () => {
@@ -70,5 +89,6 @@ test("a scroll's own offset is its readback", () => {
   assert.deepEqual(scrollEffect({ direction: "up", moved: false, position: 0 }), {
     effect: "suspected_noop",
     evidence: "scroll up did not move the page (at the boundary)",
+    next: "await bu.state()",
   });
 });

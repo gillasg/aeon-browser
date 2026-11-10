@@ -13,7 +13,12 @@ import {
   type BrowserStep,
   type BrowserTargetKey,
 } from "@browserkit/protocol";
-import { browserErrorDetail, errorCode, targetIdentity } from "./native-browser-common.js";
+import {
+  browserErrorContext,
+  browserErrorDetail,
+  errorCode,
+  targetIdentity,
+} from "./native-browser-common.js";
 import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.js";
 import { stepFailure } from "./code-step-errors.js";
 import { refusedEffect } from "./native-browser-effect.js";
@@ -765,9 +770,8 @@ function describe(error: unknown): string {
   const code = errorCode(error);
   const detail = browserErrorDetail(error);
   const message = error instanceof Error ? error.message : String(error);
-  if (detail) return describeKernelError(code, detail);
-  return describeKernelError(
-    code,
-    message.startsWith(code) ? message.slice(code.length).replace(/^:\s*/, "") : message,
-  );
+  const text =
+    detail ??
+    (message.startsWith(code) ? message.slice(code.length).replace(/^:\s*/, "") : message);
+  return describeKernelError(code, text, browserErrorContext(error));
 }

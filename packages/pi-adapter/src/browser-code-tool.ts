@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { errorNextCall, leadingCode } from "@aeon/protocol";
+import { describeError, errorNextCall, leadingCode } from "@aeon/protocol";
 import type { ModelLike } from "@browserkit/tools/site-to-api";
 import { isCredentialRequest } from "@browserkit/credentials";
 import { traceActions } from "./browser-trace-actions.js";
@@ -88,7 +88,9 @@ export function createBrowserCodeTool(
         });
       if (!run)
         return {
-          content: browserContent(JSON.stringify({ ...envelope(), error: "BROWSER_OFFLINE" })),
+          content: browserContent(
+            JSON.stringify({ ...envelope(), error: describeError("BROWSER_OFFLINE") }),
+          ),
           isError: true,
           details: undefined,
         };
@@ -371,7 +373,19 @@ function stepLine(step: Record<string, unknown>): string {
     step.disposition === "failed"
       ? " FAILED " + String(step.code ?? "") + (step.detail ? ": " + String(step.detail) : "")
       : "";
-  return "- " + String(action.op) + (detail ? " " + detail : "") + opened + failed;
+  return (
+    "- " + String(action.op) + (detail ? " " + detail : "") + opened + failed + recoveryLine(step)
+  );
+}
+
+/** The executable next call on a step whose effect was not confirmed. */
+function recoveryLine(step: Record<string, unknown>): string {
+  const result = step.result;
+  if (!result || typeof result !== "object") return "";
+  const next = (result as { next?: unknown }).next;
+  if (typeof next !== "string" || !next) return "";
+  if (String(step.code ?? "").includes("\nNext:")) return "";
+  return "\n  Next: " + next;
 }
 
 function actionDetail(action: Record<string, unknown>): string {

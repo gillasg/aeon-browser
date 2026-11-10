@@ -1,6 +1,6 @@
 import { noteActionTiming } from "./native-browser-action-timing.js";
 import { closedByAction, withWaitNote } from "./native-browser-closed-tab.js";
-import { isKernelErrorCode } from "./kernel-errors.js";
+import { respondFailure, sendFailure } from "./native-browser-result.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
 import {
@@ -720,32 +720,6 @@ function sendResult(
       }),
     ),
   );
-}
-function sendFailure(
-  socket: WebSocket,
-  request: BrowserExecutorRequest,
-  code: string,
-  detail?: string,
-): void {
-  completeBrowserRequest(request);
-  if (socket.readyState !== WebSocket.OPEN) return;
-  const safe = isKernelErrorCode(code) ? code : "CHROME_ERROR";
-  socket.send(
-    JSON.stringify(
-      BrowserOperationResultSchema.parse({
-        kind: "browser.operation.result",
-        requestId: request.requestId,
-        operationId: request.operationId,
-        ok: false,
-        code: safe,
-        ...(detail ? { detail } : {}),
-      }),
-    ),
-  );
-}
-function respondFailure(socket: WebSocket, request: BrowserExecutorRequest, code: string): true {
-  sendFailure(socket, request, code);
-  return true;
 }
 
 /** Runs one browser_code step inside the extension: same queueing, claims and target checks, no socket. */

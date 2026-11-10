@@ -104,6 +104,35 @@ test("errors and offline signals stay visible to the model", async () => {
   assert.match(offline.content[0].text, /BROWSER_OFFLINE/);
 });
 
+test("a non-confirmed effect shows the model its next call", async () => {
+  const result = await runCell({
+    output: "",
+    steps: [
+      {
+        index: 0,
+        action: { op: "click", target, element: { kind: "backend", backendNodeId: 12 } },
+        disposition: "completed",
+        result: {
+          kind: "action",
+          effect: "suspected_noop",
+          next: 'await bu.state({query: "Save"})',
+        },
+      },
+    ],
+  });
+  assert.match(result.content[0].text, /Next: await bu\.state\(\{query: "Save"\}\)/);
+});
+
+test("an engine error shows the model its next call", async () => {
+  const failed = await runCell({
+    output: "",
+    error: "TARGET_NOT_FOUND: no Save button",
+    steps: [],
+  });
+  assert.match(failed.content[0].text, /Next: await bu\.state\(\)/);
+  assert.equal(failed.content[0].text.includes("page.click"), false);
+});
+
 test("a Playwright text selector gets a CSS hint", async () => {
   const failed = await runCell({
     output: "",

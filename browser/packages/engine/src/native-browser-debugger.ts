@@ -10,6 +10,7 @@ import {
 } from "./native-browser-common.js";
 import type { BrowserElementTarget, BrowserTargetKey } from "@browserkit/protocol";
 import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom.js";
+import { ambiguousError, hiddenError, notFoundError } from "./native-browser-candidates.js";
 import { collectFrameAx } from "./native-browser-frames.js";
 import { humanMouse } from "./native-browser-human-input.js";
 export { withBrowserDebugger as withDebugger } from "./native-browser-session.js";
@@ -78,25 +79,20 @@ async function resolveRole(
   const scoped = element.scope ? await scopedBackendIds(debuggee, element.scope) : undefined;
   const eligible = scoped ? nodes.filter((node) => scoped.has(node.backendDOMNodeId ?? -1)) : nodes;
   const matches = locatorMatches(eligible, element.role, element.name, element.exact);
-  if (!matches.length)
-    throw new BrowserActionError(
-      "TARGET_NOT_FOUND",
-      `No ${element.role} named ${JSON.stringify(element.name)}. Nearby named controls: ${eligible
-        .filter((node) => !node.ignored && textValue(node.name?.value))
-        .slice(0, 12)
-        .map(
-          (node) => `${textValue(node.role?.value)}: ${textValue(node.name?.value).slice(0, 100)}`,
-        )
-        .join("; ")}. Use snapshot({query}) or a CSS/label locator.`,
-    );
+  if (!matches.length) throw notFoundError(eligible, element.role, element.name);
   const visible = await visibleNodes(
     debuggee,
     matches.map((node) => node.backendDOMNodeId ?? -1),
   );
-  return uniqueNode(
-    matches.filter((node) => visible.includes(node.backendDOMNodeId ?? -1)),
-    "TARGET_HIDDEN",
-  );
+  const shown = matches.filter((node) => visible.includes(node.backendDOMNodeId ?? -1));
+  if (!shown.length)
+    throw hiddenError(
+      eligible,
+      matches[0],
+      `the ${element.role} named ${JSON.stringify(element.name)} is not visible`,
+      { role: element.role, name: element.name },
+    );
+  return uniqueNode(shown, "TARGET_HIDDEN", { role: element.role, name: element.name }, eligible);
 }
 
 function sameSemanticNode(live: AxNode | undefined, prior: AxRef | undefined): boolean {
@@ -122,12 +118,13 @@ function locatorMatches(nodes: AxNode[], role: string, name: string, exact = tru
             .includes(normalize(name).toLowerCase())),
   );
 }
-function uniqueNode(nodes: AxNode[], missing: string): AxRef {
-  if (nodes.length > 1)
-    throw new BrowserActionError(
-      "AMBIGUOUS_TARGET",
-      "Multiple visible elements match. Narrow the name or scope to one container; no element was clicked.",
-    );
+function uniqueNode(
+  nodes: AxNode[],
+  missing: string,
+  label: { role: string; name: string },
+  tree: AxNode[],
+): AxRef {
+  if (nodes.length > 1) throw ambiguousError(tree, nodes, label);
   const node = nodes[0];
   if (!node || node.backendDOMNodeId === undefined) throw new Error(missing);
   return {
@@ -145,10 +142,11 @@ async function resolveQuery(
 ): Promise<AxRef> {
   const ids = await queryNodes(debuggee, query);
   const visible = await visibleNodes(debuggee, ids);
-  if (visible.length > 1) throw new Error("AMBIGUOUS_TARGET");
+  if (visible.length > 1) throw ambiguousQuery(nodes, visible, query.value);
   const id = visible[0];
-  if (id === undefined && ids[0] !== undefined) throw await hiddenTargetError(debuggee, ids[0]);
-  if (id === undefined) throw new Error("TARGET_NOT_FOUND");
+  if (id === undefined && ids[0] !== undefined)
+    throw await hiddenQuery(debuggee, nodes, ids[0], query.value);
+  if (id === undefined) throw notFoundError(nodes, "", query.value);
   const node = nodes.find((node) => node.backendDOMNodeId === id);
   return {
     backendNodeId: id,
@@ -157,6 +155,27 @@ async function resolveQuery(
     ...(node?.sessionId ? { sessionId: node.sessionId } : {}),
     ...(node?.frameId ? { frameId: node.frameId } : {}),
   };
+}
+
+function ambiguousQuery(nodes: AxNode[], ids: number[], value: string): Error {
+  const matches = nodes.filter((node) => ids.includes(node.backendDOMNodeId ?? -1));
+  const listed = matches.length
+    ? matches
+    : ids.map((id) => ({ backendDOMNodeId: id, role: { value: "element" }, name: { value } }));
+  return ambiguousError(nodes, listed, { role: "element", name: value, selector: value });
+}
+
+async function hiddenQuery(
+  debuggee: chrome.debugger.Debuggee,
+  nodes: AxNode[],
+  id: number,
+  value: string,
+): Promise<Error> {
+  const hinted = await hiddenTargetError(debuggee, id);
+  const detail =
+    hinted instanceof BrowserActionError ? hinted.detail : "the element is not visible";
+  const hidden = nodes.find((node) => node.backendDOMNodeId === id);
+  return hiddenError(nodes, hidden, detail, { role: "", name: value, selector: value });
 }
 
 export async function getAxTree(debuggee: chrome.debugger.Debuggee): Promise<AxNode[]> {
