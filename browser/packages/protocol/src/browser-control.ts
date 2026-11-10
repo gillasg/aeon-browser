@@ -73,6 +73,14 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       depth: z.number().int().min(0).max(80).optional(),
       compact: z.boolean().optional(),
       maxBytes: z.number().int().min(500).max(400_000).optional(),
+      /** Character budget for the rendered snapshot. Defaults to 3000. */
+      budget: z.number().int().min(500).max(30_000).optional(),
+      /** Hide lines unchanged since the last pinned snapshot. */
+      delta: z.boolean().optional(),
+      /** Remember this snapshot as the baseline a later delta compares against. */
+      pin: z.boolean().optional(),
+      /** Open a collapsed nav or footer. `all` opens every collapsed landmark. */
+      expand: z.array(z.enum(["nav", "footer", "all"])).max(3).optional(),
     })
     .strict(),
   z
@@ -197,9 +205,12 @@ const SemanticObservationSchema = z
     documentEpoch: z.number().int().nonnegative(),
     snapshotId: z.string().uuid(),
     url: z.string().max(8192),
-    nodes: z.array(BrowserSemanticNodeSchema).max(180),
+    // 180 from the accessibility tree, plus up to 40 non-semantic clickables.
+    nodes: z.array(BrowserSemanticNodeSchema).max(220),
     truncated: z.boolean(),
     text: z.string().max(20000).optional(),
+    /** Snapshot v2 text. The node list is unchanged and still addresses every id. */
+    view: z.string().max(40_000).optional(),
     diff: z
       .object({
         added: z.array(z.number().int()),

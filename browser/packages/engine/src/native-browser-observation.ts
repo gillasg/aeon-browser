@@ -19,6 +19,10 @@ import {
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { getAxTree, withDebugger } from "./native-browser-debugger.js";
 import { scopedBackendIds } from "./native-browser-dom.js";
+import { emptyScan, readPageScan, resolveClickables } from "./observe/scan.js";
+import { attachClickables, renderCaptured } from "./observe/view.js";
+import { changedIds, rememberNodes } from "./observe/baseline.js";
+import { CLICKABLE_NODE_LIMIT, type ResolvedClickable } from "./observe/types.js";
 
 interface Capture {
   viewport: { width: number; height: number };
@@ -313,69 +317,8 @@ function truncateToBudget(nodes: BrowserSemanticNode[], maxBytes?: number): void
 }
 
 export async function visiblePageText(debuggee: chrome.debugger.Debuggee): Promise<string> {
-  const response = (await send(
-    debuggee,
-    "Runtime.evaluate",
-    {
-      expression: `(${collectVisibleText.toString()})()`,
-      returnByValue: true,
-    },
-    { label: "visiblePageText", ms: 5_000 },
-  )) as { result?: { value?: string } };
-  return response.result?.value ?? "";
-}
-function collectVisibleText() {
-  const roots: (Document | ShadowRoot)[] = [document];
-  const lines: { text: string; region: number }[] = [];
-  const visible = new WeakMap<Element, boolean>();
-  let length = 0;
-  for (let i = 0; i < roots.length && length < 20000; i++) {
-    const root = roots[i];
-    if (!root) continue;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node && length < 20000; node = walker.nextNode()) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const element = node as Element;
-        if (element.shadowRoot) roots.push(element.shadowRoot);
-        if (element instanceof HTMLIFrameElement && element.contentDocument)
-          roots.push(element.contentDocument);
-        continue;
-      }
-      const text = visibleLine(node);
-      if (text) {
-        lines.push({ text, region: regionOf(node.parentElement) });
-        length += text.length + 1;
-      }
-    }
-  }
-  // Main content first, page chrome (header, navigation, footer) last; order kept within each.
-  return lines
-    .map((line, index) => ({ ...line, index }))
-    .sort((a, b) => a.region - b.region || a.index - b.index)
-    .map((line) => line.text)
-    .join("\n")
-    .slice(0, 20000);
-  function regionOf(element: Element | null) {
-    if (element?.closest("main,[role=main]")) return 0;
-    if (element?.closest("footer,[role=contentinfo]")) return 3;
-    if (element?.closest("header,nav,aside,[role=banner],[role=navigation],[role=complementary]"))
-      return 2;
-    return 1;
-  }
-  function visibleLine(node: Node) {
-    let element = node.parentElement;
-    const text = node.textContent?.replace(/\s+/g, " ").trim();
-    if (!element || !text || element.closest("script,style,noscript,[data-aeon-overlay]"))
-      return "";
-    while (element.parentElement && getComputedStyle(element).display === "contents")
-      element = element.parentElement;
-    if (!visible.has(element))
-      visible.set(
-        element,
-        element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }),
-      );
-    return visible.get(element) ? text : "";
-  }
+  const scan = await readPageScan(debuggee).catch(() => emptyScan());
+  return scan.text;
 }
 
 const SCREENSHOT_MAX_AGE_MS = 60_000;
@@ -410,6 +353,13 @@ function rootScope(nodes: AxNode[], target: BrowserTargetKey, ref: string): AxNo
   return nodes.filter((node) => node.frameId === root.frameId && ids.has(node.nodeId));
 }
 
+interface PageCapture {
+  ax: AxNode[];
+  text: string;
+  clickables: ResolvedClickable[];
+  offscreen: string[];
+}
+
 export async function observeSemantic(
   request: BrowserExecutorRequest,
   tab: chrome.tabs.Tab,
@@ -419,37 +369,72 @@ export async function observeSemantic(
   const current = currentInventoryTabs().find((item) => sameTarget(item.target, target));
   if (!current || current.documentEpoch !== request.expectedDocumentEpoch)
     throw new Error("TARGET_LOST");
-  const { nodes, text } = await withDebugger(target.tabId, async (debuggee) => {
-    await revalidateTarget(request, target.tabId);
-    await settleBrowserPage(debuggee, 3000, 0);
-    await revalidateTarget(request, target.tabId);
-    const [nodes, text] = await Promise.all([getAxTree(debuggee), visiblePageText(debuggee)]);
-    return { nodes, text };
-  });
-  const snapshotId = crypto.randomUUID();
-  const options =
-    request.step.op === "observe"
-      ? request.step
-      : { query: undefined, interactive: undefined, selector: undefined, root: undefined };
-  const rooted = options.root ? rootScope(nodes, target, options.root) : nodes;
-  const scopedIds = options.selector
-    ? await withDebugger(target.tabId, (debuggee) =>
-        scopedBackendIds(debuggee, options.selector ?? ""),
-      )
-    : undefined;
-  const scoped = scopedIds
-    ? rooted.filter((node) => scopedIds.has(node.backendDOMNodeId ?? -1))
-    : rooted;
+  const captured = await withDebugger(target.tabId, (debuggee) =>
+    collectPage(debuggee, request, target.tabId, revalidateTarget),
+  );
+  const scoped = await scopeAx(captured.ax, request, target);
   await revalidateTarget(request, target.tabId);
-  const semantic = createSemanticNodes(filterVisibleTextNodes(scoped, text), options);
+  return semanticResult(request, target, current, tab, scoped, captured);
+}
+
+async function collectPage(
+  debuggee: chrome.debugger.Debuggee,
+  request: BrowserExecutorRequest,
+  tabId: number,
+  revalidateTarget: RevalidateTarget,
+): Promise<PageCapture> {
+  await revalidateTarget(request, tabId);
+  await settleBrowserPage(debuggee, 3000, 0);
+  await revalidateTarget(request, tabId);
+  const [ax, scan] = await Promise.all([
+    getAxTree(debuggee),
+    readPageScan(debuggee).catch(() => emptyScan()),
+  ]);
+  const clickables =
+    ax.length > CLICKABLE_NODE_LIMIT
+      ? []
+      : await resolveClickables(debuggee, scan.clickables).catch(() => []);
+  return { ax, text: scan.text, clickables, offscreen: scan.offscreen };
+}
+
+async function scopeAx(
+  ax: AxNode[],
+  request: BrowserExecutorRequest,
+  target: BrowserTargetKey,
+): Promise<AxNode[]> {
+  const step = request.step.op === "observe" ? request.step : undefined;
+  const rooted = step?.root ? rootScope(ax, target, step.root) : ax;
+  if (!step?.selector) return rooted;
+  const ids = await withDebugger(target.tabId, (debuggee) =>
+    scopedBackendIds(debuggee, step.selector ?? ""),
+  );
+  return rooted.filter((node) => ids.has(node.backendDOMNodeId ?? -1));
+}
+
+function semanticResult(
+  request: BrowserExecutorRequest,
+  target: BrowserTargetKey,
+  current: { documentEpoch: number; url: string },
+  tab: chrome.tabs.Tab,
+  scoped: AxNode[],
+  captured: PageCapture,
+): BrowserExecutorResult {
+  const step = request.step.op === "observe" ? request.step : undefined;
+  const options = step ?? {};
+  const semantic = createSemanticNodes(filterVisibleTextNodes(scoped, captured.text), options);
+  attachClickables(semantic, captured.clickables, step?.query);
+  const pinKey = `${targetIdentity(target)}:${current.documentEpoch}`;
+  const baseline = baselineFor(scoped, captured.text, options, semantic.nodes, step);
+  const delta = changedIds(pinKey, baseline, Boolean(step?.delta));
+  rememberNodes(pinKey, baseline, Boolean(step?.pin) || Boolean(step?.delta));
+  const snapshotId = crypto.randomUUID();
   const key = targetIdentity(target);
   for (const ref of semantic.refs.values()) ref.documentEpoch = current.documentEpoch;
   refs.set(snapshotId, semantic.refs);
   latestSnapshots.set(key, snapshotId);
   trimOldRefs(snapshotId);
-  const diff = (options as { diff?: boolean }).diff
-    ? compareTree(key, current.documentEpoch, semantic.nodes)
-    : undefined;
+  const diff = step?.diff ? compareTree(key, current.documentEpoch, semantic.nodes) : undefined;
+  const url = tab.url ?? current.url;
   return BrowserExecutorResultSchema.parse({
     kind: "semantic",
     source: "website",
@@ -457,11 +442,61 @@ export async function observeSemantic(
     target,
     documentEpoch: current.documentEpoch,
     snapshotId,
-    url: tab.url ?? current.url,
+    url,
     nodes: semantic.nodes,
     truncated: semantic.truncated,
-    text,
+    text: captured.text,
+    view: viewOf(step, scoped, semantic, captured, url, tab.title, delta),
     ...(diff ? { diff } : {}),
+  });
+}
+
+function baselineFor(
+  scoped: AxNode[],
+  text: string,
+  options: Options,
+  nodes: BrowserSemanticNode[],
+  step: { query?: string | undefined; pin?: boolean | undefined; delta?: boolean | undefined } | undefined,
+): BrowserSemanticNode[] {
+  if (!step?.query || (!step.pin && !step.delta)) return nodes;
+  const rest = { ...options };
+  delete rest.query;
+  const full = createSemanticNodes(filterVisibleTextNodes(scoped, text), rest);
+  return full.nodes.concat(nodes.filter((node) => node.role === "clickable"));
+}
+
+function viewOf(
+  step:
+    | {
+        query?: string | undefined;
+        budget?: number | undefined;
+        expand?: ("nav" | "footer" | "all")[] | undefined;
+        diff?: boolean | undefined;
+      }
+    | undefined,
+  scoped: AxNode[],
+  semantic: { nodes: BrowserSemanticNode[]; truncated: boolean },
+  captured: PageCapture,
+  url: string,
+  title: string | undefined,
+  delta: Set<number> | undefined,
+): string {
+  return renderCaptured({
+    ax: scoped,
+    shown: semantic.nodes,
+    url,
+    clickables: semantic.nodes.flatMap((node) =>
+      node.role === "clickable" && node.backendNodeId !== undefined
+        ? [{ backendNodeId: node.backendNodeId, text: node.name }]
+        : [],
+    ),
+    offscreen: captured.offscreen,
+    truncated: semantic.truncated,
+    ...(title ? { title } : {}),
+    ...(step?.budget !== undefined ? { budget: step.budget } : {}),
+    ...(step?.query ? { focus: step.query } : {}),
+    ...(delta ? { delta } : {}),
+    ...(step?.expand?.length ? { expand: step.expand } : {}),
   });
 }
 

@@ -102,7 +102,7 @@ Globals: `browser`, `page`, `bu`, `siteMapper`, `google`, `skills`, `artifact`, 
 
 ```js
 const page = await browser.openTab("https://shop.example");
-await bu.state(); // [id] role "name" = value, plus visible text
+await bu.state(); // host/path · title, then [id] role "name" under its row or dialog
 await bu.click(12); // act by bu id, role or visible text
 await page.locator("input[name=q]").fill("lamp");
 await page.getByRole("button", { name: "Search" }).click();
@@ -116,10 +116,17 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   the user blocked answers `SITE_BLOCKED`, so tell them. Work through the user's tabs
   in place, all at once with `Promise.all`, navigating them too when the task is about them; for
   anything else open your own tab, so what the user is watching stays put.
-- `bu.state()` prints `[id] role "name" = value` and visible text (`*` marks changes; scope with
-  `{selector}` or `{query}`), led by any text the user selected on the page. Act on apps that redraw themselves by visible text, role or bu id,
-  never `document.querySelector`. Controls inside a cross-origin iframe appear under their iframe
-  with a frame prefix (`f2:e14`); acting on one goes through that frame, and
+- `bu.state()` (the same call as `page.state()`) prints `host/path · title`, then the page in
+  sections. Open dialogs come first. A nav or footer is one line (`nav "Main" (14 links)`) until
+  `{expand: ["nav"]}` or `{expand: ["all"]}`. Rows are named from their first cells, so identical
+  buttons stay on their own line under the row (`[id] button "Edit"`). Controls are
+  `[id] role "name" = value`, plus a same-site link path (`→ /orders/1`), the first select options,
+  `required`, `invalid: "…"`, and `↓` when the control is off-screen. A clickable element with no
+  role is `clickable "text"`. `*` marks what changed since the last look. `{max}`, `{selector}` and
+  `{query}` still scope it, and a cut page ends with a count pointing at `page.state({query})` or
+  `page.table()`. The printout is led by any text the user selected on the page. Act by visible
+  text, role or bu id, never `document.querySelector`. Controls inside a cross-origin iframe appear
+  under their iframe with a frame prefix (`f2:e14`); acting on one goes through that frame, and
   `bu.state({root: "f2:e14"})` / `page.snapshot({root})` scopes to that subtree (an iframe ref
   means its whole document).
 - On crowded or unfamiliar pages, `await page.act("add the large size to the cart")` does one step
