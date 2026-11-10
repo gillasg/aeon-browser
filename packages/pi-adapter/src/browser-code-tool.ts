@@ -1,5 +1,12 @@
 import { dirname, join } from "node:path";
-import { describeError, errorNextCall, leadingCode } from "@aeon/protocol";
+import {
+  actionLine,
+  describeError,
+  errorNextCall,
+  leadingCode,
+  StepEventSchema,
+  type StepEvent,
+} from "@aeon/protocol";
 import type { ModelLike } from "@browserkit/tools/site-to-api";
 import { isCredentialRequest } from "@browserkit/credentials";
 import { traceActions } from "./browser-trace-actions.js";
@@ -84,7 +91,7 @@ export function createBrowserCodeTool(
       const update = () =>
         onUpdate?.({
           content: browserContent(JSON.stringify(envelope())),
-          details: progress ? { progress } : undefined,
+          details: liveDetails(progress, steps),
         });
       if (!run)
         return {
@@ -356,26 +363,65 @@ function tabLine(stats: NonNullable<CellOutput["tabStats"]>): string {
 }
 
 function stepSummary(steps: Record<string, unknown>[]): string {
-  const lines = steps.filter((step) => step.action !== undefined).map(stepLine);
+  const lines = steps
+    .filter((step) => step.action !== undefined)
+    .map(stepLine)
+    .filter((line) => line.length > 0);
   if (!lines.length) return "steps: none";
   const shown = lines.length > 40 ? [...lines.slice(0, 10), "...", ...lines.slice(-29)] : lines;
   return "steps:\n" + shown.join("\n");
 }
 
+/** The model line for one trace step: `Click “Place order” → confirmed (POST /api/profile 200)`. */
+export function formatStepLine(step: Record<string, unknown>): string {
+  return stepLine(step);
+}
+
+function liveDetails(
+  progress: ToolProgress | undefined,
+  steps: Record<string, unknown>[],
+): { progress?: ToolProgress; steps?: ReturnType<typeof stepEvents> } | undefined {
+  const events = stepEvents(steps);
+  const details = {
+    ...(progress ? { progress } : {}),
+    ...(events.length ? { steps: events } : {}),
+  };
+  return Object.keys(details).length ? details : undefined;
+}
+
+function stepEvents(steps: readonly Record<string, unknown>[]): StepEvent[] {
+  const events: StepEvent[] = [];
+  for (const step of steps) {
+    if (step.loopFolded) continue;
+    const parsed = StepEventSchema.safeParse(step.event);
+    if (parsed.success) events.push(parsed.data);
+  }
+  return events.slice(-500);
+}
+
 function stepLine(step: Record<string, unknown>): string {
+  if (step.loopFolded) return "";
+  const event = StepEventSchema.safeParse(step.event);
+  if (event.success) return "- " + actionLine(event.data) + recoveryLine(step);
+  return legacyStepLine(step);
+}
+
+function legacyStepLine(step: Record<string, unknown>): string {
   if (typeof step.action !== "object" || step.action === null) return "- " + String(step.action);
   const action = step.action as Record<string, unknown>;
   const detail = actionDetail(action);
   const result = step.result as
     { kind?: unknown; tab?: { target?: { tabId?: unknown } } } | undefined;
   const opened = result?.kind === "tab" ? " -> tab " + String(result.tab?.target?.tabId) : "";
-  const failed =
-    step.disposition === "failed"
-      ? " FAILED " + String(step.code ?? "") + (step.detail ? ": " + String(step.detail) : "")
-      : "";
+  const failed = step.disposition === "failed" ? failedText(step) : "";
   return (
     "- " + String(action.op) + (detail ? " " + detail : "") + opened + failed + recoveryLine(step)
   );
+}
+
+function failedText(step: Record<string, unknown>): string {
+  const detail = step.detail ? ": " + String(step.detail) : "";
+  return " FAILED " + String(step.code ?? "") + detail;
 }
 
 /** The executable next call on a step whose effect was not confirmed. */

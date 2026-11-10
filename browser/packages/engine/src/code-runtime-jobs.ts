@@ -93,6 +93,7 @@ export function emptyJob(jobId: string, chatId: string, total: number): Job {
     opened: new Map(),
     guarded: new Set(),
     steps: [],
+    events: [],
     count: 0,
     calls: new Map(),
     sequence: 0,

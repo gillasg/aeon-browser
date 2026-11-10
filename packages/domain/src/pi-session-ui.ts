@@ -7,6 +7,23 @@ import type {
 } from "./chat.js";
 import type { PiJsonValue } from "./pi-content.js";
 
+/** One finished browser step on a tool-update. A value typed into a field is never included. */
+export interface PiToolStepEvent {
+  id: string;
+  cellId: string;
+  chatId: string;
+  tabId: number;
+  at: number;
+  ms: number;
+  kind: string;
+  label: string;
+  site: string;
+  write: boolean;
+  effect?: string;
+  sensitive?: boolean;
+  box?: { x: number; y: number; width: number; height: number };
+}
+
 export interface PiSlashCommand {
   kind: "builtin" | "extension" | "skill" | "prompt-template";
   name: string;
@@ -70,6 +87,8 @@ export type PiSessionEvent =
       partialResult: string;
       /** How far a long job inside this call has got (bu.progress in browser_code). */
       progress?: { done: number; total?: number; label?: string };
+      /** Finished steps, as they happen. Same words as the model line. */
+      steps?: readonly PiToolStepEvent[];
       parentToolCallId?: string;
     }
   | {

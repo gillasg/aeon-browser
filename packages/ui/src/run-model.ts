@@ -3,13 +3,10 @@ import type { PiMessageDto, PiSessionEventDto } from "@aeon/protocol";
 // One agent run, built only from the chat stream in @aeon/protocol. The orb's island and the
 // shared run cards (step timeline, approval, result) all read it.
 //
-// Stand-ins until the engine sends dedicated data (each is marked `mocked` where it is used):
-// - tool-end.path missing: guessed from the tool name (inferPath).
-// - tool-end.durationMs missing: tool-end time minus tool-start time.
-// - Live cursor positions: there is no per-action event yet, so the cursor replays the trace
-//   actions (box/point) of a tool call when its result message arrives.
-// - Action tab: actions without tabId are assumed to be in the viewer's tab.
-// - Spotlight target: the last action with a box (or point) before the run asked for the user.
+// A tool-end without a path uses the tool name (inferPath). A tool-end without durationMs uses
+// the time from tool-start to tool-end. Live steps move the cursor as they arrive; a result
+// message's trace actions fill in only when no live step did. Actions without tabId are in the
+// viewer's tab. The spotlight is the last box (or point) before the run asked for the user.
 
 export type RunPath = "recipe" | "site-mapper" | "data" | "url" | "read" | "ui";
 export type RunStatus = "idle" | "thinking" | "working" | "needs" | "done" | "error";
@@ -21,10 +18,10 @@ export interface RunStep {
   startedAt: number;
   done: boolean;
   durationMs?: number;
-  durationMocked?: boolean;
   path?: RunPath;
-  pathMocked?: boolean;
   isError?: boolean;
+  /** Every step label this call has reported, in order. The row shows the latest. */
+  liveLabels?: string[];
   /** A long job inside this one call, as the tool reports it ("Removing 47/77"). */
   progress?: RunProgress;
 }
@@ -111,16 +108,10 @@ const handlers: { [K in PiSessionEventDto["kind"]]?: Handler<K> } = {
             },
           ],
         },
-  "tool-update": (run, event) => {
-    const progress = event.progress;
-    if (event.parentToolCallId || !progress) return run;
-    return {
-      ...run,
-      steps: run.steps.map((step) =>
-        step.toolCallId === event.toolCallId ? { ...step, progress } : step,
-      ),
-    };
-  },
+  "tool-update": (run, event) =>
+    event.parentToolCallId || (!event.progress && !event.steps?.length)
+      ? run
+      : applyToolUpdate(run, event),
   "tool-end": (run, event, now) =>
     event.parentToolCallId
       ? run
@@ -164,10 +155,66 @@ function endStep(
     done: true,
     isError: event.isError,
     durationMs: event.durationMs ?? Math.max(0, Math.round(now - step.startedAt)),
-    durationMocked: event.durationMs === undefined,
     path,
-    pathMocked: event.path === undefined,
   };
+}
+
+function applyToolUpdate(
+  run: AgentRun,
+  event: Extract<PiSessionEventDto, { kind: "tool-update" }>,
+): AgentRun {
+  const reported = event.steps ?? [];
+  const latest = reported.at(-1);
+  const live = reported.map((item) => item.label);
+  const actions = reported.flatMap((item) => actionFromStep(event.toolCallId, item));
+  return {
+    ...run,
+    ...(latest ? { label: latest.label } : {}),
+    steps: run.steps.map((step) =>
+      step.toolCallId === event.toolCallId
+        ? updatedStep(step, event.progress, latest?.label, live)
+        : step,
+    ),
+    actions: actions.length ? replaceActions(run.actions, event.toolCallId, actions) : run.actions,
+  };
+}
+
+function updatedStep(
+  step: RunStep,
+  progress: RunStep["progress"],
+  label: string | undefined,
+  live: string[],
+): RunStep {
+  return {
+    ...step,
+    ...(progress ? { progress } : {}),
+    ...(label ? { label } : {}),
+    ...(live.length ? { liveLabels: live } : {}),
+  };
+}
+
+function actionFromStep(
+  toolCallId: string,
+  event: NonNullable<Extract<PiSessionEventDto, { kind: "tool-update" }>["steps"]>[number],
+): RunAction[] {
+  if (!event.box) return [];
+  return [
+    {
+      toolCallId,
+      kind: event.kind,
+      tStart: event.at,
+      tabId: event.tabId,
+      box: event.box,
+    },
+  ];
+}
+
+function replaceActions(
+  actions: readonly RunAction[],
+  toolCallId: string,
+  next: RunAction[],
+): RunAction[] {
+  return [...actions.filter((item) => item.toolCallId !== toolCallId), ...next];
 }
 
 function applyMessage(run: AgentRun, message: PiMessageDto): AgentRun {

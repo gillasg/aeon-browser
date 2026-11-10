@@ -1,9 +1,23 @@
+import {
+  closeWhenQuiet,
+  createOpenReceipt,
+  noteDialogClose,
+  noteDialogOpen,
+  noteDownload,
+  noteNavigationDone,
+  noteNavigationStart,
+  noteRequestEnd,
+  noteRequestStart,
+  chooseReceipt,
+  overlapText,
+  settledRequests,
+  type OpenReceipt,
+  type TrackedRequest,
+} from "./evidence/receipt.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
-// Per-tab receipts for one action: popups it opened, a dialog it raised, a download it started,
-// the fetch/XHR calls it caused (so a submit shows whether the server took it), and whether the
-// page navigated. Subscribers are intentionally not the source: they are per
-// chat and would also report work started outside the action being measured.
+// One receipt per action: the dialog, download, navigation and document/fetch/XHR calls that
+// action could have caused. A click with nothing in flight still closes at once.
 export interface ActionReceipt {
   popups: { tabId: number; url: string }[];
   dialog?: { type: string; message: string; accepted: boolean };
@@ -12,6 +26,10 @@ export interface ActionReceipt {
   requests?: ReceiptRequest[];
   /** An earlier input on this tab timed out and may still land. */
   lateReply?: string;
+  /** Still running when the cap closed the receipt, e.g. "request:/api/export". */
+  open?: string[];
+  /** A request was attributed here while another action on the tab was still open. */
+  overlap?: string;
 }
 export interface ReceiptRequest {
   method: string;
@@ -20,13 +38,19 @@ export interface ReceiptRequest {
   error?: string;
 }
 
-/** Calls kept per receipt; failures are always kept over successes. */
 const MAX_REQUESTS = 8;
-const pending = new Map<string, ReceiptRequest>();
 
-const receipts = new Map<number, ActionReceipt>();
-/** Input that timed out, noted on the next receipt for that tab. */
+interface LiveReceipt {
+  open: OpenReceipt;
+  body: ActionReceipt;
+}
+
+const lives = new Map<string, LiveReceipt>();
+const byTab = new Map<number, string[]>();
+const tabUrls = new Map<string, Promise<string | undefined>>();
+const lookups = new Set<Promise<void>>();
 const lateNotes = new Map<number, { detail: string; landed: boolean }>();
+let actionSeq = 0;
 
 /** An input-class send timed out. The next receipt on this tab says so. */
 export function noteLateInput(tabId: number, detail: string): void {
@@ -39,32 +63,53 @@ export function noteLateInputLanded(tabId: number): void {
   if (note) note.landed = true;
 }
 
-function takeLateNote(tabId: number): string | undefined {
-  const note = lateNotes.get(tabId);
-  if (!note) return undefined;
-  lateNotes.delete(tabId);
-  const text = note.landed ? `late reply landed: ${note.detail}` : `late reply: ${note.detail}`;
-  return text.slice(0, 300);
-}
-/** When each tab's dialog closed during the action: the page's code only goes on after that. */
-const dialogClosed = new Map<number, number>();
-
-/** Each receipt's tab URL, read when the action begins, so a download is matched without a wait. */
-const tabUrls = new Map<number, Promise<string | undefined>>();
-/** Download lookups still matching a receipt: a receipt is not taken while one runs. */
-const lookups = new Set<Promise<void>>();
-
-export function beginReceipt(tabId: number): void {
-  dialogClosed.delete(tabId);
+export function beginReceipt(tabId: number): string {
+  const actionId = `a${++actionSeq}`;
   const lateReply = takeLateNote(tabId);
-  receipts.set(tabId, { popups: [], navigated: false, ...(lateReply ? { lateReply } : {}) });
+  const body: ActionReceipt = {
+    popups: [],
+    navigated: false,
+    ...(lateReply ? { lateReply } : {}),
+  };
+  lives.set(actionId, { open: createOpenReceipt(actionId, tabId), body });
+  const open = byTab.get(tabId) ?? [];
+  open.push(actionId);
+  byTab.set(tabId, open);
   tabUrls.set(
-    tabId,
+    actionId,
     chrome.tabs.get(tabId).then(
       (tab) => tab.url,
       () => undefined,
     ),
   );
+  return actionId;
+}
+
+/** Waits until this action's caused work is quiet, then returns the receipt. */
+export async function finishReceipt(actionId: string): Promise<ActionReceipt> {
+  const live = lives.get(actionId);
+  if (!live) return { popups: [], navigated: false };
+  const closed = await closeWhenQuiet(live.open);
+  await drainLookups();
+  copyRequests(live);
+  if (closed.open?.length) live.body.open = closed.open;
+  const note = overlapText(opensOn(live.open.tabId), live.open);
+  if (note) live.body.overlap = note;
+  return detach(actionId) ?? live.body;
+}
+
+/** Drops an action's receipt when the action failed before it could close. */
+export function dropReceipt(actionId: string): void {
+  detach(actionId);
+}
+
+/** The latest receipt for a tab, without waiting. Tests and early readers use this. */
+export function takeReceipt(tabId: number): ActionReceipt {
+  const actionId = byTab.get(tabId)?.at(-1);
+  if (!actionId) return { popups: [], navigated: false };
+  const live = lives.get(actionId);
+  if (live) copyRequests(live);
+  return detach(actionId) ?? { popups: [], navigated: false };
 }
 
 /** The dialog policy records what it answered while this action's receipt is open. */
@@ -72,106 +117,149 @@ export function noteReceiptDialog(
   tabId: number,
   dialog: { type: string; message: string; accepted: boolean },
 ): void {
-  const receipt = receipts.get(tabId);
-  if (!receipt) return;
-  receipt.dialog = {
+  const live = liveFor(tabId);
+  if (!live) return;
+  live.body.dialog = {
     type: dialog.type.slice(0, 40),
     message: dialog.message.slice(0, 300),
     accepted: dialog.accepted,
   };
+  noteDialogOpen(live.open, Date.now());
 }
 
 export function noteReceiptPopup(openerId: number, tabId: number, url = ""): void {
-  const receipt = receipts.get(openerId);
-  if (!receipt) return;
-  receipt.popups.push({ tabId, url });
+  const live = liveFor(openerId);
+  if (!live) return;
+  live.body.popups.push({ tabId, url });
 }
 
-/**
- * Code after a dialog (a download, a request) runs only once the dialog is accepted, which can be
- * after the page looked settled: give it a moment so the receipt names what it did.
- */
-export async function receiptQuiet(tabId: number, quietMs = 500): Promise<void> {
-  const closed = dialogClosed.get(tabId);
-  if (closed === undefined) return;
-  const wait = closed + quietMs - Date.now();
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(wait, quietMs)));
-  // A download Chrome reported in that window may still be matching its tab.
-  await Promise.all([...lookups]);
+function liveFor(tabId: number, share = false): LiveReceipt | undefined {
+  const chosen = chooseReceipt(opensOn(tabId), tabId, share);
+  return chosen ? lives.get(chosen.actionId) : undefined;
 }
 
-export function takeReceipt(tabId: number): ActionReceipt {
-  dialogClosed.delete(tabId);
-  tabUrls.delete(tabId);
-  const receipt = receipts.get(tabId) ?? { popups: [], navigated: false };
-  receipts.delete(tabId);
-  if (receipt.requests) {
-    for (const [id, item] of pending) if (receipt.requests.includes(item)) pending.delete(id);
-    receipt.requests = keptRequests(receipt.requests);
-  }
-  return receipt;
+function opensOn(tabId: number): OpenReceipt[] {
+  return (byTab.get(tabId) ?? []).flatMap((id) => {
+    const live = lives.get(id);
+    return live ? [live.open] : [];
+  });
 }
 
-function keptRequests(requests: ReceiptRequest[]): ReceiptRequest[] {
+function copyRequests(live: LiveReceipt): void {
+  const requests = keptRequests(settledRequests(live.open));
+  if (requests.length) live.body.requests = requests;
+  else delete live.body.requests;
+}
+
+function detach(actionId: string): ActionReceipt | undefined {
+  const live = lives.get(actionId);
+  if (!live) return undefined;
+  lives.delete(actionId);
+  tabUrls.delete(actionId);
+  const rest = (byTab.get(live.open.tabId) ?? []).filter((id) => id !== actionId);
+  if (rest.length) byTab.set(live.open.tabId, rest);
+  else byTab.delete(live.open.tabId);
+  return live.body;
+}
+
+function takeLateNote(tabId: number): string | undefined {
+  const note = lateNotes.get(tabId);
+  if (!note) return undefined;
+  lateNotes.delete(tabId);
+  const text = note.landed ? `late reply landed: ${note.detail}` : `late reply: ${note.detail}`;
+  return text.slice(0, 300);
+}
+
+function keptRequests(requests: TrackedRequest[]): ReceiptRequest[] {
   const failed = requests.filter((item) => item.error || (item.status ?? 0) >= 400);
   const rest = requests.filter((item) => !failed.includes(item));
   return [...failed, ...rest].slice(0, MAX_REQUESTS);
 }
 
-function noteNetwork(
-  receipt: ActionReceipt,
-  method: string,
-  params: Record<string, unknown>,
-): void {
-  const id = String(params.requestId ?? "");
-  if (method === "Network.requestWillBeSent") {
-    if (params.type !== "XHR" && params.type !== "Fetch") return;
-    const request = (params.request ?? {}) as { method?: string; url?: string };
-    const item = {
-      method: String(request.method ?? "GET"),
-      url: String(request.url ?? "").slice(0, 500),
-    };
-    (receipt.requests ??= []).push(item);
-    pending.set(id, item);
-    return;
-  }
-  const item = pending.get(id);
-  if (!item) return;
-  if (method === "Network.responseReceived")
-    item.status = Number((params.response as { status?: number } | undefined)?.status ?? 0);
-  else if (method === "Network.loadingFailed") {
-    item.error = String(params.errorText ?? "failed").slice(0, 200);
-    pending.delete(id);
-  } else if (method === "Network.loadingFinished") pending.delete(id);
+function onRequest(live: LiveReceipt, params: Record<string, unknown>): void {
+  if (params.type !== "XHR" && params.type !== "Fetch" && params.type !== "Document") return;
+  const request = (params.request ?? {}) as { method?: string; url?: string };
+  noteRequestStart(live.open, {
+    id: String(params.requestId ?? ""),
+    method: String(request.method ?? "GET"),
+    url: String(request.url ?? ""),
+    at: Date.now(),
+  });
 }
 
-/**
- * Chrome's own download list is the second witness: CDP's downloadWillBegin can miss a download
- * that page code starts after a dialog. The download goes to the receipt whose tab's page started
- * it (its referrer), and only when CDP did not already name one.
- */
+function onResponse(live: LiveReceipt, params: Record<string, unknown>): void {
+  const status = Number((params.response as { status?: number } | undefined)?.status ?? 0);
+  noteRequestEnd(live.open, { id: String(params.requestId ?? ""), at: Date.now(), status });
+}
+
+function onFailed(live: LiveReceipt, params: Record<string, unknown>): void {
+  noteRequestEnd(live.open, {
+    id: String(params.requestId ?? ""),
+    at: Date.now(),
+    error: String(params.errorText ?? "failed"),
+  });
+}
+
+function onDialogClosed(live: LiveReceipt, params: Record<string, unknown>): void {
+  if (live.body.dialog) live.body.dialog.accepted = Boolean(params.result);
+  noteDialogClose(live.open, Date.now());
+}
+
+function onDownload(live: LiveReceipt, params: Record<string, unknown>): void {
+  if (live.body.download) return;
+  live.body.download = {
+    url: String(params.url ?? "").slice(0, 2000),
+    filename: String(params.suggestedFilename ?? "").slice(0, 300),
+    ...(params.guid ? { token: String(params.guid).slice(0, 200) } : {}),
+  };
+  noteDownload(live.open, Date.now());
+}
+
+function onFrame(live: LiveReceipt, params: Record<string, unknown>): void {
+  const frame = params.frame as { parentId?: string; url?: string } | undefined;
+  if (frame?.parentId) return;
+  noteNavigationStart(live.open, Date.now());
+  const next = String(frame?.url ?? "");
+  const check = confirmNavigation(live, next).finally(() => lookups.delete(check));
+  lookups.add(check);
+}
+
+/** A same-document frame event is not a navigation, so it must not hold the receipt for 15s. */
+async function confirmNavigation(live: LiveReceipt, next: string): Promise<void> {
+  const current = await tabUrls.get(live.open.actionId);
+  if (!lives.has(live.open.actionId)) return;
+  if (current && next && sameDocument(current, next)) {
+    noteNavigationDone(live.open, Date.now());
+    return;
+  }
+  live.body.navigated = true;
+}
+
 function noteCreatedDownload(item: chrome.downloads.DownloadItem): void {
-  const lookup = matchDownload(item, [...receipts]).finally(() => lookups.delete(lookup));
+  const lookup = matchDownload(item).finally(() => lookups.delete(lookup));
   lookups.add(lookup);
 }
 
-async function matchDownload(
-  item: chrome.downloads.DownloadItem,
-  open: [number, ActionReceipt][],
-): Promise<void> {
-  for (const [tabId, receipt] of open) {
-    if (receipt.download) continue;
-    const url = await tabUrls.get(tabId);
+async function matchDownload(item: chrome.downloads.DownloadItem): Promise<void> {
+  for (const [actionId, live] of [...lives].reverse()) {
+    if (live.body.download) continue;
+    const url = await tabUrls.get(actionId);
     if (!url || !sameOrigin(url, item.referrer || item.url)) continue;
-    receipt.download = {
+    live.body.download = {
       url: item.url.slice(0, 2000),
       filename: (item.filename.split(/[\\/]/).pop() || item.url.split("/").pop() || "").slice(
         0,
         300,
       ),
     };
+    noteDownload(live.open, Date.now());
     return;
   }
+}
+
+async function drainLookups(): Promise<void> {
+  if (lookups.size) await Promise.all([...lookups]);
+  if (lookups.size) await Promise.all([...lookups]);
 }
 
 function sameOrigin(a: string, b: string): boolean {
@@ -182,27 +270,40 @@ function sameOrigin(a: string, b: string): boolean {
   }
 }
 
+function sameDocument(a: string, b: string): boolean {
+  try {
+    const left = new URL(a);
+    const right = new URL(b);
+    return (
+      left.origin === right.origin &&
+      left.pathname === right.pathname &&
+      left.search === right.search
+    );
+  } catch {
+    return false;
+  }
+}
+
 onEngineInstall(() => {
   chrome.downloads?.onCreated.addListener(noteCreatedDownload);
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (source.tabId === undefined) return;
-    const receipt = receipts.get(source.tabId);
-    if (!receipt) return;
-    if (method.startsWith("Network.")) {
-      noteNetwork(receipt, method, (params ?? {}) as Record<string, unknown>);
-      return;
-    }
-    if (method === "Page.javascriptDialogClosed") {
-      if (receipt.dialog)
-        receipt.dialog.accepted = Boolean((params as { result?: unknown }).result);
-      dialogClosed.set(source.tabId, Date.now());
-    } else if (method === "Page.downloadWillBegin") {
-      const value = params as { url?: string; suggestedFilename?: string; guid?: string };
-      receipt.download = {
-        url: String(value.url ?? "").slice(0, 2000),
-        filename: String(value.suggestedFilename ?? "").slice(0, 300),
-        ...(value.guid ? { token: value.guid } : {}),
-      };
-    }
+    const live = liveFor(source.tabId, method === "Network.requestWillBeSent");
+    if (!live) return;
+    const data = (params ?? {}) as Record<string, unknown>;
+    if (method.startsWith("Network.")) applyNetwork(live, method, data);
+    else if (method === "Page.javascriptDialogClosed") onDialogClosed(live, data);
+    else if (method === "Page.downloadWillBegin") onDownload(live, data);
+    else if (method === "Page.frameNavigated") onFrame(live, data);
+    else if (method === "Page.loadEventFired" || method === "Page.navigatedWithinDocument")
+      noteNavigationDone(live.open, Date.now());
   });
 });
+
+function applyNetwork(live: LiveReceipt, method: string, params: Record<string, unknown>): void {
+  if (method === "Network.requestWillBeSent") onRequest(live, params);
+  else if (method === "Network.responseReceived") onResponse(live, params);
+  else if (method === "Network.loadingFailed") onFailed(live, params);
+  else if (method === "Network.loadingFinished")
+    noteRequestEnd(live.open, { id: String(params.requestId ?? ""), at: Date.now() });
+}

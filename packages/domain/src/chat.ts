@@ -28,6 +28,7 @@ export type {
   PiSessionEvent,
   PiSessionEventListener,
   PiSlashCommand,
+  PiToolStepEvent,
   PiTreeEntry,
 } from "./pi-session-ui.js";
 export type ChatId = string & { readonly __chatId: unique symbol };

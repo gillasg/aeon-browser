@@ -144,6 +144,97 @@ test(
   },
 );
 
+test(
+  "a download after confirm is on the receipt 20 of 20 times, and a 2s submit shows its final status",
+  {
+    timeout: 300_000,
+    skip:
+      !process.env.REQUIRE_E2E &&
+      (!existsSync(chromePath) || !existsSync(extension) || !existsSync(cli)),
+  },
+  async () => {
+    const home = await mkdtemp(join(tmpdir(), "bue-receipt-loop-"));
+    const env = { ...process.env, BROWSERKIT_HOME: home, SITE_TO_API_HOME: join(home, "s2a") };
+    const site = createServer((request, response) => {
+      if (request.url === "/slow") {
+        request.resume();
+        setTimeout(() => {
+          response.statusCode = 201;
+          response.setHeader("content-type", "application/json");
+          response.end("{}");
+        }, 2000);
+        return;
+      }
+      response.setHeader("content-type", "text/html");
+      if (request.url === "/file") {
+        response.setHeader("content-disposition", "attachment; filename=receipt.txt");
+        response.end("receipt");
+        return;
+      }
+      response.end(`<title>Receipt loop</title>
+        <button id="file" onclick="confirm('save it'); const a=document.createElement('a'); a.href='/file'; a.download='receipt.txt'; a.click()">file</button>
+        <button id="slow" onclick="fetch('/slow', {method:'POST', body:'{}'})">slow</button>`);
+    });
+    await new Promise((done) => site.listen(0, "127.0.0.1", done));
+    const siteUrl = `http://127.0.0.1:${site.address().port}/`;
+    const bridge = spawn(process.execPath, [cli, "serve"], { env, stdio: "ignore" });
+    const profile = await mkdtemp(join(tmpdir(), "bue-receipt-loop-chrome-"));
+    let chrome;
+    try {
+      await waitFor(async () => JSON.parse(await readFile(join(home, "bridge.json"), "utf8")));
+      chrome = spawn(
+        chromePath,
+        [
+          `--user-data-dir=${profile}`,
+          "--remote-debugging-port=0",
+          `--load-extension=${extension}`,
+          `--disable-extensions-except=${extension}`,
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--headless=new",
+          ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
+          "about:blank",
+        ],
+        { stdio: "ignore" },
+      );
+      await connectExtension(profile, env);
+      const cell = (code) =>
+        run(
+          process.execPath,
+          [cli, "repl", "--session", "receipts-loop", "--timeout", "180000", code],
+          {
+            env,
+          },
+        );
+      const opened = await cell(`page = await browser.openTab(${JSON.stringify(siteUrl)});
+        const names = [];
+        for (let i = 0; i < 20; i++) {
+          const file = await page.click("#file");
+          names.push((file.receipt && file.receipt.download && file.receipt.download.filename) || "");
+        }
+        const slow = await page.click("#slow");
+        const request = slow.receipt && slow.receipt.requests && slow.receipt.requests[0];
+        console.log("LOOP " + JSON.stringify({ names, request }));`);
+      const loop = JSON.parse(/LOOP (.*)/.exec(opened.stdout)[1]);
+      assert.equal(loop.names.length, 20, opened.stdout);
+      for (const name of loop.names) assert.match(name, /receipt\.txt/, opened.stdout);
+      assert.equal(loop.request?.method, "POST", opened.stdout);
+      assert.equal(loop.request?.status, 201, opened.stdout);
+    } finally {
+      chrome?.kill();
+      bridge.kill();
+      site.close();
+      await sleep(300);
+      await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => {},
+      );
+      await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => {},
+      );
+    }
+  },
+);
+
 async function connectExtension(profile, env) {
   const port = await waitFor(async () =>
     Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),

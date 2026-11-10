@@ -9,3 +9,4 @@ export * from "./browser-code.js";
 export * from "./site-scripts.js";
 export * from "./native-bootstrap.js";
 export * from "./errors.js";
+export * from "./step-event.js";
