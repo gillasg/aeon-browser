@@ -71,6 +71,9 @@ importers:
 
   apps/cli:
     dependencies:
+      "@aeon/pi-adapter":
+        specifier: workspace:*
+        version: link:../../packages/pi-adapter
       "@aeon/protocol":
         specifier: workspace:*
         version: link:../../packages/protocol

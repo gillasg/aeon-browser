@@ -1,4 +1,11 @@
 export { PiSdkSessionAdapter } from "./session-adapter.js";
+export {
+  buildAgentSurface,
+  hashAgentSurface,
+  type AgentSurface,
+  type AgentSurfacePaths,
+  type AgentSurfaceTool,
+} from "./agent-surface.js";
 export { resolvePiAgentDirectory } from "./session-adapter.js";
 export { siteMapperRequest, sessionChatId } from "./site-browser.js";
 export {

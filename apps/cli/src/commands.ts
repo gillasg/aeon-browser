@@ -424,6 +424,23 @@ them with "aeon pack enable" after reviewing it.`,
   ];
 }
 
+function agentSurfaceCommand(): Command {
+  return {
+    name: "agent-surface",
+    group: "Aeon",
+    summary: "the system prompt, tools and first-turn context a new chat sends",
+    help: `Usage: aeon agent-surface [--json]
+
+Prints the system prompt, the tool definitions a new chat sends to the model, and the
+first-turn page-context template. Same functions the daemon uses to start a chat. Works
+offline, with no daemon. --json prints those fields plus a stable hash.`,
+    run: async (args) => {
+      const { runAgentSurface } = await import("./agent-surface.js");
+      return runAgentSurface(has(args, "json"));
+    },
+  };
+}
+
 function stopCommand(host: DaemonHost): Command {
   return {
     name: "stop",
@@ -445,6 +462,7 @@ Stops the chat's current run and closes the agent tabs it no longer needs.`,
 function aeonOnlyCommands(host: DaemonHost): Command[] {
   return [
     doctorCommand(host),
+    agentSurfaceCommand(),
     rollbackCommand(),
     {
       name: "run",

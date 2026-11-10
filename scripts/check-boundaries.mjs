@@ -11,7 +11,7 @@ const packageRules = new Map([
   ["@aeon/daemon", ["@aeon/protocol", "@aeon/domain", "@aeon/store", "@aeon/pi-adapter"]],
   ["@aeon/pi-adapter", ["@aeon/domain", "@aeon/protocol"]],
   ["@aeon/native-host", []],
-  ["@aeon/cli", ["@aeon/protocol"]],
+  ["@aeon/cli", ["@aeon/protocol", "@aeon/pi-adapter"]],
   ["@aeon/chrome-extension", ["@aeon/protocol", "@aeon/ui"]],
   ["@aeon/ui", ["@aeon/protocol"]],
 ]);

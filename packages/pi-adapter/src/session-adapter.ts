@@ -25,7 +25,8 @@ import {
   PiForkUnsupportedEntryError,
   type PiForkEntryCheck,
 } from "@aeon/domain";
-import { createThreadTools, type ThreadToolHost } from "./thread-tools.js";
+import type { ThreadToolHost } from "./thread-tools.js";
+import { createChatTools } from "./chat-tools.js";
 import { createLocalFixtureModel, fixtureSessionOptions } from "./fixture-model.js";
 import { invalidatePiModelCatalog, readCachedPiModelCatalog } from "./session-model-catalog.js";
 import { wrapPiSession } from "./session-projection.js";
@@ -36,24 +37,18 @@ import {
   storedThinkingLevel,
 } from "./session-resolver.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
-import { createBrowserTools, type BrowserNameProvider } from "./browser-code-tool.js";
+import type { BrowserNameProvider } from "./browser-code-tool.js";
 import type { SiteRulesProvider } from "./browser-host-requests.js";
-import { createClockTool } from "./clock-tool.js";
 import {
   completeWithDefaultModel,
   completeWithDefaultModelTools,
   siteToolModel,
-  fastToolModel,
 } from "./text-completion.js";
-import { createCrawlTool } from "./crawl-tool.js";
-import { createExtractTool } from "./extract-tool.js";
-import { createAskUserTool } from "./ask-user-tool.js";
-import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { installAeonBrowser } from "./site-browser.js";
 import { installSiteMapping } from "./site-mapping.js";
 import { externalToolDefinitions, runExternalTool } from "./external-tools.js";
 import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
-import { createCapabilityTools, type CapabilityToolHost } from "./capability-tools.js";
+import type { CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { bindPiExtensions } from "./sdk-resources.js";
 
@@ -61,8 +56,18 @@ export interface PiSdkSessionAdapterOptions {
   sessionDirectory: string;
   agentDirectory?: string;
   testModel?: "local-faux";
+  /**
+   * The local fixture normally enables only its scripted tool. The agent-surface export
+   * sets this false so the request carries the chat's real tool set.
+   */
+  fixtureToolAllowlist?: boolean;
   preferredInitialModel?: { provider: string; id: string };
   browserTool?: BrowserToolRunner;
+  /**
+   * Browser primer and ability search. A live daemon turns this on by having a browser tool.
+   * The offline agent-surface export turns it on without a browser, so it does not arm tab tidy.
+   */
+  browserGuidance?: boolean;
   capabilityToolHost?: CapabilityToolHost;
 }
 
@@ -70,6 +75,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   private readonly sessionDirectory: string;
   private readonly agentDirectory: string | undefined;
   private readonly testModel: "local-faux" | undefined;
+  private readonly fixtureToolAllowlist: boolean;
   private readonly preferredInitialModel: { provider: string; id: string } | undefined;
   private readonly browserTool: BrowserToolRunner | undefined;
   private capabilityToolHost: CapabilityToolHost | undefined;
@@ -85,6 +91,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.sessionDirectory = resolve(options.sessionDirectory);
     this.agentDirectory = options.agentDirectory ? resolve(options.agentDirectory) : undefined;
     this.testModel = options.testModel;
+    this.fixtureToolAllowlist = options.fixtureToolAllowlist ?? true;
     this.preferredInitialModel = options.preferredInitialModel;
     this.browserTool = options.browserTool;
     installAeonBrowser(this.browserTool);
@@ -96,7 +103,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.capabilityToolHost = options.capabilityToolHost;
     this.resources = new PreparedSessionResources(
       this.agentDirectory ?? resolvePiAgentDirectory(),
-      Boolean(this.browserTool),
+      options.browserGuidance ?? Boolean(this.browserTool),
       resolve(this.sessionDirectory, ".."),
     );
     if (this.testModel && !this.agentDirectory) {
@@ -333,35 +340,18 @@ export class PiSdkSessionAdapter implements PiSessionPort {
       sessionManager: manager,
       ...(modelRuntime ? { modelRuntime } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
-      ...fixtureSessionOptions(fixture),
-      customTools: [
-        ...createBrowserTools(
-          input.chatId,
-          this.browserTool,
-          input.workingDirectory,
-          resolve(this.sessionDirectory, "..", "site-skills"),
-          {
-            ...(this.siteRulesHost ? { siteRules: this.siteRulesHost } : {}),
-            ...(this.browserNameHost ? { browserName: this.browserNameHost } : {}),
-            model: fastToolModel(this.completionOptions()),
-          },
-        ),
-        ...createThreadTools(input.chatId, this.threadToolHost),
-        ...createCapabilityTools(input.chatId, this.capabilityToolHost),
-        createClockTool(),
-        createSiteMapperTool(
-          input.chatId,
-          input.workingDirectory,
-          siteToolModel(this.completionOptions()),
-        ),
-        createCrawlTool(
-          input.chatId,
-          input.workingDirectory,
-          siteToolModel(this.completionOptions()),
-        ),
-        createExtractTool(this.completionOptions(), input.workingDirectory),
-        createAskUserTool(input.chatId),
-      ],
+      ...fixtureSessionOptions(fixture, this.fixtureToolAllowlist),
+      customTools: createChatTools({
+        chatId: input.chatId,
+        workingDirectory: input.workingDirectory,
+        sessionDirectory: this.sessionDirectory,
+        completion: this.completionOptions(),
+        browserTool: this.browserTool,
+        threadToolHost: this.threadToolHost,
+        capabilityToolHost: this.capabilityToolHost,
+        siteRules: this.siteRulesHost,
+        browserName: this.browserNameHost,
+      }),
     };
     const { session } = await timeStartupStep("agent-session-created", () =>
       createAgentSession(options),

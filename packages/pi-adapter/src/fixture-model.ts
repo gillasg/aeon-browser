@@ -4,8 +4,10 @@ import {
   fauxProvider,
   fauxToolCall,
   type Api,
+  type AssistantMessage,
   type Model,
 } from "@earendil-works/pi-ai";
+import type { TranscriptContext } from "@earendil-works/pi-ai/utils/transcript";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 const FIXTURE_PROVIDER = "aeon-local-fixture";
@@ -13,12 +15,32 @@ const FIXTURE_MODEL = "read-only-stream";
 const FIXTURE_RESPONSES = 64;
 const DEFAULT_TOKENS_PER_SECOND = 35;
 
+let requestCapture: ((context: TranscriptContext) => void) | undefined;
+
+/** Record each context the local fixture model is asked to answer. The caller unsubscribes. */
+export function captureFixtureModelRequest(
+  capture: (context: TranscriptContext) => void,
+): () => void {
+  requestCapture = capture;
+  return () => {
+    if (requestCapture === capture) requestCapture = undefined;
+  };
+}
+
+function scripted(message: AssistantMessage) {
+  return (context: TranscriptContext): AssistantMessage => {
+    requestCapture?.(context);
+    return message;
+  };
+}
+
 export function fixtureSessionOptions(
   fixture: Awaited<ReturnType<typeof createLocalFixtureModel>> | undefined,
+  allowlist = true,
 ): Partial<Awaited<ReturnType<typeof createLocalFixtureModel>>> {
-  return fixture
-    ? { modelRuntime: fixture.modelRuntime, model: fixture.model, tools: fixture.tools }
-    : {};
+  if (!fixture) return {};
+  const session = { modelRuntime: fixture.modelRuntime, model: fixture.model };
+  return allowlist ? { ...session, tools: fixture.tools } : session;
 }
 
 export async function createLocalFixtureModel(agentDirectory: string): Promise<{
@@ -54,9 +76,11 @@ export async function createLocalFixtureModel(agentDirectory: string): Promise<{
   const responses = [];
   for (let index = 1; index <= FIXTURE_RESPONSES; index += 1) {
     responses.push(
-      fauxAssistantMessage(fauxToolCall("ls", { path: "." }), { stopReason: "toolUse" }),
-      fauxAssistantMessage(
-        `Local fixture response ${index}. Pi streamed this through its real AgentSession.prompt path.`,
+      scripted(fauxAssistantMessage(fauxToolCall("ls", { path: "." }), { stopReason: "toolUse" })),
+      scripted(
+        fauxAssistantMessage(
+          `Local fixture response ${index}. Pi streamed this through its real AgentSession.prompt path.`,
+        ),
       ),
     );
   }
