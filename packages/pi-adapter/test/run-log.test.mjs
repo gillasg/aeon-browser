@@ -65,10 +65,11 @@ test("a whole run writes runs/<time>.json through the session lifecycle", async 
     tallyCell("chat-two", { steps: steps(), files: [] });
     await writeRunLog("chat-two", workspace);
     listener({ type: "agent_end" });
-    // The final write is asynchronous: wait for it (a fixed 50 ms failed on a busy machine).
+    // The final write is asynchronous: wait for it (3 s still failed on a machine under load).
     let file;
     let log;
-    for (let tries = 0; tries < 60 && !log?.endedAt; tries++) {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline && !log?.endedAt) {
       await wait(50);
       // A write in flight leaves its temp file beside the log; only the log itself counts.
       [file] = (await readdir(join(workspace, "runs"))).filter((name) => name.endsWith(".json"));
