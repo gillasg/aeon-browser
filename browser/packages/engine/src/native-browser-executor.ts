@@ -1,5 +1,5 @@
 import { noteActionTiming } from "./native-browser-action-timing.js";
-import { closedByAction, withWaitNote } from "./native-browser-closed-tab.js";
+import { closedByAction } from "./native-browser-closed-tab.js";
 import { respondFailure, sendFailure } from "./native-browser-result.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
@@ -106,8 +106,11 @@ import {
 } from "./network-store.js";
 import { scheduleStep, schedulerStatus } from "./native-browser-scheduler.js";
 import { guardPageCode, notePlantedScript } from "./native-browser-password-lock.js";
-import { noteAgentClick, takeFedCmNote } from "./native-browser-fedcm.js";
+import { noteAgentClick } from "./native-browser-fedcm.js";
+import { dialogExpectResult, noteDialogActivity } from "./evidence/dialogs.js";
+import { annotateStep } from "./evidence/step-notes.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
+
 type Capability = Extract<
   BrowserStep,
   { op: "event" | "frames" | "upload" | "downloads" | "pointer" | "keys" | "reconnect" }
@@ -547,12 +550,13 @@ async function executeStep(
   // into each other's page, and a session's own steps keep their order.
   return scheduleStep(step, step.target.tabId, async () => {
     stepInput(step.target.tabId, true);
+    noteDialogActivity(step);
     if (step.op === "click" || step.op === "press") noteAgentClick(step.target.tabId);
     try {
       const result = await dispatchStep(request, step, tab).catch((error: unknown) =>
         closedByAction(request, step, tab, error),
       );
-      return withFedCmNote(withWaitNote(result, step.target.tabId), step.target.tabId);
+      return annotateStep(result, step.target.tabId);
     } finally {
       stepInput(step.target.tabId, false);
     }
@@ -573,6 +577,7 @@ async function dispatchStep(
   tab: chrome.tabs.Tab,
 ): Promise<BrowserExecutorResult> {
   await guardPageCode(step);
+  if (step.op === "dialog") return dialogExpectResult(step);
   if (isCapabilityStep(step)) return performCapability({ ...request, step }, revalidateTarget);
   if (step.op === "observe" || step.op === "navigate")
     showAgentCaption(
@@ -583,8 +588,7 @@ async function dispatchStep(
     return step.kind === "semantic"
       ? observeSemantic(request, tab, revalidateTarget)
       : captureScreenshot(request, tab, revalidateTarget);
-  if (step.op === "click" || step.op === "fill" || step.op === "paste" || step.op === "scroll")
-    return performAction({ ...request, step }, revalidateTarget);
+  if (isPageAction(step)) return performAction({ ...request, step }, revalidateTarget);
   if (isExtraStep(step)) return performExtra({ ...request, step }, revalidateTarget);
   throw new Error("UNSUPPORTED");
 }
@@ -654,6 +658,11 @@ function enqueueTarget(
 type TargetStep = Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>;
 function isTargetStep(step: BrowserStep): step is TargetStep {
   return !["listTabs", "openTab", "attachTab"].includes(step.op);
+}
+function isPageAction(
+  step: BrowserStep,
+): step is Extract<BrowserStep, { op: "click" | "fill" | "paste" | "scroll" }> {
+  return ["click", "fill", "paste", "scroll"].includes(step.op);
 }
 function isExtraStep(step: BrowserStep): step is Extract<
   BrowserStep,
@@ -761,12 +770,4 @@ export async function executeLocalBrowserStep(
   } finally {
     completeBrowserRequest(request);
   }
-}
-
-/** What Aeon did with Chrome's own sign-in dialog rides on the next action's result. */
-function withFedCmNote(result: BrowserExecutorResult, tabId: number): BrowserExecutorResult {
-  if (result.kind !== "action") return result;
-  const note = takeFedCmNote(tabId);
-  if (!note) return result;
-  return { ...result, note: (result.note ? `${result.note} ${note}` : note).slice(0, 1000) };
 }

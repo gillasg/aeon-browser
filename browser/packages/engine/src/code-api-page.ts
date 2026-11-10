@@ -181,6 +181,13 @@ function __pageSelection() {
   if (!text || (element && element.closest('input, textarea, [contenteditable=""], [contenteditable="true"]'))) return '';
   return text.slice(0, 500);
 }
+function __logDialogWarn(result) {
+  var bag = [(result && result.note) || '', (result && result.data && result.data.dialogWarn) || ''].join('\n');
+  for (var line of bag.split('\n')) {
+    var at = line.indexOf('[warn]');
+    if (at >= 0) console.log(line.slice(at));
+  }
+}
 async function __step(step, readOnly = false) {
   var startedAt = Date.now();
   if (step.target && __closedTabs.has(step.target.tabId)) {
@@ -198,6 +205,7 @@ async function __step(step, readOnly = false) {
   if (step.target) await __learnOn(step.target, action ? step : undefined);
   var before = step.target && __tabs.get(__key(step.target))?.url;
   var result = await __call(step);
+  __logDialogWarn(result);
   // An evaluate that only read the page leaves it clean: no final observation, no log line.
   if (step.op === 'evaluate' && result.data && result.data.changed === false) {
     if (!wasDirty) __dirty.delete(__key(step.target));

@@ -43,6 +43,20 @@ export function beginReceipt(tabId: number): void {
   );
 }
 
+/** The dialog policy records what it answered while this action's receipt is open. */
+export function noteReceiptDialog(
+  tabId: number,
+  dialog: { type: string; message: string; accepted: boolean },
+): void {
+  const receipt = receipts.get(tabId);
+  if (!receipt) return;
+  receipt.dialog = {
+    type: dialog.type.slice(0, 40),
+    message: dialog.message.slice(0, 300),
+    accepted: dialog.accepted,
+  };
+}
+
 export function noteReceiptPopup(openerId: number, tabId: number, url = ""): void {
   const receipt = receipts.get(openerId);
   if (!receipt) return;
@@ -154,14 +168,7 @@ onEngineInstall(() => {
       noteNetwork(receipt, method, (params ?? {}) as Record<string, unknown>);
       return;
     }
-    if (method === "Page.javascriptDialogOpening") {
-      const value = params as { type?: string; message?: string };
-      receipt.dialog = {
-        type: String(value.type ?? "alert"),
-        message: String(value.message ?? "").slice(0, 300),
-        accepted: true,
-      };
-    } else if (method === "Page.javascriptDialogClosed") {
+    if (method === "Page.javascriptDialogClosed") {
       if (receipt.dialog)
         receipt.dialog.accepted = Boolean((params as { result?: unknown }).result);
       dialogClosed.set(source.tabId, Date.now());

@@ -473,6 +473,13 @@ var browser = Object.freeze({
       var probe = (await __step({op:"evaluate", target, expression:'(' + __stealthProbe.toString() + ')()'})).data.value;
       return (await __step({op:"stealth", target, probe: probe || {}})).data;
     },
+    dialog: Object.freeze({
+      expect: async (answer) => {
+        var wanted = String(answer ?? '');
+        if (!wanted) throw Error('INVALID_INPUT: page.dialog.expect needs "dismiss", "accept", or the prompt text');
+        return (await __step({op:'dialog', target, expect: wanted})).data;
+      },
+    }),
     dialogs: async (mode = 'accept', promptText = '') => {
       var shim = '(' + __dialogShim.toString() + ')(' + JSON.stringify({mode, promptText}) + ')';
       await __step({op:'cdp', target, method:'Page.addScriptToEvaluateOnNewDocument', params:{source: shim}});
