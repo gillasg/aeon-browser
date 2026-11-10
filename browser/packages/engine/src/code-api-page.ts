@@ -280,6 +280,7 @@ function __formatState(state, max = 3000, delta = false) {
       d.changed.length ? 'changed: ' + d.changed.join(',') : '',
     ].filter(Boolean).join('\\n');
   }
+  if (typeof state.view === 'string' && state.view) return state.view;
   var key = __key(state.target) + ':' + state.documentEpoch;
   var previous = __seen.get(key) || new Map(), next = new Map();
   var lines = [state.url], repeats = __repeats(state.nodes), printed = new Set(), unchanged = 0;
@@ -359,9 +360,13 @@ var bu = Object.freeze({
   state: async (options = {}) => {
     var target = options.target || __lastTarget;
     if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');
-    var {final, ...snapshot} = options;
+    var snapshot = Object.assign({}, options);
+    delete snapshot.final; delete snapshot.max; delete snapshot.target;
+    snapshot.pin = true;
+    if (options.final) snapshot.delta = true;
+    if (options.max !== undefined) snapshot.budget = options.max;
     var state = await browser.page(target).snapshot(snapshot);
-    var text = __formatState(state, options.max, final);
+    var text = __formatState(state, options.max, options.final);
     var loaded = await __autoLoadSkills(state.url);
     if (loaded) text = loaded + '\\n' + text;
     var challenge = await __challengeNote(target, state.url);

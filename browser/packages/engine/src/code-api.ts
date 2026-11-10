@@ -380,6 +380,8 @@ var browser = Object.freeze({
   },
   page: (target) => (__lastTarget = target, Object.freeze(__extendPage(target, {
     target,
+    // The same observation as bu.state, scoped to this tab.
+    state: (options = {}) => bu.state(Object.assign({}, options && typeof options === 'object' ? options : {}, {target: target})),
     // Why the last navigation failed, if it did: { code, url, stage, message, at }. The page is
     // left as it is, so it can still be read or evaluated.
     get lastError() { return __lastErrors.get(__key(target)) || null; },
