@@ -1,25 +1,8 @@
-// Ban chrome.debugger.sendCommand outside cdp/. The allow-list is the S2/S3/S4 call-site
-// slices, which are migrating in parallel. removed when those slices merge.
+// Ban chrome.debugger.sendCommand outside cdp/: every CDP call goes through send(), which bounds,
+// names and records it.
 import tseslint from "typescript-eslint";
 
 const SRC = "browser/packages/engine/src";
-
-const SLICE_ALLOW = [
-  "native-browser-input.ts",
-  "native-browser-human-input.ts",
-  "native-browser-scroll.ts",
-  "native-browser-cursor.ts",
-  "native-browser-dry-run.ts",
-  "native-browser-dom.ts",
-  "native-browser-frames.ts",
-  "native-browser-observation.ts",
-  "native-browser-preview.ts",
-  "native-browser-navigation.ts",
-  "native-browser-events.ts",
-  "native-browser-network.ts",
-  "native-browser-executor.ts",
-  "native-browser-recording.ts",
-].map((name) => `${SRC}/${name}`);
 
 const SEND_COMMAND = {
   selector:
@@ -33,10 +16,5 @@ export default [
     ignores: [`${SRC}/cdp/**`],
     languageOptions: { parser: tseslint.parser },
     rules: { "no-restricted-syntax": ["error", SEND_COMMAND] },
-  },
-  {
-    // removed when those slices merge
-    files: SLICE_ALLOW,
-    rules: { "no-restricted-syntax": "off" },
   },
 ];
