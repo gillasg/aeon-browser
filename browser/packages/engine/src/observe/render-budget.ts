@@ -1,6 +1,10 @@
 import { DROP_ORDER, RANK, cost, quote, tableText, type Line } from "./render-model.js";
 
-export function prepareLines(lines: Line[], focus: string | undefined, delta: Set<number> | undefined): {
+export function prepareLines(
+  lines: Line[],
+  focus: string | undefined,
+  delta: Set<number> | undefined,
+): {
   lines: Line[];
   hidden: number;
 } {
@@ -49,9 +53,7 @@ function foldSingles(lines: Line[]): Line[] {
     const folded = current.filter((line) => canFold(line, counts.get(line.key) ?? 0));
     if (!folded.length) break;
     const lift = new Map(folded.map((line) => [line.key, line.parentKey]));
-    current = current
-      .filter((line) => !lift.has(line.key))
-      .map((line) => reparent(line, lift));
+    current = current.filter((line) => !lift.has(line.key)).map((line) => reparent(line, lift));
   }
   return current;
 }
@@ -141,7 +143,10 @@ function applyFocus(lines: Line[], focus: string | undefined): Line[] {
   return lines.filter((line) => keep.has(line.key));
 }
 
-function applyDelta(lines: Line[], delta: Set<number> | undefined): { lines: Line[]; hidden: number } {
+function applyDelta(
+  lines: Line[],
+  delta: Set<number> | undefined,
+): { lines: Line[]; hidden: number } {
   if (!delta) return { lines, hidden: 0 };
   let hidden = 0;
   const next = lines.flatMap((line) => {
@@ -153,7 +158,8 @@ function applyDelta(lines: Line[], delta: Set<number> | undefined): { lines: Lin
 }
 
 function keepInDelta(line: Line, delta: Set<number>): boolean {
-  if (line.kind === "container" || line.section === "header" || line.section === "notice") return true;
+  if (line.kind === "container" || line.section === "header" || line.section === "notice")
+    return true;
   return line.id === undefined || delta.has(line.id);
 }
 
@@ -192,7 +198,11 @@ function ancestorChain(line: Line, byKey: Map<string, Line>): Line[] {
 function finish(all: Line[], kept: Line[], hidden: number): Line[] {
   const keys = new Set(kept.map((line) => line.key));
   const body = kept.map((line) => recount(line, all, keys));
-  return arrange([...body, ...cutNotes(all, keys), ...(hidden ? [noteLine(hiddenText(hidden), 90)] : [])]);
+  return arrange([
+    ...body,
+    ...cutNotes(all, keys),
+    ...(hidden ? [noteLine(hiddenText(hidden), 90)] : []),
+  ]);
 }
 
 function recount(line: Line, all: readonly Line[], keys: Set<string>): Line {
@@ -209,9 +219,12 @@ function cutNotes(all: readonly Line[], keys: Set<string>): Line[] {
   const texts = all.filter((line) => line.kind === "text" && !keys.has(line.key)).length;
   const chrome = all.filter((line) => line.section === "chrome" && !keys.has(line.key)).length;
   const notes: Line[] = [];
-  if (rows) notes.push(noteLine(cutNote(rows, "row", "page.state({query}) or page.table()"), notes.length));
-  if (controls) notes.push(noteLine(cutNote(controls, "control", "page.state({query})"), notes.length));
-  if (headings) notes.push(noteLine(cutNote(headings, "heading", "page.state({query})"), notes.length));
+  if (rows)
+    notes.push(noteLine(cutNote(rows, "row", "page.state({query}) or page.table()"), notes.length));
+  if (controls)
+    notes.push(noteLine(cutNote(controls, "control", "page.state({query})"), notes.length));
+  if (headings)
+    notes.push(noteLine(cutNote(headings, "heading", "page.state({query})"), notes.length));
   if (texts) notes.push(noteLine(cutNote(texts, "text line", "page.state({query})"), notes.length));
   if (chrome) notes.push(noteLine(`(+${chrome} nav or footer; page.state({query}))`, notes.length));
   return notes;

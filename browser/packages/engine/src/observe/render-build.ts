@@ -1,4 +1,9 @@
-import { INTERACTIVE_ROLES, type ExpandSection, type SemanticTree, type TreeNode } from "./types.js";
+import {
+  INTERACTIVE_ROLES,
+  type ExpandSection,
+  type SemanticTree,
+  type TreeNode,
+} from "./types.js";
 import {
   chromeText,
   containerText,
@@ -28,7 +33,11 @@ interface Build {
   order: number;
 }
 
-export function buildLines(tree: SemanticTree, expand: readonly ExpandSection[], hot: Set<string>): Line[] {
+export function buildLines(
+  tree: SemanticTree,
+  expand: readonly ExpandSection[],
+  hot: Set<string>,
+): Line[] {
   const ids = new Set(tree.nodes.map((node) => node.axId));
   const build: Build = {
     lines: [],
@@ -136,7 +145,9 @@ function chromeOpen(node: TreeNode, build: Build): boolean {
 }
 
 function emit(node: TreeNode, parentKey: string | undefined, dialog: boolean, build: Build): void {
-  const line = node.container ? containerLine(node, dialog, build) : contentLine(node, dialog, build);
+  const line = node.container
+    ? containerLine(node, dialog, build)
+    : contentLine(node, dialog, build);
   if (!line) return;
   if (parentKey) line.parentKey = parentKey;
   line.order = build.order++;
@@ -147,7 +158,14 @@ function containerLine(node: TreeNode, dialog: boolean, build: Build): Line {
   const text = isChromeRole(node.role)
     ? chromeText(node, countRole(node, "link", build), countRole(node, "button", build))
     : containerBody(node, build);
-  const line = baseLine(node.axId, text, sectionOf(node, dialog, build), "container", node.role, node.name);
+  const line = baseLine(
+    node.axId,
+    text,
+    sectionOf(node, dialog, build),
+    "container",
+    node.role,
+    node.name,
+  );
   line.hay = `${node.role} ${node.name} ${text}`.toLowerCase();
   line.row = node.role === "row";
   line.table = node.role === "table";
@@ -174,9 +192,23 @@ function contentLine(node: TreeNode, dialog: boolean, build: Build): Line | unde
   return line;
 }
 
-function textLine(node: TreeNode, dialog: boolean, build: Build, kind: Line["kind"], text: string): Line {
-  const line = baseLine(node.axId, text, sectionOf(node, dialog, build), kind, node.role, node.name);
-  line.hay = `${node.role} ${node.name} ${node.value ?? ""} ${node.options?.join(" ") ?? ""} ${text}`.toLowerCase();
+function textLine(
+  node: TreeNode,
+  dialog: boolean,
+  build: Build,
+  kind: Line["kind"],
+  text: string,
+): Line {
+  const line = baseLine(
+    node.axId,
+    text,
+    sectionOf(node, dialog, build),
+    kind,
+    node.role,
+    node.name,
+  );
+  line.hay =
+    `${node.role} ${node.name} ${node.value ?? ""} ${node.options?.join(" ") ?? ""} ${text}`.toLowerCase();
   if (node.backendNodeId !== undefined) line.id = node.backendNodeId;
   return line;
 }
@@ -265,7 +297,11 @@ function baseLine(
   };
 }
 
-export function hotNodes(nodes: readonly TreeNode[], focus: string | undefined, delta: Set<number> | undefined): Set<string> {
+export function hotNodes(
+  nodes: readonly TreeNode[],
+  focus: string | undefined,
+  delta: Set<number> | undefined,
+): Set<string> {
   const byId = new Map(nodes.map((node) => [node.axId, node]));
   const hot = new Set<string>();
   const query = focus?.toLowerCase();
@@ -281,7 +317,12 @@ export function hotNodes(nodes: readonly TreeNode[], focus: string | undefined, 
   return hot;
 }
 
-function nodeIsHot(node: TreeNode, query: string | undefined, delta: Set<number> | undefined): boolean {
-  if (query && `${node.role} ${node.name} ${node.value ?? ""}`.toLowerCase().includes(query)) return true;
+function nodeIsHot(
+  node: TreeNode,
+  query: string | undefined,
+  delta: Set<number> | undefined,
+): boolean {
+  if (query && `${node.role} ${node.name} ${node.value ?? ""}`.toLowerCase().includes(query))
+    return true;
   return delta !== undefined && node.backendNodeId !== undefined && delta.has(node.backendNodeId);
 }
