@@ -353,6 +353,7 @@ var browser = Object.freeze({
   context: (request = "", options = {}) => __context(request, options),
   // Who the run is: the Google accounts signed in on the web (authuser order).
   identity: Object.freeze({ accounts: () => __call({identity:"accounts"}) }),
+  // {since, until} counts each page's visits in that window and adds times; without them, visits stay all-time totals.
   history: Object.freeze({
     search: (text = "", options = {}) => __call({history:"search", text, ...options}),
     top: (options = {}) => __call({history:"top", ...options}),

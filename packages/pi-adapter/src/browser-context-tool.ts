@@ -17,7 +17,7 @@ export function createBrowserContextTool(browserCode: BrowserCodeTool): BrowserC
       "Use browser_context first when a request names a site, page or 'my / last / most' anything without a URL.",
     promptGuidelines: [
       "Requests that say where only vaguely ('open the opencode console', 'that article from yesterday', 'my usual subreddits') start with browser_context: it answers from the user's own tabs, history and bookmarks. Open the URL it finds instead of guessing one or asking.",
-      "'My / most / last / usual' questions about the user's browsing are answered from history (browser_context, then browser.history.top or browser.history.search in browser_code), never from bash, local files or Chrome's History database.",
+      "'My / most / last / usual' questions about the user's browsing are answered from history (browser_context, then browser.history.top or browser.history.search in browser_code), never from bash, local files or Chrome's History database. Pass {since, until} when the question is a span, such as this month: that counts visits inside the window.",
       "Use bash only for work that is clearly on this computer (files, local programs, the workspace).",
     ],
     parameters: Type.Object(

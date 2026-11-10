@@ -10,7 +10,7 @@ export interface BrowserContextInput {
 export const browserContextDescription =
   "What the user has open and where they usually go, read from their real browser in one call: the active tab, the open tabs, sites visited in the last two days, the sites they use most (from history), and history and bookmark pages matching the request's words. " +
   "Call it first when a request is vague about where: 'open X' or 'go to my X' (find the real URL the user uses; never guess or ask), 'that page / article / doc I was on', 'my / most / last / usual' anything, or a site named without a URL. " +
-  "Pass the request's key words as request. For counting or ranking the user's own visits (most visited subreddits, which docs they read), go on with browser.history.top in browser_code. Skip it when the request already gives a URL or only needs the current page.";
+  "Pass the request's key words as request. For counting or ranking the user's own visits (most visited subreddits, which docs they read), go on with browser.history.top in browser_code and pass {since, until} for a date span such as this month. Skip it when the request already gives a URL or only needs the current page.";
 
 export const browserContextSchema = {
   type: "object",

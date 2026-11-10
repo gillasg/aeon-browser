@@ -13,9 +13,14 @@ interface Ability {
 
 const ABILITIES: Ability[] = [
   {
-    call: "browser.history.search(text, {days, max})",
-    what: "pages the user visited",
+    call: "browser.history.search(text, {days, max, since, until})",
+    what: "pages the user visited; since/until counts that window and returns visit times",
     words: "history visited visit past seen pages watched",
+  },
+  {
+    call: "browser.history.top({by: 'site'|'path', match, days, since, until})",
+    what: "sites or sections ranked by visits; since/until counts only that window",
+    words: "history most visited frequent top sites month",
   },
   {
     call: "browser.bookmarks.search(text) / tree() / create(...)",

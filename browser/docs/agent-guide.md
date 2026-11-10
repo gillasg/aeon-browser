@@ -235,6 +235,8 @@ await skills.save({
 
 ```js
 await browser.history.search("flights", { days: 7, max: 20 }); // [{url, title, lastVisit, visits}]
+// A span such as this month counts each page's visits in the window and includes times:
+await browser.history.top({ by: "site", since: "2026-11-01", until: "2026-11-30" });
 await browser.bookmarks.search("recipes");
 await browser.bookmarks.tree(); // folders with link counts
 const folder = await browser.bookmarks.create({ parentId: "1", title: "Trips" });
