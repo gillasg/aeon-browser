@@ -290,10 +290,10 @@ internal static class DaemonSupervisor
                 // client "retry" and keep the daemon. Only a daemon silent to the probe too is killed.
                 if (Resynced(daemon))
                 {
-                    SupervisorLog.Write("Daemon missed one bootstrap reply but answers; kept running.");
+                    SupervisorLog.Write("Daemon missed one bootstrap reply but answered the health ping; kept running.");
                     return Failure("BOOTSTRAP_UNAVAILABLE", true);
                 }
-                SupervisorLog.Write("Daemon restart: no bootstrap reply and no answer to a probe.");
+                SupervisorLog.Write("Daemon restart: no bootstrap reply and no health ping.");
                 PoisonDaemon(daemon);
                 restartRequired = true;
                 return Failure("DAEMON_OFFLINE", true);
@@ -343,28 +343,53 @@ internal static class DaemonSupervisor
         }
     }
 
-    // Every line the daemon reads gets one reply. A probe is a line it cannot parse, so its reply is
-    // a fixed failure; reading up to that reply drops any late reply and puts the stream back in step.
-    private const string Probe = "cHJvYmU=";
+    // The health ping is the same check doctor runs. The event loop must answer within two
+    // seconds (plus a little for the reply to arrive). An answer keeps the daemon even when the
+    // extension is down; silence means the loop is stuck. A daemon from before this ping still
+    // answers the line with BOOTSTRAP_UNAVAILABLE, which is also proof it is alive.
+    private const int HealthWaitMs = 2500;
 
     private static bool Resynced(Process daemon)
     {
+        if (!AskHealth(daemon)) return false;
+        return HealthAnswered(daemon, DateTime.UtcNow.AddMilliseconds(HealthWaitMs));
+    }
+
+    private static bool AskHealth(Process daemon)
+    {
         try
         {
-            daemon.StandardInput.WriteLine(Probe);
+            var json = "{\"kind\":\"supervisor.health\"}";
+            daemon.StandardInput.WriteLine(Convert.ToBase64String(Encoding.UTF8.GetBytes(json)));
             daemon.StandardInput.Flush();
+            return true;
         }
         catch { return false; }
-        var probeReply = Convert.ToBase64String(Failure("BOOTSTRAP_UNAVAILABLE", true));
-        var deadline = DateTime.UtcNow.AddSeconds(15);
+    }
+
+    private static bool HealthAnswered(Process daemon, DateTime deadline)
+    {
         while (DateTime.UtcNow < deadline)
         {
-            var line = ReadLineWithin(daemon, deadline - DateTime.UtcNow);
-            if (line == null || line == "") return false;
-            if (IsBase64(line) && Encoding.UTF8.GetString(Convert.FromBase64String(line)).Contains("BOOTSTRAP_UNAVAILABLE"))
-                return true;
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero) return false;
+            var line = ReadLineWithin(daemon, remaining);
+            if (line == null || line.Length == 0) return false;
+            if (IsAliveAnswer(line)) return true;
         }
         return false;
+    }
+
+    private static bool IsAliveAnswer(string line)
+    {
+        if (!IsBase64(line)) return false;
+        try
+        {
+            var text = Encoding.UTF8.GetString(Convert.FromBase64String(line));
+            return text.IndexOf("\"supervisor.health.result\"", StringComparison.Ordinal) >= 0
+                || text.IndexOf("\"BOOTSTRAP_UNAVAILABLE\"", StringComparison.Ordinal) >= 0;
+        }
+        catch { return false; }
     }
 
     /// <summary>One reply line, skipping any progress marker the daemon still has in flight.</summary>

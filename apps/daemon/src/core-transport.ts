@@ -24,6 +24,7 @@ import { sessionChatId } from "@aeon/pi-adapter";
 import { handleBrowserRun } from "./core-browser.js";
 import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
+import { handleCoreHealth } from "./core-health.js";
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
 
@@ -126,6 +127,7 @@ function authenticate(
         handleBlockedSites(socket, candidate, browser) ||
         handleBrowsers(socket, candidate, browser, directory) ||
         handleChatPin(socket, candidate, browser, directory) ||
+        handleCoreHealth(socket, candidate, browser) ||
         handleToolRequest(socket, candidate, service, (session, name) =>
           pin(browser, directory, sessionChatId("external", session), name),
         ),

@@ -12,6 +12,8 @@ import { readEnvironment } from "./environment.js";
 import { installProcessGuard } from "./process-guard.js";
 import { watchStalls } from "./stall-watch.js";
 import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import type { BrowserControlService } from "./browser-control-service.js";
+import { isSupervisorHealthLine, supervisorHealthLine } from "./health-ping.js";
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
@@ -96,7 +98,7 @@ async function runManagedDaemon(): Promise<void> {
     input = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of input) {
       if (line === "shutdown") break;
-      writeReply(`${await handleSupervisorLine(line, transport)}\n`);
+      writeReply(`${await handleSupervisorLine(line, transport, runtime.browserControl)}\n`);
     }
   } finally {
     input?.close();
@@ -113,7 +115,9 @@ async function runManagedDaemon(): Promise<void> {
 async function handleSupervisorLine(
   line: string,
   transport: Awaited<ReturnType<typeof startNativeTransport>>,
+  browser: BrowserControlService,
 ): Promise<string> {
+  if (isSupervisorHealthLine(line)) return supervisorHealthLine(await browser.pingHealth());
   try {
     if (line.length > 32768) throw new Error("oversized supervisor line");
     const candidate = JSON.parse(Buffer.from(line, "base64").toString("utf8")) as unknown;

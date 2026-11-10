@@ -2,6 +2,7 @@
 // extension speaks these as browser.host.* messages over the executor socket; responses are
 // browser.host.result with the same requestId so the daemon can await one without touching code
 // cells.
+import { healthTurn } from "./engine-health.js";
 import { giveBack, controlOf } from "./native-browser-control.js";
 import { claimSpace, finishSpace, listSpaces, touchSpace } from "./native-browser-spaces.js";
 import { vaultNeverSaveSites } from "./native-browser-vault.js";
@@ -19,14 +20,21 @@ export async function hostPlumbing(candidate: unknown, socket: WebSocket): Promi
   if (!handlesHostPlumbing(candidate)) return false;
   const message = candidate as Record<string, unknown>;
   const requestId = String(message.requestId ?? "");
-  const reply = (body: Record<string, unknown>) =>
+  const reply = (body: Record<string, unknown>): void => {
     socket.send(JSON.stringify({ kind: "browser.host.result", requestId, ...body }));
+  };
   try {
-    reply({ ok: true, result: await run(message) });
+    // Health yields to the engine's event loop; every other host action runs as itself.
+    const result = isHealthAction(message) ? await healthTurn(message) : await run(message);
+    reply({ ok: true, result });
   } catch (error) {
     reply({ ok: false, error: String(error instanceof Error ? error.message : error) });
   }
   return true;
+}
+
+function isHealthAction(message: Record<string, unknown>): boolean {
+  return message.kind === "browser.host.health" || message.action === "health";
 }
 
 async function run(message: Record<string, unknown>): Promise<unknown> {
