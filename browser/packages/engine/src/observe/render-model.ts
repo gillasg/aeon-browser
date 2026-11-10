@@ -1,10 +1,4 @@
-import {
-  CELL_ROLES,
-  CHROME_ROLES,
-  TEXT_ROLES,
-  clip,
-  type TreeNode,
-} from "./types.js";
+import { CELL_ROLES, CHROME_ROLES, TEXT_ROLES, clip, type TreeNode } from "./types.js";
 
 export type Section =
   | "header"
@@ -130,7 +124,15 @@ function optionSummary(options: readonly string[]): string {
 
 function flagText(node: TreeNode): string {
   const parts: string[] = [];
-  for (const name of ["disabled", "checked", "focused", "expanded", "selected", "pressed", "mixed"] as const) {
+  for (const name of [
+    "disabled",
+    "checked",
+    "focused",
+    "expanded",
+    "selected",
+    "pressed",
+    "mixed",
+  ] as const) {
     const value = node[name];
     if (value !== undefined) parts.push(` ${name}=${String(value)}`);
   }

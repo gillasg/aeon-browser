@@ -374,14 +374,9 @@ function observeCases() {
     fault("captureViewport", "Page.captureScreenshot", (tabId) =>
       observation.captureViewport(at(tabId)),
     ),
-    fault(
-      "visiblePageText",
-      "Runtime.evaluate",
-      (tabId) => observation.visiblePageText(at(tabId)),
-      {
-        ms: 5_000,
-      },
-    ),
+    fault("evaluateScan", "Runtime.evaluate", (tabId) => observation.visiblePageText(at(tabId)), {
+      ms: 5_000,
+    }),
     fault("frame", "Page.captureScreenshot", previewFrame),
   ];
 }

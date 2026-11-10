@@ -95,14 +95,22 @@ function addContainers(
   }
 }
 
-function isContainer(node: AxNode, kids: Map<string, AxNode[]>, memo: Map<string, boolean>): boolean {
+function isContainer(
+  node: AxNode,
+  kids: Map<string, AxNode[]>,
+  memo: Map<string, boolean>,
+): boolean {
   const role = roleOf(node);
   if (role === "region") return nameOf(node).trim().length > 0;
   if (role === "listitem") return holdsControl(node, kids, memo);
   return CONTAINER_ROLES.has(role);
 }
 
-function holdsControl(node: AxNode, kids: Map<string, AxNode[]>, memo: Map<string, boolean>): boolean {
+function holdsControl(
+  node: AxNode,
+  kids: Map<string, AxNode[]>,
+  memo: Map<string, boolean>,
+): boolean {
   const id = node.nodeId;
   if (!id) return false;
   const known = memo.get(id);
@@ -180,7 +188,11 @@ function applyShown(node: TreeNode, shown: BrowserSemanticNode): TreeNode {
   };
 }
 
-function nearestIncluded(node: AxNode, include: Set<string>, byId: Map<string, AxNode>): string | undefined {
+function nearestIncluded(
+  node: AxNode,
+  include: Set<string>,
+  byId: Map<string, AxNode>,
+): string | undefined {
   let parent = node.parentId;
   let guard = 0;
   while (parent && guard++ < 200) {
@@ -198,7 +210,12 @@ function optionNames(node: AxNode, kids: Map<string, AxNode[]>): string[] | unde
   return names.length ? names : undefined;
 }
 
-function collectOptions(node: AxNode, kids: Map<string, AxNode[]>, names: string[], depth: number): void {
+function collectOptions(
+  node: AxNode,
+  kids: Map<string, AxNode[]>,
+  names: string[],
+  depth: number,
+): void {
   if (depth > 6) return;
   for (const child of kids.get(node.nodeId ?? "") ?? []) {
     if (roleOf(child) === "option") {
@@ -216,7 +233,12 @@ function rowLabel(node: AxNode, kids: Map<string, AxNode[]>): string {
   return clip(texts.slice(0, 2).join(" · "), 60);
 }
 
-function collectTexts(node: AxNode, kids: Map<string, AxNode[]>, texts: string[], depth: number): void {
+function collectTexts(
+  node: AxNode,
+  kids: Map<string, AxNode[]>,
+  texts: string[],
+  depth: number,
+): void {
   if (depth > 8 || texts.length >= 2) return;
   for (const child of kids.get(node.nodeId ?? "") ?? []) {
     const role = roleOf(child);

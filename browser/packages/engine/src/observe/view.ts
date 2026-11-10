@@ -2,7 +2,12 @@ import type { BrowserSemanticNode } from "@browserkit/protocol";
 import type { AxNode, AxRef } from "../native-browser-common.js";
 import { buildSemanticTree } from "./tree.js";
 import { renderState } from "./render.js";
-import { VIEW_CHAR_LIMIT, clampBudget, type ExpandSection, type ResolvedClickable } from "./types.js";
+import {
+  VIEW_CHAR_LIMIT,
+  clampBudget,
+  type ExpandSection,
+  type ResolvedClickable,
+} from "./types.js";
 
 export function attachClickables(
   semantic: { refs: Map<string, AxRef>; nodes: BrowserSemanticNode[] },

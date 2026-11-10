@@ -29,7 +29,11 @@ function fingerprint(node: PinNode): string {
 }
 
 /** Ids whose role, name, value or state differ from the pinned render. Undefined when there is no pin yet. */
-export function changedIds(key: string, nodes: readonly PinNode[], delta: boolean): Set<number> | undefined {
+export function changedIds(
+  key: string,
+  nodes: readonly PinNode[],
+  delta: boolean,
+): Set<number> | undefined {
   if (!delta) return undefined;
   const previous = pins.get(key);
   if (!previous) return undefined;

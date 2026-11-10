@@ -105,7 +105,9 @@ function asScan(value: unknown): PageScan {
   const record = value as Record<string, unknown>;
   return {
     text: typeof record.text === "string" ? record.text.slice(0, 20000) : "",
-    clickables: Array.isArray(record.clickables) ? record.clickables.slice(0, CLICKABLE_CAP).flatMap(asHit) : [],
+    clickables: Array.isArray(record.clickables)
+      ? record.clickables.slice(0, CLICKABLE_CAP).flatMap(asHit)
+      : [],
     offscreen: Array.isArray(record.offscreen)
       ? record.offscreen.filter((item): item is string => typeof item === "string").slice(0, 80)
       : [],
@@ -229,13 +231,15 @@ function collectVisibleText(): string {
 
 function pushRoot(element: Element, roots: (Document | ShadowRoot)[]): void {
   if (element.shadowRoot) roots.push(element.shadowRoot);
-  if (element instanceof HTMLIFrameElement && element.contentDocument) roots.push(element.contentDocument);
+  if (element instanceof HTMLIFrameElement && element.contentDocument)
+    roots.push(element.contentDocument);
 }
 
 function textRegion(element: Element | null): number {
   if (element?.closest("main,[role=main]")) return 0;
   if (element?.closest("footer,[role=contentinfo]")) return 3;
-  if (element?.closest("header,nav,aside,[role=banner],[role=navigation],[role=complementary]")) return 2;
+  if (element?.closest("header,nav,aside,[role=banner],[role=navigation],[role=complementary]"))
+    return 2;
   return 1;
 }
 
@@ -243,14 +247,20 @@ function visibleLine(node: Node, visible: WeakMap<Element, boolean>): string {
   let element = node.parentElement;
   const text = node.textContent?.replace(/\s+/g, " ").trim();
   if (!element || !text || element.closest("script,style,noscript,[data-aeon-overlay]")) return "";
-  while (element.parentElement && getComputedStyle(element).display === "contents") element = element.parentElement;
+  while (element.parentElement && getComputedStyle(element).display === "contents")
+    element = element.parentElement;
   if (!visible.has(element)) {
     visible.set(element, element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }));
   }
   return visible.get(element) ? text : "";
 }
 
-function collectClickables(options: { clickables: boolean; cap: number; ms: number; nodeLimit: number }): {
+function collectClickables(options: {
+  clickables: boolean;
+  cap: number;
+  ms: number;
+  nodeLimit: number;
+}): {
   clickables: { text: string; selector: string; offscreen: boolean }[];
   offscreen: string[];
 } {
@@ -312,7 +322,8 @@ function clickableOf(
 function armed(el: Element): boolean {
   const selector =
     "a,button,input,select,textarea,summary,[role='button'],[role='link'],[role='textbox'],[role='checkbox'],[role='radio'],[role='switch'],[role='tab'],[role='menuitem'],[role='combobox']";
-  if (el.tagName === "BODY" || el.tagName === "HTML" || el.closest("[data-aeon-overlay]")) return false;
+  if (el.tagName === "BODY" || el.tagName === "HTML" || el.closest("[data-aeon-overlay]"))
+    return false;
   if (el.matches(selector) || el.parentElement?.closest(selector)) return false;
   const style = getComputedStyle(el);
   const box = el.getBoundingClientRect();
@@ -324,7 +335,10 @@ function armed(el: Element): boolean {
 
 function outsideViewport(el: Element): boolean {
   const box = el.getBoundingClientRect();
-  return box.width > 0 && (box.bottom < 0 || box.top > innerHeight || box.right < 0 || box.left > innerWidth);
+  return (
+    box.width > 0 &&
+    (box.bottom < 0 || box.top > innerHeight || box.right < 0 || box.left > innerWidth)
+  );
 }
 
 function axRole(el: Element): string {

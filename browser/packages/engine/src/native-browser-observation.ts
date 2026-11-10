@@ -456,7 +456,9 @@ function baselineFor(
   text: string,
   options: Options,
   nodes: BrowserSemanticNode[],
-  step: { query?: string | undefined; pin?: boolean | undefined; delta?: boolean | undefined } | undefined,
+  step:
+    | { query?: string | undefined; pin?: boolean | undefined; delta?: boolean | undefined }
+    | undefined,
 ): BrowserSemanticNode[] {
   if (!step?.query || (!step.pin && !step.delta)) return nodes;
   const rest = { ...options };
