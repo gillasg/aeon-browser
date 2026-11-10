@@ -17,7 +17,8 @@ check <urls|--file f>`, with evidence per site. Far cheaper than opening each on
 - **What the user visited, saved or has open**: their history, bookmarks and open tabs, not a
   search engine. A site, page or thing they name without a link: `browser_context` (or
   `browser.context(request)`) looks in all three at once before guessing from memory.
-  "My most visited …": `browser.history.top({by, match, days})`.
+  "My most visited …": `browser.history.top({by, match, days})`. A date span ("this month"):
+  `{since, until}` counts each page's visits in that window, and `search` returns their times.
 - **Anything live or on a specific site** (prices, stock, listings, showtimes, reviews): open that
   site in the browser. Web search only finds which page to open (`search` uses keyless
   providers, and Google in the user's browser for local, live and personal queries).
