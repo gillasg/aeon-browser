@@ -1,4 +1,5 @@
 import type { BrowserExecutorRequest, BrowserTargetKey } from "@browserkit/protocol";
+import { send } from "./cdp/send.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { forgetStealth } from "./stealth.js";
 
@@ -59,9 +60,12 @@ function eventLimits(method: string): { bytes: number; queue: number } {
 function acknowledgeFrame(source: chrome.debugger.Debuggee, params: unknown): void {
   const sessionId = (params as { sessionId?: number } | undefined)?.sessionId;
   if (sessionId !== undefined)
-    void chrome.debugger
-      .sendCommand(source, "Page.screencastFrameAck", { sessionId })
-      .catch(() => undefined);
+    void send(
+      source,
+      "Page.screencastFrameAck",
+      { sessionId },
+      { label: "acknowledgeFrame" },
+    ).catch(() => undefined);
 }
 onEngineInstall(() => {
   chrome.debugger.onEvent.addListener((source, method, params) => {
@@ -112,13 +116,12 @@ export async function executeBrowserEvent(
     entry.error = "Subscription disposed";
     entry.wake?.();
     if (shouldReleaseChooser(entry))
-      await chrome.debugger
-        .sendCommand(
-          { ...debuggee, ...(entry.sessionId ? { sessionId: entry.sessionId } : {}) },
-          "Page.setInterceptFileChooserDialog",
-          { enabled: false },
-        )
-        .catch(() => undefined);
+      await send(
+        { ...debuggee, ...(entry.sessionId ? { sessionId: entry.sessionId } : {}) },
+        "Page.setInterceptFileChooserDialog",
+        { enabled: false },
+        { label: "executeBrowserEvent" },
+      ).catch(() => undefined);
     return { disposed: true };
   }
   if (!entry.queue.length && !entry.error && step.timeoutMs)
@@ -176,11 +179,16 @@ async function subscribe(
     throw new Error("Too many browser subscriptions; dispose unused listeners");
   const domain = step.event.split(".")[0];
   if (!["popup", "download", "Tracing"].includes(domain ?? ""))
-    await chrome.debugger.sendCommand(debuggee, domain + ".enable");
+    await send(debuggee, domain + ".enable", undefined, { label: "subscribe" });
   if (step.event === "Page.fileChooserOpened")
-    await chrome.debugger.sendCommand(debuggee, "Page.setInterceptFileChooserDialog", {
-      enabled: true,
-    });
+    await send(
+      debuggee,
+      "Page.setInterceptFileChooserDialog",
+      { enabled: true },
+      {
+        label: "subscribe",
+      },
+    );
   const subscriptionId = crypto.randomUUID();
   subscriptions.set(subscriptionId, {
     chatId: request.chatId,
@@ -229,7 +237,9 @@ export async function enableDiagnostics(tabId: number): Promise<void> {
   if (enabled.has(tabId)) return;
   enabled.add(tabId);
   buffers.set(tabId, { console: [], network: [] });
-  await chrome.debugger.sendCommand({ tabId }, "Network.enable").catch(() => undefined);
+  await send({ tabId }, "Network.enable", undefined, { label: "enableDiagnostics" }).catch(
+    () => undefined,
+  );
 }
 
 // Runtime.enable is the signal anti-automation scripts look for (console serialization side
@@ -238,12 +248,16 @@ const runtimeEnabled = new Set<number>();
 export async function enableConsoleCapture(tabId: number): Promise<void> {
   if (runtimeEnabled.has(tabId)) return;
   runtimeEnabled.add(tabId);
-  await chrome.debugger.sendCommand({ tabId }, "Runtime.enable").catch(() => undefined);
+  await send({ tabId }, "Runtime.enable", undefined, { label: "enableConsoleCapture" }).catch(
+    () => undefined,
+  );
 }
 /** Turns console capture off again: a page can detect the Runtime domain, so it is opt-in. */
 export async function disableConsoleCapture(tabId: number): Promise<void> {
   if (!runtimeEnabled.delete(tabId)) return;
-  await chrome.debugger.sendCommand({ tabId }, "Runtime.disable").catch(() => undefined);
+  await send({ tabId }, "Runtime.disable", undefined, { label: "disableConsoleCapture" }).catch(
+    () => undefined,
+  );
 }
 export function consoleCaptureEnabled(tabId: number): boolean {
   return runtimeEnabled.has(tabId);

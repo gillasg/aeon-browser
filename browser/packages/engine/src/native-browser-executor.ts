@@ -1,6 +1,7 @@
 import { noteActionTiming } from "./native-browser-action-timing.js";
 import { closedByAction } from "./native-browser-closed-tab.js";
 import { respondFailure, sendFailure } from "./native-browser-result.js";
+import { callClass, send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
 import {
@@ -177,15 +178,25 @@ async function executeFrame(
   }
   if (step.action === "snapshot") return frameSnapshot(debuggee, step.frameId);
   if (!step.method || /^(Browser|Target)\./.test(step.method)) throw new Error("UNSUPPORTED");
-  return chrome.debugger.sendCommand(debuggee, step.method, step.params);
+  return send(debuggee, step.method, step.params, frameOpts(step.method, step.params));
+}
+function frameOpts(method: string, params: unknown): { label: string; ms?: number } {
+  if (callClass(method) !== "eval") return { label: "executeFrame" };
+  const timeout = (params as { timeout?: unknown } | undefined)?.timeout;
+  const ms =
+    typeof timeout === "number" && Number.isFinite(timeout) && timeout > 0 ? timeout : 5_000;
+  return { label: "executeFrame", ms };
 }
 async function frameSnapshot(
   debuggee: chrome.debugger.Debuggee,
   frameId: string,
 ): Promise<unknown> {
-  const tree = (await chrome.debugger.sendCommand(debuggee, "Accessibility.getFullAXTree", {
-    frameId,
-  })) as { nodes: AxNode[] };
+  const tree = (await send(
+    debuggee,
+    "Accessibility.getFullAXTree",
+    { frameId },
+    { label: "frameSnapshot" },
+  )) as { nodes: AxNode[] };
   return createSemanticNodes(tree.nodes);
 }
 function frameValue(step: Extract<BrowserStep, { op: "frames" }>): string | undefined {
@@ -416,10 +427,12 @@ function extract(
   };
 }
 async function evaluate(debuggee: chrome.debugger.Debuggee, expression: string): Promise<unknown> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression,
-    returnByValue: true,
-  })) as {
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression, returnByValue: true },
+    { label: "evaluate", ms: 5_000 },
+  )) as {
     result?: { value?: unknown };
     exceptionDetails?: unknown;
   };
