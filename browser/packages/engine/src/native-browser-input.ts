@@ -50,6 +50,7 @@ import { frameContext, rootFramePoint } from "./native-browser-frames.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
 import { hiddenTargetError } from "./native-browser-reveal.js";
+import { send } from "./cdp/send.js";
 
 interface Point {
   x: number;
@@ -61,7 +62,14 @@ export async function actionablePoint(
   id: number,
   editable = false,
 ): Promise<Point> {
-  await chrome.debugger.sendCommand(debuggee, "DOM.scrollIntoViewIfNeeded", { backendNodeId: id });
+  await send(
+    debuggee,
+    "DOM.scrollIntoViewIfNeeded",
+    { backendNodeId: id },
+    {
+      label: "actionablePoint",
+    },
+  );
   await onNode(debuggee, id, scrollNearest).catch(() => undefined);
   const state = await onNode<{ visible: boolean; enabled: boolean; editable: boolean }>(
     debuggee,
@@ -157,15 +165,22 @@ export async function pressKey(debuggee: chrome.debugger.Debuggee, key: string):
   const event = { key: key === "Space" ? " " : key, code, windowsVirtualKeyCode };
   showAgentKeys(debuggee, [key]);
   await paceKey(debuggee);
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: text ? "keyDown" : "rawKeyDown",
-    ...event,
-    ...(text ? { text, unmodifiedText: text } : {}),
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyUp",
-    ...event,
-  });
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    {
+      type: text ? "keyDown" : "rawKeyDown",
+      ...event,
+      ...(text ? { text, unmodifiedText: text } : {}),
+    },
+    { label: "pressKey" },
+  );
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    { type: "keyUp", ...event },
+    { label: "pressKey" },
+  );
 }
 
 type Step = Extract<BrowserExecutorRequest["step"], { op: "pointer" | "keys" }>;
@@ -174,9 +189,16 @@ export async function executeInteraction(
   step: Step,
 ): Promise<unknown> {
   if (step.op === "keys") return keyboard(debuggee, step.keys);
-  const send = async (type: string, x: number, y: number, extra: Record<string, unknown> = {}) => {
+  const mouse = async (type: string, x: number, y: number, extra: Record<string, unknown> = {}) => {
     const params = await humanMouse(debuggee, type, { x, y, ...extra });
-    return chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", { type, ...params });
+    return send(
+      debuggee,
+      "Input.dispatchMouseEvent",
+      { type, ...params },
+      {
+        label: "executeInteraction",
+      },
+    );
   };
   if (step.action === "drag" && step.toX !== undefined && step.toY !== undefined)
     showAgentCursor(debuggee, step.toX, step.toY, false, {
@@ -189,21 +211,21 @@ export async function executeInteraction(
       transient: true,
       caption: step.action === "hover" ? "Hovering" : "Clicking",
     });
-  await send("mouseMoved", step.x, step.y);
+  await mouse("mouseMoved", step.x, step.y);
   if (step.action === "hover") return { hovered: true };
   if (step.action === "drag") {
     if (step.toX === undefined || step.toY === undefined) throw new Error("INVALID_TARGET");
-    await send("mousePressed", step.x, step.y, { button: "left", buttons: 1, clickCount: 1 });
+    await mouse("mousePressed", step.x, step.y, { button: "left", buttons: 1, clickCount: 1 });
     try {
       for (let i = 1; i <= 12; i++)
-        await send(
+        await mouse(
           "mouseMoved",
           step.x + ((step.toX - step.x) * i) / 12,
           step.y + ((step.toY - step.y) * i) / 12,
           { button: "left", buttons: 1 },
         );
     } finally {
-      await send("mouseReleased", step.toX, step.toY, {
+      await mouse("mouseReleased", step.toX, step.toY, {
         button: "left",
         buttons: 0,
         clickCount: 1,
@@ -213,8 +235,8 @@ export async function executeInteraction(
   }
   const count = step.action === "doubleClick" ? 2 : 1;
   for (let click = 1; click <= count; click++) {
-    await send("mousePressed", step.x, step.y, { button: "left", clickCount: click });
-    await send("mouseReleased", step.x, step.y, { button: "left", clickCount: click });
+    await mouse("mousePressed", step.x, step.y, { button: "left", clickCount: click });
+    await mouse("mouseReleased", step.x, step.y, { button: "left", clickCount: click });
   }
   return { clicked: true };
 }
@@ -226,6 +248,30 @@ const MAC_COMMANDS: Record<string, string> = {
   x: "cut",
   z: "undo",
 };
+const KEY_MASKS: Record<string, number> = {
+  Alt: 1,
+  Control: 2,
+  Ctrl: 2,
+  Meta: 4,
+  Command: 4,
+  Shift: 8,
+};
+const KEY_CODES: Record<string, number> = {
+  Enter: 13,
+  Tab: 9,
+  Escape: 27,
+  Backspace: 8,
+  Delete: 46,
+  ArrowUp: 38,
+  ArrowDown: 40,
+  ArrowLeft: 37,
+  ArrowRight: 39,
+  Home: 36,
+  End: 35,
+  PageUp: 33,
+  PageDown: 34,
+  Space: 32,
+};
 async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Promise<unknown> {
   const parts = combo.split("+"),
     key = parts.pop();
@@ -235,48 +281,24 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     return { typed: combo.length };
   }
   if (!key) throw new Error("INVALID_TARGET");
-  const masks: Record<string, number> = {
-    Alt: 1,
-    Control: 2,
-    Ctrl: 2,
-    Meta: 4,
-    Command: 4,
-    Shift: 8,
-  };
   // Text that only looks like a combo ("C++", "a+b=c") is typed, not pressed.
   if (
     combo.length > 1 &&
-    !parts.every((part) => part in masks || part === "ControlOrMeta" || part === "Mod")
+    !parts.every((part) => part in KEY_MASKS || part === "ControlOrMeta" || part === "Mod")
   ) {
     await humanType(debuggee, combo);
     return { typed: combo.length };
   }
   let modifiers = 0;
   for (const part of parts) {
-    const mask = part === "ControlOrMeta" || part === "Mod" ? (IS_MAC ? 4 : 2) : masks[part];
+    const mask = part === "ControlOrMeta" || part === "Mod" ? (IS_MAC ? 4 : 2) : KEY_MASKS[part];
     if (!mask) throw new Error("Unknown modifier: " + part);
     modifiers |= mask;
   }
-  const names: Record<string, number> = {
-    Enter: 13,
-    Tab: 9,
-    Escape: 27,
-    Backspace: 8,
-    Delete: 46,
-    ArrowUp: 38,
-    ArrowDown: 40,
-    ArrowLeft: 37,
-    ArrowRight: 39,
-    Home: 36,
-    End: 35,
-    PageUp: 33,
-    PageDown: 34,
-    Space: 32,
-  };
   const windowsVirtualKeyCode =
-    names[key] ?? (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
+    KEY_CODES[key] ?? (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
   // Plain text (no modifiers, not a named key) is typed one character at a time.
-  if (!parts.length && !names[key] && key.length > 1) {
+  if (!parts.length && !(key in KEY_CODES) && key.length > 1) {
     await humanType(debuggee, key);
     return { typed: key.length };
   }
@@ -290,17 +312,24 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
   const command = IS_MAC && modifiers === 4 ? MAC_COMMANDS[key.toLowerCase()] : undefined;
   showAgentKeys(debuggee, [combo]);
   await paceKey(debuggee);
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyDown",
-    ...params,
-    ...(text ? { text, unmodifiedText: text } : {}),
-    ...(!modifiers && !text && key.length === 1 ? { text: key } : {}),
-    ...(command ? { commands: [command] } : {}),
-  });
-  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-    type: "keyUp",
-    ...params,
-  });
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    {
+      type: "keyDown",
+      ...params,
+      ...(text ? { text, unmodifiedText: text } : {}),
+      ...(!modifiers && !text && key.length === 1 ? { text: key } : {}),
+      ...(command ? { commands: [command] } : {}),
+    },
+    { label: "keyboard" },
+  );
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    { type: "keyUp", ...params },
+    { label: "keyboard" },
+  );
   return { pressed: combo };
 }
 
@@ -310,7 +339,9 @@ async function pasteNode(
   text: string,
   html: string,
 ): Promise<void> {
-  await chrome.debugger.sendCommand(debuggee, "Page.bringToFront").catch(() => undefined);
+  await send(debuggee, "Page.bringToFront", undefined, { label: "pasteNode" }).catch(
+    () => undefined,
+  );
   const swap = (await toOffscreen({
     target: "aeon-code-offscreen",
     kind: "clipboardSwap",
@@ -329,14 +360,19 @@ async function pasteNode(
       this.focus();
     });
     for (const type of ["rawKeyDown", "keyUp"] as const) {
-      await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-        type,
-        key: "v",
-        code: "KeyV",
-        modifiers: 2,
-        windowsVirtualKeyCode: 86,
-        ...(type === "rawKeyDown" ? { commands: ["paste"] } : {}),
-      });
+      await send(
+        debuggee,
+        "Input.dispatchKeyEvent",
+        {
+          type,
+          key: "v",
+          code: "KeyV",
+          modifiers: 2,
+          windowsVirtualKeyCode: 86,
+          ...(type === "rawKeyDown" ? { commands: ["paste"] } : {}),
+        },
+        { label: "pasteNode" },
+      );
     }
     await new Promise((done) => setTimeout(done, 30));
     const landed = await onNode<string>(debuggee, id, function (this: HTMLElement) {
@@ -365,13 +401,12 @@ async function pageClipboard(
       : action === "restore"
         ? `navigator.clipboard.writeText(${JSON.stringify(text)}).then(()=> 'ok',()=> 'fail')`
         : `navigator.clipboard.write([new ClipboardItem({"text/plain": new Blob([${JSON.stringify(text)}],{type:"text/plain"}), "text/html": new Blob([${JSON.stringify(html)}],{type:"text/html"})})]).then(()=> 'ok',()=> 'fail')`;
-  const result = (await chrome.debugger
-    .sendCommand(debuggee, "Runtime.evaluate", {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-    })
-    .catch(() => undefined)) as { result?: { value?: unknown } } | undefined;
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression, awaitPromise: true, returnByValue: true },
+    { label: "pageClipboard", ms: 5_000 },
+  ).catch(() => undefined)) as { result?: { value?: unknown } } | undefined;
   if (action === "read") return String(result?.result?.value ?? "");
   return result?.result?.value === "ok" ? "ok" : undefined;
 }
@@ -471,7 +506,9 @@ export async function clickScreenshotPoint(
     request.step.target,
     request.expectedDocumentEpoch ?? -1,
   );
-  const metrics = (await chrome.debugger.sendCommand(debuggee, "Page.getLayoutMetrics")) as {
+  const metrics = (await send(debuggee, "Page.getLayoutMetrics", undefined, {
+    label: "clickScreenshotPoint",
+  })) as {
     cssVisualViewport?: {
       clientWidth?: number;
       clientHeight?: number;
@@ -503,9 +540,14 @@ export async function interactFrame(
 ): Promise<unknown> {
   const objectId = await resolveFrameObject(debuggee, frameId, selector);
   try {
-    const node = (await chrome.debugger.sendCommand(debuggee, "DOM.describeNode", {
-      objectId,
-    })) as { node: { backendNodeId: number } };
+    const node = (await send(
+      debuggee,
+      "DOM.describeNode",
+      { objectId },
+      {
+        label: "interactFrame",
+      },
+    )) as { node: { backendNodeId: number } };
     if (value !== undefined) {
       await fillNode(debuggee, node.node.backendNodeId, value);
       return { filled: true };
@@ -521,25 +563,33 @@ export async function interactFrame(
     await clickAt(debuggee, point.x + offset.x, point.y + offset.y);
     return { clicked: true };
   } finally {
-    await chrome.debugger
-      .sendCommand(debuggee, "Runtime.releaseObject", { objectId })
-      .catch(() => undefined);
+    await send(debuggee, "Runtime.releaseObject", { objectId }, { label: "interactFrame" }).catch(
+      () => undefined,
+    );
   }
 }
 async function frameOffset(
   debuggee: chrome.debugger.Debuggee,
   frameId: string,
 ): Promise<{ x: number; y: number }> {
-  const tree = (await chrome.debugger.sendCommand(debuggee, "Page.getFrameTree")) as {
+  const tree = (await send(debuggee, "Page.getFrameTree", undefined, { label: "frameOffset" })) as {
     frameTree: { frame: { id: string } };
   };
   if (tree.frameTree.frame.id === frameId) return { x: 0, y: 0 };
-  const owner = (await chrome.debugger.sendCommand(debuggee, "DOM.getFrameOwner", { frameId })) as {
-    backendNodeId: number;
-  };
-  const box = (await chrome.debugger.sendCommand(debuggee, "DOM.getBoxModel", {
-    backendNodeId: owner.backendNodeId,
-  })) as { model: { content: number[] } };
+  const owner = (await send(
+    debuggee,
+    "DOM.getFrameOwner",
+    { frameId },
+    {
+      label: "frameOffset",
+    },
+  )) as { backendNodeId: number };
+  const box = (await send(
+    debuggee,
+    "DOM.getBoxModel",
+    { backendNodeId: owner.backendNodeId },
+    { label: "frameOffset" },
+  )) as { model: { content: number[] } };
   return { x: box.model.content[0] ?? 0, y: box.model.content[1] ?? 0 };
 }
 
@@ -550,16 +600,23 @@ async function resolveFrameObject(
 ): Promise<string> {
   const contextId = await frameContext(debuggee, frameId);
   if (typeof selector === "number") {
-    const node = (await chrome.debugger.sendCommand(debuggee, "DOM.resolveNode", {
-      backendNodeId: selector,
-      executionContextId: contextId,
-    })) as { object: { objectId: string } };
+    const node = (await send(
+      debuggee,
+      "DOM.resolveNode",
+      { backendNodeId: selector, executionContextId: contextId },
+      { label: "resolveFrameObject" },
+    )) as { object: { objectId: string } };
     return node.object.objectId;
   }
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    contextId,
-    expression: `(()=>{const roots=[document],items=[];while(roots.length){const root=roots.pop();items.push(...root.querySelectorAll(${JSON.stringify(selector)}));for(const el of root.querySelectorAll('*'))if(el.shadowRoot)roots.push(el.shadowRoot);}if(items.length!==1)throw Error('Expected exactly one element');return items[0]})()`,
-  })) as { result?: { objectId?: string }; exceptionDetails?: unknown };
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    {
+      contextId,
+      expression: `(()=>{const roots=[document],items=[];while(roots.length){const root=roots.pop();items.push(...root.querySelectorAll(${JSON.stringify(selector)}));for(const el of root.querySelectorAll('*'))if(el.shadowRoot)roots.push(el.shadowRoot);}if(items.length!==1)throw Error('Expected exactly one element');return items[0]})()`,
+    },
+    { label: "resolveFrameObject", ms: 5_000 },
+  )) as { result?: { objectId?: string }; exceptionDetails?: unknown };
   const objectId = result.result?.objectId;
   if (!objectId || result.exceptionDetails) throw new Error("TARGET_NOT_FOUND");
   return objectId;
