@@ -57,6 +57,7 @@ import { refreshInventoryTab } from "./native-inventory-client.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
 import { hiddenTargetError } from "./native-browser-reveal.js";
 import { send } from "./cdp/send.js";
+import { KEY_CODES, KEY_MASKS } from "./native-browser-keys.js";
 
 interface Point {
   x: number;
@@ -253,30 +254,6 @@ const MAC_COMMANDS: Record<string, string> = {
   v: "paste",
   x: "cut",
   z: "undo",
-};
-const KEY_MASKS: Record<string, number> = {
-  Alt: 1,
-  Control: 2,
-  Ctrl: 2,
-  Meta: 4,
-  Command: 4,
-  Shift: 8,
-};
-const KEY_CODES: Record<string, number> = {
-  Enter: 13,
-  Tab: 9,
-  Escape: 27,
-  Backspace: 8,
-  Delete: 46,
-  ArrowUp: 38,
-  ArrowDown: 40,
-  ArrowLeft: 37,
-  ArrowRight: 39,
-  Home: 36,
-  End: 35,
-  PageUp: 33,
-  PageDown: 34,
-  Space: 32,
 };
 async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Promise<unknown> {
   const parts = combo.split("+"),
