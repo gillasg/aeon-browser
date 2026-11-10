@@ -132,7 +132,7 @@ function toTreeNode(
   offscreen: Set<string>,
 ): TreeNode {
   const shown = ax.backendDOMNodeId === undefined ? undefined : shownById.get(ax.backendDOMNodeId);
-  const role = (shown?.role || roleOf(ax)).toLowerCase();
+  const role = canonicalRole(shown?.role || roleOf(ax));
   const name = clip(shown?.name || nameOf(ax), 512);
   const base = nodeFromAx(ax, role, name, include, byId, kids);
   const merged = shown ? applyShown(base, shown) : base;
@@ -293,7 +293,19 @@ function property(node: AxNode, name: string): string {
 }
 
 function roleOf(node: AxNode): string {
-  return textValue(node.role?.value).toLowerCase();
+  return canonicalRole(textValue(node.role?.value));
+}
+
+// Chrome calls a table without headers a layout table; for reading it is the same table.
+const LAYOUT_ROLES: Readonly<Record<string, string>> = {
+  layouttable: "table",
+  layouttablerow: "row",
+  layouttablecell: "cell",
+};
+
+export function canonicalRole(role: string): string {
+  const lower = role.toLowerCase();
+  return LAYOUT_ROLES[lower] ?? lower;
 }
 
 function nameOf(node: AxNode): string {
