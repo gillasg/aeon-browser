@@ -1,6 +1,7 @@
 import { onEngineInstall } from "./native-engine-install.js";
 import { noteInjectedScript } from "./stealth.js";
 import { nativeSourcePreamble } from "./native-source.js";
+import { send } from "./cdp/send.js";
 import { onBrowserDebuggerAttached } from "./native-browser-session.js";
 
 // Quiet tabs are for unattended reading (explore, jobs, crawls): no popunders in front of the
@@ -149,18 +150,24 @@ async function addRules(tabId: number): Promise<void> {
 }
 
 async function onQuietAttach(tabId: number): Promise<void> {
-  await chrome.debugger
-    .sendCommand({ tabId }, "Page.addScriptToEvaluateOnNewDocument", { source: QUIET_SCRIPT })
-    .catch(() => undefined);
-  const tree = (await chrome.debugger
-    .sendCommand({ tabId }, "Page.getFrameTree", {})
-    .catch(() => undefined)) as { frameTree?: { frame?: { loaderId?: string } } } | undefined;
+  await send(
+    { tabId },
+    "Page.addScriptToEvaluateOnNewDocument",
+    { source: QUIET_SCRIPT },
+    { label: "onQuietAttach" },
+  ).catch(() => undefined);
+  const tree = (await send({ tabId }, "Page.getFrameTree", {}, { label: "onQuietAttach" }).catch(
+    () => undefined,
+  )) as { frameTree?: { frame?: { loaderId?: string } } } | undefined;
   const loader = tree?.frameTree?.frame?.loaderId;
   const expression = loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : QUIET_SCRIPT;
   if (loader) loaderIds.set(tabId, loader);
-  await chrome.debugger
-    .sendCommand({ tabId }, "Runtime.evaluate", { expression, awaitPromise: false })
-    .catch(() => undefined);
+  await send(
+    { tabId },
+    "Runtime.evaluate",
+    { expression, awaitPromise: false },
+    { label: "onQuietAttach", ms: 5_000 },
+  ).catch(() => undefined);
 }
 
 onEngineInstall(() => {

@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { onNode } from "./native-browser-dom.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
@@ -110,12 +111,12 @@ export async function noteVaultFill(debuggee: chrome.debugger.Debuggee, id: numb
  */
 async function closeChromePopup(debuggee: chrome.debugger.Debuggee): Promise<void> {
   for (const type of ["rawKeyDown", "keyUp"] as const)
-    await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-      type,
-      key: "Escape",
-      code: "Escape",
-      windowsVirtualKeyCode: 27,
-    });
+    await send(
+      debuggee,
+      "Input.dispatchKeyEvent",
+      { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
+      { label: "closeChromePopup" },
+    );
 }
 
 function vaultFieldInfo(this: HTMLInputElement): VaultForm | null {
@@ -203,11 +204,12 @@ export function vaultCandidate(tabId: number): VaultCandidate | undefined {
 /** Reads the current password form without printing or returning its value to agent code. */
 export async function probeVaultForm(tabId: number): Promise<VaultForm | undefined> {
   const value = await withBrowserDebugger(tabId, (debuggee) =>
-    chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression: PROBE,
-      returnByValue: true,
-      silent: true,
-    }),
+    send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression: PROBE, returnByValue: true, silent: true },
+      { label: "probeVaultForm", ms: 5_000 },
+    ),
   );
   const form = (value as { result?: { value?: VaultForm } } | undefined)?.result?.value;
   return form && typeof form === "object" ? form : undefined;

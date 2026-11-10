@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { fieldPoint, scanFields, type SignInFields } from "./native-browser-signin-page.js";
 
@@ -17,17 +18,19 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function clickAt(tabId: number, point: { x: number; y: number }): Promise<void> {
   await withBrowserDebugger(tabId, async (debuggee) => {
-    await chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", {
-      type: "mouseMoved",
-      ...point,
-    });
+    await send(
+      debuggee,
+      "Input.dispatchMouseEvent",
+      { type: "mouseMoved", ...point },
+      { label: "clickAt" },
+    );
     for (const type of ["mousePressed", "mouseReleased"] as const)
-      await chrome.debugger.sendCommand(debuggee, "Input.dispatchMouseEvent", {
-        type,
-        ...point,
-        button: "left",
-        clickCount: 1,
-      });
+      await send(
+        debuggee,
+        "Input.dispatchMouseEvent",
+        { type, ...point, button: "left", clickCount: 1 },
+        { label: "clickAt" },
+      );
   });
 }
 
@@ -37,12 +40,12 @@ async function press(tabId: number, key: keyof typeof KEY_CODES): Promise<void> 
   const code = KEY_CODES[key];
   await withBrowserDebugger(tabId, async (debuggee) => {
     for (const type of ["rawKeyDown", "keyUp"] as const)
-      await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
-        type,
-        key,
-        code: key,
-        windowsVirtualKeyCode: code,
-      });
+      await send(
+        debuggee,
+        "Input.dispatchKeyEvent",
+        { type, key, code: key, windowsVirtualKeyCode: code },
+        { label: "press" },
+      );
   });
 }
 

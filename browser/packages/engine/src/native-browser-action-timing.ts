@@ -1,3 +1,5 @@
+import { send } from "./cdp/send.js";
+
 // When and where each action's input reached the page, for the step trace: the moment the event
 // was sent, the click point and the element's box (viewport CSS pixels of the top-level page,
 // measured after scrolling it into view), and scroll positions before and after.
@@ -28,9 +30,12 @@ export async function measureBox(
   debuggee: chrome.debugger.Debuggee,
   backendNodeId: number,
 ): Promise<ActionTiming["box"]> {
-  const result = (await chrome.debugger
-    .sendCommand(debuggee, "DOM.getBoxModel", { backendNodeId })
-    .catch(() => undefined)) as { model?: { border?: number[] } } | undefined;
+  const result = (await send(
+    debuggee,
+    "DOM.getBoxModel",
+    { backendNodeId },
+    { label: "measureBox" },
+  ).catch(() => undefined)) as { model?: { border?: number[] } } | undefined;
   const quad = result?.model?.border;
   if (!quad || quad.length < 8) return undefined;
   const xs = [quad[0], quad[2], quad[4], quad[6]].map(Number),
