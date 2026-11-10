@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CAP_MS,
-  CAUSAL_MS,
+  AFTER_DIALOG_MS,
   LONG_CAP_MS,
   QUIET_MS,
   chooseReceipt,
@@ -94,7 +94,7 @@ test("a download during the post-dialog hold is seen, and one after close is not
   await clock.take();
   noteDownload(receipt, 100);
   const rest = await clock.take();
-  clock.set(CAUSAL_MS);
+  clock.set(AFTER_DIALOG_MS);
   rest.resolve();
   const result = await closed;
   assert.equal(receipt.sawDownload, true);
@@ -106,11 +106,11 @@ test("a download during the post-dialog hold is seen, and one after close is not
   const lateClock = manualClock();
   const done = closeWhenQuiet(late, { now: lateClock.now, sleep: lateClock.sleep });
   const hold = await lateClock.take();
-  lateClock.set(CAUSAL_MS + QUIET_MS);
+  lateClock.set(AFTER_DIALOG_MS + QUIET_MS);
   hold.resolve();
   await done;
   assert.equal(late.sawDownload, false);
-  noteDownload(late, CAUSAL_MS + QUIET_MS + 1);
+  noteDownload(late, AFTER_DIALOG_MS + QUIET_MS + 1);
   assert.equal(late.sawDownload, true);
 });
 
