@@ -288,8 +288,12 @@ aeon abilities test shop.example search  # its stored cases; fails on constant o
   `site.notes(site, {kind, key, value})`. An instruction, or anything longer, is dropped. Selectors,
   pacing and quirks still apply; they are not a place to store sentences or code.
 - **Abilities keep their promises:** lists page with `limit`/`next_cursor`; a write with a `key`
-  never applies twice; a failed write says `possible_commit` and how to `retry`; an ignored filter
-  fails as `INPUT_NOT_APPLIED`. Details: `help('abilities')`.
+  never applies twice; a failed write says `possible_commit` and how to `retry`, and does not try
+  another way once one may have committed; an ignored filter fails as `INPUT_NOT_APPLIED`.
+  `site.capabilities()` lists the same abilities as `lookups` (reads) and `changes` (writes). A
+  read may say `partial` when a way saw only part; `{complete: true}` skips those ways. Saving
+  runs the new way's tests first: a failure names the reason and leaves the old ways in place.
+  Details: `help('abilities')`.
 - **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped. Check `sites`
   first. To map a site: `map`, `describe`, `learn`, or use it in `browser_code` so its requests are
   learned as you go.

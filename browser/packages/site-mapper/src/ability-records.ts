@@ -5,7 +5,7 @@
 // rows being added or removed between calls, and declared checks that fail loudly when the site
 // ignored an input.
 
-import type { Ability, AbilityHost, AbilityWay, AbilityWayApi } from "./abilities.js";
+import type { Ability, AbilityHost, AbilityVia, AbilityWay, AbilityWayApi } from "./abilities.js";
 import { recordKey } from "./recipe-map.js";
 import type { RecipeStrategy, SiteRecipe } from "./recipes.js";
 import { runRecipe } from "./runtime/recipe.js";
@@ -89,13 +89,19 @@ function strategyFromWay(way: AbilityWay, ability: Ability): RecipeStrategy[] {
   return way.runtime === "page" ? [{ kind: "script", code: way.code }] : [];
 }
 
+export interface RecordRun {
+  result: unknown[];
+  via: AbilityVia;
+  failures: { via: AbilityVia; error: string }[];
+}
+
 /** Runs a record read through the recipe runtime; `wanted` stops paging once enough rows exist. */
 export async function readRecords(
   ability: Ability,
   inputs: Record<string, unknown>,
   host: AbilityHost,
   wanted?: number,
-): Promise<{ result: unknown[]; via: "api" | "page" | "steps" | "script" }> {
+): Promise<RecordRun> {
   const call = host.call;
   if (!call) throw new Error("No site API transport");
   const run = await runRecipe({
@@ -106,11 +112,21 @@ export async function readRecords(
     ...(wanted ? { limit: wanted } : {}),
     trackHealth: false,
   });
-  const via = { api: "api", collect: "page", workflow: "steps", script: "script" } as const;
   return {
     result: run.records,
-    via: via[(run.strategy ?? "api") as keyof typeof via] ?? "api",
+    via: viaOf(run.strategy ?? "api"),
+    failures: run.attempts.map((attempt) => ({
+      via: viaOf(attempt.strategy),
+      error: attempt.error ?? "failed",
+    })),
   };
+}
+
+function viaOf(strategy: string): AbilityVia {
+  if (strategy === "collect") return "page";
+  if (strategy === "workflow") return "steps";
+  if (strategy === "script") return "script";
+  return "api";
 }
 
 /** The list inside a result: an array, or {items|records|results|data}. */

@@ -202,6 +202,8 @@ interface AbilityRunRequest {
     key?: unknown;
     limit?: unknown;
     cursor?: unknown;
+    /** Skip ways that only return part of the contract. */
+    complete?: unknown;
     /** Run the ability's stored test cases instead. */
     test?: unknown;
     /** Only say how to run it (in the cell, for page code), without running it. */
@@ -257,13 +259,17 @@ async function answerAbilitySave(spec: Record<string, unknown>): Promise<unknown
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     } as Ability,
-    { breaking: breaking === true },
+    {
+      breaking: breaking === true,
+      ...(Array.isArray(spec.tests) && spec.tests.length ? { test: true } : {}),
+    },
   );
   return {
     saved: saved.ability.name,
     site: saved.ability.site,
     kind: saved.ability.kind,
     warnings: saved.warnings,
+    ...(saved.tests ? { tests: saved.tests } : {}),
   };
 }
 
@@ -284,6 +290,7 @@ function answerAbilityRun(request: AbilityRunRequest): Promise<unknown> {
     ...(typeof run.key === "string" ? { key: run.key } : {}),
     ...(typeof run.limit === "number" ? { limit: run.limit } : {}),
     ...(typeof run.cursor === "string" ? { cursor: run.cursor } : {}),
+    ...(run.complete ? { complete: true } : {}),
   });
 }
 
