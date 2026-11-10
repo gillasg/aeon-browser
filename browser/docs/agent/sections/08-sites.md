@@ -31,6 +31,10 @@ browserkit abilities test shop.example search  # its stored cases; fails on cons
 - **Start with `site.capabilities()`** in browser code (or `browserkit capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
   `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.
+- **Site notes** are short facts the next visit can use: a selector, a url, a pace, or a quirk
+  (`{kind, key, value}`, value at most 120 characters). They load by themselves. Save one with
+  `site.notes(site, {kind, key, value})`. An instruction, or anything longer, is dropped. Selectors,
+  pacing and quirks still apply; they are not a place to store sentences or code.
 - **Abilities keep their promises:** lists page with `limit`/`next_cursor`; a write with a `key`
   never applies twice; a failed write says `possible_commit` and how to `retry`; an ignored filter
   fails as `INPUT_NOT_APPLIED`. Details: `help('abilities')`.

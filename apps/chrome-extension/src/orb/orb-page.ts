@@ -1,6 +1,7 @@
 import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
 import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
+import { framedInPage } from "../extension-frame.js";
 import { openExtensionChat } from "../ui-connection.js";
 import { watchChatRunState } from "../chat-run-state.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
@@ -62,6 +63,9 @@ let reconnecting = false;
 void boot();
 
 async function boot(): Promise<void> {
+  // Framed by the content script on an http(s) page. A top-level open, or a frame without the
+  // one-time nonce for this tab, stays blank.
+  if (!framedInPage()) return;
   const verify: OrbVerify = { kind: "aeon.orb.verify", tabId, nonce: location.hash.slice(1) };
   history.replaceState(null, "", location.pathname + location.search);
   const verified = (await chrome.runtime.sendMessage(verify).catch(() => null)) as {

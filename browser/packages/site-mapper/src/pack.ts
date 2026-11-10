@@ -27,6 +27,7 @@ const TOP_FILES = [
   "health.json",
   "docs.md",
   "notes.md",
+  "notes.json",
 ];
 const SKIP = /^(sessions?|cookies?|storage|auth|credentials?|versions?|\.git)$/i;
 

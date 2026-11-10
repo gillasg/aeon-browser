@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
+import { AbilitySource, CodeBadge, wayLabel } from "./ability-source.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
 // Abilities: every ability Aeon has saved across sites, with how it runs (api, steps, script,
@@ -78,9 +79,12 @@ function AbilityRow({
           {ability.description && <span className="ability-about">{ability.description}</span>}
           <small>
             {ability.site} · {ability.kind === "write" ? "Changes things" : "Reads"}
+            {ability.ways.length > 0 && ` · ${ability.ways.map(wayLabel).join(", ")}`}
             {ability.inputs.length > 0 &&
               ` · ${ability.inputs.map((input) => input.name).join(", ")}`}
           </small>
+          <CodeBadge ways={ability.ways} />
+          <AbilitySource sources={ability.sources} />
         </span>
         <Health ability={ability} />
         {ability.running ? (

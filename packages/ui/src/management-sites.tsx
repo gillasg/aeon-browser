@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from "react";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
+import { AbilitySource, CodeBadge, wayLabel } from "./ability-source.js";
 import { humanize } from "./management-automations.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
@@ -44,11 +45,12 @@ export function SiteAbilities({
     <ul className="management-inputs">
       {site.abilities.map((ability) => (
         <li key={ability.name}>
-          <strong>{humanize(ability.name)}</strong>{" "}
+          <strong>{humanize(ability.name)}</strong> <CodeBadge ways={ability.ways} />{" "}
           <span className="management-subtle">
-            {ability.kind}, {ability.ways.join(" + ")}
+            {ability.kind}, {ability.ways.map(wayLabel).join(" + ")}
             {ability.description ? ` — ${ability.description}` : ""}
           </span>
+          <AbilitySource sources={ability.sources} />
           {onTry && (
             <button type="button" className="site-try" onClick={() => onTry(ability)}>
               Try it

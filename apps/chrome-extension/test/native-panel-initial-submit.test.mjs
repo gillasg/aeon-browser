@@ -47,3 +47,37 @@ test("own side-panel chat without a tab skips the tab-bound handoff safely", asy
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("the orb keeps its page grant when orb.html uses a dynamic url", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-grant-"));
+  const previousChrome = globalThis.chrome;
+  try {
+    const id = "npcdopokfkpfmepknhoecppgdgmkmihh";
+    globalThis.chrome = {
+      runtime: { id, getURL: (path) => `chrome-extension://${id}${path}` },
+    };
+    const outfile = join(directory, "worker-tabs.mjs");
+    await build({
+      entryPoints: [fileURLToPath(new URL("../src/native-worker-tabs.ts", import.meta.url))],
+      outfile,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+    });
+    const { isOpenChatSender, isPageScopeAllowed } = await import(pathToFileURL(outfile).href);
+    const sender = { id, url: `chrome-extension://${id}/session-token/orb.html` };
+    assert.equal(isOpenChatSender(sender), true);
+    assert.equal(isPageScopeAllowed(sender, { kind: "catalog" }), true);
+    assert.equal(
+      isPageScopeAllowed(
+        { id, url: "https://evil.example/session-token/orb.html" },
+        { kind: "catalog" },
+      ),
+      false,
+    );
+  } finally {
+    if (previousChrome === undefined) delete globalThis.chrome;
+    else globalThis.chrome = previousChrome;
+    await rm(directory, { recursive: true, force: true });
+  }
+});

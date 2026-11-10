@@ -29,6 +29,7 @@ import {
   abilityPlan,
   listAbilities,
   readSiteNotes,
+  saveSiteNote,
   readAbility,
   runAbility,
   saveAbility,
@@ -173,8 +174,7 @@ export function createHostHandler(
         "removed by agent",
       ).then((removed) => ({ removed }));
     if (isAbilityListRequest(request)) return listAbilities(String(request.abilityList.site ?? ""));
-    if (isSiteNotesRequest(request))
-      return readSiteNotes(siteNameFrom({ site: request.siteNotes }));
+    if (isSiteNotesRequest(request)) return answerSiteNotes(request.siteNotes);
     if (isLearnRequest(request)) return answerLearn(request);
     if (isLearnedRequest(request)) return answerLearned(request);
     if (isSiteMapperRequest(request))
@@ -305,6 +305,16 @@ interface SiteNotesRequest {
 
 function isSiteNotesRequest(value: unknown): value is SiteNotesRequest {
   return Boolean(value && (value as { siteNotes?: unknown }).siteNotes !== undefined);
+}
+
+async function answerSiteNotes(siteNotes: unknown): Promise<unknown> {
+  if (typeof siteNotes === "string" || typeof siteNotes === "number")
+    return readSiteNotes(siteNameFrom({ site: siteNotes }));
+  if (!siteNotes || typeof siteNotes !== "object") return "";
+  const body = siteNotes as { site?: unknown; fact?: unknown; kind?: unknown };
+  const site = siteNameFrom({ site: body.site });
+  if (body.fact || body.kind) return saveSiteNote(site, body.fact ?? body);
+  return readSiteNotes(site);
 }
 
 interface SiteToolRequest {

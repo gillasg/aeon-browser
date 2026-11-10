@@ -1,4 +1,5 @@
 import type { PageGrantScope } from "@aeon/protocol";
+import { isOrbPath } from "./extension-frame.js";
 import {
   NativeExtensionRequestSchema,
   NativeOpenChatResponseSchema,
@@ -11,6 +12,8 @@ import {
 } from "./native-initial-submit.js";
 
 const nativeOrigin = new URL(chrome.runtime.getURL("/")).origin;
+const OWN_PAGES = ["/home.html", "/sidepanel.html", "/chat.html", "/viewer.html", "/orb.html"];
+const OPEN_PAGES = ["/home.html", "/sidepanel.html", "/chat.html", "/orb.html"];
 type OpenRequest = Extract<
   ReturnType<typeof NativeExtensionRequestSchema.parse>,
   { kind: "aeon.native.open-chat" }
@@ -21,29 +24,21 @@ export function isPageScopeAllowed(
   scope: PageGrantScope,
 ): boolean {
   const url = getOwnSenderUrl(sender);
-  if (
-    !url ||
-    !["/home.html", "/sidepanel.html", "/chat.html", "/viewer.html", "/orb.html"].includes(
-      url.pathname,
-    )
-  )
-    return false;
-  if (url.pathname === "/viewer.html")
+  if (!url || !OWN_PAGES.some((page) => matchesPage(url, page))) return false;
+  if (matchesPage(url, "/viewer.html"))
     return scope.kind === "chat" && url.searchParams.get("chatId") === scope.chatId;
-  if (scope.kind === "management") return url.pathname === "/home.html";
+  if (scope.kind === "management") return matchesPage(url, "/home.html");
   // The orb starts a chat (catalog) and then follows that chat, so it may open either scope.
   return (
     scope.kind === "catalog" ||
-    url.pathname === "/orb.html" ||
-    (url.pathname === "/chat.html" && url.searchParams.get("chatId") === scope.chatId)
+    matchesPage(url, "/orb.html") ||
+    (matchesPage(url, "/chat.html") && url.searchParams.get("chatId") === scope.chatId)
   );
 }
 
 export function isOpenChatSender(sender: chrome.runtime.MessageSender): boolean {
   const url = getOwnSenderUrl(sender);
-  return (
-    !!url && ["/home.html", "/sidepanel.html", "/chat.html", "/orb.html"].includes(url.pathname)
-  );
+  return !!url && OPEN_PAGES.some((page) => matchesPage(url, page));
 }
 
 export async function openNativeChat(
@@ -125,6 +120,11 @@ export async function takeNativeInitialSubmit(
       code: "INITIAL_SUBMIT_UNAVAILABLE",
     });
   return NativeTakeInitialSubmitResponseSchema.parse({ ok: true, ...initialSubmit });
+}
+
+function matchesPage(url: URL, page: string): boolean {
+  if (page === "/orb.html") return isOrbPath(url.pathname);
+  return url.pathname === page;
 }
 
 function getOwnSenderUrl(sender: chrome.runtime.MessageSender): URL | undefined {

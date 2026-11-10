@@ -1,3 +1,4 @@
+import { framedByExtension } from "./extension-frame.js";
 import { installLinkBanner } from "./link-banner.js";
 import { connectionSingleFlight } from "./connection-single-flight.js";
 import { installBrowserPreview } from "./chat-browser-preview.js";
@@ -48,6 +49,11 @@ import {
 import { ChatResourcesController } from "./chat-resources-controller.js";
 import { initializeChatPreferences } from "./chat-preferences.js";
 import { ChatPiUiController } from "./chat-pi-ui-controller.js";
+if (!framedByExtension()) {
+  document.documentElement.replaceChildren();
+  throw new Error("Aeon chat cannot be framed by this page.");
+}
+
 const { root, chatId, initialDisplay } = initializeChatPage();
 installBrowserPreview(chatId);
 mirrorAgentTabView();

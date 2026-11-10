@@ -33,6 +33,10 @@ packages/
 
 Everything browser-related lives in `browser/`: the engine (browser control), the protocol, the tools, boosts, the site API, the crawl tool and the command line Aeon's CLI builds on. It is part of this workspace and builds first.
 
+## Local connections
+
+The daemon listens on `127.0.0.1` only. The extension socket is `/aeon/v1`: a connection is accepted when its `Origin` is this install's `chrome-extension://` id, and any other origin, including a web page, is rejected (`ORIGIN_NOT_ALLOWED`). The first message must carry a connection grant minted for that extension, which expires and is checked with a constant-time compare. Chrome delivers the grant through the native messaging host (`com.aeon.native_host`), which Chrome starts for the extension and which itself refuses a caller whose origin is not that extension. A page cannot open the native host, cannot mint a grant, and cannot complete the handshake. The CLI socket (`/core/v1`) accepts only a client that sends no `Origin`. The grant is not a user prompt: Aeon does not ask permission to run.
+
 ## CLI and MCP
 
 `pnpm aeon <command>` (or `node apps/cli/dist/cli.js`) drives the running Aeon from a terminal or another agent. Each task becomes a full Aeon chat, opened as a background tab in Chrome so you can watch it.
