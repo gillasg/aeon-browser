@@ -70,10 +70,9 @@ test("tool-end path and durationMs are used as sent", () => {
   assert.equal(run.status, "working");
   assert.equal(run.label, "Search Amazon");
   assert.deepEqual(
-    { path: run.steps[0].path, ms: run.steps[0].durationMs, mocked: run.steps[0].pathMocked },
-    { path: "site-mapper", ms: 1234, mocked: false },
+    { path: run.steps[0].path, ms: run.steps[0].durationMs },
+    { path: "site-mapper", ms: 1234 },
   );
-  assert.equal(run.steps[0].durationMocked, false);
 });
 
 test("missing path is inferred and missing durationMs comes from start and end", () => {
@@ -84,10 +83,10 @@ test("missing path is inferred and missing durationMs comes from start and end",
     [end("b", "browser_code"), 4100],
   ]);
   assert.deepEqual(
-    run.steps.map((step) => [step.path, step.pathMocked, step.durationMs, step.durationMocked]),
+    run.steps.map((step) => [step.path, step.durationMs]),
     [
-      ["data", true, 2500, true],
-      ["ui", true, 500, true],
+      ["data", 2500],
+      ["ui", 500],
     ],
   );
   assert.equal(run.steps[1].label, "Working in the page");

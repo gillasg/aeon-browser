@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PiBrowserContextRecordSchema } from "@browserkit/protocol";
+import { PiBrowserContextRecordSchema, StepEventSchema } from "@browserkit/protocol";
 import { ChatCatalogItemSchema, ChatIdSchema, ChatSummarySchema } from "./chat-catalog-dto.js";
 export {
   ChatIdSchema,
@@ -302,6 +302,8 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
         })
         .strict()
         .optional(),
+      /** Finished steps, as they happen. The timeline and the cursor read these. */
+      steps: z.array(StepEventSchema).max(500).optional(),
       parentToolCallId: z.string().min(1).max(160).optional(),
     })
     .strict(),

@@ -30,6 +30,9 @@ const backend = z
     kind: z.literal("backend"),
     backendNodeId: z.number().int().positive(),
     documentEpoch: z.number().int().nonnegative(),
+    /** Carried so a step can be named without a second lookup. Ignored when resolving the node. */
+    role: z.string().min(1).max(80).optional(),
+    name: z.string().max(160).optional(),
   })
   .strict();
 export const SemanticTargetSchema = z.discriminatedUnion("kind", [ref, locator, query, backend]);

@@ -14,7 +14,9 @@ import {
   type PiSessionEventListener,
   type PiSessionHandle,
   type PiSessionReference,
+  type PiToolStepEvent,
 } from "@aeon/domain";
+import { StepEventSchema, type StepEvent } from "@aeon/protocol";
 import { resultText, safeJsonObject } from "./pi-content-projection.js";
 import { submitToPi, createSessionControls } from "./session-controls.js";
 import { createPiThreadDelivery } from "./pi-thread-delivery.js";
@@ -248,6 +250,7 @@ function projectToolEvent(
       arguments: safeJsonObject(event.args),
       partialResult: resultText(event.partialResult),
       ...toolProgress(event.partialResult),
+      ...toolStepFields(event.partialResult),
       ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
     };
   const changeDiff = event.isError ? undefined : projectChangeDiff(event.result);
@@ -354,6 +357,37 @@ function createCloseSession(
   return closeSession;
 }
 import { readMessageImage, readToolImage } from "./session-image.js";
+
+/** Finished steps a tool reported in its partial result's details. */
+function toolStepFields(value: unknown): { steps?: PiToolStepEvent[] } {
+  const raw = (value as { details?: { steps?: unknown } } | null)?.details?.steps;
+  if (!Array.isArray(raw) || !raw.length) return {};
+  const steps = raw.flatMap((item) => {
+    const parsed = StepEventSchema.safeParse(item);
+    return parsed.success ? [copyStep(parsed.data)] : [];
+  });
+  return steps.length ? { steps } : {};
+}
+
+function copyStep(event: StepEvent): PiToolStepEvent {
+  const step: PiToolStepEvent = {
+    id: event.id,
+    cellId: event.cellId,
+    chatId: event.chatId,
+    tabId: event.tabId,
+    at: event.at,
+    ms: event.ms,
+    kind: event.kind,
+    label: event.label,
+    site: event.site,
+    write: event.write,
+  };
+  if (event.effect) step.effect = event.effect;
+  if (event.sensitive) step.sensitive = true;
+  if (event.box)
+    step.box = { x: event.box.x, y: event.box.y, width: event.box.width, height: event.box.height };
+  return step;
+}
 
 /** The progress a tool reported in its partial result's details (browser_code's bu.progress). */
 function toolProgress(value: unknown): {

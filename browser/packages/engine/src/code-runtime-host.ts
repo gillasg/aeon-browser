@@ -1,4 +1,6 @@
 import { stepTrace, takeActionTiming } from "./native-browser-action-timing.js";
+import { recordStep } from "./evidence/step-record.js";
+import type { StepEvent } from "@browserkit/protocol";
 import { runEffect, type KernelChecks } from "./kernel.js";
 import { cellEffects } from "./code-runtime-effects.js";
 import { describeKernelError } from "./kernel-errors.js";
@@ -71,6 +73,8 @@ export interface Cell {
   allowed: Map<string, BrowserTargetKey>;
   opened: Map<string, BrowserTargetKey>;
   steps: Record<string, unknown>[];
+  /** Finished steps, shared by the model line, the timeline and the ledger. */
+  events: StepEvent[];
   count: number;
   calls: Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>;
   sequence: number;
@@ -170,6 +174,7 @@ async function startCell(identity: BrowserIdentity, socket: WebSocket, run: Brow
     opened: new Map(),
     guarded: new Set(),
     steps: [],
+    events: [],
     count: 0,
     calls: new Map(),
     sequence: 0,
@@ -398,9 +403,17 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     const tabId = resultTab ?? stepTab;
     if (tabId !== undefined)
       Object.assign(entry, await stepTrace(tabId, INPUT_OPS.has(step.op)).catch(() => ({})));
+    recordStep(cell.events, {
+      cellId: cell.run.cellId,
+      chatId: cell.run.chatId,
+      index: typeof entry.index === "number" ? entry.index : cell.events.length,
+      step,
+      entry,
+    });
     progress(cell);
   }
 }
+
 /** Keeps a password a person typed, and matches Chrome's own save offer to the profile's manager. */
 async function beforeSubmit(cell: Cell, tabId: number): Promise<void> {
   // Probing attaches the debugger, which costs a click its popup: skip tabs the agent typed nothing

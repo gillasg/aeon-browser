@@ -8,7 +8,7 @@ import { pauseReason, watcherLine } from "../dist/management-routines.js";
 import { HomeDashboard } from "../dist/home-dashboard.js";
 import { viewFromRoute } from "../dist/home-top-bar.js";
 
-test("the step timeline shows each step's path and time, dashed when the path was guessed", () => {
+test("the step timeline shows each step's path and time", () => {
   const html = renderToStaticMarkup(
     createElement(StepTimeline, {
       steps: [
@@ -20,7 +20,6 @@ test("the step timeline shows each step's path and time, dashed when the path wa
           done: true,
           durationMs: 1200,
           path: "site-mapper",
-          pathMocked: false,
         },
         {
           toolCallId: "b",
@@ -32,7 +31,7 @@ test("the step timeline shows each step's path and time, dashed when the path wa
       ],
     }),
   );
-  assert.match(html, /data-path="site-mapper" data-mocked="false"[^>]*>site API</);
+  assert.match(html, /data-path="site-mapper"[^>]*>site API</);
   assert.match(html, />1\.2s</);
   assert.match(html, /data-state="running"/);
 });

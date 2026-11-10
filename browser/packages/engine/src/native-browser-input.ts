@@ -1,7 +1,13 @@
 import { measureBox, noteActionTiming } from "./native-browser-action-timing.js";
 import { showAgentCursor, showAgentKeys, type CursorUpdate } from "./native-browser-cursor.js";
 import { onNode, nodeState, fillTextNode, readFieldValue } from "./native-browser-dom.js";
-import { beginReceipt, receiptQuiet, takeReceipt } from "./native-browser-receipts.js";
+import {
+  beginReceipt,
+  dropReceipt,
+  finishReceipt,
+  takeReceipt,
+} from "./native-browser-receipts.js";
+import { labelForAction } from "./evidence/label.js";
 import { noteVaultFill } from "./native-browser-vault.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
 import { toOffscreen } from "./code-offscreen-host.js";
@@ -624,7 +630,11 @@ async function resolveFrameObject(
 
 function caused(receipt: ReturnType<typeof takeReceipt>): boolean {
   return Boolean(
-    receipt.dialog || receipt.download || receipt.popups.length || receipt.requests?.length,
+    receipt.dialog ||
+    receipt.download ||
+    receipt.popups.length ||
+    receipt.requests?.length ||
+    receipt.open?.length,
   );
 }
 
@@ -641,77 +651,93 @@ export async function performAction(
   let readback: string | undefined;
   let silent = false;
   let childPoint: { x: number; y: number } | undefined;
-  beginReceipt(tabId);
-  const scroll = await withDebugger(tabId, async (debuggee) => {
-    await revalidateTarget(request, tabId);
-    if (request.step.op === "scroll")
-      return scrollWithFeedback(debuggee, { ...request, step: request.step });
-    const before = await primeBrowserSettle(debuggee);
-    const since = Date.now();
-    const dispatched = await dispatchAction(debuggee, request, revalidateTarget);
-    readback = dispatched?.readback;
-    const settled = await settleBrowserPage(debuggee, 800, since, 80);
-    outcome = pageOutcome(before, settled.probe);
-    // The mutation count the page reported between the two probes: evidence for a DOM change.
-    if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
-    silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
-    if (silent && dispatched?.nodeId)
-      childPoint = await childHandlerPoint(dispatched.frame ?? debuggee, dispatched.nodeId);
-    return undefined;
-  });
-  if (scroll) await revalidateTarget(request, tabId);
-  const current = await refreshInventoryTab(tabId);
-  if (!current) throw new Error("TARGET_LOST");
-  const liveTab = await chrome.tabs.get(tabId).catch(() => undefined);
-  if (!liveTab?.url || !safePage(liveTab.url)) throw new Error("TARGET_LOST");
-  const observation =
-    scroll || (request.step.op !== "scroll" && request.step.observe === false)
-      ? undefined
-      : await observeSemantic(
-          { ...request, expectedDocumentEpoch: current.documentEpoch },
-          liveTab,
-          revalidateTarget,
+  const actionId = beginReceipt(tabId);
+  try {
+    const scroll = await withDebugger(tabId, async (debuggee) => {
+      await revalidateTarget(request, tabId);
+      if (request.step.op === "scroll")
+        return scrollWithFeedback(debuggee, { ...request, step: request.step });
+      const before = await primeBrowserSettle(debuggee);
+      const since = Date.now();
+      const dispatched = await dispatchAction(debuggee, request, revalidateTarget);
+      readback = dispatched?.readback;
+      const settled = await settleBrowserPage(debuggee, 800, since, 80);
+      outcome = pageOutcome(before, settled.probe);
+      // The mutation count the page reported between the two probes: evidence for a DOM change.
+      if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
+      silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
+      if (silent && dispatched?.nodeId)
+        childPoint = await childHandlerPoint(dispatched.frame ?? debuggee, dispatched.nodeId);
+      return undefined;
+    });
+    if (scroll) await revalidateTarget(request, tabId);
+    const current = await refreshInventoryTab(tabId);
+    if (!current) throw new Error("TARGET_LOST");
+    const liveTab = await chrome.tabs.get(tabId).catch(() => undefined);
+    if (!liveTab?.url || !safePage(liveTab.url)) throw new Error("TARGET_LOST");
+    const observation =
+      scroll || (request.step.op !== "scroll" && request.step.observe === false)
+        ? undefined
+        : await observeSemantic(
+            { ...request, expectedDocumentEpoch: current.documentEpoch },
+            liveTab,
+            revalidateTarget,
+          );
+    const receipt = await finishReceipt(actionId);
+    receipt.navigated ||= String(outcome) === "navigated";
+    // A dialog, pop-up or download is something happening, even with no DOM change or request.
+    const missed = silent && !caused(receipt) && request.step.op === "click";
+    if (missed && request.step.op === "click")
+      note = silentClickNote(request.step.element, childPoint !== undefined);
+    const query = "element" in request.step ? elementQuery(request.step.element) : undefined;
+    const effect = scroll
+      ? scrollEffect(scroll)
+      : inputStepEffect(
+          request.step.op,
+          {
+            outcome,
+            url: liveTab.url,
+            ...(changes !== undefined ? { changes } : {}),
+            ...(receipt.requests?.length ? { requests: receipt.requests.length } : {}),
+            ...(readback !== undefined ? { readback } : {}),
+          },
+          expectedValue(request.step),
+          {
+            op: request.step.op,
+            ...(query ? { query } : {}),
+            ...(missed && childPoint ? { childPoint } : {}),
+          },
         );
-  await receiptQuiet(tabId);
-  const receipt = takeReceipt(tabId);
-  receipt.navigated ||= String(outcome) === "navigated";
-  // A dialog, pop-up or download is something happening, even with no DOM change or request.
-  const missed = silent && !caused(receipt) && request.step.op === "click";
-  if (missed && request.step.op === "click")
-    note = silentClickNote(request.step.element, childPoint !== undefined);
-  const query = "element" in request.step ? elementQuery(request.step.element) : undefined;
-  const effect = scroll
-    ? scrollEffect(scroll)
-    : inputStepEffect(
-        request.step.op,
-        {
-          outcome,
-          url: liveTab.url,
-          ...(changes !== undefined ? { changes } : {}),
-          ...(receipt.requests?.length ? { requests: receipt.requests.length } : {}),
-          ...(readback !== undefined ? { readback } : {}),
-        },
-        expectedValue(request.step),
-        {
-          op: request.step.op,
-          ...(query ? { query } : {}),
-          ...(missed && childPoint ? { childPoint } : {}),
-        },
-      );
-  return BrowserExecutorResultSchema.parse({
-    kind: "action",
-    target: current.target,
-    documentEpoch: current.documentEpoch,
-    url: liveTab.url,
-    outcome,
-    effect: effect.effect,
-    evidence: effect.evidence,
-    ...(effect.next ? { next: effect.next } : {}),
-    receipt,
-    ...(note ? { note } : {}),
-    ...(observation ? { observation } : {}),
-    ...(scroll ? { scroll } : {}),
-  });
+    return BrowserExecutorResultSchema.parse({
+      kind: "action",
+      target: current.target,
+      documentEpoch: current.documentEpoch,
+      url: liveTab.url,
+      outcome,
+      effect: effect.effect,
+      evidence: effect.evidence,
+      ...(effect.next ? { next: effect.next } : {}),
+      receipt,
+      ...(note ? { note } : {}),
+      ...(observation ? { observation } : {}),
+      ...(scroll ? { scroll } : {}),
+      label: actionLabel(request.step),
+    });
+  } finally {
+    dropReceipt(actionId);
+  }
+}
+
+function actionLabel(step: BrowserStep): string {
+  const element = "element" in step ? step.element : undefined;
+  const key = "key" in step ? step.key : undefined;
+  const url = "url" in step && typeof step.url === "string" ? step.url : undefined;
+  return labelForAction({
+    op: step.op,
+    ...(element ? { element } : {}),
+    ...(typeof key === "string" ? { key } : {}),
+    ...(url ? { url } : {}),
+  }).slice(0, 200);
 }
 
 async function dispatchAction(

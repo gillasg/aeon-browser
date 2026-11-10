@@ -56,24 +56,49 @@ function __actNode(state, action) {
   return same.length === 1 ? same[0] : null;
 }
 // Every method goes through the engine's id-based steps (ids are CDP nodes, not page selectors).
+function __actElement(node, state) {
+  if (!node || !node.backendNodeId || node.frame) return null;
+  var target = {kind: 'backend', backendNodeId: node.backendNodeId, documentEpoch: state.documentEpoch || 0};
+  if (node.role) target.role = String(node.role).slice(0, 80);
+  if (node.name) target.name = String(node.name).slice(0, 160);
+  return target;
+}
 var __actMethods = {
-  click: (page, id) => page.click(id),
-  fill: (page, id, node, args) => page.fill(id, args[0] ?? ''),
+  click: (page, id, node, args, state) => page.click(__actElement(node, state) || id),
+  fill: (page, id, node, args, state) => page.fill(__actElement(node, state) || id, args[0] ?? ''),
   // A native select takes its option label through fill.
-  select: (page, id, node, args) => page.fill(id, args[0] ?? ''),
-  press: (page, id, node, args) => page.press(id, args[0] || 'Enter'),
-  check: (page, id, node) => node.checked === true ? null : page.click(id),
-  uncheck: (page, id, node) => node.checked === true ? page.click(id) : null,
+  select: (page, id, node, args, state) => page.fill(__actElement(node, state) || id, args[0] ?? ''),
+  press: (page, id, node, args, state) => page.press(__actElement(node, state) || id, args[0] || 'Enter'),
+  check: (page, id, node, args, state) => node.checked === true ? null : page.click(__actElement(node, state) || id),
+  uncheck: (page, id, node, args, state) => node.checked === true ? page.click(__actElement(node, state) || id) : null,
   hover: async (page, id, node) => {
     if (!node.backendNodeId || node.frame) throw Error('INVALID_ACTION: hover works on elements of the top page; use page.locator(css).hover() in a frame');
     var quad = (await page.cdp('DOM.getBoxModel', {backendNodeId: node.backendNodeId})).model.border;
     return page.hover((quad[0] + quad[4]) / 2, (quad[1] + quad[5]) / 2);
   },
 };
-async function __actRun(page, method, id, node, args) {
+async function __actRun(page, method, id, node, args, state) {
   var run = __actMethods[method];
   if (!run) throw Error('INVALID_ACTION: method ' + method + ' is not one of ' + Object.keys(__actMethods).join(', '));
-  return run(page, id, node, args);
+  return run(page, id, node, args, state);
+}
+function __worstEffect(effects) {
+  var rank = {refused: 0, suspected_noop: 1, unverifiable: 2, confirmed: 3};
+  var best = 'confirmed', score = 3, seen = false;
+  for (var effect of effects) {
+    var key = rank[effect] === undefined ? 'unverifiable' : effect;
+    seen = true;
+    if (rank[key] < score) { best = key; score = rank[key]; }
+  }
+  return seen ? best : 'unverifiable';
+}
+function __actOutcome(done, cached) {
+  var steps = done.map((step) => ({
+    label: step.label || step.description || step.method,
+    effect: step.effect || 'unverifiable',
+    description: step.description || '',
+  }));
+  return {ok: true, cached, effect: __worstEffect(steps.map((step) => step.effect)), steps};
 }
 async function __actPerform(target, action, variables) {
   var state = __states.get(__key(target)) || await browser.page(target).snapshot({});
@@ -82,9 +107,9 @@ async function __actPerform(target, action, variables) {
   var id = __actId(node), page = browser.page(target);
   var args = (action.args || []).map((arg) => __actFill(arg, variables));
   var method = action.method === 'type' ? 'fill' : action.method;
-  await __actRun(page, method, id, node, args);
+  var result = await __actRun(page, method, id, node, args, state);
   __states.delete(__key(target));
-  return {role: node.role, name: String(node.name || ''), method, args: action.args || [], description: action.description || ''};
+  return {role: node.role, name: String(node.name || ''), method, args: action.args || [], description: action.description || '', effect: result && result.effect || 'unverifiable', label: result && result.label || action.description || ''};
 }
 async function __actLocate(target, request, state, only) {
   var answer = await __call({locate: {...request, url: state.url, page: __actListing(state, only)}});
@@ -143,7 +168,7 @@ async function __act(target, input, options) {
   if (input && typeof input === 'object') {
     var step = await __actPerform(target, input, variables);
     console.log('[act] ' + (step.description || step.method) + ' ' + (Date.now() - startedAt) + ' ms');
-    return {ok: true, cached: false, steps: [step.description || step.method]};
+    return __actOutcome([step], false);
   }
   var instruction = String(input || '').trim();
   if (!instruction) throw Error('INVALID_ACTION: page.act takes an instruction or an action from page.observe()');
@@ -159,7 +184,7 @@ async function __act(target, input, options) {
   }
   var said = done.map((step) => step.description || step.method);
   console.log('[act] ' + said.join(' -> ') + (cached ? ' (cached)' : '') + ' ' + (Date.now() - startedAt) + ' ms');
-  return {ok: true, cached, steps: said};
+  return __actOutcome(done, cached);
 }
 // page.extract('the price and delivery date', {schema}): the page's Markdown to a fast model,
 // shaped by an optional JSON schema. page.extract({script}) is the scripted read, unchanged.

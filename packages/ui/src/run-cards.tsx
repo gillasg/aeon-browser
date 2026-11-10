@@ -4,22 +4,11 @@ import { PATH_NAMES, formatRunDuration, type RunPath, type RunStep } from "./run
 // The three run parts every surface shares: the orb's island, the side panel and the chat
 // transcript. Same markup everywhere; each surface skins the `run-*` classes.
 
-/** Which fast path a step took. Dashed when the path was guessed from the tool name. */
-export function PathTag({
-  path,
-  mocked = false,
-}: {
-  path: RunPath | undefined;
-  mocked?: boolean | undefined;
-}): ReactElement | null {
+/** Which fast path a step took. */
+export function PathTag({ path }: { path: RunPath | undefined }): ReactElement | null {
   if (!path) return null;
   return (
-    <span
-      className="run-path"
-      data-path={path}
-      data-mocked={String(mocked)}
-      title={mocked ? "Guessed from the tool" : "Reported by the tool"}
-    >
+    <span className="run-path" data-path={path}>
       {PATH_NAMES[path]}
     </span>
   );
@@ -28,17 +17,15 @@ export function PathTag({
 /** Path and time for one finished step, shown at the end of a step row. */
 export function StepMeta({
   path,
-  pathMocked,
   durationMs,
 }: {
   path?: RunPath | undefined;
-  pathMocked?: boolean | undefined;
   durationMs?: number | undefined;
 }): ReactElement | null {
   if (!path && durationMs === undefined) return null;
   return (
     <span className="run-step-meta">
-      <PathTag path={path} mocked={pathMocked} />
+      <PathTag path={path} />
       {durationMs !== undefined && (
         <span className="run-duration">{formatRunDuration(durationMs)}</span>
       )}
@@ -67,7 +54,7 @@ export function StepTimeline({
         >
           <span className="run-step-dot" aria-hidden="true" />
           <span className="run-step-label">{step.label}</span>
-          <StepMeta path={step.path} pathMocked={step.pathMocked} durationMs={step.durationMs} />
+          <StepMeta path={step.path} durationMs={step.durationMs} />
         </li>
       ))}
     </ol>

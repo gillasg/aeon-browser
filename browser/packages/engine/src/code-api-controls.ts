@@ -288,7 +288,7 @@ async function __batchRead(target, op) {
   do {
     try {
       last = (await __batchFind(target, op, false)).control;
-      if (op.expect == null || __expected(last.text + ' ' + (last.value ?? ''), op.expect)) return {read: last.value ?? last.text};
+      if (op.expect == null || __expected(last.text + ' ' + (last.value ?? ''), op.expect)) return {read: last.value ?? last.text, effect: 'confirmed', label: 'Read'};
     } catch (error) { if (!/TARGET_NOT_FOUND/.test(String(error.message))) throw error; }
     await __sleep(250);
   } while (Date.now() < deadline);
@@ -298,7 +298,7 @@ async function __batchUrl(target, op) {
   var deadline = Date.now() + Math.min(30000, op.timeout ?? 10000), url;
   do {
     url = await browser.page(target).inspect(() => location.href);
-    if (__expected(url, op.expect)) return {url};
+    if (__expected(url, op.expect)) return {url, effect: 'confirmed', label: 'Read'};
     await __sleep(250);
   } while (Date.now() < deadline);
   throw Error('EXPECTATION_FAILED: the URL is ' + url + ', without ' + JSON.stringify(String(op.expect)));
@@ -338,7 +338,7 @@ async function __batchCheck(target, op, found) {
 async function __batchRun(target, op) {
   if (op.action === 'readUrl') return __batchUrl(target, op);
   if (op.action === 'read') return __batchRead(target, op);
-  if (op.action === 'wait' && !op.target) { await __sleep(Math.min(10000, op.ms ?? 500)); return {}; }
+  if (op.action === 'wait' && !op.target) { await __sleep(Math.min(10000, op.ms ?? 500)); return {effect: 'confirmed', label: 'Wait'}; }
   var found = await __batchFind(target, op);
   if (op.action === 'wait') return {found: found.control.label || found.control.text};
   if (op.action === 'select') return __batchSelect(target, op, found);
@@ -348,9 +348,8 @@ async function __batchRun(target, op) {
     else await browser.page(target).locator(found.selector).press(String(op.key || op.value));
     return {pressed: String(op.key || op.value)};
   }
-  if (op.action === 'click') { await __batchAct(target, found, 'click'); return {clicked: found.control.label || found.control.text}; }
-  await __batchAct(target, found, 'fill', op.value);
-  return {filled: found.control.label || found.control.placeholder || found.control.name};
+  if (op.action === 'click') return __batchDone(await __batchAct(target, found, 'click'), 'click', found);
+  return __batchDone(await __batchAct(target, found, 'fill', op.value), 'fill', found);
 }
 // page.fillForm({label: value}, {submit, expect}): page.batch for the common case. Each key names
 // a field by label (or placeholder); the field decides the action: a list with options is
@@ -390,6 +389,25 @@ async function __waitText(target, text, timeout) {
   } while (Date.now() < deadline);
   throw Error('EXPECTATION_FAILED: the page never showed ' + JSON.stringify(text) + '; it shows ' + JSON.stringify(String(seen).replace(/\\s+/g, ' ').slice(0, 300)));
 }
+function __batchDone(result, kind, found) {
+  var name = found.control.label || found.control.text || found.control.placeholder || found.control.name || '';
+  var verb = kind === 'fill' ? 'Fill' : 'Click';
+  return {
+    ...(kind === 'fill' ? {filled: name} : {clicked: name}),
+    effect: result && result.effect || 'unverifiable',
+    label: result && result.label || (name ? verb + ' “' + name + '”' : verb),
+  };
+}
+function __worstEffect(effects) {
+  var rank = {refused: 0, suspected_noop: 1, unverifiable: 2, confirmed: 3};
+  var best = 'confirmed', score = 3, seen = false;
+  for (var effect of effects) {
+    var key = rank[effect] === undefined ? 'unverifiable' : effect;
+    seen = true;
+    if (rank[key] < score) { best = key; score = rank[key]; }
+  }
+  return seen ? best : 'unverifiable';
+}
 async function __batch(target, ops, options = {}) {
   if (!Array.isArray(ops) || !ops.length) throw Error('page.batch takes a list of steps: [{action, target, value}]');
   if (ops.length > 40) throw Error('page.batch takes at most 40 steps; split it');
@@ -412,7 +430,8 @@ async function __batch(target, ops, options = {}) {
   } finally {
     await browser.page(target).inspect(__pageControls, {mode: 'cleanup'}).catch(() => {});
   }
-  var result = {ok: true, ms: Date.now() - started, steps};
+  for (var step of steps) if (!step.effect) step.effect = 'unverifiable';
+  var result = {ok: true, effect: __worstEffect(steps.map((step) => step.effect)), ms: Date.now() - started, steps};
   if (options.observe) result.changed = await bu.state({target, final: true});
   return result;
 }

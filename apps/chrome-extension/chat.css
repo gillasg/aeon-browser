@@ -4174,9 +4174,6 @@ body[data-host="panel"] .composer-meta {
   border-radius: 999px;
   line-height: 17px;
 }
-.run-path[data-mocked="true"] {
-  border-style: dashed;
-}
 .run-duration {
   font-variant-numeric: tabular-nums;
 }

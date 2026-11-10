@@ -253,6 +253,7 @@ async function startJob(cell: Cell, request: Record<string, unknown>): Promise<u
     opened: new Map(),
     guarded: new Set(),
     steps: [],
+    events: [],
     count: 0,
     calls: new Map(),
     sequence: 0,

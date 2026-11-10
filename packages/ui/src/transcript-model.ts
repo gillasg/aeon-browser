@@ -32,6 +32,8 @@ export interface ToolStep {
   durationMs?: number;
   /** A long job inside this call (bu.progress): "Removing 47/77". */
   progress?: RunProgress;
+  /** The latest finished step's words, from the engine. A value typed into a field is not here. */
+  stepLabel?: string;
 }
 
 export interface ToolGroup {
@@ -339,10 +341,12 @@ function pathAndDuration(event: {
 function runningUpdate(
   event: Extract<PiSessionEventDto, { kind: "tool-update" }>,
 ): Partial<ToolStep> {
+  const stepLabel = event.steps?.at(-1)?.label;
   return {
     arguments: event.arguments,
     partialResult: event.partialResult,
     ...(event.progress ? { progress: event.progress } : {}),
+    ...(stepLabel ? { stepLabel } : {}),
     state: "running",
   };
 }

@@ -11,10 +11,11 @@ import { createHostHandler } from "../packages/tools/dist/host.js";
 // model call, self-healing when the page changed, a two-step act sees only what was added, and
 // variable values never reach the model, the cache or the result.
 
-function world({ nodes, onClick }) {
+function world({ nodes, onClick, clickResult }) {
   const states = new Map();
   const done = [];
   let snapshots = 0;
+  const idOf = (id) => (id && typeof id === "object" ? id.backendNodeId : id);
   const state = () => ({
     url: "https://shop.test/p/1",
     documentEpoch: 1,
@@ -28,11 +29,13 @@ function world({ nodes, onClick }) {
       return value;
     },
     click: async (id) => {
-      done.push(["click", id]);
-      onClick?.(id);
+      const node = idOf(id);
+      done.push(["click", node]);
+      onClick?.(node);
+      return clickResult;
     },
-    fill: async (id, value) => done.push(["fill", id, value]),
-    press: async (id, key) => done.push(["press", id, key]),
+    fill: async (id, value) => done.push(["fill", idOf(id), value]),
+    press: async (id, key) => done.push(["press", idOf(id), key]),
     hover: async (x, y) => done.push(["hover", x, y]),
     cdp: async () => ({ model: { border: [0, 0, 10, 0, 10, 10, 0, 10] } }),
   };
@@ -87,7 +90,12 @@ test("act: one model call, then the cache replays it with no model call", async 
     twoStep: false,
   }));
   const first = await run.api.act("add it to the cart");
-  assert.deepEqual(first, { ok: true, cached: false, steps: ["Add to cart"] });
+  assert.deepEqual(first, {
+    ok: true,
+    cached: false,
+    effect: "unverifiable",
+    steps: [{ label: "Add to cart", effect: "unverifiable", description: "Add to cart" }],
+  });
   const again = await run.api.act("Add it to the  cart");
   assert.equal(again.cached, true);
   assert.equal(run.seen.length, 1, "the replay made no model call");
@@ -152,7 +160,11 @@ test("a two-step act shows the model only what the first step added", async () =
           },
   );
   const result = await run.api.act("choose size Large");
-  assert.deepEqual(result.steps, ["Size menu", "Large"]);
+  assert.deepEqual(
+    result.steps.map((step) => step.description),
+    ["Size menu", "Large"],
+  );
+  assert.equal(result.effect, "unverifiable");
   assert.match(run.seen[1], /\[8\] option "Large"/);
   assert.doesNotMatch(run.seen[1], /Checkout/, "the second look holds only the new elements");
 });
@@ -195,6 +207,22 @@ test("observe returns replayable actions; act(action) runs one with no model cal
   await run.api.act(actions[1]);
   assert.equal(run.seen.length, 1);
   assert.deepEqual(run.done, [["hover", 5, 5]]);
+});
+
+test("a click the page ignored comes back as a suspected no-op", async () => {
+  const run = await cell(
+    {
+      nodes: () => [button(5, "Place order")],
+      clickResult: { effect: "suspected_noop" },
+    },
+    () => ({
+      actions: [{ id: "5", method: "click", args: [], description: "Place order" }],
+      twoStep: false,
+    }),
+  );
+  const result = await run.api.act("place the order");
+  assert.equal(result.effect, "suspected_noop");
+  assert.equal(result.steps[0].effect, "suspected_noop");
 });
 
 test("nothing that fits is a named error, not a guess", async () => {
