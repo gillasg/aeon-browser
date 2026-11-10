@@ -10,6 +10,8 @@ export interface ActionReceipt {
   navigated: boolean;
   download?: { url: string; filename: string; token?: string };
   requests?: ReceiptRequest[];
+  /** An earlier input on this tab timed out and may still land. */
+  lateReply?: string;
 }
 export interface ReceiptRequest {
   method: string;
@@ -23,6 +25,27 @@ const MAX_REQUESTS = 8;
 const pending = new Map<string, ReceiptRequest>();
 
 const receipts = new Map<number, ActionReceipt>();
+/** Input that timed out, noted on the next receipt for that tab. */
+const lateNotes = new Map<number, { detail: string; landed: boolean }>();
+
+/** An input-class send timed out. The next receipt on this tab says so. */
+export function noteLateInput(tabId: number, detail: string): void {
+  lateNotes.set(tabId, { detail: detail.slice(0, 180), landed: false });
+}
+
+/** The timed-out input's CDP call settled after the limit. */
+export function noteLateInputLanded(tabId: number): void {
+  const note = lateNotes.get(tabId);
+  if (note) note.landed = true;
+}
+
+function takeLateNote(tabId: number): string | undefined {
+  const note = lateNotes.get(tabId);
+  if (!note) return undefined;
+  lateNotes.delete(tabId);
+  const text = note.landed ? `late reply landed: ${note.detail}` : `late reply: ${note.detail}`;
+  return text.slice(0, 300);
+}
 /** When each tab's dialog closed during the action: the page's code only goes on after that. */
 const dialogClosed = new Map<number, number>();
 
@@ -33,7 +56,8 @@ const lookups = new Set<Promise<void>>();
 
 export function beginReceipt(tabId: number): void {
   dialogClosed.delete(tabId);
-  receipts.set(tabId, { popups: [], navigated: false });
+  const lateReply = takeLateNote(tabId);
+  receipts.set(tabId, { popups: [], navigated: false, ...(lateReply ? { lateReply } : {}) });
   tabUrls.set(
     tabId,
     chrome.tabs.get(tabId).then(

@@ -40,6 +40,11 @@ export interface EngineConfig {
   /** Opt-in private/metadata network refusal for agent work. */
   privateNetwork: () => Promise<boolean>;
   privateNetworkPorts: () => Promise<number[]>;
+  /**
+   * Multiplier for CDP time limits. 1 is the table. Raise it on a slow machine; there is no
+   * automatic read retry, because a retry would hit the single-flight rule and fail at once.
+   */
+  cdpLimitFactor: number;
 }
 
 export const engineConfig: EngineConfig = {
@@ -79,6 +84,7 @@ export const engineConfig: EngineConfig = {
       : [3000, 5173, 8080];
   },
   defaultSpace: () => "tabs",
+  cdpLimitFactor: 1,
 };
 
 export function configureEngine(patch: Partial<EngineConfig>): void {
