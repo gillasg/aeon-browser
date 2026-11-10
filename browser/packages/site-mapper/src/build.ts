@@ -103,11 +103,15 @@ async function attempt(
   const blocked = blockedFrom(value);
   if (blocked) return { done: { site, blocked } };
   try {
-    const saved = await saveAbility(abilityFrom(value, site, options), { breaking: true });
+    const draft = abilityFrom(value, site, options);
+    const saved = await saveAbility(draft, {
+      breaking: true,
+      ...(draft.kind === "read" && draft.tests?.length ? { test: true } : {}),
+    });
     const ability = saved.ability;
     if (ability.kind === "write")
       return { done: { site, saved: ability.name, kind: "write", warnings: saved.warnings } };
-    const tests = await testAbility(site, ability.name);
+    const tests = saved.tests ?? (await testAbility(site, ability.name));
     if (!tests.ok && tests.cases.length)
       return { retry: `Saved ${ability.name}, but its tests failed: ${JSON.stringify(tests)}` };
     return { done: { site, saved: ability.name, kind: "read", warnings: saved.warnings, tests } };

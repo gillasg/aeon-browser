@@ -99,11 +99,33 @@ async function list(args: Args): Promise<number> {
     out(site ? `${siteName(site)} has no abilities.` : "No abilities yet.");
     return 0;
   }
+  printGroup(
+    "lookups",
+    rows.filter((ability) => ability.kind !== "write"),
+  );
+  printGroup(
+    "changes",
+    rows.filter((ability) => ability.kind === "write"),
+  );
+  return 0;
+}
+
+function printGroup(
+  label: string,
+  rows: {
+    site: string;
+    kind: string;
+    ways: { kind: string }[];
+    name: string;
+    description?: string;
+  }[],
+): void {
+  if (!rows.length) return;
+  out(label);
   for (const ability of rows)
     out(
       `${ability.site}\t${ability.kind}\t${ability.ways.map((way) => way.kind).join("+")}\t${ability.name}\t${ability.description ?? ""}`,
     );
-  return 0;
 }
 
 async function show(args: Args): Promise<number> {
@@ -118,10 +140,23 @@ async function show(args: Args): Promise<number> {
     if (ability.description) out(ability.description);
     out(`ways: ${ability.ways.map((way) => way.kind).join(", ")}`);
     out(
-      `runs: ${ability.stats.runs}, failures: ${ability.stats.failures}${ability.stats.lastOkAt ? `, last ok: ${ability.stats.lastOkAt}` : ""}`,
+      `runs: ${ability.stats.runs}, failures: ${ability.stats.failures}${ability.stats.lastOkAt ? `, last ok: ${ability.stats.lastOkAt}` : ""}${ability.stats.stale ? `, stale: ${ability.stats.staleWhy ?? "ways disagreed"}` : ""}`,
     );
+    printWayStats(ability.stats.ways);
   }
   return 0;
+}
+
+function printWayStats(
+  ways:
+    | Record<string, { runs: number; failures: number; p50Ms?: number; retryAt?: string }>
+    | undefined,
+): void {
+  for (const [id, stats] of Object.entries(ways ?? {})) {
+    const latency = stats.p50Ms !== undefined ? `, p50 ${stats.p50Ms}ms` : "";
+    const retry = stats.retryAt ? `, retry ${stats.retryAt}` : "";
+    out(`way ${id}: runs ${stats.runs}, failures ${stats.failures}${latency}${retry}`);
+  }
 }
 
 async function run(args: Args): Promise<number> {

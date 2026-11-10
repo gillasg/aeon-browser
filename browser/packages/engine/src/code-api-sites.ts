@@ -164,6 +164,8 @@ var __siteCapabilities = async (host) => {
   return {
     site: siteName,
     abilities: Array.isArray(base && base.abilities) ? base.abilities : [],
+    lookups: Array.isArray(base && base.lookups) ? base.lookups : [],
+    changes: Array.isArray(base && base.changes) ? base.changes : [],
     operations: Array.isArray(base && base.operations) ? base.operations : [],
     notes: String((base && base.notes) || ''),
     webmcp: (webmcp && webmcp.tools) || [],
@@ -208,7 +210,7 @@ var __siteAbilities = {
     // Page code (built-in abilities, page-script reads) runs right here, in this cell's tabs.
     var plan = await __call({abilityRun: {site: host, name, inputs, plan: true, ...(options.via ? {via: options.via} : {})}});
     if (plan && plan.local) return {result: await __runPageAbility(plan), via: 'script', tried: []};
-    return __call({abilityRun: {site: host, name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {})}});
+    return __call({abilityRun: {site: host, name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {}), ...(options.complete ? {complete: true} : {})}});
   },
   test: async (name, site) => __call({abilityRun: {site: await __siteHostName(site), name, test: true}}),
   // Moves an ability to the site's trash/ (nothing is hard-deleted); returns {removed}.
