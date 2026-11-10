@@ -214,7 +214,7 @@ async function __step(step, readOnly = false) {
   if (action) {
     var moved = before && result.url && before.split('#')[0] !== result.url.split('#')[0] && ['click','fill','press'].includes(step.op);
     console.log('[ok] ' + step.op + (result.outcome ? ' ' + result.outcome : '') + (result.url ? ' -> ' + result.url : '') + (moved ? ' (page changed from ' + before + ')' : '') +
-      (result.data && result.data.settle ? ' (' + result.data.settle.why + ')' : '') + ' ' + (Date.now() - startedAt) + ' ms' + (result.note ? ' - ' + result.note : ''));
+      (result.data && result.data.settle ? ' (' + result.data.settle.why + ')' : '') + ' ' + (Date.now() - startedAt) + ' ms' + (result.note ? ' - ' + result.note : '') + (result.next ? ' Next: ' + result.next : ''));
   }
   if (action && step.target) __noteActed(step.target);
   if (step.target) __speedNote(result.url || before || (__tabs.get(__key(step.target)) || {}).url, action);

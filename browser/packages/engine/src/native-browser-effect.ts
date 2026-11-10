@@ -3,13 +3,20 @@
 // confirmed needs readable evidence (a value read back, a navigation, a DOM change), a step that
 // ran without evidence is unverifiable, and a bounded unchanged state is a suspected no-op rather
 // than a failure. Cua Driver's ActionResult.effect, adapted to what Aeon can see in one step.
-import { type BrowserElementTarget, type BrowserStep, NOOP_NEXT_CALL } from "@browserkit/protocol";
+import {
+  effectNext,
+  type BrowserElementTarget,
+  type BrowserStep,
+  type EffectNextContext,
+} from "@browserkit/protocol";
 
 export type StepEffect = "confirmed" | "unverifiable" | "suspected_noop" | "refused";
 
 export interface EffectVerdict {
   effect: StepEffect;
   evidence: string;
+  /** The call to run when the effect was not confirmed. */
+  next?: string;
 }
 
 export type StepOutcome = "navigated" | "changed" | "unchanged" | "unknown";
@@ -45,7 +52,17 @@ export function inputStepEffect(
   op: string,
   observation: StepObservation,
   expected?: string,
+  ctx?: EffectNextContext,
 ): EffectVerdict {
+  return attachNext(inputVerdict(op, observation, expected), { ...ctx, op });
+}
+
+function attachNext(verdict: EffectVerdict, ctx: EffectNextContext): EffectVerdict {
+  const next = effectNext(verdict.effect, ctx);
+  return next ? { ...verdict, next } : verdict;
+}
+
+function inputVerdict(op: string, observation: StepObservation, expected?: string): EffectVerdict {
   if (op === "fill" || op === "paste") {
     if (observation.readback !== undefined)
       return observation.readback === (expected ?? observation.readback)
@@ -91,15 +108,18 @@ export function scrollEffect(scroll: {
   moved: boolean;
   position: number;
 }): EffectVerdict {
-  return scroll.moved
-    ? {
-        effect: "confirmed",
-        evidence: shorten(`scrolled ${scroll.direction} to ${Math.round(scroll.position)}px`),
-      }
-    : {
-        effect: "suspected_noop",
-        evidence: shorten(`scroll ${scroll.direction} did not move the page (at the boundary)`),
-      };
+  return attachNext(
+    scroll.moved
+      ? {
+          effect: "confirmed",
+          evidence: shorten(`scrolled ${scroll.direction} to ${Math.round(scroll.position)}px`),
+        }
+      : {
+          effect: "suspected_noop",
+          evidence: shorten(`scroll ${scroll.direction} did not move the page (at the boundary)`),
+        },
+    { op: "scroll" },
+  );
 }
 
 function quote(value: string): string {
@@ -115,7 +135,7 @@ export function expectedValue(step: BrowserStep): string | undefined {
 }
 
 /** A real click that produced no navigation, DOM change or request is usually a miss. */
-export function silentClickNote(element: BrowserElementTarget): string {
+export function silentClickNote(element: BrowserElementTarget, child = false): string {
   const what =
     element.kind === "locator"
       ? `${element.role} "${element.name}"${element.scope ? ` in ${element.scope}` : ""}`
@@ -126,5 +146,16 @@ export function silentClickNote(element: BrowserElementTarget): string {
           : element.kind === "point"
             ? "the clicked point"
             : `backend node ${element.backendNodeId}`;
-  return `clicked ${what}: nothing happened (no navigation, DOM change or network request). The card's link may be on a child element; try clicking the child, or a listener may need a pointer event: try page.clickAt(x, y). Next: ${NOOP_NEXT_CALL}`;
+  const why = child
+    ? "nothing happened; a child element has the handler"
+    : "nothing happened (no navigation, DOM change or network request)";
+  return `clicked ${what}: ${why}`;
+}
+
+/** The name a state read should look for after this element missed. */
+export function elementQuery(element: BrowserElementTarget | undefined): string | undefined {
+  if (!element) return undefined;
+  if (element.kind === "locator") return element.name || undefined;
+  if (element.kind === "query") return element.value;
+  return undefined;
 }

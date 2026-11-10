@@ -26,11 +26,13 @@ import {
 } from "./native-browser-observation.js";
 import { type AxRef, BrowserActionError, safePage } from "./native-browser-common.js";
 import {
+  elementQuery,
   expectedValue,
   inputStepEffect,
   scrollEffect,
   silentClickNote,
 } from "./native-browser-effect.js";
+import { childHandlerPoint } from "./native-browser-child-click.js";
 import {
   activateNode,
   coveringElement,
@@ -581,6 +583,7 @@ export async function performAction(
   let changes: number | undefined;
   let readback: string | undefined;
   let silent = false;
+  let childPoint: { x: number; y: number } | undefined;
   beginReceipt(tabId);
   const scroll = await withDebugger(tabId, async (debuggee) => {
     await revalidateTarget(request, tabId);
@@ -595,6 +598,8 @@ export async function performAction(
     // The mutation count the page reported between the two probes: evidence for a DOM change.
     if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
     silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
+    if (silent && dispatched?.nodeId)
+      childPoint = await childHandlerPoint(dispatched.frame ?? debuggee, dispatched.nodeId);
     return undefined;
   });
   if (scroll) await revalidateTarget(request, tabId);
@@ -614,8 +619,10 @@ export async function performAction(
   const receipt = takeReceipt(tabId);
   receipt.navigated ||= String(outcome) === "navigated";
   // A dialog, pop-up or download is something happening, even with no DOM change or request.
-  if (silent && !caused(receipt) && request.step.op === "click")
-    note = silentClickNote(request.step.element);
+  const missed = silent && !caused(receipt) && request.step.op === "click";
+  if (missed && request.step.op === "click")
+    note = silentClickNote(request.step.element, childPoint !== undefined);
+  const query = "element" in request.step ? elementQuery(request.step.element) : undefined;
   const effect = scroll
     ? scrollEffect(scroll)
     : inputStepEffect(
@@ -628,6 +635,11 @@ export async function performAction(
           ...(readback !== undefined ? { readback } : {}),
         },
         expectedValue(request.step),
+        {
+          op: request.step.op,
+          ...(query ? { query } : {}),
+          ...(missed && childPoint ? { childPoint } : {}),
+        },
       );
   return BrowserExecutorResultSchema.parse({
     kind: "action",
@@ -637,6 +649,7 @@ export async function performAction(
     outcome,
     effect: effect.effect,
     evidence: effect.evidence,
+    ...(effect.next ? { next: effect.next } : {}),
     receipt,
     ...(note ? { note } : {}),
     ...(observation ? { observation } : {}),
@@ -648,7 +661,7 @@ async function dispatchAction(
   debuggee: chrome.debugger.Debuggee,
   request: ActionRequest,
   revalidateTarget: RevalidateTarget,
-): Promise<{ readback?: string } | undefined> {
+): Promise<{ readback?: string; nodeId?: number; frame?: chrome.debugger.Debuggee } | undefined> {
   await revalidateTarget(request, request.step.target.tabId);
   if (request.step.op === "click" && request.step.element.kind === "point") {
     await clickScreenshotPoint(debuggee, request);
@@ -679,11 +692,12 @@ async function dispatchAction(
     point: { x: top.x, y: top.y },
     tAct: Date.now(),
   });
-  if (request.step.op === "click")
+  if (request.step.op === "click") {
     await (box.activate
       ? onNode(frame, node.backendNodeId, activateNode)
       : clickAt(debuggee, top.x, top.y));
-  else if (request.step.op === "fill") {
+    return { nodeId: node.backendNodeId, frame };
+  } else if (request.step.op === "fill") {
     await fillNode(frame, node.backendNodeId, request.step.value);
     const readback = await readFieldValue(frame, node.backendNodeId);
     return readback !== undefined ? { readback } : undefined;

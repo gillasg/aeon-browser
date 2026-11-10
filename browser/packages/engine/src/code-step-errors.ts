@@ -1,5 +1,10 @@
 import type { BrowserStep } from "@browserkit/protocol";
-import { browserErrorDetail, errorCode } from "./native-browser-common.js";
+import {
+  BrowserActionError,
+  browserErrorContext,
+  browserErrorDetail,
+  errorCode,
+} from "./native-browser-common.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 
 // TARGET_LOST and STALE_REF are the errors an agent sees most when a user closes or moves a tab.
@@ -28,7 +33,11 @@ export async function stepFailure(step: BrowserStep, error: unknown): Promise<un
         ? "; the tab was closed or moved, so use browser.tabs() and attach a live one"
         : "";
   const base = detail.startsWith(code) ? detail : `${code}: ${detail}`;
-  return new Error(`${base}${where}${action}${fix}`);
+  const text = `${base}${where}${action}${fix}`;
+  const recovery = browserErrorContext(error);
+  if (!recovery) return new Error(text);
+  const rest = text.startsWith(code) ? text.slice(code.length).replace(/^:\s*/, "") : text;
+  return new BrowserActionError(code, rest, recovery);
 }
 
 /**

@@ -1,5 +1,6 @@
 // The closed set of failures, for the browser and for everything Node-side (crawl, mapped sites,
-// abilities). Each code carries the one move that recovers from it and who it belongs to:
+// abilities). Each code carries the one move that recovers from it, who it belongs to, and (in
+// error-next.ts) the one call to run next. Owners and codes do not change.
 //
 // - model: the agent asked for something wrong (a bad selector, a missing input, its own code threw).
 // - page:  the website did it (an overlay, a crash, a bot wall, a slow or broken site).
@@ -7,6 +8,21 @@
 // - ours:  a bug or gap in browserkit. Every one of these is a defect to fix, never expected.
 //
 // A failure no code names is INTERNAL (ours): an unnamed failure is itself a bug.
+
+import { errorNext, formatCandidateLines, type ErrorContext } from "./error-next.js";
+
+export {
+  effectNext,
+  errorNext,
+  formatCandidateLines,
+  isReadNext,
+  NO_NEXT_REASON,
+  usableCandidates,
+  type EffectNextContext,
+  type ErrorCandidate,
+  type ErrorContext,
+  type ErrorTarget,
+} from "./error-next.js";
 
 export type ErrorOwner = "model" | "page" | "user" | "ours";
 
@@ -117,45 +133,35 @@ export function errorHint(code: string): string {
 }
 
 /**
- * The call a failure can run as it is to move forward, for the codes where one exists: a read, a
- * harmless reload or a wait, never an action that could commit anything. A code with no safe
- * next call (a site the user blocked, Chrome closed) is absent; its hint says what to do instead.
- * One table, so the browser code runtime, the tools and the CLI all name the same call.
+ * The call a failure runs with no context, for the codes where one exists. Context (the name that
+ * missed, the candidates) is applied by errorNextCall. A code with no safe call is absent.
  */
-export const NEXT_CALLS: Partial<Record<ErrorCode, string>> = {
-  TARGET_NOT_FOUND: "await bu.state()",
-  AMBIGUOUS_TARGET: "await bu.state()",
-  TARGET_HIDDEN: "await bu.state()",
-  TARGET_DISABLED: "await bu.state()",
-  TARGET_BLOCKED: "await bu.state()",
-  TARGET_LOST: "await bu.state()",
-  NOT_EDITABLE: "await bu.state()",
-  STALE_REF: "await bu.state()",
-  EXPECTATION_FAILED: "await bu.state()",
-  TIMEOUT: "await bu.state()",
-  BOT_WALL: "await bu.state()",
-  SITE_BROKEN: "await bu.state()",
-  NETWORK: "await bu.state()",
-  TAB_DEAD: "browser.tabs()",
-  TAB_UNRESPONSIVE: "browser.tabs()",
-  PASSWORD_PAGE: "await page.reload()",
-  USER_TOOK_CONTROL: "await page.waitForControl()",
-};
+export const NEXT_CALLS: Partial<Record<ErrorCode, string>> = Object.fromEntries(
+  ERROR_CODES.flatMap((code) => {
+    const next = errorNext(code);
+    return next ? [[code, next]] : [];
+  }),
+);
 
 /** The safe read after a step that ran but left the page as it was. */
 export const NOOP_NEXT_CALL = "await bu.state()";
 
 /** The call to make after a failure, or "" when no call is safe. */
-export function errorNextCall(code: string): string {
-  return (isErrorCode(code) ? NEXT_CALLS[code] : undefined) ?? "";
+export function errorNextCall(code: string, ctx?: ErrorContext): string {
+  return errorNext(code, ctx) ?? "";
 }
 
-/** "CODE: detail" plus the recovery hint and, when one exists, the safe call after it. */
-export function describeError(code: string, detail = ""): string {
+/** "CODE: detail", the candidates, the recovery hint, and the call to run next. */
+export function describeError(code: string, detail = "", ctx?: ErrorContext): string {
   const head = detail && detail !== code ? `${code}: ${detail}` : code;
   const hint = errorHint(code);
-  const next = errorNextCall(code);
-  return [head, ...(hint ? [`Hint: ${hint}`] : []), ...(next ? [`Next: ${next}`] : [])].join("\n");
+  const next = errorNextCall(code, ctx);
+  return [
+    head,
+    ...formatCandidateLines(ctx?.candidates),
+    ...(hint ? [`Hint: ${hint}`] : []),
+    ...(next ? [`Next: ${next}`] : []),
+  ].join("\n");
 }
 
 /**

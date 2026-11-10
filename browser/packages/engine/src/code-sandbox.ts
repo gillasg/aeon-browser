@@ -201,7 +201,7 @@ function withHint(message: string, raw: string, code: string): string {
   }
   // Without a hint of its own, the error's shared code still says how to recover.
   hint ||= message.includes("\nHint: ") ? "" : errorHint(leadingCode(message) ?? "");
-  const next = errorNextCall(leadingCode(message) ?? "");
+  const next = /\nNext: /.test(message) ? "" : errorNextCall(leadingCode(message) ?? "");
   const lines = [message, ...(hint ? [`Hint: ${hint}`] : []), ...(next ? [`Next: ${next}`] : [])];
   return lines.join("\n");
 }

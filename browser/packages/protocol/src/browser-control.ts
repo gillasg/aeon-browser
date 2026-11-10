@@ -295,6 +295,11 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
       effect: z.enum(["confirmed", "unverifiable", "suspected_noop", "refused"]),
       /** The short readback the effect rests on. */
       evidence: z.string().max(240),
+      /**
+       * The one call to run when the effect was not confirmed (a read, or clickAt when a child
+       * holds the handler). Absent when the step was confirmed or refused.
+       */
+      next: z.string().max(300).optional(),
       receipt: z
         .object({
           popups: z
@@ -358,6 +363,8 @@ export const BrowserOperationResultSchema = z.discriminatedUnion("ok", [
       operationId: z.string().uuid(),
       ok: z.literal(false),
       detail: z.string().max(2000).optional(),
+      /** The one call to run next, when one is safe. */
+      next: z.string().max(300).optional(),
       code: z.enum([
         "TARGET_LOST",
         "AMBIGUOUS_TARGET",
