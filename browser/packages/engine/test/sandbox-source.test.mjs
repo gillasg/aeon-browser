@@ -16,7 +16,10 @@ async function sandboxParts() {
   }
   const list = /evaluate\(\s*\[([\s\S]*?)\]\.join/.exec(sandbox);
   assert.ok(list, "code-sandbox.ts evaluates a joined list of runtime parts");
-  const names = list[1].split(",").map((part) => part.trim()).filter(Boolean);
+  const names = list[1]
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
   const parts = [];
   for (const name of names) {
     const file = from.get(name);
