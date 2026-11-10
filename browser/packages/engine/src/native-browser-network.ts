@@ -1,3 +1,4 @@
+import { send } from "./cdp/send.js";
 import {
   holdBrowserDebugger,
   onBrowserDebuggerAttached,
@@ -70,10 +71,7 @@ const recorders = new Map<number, Recorder>();
 const stopped = new Map<number, Recorder>();
 type Params = Record<string, unknown>;
 // Runs inside the attach itself, so it talks to the debugger directly.
-onBrowserDebuggerAttached(async (tabId) => {
-  if (recorders.has(tabId))
-    await chrome.debugger.sendCommand({ tabId }, "Network.enable", NETWORK_BUFFERS);
-});
+onBrowserDebuggerAttached((tabId) => resumeNetwork(tabId));
 onEngineInstall(() => {
   chrome.debugger.onEvent.addListener((source, method, raw) => {
     const tabId = source.tabId;
@@ -281,8 +279,7 @@ function command(
   params: Params,
   sessionId?: string,
 ): Promise<{ body?: string; base64Encoded?: boolean; postData?: string } | undefined> {
-  return chrome.debugger
-    .sendCommand(sessionId ? { tabId, sessionId } : { tabId }, method, params)
+  return send(sessionId ? { tabId, sessionId } : { tabId }, method, params, { label: "command" })
     .then((value) => value as { body?: string; base64Encoded?: boolean; postData?: string })
     .catch(() => undefined);
 }
@@ -375,16 +372,15 @@ onEngineInstall(() => {
 
 async function enableNetwork(tabId: number): Promise<void> {
   await withBrowserDebugger(tabId, async (debuggee) => {
-    await chrome.debugger.sendCommand(debuggee, "Network.enable", NETWORK_BUFFERS);
+    await send(debuggee, "Network.enable", NETWORK_BUFFERS, { label: "enableNetwork" });
     // Workers and out-of-process iframes attach as they appear, so their requests land in the
     // same store as the top frame's (a player's resolver often runs in a service worker).
-    await chrome.debugger
-      .sendCommand(debuggee, "Target.setAutoAttach", {
-        autoAttach: true,
-        waitForDebuggerOnStart: false,
-        flatten: true,
-      })
-      .catch(() => undefined);
+    await send(
+      debuggee,
+      "Target.setAutoAttach",
+      { autoAttach: true, waitForDebuggerOnStart: false, flatten: true },
+      { label: "enableNetwork" },
+    ).catch(() => undefined);
   });
 }
 
@@ -465,7 +461,12 @@ export async function learnUserTab(tabId: number, on: boolean): Promise<void> {
   await chrome.debugger.attach({ tabId }, "1.3").catch((error: unknown) => {
     if (!/already attached/i.test(String(error))) throw error;
   });
-  await chrome.debugger.sendCommand({ tabId }, "Network.enable", NETWORK_BUFFERS);
+  await send({ tabId }, "Network.enable", NETWORK_BUFFERS, { label: "learnUserTab" });
+}
+
+async function resumeNetwork(tabId: number): Promise<void> {
+  if (!recorders.has(tabId)) return;
+  await send({ tabId }, "Network.enable", NETWORK_BUFFERS, { label: "resumeNetwork" });
 }
 
 /**

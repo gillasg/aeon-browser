@@ -1,6 +1,7 @@
 import { noteDeviceEmulation } from "./native-browser-session.js";
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
+import { callClass, send } from "./cdp/send.js";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import { refusedCdp } from "./native-browser-guards.js";
 import { onEngineInstall } from "./native-engine-install.js";
@@ -130,11 +131,23 @@ export function pageOutcome(
   if (before.document !== after.document || before.url !== after.url) return "navigated";
   return before.changes !== after.changes ? "changed" : "unchanged";
 }
+function scriptMs(timeout: number): number {
+  return timeout > 0 && Number.isFinite(timeout) ? timeout : 5_000;
+}
+
+function sendOpts(label: string, method: string, params: unknown): { label: string; ms?: number } {
+  if (callClass(method) !== "eval") return { label };
+  const timeout = (params as { timeout?: unknown } | undefined)?.timeout;
+  return { label, ms: scriptMs(typeof timeout === "number" ? timeout : 0) };
+}
+
 async function probe(debuggee: chrome.debugger.Debuggee): Promise<PageProbe | undefined> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression: `(${domQuietProbe.toString()})()`,
-    returnByValue: true,
-  })) as { result?: { value?: PageProbe }; exceptionDetails?: unknown };
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression: `(${domQuietProbe.toString()})()`, returnByValue: true },
+    { label: "probe", ms: 5_000 },
+  )) as { result?: { value?: PageProbe }; exceptionDetails?: unknown };
   if (result.exceptionDetails) throw new Error("Execution context changed");
   return result.result?.value;
 }
@@ -226,10 +239,12 @@ export async function waitPageInteractive(tabId: number, timeoutMs = 2000): Prom
 }
 
 export async function viewportFingerprint(debuggee: chrome.debugger.Debuggee): Promise<string> {
-  const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-    expression: `(${layoutProbe.toString()})()`,
-    returnByValue: true,
-  })) as { result?: { value?: string }; exceptionDetails?: unknown };
+  const result = (await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression: `(${layoutProbe.toString()})()`, returnByValue: true },
+    { label: "viewportFingerprint", ms: 5_000 },
+  )) as { result?: { value?: string }; exceptionDetails?: unknown };
   if (result.exceptionDetails || typeof result.result?.value !== "string" || !result.result.value)
     throw new Error("STALE_REF");
   return result.result.value;
@@ -319,7 +334,7 @@ export async function navigateReady(
     chrome.webNavigation.onHistoryStateUpdated.addListener(sameDocument);
     chrome.webNavigation.onReferenceFragmentUpdated.addListener(sameDocument);
     const navigate = referer
-      ? chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url, referrer: referer })
+      ? send({ tabId }, "Page.navigate", { url, referrer: referer }, { label: "navigateReady" })
       : chrome.tabs.update(tabId, { url });
     void navigate.catch((cause) => {
       clean();
@@ -379,7 +394,12 @@ export async function executePageCode(
       );
     const refused = refusedCdp(step.method, step.params as Record<string, unknown>);
     if (refused) throw new BrowserActionError("UNSUPPORTED", refused);
-    value = await chrome.debugger.sendCommand(debuggee, step.method, step.params);
+    value = await send(
+      debuggee,
+      step.method,
+      step.params,
+      sendOpts("executePageCode", step.method, step.params),
+    );
     if (debuggee.tabId !== undefined) noteDeviceEmulation(debuggee.tabId, step.method, step.params);
   }
   return {
@@ -463,11 +483,13 @@ async function readFingerprint(
   timeoutMs: number,
 ): Promise<unknown> {
   try {
-    const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression: FINGERPRINT_EXPRESSION,
-      returnByValue: true,
-      timeout: timeoutMs,
-    })) as { result?: { value?: unknown } } | undefined;
+    const ms = scriptMs(timeoutMs);
+    const result = (await send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression: FINGERPRINT_EXPRESSION, returnByValue: true, timeout: ms },
+      { label: "readFingerprint", ms },
+    )) as { result?: { value?: unknown } } | undefined;
     return result?.result?.value;
   } catch {
     return undefined;
@@ -476,7 +498,9 @@ async function readFingerprint(
 
 async function stopFingerprint(debuggee: chrome.debugger.Debuggee): Promise<void> {
   await Promise.race([
-    chrome.debugger.sendCommand(debuggee, "Runtime.terminateExecution", {}).catch(() => undefined),
+    send(debuggee, "Runtime.terminateExecution", {}, { label: "stopFingerprint" }).catch(
+      () => undefined,
+    ),
     new Promise((resolve) => setTimeout(resolve, 200)),
   ]);
 }
@@ -502,12 +526,13 @@ async function evaluatePage(
     exceptionDetails?: { text?: string; exception?: { description?: string } };
   };
   try {
-    result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
-      expression,
-      returnByValue: true,
-      awaitPromise: true,
-      timeout,
-    })) as typeof result;
+    const ms = scriptMs(timeout);
+    result = (await send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression, returnByValue: true, awaitPromise: true, timeout: ms },
+      { label: "evaluatePage", ms },
+    )) as typeof result;
   } catch (error) {
     if (!isEvaluationTimeout(error instanceof Error ? error.message : String(error))) throw error;
     throw await evaluationTimeout(debuggee, timeout, String(error));
@@ -553,7 +578,7 @@ async function evaluationTimeout(
 ): Promise<BrowserActionError> {
   let terminated = false;
   try {
-    await chrome.debugger.sendCommand(debuggee, "Runtime.terminateExecution", {});
+    await send(debuggee, "Runtime.terminateExecution", {}, { label: "evaluationTimeout" });
     terminated = true;
   } catch {
     /* The execution may already be gone. */
@@ -561,16 +586,15 @@ async function evaluationTimeout(
   let stopped = false;
   for (let attempt = 0; attempt < 2 && !stopped; attempt++) {
     if (attempt) await new Promise((resolve) => setTimeout(resolve, 80));
-    stopped = await chrome.debugger
-      .sendCommand(debuggee, "Runtime.evaluate", {
-        expression: "1+1",
-        returnByValue: true,
-        timeout: 1000,
-      })
-      .then(
-        (probe) => (probe as { result?: { value?: unknown } }).result?.value === 2,
-        () => false,
-      );
+    stopped = await send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression: "1+1", returnByValue: true, timeout: 1000 },
+      { label: "evaluationTimeout", ms: 1000 },
+    ).then(
+      (probe) => (probe as { result?: { value?: unknown } }).result?.value === 2,
+      () => false,
+    );
   }
   const flags = `{"executionStopped":${stopped && terminated},"mayHaveLateEffects":true}`;
   return new BrowserActionError(

@@ -1,4 +1,5 @@
 import { toOffscreen } from "./code-offscreen-host.js";
+import { callClass, send } from "./cdp/send.js";
 import { setTabRecording, showAgentGlow } from "./native-browser-cursor.js";
 import { beginManualScreencast, endManualScreencast } from "./native-browser-screencast.js";
 import { browserSessionOwner, withBrowserDebugger } from "./native-browser-session.js";
@@ -196,11 +197,21 @@ async function debug(
   method: string,
   params: Record<string, unknown>,
 ): Promise<unknown> {
-  if (!direct)
-    return withBrowserDebugger(tabId, (debuggee) =>
-      chrome.debugger.sendCommand(debuggee, method, params),
-    );
-  return chrome.debugger.sendCommand({ tabId }, method, params);
+  if (!direct) return withBrowserDebugger(tabId, (debuggee) => debugSend(debuggee, method, params));
+  return debugSend({ tabId }, method, params);
+}
+
+function debugSend(
+  target: chrome.debugger.Debuggee,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<unknown> {
+  return send(target, method, params, debugOpts(method));
+}
+
+function debugOpts(method: string): { label: string; ms?: number } {
+  if (callClass(method) !== "eval") return { label: "debug" };
+  return { label: "debug", ms: 5_000 };
 }
 
 async function attachDirect(tabId: number): Promise<void> {
@@ -208,9 +219,12 @@ async function attachDirect(tabId: number): Promise<void> {
     if (!/already attached/i.test(String(error))) throw error;
   });
   // Paint as if focused, so a background tab keeps producing frames.
-  await chrome.debugger
-    .sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true })
-    .catch(() => undefined);
+  await send(
+    { tabId },
+    "Emulation.setFocusEmulationEnabled",
+    { enabled: true },
+    { label: "attachDirect" },
+  ).catch(() => undefined);
 }
 
 async function startScreencast(
