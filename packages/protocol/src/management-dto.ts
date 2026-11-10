@@ -220,6 +220,18 @@ export const ManagementAbilitySchema = z
     description: z.string().max(1000).optional(),
     kind: z.enum(["read", "write"]),
     ways: z.array(z.enum(["api", "steps", "script", "page"])).max(8),
+    /** Code ways, so the list can show the source. Omitted when the ability has none. */
+    sources: z
+      .array(
+        z
+          .object({
+            runtime: z.enum(["node", "page"]),
+            code: z.string().max(8000),
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
     inputs: z
       .array(
         z
@@ -257,6 +269,19 @@ export const ManagementSiteSchema = z
     sessionSavedAt: z.string().max(60).nullable(),
     recording: z.boolean(),
     suggestions: z.array(z.string().max(500)).max(10),
+    /** Facts the agent keeps for this site. Instructions never land here. */
+    notes: z
+      .array(
+        z
+          .object({
+            kind: z.enum(["selector", "url", "pace", "quirk"]),
+            key: z.string().max(40),
+            value: z.string().max(120),
+          })
+          .strict(),
+      )
+      .max(40)
+      .optional(),
     abilities: z.array(ManagementAbilitySchema).max(100),
   })
   .strict();

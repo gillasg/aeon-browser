@@ -143,3 +143,56 @@ test("management DTO distinguishes environment references from manual Pi credent
     false,
   );
 });
+
+test("management abilities carry code source and site notes stay short facts", () => {
+  const parsed = ManagementSnapshotSchema.parse(abilitySnapshot());
+  const ability = parsed.abilities?.[0];
+  const site = parsed.sites?.[0];
+  assert.match(ability?.sources?.[0]?.code ?? "", /#rows/);
+  assert.equal(site?.notes?.[0]?.kind, "selector");
+});
+
+test("a site note longer than 120 characters is rejected", () => {
+  const snapshot = abilitySnapshot();
+  const note = snapshot.sites[0].notes[0];
+  note.value = "a".repeat(121);
+  assert.equal(ManagementSnapshotSchema.safeParse(snapshot).success, false);
+});
+
+function abilitySnapshot() {
+  const ability = {
+    name: "export_rows",
+    site: "shop.example",
+    kind: "read",
+    ways: ["script"],
+    sources: [{ runtime: "page", code: "return document.querySelector('#rows')" }],
+    inputs: [],
+    updatedAt: "2026-11-10T00:00:00.000Z",
+  };
+  return {
+    chats: [],
+    routines: [],
+    pins: [],
+    capabilityRevision: 0,
+    capabilities: [],
+    resources: null,
+    resourceError: null,
+    signIn: { provider: null, state: "not_set_up" },
+    abilities: [ability],
+    sites: [
+      {
+        site: "shop.example",
+        operations: 1,
+        updatedAt: "2026-11-10",
+        health: "ok",
+        session: false,
+        sessionAccount: null,
+        sessionSavedAt: null,
+        recording: false,
+        suggestions: [],
+        notes: [{ kind: "selector", key: "search", value: "input[name=q]" }],
+        abilities: [ability],
+      },
+    ],
+  };
+}

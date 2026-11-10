@@ -21,6 +21,7 @@ export type {
 } from "./model-accounts-types.js";
 export { ManagementSurface, type ManagementSurfaceProps } from "./management-surface.js";
 export { AbilitiesPanel } from "./management-automations.js";
+export { AbilitySource, CodeBadge, SiteFacts } from "./ability-source.js";
 export { SitesPage, siteEntries, siteSummary } from "./management-site-page.js";
 export {
   BlockedSitesSettings,

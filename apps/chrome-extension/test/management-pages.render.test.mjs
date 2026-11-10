@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AbilitiesPanel, SitesPage, siteEntries, siteSummary } from "@aeon/ui";
+import { AbilitiesPanel, SiteFacts, SitesPage, siteEntries, siteSummary } from "@aeon/ui";
 
 // A real render of the two management pages: server-rendered React with a fixture snapshot, so a
 // broken prop, a missing import or a template that throws fails here, not only in the browser.
@@ -39,6 +39,16 @@ const snapshot = {
       stats: { runs: 2, failures: 0, lastOkAt: new Date().toISOString() },
       running: false,
     },
+    {
+      name: "export_rows",
+      site: "shop.example",
+      kind: "read",
+      ways: ["script"],
+      sources: [{ runtime: "page", code: "return document.querySelector('#rows')" }],
+      inputs: [],
+      stats: { runs: 0, failures: 0 },
+      updatedAt: new Date().toISOString(),
+    },
   ],
   sites: [
     {
@@ -51,6 +61,7 @@ const snapshot = {
       sessionSavedAt: new Date().toISOString(),
       recording: false,
       suggestions: ["Add a search operation"],
+      notes: [{ kind: "selector", key: "search", value: "input[name=q]" }],
       abilities: [
         {
           name: "search",
@@ -102,6 +113,19 @@ test("the Sites page lists every site with what Aeon can do, the account and rul
   assert.match(html, /test@example\.com/);
   assert.match(html, /bad\.example/);
   assert.match(html, /blocked/);
+});
+
+test("code ways are marked with their source, and site notes render as facts", () => {
+  const html = renderToStaticMarkup(createElement(AbilitiesPanel, props));
+  assert.match(html, /data-code="true"/);
+  assert.match(html, /Page code/);
+  assert.match(html, /querySelector/);
+  assert.match(html, /#rows/);
+  const notes = renderToStaticMarkup(createElement(SiteFacts, { notes: snapshot.sites[0].notes }));
+  assert.match(notes, /aria-label="Site notes"/);
+  assert.match(notes, /selector/);
+  assert.match(notes, /search/);
+  assert.match(notes, /input\[name=q\]/);
 });
 
 test("a site's entry joins its mapped API, routines and block rule", () => {

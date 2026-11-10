@@ -90,7 +90,7 @@ const OVERLAY = `(update) => {
       'i{position:absolute;left:-16px;top:-16px;width:32px;height:32px;border-radius:50%;border:2px solid rgba(17,24,39,.55);background:rgba(255,255,255,.35);transform:scale(0);opacity:0}' +
       'i.on{animation:r 520ms cubic-bezier(.2,.7,.2,1)}@keyframes r{0%{transform:scale(.25);opacity:1}100%{transform:scale(1.6);opacity:0}}' +
       '.p{position:absolute;left:18px;top:20px;display:flex;align-items:center;gap:8px;max-width:360px;padding:5px 5px 5px 12px;border-radius:999px;background:rgba(17,24,39,.92);color:#fff;font:500 12.5px/17px system-ui,-apple-system,Segoe UI,sans-serif;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:0;transform:translateY(-3px);transition:opacity 160ms ease,transform 160ms ease}' +
-      '.p.on{opacity:1;transform:none}.p.on .ic{pointer-events:auto}' +
+      '.p.on{opacity:1;transform:none}.p.on .ic{pointer-events:auto}.p.on .tr,.p.on .stop{pointer-events:none}' +
       '.p .tx{overflow:hidden;text-overflow:ellipsis;min-width:0}.needs .p .tx{display:block;white-space:normal}' +
       '.p .sp{width:11px;height:11px;flex:none;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}' +
       '.p .ic{width:24px;height:24px;flex:none;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);color:#fff;font:600 11px/1 system-ui,sans-serif;cursor:pointer;padding:0}.p .ic:hover{background:rgba(255,255,255,.24)}' +
@@ -142,17 +142,34 @@ const OVERLAY = `(update) => {
       frame: 0, idle: 0, hide: 0, type: 0, cursorShown: false,
     };
     // Pinned to the page, not the viewport: when the page scrolls, the cursor scrolls with it.
-    const place = () => { state.cursor.style.transform = "translate(" + (state.pageX - scrollX) + "px," + (state.pageY - scrollY) + "px)"; };
+    // Glyphs only. The content script owns the real buttons and ignores page events, so a page
+    // cannot forge a stop or a transcript. Positions travel on the host as data, not as events.
+    const publish = () => {
+      const rect = (node) => {
+        if (!node) return null;
+        const box = node.getBoundingClientRect();
+        if (box.width < 2 || box.height < 2 || box.width > 64 || box.height > 64) return null;
+        return { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.width), h: Math.round(box.height) };
+      };
+      const first = (selector) => {
+        if (!state.pill.classList.contains("on")) return null;
+        for (const node of root.querySelectorAll(selector)) {
+          const box = rect(node);
+          if (box) return box;
+        }
+        return null;
+      };
+      host.dataset.aeonControls = JSON.stringify({ tr: first(".tr"), stop: first(".stop") });
+    };
+    state.publish = publish;
+    const place = () => {
+      state.cursor.style.transform = "translate(" + (state.pageX - scrollX) + "px," + (state.pageY - scrollY) + "px)";
+      publish();
+    };
     state.place = place;
-    // The transcript and stop buttons reach the extension's content script as page events (names
-    // only, no data), which opens the side panel on this tab's chat or stops it. A page can send
-    // them too; neither gives it anything (a transcript it cannot read, a stopped run).
-    const tell = (name) => (event) => { event.stopPropagation(); event.preventDefault(); dispatchEvent(new Event(name)); };
-    root.querySelector(".p > .tr").addEventListener("click", tell("aeon-cursor-transcript"));
-    root.querySelector(".p > .stop").addEventListener("click", tell("aeon-cursor-stop"));
     // Hovering the pill keeps it up, so its buttons can be reached.
-    state.pill.addEventListener("mouseenter", () => clearTimeout(state.hide));
-    state.pill.addEventListener("mouseleave", () => { if (!state.wrap.classList.contains("needs")) state.hide = setTimeout(() => state.pill.classList.remove("on"), 2500); });
+    state.pill.addEventListener("mouseenter", () => { clearTimeout(state.hide); publish(); });
+    state.pill.addEventListener("mouseleave", () => { if (!state.wrap.classList.contains("needs")) state.hide = setTimeout(() => { state.pill.classList.remove("on"); publish(); }, 2500); });
     addEventListener("scroll", place, { passive: true, capture: true });
     (document.documentElement || document.body).append(host);
     place();
@@ -272,8 +289,8 @@ const OVERLAY = `(update) => {
       for (const kind of ["keyup", "keypress", "input"]) field.addEventListener(kind, (event) => event.stopPropagation());
       const done = make("button", { class: "done" }, ["Done"]);
       done.onclick = (event) => { event.stopPropagation(); finish(); };
-      const transcript = make("button", { class: "ic", title: "Open the transcript in the side panel", "aria-label": "Open the transcript" }, ["☰"]);
-      transcript.onclick = (event) => { event.stopPropagation(); dispatchEvent(new Event("aeon-cursor-transcript")); };
+      const transcript = make("button", { class: "ic tr", title: "Open the transcript in the side panel", "aria-label": "Open the transcript" }, ["☰"]);
+      transcript.onclick = (event) => { event.stopPropagation(); };
       const cancel = make("button", { class: "ic", title: "Cancel", "aria-label": "Cancel" }, ["✕"]);
       cancel.onclick = (event) => { event.stopPropagation(); answer("cancelled"); };
       ask.append(field, done, transcript, cancel);
@@ -281,6 +298,7 @@ const OVERLAY = `(update) => {
     }
     if (!update.needs) s.hide = setTimeout(() => s.pill.classList.remove("on"), update.transient ? 2000 : 6000);
   }
+  if (s.publish) { s.publish(); requestAnimationFrame(() => s.publish()); }
   function toRgb(color) {
     var text = String(color || "").trim();
     var hex = /^#([0-9a-f]{6})$/i.exec(text);

@@ -75,8 +75,9 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["orb.html", "chat.html"],
-      "matches": ["http://*/*", "https://*/*"]
+      "resources": ["orb.html"],
+      "matches": ["http://*/*", "https://*/*"],
+      "use_dynamic_url": true
     }
   ]
 }

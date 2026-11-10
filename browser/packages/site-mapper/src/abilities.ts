@@ -1,8 +1,8 @@
 // One named thing doable on a site, read or write, with the ways to do it tried in order: the
 // site's API, a replayed step list, code, or a page collector. Abilities replace the old recipe,
-// action, workflow, skill and site-tool stores; notes.md holds what is not callable.
+// action, workflow, skill and site-tool stores; site notes hold facts that are not callable.
 
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename } from "node:fs/promises";
 import { needsError } from "./ability-needs.js";
 import { join } from "node:path";
 import { runNodeScript } from "./ability-node.js";
@@ -36,6 +36,17 @@ import {
 } from "./ability-writes.js";
 import { builtinAbilities, builtinWay } from "./builtin-abilities.js";
 import { siteDir, siteName, writeAtomic } from "./registry.js";
+export {
+  acceptSiteNote,
+  factsFromText,
+  readSiteFacts,
+  readSiteNotes,
+  renderSiteNotes,
+  saveSiteNote,
+  writeSiteNotes,
+  type SiteNote,
+  type SiteNoteKind,
+} from "./site-notes.js";
 import type { CollectRecipe, RecipePagination } from "./recipes.js";
 import type { Json } from "./types.js";
 
@@ -164,7 +175,6 @@ export interface AbilityHost {
 }
 
 const ABILITIES = "abilities";
-const NOTES = "notes.md";
 const TRASH = "trash";
 const NAME = /^[a-z0-9][a-z0-9 _.-]{0,80}$/i;
 
@@ -733,29 +743,6 @@ function lookup(path: string, inputs: Record<string, unknown>, steps: unknown[])
           : undefined;
   for (const key of rest) value = (value as Record<string, unknown> | undefined)?.[key];
   return value;
-}
-
-export async function readSiteNotes(site: string): Promise<string> {
-  try {
-    return await readFile(join(siteDir(siteName(site)), NOTES), "utf8");
-  } catch {
-    return "";
-  }
-}
-
-export async function writeSiteNotes(
-  site: string,
-  markdown: string,
-  options: { append?: boolean } = {},
-): Promise<string> {
-  const folder = siteDir(siteName(site));
-  await mkdir(folder, { recursive: true });
-  const path = join(folder, NOTES);
-  const text = options.append
-    ? [await readSiteNotes(site), markdown.trim()].filter(Boolean).join("\n\n") + "\n"
-    : markdown.trim() + "\n";
-  await writeFile(path, text, "utf8");
-  return path;
 }
 
 function validAbilityName(name: string): string {

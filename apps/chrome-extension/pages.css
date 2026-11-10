@@ -1058,6 +1058,36 @@
 .ability-health[data-tone="needs"] {
   color: var(--aeon-needs);
 }
+.ability-code {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(124, 92, 255, 0.28);
+  color: var(--aeon-text);
+  font-size: 11px;
+  line-height: 16px;
+}
+.ability-source {
+  margin-top: 8px;
+}
+.ability-source pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--aeon-text);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.ability-source span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--aeon-faint);
+  font-family: inherit;
+}
 .ability-form {
   display: flex;
   flex-wrap: wrap;

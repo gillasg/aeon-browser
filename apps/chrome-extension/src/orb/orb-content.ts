@@ -1,6 +1,4 @@
 import {
-  CURSOR_STOP,
-  CURSOR_TRANSCRIPT,
   ORB_DISMISS,
   ORB_OFF,
   ORB_RESTORE,
@@ -9,6 +7,7 @@ import {
   type OrbShown,
   type OrbToggle,
 } from "./orb-messages.js";
+import { startCursorControls } from "./cursor-controls.js";
 import { OrbOverlay } from "./orb-overlay.js";
 
 // Loaded on every http(s) page but adds nothing to it until the shortcut is pressed. While the
@@ -97,14 +96,14 @@ function start(): void {
 }
 
 /**
- * The cursor's ☰ and ■ from the agent's cursor, which the engine draws in the page, so they arrive
- * as page events. ☰ opens the transcript in the side panel; ■ stops the chat this tab's cursor
- * started, and with no cursor summoned here it opens the transcript, where Stop is.
+ * The cursor's ☰ and ■. The engine draws the glyphs in the page; the buttons that act are created
+ * here, so a page that dispatches aeon-cursor-stop or aeon-cursor-transcript cannot forge them.
+ * ☰ opens the transcript. ■ stops the chat this tab's cursor started, and with no cursor summoned
+ * here it opens the transcript, where Stop is.
  */
 function listenToCursorButtons(summoned: () => boolean): void {
   const send = (kind: string) => {
     if (chrome.runtime?.id) void chrome.runtime.sendMessage({ kind }).catch(() => undefined);
   };
-  addEventListener("aeon-cursor-transcript", () => send(CURSOR_TRANSCRIPT));
-  addEventListener("aeon-cursor-stop", () => send(summoned() ? CURSOR_STOP : CURSOR_TRANSCRIPT));
+  startCursorControls(send, summoned);
 }

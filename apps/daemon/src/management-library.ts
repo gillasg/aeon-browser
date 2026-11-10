@@ -8,6 +8,7 @@ import {
   loadModel,
   readHealth,
   readSession,
+  readSiteFacts,
 } from "@browserkit/site-mapper";
 import { listRuns, listWorkflows, readWorkflow } from "@browserkit/tools/workflow-store";
 
@@ -138,6 +139,7 @@ export interface AbilityCard {
   description?: string;
   kind: "read" | "write";
   ways: string[];
+  sources?: { runtime: "node" | "page"; code: string }[];
   inputs: { name: string; required: boolean; description?: string }[];
   stats?: { runs: number; failures: number; lastOkAt?: string; lastUsedAt?: string };
   updatedAt: string;
@@ -153,6 +155,7 @@ export interface SiteCard {
   sessionAccount: string | null;
   sessionSavedAt: string | null;
   abilities: AbilityCard[];
+  notes: { kind: "selector" | "url" | "pace" | "quirk"; key: string; value: string }[];
   recording: boolean;
   suggestions: string[];
 }
@@ -180,20 +183,41 @@ export async function abilityCards(): Promise<AbilityCard[]> {
   const sites = await allSites();
   return (
     await Promise.all(
-      sites.slice(0, 200).map(async (item) =>
-        (await listAbilities(item.site).catch(() => [])).map((ability) => ({
-          name: ability.name,
-          site: item.site,
-          ...(ability.description ? { description: ability.description } : {}),
-          kind: ability.kind,
-          ways: ability.ways.map((way) => way.kind),
-          inputs: abilityInputs(ability.inputs),
-          stats: ability.stats,
-          updatedAt: ability.updatedAt,
-        })),
-      ),
+      sites
+        .slice(0, 200)
+        .map(async (item) =>
+          (await listAbilities(item.site).catch(() => [])).map((ability) =>
+            toAbilityCard(item.site, ability),
+          ),
+        ),
     )
   ).flat();
+}
+
+type ListedAbility = Awaited<ReturnType<typeof listAbilities>>[number];
+
+function toAbilityCard(site: string, ability: ListedAbility): AbilityCard {
+  const sources = scriptSources(ability);
+  return {
+    name: ability.name,
+    site,
+    ...(ability.description ? { description: ability.description } : {}),
+    kind: ability.kind,
+    ways: ability.ways.map((way) => way.kind),
+    ...(sources.length ? { sources } : {}),
+    inputs: abilityInputs(ability.inputs),
+    stats: ability.stats,
+    updatedAt: ability.updatedAt,
+  };
+}
+
+function scriptSources(ability: ListedAbility): NonNullable<AbilityCard["sources"]> {
+  const sources: NonNullable<AbilityCard["sources"]> = [];
+  for (const way of ability.ways) {
+    if (way.kind !== "script" || !way.code) continue;
+    sources.push({ runtime: way.runtime, code: way.code.slice(0, 8000) });
+  }
+  return sources;
 }
 
 function abilityInputs(schema: Record<string, unknown>): AbilityCard["inputs"] {
@@ -207,11 +231,12 @@ function abilityInputs(schema: Record<string, unknown>): AbilityCard["inputs"] {
 }
 
 async function siteCard(site: SiteSummary): Promise<SiteCard> {
-  const [health, session, abilities, model] = await Promise.all([
+  const [health, session, abilities, model, notes] = await Promise.all([
     readHealth(site.site).catch(() => undefined),
     readSession(site.site).catch(() => undefined),
     listAbilities(site.site).catch(() => []),
     loadModel(site.site).catch(() => undefined),
+    readSiteFacts(site.site).catch(() => []),
   ]);
   const stored = session as
     { account?: unknown; savedAt?: unknown; updatedAt?: unknown } | undefined;
@@ -223,16 +248,8 @@ async function siteCard(site: SiteSummary): Promise<SiteCard> {
     session: session !== undefined,
     sessionAccount: typeof stored?.account === "string" ? stored.account : null,
     sessionSavedAt: sessionSavedAt(stored),
-    abilities: abilities.map((ability) => ({
-      name: ability.name,
-      site: site.site,
-      ...(ability.description ? { description: ability.description } : {}),
-      kind: ability.kind,
-      ways: ability.ways.map((way) => way.kind),
-      inputs: abilityInputs(ability.inputs),
-      stats: ability.stats,
-      updatedAt: ability.updatedAt,
-    })),
+    abilities: abilities.map((ability) => toAbilityCard(site.site, ability)),
+    notes,
     recording: isSiteRecording(site.site),
     suggestions: suggestionsOf(model),
   };

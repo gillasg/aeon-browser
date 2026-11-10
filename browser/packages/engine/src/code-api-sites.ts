@@ -214,7 +214,12 @@ var __siteAbilities = {
   // Moves an ability to the site's trash/ (nothing is hard-deleted); returns {removed}.
   remove: async (name, site) => __call({abilityRemove: {site: await __siteHostName(site), name}}),
   list: async (site) => __call({abilityList: {site: await __siteHostName(site)}}),
-  notes: async (site) => __call({siteNotes: await __siteHostName(site)}),
+  notes: async (site, fact) => {
+    var body = fact || (site && typeof site === 'object' ? site : undefined);
+    var host = await __siteHostName(body && site && typeof site === 'object' ? undefined : site);
+    if (!body) return __call({siteNotes: host});
+    return __call({siteNotes: {site: host, fact: body}});
+  },
 };
 var __siteBase = {tools: __siteToolGroup('tool'), pageTools: __siteToolGroup('pageTool'), capabilities: __siteCapabilities, run: __siteAbilities.run, test: __siteAbilities.test, remove: __siteAbilities.remove, save: __saveAbility, list: __siteAbilities.list, notes: __siteAbilities.notes};
 var site = Object.freeze(new Proxy(__siteBase, {

@@ -2,6 +2,7 @@ import { useState, type ReactElement } from "react";
 import { EmptyState } from "./empty-state.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
+import { SiteFacts } from "./ability-source.js";
 import { AbilitiesPanel, ActionNote } from "./management-automations.js";
 import {
   ImportPath,
@@ -239,6 +240,7 @@ function CanDo({
             suggest(`On ${host}, ${ability.description || ability.name.replace(/_/g, " ")}: `))
         }
       />
+      <SiteFacts notes={site.notes} />
       {site.suggestions.length > 0 && (
         <ul className="management-inputs">
           {site.suggestions.map((suggestion) => (
