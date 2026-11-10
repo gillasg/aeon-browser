@@ -36,7 +36,12 @@ function prop(name, value) {
 
 function render(ax, options = {}) {
   const url = options.url ?? URL;
-  const visible = options.text ?? ax.map((node) => node.name?.value).filter(Boolean).join("\n");
+  const visible =
+    options.text ??
+    ax
+      .map((node) => node.name?.value)
+      .filter(Boolean)
+      .join("\n");
   const filtered = filterVisibleTextNodes(ax, visible);
   const semantic = createSemanticNodes(filtered, options.query ? { query: options.query } : {});
   const tree = buildSemanticTree({
@@ -60,7 +65,10 @@ function legacy(url, nodes) {
   const lines = [url];
   const groups = new Map();
   for (const node of nodes) {
-    if (["heading", "statictext", "paragraph"].includes(node.role.toLowerCase()) || node.value !== undefined)
+    if (
+      ["heading", "statictext", "paragraph"].includes(node.role.toLowerCase()) ||
+      node.value !== undefined
+    )
       continue;
     const key = `${node.role}|${node.name}`;
     groups.set(key, [...(groups.get(key) ?? []), node.backendNodeId || node.ref]);
@@ -79,7 +87,15 @@ function legacy(url, nodes) {
     }
     let text = `[${node.backendNodeId}] ${node.role} ${JSON.stringify(node.name)}`;
     if (node.value !== undefined) text += ` = ${JSON.stringify(node.value)}`;
-    for (const flag of ["disabled", "checked", "focused", "expanded", "selected", "pressed", "mixed"]) {
+    for (const flag of [
+      "disabled",
+      "checked",
+      "focused",
+      "expanded",
+      "selected",
+      "pressed",
+      "mixed",
+    ]) {
       if (node[flag] !== undefined) text += ` ${flag}=${node[flag]}`;
     }
     const group = repeats.get(`${node.role}|${node.name}`);
@@ -111,14 +127,24 @@ function deals() {
 
 function jobs() {
   const items = ["Designer", "Editor", "Producer"].map((title) =>
-    el("listitem", "", [el("statictext", title), el("statictext", "Remote"), el("button", "Apply")]),
+    el("listitem", "", [
+      el("statictext", title),
+      el("statictext", "Remote"),
+      el("button", "Apply"),
+    ]),
   );
-  return el("RootWebArea", "Jobs", [el("main", "", [el("heading", "Open roles"), el("list", "Roles", items)])]);
+  return el("RootWebArea", "Jobs", [
+    el("main", "", [el("heading", "Open roles"), el("list", "Roles", items)]),
+  ]);
 }
 
 function thread() {
   return el("RootWebArea", "Thread", [
-    el("main", "", [el("heading", "Show your work"), el("button", "Like"), el("button", "Show more")]),
+    el("main", "", [
+      el("heading", "Show your work"),
+      el("button", "Like"),
+      el("button", "Show more"),
+    ]),
   ]);
 }
 
@@ -126,15 +152,19 @@ function shop() {
   return el("RootWebArea", "Shop", [
     el("main", "", [
       el("heading", "Lamps"),
-      el("link", "Brass lamp", [], { properties: [prop("url", "https://example.com/lamps/brass")] }),
-      el("link", "Copper lamp", [], { properties: [prop("url", "https://example.com/lamps/copper")] }),
+      el("link", "Brass lamp", [], {
+        properties: [prop("url", "https://example.com/lamps/brass")],
+      }),
+      el("link", "Copper lamp", [], {
+        properties: [prop("url", "https://example.com/lamps/copper")],
+      }),
     ]),
   ]);
 }
 
 function orders() {
-  const years = ["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"].map((year) =>
-    el("option", year),
+  const years = ["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"].map(
+    (year) => el("option", year),
   );
   return el("RootWebArea", "Your Orders", [
     el("navigation", "Main", [el("link", "Home"), el("link", "Buy again")]),
@@ -149,13 +179,19 @@ function orders() {
           el("cell", "1182"),
           el("cell", "USB cable"),
           el("cell", "Delivered"),
-          el("link", "View", [], { backend: 412, properties: [prop("url", "https://example.com/orders/1182")] }),
+          el("link", "View", [], {
+            backend: 412,
+            properties: [prop("url", "https://example.com/orders/1182")],
+          }),
           el("button", "Return", [], { backend: 413 }),
         ]),
         el("row", "", [
           el("cell", "1175"),
           el("cell", "HDMI cable"),
-          el("link", "View", [], { backend: 414, properties: [prop("url", "https://example.com/orders/1175")] }),
+          el("link", "View", [], {
+            backend: 414,
+            properties: [prop("url", "https://example.com/orders/1175")],
+          }),
         ]),
       ]),
     ]),
@@ -241,40 +277,102 @@ function offscreen() {
 
 function search() {
   const items = ["Lamp", "Cable"].map((name) =>
-    el("listitem", "", [el("statictext", name), el("link", "Open", [], { properties: [prop("url", "https://example.com/search/1")] })]),
+    el("listitem", "", [
+      el("statictext", name),
+      el("link", "Open", [], { properties: [prop("url", "https://example.com/search/1")] }),
+    ]),
   );
   return el("RootWebArea", "Search", [el("main", "", [el("list", "Results", items)])]);
 }
 
 function yearPage() {
-  const years = ["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"].map((year) =>
-    el("option", year),
+  const years = ["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"].map(
+    (year) => el("option", year),
   );
   return el("RootWebArea", "Filter", [
-    el("main", "", [el("combobox", "Year", years, { value: "2026", backend: 301 }), el("button", "Apply")]),
+    el("main", "", [
+      el("combobox", "Year", years, { value: "2026", backend: 301 }),
+      el("button", "Apply"),
+    ]),
   ]);
 }
 
 function badAx() {
-  return el("RootWebArea", "Canvas", [el("main", "", [el("heading", "Map")])]) ;
+  return el("RootWebArea", "Canvas", [el("main", "", [el("heading", "Map")])]);
 }
 
 const pages = [
-  { name: "deals", ax: deals, need: ['button "Save"', 'link "View deal"', 'row "Deal 1 · 40% off"', "→ /deals/1"] },
+  {
+    name: "deals",
+    ax: deals,
+    need: ['button "Save"', 'link "View deal"', 'row "Deal 1 · 40% off"', "→ /deals/1"],
+  },
   { name: "jobs", ax: jobs, need: ['item "Designer · Remote"', 'button "Apply"', "## Open roles"] },
   { name: "thread", ax: thread, need: ['button "Like"', 'button "Show more"'] },
   { name: "shop", ax: shop, need: ['link "Brass lamp"', "→ /lamps/brass", "## Lamps"] },
-  { name: "orders", ax: orders, need: ['button "Reject all"', '[301] combobox "Year" = 2026 (2026, 2025, 2024, +6)', 'row "1182 · USB cable"', "→ /orders/1182", 'button "Return"'] },
-  { name: "year", ax: yearPage, need: ['combobox "Year" = 2026 (2026, 2025, 2024, +6)', 'button "Apply"'] },
-  { name: "cookies", ax: cookies, need: ['dialog "Cookie preferences"', 'button "Reject all"', 'button "Continue"'] },
+  {
+    name: "orders",
+    ax: orders,
+    need: [
+      'button "Reject all"',
+      '[301] combobox "Year" = 2026 (2026, 2025, 2024, +6)',
+      'row "1182 · USB cable"',
+      "→ /orders/1182",
+      'button "Return"',
+    ],
+  },
+  {
+    name: "year",
+    ax: yearPage,
+    need: ['combobox "Year" = 2026 (2026, 2025, 2024, +6)', 'button "Apply"'],
+  },
+  {
+    name: "cookies",
+    ax: cookies,
+    need: ['dialog "Cookie preferences"', 'button "Reject all"', 'button "Continue"'],
+  },
   { name: "login", ax: login, need: ['textbox "Email"', "focused=true", 'button "Sign in"'] },
-  { name: "apply", ax: applyForm, need: ['textbox "you@example.com"', "required", 'invalid: "Enter an email"', 'button "Submit"'] },
-  { name: "news", ax: news, need: ["## City desk", 'link "Read more"', "→ /news/city", 'button "Save story"'] },
+  {
+    name: "apply",
+    ax: applyForm,
+    need: ['textbox "you@example.com"', "required", 'invalid: "Enter an email"', 'button "Submit"'],
+  },
+  {
+    name: "news",
+    ax: news,
+    need: ["## City desk", 'link "Read more"', "→ /news/city", 'button "Save story"'],
+  },
   { name: "directory", ax: directory, need: ['[70] button "Continue"', 'nav "Main" (30 links)'] },
-  { name: "bad-ax", ax: badAx, need: ["Accessibility tree is almost empty. Use page.act or a screenshot."], clickables: [{ backendNodeId: 77, text: "Track shipment" }], extra: ['clickable "Track shipment"'] },
-  { name: "edits", ax: namedEdits, need: ['[500] button "Edit"', '[511] button "Edit"', 'row "Order 1 · Item 1"', 'row "Order 12 · Item 12"'] },
-  { name: "offscreen", ax: offscreen, need: ['button "Save"', "↓", 'button "Cancel"'], offscreen: ["button|Save"] },
-  { name: "search", ax: search, need: ['item "Lamp"', 'link "Open"'], url: "https://example.com/search?q=lamp#results", title: "Search" },
+  {
+    name: "bad-ax",
+    ax: badAx,
+    need: ["Accessibility tree is almost empty. Use page.act or a screenshot."],
+    clickables: [{ backendNodeId: 77, text: "Track shipment" }],
+    extra: ['clickable "Track shipment"'],
+  },
+  {
+    name: "edits",
+    ax: namedEdits,
+    need: [
+      '[500] button "Edit"',
+      '[511] button "Edit"',
+      'row "Order 1 · Item 1"',
+      'row "Order 12 · Item 12"',
+    ],
+  },
+  {
+    name: "offscreen",
+    ax: offscreen,
+    need: ['button "Save"', "↓", 'button "Cancel"'],
+    offscreen: ["button|Save"],
+  },
+  {
+    name: "search",
+    ax: search,
+    need: ['item "Lamp"', 'link "Open"'],
+    url: "https://example.com/search?q=lamp#results",
+    title: "Search",
+  },
 ];
 
 test("fifteen saved trees keep their controls inside the 3000 character budget", () => {
@@ -282,14 +380,31 @@ test("fifteen saved trees keep their controls inside the 3000 character budget",
   for (const page of pages) {
     seq = 0;
     const ax = page.ax();
-    const full = render(ax, { budget: 30000, url: page.url, title: page.title, clickables: page.clickables, offscreen: page.offscreen });
+    const full = render(ax, {
+      budget: 30000,
+      url: page.url,
+      title: page.title,
+      clickables: page.clickables,
+      offscreen: page.offscreen,
+    });
     seq = 0;
-    const fitted = render(ax, { budget: 3000, url: page.url, title: page.title, clickables: page.clickables, offscreen: page.offscreen });
+    const fitted = render(ax, {
+      budget: 3000,
+      url: page.url,
+      title: page.title,
+      clickables: page.clickables,
+      offscreen: page.offscreen,
+    });
     const old = legacy(full.url, full.nodes);
     for (const needle of [...page.need, ...(page.extra ?? [])]) {
       assert.ok(fitted.view.includes(needle), `${page.name} missing ${needle}\n${fitted.view}`);
     }
-    rows.push({ page: page.name, old: old.length, next: full.view.length, at3000: fitted.view.length });
+    rows.push({
+      page: page.name,
+      old: old.length,
+      next: full.view.length,
+      at3000: fitted.view.length,
+    });
   }
   console.log("snapshot size, old formatter vs v2 (no trailing visible-text dump)");
   console.log("page        old   new   new@3000");
@@ -303,7 +418,10 @@ test("fifteen saved trees keep their controls inside the 3000 character budget",
 
 test("an orders page leads with the dialog, names the row, and keeps the link path", () => {
   seq = 0;
-  const { view } = render(orders(), { url: "https://example.com/orders/?tab=open#top", title: "Your Orders" });
+  const { view } = render(orders(), {
+    url: "https://example.com/orders/?tab=open#top",
+    title: "Your Orders",
+  });
   assert.match(view, /^example\.com\/orders\?tab=open#top · Your Orders/);
   const dialogAt = view.search(/^dialog "Cookie preferences"/m);
   const navAt = view.search(/^nav "Main"/m);
@@ -334,7 +452,9 @@ test("twelve named Edit buttons stay on their own rows", () => {
 
 test("twelve identical Edit buttons with no row text collapse", () => {
   seq = 0;
-  const buttons = Array.from({ length: 12 }, (_, index) => el("button", "Edit", [], { backend: 800 + index }));
+  const buttons = Array.from({ length: 12 }, (_, index) =>
+    el("button", "Edit", [], { backend: 800 + index }),
+  );
   const { view } = render(el("RootWebArea", "Bulk", [el("main", "", buttons)]));
   assert.match(view, /button "Edit" x12/);
   assert.equal(view.split("x12").length - 1, 1);
@@ -343,9 +463,15 @@ test("twelve identical Edit buttons with no row text collapse", () => {
 test("identical buttons collapse only when every row name matches", () => {
   seq = 0;
   const same = Array.from({ length: 5 }, (_, index) =>
-    el("row", "", [el("cell", "Pending"), el("cell", "Box"), el("button", "Edit", [], { backend: 900 + index })]),
+    el("row", "", [
+      el("cell", "Pending"),
+      el("cell", "Box"),
+      el("button", "Edit", [], { backend: 900 + index }),
+    ]),
   );
-  const collapsed = render(el("RootWebArea", "Queue", [el("main", "", [el("table", "Queue", same)])])).view;
+  const collapsed = render(
+    el("RootWebArea", "Queue", [el("main", "", [el("table", "Queue", same)])]),
+  ).view;
   assert.match(collapsed, /x5/);
   seq = 0;
   const rows = Array.from({ length: 5 }, (_, index) =>
@@ -355,7 +481,9 @@ test("identical buttons collapse only when every row name matches", () => {
       el("button", "Edit", [], { backend: 900 + index }),
     ]),
   );
-  const distinct = render(el("RootWebArea", "Queue", [el("main", "", [el("table", "Queue", rows)])])).view;
+  const distinct = render(
+    el("RootWebArea", "Queue", [el("main", "", [el("table", "Queue", rows)])]),
+  ).view;
   assert.equal(distinct.split('button "Edit"').length - 1, 5);
   assert.doesNotMatch(distinct, /x5/);
   assert.match(distinct, /row "Shipped · Box"/);
@@ -384,7 +512,9 @@ test("a query keeps the matching control and its row", () => {
 test("delta marks a changed control and a quiet page hides the rest", () => {
   const key = "snapshot-v2-delta";
   seq = 0;
-  const before = el("RootWebArea", "Cart", [el("main", "", [el("button", "Save", [], { backend: 50 })])]);
+  const before = el("RootWebArea", "Cart", [
+    el("main", "", [el("button", "Save", [], { backend: 50 })]),
+  ]);
   const first = createSemanticNodes(before).nodes;
   assert.equal(changedIds(key, first, true), undefined);
   rememberNodes(key, first, true);
@@ -395,7 +525,9 @@ test("delta marks a changed control and a quiet page hides the rest", () => {
   assert.match(hidden, /unchanged lines hidden; bu\.state\(\) shows the whole page/);
   assert.doesNotMatch(hidden, /button "Save"/);
   seq = 0;
-  const after = el("RootWebArea", "Cart", [el("main", "", [el("button", "Saved", [], { backend: 50 })])]);
+  const after = el("RootWebArea", "Cart", [
+    el("main", "", [el("button", "Saved", [], { backend: 50 })]),
+  ]);
   const changed = changedIds(key, createSemanticNodes(after).nodes, true);
   assert.ok(changed?.has(50));
   seq = 0;
@@ -406,7 +538,10 @@ test("delta marks a changed control and a quiet page hides the rest", () => {
 test("the budget drops text and spare rows before a control", () => {
   seq = 0;
   const essay = el("RootWebArea", "Notes", [
-    el("main", "", [el("statictext", "word ".repeat(80).trim()), el("button", "Buy", [], { backend: 3 })]),
+    el("main", "", [
+      el("statictext", "word ".repeat(80).trim()),
+      el("button", "Buy", [], { backend: 3 }),
+    ]),
   ]);
   const short = render(essay, { budget: 180 }).view;
   assert.match(short, /\[3\] button "Buy"/);
@@ -420,7 +555,9 @@ test("the budget drops text and spare rows before a control", () => {
       el("button", "View", [], { backend: 5000 + index }),
     ]),
   );
-  const cut = render(el("RootWebArea", "Orders", [el("main", "", [el("table", "Orders", rows)])]), { budget: 700 }).view;
+  const cut = render(el("RootWebArea", "Orders", [el("main", "", [el("table", "Orders", rows)])]), {
+    budget: 700,
+  }).view;
   assert.match(cut, /table "Orders" \(40 rows; \d+ shown\)/);
   assert.match(cut, /\(\+\d+ rows; page\.state\(\{query\}\) or page\.table\(\)\)/);
   assert.match(cut, /button "View"/);

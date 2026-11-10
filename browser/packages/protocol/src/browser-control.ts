@@ -80,7 +80,10 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       /** Remember this snapshot as the baseline a later delta compares against. */
       pin: z.boolean().optional(),
       /** Open a collapsed nav or footer. `all` opens every collapsed landmark. */
-      expand: z.array(z.enum(["nav", "footer", "all"])).max(3).optional(),
+      expand: z
+        .array(z.enum(["nav", "footer", "all"]))
+        .max(3)
+        .optional(),
     })
     .strict(),
   z

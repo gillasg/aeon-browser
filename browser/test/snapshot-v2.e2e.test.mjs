@@ -67,7 +67,13 @@ test(
       await connectExtension(profile, env);
       const shot = await run(
         process.execPath,
-        [cli, "repl", "--session", "snapshot", `page = await browser.openTab(${JSON.stringify(siteUrl)});\nawait bu.state();`],
+        [
+          cli,
+          "repl",
+          "--session",
+          "snapshot",
+          `page = await browser.openTab(${JSON.stringify(siteUrl)});\nawait bu.state();`,
+        ],
         { env },
       );
       const out = `${shot.stdout}\n${shot.stderr}`;
@@ -82,8 +88,12 @@ test(
       bridge.kill();
       site.close();
       await sleep(300);
-      await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
-      await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
+      await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => {},
+      );
+      await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => {},
+      );
     }
   },
 );
@@ -93,7 +103,9 @@ async function connectExtension(profile, env) {
     Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
   );
   const worker = await waitFor(async () => {
-    const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) => response.json());
+    const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) =>
+      response.json(),
+    );
     const found = targets.find((item) => item.url.endsWith("/service-worker.js"));
     if (!found) throw new Error("no worker yet");
     return found;
@@ -110,7 +122,9 @@ async function connectExtension(profile, env) {
   await cdp("Runtime.evaluate", {
     expression: `chrome.runtime.sendNativeMessage = (_host, request, callback) => callback(${JSON.stringify(reply)});`,
   });
-  const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((response) => response.json());
+  const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((response) =>
+    response.json(),
+  );
   const browser = await connect(version.webSocketDebuggerUrl);
   await browser("Target.createTarget", { url: "about:blank" });
   await waitFor(async () => {
@@ -121,7 +135,11 @@ async function connectExtension(profile, env) {
 
 function nativeBootstrap(env) {
   return new Promise((resolveReply, reject) => {
-    const host = spawn(process.execPath, [cli, "chrome-extension://dmlgohfphkbenjopdphcojgjeidlmajj/"], { env });
+    const host = spawn(
+      process.execPath,
+      [cli, "chrome-extension://dmlgohfphkbenjopdphcojgjeidlmajj/"],
+      { env },
+    );
     const chunks = [];
     host.stdout.on("data", (chunk) => chunks.push(chunk));
     host.on("error", reject);
