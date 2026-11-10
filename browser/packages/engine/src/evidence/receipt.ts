@@ -3,8 +3,6 @@
 
 export const QUIET_MS = 150;
 export const CAUSAL_MS = 500;
-/** After a dialog the page's own code runs on (a download, a submit); a busy machine can be slow. */
-export const AFTER_DIALOG_MS = 1_500;
 export const CAP_MS = 3_000;
 export const LONG_CAP_MS = 15_000;
 
@@ -65,7 +63,7 @@ export function createOpenReceipt(actionId: string, tabId: number, now = Date.no
 /** A request counts only inside 500ms of the action, of a dialog close, or of the close hold. */
 export function inCausalWindow(receipt: OpenReceipt, now: number): boolean {
   if (now - receipt.startedAt <= CAUSAL_MS) return true;
-  if (receipt.dialogClosedAt !== undefined && now - receipt.dialogClosedAt <= AFTER_DIALOG_MS)
+  if (receipt.dialogClosedAt !== undefined && now - receipt.dialogClosedAt <= CAUSAL_MS)
     return true;
   return receipt.holdUntil !== undefined && now <= receipt.holdUntil;
 }
@@ -194,13 +192,13 @@ function idle(receipt: OpenReceipt): boolean {
 function holdAfterDialog(receipt: OpenReceipt, now: number): void {
   // Settle can use up the 500ms after a dialog before we ask to close. Hold one causal window
   // from this moment so the page code that runs after confirm (a download, a request) can join.
-  if (receipt.dialog && receipt.holdUntil === undefined) receipt.holdUntil = now + AFTER_DIALOG_MS;
+  if (receipt.dialog && receipt.holdUntil === undefined) receipt.holdUntil = now + CAUSAL_MS;
 }
 
 function isQuiet(receipt: OpenReceipt, now: number, quietMs: number): boolean {
   if (receipt.pending.size > 0) return false;
   if (receipt.holdUntil !== undefined && now < receipt.holdUntil) return false;
-  if (receipt.dialogClosedAt !== undefined && now < receipt.dialogClosedAt + AFTER_DIALOG_MS)
+  if (receipt.dialogClosedAt !== undefined && now < receipt.dialogClosedAt + CAUSAL_MS)
     return false;
   return now - receipt.lastProgressAt >= quietMs;
 }
@@ -224,7 +222,7 @@ function waitMs(
 }
 
 function dialogUntil(receipt: OpenReceipt): number {
-  return receipt.dialogClosedAt === undefined ? 0 : receipt.dialogClosedAt + AFTER_DIALOG_MS;
+  return receipt.dialogClosedAt === undefined ? 0 : receipt.dialogClosedAt + CAUSAL_MS;
 }
 
 function capped(receipt: OpenReceipt): ClosedReceipt {
