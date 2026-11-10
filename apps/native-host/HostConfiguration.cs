@@ -12,6 +12,10 @@ internal sealed class HostConfiguration
     public string NodeExecutable;
     public string DaemonEntrypoint;
     public string DataDirectory;
+    // Optional release-train fields. The daemon still starts from DaemonEntrypoint.
+    public string Current;
+    public string Previous;
+    public string Channel;
 
     public string ExtensionOrigin { get { return "chrome-extension://" + ExtensionId; } }
 
@@ -56,9 +60,7 @@ internal sealed class HostConfiguration
             FileShare.ReadWrite | FileShare.Delete))
         using (var reader = new StreamReader(stream)) text = reader.ReadToEnd();
         var values = serializer.Deserialize<Dictionary<string, object>>(text);
-        if (values == null || values.Count != 4 ||
-            !values.ContainsKey("extensionId") || !values.ContainsKey("nodeExecutable") ||
-            !values.ContainsKey("daemonEntrypoint") || !values.ContainsKey("dataDirectory"))
+        if (!SupportedShape(values))
             throw new InvalidDataException("Native host config has an unsupported shape.");
 
         var result = new HostConfiguration
@@ -66,7 +68,10 @@ internal sealed class HostConfiguration
             ExtensionId = ReadString(values, "extensionId"),
             NodeExecutable = ReadString(values, "nodeExecutable"),
             DaemonEntrypoint = ReadString(values, "daemonEntrypoint"),
-            DataDirectory = ReadString(values, "dataDirectory")
+            DataDirectory = ReadString(values, "dataDirectory"),
+            Current = ReadOptional(values, "current"),
+            Previous = ReadOptional(values, "previous"),
+            Channel = ReadOptional(values, "channel")
         };
         result.Validate();
         return result;
@@ -77,7 +82,7 @@ internal sealed class HostConfiguration
         if (!Regex.IsMatch(ExtensionId, "^[a-p]{32}$"))
             throw new InvalidDataException("Native host config has an invalid extension ID.");
         NodeExecutable = ExistingFile(NodeExecutable);
-        DaemonEntrypoint = ExistingFile(DaemonEntrypoint);
+        DaemonEntrypoint = ExistingEntrypoint(DaemonEntrypoint);
         var localAppData = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
         var appDataRoot = Path.GetFullPath(Path.Combine(localAppData, "Aeon")) + Path.DirectorySeparatorChar;
         DataDirectory = Path.GetFullPath(DataDirectory);
@@ -114,6 +119,28 @@ internal sealed class HostConfiguration
         }
     }
 
+    private static bool SupportedShape(Dictionary<string, object> values)
+    {
+        if (values == null || !values.ContainsKey("extensionId") || !values.ContainsKey("nodeExecutable") ||
+            !values.ContainsKey("daemonEntrypoint") || !values.ContainsKey("dataDirectory"))
+            return false;
+        foreach (var key in values.Keys)
+            if (!KnownKey(key)) return false;
+        return true;
+    }
+
+    private static bool KnownKey(string key)
+    {
+        return key == "extensionId" || key == "nodeExecutable" || key == "daemonEntrypoint" ||
+            key == "dataDirectory" || key == "current" || key == "previous" || key == "channel";
+    }
+
+    private static string ReadOptional(IDictionary<string, object> values, string key)
+    {
+        if (!values.ContainsKey(key)) return null;
+        return ReadString(values, key);
+    }
+
     private static string ReadString(IDictionary<string, object> values, string key)
     {
         var value = values[key] as string;
@@ -126,5 +153,17 @@ internal sealed class HostConfiguration
         var fullPath = Path.GetFullPath(path);
         if (!File.Exists(fullPath)) throw new FileNotFoundException("A configured native host file is missing.");
         return fullPath;
+    }
+
+    /// <summary>
+    /// A versioned build may be the daemon file or its directory. The directory form launches main.js inside it.
+    /// </summary>
+    private static string ExistingEntrypoint(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (File.Exists(fullPath)) return fullPath;
+        var nested = Path.Combine(fullPath, "main.js");
+        if (Directory.Exists(fullPath) && File.Exists(nested)) return Path.GetFullPath(nested);
+        throw new FileNotFoundException("A configured native host file is missing.");
     }
 }

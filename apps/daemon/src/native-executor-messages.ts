@@ -45,6 +45,7 @@ export function attachNativeExecutor(
     if (handleAgentSettingsReply(candidate)) return;
     if (handleBlockedSitesReply(candidate)) return;
     if (handleCompanionMessage(socket, candidate, { service, browserControl })) return;
+    if (browserControl.handleHealthReply(candidate)) return;
     // Page grants authenticate the UI independently of browser inventory.
     const request = PageGrantIssueRequestSchema.safeParse(candidate);
     if (!request.success) return socket.close(1008, "Unsupported executor message");

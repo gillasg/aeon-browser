@@ -215,6 +215,11 @@ export class AeonClient {
     });
   }
 
+  /** The app-level health ping: daemon, extension and engine, not a socket ping. */
+  health(timeoutMs = 2500): Promise<Json> {
+    return this.ask("core.health", {}, "core.health.result", timeoutMs);
+  }
+
   /** Lists the connected browsers (one per Chrome profile), naming one first if asked. */
   browsers(rename?: { browser: string; name: string }): Promise<Json> {
     return this.ask("core.browsers", rename ? { rename } : {}, "core.browsers.result");

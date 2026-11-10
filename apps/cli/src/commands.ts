@@ -21,6 +21,8 @@ import type { ChatResult } from "./results.js";
 import { settingsCommand } from "./settings.js";
 import { signinCommand } from "./signin.js";
 import { setupCommands } from "./setup.js";
+import { doctorCommand } from "./doctor.js";
+import { rollbackCommand } from "./rollback.js";
 import { packCommand } from "./pack.js";
 import { listTools, runTool } from "./tools.js";
 
@@ -442,6 +444,8 @@ Stops the chat's current run and closes the agent tabs it no longer needs.`,
 
 function aeonOnlyCommands(host: DaemonHost): Command[] {
   return [
+    doctorCommand(host),
+    rollbackCommand(),
     {
       name: "run",
       group: "Aeon",

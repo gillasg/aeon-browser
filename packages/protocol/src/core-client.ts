@@ -334,4 +334,24 @@ export const CoreChatPinnedSchema = z
     error: z.string().max(2000).optional(),
   })
   .strict();
+/** App-level health: the daemon event loop, then the extension, then the engine. */
+export const CoreHealthRequestSchema = z
+  .object({
+    kind: z.literal("core.health"),
+    requestId: z.string().uuid(),
+  })
+  .strict();
+export const CoreHealthResultSchema = z
+  .object({
+    kind: z.literal("core.health.result"),
+    requestId: z.string().uuid(),
+    ok: z.boolean(),
+    daemon: z.literal(true),
+    extension: z.boolean(),
+    engine: z.boolean(),
+    protocolVersion: ProtocolVersionSchema,
+    engineProtocol: ProtocolVersionSchema.optional(),
+    ms: z.number().int().nonnegative(),
+  })
+  .strict();
 export type CoreBrowserSummary = z.infer<typeof CoreBrowserSummarySchema>;

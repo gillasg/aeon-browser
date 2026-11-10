@@ -34,6 +34,32 @@ internal static class HostConfigurationProbe
             File.Delete(entry);
             try { HostConfiguration.Load(path); throw new Exception("Missing entrypoint accepted"); }
             catch (FileNotFoundException) { }
+            File.WriteAllText(entry, "fixture");
+            var extra = new Dictionary<string, object> {
+                { "extensionId", new string('a', 32) }, { "nodeExecutable", executable },
+                { "daemonEntrypoint", entry }, { "dataDirectory", data }, { "extra", "no" }
+            };
+            File.WriteAllText(path, new JavaScriptSerializer().Serialize(extra));
+            try { HostConfiguration.Load(path); throw new Exception("Unknown config key accepted"); }
+            catch (InvalidDataException) { }
+            var build = Path.Combine(root, "builds", "0.1.0-abc1234");
+            Directory.CreateDirectory(build);
+            var nested = Path.Combine(build, "main.js");
+            File.WriteAllText(nested, "fixture");
+            var pointed = new JavaScriptSerializer().Serialize(new Dictionary<string, object> {
+                { "extensionId", new string('a', 32) }, { "nodeExecutable", executable },
+                { "daemonEntrypoint", build }, { "dataDirectory", data },
+                { "current", "0.1.0-abc1234" }, { "previous", "0.1.0-def5678" }
+            });
+            File.WriteAllText(path, pointed);
+            var rolled = HostConfiguration.Load(path);
+            if (rolled.DaemonEntrypoint != Path.GetFullPath(nested))
+                throw new Exception("Build directory was not resolved to main.js");
+            if (rolled.Current != "0.1.0-abc1234" || rolled.Previous != "0.1.0-def5678")
+                throw new Exception("Release fields were dropped");
+            File.Delete(nested);
+            try { HostConfiguration.Load(path); throw new Exception("Build directory without main.js accepted"); }
+            catch (FileNotFoundException) { }
             Console.WriteLine("Configuration recovery and validation passed");
             return 0;
         }

@@ -16,6 +16,7 @@ import { isWriteStep } from "./browser-step-write.js";
 import { BrowserCodeCells, type BrowserCodeCellInput } from "./browser-code-cells.js";
 import type { SiteScriptService } from "./site-script-service.js";
 import { CdpService } from "./cdp-service.js";
+import { HealthPings, type HealthReport } from "./health-ping.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import {
   listBrowserTabs,
@@ -50,6 +51,7 @@ export class BrowserControlService {
   private ownerTitles: ((chatId: string) => string | undefined) | undefined;
   private spaceForChat: ((chatId: string) => "window" | "tabs" | undefined) | undefined;
   private cdpService: CdpService | undefined;
+  private readonly health = new HealthPings();
   private readonly cells = new BrowserCodeCells((chatId, target) =>
     this.setAssociation(chatId, target, "agent-created", "agent-open"),
   );
@@ -325,6 +327,22 @@ export class BrowserControlService {
   executorSockets(): WebSocket[] {
     return [...this.executors.values()];
   }
+  /**
+   * Daemon, then extension, then engine. No open executor answers at once as extension-down;
+   * the engine must echo the nonce on a later turn.
+   */
+  pingHealth(budgetMs?: number): Promise<HealthReport> {
+    return this.health.ping((body) => {
+      const socket = this.openExecutor();
+      if (!socket) return false;
+      socket.send(JSON.stringify(body));
+      return true;
+    }, budgetMs);
+  }
+  /** An engine health reply. Other host results are consumed so they do not drop the socket. */
+  handleHealthReply(candidate: unknown): boolean {
+    return this.health.handleReply(candidate);
+  }
   /** Starts or reports the daemon CDP endpoint; calls travel over the existing executor socket. */
   async startCdp(port: number, directory: string): Promise<unknown> {
     this.cdpService ??= new CdpService((body) => this.sendCdp(body), directory);
@@ -336,8 +354,11 @@ export class BrowserControlService {
   stopCdp(): Promise<unknown> {
     return this.cdpService?.stop() ?? Promise.resolve({ running: false });
   }
+  private openExecutor(): WebSocket | undefined {
+    return this.executorSockets().find((item) => item.readyState === WebSocket.OPEN);
+  }
   private sendCdp(body: Record<string, unknown>): void {
-    const socket = [...this.executors.values()].find((item) => item.readyState === WebSocket.OPEN);
+    const socket = this.openExecutor();
     if (!socket) throw new Error("BROWSER_OFFLINE: no browser connected");
     socket.send(JSON.stringify(body));
   }
