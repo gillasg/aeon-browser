@@ -132,6 +132,7 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
   model, the cache and the result only see `%email%`. With a known id or selector, act on it
   directly. `help('act')`.
 - `page.console()` reads console messages and errors (capture is off until asked for).
+- When you know a dialog is coming, set it first with `await page.dialog.expect("dismiss")`, `page.dialog.expect("accept")` or `page.dialog.expect("the text")`.
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
 - After a cell with actions the new page state prints automatically; never add blind sleeps (one right

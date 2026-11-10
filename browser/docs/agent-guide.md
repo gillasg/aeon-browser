@@ -147,7 +147,8 @@ await page.download(url);
 
 ```js
 await page.console({ errors: true }); // page console messages and errors; the first call starts recording
-await page.dialogs("dismiss"); // alert/confirm/prompt are accepted by default; this declines them
+await page.dialog.expect("accept"); // next dialog: "dismiss", "accept", or the prompt text
+await page.dialogs("dismiss"); // from here on, alert/confirm/prompt decline
 await page.dialogs("accept", "my answer"); // answer prompts
 await page.pdf("receipt.pdf"); // save the page as a PDF file
 await page.emulate({

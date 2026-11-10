@@ -176,4 +176,12 @@ export const browserExtraSteps = [
       scriptId: z.string().uuid().optional(),
     })
     .strict(),
+  z
+    .object({
+      op: z.literal("dialog"),
+      target,
+      /** "dismiss", "accept", or the text to accept the next prompt with. One dialog. */
+      expect: z.string().min(1).max(500),
+    })
+    .strict(),
 ] as const;

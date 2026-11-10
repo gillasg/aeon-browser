@@ -36,14 +36,7 @@ onEngineInstall(() => {
     if (source.tabId === undefined) return;
     const state = activity.get(source.tabId);
     if (!state) return;
-    const data = (raw ?? {}) as { requestId?: string; type?: string; defaultPrompt?: string };
-    if (method === "Page.javascriptDialogOpening")
-      void chrome.debugger
-        .sendCommand(source, "Page.handleJavaScriptDialog", {
-          accept: true,
-          promptText: data.defaultPrompt ?? "",
-        })
-        .catch(() => undefined);
+    const data = (raw ?? {}) as { requestId?: string; type?: string };
     captureNetworkActivity(
       state,
       (source.sessionId ?? "") + ":" + data.requestId,
@@ -430,16 +423,62 @@ async function answeredWithin<T>(ms: number, work: Promise<T>): Promise<T> {
 }
 
 // URL, element count and text length: cheap, and enough to tell a read from a change.
-async function pageFingerprint(debuggee: chrome.debugger.Debuggee): Promise<string | undefined> {
-  const result = (await chrome.debugger
-    .sendCommand(debuggee, "Runtime.evaluate", {
-      expression:
-        "location.href+'|'+document.getElementsByTagName('*').length+'|'+(document.body?document.body.textContent.length:0)",
-      returnByValue: true,
-    })
-    .catch(() => undefined)) as { result?: { value?: unknown } } | undefined;
-  const value = result?.result?.value;
+// A hung renderer must not stall the step: give up and report unknown.
+const FINGERPRINT_MS = 1_500;
+const FINGERPRINT_EXPRESSION =
+  "location.href+'|'+document.getElementsByTagName('*').length+'|'+(document.body?document.body.textContent.length:0)";
+
+export async function pageFingerprint(
+  debuggee: chrome.debugger.Debuggee,
+  timeoutMs = FINGERPRINT_MS,
+): Promise<string | undefined> {
+  const value = await fingerprintWithin(debuggee, timeoutMs);
   return typeof value === "string" ? value : undefined;
+}
+
+async function fingerprintWithin(
+  debuggee: chrome.debugger.Debuggee,
+  timeoutMs: number,
+): Promise<unknown> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let late = false;
+  try {
+    return await Promise.race([
+      readFingerprint(debuggee, timeoutMs),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => {
+          late = true;
+          resolve(undefined);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (late) await stopFingerprint(debuggee);
+  }
+}
+
+async function readFingerprint(
+  debuggee: chrome.debugger.Debuggee,
+  timeoutMs: number,
+): Promise<unknown> {
+  try {
+    const result = (await chrome.debugger.sendCommand(debuggee, "Runtime.evaluate", {
+      expression: FINGERPRINT_EXPRESSION,
+      returnByValue: true,
+      timeout: timeoutMs,
+    })) as { result?: { value?: unknown } } | undefined;
+    return result?.result?.value;
+  } catch {
+    return undefined;
+  }
+}
+
+async function stopFingerprint(debuggee: chrome.debugger.Debuggee): Promise<void> {
+  await Promise.race([
+    chrome.debugger.sendCommand(debuggee, "Runtime.terminateExecution", {}).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 200)),
+  ]);
 }
 export function hintEvaluateError(description: string): string {
   const text = String(description ?? "");

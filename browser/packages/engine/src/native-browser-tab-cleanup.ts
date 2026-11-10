@@ -120,6 +120,12 @@ export function isAgentTab(tabId: number): boolean {
   return tracked.has(tabId);
 }
 
+/** A tab the agent opened. A user's tab, and a popup the page opened, are not. */
+export function agentOpenedTab(tabId: number): boolean {
+  const entry = tracked.get(tabId);
+  return entry !== undefined && entry.popup !== true;
+}
+
 /** A list request must wait for session-storage state before it marks each tab's owner. */
 export function ensureAgentTabsRestored(): Promise<void> {
   return restore();

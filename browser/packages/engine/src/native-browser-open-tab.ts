@@ -14,12 +14,17 @@ import {
   bindBrowserSession,
 } from "./native-browser-session.js";
 import { claimAgentTab, groupAgentTab } from "./native-browser-groups.js";
-import { markAgentTabGrouped, trackAgentTab } from "./native-browser-tab-cleanup.js";
+import {
+  agentOpenedTab,
+  markAgentTabGrouped,
+  trackAgentTab,
+} from "./native-browser-tab-cleanup.js";
 import { ownerTitle } from "./native-browser-owner.js";
 import { enableQuietTab } from "./native-browser-quiet.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { BrowserActionError, safePage, sameIdentity } from "./native-browser-common.js";
 import { navigateReady } from "./native-browser-navigation.js";
+import { noteAgentNavigation, setAgentOpenedTab } from "./evidence/dialogs.js";
 import { captureFromTabStart } from "./native-browser-network.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 import {
@@ -28,6 +33,8 @@ import {
   noteSpace,
   spaceWindow,
 } from "./native-browser-spaces.js";
+
+setAgentOpenedTab(agentOpenedTab);
 
 export async function openTab(
   identity: BrowserIdentity,
@@ -79,6 +86,7 @@ async function navigateOpenedTab(
   referer?: string,
 ): Promise<string | undefined> {
   try {
+    noteAgentNavigation(tabId);
     await withBrowserDebugger(tabId, async () => {
       await captureFromTabStart(tabId);
       await navigateReady(tabId, url, timeoutMs, referer);

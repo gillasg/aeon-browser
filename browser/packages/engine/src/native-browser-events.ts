@@ -257,6 +257,14 @@ export function readDiagnostics(tabId: number, clear = false): Diagnostics {
   }
   return result;
 }
+/** A dialog line the policy already decided: accepted, dismissed, or a [warn]. */
+export function notePageConsole(tabId: number, level: string, text: string): void {
+  const buffer = buffers.get(tabId);
+  if (!buffer) return;
+  buffer.console.push({ level, text: text.slice(0, 1000) });
+  if (buffer.console.length > 80) buffer.console.shift();
+}
+
 export function forgetDiagnostics(tabId: number): void {
   buffers.delete(tabId);
   runtimeEnabled.delete(tabId);
@@ -270,14 +278,8 @@ onEngineInstall(() => {
     const buffer = buffers.get(source.tabId);
     if (!buffer) return;
     const params = (raw ?? {}) as Record<string, unknown>;
-    if (method === "Page.javascriptDialogOpening") {
-      buffer.console.push({
-        level: "info",
-        text: `[dialog ${String(params.type)}] ${String(params.message).slice(0, 300)} (accepted)`,
-      });
-      if (buffer.console.length > 80) buffer.console.shift();
-      return;
-    }
+    // The dialog policy writes the line (accepted, dismissed, or [warn]); it is not always accepted.
+    if (method === "Page.javascriptDialogOpening") return;
     if (method === "Runtime.consoleAPICalled" || method === "Runtime.exceptionThrown")
       captureConsole(buffer, method, params);
     else captureNetwork(source.tabId, buffer, method, params);
