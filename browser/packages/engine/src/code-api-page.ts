@@ -182,8 +182,8 @@ function __pageSelection() {
   return text.slice(0, 500);
 }
 function __logDialogWarn(result) {
-  var bag = [(result && result.note) || '', (result && result.data && result.data.dialogWarn) || ''].join('\n');
-  for (var line of bag.split('\n')) {
+  var bag = [(result && result.note) || '', (result && result.data && result.data.dialogWarn) || ''].join('\\n');
+  for (var line of bag.split('\\n')) {
     var at = line.indexOf('[warn]');
     if (at >= 0) console.log(line.slice(at));
   }
