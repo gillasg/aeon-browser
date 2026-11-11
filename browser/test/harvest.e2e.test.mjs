@@ -57,6 +57,7 @@ test(
           "--no-first-run",
           "--no-default-browser-check",
           "--headless=new",
+          ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
           "about:blank",
         ],
         { stdio: "ignore" },

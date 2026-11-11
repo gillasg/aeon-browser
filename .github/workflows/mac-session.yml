@@ -1,0 +1,380 @@
+name: Mac session
+
+on:
+  workflow_dispatch:
+    inputs:
+      timeout-minutes:
+        description: Minutes to keep the runner alive (1-180)
+        required: false
+        default: 60
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  session:
+    runs-on: macos-latest
+    timeout-minutes: ${{ fromJSON(inputs['timeout-minutes']) > 180 && 180 || fromJSON(inputs['timeout-minutes']) < 1 && 1 || fromJSON(inputs['timeout-minutes']) }}
+    steps:
+      - name: Check timeout
+        run: |
+          set -euo pipefail
+          requested="${{ inputs['timeout-minutes'] }}"
+          if [ "$requested" -lt 1 ] || [ "$requested" -gt 180 ]; then
+            echo "timeout-minutes must be from 1 to 180 (got ${requested})"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Cache Chrome for Testing
+        uses: actions/cache@v4
+        with:
+          path: .slice0-audit/chrome-for-testing-154.0.8037.57
+          key: chrome-for-testing-154.0.8037.57-mac-arm64
+      - name: Install Chrome for Testing
+        run: |
+          set -euo pipefail
+          dir=".slice0-audit/chrome-for-testing-154.0.8037.57"
+          bin="$dir/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+          if [ ! -f "$bin" ]; then
+            mkdir -p "$dir"
+            curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/mac-arm64/chrome-mac-arm64.zip" -o "$dir/chrome.zip"
+            unzip -q "$dir/chrome.zip" -d "$dir"
+            rm -f "$dir/chrome.zip"
+          fi
+          chmod +x "$bin"
+          xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
+          echo "CHROME_PATH=$(pwd)/$bin" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build Aeon
+        run: pnpm build
+      - name: Grant screen capture and verify
+        run: |
+          set -euo pipefail
+          sw_vers
+          python3 - <<'PY'
+          import os, sqlite3, time
+          home = os.environ["HOME"]
+          clients = [
+              "/usr/sbin/screencapture",
+              "/bin/bash",
+              "/usr/libexec/sshd-keygen-wrapper",
+          ]
+          sshd_csreq = bytes.fromhex(
+              "fade0c000000003c0000000100000006000000020000001d636f6d2e6170706c652e737368642d6b657967656e2d7772617070657200000000000003"
+          )
+          def grant(db):
+              print(f"TCC db: {db}")
+              if not os.path.exists(db):
+                  print(f"missing {db}")
+                  return False
+              con = sqlite3.connect(db, timeout=10)
+              cols = [row[1] for row in con.execute("pragma table_info(access)")]
+              print("columns:", ",".join(cols))
+              now = int(time.time())
+              for client in clients:
+                  row = {name: None for name in cols}
+                  row["service"] = "kTCCServiceScreenCapture"
+                  row["client"] = client
+                  if "client_type" in row:
+                      row["client_type"] = 1
+                  if "auth_value" in row:
+                      row["auth_value"] = 2
+                  if "allowed" in row:
+                      row["allowed"] = 1
+                  if "auth_reason" in row:
+                      row["auth_reason"] = 4
+                  if "auth_version" in row:
+                      row["auth_version"] = 1
+                  if "prompt_count" in row:
+                      row["prompt_count"] = 0
+                  if "indirect_object_identifier_type" in row:
+                      row["indirect_object_identifier_type"] = 0
+                  if "indirect_object_identifier" in row:
+                      row["indirect_object_identifier"] = "UNUSED"
+                  if "flags" in row:
+                      row["flags"] = 0
+                  if "last_modified" in row:
+                      row["last_modified"] = now
+                  if "boot_uuid" in row:
+                      row["boot_uuid"] = "UNUSED"
+                  if "last_reminded" in row:
+                      row["last_reminded"] = now
+                  if client.endswith("sshd-keygen-wrapper") and "csreq" in row:
+                      row["csreq"] = sshd_csreq
+                  con.execute(
+                      "DELETE FROM access WHERE service=? AND client=?",
+                      ("kTCCServiceScreenCapture", client),
+                  )
+                  con.execute(
+                      f"INSERT INTO access ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)})",
+                      [row[name] for name in cols],
+                  )
+                  print(f"granted {client}")
+              con.commit()
+              con.close()
+              return True
+          user_db = os.path.join(home, "Library/Application Support/com.apple.TCC/TCC.db")
+          print("user grant:", grant(user_db))
+          PY
+          sudo /usr/bin/python3 - <<'PY'
+          import os, sqlite3, time
+          clients = [
+              "/usr/sbin/screencapture",
+              "/bin/bash",
+              "/usr/libexec/sshd-keygen-wrapper",
+          ]
+          sshd_csreq = bytes.fromhex(
+              "fade0c000000003c0000000100000006000000020000001d636f6d2e6170706c652e737368642d6b657967656e2d7772617070657200000000000003"
+          )
+          db = "/Library/Application Support/com.apple.TCC/TCC.db"
+          print(f"system TCC db: {db}")
+          con = sqlite3.connect(db, timeout=10)
+          cols = [row[1] for row in con.execute("pragma table_info(access)")]
+          print("system columns:", ",".join(cols))
+          now = int(time.time())
+          for client in clients:
+              row = {name: None for name in cols}
+              row["service"] = "kTCCServiceScreenCapture"
+              row["client"] = client
+              if "client_type" in row:
+                  row["client_type"] = 1
+              if "auth_value" in row:
+                  row["auth_value"] = 2
+              if "allowed" in row:
+                  row["allowed"] = 1
+              if "auth_reason" in row:
+                  row["auth_reason"] = 4
+              if "auth_version" in row:
+                  row["auth_version"] = 1
+              if "prompt_count" in row:
+                  row["prompt_count"] = 0
+              if "indirect_object_identifier_type" in row:
+                  row["indirect_object_identifier_type"] = 0
+              if "indirect_object_identifier" in row:
+                  row["indirect_object_identifier"] = "UNUSED"
+              if "flags" in row:
+                  row["flags"] = 0
+              if "last_modified" in row:
+                  row["last_modified"] = now
+              if "boot_uuid" in row:
+                  row["boot_uuid"] = "UNUSED"
+              if "last_reminded" in row:
+                  row["last_reminded"] = now
+              if client.endswith("sshd-keygen-wrapper") and "csreq" in row:
+                  row["csreq"] = sshd_csreq
+              con.execute(
+                  "DELETE FROM access WHERE service=? AND client=?",
+                  ("kTCCServiceScreenCapture", client),
+              )
+              con.execute(
+                  f"INSERT INTO access ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)})",
+                  [row[name] for name in cols],
+              )
+              print(f"system granted {client}")
+          con.commit()
+          con.close()
+          PY
+          sudo killall tccd || true
+          plist="$HOME/Library/Group Containers/group.com.apple.replayd/ScreenCaptureApprovals.plist"
+          mkdir -p "$(dirname "$plist")"
+          for bin in /usr/sbin/screencapture /bin/bash /usr/libexec/sshd-keygen-wrapper; do
+            defaults write "$plist" "$bin" -date "3024-01-01 00:00:00 +0000"
+          done
+          killall cfprefsd || true
+          screencapture -x /tmp/before.png || true
+          open -a Terminal
+          sleep 2
+          osascript <<'APPLESCRIPT' || true
+          tell application "Terminal"
+            activate
+            if (count of windows) is 0 then
+              do script ""
+            end if
+            set bounds of front window to {0, 0, 1600, 1100}
+            set background color of selected tab of front window to {65535, 0, 0}
+          end tell
+          APPLESCRIPT
+          sleep 2
+          screencapture -x /tmp/check.png
+          cp /tmp/check.png "$GITHUB_WORKSPACE/screen-capture-check.png"
+          cat > /tmp/sample-shot.swift <<'SWIFT'
+          import AppKit
+          import Foundation
+          let path = "/tmp/check.png"
+          guard let image = NSImage(contentsOfFile: path),
+                let tiff = image.tiffRepresentation,
+                let rep = NSBitmapImageRep(data: tiff) else {
+            fputs("could not read screenshot\n", stderr)
+            exit(2)
+          }
+          let width = rep.pixelsWide
+          let height = rep.pixelsHigh
+          var red = 0
+          var samples = 0
+          var y = height / 5
+          while y < height * 4 / 5 {
+            var x = width / 5
+            while x < width * 4 / 5 {
+              if let color = rep.colorAt(x: x, y: y) {
+                samples += 1
+                if color.redComponent > 0.75 && color.greenComponent < 0.35 && color.blueComponent < 0.35 {
+                  red += 1
+                }
+              }
+              x += 24
+            }
+            y += 24
+          }
+          let bytes = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
+          print("pixels \(width)x\(height) samples \(samples) red \(red) bytes \(bytes)")
+          if samples > 0 && red * 2 > samples {
+            print("SCREEN_CAPTURE: worked")
+          } else {
+            print("SCREEN_CAPTURE: failed")
+          }
+          SWIFT
+          set +e
+          swift /tmp/sample-shot.swift | tee /tmp/screen-capture-result.txt
+          sample_status=$?
+          set -e
+          before_bytes=$(wc -c < /tmp/before.png || echo 0)
+          check_bytes=$(wc -c < /tmp/check.png || echo 0)
+          echo "before_bytes=$before_bytes check_bytes=$check_bytes sample_status=$sample_status"
+          if [ "$sample_status" -ne 0 ]; then
+            echo "SCREEN_CAPTURE: failed" | tee /tmp/screen-capture-result.txt
+          fi
+          result=$(grep SCREEN_CAPTURE /tmp/screen-capture-result.txt | tail -1 || true)
+          {
+            echo "## Screen capture"
+            echo "${result:-SCREEN_CAPTURE: failed}"
+            echo "before_bytes=$before_bytes check_bytes=$check_bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload screen capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screen-capture-check
+          path: screen-capture-check.png
+          if-no-files-found: warn
+      - name: Open SSH and wait
+        env:
+          CLAUDE_SSH_PUBKEY: ${{ secrets.CLAUDE_SSH_PUBKEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLAUDE_SSH_PUBKEY:-}" ]; then
+            echo "CLAUDE_SSH_PUBKEY secret is empty"
+            exit 1
+          fi
+          case "$CLAUDE_SSH_PUBKEY" in
+            *PRIVATE*) echo "CLAUDE_SSH_PUBKEY must be a public key"; exit 1 ;;
+          esac
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$CLAUDE_SSH_PUBKEY" >> "$HOME/.ssh/authorized_keys"
+          chmod 700 "$HOME/.ssh"
+          chmod 600 "$HOME/.ssh/authorized_keys"
+          sudo mkdir -p /etc/ssh/sshd_config.d
+          if ! grep -q 'sshd_config.d' /etc/ssh/sshd_config; then
+            tmp=$(mktemp)
+            printf '%s\n' 'Include /etc/ssh/sshd_config.d/*.conf' | cat - /etc/ssh/sshd_config > "$tmp"
+            sudo cp "$tmp" /etc/ssh/sshd_config
+            rm -f "$tmp"
+          fi
+          sudo sed -i '' -E 's/^[# ]*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+          sudo sed -i '' -E 's/^[# ]*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config
+          sudo sed -i '' -E 's/^[# ]*ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+          sudo sed -i '' -E 's/^[# ]*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+          sudo tee /etc/ssh/sshd_config.d/99-aeon-key-only.conf >/dev/null <<'EOF'
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          ChallengeResponseAuthentication no
+          PubkeyAuthentication yes
+          AuthenticationMethods publickey
+          EOF
+          sudo systemsetup -setremotelogin on || true
+          if ! sudo launchctl print system/com.openssh.sshd >/dev/null 2>&1; then
+            sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist \
+              || sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+          fi
+          sudo launchctl kickstart -k system/com.openssh.sshd || true
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+            if nc -z 127.0.0.1 22; then
+              echo "sshd is listening"
+              break
+            fi
+            sleep 1
+          done
+          nc -z 127.0.0.1 22
+          bore_dir="$RUNNER_TEMP/bore"
+          mkdir -p "$bore_dir"
+          curl -fsSL -o "$bore_dir/bore.tar.gz" \
+            "https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-aarch64-apple-darwin.tar.gz"
+          tar -xzf "$bore_dir/bore.tar.gz" -C "$bore_dir"
+          bore_bin=$(find "$bore_dir" -type f -name bore | head -1)
+          chmod +x "$bore_bin"
+          "$bore_bin" local 22 --to bore.pub > /tmp/bore.log 2>&1 &
+          echo $! > /tmp/bore.pid
+          host=""
+          port=""
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+            if grep -E 'listening at .+:[0-9]+' /tmp/bore.log >/dev/null; then
+              listen=$(grep -E 'listening at .+:[0-9]+' /tmp/bore.log | tail -1)
+              host=$(printf '%s\n' "$listen" | sed -E 's/.*listening at ([^ ]+):([0-9]+).*/\1/')
+              port=$(printf '%s\n' "$listen" | sed -E 's/.*listening at ([^ ]+):([0-9]+).*/\2/')
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/bore.pid)" 2>/dev/null; then
+              echo "bore exited"
+              cat /tmp/bore.log
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$port" ]; then
+            echo "bore did not publish a port; trying cloudflared"
+            cat /tmp/bore.log || true
+            curl -fsSL -o "$RUNNER_TEMP/cloudflared.tgz" \
+              "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz"
+            tar -xzf "$RUNNER_TEMP/cloudflared.tgz" -C "$RUNNER_TEMP"
+            cfd=$(find "$RUNNER_TEMP" -type f -name cloudflared | head -1)
+            chmod +x "$cfd"
+            "$cfd" tunnel --no-autoupdate --url tcp://127.0.0.1:22 > /tmp/cloudflared.log 2>&1 &
+            echo $! > /tmp/cloudflared.pid
+            for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+              if grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log >/dev/null; then
+                listen=$(grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log | tail -1)
+                host=$(printf '%s\n' "$listen" | sed -E 's/.*tcp:\/\/([^:]+):([0-9]+).*/\1/')
+                port=$(printf '%s\n' "$listen" | sed -E 's/.*tcp:\/\/([^:]+):([0-9]+).*/\2/')
+                break
+              fi
+              sleep 1
+            done
+          fi
+          if [ -z "$port" ]; then
+            echo "No token-free TCP tunnel came up. bore log:"
+            cat /tmp/bore.log || true
+            echo "cloudflared log:"
+            cat /tmp/cloudflared.log || true
+            exit 1
+          fi
+          user=$(whoami)
+          echo "SSH: ssh -p ${port} ${user}@${host}"
+          {
+            echo "## SSH"
+            echo '```'
+            echo "SSH: ssh -p ${port} ${user}@${host}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Waiting until /tmp/stop or the job timeout."
+          while [ ! -f /tmp/stop ]; do
+            sleep 10
+          done
+          echo "Stop file seen."

@@ -10,10 +10,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
+import { chromeForTestingPath } from "./browser-fixture-helper.mjs";
 
-const chromePath = resolve(
-  ".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe",
-);
+const chromePath = chromeForTestingPath();
 const extension = resolve("apps/chrome-extension/native-dist");
 const log = process.env.AEON_TEST_DEBUG
   ? (...parts) => process.stderr.write(parts.join(" ") + String.fromCharCode(10))
@@ -22,7 +21,12 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 test(
   "browser_code cells run inside the extension against real Chrome",
-  { skip: process.platform !== "win32" || !existsSync(chromePath) || !existsSync(extension) },
+  {
+    skip:
+      existsSync(chromePath) && existsSync(extension)
+        ? false
+        : "Chrome for Testing or the built extension is missing",
+  },
   async (t) => {
     const page = createServer((request, response) => {
       if (request.url?.startsWith("/api/orders")) {
@@ -56,6 +60,7 @@ test(
         "--no-first-run",
         "--no-default-browser-check",
         "--headless=new",
+        ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
         "about:blank",
       ],
       { stdio: "ignore" },
