@@ -6,38 +6,42 @@ import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../scripts/daemon-launcher.ps1", import.meta.url));
 
-test("Test-CorePing uses one 2s budget when the handshake is late", { timeout: 20_000 }, async () => {
-  const sockets = new Set();
-  const server = net.createServer((socket) => {
-    sockets.add(socket);
-    socket.on("error", () => undefined);
-    socket.on("close", () => sockets.delete(socket));
-    setTimeout(() => {
-      if (socket.destroyed) return;
-      socket.write(
-        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
-      );
-    }, 1_500);
-  });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address();
-  const command = [
-    `. '${script.replaceAll("'", "''")}'`,
-    "$sw = [Diagnostics.Stopwatch]::StartNew()",
-    `Test-CorePing ${port} | Out-Null`,
-    "Write-Output $sw.ElapsedMilliseconds",
-  ].join("; ");
-  try {
-    const { code, stdout, stderr } = await runPwsh(command);
-    assert.equal(code, 0, stderr || stdout);
-    const elapsed = Number(stdout.trim().split(/\s+/).at(-1));
-    assert.ok(elapsed > 1_400, `elapsed ${elapsed} ms (stdout ${stdout})`);
-    assert.ok(elapsed < 2_800, `elapsed ${elapsed} ms (stdout ${stdout})`);
-  } finally {
-    for (const socket of sockets) socket.destroy();
-    await new Promise((resolve) => server.close(resolve));
-  }
-});
+test(
+  "Test-CorePing uses one 2s budget when the handshake is late",
+  { timeout: 20_000 },
+  async () => {
+    const sockets = new Set();
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.on("error", () => undefined);
+      socket.on("close", () => sockets.delete(socket));
+      setTimeout(() => {
+        if (socket.destroyed) return;
+        socket.write(
+          "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
+        );
+      }, 1_500);
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address();
+    const command = [
+      `. '${script.replaceAll("'", "''")}'`,
+      "$sw = [Diagnostics.Stopwatch]::StartNew()",
+      `Test-CorePing ${port} | Out-Null`,
+      "Write-Output $sw.ElapsedMilliseconds",
+    ].join("; ");
+    try {
+      const { code, stdout, stderr } = await runPwsh(command);
+      assert.equal(code, 0, stderr || stdout);
+      const elapsed = Number(stdout.trim().split(/\s+/).at(-1));
+      assert.ok(elapsed > 1_400, `elapsed ${elapsed} ms (stdout ${stdout})`);
+      assert.ok(elapsed < 2_800, `elapsed ${elapsed} ms (stdout ${stdout})`);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  },
+);
 
 function runPwsh(command) {
   return new Promise((resolve, reject) => {
