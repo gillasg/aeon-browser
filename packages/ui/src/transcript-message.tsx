@@ -6,6 +6,7 @@ import { AnnotatedMessage } from "./annotated-message.js";
 import { ThinkingDisclosure } from "./thinking-disclosure.js";
 import { MessageActions } from "./message-actions.js";
 import type { TranscriptRow } from "./transcript-model.js";
+import { failureTitle } from "./failure-title.js";
 
 export function TranscriptMessage({
   row,
@@ -270,9 +271,10 @@ function MessageNote({ message }: { message: PiMessageDto | null }): ReactElemen
   if (message?.stopReason === "aborted") return <p className="message-stopped">Stopped</p>;
   if (!message?.errorMessage) return null;
   return (
-    <p className="message-error" role="alert">
-      {message.errorMessage}
-    </p>
+    <div className="message-error" role="alert">
+      <p className="message-error-title">{failureTitle(message.errorMessage)}</p>
+      <p className="message-error-detail">{message.errorMessage}</p>
+    </div>
   );
 }
 

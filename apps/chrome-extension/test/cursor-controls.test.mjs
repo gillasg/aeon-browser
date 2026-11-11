@@ -66,10 +66,7 @@ test("chat stays in the extension and orb.html is the only dynamic web resource"
 });
 
 test("the page cursor publishes button boxes and does not dispatch cursor events", async () => {
-  const overlay = await readFile(
-    join(repo, "browser/packages/engine/src/native-browser-cursor.ts"),
-    "utf8",
-  );
+  const overlay = await readFile(join(repo, "browser/packages/engine/src/cursor-page.ts"), "utf8");
   assert.match(overlay, /dataset\.aeonControls/);
   assert.match(overlay, /\.p\.on \.tr,\.p\.on \.stop\{pointer-events:none\}/);
   assert.equal(overlay.includes("dispatchEvent"), false);

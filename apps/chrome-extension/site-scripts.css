@@ -4,10 +4,10 @@
 }
 body {
   margin: 0;
-  background: var(--aeon-canvas, #111);
-  color: var(--aeon-text, #eee);
+  background: var(--aeon-canvas);
+  color: var(--aeon-text);
   font:
-    15px/1.6 Geist,
+    var(--aeon-fs-15)/1.6 Geist,
     system-ui,
     sans-serif;
   color-scheme: light dark;
@@ -18,23 +18,23 @@ main {
   padding: 0 24px;
 }
 h1 {
-  font-size: 24px;
+  font-size: var(--aeon-fs-24);
 }
 h2 {
-  font-size: 17px;
+  font-size: var(--aeon-fs-17);
 }
 section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--aeon-line, #333);
-  border-radius: 14px;
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-14);
 }
 button {
   font: inherit;
   padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--aeon-line, #444);
-  background: var(--aeon-surface, #222);
+  border-radius: var(--aeon-r-8);
+  border: 1px solid var(--aeon-line);
+  background: var(--aeon-surface);
   color: inherit;
   cursor: pointer;
   margin-right: 8px;
@@ -44,7 +44,7 @@ button:hover {
 }
 .script-row {
   padding: 12px 0;
-  border-bottom: 1px solid var(--aeon-line, #333);
+  border-bottom: 1px solid var(--aeon-line);
 }
 .script-detail {
   display: block;

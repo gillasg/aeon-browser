@@ -9,6 +9,29 @@ const require = createRequire(import.meta.url);
 const engine = (file) => require.resolve("@browserkit/engine/" + file);
 
 const appRoot = fileURLToPath(new URL("../", import.meta.url));
+const STATIC_FILES = [
+  "manifest.native.json",
+  "chat.html",
+  "completion-icon.png",
+  "aeon-icon.svg",
+  ...[16, 32, 48, 128].map((size) => "aeon-icon-" + size + ".png"),
+  "viewer.html",
+  "site-scripts.html",
+  "site-scripts.css",
+  "viewer-shell.css",
+  "chat.css",
+  "home.html",
+  "home.css",
+  "sidepanel.html",
+  "code-offscreen.html",
+  "code-sandbox.html",
+  "sidepanel.css",
+  "geist-latin.woff2",
+  "atmosphere.css",
+  "sidebar-layout.css",
+  "pages.css",
+  "atmosphere-wallpaper.png",
+];
 
 export async function buildExtension() {
   const output = join(appRoot, "native-dist");
@@ -36,31 +59,8 @@ export async function buildExtension() {
   await buildEntries(shared, output, entries);
 
   await buildViewerWorker(shared, output);
-  const files = [
-    "manifest.native.json",
-    "chat.html",
-    "completion-icon.png",
-    "aeon-icon.svg",
-    ...[16, 32, 48, 128].map((size) => "aeon-icon-" + size + ".png"),
-    "viewer.html",
-    "site-scripts.html",
-    "site-scripts.css",
-    "viewer-shell.css",
-    "chat.css",
-    "home.html",
-    "home.css",
-    "sidepanel.html",
-    "code-offscreen.html",
-    "code-sandbox.html",
-    "sidepanel.css",
-    "geist-latin.woff2",
-    "atmosphere.css",
-    "sidebar-layout.css",
-    "pages.css",
-    "atmosphere-wallpaper.png",
-  ];
   await Promise.all(
-    files.map((file) =>
+    STATIC_FILES.map((file) =>
       copyFile(
         join(appRoot, file),
         join(output, file.startsWith("manifest.") ? "manifest.json" : file),
@@ -68,8 +68,15 @@ export async function buildExtension() {
     ),
   );
   await copyFile(join(appRoot, "../../packages/ui/src/tokens.css"), join(output, "ui-tokens.css"));
+  await writeCursorPage(output);
   await writeBuildInfo(output);
   process.stdout.write(`Built native extension at ${output}\n`);
+}
+
+async function writeCursorPage(output) {
+  const module = await import(pathToFileURL(engine("cursor-page")).href);
+  const source = "globalThis.__aeonCursor = " + module.cursorFunctionSource() + ";\n";
+  await writeFile(join(output, "cursor-page.js"), source);
 }
 
 function buildViewerWorker(shared, output) {

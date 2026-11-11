@@ -1,5 +1,5 @@
 import type { KeyboardEvent, ReactElement } from "react";
-import { ChatSwitcher } from "@aeon/ui";
+import { ChatSwitcher, type BoxLine } from "@aeon/ui";
 
 // The cursor's ask box: always a compose field. The first message starts a chat with this tab as
 // context, later ones continue it; the transcript itself lives in the side panel (☰).
@@ -21,6 +21,8 @@ export interface OrbViewModel {
   tabChoices: OrbTab[] | null;
   running: ReadonlySet<string>;
   needs: ReadonlySet<string>;
+  /** The step, or the answer once the run ends. Absent before a run. */
+  line?: BoxLine;
 }
 
 export interface OrbTab {
@@ -75,18 +77,14 @@ function Compose({
   };
   // The field has the whole width; everything else is one quiet line under it: the tabs this
   // message carries (× drops one, + adds another), then learning and the chat switcher.
-  const placeholder = model.ask
-    ? "Type the answer here…"
-    : model.chatId
-      ? "Reply to Aeon…"
-      : "Ask Aeon about this page…";
   return (
     <>
       {model.ask && <p className="isl-ask">{model.ask}</p>}
+      <RunningLine model={model} actions={actions} />
       <textarea
         id="prompt"
         rows={1}
-        placeholder={placeholder}
+        placeholder={promptPlaceholder(model)}
         aria-label="Ask Aeon"
         disabled={model.busy}
         onKeyDown={send}
@@ -119,6 +117,36 @@ function Compose({
         {model.tabChoices && <TabChoices model={model} actions={actions} />}
       </div>
     </>
+  );
+}
+
+function promptPlaceholder(model: OrbViewModel): string {
+  if (model.ask) return "Type the answer here…";
+  if (model.chatId) return "Reply to Aeon…";
+  return "Ask Aeon about this page…";
+}
+
+function RunningLine({
+  model,
+  actions,
+}: {
+  model: OrbViewModel;
+  actions: OrbViewActions;
+}): ReactElement | null {
+  const line = model.line;
+  if (!line || line.text === model.ask) return null;
+  return (
+    <p className="isl-line">
+      {line.title ? <span className="isl-line-title">{line.title}</span> : null}
+      <span className="isl-line-text" data-clamp={line.more ? "2" : "1"}>
+        {line.text}
+      </span>
+      {line.more ? (
+        <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
+          Side panel
+        </button>
+      ) : null}
+    </p>
   );
 }
 

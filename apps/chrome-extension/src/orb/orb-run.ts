@@ -3,6 +3,7 @@
 
 export {
   applyEvent,
+  boxLine,
   cursorSteps,
   describeTool,
   formatRunDuration as formatDuration,
@@ -12,6 +13,7 @@ export {
   summarize,
 } from "@aeon/ui";
 export type {
+  BoxLine,
   AgentRun as OrbRun,
   RunAction as OrbAction,
   RunBox as OrbBox,

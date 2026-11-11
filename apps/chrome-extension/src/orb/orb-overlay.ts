@@ -1,11 +1,12 @@
 import {
+  CURSOR_INSTALL,
   CURSOR_STOP,
   CURSOR_TRANSCRIPT,
   type OrbToContent,
   type OrbVisualState,
 } from "./orb-messages.js";
 import type { OrbBox, OrbCursorStep } from "./orb-run.js";
-import { CURSOR_PATH, OVERLAY_STYLE, spotlightGradient } from "./orb-overlay-style.js";
+import { OVERLAY_STYLE, spotlightGradient } from "./orb-overlay-style.js";
 import {
   loadOrbPosition,
   saveOrbPosition,
@@ -13,16 +14,14 @@ import {
   type OrbPosition,
 } from "./orb-position.js";
 
-// Everything the cursor draws over the page. The cursor is one thing: a white pointer that sits
-// where it was left (bottom-left by default, dragged anywhere, one position for every site) with
-// its pill beside it. Summoned, the pill opens as the ask box (orb.html, framed so the page can't
-// read it). Working, the pill says what it is doing, with ☰ (the transcript, in the side panel)
-// and ■ (stop); when the agent acts in this page, the engine's identical cursor takes over and this
-// one steps aside. It needs you: the pill turns amber. Done or couldn't finish: one line, which
-// fades after a few seconds unless hovered. While the tab is recorded on video nothing is drawn.
+// The cursor's pill, hit target and ask box. The glyph is the shared page cursor (one shape for
+// the summon and for the agent's steps). This layer remembers where it was left, drags it, and
+// steps out of the way while the agent drives that same glyph. The pill says what it is doing,
+// with ☰ (the transcript, in the side panel) and ■ (stop). Needs you: the pill turns amber.
+// Done or couldn't finish: one line, which fades after a few seconds unless hovered. A recording
+// hides this layer; the engine decides whether the glyph itself stays.
 
 const DEFAULT_PANEL = { width: 360, height: 96 };
-const TRAVEL_MS = 650;
 const DRAG_SLOP = 4;
 const HIT_SIZE = 32;
 const RESULT_MS = 6000;
@@ -34,7 +33,6 @@ interface Point {
 
 export class OrbOverlay {
   private readonly host = document.createElement("div");
-  private readonly cursor = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   private readonly spot = document.createElement("div");
   private readonly hit = document.createElement("button");
   private readonly frame = document.createElement("iframe");
@@ -58,6 +56,9 @@ export class OrbOverlay {
   private raf = 0;
   /** False until the saved position loads, so a new page never shows the cursor sliding in. */
   private placed = false;
+  private summonKey = "";
+  private arming = false;
+  private releasePending = false;
 
   constructor(
     readonly tabId: number,
@@ -115,9 +116,10 @@ export class OrbOverlay {
     else if (message.kind === "aeon.orb.prefs") this.setReducedMotion(message.reduceMotion);
   }
 
-  /** A video recording of this tab shows the page only. */
+  /** A recording hides the pill and the box. The shared glyph follows the engine's own rule. */
   setRecording(on: boolean): void {
     this.host.style.display = on ? "none" : "";
+    if (!on) this.ensureCursor();
   }
 
   private updatePill(): void {
@@ -142,6 +144,10 @@ export class OrbOverlay {
     removeEventListener("pointerdown", this.clickAway, { capture: true });
     this.stopWatching();
     this.host.remove();
+    const glyph = document.getElementById("aeon-agent-cursor");
+    if (!glyph) return;
+    if (this.acting) glyph.removeAttribute("data-aeon-summon");
+    else glyph.remove();
   }
 
   private buildDom(nonce: string): void {
@@ -151,7 +157,6 @@ export class OrbOverlay {
     const layer = document.createElement("div");
     layer.className = "layer";
     this.spot.className = "spot";
-    this.buildCursor();
     this.hit.className = "hit";
     this.hit.type = "button";
     this.hit.title = "Aeon · click to ask, drag to move";
@@ -165,27 +170,12 @@ export class OrbOverlay {
     this.frame.className = "off";
     this.frame.setAttribute("allowtransparency", "true");
     this.buildPill();
-    layer.append(this.spot, this.cursor, this.hit, this.pill, this.frame);
+    layer.append(this.spot, this.hit, this.pill, this.frame);
     shadow.append(style, layer);
     // An extension reload leaves the old script's cursor on the page with nothing driving it.
     for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
     this.host.setAttribute("data-aeon-orb", "");
     document.documentElement.append(this.host);
-  }
-
-  private buildCursor(): void {
-    this.cursor.setAttribute("class", "cursor");
-    this.cursor.setAttribute("viewBox", "0 0 18 20");
-    this.cursor.setAttribute("width", "18");
-    this.cursor.setAttribute("height", "20");
-    this.cursor.setAttribute("aria-hidden", "true");
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", CURSOR_PATH);
-    path.setAttribute("fill", "#fff");
-    path.setAttribute("stroke", "#111");
-    path.setAttribute("stroke-width", "1.5");
-    path.setAttribute("stroke-linejoin", "round");
-    this.cursor.append(path);
   }
 
   /** The pill: what it is doing (click to ask again), ☰ the transcript, ■ stop. */
@@ -235,22 +225,22 @@ export class OrbOverlay {
     }, RESULT_MS);
   }
 
-  /** The agent acts in this page: the engine's cursor takes over from here, this one steps aside. */
+  /** The agent acts in this page: stop writing the summon so the engine drives the same glyph. */
   private streamTo(steps: readonly OrbCursorStep[]): void {
-    const first = steps[0];
-    if (!first || this.acting) return;
-    this.target = this.clampPoint({ x: first.x, y: first.y });
-    this.later(() => {
-      if (this.state !== "working") return;
-      this.acting = true;
-      this.cursor.classList.add("away");
-      this.updatePill();
-    }, TRAVEL_MS);
+    if (!steps[0] || this.acting) return;
+    this.acting = true;
+    this.hit.hidden = true;
+    this.updatePill();
   }
 
   private showCursor(): void {
+    this.hit.hidden = false;
+    if (this.state === "needs") {
+      this.acting = false;
+      return;
+    }
+    this.releasePending = this.acting;
     this.acting = false;
-    this.cursor.classList.remove("away");
     if (!this.spot.classList.contains("on")) this.target = this.home();
   }
 
@@ -277,7 +267,7 @@ export class OrbOverlay {
   }
 
   private readonly dragStart = (event: PointerEvent): void => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || this.acting) return;
     event.preventDefault();
     this.hit.setPointerCapture(event.pointerId);
     this.drag = { start: { x: event.clientX, y: event.clientY }, moved: false };
@@ -317,34 +307,75 @@ export class OrbOverlay {
   };
 
   private readonly tick = (): void => {
+    if (!this.acting) this.ensureCursor();
     const ease = this.reducedMotion ? 1 : 0.16;
     this.point.x += (this.target.x - this.point.x) * ease;
     this.point.y += (this.target.y - this.point.y) * ease;
-    const { x, y } = this.point;
-    // The point is the cursor's tip; the hit area sits around it, the pill beside it.
-    this.cursor.style.transform = `translate(${x - 1}px, ${y - 1}px)`;
-    this.cursor.style.visibility = this.placed ? "" : "hidden";
-    this.hit.style.transform = `translate(${x - HIT_SIZE / 2 + 6}px, ${y - HIT_SIZE / 2 + 8}px)`;
-    if (!this.pill.hidden) {
-      const width = this.pill.offsetWidth;
-      const left = x + 18 + width > innerWidth - 8 ? x - 8 - width : x + 18;
-      this.pill.style.transform = `translate(${left}px, ${y + 14}px)`;
-    }
-    this.placeFrame();
+    if (!this.acting && this.state !== "needs")
+      this.writeSummon(this.drag?.moved === true, this.releasePending);
+    this.releasePending = false;
+    this.placeChrome(this.glyphPoint());
     this.raf = requestAnimationFrame(this.tick);
   };
 
   /** The box opens beside the cursor's tip, where the pill would be, on the side with room. */
-  private placeFrame(): void {
+  private placeFrame(at: Point): void {
     const { width, height } = this.panel;
-    let left = this.point.x + 18;
-    if (left + width > innerWidth - 8) left = this.point.x - 8 - width;
-    const top = clampSize(this.point.y + 14, 8, innerHeight - height - 8);
+    let left = at.x + 24;
+    if (left + width > innerWidth - 8) left = at.x - 8 - width;
+    const top = clampSize(at.y + 16, 8, innerHeight - height - 8);
     this.frame.style.width = width + "px";
     this.frame.style.height = height + "px";
     this.frame.style.left = clampSize(left, 8, innerWidth - width - 8) + "px";
     this.frame.style.top = top + "px";
-    this.frame.style.transformOrigin = left > this.point.x ? "0 0" : "100% 0";
+    this.frame.style.transformOrigin = left > at.x ? "0 0" : "100% 0";
+  }
+
+  private placeChrome(at: Point): void {
+    const { x, y } = at;
+    this.hit.style.visibility = this.placed ? "" : "hidden";
+    this.hit.style.transform = `translate(${x - HIT_SIZE / 2}px, ${y - HIT_SIZE / 2}px)`;
+    this.placePill(x, y);
+    this.placeFrame(at);
+  }
+
+  private placePill(x: number, y: number): void {
+    if (this.pill.hidden) return;
+    const width = this.pill.offsetWidth;
+    const left = x + 24 + width > innerWidth - 8 ? x - 8 - width : x + 24;
+    this.pill.style.transform = `translate(${left}px, ${y + 16}px)`;
+  }
+
+  private glyphPoint(): Point {
+    const raw = document.getElementById("aeon-agent-cursor")?.dataset.aeonPoint;
+    return (raw && parsePoint(raw)) || this.point;
+  }
+
+  private writeSummon(place: boolean, release: boolean): void {
+    const glyph = document.getElementById("aeon-agent-cursor");
+    if (!glyph) return;
+    const x = Math.round(this.target.x);
+    const y = Math.round(this.target.y);
+    const payload = JSON.stringify({ x, y, place, release });
+    const key = JSON.stringify({ x, y, place, release: false });
+    if (key === this.summonKey && !release) return;
+    this.summonKey = key;
+    glyph.setAttribute("data-aeon-summon", payload);
+  }
+
+  private ensureCursor(): void {
+    if (this.arming || this.acting || !chrome.runtime?.id) return;
+    if (document.getElementById("aeon-agent-cursor")) return;
+    this.arming = true;
+    const home = this.home();
+    void chrome.runtime
+      .sendMessage({ kind: CURSOR_INSTALL, x: Math.round(home.x), y: Math.round(home.y) })
+      .catch(() => undefined)
+      .finally(() => {
+        this.later(() => {
+          this.arming = false;
+        }, 400);
+      });
   }
 
   private clampPoint(point: Point): Point {
@@ -388,4 +419,14 @@ function send(kind: string): void {
 
 function clampSize(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function parsePoint(raw: string): Point | null {
+  try {
+    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
+    if (typeof parsed.x !== "number" || typeof parsed.y !== "number") return null;
+    return { x: parsed.x, y: parsed.y };
+  } catch {
+    return null;
+  }
 }

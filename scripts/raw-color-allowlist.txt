@@ -1,0 +1,2 @@
+# Repo-relative paths that may keep a raw colour. Justified exceptions only.
+# tokens.css and cursor-mark.ts are the colour sources and are not scanned.

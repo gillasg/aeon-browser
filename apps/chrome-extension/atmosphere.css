@@ -132,7 +132,7 @@ select option,
   background: var(--surface-raised);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--aeon-r-8);
   padding: 8px 12px;
   cursor: pointer;
 }
@@ -145,7 +145,7 @@ html[data-wallpaper="true"] body:not([data-host="panel"]) .home-main[data-screen
       color-mix(in srgb, var(--canvas) 40%, transparent) 35%,
       var(--canvas) 95%
     ),
-    radial-gradient(circle, #222d4940 0.65px, transparent 0.85px),
+    radial-gradient(circle, var(--aeon-c-222d49-25) 0.65px, transparent 0.85px),
     var(--wallpaper-image, url("atmosphere-wallpaper.png"));
   background-size:
     100% 100%,
@@ -238,7 +238,7 @@ body[data-host="panel"] .home-start {
 .sidebar-project-row {
   display: flex;
   align-items: center;
-  border-radius: 10px;
+  border-radius: var(--aeon-r-md);
   min-height: 38px;
 }
 .sidebar-project-row:hover {
@@ -285,13 +285,13 @@ body[data-host="panel"] .home-start {
   overflow: auto;
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: var(--aeon-r-xl);
   background: var(--canvas);
   color: var(--text);
   font: inherit;
 }
 .create-project-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--aeon-c-000000-50);
 }
 .create-project-dialog header {
   display: flex;
@@ -301,17 +301,17 @@ body[data-host="panel"] .home-start {
 }
 .create-project-dialog h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--aeon-fs-24);
   font-weight: 600;
 }
 .create-project-dialog h3 {
-  font-size: 14px;
+  font-size: var(--aeon-fs-base);
   margin: 20px 0 10px;
 }
 .create-project-dialog button {
   font: inherit;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--aeon-r-12);
   padding: 6px 12px;
   background: var(--canvas);
   color: var(--text);
@@ -326,11 +326,11 @@ body[data-host="panel"] .home-start {
   gap: 12px;
   align-items: center;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--aeon-r-14);
   padding: 0 16px;
 }
 .project-name:focus-within {
-  border-color: #5799cb;
+  border-color: var(--aeon-c-5799cb);
 }
 .project-name input {
   min-width: 0;
@@ -344,7 +344,7 @@ body[data-host="panel"] .home-start {
 }
 .project-source-folders {
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--aeon-r-lg);
   padding: 20px;
   text-align: center;
 }
@@ -375,14 +375,14 @@ body[data-host="panel"] .home-start {
 }
 .create-project-dialog [role="alert"] {
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--aeon-fs-base);
 }
 
 /* File operations share a compact, flat surface and sticky filename row. */
 .inline-edit-diff,
 .inline-read-file {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--aeon-r-8);
   overflow: auto;
   max-height: 420px;
   background: var(--canvas);
@@ -399,7 +399,7 @@ body[data-host="panel"] .home-start {
   background: var(--canvas);
   border-bottom: 1px solid var(--line);
   font:
-    500 13px/20px Geist,
+    500 var(--aeon-fs-md)/20px Geist,
     sans-serif;
 }
 .inline-edit-path {
@@ -436,7 +436,7 @@ body[data-host="panel"] .home-start {
   background: transparent;
   color: var(--muted);
   font:
-    11px/18px Geist,
+    var(--aeon-fs-xs)/18px Geist,
     sans-serif;
 }
 .inline-edit-lines {
@@ -447,10 +447,10 @@ body[data-host="panel"] .home-start {
   line-height: 23px;
 }
 .diff-added {
-  background: color-mix(in srgb, #258647 18%, var(--canvas));
+  background: color-mix(in srgb, var(--aeon-c-258647) 18%, var(--canvas));
 }
 .diff-removed {
-  background: color-mix(in srgb, #bd3344 18%, var(--canvas));
+  background: color-mix(in srgb, var(--aeon-c-bd3344) 18%, var(--canvas));
 }
 .activity-step > .inline-read-file {
   margin: 8px 0 12px 28px;
@@ -462,7 +462,7 @@ body[data-host="panel"] .home-start {
   margin: 0;
   padding: 10px 12px;
   font:
-    13px/23px Consolas,
+    var(--aeon-fs-md)/23px Consolas,
     monospace;
   white-space: pre;
   overflow: auto;
@@ -474,7 +474,7 @@ body[data-host="panel"] .home-start {
 .home-query-form {
   box-sizing: border-box;
   min-height: 66px;
-  border-radius: 25px;
+  border-radius: var(--aeon-r-25);
   gap: 12px;
   padding: 8px 10px;
   align-items: center;
@@ -505,7 +505,7 @@ body[data-host="panel"] .home-start {
   padding: 0;
   margin: 0;
   flex: none;
-  border-radius: 50%;
+  border-radius: var(--aeon-r-half);
   background: var(--surface-raised);
   color: var(--muted);
   line-height: 1;
@@ -533,28 +533,28 @@ body[data-host="panel"] .home-start {
 }
 .home-attachments p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--aeon-fs-sm);
 }
 /* Quiet project creation, without the oversized boxed empty state. */
 .create-project-dialog {
   width: min(480px, calc(100vw - 32px));
   padding: 22px;
-  border-radius: 16px;
+  border-radius: var(--aeon-r-lg);
 }
 .create-project-dialog h2 {
-  font-size: 20px;
+  font-size: var(--aeon-fs-20);
 }
 .create-project-dialog header {
   margin-bottom: 16px;
 }
 .create-project-dialog h3 {
-  font-size: 12px;
+  font-size: var(--aeon-fs-sm);
   font-weight: 500;
   color: var(--muted);
   margin: 20px 0 8px;
 }
 .project-name {
-  border-radius: 8px;
+  border-radius: var(--aeon-r-8);
   padding: 0 12px;
 }
 .project-name input {
@@ -574,26 +574,26 @@ body[data-host="panel"] .home-start {
   gap: 8px;
   background: var(--surface);
   padding: 8px 12px;
-  font-size: 13px;
-  border-radius: 8px;
+  font-size: var(--aeon-fs-md);
+  border-radius: var(--aeon-r-8);
 }
 .project-source-row {
   padding: 6px 0;
-  font-size: 13px;
+  font-size: var(--aeon-fs-md);
 }
 .create-project-dialog footer {
   margin-top: 24px;
   gap: 10px;
 }
 .create-project-dialog footer button[type="submit"] {
-  border-radius: 8px;
+  border-radius: var(--aeon-r-8);
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--aeon-fs-md);
 }
 
 .home-shell > .chat-navigation .icon-button,
 .app-shell > .chat-navigation .icon-button {
-  border-radius: 50%;
+  border-radius: var(--aeon-r-half);
   background: var(--canvas);
   border: 1px solid var(--line);
 }
@@ -601,7 +601,7 @@ body[data-host="panel"] .home-start {
 .attach-button:focus-visible {
   background: var(--surface-raised);
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--muted);
+  box-shadow: var(--aeon-drop-11);
 }
 .home-collection-actions button:hover,
 .home-collection-actions button:focus-visible,
@@ -609,7 +609,7 @@ body[data-host="panel"] .home-start {
 .home-collection-tabs button:focus-visible {
   background: var(--surface-raised);
   color: var(--text);
-  border-radius: 8px;
+  border-radius: var(--aeon-r-8);
 }
 .home-collection-actions button:active,
 .home-collection-tabs button:active,
@@ -634,20 +634,20 @@ body[data-host="panel"] .home-start {
 .chat-sidebar .sidebar-project-row,
 .home-sidebar .sidebar-management-links button,
 .chat-sidebar .sidebar-management-links button {
-  border-radius: 10px;
+  border-radius: var(--aeon-r-md);
 }
 
 /* Midnight: cool charcoal surfaces over a near-black canvas. */
 
 :root[data-theme="midnight"] .home-sidebar,
 :root[data-theme="midnight"] .chat-sidebar {
-  background: #151521;
-  border-right-color: #24242b;
+  background: var(--aeon-c-151521);
+  border-right-color: var(--aeon-c-24242b);
 }
 :root[data-theme="midnight"] .composer,
 :root[data-theme="midnight"] .home-query-form {
   background: var(--aeon-surface);
-  border-color: #1b1b27;
+  border-color: var(--aeon-c-1b1b27);
 }
 .home-shell[data-sidebar-collapsed="false"] {
   --home-sidebar-width: min(var(--aeon-sidebar-width, 264px), calc(100vw - 100px));
@@ -683,12 +683,12 @@ body[data-host="panel"] .sidebar-resizer {
 .composer-queue-item {
   min-height: 40px;
   padding: 6px 12px 12px;
-  border-radius: 0;
+  border-radius: var(--aeon-r-0);
   background: var(--surface);
   gap: 10px;
 }
 .composer-queue-item:first-child {
-  border-radius: 18px 18px 0 0;
+  border-radius: var(--aeon-r-18) var(--aeon-r-18) var(--aeon-r-0) var(--aeon-r-0);
 }
 .composer-queue-item + .composer-queue-item {
   border-top: 0;
@@ -717,13 +717,13 @@ body[data-host="panel"] .sidebar-resizer {
   font: inherit;
   cursor: pointer;
   padding: 4px;
-  border-radius: 5px;
+  border-radius: var(--aeon-r-5);
 }
 .queue-actions button {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--aeon-fs-sm);
 }
 .queue-actions button:hover,
 .queue-reorder button:hover,
@@ -755,7 +755,7 @@ body[data-host="panel"] .sidebar-resizer {
   background: var(--canvas);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--aeon-r-5);
   padding: 6px;
   font: inherit;
 }
@@ -775,7 +775,7 @@ body[data-host="panel"] .sidebar-resizer {
   width: min(100%, 940px);
   margin: 0 auto 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--aeon-fs-md);
 }
 .home-project-chip span {
   max-width: 220px;
@@ -849,7 +849,7 @@ body[data-host="panel"] .composer-context-slot {
   display: block;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--aeon-r-0);
   background: transparent;
 }
 .message-row.user:has(.message-context) .message-content {
@@ -858,7 +858,7 @@ body[data-host="panel"] .composer-context-slot {
 .pending-work {
   margin: 24px 0;
   color: var(--aeon-muted);
-  font-size: 13px;
+  font-size: var(--aeon-fs-md);
 }
 .home-start .page-context-tray {
   width: min(100%, 760px);
@@ -875,10 +875,10 @@ body[data-host="panel"] .composer-context-slot {
   width: min(400px, calc(100vw - 48px));
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--aeon-r-18);
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 10px 35px #0005;
+  box-shadow: var(--aeon-drop-12);
   z-index: 90;
 }
 .composer-add-menu button {
@@ -889,7 +889,7 @@ body[data-host="panel"] .composer-context-slot {
   min-height: 40px;
   padding: 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--aeon-r-8);
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -940,7 +940,7 @@ body[data-host="panel"] .composer-context-slot {
   color: var(--muted);
 }
 .composer-add-menu p {
-  font-size: 12px;
+  font-size: var(--aeon-fs-sm);
   color: var(--muted);
   padding: 8px;
   margin: 0;
@@ -950,7 +950,7 @@ body[data-host="panel"] .composer-context-slot {
   width: 76px;
   height: 76px;
   flex: none;
-  border-radius: 12px;
+  border-radius: var(--aeon-r-12);
   border: 1px solid var(--line);
   background: var(--surface);
 }
@@ -958,7 +958,7 @@ body[data-host="panel"] .composer-context-slot {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 11px;
+  border-radius: var(--aeon-r-11);
   display: block;
 }
 .attachment-thumbnail button {
@@ -971,10 +971,10 @@ body[data-host="panel"] .composer-context-slot {
   place-items: center;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 50%;
+  border-radius: var(--aeon-r-half);
   background: var(--surface);
   color: var(--text);
-  font-size: 15px;
+  font-size: var(--aeon-fs-15);
   line-height: 1;
   cursor: pointer;
 }
