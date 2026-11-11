@@ -28,6 +28,8 @@ import {
 import { exportSession } from "./session-export.js";
 import { docsExpression, docsTargets, type SiteDocs } from "./docs.js";
 import { paginate, type PaginateOptions } from "./paginate.js";
+import { applyPaceNotes, exportPaced, notePaceLimit, takePace } from "../pace.js";
+import { readSiteFacts } from "../site-notes.js";
 
 // The runtime: `const api = await siteMapper("shop.example")`, then `await api.searchProducts({ q })`
 // or `for await (const item of api.paginate.searchProducts({ q }))`.
@@ -113,6 +115,13 @@ export function errorKind(error: unknown): ErrorKind {
 
 const SESSION_FRESH_MS = 12 * 3600_000;
 const REFRESH_EVERY_MS = 10 * 60_000;
+
+/** Halves the site's pace on a 429 or a challenge page. Returns the wall when there was one. */
+function paceOnChallenge(site: string, response: RuntimeResponse): Challenge | undefined {
+  const wall = detectChallenge(response);
+  if (wall || response.status === 429) notePaceLimit(site);
+  return wall;
+}
 
 export class SiteClient {
   readonly site: string;
@@ -461,7 +470,10 @@ export class SiteClient {
   async write(id: string, params: Params = {}): Promise<RuntimeResponse> {
     const operation = this.operation(id);
     if (operation.role === "auth") throw new WriteThroughApi(id);
-    return this.exchange(operation, params, 0, false);
+    await takePace(this.site);
+    const response = await this.exchange(operation, params, 0, false);
+    paceOnChallenge(this.site, response);
+    return response;
   }
 
   private async exchange(
@@ -488,9 +500,11 @@ export class SiteClient {
   }
 
   /** The operation's data; throws HttpError on 4xx/5xx. */
-  async call(id: string, params: Params = {}): Promise<unknown> {
+  async call(id: string, params: Params = {}, options?: { pace?: boolean }): Promise<unknown> {
+    // An export already took a token for this row. A second take would halve the printed rate.
+    if (options?.pace !== false) await takePace(this.site);
     const response = await this.request(id, params);
-    const wall = detectChallenge(response);
+    const wall = paceOnChallenge(this.site, response);
     if (wall) throw new Challenged(id, response, wall);
     if (response.status === 401 || response.status === 403) throw new SignedOut(id, response);
     if (response.status >= 400 || response.status === 0) throw new HttpError(id, response);
@@ -566,6 +580,7 @@ export class SiteClient {
 
   /** A server-rendered page's data: its embedded state, or fields read with its CSS extractor. */
   async fetchPage(id: string, params: Record<string, string> = {}): Promise<unknown> {
+    await takePace(this.site);
     const page = this.pageEndpoint(id);
     if (!page) throw new Error(`${this.site} has no page endpoint ${id}`);
     const url = this.pageUrl(page, params);
@@ -588,7 +603,16 @@ export class SiteClient {
       headers: { accept: "text/html" },
     };
     const response = await this.limiter.run(() => this.direct.send(request, { auth: [], home }));
+    paceOnChallenge(this.site, response);
     return extractEmbedded(response.text ?? "");
+  }
+
+  /** A paced export: one call per row, with the expected time printed by the caller. */
+  exportRows<T>(
+    rows: readonly unknown[],
+    call: (row: unknown, index: number) => Promise<T>,
+  ): Promise<{ rows: T[]; note: string; expectedMs: number }> {
+    return exportPaced(this.site, rows, call);
   }
 }
 
@@ -664,6 +688,10 @@ export async function siteMapper(
       `${siteName(site)} is not mapped yet. Record it first: browserkit map https://${siteName(site)}`,
     );
   const overrides = options.model ? {} : await readOverrides(site);
+  if (!options.model)
+    await readSiteFacts(site)
+      .then((notes) => applyPaceNotes(siteName(site), notes))
+      .catch(() => undefined);
   const session = await initialSession(model, options);
   const { session: _ignored, ...rest } = options;
   void _ignored;

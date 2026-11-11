@@ -1,8 +1,10 @@
 import { ENGINE_PROTOCOL_VERSION } from "@browserkit/protocol";
+import { cdpFailures } from "./cdp/send.js";
 
 export interface EngineHealth {
   nonce: string;
   protocolVersion: { major: number; minor: number };
+  cdpFailures: { label: string; count: number }[];
 }
 
 /**
@@ -19,6 +21,7 @@ export function healthTurn(message: Record<string, unknown>): Promise<EngineHeal
           major: ENGINE_PROTOCOL_VERSION.major,
           minor: ENGINE_PROTOCOL_VERSION.minor,
         },
+        cdpFailures: cdpFailures(),
       });
     }, 0);
   });

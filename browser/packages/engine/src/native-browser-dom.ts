@@ -300,7 +300,10 @@ export async function fillTextNode(
       { label: "fillTextNode" },
     )) as { node?: { backendNodeId?: number } };
     if (!node.node?.backendNodeId) throw new Error("STALE_REF");
-    if (value) await humanType(debuggee, value);
+    const keys = selected.result.objectId
+      ? await listensForKeys(debuggee, selected.result.objectId)
+      : false;
+    if (value) await humanType(debuggee, value, { keys });
     else await clearSelection(debuggee);
     const field = node.node.backendNodeId;
     if (await retained(debuggee, field, value)) return;
@@ -324,6 +327,72 @@ export async function fillTextNode(
     ).catch(() => undefined);
   }
 }
+const KEY_LISTENS = new Set(["keydown", "keypress", "keyup", "beforeinput"]);
+
+/** True when the node, an ancestor, the document, or the window listens for keys. */
+export async function listensForKeys(
+  debuggee: chrome.debugger.Debuggee,
+  objectId: string,
+): Promise<boolean> {
+  let current: string | undefined = objectId;
+  let release = false;
+  const seen = new Set<string>();
+  try {
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      if (await objectListens(debuggee, current)) return true;
+      const next = await nextListenerTarget(debuggee, current);
+      if (release) await releaseObject(debuggee, current);
+      current = next;
+      release = true;
+    }
+    return false;
+  } finally {
+    if (release && current) await releaseObject(debuggee, current);
+  }
+}
+
+async function objectListens(
+  debuggee: chrome.debugger.Debuggee,
+  objectId: string,
+): Promise<boolean> {
+  const result = (await send(
+    debuggee,
+    "DOMDebugger.getEventListeners",
+    { objectId },
+    { label: "listensForKeys" },
+  ).catch(() => undefined)) as { listeners?: { type?: string }[] } | undefined;
+  return Boolean(result?.listeners?.some((listener) => KEY_LISTENS.has(listener.type ?? "")));
+}
+
+async function nextListenerTarget(
+  debuggee: chrome.debugger.Debuggee,
+  objectId: string,
+): Promise<string | undefined> {
+  const result = (await send(
+    debuggee,
+    "Runtime.callFunctionOn",
+    { objectId, functionDeclaration: nextListenerNode.toString() },
+    { label: "listensForKeys", ms: 1_000 },
+  ).catch(() => undefined)) as { result?: { objectId?: string } } | undefined;
+  return result?.result?.objectId;
+}
+
+function nextListenerNode(this: Node): Node | null {
+  if (this === (window as unknown as Node)) return null;
+  if (this.parentNode) return this.parentNode;
+  if (this.nodeType === 9) return (this as Document).defaultView as unknown as Node;
+  const doc = (this as HTMLElement).ownerDocument;
+  if (doc && doc !== this) return doc;
+  return null;
+}
+
+function releaseObject(debuggee: chrome.debugger.Debuggee, objectId: string): Promise<unknown> {
+  return send(debuggee, "Runtime.releaseObject", { objectId }, { label: "listensForKeys" }).catch(
+    () => undefined,
+  );
+}
+
 function selectTextInput(this: HTMLInputElement | HTMLTextAreaElement) {
   if (!editable(this)) return null;
   const root = this.getRootNode() as Document | ShadowRoot;

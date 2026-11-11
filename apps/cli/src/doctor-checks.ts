@@ -33,6 +33,7 @@ export interface HealthView {
   engine: boolean;
   protocolVersion: ProtocolVersion;
   engineProtocol?: ProtocolVersion;
+  cdpFailures?: { label: string; count: number }[];
 }
 
 export interface DataDir {
@@ -75,7 +76,18 @@ export function formatDoctor(checks: Check[], json: boolean): string {
 
 function daemonCheck(report: HealthView | undefined): Check {
   if (!report) return line("daemon", "fail", "The daemon did not answer.", OPEN_AEON);
-  return line("daemon", "ok", "The daemon answered the health ping.", OPEN_AEON);
+  return line(
+    "daemon",
+    "ok",
+    "The daemon answered the health ping." + failureText(report),
+    OPEN_AEON,
+  );
+}
+
+function failureText(report: HealthView): string {
+  const rows = report.cdpFailures ?? [];
+  if (rows.length === 0) return "";
+  return " CDP failures: " + rows.map((row) => `${row.label} ${row.count}`).join(", ");
 }
 
 function protocolCheck(report: HealthView | undefined): Check {

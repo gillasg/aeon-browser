@@ -10,6 +10,7 @@ import { onBrowserDebuggerAttached } from "./native-browser-session.js";
 const RULE_BASE = 600_000;
 const RULE_SPAN = 90_000;
 const quiet = new Set<number>();
+const adsOn = new Set<number>();
 const loaderIds = new Map<number, string>();
 const ruleIds = new Map<number, number[]>();
 let nextRule = 0;
@@ -105,15 +106,25 @@ const QUIET_SWEEP = `(() => {
   }
 })()`;
 
-export async function enableQuietTab(tabId: number): Promise<void> {
-  if (quiet.has(tabId)) return;
-  quiet.add(tabId);
-  noteInjectedScript(tabId, "quiet tab: popups blocked, media muted, ads filtered");
-  await addRules(tabId);
+/** Quiet mutes media. Ad-host blocking and the document-start script are off unless `ads` (explore, crawl). */
+export async function enableQuietTab(
+  tabId: number,
+  options: { ads?: boolean } = {},
+): Promise<void> {
+  if (options.ads) adsOn.add(tabId);
+  if (!quiet.has(tabId)) {
+    quiet.add(tabId);
+    noteInjectedScript(
+      tabId,
+      options.ads ? "quiet tab: media muted, ads filtered" : "quiet tab: media muted",
+    );
+  }
+  if (options.ads) await addRules(tabId);
 }
 
 export async function disableQuietTab(tabId: number): Promise<void> {
   quiet.delete(tabId);
+  adsOn.delete(tabId);
   loaderIds.delete(tabId);
   const ids = ruleIds.get(tabId) ?? [];
   ruleIds.delete(tabId);
@@ -149,18 +160,27 @@ async function addRules(tabId: number): Promise<void> {
     .catch(() => undefined);
 }
 
-async function onQuietAttach(tabId: number): Promise<void> {
+async function installQuietScript(tabId: number): Promise<void> {
   await send(
     { tabId },
     "Page.addScriptToEvaluateOnNewDocument",
     { source: QUIET_SCRIPT },
     { label: "onQuietAttach" },
   ).catch(() => undefined);
+}
+
+function quietSource(tabId: number, loader: string | undefined): string {
+  if (!adsOn.has(tabId)) return QUIET_SWEEP;
+  return loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : QUIET_SCRIPT;
+}
+
+async function onQuietAttach(tabId: number): Promise<void> {
+  if (adsOn.has(tabId)) await installQuietScript(tabId);
   const tree = (await send({ tabId }, "Page.getFrameTree", {}, { label: "onQuietAttach" }).catch(
     () => undefined,
   )) as { frameTree?: { frame?: { loaderId?: string } } } | undefined;
   const loader = tree?.frameTree?.frame?.loaderId;
-  const expression = loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : QUIET_SCRIPT;
+  const expression = quietSource(tabId, loader);
   if (loader) loaderIds.set(tabId, loader);
   await send(
     { tabId },
@@ -182,6 +202,7 @@ onEngineInstall(() => {
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
     quiet.delete(tabId);
+    adsOn.delete(tabId);
     loaderIds.delete(tabId);
     const ids = ruleIds.get(tabId) ?? [];
     ruleIds.delete(tabId);

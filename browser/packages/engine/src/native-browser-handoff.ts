@@ -1,5 +1,6 @@
 import { send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
+import { withLock } from "./native-browser-scheduler.js";
 import { guardAgentTab } from "./native-browser-tab-cleanup.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
@@ -72,8 +73,10 @@ export async function handOffToUser(
 ): Promise<"done" | "cancelled"> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!tab) throw new Error("TARGET_LOST");
-  await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
-  await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
+  await withLock(`window:${tab.windowId}`, async () => {
+    await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
+    await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
+  });
   const notification = "aeon-handoff-" + tabId;
   if (!(await userSees(tabId, tab.windowId)))
     void chrome.notifications

@@ -4,6 +4,7 @@
 // raise engineConfig.cdpLimitFactor. The happy path starts sendCommand in this turn and waits only
 // on that call.
 
+import { beginLazyDomain, setDomainFailureNote } from "./domains.js";
 import { engineConfig } from "../engine-config.js";
 import { noteLateInput, noteLateInputLanded } from "../native-browser-receipts.js";
 
@@ -48,10 +49,21 @@ interface Flight {
   label?: string;
   started: number;
 }
+interface Gate {
+  done: boolean;
+}
 
 const stuck = new Map<number, Promise<unknown>>();
 const flights = new Set<Flight>();
 const records: CallRecord[] = [];
+const failures = new Map<string, number>();
+
+/** Swallowed and thrown CDP failures, per label, for `aeon doctor`. */
+export function cdpFailures(): { label: string; count: number }[] {
+  return [...failures]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+}
 
 export function callClass(method: string): CallClass {
   if (method.startsWith("Input.")) return "input";
@@ -98,7 +110,7 @@ export function bounded<T>(
 ): Promise<T> {
   const meta: Meta = { method: "Debugger.attach", label, cls: "attach", ms: scale(ms) };
   if (stuck.has(tabId)) return rejectStuck(tabId, meta.method, label);
-  return watch(tabId, work, meta);
+  return watch(tabId, work, meta, { done: false });
 }
 
 export function inflight(): { tabId?: number; method: string; label?: string; ageMs: number }[] {
@@ -127,7 +139,26 @@ function dispatch<T>(
   if (!meta) return Promise.reject(missingMs(method, o?.label));
   const held = heldTab(wake, d.tabId);
   if (held !== undefined) return rejectStuck(held, method, o?.label);
-  return watch(d.tabId, issued(d, method, params, meta, o?.ms), meta);
+  const gate: Gate = { done: false };
+  // The flight and its deadline start in this turn. A lazy Domain.enable shares that deadline.
+  // Once the call has timed out, the command itself is not sent when enable finally returns.
+  return watch(d.tabId, perform(d, method, params, meta, o?.ms, gate), meta, gate);
+}
+
+function perform<T>(
+  d: chrome.debugger.DebuggerSession,
+  method: string,
+  params: object | undefined,
+  meta: Meta,
+  ms: number | undefined,
+  gate: Gate,
+): Promise<T> {
+  const enable = beginLazyDomain(d, method);
+  if (enable === undefined) return issued(d, method, params, meta, ms);
+  return enable.then(() => {
+    if (gate.done) return undefined as T;
+    return issued(d, method, params, meta, ms);
+  });
 }
 
 function callMeta(method: string, o: SendOptions | undefined): Meta | undefined {
@@ -166,7 +197,7 @@ function commandBody(
   return { ...body, timeout: ms };
 }
 
-function watch<T>(tabId: number | undefined, work: Promise<T>, meta: Meta): Promise<T> {
+function watch<T>(tabId: number | undefined, work: Promise<T>, meta: Meta, gate: Gate): Promise<T> {
   const started = Date.now();
   const flight: Flight = {
     method: meta.method,
@@ -176,23 +207,22 @@ function watch<T>(tabId: number | undefined, work: Promise<T>, meta: Meta): Prom
   };
   flights.add(flight);
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let done = false;
   const stop = (ok: boolean, err?: string, ms = Date.now() - started): CallRecord => {
-    done = true;
+    gate.done = true;
     flights.delete(flight);
     if (timer !== undefined) clearTimeout(timer);
     return remember(entry(tabId, meta, ms, ok, err));
   };
   return new Promise((resolve, reject) => {
-    timer = setTimeout(() => onTimeout(tabId, work, meta, done, stop, reject), meta.ms);
+    timer = setTimeout(() => onTimeout(tabId, work, meta, gate, stop, reject), meta.ms);
     work.then(
       (value) => {
-        if (done) return;
+        if (gate.done) return;
         stop(true);
         resolve(value);
       },
       (error: unknown) => {
-        if (done) return;
+        if (gate.done) return;
         stop(false, messageOf(error));
         reject(error instanceof Error ? error : new Error(messageOf(error)));
       },
@@ -204,11 +234,11 @@ function onTimeout<T>(
   tabId: number | undefined,
   work: Promise<T>,
   meta: Meta,
-  done: boolean,
+  gate: Gate,
   stop: (ok: boolean, err?: string, ms?: number) => CallRecord,
   reject: (error: Error) => void,
 ): void {
-  if (done) return;
+  if (gate.done) return;
   const error = timeoutError(meta, tabId);
   const record = stop(false, error.message, meta.ms);
   if (tabId !== undefined) armStuck(tabId, work, record, meta);
@@ -307,5 +337,12 @@ function entry(
 function remember(record: CallRecord): CallRecord {
   records.push(record);
   if (records.length > RING) records.shift();
+  if (!record.ok) noteFailure(record.label ?? record.method);
   return record;
 }
+
+function noteFailure(label: string): void {
+  failures.set(label, (failures.get(label) ?? 0) + 1);
+}
+
+setDomainFailureNote(noteFailure);

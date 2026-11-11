@@ -1,3 +1,4 @@
+import { TEXT_CAP, truncationNote } from "../sync-text.js";
 import type { JsonSchema } from "../types.js";
 
 // JSON Schema inference over many samples: a property is required only when every sample has
@@ -89,6 +90,8 @@ function observeString(acc: Accumulator, value: string): void {
 }
 
 export function inferSchema(values: unknown[]): JsonSchema {
+  const encoded = JSON.stringify(values);
+  if (encoded.length > TEXT_CAP) return { note: truncationNote("inferSchema", encoded.length) };
   const acc = accumulator();
   for (const value of values) observe(acc, value);
   return toSchema(acc);
