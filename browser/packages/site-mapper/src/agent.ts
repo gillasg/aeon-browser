@@ -81,8 +81,10 @@ export interface FlowOptions {
   session?: string;
   /** Bring the recorded tab to the front. Default true. */
   foreground?: boolean;
-  /** Block popunders, autoplay and ad hosts (explore defaults to this). */
+  /** Block popunders and autoplay (explore defaults to this). */
   quiet?: boolean;
+  /** Block ad hosts. Explore sets this with quiet. */
+  ads?: boolean;
   /** Requests that would change something are blocked and only recorded (see RecordOptions). */
   dryRun?: boolean;
 }
@@ -190,6 +192,7 @@ function startFlow(name: string, options: FlowOptions): Promise<RecordingSession
     ...(options.session ? { session: options.session } : {}),
     ...(options.foreground === false ? { foreground: false } : {}),
     ...(options.quiet ? { quiet: true } : {}),
+    ...(options.ads ? { ads: true } : {}),
     ...(options.dryRun ? { dryRun: true } : {}),
   });
 }

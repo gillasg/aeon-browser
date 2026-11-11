@@ -14,6 +14,7 @@ import { ambiguousError, hiddenError, notFoundError } from "./native-browser-can
 import { collectFrameAx } from "./native-browser-frames.js";
 import { humanMouse } from "./native-browser-human-input.js";
 import { send } from "./cdp/send.js";
+import { withFocusEmulation } from "./native-browser-session.js";
 export { withBrowserDebugger as withDebugger } from "./native-browser-session.js";
 
 export async function resolveElement(
@@ -24,8 +25,19 @@ export async function resolveElement(
   latestSnapshots: Map<string, string>,
   documentEpoch?: number,
 ): Promise<AxRef> {
-  const nodes = await getAxTree(debuggee);
   if (!element) throw new Error("INVALID_TARGET");
+  if (element.kind === "backend" || element.kind === "ref") {
+    const direct = await resolveByNodeId(
+      debuggee,
+      element,
+      target,
+      refs,
+      latestSnapshots,
+      documentEpoch,
+    );
+    if (direct) return direct;
+  }
+  const nodes = await getAxTree(debuggee);
   if (element.kind === "backend") return resolveBackend(nodes, element, documentEpoch);
   if (element.kind === "ref") {
     const key = targetIdentity(target);
@@ -57,15 +69,76 @@ export async function resolveElement(
   if (element.kind === "query") return resolveQuery(debuggee, nodes, element);
   return resolveRole(debuggee, nodes, element);
 }
+async function resolveByNodeId(
+  debuggee: chrome.debugger.Debuggee,
+  element: BrowserElementTarget,
+  target: BrowserTargetKey,
+  refs: Map<string, Map<string, AxRef>>,
+  latestSnapshots: Map<string, string>,
+  documentEpoch?: number,
+): Promise<AxRef | undefined> {
+  if (element.kind === "backend") return describeBackend(debuggee, element, documentEpoch);
+  if (element.kind === "ref")
+    return describeRef(debuggee, element, target, refs, latestSnapshots, documentEpoch);
+  return undefined;
+}
+
+async function describeBackend(
+  debuggee: chrome.debugger.Debuggee,
+  element: Extract<BrowserElementTarget, { kind: "backend" }>,
+  documentEpoch?: number,
+): Promise<AxRef | undefined> {
+  if (documentEpoch !== element.documentEpoch) throw new Error("STALE_REF");
+  if (!(await nodeExists(debuggee, element.backendNodeId))) return undefined;
+  return {
+    backendNodeId: element.backendNodeId,
+    documentEpoch: element.documentEpoch,
+    role: "",
+    name: "",
+  };
+}
+
+async function describeRef(
+  debuggee: chrome.debugger.Debuggee,
+  element: Extract<BrowserElementTarget, { kind: "ref" }>,
+  target: BrowserTargetKey,
+  refs: Map<string, Map<string, AxRef>>,
+  latestSnapshots: Map<string, string>,
+  documentEpoch?: number,
+): Promise<AxRef | undefined> {
+  if (latestSnapshots.get(targetIdentity(target)) !== element.snapshotId)
+    throw new Error("STALE_REF");
+  const prior = refs.get(element.snapshotId)?.get(element.ref);
+  if (!prior) throw new Error("STALE_REF");
+  if (documentEpoch !== undefined && prior.documentEpoch !== documentEpoch)
+    throw new Error("STALE_REF");
+  const where = prior.sessionId ? { ...debuggee, sessionId: prior.sessionId } : debuggee;
+  if (!(await nodeExists(where, prior.backendNodeId))) return undefined;
+  return prior;
+}
+
+async function nodeExists(
+  debuggee: chrome.debugger.Debuggee,
+  backendNodeId: number,
+): Promise<boolean> {
+  const described = (await send(
+    debuggee,
+    "DOM.describeNode",
+    { backendNodeId },
+    { label: "resolveElement" },
+  ).catch(() => undefined)) as { node?: unknown } | undefined;
+  return Boolean(described?.node);
+}
+
 function resolveBackend(
   nodes: AxNode[],
   element: Extract<BrowserElementTarget, { kind: "backend" }>,
   documentEpoch?: number,
 ): AxRef {
   if (documentEpoch !== element.documentEpoch) throw new Error("STALE_REF");
-  const live = nodes.find(
-    (node) => node.backendDOMNodeId === element.backendNodeId && !node.ignored,
-  );
+  // A hidden or accessibility-ignored node often has an empty box. It is still the node
+  // the caller named: return it so the click hits it, instead of treating the id as a miss.
+  const live = nodes.find((node) => node.backendDOMNodeId === element.backendNodeId);
   if (!live) throw new Error("STALE_REF");
   return {
     backendNodeId: element.backendNodeId,
@@ -258,16 +331,32 @@ export async function clickAt(
 ): Promise<void> {
   showAgentCursor(debuggee, x, y, true);
   noteActionTiming(debuggee.tabId, { tAct: Date.now(), point: { x, y } });
+  await withFocusEmulation(debuggee.tabId, () => pressAt(debuggee, x, y));
+}
+
+async function pressAt(debuggee: chrome.debugger.Debuggee, x: number, y: number): Promise<void> {
+  // One direct move, unless the recorder's pointer is on: then the curve plays and this is the landing.
+  const moved = await humanMouse(debuggee, "mouseMoved", { x, y });
+  const at = {
+    x: typeof moved.x === "number" ? moved.x : x,
+    y: typeof moved.y === "number" ? moved.y : y,
+  };
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
-    { type: "mousePressed", x, y, button: "left", clickCount: 1 },
+    { type: "mouseMoved", ...at },
     { label: "clickAt" },
   );
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
-    { type: "mouseReleased", x, y, button: "left", clickCount: 1 },
+    { type: "mousePressed", ...at, button: "left", clickCount: 1 },
+    { label: "clickAt" },
+  );
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mouseReleased", ...at, button: "left", clickCount: 1 },
     { label: "clickAt" },
   );
 }

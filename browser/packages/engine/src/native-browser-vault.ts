@@ -101,22 +101,22 @@ export async function noteVaultFill(debuggee: chrome.debugger.Debuggee, id: numb
     return;
   }
   if (form.hasPassword && form.password) rememberVaultCandidate(debuggee.tabId, form, "agent");
-  await closeChromePopup(debuggee).catch(() => undefined);
+  await dismissPasswordUi(debuggee);
 }
 
 /**
- * Chrome opens its own password popup (saved logins, "use a strong password?") on a password
- * field the window shows, and it takes the next click meant for the page. Escape closes it, and
- * does nothing in a password field itself.
+ * Chrome's password bubble can sit over the page when the window is in front and swallow the
+ * next click. Blur the field before that click. Do not send Escape or any other key: the page
+ * sees it, and sign-up forms often live in a modal that Escape closes.
  */
-async function closeChromePopup(debuggee: chrome.debugger.Debuggee): Promise<void> {
-  for (const type of ["rawKeyDown", "keyUp"] as const)
-    await send(
-      debuggee,
-      "Input.dispatchKeyEvent",
-      { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
-      { label: "closeChromePopup" },
-    );
+export async function dismissPasswordUi(debuggee: chrome.debugger.Debuggee): Promise<void> {
+  if (debuggee.tabId === undefined || !vaultCandidate(debuggee.tabId)) return;
+  await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression: "document.activeElement&&document.activeElement.blur()", silent: true },
+    { label: "dismissPasswordUi", ms: 1_000 },
+  ).catch(() => undefined);
 }
 
 function vaultFieldInfo(this: HTMLInputElement): VaultForm | null {

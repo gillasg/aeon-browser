@@ -6,7 +6,6 @@ $appRoot = $PSScriptRoot
 $hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
 $statusPath = Join-Path $appRoot 'daemon-supervisor-status.json'
 $statePath = Join-Path $appRoot 'daemon-launcher-state.json'
-if (-not (Test-Path -LiteralPath $hostExecutable -PathType Leaf)) { return }
 
 function Read-JsonFile([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
@@ -27,12 +26,50 @@ function Test-DaemonHealth {
     if (-not $daemon -or $daemon.ProcessName -ne 'node') { return $false }
     $match = [regex]::Match([string]$connection.endpoint, '^ws://127\.0\.0\.1:(\d+)/core/v1$')
     if (-not $match.Success) { return $false }
+    return Test-CorePing ([int]$match.Groups[1].Value)
+}
+
+function Test-CorePing([int]$Port) {
+    # One 2s budget for connect, handshake, and the ping. Each step uses only the time left.
     $client = New-Object Net.Sockets.TcpClient
+    $deadline = [DateTime]::UtcNow.AddSeconds(2)
     try {
-        $pending = $client.ConnectAsync('127.0.0.1', [int]$match.Groups[1].Value)
-        if (-not $pending.Wait(500)) { return $false }
-        return $client.Connected
+        $left = [int]($deadline - [DateTime]::UtcNow).TotalMilliseconds
+        if ($left -le 0 -or -not $client.ConnectAsync('127.0.0.1', $Port).Wait($left)) { return $false }
+        $stream = $client.GetStream()
+        $key = [Convert]::ToBase64String([guid]::NewGuid().ToByteArray())
+        $head = "GET /core/v1 HTTP/1.1`r`nHost: 127.0.0.1:${Port}`r`nUpgrade: websocket`r`nConnection: Upgrade`r`nSec-WebSocket-Key: ${key}`r`nSec-WebSocket-Version: 13`r`n`r`n"
+        $bytes = [Text.Encoding]::ASCII.GetBytes($head)
+        if (-not (Set-PingBudget $client $deadline)) { return $false }
+        $stream.Write($bytes, 0, $bytes.Length)
+        $buffer = New-Object byte[] 2048
+        if (-not (Set-PingBudget $client $deadline)) { return $false }
+        $read = $stream.Read($buffer, 0, $buffer.Length)
+        if ([Text.Encoding]::ASCII.GetString($buffer, 0, $read) -notmatch ' 101 ') { return $false }
+        $id = [guid]::NewGuid().ToString()
+        $payload = [Text.Encoding]::UTF8.GetBytes("{""kind"":""core.ping"",""requestId"":""$id""}")
+        $mask = New-Object byte[] 4
+        $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $rng.GetBytes($mask) } finally { $rng.Dispose() }
+        $frame = New-Object byte[] (6 + $payload.Length)
+        $frame[0] = 129
+        $frame[1] = 128 -bor $payload.Length
+        [Array]::Copy($mask, 0, $frame, 2, 4)
+        for ($i = 0; $i -lt $payload.Length; $i++) { $frame[6 + $i] = $payload[$i] -bxor $mask[$i % 4] }
+        if (-not (Set-PingBudget $client $deadline)) { return $false }
+        $stream.Write($frame, 0, $frame.Length)
+        if (-not (Set-PingBudget $client $deadline)) { return $false }
+        $read = $stream.Read($buffer, 0, $buffer.Length)
+        return [Text.Encoding]::UTF8.GetString($buffer, 0, $read).Contains('core.ping.result')
     } catch { return $false } finally { $client.Close() }
+}
+
+function Set-PingBudget([Net.Sockets.TcpClient]$Client, [DateTime]$Deadline) {
+    $left = [int]($Deadline - [DateTime]::UtcNow).TotalMilliseconds
+    if ($left -le 0) { return $false }
+    $Client.ReceiveTimeout = $left
+    $Client.SendTimeout = $left
+    return $true
 }
 
 function Get-Supervisors {
@@ -47,6 +84,11 @@ function Get-Supervisors {
 function Save-Unhealthy([int]$Count) {
     try { [IO.File]::WriteAllText($statePath, '{"unhealthy":' + $Count + '}') } catch { }
 }
+
+# Dot-sourcing defines Test-CorePing for tests and does not start or stop a supervisor.
+if ($MyInvocation.InvocationName -eq '.') { return }
+
+if (-not (Test-Path -LiteralPath $hostExecutable -PathType Leaf)) { return }
 
 $unhealthy = 0
 $state = Read-JsonFile $statePath

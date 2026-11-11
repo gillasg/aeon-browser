@@ -1,4 +1,5 @@
 import { createRedactor, redactUrl, type Redactor } from "../redact.js";
+import { TEXT_CAP, truncationNote } from "../sync-text.js";
 import type { Operation, Overrides, SiteModel } from "../types.js";
 import { sentence } from "./openapi.js";
 
@@ -64,6 +65,8 @@ function schemeLine(scheme: SiteModel["security"][number]): string {
 }
 
 export function markdownReport(model: SiteModel, rules: Overrides["redact"] = {}): string {
+  const encoded = JSON.stringify(model);
+  if (encoded.length > TEXT_CAP) return truncationNote("markdownReport", encoded.length);
   const redactor = createRedactor(rules);
   const origins = model.origins.join(", ") || "no origins";
   return [

@@ -64,7 +64,8 @@ globalThis.chrome = {
   windows: { get: async () => ({ focused: true, state: "normal" }) },
 };
 
-const { callClass, callLimitMs, inflight, recent, send } = await import("../dist/cdp/send.js");
+const { callClass, callLimitMs, cdpFailures, inflight, recent, send } =
+  await import("../dist/cdp/send.js");
 const { engineConfig, configureEngine } = await import("../dist/engine-config.js");
 const { beginReceipt, takeReceipt } = await import("../dist/native-browser-receipts.js");
 const { setHumanInputEnabled } = await import("../dist/native-browser-human-input.js");
@@ -118,6 +119,20 @@ function actionResult(lateReply) {
     receipt: { popups: [], navigated: false, ...(lateReply ? { lateReply } : {}) },
   };
 }
+
+test("a swallowed CDP failure is counted for doctor", async () => {
+  const tab = nextTab();
+  const original = chrome.debugger.sendCommand;
+  chrome.debugger.sendCommand = () => Promise.reject(new Error("nope"));
+  try {
+    await send({ tabId: tab }, "Page.getFrameTree", {}, { label: "doctor-count" }).catch(
+      () => undefined,
+    );
+  } finally {
+    chrome.debugger.sendCommand = original;
+  }
+  assert.equal(cdpFailures().find((row) => row.label === "doctor-count")?.count, 1);
+});
 
 test("bounded CDP send", async (t) => {
   await t.test("class and limit table, widened only by cdpLimitFactor", classTable);
@@ -515,15 +530,6 @@ function attachFaults({ read, emulate, attachLimit }) {
         times: 2,
         hang: (method) => method === "Page.enable" || method === "Page.setWebLifecycleState",
       },
-    ),
-    fault("attach domains", "DOM.enable", read, (tabId) =>
-      session.ensureBrowserAttachment(tabId, "chat"),
-    ),
-    fault("attach domains", "Accessibility.enable", read, (tabId) =>
-      session.ensureBrowserAttachment(tabId, "chat"),
-    ),
-    fault("attach focus", "Emulation.setFocusEmulationEnabled", emulate, (tabId) =>
-      session.ensureBrowserAttachment(tabId, "chat"),
     ),
     fault(
       "already attached",

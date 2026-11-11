@@ -8,15 +8,19 @@ export interface DiffLine {
 }
 
 /** A line diff (longest common subsequence; long inputs fall back to a plain replace). */
+const TEXT_CAP = 262_144;
+
 export function diffLines(before: string, after: string): DiffLine[] {
+  const capped = overCap(before, after);
+  if (capped) return capped;
   const a = before.split("\n");
   const b = after.split("\n");
-  if (a.length * b.length > 4_000_000)
-    return [
-      ...a.map((text) => ({ kind: "-" as const, text })),
-      ...b.map((text) => ({ kind: "+" as const, text })),
-    ];
-  const lengths = lcsTable(a, b);
+  const wide = tooWide(a, b);
+  if (wide) return wide;
+  return walkDiff(a, b, lcsTable(a, b));
+}
+
+function walkDiff(a: string[], b: string[], lengths: Uint32Array[]): DiffLine[] {
   const out: DiffLine[] = [];
   let i = 0;
   let j = 0;
@@ -25,13 +29,30 @@ export function diffLines(before: string, after: string): DiffLine[] {
       out.push({ kind: " ", text: a[i] as string });
       i++;
       j++;
-    } else if ((lengths[i + 1]?.[j] ?? 0) >= (lengths[i]?.[j + 1] ?? 0))
-      out.push({ kind: "-", text: a[i++] as string });
+    } else if (takeBefore(lengths, i, j)) out.push({ kind: "-", text: a[i++] as string });
     else out.push({ kind: "+", text: b[j++] as string });
   }
   while (i < a.length) out.push({ kind: "-", text: a[i++] as string });
   while (j < b.length) out.push({ kind: "+", text: b[j++] as string });
   return out;
+}
+
+function takeBefore(lengths: Uint32Array[], i: number, j: number): boolean {
+  return (lengths[i + 1]?.[j] ?? 0) >= (lengths[i]?.[j + 1] ?? 0);
+}
+
+function overCap(before: string, after: string): DiffLine[] | undefined {
+  const length = Math.max(before.length, after.length);
+  if (length <= TEXT_CAP) return undefined;
+  return [{ kind: " ", text: `[truncated ${length - TEXT_CAP} chars; diffLines cap ${TEXT_CAP}]` }];
+}
+
+function tooWide(a: string[], b: string[]): DiffLine[] | undefined {
+  if (a.length * b.length <= 4_000_000) return undefined;
+  return [
+    ...a.map((text) => ({ kind: "-" as const, text })),
+    ...b.map((text) => ({ kind: "+" as const, text })),
+  ];
 }
 
 function lcsTable(a: string[], b: string[]): Uint32Array[] {

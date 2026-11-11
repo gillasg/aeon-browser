@@ -73,6 +73,7 @@ async function exploreOne(
         ...(startUrl ? { startUrl } : {}),
         foreground: options.foreground === true,
         quiet: options.quiet,
+        ads: options.quiet,
         ...(options.actions ? { dryRun: true } : {}),
         ...(options.bridge ? { bridge: options.bridge } : {}),
       },

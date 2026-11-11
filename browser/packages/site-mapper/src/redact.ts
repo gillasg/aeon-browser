@@ -1,3 +1,4 @@
+import { TEXT_CAP, truncationNote } from "./sync-text.js";
 import type { Overrides } from "./types.js";
 
 // Redaction for everything that leaves the machine or goes into a shareable file: reports,
@@ -29,6 +30,7 @@ export function createRedactor(rules: Overrides["redact"] = {}): Redactor {
   const extraKeys = new Set((rules.keys ?? []).map((k) => k.toLowerCase()));
   const patterns = (rules.patterns ?? []).map((pattern) => new RegExp(pattern, "g"));
   const text = (value: string): string => {
+    if (value.length > TEXT_CAP) return truncationNote("redact.text", value.length);
     let out = value.replace(JWT, "<jwt>").replace(EMAIL, "<email>");
     out = out.replace(CARD, (match) => (luhn(match.replace(/\D/g, "")) ? "<card>" : match));
     out = out.replace(PHONE, (match) =>

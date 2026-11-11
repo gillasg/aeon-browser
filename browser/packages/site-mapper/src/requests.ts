@@ -1,4 +1,5 @@
 import { code } from "./code.js";
+import { formatPace, paceExpectedMs, setBatchRate } from "./pace.js";
 import { listSites, loadModel, siteName } from "./registry.js";
 import type { Params } from "./runtime/request.js";
 import { siteMapper } from "./runtime/site-mapper.js";
@@ -20,7 +21,9 @@ export interface SiteMapperRequest {
     | "learn-live"
     | "write"
     | "undo"
-    | "code";
+    | "code"
+    | "export"
+    | "pace";
   site?: string;
   url?: string;
   options?: Record<string, unknown>;
@@ -84,7 +87,40 @@ const HANDLERS: Record<Exclude<SiteMapperRequest["siteMapper"], "sites" | "code"
     undoLive(site, required(request.operation, "operation"), request.params ?? {}),
   call: async (site, request) =>
     (await siteMapper(site)).call(required(request.operation, "operation"), request.params ?? {}),
+  export: async (site, request) => exportRows(site, request),
+  pace: async (site, request) => pacePreview(site, request),
 };
+
+async function pacePreview(site: string, request: SiteMapperRequest): Promise<unknown> {
+  const client = await siteMapper(site);
+  if (request.params?.clear === true) {
+    setBatchRate(client.site);
+    return { cleared: true };
+  }
+  const rate = Number(request.params?.perSecond);
+  if (Number.isFinite(rate) && rate > 0) setBatchRate(client.site, rate);
+  const calls = Number(request.params?.calls);
+  const count = Number.isFinite(calls) && calls >= 0 ? Math.floor(calls) : 0;
+  return { note: formatPace(client.site, count), expectedMs: paceExpectedMs(client.site, count) };
+}
+
+async function exportRows(site: string, request: SiteMapperRequest): Promise<unknown> {
+  const client = await siteMapper(site);
+  const params = { ...(request.params ?? {}) };
+  const rows = Array.isArray(params.rows) ? params.rows : [];
+  delete params.rows;
+  const operation = required(request.operation, "operation");
+  const result = await client.exportRows(rows, (row) =>
+    client.call(operation, rowParams(params, row), { pace: false }),
+  );
+  return result;
+}
+
+function rowParams(shared: Params, row: unknown): Params {
+  if (row !== null && typeof row === "object" && !Array.isArray(row))
+    return { ...shared, ...(row as Params) };
+  return { ...shared, row };
+}
 
 export async function handleSiteMapperRequest(request: SiteMapperRequest): Promise<unknown> {
   if (request.siteMapper === "sites") return listSites();

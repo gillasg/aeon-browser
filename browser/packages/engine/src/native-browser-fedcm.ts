@@ -5,7 +5,6 @@
 //   pick that account; with several, leave it open and tell the agent which call picks one;
 // - a dialog the page opened by itself (One Tap) is dismissed: no site is signed into unasked.
 import { send } from "./cdp/send.js";
-import { onBrowserDebuggerAttached } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
 const ASKED_WITHIN_MS = 15_000;
@@ -23,9 +22,43 @@ interface DialogShown {
   title?: string;
 }
 
+const fedcmOn = new Set<number>();
+const fedcmWanted = new Set<number>();
+const fedcmFlight = new Map<number, Promise<void>>();
+
 /** The agent clicked or pressed in this tab: a sign-in dialog that follows is one it asked for. */
 export function noteAgentClick(tabId: number): void {
   clickedAt.set(tabId, Date.now());
+  fedcmWanted.add(tabId);
+}
+
+/** True once FedCm.enable has resolved for this tab. */
+export function fedcmEnabled(tabId: number): boolean {
+  return fedcmOn.has(tabId);
+}
+
+/**
+ * Enables FedCM after the debugger is attached. A failure leaves the tab unmarked so the next
+ * action retries. Detach clears the flag (`forgetFedCm`).
+ */
+export function ensureFedCm(tabId: number): Promise<void> {
+  if (!fedcmWanted.has(tabId) || fedcmOn.has(tabId)) return Promise.resolve();
+  const flight = fedcmFlight.get(tabId);
+  if (flight) return flight;
+  const work = enableFedCm(tabId).finally(() => {
+    if (fedcmFlight.get(tabId) === work) fedcmFlight.delete(tabId);
+  });
+  fedcmFlight.set(tabId, work);
+  return work;
+}
+
+/** Drops FedCM state for a tab that detached. The next click can enable it again. */
+export function forgetFedCm(tabId: number): void {
+  clickedAt.delete(tabId);
+  notes.delete(tabId);
+  fedcmOn.delete(tabId);
+  fedcmWanted.delete(tabId);
+  fedcmFlight.delete(tabId);
 }
 
 /** What Aeon did with a sign-in dialog since the last step, once. */
@@ -49,9 +82,13 @@ function command(
 }
 
 function enableFedCm(tabId: number): Promise<void> {
-  return command(tabId, "FedCm.enable", { disableRejectionDelay: true }, "enableFedCm").then(
-    () => undefined,
-  );
+  return send({ tabId }, "FedCm.enable", { disableRejectionDelay: true }, { label: "enableFedCm" })
+    .then(() => {
+      fedcmOn.add(tabId);
+    })
+    .catch(() => {
+      fedcmOn.delete(tabId);
+    });
 }
 
 export async function answerDialog(tabId: number, dialog: DialogShown): Promise<void> {
@@ -101,13 +138,11 @@ export async function answerDialog(tabId: number, dialog: DialogShown): Promise<
 }
 
 onEngineInstall(() => {
-  onBrowserDebuggerAttached((tabId) => enableFedCm(tabId));
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (source.tabId === undefined || method !== "FedCm.dialogShown") return;
     void answerDialog(source.tabId, params as DialogShown);
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
-    clickedAt.delete(tabId);
-    notes.delete(tabId);
+    forgetFedCm(tabId);
   });
 });

@@ -6,11 +6,14 @@ import {
   webPage,
 } from "./native-browser-foreign-frames.js";
 import {
-  enableDiagnostics,
+  armDiagnostics,
   forgetDiagnostics,
   releaseBrowserEvents,
 } from "./native-browser-events.js";
+import { ensureFedCm, forgetFedCm } from "./native-browser-fedcm.js";
+import { withLock } from "./native-browser-scheduler.js";
 import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-navigation.js";
+import { forgetDomains } from "./cdp/domains.js";
 import { bounded, send, sendWake } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
@@ -155,6 +158,8 @@ async function runWithBrowserDebugger<T>(
     touchAgentTab(tabId);
     await ensureBrowserViewport(tabId);
     if (attachments.get(tabId) !== entry) throw new Error("DEBUGGER_DETACHED");
+    if (networkWanted.has(tabId)) await ensureNetwork(tabId);
+    await ensureFedCm(tabId);
     if (entry.timer !== undefined) clearTimeout(entry.timer);
     entry.timer = globalThis.setTimeout(() => idleDetach(tabId), 90_000);
     void showAgentBadge(tabId);
@@ -201,6 +206,11 @@ function forget(tabId: number): void {
   const entry = attachments.get(tabId);
   if (entry?.timer !== undefined) clearTimeout(entry.timer);
   attachments.delete(tabId);
+  forgetDomains(tabId);
+  networkOn.delete(tabId);
+  networkWanted.delete(tabId);
+  networkFlight.delete(tabId);
+  forgetFedCm(tabId);
   forgetDiagnostics(tabId);
   forgetBrowserActivity(tabId);
   void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => undefined);
@@ -224,18 +234,10 @@ async function attach(tabId: number): Promise<void> {
   }
   trackBrowserActivity(tabId);
   await enablePage(tabId);
+  armDiagnostics(tabId);
   void showAgentGlow(tabId);
-  await Promise.all([
-    send({ tabId }, "DOM.enable", undefined, { label: "attach", cls: "attach" }),
-    send({ tabId }, "Accessibility.enable", undefined, { label: "attach", cls: "attach" }),
-  ]);
-  await send(
-    { tabId },
-    "Emulation.setFocusEmulationEnabled",
-    { enabled: true },
-    { label: "attach" },
-  ).catch(() => undefined);
-  await enableDiagnostics(tabId);
+  // DOM, Accessibility and focus turn on at first need. The diagnostics buffer is armed
+  // here without Network; the first action enables Network and that traffic fills the buffer.
   for (const listener of attachListeners)
     await Promise.resolve(listener(tabId)).catch(() => undefined);
 }
@@ -319,6 +321,71 @@ export async function restoreBrowserOwners(owners: Map<number, string>): Promise
   }
 }
 
+const networkOn = new Set<number>();
+const networkWanted = new Set<number>();
+const networkFlight = new Map<number, Promise<void>>();
+
+/** A write step wants Network. Enable runs after the debugger is attached, not before. */
+export function wantNetwork(tabId: number): void {
+  networkWanted.add(tabId);
+}
+
+/** Network at the first action (a click, a navigation), not at the first read and not at attach.
+ * The tab is recorded only after Network.enable resolves. A failure stays unmarked and retries. */
+export async function ensureNetwork(tabId: number): Promise<void> {
+  if (networkOn.has(tabId)) return;
+  const flight = networkFlight.get(tabId);
+  if (flight) return flight;
+  const work = enableNetwork(tabId).finally(() => {
+    if (networkFlight.get(tabId) === work) networkFlight.delete(tabId);
+  });
+  networkFlight.set(tabId, work);
+  return work;
+}
+
+async function enableNetwork(tabId: number): Promise<void> {
+  const entry = attachments.get(tabId);
+  if (!entry) return;
+  try {
+    await entry.attached;
+  } catch {
+    return;
+  }
+  if (networkOn.has(tabId) || attachments.get(tabId) !== entry) return;
+  try {
+    await send({ tabId }, "Network.enable", undefined, { label: "ensureNetwork" });
+  } catch {
+    return;
+  }
+  if (attachments.get(tabId) === entry) networkOn.add(tabId);
+}
+
+/** Focus emulation for one action, then off. A tab is not left looking focused. */
+export async function withFocusEmulation<T>(
+  tabId: number | undefined,
+  work: () => Promise<T>,
+): Promise<T> {
+  if (tabId === undefined) return work();
+  await send(
+    { tabId },
+    "Emulation.setFocusEmulationEnabled",
+    { enabled: true },
+    { label: "withFocus" },
+  ).catch(() => undefined);
+  try {
+    return await work();
+  } finally {
+    await send(
+      { tabId },
+      "Emulation.setFocusEmulationEnabled",
+      { enabled: false },
+      { label: "withFocus" },
+    ).catch(() => undefined);
+  }
+}
+
+const MIN_WIDTH = 1280;
+const MIN_HEIGHT = 900;
 const overridden = new Set<number>();
 /** Device sizes the agent chose (page.emulate); they win over the background-tab viewport. */
 const emulated = new Map<number, unknown>();
@@ -331,20 +398,20 @@ onEngineInstall(() => {
   chrome.tabs.onActivated?.addListener(({ tabId }) => void restoreBrowserViewport(tabId));
 });
 export async function ensureBrowserViewport(tabId: number): Promise<void> {
-  if (emulated.has(tabId)) return;
-  if (overridden.has(tabId)) return;
+  if (emulated.has(tabId) || overridden.has(tabId)) return;
   const tab = await chrome.tabs.get?.(tabId).catch(() => undefined);
   if (!tab) return;
   if (tab.active || ((tab as chrome.tabs.Tab & { splitViewId?: number }).splitViewId ?? -1) >= 0) {
     await restoreBrowserViewport(tabId);
     return;
   }
+  if (await sizeRealWindow(tab.windowId)) return;
   await send(
     { tabId },
     "Emulation.setDeviceMetricsOverride",
     {
-      width: 1280,
-      height: 800,
+      width: MIN_WIDTH,
+      height: MIN_HEIGHT,
       // 0 keeps the screen's own pixel ratio: a forced 1 on a scaled display is a tell pages read.
       deviceScaleFactor: 0,
       mobile: false,
@@ -352,6 +419,28 @@ export async function ensureBrowserViewport(tabId: number): Promise<void> {
     { label: "ensureBrowserViewport" },
   );
   overridden.add(tabId);
+}
+
+/** Sizes the real window. False when it cannot be (the caller may override the viewport). */
+async function sizeRealWindow(windowId: number | undefined): Promise<boolean> {
+  if (windowId === undefined || !chrome.windows?.get || !chrome.windows.update) return false;
+  return withLock(`window:${windowId}`, () => resizeWindow(windowId));
+}
+
+async function resizeWindow(windowId: number): Promise<boolean> {
+  const win = await chrome.windows.get(windowId).catch(() => undefined);
+  if (!win) return false;
+  if ((win.width ?? 0) >= MIN_WIDTH && (win.height ?? 0) >= MIN_HEIGHT) return true;
+  try {
+    await chrome.windows.update(windowId, {
+      width: Math.max(win.width ?? 0, MIN_WIDTH),
+      height: Math.max(win.height ?? 0, MIN_HEIGHT),
+    });
+    const after = await chrome.windows.get(windowId);
+    return (after.width ?? 0) >= MIN_WIDTH && (after.height ?? 0) >= MIN_HEIGHT;
+  } catch {
+    return false;
+  }
 }
 export async function restoreBrowserViewport(tabId: number): Promise<void> {
   if (emulated.has(tabId)) return;

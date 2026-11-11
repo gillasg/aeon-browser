@@ -78,11 +78,25 @@ type TabState = {
 };
 
 const tabs = new Map<number, TabState>();
-let enabled = true;
+let enabled = false;
+let generatorUsers = 0;
 
-/** Turn the pacing off for a fast run (tests, bulk reads). */
+/** Turn the curved pointer and key timing on. Production leaves this off. */
 export function setHumanInputEnabled(value: boolean): void {
   enabled = value;
+}
+
+/**
+ * The Bezier pointer (tremor, overshoot) is the recorder's visual, and nowhere else.
+ * Each start counts; the last stop turns it off.
+ */
+export function setPointerGenerator(on: boolean): void {
+  generatorUsers += on ? 1 : -1;
+  if (generatorUsers < 0) generatorUsers = 0;
+}
+
+function curvedPointer(): boolean {
+  return enabled || generatorUsers > 0;
 }
 
 export function forgetHumanInput(tabId: number): void {
@@ -113,7 +127,7 @@ export async function humanMouse(
   method: string,
   params: Params,
 ): Promise<Params> {
-  if (!enabled || debuggee.tabId === undefined) return params;
+  if (!curvedPointer() || debuggee.tabId === undefined) return params;
   const tab = state(debuggee.tabId);
   let output: Params = params;
   const run = tab.queue.then(async () => {
@@ -206,7 +220,7 @@ function glide(dx: number, dy: number): Point[] {
 
 /** Space consecutive key presses like a person. */
 export async function paceKey(debuggee: chrome.debugger.Debuggee): Promise<void> {
-  if (!enabled || debuggee.tabId === undefined) return;
+  if (!curvedPointer() || debuggee.tabId === undefined) return;
   const tab = state(debuggee.tabId);
   const gap = random(30, 110) - (Date.now() - tab.lastKeyAt);
   if (gap > 0 && tab.lastKeyAt > 0 && Date.now() - tab.lastKeyAt < 1000) await sleep(gap);
@@ -265,55 +279,41 @@ export function keyFor(char: string): KeyEvent | undefined {
   };
 }
 
-/** The pause before a character: quicker within a word, longer after a space or punctuation. */
-function gapBefore(previous: string | undefined): number {
-  if (previous === undefined) return 0;
-  if (previous === " ") return random(70, 170);
-  if (/[.,;:!?]/.test(previous)) return random(120, 260);
-  return random(35, 110);
-}
-
-/** Type one character at a time as real key presses, with key spacing and hold times. */
-export async function humanType(debuggee: chrome.debugger.Debuggee, text: string): Promise<void> {
-  if (!enabled) {
+/**
+ * Types `text`. Real key events when `keys` is set (a site listens, or the caller asked to
+ * press keys), for the whole value. Otherwise one insert, which is a single round trip.
+ * A value longer than 120 characters is never insertText when keys were requested.
+ */
+export async function humanType(
+  debuggee: chrome.debugger.Debuggee,
+  text: string,
+  options?: { keys?: boolean },
+): Promise<void> {
+  const keys = options?.keys ?? enabled;
+  if (!keys) {
     await send(debuggee, "Input.insertText", { text }, { label: "humanType" });
     return;
   }
-  // Long text is sent in chunks with pacing between chunks, not per character: speed first.
-  if (text.length > 120) {
-    for (let index = 0; index < text.length; index += 32) {
-      await paceKey(debuggee);
-      await send(
-        debuggee,
-        "Input.insertText",
-        { text: text.slice(index, index + 32) },
-        { label: "humanType" },
-      );
-    }
+  for (const char of text) await typeChar(debuggee, char);
+}
+
+async function typeChar(debuggee: chrome.debugger.Debuggee, char: string): Promise<void> {
+  const key = keyFor(char);
+  if (!key) {
+    await send(debuggee, "Input.insertText", { text: char }, { label: "humanType" });
     return;
   }
-  let previous: string | undefined;
-  for (const char of text) {
-    await sleep(gapBefore(previous));
-    previous = char;
-    const key = keyFor(char);
-    if (!key) {
-      await send(debuggee, "Input.insertText", { text: char }, { label: "humanType" });
-      continue;
-    }
-    const { text: typed, ...event } = key;
-    await send(
-      debuggee,
-      "Input.dispatchKeyEvent",
-      { type: "keyDown", ...event, text: typed, unmodifiedText: typed },
-      { label: "humanType" },
-    );
-    await sleep(random(40, 110));
-    await send(
-      debuggee,
-      "Input.dispatchKeyEvent",
-      { type: "keyUp", ...event },
-      { label: "humanType" },
-    );
-  }
+  const { text: typed, ...event } = key;
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    { type: "keyDown", ...event, text: typed, unmodifiedText: typed },
+    { label: "humanType" },
+  );
+  await send(
+    debuggee,
+    "Input.dispatchKeyEvent",
+    { type: "keyUp", ...event },
+    { label: "humanType" },
+  );
 }

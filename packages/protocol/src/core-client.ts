@@ -352,6 +352,30 @@ export const CoreHealthResultSchema = z
     protocolVersion: ProtocolVersionSchema,
     engineProtocol: ProtocolVersionSchema.optional(),
     ms: z.number().int().nonnegative(),
+    cdpFailures: z
+      .array(
+        z
+          .object({
+            label: z.string().max(200),
+            count: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .max(50)
+      .optional(),
+  })
+  .strict();
+export const CorePingRequestSchema = z
+  .object({
+    kind: z.literal("core.ping"),
+    requestId: z.string().uuid(),
+  })
+  .strict();
+export const CorePingResultSchema = z
+  .object({
+    kind: z.literal("core.ping.result"),
+    requestId: z.string().uuid(),
+    ok: z.literal(true),
   })
   .strict();
 export type CoreBrowserSummary = z.infer<typeof CoreBrowserSummarySchema>;

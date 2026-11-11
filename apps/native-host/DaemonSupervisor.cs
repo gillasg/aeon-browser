@@ -288,7 +288,7 @@ internal static class DaemonSupervisor
             {
                 // A daemon that answers a probe is alive, and its running chats with it: answer this
                 // client "retry" and keep the daemon. Only a daemon silent to the probe too is killed.
-                if (Resynced(daemon))
+                if (Resynced(config, daemon))
                 {
                     SupervisorLog.Write("Daemon missed one bootstrap reply but answered the health ping; kept running.");
                     return Failure("BOOTSTRAP_UNAVAILABLE", true);
@@ -349,8 +349,25 @@ internal static class DaemonSupervisor
     // answers the line with BOOTSTRAP_UNAVAILABLE, which is also proof it is alive.
     private const int HealthWaitMs = 2500;
 
-    private static bool Resynced(Process daemon)
+    // AEON_PING_KILLS=1 makes a silent core.ping the kill. Unset, the stdout probe still decides.
+    private static bool PingDecidesKill()
     {
+        return string.Equals(
+            Environment.GetEnvironmentVariable("AEON_PING_KILLS"),
+            "1",
+            StringComparison.Ordinal);
+    }
+
+    private static bool Resynced(HostConfiguration config, Process daemon)
+    {
+        var ping = DaemonHealthPing.Try(config);
+        var pingKills = PingDecidesKill();
+        SupervisorLog.Write(
+            "core.ping " + (ping ? "answered" : "silent") +
+            (pingKills
+                ? "; kill uses core.ping (AEON_PING_KILLS=1)."
+                : "; the kill still uses the stdout probe."));
+        if (pingKills) return ping;
         if (!AskHealth(daemon)) return false;
         return HealthAnswered(daemon, DateTime.UtcNow.AddMilliseconds(HealthWaitMs));
     }
@@ -491,13 +508,25 @@ internal static class DaemonSupervisor
     /// </summary>
     private static Process StartWithin(HostConfiguration config, int seconds)
     {
+        var started = DateTime.UtcNow;
+        SupervisorLog.Write("spawn begin " + BootLog.Context());
         var starting = Task.Run(() => StartDaemon(config));
+        SupervisorLog.Write("spawn task " + Elapsed(started) + " " + BootLog.Context());
         if (!starting.Wait(TimeSpan.FromSeconds(seconds)))
         {
-            SupervisorLog.Write("Daemon spawn did not return in " + seconds + " s; supervisor exits so a fresh one starts.");
+            SupervisorLog.Write(
+                "spawn timeout " + seconds + " s " + BootLog.Context() +
+                "; supervisor exits so a fresh one starts.");
             Environment.Exit(3);
         }
-        return starting.GetAwaiter().GetResult();
+        var process = starting.GetAwaiter().GetResult();
+        SupervisorLog.Write("spawn process " + process.Id + " in " + Elapsed(started) + " " + BootLog.Context());
+        return process;
+    }
+
+    private static string Elapsed(DateTime started)
+    {
+        return (DateTime.UtcNow - started).TotalMilliseconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " ms";
     }
 
     private static Process StartDaemon(HostConfiguration config)

@@ -182,7 +182,7 @@ var browser = Object.freeze({
         if (live) {
           const same = String(live.url) === url;
           await bu.use(known);
-          if (options.quiet === true) await __call({quiet:{target:known, enabled:true}});
+          if (options.quiet === true) await __call({quiet:{target:known, enabled:true, ...(options.ads === true ? {ads:true} : {})}});
           if (!same) await browser.page(known).navigate(url);
           console.log('[ok] openTab reused tab ' + known.tabId + ' for ' + (origin || url) + (same ? '' : ' (navigated)') + '; pass {newTab: true} for a separate tab');
           return __openResult(live, true);
@@ -196,6 +196,7 @@ var browser = Object.freeze({
       foreground: options.foreground === true,
       ...(options.referer ? {referer: String(options.referer)} : {}),
       ...(options.quiet === true ? {quiet:true} : {}),
+      ...(options.ads === true ? {ads:true} : {}),
       ...(options.space === 'window' || options.space === 'tabs' ? {space: options.space} : {}),
       ...(options.present === false ? {present:false} : {}),
       ...(options.timeoutMs ? {timeoutMs: Math.max(500, Math.min(Number(options.timeoutMs) || 0, 120000))} : {}),
@@ -300,7 +301,7 @@ var browser = Object.freeze({
     save: async (name = 'network.har', filter = {}) => { var har = await browser.network.har(filter); await artifact(name, JSON.stringify(har)); return {saved: name}; },
     clear: async () => (await __step({op:'networkStore', target:__hostTarget(), action:'clear'})).data,
   }),
-  // What is queued or running: per-tab queues and the browser-wide write lock.
+  // What is queued or running: per-tab queues and the lock for what a step shares.
   scheduler: async () => (await __step({op:'scheduler', target:__hostTarget()})).data,
   // Windows and zoom: the browser's own window list, resizing, and per-tab zoom.
   windows: __windows,

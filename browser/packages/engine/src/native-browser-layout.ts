@@ -1,4 +1,5 @@
 import { engineConfig } from "./engine-config.js";
+import { withLock } from "./native-browser-scheduler.js";
 import { groupAgentTab, isAgentGroupId } from "./native-browser-groups.js";
 import { expectAgentActivation, isAgentTab } from "./native-browser-tab-cleanup.js";
 
@@ -24,6 +25,13 @@ export async function presentBrowserTask(
   tabId: number,
   force = false,
 ): Promise<void> {
+  const shown = await chrome.tabs.get(tabId).catch(() => undefined);
+  await withLock(shown ? `window:${shown.windowId}` : "browser", () =>
+    presentUnlocked(chatId, tabId, force),
+  );
+}
+
+async function presentUnlocked(chatId: string, tabId: number, force: boolean): Promise<void> {
   const tabs = chrome.tabs as SplitTabs;
   // Working in front: whichever tab the agent works in becomes the visible one.
   if (await engineConfig.agentInFront().catch(() => false)) {

@@ -24,7 +24,7 @@ import { sessionChatId } from "@aeon/pi-adapter";
 import { handleBrowserRun } from "./core-browser.js";
 import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
-import { handleCoreHealth } from "./core-health.js";
+import { handleCoreHealth, handleCorePing } from "./core-health.js";
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
 
@@ -88,14 +88,19 @@ function authenticate(
 ): void {
   const timer = setTimeout(() => socket.close(1008, "AUTHENTICATION_TIMEOUT"), 3000);
   socket.once("close", () => clearTimeout(timer));
-  socket.once("message", (data, binary) => {
-    clearTimeout(timer);
+  const onMessage = (data: Buffer | string, binary: boolean): void => {
     let candidate: unknown;
     try {
       candidate = JSON.parse(data.toString()) as unknown;
     } catch {
-      return socket.close(1008, "INVALID_HELLO");
+      socket.off("message", onMessage);
+      clearTimeout(timer);
+      socket.close(1008, "INVALID_HELLO");
+      return;
     }
+    if (handleCorePing(socket, candidate)) return;
+    socket.off("message", onMessage);
+    clearTimeout(timer);
     const hello = CoreHelloSchema.safeParse(candidate);
     if (binary || !hello.success || !equalToken(token, hello.data.token))
       return socket.close(1008, "AUTHENTICATION_FAILED");
@@ -116,24 +121,41 @@ function authenticate(
       () => true,
       (chatId, target, url) => browser.attachContext(chatId, target, url),
       threads,
-      (candidate) =>
-        handleAttentionMessage(socket, candidate, attention) ||
-        handleOpenChat(socket, candidate, service, browser) ||
-        handleChatStop(socket, candidate, service, browser) ||
-        handleSettings(socket, candidate, browser) ||
-        handleBrowserRun(socket, candidate, browser, directory) ||
-        handleCdpRequest(socket, candidate, browser, directory) ||
-        handleModelComplete(socket, candidate, service) ||
-        handleBlockedSites(socket, candidate, browser) ||
-        handleBrowsers(socket, candidate, browser, directory) ||
-        handleChatPin(socket, candidate, browser, directory) ||
-        handleCoreHealth(socket, candidate, browser) ||
-        handleToolRequest(socket, candidate, service, (session, name) =>
-          pin(browser, directory, sessionChatId("external", session), name),
-        ),
+      (candidate) => routeAuthenticated(socket, candidate, attention, service, browser, directory),
     );
-  });
+  };
+  socket.on("message", onMessage);
 }
+
+function routeAuthenticated(
+  socket: WebSocket,
+  candidate: unknown,
+  attention: CoreAttention,
+  service: ChatService,
+  browser: BrowserControlService,
+  directory: string,
+): boolean {
+  const routes = [
+    () => handleAttentionMessage(socket, candidate, attention),
+    () => handleOpenChat(socket, candidate, service, browser),
+    () => handleChatStop(socket, candidate, service, browser),
+    () => handleSettings(socket, candidate, browser),
+    () => handleBrowserRun(socket, candidate, browser, directory),
+    () => handleCdpRequest(socket, candidate, browser, directory),
+    () => handleModelComplete(socket, candidate, service),
+    () => handleBlockedSites(socket, candidate, browser),
+    () => handleBrowsers(socket, candidate, browser, directory),
+    () => handleChatPin(socket, candidate, browser, directory),
+    () => handleCorePing(socket, candidate),
+    () => handleCoreHealth(socket, candidate, browser),
+    () =>
+      handleToolRequest(socket, candidate, service, (session, name) =>
+        pin(browser, directory, sessionChatId("external", session), name),
+      ),
+  ];
+  return routes.some((route) => route());
+}
+
 function handleOpenChat(
   socket: WebSocket,
   candidate: unknown,

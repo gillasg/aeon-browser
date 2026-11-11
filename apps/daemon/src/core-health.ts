@@ -1,11 +1,30 @@
 import {
   CoreHealthRequestSchema,
   CoreHealthResultSchema,
+  CorePingRequestSchema,
+  CorePingResultSchema,
   SUPPORTED_PROTOCOL_VERSION,
 } from "@aeon/protocol";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import type { HealthReport } from "./health-ping.js";
+
+/** The event loop answers this itself. A blocked loop cannot, which is the point. */
+export function handleCorePing(socket: WebSocket, candidate: unknown): boolean {
+  const request = CorePingRequestSchema.safeParse(candidate);
+  if (!request.success) return false;
+  if (socket.readyState !== WebSocket.OPEN) return true;
+  socket.send(
+    JSON.stringify(
+      CorePingResultSchema.parse({
+        kind: "core.ping.result",
+        requestId: request.data.requestId,
+        ok: true,
+      }),
+    ),
+  );
+  return true;
+}
 
 /** `aeon doctor` and any other core client: the same ping the supervisor sends. */
 export function handleCoreHealth(
@@ -39,6 +58,7 @@ function healthResult(requestId: string, report: HealthReport): Record<string, u
     protocolVersion: report.protocolVersion,
     ms: report.ms,
     ...(report.engineProtocol ? { engineProtocol: report.engineProtocol } : {}),
+    ...(report.cdpFailures?.length ? { cdpFailures: report.cdpFailures } : {}),
   };
 }
 

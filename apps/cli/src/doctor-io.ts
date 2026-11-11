@@ -83,6 +83,7 @@ function viewOf(message: unknown): HealthView | undefined {
     protocolVersion: parsed.data.protocolVersion,
   };
   if (parsed.data.engineProtocol) view.engineProtocol = parsed.data.engineProtocol;
+  if (parsed.data.cdpFailures?.length) view.cdpFailures = parsed.data.cdpFailures;
   return view;
 }
 

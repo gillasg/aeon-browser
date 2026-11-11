@@ -368,7 +368,7 @@ test("Chrome's saved-login click and keypress name the call", async () => {
   await finish();
 });
 
-test("vault probe and the password-popup Escape name the call", async () => {
+test("vault probe and the password-field blur name the call", async () => {
   const tab = ++seq;
   session.bindBrowserSession(tab, "chat");
   hang = (method) => method === "Runtime.evaluate";
@@ -387,13 +387,18 @@ test("vault probe and the password-popup Escape name the call", async () => {
   );
   await finish();
 
-  hang = (method) => method === "Input.dispatchKeyEvent";
-  await settled(callLimitMs("Input.dispatchKeyEvent"), () =>
+  hang = (method) => method === "Runtime.evaluate";
+  const before = calls.length;
+  await settled(callLimitMs("Runtime.evaluate", 1_000), () =>
     vault.noteVaultFill({ tabId: ++seq }, 4),
   );
-  const row = failure("closeChromePopup");
-  assert.match(row?.err ?? "", /closeChromePopup/);
+  const row = failure("dismissPasswordUi");
+  assert.match(row?.err ?? "", /dismissPasswordUi/);
   assert.match(row?.err ?? "", /did not answer/);
+  assert.equal(
+    calls.slice(before).some((item) => item.method === "Input.dispatchKeyEvent"),
+    false,
+  );
   await finish();
 });
 
@@ -497,7 +502,7 @@ test("a planted script removal and a quiet attach name the call", async () => {
   installEngineListeners();
   const quietTab = ++seq;
   session.bindBrowserSession(quietTab, "chat");
-  await quiet.enableQuietTab(quietTab);
+  await quiet.enableQuietTab(quietTab, { ads: true });
   hang = (method) => method === "Page.addScriptToEvaluateOnNewDocument";
   await settled(callLimitMs("Page.addScriptToEvaluateOnNewDocument"), () =>
     session.ensureBrowserAttachment(quietTab, "chat"),

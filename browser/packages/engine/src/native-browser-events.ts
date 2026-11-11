@@ -233,6 +233,16 @@ interface Diagnostics {
 const buffers = new Map<number, Diagnostics>();
 const requests = new Map<string, { url: string; status?: number; error?: string }>();
 const enabled = new Set<number>();
+
+/** Creates the diagnostics buffer at attach. Does not enable Network; the first action does. */
+export function armDiagnostics(tabId: number): void {
+  if (!buffers.has(tabId)) buffers.set(tabId, { console: [], network: [] });
+}
+
+export function diagnosticsArmed(tabId: number): boolean {
+  return buffers.has(tabId);
+}
+
 export async function enableDiagnostics(tabId: number): Promise<void> {
   if (enabled.has(tabId)) return;
   enabled.add(tabId);

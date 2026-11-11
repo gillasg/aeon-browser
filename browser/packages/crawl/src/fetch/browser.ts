@@ -131,7 +131,7 @@ export function pageCode(url: string, options: ScrapeOptions, outputs: BrowserOu
   return `const out = { actionShots: [] };
 let tab = globalThis.__crawlTab;
 if (!tab) {
-  tab = await browser.openTab(${target}, { new: true });
+  tab = await browser.openTab(${target}, { new: true, quiet: true, ads: true });
   globalThis.__crawlTab = tab;
   ${setupCode(options)}
   await tab.network.start({});

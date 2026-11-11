@@ -267,9 +267,12 @@ async function progressCall(host: EffectHost, cell: Cell, value: Value): Promise
   return { ok: true };
 }
 
-async function quietCall(tabId: number, request: { enabled?: unknown }): Promise<unknown> {
+async function quietCall(
+  tabId: number,
+  request: { enabled?: unknown; ads?: unknown },
+): Promise<unknown> {
   const enabled = request.enabled !== false;
-  if (enabled) await enableQuietTab(tabId);
+  if (enabled) await enableQuietTab(tabId, { ads: request.ads === true });
   else await disableQuietTab(tabId);
   return { quiet: enabled };
 }
