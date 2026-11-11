@@ -11,7 +11,19 @@ async function view() {
   // The bundle stays in the package so its external react resolves to this app's copy.
   const directory = await mkdtemp(fileURLToPath(new URL("./.orb-line-", import.meta.url)));
   const stub = join(directory, "ui.mjs");
-  await writeFile(stub, "export function ChatSwitcher() { return null; }\n");
+  await writeFile(
+    stub,
+    [
+      'import { createElement } from "react";',
+      "export function ChatSwitcher() { return null; }",
+      "export function AnswerLines(props) {",
+      "  if (!props.footer) return null;",
+      '  const text = props.footer.lines.map((line) => line.text || line.label).join(" ");',
+      '  return createElement("div", { className: "answer-lines" }, text);',
+      "}",
+      "",
+    ].join("\n"),
+  );
   const outfile = join(directory, "view.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL("../src/orb/orb-view.tsx", import.meta.url))],
@@ -50,6 +62,8 @@ const actions = {
   newChat() {},
   loadChats() {},
   toSidePanel() {},
+  answerOffer() {},
+  answerWrong() {},
   toggleLearning() {},
   removeContext() {},
   pickTabs() {},
@@ -84,4 +98,31 @@ test("a finished line clamps to two lines and links to the side panel", async ()
   assert.match(html, /data-clamp="2"/);
   assert.match(html, /isl-line-more/);
   assert.match(html, /Side panel/);
+});
+
+const footer = {
+  lines: [
+    { kind: "notice", text: "1.1 s · from memory (was 38 s)" },
+    { kind: "learned", text: "Learned: orders" },
+  ],
+};
+
+test("finished answers show the lines underneath, and a running step does not", async () => {
+  const orb = await view();
+  const done = renderToStaticMarkup(
+    createElement(orb.OrbBox, {
+      model: { ...model, line: { text: "Twenty three orders.", more: true }, footer },
+      actions,
+    }),
+  );
+  assert.match(done, /answer-lines/);
+  assert.match(done, /Learned: orders/);
+  assert.match(done, /1\.1 s · from memory/);
+  const running = renderToStaticMarkup(
+    createElement(orb.OrbBox, {
+      model: { ...model, line: { text: "Reading your orders · 23 found", more: false }, footer },
+      actions,
+    }),
+  );
+  assert.doesNotMatch(running, /answer-lines/);
 });

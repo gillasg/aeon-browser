@@ -1,3 +1,4 @@
+import { footerFromCard, mergeFooters, runCardOf, type AnswerFooter } from "./answer-lines.js";
 import type { RunPath, RunProgress } from "./run-model.js";
 import { insertAssistantEntry, separatesToolBatch } from "./transcript-assistant-entry.js";
 import { updateTurnTiming, type TurnTiming } from "./turn-timing.js";
@@ -51,7 +52,7 @@ export type TranscriptRow = (
     }
   | { kind: "transient"; key: string; message: PiMessageDto }
   | { kind: "tool-group"; key: string; group: ToolGroup }
-) & { timing?: TurnTiming };
+) & { timing?: TurnTiming; footer?: AnswerFooter };
 
 interface PendingBrowserContext {
   orphanKey: string;
@@ -66,8 +67,10 @@ export class TranscriptModel {
   private activeGroup: ToolGroup | undefined;
   private readonly transients = new Map<string, string>();
   private readonly pendingContexts = new Map<string, PendingBrowserContext[]>();
+  private queued: AnswerFooter | undefined;
   setSnapshot(entries: readonly PiEntryDto[]): void {
     this.rows = [];
+    this.queued = undefined;
     this.entryIds.clear();
     this.steps.clear();
     this.activeGroup = undefined;
@@ -82,6 +85,12 @@ export class TranscriptModel {
 
   /** Applies one event with an explicit clock, so tests can control a turn's span. */
   applyAt(event: PiSessionEventDto, now: number): void {
+    const card = runCardOf(event);
+    if (card) {
+      this.attachFooter(card);
+      this.rows = [...this.rows];
+      return;
+    }
     if (event.kind === "view-replaced") {
       this.setSnapshot(event.entries);
       return;
@@ -95,26 +104,7 @@ export class TranscriptModel {
       event.kind === "message-end"
     )
       this.applyMessageEvent(event);
-    else if (event.kind === "tool-start")
-      Object.assign(this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId), {
-        arguments: event.arguments,
-        state: "running",
-      });
-    else if (event.kind === "tool-update")
-      Object.assign(
-        this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId),
-        runningUpdate(event),
-      );
-    else if (event.kind === "tool-end")
-      Object.assign(this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId), {
-        result: event.result,
-        isError: event.isError,
-        state: event.isError ? "failed" : "complete",
-        endedAt: Date.now(),
-        resultUnavailable: false,
-        changeDiff: event.changeDiff,
-        ...pathAndDuration(event),
-      });
+    else this.applyTool(event);
     updateTurnTiming(this.rows, event, now);
     this.rows = [...this.rows];
   }
@@ -155,8 +145,52 @@ export class TranscriptModel {
         },
       };
     }
-    this.rows.push({ kind: "entry", key: `entry:${entry.entryId}`, entry });
+    const row: TranscriptRow = { kind: "entry", key: `entry:${entry.entryId}`, entry };
+    this.rows.push(message.role === "user" ? this.takeQueue(row) : row);
   }
+
+  private applyTool(event: PiSessionEventDto): void {
+    if (event.kind === "tool-start")
+      Object.assign(this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId), {
+        arguments: event.arguments,
+        state: "running",
+      });
+    else if (event.kind === "tool-update")
+      Object.assign(
+        this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId),
+        runningUpdate(event),
+      );
+    else if (event.kind === "tool-end")
+      Object.assign(this.stepFor(event.toolCallId, event.toolName, event.parentToolCallId), {
+        result: event.result,
+        isError: event.isError,
+        state: event.isError ? "failed" : "complete",
+        endedAt: Date.now(),
+        resultUnavailable: false,
+        changeDiff: event.changeDiff,
+        ...pathAndDuration(event),
+      });
+  }
+
+  private attachFooter(card: unknown): void {
+    const next = footerFromCard(card);
+    if (!next) return;
+    const index = lastUserIndex(this.rows);
+    const row = index < 0 ? undefined : this.rows[index];
+    if (!row) {
+      this.queued = mergeFooters(this.queued, next);
+      return;
+    }
+    this.rows[index] = { ...row, footer: mergeFooters(row.footer, next) };
+  }
+
+  private takeQueue(row: TranscriptRow): TranscriptRow {
+    if (!this.queued) return row;
+    const footer = mergeFooters(row.footer, this.queued);
+    this.queued = undefined;
+    return { ...row, footer };
+  }
+
   private applyMessageEvent(event: Extract<PiSessionEventDto, { message: PiMessageDto }>): void {
     if (event.message.role === "tool") {
       if (event.kind === "message-end") this.addToolResult(event.message, new Date().toISOString());
@@ -324,6 +358,14 @@ export class TranscriptModel {
     this.rows.push({ kind: "tool-group", key: group.key, group });
     return group;
   }
+}
+
+function lastUserIndex(rows: readonly TranscriptRow[]): number {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (row?.kind === "entry" && row.entry.message?.role === "user") return index;
+  }
+  return -1;
 }
 
 /** tool-end's fast path and duration, when the tool reported them. */

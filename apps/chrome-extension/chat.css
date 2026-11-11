@@ -1014,6 +1014,41 @@ summary:focus-visible {
 .message-error-title {
   font-weight: 600;
 }
+.answer-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--aeon-s-1);
+  margin-top: var(--aeon-s-2);
+}
+.answer-line {
+  margin: 0;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+  line-height: 1.4;
+}
+.answer-line[data-kind="learned"] {
+  color: var(--aeon-text);
+}
+.answer-line[data-kind="offer"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aeon-s-2);
+  align-items: baseline;
+}
+.answer-offer {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--aeon-accent);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  cursor: pointer;
+}
+.answer-offer:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
 /* A run the user stopped: a quiet note, not an error. */
 .message-stopped {
   margin: 0;

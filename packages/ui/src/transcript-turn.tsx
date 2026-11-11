@@ -4,11 +4,15 @@ import { ChatActivityGroup } from "./chat-activity.js";
 import { DisclosureChevron } from "./activity-icons.js";
 import { TranscriptMessage } from "./transcript-message.js";
 import { TurnThinking } from "./turn-thinking.js";
+import { AnswerLines } from "./answer-lines-view.js";
+import type { AnswerOffer } from "./answer-lines.js";
 export interface TranscriptActions {
   actionsDisabled: boolean;
   onEditEntry?: (entryId: string) => Promise<void> | void;
   onBranchEntry?: (entryId: string) => Promise<void> | void;
   onPinMessage?: (text: string) => Promise<void> | void;
+  onAnswerOffer?(offer: AnswerOffer): void;
+  onAnswerWrong?(): void;
 }
 export function transcriptTurns(rows: readonly TranscriptRow[]): TranscriptRow[][] {
   const turns: TranscriptRow[][] = [];
@@ -32,7 +36,14 @@ export function TranscriptTurn({
   const state = turnState(rows, live);
   const outer = useRef<HTMLDetailsElement>(null);
   const now = useTurnClock(state.active, outer);
-  if (!state.hasWork) return <>{rows.map((row) => renderRow(row, actions))}</>;
+  const lines = turnLines(rows, actions);
+  if (!state.hasWork)
+    return (
+      <>
+        {rows.map((row) => renderRow(row, actions))}
+        {lines}
+      </>
+    );
   return (
     <>
       {state.before.map((row) => renderRow(row, actions))}
@@ -60,7 +71,26 @@ export function TranscriptTurn({
         </div>
       </details>
       {state.final.map((row) => renderRow(row, actions, true))}
+      {lines}
     </>
+  );
+}
+
+function turnLines(
+  rows: readonly TranscriptRow[],
+  actions: TranscriptActions,
+): ReactElement | null {
+  const footer = rows.find(
+    (row) => row.kind === "entry" && row.entry.message?.role === "user",
+  )?.footer;
+  if (!footer) return null;
+  return (
+    <AnswerLines
+      footer={footer}
+      disabled={actions.actionsDisabled}
+      {...(actions.onAnswerOffer ? { onOffer: actions.onAnswerOffer } : {})}
+      {...(actions.onAnswerWrong ? { onWrong: actions.onAnswerWrong } : {})}
+    />
   );
 }
 function turnState(rows: readonly TranscriptRow[], live: boolean) {

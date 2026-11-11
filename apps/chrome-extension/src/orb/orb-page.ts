@@ -1,6 +1,15 @@
 import { createElement, type ReactNode } from "react";
 import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
-import { ORB_REDUCE_MOTION_KEY, logApiWrites, mountAeonUi, orbFlag } from "@aeon/ui";
+import {
+  ORB_REDUCE_MOTION_KEY,
+  WRONG_FOLLOW_UP,
+  attachFooter,
+  logApiWrites,
+  mountAeonUi,
+  orbFlag,
+  runCardOf,
+  type AnswerOffer,
+} from "@aeon/ui";
 import { framedInPage } from "../extension-frame.js";
 import { openExtensionChat } from "../ui-connection.js";
 import { watchChatRunState } from "../chat-run-state.js";
@@ -205,6 +214,16 @@ function listen(): void {
   );
 }
 
+function answerOffer(offer: AnswerOffer): void {
+  if (offer.action === "pin") {
+    const value = (run?.answer ?? "").trim().slice(0, 200);
+    if (!value) return;
+    void session.createPin("Answer", value).catch((error: unknown) => notice(messageOf(error)));
+    return;
+  }
+  if (offer.followUp.trim()) void submit(offer.followUp);
+}
+
 // Sent, the box folds back to the cursor, whose pill carries the run. A chat this cursor already
 // has gets the message as its next turn; otherwise a new chat starts with this tab as context.
 async function submit(text: string): Promise<void> {
@@ -271,6 +290,13 @@ async function reconnectSession(): Promise<void> {
 
 function onEvent(event: PiSessionEventDto, refresh = true): void {
   if (session.chatId) logApiWrites(event, { chatId: session.chatId, task: "" });
+  const card = runCardOf(event);
+  if (card) {
+    if (!run) return;
+    run = attachFooter(run, card);
+    if (refresh) sync();
+    return;
+  }
   // A follow-up (from the box or the side panel) starts a new run in the same chat.
   if (!run || (event.kind === "run-state" && event.state === "running-unconfirmed" && done(run))) {
     run = initialRun();
@@ -286,6 +312,10 @@ function done(current: OrbRun): boolean {
   return current.status === "done" || current.status === "error";
 }
 
+function sameFooter(current: OrbViewModel["footer"], next: OrbViewModel["footer"]): boolean {
+  return JSON.stringify(current ?? null) === JSON.stringify(next ?? null);
+}
+
 function sameBoxLine(current: BoxLine | undefined, next: BoxLine | null): boolean {
   if (!current && !next) return true;
   if (!current || !next) return false;
@@ -298,10 +328,16 @@ function sync(): void {
   const state = visualState(run);
   const ask = run.status === "needs" ? run.label : "";
   const line = boxLine(run);
-  if (ask !== model.ask || !sameBoxLine(model.line, line)) {
+  if (
+    ask !== model.ask ||
+    !sameBoxLine(model.line, line) ||
+    !sameFooter(model.footer, run.footer)
+  ) {
     model.ask = ask;
     if (line) model.line = line;
     else delete model.line;
+    if (run.footer) model.footer = run.footer;
+    else delete model.footer;
     render();
     if (ask) focusPrompt();
   }
@@ -427,6 +463,8 @@ function view(): ReactNode {
       newChat: () => void selectChat(undefined),
       loadChats: () => void loadChats(),
       toSidePanel,
+      answerOffer: (offer) => void answerOffer(offer),
+      answerWrong: () => void submit(WRONG_FOLLOW_UP),
       toggleLearning: () => void toggleLearning(),
       pickTabs: () => void pickTabs(),
       addContext: (id) => void addContext(id),

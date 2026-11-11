@@ -9,34 +9,48 @@ import {
 import { PendingWork } from "./pending-work.js";
 import { AnnotationSelection } from "./annotation-selection.js";
 import { HandoffCard, pendingHandoff } from "./handoff-card.js";
+import type { AnswerOffer } from "./answer-lines.js";
 import type { TranscriptRow } from "./transcript-model.js";
 import { TranscriptTurn, transcriptTurns, type TranscriptActions } from "./transcript-turn.js";
 import { TranscriptRail } from "./transcript-rail.js";
+
+interface ChatTranscriptProps {
+  rows: readonly TranscriptRow[];
+  onEditEntry?: (entryId: string) => Promise<void> | void;
+  onBranchEntry?: (entryId: string) => Promise<void> | void;
+  onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
+  onAnswerOffer?: ((offer: AnswerOffer) => void) | undefined;
+  onAnswerWrong?: (() => void) | undefined;
+  actionsDisabled?: boolean;
+  running?: boolean;
+  starting?: boolean;
+  connecting?: boolean;
+  preparing?: boolean;
+}
 
 export function ChatTranscript({
   rows,
   onEditEntry,
   onBranchEntry,
   onPinMessage,
+  onAnswerOffer,
+  onAnswerWrong,
   actionsDisabled = false,
   running = false,
   starting = false,
   connecting = false,
   preparing = false,
-}: {
-  rows: readonly TranscriptRow[];
-  onEditEntry?: (entryId: string) => Promise<void> | void;
-  onBranchEntry?: (entryId: string) => Promise<void> | void;
-  onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
-  actionsDisabled?: boolean;
-  running?: boolean;
-  starting?: boolean;
-  connecting?: boolean;
-  preparing?: boolean;
-}): ReactElement {
+}: ChatTranscriptProps): ReactElement {
   const { root, awayFromLatest, atTop, updateScrollState, jumpToLatest } =
     useTranscriptScroll(rows);
-  const actions = turnActions({ actionsDisabled, onEditEntry, onBranchEntry, onPinMessage });
+  const actions = turnActions({
+    actionsDisabled,
+    onEditEntry,
+    onBranchEntry,
+    onPinMessage,
+    onAnswerOffer,
+    onAnswerWrong,
+  });
   return (
     <div
       className="transcript-wrap"
@@ -114,17 +128,23 @@ function turnActions({
   onEditEntry,
   onBranchEntry,
   onPinMessage,
+  onAnswerOffer,
+  onAnswerWrong,
 }: {
   actionsDisabled: boolean;
   onEditEntry?: ((entryId: string) => Promise<void> | void) | undefined;
   onBranchEntry?: ((entryId: string) => Promise<void> | void) | undefined;
   onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
+  onAnswerOffer?: ((offer: AnswerOffer) => void) | undefined;
+  onAnswerWrong?: (() => void) | undefined;
 }): TranscriptActions {
   return {
     actionsDisabled,
     ...(onEditEntry ? { onEditEntry } : {}),
     ...(onBranchEntry ? { onBranchEntry } : {}),
     ...(onPinMessage ? { onPinMessage } : {}),
+    ...(onAnswerOffer ? { onAnswerOffer } : {}),
+    ...(onAnswerWrong ? { onAnswerWrong } : {}),
   };
 }
 

@@ -1,5 +1,11 @@
 import type { KeyboardEvent, ReactElement } from "react";
-import { ChatSwitcher, type BoxLine } from "@aeon/ui";
+import {
+  AnswerLines,
+  ChatSwitcher,
+  type AnswerFooter,
+  type AnswerOffer,
+  type BoxLine,
+} from "@aeon/ui";
 
 // The cursor's ask box: always a compose field. The first message starts a chat with this tab as
 // context, later ones continue it; the transcript itself lives in the side panel (☰).
@@ -23,6 +29,8 @@ export interface OrbViewModel {
   needs: ReadonlySet<string>;
   /** The step, or the answer once the run ends. Absent before a run. */
   line?: BoxLine;
+  /** Learned line, speed line and offers under a finished answer. */
+  footer?: AnswerFooter;
 }
 
 export interface OrbTab {
@@ -41,6 +49,8 @@ export interface OrbViewActions {
   loadChats(): void;
   /** The transcript, in the side panel beside this page. */
   toSidePanel(): void;
+  answerOffer(offer: AnswerOffer): void;
+  answerWrong(): void;
   toggleLearning(): void;
   removeContext(tabId: number): void;
   /** Opens (or closes) the list of open tabs to add as context. */
@@ -136,17 +146,27 @@ function RunningLine({
   const line = model.line;
   if (!line || line.text === model.ask) return null;
   return (
-    <p className="isl-line">
-      {line.title ? <span className="isl-line-title">{line.title}</span> : null}
-      <span className="isl-line-text" data-clamp={line.more ? "2" : "1"}>
-        {line.text}
-      </span>
-      {line.more ? (
-        <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
-          Side panel
-        </button>
+    <>
+      <p className="isl-line">
+        {line.title ? <span className="isl-line-title">{line.title}</span> : null}
+        <span className="isl-line-text" data-clamp={line.more ? "2" : "1"}>
+          {line.text}
+        </span>
+        {line.more ? (
+          <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
+            Side panel
+          </button>
+        ) : null}
+      </p>
+      {line.more && model.footer ? (
+        <AnswerLines
+          footer={model.footer}
+          disabled={model.busy}
+          onOffer={actions.answerOffer}
+          onWrong={actions.answerWrong}
+        />
       ) : null}
-    </p>
+    </>
   );
 }
 
