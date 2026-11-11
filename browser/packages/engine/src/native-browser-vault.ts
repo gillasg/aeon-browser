@@ -2,6 +2,7 @@ import { send } from "./cdp/send.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { onNode } from "./native-browser-dom.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
+import { engineDebug } from "./native-debug-log.js";
 import { agentTyped } from "./native-browser-password-lock.js";
 import { rememberSecrets } from "./native-browser-secrets.js";
 import { SessionMap } from "./native-session-map.js";
@@ -344,7 +345,13 @@ export async function finishVaultCapture(
   await candidates.ready;
   const candidate = vaultCandidate(tabId);
   if (!candidate) return undefined;
+  engineDebug("vault", "capture-start", { tab: tabId, source: candidate.source });
   const after = await formAfterSubmit(tabId);
+  engineDebug("vault", "form-after-submit", {
+    tab: tabId,
+    hasPassword: after?.hasPassword,
+    refused: after?.refused,
+  });
   if (!vaultSubmissionSucceeded(after)) {
     // The form is still there: the site refused it, so there is nothing worth saving.
     forgetVaultCandidate(tabId);
@@ -353,6 +360,7 @@ export async function finishVaultCapture(
   candidates.delete(tabId);
   if (await neverSave(candidate.site || new URL(candidate.url).hostname)) return "skipped";
   const answer = await saveVaultCandidate(candidate, ask);
+  engineDebug("vault", "save-answer", { tab: tabId, ...(answer ?? {}) });
   if (answer?.saved) return "saved";
   // No answer (the run ended while a manager was still saving) is not a refusal: never nag.
   if (!answer) return "skipped";
