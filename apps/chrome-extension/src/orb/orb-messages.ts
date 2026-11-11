@@ -36,6 +36,8 @@ export const ORB_RESTORE = "aeon.orb.restore";
 export const ORB_OFF = "aeon.orb.off";
 /** Content script → service worker: open this tab's transcript in the side panel (the cursor's ☰). */
 export const CURSOR_TRANSCRIPT = "aeon.cursor.transcript";
+/** Content script → service worker: install the shared page cursor in this tab. */
+export const CURSOR_INSTALL = "aeon.cursor.install";
 /** Content script → this tab's orb.html: stop its chat (the cursor's ■). */
 export const CURSOR_STOP = "aeon.cursor.stop";
 /** Session storage: the orb was summoned and follows the user across tabs until dismissed. */

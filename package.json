@@ -12,7 +12,7 @@
     "build:core": "pnpm build:browser && pnpm exec tsc -b packages/domain packages/protocol apps/daemon packages/pi-adapter packages/store apps/cli && pnpm --filter @aeon/native-host build",
     "build:native-host": "pnpm --filter @aeon/native-host build",
     "typecheck": "pnpm exec tsc -b packages/domain packages/protocol apps/daemon packages/pi-adapter packages/store apps/cli packages/ui --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
-    "lint": "eslint apps packages scripts --max-warnings=0 && eslint -c browser/packages/engine/eslint.config.mjs browser/packages/engine/src --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs",
+    "lint": "eslint apps packages scripts --max-warnings=0 && eslint -c browser/packages/engine/eslint.config.mjs browser/packages/engine/src --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs && node scripts/check-raw-color.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/*.mjs\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
     "test": "node scripts/run-tests.mjs \"apps/*/test/*.test.mjs\" \"packages/*/test/*.test.mjs\" \"scripts/*.test.mjs\" \"benchmarks/*.test.mjs\"",

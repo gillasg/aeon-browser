@@ -12,7 +12,15 @@ import {
   type OrbVerify,
   type OrbVisualState,
 } from "./orb-messages.js";
-import { applyEvent, cursorSteps, initialRun, spotlightBox, type OrbRun } from "./orb-run.js";
+import {
+  applyEvent,
+  boxLine,
+  cursorSteps,
+  initialRun,
+  spotlightBox,
+  type BoxLine,
+  type OrbRun,
+} from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
 import { OrbBox, type OrbTab, type OrbViewModel } from "./orb-view.js";
@@ -278,13 +286,22 @@ function done(current: OrbRun): boolean {
   return current.status === "done" || current.status === "error";
 }
 
+function sameBoxLine(current: BoxLine | undefined, next: BoxLine | null): boolean {
+  if (!current && !next) return true;
+  if (!current || !next) return false;
+  return current.text === next.text && current.more === next.more && current.title === next.title;
+}
+
 /** Pushes the run to the overlay: the swarm's state, where the agent acts, what needs the user. */
 function sync(): void {
   if (!run) return;
   const state = visualState(run);
   const ask = run.status === "needs" ? run.label : "";
-  if (ask !== model.ask) {
+  const line = boxLine(run);
+  if (ask !== model.ask || !sameBoxLine(model.line, line)) {
     model.ask = ask;
+    if (line) model.line = line;
+    else delete model.line;
     render();
     if (ask) focusPrompt();
   }

@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
+import { failureTitle } from "./failure-title.js";
 import { PATH_NAMES, formatRunDuration, type RunPath, type RunStep } from "./run-model.js";
 
 // The three run parts every surface shares: the orb's island, the side panel and the chat
@@ -97,6 +98,7 @@ export function ResultCard({
   answer,
   summary,
   note,
+  code,
   children,
 }: {
   tone?: "done" | "failed";
@@ -105,13 +107,14 @@ export function ResultCard({
   summary?: string;
   /** One line under the actions: why Watch is missing, or what it did. */
   note?: string;
+  /** Failure text. Its owner picks the title when `title` is omitted. */
+  code?: string;
   children?: ReactNode;
 }): ReactElement {
+  const heading = title ?? (tone === "done" ? "Done" : failureTitle(code ?? ""));
   return (
     <section className="run-result" data-tone={tone}>
-      <header className="run-eyebrow">
-        {title ?? (tone === "done" ? "Done" : "Something went wrong")}
-      </header>
+      <header className="run-eyebrow">{heading}</header>
       <div className="run-answer">{answer}</div>
       {summary && <div className="run-summary">{summary}</div>}
       {children && <div className="run-actions">{children}</div>}

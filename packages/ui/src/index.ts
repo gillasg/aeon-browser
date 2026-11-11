@@ -64,6 +64,8 @@ export {
   type RunStep,
 } from "./run-model.js";
 export { ApprovalCard, PathTag, ResultCard, StepMeta, StepTimeline } from "./run-cards.js";
+export { failureTitle } from "./failure-title.js";
+export { boxLine, type BoxLine } from "./box-line.js";
 export {
   ACTIVITY_LOG_KEY,
   logApiWrites,

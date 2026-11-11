@@ -54,7 +54,11 @@
 .sidebar-chat-item:focus-within .sidebar-chat-row > span,
 .sidebar-chat-item:has(:popover-open) .sidebar-chat-row > span {
   text-overflow: clip;
-  mask-image: linear-gradient(to right, #000 calc(100% - 104px), transparent calc(100% - 74px));
+  mask-image: linear-gradient(
+    to right,
+    var(--aeon-c-000000) calc(100% - 104px),
+    transparent calc(100% - 74px)
+  );
 }
 .sidebar-chat-item .sidebar-row-actions {
   right: 6px;
@@ -118,7 +122,11 @@
 }
 .sidebar-project-row:hover > button:first-child span,
 .sidebar-project-row:focus-within > button:first-child span {
-  mask-image: linear-gradient(to right, #000 calc(100% - 76px), transparent calc(100% - 48px));
+  mask-image: linear-gradient(
+    to right,
+    var(--aeon-c-000000) calc(100% - 76px),
+    transparent calc(100% - 48px)
+  );
 }
 .sidebar-project-row > button:first-child span {
   flex: 1;
@@ -178,7 +186,7 @@
   height: 16px;
   display: grid;
   place-items: center;
-  color: #848490;
+  color: var(--aeon-c-848490);
   pointer-events: none;
 }
 .sidebar-working-spinner {
@@ -190,8 +198,8 @@
   position: absolute;
   width: 5px;
   height: 5px;
-  border-radius: 50%;
-  background: #4299ff;
+  border-radius: var(--aeon-r-half);
+  background: var(--aeon-c-4299ff);
 }
 .sidebar-chat-item:has(.sidebar-chat-status) .sidebar-chat-row > span {
   padding-right: 20px;

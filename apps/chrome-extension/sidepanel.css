@@ -99,7 +99,7 @@ body {
   border: 1px solid var(--panel-line);
   border-radius: var(--aeon-r-md);
   background: var(--panel-surface);
-  box-shadow: 0 16px 36px var(--aeon-swatch-0009);
+  box-shadow: var(--aeon-drop-20);
 }
 .picker-menu[hidden] {
   display: none;

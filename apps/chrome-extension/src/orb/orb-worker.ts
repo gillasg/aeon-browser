@@ -1,7 +1,9 @@
 import { chatUrl, findExistingChat } from "../native-worker-tabs.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
+import { CURSOR_MARK, CURSOR_TOKEN_CSS } from "@browserkit/engine/cursor-mark";
 import {
+  CURSOR_INSTALL,
   CURSOR_TRANSCRIPT,
   ORB_COMMAND,
   ORB_DISMISS,
@@ -24,27 +26,9 @@ export function installOrb(): void {
   chrome.commands.onCommand.addListener((command, tab) => {
     if (command === ORB_COMMAND) summon(tab);
   });
-  chrome.runtime.onMessage.addListener((request: unknown, sender, sendResponse) => {
-    const message = request as Partial<OrbVerify> | { kind?: unknown } | null;
-    if (sender.id !== chrome.runtime.id) return;
-    if (message?.kind === ORB_RESTORE) {
-      void restore(sender.tab?.id).then(sendResponse, () => sendResponse(null));
-      return true;
-    }
-    if (message?.kind === ORB_OFF) {
-      void setOn(false);
-      return;
-    }
-    if (message?.kind === CURSOR_TRANSCRIPT && sender.tab) {
-      openTranscript(sender.tab);
-      return;
-    }
-    if (message?.kind !== "aeon.orb.verify") return;
-    void verify(message as Partial<OrbVerify>, sender).then(sendResponse, () =>
-      sendResponse({ ok: false }),
-    );
-    return true;
-  });
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
+    onOrbMessage(request, sender, sendResponse),
+  );
   chrome.storage.session.onChanged.addListener((changes) => {
     if (Object.keys(changes).some((key) => isNeedsKey(key) || key.startsWith(UNREAD_PREFIX)))
       void updateBadge();
@@ -53,6 +37,81 @@ export function installOrb(): void {
 }
 
 const UNREAD_PREFIX = "piper-unread-";
+
+function onOrbMessage(
+  request: unknown,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void,
+): boolean | undefined {
+  if (sender.id !== chrome.runtime.id) return undefined;
+  const kind = (request as { kind?: unknown } | null)?.kind;
+  if (kind === ORB_RESTORE) return replyRestore(sender.tab?.id, sendResponse);
+  if (kind === ORB_OFF) return stopOrb();
+  if (kind === CURSOR_TRANSCRIPT) return openTabTranscript(sender.tab);
+  if (kind === CURSOR_INSTALL) return installFrom(sender.tab, request);
+  if (kind !== "aeon.orb.verify") return undefined;
+  void verify(request as Partial<OrbVerify>, sender).then(sendResponse, () =>
+    sendResponse({ ok: false }),
+  );
+  return true;
+}
+
+function replyRestore(tabId: number | undefined, sendResponse: (response?: unknown) => void): true {
+  void restore(tabId).then(sendResponse, () => sendResponse(null));
+  return true;
+}
+
+function stopOrb(): undefined {
+  void setOn(false);
+  return undefined;
+}
+
+function openTabTranscript(tab: chrome.tabs.Tab | undefined): undefined {
+  if (tab) openTranscript(tab);
+  return undefined;
+}
+
+function installFrom(tab: chrome.tabs.Tab | undefined, request: unknown): undefined {
+  if (tab?.id === undefined) return undefined;
+  const point = request as { x?: unknown; y?: unknown };
+  void installSharedCursor(tab.id, Number(point.x), Number(point.y));
+  return undefined;
+}
+
+async function installSharedCursor(tabId: number, x: number, y: number): Promise<void> {
+  const target = { tabId, frameIds: [0] };
+  await chrome.scripting
+    .executeScript({ target, world: "MAIN", files: ["cursor-page.js"] })
+    .catch(() => undefined);
+  await chrome.scripting
+    .executeScript({
+      target,
+      world: "MAIN",
+      func: applyInstalledCursor,
+      args: [summonUpdate(x, y), CURSOR_TOKEN_CSS, CURSOR_MARK],
+    })
+    .catch(() => undefined);
+}
+
+function summonUpdate(x: number, y: number): { x: number; y: number; summon: true; place: true } {
+  return {
+    x: Number.isFinite(x) ? Math.round(x) : 56,
+    y: Number.isFinite(y) ? Math.round(y) : 56,
+    summon: true,
+    place: true,
+  };
+}
+
+function applyInstalledCursor(
+  update: { x: number; y: number; summon: true; place: true },
+  tokenCss: string,
+  mark: object,
+): void {
+  const page = globalThis as {
+    __aeonCursor?: (next: object, css: string, cursor: object) => void;
+  };
+  page.__aeonCursor?.(update, tokenCss, mark);
+}
 
 async function updateBadge(): Promise<void> {
   const values = await chrome.storage.session.get(null);

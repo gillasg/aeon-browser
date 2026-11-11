@@ -1,4 +1,5 @@
 import type { PiMessageDto, PiSessionEventDto } from "@aeon/protocol";
+import { failureTitle } from "./failure-title.js";
 
 // One agent run, built only from the chat stream in @aeon/protocol. The orb's island and the
 // shared run cards (step timeline, approval, result) all read it.
@@ -226,8 +227,10 @@ function applyMessage(run: AgentRun, message: PiMessageDto): AgentRun {
     .trim();
   // A run the user stopped settles like any other, but says so in every view.
   if (message.stopReason === "aborted") return { ...run, stopped: true };
-  if (message.stopReason === "error")
-    return { ...run, status: "error", error: message.errorMessage ?? "The run failed." };
+  if (message.stopReason === "error") {
+    const error = message.errorMessage ?? "The run failed.";
+    return { ...run, status: "error", error, label: failureTitle(error) };
+  }
   return text ? { ...run, answer: text } : run;
 }
 

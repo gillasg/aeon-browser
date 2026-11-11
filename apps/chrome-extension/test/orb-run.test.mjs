@@ -186,6 +186,7 @@ test("an assistant error ends the run as an error", () => {
   ]);
   assert.equal(run.status, "error");
   assert.equal(run.error, "No model");
+  assert.equal(run.label, "Aeon broke");
 });
 
 async function loadModule(source) {

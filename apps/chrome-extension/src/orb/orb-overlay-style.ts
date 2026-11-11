@@ -1,57 +1,54 @@
-// Styles for the overlay, scoped inside its closed shadow root so pages cannot restyle it. The
-// engine draws the agent's cursor while it acts and the edge glow; the overlay draws the same
-// cursor while it is summoned or between steps, its pill and its box.
-export const OVERLAY_STYLE = `
-:host { all: initial; }
+import { CURSOR_TOKEN_CSS } from "@browserkit/engine/cursor-mark";
+
+// The orb's own layer: the hit target, the pill and the ask box frame. The glyph itself is the
+// shared page cursor, so this layer does not draw a second one. Island colours come from the
+// cursor token group, which does not follow the page theme.
+const LAYER_STYLE = `
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
-.cursor {
-  position: fixed; left: 0; top: 0; width: 18px; height: 20px; pointer-events: none;
-  will-change: transform; opacity: 1; transition: opacity .25s ease;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
-}
-.cursor.away { opacity: 0; }
 .spot {
   position: fixed; inset: 0; pointer-events: none; opacity: 0;
   transition: opacity .5s ease;
 }
 .spot.on { opacity: 1; }
 .hit {
-  all: unset; position: fixed; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%;
-  pointer-events: auto; cursor: grab; will-change: transform;
+  all: unset; position: fixed; left: 0; top: 0; width: 32px; height: 32px;
+  border-radius: var(--aeon-r-full); pointer-events: auto; cursor: grab; will-change: transform;
 }
 .hit:active { cursor: grabbing; }
-.hit:focus-visible { outline: 2px solid rgba(255, 255, 255, .8); outline-offset: -4px; }
+.hit:focus-visible { outline: 2px solid var(--aeon-island-focus); outline-offset: -4px; }
 .pill {
   position: fixed; left: 0; top: 0; display: flex; align-items: center; gap: 8px;
-  max-width: 360px; padding: 5px 5px 5px 12px; box-sizing: border-box; border-radius: 999px;
-  pointer-events: auto; white-space: nowrap; will-change: transform;
-  font: 500 12.5px/17px system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff;
-  background: rgba(17, 24, 39, .92); box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
-  transition: opacity .3s ease;
+  max-width: 360px; padding: 5px 5px 5px 12px; box-sizing: border-box;
+  border-radius: var(--aeon-r-full); pointer-events: auto; white-space: nowrap;
+  will-change: transform; font: 500 var(--aeon-fs-md)/17px system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--aeon-island-ink); background: var(--aeon-island-bg);
+  box-shadow: 0 6px 18px var(--aeon-island-shadow); transition: opacity .3s ease;
 }
 .pill[hidden] { display: none; }
 .pill.fading { opacity: 0; }
-.pill[data-state="needs"] { background: #e08a00; }
-.pill[data-state="done"] { background: #2f3b2d; }
-.pill[data-state="error"] { background: #5a2f2c; }
+.pill[data-state="needs"] { background: var(--aeon-island-needs); }
+.pill[data-state="done"] { background: var(--aeon-island-done); }
+.pill[data-state="error"] { background: var(--aeon-island-error); }
 .pill .label {
   all: unset; cursor: pointer; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 .pill .spin {
-  width: 11px; height: 11px; flex: none; border-radius: 50%; box-sizing: border-box;
-  border: 2px solid rgba(255, 255, 255, .3); border-top-color: #fff;
+  width: 11px; height: 11px; flex: none; border-radius: var(--aeon-r-full); box-sizing: border-box;
+  border: 2px solid var(--aeon-island-spin); border-top-color: var(--aeon-island-ink);
   animation: spin .8s linear infinite;
 }
 .pill:not([data-state="thinking"]):not([data-state="working"]) .spin { display: none; }
 .pill:not([data-state="thinking"]):not([data-state="working"]):not([data-state="needs"]) .stop { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .pill .ic {
-  all: unset; width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid;
-  place-items: center; cursor: pointer; background: rgba(255, 255, 255, .12);
-  font: 600 11px/1 system-ui, sans-serif;
+  all: unset; width: 24px; height: 24px; flex: none; border-radius: var(--aeon-r-full);
+  display: grid; place-items: center; cursor: pointer; background: var(--aeon-island-line-strong);
+  font: 600 var(--aeon-fs-xs)/1 system-ui, sans-serif; color: var(--aeon-island-ink);
 }
-.pill .ic:hover { background: rgba(255, 255, 255, .24); }
-.pill .ic:focus-visible, .pill .label:focus-visible { outline: 2px solid rgba(255, 255, 255, .8); outline-offset: 2px; }
+.pill .ic:hover { background: var(--aeon-island-wash-24); }
+.pill .ic:focus-visible, .pill .label:focus-visible {
+  outline: 2px solid var(--aeon-island-focus); outline-offset: 2px;
+}
 iframe {
   position: fixed; left: 0; top: 0; border: 0; background: transparent;
   pointer-events: auto; color-scheme: normal; opacity: 0;
@@ -61,16 +58,15 @@ iframe {
 iframe.on { opacity: 1; transform: none; }
 iframe.off { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  iframe, .spot, .cursor, .pill { transition: none; }
+  iframe, .spot, .pill { transition: none; }
   .pill .spin { animation: none; }
 }
 :host([data-reduced-motion]) iframe, :host([data-reduced-motion]) .spot,
-:host([data-reduced-motion]) .cursor, :host([data-reduced-motion]) .pill { transition: none; }
+:host([data-reduced-motion]) .pill { transition: none; }
 :host([data-reduced-motion]) .pill .spin { animation: none; }
 `;
 
-/** The cursor itself: a plain white pointer without a stem (the engine draws the same one). */
-export const CURSOR_PATH = "M1.5 1.5 L1.5 16.5 L13.5 9.5 Z";
+export const OVERLAY_STYLE = ":host { all: initial; }" + CURSOR_TOKEN_CSS + LAYER_STYLE;
 
 export function spotlightGradient(box: {
   x: number;
@@ -80,5 +76,7 @@ export function spotlightGradient(box: {
 }): string {
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
-  return `radial-gradient(ellipse ${box.width * 0.9 + 40}px ${box.height + 40}px at ${cx}px ${cy}px, transparent 60%, rgba(10, 8, 20, .55) 100%)`;
+  const rx = box.width * 0.9 + 40;
+  const ry = box.height + 40;
+  return `radial-gradient(ellipse ${rx}px ${ry}px at ${cx}px ${cy}px, transparent 60%, var(--aeon-island-scrim) 100%)`;
 }
