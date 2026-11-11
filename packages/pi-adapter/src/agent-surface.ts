@@ -7,14 +7,16 @@ import {
   toToolDeclaration,
   type TranscriptContext,
 } from "@earendil-works/pi-ai/utils/transcript";
-import { browserContextPrompt } from "./browser-context-message.js";
+import { buildFirstTurn } from "./first-turn.js";
 import { captureFixtureModelRequest } from "./fixture-model.js";
 import { PiSdkSessionAdapter } from "./session-adapter.js";
 
 /**
  * A fixed page record so the first-turn context is a template, not a live tab.
- * `browserContextPrompt` is the same function a chat uses when a page is attached.
+ * `exampleFirstTurn` is the same builder a chat uses.
  */
+const SURFACE_NOW = "2026-11-10T09:02:00.000Z";
+const SURFACE_ZONE = "Asia/Kolkata";
 export const AGENT_SURFACE_PAGE: PiBrowserContextRecord = {
   contextId: "00000000-0000-4000-8000-000000000010",
   kind: "page",
@@ -30,6 +32,23 @@ export const AGENT_SURFACE_PAGE: PiBrowserContextRecord = {
 };
 
 const NEW_CHAT_PROMPT = "New chat.";
+
+/** The production first turn for the fixed page, so aeon-eval can rebuild it. */
+export function exampleFirstTurn(prompt = NEW_CHAT_PROMPT): string {
+  return buildFirstTurn({
+    prompt,
+    now: new Date(SURFACE_NOW),
+    timeZone: SURFACE_ZONE,
+    activeTab: {
+      url: AGENT_SURFACE_PAGE.url,
+      title: AGENT_SURFACE_PAGE.title ?? "",
+      fromCursor: true,
+    },
+    openTabs: [],
+    abilities: [],
+    mappedReads: [],
+  });
+}
 
 export interface AgentSurfaceTool {
   name: string;
@@ -82,6 +101,10 @@ async function captureNewChat(paths: AgentSurfacePaths): Promise<TranscriptConte
   const stop = captureFixtureModelRequest((context) => {
     first ??= context;
   });
+  const previousNow = process.env.AEON_SURFACE_NOW;
+  const previousZone = process.env.AEON_SURFACE_ZONE;
+  process.env.AEON_SURFACE_NOW = SURFACE_NOW;
+  process.env.AEON_SURFACE_ZONE = SURFACE_ZONE;
   const adapter = new PiSdkSessionAdapter({
     sessionDirectory: paths.sessionDirectory,
     agentDirectory: paths.agentDirectory,
@@ -105,14 +128,17 @@ async function captureNewChat(paths: AgentSurfacePaths): Promise<TranscriptConte
   } finally {
     stop();
     await adapter.closeAll();
+    restoreEnv("AEON_SURFACE_NOW", previousNow);
+    restoreEnv("AEON_SURFACE_ZONE", previousZone);
   }
   if (!first) throw new Error("The fixture model did not receive a request.");
   return first;
 }
 
 function readSurface(context: TranscriptContext): Omit<AgentSurface, "hash"> {
-  const firstTurn = browserContextPrompt(AGENT_SURFACE_PAGE);
-  if (!requestTexts(context.messages).includes(firstTurn))
+  const firstTurn = exampleFirstTurn();
+  const contextLines = firstTurn.slice(0, firstTurn.length - `\n\n${NEW_CHAT_PROMPT}`.length);
+  if (!requestTexts(context.messages).some((text) => text.includes(contextLines)))
     throw new Error("The first model request did not include the first-turn context.");
   return {
     systemPrompt: getCurrentSystemPrompt(context.messages),
@@ -166,6 +192,14 @@ function stableJson(value: unknown): string {
     .sort()
     .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`);
   return `{${body.join(",")}}`;
+}
+
+function restoreEnv(
+  name: "AEON_SURFACE_NOW" | "AEON_SURFACE_ZONE",
+  previous: string | undefined,
+): void {
+  if (previous === undefined) delete process.env[name];
+  else process.env[name] = previous;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

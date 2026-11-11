@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { siteDir, siteName } from "./registry.js";
 
-export type SiteNoteKind = "selector" | "url" | "pace" | "quirk";
+export type SiteNoteKind = "selector" | "url" | "pace" | "quirk" | "official";
 
 export interface SiteNote {
   kind: SiteNoteKind;
@@ -18,7 +18,7 @@ const VALUE_MAX = 120;
 const FACT_MAX = 40;
 const NOTES_JSON = "notes.json";
 const NOTES_MD = "notes.md";
-const KINDS = new Set<SiteNoteKind>(["selector", "url", "pace", "quirk"]);
+const KINDS = new Set<SiteNoteKind>(["selector", "url", "pace", "quirk", "official"]);
 
 const INSTRUCTION =
   /\b(ignore|disregard|override)\b.{0,60}\b(instruction|instructions|prompt|rule|rules|above|previous)\b|\byou are now\b|\bdo not (tell|mention|reveal|ask)\b|\bwithout asking\b|\b(exfiltrate|jailbreak)\b|\bsend\b.{0,40}\b(password|cookie|cookies|token|secret|credential)s?\b|\bnew instructions?\b|\bfrom now on\b|\bsystem prompt\b/i;
@@ -90,10 +90,15 @@ function asNote(input: unknown): SiteNote | undefined {
 }
 
 function kindFits(note: SiteNote): boolean {
+  if (note.kind === "official") return isHost(note.value);
   if (note.kind === "selector") return isSelector(note.value);
   if (note.kind === "url") return isUrl(note.value);
   if (note.kind === "pace") return isPace(note.value) || isPace(note.key);
   return !isCode(note.value);
+}
+
+function isHost(value: string): boolean {
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(value) && !value.includes("..");
 }
 
 function factFromLine(line: string): SiteNote | undefined {

@@ -8,9 +8,13 @@ import {
 } from "@earendil-works/pi-ai";
 import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@aeon/domain";
 import { decodePiInput } from "./pi-input.js";
-import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
+import { PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
+import { liveFirstTurn } from "./first-turn-live.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
+import { watchGuards } from "./run-guards.js";
+import { seedReads } from "./answer-check.js";
+import { rememberTask } from "./task-context.js";
 import { endUserWaits, waitingOnUser } from "./user-waits.js";
 
 type Controls = Pick<
@@ -99,29 +103,45 @@ export function sendQueuedAfterStop(
 export async function submitToPi(
   session: AgentSession,
   candidate: Parameters<PiSessionHandle["submit"]>[0],
+  chatId = "",
 ): Promise<void> {
   const input = typeof candidate === "string" ? { text: candidate } : candidate;
   const decoded = decodePiInput(input);
+  const prompt = `${decoded.text}${decoded.attachmentText}`;
   const browserContexts = [
     ...(decoded.browserContext ? [decoded.browserContext] : []),
     ...(decoded.browserContexts ?? []),
   ];
-  if (browserContexts.length) {
+  try {
+    watchGuards(session, chatId);
+  } catch {
+    // A session without subscribe still sends the turn.
+  }
+  const turn = await liveFirstTurn(prompt, browserContexts);
+  const context = turn.endsWith(`\n\n${prompt}`) ? turn.slice(0, -(prompt.length + 2)) : turn;
+  rememberTurn(chatId, prompt, context);
+  if (context.trim()) {
     await session.sendCustomMessage(
       {
         customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE,
-        content: browserContexts.map(browserContextPrompt).join("\n\n"),
+        content: context,
         display: false,
-        details: { browserContext: browserContexts[0], browserContexts },
+        details: browserContexts.length
+          ? { browserContext: browserContexts[0], browserContexts }
+          : { firstTurn: true },
       },
       { deliverAs: "nextTurn" },
     );
   }
   if (input.budget) watchBudget(session, input.budget);
-  await session.prompt(
-    `${decoded.text}${decoded.attachmentText}`,
-    decoded.images.length ? { images: decoded.images } : undefined,
-  );
+  await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
+}
+
+function rememberTurn(chatId: string, prompt: string, context: string): void {
+  if (!chatId) return;
+  rememberTask(chatId, prompt);
+  seedReads(chatId, prompt);
+  if (context.trim()) seedReads(chatId, context);
 }
 
 function toModel(model: { provider: string; id: string; name: string }): PiAvailableModel {

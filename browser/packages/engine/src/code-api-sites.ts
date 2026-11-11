@@ -55,26 +55,7 @@ async function __mappedNote(url) {
   if (reads.length) said.push('API reads ' + reads.slice(0, 8).map(call).join(', ') + (reads.length > 8 ? ' and ' + (reads.length - 8) + ' more' : '') + ": siteMapper.call('" + host + "', name, params)");
   return said.length ? host + ' is mapped; prefer these over clicking through pages: ' + said.join('; ') + '. site.capabilities() has the details.' : '';
 }
-// Slow page work on a site Aeon has not learned is worth an offer: after 90 s of steps there
-// (gaps over 10 minutes start the clock again), one line tells the agent to offer learning it.
-var __siteClock = new Map();
-var __NOT_WORTH_LEARNING = /(^|\\.)(google|bing|duckduckgo|yahoo)\\.[a-z.]+$|^(localhost|127\\.0\\.0\\.1)$/;
-async function __noteSiteTime(target) {
-  var host = '';
-  try { host = new URL(__tabs.get(__key(target))?.url || '').hostname.replace(/^www\\./, ''); } catch { return; }
-  if (!host || __NOT_WORTH_LEARNING.test(host)) return;
-  var now = Date.now(), clock = __siteClock.get(host);
-  if (!clock || now - clock.last > 600000) clock = {first: now, said: clock?.said};
-  clock.last = now;
-  __siteClock.set(host, clock);
-  if (clock.said || now - clock.first < 90000) return;
-  clock.said = true;
-  var caps;
-  try { caps = await __call({siteCapabilities: {host}}); } catch { return; }
-  if ((caps?.abilities || []).length || (caps?.operations || []).some((op) => op.does === 'read')) return;
-  var minutes = Math.max(1, Math.round((now - clock.first) / 60000));
-  console.log('[site] ' + minutes + ' min of page work on ' + host + ', which is not learned yet. When you answer, end with one line: "That took about ' + minutes + ' min. I can save this as an ability on ' + host + ' so next time it is one quick call. Want that?" (a yes: site_mapper build with this task; it learns the site on the way)');
-}
+async function __noteSiteTime() {}
 var skills = Object.freeze({
   list: (url) => __call({siteSkill:'list', url: url ?? (__lastTarget ? browser.page(__lastTarget).url : undefined)}),
   load: async (name) => {

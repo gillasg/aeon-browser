@@ -274,7 +274,7 @@ export const ManagementSiteSchema = z
       .array(
         z
           .object({
-            kind: z.enum(["selector", "url", "pace", "quirk"]),
+            kind: z.enum(["selector", "url", "pace", "quirk", "official"]),
             key: z.string().max(40),
             value: z.string().max(120),
           })

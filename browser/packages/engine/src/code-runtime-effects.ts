@@ -14,6 +14,7 @@ import { sessionHeadersFor } from "./native-browser-session-headers.js";
 import { resetChatTabs, reapChatPopups } from "./native-browser-tab-cleanup.js";
 import { disableQuietTab, enableQuietTab } from "./native-browser-quiet.js";
 import { networkCall } from "./native-browser-network.js";
+import { pageGuard } from "./page-guard.js";
 import { mediaCall, type MediaRequest } from "./native-browser-media.js";
 import { isLibraryRequest, libraryCall } from "./native-browser-library.js";
 import { windowsCall } from "./native-browser-windows.js";
@@ -235,6 +236,11 @@ function browserEffects(host: EffectHost): Effect<Cell>[] {
       name: "browser.library",
       match: (value) => isLibraryRequest(value),
       run: (_, value) => libraryCall(value),
+    },
+    {
+      name: "page.guard",
+      match: has("guard"),
+      run: async (_, value) => pageGuard(value.guard),
     },
   ];
 }
