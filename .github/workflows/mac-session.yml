@@ -425,6 +425,7 @@ jobs:
           fi
           user=$(whoami)
           echo "SSH: ssh -p ${port} ${user}@${host}"
+          printf '%s\n' "SSH: ssh -p ${port} ${user}@${host}" > "$GITHUB_WORKSPACE/mac-ssh.txt"
           {
             echo "## SSH"
             echo '```'
@@ -432,6 +433,12 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Tunnel is supervised by launchd and stays up after this step."
+      - name: Upload SSH command
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-ssh
+          path: mac-ssh.txt
+          if-no-files-found: error
       - name: Build Aeon
         run: pnpm build
       - name: Wait until stop
