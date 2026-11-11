@@ -518,15 +518,16 @@ function isSubmitLike(step: BrowserStep): boolean {
   if (step.op === "press") return /^(Enter|NumpadEnter)$/i.test(step.key);
   if (step.op === "keys") return /\n|\r|\{?Enter\}?/i.test(step.keys);
   if (step.op === "pointer") return step.action === "click" || step.action === "doubleClick";
-  if (step.op !== "click") return false;
+  if (step.op !== "click" && step.op !== "hold") return false;
   const element = step.element;
-  if (element.kind === "locator" && element.role !== "button") return element.role === "link";
+  if (element?.kind === "locator" && element.role !== "button") return element.role === "link";
   return true;
 }
 
 // Steps whose trace entries carry input timing, pixel ratio included.
 const INPUT_OPS = new Set([
   "click",
+  "hold",
   "fill",
   "press",
   "scroll",

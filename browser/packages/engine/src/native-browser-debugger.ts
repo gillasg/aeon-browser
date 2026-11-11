@@ -335,18 +335,7 @@ export async function clickAt(
 }
 
 async function pressAt(debuggee: chrome.debugger.Debuggee, x: number, y: number): Promise<void> {
-  // One direct move, unless the recorder's pointer is on: then the curve plays and this is the landing.
-  const moved = await humanMouse(debuggee, "mouseMoved", { x, y });
-  const at = {
-    x: typeof moved.x === "number" ? moved.x : x,
-    y: typeof moved.y === "number" ? moved.y : y,
-  };
-  await send(
-    debuggee,
-    "Input.dispatchMouseEvent",
-    { type: "mouseMoved", ...at },
-    { label: "clickAt" },
-  );
+  const at = await land(debuggee, x, y, "clickAt");
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
@@ -358,6 +347,132 @@ async function pressAt(debuggee: chrome.debugger.Debuggee, x: number, y: number)
     "Input.dispatchMouseEvent",
     { type: "mouseReleased", ...at, button: "left", clickCount: 1 },
     { label: "clickAt" },
+  );
+}
+
+/** Press-and-hold length. Omitted or non-finite uses the default; the cap is 15s. */
+export const HOLD_DEFAULT_MS = 1500;
+export const HOLD_MAX_MS = 15000;
+
+export function clampHoldMs(ms: number | undefined): number {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return HOLD_DEFAULT_MS;
+  return Math.min(HOLD_MAX_MS, Math.max(0, Math.round(ms)));
+}
+
+/** Same landing as a click, then the left button stays down for `ms` before it releases. */
+export async function holdAt(
+  debuggee: chrome.debugger.Debuggee,
+  x: number,
+  y: number,
+  ms?: number,
+): Promise<void> {
+  showAgentCursor(debuggee, x, y, true);
+  noteActionTiming(debuggee.tabId, { tAct: Date.now(), point: { x, y } });
+  await withFocusEmulation(debuggee.tabId, () => holdPressed(debuggee, x, y, clampHoldMs(ms)));
+}
+
+/** A coordinate hold. Anything else (a click with no element, one axis) is not a target. */
+export async function pointHold(
+  debuggee: chrome.debugger.Debuggee,
+  step: { op: string; x?: number | undefined; y?: number | undefined; ms?: number | undefined },
+): Promise<void> {
+  if (step.op !== "hold" || step.x === undefined || step.y === undefined)
+    throw new Error("INVALID_TARGET");
+  await holdAt(debuggee, step.x, step.y, step.ms);
+}
+
+/** Click or hold at a point. A click whose box asks for DOM activation is left to the caller. */
+export async function deliverAt(
+  debuggee: chrome.debugger.Debuggee,
+  step: { op: string; ms?: number | undefined },
+  x: number,
+  y: number,
+  activate: boolean,
+): Promise<"activate" | "sent"> {
+  if (step.op === "click" && activate) return "activate";
+  if (step.op === "hold") await holdAt(debuggee, x, y, step.ms);
+  else await clickAt(debuggee, x, y);
+  return "sent";
+}
+
+async function land(
+  debuggee: chrome.debugger.Debuggee,
+  x: number,
+  y: number,
+  label: string,
+): Promise<{ x: number; y: number }> {
+  // One direct move, unless the recorder's pointer is on: then the curve plays and this is the landing.
+  const moved = await humanMouse(debuggee, "mouseMoved", { x, y });
+  const at = {
+    x: typeof moved.x === "number" ? moved.x : x,
+    y: typeof moved.y === "number" ? moved.y : y,
+  };
+  await send(debuggee, "Input.dispatchMouseEvent", { type: "mouseMoved", ...at }, { label });
+  return at;
+}
+
+const HOLD_JITTER_MIN_MS = 140;
+const HOLD_JITTER_SPAN_MS = 120;
+
+function holdShift(): number {
+  return Math.round((Math.random() * 2 - 1) * 10) / 10;
+}
+
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sleepUntil(started: number, ms: number): Promise<void> {
+  for (;;) {
+    const left = ms - (Date.now() - started);
+    if (left <= 0) return;
+    await sleep(left);
+  }
+}
+
+async function holdPressed(
+  debuggee: chrome.debugger.Debuggee,
+  x: number,
+  y: number,
+  ms: number,
+): Promise<void> {
+  const at = await land(debuggee, x, y, "holdAt");
+  const pressedAt = Date.now();
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mousePressed", ...at, button: "left", clickCount: 1, buttons: 1 },
+    { label: "holdAt" },
+  );
+  let next = pressedAt + HOLD_JITTER_MIN_MS + Math.floor(Math.random() * HOLD_JITTER_SPAN_MS);
+  while (Date.now() - pressedAt < ms) {
+    const left = ms - (Date.now() - pressedAt);
+    const untilJitter = next - Date.now();
+    if (untilJitter >= left) break;
+    await sleep(Math.max(0, untilJitter));
+    if (Date.now() - pressedAt >= ms) break;
+    // About a pixel, so the pointer stays on the control. Release goes back to the press point.
+    await send(
+      debuggee,
+      "Input.dispatchMouseEvent",
+      {
+        type: "mouseMoved",
+        x: Math.round((at.x + holdShift()) * 10) / 10,
+        y: Math.round((at.y + holdShift()) * 10) / 10,
+        button: "left",
+        buttons: 1,
+      },
+      { label: "holdAt" },
+    );
+    next = Date.now() + HOLD_JITTER_MIN_MS + Math.floor(Math.random() * HOLD_JITTER_SPAN_MS);
+  }
+  await sleepUntil(pressedAt, ms);
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mouseReleased", ...at, button: "left", clickCount: 1, buttons: 0 },
+    { label: "holdAt" },
   );
 }
 

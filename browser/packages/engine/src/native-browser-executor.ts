@@ -568,7 +568,8 @@ async function executeStep(
       if (isWriteStep(step)) wantNetwork(step.target.tabId);
       stepInput(step.target.tabId, true);
       noteDialogActivity(step);
-      if (step.op === "click" || step.op === "press") noteAgentClick(step.target.tabId);
+      if (step.op === "click" || step.op === "hold" || step.op === "press")
+        noteAgentClick(step.target.tabId);
       try {
         const result = await dispatchStep(request, step, tab).catch((error: unknown) =>
           closedByAction(request, step, tab, error),
@@ -680,8 +681,8 @@ function isTargetStep(step: BrowserStep): step is TargetStep {
 }
 function isPageAction(
   step: BrowserStep,
-): step is Extract<BrowserStep, { op: "click" | "fill" | "paste" | "scroll" }> {
-  return ["click", "fill", "paste", "scroll"].includes(step.op);
+): step is Extract<BrowserStep, { op: "click" | "hold" | "fill" | "paste" | "scroll" }> {
+  return ["click", "hold", "fill", "paste", "scroll"].includes(step.op);
 }
 function isExtraStep(step: BrowserStep): step is Extract<
   BrowserStep,

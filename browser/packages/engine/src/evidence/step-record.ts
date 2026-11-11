@@ -56,7 +56,7 @@ export function stepEventFrom(input: {
   const sensitive = Boolean(target && isSensitive(target));
   const box = boxOf(input.entry.box);
   const label = labelFor({
-    kind,
+    kind: input.step.op === "hold" ? "hold" : kind,
     ...(target ? { target } : {}),
     ...(input.step.key ? { key: input.step.key } : {}),
     ...(typeof input.step.url === "string" ? { url: input.step.url } : {}),
@@ -177,22 +177,23 @@ function stripCount(label: string): string {
 }
 
 function kindOf(op: string): StepEvent["kind"] | undefined {
+  const name = op === "hold" ? "click" : op;
   const kind =
-    op === "paste"
+    name === "paste"
       ? "fill"
-      : op === "keys" || op === "pointer"
+      : name === "keys" || name === "pointer"
         ? "press"
-        : op === "openTab"
+        : name === "openTab"
           ? "open"
-          : op === "closeTab"
+          : name === "closeTab"
             ? "close"
-            : op === "observe" ||
-                op === "snapshot" ||
-                op === "markdown" ||
-                op === "evaluate" ||
-                op === "listTabs"
+            : name === "observe" ||
+                name === "snapshot" ||
+                name === "markdown" ||
+                name === "evaluate" ||
+                name === "listTabs"
               ? "read"
-              : op;
+              : name;
   return KINDS.has(kind as StepEvent["kind"]) ? (kind as StepEvent["kind"]) : undefined;
 }
 

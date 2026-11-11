@@ -44,7 +44,9 @@ try, or a choice that is theirs. Before a click that opens a passkey or 2FA prom
 blocks on, start it first with `{start: true}` (help('signin')).
 
 A bot wall (Cloudflare, DataDome and the like) logs a `[warn] challenge:` line when the page opens.
-Try its checkbox once (`clickAt` on it); if the check is still there,
-`await bu.handoff("Please finish the check", {wait: true})` returns once the page is clear. To reuse the signed-in session from a script, `browserkit session export
+Try its checkbox once (`page.clickAt` on it). A press-and-hold check gets one try with
+`page.hold(target, {ms})` or `page.holdAt(x, y, {ms})`; if the check is still there,
+`await bu.handoff("Please finish the check", {wait: true})` returns once the page is clear. Never
+try more than once. To reuse the signed-in session from a script, `browserkit session export
 <site>` or `browserkit cookies export <site>` saves the cookies, mapped site or not.
 `help('gated')`.

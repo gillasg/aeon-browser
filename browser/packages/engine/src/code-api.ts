@@ -55,7 +55,7 @@ async function __press(target, element, key, options, locator) {
 }
 // Actions on a locator report what they touched and when: {box, tStart, tEnd} (box in CSS pixels of
 // the viewport just before the action; times in epoch ms, the clock screencast frames use).
-var __TIMED = ['click', 'dblclick', 'fill', 'hover', 'check', 'uncheck', 'press', 'selectOption'];
+var __TIMED = ['click', 'hold', 'dblclick', 'fill', 'hover', 'check', 'uncheck', 'press', 'selectOption'];
 function __timeActions(locator) {
   for (var name of __TIMED) {
     var action = locator[name];
@@ -69,10 +69,21 @@ function __timeActions(locator) {
   }
   return locator;
 }
+function __holdMs(options) {
+  if (!options || options.ms === undefined || options.ms === null) return undefined;
+  var ms = Math.round(Number(options.ms));
+  if (!Number.isFinite(ms)) return undefined;
+  return Math.max(0, Math.min(15000, ms));
+}
+function __holdFields(options) {
+  var ms = __holdMs(options);
+  return ms === undefined ? {} : {ms: ms};
+}
 function __locator(target, element, index) {
   var loc = Object.freeze(__timeActions(__extendLocator(target, element, {
     element,
     click: () => __step({op:'click',target,element:__wire(element),observe:false}),
+    hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
     fill: (value) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false}),
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
     getByRole: (role, options = {}) => {
@@ -407,6 +418,8 @@ var browser = Object.freeze({
     saveMedia: (what, options = {}) => __saveMedia(target, what, options),
     setFileInputFiles: (backendNodeId, files) => __step({op:'upload',target,backendNodeId,files}),
     clickAt: (x,y) => __step({op:'pointer',target,action:'click',x,y}),
+    hold: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.hold(options) : __step(Object.assign({op:'hold',target,element:__wire(__element(target, element)),observe:false}, __holdFields(options))); },
+    holdAt: (x, y, options) => __step(Object.assign({op:'hold',target,x:Number(x),y:Number(y),observe:false}, __holdFields(options))),
     doubleClickAt: (x,y) => __step({op:'pointer',target,action:'doubleClick',x,y}),
     hover: (x,y) => __step({op:'pointer',target,action:'hover',x,y}),
     drag: (x,y,toX,toY) => __step({op:'pointer',target,action:'drag',x,y,toX,toY}),

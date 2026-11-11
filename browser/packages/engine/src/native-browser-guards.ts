@@ -23,6 +23,7 @@ export function refusedCdp(
 export function stepChangesPage(step: BrowserStep): boolean {
   switch (step.op) {
     case "click":
+    case "hold":
     case "fill":
     case "press":
     case "keys":
