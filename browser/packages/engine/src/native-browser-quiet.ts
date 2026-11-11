@@ -73,12 +73,7 @@ const ALL_TYPES = [
   "other",
 ] as chrome.declarativeNetRequest.ResourceType[];
 
-const QUIET_SCRIPT = `(() => {
-  ${nativeSourcePreamble}
-  const realOpen = window.open;
-  const open = function () { return null; };
-  __keepNative(open, realOpen);
-  window.open = open;
+const QUIET_MEDIA_BODY = `
   const realPlay = HTMLMediaElement.prototype.play;
   const play = function () {
     try { this.autoplay = false; this.muted = true; this.pause(); } catch {}
@@ -97,7 +92,20 @@ const QUIET_SCRIPT = `(() => {
   };
   if (document.documentElement) watch();
   else document.addEventListener('DOMContentLoaded', watch, { once: true });
-  quiet();
+  quiet();`;
+
+const QUIET_MEDIA = `(() => {
+  ${nativeSourcePreamble}
+  ${QUIET_MEDIA_BODY}
+})();`;
+
+const QUIET_SCRIPT = `(() => {
+  ${nativeSourcePreamble}
+  const realOpen = window.open;
+  const open = function () { return null; };
+  __keepNative(open, realOpen);
+  window.open = open;
+  ${QUIET_MEDIA_BODY}
 })();`;
 
 const QUIET_SWEEP = `(() => {
@@ -170,8 +178,9 @@ async function installQuietScript(tabId: number): Promise<void> {
 }
 
 function quietSource(tabId: number, loader: string | undefined): string {
-  if (!adsOn.has(tabId)) return QUIET_SWEEP;
-  return loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : QUIET_SCRIPT;
+  // A one-shot sweep misses media that the parser adds after the debugger attaches.
+  if (loader && loaderIds.get(tabId) === loader) return QUIET_SWEEP;
+  return adsOn.has(tabId) ? QUIET_SCRIPT : QUIET_MEDIA;
 }
 
 async function onQuietAttach(tabId: number): Promise<void> {

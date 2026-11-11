@@ -228,6 +228,7 @@ async function __guardSubmit(step) {
 }
 async function __harvestRows(target, name) {
   var hit = await __call({network: 'harvest', target: target, name: String(name), visible: await __visibleText(target)});
+  if (hit && hit.line) console.log(hit.line);
   return {name: (hit && hit.name) || String(name), count: (hit && hit.count) || 0, rows: (hit && hit.rows) || []};
 }
 async function __harvestFooter(target) {
