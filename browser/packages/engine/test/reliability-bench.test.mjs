@@ -17,9 +17,7 @@ globalThis.chrome = {
         setTimeout(() => {
           if (method === "DOM.describeNode") resolve(calls.describe ?? { node: { nodeId: 1 } });
           else if (method === "Accessibility.getFullAXTree")
-            resolve(
-              calls.tree ?? { nodes: [{ backendDOMNodeId: 7, role: { value: "button" } }] },
-            );
+            resolve(calls.tree ?? { nodes: [{ backendDOMNodeId: 7, role: { value: "button" } }] });
           else resolve({ frameTree: { frame: { id: "root" } } });
         }, ms),
       );
