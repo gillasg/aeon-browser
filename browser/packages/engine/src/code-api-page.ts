@@ -535,8 +535,9 @@ async function __finishCell() {
   }
   __dirty.clear();
   await __wallNote();
+  // Passive learning deletes the bodies it hands over. The [data] line has to read them first.
+  await __harvestFooter(__lastTarget).catch(function () {});
   await __learnFromCell();
   await __saveReads();
-  await __harvestFooter(__lastTarget).catch(function () {});
 }
 `;
