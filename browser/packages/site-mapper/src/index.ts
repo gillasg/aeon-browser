@@ -193,4 +193,53 @@ export {
   type LiveLearnResult,
   type WriteKind,
 } from "./live.js";
+export {
+  patternOf,
+  rememberRun,
+  structuralSignature,
+  type ControlSeen,
+  type PageSeen,
+  type RunKnowledge,
+} from "./site-knowledge.js";
+export {
+  compileRoute,
+  contentWords,
+  draftCell,
+  hasSuccess,
+  memoryLine,
+  type CompileInput,
+  type CompileOutcome,
+} from "./route-compile.js";
+export { inferSlots } from "./route-slots.js";
+export { inputsFor, matchSavedRoute, sitesNamed, type RouteHit } from "./route-match.js";
+export {
+  cancelPending,
+  combine,
+  dropRoute,
+  listRoutes,
+  readRoute,
+  settleRoutes,
+  stageRun,
+  type StageInput,
+  type StageResult,
+} from "./route-store.js";
+export {
+  forgetAbility,
+  promoteRoute,
+  promotionReady,
+  renameAbility,
+  type Promotion,
+} from "./route-promote.js";
+export { reportWrong, type WrongReport } from "./route-wrong.js";
+export { actRoute, dropActRoute, readActRoute, saveActRoute, type ActStep } from "./act-route.js";
+export { queueHeal } from "./ability-heal.js";
+export { matchControl, type FallbackTarget, type PageControl } from "./step-fallbacks.js";
+export { testAllAbilities, type AbilityTestRow } from "./ability-test-all.js";
+export type {
+  ObservedStep,
+  Route,
+  RouteInput,
+  RouteStep,
+  TargetWithFallbacks,
+} from "./route-types.js";
 export * from "./runtime/index.js";

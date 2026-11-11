@@ -19,6 +19,7 @@ const READ_CAP = 8;
 export async function liveFirstTurn(
   prompt: string,
   records: PiBrowserContextRecord[],
+  routeDraft?: FirstTurnInput["routeDraft"],
 ): Promise<string> {
   const now = process.env.AEON_SURFACE_NOW ? new Date(process.env.AEON_SURFACE_NOW) : new Date();
   const timeZone =
@@ -47,6 +48,7 @@ export async function liveFirstTurn(
           activeTab: tabFromCapture(active),
         }
       : {}),
+    ...(routeDraft ? { routeDraft } : {}),
   };
   return buildFirstTurn(input);
 }

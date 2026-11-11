@@ -70,5 +70,5 @@ test("a route draft is its own line", () => {
       ranAt: "14:00",
     },
   });
-  assert.match(text, /\[draft\] shop\.example: open orders \(14:00\)/);
+  assert.match(text, /\[draft\] shop\.example: open orders \(14:00\) page\.read\(\)/);
 });

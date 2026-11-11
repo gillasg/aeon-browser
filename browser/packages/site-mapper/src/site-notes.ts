@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { siteDir, siteName } from "./registry.js";
 
-export type SiteNoteKind = "selector" | "url" | "pace" | "quirk" | "official";
+export type SiteNoteKind = "selector" | "url" | "pace" | "quirk" | "official" | "page" | "control";
 
 export interface SiteNote {
   kind: SiteNoteKind;
@@ -15,10 +15,27 @@ export interface SiteNote {
 
 const KEY_MAX = 40;
 const VALUE_MAX = 120;
-const FACT_MAX = 40;
+const FACT_MAX = 240;
 const NOTES_JSON = "notes.json";
 const NOTES_MD = "notes.md";
-const KINDS = new Set<SiteNoteKind>(["selector", "url", "pace", "quirk", "official"]);
+const KINDS = new Set<SiteNoteKind>([
+  "selector",
+  "url",
+  "pace",
+  "quirk",
+  "official",
+  "page",
+  "control",
+]);
+const KIND_CAP: Record<SiteNoteKind, number> = {
+  selector: 30,
+  url: 30,
+  pace: 8,
+  quirk: 30,
+  official: 8,
+  page: 30,
+  control: 40,
+};
 
 const INSTRUCTION =
   /\b(ignore|disregard|override)\b.{0,60}\b(instruction|instructions|prompt|rule|rules|above|previous)\b|\byou are now\b|\bdo not (tell|mention|reveal|ask)\b|\bwithout asking\b|\b(exfiltrate|jailbreak)\b|\bsend\b.{0,40}\b(password|cookie|cookies|token|secret|credential)s?\b|\bnew instructions?\b|\bfrom now on\b|\bsystem prompt\b/i;
@@ -42,7 +59,7 @@ export async function writeSiteNotes(
   markdown: string,
   options: { append?: boolean } = {},
 ): Promise<string> {
-  const incoming = factsFromText(markdown);
+  const incoming = factsFromText(markdown).filter((fact) => originOk(site, fact));
   const facts = options.append ? mergeFacts(await readSiteFacts(site), incoming) : incoming;
   return writeFacts(site, facts);
 }
@@ -51,7 +68,7 @@ export async function writeSiteNotes(
 export async function saveSiteNote(site: string, input: unknown): Promise<string> {
   const current = await readSiteFacts(site);
   const fact = acceptSiteNote(input);
-  if (!fact) return renderSiteNotes(current);
+  if (!fact || !originOk(site, fact)) return renderSiteNotes(current);
   const facts = mergeFacts(current, [fact]);
   await writeFacts(site, facts);
   return renderSiteNotes(facts);
@@ -94,6 +111,8 @@ function kindFits(note: SiteNote): boolean {
   if (note.kind === "selector") return isSelector(note.value);
   if (note.kind === "url") return isUrl(note.value);
   if (note.kind === "pace") return isPace(note.value) || isPace(note.key);
+  if (note.kind === "page") return isPageFact(note.value);
+  if (note.kind === "control") return isControl(note.value);
   return !isCode(note.value);
 }
 
@@ -149,14 +168,39 @@ function stripCode(text: string): string {
 function addFact(facts: SiteNote[], fact: SiteNote | undefined): void {
   if (!fact || facts.length >= FACT_MAX) return;
   const index = facts.findIndex((item) => item.kind === fact.kind && item.key === fact.key);
-  if (index >= 0) facts[index] = fact;
-  else facts.push(fact);
+  if (index >= 0) {
+    facts[index] = fact;
+    return;
+  }
+  const count = facts.filter((item) => item.kind === fact.kind).length;
+  if (count >= KIND_CAP[fact.kind]) return;
+  facts.push(fact);
 }
 
 function mergeFacts(current: readonly SiteNote[], incoming: readonly SiteNote[]): SiteNote[] {
   const facts = [...current];
   for (const fact of incoming) addFact(facts, fact);
-  return facts.slice(-FACT_MAX);
+  return facts;
+}
+
+function originOk(site: string, note: SiteNote): boolean {
+  const want =
+    site
+      .replace(/^www\./, "")
+      .split("/")[0]
+      ?.toLowerCase() ?? "";
+  const hosts = [...note.value.matchAll(/https?:\/\/([^/\s]+)/gi)].map((match) =>
+    (match[1] ?? "").replace(/^www\./, "").toLowerCase(),
+  );
+  return hosts.every((host) => host === want || host.endsWith(`.${want}`));
+}
+
+function isPageFact(value: string): boolean {
+  return /^\/[^\s|]{1,80} sig:[0-9a-f]{6,12}$/.test(value);
+}
+
+function isControl(value: string): boolean {
+  return /^(role|css|text)=/.test(value) && !/[.!?]\s/.test(value) && !/https?:/i.test(value);
 }
 
 function isSelector(value: string): boolean {

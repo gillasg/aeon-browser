@@ -4,6 +4,7 @@
 
 import { attemptWay, fill } from "./ability-attempt.js";
 import { compareWays, oracleFor, shouldDiffer, type DifferResult } from "./ability-differ.js";
+import { queueHeal } from "./ability-heal.js";
 import { contractGap, isPartial, readBackOf } from "./ability-guard.js";
 import { needsError } from "./ability-needs.js";
 import {
@@ -161,15 +162,21 @@ async function finishWay(
   const started = Date.now();
   try {
     const result = await attemptWay(ability, way, inputs, host);
-    return judged(ability, way, result, Date.now() - started, options, tried, notes);
+    return await judged(ability, way, result, Date.now() - started, options, tried, notes);
   } catch (error) {
+    const message = messageOf(error);
+    if (message.startsWith("contract:")) await noteFreshness(ability, way, message);
     notes.push({ way, ok: false, ms: Date.now() - started });
-    tried.push({ via: way.kind, error: messageOf(error) });
+    tried.push({ via: way.kind, error: message });
     return undefined;
   }
 }
 
-function judged(
+async function noteFreshness(ability: Ability, way: AbilityWay, reason: string): Promise<void> {
+  await queueHeal(ability.site, ability.name, wayId(way), reason).catch(() => undefined);
+}
+
+async function judged(
   ability: Ability,
   way: AbilityWay,
   result: unknown,
@@ -177,9 +184,12 @@ function judged(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): Pick<TrackedRun, "result" | "via" | "partial"> | undefined {
+): Promise<Pick<TrackedRun, "result" | "via" | "partial"> | undefined> {
   const gap = contractGap(ability, result);
-  if (gap) return noteSkip(way, `contract: ${gap}`, ms, false, tried, notes);
+  if (gap) {
+    await noteFreshness(ability, way, `contract: ${gap}`);
+    return noteSkip(way, `contract: ${gap}`, ms, false, tried, notes);
+  }
   const partial = isPartial(way, result);
   if (partial && options.complete)
     return noteSkip(
@@ -219,7 +229,7 @@ async function runRecordWays(
   try {
     const read = await readRecords(ability, inputs, host, wantedRows(options));
     noteFailures(ability.ways, read.failures, tried, notes);
-    return judgedRecord(
+    return await judgedRecord(
       ability,
       read.via,
       read.result,
@@ -234,7 +244,7 @@ async function runRecordWays(
   }
 }
 
-function judgedRecord(
+async function judgedRecord(
   ability: Ability,
   via: AbilityVia,
   result: unknown,
@@ -242,10 +252,10 @@ function judgedRecord(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): { run: TrackedRun } | { rejected: true } | undefined {
+): Promise<{ run: TrackedRun } | { rejected: true } | undefined> {
   const way = winningWay(ability.ways, via, notes);
   if (!way) return undefined;
-  const judgedWay = judged(ability, way, result, ms, options, tried, notes);
+  const judgedWay = await judged(ability, way, result, ms, options, tried, notes);
   if (!judgedWay) return { rejected: true };
   return { run: { ...judgedWay, tried, notes } };
 }

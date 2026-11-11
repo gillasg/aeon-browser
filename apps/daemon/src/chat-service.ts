@@ -52,6 +52,7 @@ import {
   type PublishedChatEvent,
 } from "./chat-event-hub.js";
 import type { BrowserSiteRules } from "./browser-site-rules.js";
+import { RouteRecorder } from "./route-recorder.js";
 export class ChatService {
   private readonly store: ChatStore & ThreadCoordinationStore;
   private readonly pi: PiSessionPort;
@@ -62,6 +63,7 @@ export class ChatService {
   private stoppedListener: ((chatId: ChatId) => void) | undefined;
   private readonly commandGate = new ChatCommandGate();
   private readonly eventHub = new ChatEventHub();
+  private readonly routes = new RouteRecorder(this.eventHub);
   private readonly observedSessions = new Map<ChatId, ObservedSession>();
   /** Submissions waiting for their run; stop marks them so a run that starts late is stopped too. */
   private readonly starting = new Map<ChatId, { stopped: boolean }>();
@@ -323,7 +325,13 @@ export class ChatService {
         this.observeSession(chatId, session);
         try {
           await configureInitialPrompt(session, selection);
-          if (!pending.stopped) await session.submit(prompt);
+          const prepared = await this.routes.prepare(chatId, prompt.text);
+          if (!pending.stopped)
+            await session.submit({
+              ...prompt,
+              text: prepared.text,
+              ...(prepared.draft ? { routeDraft: prepared.draft } : {}),
+            });
         } catch (error) {
           this.recordMaterializedSession(chatId, session);
           throw error;
@@ -373,9 +381,11 @@ export class ChatService {
     sites: readonly string[],
   ): void {
     this.siteRules?.beginRoutineRun(chatId, runId, instruction, sites);
+    this.routes.noteWatcher(chatId, instruction);
   }
   endRoutineRun(chatId: string, runId: string): void {
     this.siteRules?.endRoutineRun(chatId, runId);
+    this.routes.dropIdlePrompt(chatId);
   }
   /** Queue edits skip the command gate, which a running submission holds until its run ends. */
   async editQueue(
@@ -492,6 +502,7 @@ export class ChatService {
     current?.unsubscribe();
     const unsubscribe = session.subscribe((event: PiSessionEvent) => {
       this.eventHub.publish(chatId, event);
+      void this.routes.observe(chatId, event);
     });
     this.observedSessions.set(chatId, { session, unsubscribe });
   }

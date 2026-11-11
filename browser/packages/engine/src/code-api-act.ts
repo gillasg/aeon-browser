@@ -129,8 +129,13 @@ async function __observe(target, instruction, options) {
   return found.actions;
 }
 function __actSite(state) { try { return new URL(state.url).hostname; } catch { return ''; } }
+async function __actLoad(key) {
+  var routed = await __call({actRoute: 'get', ...key}).catch(function () { return null; });
+  if (routed && Array.isArray(routed.steps) && routed.steps.length) return routed;
+  return __call({actionCache: 'get', ...key}).catch(function () { return {steps: null}; });
+}
 async function __actReplay(target, key, variables) {
-  var hit = await __call({actionCache: 'get', ...key}).catch(() => ({steps: null}));
+  var hit = await __actLoad(key);
   if (!hit || !Array.isArray(hit.steps) || !hit.steps.length) return null;
   var done = [];
   try {
@@ -143,6 +148,7 @@ async function __actReplay(target, key, variables) {
     // The page changed under the cached step: a later step must not run on a guess. When nothing
     // ran yet, the act falls back to the model, which re-caches what works now.
     if (done.length) throw Error('ACT_REPLAY_PARTIAL: ' + done.map((step) => step.description || step.method).join(' -> ') + ' ran from the cache, then: ' + error.message);
+    await __call({actRoute: 'drop', ...key}).catch(function () {});
     await __call({actionCache: 'drop', ...key}).catch(() => {});
     return null;
   }
@@ -180,7 +186,10 @@ async function __act(target, input, options) {
   var cached = Boolean(done);
   if (!done) {
     done = await __actInfer(target, instruction, variables, names);
-    if (useCache) await __call({actionCache: 'put', ...key, steps: done}).catch(() => {});
+    if (useCache) {
+      await __call({actRoute: 'put', ...key, steps: done}).catch(function () {});
+      await __call({actionCache: 'put', ...key, steps: done}).catch(() => {});
+    }
   }
   var said = done.map((step) => step.description || step.method);
   console.log('[act] ' + said.join(' -> ') + (cached ? ' (cached)' : '') + ' ' + (Date.now() - startedAt) + ' ms');

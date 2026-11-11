@@ -6,9 +6,14 @@ import {
   type Api,
   type Model,
 } from "@earendil-works/pi-ai";
-import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@aeon/domain";
+import type {
+  PiAvailableModel,
+  PiBrowserContextRecord,
+  PiModelOption,
+  PiSessionHandle,
+} from "@aeon/domain";
 import { decodePiInput } from "./pi-input.js";
-import { PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
+import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
 import { liveFirstTurn } from "./first-turn-live.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
@@ -117,22 +122,9 @@ export async function submitToPi(
   } catch {
     // A session without subscribe still sends the turn.
   }
-  const turn = await liveFirstTurn(prompt, browserContexts);
-  const context = turn.endsWith(`\n\n${prompt}`) ? turn.slice(0, -(prompt.length + 2)) : turn;
+  const context = await hiddenTurn(prompt, browserContexts, decoded.routeDraft);
   rememberTurn(chatId, prompt, context);
-  if (context.trim()) {
-    await session.sendCustomMessage(
-      {
-        customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE,
-        content: context,
-        display: false,
-        details: browserContexts.length
-          ? { browserContext: browserContexts[0], browserContexts }
-          : { firstTurn: true },
-      },
-      { deliverAs: "nextTurn" },
-    );
-  }
+  await sendHiddenTurn(session, context, browserContexts);
   if (input.budget) watchBudget(session, input.budget);
   await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
 }
@@ -142,6 +134,36 @@ function rememberTurn(chatId: string, prompt: string, context: string): void {
   rememberTask(chatId, prompt);
   seedReads(chatId, prompt);
   if (context.trim()) seedReads(chatId, context);
+}
+
+async function hiddenTurn(
+  prompt: string,
+  browserContexts: PiBrowserContextRecord[],
+  routeDraft: ReturnType<typeof decodePiInput>["routeDraft"],
+): Promise<string> {
+  const turn = await liveFirstTurn(prompt, browserContexts, routeDraft);
+  const context = turn.endsWith(`\n\n${prompt}`) ? turn.slice(0, -(prompt.length + 2)) : turn;
+  const banner = browserContexts.map(browserContextPrompt).join("\n\n");
+  return [context, banner].filter((part) => part.trim()).join("\n\n");
+}
+
+async function sendHiddenTurn(
+  session: AgentSession,
+  context: string,
+  browserContexts: PiBrowserContextRecord[],
+): Promise<void> {
+  if (!context.trim()) return;
+  await session.sendCustomMessage(
+    {
+      customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE,
+      content: context,
+      display: false,
+      details: browserContexts.length
+        ? { browserContext: browserContexts[0], browserContexts }
+        : { firstTurn: true },
+    },
+    { deliverAs: "nextTurn" },
+  );
 }
 
 function toModel(model: { provider: string; id: string; name: string }): PiAvailableModel {

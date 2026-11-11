@@ -47,7 +47,10 @@ import {
 import { installAeonBrowser } from "./site-browser.js";
 import { installSiteMapping } from "./site-mapping.js";
 import { externalToolDefinitions, runExternalTool } from "./external-tools.js";
-import { installBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
+import {
+  closeBrowserSessionLifecycle,
+  installBrowserSessionLifecycle,
+} from "./browser-session-lifecycle.js";
 import type { CapabilityToolHost } from "./capability-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { bindPiExtensions } from "./sdk-resources.js";
@@ -362,6 +365,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     await setInitialModel(session, input, this.preferredInitialModel, fixture);
     const reference = sessionReferenceFromManager(manager);
     if (reference.sessionId !== input.activationId) {
+      await closeBrowserSessionLifecycle(session);
       session.dispose();
       throw new Error("Pi restored a session that does not match the durable activation ID.");
     }
@@ -372,6 +376,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
         bindPiExtensions(session, extensionUi.context),
       );
     } catch (error) {
+      await closeBrowserSessionLifecycle(session);
       extensionUi.close();
       session.dispose();
       throw error;

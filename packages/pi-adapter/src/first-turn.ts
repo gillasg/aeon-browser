@@ -1,3 +1,5 @@
+import type { PiSessionInput } from "@aeon/domain";
+
 // The first model turn. Same lines a chat sends and aeon-eval's path-choice d8 turn expects.
 
 export interface AbilityMatch {
@@ -22,7 +24,7 @@ export interface FirstTurnInput {
   openTabs: { host: string; title: string }[];
   abilities: AbilityMatch[];
   mappedReads: { site: string; name: string; inputs: string[] }[];
-  routeDraft?: { site: string; summary: string; cell: string; ranAt: string };
+  routeDraft?: NonNullable<PiSessionInput["routeDraft"]>;
 }
 
 const DEICTIC = /\b(this|here)\b|\bthe form\b|\bthis page\b|\bthis tab\b/i;
@@ -108,7 +110,7 @@ function tabsLine(tabs: FirstTurnInput["openTabs"]): string {
 }
 
 function draftLine(draft: NonNullable<FirstTurnInput["routeDraft"]>): string {
-  return `${draft.site}: ${draft.summary} (${draft.ranAt})`;
+  return `${draft.site}: ${draft.summary} (${draft.ranAt}) ${draft.cell}`;
 }
 
 export function hostOf(url: string): string {

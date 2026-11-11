@@ -28,6 +28,7 @@ import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { projectMessage } from "./pi-message-projection.js";
 import { projectChangeDiff } from "./pi-change-diff.js";
 import { toEntryProjection } from "./session-entry-projection.js";
+import { closeBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
 type AgentMessageFromEvent = Extract<AgentSessionEvent, { type: "message_start" }>["message"];
 export function wrapPiSession(
   session: AgentSession,
@@ -343,6 +344,8 @@ function createCloseSession(
     routineSupport.close();
     closing = (async () => {
       try {
+        // Finish workspace/runs writes before dispose, and refuse any that a shutdown event starts.
+        await closeBrowserSessionLifecycle(session);
         await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
       } finally {
         try {
@@ -384,9 +387,28 @@ function copyStep(event: StepEvent): PiToolStepEvent {
   };
   if (event.effect) step.effect = event.effect;
   if (event.sensitive) step.sensitive = true;
+  if (event.via) step.via = event.via;
+  if (event.target)
+    step.target = {
+      role: event.target.role,
+      name: event.target.name,
+      ...(event.target.id !== undefined ? { id: event.target.id } : {}),
+    };
+  const evidence = stepEvidence(event.evidence);
+  if (evidence) step.evidence = evidence;
   if (event.box)
     step.box = { x: event.box.x, y: event.box.y, width: event.box.width, height: event.box.height };
   return step;
+}
+
+function stepEvidence(evidence: StepEvent["evidence"]): PiToolStepEvent["evidence"] | undefined {
+  if (!evidence) return undefined;
+  const copied: NonNullable<PiToolStepEvent["evidence"]> = {};
+  if (evidence.request) copied.request = evidence.request;
+  if (evidence.navigated) copied.navigated = evidence.navigated;
+  if (evidence.download) copied.download = { name: evidence.download.name };
+  if (evidence.valueRead) copied.valueRead = true;
+  return copied;
 }
 
 /** The progress a tool reported in its partial result's details (browser_code's bu.progress). */

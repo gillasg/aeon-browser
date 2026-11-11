@@ -7,6 +7,7 @@ import {
   finishReceipt,
   takeReceipt,
 } from "./native-browser-receipts.js";
+import "./native-browser-download-reissue.js";
 import { labelForAction } from "./evidence/label.js";
 import { noteVaultFill } from "./native-browser-vault.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
@@ -677,6 +678,12 @@ export async function performAction(
             ...(changes !== undefined ? { changes } : {}),
             ...(receipt.requests?.length ? { requests: receipt.requests.length } : {}),
             ...(readback !== undefined ? { readback } : {}),
+            ...(receipt.dialog
+              ? { dialog: { type: receipt.dialog.type, accepted: receipt.dialog.accepted } }
+              : {}),
+            ...(receipt.download?.filename
+              ? { download: { filename: receipt.download.filename } }
+              : {}),
           },
           expectedValue(request.step),
           {

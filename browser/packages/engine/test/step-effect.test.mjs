@@ -36,6 +36,38 @@ test("a fill with its value read back is confirmed even when nothing else change
   });
 });
 
+test("an accepted dialog or a download is evidence, so the click is not a suspected no-op", () => {
+  assert.deepEqual(
+    inputStepEffect("click", {
+      outcome: "unchanged",
+      dialog: { type: "confirm", accepted: true },
+    }),
+    { effect: "confirmed", evidence: "confirm dialog accepted" },
+  );
+  assert.deepEqual(
+    inputStepEffect("click", {
+      outcome: "unchanged",
+      dialog: { type: "confirm", accepted: true },
+      download: { filename: "receipt.txt" },
+    }),
+    { effect: "confirmed", evidence: "confirm dialog accepted; download receipt.txt" },
+  );
+  assert.deepEqual(
+    inputStepEffect("click", { outcome: "unchanged", download: { filename: "a.txt" } }),
+    {
+      effect: "confirmed",
+      evidence: "download a.txt",
+    },
+  );
+  assert.equal(
+    inputStepEffect("click", {
+      outcome: "unchanged",
+      dialog: { type: "confirm", accepted: false },
+    }).effect,
+    "suspected_noop",
+  );
+});
+
 test("an unchanged click is a suspected no-op; a request without a visible change is not", () => {
   assert.deepEqual(inputStepEffect("click", { outcome: "unchanged" }), {
     effect: "suspected_noop",
