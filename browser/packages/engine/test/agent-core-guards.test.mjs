@@ -230,6 +230,13 @@ test("page text for a guard is read in an isolated world, and Enter in a field i
     source,
     /browser\.page\(target\)\.inspect\(function \(\) \{\s*var body = document\.body/,
   );
+  const finish = source.slice(source.indexOf("async function __finishCell"));
+  const harvestAt = finish.indexOf("__harvestFooter");
+  const learnAt = finish.indexOf("__learnFromCell");
+  assert.ok(
+    harvestAt > 0 && learnAt > harvestAt,
+    "harvest reads captured bodies before learning deletes them",
+  );
 });
 
 test("an announced irreversible step is named, and a requested one is not", () => {
