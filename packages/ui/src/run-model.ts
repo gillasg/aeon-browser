@@ -1,4 +1,5 @@
 import type { PiMessageDto, PiSessionEventDto } from "@aeon/protocol";
+import type { AnswerFooter } from "./answer-lines.js";
 import { failureTitle } from "./failure-title.js";
 
 // One agent run, built only from the chat stream in @aeon/protocol. The orb's island and the
@@ -71,6 +72,8 @@ export interface AgentRun {
   /** The user stopped the run (Pi recorded it as aborted). */
   stopped?: boolean;
   error?: string;
+  /** Learned line, speed line and offers under the answer. Cleared when the next run starts. */
+  footer?: AnswerFooter;
 }
 
 export interface RunCursorStep {
@@ -123,8 +126,7 @@ const handlers: { [K in PiSessionEventDto["kind"]]?: Handler<K> } = {
   "entry-added": (run, event) =>
     event.entry.message ? applyMessage(run, event.entry.message) : run,
   "run-state": (run, event) => applyRunState(run, event.state),
-  "turn-boundary": (run, event) =>
-    event.active ? { ...run, status: "thinking", label: "Thinking" } : finish(run),
+  "turn-boundary": (run, event) => (event.active ? beginAgain(run, "Thinking") : finish(run)),
   "extension-ui-request": (run, event) => ({
     ...run,
     status: "needs",
@@ -256,7 +258,14 @@ function applyRunState(run: AgentRun, state: string): AgentRun {
   if (state === "needs_attention") return { ...run, status: "needs", label: "Needs you" };
   // The daemon says the chat is settled with nothing waiting: a question it showed is gone.
   if (state === "idle") return finish(run.status === "needs" ? withoutQuestion(run) : run);
-  return run.status === "idle" || run.status === "done" ? { ...run, status: "thinking" } : run;
+  return run.status === "idle" || run.status === "done" ? beginAgain(run) : run;
+}
+
+function beginAgain(run: AgentRun, label?: string): AgentRun {
+  const next: AgentRun = { ...run, status: "thinking" };
+  if (label) next.label = label;
+  delete next.footer;
+  return next;
 }
 
 function withoutQuestion(run: AgentRun): AgentRun {

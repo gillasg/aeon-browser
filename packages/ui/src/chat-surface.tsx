@@ -8,6 +8,7 @@ import { ChatNavigation } from "./chat-navigation.js";
 import { ChatComposer, type ChatComposerProps } from "./chat-composer.js";
 import { ChatTranscript } from "./chat-transcript.js";
 import { LoadedResources, type LoadedResourcesState } from "./loaded-resources.js";
+import type { AnswerOffer } from "./answer-lines.js";
 import type { TranscriptRow } from "./transcript-model.js";
 import { PiSessionPanel } from "./pi-session-panel.js";
 import { ExtensionDialogs } from "./extension-dialogs.js";
@@ -54,6 +55,8 @@ export interface ChatSurfaceProps {
   onEditMessage?(entryId: string): Promise<void> | void;
   onBranchMessage?(entryId: string): Promise<void> | void;
   onPinAnswer?: ((text: string) => Promise<void> | void) | undefined;
+  onAnswerOffer?: ((offer: AnswerOffer) => void) | undefined;
+  onAnswerWrong?: (() => void) | undefined;
   onNewChat(): void;
   onPinChat?(chat: ChatSummaryDto): void;
   onDeleteChat?(chat: ChatSummaryDto): void;
@@ -197,6 +200,8 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               {...(props.onEditMessage ? { onEditEntry: props.onEditMessage } : {})}
               {...(props.onBranchMessage ? { onBranchEntry: props.onBranchMessage } : {})}
               onPinMessage={props.onPinAnswer}
+              onAnswerOffer={props.onAnswerOffer}
+              onAnswerWrong={props.onAnswerWrong}
             />
           ) : props.compact ? (
             <div className="transcript-wrap" />

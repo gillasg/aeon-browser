@@ -25,7 +25,10 @@ import {
   mountAeonUi,
   TranscriptModel,
   UI_BUILTIN_COMMANDS,
+  WRONG_FOLLOW_UP,
+  type AnswerOffer,
 } from "@aeon/ui";
+import { latestAnswerText, sendAnswerOffer, sendAnswerText } from "./answer-offer.js";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
@@ -228,7 +231,34 @@ function createView() {
     ...sidebar.actionProps(),
     onNewChat: () => openNewChat(),
     onPinAnswer: (text: string) => void pinAnswer(text),
+    onAnswerOffer: (offer: AnswerOffer) => void offerAnswer(offer),
+    onAnswerWrong: () => void wrongAnswer(),
   });
+}
+
+function offerAnswer(offer: AnswerOffer): void {
+  void sendAnswerOffer({
+    client,
+    chatId,
+    offer,
+    wasRunning: runState === "running-unconfirmed",
+    answerText: latestAnswerText(transcript.rows),
+    onError: showError,
+    pin: pinAnswer,
+  });
+}
+
+function wrongAnswer(): void {
+  if (!client) return;
+  void sendAnswerText(
+    {
+      client,
+      chatId,
+      wasRunning: runState === "running-unconfirmed",
+      onError: showError,
+    },
+    WRONG_FOLLOW_UP,
+  ).catch((error: unknown) => showError(error instanceof Error ? error.message : "Couldn't send."));
 }
 
 /** Keeps an answer on the new-tab home through the same management grant the orb uses. */

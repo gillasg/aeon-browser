@@ -66,6 +66,18 @@ export {
 export { ApprovalCard, PathTag, ResultCard, StepMeta, StepTimeline } from "./run-cards.js";
 export { failureTitle } from "./failure-title.js";
 export { boxLine, type BoxLine } from "./box-line.js";
+export { AnswerLines } from "./answer-lines-view.js";
+export {
+  attachFooter,
+  footerFromCard,
+  mergeFooters,
+  runCardOf,
+  WRONG_FOLLOW_UP,
+  type AnswerFooter,
+  type AnswerLine,
+  type AnswerOffer,
+  type AnswerWrong,
+} from "./answer-lines.js";
 export {
   ACTIVITY_LOG_KEY,
   logApiWrites,
