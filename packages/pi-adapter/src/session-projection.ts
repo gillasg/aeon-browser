@@ -45,7 +45,7 @@ export function wrapPiSession(
     readToolImage: (toolCallId, index) => readToolImage(manager, toolCallId, index),
     readMessageImage: (imageId) => readMessageImage(manager, imageId),
     reference,
-    submit: (input) => submitToPi(session, input, chatId),
+    submit: (input) => submitToPi(session, input),
     ...threadDelivery,
     ...routineSupport,
     ...createSessionControls(session, chatId),

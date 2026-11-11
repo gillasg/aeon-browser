@@ -199,8 +199,8 @@ export const EFFECTS = [
   },
   {
     name: "page.guard",
-    call: "a click, or page.read()",
-    does: "stops an unasked final submit, and marks a list the page already contradicted",
+    call: "page.read()",
+    does: "marks a list the page already contradicted, its location, or a partial list",
     needs: [],
     errors: [],
   },

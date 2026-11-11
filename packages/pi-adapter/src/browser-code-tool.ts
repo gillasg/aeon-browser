@@ -26,7 +26,6 @@ import { tallyCell, writeRunLog } from "./run-log.js";
 import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
 import { formatCell } from "./cell-grammar.js";
 export { formatStepLine } from "./cell-grammar.js";
-import { taskOf } from "./task-context.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
@@ -95,7 +94,6 @@ export function createBrowserCodeTool(
     execute: async (toolCallId, { code }, signal, onUpdate) => {
       const operationId = randomUUID();
       const startedAt = Date.now();
-      const cellCode = `globalThis.__aeonTask=${JSON.stringify(taskOf(chatId))};\n${code}`;
       let steps: Record<string, unknown>[] = [];
       let progress: ToolProgress | undefined;
       const writes = new SiteWrites();
@@ -119,7 +117,7 @@ export function createBrowserCodeTool(
         toolCallId,
         {
           codeCell: {
-            code: cellCode,
+            code,
             timeoutMs: CELL_TIMEOUT_MS,
             onCall: cellCall({
               chatId,

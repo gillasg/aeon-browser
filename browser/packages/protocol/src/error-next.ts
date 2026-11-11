@@ -112,7 +112,6 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   SITE_BROKEN: readState,
   NETWORK: readState,
   ABILITY_NEEDS: tabs,
-  TAB_BUDGET: tabs,
   // Another request repeats the limit. The recovery is to report it, not to fetch again.
   RATE_LIMITED: null,
   // An unexpected failure is a bug. Repeating the same call repeats it.
