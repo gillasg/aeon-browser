@@ -216,7 +216,7 @@ function __formField(element) {
   return /input|textarea|select/i.test(String(element.value || '') + ' ' + String(element.by || ''));
 }
 async function __guardSubmit(step) {
-  if (step.op !== 'click' && step.op !== 'press') return '';
+  if (step.op !== 'click' && step.op !== 'press' && step.op !== 'hold') return '';
   var fieldEnter = step.op === 'press' && /^enter$/i.test(String(step.key || '')) && __formField(step.element);
   var label = __clickLabel(step);
   if (!fieldEnter && (!label || !/submit|declare|pay|send|file|lodge|apply|place order/i.test(label))) return '';
@@ -237,7 +237,7 @@ async function __harvestFooter(target) {
 }
 async function __step(step, readOnly = false) {
   var startedAt = Date.now();
-  if (!readOnly && (step.op === 'click' || step.op === 'press')) {
+  if (!readOnly && (step.op === 'click' || step.op === 'press' || step.op === 'hold')) {
     var stopped = await __guardSubmit(step);
     if (stopped) throw Error(stopped);
   }
@@ -248,7 +248,7 @@ async function __step(step, readOnly = false) {
     return {kind:'closed', target:step.target, url:closed.url, note};
   }
   if (step.target) __lastTarget = step.target;
-  var action = ['click','fill','press','scroll','navigate','evaluate','cdp','upload','pointer','keys','reconnect'].includes(step.op);
+  var action = ['click','hold','fill','press','scroll','navigate','evaluate','cdp','upload','pointer','keys','reconnect'].includes(step.op);
   if(step.op==='frames' && ['click','fill','cdp'].includes(step.action))action=true;
   if (readOnly) action=false;
   var wasDirty = step.target && __dirty.has(__key(step.target));
@@ -271,7 +271,7 @@ async function __step(step, readOnly = false) {
     __dirty.delete(__key(step.target));
   }
   if (action) {
-    var moved = before && result.url && before.split('#')[0] !== result.url.split('#')[0] && ['click','fill','press'].includes(step.op);
+    var moved = before && result.url && before.split('#')[0] !== result.url.split('#')[0] && ['click','hold','fill','press'].includes(step.op);
     console.log('[ok] ' + step.op + (result.outcome ? ' ' + result.outcome : '') + (result.url ? ' -> ' + result.url : '') + (moved ? ' (page changed from ' + before + ')' : '') +
       (result.data && result.data.settle ? ' (' + result.data.settle.why + ')' : '') + ' ' + (Date.now() - startedAt) + ' ms' + (result.note ? ' - ' + result.note : '') + (result.next ? ' Next: ' + result.next : ''));
   }
@@ -428,6 +428,7 @@ var bu = Object.freeze({
     return text;
   },
   click: (id) => browser.page(__lastTarget).click(__element(__lastTarget, id)),
+  hold: (id, options) => browser.page(__lastTarget).hold(__element(__lastTarget, id), options),
   type: async (id, text, options = {}) => {
     var target = __lastTarget;
     var element = __element(target, id);

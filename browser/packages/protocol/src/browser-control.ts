@@ -124,6 +124,18 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       amount: z.number().int().min(40).max(1200),
     })
     .strict(),
+  z
+    .object({
+      op: z.literal("hold"),
+      target: BrowserTargetKeySchema,
+      element: BrowserElementTargetSchema.optional(),
+      x: z.number().finite().min(0).max(50000).optional(),
+      y: z.number().finite().min(0).max(50000).optional(),
+      /** How long the button stays down. The engine default is 1500; the cap is 15000. */
+      ms: z.number().int().min(0).max(15000).optional(),
+      observe: z.boolean().optional(),
+    })
+    .strict(),
 ]);
 export type BrowserStep = z.infer<typeof BrowserStepSchema>;
 
@@ -134,6 +146,7 @@ export type BrowserOperationCall = z.infer<typeof BrowserOperationCallSchema>;
 
 const WRITE_STEPS = new Set([
   "click",
+  "hold",
   "fill",
   "press",
   "pointer",

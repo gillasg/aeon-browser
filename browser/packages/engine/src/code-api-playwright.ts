@@ -193,7 +193,7 @@ function __locatorRead(target, element, index, op, arg) {
 // clicked at the element's centre after scrolling it into view.
 // Like Playwright, it waits a moment for the element to be visible, and refuses a hidden one rather
 // than clicking empty space (a field collapsed behind a search button is 0×0).
-async function __clickIndexed(target, element, index, options) {
+async function __clickIndexed(target, element, index, options, hold) {
   var box;
   for (var waited = 0; ; waited += 250) {
     box = await __locatorRead(target, element, index, (found) => {
@@ -209,6 +209,7 @@ async function __clickIndexed(target, element, index, options) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   var page = browser.page(target);
+  if (hold) return page.holdAt(box.x, box.y, options);
   return options && options.clickCount === 2 ? page.doubleClickAt(box.x, box.y) : page.clickAt(box.x, box.y);
 }
 // A fill is only done when the field reads back what was typed (Playwright's fill returns nothing).
@@ -245,6 +246,7 @@ function __extendLocator(target, element, base, index) {
     waitFor: (options = {}) => __waitUntil(() => read((found) => found.length), options.timeout ?? 10000),
     ...(indexed ? {
       click: (options) => __clickIndexed(target, element, at0, options),
+      hold: (options) => __clickIndexed(target, element, at0, options, true),
       dblclick: () => __clickIndexed(target, element, at0, {clickCount: 2}),
       fill: async (value) => { await __clickIndexed(target, element, at0); await browser.page(target).keyboard('ControlOrMeta+a'); await browser.page(target).keyboard(String(value)); await __checkFilled(target, element, at0, String(value)); },
     } : {

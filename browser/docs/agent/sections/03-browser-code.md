@@ -11,8 +11,12 @@ await bu.click(12); // act by bu id, role or visible text
 await page.locator("input[name=q]").fill("lamp");
 await page.getByRole("button", { name: "Search" }).click();
 const rows = await page.list("tr"); // every row, scrolling lists that draw lazily
+await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, hold-to-record
 ```
 
+- Hold a control with `page.hold(target, {ms})`, `bu.hold(id, {ms})` or `page.holdAt(x, y, {ms})`
+  (1500 ms unless `{ms}` says otherwise, at most 15000): a hold-to-confirm button, a long-press
+  menu or hold-to-record. The receipt matches a click. `help('visual')`.
 - One `page` per site: `browser.openTab` on a site you already have a tab for navigates it
   (`{newTab: true}` for another tab). `browser.activeTab()` is the tab the user is on;
   `browser.tabs(query?)` lists tabs (`mine:true` only for tabs this chat or session opened). Any

@@ -3,6 +3,7 @@
 
 const VERBS: Readonly<Record<string, string>> = {
   click: "Click",
+  hold: "Hold",
   fill: "Fill",
   press: "Press",
   select: "Select",

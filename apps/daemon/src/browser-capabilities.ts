@@ -12,6 +12,7 @@ export function requiresBrowserRuntime(step: BrowserStep): boolean {
       "pointer",
       "keys",
       "reconnect",
+      "hold",
     ].includes(step.op)
   )
     return true;

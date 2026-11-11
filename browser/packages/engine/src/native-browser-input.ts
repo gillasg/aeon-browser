@@ -23,6 +23,8 @@ import {
 import {
   resolveElement,
   clickAt,
+  deliverAt,
+  pointHold,
   getViewportCenter,
   scrollAt,
   withDebugger,
@@ -486,7 +488,7 @@ function normalizePreparationError(error: unknown): unknown {
 }
 
 type ActionRequest = BrowserExecutorRequest & {
-  step: Extract<BrowserStep, { op: "click" | "fill" | "paste" | "scroll" }>;
+  step: Extract<BrowserStep, { op: "click" | "hold" | "fill" | "paste" | "scroll" }>;
 };
 export async function clickScreenshotPoint(
   debuggee: chrome.debugger.Debuggee,
@@ -747,7 +749,7 @@ async function dispatchAction(
     await scrollViewport(debuggee, request);
     return undefined;
   }
-  if (!request.step.element) throw new Error("INVALID_TARGET");
+  if (!request.step.element) return void (await pointHold(debuggee, request.step));
   const {
     node,
     point: box,
@@ -768,10 +770,9 @@ async function dispatchAction(
     point: { x: top.x, y: top.y },
     tAct: Date.now(),
   });
-  if (request.step.op === "click") {
-    await (box.activate
-      ? onNode(frame, node.backendNodeId, activateNode)
-      : clickAt(debuggee, top.x, top.y));
+  if (request.step.op === "click" || request.step.op === "hold") {
+    const pointer = await deliverAt(debuggee, request.step, top.x, top.y, !!box.activate);
+    if (pointer === "activate") await onNode(frame, node.backendNodeId, activateNode);
     return { nodeId: node.backendNodeId, frame };
   } else if (request.step.op === "fill") {
     await fillNode(frame, node.backendNodeId, request.step.value);
