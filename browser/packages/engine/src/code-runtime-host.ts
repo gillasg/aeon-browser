@@ -55,7 +55,12 @@ import {
   releaseTabs,
   type SiteRules,
 } from "./native-browser-site-rules.js";
-import { handOffToUser, takeTypedAnswer } from "./native-browser-handoff.js";
+import {
+  dismissHandoffPage,
+  handOffToUser,
+  publishHandoffWaiting,
+  takeTypedAnswer,
+} from "./native-browser-handoff.js";
 import { presentBrowserTask, presentsBrowserTask } from "./native-browser-layout.js";
 import { engineConfig } from "./engine-config.js";
 import { agentTabSummary, unusedAgentTabs } from "./native-browser-tab-cleanup.js";
@@ -463,14 +468,23 @@ async function vaultAfterSubmit(
   result: unknown,
 ): Promise<void> {
   if (!vaultCandidate(target.tabId)) return;
+  // Before the post-submit probes. The unlock hand-off is decided only after they return, and a
+  // stuck probe must not hide the flag the page is already being asked to show.
+  await publishHandoffWaiting(target.tabId);
   const outcome = await finishVaultCapture(target.tabId, (request) =>
     callCore(cell, request),
   ).catch(() => undefined);
   // Every outcome is said on the click itself, so the model never has to check a save.
-  if (outcome === "saved") return addNote(result, VAULT_SAVED);
+  if (outcome === "saved") {
+    await dismissHandoffPage(target.tabId);
+    return addNote(result, VAULT_SAVED);
+  }
   if (outcome === "failed") return addNote(result, await askToUnlock(cell, target));
   // Nothing saved (no answer, skipped or a person's own password): nothing to say.
-  if (outcome !== "unsaved") return;
+  if (outcome !== "unsaved") {
+    await dismissHandoffPage(target.tabId);
+    return;
+  }
   const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
   addNote(result, asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE);
 }
@@ -564,6 +578,8 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
     return { cancelled: Boolean(pending) };
   }
   if (pending && start !== true) return waitForStarted(cell, target.tabId, pending.run);
+  // Before Split View takes the window lock. The page flag does not need that lock or the debugger.
+  await publishHandoffWaiting(target.tabId);
   void notePreviewActivity(cell.run.chatId, target.tabId);
   // The user needs to see the tab: pair it beside its Chat in Split View, whatever the view setting.
   void presentBrowserTask(cell.run.chatId, target.tabId, true);

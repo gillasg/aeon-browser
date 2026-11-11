@@ -142,6 +142,33 @@ async function plantedState(tabId: number): Promise<unknown> {
   return undefined;
 }
 
+/**
+ * Put the waiting flag on the page before any window lock or debugger probe. The unlock hand-off
+ * is read from the page itself; a stuck debugger or a held window lock must not sit in front of it.
+ */
+export async function publishHandoffWaiting(tabId: number): Promise<void> {
+  if (tabRecording(tabId)) return;
+  await plantedState(tabId).catch(() => undefined);
+}
+
+/** Drop a waiting flag this hand-off did not keep. Script only: a stuck debugger must not block it. */
+export async function dismissHandoffPage(tabId: number): Promise<void> {
+  await chrome.scripting
+    .executeScript({
+      target: { tabId },
+      func: (source: string) => {
+        const script = document.createElement("script");
+        script.textContent = source;
+        const parent = document.documentElement || document.head;
+        if (!parent) return;
+        parent.append(script);
+        script.remove();
+      },
+      args: [CLEAR],
+    })
+    .catch(() => undefined);
+}
+
 function terminalHandoff(state: unknown): "done" | "cancelled" | { answer: string } | undefined {
   if (state === "done" || state === "cancelled") return state;
   if (
@@ -204,6 +231,8 @@ export async function handOffToUser(
 ): Promise<"done" | "cancelled"> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!tab) throw new Error("TARGET_LOST");
+  // Before the window lock. Focusing the tab can wait out a lock an earlier step still holds.
+  if (!tabRecording(tabId)) await plantedState(tabId);
   await withLock(`window:${tab.windowId}`, async () => {
     await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
     await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
