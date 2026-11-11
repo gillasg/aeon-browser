@@ -7,25 +7,40 @@ import { spawn } from "node:child_process";
 import { connectCdp, waitForDebugPort, stopChild } from "./browser-cdp-helper.mjs";
 import assert from "node:assert/strict";
 
+// Chrome for Testing 154. The CI job sets CHROME_PATH; the fallback matches that job's layout.
+export function chromeForTestingPath() {
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
+  const root = resolve(".slice0-audit/chrome-for-testing-154.0.8037.57");
+  if (process.platform === "darwin") {
+    return join(
+      root,
+      "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    );
+  }
+  if (process.platform === "linux") return join(root, "chrome-linux64/chrome");
+  return join(root, "chrome-win64/chrome.exe");
+}
+
+function chromeArguments(folder) {
+  const args = [
+    `--user-data-dir=${folder}`,
+    "--headless=new",
+    "--remote-debugging-port=0",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-sync",
+  ];
+  // Linux CI runners forbid the user namespaces Chrome's sandbox needs.
+  if (process.platform === "linux" && process.env.CI) args.push("--no-sandbox");
+  args.push("about:blank");
+  return args;
+}
+
 export async function browserFixture() {
   const folder = await mkdtemp(join(tmpdir(), "aeon-browser-fixture-"));
   // CHROME_PATH first: a worktree has no .slice0-audit folder of its own.
-  const chromePath =
-    process.env.CHROME_PATH ??
-    resolve(".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe");
-  const child = spawn(
-    chromePath,
-    [
-      `--user-data-dir=${folder}`,
-      "--headless=new",
-      "--remote-debugging-port=0",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--disable-sync",
-      "about:blank",
-    ],
-    { windowsHide: true, stdio: "ignore" },
-  );
+  const chromePath = chromeForTestingPath();
+  const child = spawn(chromePath, chromeArguments(folder), { windowsHide: true, stdio: "ignore" });
   let cdp;
   const oldChrome = globalThis.chrome;
   async function close() {

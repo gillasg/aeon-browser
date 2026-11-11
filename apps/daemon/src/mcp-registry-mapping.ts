@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { posix, win32 } from "node:path";
 import type { McpCapability } from "@aeon/domain";
 
 export type PiMcpServerConfig =
@@ -48,7 +48,10 @@ export function mapMcpCapabilityToPi(
         type: "stdio",
         command: capability.command,
         args: [...capability.args],
-        cwd: resolve(defaultWorkingDirectory, capability.workingDirectory ?? "."),
+        cwd: resolveConfiguredDirectory(
+          defaultWorkingDirectory,
+          capability.workingDirectory ?? ".",
+        ),
         ...(envCredential ? { env: { [envCredential]: envReference(envCredential) } } : {}),
         ...describe(capability),
         enabled: !manualCredential,
@@ -90,7 +93,7 @@ export function mapRegisteredCliBridge(
       type: "stdio",
       command: bridge.command,
       args: [bridge.scriptPath, "--registry", bridge.registryPath],
-      cwd: resolve(defaultWorkingDirectory),
+      cwd: resolveConfiguredDirectory(defaultWorkingDirectory),
       description: "The command-line tools the user registered in Aeon.",
       enabled: true,
       exposure: "codemode",
@@ -110,6 +113,15 @@ function describe(capability: McpCapability): { description?: string } {
 
 function envReference(name: string): string {
   return "$" + "{" + name + "}";
+}
+
+/** A Windows base stays a Windows path on macOS and Linux. Other bases use the host path style. */
+function resolveConfiguredDirectory(base: string, child?: string): string {
+  const paths =
+    process.platform === "win32" || /^[A-Za-z]:[\\/]/.test(base) || base.startsWith("\\\\")
+      ? win32
+      : posix;
+  return child === undefined ? paths.resolve(base) : paths.resolve(base, child);
 }
 
 function credentialBinding(credential: string | null | undefined): {

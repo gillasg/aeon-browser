@@ -12,10 +12,11 @@ const compilerCandidates = [
   join(windows, "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe"),
   join(windows, "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe"),
 ];
+if (process.platform !== "win32") process.stdout.write("skipped: Windows-only (C# host)\n");
 
 test(
   "native host poisons a timed-out or failed stdout reader",
-  { skip: process.platform !== "win32" },
+  { skip: process.platform === "win32" ? false : "Windows-only (C# host)" },
   () => {
     const compiler = compilerCandidates.find(existsSync);
     assert.ok(compiler, "the .NET Framework csc.exe used by the native host build is available");

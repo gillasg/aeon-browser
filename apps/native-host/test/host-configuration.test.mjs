@@ -6,10 +6,12 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+if (process.platform !== "win32") process.stdout.write("skipped: Windows-only (C# host)\n");
+
 test(
   "native configuration retries partial writes without accepting broken installations",
   {
-    skip: process.platform !== "win32",
+    skip: process.platform === "win32" ? false : "Windows-only (C# host)",
   },
   () => {
     const directory = mkdtempSync(join(tmpdir(), "aeon-host-config-"));

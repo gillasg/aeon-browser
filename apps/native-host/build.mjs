@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
+if (process.platform !== "win32") {
+  process.stdout.write("skipped: Windows-only (C# host)\n");
+  process.exit(0);
+}
 const windows = process.env.WINDIR ?? "C:\\Windows";
 const compilerCandidates = [
   join(windows, "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe"),

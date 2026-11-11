@@ -5,10 +5,16 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../scripts/daemon-launcher.ps1", import.meta.url));
+if (process.platform !== "win32") {
+  process.stdout.write("skipped: Windows-only (PowerShell launcher)\n");
+}
 
 test(
   "Test-CorePing uses one 2s budget when the handshake is late",
-  { timeout: 20_000 },
+  {
+    timeout: 20_000,
+    skip: process.platform === "win32" ? false : "Windows-only (PowerShell launcher)",
+  },
   async () => {
     const sockets = new Set();
     const server = net.createServer((socket) => {
