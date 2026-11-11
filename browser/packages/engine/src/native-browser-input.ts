@@ -298,9 +298,8 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     return { typed: key.length };
   }
   if (!windowsVirtualKeyCode) throw new Error("Unsupported key");
-  // The fill blurred the password field. Enter has to land in it again or the form never
-  // submits, so the site never takes the password and nothing is saved. A focused control
-  // is left alone. A locator Enter is still the official-form guard's to stop.
+  // The fill blurred the password: Enter must land in it again or the form never submits and
+  // nothing is saved. A focused control is left alone; a locator Enter stays the guard's.
   if (!modifiers && (key === "Enter" || key === "NumpadEnter")) await focusFilledPassword(debuggee);
   const params = { key: key === "Space" ? " " : key, modifiers, windowsVirtualKeyCode };
   // Enter and Space produce text, and Chrome submits a form only when the key event carries it;
