@@ -468,22 +468,15 @@ async function vaultAfterSubmit(
   result: unknown,
 ): Promise<void> {
   if (!vaultCandidate(target.tabId)) return;
-  // Before the post-submit probes. The unlock hand-off is decided only after they return, and a
-  // stuck probe must not hide the flag the page is already being asked to show.
+  // Before the probes: a stuck probe must not hide the flag the unlock hand-off is read from.
   await publishHandoffWaiting(target.tabId);
-  const outcome = await finishVaultCapture(target.tabId, (request) =>
-    callCore(cell, request),
-  ).catch(() => undefined);
-  // Every outcome is said on the click itself, so the model never has to check a save.
-  if (outcome === "saved") {
-    await dismissHandoffPage(target.tabId);
-    return addNote(result, VAULT_SAVED);
-  }
+  const capture = finishVaultCapture(target.tabId, (r) => callCore(cell, r));
+  const outcome = await capture.catch(() => undefined);
+  // Every outcome is said on the click, so the model never checks a save. Only "unsaved" hands off.
   if (outcome === "failed") return addNote(result, await askToUnlock(cell, target));
-  // Nothing saved (no answer, skipped or a person's own password): nothing to say.
   if (outcome !== "unsaved") {
     await dismissHandoffPage(target.tabId);
-    return;
+    return outcome === "saved" ? addNote(result, VAULT_SAVED) : undefined;
   }
   const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
   addNote(result, asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE);
