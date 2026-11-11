@@ -13,7 +13,6 @@ const quiet = new Set<number>();
 const adsOn = new Set<number>();
 const loaderIds = new Map<number, string>();
 const ruleIds = new Map<number, number[]>();
-const mediaScriptIds = new Map<number, string>();
 let nextRule = 0;
 
 const AD_HOSTS = [
@@ -74,7 +73,9 @@ const ALL_TYPES = [
   "other",
 ] as chrome.declarativeNetRequest.ResourceType[];
 
-const QUIET_MEDIA_BODY = `
+// Hooks play() and mutes what is already in the document. A one-shot sweep is not enough: it runs
+// on the blank tab, then the real page calls play() after navigation.
+const MEDIA_BODY = `
   const realPlay = HTMLMediaElement.prototype.play;
   const play = function () {
     try { this.autoplay = false; this.muted = true; this.pause(); } catch {}
@@ -93,11 +94,12 @@ const QUIET_MEDIA_BODY = `
   };
   if (document.documentElement) watch();
   else document.addEventListener('DOMContentLoaded', watch, { once: true });
-  quiet();`;
+  quiet();
+`;
 
-const QUIET_MEDIA = `(() => {
+const MEDIA_SCRIPT = `(() => {
   ${nativeSourcePreamble}
-  ${QUIET_MEDIA_BODY}
+  ${MEDIA_BODY}
 })();`;
 
 const QUIET_SCRIPT = `(() => {
@@ -106,7 +108,7 @@ const QUIET_SCRIPT = `(() => {
   const open = function () { return null; };
   __keepNative(open, realOpen);
   window.open = open;
-  ${QUIET_MEDIA_BODY}
+  ${MEDIA_BODY}
 })();`;
 
 const QUIET_SWEEP = `(() => {
@@ -115,7 +117,7 @@ const QUIET_SWEEP = `(() => {
   }
 })()`;
 
-/** Quiet mutes media. Ad-host blocking and the document-start script are off unless `ads` (explore, crawl). */
+/** Quiet mutes media on this document and the next one. Ad-host blocking and the window.open hook stay off unless `ads` (explore, crawl). */
 export async function enableQuietTab(
   tabId: number,
   options: { ads?: boolean } = {},
@@ -135,7 +137,6 @@ export async function disableQuietTab(tabId: number): Promise<void> {
   quiet.delete(tabId);
   adsOn.delete(tabId);
   loaderIds.delete(tabId);
-  await removeMediaScript(tabId);
   const ids = ruleIds.get(tabId) ?? [];
   ruleIds.delete(tabId);
   if (ids.length)
@@ -170,38 +171,22 @@ async function addRules(tabId: number): Promise<void> {
     .catch(() => undefined);
 }
 
-// A quiet tab is usually attached while it is still about:blank and only then navigated: a
-// one-shot sweep of the current document would run before the page exists. Register the media
-// patch for every document instead, so a video that autoplays while it is parsed is already
-// muted. The ad-filtering page (explore, crawl) additionally keeps popunders from opening.
-async function installQuietScript(tabId: number): Promise<void> {
-  await removeMediaScript(tabId);
-  const source = adsOn.has(tabId) ? QUIET_SCRIPT : QUIET_MEDIA;
-  const result = (await send(
-    { tabId },
-    "Page.addScriptToEvaluateOnNewDocument",
-    { source },
-    { label: "onQuietAttach" },
-  ).catch(() => undefined)) as { identifier?: string } | undefined;
-  if (result?.identifier) mediaScriptIds.set(tabId, result.identifier);
+function documentScript(tabId: number): string {
+  return adsOn.has(tabId) ? QUIET_SCRIPT : MEDIA_SCRIPT;
 }
 
-async function removeMediaScript(tabId: number): Promise<void> {
-  const identifier = mediaScriptIds.get(tabId);
-  if (!identifier) return;
-  mediaScriptIds.delete(tabId);
+async function installQuietScript(tabId: number): Promise<void> {
   await send(
     { tabId },
-    "Page.removeScriptToEvaluateOnNewDocument",
-    { identifier },
+    "Page.addScriptToEvaluateOnNewDocument",
+    { source: documentScript(tabId) },
     { label: "onQuietAttach" },
   ).catch(() => undefined);
 }
 
 function quietSource(tabId: number, loader: string | undefined): string {
-  // A one-shot sweep misses media that the parser adds after the debugger attaches.
-  if (loader && loaderIds.get(tabId) === loader) return QUIET_SWEEP;
-  return adsOn.has(tabId) ? QUIET_SCRIPT : QUIET_MEDIA;
+  // Same document already ran the hook. A second eval would wrap play() again.
+  return loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : documentScript(tabId);
 }
 
 async function onQuietAttach(tabId: number): Promise<void> {
@@ -234,7 +219,6 @@ onEngineInstall(() => {
     quiet.delete(tabId);
     adsOn.delete(tabId);
     loaderIds.delete(tabId);
-    mediaScriptIds.delete(tabId);
     const ids = ruleIds.get(tabId) ?? [];
     ruleIds.delete(tabId);
     if (ids.length)
