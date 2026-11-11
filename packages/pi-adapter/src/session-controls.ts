@@ -18,8 +18,6 @@ import { liveFirstTurn } from "./first-turn-live.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
 import { watchGuards } from "./run-guards.js";
-import { seedReads } from "./answer-check.js";
-import { rememberTask } from "./task-context.js";
 import { endUserWaits, waitingOnUser } from "./user-waits.js";
 
 type Controls = Pick<
@@ -108,7 +106,6 @@ export function sendQueuedAfterStop(
 export async function submitToPi(
   session: AgentSession,
   candidate: Parameters<PiSessionHandle["submit"]>[0],
-  chatId = "",
 ): Promise<void> {
   const input = typeof candidate === "string" ? { text: candidate } : candidate;
   const decoded = decodePiInput(input);
@@ -118,22 +115,14 @@ export async function submitToPi(
     ...(decoded.browserContexts ?? []),
   ];
   try {
-    watchGuards(session, chatId);
+    watchGuards(session);
   } catch {
     // A session without subscribe still sends the turn.
   }
   const context = await hiddenTurn(prompt, browserContexts, decoded.routeDraft);
-  rememberTurn(chatId, prompt, context);
   await sendHiddenTurn(session, context, browserContexts);
   if (input.budget) watchBudget(session, input.budget);
   await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
-}
-
-function rememberTurn(chatId: string, prompt: string, context: string): void {
-  if (!chatId) return;
-  rememberTask(chatId, prompt);
-  seedReads(chatId, prompt);
-  if (context.trim()) seedReads(chatId, context);
 }
 
 async function hiddenTurn(
