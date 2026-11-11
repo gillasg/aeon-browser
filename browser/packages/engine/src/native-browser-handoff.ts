@@ -48,6 +48,56 @@ onEngineInstall(() => {
 
 const CLEAR = `(() => { delete globalThis[${KEY}]; })()`;
 
+// Done and Cancel live on the page. Reading them through the debugger misses the answer when that
+// tab's debugger call is stuck, or when another debugger (DevTools, a test) is attached: the poll
+// then reports "waiting" forever and the hand-off never appears. The main world is the same one
+// the page's button writes.
+function handoffPageState(): unknown {
+  const key = Symbol.for("aeon.handoff");
+  const state = (globalThis as Record<symbol, unknown>)[key];
+  if (state === "done" || state === "cancelled") return state;
+  if (
+    state &&
+    typeof state === "object" &&
+    typeof (state as { answer?: unknown }).answer === "string"
+  )
+    return { answer: (state as { answer: string }).answer };
+  if (!state) {
+    (globalThis as Record<symbol, unknown>)[key] = "waiting";
+    return "fresh";
+  }
+  return "waiting";
+}
+
+function clearHandoffPageState(): void {
+  delete (globalThis as Record<symbol, unknown>)[Symbol.for("aeon.handoff")];
+}
+
+function knownHandoffState(state: unknown): boolean {
+  if (state === "done" || state === "cancelled" || state === "fresh" || state === "waiting")
+    return true;
+  return Boolean(
+    state &&
+    typeof state === "object" &&
+    typeof (state as { answer?: unknown }).answer === "string",
+  );
+}
+
+async function pageHandoffState(tabId: number): Promise<unknown> {
+  try {
+    const [injected] = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: "MAIN",
+      func: handoffPageState,
+    });
+    const state = injected?.result;
+    if (knownHandoffState(state)) return state;
+  } catch {
+    // A page scripting cannot reach still answers through the debugger.
+  }
+  return evaluate(tabId, STATE);
+}
+
 // What the user typed into the cursor's ask instead of acting in the tab, kept for the hand-off's
 // caller (bu.handoff returns it) until it is taken.
 const typed = new Map<number, string>();
@@ -101,7 +151,7 @@ export async function handOffToUser(
       if (answered) return answered;
       // A password the user types here is kept (never shown to the agent) so it can be saved.
       await noteUserLogin(tabId);
-      const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, STATE);
+      const state = tabRecording(tabId) ? "waiting" : await pageHandoffState(tabId);
       if (state === "done" || state === "cancelled") return state;
       if (typeof (state as { answer?: unknown } | null)?.answer === "string") {
         typed.set(tabId, (state as { answer: string }).answer);
@@ -120,6 +170,9 @@ export async function handOffToUser(
     showAgentNeeds(tabId, null);
     answers.delete(tabId);
     void chrome.notifications.clear(notification).catch(() => undefined);
+    void chrome.scripting
+      .executeScript({ target: { tabId }, world: "MAIN", func: clearHandoffPageState })
+      .catch(() => undefined);
     void evaluate(tabId, CLEAR).catch(() => undefined);
   }
 }
