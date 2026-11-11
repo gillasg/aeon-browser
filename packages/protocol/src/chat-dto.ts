@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PiBrowserContextRecordSchema, StepEventSchema } from "@browserkit/protocol";
+import { RunCardSchema } from "./run-card.js";
 import { ChatCatalogItemSchema, ChatIdSchema, ChatSummarySchema } from "./chat-catalog-dto.js";
 export {
   ChatIdSchema,
@@ -357,6 +358,7 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ kind: z.literal("extension-ui-resolved"), requestId: z.string().uuid() }).strict(),
   z.object({ kind: z.literal("extension-ui-notice"), notice: PiExtensionUiNoticeSchema }).strict(),
+  z.object({ kind: z.literal("run-card"), card: RunCardSchema }).strict(),
   z
     .object({
       kind: z.literal("chat-metadata"),

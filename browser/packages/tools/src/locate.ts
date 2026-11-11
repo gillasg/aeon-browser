@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ModelLike } from "@browserkit/site-mapper";
+import { dropActRoute, readActRoute, saveActRoute, type ModelLike } from "@browserkit/site-mapper";
 
 // page.observe / page.act in browser code: one small-model call picks elements on the page for a
 // plain-language instruction, and a local cache replays a step that worked before without any
@@ -289,6 +289,14 @@ export function isActionCacheRequest(value: unknown): value is ActionCacheReques
   return kind === "get" || kind === "put" || kind === "drop";
 }
 
+export function isActRouteRequest(value: unknown): value is ActionCacheRequest {
+  const kind = (value as { actRoute?: unknown } | null)?.actRoute;
+  if (kind !== "get" && kind !== "put" && kind !== "drop") return false;
+  const body = value as { actionCache?: unknown };
+  body.actionCache = kind;
+  return true;
+}
+
 const MAX_ENTRIES = 1000;
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const writes = new Map<string, Promise<unknown>>();
@@ -352,16 +360,10 @@ function serialised<T>(home: string, work: () => Promise<T>): Promise<T> {
 
 export function handleActionCache(request: ActionCacheRequest, home: string): Promise<unknown> {
   const key = actionCacheKey(request.site, request.instruction, request.variables);
-  if (request.actionCache === "get")
-    return readCache(home).then((entries) => ({ steps: entries[key]?.steps ?? null }));
+  if (request.actionCache === "get") return readCached(home, key);
   return serialised(home, async () => {
     const entries = await readCache(home);
-    if (request.actionCache === "drop") {
-      const dropped = key in entries;
-      delete entries[key];
-      if (dropped) await writeCache(home, entries);
-      return { dropped };
-    }
+    if (request.actionCache === "drop") return dropCached(home, key, entries);
     const steps = (Array.isArray(request.steps) ? request.steps : [])
       .map(cachedStep)
       .filter((step): step is CachedStep => Boolean(step))
@@ -369,6 +371,41 @@ export function handleActionCache(request: ActionCacheRequest, home: string): Pr
     if (!steps.length) return { saved: false };
     entries[key] = { steps, savedAt: Date.now(), hits: (entries[key]?.hits ?? 0) + 1 };
     await writeCache(home, entries);
+    await saveActRoute(
+      home,
+      key,
+      text(request.site, 200),
+      text(request.instruction, 200),
+      steps,
+    ).catch(() => undefined);
     return { saved: true };
   });
+}
+
+async function readCached(home: string, key: string): Promise<{ steps: CachedStep[] | null }> {
+  const entries = await readCache(home);
+  if (entries[key]?.steps) return { steps: entries[key].steps };
+  const routed = await readActRoute(home, key).catch(() => undefined);
+  if (!routed) return { steps: null };
+  return {
+    steps: routed.steps.map((step) => ({
+      role: step.role,
+      name: step.name,
+      method: step.method as LocateMethod,
+      args: step.args,
+      description: step.description,
+    })),
+  };
+}
+
+async function dropCached(
+  home: string,
+  key: string,
+  entries: Record<string, CacheEntry>,
+): Promise<{ dropped: boolean }> {
+  const dropped = key in entries;
+  delete entries[key];
+  if (dropped) await writeCache(home, entries);
+  const routed = await dropActRoute(home, key).catch(() => false);
+  return { dropped: dropped || routed };
 }

@@ -106,21 +106,29 @@ export async function submitToPi(
     ...(decoded.browserContext ? [decoded.browserContext] : []),
     ...(decoded.browserContexts ?? []),
   ];
-  if (browserContexts.length) {
-    await session.sendCustomMessage(
-      {
-        customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE,
-        content: browserContexts.map(browserContextPrompt).join("\n\n"),
-        display: false,
-        details: { browserContext: browserContexts[0], browserContexts },
-      },
-      { deliverAs: "nextTurn" },
-    );
-  }
+  await sendHiddenContext(session, browserContexts, decoded.routeDraft);
   if (input.budget) watchBudget(session, input.budget);
   await session.prompt(
     `${decoded.text}${decoded.attachmentText}`,
     decoded.images.length ? { images: decoded.images } : undefined,
+  );
+}
+
+async function sendHiddenContext(
+  session: AgentSession,
+  browserContexts: NonNullable<ReturnType<typeof decodePiInput>["browserContexts"]>,
+  routeDraft: string | undefined,
+): Promise<void> {
+  const content = [browserContexts.map(browserContextPrompt).join("\n\n"), routeDraft]
+    .filter((part) => part && part.trim())
+    .join("\n\n");
+  if (!content) return;
+  const details = browserContexts.length
+    ? { browserContext: browserContexts[0], browserContexts }
+    : { routeDraft: true as const };
+  await session.sendCustomMessage(
+    { customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE, content, display: false, details },
+    { deliverAs: "nextTurn" },
   );
 }
 

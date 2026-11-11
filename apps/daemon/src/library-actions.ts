@@ -1,6 +1,12 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
+  declineOffer,
+  forgetSavedAbility,
+  renameSavedAbility,
+  reportWrongResult,
+} from "./route-api.js";
+import {
   browserRecipeHost,
   rebuild,
   RecordingSession,
@@ -63,6 +69,10 @@ export const LIBRARY_ACTIONS = [
   "stop_site_recording",
   "check_providers",
   "test_provider",
+  "rename_ability",
+  "forget_ability",
+  "report_wrong",
+  "decline_offer",
 ] as const;
 
 export type LibraryAction = (typeof LIBRARY_ACTIONS)[number];
@@ -137,6 +147,10 @@ export class LibraryActions {
     ["stop_site_recording", (input) => this.stopRecording(input)],
     ["check_providers", () => this.checkProviders()],
     ["test_provider", (input) => this.testProvider(input)],
+    ["rename_ability", (input) => this.renameAbility(input)],
+    ["forget_ability", (input) => this.forgetAbility(input)],
+    ["report_wrong", (input) => this.reportWrong(input)],
+    ["decline_offer", (input) => this.declineOffer(input)],
   ]);
 
   private dispatch(action: LibraryAction, input: Record<string, unknown>): Promise<void> {
@@ -508,6 +522,36 @@ export class LibraryActions {
   private exportPath(name: string, given: unknown): string {
     if (typeof given === "string" && given.trim()) return given.trim();
     return join(browserkitDataDirectory(), "exports", name.replace(/[^\w.-]+/g, "-"));
+  }
+
+  private async renameAbility(input: Record<string, unknown>): Promise<void> {
+    const ability = await renameSavedAbility(
+      required(input, "site"),
+      required(input, "from"),
+      required(input, "to"),
+    );
+    noteAction(true, `Renamed ${ability.name}`);
+  }
+
+  private async forgetAbility(input: Record<string, unknown>): Promise<void> {
+    const removed = await forgetSavedAbility(required(input, "site"), required(input, "name"));
+    noteAction(removed, removed ? "Forgotten" : "No ability by that name");
+  }
+
+  private async reportWrong(input: Record<string, unknown>): Promise<void> {
+    const result = await reportWrongResult({
+      site: required(input, "site"),
+      quirk: required(input, "quirk"),
+      ...(typeof input.routeId === "string" ? { routeId: input.routeId } : {}),
+      ...(typeof input.abilityId === "string" ? { abilityId: input.abilityId } : {}),
+      ...(typeof input.pageType === "string" ? { pageType: input.pageType } : {}),
+    });
+    noteAction(true, result.droppedRoute ? "Dropped the route" : "Recorded the correction");
+  }
+
+  private async declineOffer(input: Record<string, unknown>): Promise<void> {
+    await declineOffer(required(input, "site"), required(input, "id"));
+    noteAction(true, "Declined");
   }
 }
 

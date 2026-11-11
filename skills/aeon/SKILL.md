@@ -275,10 +275,9 @@ aeon abilities test shop.example search  # its stored cases; fails on constant o
 
 - **A `[site]` line** appears when you open a mapped site: it names the site's abilities and API
   reads. Use them instead of clicking through the pages.
-- **A `[site] … not learned yet` line** appears after 90 s of page work on a site with no
-  abilities or API reads: end your answer with the one-line offer it gives, and save the task as
-  an ability (`abilities build`, which learns the site's API on the way) if the user says yes.
-  Learning a site maps what it can do; an ability is one task saved to run in one call.
+- **Routes are saved silently** after a successful run. Do not ask the user to save the task.
+  A long first run on a site with no map gets a daemon offer to learn it; that offer is not yours
+  to write. Learning a site maps what it can do; an ability is one task saved to run in one call.
 - **Built-in abilities** come with AI sites, Gemini and X (`ask`, `make_image`, `thread`,
   `research`…; see AI sites below). A saved ability with the same name replaces one.
 - **Anything can be an ability:** an API call or chain, a workflow of steps, a script (node or in
@@ -290,10 +289,11 @@ aeon abilities test shop.example search  # its stored cases; fails on constant o
 - **Start with `site.capabilities()`** in browser code (or `aeon capabilities <site>`): the
   site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
   `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.
-- **Site notes** are short facts the next visit can use: a selector, a url, a pace, or a quirk
-  (`{kind, key, value}`, value at most 120 characters). They load by themselves. Save one with
-  `site.notes(site, {kind, key, value})`. An instruction, or anything longer, is dropped. Selectors,
-  pacing and quirks still apply; they are not a place to store sentences or code.
+- **Site notes** are short facts the next visit can use: a selector, a url, a page type, a
+  control, a pace, or a quirk (`{kind, key, value}`, value at most 120
+  characters, same-origin URLs only). They load by themselves. Save one with
+  `site.notes(site, {kind, key, value})`. An instruction, or anything longer, is dropped. They are
+  not a place to store sentences or code.
 - **Abilities keep their promises:** lists page with `limit`/`next_cursor`; a write with a `key`
   never applies twice; a failed write says `possible_commit` and how to `retry`, and does not try
   another way once one may have committed; an ignored filter fails as `INPUT_NOT_APPLIED`.

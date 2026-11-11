@@ -58,6 +58,10 @@ export const ManagementActionRequestSchema = z
           "stop_site_recording",
           "check_providers",
           "test_provider",
+          "rename_ability",
+          "forget_ability",
+          "report_wrong",
+          "decline_offer",
         ]),
         input: z.record(z.string(), z.unknown()),
       })
