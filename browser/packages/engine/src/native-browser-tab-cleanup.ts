@@ -10,6 +10,7 @@ import { collapseAgentGroups, agentGroupsReady, isAgentGroupId } from "./native-
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { spaceWindowIds } from "./native-browser-spaces.js";
+import { budgetTabs } from "./tab-budget.js";
 
 type Tracked = {
   touched: number;
@@ -17,6 +18,8 @@ type Tracked = {
   seen?: boolean;
   url?: string;
   popup?: boolean;
+  /** A pool or job tab. It does not count toward the open-tab budget. */
+  pool?: boolean;
   used?: boolean;
 };
 type Stats = { opened: number; closed: number; popups: number };
@@ -39,13 +42,14 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 export function trackAgentTab(
   tabId: number,
   chatId?: string,
-  options: { url?: string; popup?: boolean } = {},
+  options: { url?: string; popup?: boolean; pool?: boolean } = {},
 ): void {
   tracked.set(tabId, {
     touched: Date.now(),
     ...(chatId ? { chatId } : {}),
     ...(options.url ? { url: options.url } : {}),
     ...(options.popup ? { popup: true } : {}),
+    ...(options.pool ? { pool: true } : {}),
   });
   if (chatId) {
     const entry = stats.get(chatId) ?? { opened: 0, closed: 0, popups: 0 };
@@ -141,6 +145,22 @@ export function unusedAgentTabs(chatId: string): { tabId: number; url: string }[
 /** Tabs this chat or session opened, for browser.tabs().mine. */
 export function mineTabIds(chatId: string): number[] {
   return chatTabs(chatId).map(([tabId]) => tabId);
+}
+
+/** Agent tabs that count toward the open-tab budget. Popups, pool tabs and job tabs do not. */
+export function agentTabBudgetList(
+  chatId: string | undefined,
+): { id: number; url: string; touched: number }[] {
+  if (!chatId) return [];
+  return budgetTabs(
+    chatTabs(chatId).map(([id, entry]) => ({
+      id,
+      url: entry.url ?? "",
+      touched: entry.touched,
+      ...(entry.popup ? { popup: true } : {}),
+      ...(entry.pool ? { pool: true } : {}),
+    })),
+  );
 }
 
 /**

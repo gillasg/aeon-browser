@@ -6,11 +6,20 @@ import {
   type Api,
   type Model,
 } from "@earendil-works/pi-ai";
-import type { PiAvailableModel, PiModelOption, PiSessionHandle } from "@aeon/domain";
+import type {
+  PiAvailableModel,
+  PiBrowserContextRecord,
+  PiModelOption,
+  PiSessionHandle,
+} from "@aeon/domain";
 import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
+import { liveFirstTurn } from "./first-turn-live.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
+import { watchGuards } from "./run-guards.js";
+import { seedReads } from "./answer-check.js";
+import { rememberTask } from "./task-context.js";
 import { endUserWaits, waitingOnUser } from "./user-waits.js";
 
 type Controls = Pick<
@@ -99,35 +108,60 @@ export function sendQueuedAfterStop(
 export async function submitToPi(
   session: AgentSession,
   candidate: Parameters<PiSessionHandle["submit"]>[0],
+  chatId = "",
 ): Promise<void> {
   const input = typeof candidate === "string" ? { text: candidate } : candidate;
   const decoded = decodePiInput(input);
+  const prompt = `${decoded.text}${decoded.attachmentText}`;
   const browserContexts = [
     ...(decoded.browserContext ? [decoded.browserContext] : []),
     ...(decoded.browserContexts ?? []),
   ];
-  await sendHiddenContext(session, browserContexts, decoded.routeDraft);
+  try {
+    watchGuards(session, chatId);
+  } catch {
+    // A session without subscribe still sends the turn.
+  }
+  const context = await hiddenTurn(prompt, browserContexts, decoded.routeDraft);
+  rememberTurn(chatId, prompt, context);
+  await sendHiddenTurn(session, context, browserContexts);
   if (input.budget) watchBudget(session, input.budget);
-  await session.prompt(
-    `${decoded.text}${decoded.attachmentText}`,
-    decoded.images.length ? { images: decoded.images } : undefined,
-  );
+  await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
 }
 
-async function sendHiddenContext(
+function rememberTurn(chatId: string, prompt: string, context: string): void {
+  if (!chatId) return;
+  rememberTask(chatId, prompt);
+  seedReads(chatId, prompt);
+  if (context.trim()) seedReads(chatId, context);
+}
+
+async function hiddenTurn(
+  prompt: string,
+  browserContexts: PiBrowserContextRecord[],
+  routeDraft: ReturnType<typeof decodePiInput>["routeDraft"],
+): Promise<string> {
+  const turn = await liveFirstTurn(prompt, browserContexts, routeDraft);
+  const context = turn.endsWith(`\n\n${prompt}`) ? turn.slice(0, -(prompt.length + 2)) : turn;
+  const banner = browserContexts.map(browserContextPrompt).join("\n\n");
+  return [context, banner].filter((part) => part.trim()).join("\n\n");
+}
+
+async function sendHiddenTurn(
   session: AgentSession,
-  browserContexts: NonNullable<ReturnType<typeof decodePiInput>["browserContexts"]>,
-  routeDraft: string | undefined,
+  context: string,
+  browserContexts: PiBrowserContextRecord[],
 ): Promise<void> {
-  const content = [browserContexts.map(browserContextPrompt).join("\n\n"), routeDraft]
-    .filter((part) => part && part.trim())
-    .join("\n\n");
-  if (!content) return;
-  const details = browserContexts.length
-    ? { browserContext: browserContexts[0], browserContexts }
-    : { routeDraft: true as const };
+  if (!context.trim()) return;
   await session.sendCustomMessage(
-    { customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE, content, display: false, details },
+    {
+      customType: PI_BROWSER_CONTEXT_CUSTOM_TYPE,
+      content: context,
+      display: false,
+      details: browserContexts.length
+        ? { browserContext: browserContexts[0], browserContexts }
+        : { firstTurn: true },
+    },
     { deliverAs: "nextTurn" },
   );
 }

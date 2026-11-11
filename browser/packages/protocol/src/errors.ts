@@ -113,6 +113,14 @@ export const ERRORS = {
     "ours",
     "this host cannot run that way of the ability: run it where a browser is attached",
   ],
+  TAB_BUDGET: [
+    "model",
+    "too many agent tabs are open: close one with browser.closeTab(id) or page.close() before opening another",
+  ],
+  RATE_LIMITED: [
+    "page",
+    "the page is rate limiting this browser: do not send another request; report the limit to the user",
+  ],
   INTERNAL: ["ours", "browserkit failed unexpectedly: report it; do not retry the same call"],
 } as const satisfies Record<string, readonly [ErrorOwner, string]>;
 

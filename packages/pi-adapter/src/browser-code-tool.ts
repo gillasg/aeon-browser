@@ -1,6 +1,5 @@
 import { dirname, join } from "node:path";
 import {
-  actionLine,
   describeError,
   errorNextCall,
   leadingCode,
@@ -25,6 +24,9 @@ import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
 import { siteMapperRequest } from "./site-browser.js";
 import { tallyCell, writeRunLog } from "./run-log.js";
 import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
+import { formatCell } from "./cell-grammar.js";
+export { formatStepLine } from "./cell-grammar.js";
+import { taskOf } from "./task-context.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
@@ -46,6 +48,20 @@ export interface BrowserCodeOptions {
 }
 
 export type BrowserNameProvider = (chatId: string) => Promise<string | undefined>;
+
+function offlineCell(envelope: () => object): {
+  content: ReturnType<typeof browserContent>;
+  isError: true;
+  details: undefined;
+} {
+  return {
+    content: browserContent(
+      JSON.stringify({ ...envelope(), error: describeError("BROWSER_OFFLINE") }),
+    ),
+    isError: true,
+    details: undefined,
+  };
+}
 
 export function createBrowserTools(
   chatId: string,
@@ -78,6 +94,8 @@ export function createBrowserCodeTool(
     executionMode: "sequential",
     execute: async (toolCallId, { code }, signal, onUpdate) => {
       const operationId = randomUUID();
+      const startedAt = Date.now();
+      const cellCode = `globalThis.__aeonTask=${JSON.stringify(taskOf(chatId))};\n${code}`;
       let steps: Record<string, unknown>[] = [];
       let progress: ToolProgress | undefined;
       const writes = new SiteWrites();
@@ -93,14 +111,7 @@ export function createBrowserCodeTool(
           content: browserContent(JSON.stringify(envelope())),
           details: liveDetails(progress, steps),
         });
-      if (!run)
-        return {
-          content: browserContent(
-            JSON.stringify({ ...envelope(), error: describeError("BROWSER_OFFLINE") }),
-          ),
-          isError: true,
-          details: undefined,
-        };
+      if (!run) return offlineCell(envelope);
       // A steer while the cell hands off to the user ends the cell, so the model reads it now.
       const wait = openUserWait(chatId, signal, () => steps.some(handingOff));
       const output = await run(
@@ -108,7 +119,7 @@ export function createBrowserCodeTool(
         toolCallId,
         {
           codeCell: {
-            code,
+            code: cellCode,
             timeoutMs: CELL_TIMEOUT_MS,
             onCall: cellCall({
               chatId,
@@ -146,7 +157,16 @@ export function createBrowserCodeTool(
           isError: true,
           details: undefined,
         };
-      return browserCodeResult({ chatId, output, steps, workspace, operationId, writes, files });
+      return browserCodeResult({
+        chatId,
+        output,
+        steps,
+        workspace,
+        operationId,
+        writes,
+        files,
+        startedAt,
+      });
     },
   });
 }
@@ -197,6 +217,7 @@ async function browserCodeResult(options: {
   operationId: string;
   writes: SiteWrites;
   files: string[];
+  startedAt: number;
 }) {
   const { chatId, workspace, operationId, writes, files } = options;
   let { steps } = options;
@@ -214,7 +235,7 @@ async function browserCodeResult(options: {
   const details = resultDetails(actions, writes);
   const delivered = !failed && isDelivery(cell.value);
   return {
-    content: modelContent(body),
+    content: modelContent(body, options.startedAt),
     isError: failed,
     details: Object.keys(details).length ? details : undefined,
     // finish_from_js handed the answer over: the run ends after this call.
@@ -318,63 +339,37 @@ function isWorkspaceWrite(request: { workspace: string }): boolean {
 
 // The model rereads this on every later call, so it gets one line per step plus the cell's own
 // output instead of the raw envelope with its repeated tab identities. Screenshots stay images.
-function modelContent(body: {
-  steps: Record<string, unknown>[];
-  output: string;
-  value?: unknown;
-  error?: string;
-  reset?: boolean;
-  runLog?: string;
-  hint?: string;
-  tabStats?: {
-    opened?: number;
-    closed?: number;
-    mine?: number[];
-    total?: number;
-    popups?: number;
-  };
-}): ReturnType<typeof browserContent> {
+function modelContent(
+  body: {
+    steps: Record<string, unknown>[];
+    output: string;
+    value?: unknown;
+    error?: string;
+    reset?: boolean;
+    runLog?: string;
+    hint?: string;
+    tabStats?: CellOutput["tabStats"];
+  },
+  startedAt: number,
+): ReturnType<typeof browserContent> {
   const images = browserContent(JSON.stringify({ steps: body.steps })).slice(1);
-  const parts = [stepSummary(body.steps)];
-  if (body.output) parts.push("output:\n" + body.output);
-  // bu.state() logs its text and returns it: the value would repeat the output word for word.
-  if (body.value !== undefined && !echoed(body.output, body.value))
-    parts.push("value: " + (JSON.stringify(body.value) ?? "undefined"));
-  if (body.error) parts.push("error: " + body.error);
-  if (body.reset) parts.push("runtime reset: top-level variables are gone");
-  if (body.tabStats) parts.push(tabLine(body.tabStats));
-  if (body.runLog) parts.push("run log: " + body.runLog);
-  if (body.hint) parts.push("hint: " + body.hint);
-  return [{ type: "text", text: parts.join("\n") }, ...images];
-}
-
-/** A string value the output already shows in full. */
-function echoed(output: string, value: unknown): boolean {
-  return typeof value === "string" && value.length > 40 && output.includes(value);
-}
-
-function tabLine(stats: NonNullable<CellOutput["tabStats"]>): string {
-  const ids = stats.mine ?? [];
-  return (
-    `tabs: opened ${stats.opened ?? 0}, closed ${stats.closed ?? 0}, mine ${ids.length}` +
-    `${ids.length ? ` (${ids.join(", ")})` : ""}, total ${stats.total ?? 0}` +
-    `${stats.popups ? `; popups: ${stats.popups} parked` : ""}`
-  );
-}
-
-function stepSummary(steps: Record<string, unknown>[]): string {
-  const lines = steps
-    .filter((step) => step.action !== undefined)
-    .map(stepLine)
-    .filter((line) => line.length > 0);
-  if (!lines.length) return "steps: none";
-  const shown = lines.length > 40 ? [...lines.slice(0, 10), "...", ...lines.slice(-29)] : lines;
-  return "steps:\n" + shown.join("\n");
-}
-
-/** The model line for one trace step: `Click “Place order” → confirmed (POST /api/profile 200)`. */
-export function formatStepLine(step: Record<string, unknown>): string {
-  return stepLine(step);
+  return [
+    {
+      type: "text",
+      text: formatCell({
+        steps: body.steps,
+        output: body.output,
+        startedAt,
+        ...(body.value !== undefined ? { value: body.value } : {}),
+        ...(body.error !== undefined ? { error: body.error } : {}),
+        ...(body.reset !== undefined ? { reset: body.reset } : {}),
+        ...(body.runLog !== undefined ? { runLog: body.runLog } : {}),
+        ...(body.hint !== undefined ? { hint: body.hint } : {}),
+        ...(body.tabStats ? { tabStats: body.tabStats } : {}),
+      }),
+    },
+    ...images,
+  ];
 }
 
 function liveDetails(
@@ -397,55 +392,6 @@ function stepEvents(steps: readonly Record<string, unknown>[]): StepEvent[] {
     if (parsed.success) events.push(parsed.data);
   }
   return events.slice(-500);
-}
-
-function stepLine(step: Record<string, unknown>): string {
-  if (step.loopFolded) return "";
-  const event = StepEventSchema.safeParse(step.event);
-  if (event.success) return "- " + actionLine(event.data) + recoveryLine(step);
-  return legacyStepLine(step);
-}
-
-function legacyStepLine(step: Record<string, unknown>): string {
-  if (typeof step.action !== "object" || step.action === null) return "- " + String(step.action);
-  const action = step.action as Record<string, unknown>;
-  const detail = actionDetail(action);
-  const result = step.result as
-    { kind?: unknown; tab?: { target?: { tabId?: unknown } } } | undefined;
-  const opened = result?.kind === "tab" ? " -> tab " + String(result.tab?.target?.tabId) : "";
-  const failed = step.disposition === "failed" ? failedText(step) : "";
-  return (
-    "- " + String(action.op) + (detail ? " " + detail : "") + opened + failed + recoveryLine(step)
-  );
-}
-
-function failedText(step: Record<string, unknown>): string {
-  const detail = step.detail ? ": " + String(step.detail) : "";
-  return " FAILED " + String(step.code ?? "") + detail;
-}
-
-/** The executable next call on a step whose effect was not confirmed. */
-function recoveryLine(step: Record<string, unknown>): string {
-  const result = step.result;
-  if (!result || typeof result !== "object") return "";
-  const next = (result as { next?: unknown }).next;
-  if (typeof next !== "string" || !next) return "";
-  if (String(step.code ?? "").includes("\nNext:")) return "";
-  return "\n  Next: " + next;
-}
-
-function actionDetail(action: Record<string, unknown>): string {
-  const target = action.target as { tabId?: unknown } | undefined;
-  const element = action.element as Record<string, unknown> | undefined;
-  const id = element && (element.backendNodeId ?? element.value ?? element.ref ?? element.role);
-  return [
-    target?.tabId !== undefined ? "tab " + String(target.tabId) : "",
-    typeof action.url === "string" ? action.url : "",
-    id === undefined ? "" : String(id),
-    typeof action.method === "string" ? action.method : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
 }
 
 async function serveCall(

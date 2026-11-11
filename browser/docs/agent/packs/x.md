@@ -1,0 +1,1 @@
+A post with its replies, and research over posts, are saved abilities. thread takes a post url and how many replies. research takes a topic and opens every post it cites; write the answer from those posts, not from the summary alone. help('abilities') names the site and the inputs. Never ask for an API key.

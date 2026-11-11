@@ -197,6 +197,13 @@ export const EFFECTS = [
     needs: [],
     errors: ["INVALID_INPUT"],
   },
+  {
+    name: "page.guard",
+    call: "a click, or page.read()",
+    does: "stops an unasked final submit, and marks a list the page already contradicted",
+    needs: [],
+    errors: [],
+  },
 ] as const satisfies readonly EffectDoc[];
 
 export type EffectName = (typeof EFFECTS)[number]["name"];

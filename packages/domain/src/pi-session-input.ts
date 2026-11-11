@@ -30,6 +30,6 @@ export interface PiSessionInput {
   attachments?: readonly PiAttachment[];
   browserContext?: PiBrowserContextRecord;
   browserContexts?: PiBrowserContextRecord[];
-  /** Hidden rung-1 draft. Omitted when this submit has none. */
-  routeDraft?: string;
+  /** Hidden rung-1 draft from fillRouteDraft. Omitted when this submit has none. */
+  routeDraft?: { site: string; summary: string; cell: string; ranAt: string };
 }

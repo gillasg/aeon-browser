@@ -24,7 +24,8 @@ test("the model action line is the step event's label, effect and evidence", () 
     event,
     result: { next: "page.snapshot()" },
   });
-  assert.equal(line, "- " + actionLine(event) + "\n  Next: page.snapshot()");
+  assert.equal(line, "[did] " + actionLine(event));
+  assert.doesNotMatch(line, /\[next\]/);
   assert.match(line, /Click “Place order” → confirmed \(POST \/api\/profile 200\)/);
 });
 

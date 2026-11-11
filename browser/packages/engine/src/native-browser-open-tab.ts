@@ -16,6 +16,7 @@ import {
 import { claimAgentTab, groupAgentTab } from "./native-browser-groups.js";
 import {
   agentOpenedTab,
+  agentTabBudgetList,
   markAgentTabGrouped,
   trackAgentTab,
 } from "./native-browser-tab-cleanup.js";
@@ -26,6 +27,7 @@ import { BrowserActionError, safePage, sameIdentity } from "./native-browser-com
 import { navigateReady } from "./native-browser-navigation.js";
 import { noteAgentNavigation, setAgentOpenedTab } from "./evidence/dialogs.js";
 import { captureFromTabStart } from "./native-browser-network.js";
+import { takeTabSlot } from "./tab-budget.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 import {
   ensureSpacesRestored,
@@ -41,37 +43,47 @@ export async function openTab(
   request: BrowserExecutorRequest,
 ): Promise<BrowserExecutorResult> {
   const step = validOpenTab(request, identity);
-  await assertBrowserNetwork(step.url);
-  const space = step.window ? "tabs" : (step.space ?? engineConfig.defaultSpace(request.chatId));
-  await ensureSpacesRestored();
-  const created = await createTab(step, request.chatId, space);
-  if (created.id === undefined) throw new Error("TARGET_LOST");
-  if (!step.window)
-    noteSpace(request.chatId, space, space === "window" ? created.windowId : undefined);
-  trackAgentTab(created.id, request.chatId, { url: step.url });
-  bindBrowserSession(created.id, request.chatId);
-  markAgentTabGrouped(created.id);
-  claimAgentTab(created.id);
-  if (await engineConfig.privateNetwork())
-    await guardPrivateTab(created.id, await engineConfig.privateNetworkPorts());
-  await groupAgentTab(
-    created.id,
-    created.windowId,
-    request.chatId,
-    step.ownerTitle ?? ownerTitle(request.chatId),
-  );
-  if (step.quiet) await enableQuietTab(created.id, { ads: step.ads === true });
-  const navigation = await navigateOpenedTab(created.id, step.url, step.timeoutMs, step.referer);
-  assertRequestActive(request);
-  const tab = await refreshInventoryTab(created.id);
-  if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
-  bindBrowserSession(created.id, request.chatId);
-  const label = noteLabel(request.chatId, created.id, tab.url);
-  return BrowserExecutorResultSchema.parse({
-    kind: "tab",
-    tab: { ...tab, ...(label ? { label, control: "agent" as const } : {}) },
-    ...(navigation ? { navigation: "failed" as const, reason: navigation } : {}),
-  });
+  const exempt = step.space === "window" || step.present === false;
+  const slot = takeTabSlot(request.chatId, agentTabBudgetList(request.chatId), exempt);
+  if (slot.error) throw new Error(slot.error);
+  try {
+    await assertBrowserNetwork(step.url);
+    const space = step.window ? "tabs" : (step.space ?? engineConfig.defaultSpace(request.chatId));
+    await ensureSpacesRestored();
+    const created = await createTab(step, request.chatId, space);
+    if (created.id === undefined) throw new Error("TARGET_LOST");
+    if (!step.window)
+      noteSpace(request.chatId, space, space === "window" ? created.windowId : undefined);
+    trackAgentTab(created.id, request.chatId, {
+      url: step.url,
+      ...(exempt ? { pool: true } : {}),
+    });
+    bindBrowserSession(created.id, request.chatId);
+    markAgentTabGrouped(created.id);
+    claimAgentTab(created.id);
+    if (await engineConfig.privateNetwork())
+      await guardPrivateTab(created.id, await engineConfig.privateNetworkPorts());
+    await groupAgentTab(
+      created.id,
+      created.windowId,
+      request.chatId,
+      step.ownerTitle ?? ownerTitle(request.chatId),
+    );
+    if (step.quiet) await enableQuietTab(created.id, { ads: step.ads === true });
+    const navigation = await navigateOpenedTab(created.id, step.url, step.timeoutMs, step.referer);
+    assertRequestActive(request);
+    const tab = await refreshInventoryTab(created.id);
+    if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
+    bindBrowserSession(created.id, request.chatId);
+    const label = noteLabel(request.chatId, created.id, tab.url);
+    return BrowserExecutorResultSchema.parse({
+      kind: "tab",
+      tab: { ...tab, ...(label ? { label, control: "agent" as const } : {}) },
+      ...(navigation ? { navigation: "failed" as const, reason: navigation } : {}),
+    });
+  } finally {
+    slot.release();
+  }
 }
 
 /**

@@ -55,6 +55,7 @@ async function __mappedNote(url) {
   if (reads.length) said.push('API reads ' + reads.slice(0, 8).map(call).join(', ') + (reads.length > 8 ? ' and ' + (reads.length - 8) + ' more' : '') + ": siteMapper.call('" + host + "', name, params)");
   return said.length ? host + ' is mapped; prefer these over clicking through pages: ' + said.join('; ') + '. site.capabilities() has the details.' : '';
 }
+async function __noteSiteTime() {}
 var skills = Object.freeze({
   list: (url) => __call({siteSkill:'list', url: url ?? (__lastTarget ? browser.page(__lastTarget).url : undefined)}),
   load: async (name) => {

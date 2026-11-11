@@ -3,7 +3,7 @@
 Check the agent used the abilities that fit, and note each miss: history, bookmarks or open tabs
 for what the user visited or has open; the site, not web search, for anything live; `page.data()`
 before scraping by hand; `siteMapper.batch` after the first of many identical changes;
-`site.capabilities()` before exploring; a `key` on every ability write; the `Prompt cache` line at
+a saved ability (`[saved]` or `site.run`) before clicking through; a `key` on every ability write; the `Prompt cache` line at
 the end of `aeon trace` (where it falls, something before the cached part changed). A miss seen in
 two reviewed chats changes the ability map or a browser-code hint, never appended guidance.
 

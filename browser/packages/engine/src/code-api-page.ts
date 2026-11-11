@@ -188,8 +188,59 @@ function __logDialogWarn(result) {
     if (at >= 0) console.log(line.slice(at));
   }
 }
+function __clickLabel(step) {
+  var element = step.element;
+  if (element == null) return '';
+  if (typeof element === 'string' || typeof element === 'number') {
+    var state = step.target && __states.get(__key(step.target));
+    var node = state && state.nodes && state.nodes.find(function (item) {
+      return item.backendNodeId === element || item.ref === element || item.backendNodeId === Number(element);
+    });
+    return node && node.name ? String(node.name) : '';
+  }
+  if (typeof element.name === 'string' && element.name) return element.name;
+  if (typeof element.value === 'string' && (element.by === 'text' || element.by === 'label')) return element.value;
+  return '';
+}
+async function __visibleText(target) {
+  if (!target) return '';
+  try {
+    var text = await __isolatedEval(target, '(function () { var body = document.body; return body && body.innerText ? body.innerText.slice(0, 6000) : ""; })()');
+    return typeof text === 'string' ? text : '';
+  } catch (error) { return ''; }
+}
+function __formField(element) {
+  if (!element || typeof element !== 'object') return false;
+  var role = String(element.role || '').toLowerCase();
+  if (role === 'textbox' || role === 'searchbox' || role === 'combobox' || role === 'spinbutton') return true;
+  return /input|textarea|select/i.test(String(element.value || '') + ' ' + String(element.by || ''));
+}
+async function __guardSubmit(step) {
+  if (step.op !== 'click' && step.op !== 'press') return '';
+  var fieldEnter = step.op === 'press' && /^enter$/i.test(String(step.key || '')) && __formField(step.element);
+  var label = __clickLabel(step);
+  if (!fieldEnter && (!label || !/submit|declare|pay|send|file|lodge|apply|place order/i.test(label))) return '';
+  var host = '';
+  try { host = new URL((__tabs.get(__key(step.target)) || {}).url || '').hostname; } catch (error) {}
+  var pageText = await __visibleText(step.target);
+  var answer = await __call({guard: {kind: 'submit', host: host, label: label, task: String(globalThis.__aeonTask || ''), pageText: pageText.slice(0, 1500), fieldEnter: fieldEnter}});
+  return answer && answer.stop ? String(answer.stop) : '';
+}
+async function __harvestRows(target, name) {
+  var hit = await __call({network: 'harvest', target: target, name: String(name), visible: await __visibleText(target)});
+  return {name: (hit && hit.name) || String(name), count: (hit && hit.count) || 0, rows: (hit && hit.rows) || []};
+}
+async function __harvestFooter(target) {
+  if (!target) return;
+  var hit = await __call({network: 'harvest', target: target, footer: true, visible: await __visibleText(target)});
+  if (hit && hit.line) console.log(hit.line);
+}
 async function __step(step, readOnly = false) {
   var startedAt = Date.now();
+  if (!readOnly && (step.op === 'click' || step.op === 'press')) {
+    var stopped = await __guardSubmit(step);
+    if (stopped) throw Error(stopped);
+  }
   if (step.target && __closedTabs.has(step.target.tabId)) {
     var closed = __closedTabs.get(step.target.tabId);
     var note = 'closed by you (tab ' + step.target.tabId + (closed.url ? ', ' + closed.url : '') + ')';
@@ -486,5 +537,6 @@ async function __finishCell() {
   await __wallNote();
   await __learnFromCell();
   await __saveReads();
+  await __harvestFooter(__lastTarget).catch(function () {});
 }
 `;

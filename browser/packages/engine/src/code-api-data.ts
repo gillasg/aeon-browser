@@ -301,7 +301,11 @@ function __extendPageData(target, base) {
       } else if (changes.body !== undefined) request.body = changes.body;
       return inspect(__pageRequest, request);
     },
-    data: (options = {}) => (__noteRead(target), base.inspect('(' + __readPageData.toString() + ')(' + __readMetadata.toString() + ', ' + JSON.stringify(options) + ')')),
+    data: async (options = {}) => {
+      if (typeof options === 'string') return __harvestRows(target, options);
+      __noteRead(target);
+      return base.inspect('(' + __readPageData.toString() + ')(' + __readMetadata.toString() + ', ' + JSON.stringify(options) + ')');
+    },
     metadata: () => base.inspect('(' + __readMetadata.toString() + ')()'),
     markdown: async (options = {}) => {
       __noteRead(target);
@@ -387,6 +391,13 @@ function __extendPageData(target, base) {
           result.data = {partial: true, note: 'omitted to keep the read under ' + max + ' characters'};
           result.notes.push('list and data omitted to keep the read under ' + max + ' characters');
         }
+      }
+      var guard = await __call({guard: {kind: 'read', text: String(result.markdown || '').slice(0, 4000), count: result.list && result.list.items ? result.list.items.length : 0, shown: result.list && result.list.count != null ? result.list.count : (result.list && result.list.items ? result.list.items.length : undefined), total: result.list ? result.list.total : undefined}}).catch(function () { return null; });
+      if (guard && guard.contradiction) result.contradiction = guard.contradiction;
+      if (guard && guard.location) result.location = guard.location;
+      if (guard && guard.partial && result.list) {
+        result.list.partial = true;
+        if (guard.total != null) result.list.total = guard.total;
       }
       return result;
     },

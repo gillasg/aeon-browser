@@ -1,4 +1,5 @@
 export { PiSdkSessionAdapter } from "./session-adapter.js";
+export { buildFirstTurn, type AbilityMatch, type FirstTurnInput } from "./first-turn.js";
 export {
   buildAgentSurface,
   hashAgentSurface,

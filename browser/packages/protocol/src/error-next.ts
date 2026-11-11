@@ -112,6 +112,9 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   SITE_BROKEN: readState,
   NETWORK: readState,
   ABILITY_NEEDS: tabs,
+  TAB_BUDGET: tabs,
+  // Another request repeats the limit. The recovery is to report it, not to fetch again.
+  RATE_LIMITED: null,
   // An unexpected failure is a bug. Repeating the same call repeats it.
   INTERNAL: null,
 };
@@ -121,6 +124,7 @@ export const NO_NEXT_REASON: Partial<Record<ErrorCode, string>> = {
   SITE_BLOCKED: "the user blocked this site; another route would ignore that choice",
   UNSUPPORTED: "this browser cannot do that here, and no one read replaces it",
   CHROME_ERROR: "Chrome refused the step; repeating the same call repeats it",
+  RATE_LIMITED: "another request repeats the limit; the recovery is to report it to the user",
   INTERNAL: "an unexpected failure is a bug; repeating the same call repeats it",
 };
 

@@ -9,7 +9,7 @@ export function createClockTool(now: () => Date = () => new Date()): ReturnType<
     name: "current_time",
     label: "Current time",
     description:
-      "The user's current local date, weekday, time and time zone, from their computer's clock. You do not know today's date: call this before anything involving dates or relative times (today, tomorrow, this week, next Friday, latest, upcoming) instead of assuming or searching for the date.",
+      "The user's local date, weekday, time and time zone. The first turn and each cell footer already include them; call this only when a later turn needs a fresh clock.",
     parameters: Type.Object({}, { additionalProperties: false }),
     execute: () => {
       const date = now();

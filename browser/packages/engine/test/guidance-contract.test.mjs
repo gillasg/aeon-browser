@@ -1,7 +1,7 @@
 // Every runtime call the agent text names must exist in the runtime: guidance can never promise
 // a method the engine does not have (the drift that sent agents to calls that throw).
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -35,7 +35,16 @@ function agentText() {
     ...readdirSync(parts).map((name) => read(join(parts, name))),
     read(join(repo, "packages", "pi-adapter", "guidance-extra.md")),
     read(join(engine, "src", "code-api-help.ts")),
+    packText(),
   ].join("\n");
+}
+
+function packText() {
+  const packs = join(browserRoot, "docs", "agent", "packs");
+  if (!existsSync(packs)) return "";
+  return readdirSync(packs)
+    .map((name) => read(join(packs, name)))
+    .join("\n");
 }
 
 // Names the text uses for something other than a runtime method (a result field, an option,
@@ -114,6 +123,7 @@ test("every call the skill teaches reaches Aeon's own agent (guidance or help)",
     read(join(docs, "guidance.md")),
     read(join(repo, "packages", "pi-adapter", "guidance-extra.md")),
     read(join(engine, "src", "code-api-help.ts")),
+    packText(),
   ].join("\n");
   const missing = [...namedCalls(skill).keys()].filter((call) => !own.includes(call));
   assert.deepEqual(missing, [], `the skill teaches calls Aeon's agent never hears of: ${missing}`);

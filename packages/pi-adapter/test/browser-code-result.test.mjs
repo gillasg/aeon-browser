@@ -79,10 +79,11 @@ test("the model gets one line per step and the cell output, not the raw envelope
     ],
   });
   const text = result.content[0].text;
-  assert.equal(
-    text,
-    "steps:\n- openTab https://a.test/ -> tab 41\n- click tab 41 648 FAILED TARGET_HIDDEN\noutput:\nShop page",
-  );
+  assert.match(text, /\[did\] openTab https:\/\/a\.test\/ -> tab 41/);
+  assert.match(text, /\[did\] click tab 41 648 FAILED TARGET_HIDDEN/);
+  assert.match(text, /\[warn\] TARGET_HIDDEN/);
+  assert.match(text, /output:\nShop page/);
+  assert.match(text, /\[now\]/);
   assert.doesNotMatch(text, /tabIncarnation|operationId/);
   assert.deepEqual(result.content[1], { type: "image", data: "AQID", mimeType: "image/png" });
 });
@@ -120,7 +121,7 @@ test("a non-confirmed effect shows the model its next call", async () => {
       },
     ],
   });
-  assert.match(result.content[0].text, /Next: await bu\.state\(\{query: "Save"\}\)/);
+  assert.match(result.content[0].text, /\[next\] await bu\.state\(\{query: "Save"\}\)/);
 });
 
 test("an engine error shows the model its next call", async () => {
