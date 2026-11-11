@@ -119,6 +119,38 @@ export async function dismissPasswordUi(debuggee: chrome.debugger.Debuggee): Pro
   ).catch(() => undefined);
 }
 
+const FOCUS_FILLED_PASSWORD = `(() => {
+  const active = document.activeElement;
+  const role = active && active.getAttribute ? active.getAttribute("role") || "" : "";
+  const editable = active && (
+    active.isContentEditable ||
+    active.tagName === "INPUT" || active.tagName === "TEXTAREA" ||
+    active.tagName === "SELECT" || active.tagName === "BUTTON" ||
+    /^(button|textbox|searchbox|combobox)$/.test(role)
+  );
+  if (editable) return false;
+  const field = [...document.querySelectorAll("input[type=password]")].find((el) => el.value);
+  if (!field) return false;
+  field.focus();
+  return true;
+})()`;
+
+/**
+ * A password fill blurs the field so Chrome's bubble cannot cover the next click. That also
+ * takes focus off the field, and Enter on the page then submits nothing. Put focus back when
+ * nothing else is focused, then the caller's Enter key submits the form. The official-form
+ * guard still stops an Enter pressed on the field itself; this does not send a key.
+ */
+export async function focusFilledPassword(debuggee: chrome.debugger.Debuggee): Promise<void> {
+  if (debuggee.tabId === undefined || !vaultCandidate(debuggee.tabId)) return;
+  await send(
+    debuggee,
+    "Runtime.evaluate",
+    { expression: FOCUS_FILLED_PASSWORD, silent: true },
+    { label: "focusFilledPassword", ms: 1_000 },
+  ).catch(() => undefined);
+}
+
 function vaultFieldInfo(this: HTMLInputElement): VaultForm | null {
   if (this.type !== "password") return null;
   const form = this.form || this.closest("form");

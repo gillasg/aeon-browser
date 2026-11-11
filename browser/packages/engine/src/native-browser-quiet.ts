@@ -73,12 +73,9 @@ const ALL_TYPES = [
   "other",
 ] as chrome.declarativeNetRequest.ResourceType[];
 
-const QUIET_SCRIPT = `(() => {
-  ${nativeSourcePreamble}
-  const realOpen = window.open;
-  const open = function () { return null; };
-  __keepNative(open, realOpen);
-  window.open = open;
+// Hooks play() and mutes what is already in the document. A one-shot sweep is not enough: it runs
+// on the blank tab, then the real page calls play() after navigation.
+const MEDIA_BODY = `
   const realPlay = HTMLMediaElement.prototype.play;
   const play = function () {
     try { this.autoplay = false; this.muted = true; this.pause(); } catch {}
@@ -98,6 +95,20 @@ const QUIET_SCRIPT = `(() => {
   if (document.documentElement) watch();
   else document.addEventListener('DOMContentLoaded', watch, { once: true });
   quiet();
+`;
+
+const MEDIA_SCRIPT = `(() => {
+  ${nativeSourcePreamble}
+  ${MEDIA_BODY}
+})();`;
+
+const QUIET_SCRIPT = `(() => {
+  ${nativeSourcePreamble}
+  const realOpen = window.open;
+  const open = function () { return null; };
+  __keepNative(open, realOpen);
+  window.open = open;
+  ${MEDIA_BODY}
 })();`;
 
 const QUIET_SWEEP = `(() => {
@@ -106,7 +117,7 @@ const QUIET_SWEEP = `(() => {
   }
 })()`;
 
-/** Quiet mutes media. Ad-host blocking and the document-start script are off unless `ads` (explore, crawl). */
+/** Quiet mutes media on this document and the next one. Ad-host blocking and the window.open hook stay off unless `ads` (explore, crawl). */
 export async function enableQuietTab(
   tabId: number,
   options: { ads?: boolean } = {},
@@ -160,22 +171,26 @@ async function addRules(tabId: number): Promise<void> {
     .catch(() => undefined);
 }
 
+function documentScript(tabId: number): string {
+  return adsOn.has(tabId) ? QUIET_SCRIPT : MEDIA_SCRIPT;
+}
+
 async function installQuietScript(tabId: number): Promise<void> {
   await send(
     { tabId },
     "Page.addScriptToEvaluateOnNewDocument",
-    { source: QUIET_SCRIPT },
+    { source: documentScript(tabId) },
     { label: "onQuietAttach" },
   ).catch(() => undefined);
 }
 
 function quietSource(tabId: number, loader: string | undefined): string {
-  if (!adsOn.has(tabId)) return QUIET_SWEEP;
-  return loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : QUIET_SCRIPT;
+  // Same document already ran the hook. A second eval would wrap play() again.
+  return loader && loaderIds.get(tabId) === loader ? QUIET_SWEEP : documentScript(tabId);
 }
 
 async function onQuietAttach(tabId: number): Promise<void> {
-  if (adsOn.has(tabId)) await installQuietScript(tabId);
+  await installQuietScript(tabId);
   const tree = (await send({ tabId }, "Page.getFrameTree", {}, { label: "onQuietAttach" }).catch(
     () => undefined,
   )) as { frameTree?: { frame?: { loaderId?: string } } } | undefined;

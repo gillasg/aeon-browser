@@ -48,7 +48,8 @@ globalThis.chrome = {
 const { resolveElement, clickAt } = await import("../dist/native-browser-debugger.js");
 const { humanType } = await import("../dist/native-browser-human-input.js");
 const { ensureBrowserAttachment } = await import("../dist/native-browser-session.js");
-const { rememberVaultCandidate } = await import("../dist/native-browser-vault.js");
+const { focusFilledPassword, forgetVaultCandidate, rememberVaultCandidate } =
+  await import("../dist/native-browser-vault.js");
 const { configureEngine } = await import("../dist/engine-config.js");
 
 configureEngine({
@@ -184,6 +185,29 @@ test("password UI is blurred when the fill is dismissed, and no key is sent", as
   calls.length = 0;
   const { dismissPasswordUi } = await import("../dist/native-browser-vault.js");
   await dismissPasswordUi({ tabId: 4 });
+  assert.ok(calls.includes("Runtime.evaluate"), calls.join(","));
+  assert.equal(calls.includes("Input.dispatchKeyEvent"), false, calls.join(","));
+});
+
+test("Enter focuses a filled password only when nothing else is focused", async () => {
+  calls.length = 0;
+  forgetVaultCandidate(9);
+  await focusFilledPassword({ tabId: 9 });
+  assert.equal(calls.includes("Runtime.evaluate"), false, calls.join(","));
+  rememberVaultCandidate(
+    9,
+    {
+      url: "https://example.test/signup",
+      site: "example.test",
+      hasPassword: true,
+      password: "hunter2",
+      username: "ada",
+      signup: true,
+    },
+    "agent",
+  );
+  calls.length = 0;
+  await focusFilledPassword({ tabId: 9 });
   assert.ok(calls.includes("Runtime.evaluate"), calls.join(","));
   assert.equal(calls.includes("Input.dispatchKeyEvent"), false, calls.join(","));
 });

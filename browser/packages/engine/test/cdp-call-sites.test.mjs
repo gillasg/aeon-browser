@@ -512,3 +512,40 @@ test("a planted script removal and a quiet attach name the call", async () => {
   assert.match(quietRow?.err ?? "", /did not answer/);
   await finish();
 });
+
+test("a quiet tab without ads still installs the media hook, and ads still blocks window.open", async () => {
+  installEngineListeners();
+  hang = () => false;
+  const plain = ++seq;
+  session.bindBrowserSession(plain, "chat");
+  await quiet.enableQuietTab(plain);
+  const before = calls.length;
+  await session.ensureBrowserAttachment(plain, "chat");
+  const media = calls
+    .slice(before)
+    .find((item) => item.method === "Page.addScriptToEvaluateOnNewDocument");
+  assert.ok(
+    media,
+    calls
+      .slice(before)
+      .map((item) => item.method)
+      .join(","),
+  );
+  assert.match(media.params.source, /HTMLMediaElement\.prototype\.play/);
+  assert.match(media.params.source, /this\.muted = true/);
+  assert.doesNotMatch(media.params.source, /window\.open/);
+  await session.releaseBrowserSessions("chat").catch(() => undefined);
+
+  const filtered = ++seq;
+  session.bindBrowserSession(filtered, "chat");
+  await quiet.enableQuietTab(filtered, { ads: true });
+  const adsBefore = calls.length;
+  await session.ensureBrowserAttachment(filtered, "chat");
+  const full = calls
+    .slice(adsBefore)
+    .find((item) => item.method === "Page.addScriptToEvaluateOnNewDocument");
+  assert.ok(full);
+  assert.match(full.params.source, /window\.open/);
+  assert.match(full.params.source, /HTMLMediaElement\.prototype\.play/);
+  await session.releaseBrowserSessions("chat").catch(() => undefined);
+});

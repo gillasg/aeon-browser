@@ -9,7 +9,7 @@ import {
 } from "./native-browser-receipts.js";
 import "./native-browser-download-reissue.js";
 import { labelForAction } from "./evidence/label.js";
-import { noteVaultFill } from "./native-browser-vault.js";
+import { focusFilledPassword, noteVaultFill } from "./native-browser-vault.js";
 import { withFocusEmulation } from "./native-browser-session.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
 import { toOffscreen } from "./code-offscreen-host.js";
@@ -298,6 +298,10 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     return { typed: key.length };
   }
   if (!windowsVirtualKeyCode) throw new Error("Unsupported key");
+  // The fill blurred the password field. Enter has to land in it again or the form never
+  // submits, so the site never takes the password and nothing is saved. A focused control
+  // is left alone. A locator Enter is still the official-form guard's to stop.
+  if (!modifiers && (key === "Enter" || key === "NumpadEnter")) await focusFilledPassword(debuggee);
   const params = { key: key === "Space" ? " " : key, modifiers, windowsVirtualKeyCode };
   // Enter and Space produce text, and Chrome submits a form only when the key event carries it;
   // a keyDown without text left the form unsubmitted (page.keyboard.press('Enter')).
