@@ -35,7 +35,7 @@ function Line({
   disabled,
 }: {
   line: AnswerLine;
-  onOffer?(offer: AnswerOffer): void;
+  onOffer: ((offer: AnswerOffer) => void) | undefined;
   disabled: boolean;
 }): ReactElement {
   if (line.kind !== "offer")
