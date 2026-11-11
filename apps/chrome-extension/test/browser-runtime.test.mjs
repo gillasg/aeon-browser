@@ -28,7 +28,8 @@ test(
       await fixture.setPage(
         `<select aria-label="Country"><option value="us">United States</option><option value="ca">Canada</option></select><input type="date" aria-label="Date"><button id="expand" aria-expanded="false">Expand</button><div id="late"></div><div style="opacity:0">Fake success</div>`,
       );
-      for (const [name, run] of cases) await t.test(name, () => run({ ...fixture, target }));
+      for (const [name, run, options] of cases)
+        await t.test(name, options ?? {}, () => run({ ...fixture, target }));
     } finally {
       await api.releaseBrowserSessions();
       await fixture.close();
@@ -180,9 +181,40 @@ const cases = [
   ],
   [
     "native JavaScript dialogs are accepted automatically and recorded",
-    async ({ evaluate }) => {
-      assert.equal(await evaluate("confirm('Proceed with fixture?')"), true);
-      assert.equal(await evaluate("prompt('Name','Aeon')"), "Aeon");
+    async ({ api, evaluate }) => {
+      // Confirm and prompt are accepted only after an agent act. Alert would pass either way.
+      api.noteDialogAct(1);
+      assert.equal(await answered(evaluate, "confirm('Proceed with fixture?')"), true);
+      api.noteDialogAct(1);
+      assert.equal(await answered(evaluate, "prompt('Name','Aeon')"), "Aeon");
+      const recorded = api
+        .readDiagnostics(1)
+        .console.map((row) => row.text)
+        .join("\n");
+      assert.match(recorded, /\[dialog confirm\] Proceed with fixture\? \(accepted\)/);
+      assert.match(recorded, /\[dialog prompt\] Name \(accepted\)/);
     },
+    { timeout: 20_000 },
   ],
 ];
+
+const DIALOG_WAIT_MS = 8_000;
+
+// Runtime.evaluate of a dialog does not return until Page.handleJavaScriptDialog. The file's
+// 900s timeout is the only other bound, and it names the file rather than this wait.
+function answered(evaluate, expression) {
+  let timer;
+  const blocked = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          expression +
+            " is still blocking this headless page after " +
+            DIALOG_WAIT_MS +
+            "ms. Page.javascriptDialogOpening was never answered with Page.handleJavaScriptDialog.",
+        ),
+      );
+    }, DIALOG_WAIT_MS);
+  });
+  return Promise.race([evaluate(expression), blocked]).finally(() => clearTimeout(timer));
+}

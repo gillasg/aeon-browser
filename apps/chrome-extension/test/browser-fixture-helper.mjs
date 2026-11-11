@@ -72,8 +72,16 @@ function installChromeShim(cdp, commands) {
   const event = { addListener() {}, removeListener() {} };
   const listeners = new Set();
   cdp.onEvent((method, params, sessionId) => {
-    for (const listener of listeners)
-      listener({ tabId: 1, ...(sessionId ? { sessionId } : {}) }, method, params);
+    const source = { tabId: 1, ...(sessionId ? { sessionId } : {}) };
+    // Chrome runs each listener on its own. One throw must not skip the dialog answer:
+    // an open confirm() never returns on a headless page.
+    for (const listener of listeners) {
+      try {
+        listener(source, method, params);
+      } catch {
+        /* The dialog handler still has to run. */
+      }
+    }
   });
   const send = async (_debuggee, command, args) => {
     commands.push(command);
@@ -120,6 +128,9 @@ async function buildLayer(folder) {
         )
         .concat(
           "export { installEngineListeners } from './apps/chrome-extension/node_modules/@browserkit/engine/src/native-engine-install.ts';",
+          // The service worker loads this through the executor. This bundle has to load it too,
+          // or confirm()/prompt() freeze the headless renderer until the file times out.
+          "export { noteDialogAct } from './apps/chrome-extension/node_modules/@browserkit/engine/src/evidence/dialogs.ts';",
         )
         .join("\n"),
       resolveDir: resolve("."),
