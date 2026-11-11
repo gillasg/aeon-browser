@@ -82,7 +82,7 @@ test(
       );
       assert.match(result.stdout, /ROWS 2 Blue lamp,Red kettle/);
     } finally {
-      chrome?.kill();
+      await stopChrome(chrome);
       bridge.kill();
       site.close();
       await rm(home, { recursive: true, force: true });
@@ -90,6 +90,18 @@ test(
     }
   },
 );
+
+/** Chrome keeps the profile locked until this process has exited. */
+async function stopChrome(chrome) {
+  if (!chrome || chrome.exitCode !== null || chrome.signalCode !== null) return;
+  const exited = new Promise((done) => chrome.once("exit", done));
+  try {
+    chrome.kill();
+  } catch {
+    return;
+  }
+  if (chrome.exitCode === null && chrome.signalCode === null) await exited;
+}
 
 async function connectExtension(profile, env) {
   const port = await waitFor(async () =>
