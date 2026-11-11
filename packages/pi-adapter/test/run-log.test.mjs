@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { finishRunLog, runLogName, startRunLog, tallyCell, writeRunLog } from "../dist/run-log.js";
-import { installBrowserSessionLifecycle } from "../dist/browser-session-lifecycle.js";
+import {
+  closeBrowserSessionLifecycle,
+  installBrowserSessionLifecycle,
+} from "../dist/browser-session-lifecycle.js";
 
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -63,24 +66,72 @@ test("a whole run writes runs/<time>.json through the session lifecycle", async 
     installBrowserSessionLifecycle(session, "chat-two", undefined, { workspace });
     listener({ type: "agent_start" });
     tallyCell("chat-two", { steps: steps(), files: [] });
-    await writeRunLog("chat-two", workspace);
     listener({ type: "agent_end" });
-    // The final write is asynchronous: wait for it (3 s still failed on a machine under load).
-    let file;
-    let log;
-    const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline && !log?.endedAt) {
-      await wait(50);
-      // A write in flight leaves its temp file beside the log; only the log itself counts.
-      [file] = (await readdir(join(workspace, "runs"))).filter((name) => name.endsWith(".json"));
-      log = file
-        ? JSON.parse(await readFile(join(workspace, "runs", file), "utf8").catch(() => "{}"))
-        : undefined;
-    }
+    await closeBrowserSessionLifecycle(session);
+    const [file] = (await readdir(join(workspace, "runs"))).filter((name) =>
+      name.endsWith(".json"),
+    );
+    const log = JSON.parse(await readFile(join(workspace, "runs", file), "utf8"));
     assert.match(file, /\.json$/);
     assert.deepEqual(log.hosts, ["other.example", "shop.example"]);
     assert.ok(log.endedAt);
   } finally {
+    await closeBrowserSessionLifecycle(session);
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("closing the session while a run-log write is pending writes nothing afterwards", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "aeon-runlog-close-"));
+  let releaseHold = () => undefined;
+  const holdRunLog = new Promise((done) => {
+    releaseHold = () => {
+      releaseHold = () => undefined;
+      done();
+    };
+  });
+  let deliver = () => undefined;
+  const session = {
+    subscribe(fn) {
+      deliver = fn;
+      return () => undefined;
+    },
+  };
+  installBrowserSessionLifecycle(session, "chat-close", undefined, { workspace, holdRunLog });
+  try {
+    deliver({ type: "agent_start" });
+    deliver({ type: "agent_end" });
+    await wait(20);
+    assert.deepEqual(await runFiles(workspace), []);
+
+    let settled = false;
+    const closing = closeBrowserSessionLifecycle(session).then(() => {
+      settled = true;
+    });
+    await wait(30);
+    assert.equal(settled, false, "close waits while the run-log write is still pending");
+    assert.deepEqual(await runFiles(workspace), []);
+
+    releaseHold();
+    await closing;
+    const atClose = await runFiles(workspace);
+    assert.equal(atClose.filter((name) => name.endsWith(".json")).length, 1);
+
+    deliver({ type: "agent_start" });
+    deliver({ type: "agent_end" });
+    await wait(40);
+    assert.deepEqual(await runFiles(workspace), atClose);
+  } finally {
+    releaseHold();
+    await closeBrowserSessionLifecycle(session);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+async function runFiles(workspace) {
+  const names = await readdir(join(workspace, "runs")).catch((error) => {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  });
+  return names.sort();
+}
