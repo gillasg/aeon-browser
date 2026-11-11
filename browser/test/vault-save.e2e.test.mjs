@@ -438,8 +438,7 @@ async function handoffEvidence({ port, target, page, cdp }) {
     );
   const pages = [];
   for (const item of targets.filter((entry) => entry.type === "page")) {
-    const connection =
-      item.id === page.id ? cdp : await connect(item.webSocketDebuggerUrl).catch(() => undefined);
+    const connection = item.id === page.id ? cdp : connect(item.webSocketDebuggerUrl);
     if (!connection) continue;
     const found = await probePage(connection);
     pages.push({ id: item.id, url: item.url, title: item.title, probe: found });
