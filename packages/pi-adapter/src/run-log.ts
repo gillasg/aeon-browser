@@ -44,6 +44,14 @@ export interface CellTally {
 const MAX_HOSTS = 60;
 const MAX_ACTIONS = 300;
 const runs = new Map<string, RunLogTotals>();
+/** Chats whose session has closed: a new write is refused until the next run starts. */
+const sealed = new Set<string>();
+const pendingWrites = new Map<string, Set<Promise<void>>>();
+
+/** The next run of a chat that has been closed may write again. */
+export function unsealRunLog(chatId: string): void {
+  sealed.delete(chatId);
+}
 
 /** The log a run is keeping, started on the run's first cell. */
 export function startRunLog(chatId: string, now = Date.now()): RunLogTotals {
@@ -73,12 +81,25 @@ export function tallyCell(chatId: string, cell: CellTally, at = Date.now()): str
   return runLogName(totals.startedAt);
 }
 
+/** A closed chat writes no further run log. Writes already started still finish. */
+export function sealRunLog(chatId: string): void {
+  sealed.add(chatId);
+}
+
+/** Resolves when this chat's run-log writes have reached disk. */
+export async function settleRunLogs(chatId: string): Promise<void> {
+  const pending = pendingWrites.get(chatId);
+  if (!pending?.size) return;
+  await Promise.all([...pending]);
+}
+
 /** Writes the log to the workspace; called as the run ends and after each cell that changed it. */
 export async function writeRunLog(
   chatId: string,
   workspace: string | undefined,
   input: { ended?: boolean; error?: boolean } = {},
 ): Promise<string | undefined> {
+  if (sealed.has(chatId)) return undefined;
   const totals = runs.get(chatId);
   if (!totals || !workspace) return undefined;
   const name = runLogName(totals.startedAt);
@@ -92,6 +113,27 @@ export async function writeRunLog(
     jobs: [...totals.jobs],
     actions: totals.actions,
   };
+  const io = persistRunLog(workspace, name, body);
+  trackWrite(chatId, io);
+  await io;
+  return name;
+}
+
+function trackWrite(chatId: string, work: Promise<void>): void {
+  const bucket = pendingWrites.get(chatId) ?? new Set<Promise<void>>();
+  pendingWrites.set(chatId, bucket);
+  const done = work.then(
+    () => undefined,
+    () => undefined,
+  );
+  bucket.add(done);
+  void done.finally(() => {
+    bucket.delete(done);
+    if (bucket.size === 0) pendingWrites.delete(chatId);
+  });
+}
+
+async function persistRunLog(workspace: string, name: string, body: unknown): Promise<void> {
   await mkdir(join(workspace, "runs"), { recursive: true });
   // checkpoint is an atomic overwrite: the log is rewritten as the run goes on.
   await workspaceCall(workspace, {
@@ -99,7 +141,6 @@ export async function writeRunLog(
     name,
     value: body,
   } as never);
-  return name;
 }
 
 /** The run is over: write the final log and forget it. */

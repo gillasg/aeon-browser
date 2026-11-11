@@ -28,6 +28,7 @@ import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { projectMessage } from "./pi-message-projection.js";
 import { projectChangeDiff } from "./pi-change-diff.js";
 import { toEntryProjection } from "./session-entry-projection.js";
+import { closeBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
 type AgentMessageFromEvent = Extract<AgentSessionEvent, { type: "message_start" }>["message"];
 export function wrapPiSession(
   session: AgentSession,
@@ -343,6 +344,8 @@ function createCloseSession(
     routineSupport.close();
     closing = (async () => {
       try {
+        // Finish workspace/runs writes before dispose, and refuse any that a shutdown event starts.
+        await closeBrowserSessionLifecycle(session);
         await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
       } finally {
         try {
