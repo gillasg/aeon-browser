@@ -21,9 +21,10 @@ permissions:
 jobs:
   session:
     runs-on: macos-latest
-    timeout-minutes: ${{ fromJSON(inputs['timeout-minutes']) > 180 && 180 || fromJSON(inputs['timeout-minutes']) < 1 && 1 || fromJSON(inputs['timeout-minutes']) }}
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && (fromJSON(inputs['timeout-minutes']) > 180 && 180 || fromJSON(inputs['timeout-minutes']) < 1 && 1 || fromJSON(inputs['timeout-minutes'])) || 15 }}
     steps:
       - name: Check timeout
+        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           requested="${{ inputs['timeout-minutes'] }}"
