@@ -7,9 +7,10 @@ import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import WebSocket from "ws";
 import { fakeVault, NEW, SAVED, vaultRoutes } from "./vault-site.mjs";
@@ -21,6 +22,62 @@ const extension = resolve("apps/extension/build");
 const cli = resolve("apps/bridge/dist/cli.js");
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const execRun = promisify(execFile);
+// Only a failing run writes here; CI uploads the folder when the job fails.
+const outputDir = fileURLToPath(new URL("../test-output/", import.meta.url));
+const workerLogs = [];
+let workerCdp;
+
+// What a page says about the hand-off and the cursor, read from its own main world.
+const PROBE = `(() => {
+  const state = globalThis[Symbol.for("aeon.handoff")];
+  const cursor = document.getElementById("aeon-agent-cursor");
+  return {
+    url: location.href,
+    title: document.title,
+    readyState: document.readyState,
+    handoff:
+      state === undefined
+        ? null
+        : typeof state === "object"
+          ? JSON.parse(JSON.stringify(state))
+          : String(state),
+    cursor: Boolean(cursor),
+    cursorText: cursor ? String(cursor.innerText ?? "").slice(0, 300) : "",
+    passwordFields: document.querySelectorAll("input[type=password]").length,
+  };
+})()`;
+
+// What the worker knows: every tab and window, which targets hold a debugger, and the engine's
+// own rolling log, which says how far a hand-off or a vault save got.
+const WORKER_STATE = `(async () => {
+  const tabs = await chrome.tabs.query({});
+  const windows = await chrome.windows.getAll({});
+  const debuggerTargets = await chrome.debugger.getTargets().catch(() => []);
+  return {
+    tabs: tabs.map((tab) => ({
+      id: tab.id,
+      windowId: tab.windowId,
+      active: tab.active,
+      status: tab.status,
+      url: tab.url,
+      title: tab.title,
+    })),
+    windows: windows.map((window) => ({
+      id: window.id,
+      focused: window.focused,
+      state: window.state,
+      type: window.type,
+    })),
+    debuggerTargets: debuggerTargets.map((target) => ({
+      id: target.id,
+      tabId: target.tabId,
+      attached: target.attached,
+      type: target.type,
+      url: target.url,
+    })),
+    engineLog: typeof globalThis.__aeonEngineDebug === "function" ? globalThis.__aeonEngineDebug() : [],
+  };
+})()`;
 
 const run = async (...args) => {
   try {
@@ -262,8 +319,11 @@ test(
       await sub("a locked manager offers the unlock hand-off, and Done saves it", async () => {
         await vault.reset();
         await vault.lock();
+        // An earlier instant-success tab can still be open (CI's slower run keeps it just under
+        // the idle-tab cleanup); only the tab this cell opens carries the new hand-off.
+        const before = await handoffTargets(profile, url("/vault/instant"));
         const pending = cell(fillAndSubmit(url("/vault/instant")), "vault-locked");
-        await answerHandoff(profile, url("/vault/instant"), () => vault.unlock());
+        await answerHandoff(profile, url("/vault/instant"), () => vault.unlock(), before);
         const { stdout } = await pending;
         assert.match(stdout, /unlocked it and the login was saved/, stdout);
         await waitFor(async () => {
@@ -322,30 +382,159 @@ async function waitFor(check, timeout = 15_000) {
   throw last ?? new Error("timed out");
 }
 
+/** The page targets already showing `target`, so the hand-off watcher only takes a new one. */
+async function handoffTargets(profile, target) {
+  const port = await waitFor(async () =>
+    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
+  );
+  const tabs = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) =>
+    response.json(),
+  );
+  return new Set(
+    tabs.filter((tab) => tab.type === "page" && tab.url === target).map((tab) => tab.id),
+  );
+}
+
 // Answers the hand-off the way the cursor's Done does, from the page itself. `beforeDone` runs
 // after the card is up and before Done, like a person unlocking their password manager first.
-async function answerHandoff(profile, target, beforeDone) {
+async function answerHandoff(profile, target, beforeDone, known = new Set()) {
   const port = await waitFor(async () =>
     Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
   );
   const page = await waitFor(async () => {
     const tabs = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
-    const found = tabs.find((tab) => tab.type === "page" && tab.url === target);
+    const found = tabs.find(
+      (tab) => tab.type === "page" && tab.url === target && !known.has(tab.id),
+    );
     if (!found) throw new Error("no fixture tab yet");
     return found;
   });
   const cdp = await connect(page.webSocketDebuggerUrl);
-  await waitFor(async () => {
-    const waiting = await cdp("Runtime.evaluate", {
-      expression: "globalThis[Symbol.for('aeon.handoff')] === 'waiting'",
-      returnByValue: true,
-    });
-    if (waiting.result?.result?.value !== true) throw new Error("hand-off not shown yet");
-  }, 20_000);
+  try {
+    await waitFor(async () => {
+      const waiting = await cdpCall(cdp, "Runtime.evaluate", {
+        expression: "globalThis[Symbol.for('aeon.handoff')] === 'waiting'",
+        returnByValue: true,
+      });
+      if (waiting.result?.result?.value !== true) throw new Error("hand-off not shown yet");
+    }, 20_000);
+  } catch (error) {
+    const evidence = await handoffEvidence({ port, target, page, cdp }).catch((failure) => ({
+      failure: String(failure?.stack ?? failure),
+    }));
+    const summary = describeHandoffEvidence(evidence);
+    console.error("HANDOFF FAILURE EVIDENCE\n" + summary);
+    error.message = `${error.message}\n${summary}`;
+    throw error;
+  }
   await beforeDone?.();
   await cdp("Runtime.evaluate", {
     expression: "globalThis[Symbol.for('aeon.handoff')] = 'done'",
   });
+}
+
+/** Everything a stalled hand-off should show: the watched page, every other page, the worker. */
+async function handoffEvidence({ port, target, page, cdp }) {
+  await mkdir(outputDir, { recursive: true });
+  const targets = await fetch(`http://127.0.0.1:${port}/json/list`)
+    .then((response) => response.json())
+    .catch(() => []);
+  const targetsPath = join(outputDir, "handoff-targets.json");
+  await writeFile(targetsPath, JSON.stringify(targets, null, 2));
+  const watched = {
+    id: page.id,
+    url: page.url,
+    probe: await probePage(cdp),
+  };
+  const screenshot = await cdpCall(cdp, "Page.captureScreenshot", { format: "png" }).catch(
+    () => undefined,
+  );
+  if (screenshot?.result?.data)
+    await writeFile(
+      join(outputDir, `handoff-watched-${page.id}.png`),
+      Buffer.from(screenshot.result.data, "base64"),
+    );
+  const pages = [];
+  for (const item of targets.filter((entry) => entry.type === "page")) {
+    const connection = item.id === page.id ? cdp : connect(item.webSocketDebuggerUrl);
+    if (!connection) continue;
+    const found = await probePage(connection);
+    pages.push({ id: item.id, url: item.url, title: item.title, probe: found });
+    if (item.id !== page.id) {
+      const shot = await cdpCall(connection, "Page.captureScreenshot", { format: "png" }).catch(
+        () => undefined,
+      );
+      if (shot?.result?.data)
+        await writeFile(
+          join(outputDir, `handoff-page-${item.id}.png`),
+          Buffer.from(shot.result.data, "base64"),
+        );
+    }
+  }
+  const worker = workerCdp
+    ? await cdpCall(
+        workerCdp,
+        "Runtime.evaluate",
+        { expression: WORKER_STATE, awaitPromise: true, returnByValue: true },
+        10_000,
+      ).catch((failure) => ({ error: { message: String(failure?.message ?? failure) } }))
+    : { error: { message: "no worker connection" } };
+  const evidence = {
+    at: new Date().toISOString(),
+    target,
+    watched,
+    pages,
+    worker,
+    workerConsole: workerLogs,
+  };
+  await writeFile(join(outputDir, "handoff-diagnostics.json"), JSON.stringify(evidence, null, 2));
+  return evidence;
+}
+
+function describeHandoffEvidence(evidence) {
+  if (evidence.failure) return `diagnostics failed: ${evidence.failure}`;
+  const state = evidence.worker?.result?.result?.value ?? evidence.worker?.error ?? {};
+  const lines = [
+    `wanted ${evidence.target}`,
+    `watched ${evidence.watched.id} hand-off=${JSON.stringify(evidence.watched.probe?.handoff)} cursor=${evidence.watched.probe?.cursor}`,
+    `pages ${evidence.pages
+      .map(
+        (page) =>
+          `${page.id} ${page.url} hand-off=${JSON.stringify(page.probe?.handoff)} cursor=${page.probe?.cursor}`,
+      )
+      .join(" | ")}`,
+    `tabs ${(state.tabs ?? []).map((tab) => `${tab.id}:${tab.url}`).join(" | ")}`,
+    `debugger ${(state.debuggerTargets ?? [])
+      .map((target) => `${target.tabId ?? target.id}:${target.attached}`)
+      .join(" | ")}`,
+    `windows ${(state.windows ?? [])
+      .map((window) => `${window.id}:${window.focused ? "focused" : "not-focused"}`)
+      .join(" | ")}`,
+    "engine log:",
+    ...(state.engineLog ?? []).slice(-80).map((entry) => {
+      const data = entry.data === undefined ? "" : ` ${JSON.stringify(entry.data)}`;
+      return `  ${entry.at} ${entry.scope}/${entry.message}${data}`;
+    }),
+    "worker console:",
+    ...evidence.workerConsole.slice(-40).map((entry) => `  ${entry.level ?? ""} ${entry.text}`),
+  ];
+  return lines.join("\n");
+}
+
+async function probePage(cdp) {
+  const result = await cdpCall(cdp, "Runtime.evaluate", {
+    expression: PROBE,
+    returnByValue: true,
+  }).catch((failure) => ({ error: { message: String(failure?.message ?? failure) } }));
+  return result?.result?.result?.value ?? result?.error ?? { probe: "failed" };
+}
+
+/** A diagnostic call never holds the failure report hostage to a wedged target. */
+function cdpCall(cdp, method, params = {}, ms = 5_000) {
+  return Promise.race([
+    cdp(method, params),
+    sleep(ms).then(() => ({ error: { message: `${method} timed out after ${ms} ms` } })),
+  ]);
 }
 
 // Chrome only finds native hosts registered for the real browser, so the test answers the
@@ -361,7 +550,10 @@ async function connectExtension(profile, env) {
     return found;
   });
   const reply = await nativeBootstrap(env);
-  const cdp = await connect(worker.webSocketDebuggerUrl);
+  const cdp = await connect(worker.webSocketDebuggerUrl, rememberWorkerEvent);
+  workerCdp = cdp;
+  await cdp("Runtime.enable").catch(() => undefined);
+  await cdp("Log.enable").catch(() => undefined);
   await waitFor(async () => {
     const ready = await cdp("Runtime.evaluate", {
       expression: "typeof chrome?.runtime?.id",
@@ -410,12 +602,46 @@ function nativeBootstrap(env) {
   });
 }
 
-function connect(url) {
+function rememberWorkerEvent(message) {
+  if (message.method === "Runtime.consoleAPICalled") {
+    const text = (message.params?.args ?? [])
+      .map((arg) => String(arg.value ?? arg.description ?? ""))
+      .join(" ");
+    workerLogs.push({
+      at: Date.now(),
+      kind: "console",
+      level: message.params?.type,
+      text: text.slice(0, 2000),
+    });
+  } else if (message.method === "Runtime.exceptionThrown") {
+    const details = message.params?.exceptionDetails;
+    workerLogs.push({
+      at: Date.now(),
+      kind: "exception",
+      text: String(details?.exception?.description ?? details?.text ?? "").slice(0, 2000),
+    });
+  } else if (message.method === "Log.entryAdded") {
+    const entry = message.params?.entry;
+    workerLogs.push({
+      at: Date.now(),
+      kind: "log",
+      level: entry?.level,
+      text: String(entry?.text ?? "").slice(0, 2000),
+    });
+  }
+  if (workerLogs.length > 500) workerLogs.shift();
+}
+
+function connect(url, onEvent) {
   const socket = new WebSocket(url);
   let id = 0;
   const waiting = new Map();
   socket.on("message", (raw) => {
     const message = JSON.parse(String(raw));
+    if (message.id === undefined) {
+      onEvent?.(message);
+      return;
+    }
     waiting.get(message.id)?.(message);
     waiting.delete(message.id);
   });
