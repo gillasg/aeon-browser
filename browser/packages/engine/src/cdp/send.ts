@@ -266,6 +266,15 @@ function armStuck(tabId: number, work: Promise<unknown>, record: CallRecord, met
   });
 }
 
+/**
+ * A timed-out call keeps the tab single-flight until Chrome answers it. A hand-off has to publish
+ * its waiting flag anyway: the next send is attempted, and a late answer still clears only its own
+ * entry.
+ */
+export function releaseStuck(tabId: number): void {
+  stuck.delete(tabId);
+}
+
 function rejectStuck(tabId: number, method: string, label?: string): Promise<never> {
   const error = new Error("TAB_UNRESPONSIVE: the tab has not answered an earlier call yet");
   remember({

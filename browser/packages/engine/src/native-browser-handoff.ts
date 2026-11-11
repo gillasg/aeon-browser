@@ -1,4 +1,4 @@
-import { send } from "./cdp/send.js";
+import { releaseStuck, send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { withLock } from "./native-browser-scheduler.js";
 import { guardAgentTab } from "./native-browser-tab-cleanup.js";
@@ -26,15 +26,33 @@ const KEY = "Symbol.for('aeon.handoff')";
 /**
  * The hand-off's state in the page: Done or Cancel in the cursor's pill sets it, and so does an
  * answer typed into the pill instead ({answer}). "fresh" means a new document (the site
- * navigated), so the pill is shown again.
+ * navigated), so the pill is shown again. The same script runs as a page script (so a debugger
+ * that is stuck, or held by a test, still cannot hide the flag) and through the debugger.
  */
-const STATE = `(() => {
-  const state = globalThis[${KEY}];
-  if (state === "done" || state === "cancelled") return state;
-  if (state && typeof state === "object" && typeof state.answer === "string") return { answer: state.answer };
-  if (!state) { globalThis[${KEY}] = "waiting"; return "fresh"; }
-  return "waiting";
+export const handoffPageSource = `(() => {
+  const key = Symbol.for("aeon.handoff");
+  const state = globalThis[key];
+  let next;
+  if (state === "done" || state === "cancelled") next = state;
+  else if (state && typeof state === "object" && typeof state.answer === "string") next = { answer: state.answer };
+  else if (!state) { globalThis[key] = "waiting"; next = "fresh"; }
+  else next = "waiting";
+  try {
+    const parent = document.documentElement || document.head;
+    if (parent) {
+      let node = document.getElementById("aeon-handoff-state");
+      if (!node) {
+        node = document.createElement("meta");
+        node.id = "aeon-handoff-state";
+        parent.append(node);
+      }
+      node.setAttribute("content", typeof next === "string" ? next : JSON.stringify(next));
+    }
+  } catch (ignore) {}
+  return next;
 })()`;
+
+const STATE = handoffPageSource;
 
 // Answers given from the chat's hand-off card, keyed by tab; the next poll picks them up.
 const answers = new Map<number, "done" | "cancelled">();
@@ -46,7 +64,10 @@ onEngineInstall(() => {
   });
 });
 
-const CLEAR = `(() => { delete globalThis[${KEY}]; })()`;
+const CLEAR = `(() => {
+  delete globalThis[${KEY}];
+  document.getElementById("aeon-handoff-state")?.remove();
+})()`;
 
 // Done and Cancel live on the page. Reading them through the debugger misses the answer when that
 // tab's debugger call is stuck, or when another debugger (DevTools, a test) is attached: the poll
@@ -71,6 +92,65 @@ function handoffPageState(): unknown {
 
 function clearHandoffPageState(): void {
   delete (globalThis as Record<symbol, unknown>)[Symbol.for("aeon.handoff")];
+  document.getElementById("aeon-handoff-state")?.remove();
+}
+
+// A <script> runs in the page's own world, the one DevTools and the test read. executeScript's
+// MAIN world is not always that world, so a success there must not skip the page script or the
+// debugger write.
+function plantHandoffState(source: string): unknown {
+  const script = document.createElement("script");
+  script.textContent = source;
+  const parent = document.documentElement || document.head;
+  if (!parent) return undefined;
+  parent.append(script);
+  script.remove();
+  const raw = document.getElementById("aeon-handoff-state")?.getAttribute("content") ?? "";
+  if (raw === "done" || raw === "cancelled" || raw === "fresh" || raw === "waiting") return raw;
+  try {
+    const parsed = JSON.parse(raw) as { answer?: unknown };
+    if (parsed && typeof parsed.answer === "string") return { answer: parsed.answer };
+  } catch {
+    // The marker was not this hand-off's state.
+  }
+  return undefined;
+}
+
+async function plantedState(tabId: number): Promise<unknown> {
+  try {
+    const [injected] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: plantHandoffState,
+      args: [handoffPageSource],
+    });
+    const planted = injected?.result;
+    if (knownHandoffState(planted)) return planted;
+  } catch {
+    // Scripting can be blocked on this page. The debugger write still runs.
+  }
+  try {
+    const [injected] = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: "MAIN",
+      func: handoffPageState,
+    });
+    const planted = injected?.result;
+    if (knownHandoffState(planted)) return planted;
+  } catch {
+    // Same fallback.
+  }
+  return undefined;
+}
+
+function terminalHandoff(state: unknown): "done" | "cancelled" | { answer: string } | undefined {
+  if (state === "done" || state === "cancelled") return state;
+  if (
+    state &&
+    typeof state === "object" &&
+    typeof (state as { answer?: unknown }).answer === "string"
+  )
+    return { answer: (state as { answer: string }).answer };
+  return undefined;
 }
 
 function knownHandoffState(state: unknown): boolean {
@@ -84,18 +164,19 @@ function knownHandoffState(state: unknown): boolean {
 }
 
 async function pageHandoffState(tabId: number): Promise<unknown> {
-  try {
-    const [injected] = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: "MAIN",
-      func: handoffPageState,
-    });
-    const state = injected?.result;
-    if (knownHandoffState(state)) return state;
-  } catch {
-    // A page scripting cannot reach still answers through the debugger.
-  }
-  return evaluate(tabId, STATE);
+  const planted = await plantedState(tabId);
+  const answered = terminalHandoff(planted);
+  if (answered) return answered;
+  // A timed-out probe keeps the tab single-flight and the flag write is then refused without
+  // running. Drop that hold so this send actually publishes waiting.
+  releaseStuck(tabId);
+  const viaDebugger = await evaluate(tabId, STATE);
+  const debuggerAnswer = terminalHandoff(viaDebugger);
+  if (debuggerAnswer) return debuggerAnswer;
+  if (planted === "fresh" || viaDebugger === "fresh") return "fresh";
+  if (knownHandoffState(viaDebugger)) return viaDebugger;
+  if (knownHandoffState(planted)) return planted;
+  return "waiting";
 }
 
 // What the user typed into the cursor's ask instead of acting in the tab, kept for the hand-off's
@@ -143,12 +224,15 @@ export async function handOffToUser(
   typed.delete(tabId);
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
+  // Before the cursor's debugger call. Publishing waits on nothing that can stick.
+  if (!tabRecording(tabId)) await plantedState(tabId);
   showAgentNeeds(tabId, message, spotlight);
   try {
     while (active() && Date.now() < deadline) {
       if (!(await chrome.tabs.get(tabId).catch(() => undefined))) throw new Error("TARGET_LOST");
       const answered = answers.get(tabId);
       if (answered) return answered;
+      if (!tabRecording(tabId)) await plantedState(tabId);
       // A password the user types here is kept (never shown to the agent) so it can be saved.
       await noteUserLogin(tabId);
       const state = tabRecording(tabId) ? "waiting" : await pageHandoffState(tabId);

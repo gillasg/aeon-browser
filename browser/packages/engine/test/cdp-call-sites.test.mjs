@@ -2,6 +2,7 @@
 // record names the function. Eval passes the caller's 5s (or the caller's own timeout).
 import assert from "node:assert/strict";
 import test from "node:test";
+import vm from "node:vm";
 
 const pending = [];
 const calls = [];
@@ -419,6 +420,50 @@ test("hand-off's page read names the call and the poll still ends", async () => 
   assert.match(row?.err ?? "", /evaluate/);
   assert.match(row?.err ?? "", /did not answer/);
   await finish();
+});
+
+test("the hand-off page script publishes waiting on the page global", () => {
+  const source = handoff.handoffPageSource;
+  let marker = null;
+  const document = {
+    documentElement: {
+      append(node) {
+        marker = node;
+      },
+    },
+    head: null,
+    getElementById(id) {
+      return marker && marker.id === id ? marker : null;
+    },
+    createElement() {
+      const attrs = {};
+      const node = {
+        id: "",
+        setAttribute(name, value) {
+          attrs[name] = value;
+        },
+        getAttribute(name) {
+          return attrs[name];
+        },
+        remove() {
+          if (marker === node) marker = null;
+        },
+      };
+      return node;
+    },
+  };
+  const context = { Symbol, document };
+  context.globalThis = context;
+  vm.createContext(context);
+  const read = () => vm.runInContext("globalThis[Symbol.for('aeon.handoff')]", context);
+  assert.equal(vm.runInContext(source, context), "fresh");
+  // A vm context hides symbol properties from the outside object. Read them in the page realm.
+  assert.equal(read(), "waiting");
+  assert.equal(marker.getAttribute("content"), "fresh");
+  assert.equal(vm.runInContext(source, context), "waiting");
+  vm.runInContext("globalThis[Symbol.for('aeon.handoff')] = 'done'", context);
+  assert.equal(vm.runInContext(source, context), "done");
+  assert.equal(read(), "done");
 });
 
 test("a FedCM answer that never returns is swallowed and named", async () => {
