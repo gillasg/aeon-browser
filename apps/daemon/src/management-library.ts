@@ -9,6 +9,7 @@ import {
   readHealth,
   readSession,
   readSiteFacts,
+  type SiteNote,
 } from "@browserkit/site-mapper";
 import { listRuns, listWorkflows, readWorkflow } from "@browserkit/tools/workflow-store";
 
@@ -155,11 +156,7 @@ export interface SiteCard {
   sessionAccount: string | null;
   sessionSavedAt: string | null;
   abilities: AbilityCard[];
-  notes: {
-    kind: "selector" | "url" | "pace" | "quirk" | "page" | "control";
-    key: string;
-    value: string;
-  }[];
+  notes: SiteNote[];
   recording: boolean;
   suggestions: string[];
 }

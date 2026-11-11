@@ -11,7 +11,6 @@ import {
   toToolDeclaration,
 } from "@earendil-works/pi-ai/utils/transcript";
 import { AGENT_SURFACE_PAGE, buildAgentSurface, hashAgentSurface } from "../dist/agent-surface.js";
-import { browserContextPrompt } from "../dist/browser-context-message.js";
 import { createChatTools } from "../dist/chat-tools.js";
 import { captureFixtureModelRequest } from "../dist/fixture-model.js";
 import { PiSdkSessionAdapter } from "../dist/index.js";
@@ -38,8 +37,12 @@ test(
     assert.match(surface.hash, /^[a-f0-9]{64}$/);
     assert.equal(surface.systemPrompt, getCurrentSystemPrompt(captured.messages));
     assert.deepEqual(surface.tools, declaredTools(captured.messages));
-    assert.equal(surface.firstTurn, browserContextPrompt(AGENT_SURFACE_PAGE));
-    assert.ok(messageTexts(captured.messages).includes(surface.firstTurn));
+    assert.match(surface.firstTurn, /\[now\] Tue 10 Nov 2026 14:32 IST/);
+    assert.match(surface.firstTurn, /\[page\] example\.test · Page title/);
+    assert.match(surface.firstTurn, /\[saved\] none\n\[api\] none\n\[tabs\] none\n\nNew chat\.$/);
+    const context = surface.firstTurn.slice(0, surface.firstTurn.length - "\n\nNew chat.".length);
+    assert.ok(messageTexts(captured.messages).some((text) => text.includes(context)));
+    assert.ok(messageTexts(captured.messages).some((text) => text.includes("New chat.")));
     assert.match(surface.systemPrompt, /browser_code/);
     const names = new Set(surface.tools.map((tool) => tool.name));
     for (const tool of createChatTools(toolInput(paths)))
@@ -78,6 +81,10 @@ async function captureFirstRequest(paths) {
   const stop = captureFixtureModelRequest((context) => {
     first ??= context;
   });
+  const previousNow = process.env.AEON_SURFACE_NOW;
+  const previousZone = process.env.AEON_SURFACE_ZONE;
+  process.env.AEON_SURFACE_NOW = "2026-11-10T09:02:00.000Z";
+  process.env.AEON_SURFACE_ZONE = "Asia/Kolkata";
   const adapter = new PiSdkSessionAdapter({
     sessionDirectory: paths.sessionDirectory,
     agentDirectory: paths.agentDirectory,
@@ -97,6 +104,10 @@ async function captureFirstRequest(paths) {
   } finally {
     stop();
     await adapter.closeAll();
+    if (previousNow === undefined) delete process.env.AEON_SURFACE_NOW;
+    else process.env.AEON_SURFACE_NOW = previousNow;
+    if (previousZone === undefined) delete process.env.AEON_SURFACE_ZONE;
+    else process.env.AEON_SURFACE_ZONE = previousZone;
   }
   assert.ok(first, "the fixture model received the first request");
   return first;

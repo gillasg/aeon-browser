@@ -18,7 +18,7 @@ import {
   type RouteHit,
   type RunKnowledge,
 } from "@browserkit/site-mapper";
-import { draftBlock, fillRouteDraft } from "./route-draft.js";
+import { fillRouteDraft, type RouteDraft } from "./route-draft.js";
 import { declinesFor, previousDuration, rememberDuration } from "./route-memory.js";
 import {
   absorb,
@@ -68,8 +68,8 @@ export class RouteRecorder {
     private readonly settleMs = SETTLE_MS,
   ) {}
 
-  /** The user's words, plus a hidden `[draft]` block when a saved route matches. */
-  async prepare(chatId: string, prompt: string): Promise<{ text: string; draft?: string }> {
+  /** The user's words, plus a rung-1 draft when a saved route matches. */
+  async prepare(chatId: string, prompt: string): Promise<{ text: string; draft?: RouteDraft }> {
     await this.noteCorrection(chatId, prompt).catch(report);
     const draft = await this.draftFor(chatId, prompt).catch(() => undefined);
     this.prompted.set(chatId, {
@@ -141,10 +141,10 @@ export class RouteRecorder {
     return run;
   }
 
-  private async draftFor(chatId: string, prompt: string): Promise<string | undefined> {
+  private async draftFor(chatId: string, prompt: string): Promise<RouteDraft | undefined> {
     const hit = await bestRoute(prompt, this.lastSite.get(chatId));
     if (!hit) return undefined;
-    const draft = fillRouteDraft(
+    return fillRouteDraft(
       {
         site: hit.route.site,
         summary: hit.route.summary,
@@ -153,7 +153,6 @@ export class RouteRecorder {
       },
       1,
     );
-    return draft ? draftBlock(draft) : undefined;
   }
 
   private async finish(run: LiveRun): Promise<void> {
