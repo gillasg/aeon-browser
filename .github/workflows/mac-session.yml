@@ -333,6 +333,24 @@ jobs:
             sleep 1
           done
           nc -z 127.0.0.1 22
+          echo "authorized keys:"
+          ssh-keygen -lf "$HOME/.ssh/authorized_keys"
+          ls -ld "$HOME" "$HOME/.ssh" "$HOME/.ssh/authorized_keys"
+          sudo sshd -T | grep -E '^(authorizedkeysfile|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|strictmodes|authenticationmethods)' || true
+          # Prove key-only login works before publishing the tunnel: a key this job generates is
+          # added, tried over loopback and removed again. The secret key itself is never logged.
+          self_key="$RUNNER_TEMP/self-check-key"
+          rm -f "$self_key" "$self_key.pub"
+          ssh-keygen -q -t ed25519 -N '' -C aeon-self-check -f "$self_key"
+          cat "$self_key.pub" >> "$HOME/.ssh/authorized_keys"
+          if ! ssh -i "$self_key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no \
+               -o ConnectTimeout=10 "$(whoami)@127.0.0.1" 'echo SSH_LOCAL_OK'; then
+            echo "key-only SSH login to loopback failed; sshd said:"
+            sudo log show --last 2m --predicate 'process == "sshd"' --style compact 2>/dev/null | tail -20 || true
+            exit 1
+          fi
+          sed -i '' "\|$(cut -d' ' -f2 "$self_key.pub")|d" "$HOME/.ssh/authorized_keys"
+          rm -f "$self_key" "$self_key.pub"
           bore_dir="$RUNNER_TEMP/bore"
           mkdir -p "$bore_dir"
           curl -fsSL -o "$bore_dir/bore.tar.gz" \
