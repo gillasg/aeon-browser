@@ -53,8 +53,6 @@ jobs:
           chmod +x "$bin"
           xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
           echo "CHROME_PATH=$(pwd)/$bin" >> "$GITHUB_STEP_SUMMARY"
-      - name: Build Aeon
-        run: pnpm build
       - name: Grant screen capture and verify
         run: |
           set -euo pipefail
@@ -373,6 +371,8 @@ jobs:
             echo "SSH: ssh -p ${port} ${user}@${host}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "Building Aeon while the tunnel stays up."
+          pnpm build
           echo "Waiting until /tmp/stop or the job timeout."
           while [ ! -f /tmp/stop ]; do
             sleep 10
