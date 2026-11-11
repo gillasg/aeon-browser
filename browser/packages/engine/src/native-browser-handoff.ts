@@ -1,5 +1,6 @@
 import { send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
+import { engineDebug } from "./native-debug-log.js";
 import { withLock } from "./native-browser-scheduler.js";
 import { guardAgentTab } from "./native-browser-tab-cleanup.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
@@ -73,12 +74,16 @@ export async function handOffToUser(
 ): Promise<"done" | "cancelled"> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!tab) throw new Error("TARGET_LOST");
+  engineDebug("handoff", "start", { tab: tabId, window: tab.windowId });
   await withLock(`window:${tab.windowId}`, async () => {
     await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
     await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
   });
+  engineDebug("handoff", "focused", { tab: tabId });
   const notification = "aeon-handoff-" + tabId;
-  if (!(await userSees(tabId, tab.windowId)))
+  const seen = await userSees(tabId, tab.windowId);
+  engineDebug("handoff", "visibility", { tab: tabId, seen });
+  if (!seen)
     void chrome.notifications
       .create(notification, {
         type: "basic",
@@ -94,6 +99,8 @@ export async function handOffToUser(
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
   showAgentNeeds(tabId, message, spotlight);
+  engineDebug("handoff", "shown", { tab: tabId });
+  const startedAt = Date.now();
   try {
     while (active() && Date.now() < deadline) {
       if (!(await chrome.tabs.get(tabId).catch(() => undefined))) throw new Error("TARGET_LOST");
@@ -102,6 +109,7 @@ export async function handOffToUser(
       // A password the user types here is kept (never shown to the agent) so it can be saved.
       await noteUserLogin(tabId);
       const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, STATE);
+      engineDebug("handoff", "poll", { tab: tabId, state, ms: Date.now() - startedAt });
       if (state === "done" || state === "cancelled") return state;
       if (typeof (state as { answer?: unknown } | null)?.answer === "string") {
         typed.set(tabId, (state as { answer: string }).answer);
@@ -115,6 +123,7 @@ export async function handOffToUser(
     }
     return "cancelled";
   } finally {
+    engineDebug("handoff", "end", { tab: tabId, ms: Date.now() - startedAt });
     guardAgentTab(tabId, false);
     handoffActive(tabId, false);
     showAgentNeeds(tabId, null);
@@ -148,6 +157,12 @@ async function evaluate(tabId: number, expression: string): Promise<unknown> {
       { expression, returnByValue: true, silent: true },
       { label: "evaluate", ms: 5_000 },
     ),
-  ).catch(() => undefined);
+  ).catch((error: unknown) => {
+    engineDebug("handoff", "probe-failed", {
+      tab: tabId,
+      error: String(error).slice(0, 300),
+    });
+    return undefined;
+  });
   return (result as { result?: { value?: unknown } } | undefined)?.result?.value ?? "waiting";
 }

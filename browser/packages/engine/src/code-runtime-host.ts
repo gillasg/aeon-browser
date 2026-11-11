@@ -56,6 +56,7 @@ import {
   type SiteRules,
 } from "./native-browser-site-rules.js";
 import { handOffToUser, takeTypedAnswer } from "./native-browser-handoff.js";
+import { engineDebug } from "./native-debug-log.js";
 import { presentBrowserTask, presentsBrowserTask } from "./native-browser-layout.js";
 import { engineConfig } from "./engine-config.js";
 import { agentTabSummary, unusedAgentTabs } from "./native-browser-tab-cleanup.js";
@@ -466,6 +467,7 @@ async function vaultAfterSubmit(
   const outcome = await finishVaultCapture(target.tabId, (request) =>
     callCore(cell, request),
   ).catch(() => undefined);
+  engineDebug("vault", "after-submit-outcome", { tab: target.tabId, outcome });
   // Every outcome is said on the click itself, so the model never has to check a save.
   if (outcome === "saved") return addNote(result, VAULT_SAVED);
   if (outcome === "failed") return addNote(result, await askToUnlock(cell, target));
@@ -487,6 +489,7 @@ function addNote(result: unknown, note: string): void {
  */
 async function askToUnlock(cell: Cell, target: { tabId: number }): Promise<string> {
   const provider = failedSave(target.tabId);
+  engineDebug("vault", "ask-unlock", { tab: target.tabId, provider });
   if (!provider) return MANAGER_DID_NOT_SAVE;
   const asked = await handoff(cell, { target, message: unlockToSave(provider) }).catch(
     () => "cancelled",

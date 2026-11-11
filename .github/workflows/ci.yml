@@ -47,3 +47,11 @@ jobs:
         run: pnpm --dir browser run test:browser && pnpm test:browser
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe
+      - name: Keep browser test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-output
+          path: browser/test-output
+          if-no-files-found: ignore
+          retention-days: 7

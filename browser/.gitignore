@@ -3,6 +3,7 @@ node_modules/
 *.tsbuildinfo
 apps/extension/build/
 coverage/
+test-output/
 *.log
 .env
 
