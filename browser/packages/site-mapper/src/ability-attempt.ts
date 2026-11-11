@@ -2,6 +2,7 @@
 // or a script. The runner decides the order and what a failure means; this file only attempts.
 
 import { runNodeScript } from "./ability-node.js";
+import { matchControl, type FallbackTarget } from "./step-fallbacks.js";
 import type {
   Ability,
   AbilityApiStep,
@@ -86,12 +87,86 @@ async function attemptSteps(
   inputs: Record<string, unknown>,
   host: AbilityHost,
 ): Promise<unknown> {
+  if (host.act && host.controls && savedSteps(way).length) return replaySaved(way, inputs, host);
   if (!host.workflow) throw new Error("No workflow runtime is attached");
   return host.workflow({
     ...(way.name ? { name: way.name } : {}),
     ...(way.workflow ? { workflow: way.workflow } : {}),
     inputs: { ...inputs, ...(fill(way.params ?? {}, inputs) as Record<string, unknown>) },
   });
+}
+
+interface SavedStep {
+  kind: string;
+  target?: FallbackTarget;
+  args?: string[];
+  onPageType?: string;
+}
+
+function savedSteps(way: AbilityWaySteps): SavedStep[] {
+  if (!Array.isArray(way.steps)) return [];
+  return way.steps.filter(isSavedStep);
+}
+
+function isSavedStep(value: unknown): value is SavedStep {
+  return Boolean(
+    value && typeof value === "object" && typeof (value as { kind?: unknown }).kind === "string",
+  );
+}
+
+async function replaySaved(
+  way: AbilityWaySteps,
+  inputs: Record<string, unknown>,
+  host: AbilityHost,
+): Promise<unknown> {
+  const act = host.act;
+  if (!act || !host.controls) throw new Error("No step replay is attached");
+  let last: unknown;
+  for (const step of savedSteps(way)) {
+    const target = fillTarget(step.target, inputs);
+    await assertCurrent(step, target, host);
+    last = await act({
+      kind: step.kind,
+      ...(target ? { target } : {}),
+      args: fillArgs(step.args, inputs),
+    });
+  }
+  return last;
+}
+
+async function assertCurrent(
+  step: SavedStep,
+  target: FallbackTarget | undefined,
+  host: AbilityHost,
+): Promise<void> {
+  const page = step.onPageType && host.pageType ? await host.pageType() : undefined;
+  if (step.onPageType && page && page !== step.onPageType)
+    throw new Error(`page type ${page} is not ${step.onPageType}`);
+  if (!target || !host.controls) return;
+  if (!matchControl(target, await host.controls()))
+    throw new Error(`target did not resolve: ${target.role ?? ""} ${target.name ?? ""}`.trim());
+}
+
+function fillTarget(
+  target: FallbackTarget | undefined,
+  inputs: Record<string, unknown>,
+): FallbackTarget | undefined {
+  if (!target) return undefined;
+  return {
+    ...target,
+    ...(target.name ? { name: fillText(target.name, inputs) } : {}),
+    ...(target.text ? { text: fillText(target.text, inputs) } : {}),
+  };
+}
+
+function fillArgs(args: string[] | undefined, inputs: Record<string, unknown>): string[] {
+  return (args ?? []).map((arg) => fillText(arg, inputs));
+}
+
+function fillText(text: string, inputs: Record<string, unknown>): string {
+  return text.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (whole, name) =>
+    Object.prototype.hasOwnProperty.call(inputs, name) ? String(inputs[name]) : whole,
+  );
 }
 
 async function attemptPage(
