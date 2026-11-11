@@ -293,7 +293,12 @@ function humanCases() {
   });
   return [
     direct("humanType", "Input.insertText", (tabId) => human.humanType({ tabId }, "hi")),
-    direct("humanType", "Input.insertText", typing("a".repeat(121)).run, typing("a".repeat(121))),
+    direct(
+      "humanType",
+      "Input.dispatchKeyEvent",
+      typing("a".repeat(121)).run,
+      typing("a".repeat(121)),
+    ),
     direct("humanType", "Input.insertText", typing("é").run, typing("é")),
     direct("humanType", "Input.dispatchKeyEvent", typing("a").run, typing("a")),
     direct("humanType", "Input.dispatchKeyEvent", typing("a").run, {
