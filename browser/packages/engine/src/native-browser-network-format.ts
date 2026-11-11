@@ -84,7 +84,11 @@ const PHONE = /(?<![\w/.-])\+?\d[\d\s().-]{8,}\d(?![\w/.-])/g;
 const CARD = /\b(?:\d[ -]?){13,19}\b/g;
 
 /** Text patterns no HAR viewer needs: tokens, addresses, card and phone numbers. */
+const TEXT_CAP = 262_144;
+
 export function redactHarText(value: string): string {
+  if (value.length > TEXT_CAP)
+    return `[truncated ${value.length - TEXT_CAP} chars; redactHarText cap ${TEXT_CAP}]`;
   return value
     .replace(JWT, "<redacted>")
     .replace(EMAIL, "<redacted>")

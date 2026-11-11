@@ -19,8 +19,10 @@ export interface RecordOptions {
   bridge?: () => Promise<Bridge>;
   /** Bring the tab to the front so the user can use it. Default true. */
   foreground?: boolean;
-  /** No popunders, autoplay or ad hosts while recording (explore defaults to this). */
+  /** No popunders or autoplay while recording (explore defaults to this). */
   quiet?: boolean;
+  /** Block ad hosts and the document-start script. Explore sets this. */
+  ads?: boolean;
   session?: string;
   /** Block requests that would change something (they are recorded, not sent): map actions safely. */
   dryRun?: boolean;
@@ -102,7 +104,7 @@ await globalThis.__recTabs[0].network.start({ types: 'all'${options.dryRun ? ", 
     await bridge.run(
       // Tabs open on web pages only, so the first load happens before recording starts and
       // the page is loaded again once it has.
-      `globalThis.__recTabs = [await browser.openTab(${JSON.stringify(options.url)}, { foreground: ${foreground}, new: true${options.quiet ? ", quiet: true" : ""}, present: false })];
+      `globalThis.__recTabs = [await browser.openTab(${JSON.stringify(options.url)}, { foreground: ${foreground}, new: true${options.quiet ? ", quiet: true" : ""}${options.ads ? ", ads: true" : ""}, present: false })];
 await globalThis.__recTabs[0].network.start({ types: 'all'${options.dryRun ? ", dryRun: true" : ""} });
 await globalThis.__recTabs[0].navigate(${JSON.stringify(options.url)});
 'recording'`,

@@ -127,6 +127,11 @@ var siteMapper=Object.freeze({
   watch:(site,operation,params={},options={})=>__call({siteMapper:'watch', ...(__siteObject(site) || {site,operation,params,...options})}),
   action:(site,name,inputs={})=>__call({siteMapper:'action', ...(__siteObject(site) || {site,name,params:inputs})}),
   channel:(site,id,options={})=>__call({siteMapper:'channel', ...(__siteObject(site) || {site,name:id,params:options})}),
+  export:(site,operation,rows,params={})=>{
+    var one = __siteObject(site);
+    var body = one ? one : {site, operation, params:{...params, rows}};
+    return __call({siteMapper:'export', ...body}).then(result => { if (result && result.note) console.log(result.note); return result; });
+  },
 });
 // Site pack tools: callable helpers saved with the site. Node tools run through the host; page
 // tools run here in the page with the current document. Only the current host's tools resolve.
@@ -341,28 +346,31 @@ function __learnedLine(site, op) {
   if (op.varies && op.varies.length) text += '. Per item: ' + op.varies.join('; ');
   return text;
 }
-// One write over many items: paced (3 a second unless told), the first checked with
-// options.verify(result, item) when given, stopping at the first error or rate limit. What is
+// One write over many items. The host paces them: a burst of 5, then about one a second,
+// or the site's pace note, or options.perSecond for this batch only. The first item is
+// checked with options.verify(result, item) when given. A failure stops the batch. What is
 // left continues in the page, and that run repairs the operation.
 async function __writeBatch(site, operation, items, options = {}) {
   if (!Array.isArray(items)) throw Error('siteMapper.batch(site, operation, items): items is an array of params objects');
-  var gap = 1000 / Math.max(0.2, Math.min(10, Number(options.perSecond) || 3));
   var label = options.label || operation, results = [], stopped;
+  var pace = await __call({siteMapper:'pace', site, params:{calls: items.length, perSecond: options.perSecond}});
+  if (pace && pace.note) console.log(pace.note);
   bu.progress(0, items.length, label);
-  for (var index = 0; index < items.length; index++) {
-    var started = Date.now();
-    try {
-      var value = await siteMapper.write(site, operation, items[index]);
-      if (index === 0 && typeof options.verify === 'function' && !(await options.verify(value, items[0])))
-        throw Error('the first write did not do what the page does (verify returned false)');
-      results.push({ok: true});
-    } catch (error) {
-      stopped = {index, item: items[index], error: String(error && error.message || error).slice(0, 300)};
-      break;
+  try {
+    for (var index = 0; index < items.length; index++) {
+      try {
+        var value = await siteMapper.write(site, operation, items[index]);
+        if (index === 0 && typeof options.verify === 'function' && !(await options.verify(value, items[0])))
+          throw Error('the first write did not do what the page does (verify returned false)');
+        results.push({ok: true});
+      } catch (error) {
+        stopped = {index, item: items[index], error: String(error && error.message || error).slice(0, 300)};
+        break;
+      }
+      bu.progress(index + 1, items.length, label);
     }
-    bu.progress(index + 1, items.length, label);
-    var wait = gap - (Date.now() - started);
-    if (wait > 0 && index < items.length - 1) await new Promise(resolve => setTimeout(resolve, wait));
+  } finally {
+    await __call({siteMapper:'pace', site, params:{clear:true}});
   }
   var done = results.length, remaining = items.slice(done);
   console.log('[batch] ' + operation + ': ' + done + '/' + items.length + ' done' + (stopped ? '; stopped at item ' + (stopped.index + 1) + ': ' + stopped.error + '. Do the remaining ' + remaining.length + ' in the page; that repairs the operation.' : ''));

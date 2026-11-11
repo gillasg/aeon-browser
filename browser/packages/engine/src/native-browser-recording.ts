@@ -1,5 +1,6 @@
 import { toOffscreen } from "./code-offscreen-host.js";
 import { callClass, send } from "./cdp/send.js";
+import { setPointerGenerator } from "./native-browser-human-input.js";
 import { setTabRecording, showAgentGlow } from "./native-browser-cursor.js";
 import { beginManualScreencast, endManualScreencast } from "./native-browser-screencast.js";
 import { browserSessionOwner, withBrowserDebugger } from "./native-browser-session.js";
@@ -140,6 +141,7 @@ async function start(tabId: number, value: Record<string, unknown>): Promise<unk
     const result = captured.ok ? captured : await startScreencast(tabId, options, direct);
     if (!result.ok) throw new Error("RECORDING_FAILED: " + result.error);
     const mode = captured.ok ? "tab" : "screencast";
+    setPointerGenerator(true);
     recordings.set(tabId, {
       mode,
       audio: mode === "tab" && options.audio,
@@ -279,6 +281,7 @@ async function cancel(tabId: number): Promise<unknown> {
 async function finish(tabId: number): Promise<void> {
   const entry = recordings.get(tabId);
   recordings.delete(tabId);
+  if (entry) setPointerGenerator(false);
   saveRecordings();
   setTabRecording(tabId, undefined);
   if (entry?.mode === "screencast")

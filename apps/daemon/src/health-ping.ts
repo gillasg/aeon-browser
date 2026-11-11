@@ -17,6 +17,7 @@ export interface HealthReport {
   protocolVersion: ProtocolVersion;
   engineProtocol?: ProtocolVersion;
   ms: number;
+  cdpFailures?: { label: string; count: number }[];
 }
 
 interface HostResult {
@@ -81,9 +82,11 @@ function healthRequest(requestId: string, nonce: string): Record<string, unknown
 }
 
 function fromReply(message: HostResult, nonce: string, started: number): HealthReport {
-  const result = message.result as { nonce?: unknown; protocolVersion?: unknown } | undefined;
+  const result = message.result as
+    { nonce?: unknown; protocolVersion?: unknown; cdpFailures?: unknown } | undefined;
   const engineProtocol = versionOf(result?.protocolVersion);
   const engine = message.ok === true && result?.nonce === nonce && engineProtocol !== undefined;
+  const cdpFailures = failuresOf(result?.cdpFailures);
   return {
     ok: engine,
     daemon: true,
@@ -91,8 +94,20 @@ function fromReply(message: HostResult, nonce: string, started: number): HealthR
     engine,
     protocolVersion: SUPPORTED_PROTOCOL_VERSION,
     ...(engine && engineProtocol ? { engineProtocol } : {}),
+    ...(cdpFailures ? { cdpFailures } : {}),
     ms: elapsed(started),
   };
+}
+
+function failuresOf(value: unknown): { label: string; count: number }[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const rows = value.flatMap((item) => {
+    const row = item as { label?: unknown; count?: unknown };
+    return typeof row.label === "string" && typeof row.count === "number"
+      ? [{ label: row.label, count: row.count }]
+      : [];
+  });
+  return rows.length > 0 ? rows.slice(0, 50) : undefined;
 }
 
 function miss(started: number): HealthReport {

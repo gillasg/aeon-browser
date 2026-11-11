@@ -1,7 +1,7 @@
-// Two locks keep several sessions from stepping on each other: a FIFO per tab, so a session's own
-// steps stay in the order it issued them, and one browser-wide write lock, so only one session
-// changes a page (clicks, typing, navigation, uploads) at a time. Reads run in parallel across
-// tabs. Every wait is bounded; a stuck holder turns into BUSY_TIMEOUT instead of a hung agent.
+// Locks are scoped to what is shared. A tab's input and evaluation take `tab:<id>`. Activation,
+// split view and anything the user sees take `window:<id>`. The file chooser, the downloads
+// shelf, and paste (one clipboard document for the whole browser) take `browser`. CDP input is
+// per target and needs no OS focus. Every wait is bounded. A waiter that gives up does not run.
 
 import type { BrowserStep } from "@browserkit/protocol";
 import { browserStepWrites } from "@browserkit/protocol";
@@ -11,15 +11,33 @@ interface TabQueue {
   depth: number;
 }
 
-const queues = new Map<number, TabQueue>();
-const WRITE_WAIT_MS = 30_000;
+interface Gate {
+  tail: Promise<void>;
+  held: boolean;
+  waiting: number;
+}
 
-let writeTail: Promise<unknown> = Promise.resolve();
-let writing = false;
-let waitingWrites = 0;
+const queues = new Map<number, TabQueue>();
+const gates = new Map<string, Gate>();
+let writeWaitMs = 30_000;
+
+/** Tests shorten the 30s busy wait. Production leaves it alone. */
+export function setLockWaitMs(ms: number): void {
+  writeWaitMs = ms;
+}
 
 export function isWriteStep(step: BrowserStep): boolean {
   return browserStepWrites(step);
+}
+
+/** The lock a step needs, or undefined when it only reads. */
+export function lockScope(step: BrowserStep, tabId: number, windowId?: number): string | undefined {
+  void windowId;
+  if (step.op === "upload") return "browser";
+  if (step.op === "downloads" && isWriteStep(step)) return "browser";
+  if (step.op === "paste") return "browser";
+  if (step.op === "evaluate" || isWriteStep(step)) return `tab:${tabId}`;
+  return undefined;
 }
 
 export async function inTabQueue<T>(tabId: number, work: () => Promise<T>): Promise<T> {
@@ -39,63 +57,80 @@ export async function inTabQueue<T>(tabId: number, work: () => Promise<T>): Prom
   }
 }
 
-export async function withWriteLock<T>(work: () => Promise<T>): Promise<T> {
-  const previous = writeTail;
-  let release!: () => void;
-  writeTail = new Promise<void>((resolve) => {
+export async function withLock<T>(scope: string, work: () => Promise<T>): Promise<T> {
+  const gate = gates.get(scope) ?? { tail: Promise.resolve(), held: false, waiting: 0 };
+  gates.set(scope, gate);
+  const previous = gate.tail;
+  let release: () => void = () => undefined;
+  gate.tail = new Promise<void>((resolve) => {
     release = resolve;
   });
-  waitingWrites += 1;
+  gate.waiting += 1;
+  let acquired = false;
   try {
-    await withDeadline(
-      previous,
-      WRITE_WAIT_MS,
-      "BUSY_TIMEOUT: another session has been writing to this browser for 30s",
-    );
-    writing = true;
+    await withDeadline(previous, writeWaitMs, `BUSY_TIMEOUT: ${scope} was busy for 30s`);
+    acquired = true;
+    gate.held = true;
     return await work();
   } finally {
-    writing = false;
-    waitingWrites -= 1;
-    release();
+    gate.waiting -= 1;
+    if (acquired) {
+      gate.held = false;
+      release();
+    } else {
+      // Timed out before taking the lock. The holder still owns it: fail, and let the
+      // next waiter through only once the holder finishes.
+      void previous.then(release, release);
+    }
   }
 }
 
 export interface SchedulerStatus {
   write: { busy: boolean; waiting: number };
   tabs: { tabId: number; busy: boolean; waiting: number }[];
+  scopes: { scope: string; busy: boolean; waiting: number }[];
 }
 
 export function schedulerStatus(): SchedulerStatus {
+  const browser = gates.get("browser");
   return {
-    write: { busy: writing, waiting: waitingWrites },
+    write: { busy: browser?.held === true, waiting: browser?.waiting ?? 0 },
     tabs: [...queues].map(([tabId, queue]) => ({
       tabId,
       busy: queue.depth > 0,
       waiting: Math.max(0, queue.depth - 1),
     })),
+    scopes: [...gates].map(([scope, gate]) => ({
+      scope,
+      busy: gate.held,
+      waiting: gate.waiting,
+    })),
   };
 }
 
 /**
- * One dispatch under the per-tab FIFO for writes and the browser-wide write lock. Reads skip
- * both: they never change a page, so several can run in parallel even in the same tab.
+ * One dispatch under the per-tab FIFO and the lock for what the step shares.
+ * Reads skip both: they never change a page, so several can run at once.
  */
 export async function scheduleStep<T>(
   step: BrowserStep,
   tabId: number,
   dispatch: () => Promise<T>,
+  windowId?: number,
 ): Promise<T> {
-  if (!isWriteStep(step)) return dispatch();
+  const scope = lockScope(step, tabId, windowId);
+  if (!scope) return dispatch();
   const queued = Date.now();
-  return withWriteLock(() => {
-    const waited = Date.now() - queued;
-    if (waited >= WAIT_NOTE_MS) writeWaits.set(tabId, waited);
-    return inTabQueue(tabId, dispatch);
-  });
+  return inTabQueue(tabId, () =>
+    withLock(scope, () => {
+      const waited = Date.now() - queued;
+      if (waited >= WAIT_NOTE_MS) writeWaits.set(tabId, waited);
+      return dispatch();
+    }),
+  );
 }
 
-/** How long the last write in a tab waited for another session's write, when it was long. */
+/** How long the last write in a tab waited for a shared lock, when it was long. */
 const writeWaits = new Map<number, number>();
 const WAIT_NOTE_MS = 1000;
 export function takeWriteWait(tabId: number): number | undefined {

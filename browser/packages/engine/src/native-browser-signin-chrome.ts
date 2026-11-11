@@ -1,4 +1,5 @@
 import { send } from "./cdp/send.js";
+import { withLock } from "./native-browser-scheduler.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { fieldPoint, scanFields, type SignInFields } from "./native-browser-signin-page.js";
 
@@ -106,16 +107,25 @@ export async function chromeFill(
   return after && chromeFilled(fields, after) ? { fields: after, submitted: false } : undefined;
 }
 
-/** Runs the sign-in with the tab in front, then puts back the tab its window showed before. */
+/** Runs the sign-in with the tab in front, then puts back the tab its window showed before.
+ * The window lock covers only the focus change, not the fill. */
 export async function inFront<T>(tabId: number, run: () => Promise<T>): Promise<T> {
   const tab = await chrome.tabs.get(tabId);
-  const [previous] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-  await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
-  await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
+  const scope = `window:${tab.windowId}`;
+  const previousId = await withLock(scope, () => showTab(tabId, tab.windowId));
   try {
     return await run();
   } finally {
-    if (previous?.id !== undefined && previous.id !== tabId)
-      await chrome.tabs.update(previous.id, { active: true }).catch(() => undefined);
+    if (previousId !== undefined && previousId !== tabId)
+      await withLock(scope, async () => {
+        await chrome.tabs.update(previousId, { active: true }).catch(() => undefined);
+      });
   }
+}
+
+async function showTab(tabId: number, windowId: number): Promise<number | undefined> {
+  const [previous] = await chrome.tabs.query({ active: true, windowId });
+  await chrome.windows.update(windowId, { focused: true }).catch(() => undefined);
+  await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
+  return previous?.id;
 }

@@ -51,7 +51,11 @@ function absolutize(doc: Doc, base: string): void {
   }
 }
 
+const TEXT_CAP = 262_144;
+
 export function toMarkdown(html: string): string {
+  if (html.length > TEXT_CAP)
+    return `[truncated ${html.length - TEXT_CAP} chars; toMarkdown cap ${TEXT_CAP}]`;
   return markdownService()
     .turndown(html)
     .replace(/\n{3,}/g, "\n\n")

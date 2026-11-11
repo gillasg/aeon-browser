@@ -29,8 +29,10 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       clientInstanceId: z.string().uuid(),
       url: HttpUrlSchema,
       foreground: z.boolean().default(false),
-      /** Park popups, mute media and block ad hosts while the agent uses this tab. */
+      /** Park popups and mute media while the agent uses this tab. */
       quiet: z.boolean().optional(),
+      /** Also block ad hosts and the document-start script. Explore and crawl set this. */
+      ads: z.boolean().optional(),
       /** Its own background window (bulk work) or a tab in the user's window (a chat). */
       space: z.enum(["window", "tabs"]).optional(),
       /** The Referer this page load sends (some providers allowlist it). */

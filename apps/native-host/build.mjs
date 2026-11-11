@@ -20,6 +20,8 @@ const source = [
   "HostConfiguration.cs",
   "NativeMessagingHost.cs",
   "DaemonSupervisor.cs",
+  "BootLog.cs",
+  "DaemonHealthPing.cs",
   "DaemonOutputReader.cs",
   "SupervisorStatus.cs",
   "SupervisorLog.cs",

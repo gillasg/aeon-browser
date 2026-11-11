@@ -60,7 +60,7 @@ export async function openTab(
     request.chatId,
     step.ownerTitle ?? ownerTitle(request.chatId),
   );
-  if (step.quiet) await enableQuietTab(created.id);
+  if (step.quiet) await enableQuietTab(created.id, { ads: step.ads === true });
   const navigation = await navigateOpenedTab(created.id, step.url, step.timeoutMs, step.referer);
   assertRequestActive(request);
   const tab = await refreshInventoryTab(created.id);

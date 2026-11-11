@@ -21,6 +21,7 @@ import {
   handleBrowserRelease,
   registerBrowserRequest,
   completeBrowserRequest,
+  wantNetwork,
 } from "./native-browser-session.js";
 import {
   discoverFrames,
@@ -559,21 +560,26 @@ async function executeStep(
   bindBrowserSession(step.target.tabId, request.chatId);
   void noteAgentStep(step.target.tabId, request.chatId);
   touchSpace(request.chatId);
-  // One step per tab at a time, and writes one at a time browser-wide: two sessions cannot type
-  // into each other's page, and a session's own steps keep their order.
-  return scheduleStep(step, step.target.tabId, async () => {
-    stepInput(step.target.tabId, true);
-    noteDialogActivity(step);
-    if (step.op === "click" || step.op === "press") noteAgentClick(step.target.tabId);
-    try {
-      const result = await dispatchStep(request, step, tab).catch((error: unknown) =>
-        closedByAction(request, step, tab, error),
-      );
-      return annotateStep(result, step.target.tabId);
-    } finally {
-      stepInput(step.target.tabId, false);
-    }
-  });
+  // One step per tab at a time, under the lock for what the step shares.
+  return scheduleStep(
+    step,
+    step.target.tabId,
+    async () => {
+      if (isWriteStep(step)) wantNetwork(step.target.tabId);
+      stepInput(step.target.tabId, true);
+      noteDialogActivity(step);
+      if (step.op === "click" || step.op === "press") noteAgentClick(step.target.tabId);
+      try {
+        const result = await dispatchStep(request, step, tab).catch((error: unknown) =>
+          closedByAction(request, step, tab, error),
+        );
+        return annotateStep(result, step.target.tabId);
+      } finally {
+        stepInput(step.target.tabId, false);
+      }
+    },
+    tab.windowId,
+  );
 }
 
 /** Every step that can change the page returns once it has settled, never mid-reaction. */

@@ -9,6 +9,7 @@ import {
 } from "./native-browser-receipts.js";
 import { labelForAction } from "./evidence/label.js";
 import { noteVaultFill } from "./native-browser-vault.js";
+import { withFocusEmulation } from "./native-browser-session.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
 import { toOffscreen } from "./code-offscreen-host.js";
 import {
@@ -191,6 +192,7 @@ export async function pressKey(debuggee: chrome.debugger.Debuggee, key: string):
 }
 
 type Step = Extract<BrowserExecutorRequest["step"], { op: "pointer" | "keys" }>;
+type PointerStep = Extract<Step, { op: "pointer" }>;
 export async function executeInteraction(
   debuggee: chrome.debugger.Debuggee,
   step: Step,
@@ -220,6 +222,13 @@ export async function executeInteraction(
     });
   await mouse("mouseMoved", step.x, step.y);
   if (step.action === "hover") return { hovered: true };
+  return withFocusEmulation(debuggee.tabId, () => pressPointer(step, mouse));
+}
+
+async function pressPointer(
+  step: PointerStep,
+  mouse: (type: string, x: number, y: number, extra?: Record<string, unknown>) => Promise<unknown>,
+): Promise<unknown> {
   if (step.action === "drag") {
     if (step.toX === undefined || step.toY === undefined) throw new Error("INVALID_TARGET");
     await mouse("mousePressed", step.x, step.y, { button: "left", buttons: 1, clickCount: 1 });
@@ -260,7 +269,7 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     key = parts.pop();
   if (!key && combo.length > 1) {
     // "C++": text ending in a plus is typed, not read as a combo.
-    await humanType(debuggee, combo);
+    await humanType(debuggee, combo, { keys: true });
     return { typed: combo.length };
   }
   if (!key) throw new Error("INVALID_TARGET");
@@ -269,7 +278,7 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     combo.length > 1 &&
     !parts.every((part) => part in KEY_MASKS || part === "ControlOrMeta" || part === "Mod")
   ) {
-    await humanType(debuggee, combo);
+    await humanType(debuggee, combo, { keys: true });
     return { typed: combo.length };
   }
   let modifiers = 0;
@@ -282,7 +291,7 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
     KEY_CODES[key] ?? (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
   // Plain text (no modifiers, not a named key) is typed one character at a time.
   if (!parts.length && !(key in KEY_CODES) && key.length > 1) {
-    await humanType(debuggee, key);
+    await humanType(debuggee, key, { keys: true });
     return { typed: key.length };
   }
   if (!windowsVirtualKeyCode) throw new Error("Unsupported key");
