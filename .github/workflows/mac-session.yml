@@ -207,34 +207,55 @@ jobs:
           cat > /tmp/sample-shot.swift <<'SWIFT'
           import AppKit
           import Foundation
+          func bitmap(_ path: String) -> NSBitmapImageRep? {
+            guard let image = NSImage(contentsOfFile: path),
+                  let tiff = image.tiffRepresentation else { return nil }
+            return NSBitmapImageRep(data: tiff)
+          }
+          func colors(_ rep: NSBitmapImageRep) -> [NSColor] {
+            var found: [NSColor] = []
+            let width = rep.pixelsWide
+            let height = rep.pixelsHigh
+            var y = height / 5
+            while y < height * 4 / 5 {
+              var x = width / 5
+              while x < width * 4 / 5 {
+                if let color = rep.colorAt(x: x, y: y) { found.append(color) }
+                x += 24
+              }
+              y += 24
+            }
+            return found
+          }
+          func isRed(_ color: NSColor) -> Bool {
+            color.redComponent > 0.75 && color.greenComponent < 0.35 && color.blueComponent < 0.35
+          }
           let path = "/tmp/check.png"
-          guard let image = NSImage(contentsOfFile: path),
-                let tiff = image.tiffRepresentation,
-                let rep = NSBitmapImageRep(data: tiff) else {
+          guard let rep = bitmap(path) else {
             fputs("could not read screenshot\n", stderr)
             exit(2)
           }
-          let width = rep.pixelsWide
-          let height = rep.pixelsHigh
-          var red = 0
-          var samples = 0
-          var y = height / 5
-          while y < height * 4 / 5 {
-            var x = width / 5
-            while x < width * 4 / 5 {
-              if let color = rep.colorAt(x: x, y: y) {
-                samples += 1
-                if color.redComponent > 0.75 && color.greenComponent < 0.35 && color.blueComponent < 0.35 {
-                  red += 1
+          let after = colors(rep)
+          let red = after.filter(isRed).count
+          var changed = 0
+          if let before = bitmap("/tmp/before.png") {
+            let earlier = colors(before)
+            let count = min(earlier.count, after.count)
+            if count > 0 {
+              for index in 0..<count {
+                let left = earlier[index]
+                let right = after[index]
+                if abs(left.redComponent - right.redComponent) > 0.08
+                  || abs(left.greenComponent - right.greenComponent) > 0.08
+                  || abs(left.blueComponent - right.blueComponent) > 0.08 {
+                  changed += 1
                 }
               }
-              x += 24
             }
-            y += 24
           }
           let bytes = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
-          print("pixels \(width)x\(height) samples \(samples) red \(red) bytes \(bytes)")
-          if samples > 0 && red * 2 > samples {
+          print("pixels \(rep.pixelsWide)x\(rep.pixelsHigh) samples \(after.count) red \(red) changed \(changed) bytes \(bytes)")
+          if after.count > 0 && (red * 2 > after.count || changed * 5 > after.count) {
             print("SCREEN_CAPTURE: worked")
           } else {
             print("SCREEN_CAPTURE: failed")
@@ -263,7 +284,7 @@ jobs:
           name: screen-capture-check
           path: screen-capture-check.png
           if-no-files-found: warn
-      - name: Open SSH and wait
+      - name: Open SSH
         env:
           CLAUDE_SSH_PUBKEY: ${{ secrets.CLAUDE_SSH_PUBKEY }}
         run: |
@@ -319,20 +340,57 @@ jobs:
           tar -xzf "$bore_dir/bore.tar.gz" -C "$bore_dir"
           bore_bin=$(find "$bore_dir" -type f -name bore | head -1)
           chmod +x "$bore_bin"
-          "$bore_bin" local 22 --to bore.pub > /tmp/bore.log 2>&1 &
-          echo $! > /tmp/bore.pid
+          start_agent() {
+            label="$1"
+            script="$2"
+            log="$3"
+            plist="$HOME/Library/LaunchAgents/${label}.plist"
+            mkdir -p "$HOME/Library/LaunchAgents"
+            rm -f "$log"
+            {
+              echo '<?xml version="1.0" encoding="UTF-8"?>'
+              echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+              echo '<plist version="1.0"><dict>'
+              echo "<key>Label</key><string>${label}</string>"
+              echo '<key>ProgramArguments</key><array>'
+              echo "<string>${script}</string>"
+              echo '</array>'
+              echo '<key>RunAtLoad</key><true/>'
+              echo '</dict></plist>'
+            } > "$plist"
+            uid=$(id -u)
+            domain="gui/${uid}"
+            launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+            if ! launchctl bootstrap "$domain" "$plist"; then
+              echo "gui bootstrap failed for ${label}; trying the user domain"
+              domain="user/${uid}"
+              launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+              launchctl bootstrap "$domain" "$plist"
+            fi
+            echo "$domain" > "/tmp/${label}.domain"
+          }
+          agent_exited() {
+            label="$1"
+            domain=$(cat "/tmp/${label}.domain" 2>/dev/null || true)
+            [ -n "$domain" ] || return 1
+            state=$(launchctl print "${domain}/${label}" 2>/dev/null | awk -F ' = ' '/state = /{print $2; exit}' || true)
+            [ "$state" = "not running" ]
+          }
+          printf '#!/bin/bash\nexec %q local 22 --to bore.pub >>/tmp/bore.log 2>&1\n' "$bore_bin" > "$RUNNER_TEMP/run-bore.sh"
+          chmod +x "$RUNNER_TEMP/run-bore.sh"
+          start_agent com.aeon.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
           host=""
           port=""
           for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-            if grep -E 'listening at .+:[0-9]+' /tmp/bore.log >/dev/null; then
+            if grep -E 'listening at .+:[0-9]+' /tmp/bore.log >/dev/null 2>&1; then
               listen=$(grep -E 'listening at .+:[0-9]+' /tmp/bore.log | tail -1)
               host=$(printf '%s\n' "$listen" | sed -E 's/.*listening at ([^ ]+):([0-9]+).*/\1/')
               port=$(printf '%s\n' "$listen" | sed -E 's/.*listening at ([^ ]+):([0-9]+).*/\2/')
               break
             fi
-            if ! kill -0 "$(cat /tmp/bore.pid)" 2>/dev/null; then
-              echo "bore exited"
-              cat /tmp/bore.log
+            if agent_exited com.aeon.bore; then
+              echo "bore is not running"
+              cat /tmp/bore.log || true
               break
             fi
             sleep 1
@@ -345,10 +403,11 @@ jobs:
             tar -xzf "$RUNNER_TEMP/cloudflared.tgz" -C "$RUNNER_TEMP"
             cfd=$(find "$RUNNER_TEMP" -type f -name cloudflared | head -1)
             chmod +x "$cfd"
-            "$cfd" tunnel --no-autoupdate --url tcp://127.0.0.1:22 > /tmp/cloudflared.log 2>&1 &
-            echo $! > /tmp/cloudflared.pid
+            printf '#!/bin/bash\nexec %q tunnel --no-autoupdate --url tcp://127.0.0.1:22 >>/tmp/cloudflared.log 2>&1\n' "$cfd" > "$RUNNER_TEMP/run-cloudflared.sh"
+            chmod +x "$RUNNER_TEMP/run-cloudflared.sh"
+            start_agent com.aeon.cloudflared "$RUNNER_TEMP/run-cloudflared.sh" /tmp/cloudflared.log
             for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-              if grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log >/dev/null; then
+              if grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log >/dev/null 2>&1; then
                 listen=$(grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log | tail -1)
                 host=$(printf '%s\n' "$listen" | sed -E 's/.*tcp:\/\/([^:]+):([0-9]+).*/\1/')
                 port=$(printf '%s\n' "$listen" | sed -E 's/.*tcp:\/\/([^:]+):([0-9]+).*/\2/')
@@ -372,8 +431,12 @@ jobs:
             echo "SSH: ssh -p ${port} ${user}@${host}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "Building Aeon while the tunnel stays up."
-          pnpm build
+          echo "Tunnel is supervised by launchd and stays up after this step."
+      - name: Build Aeon
+        run: pnpm build
+      - name: Wait until stop
+        run: |
+          set -euo pipefail
           echo "Waiting until /tmp/stop or the job timeout."
           while [ ! -f /tmp/stop ]; do
             sleep 10
