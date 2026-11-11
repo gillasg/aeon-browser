@@ -6,6 +6,16 @@ ${locatorShorthandSource}
 var __states = new Map(), __tabs = new Map(), __seen = new Map(), __dirty = new Map(), __opened = new Map(), __busy = new Set(), __keptTabs = new Set(), __closedTabs = new Map(), __focusedWindowId, __attachedTarget, __lastTarget;
 var __labels = new Map();
 var __key = target => JSON.stringify(target);
+// Steps are checked against a target key. Agents pass the id, label, or listed tab they were shown,
+// so every call resolves that to the key before it is sent. Direct calls (saved reads) too.
+var __hostCall = __call;
+var __binding = 0;
+__call = async function (request) {
+  if (!request || request.target == null) return __hostCall(request);
+  var bound = await __boundTarget(request.target);
+  if (bound !== request.target) request = {...request, target: bound};
+  return __hostCall(request);
+};
 // The last navigation failure per tab: page.lastError = { code, url, stage, message, at }.
 var __lastErrors = new Map();
 function __noteNavError(target, url, stage, error) {
@@ -54,6 +64,40 @@ function __listedTab(entry) {
     get: (object, key) => key in object || typeof key === 'symbol' || plain.has(key) ? object[key] : asPage()[key],
   });
 }
+function __isTargetKey(value) {
+  return !!value && typeof value === 'object' && typeof value.clientInstanceId === 'string' && typeof value.browserRunId === 'string' && typeof value.tabIncarnation === 'string' && typeof value.tabId === 'number';
+}
+// Sync bind when this session has already listed or opened the tab. page() stays synchronous.
+function __targetNow(target) {
+  if (target == null || __isTargetKey(target)) return target;
+  if (typeof target === 'object' && target.target && __isTargetKey(target.target)) return target.target;
+  var id = typeof target === 'number' ? target : target && typeof target === 'object' ? target.tabId ?? target.id : undefined;
+  if (typeof id === 'number') {
+    var found = [...__tabs.values()].find(tab => tab.target && tab.target.tabId === id);
+    if (found) return found.target;
+  }
+  if (typeof target === 'string' && /^p\d{1,3}$/.test(target) && __labels.get(target)) return __labels.get(target);
+  return target;
+}
+// A tab id, a session label (p1), a listed tab, or a page. Already-bound keys pass through.
+async function __boundTarget(target) {
+  if (target == null || __isTargetKey(target)) return target;
+  if (__binding) return target;
+  __binding++;
+  try {
+    if (typeof target === 'string') {
+      if (!/^p\d{1,3}$/.test(target)) return target;
+      return await __labelTarget(target);
+    }
+    if (typeof target === 'number') return await __tabTarget(target);
+    if (typeof target === 'object') {
+      if (target.target) return await __tabTarget(target);
+      var id = target.tabId ?? target.id;
+      if (typeof id === 'number' && !target.clientInstanceId) return await __tabTarget(id);
+    }
+    return target;
+  } finally { __binding--; }
+}
 async function __tabTarget(target) {
   // A tab id, a tab from browser.tabs(), a page, or a target itself.
   if (target && typeof target === 'object' && target.target) return target.target;
@@ -71,7 +115,15 @@ async function __tabTarget(target) {
 async function __labelTarget(label) {
   var known = __labels.get(label);
   if (known && __tabs.get(__key(known))) return known;
-  var found = (await __step({op:'session', target: __hostTarget(), action:'resolve', label: String(label)})).data;
+  var host = __isTargetKey(__lastTarget) ? __lastTarget : [...__tabs.values()][0]?.target;
+  if (!__isTargetKey(host)) {
+    await browser.tabs();
+    known = __labels.get(label);
+    if (known && __tabs.get(__key(known))) return known;
+    host = [...__tabs.values()][0]?.target;
+  }
+  if (!__isTargetKey(host)) throw Error('NO_TAB: open or attach a tab first (browser.openTab / bu.use)');
+  var found = (await __step({op:'session', target: host, action:'resolve', label: String(label)})).data;
   __labels.set(found.label || String(label), found.tab.target);
   __tabs.set(__key(found.tab.target), found.tab);
   return found.tab.target;
@@ -237,6 +289,12 @@ async function __harvestFooter(target) {
 }
 async function __step(step, readOnly = false) {
   var startedAt = Date.now();
+  // Bind before the closed-tab check, the dirty set, and the call, so a thrown evaluate cannot
+  // leave a raw tab id for the post-cell observation.
+  if (step && step.target != null) {
+    var bound = await __boundTarget(step.target);
+    if (bound !== step.target) step = {...step, target: bound};
+  }
   if (!readOnly && (step.op === 'click' || step.op === 'press')) {
     var stopped = await __guardSubmit(step);
     if (stopped) throw Error(stopped);

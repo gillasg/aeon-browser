@@ -379,7 +379,9 @@ var browser = Object.freeze({
     await attached.inspect(() => 1);
     return attached;
   },
-  page: (target) => (__lastTarget = target, Object.freeze(__extendPage(target, {
+  // A tab id, a session label, or a listed tab is that tab's target when the session already knows it.
+  // The async bind in __step covers the first call, before any list has come back.
+  page: (target) => (__lastTarget = (target = __targetNow(target)), Object.freeze(__extendPage(target, {
     target,
     // The same observation as bu.state, scoped to this tab.
     state: (options = {}) => bu.state(Object.assign({}, options && typeof options === 'object' ? options : {}, {target: target})),
