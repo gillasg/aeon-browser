@@ -319,8 +319,11 @@ test(
       await sub("a locked manager offers the unlock hand-off, and Done saves it", async () => {
         await vault.reset();
         await vault.lock();
+        // An earlier instant-success tab can still be open (CI's slower run keeps it just under
+        // the idle-tab cleanup); only the tab this cell opens carries the new hand-off.
+        const before = await handoffTargets(profile, url("/vault/instant"));
         const pending = cell(fillAndSubmit(url("/vault/instant")), "vault-locked");
-        await answerHandoff(profile, url("/vault/instant"), () => vault.unlock());
+        await answerHandoff(profile, url("/vault/instant"), () => vault.unlock(), before);
         const { stdout } = await pending;
         assert.match(stdout, /unlocked it and the login was saved/, stdout);
         await waitFor(async () => {
@@ -379,15 +382,30 @@ async function waitFor(check, timeout = 15_000) {
   throw last ?? new Error("timed out");
 }
 
+/** The page targets already showing `target`, so the hand-off watcher only takes a new one. */
+async function handoffTargets(profile, target) {
+  const port = await waitFor(async () =>
+    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
+  );
+  const tabs = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) =>
+    response.json(),
+  );
+  return new Set(
+    tabs.filter((tab) => tab.type === "page" && tab.url === target).map((tab) => tab.id),
+  );
+}
+
 // Answers the hand-off the way the cursor's Done does, from the page itself. `beforeDone` runs
 // after the card is up and before Done, like a person unlocking their password manager first.
-async function answerHandoff(profile, target, beforeDone) {
+async function answerHandoff(profile, target, beforeDone, known = new Set()) {
   const port = await waitFor(async () =>
     Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
   );
   const page = await waitFor(async () => {
     const tabs = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
-    const found = tabs.find((tab) => tab.type === "page" && tab.url === target);
+    const found = tabs.find(
+      (tab) => tab.type === "page" && tab.url === target && !known.has(tab.id),
+    );
     if (!found) throw new Error("no fixture tab yet");
     return found;
   });
