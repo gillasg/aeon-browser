@@ -65,8 +65,9 @@ test("a long value asked for as keys is real key events, never insertText", asyn
     false,
   );
   assert.equal(
-    calls.filter((call) => call.method === "Input.dispatchKeyEvent" && call.params.type === "keyDown")
-      .length,
+    calls.filter(
+      (call) => call.method === "Input.dispatchKeyEvent" && call.params.type === "keyDown",
+    ).length,
     text.length,
   );
 });

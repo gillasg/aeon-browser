@@ -61,14 +61,10 @@ globalThis.chrome = {
 };
 
 const { beginLazyDomain } = await import("../dist/cdp/domains.js");
-const {
-  armDiagnostics,
-  diagnosticsArmed,
-  enableDiagnostics,
-  notePageConsole,
-  readDiagnostics,
-} = await import("../dist/native-browser-events.js");
-const { fedcmEnabled, forgetFedCm, noteAgentClick } = await import("../dist/native-browser-fedcm.js");
+const { armDiagnostics, diagnosticsArmed, enableDiagnostics, notePageConsole, readDiagnostics } =
+  await import("../dist/native-browser-events.js");
+const { fedcmEnabled, forgetFedCm, noteAgentClick } =
+  await import("../dist/native-browser-fedcm.js");
 const { listensForKeys } = await import("../dist/native-browser-dom.js");
 const { setLockWaitMs, withLock } = await import("../dist/native-browser-scheduler.js");
 const { inFront } = await import("../dist/native-browser-signin-chrome.js");
