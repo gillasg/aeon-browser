@@ -45,7 +45,10 @@ function model(site, pages = []) {
     generatedAt: "2026-11-11T00:00:00.000Z",
     origins: [`https://${site}`],
     security: [],
-    operations: [operation("save", "action", "POST", "/save"), operation("load", "read", "GET", "/load")],
+    operations: [
+      operation("save", "action", "POST", "/save"),
+      operation("load", "read", "GET", "/load"),
+    ],
     pages,
     channels: [],
     components: {},
