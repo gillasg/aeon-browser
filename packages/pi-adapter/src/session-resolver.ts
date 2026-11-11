@@ -37,7 +37,13 @@ export function resolvePiSessionManager(
 export function sessionReferenceFromManager(manager: SessionManager): PiSessionReference {
   const sessionFile = manager.getSessionFile();
   if (!sessionFile) throw new Error("Pi did not provide a durable session file path.");
-  return { sessionId: manager.getSessionId(), sessionFile: resolve(sessionFile) };
+  return { sessionId: manager.getSessionId(), sessionFile: canonicalSessionFile(sessionFile) };
+}
+
+/** Pi reports `/var` and `/private/var` for one macOS file. Store the real path so a restart matches. */
+function canonicalSessionFile(sessionFile: string): string {
+  const path = resolve(sessionFile);
+  return existsSync(path) ? realpathSync(path) : path;
 }
 
 export type StoredThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
