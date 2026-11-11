@@ -1,17 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { browserFixture } from "./browser-fixture-helper.mjs";
+import { browserFixture, chromeForTestingPath } from "./browser-fixture-helper.mjs";
+const chromePath = chromeForTestingPath();
 test(
   "runtime helpers operate against real Chrome",
   {
-    skip:
-      process.platform !== "win32" ||
-      !existsSync(
-        resolve(".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe"),
-      ),
+    skip: existsSync(chromePath) ? false : "Chrome for Testing is not installed",
   },
   async (t) => {
     const fixture = await browserFixture();

@@ -13,10 +13,9 @@ import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { WebSocketServer } from "ws";
+import { chromeForTestingPath } from "./browser-fixture-helper.mjs";
 
-const chromePath = resolve(
-  ".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe",
-);
+const chromePath = chromeForTestingPath();
 const extension = resolve("apps/chrome-extension/native-dist");
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const chatId = randomUUID();
@@ -30,7 +29,12 @@ const model = {
 
 test(
   "Add or manage models opens the Models page from a Chat",
-  { skip: process.platform !== "win32" || !existsSync(chromePath) || !existsSync(extension) },
+  {
+    skip:
+      existsSync(chromePath) && existsSync(extension)
+        ? false
+        : "Chrome for Testing or the built extension is missing",
+  },
   async () => {
     const profile = await mkdtemp(join(tmpdir(), "aeon-model-sign-in-"));
     const page = await signInPage();
@@ -45,6 +49,7 @@ test(
         "--no-first-run",
         "--no-default-browser-check",
         "--headless=new",
+        ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
         "about:blank",
       ],
       { stdio: "ignore" },

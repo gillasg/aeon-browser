@@ -1,17 +1,13 @@
 import { existsSync } from "node:fs";
-import { resolve as resolvePath } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { browserFixture } from "./browser-fixture-helper.mjs";
+import { browserFixture, chromeForTestingPath } from "./browser-fixture-helper.mjs";
+const chromePath = chromeForTestingPath();
 test(
   "browser layer handles real dynamic inputs, duplicate controls and stale geometry",
   {
-    skip:
-      process.platform !== "win32" ||
-      !existsSync(
-        resolvePath(".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe"),
-      ),
+    skip: existsSync(chromePath) ? false : "Chrome for Testing is not installed",
   },
   async (t) => {
     const fixture = await browserFixture();

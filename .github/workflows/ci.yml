@@ -9,7 +9,20 @@ permissions:
 
 jobs:
   check:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            chrome-platform: win64
+            chrome-binary: chrome-win64/chrome.exe
+          - os: macos-latest
+            chrome-platform: mac-arm64
+            chrome-binary: chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+          - os: ubuntu-latest
+            chrome-platform: linux64
+            chrome-binary: chrome-linux64/chrome
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,26 +37,74 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .slice0-audit/chrome-for-testing-154.0.8037.57
-          key: chrome-for-testing-154.0.8037.57-win64
+          key: chrome-for-testing-154.0.8037.57-${{ matrix.chrome-platform }}
       - name: Install Chrome for Testing
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $dir = ".slice0-audit/chrome-for-testing-154.0.8037.57"
-          if (-not (Test-Path "$dir/chrome-win64/chrome.exe")) {
+          $bin = "$dir/${{ matrix.chrome-binary }}"
+          if (-not (Test-Path -LiteralPath $bin)) {
             New-Item -ItemType Directory -Force $dir | Out-Null
-            Invoke-WebRequest "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/win64/chrome-win64.zip" -OutFile "$dir/chrome-win64.zip"
-            Expand-Archive "$dir/chrome-win64.zip" -DestinationPath $dir -Force
+            $zip = Join-Path $dir "chrome.zip"
+            Invoke-WebRequest "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/${{ matrix.chrome-platform }}/chrome-${{ matrix.chrome-platform }}.zip" -OutFile $zip
+            Expand-Archive $zip -DestinationPath $dir -Force
+            Remove-Item $zip
           }
+      - name: Install Chrome for Testing
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=".slice0-audit/chrome-for-testing-154.0.8037.57"
+          bin="$dir/${{ matrix.chrome-binary }}"
+          if [ ! -f "$bin" ]; then
+            mkdir -p "$dir"
+            curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/${{ matrix.chrome-platform }}/chrome-${{ matrix.chrome-platform }}.zip" -o "$dir/chrome.zip"
+            unzip -q "$dir/chrome.zip" -d "$dir"
+            rm -f "$dir/chrome.zip"
+          fi
+          chmod +x "$bin"
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
+          fi
+      - name: Install Chrome shared libraries
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          deps=".slice0-audit/chrome-for-testing-154.0.8037.57/chrome-linux64/deb.deps"
+          while IFS= read -r pkg || [ -n "$pkg" ]; do
+            pkg="${pkg%%#*}"
+            pkg="$(printf '%s' "$pkg" | xargs)"
+            [ -z "$pkg" ] && continue
+            sudo apt-get satisfy -y --no-install-recommends "$pkg"
+          done < "$deps"
       - run: pnpm check
       # After the build: the canary runs the built bridge and the built extension.
       - name: Canary
+        if: runner.os != 'Linux'
         working-directory: browser
         run: node --test test/canary.e2e.test.mjs
         env:
-          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/${{ matrix.chrome-binary }}
+          REQUIRE_E2E: "1"
+      - name: Canary
+        if: runner.os == 'Linux'
+        working-directory: browser
+        run: xvfb-run -a node --test test/canary.e2e.test.mjs
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/${{ matrix.chrome-binary }}
           REQUIRE_E2E: "1"
       # The real-Chrome lane (`pnpm check:browser` without its build, which `pnpm check` already did).
       - name: Browser lane
+        if: runner.os != 'Linux'
         run: pnpm --dir browser run test:browser && pnpm test:browser
         env:
-          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/${{ matrix.chrome-binary }}
+      - name: Browser lane
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm --dir browser run test:browser && xvfb-run -a pnpm test:browser
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-154.0.8037.57/${{ matrix.chrome-binary }}

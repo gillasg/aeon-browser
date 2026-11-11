@@ -1,6 +1,6 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { existsSync, realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   type OpenPiSessionInput,
   type PiSessionReference,
@@ -37,7 +37,13 @@ export function resolvePiSessionManager(
 export function sessionReferenceFromManager(manager: SessionManager): PiSessionReference {
   const sessionFile = manager.getSessionFile();
   if (!sessionFile) throw new Error("Pi did not provide a durable session file path.");
-  return { sessionId: manager.getSessionId(), sessionFile: resolve(sessionFile) };
+  return { sessionId: manager.getSessionId(), sessionFile: canonicalSessionFile(sessionFile) };
+}
+
+/** Pi reports `/var` and `/private/var` for one macOS file. Store the real path so a restart matches. */
+function canonicalSessionFile(sessionFile: string): string {
+  const path = resolve(sessionFile);
+  return existsSync(path) ? realpathSync(path) : path;
 }
 
 export type StoredThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -69,29 +75,34 @@ function restoreManager(path: string, input: OpenPiSessionInput): SessionManager
 }
 
 export function assertOwnedSessionPath(sessionDirectory: string, sessionFile: string): string {
-  const root = resolve(sessionDirectory);
-  const path = resolve(sessionFile);
+  const root = existingPhysicalPath(resolve(sessionDirectory));
+  const path = existingPhysicalPath(resolve(sessionFile));
+  if (!path.toLowerCase().endsWith(".jsonl") || !pathIsInside(root, path)) {
+    throw new Error(
+      existsSync(path)
+        ? "Pi session file resolves outside Aeon's Pi session directory."
+        : "Stored Pi session path is outside Aeon's Pi session directory.",
+    );
+  }
+  return path;
+}
+
+/** `/var` and `/private/var` are one macOS directory. Compare the real directories. */
+function existingPhysicalPath(path: string): string {
+  if (existsSync(path)) return realpathSync(path);
+  const parent = dirname(path);
+  if (!existsSync(parent)) return path;
+  return join(realpathSync(parent), basename(path));
+}
+
+function pathIsInside(root: string, path: string): boolean {
   const relativePath = relative(root, path);
-  if (
-    !relativePath ||
-    relativePath.startsWith(`..${sep}`) ||
-    relativePath === ".." ||
-    isAbsolute(relativePath) ||
-    !path.toLowerCase().endsWith(".jsonl")
-  ) {
-    throw new Error("Stored Pi session path is outside Aeon's Pi session directory.");
-  }
-  if (!existsSync(path)) return path;
-  const physicalRoot = existsSync(root) ? realpathSync(root) : root;
-  const physicalRelative = relative(physicalRoot, realpathSync(path));
-  if (
-    physicalRelative.startsWith(`..${sep}`) ||
-    physicalRelative === ".." ||
-    isAbsolute(physicalRelative)
-  ) {
-    throw new Error("Pi session file resolves outside Aeon's Pi session directory.");
-  }
-  return realpathSync(path);
+  return (
+    relativePath.length > 0 &&
+    relativePath !== ".." &&
+    !relativePath.startsWith(`..${sep}`) &&
+    !isAbsolute(relativePath)
+  );
 }
 
 function isThinkingLevel(value: string): value is StoredThinkingLevel {
