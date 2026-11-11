@@ -138,8 +138,7 @@ const FOCUS_FILLED_PASSWORD = `(() => {
 /**
  * A password fill blurs the field so Chrome's bubble cannot cover the next click. That also
  * takes focus off the field, and Enter on the page then submits nothing. Put focus back when
- * nothing else is focused, then the caller's Enter key submits the form. The official-form
- * guard still stops an Enter pressed on the field itself; this does not send a key.
+ * nothing else is focused, so the caller's Enter key does what it does on any focused field.
  */
 export async function focusFilledPassword(debuggee: chrome.debugger.Debuggee): Promise<void> {
   if (debuggee.tabId === undefined || !vaultCandidate(debuggee.tabId)) return;
