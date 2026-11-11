@@ -10,11 +10,26 @@ var __key = target => JSON.stringify(target);
 // so every call resolves that to the key before it is sent. Direct calls (saved reads) too.
 var __hostCall = __call;
 var __binding = 0;
+// The requests whose target is nested one level down instead of on the request itself.
+var __targetCalls = ['signIn', 'fillCode', 'fillProfile', 'handoff', 'media', 'quiet'];
+// One binder for every request: a tab id, a p1 label, a listed tab, a page, or a target key.
+async function __bindRequest(request) {
+  if (!request || typeof request !== 'object') return request;
+  var bound = request;
+  if (request.target != null) {
+    var target = await __boundTarget(request.target);
+    if (target !== request.target) bound = {...bound, target};
+  }
+  for (var key of __targetCalls) {
+    var call = bound[key];
+    if (!call || typeof call !== 'object' || call.target == null) continue;
+    var nested = await __boundTarget(call.target);
+    if (nested !== call.target) bound = {...bound, [key]: {...call, target: nested}};
+  }
+  return bound;
+}
 __call = async function (request) {
-  if (!request || request.target == null) return __hostCall(request);
-  var bound = await __boundTarget(request.target);
-  if (bound !== request.target) request = {...request, target: bound};
-  return __hostCall(request);
+  return __hostCall(await __bindRequest(request));
 };
 // The last navigation failure per tab: page.lastError = { code, url, stage, message, at }.
 var __lastErrors = new Map();
@@ -76,7 +91,7 @@ function __targetNow(target) {
     var found = [...__tabs.values()].find(tab => tab.target && tab.target.tabId === id);
     if (found) return found.target;
   }
-  if (typeof target === 'string' && /^p\d{1,3}$/.test(target) && __labels.get(target)) return __labels.get(target);
+  if (typeof target === 'string' && /^p\\d{1,3}$/.test(target) && __labels.get(target)) return __labels.get(target);
   return target;
 }
 // A tab id, a session label (p1), a listed tab, or a page. Already-bound keys pass through.
@@ -86,7 +101,7 @@ async function __boundTarget(target) {
   __binding++;
   try {
     if (typeof target === 'string') {
-      if (!/^p\d{1,3}$/.test(target)) return target;
+      if (!/^p\\d{1,3}$/.test(target)) return target;
       return await __labelTarget(target);
     }
     if (typeof target === 'number') return await __tabTarget(target);
