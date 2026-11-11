@@ -143,8 +143,10 @@ export interface Ability {
   options: AbilityOptions;
   stats: AbilityStats;
   createdBy: AbilityCreatedBy;
-  /** The old store it came from: recipe, action, workflow, tool, pageTool, skill, pack. */
+  /** The old store it came from: recipe, action, workflow, tool, pageTool, skill, pack, route. */
   sourceKind?: string;
+  /** Promoted from a route. */
+  promoted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -195,6 +197,14 @@ export interface AbilityHost {
   signedIn?: () => Promise<boolean>;
   /** When present, a precondition of `pageType` is checked before the run. */
   pageType?: () => Promise<string | undefined>;
+  /** Steps ways: the controls on the page, so fallbacks can resolve. */
+  controls?: () => Promise<{ role?: string; name?: string; css?: string; text?: string }[]>;
+  /** Steps ways: act on the control a fallback resolved. */
+  act?: (step: {
+    kind: string;
+    args?: string[];
+    target?: { role?: string; name?: string; css?: string; text?: string };
+  }) => Promise<unknown>;
 }
 
 const ABILITIES = "abilities";
@@ -274,22 +284,23 @@ export async function saveAbility(
   warnings: string[];
   tests?: AbilityTestReport;
 }> {
-  const site = siteName(ability.site);
-  const name = validAbilityName(ability.name);
-  validateAbility({ ...ability, name, site });
+  const prepared = ability;
+  const site = siteName(prepared.site);
+  const name = validAbilityName(prepared.name);
+  validateAbility({ ...prepared, name, site });
   await mkdir(abilityDirectory(site), { recursive: true });
   const path = join(abilityDirectory(site), abilitySlug(name) + ".json");
   const existing = await readAbilityFile(path);
   if (existing && options.replace === false)
     throw new Error(`ABILITY_EXISTS: ${site} already has ${name}`);
-  if (options.check !== false) checkContract(ability, existing, options);
+  if (options.check !== false) checkContract(prepared, existing, options);
   const drafted = withSample(
     {
-      ...ability,
+      ...prepared,
       name,
       site,
-      stats: liveWayStats(ability.stats ?? { runs: 0, failures: 0 }, ability.ways),
-      createdAt: ability.createdAt || new Date().toISOString(),
+      stats: liveWayStats(prepared.stats ?? { runs: 0, failures: 0 }, prepared.ways),
+      createdAt: prepared.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
     options.sample,
@@ -389,10 +400,7 @@ export async function trashAbility(
   return true;
 }
 
-/**
- * Five failures in a row with no success in 14 days, or unused for 60 days, go to trash/.
- * A never-used ability is measured from its creation.
- */
+/** Five failures with no success in 14 days, or 60 days unused, moves an ability to trash. */
 export async function maintainAbilities(
   site: string,
   now = new Date(),

@@ -55,6 +55,13 @@ export {
 } from "./chat-dto.js";
 export { PiModelCatalogSchema, type PiModelCatalogDto } from "./model-catalog-dto.js";
 export {
+  RunCardItemSchema,
+  RunCardOfferActionSchema,
+  RunCardSchema,
+  type RunCard,
+  type RunCardItem,
+} from "./run-card.js";
+export {
   ChatCloseViewRequestSchema,
   ChatCommandRequestSchema,
   ChatEventMessageSchema,

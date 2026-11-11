@@ -9,6 +9,7 @@ import {
   answerLocate,
   answerPageExtract,
   handleActionCache,
+  isActRouteRequest,
   isActionCacheRequest,
   isLocateRequest,
   isPageExtractRequest,
@@ -160,7 +161,8 @@ export function createHostHandler(
     if (isTableRequest(request)) return handleTableRequest(request, home);
     if (isLocateRequest(request)) return answerLocate(request, options.model);
     if (isPageExtractRequest(request)) return answerPageExtract(request, options.model);
-    if (isActionCacheRequest(request)) return handleActionCache(request, home);
+    if (isActRouteRequest(request) || isActionCacheRequest(request))
+      return handleActionCache(request, home);
     if (isSiteRulesRequest(request)) return answerSiteRules(context, options, home);
     if (isSiteToolRequest(request)) return handleSiteTool(request);
     if (isSiteCapabilitiesRequest(request))

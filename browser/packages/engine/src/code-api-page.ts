@@ -228,7 +228,6 @@ async function __step(step, readOnly = false) {
   if (step.target) __speedNote(result.url || before || (__tabs.get(__key(step.target)) || {}).url, action);
   else if (result.kind === 'tab') __speedNote(result.tab && result.tab.url, false);
   if (action && step.op !== 'observe' && step.target) { try { await __autoAfter(step.target, step); } catch {} }
-  if (action && step.target) await __noteSiteTime(step.target).catch(() => {});
   return result;
 }
 function __element(target, element) {

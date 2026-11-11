@@ -155,7 +155,11 @@ export interface SiteCard {
   sessionAccount: string | null;
   sessionSavedAt: string | null;
   abilities: AbilityCard[];
-  notes: { kind: "selector" | "url" | "pace" | "quirk"; key: string; value: string }[];
+  notes: {
+    kind: "selector" | "url" | "pace" | "quirk" | "page" | "control";
+    key: string;
+    value: string;
+  }[];
   recording: boolean;
   suggestions: string[];
 }

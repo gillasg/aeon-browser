@@ -17,7 +17,7 @@ const PROVIDED: Record<AbilityNeed, (host: AbilityHost) => boolean> = {
 
 export function wayNeeds(way: AbilityWay): AbilityNeed[] {
   if (way.kind === "api") return way.open ? ["site-api", "page-open"] : ["site-api"];
-  if (way.kind === "steps") return ["workflow"];
+  if (way.kind === "steps") return way.workflow || way.name ? ["workflow"] : [];
   if (way.kind === "page") return ["page-collect"];
   // A node script calls the site API through the host or, without one, the shared transport.
   return way.runtime === "page" ? ["page-script"] : [];

@@ -21,6 +21,14 @@ export interface PiToolStepEvent {
   write: boolean;
   effect?: string;
   sensitive?: boolean;
+  via?: "page" | "api" | "ability";
+  target?: { role: string; name: string; id?: number };
+  evidence?: {
+    request?: { method: string; path: string; status: number };
+    navigated?: string;
+    download?: { name: string };
+    valueRead?: boolean;
+  };
   box?: { x: number; y: number; width: number; height: number };
 }
 
@@ -113,6 +121,25 @@ export type PiSessionEvent =
   | { kind: "extension-ui-request"; request: PiExtensionUiRequest }
   | { kind: "extension-ui-resolved"; requestId: string }
   | { kind: "extension-ui-notice"; notice: PiExtensionUiNotice }
+  | {
+      kind: "run-card";
+      card: {
+        chatId: string;
+        runId: string;
+        items: readonly (
+          | { kind: "notice"; text: string; detail?: string | undefined }
+          | { kind: "learned"; abilityId: string; name: string; site: string }
+          | {
+              kind: "offer";
+              id: string;
+              text: string;
+              action: string;
+              args?: Readonly<Record<string, unknown>> | undefined;
+            }
+        )[];
+        wrong: { routeId?: string | undefined; abilityId?: string | undefined };
+      };
+    }
   | {
       kind: "chat-metadata";
       title: string;

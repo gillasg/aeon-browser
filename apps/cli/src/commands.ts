@@ -25,6 +25,7 @@ import { doctorCommand } from "./doctor.js";
 import { rollbackCommand } from "./rollback.js";
 import { packCommand } from "./pack.js";
 import { listTools, runTool } from "./tools.js";
+import { abilitiesCommand } from "./abilities-cmd.js";
 
 // Every command Aeon has: its own chat commands, then browserkit's commands in the same groups,
 // with the few that are about a bridge or a password-manager folder replaced by Aeon's own.
@@ -696,6 +697,8 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
 (reload it in chrome://extensions).`,
     run: () => updateAeon(),
   });
+  const abilities = BROWSERKIT_COMMANDS.find((command) => command.name === "abilities");
+  if (abilities) overrides.set("abilities", abilitiesCommand(abilities));
   const commands = BROWSERKIT_COMMANDS.map((command) => overrides.get(command.name) ?? command);
   return [...aeonOnlyCommands(host), ...browsersCommands(host), ...commands];
 }

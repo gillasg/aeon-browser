@@ -384,9 +384,28 @@ function copyStep(event: StepEvent): PiToolStepEvent {
   };
   if (event.effect) step.effect = event.effect;
   if (event.sensitive) step.sensitive = true;
+  if (event.via) step.via = event.via;
+  if (event.target)
+    step.target = {
+      role: event.target.role,
+      name: event.target.name,
+      ...(event.target.id !== undefined ? { id: event.target.id } : {}),
+    };
+  const evidence = stepEvidence(event.evidence);
+  if (evidence) step.evidence = evidence;
   if (event.box)
     step.box = { x: event.box.x, y: event.box.y, width: event.box.width, height: event.box.height };
   return step;
+}
+
+function stepEvidence(evidence: StepEvent["evidence"]): PiToolStepEvent["evidence"] | undefined {
+  if (!evidence) return undefined;
+  const copied: NonNullable<PiToolStepEvent["evidence"]> = {};
+  if (evidence.request) copied.request = evidence.request;
+  if (evidence.navigated) copied.navigated = evidence.navigated;
+  if (evidence.download) copied.download = { name: evidence.download.name };
+  if (evidence.valueRead) copied.valueRead = true;
+  return copied;
 }
 
 /** The progress a tool reported in its partial result's details (browser_code's bu.progress). */
