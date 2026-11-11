@@ -1,6 +1,12 @@
 name: Mac session
 
 on:
+  # One-shot registration. GitHub will not dispatch a workflow that has never
+  # run, and this file is not on the default branch yet. Removed after the
+  # first push run registers it.
+  push:
+    branches: [ci/three-os]
+    paths: [".github/workflows/mac-session.yml"]
   workflow_dispatch:
     inputs:
       timeout-minutes:
