@@ -227,6 +227,11 @@ function exaBlock(block: string): WebResult[] {
   ];
 }
 
+// Exa answers every hit as one text, hits separated by a rule and the next hit's Title line. A
+// rule inside a hit's own text (a Markdown horizontal rule) is not a separator, so split only
+// where a Title follows it.
+const EXA_HIT_BREAK = /\n\n---\n\n(?=Title: )/;
+
 async function exa(query: string, limit: number, signal?: AbortSignal): Promise<WebResult[]> {
   const url = new URL("https://mcp.exa.ai/mcp");
   const key = keyed("EXA_API_KEY");
@@ -238,7 +243,7 @@ async function exa(query: string, limit: number, signal?: AbortSignal): Promise<
     {},
     signal,
   );
-  return text.split(/\n\n---\n\n/).flatMap(exaBlock);
+  return text.split(EXA_HIT_BREAK).flatMap(exaBlock);
 }
 
 async function parallel(query: string, signal?: AbortSignal): Promise<WebResult[]> {
