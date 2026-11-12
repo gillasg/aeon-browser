@@ -54,7 +54,7 @@ test("prepared runtime is ready before consumption and belongs to only one sessi
     const [first, second] = await Promise.all([pool.take(), pool.take()]);
     assert.notEqual(first.id, second.id);
     assert.equal(first.id, 1);
-    assert.equal(first.options.authPath, join(directory, "auth.json"));
+    assert.equal(first.options.agentDirectory, directory);
     await writeFile(join(directory, "auth.json"), "{}");
     pool.prepare();
     assert.equal((await pool.take()).id, 4);

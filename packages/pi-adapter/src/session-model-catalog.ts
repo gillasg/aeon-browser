@@ -5,11 +5,11 @@ import {
   type Model,
   type ModelThinkingLevel,
 } from "@earendil-works/pi-ai";
-import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { PiModelCatalog, PiModelOption } from "@aeon/domain";
 import { createLocalFixtureModel } from "./fixture-model.js";
 import { BackgroundCache } from "./background-cache.js";
-import { join } from "node:path";
+import { createAeonModelRuntime, refreshInBackground } from "./live-models.js";
 
 interface ModelCatalogOptions {
   sessionDirectory: string;
@@ -22,14 +22,11 @@ export async function readPiModelCatalog(options: ModelCatalogOptions): Promise<
   if (options.testModel && options.agentDirectory)
     return readFixtureCatalog(options.agentDirectory);
 
-  const runtime = await ModelRuntime.create(
-    options.agentDirectory
-      ? {
-          authPath: join(options.agentDirectory, "auth.json"),
-          modelsPath: join(options.agentDirectory, "models.json"),
-        }
-      : {},
-  );
+  const runtime = await createAeonModelRuntime({
+    ...(options.agentDirectory ? { agentDirectory: options.agentDirectory } : {}),
+  });
+  // The picker is the one place a stale list is visible; refresh it while the user reads.
+  refreshInBackground(runtime, options.agentDirectory ?? "default");
   const models = runtime.getAvailableSnapshot();
   const settings = SettingsManager.create(options.sessionDirectory, options.agentDirectory);
   const selectedDefault =

@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
-import type { AuthType, MutableModels } from "@earendil-works/pi-ai";
-import { builtinModels } from "@earendil-works/pi-ai/providers/all";
+import type { AuthType, Models, ModelsStore } from "@earendil-works/pi-ai";
+import { createAeonModelRuntime, refreshInBackground } from "@aeon/pi-adapter";
 import {
   availableModels,
   providerStatuses,
@@ -16,8 +16,12 @@ import { PiSettings, type ModelChoice } from "./settings.js";
 export interface ModelAccountOptions {
   /** Pi's agent directory. Default: `PI_CODING_AGENT_DIR` or `~/.pi/agent`. */
   agentDir?: string;
-  /** A custom provider collection. Default: every provider Pi ships, backed by auth.json. */
-  models?: MutableModels;
+  /** A custom provider collection. Default: every provider Pi ships, with live catalogs. */
+  models?: Models;
+  /** Test seam: the model catalog cache file. */
+  modelsStore?: ModelsStore;
+  /** Test seam: replaces `fetch` for live catalogs. */
+  fetch?: typeof fetch;
 }
 
 export interface LoginState {
@@ -34,7 +38,7 @@ export class LoginService extends EventEmitter {
   readonly agentDir: string;
   readonly store: FileCredentialStore;
   readonly settings: PiSettings;
-  readonly models: MutableModels;
+  private readonly runtime: Promise<Models>;
   private readonly sessions = new Map<string, LoginSession>();
 
   constructor(options: ModelAccountOptions = {}) {
@@ -42,16 +46,36 @@ export class LoginService extends EventEmitter {
     this.agentDir = options.agentDir ?? defaultAgentDir();
     this.store = new FileCredentialStore(join(this.agentDir, "auth.json"));
     this.settings = new PiSettings(join(this.agentDir, "settings.json"));
-    this.models = options.models ?? builtinModels({ credentials: this.store });
+    this.runtime =
+      options.models !== undefined
+        ? Promise.resolve(options.models)
+        : createAeonModelRuntime({
+            agentDirectory: this.agentDir,
+            ...(options.modelsStore ? { modelsStore: options.modelsStore } : {}),
+            ...(options.fetch ? { fetch: options.fetch } : {}),
+          });
+    // Restoring the cache is quick; the network refresh stays in the background and failures
+    // fall back to the cache, then to the built-in list.
+    void this.runtime
+      .then((models) => refreshInBackground(models, this.agentDir))
+      .catch(() => undefined);
+  }
+
+  /** The model collection, once the cached catalogs have been restored. */
+  models(): Promise<Models> {
+    return this.runtime;
   }
 
   async state(): Promise<LoginState> {
-    const [providers, models, defaultModel] = await Promise.all([
-      providerStatuses(this.models, this.store),
-      availableModels(this.models),
+    const models = await this.models();
+    const [providers, available, defaultModel] = await Promise.all([
+      providerStatuses(models, this.store),
+      availableModels(models),
       this.settings.defaultModel(),
     ]);
-    return defaultModel ? { providers, models, defaultModel } : { providers, models };
+    return defaultModel
+      ? { providers, models: available, defaultModel }
+      : { providers, models: available };
   }
 
   /** Starts a provider's sign-in. A sign-in already running for that provider is cancelled. */
@@ -60,7 +84,8 @@ export class LoginService extends EventEmitter {
     method: AuthType,
     onAuthUrl?: (url: string) => void,
   ): Promise<LoginSession> {
-    const provider = this.models.getProvider(providerId);
+    const models = await this.models();
+    const provider = models.getProvider(providerId);
     const supported = method === "oauth" ? provider?.auth.oauth : provider?.auth.apiKey?.login;
     if (!provider || !supported) throw new LoginError(`${providerId} has no ${method} sign-in`);
     for (const existing of this.sessions.values())
@@ -71,7 +96,7 @@ export class LoginService extends EventEmitter {
     if (onAuthUrl) hooks.onAuthUrl = onAuthUrl;
     const session = new LoginSession(providerId, method, hooks);
     this.sessions.set(session.id, session);
-    void session.run(this.models, await this.settings.deviceId());
+    void session.run(models, await this.settings.deviceId());
     return session;
   }
 
@@ -80,14 +105,15 @@ export class LoginService extends EventEmitter {
   }
 
   async logout(providerId: string): Promise<void> {
-    if (!this.models.getProvider(providerId))
-      throw new LoginError(`Unknown provider ${providerId}`);
-    await this.models.logout(providerId);
+    const models = await this.models();
+    if (!models.getProvider(providerId)) throw new LoginError(`Unknown provider ${providerId}`);
+    await models.logout(providerId);
     this.emit("change");
   }
 
   async setDefaultModel(choice: ModelChoice | undefined): Promise<void> {
-    if (choice && !this.models.getModel(choice.provider, choice.model))
+    const models = await this.models();
+    if (choice && !models.getModel(choice.provider, choice.model))
       throw new LoginError(`Unknown model ${choice.provider}/${choice.model}`);
     await this.settings.setDefaultModel(choice);
     this.emit("change");

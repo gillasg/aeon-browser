@@ -1,8 +1,8 @@
 diff --git a/dist/core/extensions/loader.js b/dist/core/extensions/loader.js
-index eb2bd2878081bc2840cc71f4a5effb5f652a3b8b..ae67c71ba239c21ef0920d594c60357c9af01b8d 100644
+index 7fad6e0430c473d17db67bab86975a27fa53457e..ac4efe143e96781f5c029459079dd202ebec70c5 100644
 --- a/dist/core/extensions/loader.js
 +++ b/dist/core/extensions/loader.js
-@@ -95,10 +95,10 @@ export function clearExtensionCache() {
+@@ -97,10 +97,10 @@ export function clearExtensionCache() {
      extensionCacheGeneration++;
  }
  function useExtensionCacheCwd(cwd) {
@@ -10,13 +10,13 @@ index eb2bd2878081bc2840cc71f4a5effb5f652a3b8b..ae67c71ba239c21ef0920d594c60357c
 +    // creates fresh extension instances, so a daemon serving many working directories keeps
 +    // the cache instead of re-importing every extension whenever the directory changes.
      const resolvedCwd = resolvePath(cwd);
--    if (extensionCacheCwd !== undefined && extensionCacheCwd !== resolvedCwd) {
+-    if (extensionCacheCwd !== undefined && !pathsEqual(extensionCacheCwd, resolvedCwd)) {
 -        clearExtensionCache();
 -    }
      extensionCacheCwd = resolvedCwd;
      return { cwd: resolvedCwd, generation: extensionCacheGeneration };
  }
-@@ -457,9 +457,7 @@ function createExtensionAPI(extension, runtime, cwd, eventBus) {
+@@ -463,9 +463,7 @@ function createExtensionAPI(extension, runtime, cwd, eventBus) {
      };
  }
  function isCurrentCacheToken(cacheToken) {
@@ -28,7 +28,7 @@ index eb2bd2878081bc2840cc71f4a5effb5f652a3b8b..ae67c71ba239c21ef0920d594c60357c
  async function loadExtensionModule(extensionPath, cacheToken) {
      if (isCurrentCacheToken(cacheToken)) {
 diff --git a/dist/core/sdk.js b/dist/core/sdk.js
-index 9d1f2466deab699388e7ced0021500362c6150b6..e2817a018cb24677cbed3493b95e7d175b9ec06a 100644
+index d616902a486cec4539bddb715e1cc788f8d38498..5a728e461fa8bd75752dddbcbd67b9d3b296c6ba 100644
 --- a/dist/core/sdk.js
 +++ b/dist/core/sdk.js
 @@ -82,7 +82,9 @@ export async function createAgentSession(options = {}) {
@@ -43,10 +43,10 @@ index 9d1f2466deab699388e7ced0021500362c6150b6..e2817a018cb24677cbed3493b95e7d17
      let model = options.model;
      let modelFallbackMessage;
 diff --git a/dist/core/session-manager.js b/dist/core/session-manager.js
-index 62b469b5dc3fcea2aa8f52218cbdfe892d9abed4..8bb558403f71bb860c852315126ad535c63d7a95 100644
+index 7ee05014e13c6434040bfdd7b39b455a6731a7d6..ea8091d38e2ed530530842b65de21c1b6a801a44 100644
 --- a/dist/core/session-manager.js
 +++ b/dist/core/session-manager.js
-@@ -795,8 +795,6 @@ export class SessionManager {
+@@ -796,8 +796,6 @@ export class SessionManager {
          if (!this.persist || !this.sessionFile)
              return;
          if (!this.flushed) {
@@ -85,10 +85,10 @@ index 2ee96fad28b6b73c84a3a9410e56cc78c16ab807..2589a562ca924312961f90a8e4fba604
       * How long the first prompt waits for servers with `direct` tools that are still connecting at
       * startup, in milliseconds. Their tools become available when they connect. Other servers are
 diff --git a/dist/extensions/mcp/index.js b/dist/extensions/mcp/index.js
-index 8ebc6df8ab912f6af3ebb1a4446dcb1e285af77f..ff84a38c9db827dfeff04d4c6aed265aaaafa70a 100644
+index 69edd29690f5a1513723e842e2ea4933658082e2..0e48544e5f9d5c7b9add7cc6faeb1d0d3971ee7c 100644
 --- a/dist/extensions/mcp/index.js
 +++ b/dist/extensions/mcp/index.js
-@@ -235,6 +235,26 @@ export function createMcpExtension(options = {}) {
+@@ -236,6 +236,26 @@ export function createMcpExtension(options = {}) {
          const emitChange = () => {
              for (const listener of listeners)
                  listener();
@@ -116,7 +116,7 @@ index 8ebc6df8ab912f6af3ebb1a4446dcb1e285af77f..ff84a38c9db827dfeff04d4c6aed265a
          const subscribe = (listener) => {
              listeners.add(listener);
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 3821d9f41564a68e990d233b260427d6a5681f42..90c092cef5734c3e64ada10677652cddc6ea6d84 100644
+index bb8acdb1b034f89e8fcb86a5933fa513d49a8ef3..57b64d9f59096841d2c747b4d92ea1d5a877b469 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -29,8 +29,8 @@ export { hasTrustRequiringProjectResources, type ProjectTrustDecision, ProjectTr
