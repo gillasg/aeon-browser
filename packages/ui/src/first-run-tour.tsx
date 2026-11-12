@@ -8,7 +8,7 @@ export const TOUR_KEY = "aeonTour";
 const STEPS: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: "Call Aeon on any page",
-    body: "Press Ctrl+Shift+Space on any page. the Aeon cursor opens with the page as context; press it again to close.",
+    body: "Press Ctrl+Shift+Space on any page, Aeon's own included. The Aeon cursor opens with the page as context; press it again to close.",
   },
   {
     title: "Watch it work",
