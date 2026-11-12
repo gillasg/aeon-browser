@@ -133,7 +133,8 @@ function Compose({
 function promptPlaceholder(model: OrbViewModel): string {
   if (model.ask) return "Type the answer here…";
   if (model.chatId) return "Reply to Aeon…";
-  return "Ask Aeon about this page…";
+  // Aeon's own pages are never page context.
+  return model.context.length ? "Ask Aeon about this page…" : "Ask Aeon anything…";
 }
 
 function RunningLine({

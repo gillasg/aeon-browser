@@ -1,6 +1,7 @@
 import { chatUrl, findExistingChat } from "../native-worker-tabs.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
+import { CURSOR_LOCAL, isAeonTabPage, isCursorPage, summonUpdate } from "./orb-aeon-pages.js";
 import { CURSOR_MARK, CURSOR_TOKEN_CSS } from "@browserkit/engine/cursor-mark";
 import {
   CURSOR_INSTALL,
@@ -15,8 +16,9 @@ import {
   type OrbVerify,
 } from "./orb-messages.js";
 
-// The shortcut lives in the service worker. Pages Chrome keeps extensions out of
-// (chrome://, the Web Store, the PDF viewer) get the side panel instead. The worker also keeps
+// The shortcut lives in the service worker. It starts and closes the cursor on web pages and on
+// Aeon's own tabs (Home, a chat tab); pages Chrome keeps extensions out of (chrome://, the Web
+// Store, the PDF viewer) get the side panel instead. The worker also keeps
 // the toolbar badge: how many runs need the user, else how many finished results are unread.
 // The orb is a pet: once summoned it is on every web page (its box open where it was summoned,
 // folded elsewhere) and comes back after every navigation and reload, until the shortcut, or a
@@ -74,8 +76,22 @@ function openTabTranscript(tab: chrome.tabs.Tab | undefined): undefined {
 function installFrom(tab: chrome.tabs.Tab | undefined, request: unknown): undefined {
   if (tab?.id === undefined) return undefined;
   const point = request as { x?: unknown; y?: unknown };
-  void installSharedCursor(tab.id, Number(point.x), Number(point.y));
+  const x = Number(point.x);
+  const y = Number(point.y);
+  if (isAeonTabPage(tab.url, chrome.runtime.getURL(""))) void drawOnAeonPage(tab.id, x, y);
+  else void installSharedCursor(tab.id, x, y);
   return undefined;
+}
+
+/** chrome.scripting cannot reach Aeon's own pages: they draw the cursor themselves. */
+async function drawOnAeonPage(tabId: number, x: number, y: number): Promise<void> {
+  const message = {
+    kind: CURSOR_LOCAL,
+    update: summonUpdate(x, y),
+    css: CURSOR_TOKEN_CSS,
+    mark: CURSOR_MARK,
+  };
+  await chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => undefined);
 }
 
 async function installSharedCursor(tabId: number, x: number, y: number): Promise<void> {
@@ -91,15 +107,6 @@ async function installSharedCursor(tabId: number, x: number, y: number): Promise
       args: [summonUpdate(x, y), CURSOR_TOKEN_CSS, CURSOR_MARK],
     })
     .catch(() => undefined);
-}
-
-function summonUpdate(x: number, y: number): { x: number; y: number; summon: true; place: true } {
-  return {
-    x: Number.isFinite(x) ? Math.round(x) : 56,
-    y: Number.isFinite(y) ? Math.round(y) : 56,
-    summon: true,
-    place: true,
-  };
 }
 
 function applyInstalledCursor(
@@ -132,7 +139,7 @@ async function updateBadge(): Promise<void> {
 
 function summon(tab: chrome.tabs.Tab | undefined): void {
   if (tab?.id === undefined) return;
-  if (!/^https?:/.test(tab.url ?? "")) {
+  if (!isCursorPage(tab.url, chrome.runtime.getURL(""))) {
     // Must run before any await: opening the side panel needs the shortcut's user gesture.
     if (tab.windowId !== undefined)
       void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined);
@@ -145,11 +152,17 @@ async function toggle(tabId: number): Promise<void> {
   if (await isOn()) return setOn(false);
   await setOn(true);
   await present(tabId, true);
-  // Every other web page gets the folded orb; frozen or unloaded tabs ask when they wake.
-  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }).catch(() => []);
-  for (const tab of tabs)
+  // Every other page gets the folded orb; frozen or unloaded tabs ask when they wake.
+  for (const tab of await cursorTabs())
     if (tab.id !== undefined && tab.id !== tabId && !tab.discarded)
       void present(tab.id, false).catch(() => undefined);
+}
+
+/** Web pages and Aeon's own tabs. */
+async function cursorTabs(): Promise<chrome.tabs.Tab[]> {
+  const base = chrome.runtime.getURL("");
+  const tabs = await chrome.tabs.query({}).catch(() => [] as chrome.tabs.Tab[]);
+  return tabs.filter((tab) => isCursorPage(tab.url, base));
 }
 
 async function isOn(): Promise<boolean> {
@@ -159,8 +172,7 @@ async function isOn(): Promise<boolean> {
 async function setOn(on: boolean): Promise<void> {
   await chrome.storage.session.set({ [ORB_ON_KEY]: on });
   if (on) return;
-  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }).catch(() => []);
-  for (const tab of tabs)
+  for (const tab of await cursorTabs())
     if (tab.id !== undefined)
       void chrome.tabs
         .sendMessage(tab.id, { kind: ORB_DISMISS }, { frameId: 0 })
@@ -229,7 +241,7 @@ export async function presentAsk(chatId: string): Promise<void> {
   const [tab] = await chrome.tabs
     .query({ active: true, lastFocusedWindow: true })
     .catch(() => [] as chrome.tabs.Tab[]);
-  if (tab?.id === undefined || !/^https?:/.test(tab.url ?? "")) return;
+  if (tab?.id === undefined || !isCursorPage(tab.url, chrome.runtime.getURL(""))) return;
   await chrome.storage.session.set({ ["aeon-orb-chat:" + tab.id]: chatId });
   await present(tab.id, true).catch(() => undefined);
 }
@@ -254,13 +266,19 @@ async function verify(
   message: Partial<OrbVerify>,
   sender: chrome.runtime.MessageSender,
 ): Promise<{ ok: boolean }> {
-  if (
-    typeof message.nonce !== "string" ||
-    !sender.url?.startsWith(chrome.runtime.getURL("orb.html"))
-  )
-    return { ok: false };
+  if (typeof message.nonce !== "string" || !isOrbFrameUrl(sender.url)) return { ok: false };
   const key = nonceKey(message.nonce);
   const stored = (await chrome.storage.session.get(key))[key];
   await chrome.storage.session.remove(key);
   return { ok: stored === message.tabId && sender.tab?.id === message.tabId };
+}
+
+/**
+ * orb.html, as the content script frames it: on web pages through the dynamic URL Chrome gives
+ * web-accessible resources, on Aeon's own pages from the extension's fixed origin.
+ */
+function isOrbFrameUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  if (url.startsWith(chrome.runtime.getURL("orb.html"))) return true;
+  return url.startsWith(`chrome-extension://${chrome.runtime.id}/orb.html`);
 }

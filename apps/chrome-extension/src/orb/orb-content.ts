@@ -8,10 +8,12 @@ import {
   type OrbToggle,
 } from "./orb-messages.js";
 import { startCursorControls } from "./cursor-controls.js";
+import { drawLocalCursor, isCursorLocal, pageChatId } from "./orb-aeon-pages.js";
 import { OrbOverlay } from "./orb-overlay.js";
 
-// Loaded on every http(s) page but adds nothing to it until the shortcut is pressed. While the
-// orb is on, every page asks for it on load and when it becomes visible, so it follows the user.
+// Loaded on every http(s) page, and by Aeon's own tab pages themselves, but adds nothing until the
+// shortcut is pressed. While the orb is on, every page asks for it on load and when it becomes
+// visible, so it follows the user. An Aeon page framed in another (the side panel's chat) has none.
 
 declare global {
   interface Window {
@@ -19,7 +21,9 @@ declare global {
   }
 }
 
-if (!window.__aeonOrbLoaded) {
+const aeonPage = location.protocol === "chrome-extension:";
+
+if (!window.__aeonOrbLoaded && (!aeonPage || window.parent === window)) {
   window.__aeonOrbLoaded = true;
   start();
 }
@@ -36,6 +40,7 @@ function start(): void {
   };
   const show = (message: OrbToggle) => {
     if (!overlay) {
+      followPageChat(message.tabId);
       overlay = new OrbOverlay(message.tabId, message.nonce);
       overlay.setRecording(recording);
     }
@@ -63,6 +68,8 @@ function start(): void {
   document.addEventListener("visibilitychange", restore);
 
   listenToCursorButtons(() => overlay !== undefined);
+  listenForEscape(() => overlay);
+  if (aeonPage) listenForLocalCursor();
 
   chrome.runtime.onMessage.addListener((message: unknown, sender) => {
     if (sender.id !== chrome.runtime.id) return;
@@ -82,10 +89,13 @@ function start(): void {
     if (message.kind === "aeon.orb.hide") close(message.keepRunning);
     else overlay.apply(message);
   });
+}
 
+function listenForEscape(current: () => OrbOverlay | undefined): void {
   addEventListener(
     "keydown",
     (event) => {
+      const overlay = current();
       if (event.key !== "Escape" || !overlay?.bubbleOpen) return;
       // Handled here, so browserkit does not also read this Esc as taking the tab over.
       event.preventDefault();
@@ -93,6 +103,19 @@ function start(): void {
     },
     { capture: true },
   );
+}
+
+/** Aeon's own pages draw the shared cursor themselves (chrome.scripting cannot reach them). */
+function listenForLocalCursor(): void {
+  chrome.runtime.onMessage.addListener((message: unknown, sender) => {
+    if (sender.id === chrome.runtime.id && isCursorLocal(message)) void drawLocalCursor(message);
+  });
+}
+
+/** On a chat tab, the cursor box shows the chat on the page rather than the last one used. */
+function followPageChat(tabId: number): void {
+  const chatId = aeonPage ? pageChatId(location.href) : undefined;
+  if (chatId) void chrome.storage.session.set({ ["aeon-orb-chat:" + tabId]: chatId });
 }
 
 /**
