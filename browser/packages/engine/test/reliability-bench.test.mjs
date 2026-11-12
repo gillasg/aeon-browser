@@ -5,6 +5,7 @@ const calls = [];
 const delay = {
   "DOM.describeNode": 2,
   "Accessibility.getFullAXTree": 40,
+  "Accessibility.getPartialAXTree": 1,
   "Page.getFrameTree": 8,
 };
 
@@ -16,6 +17,12 @@ globalThis.chrome = {
       return new Promise((resolve) =>
         setTimeout(() => {
           if (method === "DOM.describeNode") resolve(calls.describe ?? { node: { nodeId: 1 } });
+          else if (method === "Accessibility.getPartialAXTree")
+            resolve(
+              calls.partial ?? {
+                nodes: [{ backendDOMNodeId: 7, role: { value: "button" }, name: { value: "Go" } }],
+              },
+            );
           else if (method === "Accessibility.getFullAXTree")
             resolve(calls.tree ?? { nodes: [{ backendDOMNodeId: 7, role: { value: "button" } }] });
           else resolve({ frameTree: { frame: { id: "root" } } });
@@ -71,9 +78,9 @@ test("resolving a live node id skips the accessibility tree", async () => {
     1,
   );
   const hit = performance.now() - started;
-  assert.ok(calls.includes("DOM.describeNode"));
+  assert.ok(calls.includes("Accessibility.getPartialAXTree"));
   assert.equal(calls.includes("Accessibility.getFullAXTree"), false);
-  calls.describe = {};
+  calls.partial = { nodes: [] };
   calls.length = 0;
   const treeStarted = performance.now();
   await resolveElement(
@@ -87,19 +94,20 @@ test("resolving a live node id skips the accessibility tree", async () => {
   const miss = performance.now() - started;
   const tree = performance.now() - treeStarted;
   console.log(
-    `resolve hit ${hit.toFixed(1)} ms (describeNode); tree fallback ${tree.toFixed(1)} ms; before path about 48 ms`,
+    `resolve hit ${hit.toFixed(1)} ms (partial tree); tree fallback ${tree.toFixed(1)} ms; before path about 48 ms`,
   );
   assert.ok(hit < 30, `hit ${hit}`);
   assert.ok(tree > 40, `tree ${tree}`);
   assert.ok(calls.includes("Accessibility.getFullAXTree"));
   void miss;
   delete calls.tree;
+  delete calls.partial;
   delete calls.describe;
 });
 
 test("a backend id on an ignored node is returned for a click, not dropped as a miss", async () => {
   calls.length = 0;
-  calls.describe = {};
+  calls.partial = { nodes: [] };
   calls.tree = { nodes: [{ backendDOMNodeId: 7, ignored: true }] };
   const ref = await resolveElement(
     { tabId: 4 },
@@ -111,12 +119,12 @@ test("a backend id on an ignored node is returned for a click, not dropped as a 
   );
   assert.equal(ref.backendNodeId, 7);
   delete calls.tree;
-  delete calls.describe;
+  delete calls.partial;
 });
 
 test("a described backend id with an empty box does not walk the accessibility tree", async () => {
   calls.length = 0;
-  calls.describe = { node: { backendNodeId: 7 } };
+  calls.partial = { nodes: [{ backendDOMNodeId: 7, ignored: true }] };
   calls.tree = { nodes: [{ backendDOMNodeId: 7, ignored: true }] };
   const ref = await resolveElement(
     { tabId: 4 },
@@ -129,7 +137,7 @@ test("a described backend id with an empty box does not walk the accessibility t
   assert.equal(ref.backendNodeId, 7);
   assert.equal(calls.includes("Accessibility.getFullAXTree"), false);
   delete calls.tree;
-  delete calls.describe;
+  delete calls.partial;
 });
 
 test("attach enables the page and leaves the other domains off", async () => {

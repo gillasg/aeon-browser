@@ -32,7 +32,7 @@ test("events, uploads, frame routing and native interaction work in real Chrome"
       await f.evaluate(
         "document.querySelector('#edit').focus();document.querySelector('#edit').textContent='old'",
       );
-      await f.api.executeInteraction(f.debuggee, { op: "keys", keys: "Control+a" });
+      await f.api.executeInteraction(f.debuggee, { op: "keys", keys: "ControlOrMeta+a" });
       await f.send("Input.insertText", { text: "new" });
       assert.equal(await f.evaluate("document.querySelector('#edit').textContent"), "new");
     });

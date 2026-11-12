@@ -12,7 +12,7 @@ import { labelForAction } from "./evidence/label.js";
 import { focusFilledPassword, noteVaultFill } from "./native-browser-vault.js";
 import { withFocusEmulation } from "./native-browser-session.js";
 import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
-import { toOffscreen } from "./code-offscreen-host.js";
+import { pasteNode } from "./native-browser-paste.js";
 import {
   type BrowserExecutorRequest,
   type BrowserElementTarget,
@@ -107,14 +107,19 @@ export async function fillNode(
   id: number,
   value: string,
 ): Promise<void> {
-  const native = await onNode<string>(debuggee, id, setNativeValue, [value]);
-  if (native === "done") {
+  // A control's focus handler runs only while its document is the focused one, and a combobox
+  // can move focus into a replacement input there. Aeon fills tabs the user is not looking at,
+  // so emulate focus for the fill or the value lands in an input we never measured.
+  await withFocusEmulation(debuggee.tabId, async () => {
+    const native = await onNode<string>(debuggee, id, setNativeValue, [value]);
+    if (native === "done") {
+      await noteVaultFill(debuggee, id).catch(() => undefined);
+      return;
+    }
+    if (native !== "text") throw new Error(native);
+    await fillTextNode(debuggee, id, value);
     await noteVaultFill(debuggee, id).catch(() => undefined);
-    return;
-  }
-  if (native !== "text") throw new Error(native);
-  await fillTextNode(debuggee, id, value);
-  await noteVaultFill(debuggee, id).catch(() => undefined);
+  });
 }
 function setNativeValue(this: HTMLInputElement | HTMLSelectElement, value: string): string {
   if (this instanceof HTMLSelectElement) {
@@ -331,83 +336,6 @@ async function keyboard(debuggee: chrome.debugger.Debuggee, combo: string): Prom
   return { pressed: combo };
 }
 
-async function pasteNode(
-  debuggee: chrome.debugger.Debuggee,
-  id: number,
-  text: string,
-  html: string,
-): Promise<void> {
-  await send(debuggee, "Page.bringToFront", undefined, { label: "pasteNode" }).catch(
-    () => undefined,
-  );
-  const swap = (await toOffscreen({
-    target: "aeon-code-offscreen",
-    kind: "clipboardSwap",
-    text,
-    html,
-  }).catch((error: unknown) => ({ error: String(error) }))) as { error?: string } | undefined;
-  let backup: string | undefined;
-  let pageWritten = false;
-  if (swap?.error) {
-    backup = await pageClipboard(debuggee, "read");
-    pageWritten = Boolean(await pageClipboard(debuggee, "write", text, html));
-    if (!pageWritten) throw new BrowserActionError("CLIPBOARD_UNAVAILABLE", swap.error);
-  }
-  try {
-    await onNode(debuggee, id, function (this: HTMLElement) {
-      this.focus();
-    });
-    for (const type of ["rawKeyDown", "keyUp"] as const) {
-      await send(
-        debuggee,
-        "Input.dispatchKeyEvent",
-        {
-          type,
-          key: "v",
-          code: "KeyV",
-          modifiers: 2,
-          windowsVirtualKeyCode: 86,
-          ...(type === "rawKeyDown" ? { commands: ["paste"] } : {}),
-        },
-        { label: "pasteNode" },
-      );
-    }
-    await new Promise((done) => setTimeout(done, 30));
-    const landed = await onNode<string>(debuggee, id, function (this: HTMLElement) {
-      return this.innerHTML || this.innerText || "";
-    });
-    if (!landed || (!landed.includes(text.slice(0, 20)) && !/text/i.test(landed)))
-      await fillTextNode(debuggee, id, text);
-  } finally {
-    if (pageWritten) await pageClipboard(debuggee, "restore", backup ?? "");
-    else
-      await toOffscreen({ target: "aeon-code-offscreen", kind: "clipboardRestore" }).catch(
-        () => undefined,
-      );
-  }
-}
-
-async function pageClipboard(
-  debuggee: chrome.debugger.Debuggee,
-  action: string,
-  text = "",
-  html = "",
-): Promise<string | undefined> {
-  const expression =
-    action === "read"
-      ? "navigator.clipboard.readText().catch(()=> '')"
-      : action === "restore"
-        ? `navigator.clipboard.writeText(${JSON.stringify(text)}).then(()=> 'ok',()=> 'fail')`
-        : `navigator.clipboard.write([new ClipboardItem({"text/plain": new Blob([${JSON.stringify(text)}],{type:"text/plain"}), "text/html": new Blob([${JSON.stringify(html)}],{type:"text/html"})})]).then(()=> 'ok',()=> 'fail')`;
-  const result = (await send(
-    debuggee,
-    "Runtime.evaluate",
-    { expression, awaitPromise: true, returnByValue: true },
-    { label: "pageClipboard", ms: 5_000 },
-  ).catch(() => undefined)) as { result?: { value?: unknown } } | undefined;
-  if (action === "read") return String(result?.result?.value ?? "");
-  return result?.result?.value === "ok" ? "ok" : undefined;
-}
 function elementCaption(
   request: BrowserExecutorRequest,
   node: AxRef,
