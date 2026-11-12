@@ -291,7 +291,9 @@ test(
       await t.test("workspace calls are served by Core", async () => {
         const result = await run("await checkpoint('progress.json', {done: 3})");
         assert.equal(result.error, undefined);
-        assert.deepEqual(core.calls.at(-1), {
+        // The cell's closing observation asks for site rules after the checkpoint; what this
+        // test owns is that Core served the workspace call with its name and value.
+        assert.deepEqual(core.calls.filter((call) => call.workspace === "checkpoint").at(-1), {
           workspace: "checkpoint",
           name: "progress.json",
           value: { done: 3 },
