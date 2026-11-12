@@ -89,12 +89,21 @@ async function describeBackend(
   documentEpoch?: number,
 ): Promise<AxRef | undefined> {
   if (documentEpoch !== element.documentEpoch) throw new Error("STALE_REF");
-  if (!(await nodeExists(debuggee, element.backendNodeId))) return undefined;
+  // One node's accessibility record, not the whole tree: callers label receipts and compare
+  // the live role and name, so an empty one is a miss, not a sparse reference.
+  const partial = (await send(
+    debuggee,
+    "Accessibility.getPartialAXTree",
+    { backendNodeId: element.backendNodeId, fetchRelatives: false },
+    { label: "resolveElement" },
+  ).catch(() => undefined)) as { nodes?: AxNode[] } | undefined;
+  const node = partial?.nodes?.[0];
+  if (!node) return undefined;
   return {
     backendNodeId: element.backendNodeId,
     documentEpoch: element.documentEpoch,
-    role: "",
-    name: "",
+    role: textValue(node.role?.value),
+    name: textValue(node.name?.value),
   };
 }
 
