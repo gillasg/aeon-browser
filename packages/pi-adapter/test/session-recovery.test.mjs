@@ -9,7 +9,7 @@ import { asActivationId, asChatId, PiSessionUnavailableError } from "@aeon/domai
 import { PiSdkSessionAdapter } from "../dist/index.js";
 
 test("pinned Pi creates one stable session and flushes it without provider access", async (t) => {
-  assert.equal(VERSION, "1.4.0");
+  assert.equal(VERSION, "1.5.2");
   const paths = await makeSandbox();
   const input = makeInput(paths);
   const firstAdapter = new PiSdkSessionAdapter({

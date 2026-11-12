@@ -8,6 +8,19 @@ export {
   type AgentSurfaceTool,
 } from "./agent-surface.js";
 export { resolvePiAgentDirectory } from "./session-adapter.js";
+export {
+  aeonModelsStorePath,
+  createAeonModelRuntime,
+  createLiveModels,
+  readOpenCodeGoModels,
+  refreshInBackground,
+  withLiveModelList,
+  LIVE_MODELS_REFRESH_MS,
+  LIVE_MODELS_STORE_FILE,
+  OPENCODE_GO_MODELS_URL,
+  type AeonModelRuntimeOptions,
+  type LiveModelSource,
+} from "./live-models.js";
 export { siteMapperRequest, sessionChatId } from "./site-browser.js";
 export {
   createAeonHostHandler,

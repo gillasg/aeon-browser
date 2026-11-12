@@ -280,7 +280,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
 
   async closeAll(): Promise<void> {
     this.resources.clear();
-    this.preparedRuntime?.close();
+    await this.preparedRuntime?.close();
     const pendingSessions = [...this.liveSessions.values()];
     this.liveSessions.clear();
     await Promise.all(pendingSessions.map(async (pending) => (await pending).close()));
