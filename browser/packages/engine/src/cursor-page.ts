@@ -2,6 +2,29 @@
 // Aeon extension installs the same source, so both worlds share one host and one glide.
 import { CURSOR_MARK, CURSOR_TOKEN_CSS, glideDuration, glidePoint } from "./cursor-mark.js";
 
+/** What the painter is showing right now. Nothing shown means the host leaves the page. */
+export interface CursorPaint {
+  needs?: boolean;
+  glow?: boolean;
+  pill?: boolean;
+  spotlight?: boolean;
+  callout?: boolean;
+  keys?: boolean;
+  cursorShown?: boolean;
+  opacity?: string;
+}
+
+/**
+ * Whether anything of the cursor's is on screen. The host (and the extension's buttons beside it)
+ * is removed from the page once this is false and stays so: a page with nothing happening on it
+ * carries no DOM of ours.
+ */
+export function cursorVisible(paint: CursorPaint): boolean {
+  if (paint.needs === true) return true;
+  if (paint.glow || paint.pill || paint.spotlight || paint.callout || paint.keys) return true;
+  return paint.cursorShown === true && paint.opacity !== "0";
+}
+
 const PAGE_STYLE = [
   ".g{position:fixed;inset:0;border-radius:var(--aeon-r-18);pointer-events:none;opacity:0;transform:none;",
   "box-shadow:inset 0 0 0 1.5px var(--aeon-island-glow-line),inset 0 0 22px var(--aeon-island-glow-mid),inset 0 0 80px var(--aeon-island-glow-soft);",
@@ -133,6 +156,31 @@ const PAGE_BODY = `
       };
       host.dataset.aeonControls = JSON.stringify({ tr: first(".tr"), stop: first(".stop") });
     };
+    state.shown = function () {
+      return cursorVisible({
+        needs: state.wrap.classList.contains("needs"),
+        glow: state.glow.classList.contains("on"),
+        pill: state.pill.classList.contains("on"),
+        spotlight: state.spotlight.classList.contains("on"),
+        callout: state.callout.classList.contains("on"),
+        keys: state.keys.classList.contains("on"),
+        cursorShown: state.cursorShown,
+        opacity: state.cursor.style.opacity
+      });
+    };
+    state.restSoon = function () {
+      clearTimeout(state.restTimer);
+      state.restTimer = setTimeout(function () {
+        if (state.shown()) return;
+        state.restWatch.disconnect();
+        cancelAnimationFrame(state.frame);
+        clearTimeout(state.hide); clearTimeout(state.keysHide); clearInterval(state.type);
+        host.remove();
+      }, 1200);
+    };
+    state.restWatch = new MutationObserver(state.restSoon);
+    state.restWatch.observe(state.wrap, { attributes: true, subtree: true, attributeFilter: ["class", "style"] });
+    state.restSoon();
     state.pill.addEventListener("mouseenter", function () { clearTimeout(state.hide); state.publish(); });
     state.pill.addEventListener("mouseleave", function () {
       if (!state.wrap.classList.contains("needs")) state.hide = setTimeout(function () { state.pill.classList.remove("on"); state.publish(); }, 2500);
@@ -255,12 +303,12 @@ const PAGE_BODY = `
     var old = state.pill.querySelector(".ask");
     if (old) old.remove();
     if (next.needs) paintAsk(state, makeNode);
-    if (!next.needs) state.hide = setTimeout(function () { state.pill.classList.remove("on"); }, next.transient ? 2000 : 6000);
+    if (!next.needs) state.hide = setTimeout(function () { state.pill.classList.remove("on"); state.publish(); }, next.transient ? 2000 : 6000);
   }
   function paintAsk(state, makeNode) {
     var ask = makeNode("div", { class: "ask" });
     var field = makeNode("input", { type: "text", placeholder: "Or type the answer here…", "aria-label": "Type the answer" });
-    var answer = function (value) { globalThis[Symbol.for("aeon.handoff")] = value; state.wrap.classList.remove("needs"); state.pill.classList.remove("on"); };
+    var answer = function (value) { globalThis[Symbol.for("aeon.handoff")] = value; state.wrap.classList.remove("needs"); state.pill.classList.remove("on"); state.publish(); };
     var finish = function () { answer(field.value.trim() ? { answer: field.value.trim().slice(0, 2000) } : "done"); };
     field.addEventListener("keydown", function (event) { event.stopPropagation(); if (event.key === "Enter" && !event.isComposing) finish(); });
     ["keyup", "keypress", "input"].forEach(function (kind) { field.addEventListener(kind, function (event) { event.stopPropagation(); }); });
@@ -299,6 +347,7 @@ const PAGE_BODY = `
     state.callout.classList.remove("on");
     state.keys.classList.remove("on");
     node.setAttribute("aria-hidden", "true");
+    state.publish();
   }
   function toRgb(color) {
     var text = String(color || "").trim();
@@ -320,6 +369,8 @@ export function cursorFunctionSource(): string {
     glidePoint.toString() +
     "\n" +
     glideDuration.toString() +
+    "\n" +
+    cursorVisible.toString() +
     "\n" +
     PAGE_BODY +
     "\n}"

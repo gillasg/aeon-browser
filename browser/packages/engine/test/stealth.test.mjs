@@ -24,7 +24,7 @@ test("each observable signal is named", () => {
       wrapped: ["window.open"],
       geolocationShim: true,
     },
-    { runtimeEnabled: true, injectedScripts: ["quiet tab"] },
+    { runtimeEnabled: true, injectedScripts: [{ label: "quiet tab", world: "main" }] },
   );
   assert.equal(report.detectable, true);
   assert.equal(report.signals.length, 7);
@@ -34,12 +34,34 @@ test("each observable signal is named", () => {
   assert.match(report.signals.join("\n"), /#aeon-handoff/);
   assert.match(report.signals.join("\n"), /window\.open/);
   assert.match(report.signals.join("\n"), /quiet tab/);
+  assert.deepEqual(report.diagnostics, []);
+});
+
+test("an isolated-world helper is metadata, not a page-visible signal", () => {
+  const report = judgeStealth(
+    {},
+    {
+      runtimeEnabled: false,
+      injectedScripts: [
+        { label: "the settle probe (isolated world)", world: "isolated" },
+        { label: "first download: reissue when Chrome drops it", world: "isolated" },
+      ],
+    },
+  );
+  assert.equal(report.detectable, false);
+  assert.deepEqual(report.signals, []);
+  assert.equal(report.diagnostics.length, 2);
+  assert.match(report.diagnostics.join("\n"), /isolated-world helper/);
+  assert.match(report.diagnostics.join("\n"), /settle probe/);
 });
 
 test("queued scripts are cleared with the tab", () => {
   noteInjectedScript(7, "dialogs");
   noteInjectedScript(7, "location");
-  assert.deepEqual(injectedScripts(7).sort(), ["dialogs", "location"]);
+  assert.deepEqual(
+    injectedScripts(7).map((script) => script.label),
+    ["dialogs", "location"],
+  );
   forgetStealth(7);
   assert.deepEqual(injectedScripts(7), []);
 });

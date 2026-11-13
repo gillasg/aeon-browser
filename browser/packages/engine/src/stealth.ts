@@ -2,16 +2,27 @@
 // only it knows (an open Runtime domain, scripts queued for every new document). Detection is
 // reported, never hidden: page.stealthCheck() is a diagnostic, not a guarantee.
 
-const injected = new Map<number, Set<string>>();
-
-/** Records a script the engine queued for every document of a tab, so checks can name it. */
-export function noteInjectedScript(tabId: number, label: string): void {
-  const labels = injected.get(tabId) ?? new Set<string>();
-  labels.add(label);
-  injected.set(tabId, labels);
+/** A script the engine queued for every document of a tab, and the world it runs in. */
+export interface InjectedScript {
+  label: string;
+  /** `main` runs in the page's own world (a page can see it); `isolated` cannot be read by page code. */
+  world: "main" | "isolated";
 }
 
-export function injectedScripts(tabId: number): string[] {
+const injected = new Map<number, InjectedScript[]>();
+
+/** Records a script the engine queued for every document of a tab, so checks can name it. */
+export function noteInjectedScript(
+  tabId: number,
+  label: string,
+  world: InjectedScript["world"] = "main",
+): void {
+  const scripts = injected.get(tabId) ?? [];
+  if (!scripts.some((script) => script.label === label)) scripts.push({ label, world });
+  injected.set(tabId, scripts);
+}
+
+export function injectedScripts(tabId: number): InjectedScript[] {
   return [...(injected.get(tabId) ?? [])];
 }
 
@@ -32,19 +43,23 @@ export interface StealthProbe {
 
 export interface StealthState {
   runtimeEnabled: boolean;
-  injectedScripts: string[];
+  injectedScripts: InjectedScript[];
 }
 
 export interface StealthReport extends StealthState {
+  /** True when a page can observe the agent itself; engine-only metadata does not count. */
   detectable: boolean;
   /** One readable line per signal a page can see. */
   signals: string[];
+  /** Engine metadata a page cannot read (isolated worlds, scripts queued for documents). */
+  diagnostics: string[];
   probe: StealthProbe;
 }
 
-/** Turns the page's observations and the engine's own state into named, readable signals. */
+/** Turns the page's observations and the engine's own state into named, readable lines. */
 export function judgeStealth(probe: StealthProbe, state: StealthState): StealthReport {
   const signals: string[] = [];
+  const diagnostics: string[] = [];
   if (probe.webdriver === true)
     signals.push("navigator.webdriver is true (Chrome is in automation mode)");
   if (state.runtimeEnabled)
@@ -58,11 +73,18 @@ export function judgeStealth(probe: StealthProbe, state: StealthState): StealthR
     signals.push("navigator.geolocation is answered by the agent's location shim");
   for (const name of probe.leaks ?? [])
     signals.push(`a wrapper leaves a detectable property: ${name}`);
-  for (const name of state.injectedScripts)
-    signals.push(`a script is queued for every document of this tab: ${name}`);
+  for (const script of state.injectedScripts) {
+    if (script.world === "main")
+      signals.push(`a script runs in the page's own world on every document: ${script.label}`);
+    else
+      diagnostics.push(
+        `an isolated-world helper of Aeon's runs here (page code cannot read it): ${script.label}`,
+      );
+  }
   return {
     detectable: signals.length > 0,
     signals,
+    diagnostics,
     runtimeEnabled: state.runtimeEnabled,
     injectedScripts: state.injectedScripts,
     probe,
