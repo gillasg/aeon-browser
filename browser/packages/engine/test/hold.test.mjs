@@ -38,15 +38,19 @@ function windowInfo() {
   };
 }
 
-function sendCommand(_debuggee, method, params) {
+// A press the browser takes a while to deliver: the page counts its dwell from that moment.
+let pressDelayMs = 0;
+
+async function sendCommand(_debuggee, method, params) {
+  if (pressDelayMs > 0 && method === "Input.dispatchMouseEvent" && params?.type === "mousePressed")
+    await new Promise((done) => setTimeout(done, pressDelayMs));
   calls.push({ method, params, at: Date.now() });
-  if (method === "Page.getFrameTree")
-    return Promise.resolve({ frameTree: { frame: { id: "frame" } } });
-  if (method === "Page.createIsolatedWorld") return Promise.resolve({ executionContextId: 3 });
+  if (method === "Page.getFrameTree") return { frameTree: { frame: { id: "frame" } } };
+  if (method === "Page.createIsolatedWorld") return { executionContextId: 3 };
   if (method === "Runtime.evaluate") {
     const expression = String(params?.expression ?? "");
     if (expression.includes("__aeonQuiet")) {
-      return Promise.resolve({
+      return {
         result: {
           value: {
             ready: "complete",
@@ -56,11 +60,11 @@ function sendCommand(_debuggee, method, params) {
             changes: 1,
           },
         },
-      });
+      };
     }
-    return Promise.resolve({ result: { value: "ok" } });
+    return { result: { value: "ok" } };
   }
-  return Promise.resolve({});
+  return {};
 }
 
 globalThis.chrome = {
@@ -264,6 +268,25 @@ test("press-and-hold", async (t) => {
       assert.ok(events[release].at - events[press].at < 1500);
     },
   );
+
+  await t.test("a slow press counts the hold from when the page received it", async () => {
+    calls.length = 0;
+    pressDelayMs = 300;
+    try {
+      await holdAt({ tabId: 3 }, 40, 50, 200);
+    } finally {
+      pressDelayMs = 0;
+    }
+    const events = mice();
+    const press = events.find((event) => event.params.type === "mousePressed");
+    const release = events.findLast((event) => event.params.type === "mouseReleased");
+    // press.at is the moment the browser answered the press, i.e. what the page's own clock
+    // saw; the release must still come a full `ms` after that, not early by the delivery time.
+    assert.ok(
+      release.at - press.at >= 200,
+      `the page saw ${release.at - press.at} ms of a 200 ms hold`,
+    );
+  });
 
   await t.test("holdAt returns the same action receipt as a click", async () => {
     calls.length = 0;

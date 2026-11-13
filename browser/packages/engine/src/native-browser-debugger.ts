@@ -447,13 +447,16 @@ async function holdPressed(
   ms: number,
 ): Promise<void> {
   const at = await land(debuggee, x, y, "holdAt");
-  const pressedAt = Date.now();
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
     { type: "mousePressed", ...at, button: "left", clickCount: 1, buttons: 1 },
     { label: "holdAt" },
   );
+  // The page times its dwell from the mousedown it receives, so the clock starts when the press
+  // has landed. Counting from before the send made a slow renderer shorten the hold (a 1.2s hold
+  // against a 1s control released before the page had seen a second pass).
+  const pressedAt = Date.now();
   let next = pressedAt + HOLD_JITTER_MIN_MS + Math.floor(Math.random() * HOLD_JITTER_SPAN_MS);
   while (Date.now() - pressedAt < ms) {
     const left = ms - (Date.now() - pressedAt);
