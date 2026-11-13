@@ -199,6 +199,8 @@ function __abilityOutcome(name, raw) {
 }
 var __siteAbilities = {
   run: async (name, inputs = {}, options = {}) => {
+    // Models that have just used siteMapper.call(site, operation, params) try the same order here.
+    if (typeof inputs === 'string') throw Error('site.run takes the ability name first, then its inputs: site.run(name, inputs, {site}).');
     var host = await __siteHostName(options.site);
     // Page code (built-in abilities, page-script reads) runs right here, in this cell's tabs.
     var plan = await __call({abilityRun: {site: host, name, inputs, plan: true, ...(options.via ? {via: options.via} : {})}});

@@ -8,10 +8,12 @@
   blog): `browserkit crawl <url> --out site.md`.
 - **Which of many sites load** (dead links, parked domains, which answer an API path): `browserkit
 check <urls|--file f>`, with evidence per site. Far cheaper than opening each one.
-- **Call a site's API**: only if the site is mapped (`browserkit sites`). One call replaces many
-  page actions and returns JSON with the user's session. If it is not mapped, map it (`map`,
-  `describe`, `learn`) or just use the page. `map <url> --until-idle` (or `--for 60`) records
-  without waiting for Enter, for scripts and agents.
+- **Call a site's API**: the first turn names one (`[api]`); a mapped site also lists them
+  (`browserkit sites`). One call replaces many page actions and returns JSON with the user's
+  session. A `[saved]` line is a saved ability, not an operation: `site.run` or `site_mapper
+ability`, never `call`. If it is not mapped, map it (`map`, `describe`, `learn`) or just use the
+  page. `map <url> --until-idle` (or `--for 60`) records without waiting for Enter, for scripts and
+  agents.
 - **A site used repeatedly**, where the answer must keep coming: map it, then `call`, `watch`,
   `federate` (several sites at once, with provenance).
 - **What the user visited, saved or has open**: their history, bookmarks and open tabs, not a
@@ -23,8 +25,8 @@ check <urls|--file f>`, with evidence per site. Far cheaper than opening each on
   site in the browser. Web search only finds which page to open (`search` uses keyless
   providers, and Google in the user's browser for local, live and personal queries).
 - **A lasting tool for one task on a site** ("make me something that checks X"): build an ability
-  (`browserkit abilities build <site> "<task>"`); it is tested before it is saved, or says why the
-  site cannot do it.
+  — `site_mapper` with `action: 'build'`, `site` and `goal` in a chat, `browserkit abilities build
+<site> "<task>"` in a shell. It is tested before it is saved, or says why the site cannot do it.
 - **What a page sends** (the API behind it, a download link, a stream): network capture,
   `help('network')`; live WebSockets and event streams, `help('live')`; everything else DevTools
   shows (elements, console, sources, performance, memory, application storage), `help('devtools')`.

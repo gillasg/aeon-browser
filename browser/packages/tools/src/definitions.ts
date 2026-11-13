@@ -331,7 +331,12 @@ const siteMapperParameters: JsonObjectSchema = {
   type: "object",
   properties: {
     action: { type: "string", enum: [...SITE_MAPPER_TOOL_ACTIONS] },
-    name: { type: "string", maxLength: 200, description: "For action and channel: its name." },
+    name: {
+      type: "string",
+      maxLength: 200,
+      description:
+        "For ability: the ability's name, from a `[saved]` line. For action and channel: its name.",
+    },
     steps: {
       ...strings,
       maxItems: 20,
@@ -369,8 +374,15 @@ const siteMapperParameters: JsonObjectSchema = {
       enum: ["read", "write"],
       description: "For build: read (default) or write; a write is learned in dry run.",
     },
-    operation: { type: "string", maxLength: 200 },
-    params: { type: "object" },
+    operation: {
+      type: "string",
+      maxLength: 200,
+      description: "For call, watch and signing: the operation, from an `[api]` line.",
+    },
+    params: {
+      type: "object",
+      description: "For call, ability, watch and channel: the inputs, flat by name.",
+    },
     transport: { type: "string", enum: ["auto", "page", "direct"] },
     via: { type: "string", enum: ["api", "steps", "script", "page"] },
     files: {
@@ -412,7 +424,7 @@ const siteMapperParameters: JsonObjectSchema = {
 export const siteMapperTool: AgentToolDefinition<SiteMapperToolInput> = {
   name: "site_mapper",
   description:
-    "Call a site's abilities (actions: sites, operations, call, ability, watch, channel), see its published docs, keep it working (heal, coverage, edit, name, describe, signing, session, export), or map sites you haven't used: by name (explore) or from capture files (import). build makes one tested ability for a task (goal) by doing it once in a background tab; a write is learned in dry run. ability lists or runs one site ability (its API first, then replay steps, page code or node code); key makes a write apply once, limit/cursor page a list, test runs its stored cases. code reads routes, chunks, source maps, robots and sitemap before guessing URLs. Calls use the user's logins.",
+    "Work a mapped site. `[api]` lines on the first turn are mapped reads: call, with site, operation and params. `[saved]` lines are saved abilities: ability, with site, name and params — call cannot run an ability. When one covers the request and its inputs are given, make that call now; sites and operations are for when nothing on the turn fits. build makes one tested ability for a task (goal) by doing it once in a background tab, a write learned in dry run; ability lists or runs one; watch returns only what is new; channel listens on a live feed. docs, heal, coverage, edit, name, describe, signing, session, export, explore, import and code map, read and keep the rest. Calls use the user's logins.",
   actions: [
     { name: "sites", params: [] },
     { name: "code", params: ["url", "grep", "maxFiles", "maxBytes"] },
