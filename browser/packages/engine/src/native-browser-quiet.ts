@@ -128,6 +128,7 @@ export async function enableQuietTab(
     noteInjectedScript(
       tabId,
       options.ads ? "quiet tab: media muted, ads filtered" : "quiet tab: media muted",
+      "main",
     );
   }
   if (options.ads) await addRules(tabId);

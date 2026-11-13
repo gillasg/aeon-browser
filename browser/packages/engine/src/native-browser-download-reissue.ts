@@ -124,7 +124,7 @@ function requestDownload(url: string, filename?: string): Promise<boolean> {
 }
 
 async function installDownloadHook(tabId: number): Promise<void> {
-  noteInjectedScript(tabId, "first download: reissue when Chrome drops it (isolated world)");
+  noteInjectedScript(tabId, "first download: reissue when Chrome drops it", "isolated");
   await send(
     { tabId },
     "Page.addScriptToEvaluateOnNewDocument",

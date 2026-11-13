@@ -5,6 +5,7 @@ import { callClass, send } from "./cdp/send.js";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import { refusedCdp } from "./native-browser-guards.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { noteInjectedScript } from "./stealth.js";
 
 interface Activity {
   pending: Map<string, number>;
@@ -141,17 +142,106 @@ function sendOpts(label: string, method: string, params: unknown): { label: stri
   return { label, ms: scriptMs(typeof timeout === "number" ? timeout : 0) };
 }
 
+// The settle probe keeps its observer in its own world, not the page's: the page cannot list a
+// world it does not own, so no `__aeon*` global (and no observer) shows up in a check. One world
+// per document: a navigation drops the context and the next probe makes another.
+const QUIET_WORLD = "browserkit-quiet";
+interface QuietWorld {
+  /** The main frame, which stays the same id across that tab's navigations. */
+  frame?: string;
+  context?: number;
+  /** This document has no isolated world (chrome://, the Web Store): use the page's own. */
+  pageWorld: boolean;
+}
+const quietWorlds = new Map<number, QuietWorld>();
+
+function forgetQuietWorld(tabId: number): void {
+  const state = quietWorlds.get(tabId);
+  if (!state) return;
+  delete state.context;
+  state.pageWorld = false;
+}
+
+onEngineInstall(() => {
+  chrome.debugger.onEvent.addListener((source, method, params) => {
+    if (method !== "Page.frameNavigated" || source.tabId === undefined) return;
+    if ((params as { frame?: { parentId?: string } }).frame?.parentId) return;
+    forgetQuietWorld(source.tabId);
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => quietWorlds.delete(tabId));
+});
+
+async function mainFrame(
+  debuggee: chrome.debugger.Debuggee,
+  tabId: number,
+  state: QuietWorld,
+): Promise<string> {
+  if (state.frame) return state.frame;
+  const tree = (await send(debuggee, "Page.getFrameTree", {}, { label: "quietFrame" })) as
+    { frameTree?: { frame?: { id?: string } } } | undefined;
+  const frame = tree?.frameTree?.frame?.id;
+  if (!frame) throw new Error("Execution context changed");
+  state.frame = frame;
+  quietWorlds.set(tabId, state);
+  return frame;
+}
+
+async function quietContext(debuggee: chrome.debugger.Debuggee): Promise<number | undefined> {
+  const tabId = debuggee.tabId;
+  if (tabId === undefined) return undefined;
+  const state = quietWorlds.get(tabId) ?? { pageWorld: false };
+  if (state.pageWorld) return undefined;
+  if (state.context !== undefined) return state.context;
+  const frameId = await mainFrame(debuggee, tabId, state);
+  // A frame mid-commit refuses the world once; the next probe (20 ms later) gets one. Two tries
+  // tell "not ready yet" from "this scheme has no isolated worlds" without leaking into the page.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const made = (await send(
+      debuggee,
+      "Page.createIsolatedWorld",
+      { frameId, worldName: QUIET_WORLD },
+      { label: "quietWorld" },
+    ).catch(() => undefined)) as { executionContextId?: number } | undefined;
+    const context = made?.executionContextId;
+    if (context !== undefined) {
+      state.context = context;
+      quietWorlds.set(tabId, state);
+      noteInjectedScript(tabId, "the settle probe (isolated world)", "isolated");
+      return context;
+    }
+    await new Promise((done) => setTimeout(done, 20));
+  }
+  state.pageWorld = true;
+  quietWorlds.set(tabId, state);
+  noteInjectedScript(
+    tabId,
+    "the settle probe (page world: no isolated world on this page)",
+    "main",
+  );
+  return undefined;
+}
+
 async function probe(debuggee: chrome.debugger.Debuggee): Promise<PageProbe | undefined> {
+  const contextId = await quietContext(debuggee);
   const result = (await send(
     debuggee,
     "Runtime.evaluate",
-    { expression: `(${domQuietProbe.toString()})()`, returnByValue: true },
+    {
+      expression: `(${domQuietProbe.toString()})()`,
+      returnByValue: true,
+      ...(contextId === undefined ? {} : { contextId }),
+    },
     { label: "probe", ms: 5_000 },
-  )) as { result?: { value?: PageProbe }; exceptionDetails?: unknown };
+  ).catch((error: unknown) => {
+    if (debuggee.tabId !== undefined) forgetQuietWorld(debuggee.tabId);
+    throw error;
+  })) as { result?: { value?: PageProbe }; exceptionDetails?: unknown };
   if (result.exceptionDetails) throw new Error("Execution context changed");
   return result.result?.value;
 }
 function domQuietProbe() {
+  // Runs in the tab's own isolated world (or, on a page that has none, its own window). The
+  // observer and its state never touch the page's globals in the normal case.
   // Aeon's own layers (labels, annotations, the agent cursor) are not the page changing.
   const OVERLAY = "[data-aeon-overlay],[data-browserkit-overlay]";
   const host = window as unknown as {

@@ -42,16 +42,31 @@ export function parseControls(raw: string | undefined): CursorControls | null {
   }
 }
 
+/** The boxes worth mounting buttons for: no box on screen means nothing of ours in the page. */
+export function controlsToShow(raw: string | undefined): CursorControls | null {
+  const controls = parseControls(raw);
+  return controls?.tr || controls?.stop ? controls : null;
+}
+
 export function startCursorControls(send: (kind: string) => void, summoned: () => boolean): void {
-  const buttons = mountButtons((action, event) => {
-    if (!acceptCursorClick(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    send(controlKind(action, summoned()));
-  });
+  let buttons: ControlButtons | undefined;
+  // Nothing of ours in the page until there is something to click: the host is created for the
+  // pill's two buttons and removed again when the pill is not showing its boxes.
   const sync = () => {
+    const controls = controlsToShow(cursorAttribute());
+    if (!controls) {
+      buttons?.host.remove();
+      buttons = undefined;
+      return;
+    }
+    buttons ??= mountButtons((action, event) => {
+      if (!acceptCursorClick(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      send(controlKind(action, summoned()));
+    });
     raise(buttons.host);
-    applyControls(buttons, parseControls(cursorAttribute()));
+    applyControls(buttons, controls);
   };
   watchCursor(sync);
   sync();

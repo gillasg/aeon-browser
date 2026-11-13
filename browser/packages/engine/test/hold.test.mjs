@@ -40,6 +40,9 @@ function windowInfo() {
 
 function sendCommand(_debuggee, method, params) {
   calls.push({ method, params, at: Date.now() });
+  if (method === "Page.getFrameTree")
+    return Promise.resolve({ frameTree: { frame: { id: "frame" } } });
+  if (method === "Page.createIsolatedWorld") return Promise.resolve({ executionContextId: 3 });
   if (method === "Runtime.evaluate") {
     const expression = String(params?.expression ?? "");
     if (expression.includes("__aeonQuiet")) {
