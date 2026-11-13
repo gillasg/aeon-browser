@@ -424,7 +424,7 @@ const siteMapperParameters: JsonObjectSchema = {
 export const siteMapperTool: AgentToolDefinition<SiteMapperToolInput> = {
   name: "site_mapper",
   description:
-    "Work a mapped site. `[api]` lines on the first turn are mapped reads: call, with site, operation and params. `[saved]` lines are saved abilities: ability, with site, name and params — call cannot run an ability. When one covers the request and its inputs are given, make that call now; sites and operations are for when nothing on the turn fits. build makes one tested ability for a task (goal) by doing it once in a background tab, a write learned in dry run; ability lists or runs one; watch returns only what is new; channel listens on a live feed. docs, heal, coverage, edit, name, describe, signing, session, export, explore, import and code map, read and keep the rest. Calls use the user's logins.",
+    "Work a site: call what is mapped, learn what is not. `[api]` lines on the first turn are mapped reads: call, with site, operation and params. `[saved]` lines are saved abilities: ability, with site, name and params — call cannot run an ability. When one covers the request and its inputs are given, make that call now; sites and operations are for when nothing on the turn fits. build makes one tested ability for a task (goal) by doing it once in a background tab, a write learned in dry run; ability lists or runs one; watch returns only what is new; channel listens on a live feed. docs, heal, coverage, edit, name, describe, signing, session, export, explore, import and code map, read and keep the rest. Calls use the user's logins.",
   actions: [
     { name: "sites", params: [] },
     { name: "code", params: ["url", "grep", "maxFiles", "maxBytes"] },
