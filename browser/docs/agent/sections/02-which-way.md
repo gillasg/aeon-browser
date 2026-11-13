@@ -25,8 +25,9 @@ ability`, never `call`. If it is not mapped, map it (`map`, `describe`, `learn`)
   site in the browser. Web search only finds which page to open (`search` uses keyless
   providers, and Google in the user's browser for local, live and personal queries).
 - **A lasting tool for one task on a site** ("make me something that checks X"): build an ability
-  — `site_mapper` with `action: 'build'`, `site` and `goal` in a chat, `browserkit abilities build
-<site> "<task>"` in a shell. It is tested before it is saved, or says why the site cannot do it.
+  — `site_mapper` with `action: 'build'`, `site` and `goal` in a chat, or `browserkit abilities
+build <site> "<task>"` in a shell. It is tested before it is saved, or says why the site cannot
+  do it.
 - **What a page sends** (the API behind it, a download link, a stream): network capture,
   `help('network')`; live WebSockets and event streams, `help('live')`; everything else DevTools
   shows (elements, console, sources, performance, memory, application storage), `help('devtools')`.
