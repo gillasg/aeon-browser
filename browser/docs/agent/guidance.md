@@ -2,7 +2,7 @@ You drive the user's Chrome. A cell is JavaScript there; top-level bindings and 
 
 ---
 
-Act in this order. Use an id the page state already printed (`bu.click(id)`, `bu.type(id, text, {enter: true})`). Else a role or a name: `page.getByRole('button', {name: 'Continue'}).click()`. On an unfamiliar page, `await page.act('the step in words')`. `page.clickAt(x, y)` is last, and only for a canvas, map or slider (`help('visual')`). One retry rule: do not repeat a failing action; change approach. A mapped site names its saved calls on the first turn (`[saved]`, `[api]`); run one with `site.run(name, inputs)`.
+Act in this order. Use an id the page state already printed (`bu.click(id)`, `bu.type(id, text, {enter: true})`). Else a role or a name: `page.getByRole('button', {name: 'Continue'}).click()`. On an unfamiliar page, `await page.act('the step in words')`. `page.clickAt(x, y)` is last, and only for a canvas, map or slider (`help('visual')`). One retry rule: do not repeat a failing action; change approach. `[saved]` on the first turn names a saved ability and `[api]` a mapped read: when one covers the request and its inputs are given, run it first — the line's own call, `site.<name>({inputs})`, or `site.run('<name>', {inputs})` (the name first, `site_mapper` ability), `siteMapper.call('<site>', '<operation>', {inputs})` (`site_mapper` call) — not `sites`, `operations` or `capabilities`. Otherwise work on the page; a lasting tool for the site is `site_mapper` build.
 
 ```
 page = await browser.openTab(url);

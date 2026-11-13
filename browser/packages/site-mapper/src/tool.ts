@@ -71,7 +71,7 @@ export interface SiteToolInput {
 export const SITE_TOOL_HELP = [
   "how a site works (routes, endpoints): code(url) before guessing URLs.",
   "docs: the site's published API documents (OpenAPI/Swagger) and GraphQL schemas, read with the user's session: operations nobody clicked yet. Saved in the site's folder.",
-  "actions: list saved multi-step actions, or save one with name, steps (operation ids in order) and description. action runs one by name with params as inputs; each step's result feeds the next.",
+  "actions/action: list, save (name, steps as operation ids in order, description) or run a saved multi-step action by name; each step's result feeds the next.",
   "recipe: with no name, lists the site's recipes (API-then-page strategies, fields, health); with name and params, runs one and returns its mapped records. Recipes live in the site pack; a write recipe records a receipt so a repeat is skipped.",
   "channel: the site's live WebSocket/event streams (operations lists them); with name, listens on one from the site's page (params: send [messages], seconds, match) and returns what arrived.",
   "session: export the user's session so calls run without the browser (renewed from the browser when it expires). export: OpenAPI, AsyncAPI, a typed client and reports into folder.",

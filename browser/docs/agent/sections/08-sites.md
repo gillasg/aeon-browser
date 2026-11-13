@@ -14,8 +14,10 @@ browserkit abilities run shop.example order --inputs '{"item":"tea"}' --key orde
 browserkit abilities test shop.example search  # its stored cases; fails on constant output
 ```
 
-- **A `[site]` line** appears when you open a mapped site: it names the site's abilities and API
-  reads. Use them instead of clicking through the pages.
+- **A mapped site says what it can do.** The first turn's `[saved]` line names its saved
+  abilities and `[api]` its mapped reads; a `[site]` line repeats them when you open the site.
+  Run the one that fits instead of clicking through the pages, and when it covers the request
+  with the inputs given, it is the whole job.
 - **Routes are saved silently** after a successful run. Do not ask the user to save the task.
   A long first run on a site with no map gets a daemon offer to learn it; that offer is not yours
   to write. Learning a site maps what it can do; an ability is one task saved to run in one call.
@@ -27,9 +29,11 @@ browserkit abilities test shop.example search  # its stored cases; fails on cons
   tab, fastest), then a page way (`page` collect for lists, a `page` script when the data only
   exists rendered) so a changed API still works; `steps` for click flows with no clean API (forms,
   wizards, anything that pays or posts); a `node` script to combine several calls.
-- **Start with `site.capabilities()`** in browser code (or `browserkit capabilities <site>`): the
-  site's abilities, mapped operations, notes and WebMCP tools in one answer. Run one with
-  `site.run(name, inputs, {via, key, limit, cursor})` or `site.<name>(inputs)`.
+- **The full list** is `site.capabilities()` in browser code (or `browserkit capabilities <site>`):
+  the site's abilities, mapped operations, notes and WebMCP tools in one answer. Ask for it when
+  the turn's lines do not cover the task. Run an ability with `site.run(name, inputs, {via, key,
+limit, cursor})` or `site.<name>(inputs)`. An ability is not a mapped operation: `call` and
+  `siteMapper.call` never run one, `ability` and `site.run` do.
 - **Site notes** are short facts the next visit can use: a selector, a url, a page type, a
   control, a pace, or a quirk (`{kind, key, value}`, value at most 120
   characters, same-origin URLs only). They load by themselves. Save one with
@@ -42,9 +46,10 @@ browserkit abilities test shop.example search  # its stored cases; fails on cons
   read may say `partial` when a way saw only part; `{complete: true}` skips those ways. Saving
   runs the new way's tests first: a failure names the reason and leaves the old ways in place.
   Details: `help('abilities')`.
-- **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped. Check `sites`
-  first. To map a site: `map`, `describe`, `learn`, or use it in `browser_code` so its requests are
-  learned as you go.
+- **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped: a mapped
+  site shows `[api]` on the first turn, and a `[site]` line when you open it. `browserkit sites`
+  lists them when nothing on the turn matches. To map a site: `map`, `describe`, `learn`, or use
+  it in `browser_code` so its requests are learned as you go.
 - `call` reads. A write the page made successfully can be repeated with `siteMapper.write`; the
   same change on many items is `siteMapper.batch` in one call (paced, stops at the first error).
   Paying, ordering, sending, posting, deleting and account changes always stay in the page.
