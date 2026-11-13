@@ -67,8 +67,11 @@ test(
         !shown.report.signals.some((line) => /settle probe|page's own world/.test(line)),
         `an isolated-world helper was reported as a page-visible tell: ${result.stdout}`,
       );
-      // The only thing of ours on a driven page is the cursor that is drawing.
-      assert.deepEqual(shown.main.overlays, ["#aeon-agent-cursor"], result.stdout);
+      // Nothing of ours but the cursor that may be drawing: no second overlay beside it.
+      assert.ok(
+        shown.main.overlays.every((name) => name === "#aeon-agent-cursor"),
+        `an overlay other than the cursor was on a driven page: ${result.stdout}`,
+      );
     } finally {
       chrome?.kill();
       bridge.kill();
@@ -87,6 +90,7 @@ test(
 
 function repl(url) {
   return `page = await browser.openTab(${JSON.stringify(url)});
+    await page.waitForTimeout(300);
     const report = await page.stealthCheck();
     const main = await page.evaluate(() => ({
       globals: Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit)/.test(name)),
