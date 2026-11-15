@@ -307,8 +307,14 @@ export class LibraryActions {
     const site = required(input, "site");
     const path = this.exportPath(`${site}.zip`, input.path);
     await mkdir(dirname(path), { recursive: true });
-    await exportSitePack({ site, out: path });
-    noteAction(true, `Exported ${site} to ${path}`);
+    // The user's own export never dead-ends: findings are reported, not blocking.
+    const result = await exportSitePack({ site, out: path, publish: "warn" });
+    const flagged = result.findings.length;
+    const note =
+      flagged > 0
+        ? ` (${flagged} review note(s): see \`aeon abilities publish ${site} <name>\`)`
+        : "";
+    noteAction(true, `Exported ${site} to ${path}${note}`);
   }
 
   private async importSite(input: Record<string, unknown>): Promise<void> {
