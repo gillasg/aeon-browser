@@ -42,6 +42,23 @@ export {
 } from "./ability-versions.js";
 export { restoreAbility, type RestoreAbilityOptions } from "./ability-restore.js";
 export {
+  formatFinding,
+  lintPublicAbility,
+  publicAbility,
+  publishErrors,
+  type PublicAbility,
+  type PublishFinding,
+  type PublishSeverity,
+} from "./ability-publish.js";
+export {
+  parseReview,
+  reviewPrompt,
+  reviewSystem,
+  REVIEW_MODEL,
+  type AbilityReview,
+  type ReviewFinding,
+} from "./ability-review.js";
+export {
   abilityContent,
   contentDigest,
   digestOf,

@@ -11,18 +11,23 @@ import {
 import { has, type Args } from "browserkit/dist/args.js";
 import { printJson } from "browserkit/dist/output.js";
 import type { Command } from "browserkit/dist/usage.js";
+import { publishAbility, reviewAbility } from "./ability-publish-cmd.js";
 
 export function abilitiesCommand(original: Command): Command {
   return {
     ...original,
-    summary: "list, run, test, rename, version, restore and forget saved abilities",
+    summary: "list, run, test, rename, version, restore, publish and forget saved abilities",
     help: `${original.help}
 
   test --all                 every saved ability's stored tests, offline
   rename <site> <from> <to>  rename one
   forget <site> <name>       drop one
   versions <site> <name>     earlier saved content, newest first
-  restore <site> <name> <at> make an earlier version live again (same contract checks)`,
+  restore <site> <name> <at> make an earlier version live again (same contract checks)
+  publish <site> <name> [--out <file>] [--json]
+                              the definition a caller sees, plus the share lint
+  review <site> <name> [--json]
+                              one model read of the claims; separate and optional`,
     run: (args) => dispatch(original, args),
   };
 }
@@ -41,6 +46,10 @@ const VERBS: Record<string, Handler> = {
     site && from ? versions(site, from, has(args, "json")) : undefined,
   restore: async (site, from, to, args) =>
     site && from && to ? restore(site, from, to, has(args, "breaking")) : undefined,
+  publish: async (site, from, _to, args) =>
+    site && from ? publishAbility(site, from, args) : undefined,
+  review: async (site, from, _to, args) =>
+    site && from ? reviewAbility(site, from, args) : undefined,
 };
 
 async function dispatch(original: Command, args: Args): Promise<number> {

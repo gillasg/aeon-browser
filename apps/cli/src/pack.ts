@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   exportSitePack,
+  formatFinding,
   installSitePack,
   readSitePack,
   skillsForSite,
@@ -108,15 +109,22 @@ async function exportPack(host: DaemonHost, args: Args): Promise<number> {
       warning = `Boosts left out: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
-  const packed = await exportSitePack({ site, out, skills: await siteSkills(site), boosts });
+  const packed = await exportSitePack({
+    site,
+    out,
+    skills: await siteSkills(site),
+    boosts,
+    publish: has(args, "warn") ? "warn" : "block",
+  });
   if (has(args, "json")) {
     printJson({ ...packed, ...(warning ? { warning } : {}) });
     return 0;
   }
   process.stdout.write(
-    `Exported ${packed.site} to ${packed.out}: ${packed.files.length} site files, ${packed.skills.length} skills, ${packed.boosts.length} boosts.\n` +
+    `Exported ${packed.site} to ${packed.out}: ${packed.files.length} site files, ${packed.skills.length} skills, ${packed.boosts.length} boosts, ${packed.published} public abilities.\n` +
       "Sessions, cookies and credential-bearing headers and bodies are stripped.\n",
   );
+  for (const finding of packed.findings) process.stderr.write(formatFinding(finding) + "\n");
   if (warning) process.stderr.write(warning + "\n");
   return 0;
 }
