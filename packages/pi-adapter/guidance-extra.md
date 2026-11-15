@@ -1,4 +1,4 @@
-Offers, routines and images: help('offers').
+Ongoing work, 'keep an eye on' or 'tell me when' is a routine; a one-shot `watch` is its check; 'every visit' is a boost.
 
 ---
 
