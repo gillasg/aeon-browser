@@ -96,6 +96,7 @@ async function drawOnAeonPage(tabId: number, x: number, y: number): Promise<void
 
 async function installSharedCursor(tabId: number, x: number, y: number): Promise<void> {
   const target = { tabId, frameIds: [0] };
+  // The painter listens for this event; nothing of it stays on window where a page can read it.
   await chrome.scripting
     .executeScript({ target, world: "MAIN", files: ["cursor-page.js"] })
     .catch(() => undefined);
@@ -103,21 +104,24 @@ async function installSharedCursor(tabId: number, x: number, y: number): Promise
     .executeScript({
       target,
       world: "MAIN",
-      func: applyInstalledCursor,
-      args: [summonUpdate(x, y), CURSOR_TOKEN_CSS, CURSOR_MARK],
+      func: paintInstalledCursor,
+      args: [
+        {
+          update: summonUpdate(x, y),
+          css: CURSOR_TOKEN_CSS,
+          mark: CURSOR_MARK,
+        },
+      ],
     })
     .catch(() => undefined);
 }
 
-function applyInstalledCursor(
-  update: { x: number; y: number; summon: true; place: true },
-  tokenCss: string,
-  mark: object,
-): void {
-  const page = globalThis as {
-    __aeonCursor?: (next: object, css: string, cursor: object) => void;
-  };
-  page.__aeonCursor?.(update, tokenCss, mark);
+function paintInstalledCursor(detail: {
+  update: { x: number; y: number; summon: true; place: true };
+  css: string;
+  mark: object;
+}): void {
+  window.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail }));
 }
 
 async function updateBadge(): Promise<void> {

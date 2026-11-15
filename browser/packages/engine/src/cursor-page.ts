@@ -302,13 +302,13 @@ const PAGE_BODY = `
     } else state.text.textContent = text;
     var old = state.pill.querySelector(".ask");
     if (old) old.remove();
-    if (next.needs) paintAsk(state, makeNode);
+    if (next.needs) paintAsk(state, makeNode, next.answerKey);
     if (!next.needs) state.hide = setTimeout(function () { state.pill.classList.remove("on"); state.publish(); }, next.transient ? 2000 : 6000);
   }
-  function paintAsk(state, makeNode) {
+  function paintAsk(state, makeNode, answerKey) {
     var ask = makeNode("div", { class: "ask" });
     var field = makeNode("input", { type: "text", placeholder: "Or type the answer here…", "aria-label": "Type the answer" });
-    var answer = function (value) { globalThis[Symbol.for("aeon.handoff")] = value; state.wrap.classList.remove("needs"); state.pill.classList.remove("on"); state.publish(); };
+    var answer = function (value) { globalThis[Symbol.for(answerKey || "aeon.handoff")] = value; state.wrap.classList.remove("needs"); state.pill.classList.remove("on"); state.publish(); };
     var finish = function () { answer(field.value.trim() ? { answer: field.value.trim().slice(0, 2000) } : "done"); };
     field.addEventListener("keydown", function (event) { event.stopPropagation(); if (event.key === "Enter" && !event.isComposing) finish(); });
     ["keyup", "keypress", "input"].forEach(function (kind) { field.addEventListener(kind, function (event) { event.stopPropagation(); }); });

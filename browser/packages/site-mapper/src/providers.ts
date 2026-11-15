@@ -583,8 +583,13 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
       if (await send.count().catch(() => 0)) { await send.click().catch(() => {}); break; }
     }
     await page.waitForTimeout(1500);
-    if (await left()) throw new Error("PROVIDER_NOT_SENT: the prompt stayed in ${definition.name}'s message box; the user is probably signed out there (sign in to ${definition.host} in Chrome), or the page changed");
-  }`;
+    if (await left()) {
+      await page.evaluate(() => document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer"))).catch(() => {});
+      throw new Error("PROVIDER_NOT_SENT: the prompt stayed in ${definition.name}'s message box; the user is probably signed out there (sign in to ${definition.host} in Chrome), or the page changed");
+    }
+  }
+  await page.evaluate(() => document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer"))).catch(() => {});
+`;
 }
 
 /** The page fallback: open the provider, type the prompt, read the newest answer. */
@@ -677,28 +682,32 @@ export function imageScript(
   ${files ? `await page.upload("input[type=file]", ${files});` : ""}
   // Images already on the page (avatar, uploads, older answers) are never the answer.
   await page.evaluate(() => document.querySelectorAll("img").forEach((img) => img.setAttribute("data-aeon-old", "")));
-  ${sendPromptCode(PROVIDERS.gemini, prompt)}
-  while (Date.now() < deadline) {
-    await page.waitForTimeout(1000);
-    const found = await page.evaluate(() => {
-      const fresh = [...document.querySelectorAll("img:not([data-aeon-old])")].filter((img) => {
-        const box = img.getBoundingClientRect();
-        return img.complete && img.naturalWidth >= 256 && box.width >= 150 && box.height >= 150;
+  try {
+    ${sendPromptCode(PROVIDERS.gemini, prompt)}
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(1000);
+      const found = await page.evaluate(() => {
+        const fresh = [...document.querySelectorAll("img:not([data-aeon-old])")].filter((img) => {
+          const box = img.getBoundingClientRect();
+          return img.complete && img.naturalWidth >= 256 && box.width >= 150 && box.height >= 150;
+        });
+        const image = fresh[fresh.length - 1];
+        if (!image) return "";
+        // Gemini shows a blob it may already have revoked: read the pixels on screen.
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        try { canvas.getContext("2d").drawImage(image, 0, 0); return canvas.toDataURL("image/jpeg", 0.92); } catch { return image.currentSrc || image.src; }
       });
-      const image = fresh[fresh.length - 1];
-      if (!image) return "";
-      // Gemini shows a blob it may already have revoked: read the pixels on screen.
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      try { canvas.getContext("2d").drawImage(image, 0, 0); return canvas.toDataURL("image/jpeg", 0.92); } catch { return image.currentSrc || image.src; }
-    });
-    if (found) {
-      const saved = await page.saveMedia(found, { name: ${JSON.stringify(out)} });
-      return { saved };
+      if (found) {
+        const saved = await page.saveMedia(found, { name: ${JSON.stringify(out)} });
+        return { saved };
+      }
     }
+    throw new Error("PROVIDER_TIMEOUT: Gemini returned no image; the page may have changed");
+  } finally {
+    await page.evaluate(() => document.querySelectorAll("img[data-aeon-old]").forEach((img) => img.removeAttribute("data-aeon-old"))).catch(() => {});
   }
-  throw new Error("PROVIDER_TIMEOUT: Gemini returned no image; the page may have changed");
 })()`;
 }
 

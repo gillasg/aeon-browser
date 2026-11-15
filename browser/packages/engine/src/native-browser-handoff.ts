@@ -22,20 +22,29 @@ import {
 // when the page shows nothing of ours); the chat's card carries it too.
 const POLL_MS = 600;
 const MAX_WAIT_MS = 30 * 60_000;
-const KEY = "Symbol.for('aeon.handoff')";
+
+function handoffKey(): string {
+  return "aeon.handoff." + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 /**
  * The hand-off's state in the page: Done or Cancel in the cursor's pill sets it, and so does an
  * answer typed into the pill instead ({answer}). "fresh" means a new document (the site
- * navigated), so the pill is shown again.
+ * navigated), so the pill is shown again. The key is random per hand-off, so a page cannot name it.
  */
-const STATE = `(() => {
-  const state = globalThis[${KEY}];
+function stateExpression(key: string): string {
+  return `(() => {
+  const state = globalThis[Symbol.for(${JSON.stringify(key)})];
   if (state === "done" || state === "cancelled") return state;
   if (state && typeof state === "object" && typeof state.answer === "string") return { answer: state.answer };
-  if (!state) { globalThis[${KEY}] = "waiting"; return "fresh"; }
+  if (!state) { globalThis[Symbol.for(${JSON.stringify(key)})] = "waiting"; return "fresh"; }
   return "waiting";
 })()`;
+}
+
+function clearExpression(key: string): string {
+  return `(() => { delete globalThis[Symbol.for(${JSON.stringify(key)})]; })()`;
+}
 
 // Answers given from the chat's hand-off card, keyed by tab; the next poll picks them up.
 const answers = new Map<number, "done" | "cancelled">();
@@ -46,8 +55,6 @@ onEngineInstall(() => {
       answers.set(Number(message.tabId), message.answer);
   });
 });
-
-const CLEAR = `(() => { delete globalThis[${KEY}]; })()`;
 
 // What the user typed into the cursor's ask instead of acting in the tab, kept for the hand-off's
 // caller (bu.handoff returns it) until it is taken.
@@ -94,11 +101,12 @@ export async function handOffToUser(
       })
       .catch(() => undefined);
   const deadline = Date.now() + MAX_WAIT_MS;
+  const key = handoffKey();
   answers.delete(tabId);
   typed.delete(tabId);
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
-  showAgentNeeds(tabId, message, spotlight);
+  showAgentNeeds(tabId, message, spotlight, key);
   engineDebug("handoff", "shown", { tab: tabId });
   const startedAt = Date.now();
   try {
@@ -108,7 +116,7 @@ export async function handOffToUser(
       if (answered) return answered;
       // A password the user types here is kept (never shown to the agent) so it can be saved.
       await noteUserLogin(tabId);
-      const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, STATE);
+      const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, stateExpression(key));
       engineDebug("handoff", "poll", { tab: tabId, state, ms: Date.now() - startedAt });
       if (state === "done" || state === "cancelled") return state;
       if (typeof (state as { answer?: unknown } | null)?.answer === "string") {
@@ -117,7 +125,7 @@ export async function handOffToUser(
       }
       if (state === "fresh") {
         void showAgentBadge(tabId, true);
-        await evaluate(tabId, agentNeedsExpression(message, spotlight)).catch(() => undefined);
+        await evaluate(tabId, agentNeedsExpression(message, spotlight, key)).catch(() => undefined);
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     }
@@ -129,7 +137,7 @@ export async function handOffToUser(
     showAgentNeeds(tabId, null);
     answers.delete(tabId);
     void chrome.notifications.clear(notification).catch(() => undefined);
-    void evaluate(tabId, CLEAR).catch(() => undefined);
+    void evaluate(tabId, clearExpression(key)).catch(() => undefined);
   }
 }
 

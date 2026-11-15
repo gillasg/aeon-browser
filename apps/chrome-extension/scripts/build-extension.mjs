@@ -75,7 +75,19 @@ export async function buildExtension() {
 
 async function writeCursorPage(output) {
   const module = await import(pathToFileURL(engine("cursor-page")).href);
-  const source = "globalThis.__aeonCursor = " + module.cursorFunctionSource() + ";\n";
+  // A page listener, not a page global: the worker dispatches one event per paint. Aeon's own
+  // extension pages still load this file as a script and call the function it leaves behind.
+  const source = [
+    "(() => {",
+    "  const paint = " + module.cursorFunctionSource() + ";",
+    '  addEventListener("aeon:cursor:paint", (event) => {',
+    "    const detail = event && event.detail;",
+    '    if (detail && detail.update) paint(detail.update, detail.css || "", detail.mark || {});',
+    "  });",
+    '  if (location.protocol === "chrome-extension:") globalThis.__aeonCursor = paint;',
+    "})();",
+    "",
+  ].join("\n");
   await writeFile(join(output, "cursor-page.js"), source);
 }
 
