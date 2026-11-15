@@ -47,6 +47,14 @@ export type AbilityKind = "read" | "write";
 export type AbilityCreatedBy = "agent" | "user" | "import" | "builtin";
 export type AbilityVia = "api" | "steps" | "script" | "page";
 
+/** The answer a way accepted last time: required fields and types, and where its list lives. */
+export interface AbilityWayExpect {
+  /** A JSON Schema of the body. Values are never compared, only recorded fields and types. */
+  shape?: Record<string, unknown>;
+  /** JSON pointer to the list the way returns. A missing list is drift; an empty one is a result. */
+  list?: string;
+}
+
 export interface AbilityApiStep {
   operation: string;
   params?: Record<string, unknown>;
@@ -68,6 +76,18 @@ export interface AbilityWayApi {
   input?: Json;
   /** Write abilities: index of the operation that applies the change (default: the last). */
   commit?: number;
+  /** The shape this way's answer must keep. Absent: learned from its first success. */
+  expect?: AbilityWayExpect;
+  /** Values a later step takes from an earlier response, as `steps.<i>.<path>`. */
+  refs?: AbilityReference[];
+}
+
+/** A param value taken from an earlier step's answer rather than from the caller. */
+export interface AbilityReference {
+  step: number;
+  param: string;
+  /** The pointer it was read from, e.g. `steps.0.items.0.id`. */
+  from: string;
 }
 
 export interface AbilityWaySteps {
@@ -88,6 +108,8 @@ export interface AbilityWayScript {
   code: string;
   runtime: "node" | "page";
   input?: Json;
+  /** The shape this way's answer must keep. Absent: learned from its first success. */
+  expect?: AbilityWayExpect;
 }
 
 export interface AbilityWayPage {
@@ -97,6 +119,8 @@ export interface AbilityWayPage {
   collect?: CollectRecipe;
   url?: string;
   extractor?: unknown;
+  /** The shape this way's answer must keep. Absent: learned from its first success. */
+  expect?: AbilityWayExpect;
 }
 
 export type AbilityWay = AbilityWayApi | AbilityWaySteps | AbilityWayScript | AbilityWayPage;
@@ -166,6 +190,8 @@ export interface AbilityRunResult {
   readBack?: { ok: boolean; missing: string[] };
   /** The way that ran only had part of the contract. */
   partial?: boolean;
+  /** Ways whose answer no longer matched the shape they recorded. The result may be one of them. */
+  unverified?: { via: AbilityVia; reason: string }[];
   /** A second way disagreed; the ability is marked stale. */
   stale?: boolean;
   staleWhy?: string;

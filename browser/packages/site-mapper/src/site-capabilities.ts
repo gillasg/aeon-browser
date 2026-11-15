@@ -8,6 +8,7 @@ import {
   type AbilityPrecondition,
 } from "./abilities.js";
 import { untestedWays } from "./ability-digest.js";
+import { wayId } from "./ability-stats.js";
 import { capabilityIndex } from "./infer/capabilities.js";
 import { inputParams } from "./params.js";
 import { loadModel, siteName } from "./registry.js";
@@ -25,6 +26,8 @@ export interface SiteAbilitySummary {
   stale?: boolean;
   /** At least one way changed since its tests last passed. */
   untested?: boolean;
+  /** Ways whose answer no longer matched the shape they recorded. */
+  unverified?: { via: string; why?: string }[];
   preconditions?: AbilityPrecondition;
   /** Read ability a write uses to confirm itself. */
   postcondition?: string;
@@ -91,6 +94,7 @@ function summarize(ability: Ability): SiteAbilitySummary {
     ...(ability.ways.some((way) => way.partial) ? { partial: true } : {}),
     ...(ability.stats?.stale ? { stale: true } : {}),
     ...untestedField(ability),
+    ...unverifiedField(ability),
     ...(ability.preconditions ? { preconditions: ability.preconditions } : {}),
     ...(post ? { postcondition: post } : {}),
     stats: ability.stats,
@@ -99,6 +103,16 @@ function summarize(ability: Ability): SiteAbilitySummary {
 
 function untestedField(ability: Ability): { untested?: boolean } {
   return untestedWays(ability).length ? { untested: true } : {};
+}
+
+/** Ways whose last answer no longer matched the recorded shape. They are kept, not removed. */
+function unverifiedField(ability: Ability): { unverified?: { via: string; why?: string }[] } {
+  const ways = ability.ways.flatMap((way) => {
+    const stats = ability.stats?.ways?.[wayId(way)];
+    if (!stats?.unverified) return [];
+    return [{ via: way.kind, ...(stats.unverifiedWhy ? { why: stats.unverifiedWhy } : {}) }];
+  });
+  return ways.length ? { unverified: ways } : {};
 }
 
 function lookupsFirst(left: SiteAbilitySummary, right: SiteAbilitySummary): number {

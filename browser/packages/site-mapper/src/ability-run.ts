@@ -15,6 +15,7 @@ import {
   usesRecordRuntime,
   type AbilityPage,
 } from "./ability-records.js";
+import { expectedShape, shapeDrift, shapeOf } from "./ability-shape.js";
 import { inBackoff, orderWays, wayId, type WayNote } from "./ability-stats.js";
 import {
   AbilityWriteError,
@@ -44,7 +45,20 @@ interface TrackedRun {
   tried: { via: AbilityVia; error: string }[];
   notes: WayNote[];
   partial?: boolean;
+  /** The way whose answer was returned. */
+  used?: AbilityWay;
+  /** Ways whose answer no longer matched their recorded shape. */
+  unverified?: { via: AbilityVia; reason: string }[];
 }
+
+interface Drifted {
+  result: unknown;
+  way: AbilityWay;
+  why: string;
+}
+
+type WayHit =
+  { result: unknown; via: AbilityVia; way: AbilityWay; partial?: boolean } | { drift: Drifted };
 
 export async function executeRead(
   ability: Ability,
@@ -93,12 +107,14 @@ async function runRead(
   const tried = [...ranked.held];
   const notes: WayNote[] = [];
   let ways = ranked.ways;
+  let drift: Drifted | undefined;
   if (usesRecordRuntime(ability) && options.via !== "script") {
     const recorded = await runRecordWays({ ...ability, ways }, inputs, host, options, tried, notes);
     if (recorded && "run" in recorded) return recorded.run;
+    if (recorded && "drift" in recorded) drift = recorded.drift;
     ways = recorded ? unseen(ways, notes) : nodeScripts(ways);
   }
-  return runWayList(ability, ways, inputs, host, options, tried, notes, record);
+  return runWayList(ability, ways, inputs, host, options, tried, notes, record, drift);
 }
 
 function nodeScripts(ways: AbilityWay[]): AbilityWay[] {
@@ -119,13 +135,44 @@ async function runWayList(
   tried: TrackedRun["tried"],
   notes: WayNote[],
   record: RunRecorder | undefined,
+  initial?: Drifted,
 ): Promise<TrackedRun> {
+  let drift = initial;
   for (const way of ways) {
     const hit = await oneWay(ability, way, inputs, host, options, tried, notes);
-    if (hit) return { ...hit, tried, notes };
+    if (!hit) continue;
+    if ("drift" in hit) {
+      drift ??= hit.drift;
+      continue;
+    }
+    return {
+      result: hit.result,
+      via: hit.via,
+      used: hit.way,
+      ...(hit.partial ? { partial: true } : {}),
+      tried,
+      notes,
+      ...unverifiedField(notes),
+    };
   }
+  if (drift)
+    return {
+      result: drift.result,
+      via: drift.way.kind,
+      tried,
+      notes,
+      used: drift.way,
+      ...unverifiedField(notes),
+    };
   if (record) await record(false, notes);
   throw new Error(`ABILITY_FAILED: ${ability.site} ${ability.name} (${triedText(tried)})`);
+}
+
+function unverifiedField(notes: WayNote[]): Pick<TrackedRun, "unverified"> {
+  const unverified = notes
+    .filter((note) => note.unverified)
+    .map((note) => ({ via: note.way.kind, reason: note.unverified as string }));
+  return unverified.length ? { unverified } : {};
 }
 
 async function oneWay(
@@ -136,7 +183,7 @@ async function oneWay(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): Promise<Pick<TrackedRun, "result" | "via" | "partial"> | undefined> {
+): Promise<WayHit | undefined> {
   if (options.via && way.kind !== options.via) return undefined;
   if (way.partial && options.complete) {
     tried.push({ via: way.kind, error: "partial way skipped; caller asked for the full result" });
@@ -158,7 +205,7 @@ async function finishWay(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): Promise<Pick<TrackedRun, "result" | "via" | "partial"> | undefined> {
+): Promise<WayHit | undefined> {
   const started = Date.now();
   try {
     const result = await attemptWay(ability, way, inputs, host);
@@ -184,12 +231,14 @@ async function judged(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): Promise<Pick<TrackedRun, "result" | "via" | "partial"> | undefined> {
+): Promise<WayHit | undefined> {
   const gap = contractGap(ability, result);
   if (gap) {
     await noteFreshness(ability, way, `contract: ${gap}`);
     return noteSkip(way, `contract: ${gap}`, ms, false, tried, notes);
   }
+  const why = shapeDrift(expectedShape(ability, way), result);
+  if (why) return drifted(ability, way, result, ms, why, tried, notes);
   const partial = isPartial(way, result);
   if (partial && options.complete)
     return noteSkip(
@@ -200,8 +249,31 @@ async function judged(
       tried,
       notes,
     );
-  notes.push({ way, ok: true, ms });
-  return { result, via: way.kind, ...(partial ? { partial: true } : {}) };
+  notes.push({ way, ok: true, ms, ...learnedShape(way, result) });
+  return { result, via: way.kind, way, ...(partial ? { partial: true } : {}) };
+}
+
+/** A way without a declared expectation records what its first verified answer looked like. */
+function learnedShape(way: AbilityWay, result: unknown): Pick<WayNote, "shape"> {
+  if (way.kind === "steps" || way.expect) return {};
+  const shape = shapeOf(result);
+  return shape ? { shape } : {};
+}
+
+/** A drifted way answered; it is tried, marked unverified and kept. */
+async function drifted(
+  ability: Ability,
+  way: AbilityWay,
+  result: unknown,
+  ms: number,
+  why: string,
+  tried: TrackedRun["tried"],
+  notes: WayNote[],
+): Promise<WayHit> {
+  await noteFreshness(ability, way, `contract: ${why}`);
+  notes.push({ way, ok: true, ms, unverified: why });
+  tried.push({ via: way.kind, error: `unverified: ${why}` });
+  return { drift: { result, way, why } };
 }
 
 function noteSkip(
@@ -224,7 +296,7 @@ async function runRecordWays(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): Promise<{ run: TrackedRun } | { rejected: true } | undefined> {
+): Promise<{ run: TrackedRun } | { rejected: true } | { drift: Drifted } | undefined> {
   const started = Date.now();
   try {
     const read = await readRecords(ability, inputs, host, wantedRows(options));
@@ -252,12 +324,23 @@ async function judgedRecord(
   options: AbilityRunOptions,
   tried: TrackedRun["tried"],
   notes: WayNote[],
-): Promise<{ run: TrackedRun } | { rejected: true } | undefined> {
+): Promise<{ run: TrackedRun } | { rejected: true } | { drift: Drifted } | undefined> {
   const way = winningWay(ability.ways, via, notes);
   if (!way) return undefined;
   const judgedWay = await judged(ability, way, result, ms, options, tried, notes);
   if (!judgedWay) return { rejected: true };
-  return { run: { ...judgedWay, tried, notes } };
+  if ("drift" in judgedWay) return { drift: judgedWay.drift };
+  return {
+    run: {
+      result: judgedWay.result,
+      via: judgedWay.via,
+      used: judgedWay.way,
+      ...(judgedWay.partial ? { partial: true } : {}),
+      tried,
+      notes,
+      ...unverifiedField(notes),
+    },
+  };
 }
 
 function winningWay(ways: AbilityWay[], via: AbilityVia, notes: WayNote[]): AbilityWay | undefined {
@@ -320,7 +403,7 @@ async function maybeDiffer(
 ): Promise<DifferResult | undefined> {
   const stats = ability.stats ?? { runs: 0, failures: 0 };
   if (!shouldDiffer(stats, options.differ)) return undefined;
-  const used = run.notes.find((note) => note.ok)?.way;
+  const used = run.used;
   const other = used ? oracleFor(ability.ways, used) : undefined;
   if (!used || !other || inBackoff(stats.ways?.[wayId(other)], Date.now())) return undefined;
   if (needsError(other, host)) return undefined;
@@ -339,6 +422,7 @@ function publicRead(
     via: run.via,
     tried: run.tried,
     ...(run.partial ? { partial: true } : {}),
+    ...(run.unverified?.length ? { unverified: run.unverified } : {}),
     ...(differ?.stale ? { stale: true, ...(differ.why ? { staleWhy: differ.why } : {}) } : {}),
   };
 }

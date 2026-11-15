@@ -109,10 +109,13 @@ export {
   type AbilityWayStats,
   type AbilityWay,
   type AbilityWayApi,
+  type AbilityWayExpect,
+  type AbilityReference,
   type AbilityWayPage,
   type AbilityWayScript,
   type AbilityWaySteps,
 } from "./abilities.js";
+export { shapeOf, expectedShape, shapeDrift, type AnswerShape } from "./ability-shape.js";
 export {
   buildAbility,
   type BlockedReason,
