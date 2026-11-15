@@ -31,7 +31,7 @@ function __mediaRecorder(arg) {
       var blob = new Blob(state.chunks, {type: state.type});
       var bytes = new Uint8Array(await blob.arrayBuffer()), binary = '';
       for (var i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
-      window.__browserkitMediaRecording = undefined;
+      delete window.__browserkitMediaRecording;
       resolve({type: state.type, bytes: bytes.length, base64: btoa(binary)});
     };
     state.recorder.stop();

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const RunCardOfferActionSchema = z.enum([
   "learn-site",
+  "save-ability",
   "schedule",
   "watch",
   "save-file",

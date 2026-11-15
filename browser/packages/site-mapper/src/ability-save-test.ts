@@ -2,6 +2,7 @@
 // the save throws with the reason and the file on disk keeps the ways it already had.
 
 import type { Ability, AbilityWay } from "./abilities.js";
+import { wayDigest } from "./ability-digest.js";
 import { testAbilityCases, type AbilityTest, type AbilityTestReport } from "./ability-contract.js";
 import { rowsOf } from "./ability-records.js";
 import { wayId } from "./ability-stats.js";
@@ -27,9 +28,17 @@ export async function proveSave(
   if (candidate.kind === "write") return undefined;
   const tests = candidate.tests ?? [];
   if (!tests.length) return undefined;
+  if (alreadyTested(existing, candidate))
+    return { ok: true, cases: [], constant: false, skipped: true };
   const novel = novelWays(existing?.ways, candidate.ways);
   const probes = novel.length ? novel.map((way) => ({ ...candidate, ways: [way] })) : [candidate];
   return runProbes(candidate, probes, novel.length > 0, run);
+}
+
+/** Every way already passed at this exact content (tests and outputs included). */
+function alreadyTested(existing: Ability | undefined, candidate: Ability): boolean {
+  if (!existing?.tested) return false;
+  return candidate.ways.every((way) => existing.tested?.[wayDigest(candidate, way)]?.ok === true);
 }
 
 async function runProbes(

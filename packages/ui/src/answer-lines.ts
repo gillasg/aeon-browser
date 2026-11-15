@@ -42,6 +42,7 @@ const OFFER_LABEL: Record<string, string> = {
   "get-all": "Get all",
   "do-rest": "Do the rest",
   "learn-site": "Learn this site",
+  "save-ability": "Save this as an ability",
   "save-file": "Save as file",
   watch: "Tell me when",
   schedule: "Every time",
@@ -54,6 +55,8 @@ const OFFER_FOLLOW_UP: Record<string, string> = {
   fresh: "Do that again from scratch, without the saved way.",
   "get-all": "Get all of the rows, not just the part you have.",
   "do-rest": "Do the rest of them.",
+  "save-ability":
+    "Save what you just did as an ability for this site, so next time it runs in one click without a model.",
   "save-file": "Save that as a file.",
   relearn: "That saved way broke. Learn it again.",
   pin: "",

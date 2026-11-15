@@ -15,8 +15,10 @@ import {
   exportSitePack,
   importRecipes,
   installSitePack,
+  listAbilityVersions,
   readRecipe,
   readSitePack,
+  restoreAbility as restoreSavedAbility,
   runAbility,
   runRecipe,
   siteDir,
@@ -71,6 +73,8 @@ export const LIBRARY_ACTIONS = [
   "test_provider",
   "rename_ability",
   "forget_ability",
+  "list_ability_versions",
+  "restore_ability",
   "report_wrong",
   "decline_offer",
 ] as const;
@@ -149,6 +153,8 @@ export class LibraryActions {
     ["test_provider", (input) => this.testProvider(input)],
     ["rename_ability", (input) => this.renameAbility(input)],
     ["forget_ability", (input) => this.forgetAbility(input)],
+    ["list_ability_versions", (input) => this.listAbilityVersions(input)],
+    ["restore_ability", (input) => this.restoreAbility(input)],
     ["report_wrong", (input) => this.reportWrong(input)],
     ["decline_offer", (input) => this.declineOffer(input)],
   ]);
@@ -301,8 +307,14 @@ export class LibraryActions {
     const site = required(input, "site");
     const path = this.exportPath(`${site}.zip`, input.path);
     await mkdir(dirname(path), { recursive: true });
-    await exportSitePack({ site, out: path });
-    noteAction(true, `Exported ${site} to ${path}`);
+    // The user's own export never dead-ends: findings are reported, not blocking.
+    const result = await exportSitePack({ site, out: path, publish: "warn" });
+    const flagged = result.findings.length;
+    const note =
+      flagged > 0
+        ? ` (${flagged} review note(s): see \`aeon abilities publish ${site} <name>\`)`
+        : "";
+    noteAction(true, `Exported ${site} to ${path}${note}`);
   }
 
   private async importSite(input: Record<string, unknown>): Promise<void> {
@@ -536,6 +548,26 @@ export class LibraryActions {
   private async forgetAbility(input: Record<string, unknown>): Promise<void> {
     const removed = await forgetSavedAbility(required(input, "site"), required(input, "name"));
     noteAction(removed, removed ? "Forgotten" : "No ability by that name");
+  }
+
+  private async listAbilityVersions(input: Record<string, unknown>): Promise<void> {
+    const rows = await listAbilityVersions(required(input, "site"), required(input, "name"));
+    noteAction(
+      true,
+      rows.length
+        ? rows.map((row) => `${row.at} ${row.ways.join("+")} ${row.bytes}B`).join("\n")
+        : "No earlier versions",
+    );
+  }
+
+  private async restoreAbility(input: Record<string, unknown>): Promise<void> {
+    const saved = await restoreSavedAbility(
+      required(input, "site"),
+      required(input, "name"),
+      required(input, "at"),
+      input.breaking === true ? { breaking: true } : {},
+    );
+    noteAction(true, `Restored ${saved.ability.name} from ${String(input.at)}`);
   }
 
   private async reportWrong(input: Record<string, unknown>): Promise<void> {

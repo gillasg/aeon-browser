@@ -17,6 +17,8 @@ export interface RunFacts {
   partial?: { have: number; total: number };
   longFirstRun?: boolean;
   fromMemory?: boolean;
+  /** The run worked after a retry, a failure or a correction, and no ability covers it yet. */
+  saveAbility?: boolean;
   learned?: { abilityId: string; name: string; site: string };
   routeId?: string;
   abilityId?: string;
@@ -76,6 +78,13 @@ function offersFor(facts: RunFacts): Offer[] {
   const offers: Offer[] = [];
   if (facts.fromMemory)
     offers.push({ kind: "offer", id: id("fresh"), text: "Do it fresh", action: "fresh" });
+  if (facts.saveAbility)
+    offers.push({
+      kind: "offer",
+      id: id("save-ability"),
+      text: "Save this as an ability, so next time is one call.",
+      action: "save-ability",
+    });
   if (facts.partial && facts.partial.have < facts.partial.total)
     offers.push({
       kind: "offer",

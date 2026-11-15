@@ -2,6 +2,14 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import type { Ability } from "./abilities.js";
+import { abilitySlug } from "./ability-files.js";
+import {
+  formatFinding,
+  lintPublicAbility,
+  publicAbility,
+  type PublishFinding,
+} from "./ability-publish.js";
 import { createRedactor, SECRET_HEADERS, SECRET_KEYS } from "./redact.js";
 import { siteDir, siteName } from "./registry.js";
 import { importPackAbilities } from "./abilities-migrate.js";
@@ -70,6 +78,10 @@ export interface PackExport {
   files: string[];
   skills: string[];
   boosts: string[];
+  /** Public ability definitions written into the pack. */
+  published: number;
+  /** Deterministic publish checks, including notices that did not block. */
+  findings: (PublishFinding & { ability: string })[];
 }
 
 export interface SitePack {
@@ -85,6 +97,8 @@ export async function exportSitePack(options: {
   out: string;
   skills?: PackSkill[];
   boosts?: PackBoost[];
+  /** `block` (default) refuses a pack whose ability lint has errors; `warn` writes it anyway. */
+  publish?: "block" | "warn";
 }): Promise<PackExport> {
   const site = siteName(options.site);
   const root = siteDir(site);
@@ -106,11 +120,12 @@ export async function exportSitePack(options: {
     const path = join(root, "flows", name);
     add(`flows/${name}`, scrubFile(name, await readFile(path, "utf8"), redactor));
   }
-  // The site's abilities travel with it (the migration bookkeeping does not).
-  for (const name of await abilityFiles(join(root, "abilities"))) {
-    const path = join(root, "abilities", name);
-    add(`abilities/${name}`, scrubFile(name, await readFile(path, "utf8"), redactor));
-  }
+  // The site's abilities travel with it (the migration bookkeeping does not), each with the
+  // public definition a stranger can review before calling it.
+  const abilities = await readAbilityFiles(join(root, "abilities"));
+  for (const entry of abilities)
+    add(`abilities/${entry.file}`, scrubFile(entry.file, entry.text, redactor));
+  const published = publishAbilities(abilities, add, redactor, options.publish ?? "block");
   const skills = (options.skills ?? []).map(sanitizeSkill);
   for (const skill of skills)
     add(`skills/${skill.name}.json`, JSON.stringify(skill, null, 2) + "\n");
@@ -139,6 +154,7 @@ export async function exportSitePack(options: {
     files: manifest.files,
     skills: manifest.skills,
     boosts: manifest.boosts,
+    ...published,
   };
 }
 
@@ -366,6 +382,63 @@ async function abilityFiles(folder: string): Promise<string[]> {
   if (!existsSync(folder)) return [];
   const names = await readdir(folder);
   return names.filter((name) => name.endsWith(".json") && !/^migration/.test(name)).sort();
+}
+
+async function readAbilityFiles(folder: string): Promise<{ file: string; text: string }[]> {
+  const names = await abilityFiles(folder);
+  return Promise.all(
+    names.map(async (file) => ({ file, text: await readFile(join(folder, file), "utf8") })),
+  );
+}
+
+/** Writes a public definition per ability; blocks the pack when the lint finds an error. */
+function publishAbilities(
+  entries: { file: string; text: string }[],
+  add: (path: string, text: string) => void,
+  redactor: ReturnType<typeof createRedactor>,
+  mode: "block" | "warn",
+): { published: number; findings: (PublishFinding & { ability: string })[] } {
+  const findings: (PublishFinding & { ability: string })[] = [];
+  let published = 0;
+  for (const entry of entries) {
+    const ability = parseAbility(entry.text);
+    if (!ability) continue;
+    const found = lintPublicAbility(ability).map((finding) => ({
+      ...finding,
+      ability: ability.name,
+    }));
+    findings.push(...found);
+    const definition = redactor.json(publicAbility(ability));
+    add(
+      `abilities/public/${abilitySlug(ability.name)}.json`,
+      JSON.stringify(definition, null, 2) + "\n",
+    );
+    published += 1;
+  }
+  refuseUnpublishable(findings, mode);
+  return { published, findings };
+}
+
+function refuseUnpublishable(
+  findings: (PublishFinding & { ability: string })[],
+  mode: "block" | "warn",
+): void {
+  const errors = findings.filter((finding) => finding.severity === "error");
+  if (!errors.length || mode === "warn") return;
+  const shown = errors.slice(0, 4).map(formatFinding).join("; ");
+  const more = errors.length > 4 ? `; and ${errors.length - 4} more` : "";
+  throw new Error(
+    `ABILITY_NOT_PUBLISHABLE: ${shown}${more}. Fix them, or share it unreviewed (publish: "warn" / --warn).`,
+  );
+}
+
+function parseAbility(text: string): Ability | undefined {
+  try {
+    const value = JSON.parse(text) as Ability;
+    return value && typeof value.name === "string" && Array.isArray(value.ways) ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function flowFiles(folder: string): Promise<string[]> {

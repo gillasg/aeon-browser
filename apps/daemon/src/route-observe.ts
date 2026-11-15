@@ -42,11 +42,15 @@ export interface LiveRun {
   stepsByTool: Record<string, SeenStep[]>;
   corrected: boolean;
   ours: boolean;
+  /** A tool call failed, or a step was refused or found to do nothing. */
+  stumbled: boolean;
   usedAbility: boolean;
   fromMemory: boolean;
   /** Rung 1 handed the model a saved draft. This is not a replay. */
   draft: boolean;
   watcher: boolean;
+  /** The run ended without a known outcome; it is not a success to learn from. */
+  unsure: boolean;
   partial?: { have: number; total: number };
 }
 
@@ -73,10 +77,12 @@ export function openRun(
     stepsByTool: {},
     corrected: false,
     ours: false,
+    stumbled: false,
     usedAbility: false,
     fromMemory: false,
     draft: false,
     watcher: false,
+    unsure: false,
   };
 }
 
@@ -86,8 +92,11 @@ export function absorb(run: LiveRun | undefined, event: SeenEvent, now: number):
   if (!run) return { finish: false };
   if (event.kind === "user") return { run: onUser(run, event.text ?? ""), finish: false };
   if (event.kind === "steps") return { run: onSteps(run, event), finish: false };
-  if (event.kind === "error" && event.result && OURS.test(event.result))
-    return { run: { ...run, ours: true }, finish: false };
+  if (event.kind === "error")
+    return {
+      run: OURS.test(event.result ?? "") ? { ...run, ours: true } : { ...run, stumbled: true },
+      finish: false,
+    };
   return { run, finish: false };
 }
 
@@ -99,7 +108,8 @@ function onState(run: LiveRun | undefined, state: string | undefined, now: numbe
   if (!run) return { finish: false };
   if (state === "running-unconfirmed" && run.startedAt === 0)
     return { run: { ...run, startedAt: now }, finish: false };
-  if (state === "idle" || state === "uncertain") return { run, finish: true };
+  if (state === "idle") return { run: { ...run, unsure: false }, finish: true };
+  if (state === "uncertain") return { run: { ...run, unsure: true }, finish: true };
   return { run, finish: false };
 }
 
@@ -116,10 +126,15 @@ function onSteps(run: LiveRun, event: SeenEvent): LiveRun {
   return {
     ...run,
     stepsByTool: { ...run.stepsByTool, [id]: steps },
+    stumbled: run.stumbled || steps.some((step) => stepFailed(step)),
     usedAbility:
       run.usedAbility || steps.some((step) => step.kind === "ability" || step.via === "ability"),
     ...(partial ? { partial } : {}),
   };
+}
+
+function stepFailed(step: SeenStep): boolean {
+  return step.effect === "refused" || step.effect === "suspected_noop";
 }
 
 function partialOf(progress: SeenEvent["progress"]): LiveRun["partial"] | undefined {

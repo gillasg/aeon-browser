@@ -31,6 +31,45 @@ export {
   type SiteOperationSummary,
 } from "./site-capabilities.js";
 export {
+  ABILITY_HISTORY_LIMIT,
+  countAbilityVersions,
+  listAbilityVersions,
+  readAbilityVersion,
+  saveAbilityVersion,
+  versionChangedAbility,
+  versionStamp,
+  type AbilityVersion,
+} from "./ability-versions.js";
+export { restoreAbility, type RestoreAbilityOptions } from "./ability-restore.js";
+export {
+  formatFinding,
+  lintPublicAbility,
+  publicAbility,
+  publishErrors,
+  type PublicAbility,
+  type PublishFinding,
+  type PublishSeverity,
+} from "./ability-publish.js";
+export {
+  parseReview,
+  reviewPrompt,
+  reviewSystem,
+  REVIEW_MODEL,
+  type AbilityReview,
+  type ReviewFinding,
+} from "./ability-review.js";
+export {
+  abilityContent,
+  contentDigest,
+  digestOf,
+  normalizedCode,
+  testedAbility,
+  untestedWays,
+  wayDigest,
+  withTested,
+  type AbilityTested,
+} from "./ability-digest.js";
+export {
   abilityDirectory,
   abilitySlug,
   createAbility,

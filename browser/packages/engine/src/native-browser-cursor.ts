@@ -51,6 +51,8 @@ export interface CursorUpdate {
   start?: { x: number; y: number };
   /** The agent waits for the user: amber cursor and spotlight, no glow, the message as caption. */
   needs?: string | null;
+  /** Where the cursor's typed answer goes: a random Symbol key per hand-off. */
+  answerKey?: string;
   /** The tab is being recorded with the cursor: show only the cursor, nothing else of ours. */
   clean?: boolean;
   /** Summoned cursor: remember this point. Ignored while the agent is already driving it. */
@@ -121,6 +123,7 @@ export async function showAgentBadge(tabId: number, needs = false): Promise<void
 export function agentNeedsExpression(
   message: string,
   spotlight?: { x: number; y: number; width: number; height: number },
+  answerKey?: string,
 ): string {
   const point = spotlight
     ? {
@@ -131,6 +134,7 @@ export function agentNeedsExpression(
   return cursorExpression({
     needs: message,
     glow: false,
+    ...(answerKey ? { answerKey } : {}),
     ...(spotlight ? { spotlight, ...point } : {}),
   });
 }
@@ -140,6 +144,7 @@ export function showAgentNeeds(
   tabId: number,
   message: string | null,
   spotlight?: { x: number; y: number; width: number; height: number },
+  answerKey?: string,
 ): void {
   const point = spotlight
     ? {
@@ -152,6 +157,7 @@ export function showAgentNeeds(
     { tabId },
     {
       needs: message,
+      ...(answerKey && message !== null ? { answerKey } : {}),
       ...(message !== null ? { glow: false } : { glow: true, hideSpotlight: true }),
       ...(spotlight && message !== null ? { spotlight, ...point } : {}),
     },

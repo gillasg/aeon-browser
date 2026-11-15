@@ -81,6 +81,37 @@ test("a long first run offers to learn the site and does not ask a question", ()
   assert.equal(offer.text.includes("?"), false);
 });
 
+test("a bumpy first run offers to save it as an ability exactly once", () => {
+  const card = buildRunCard({
+    ...base,
+    saveAbility: true,
+    longFirstRun: true,
+    durationMs: 130000,
+    path: "first time",
+  });
+  const offers = card.items.filter((item) => item.kind === "offer");
+  assert.deepEqual(
+    offers.map((item) => item.action),
+    ["save-ability", "learn-site"],
+  );
+  assert.equal(offers.filter((item) => item.action === "save-ability").length, 1);
+  assert.match(offers[0].text, /save this as an ability/i);
+});
+
+test("a declined save offer does not come back", () => {
+  const card = buildRunCard({
+    ...base,
+    saveAbility: true,
+    durationMs: 4000,
+    path: "first time",
+    declined: ["save-ability:shop.test:orders"],
+  });
+  assert.equal(
+    card.items.some((item) => item.kind === "offer" && item.action === "save-ability"),
+    false,
+  );
+});
+
 test("rung 1 fills routeDraft and rung 0 does not", () => {
   const route = {
     site: "shop.test",

@@ -163,6 +163,10 @@ test(
         );
         assert.deepEqual(result.value, [true, true]);
         assert.doesNotMatch((await run("await bu.state()")).output, /aeon-agent-cursor/);
+        const globals = await run(
+          "await page.evaluate(() => Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit|browserkit-)/.test(name)))",
+        );
+        assert.deepEqual(globals.value, [], "the extension left a page global behind");
       });
 
       await t.test("labeled screenshots place ids on the elements and clean up", async () => {
@@ -468,6 +472,7 @@ async function fakeCore() {
 
 // Finds the fixture tab waiting on a hand-off (the cursor pill's Done/Cancel) and answers it as the user would.
 async function handoffPage(port, url) {
+  const key = `Object.getOwnPropertySymbols(window).find((symbol) => String(Symbol.keyFor(symbol) || "").startsWith("aeon.handoff."))`;
   for (let i = 0; i < 80; i++) {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     for (const item of targets.filter((entry) => entry.type === "page" && entry.url === url)) {
@@ -475,7 +480,7 @@ async function handoffPage(port, url) {
       const check = async () =>
         (
           await page("Runtime.evaluate", {
-            expression: "globalThis[Symbol.for('aeon.handoff')] === 'waiting'",
+            expression: `(() => { const key = ${key}; return key ? globalThis[key] === "waiting" : false; })()`,
             returnByValue: true,
           })
         ).result?.result?.value === true;
@@ -484,7 +489,7 @@ async function handoffPage(port, url) {
           present: check,
           answer: (state) =>
             page("Runtime.evaluate", {
-              expression: `globalThis[Symbol.for('aeon.handoff')] = ${JSON.stringify(state)}`,
+              expression: `(() => { const key = ${key}; if (key) globalThis[key] = ${JSON.stringify(state)}; })()`,
             }),
         };
     }

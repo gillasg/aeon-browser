@@ -252,6 +252,19 @@ export const ManagementAbilitySchema = z
       })
       .strict()
       .optional(),
+    /** Ways that changed since their tests last passed. */
+    untested: z
+      .array(z.enum(["api", "steps", "script", "page"]))
+      .max(8)
+      .optional(),
+    /** Earlier saves kept for restore. */
+    versions: z
+      .object({
+        count: z.number().int().nonnegative(),
+        latestAt: z.string().max(60).optional(),
+      })
+      .strict()
+      .optional(),
     updatedAt: z.string().max(60),
     running: z.boolean().optional(),
   })
