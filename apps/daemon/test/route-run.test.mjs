@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { listRoutes, settleRoutes, stageRun } from "@browserkit/site-mapper";
+import { listRoutes, saveAbility, settleRoutes, stageRun } from "@browserkit/site-mapper";
 import { isWordCorrection, RouteRecorder } from "../dist/route-recorder.js";
 import { absorb, openRun } from "../dist/route-observe.js";
 import { draftPrompt } from "../dist/route-draft.js";
@@ -151,15 +151,133 @@ async function withRecorder(run) {
   const root = await mkdtemp(join(tmpdir(), "route-run-"));
   const previous = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = root;
-  const recorder = new RouteRecorder({ publish() {} }, 60_000);
+  const cards = [];
+  const recorder = new RouteRecorder({ publish: (_chat, event) => cards.push(event) }, 60_000);
   try {
-    await run(recorder);
+    await run(recorder, cards);
   } finally {
     recorder.close();
     if (previous === undefined) delete process.env.SITE_TO_API_HOME;
     else process.env.SITE_TO_API_HOME = previous;
     await rm(root, { recursive: true, force: true });
   }
+}
+
+test("a short clean run offers nothing to save", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await finishRun(recorder, "chat", "orders for 2024", "shop.test");
+    assert.equal(saveOffers(cards.at(-1)).length, 0);
+  });
+});
+
+test("a run that failed then worked offers to save the ability once", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", {
+      kind: "tool-end",
+      toolCallId: "t1",
+      toolName: "browser_code",
+      result: "TIMEOUT: the click did not land",
+      isError: true,
+    });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    const offers = saveOffers(cards.at(-1));
+    assert.equal(offers.length, 1);
+    assert.match(offers[0].text, /save this as an ability/i);
+  });
+});
+
+test("a mid-run correction offers to save the corrected run once", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", {
+      kind: "message-end",
+      message: { role: "user", content: [{ type: "text", text: "not that, the open orders" }] },
+    });
+    await recorder.observe("chat", stepEvent("shop.test", "Open orders"));
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    assert.equal(saveOffers(cards.at(-1)).length, 1);
+  });
+});
+
+test("a correction in the next message makes that run worth saving", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await finishRun(recorder, "chat", "orders for 2024", "shop.test");
+    await finishRun(recorder, "chat", "nope", "shop.test");
+    assert.equal(saveOffers(cards.at(-1)).length, 1);
+  });
+});
+
+test("an ability that already covers the task gets no save offer", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await saveAbility(ability("orders"));
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", {
+      kind: "message-end",
+      message: { role: "user", content: [{ type: "text", text: "that was wrong" }] },
+    });
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    assert.equal(saveOffers(cards.at(-1)).length, 0);
+  });
+});
+
+test("a failed and corrected run still offers one save offer, not two", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", {
+      kind: "tool-end",
+      toolCallId: "t1",
+      toolName: "browser_code",
+      result: "TIMEOUT: the click did not land",
+      isError: true,
+    });
+    await recorder.observe("chat", {
+      kind: "message-end",
+      message: { role: "user", content: [{ type: "text", text: "that was wrong" }] },
+    });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    assert.equal(saveOffers(cards.at(-1)).length, 1);
+    assert.equal(cards.filter((card) => saveOffers(card).length).length, 1);
+  });
+});
+
+test("an unsure finish is not a success worth saving", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", { kind: "run-state", state: "uncertain" });
+    assert.equal(saveOffers(cards.at(-1)).length, 0);
+  });
+});
+
+function saveOffers(card) {
+  return (card?.card.items ?? []).filter(
+    (item) => item.kind === "offer" && item.action === "save-ability",
+  );
+}
+
+function ability(name) {
+  return {
+    name,
+    site: "shop.test",
+    kind: "read",
+    inputs: { type: "object", properties: { q: { type: "string" } } },
+    ways: [{ kind: "api", operation: "search", params: { q: "{{inputs.q}}" } }],
+    options: {},
+    stats: { runs: 0, failures: 0 },
+    createdBy: "agent",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 async function finishRun(recorder, chatId, prompt, site) {

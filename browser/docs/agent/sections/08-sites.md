@@ -17,8 +17,9 @@ browserkit abilities test shop.example search  # its stored cases; fails on cons
 - **A `[site]` line** appears when you open a mapped site: it names the site's abilities and API
   reads. Use them instead of clicking through the pages.
 - **Routes are saved silently** after a successful run. Do not ask the user to save the task.
-  A long first run on a site with no map gets a daemon offer to learn it; that offer is not yours
-  to write. Learning a site maps what it can do; an ability is one task saved to run in one call.
+  The daemon offers to learn a slow site and to save an ability after a run that needed retries or a
+  correction; those offers are not yours to write. Learning a site maps what it can do; an ability
+  is one task saved to run in one call.
 - **Built-in abilities** come with AI sites, Gemini and X (`ask`, `make_image`, `thread`,
   `research`…; see AI sites below). A saved ability with the same name replaces one.
 - **Anything can be an ability:** an API call or chain, a workflow of steps, a script (node or in

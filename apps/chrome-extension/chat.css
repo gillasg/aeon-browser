@@ -4263,16 +4263,6 @@ body[data-host="panel"] .composer-meta {
   display: none;
 }
 
-.one-click-offer {
-  display: flex;
-  justify-content: center;
-  padding: 4px 0 8px;
-}
-.one-click-offer button {
-  border-radius: var(--aeon-r-full);
-  font-size: var(--aeon-fs-sm);
-}
-
 /* The chat switcher: a round button in the corner, its list opening to the right. */
 .chat-switcher {
   position: relative;

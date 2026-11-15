@@ -98,6 +98,27 @@ test("offers stop at two", async () => {
   );
 });
 
+test("a save offer reads as one line and never doubles in a merged footer", async () => {
+  const lines = await load("../../../packages/ui/src/answer-lines.ts");
+  const card = {
+    items: [
+      { kind: "notice", text: "12 s · first time" },
+      {
+        kind: "offer",
+        id: "save-ability:shop.test:orders",
+        text: "Save this as an ability, so next time is one call.",
+        action: "save-ability",
+      },
+    ],
+  };
+  const first = lines.footerFromCard(card);
+  const offer = first.lines.find((line) => line.kind === "offer");
+  assert.equal(offer.label, "Save this as an ability");
+  assert.match(offer.followUp, /^Save what you just did as an ability/);
+  const merged = lines.mergeFooters(first, lines.footerFromCard(card));
+  assert.equal(merged.lines.filter((line) => line.kind === "offer").length, 1);
+});
+
 test("the lines render under an answer, with the offer's own words beside its button", async () => {
   const view = await load("../../../packages/ui/src/answer-lines-view.tsx");
   const footer = {

@@ -7,8 +7,10 @@ import type { RunCard } from "@aeon/protocol";
 import {
   cancelPending,
   contentWords,
+  hasSuccess,
   listAbilities,
   listRoutes,
+  matchAbilities,
   matchSavedRoute,
   promoteRoute,
   settleRoutes,
@@ -45,6 +47,7 @@ interface Prompted {
   fromMemory: boolean;
   draft: boolean;
   watcher: boolean;
+  corrected: boolean;
 }
 
 interface Due {
@@ -60,6 +63,7 @@ export class RouteRecorder {
   private readonly prompted = new Map<string, Prompted>();
   private readonly runs = new Map<string, LiveRun>();
   private readonly lastSite = new Map<string, string>();
+  private readonly lastPrompt = new Map<string, string>();
   private readonly due = new Map<string, Due[]>();
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -70,6 +74,8 @@ export class RouteRecorder {
 
   /** The user's words, plus a rung-1 draft when a saved route matches. */
   async prepare(chatId: string, prompt: string): Promise<{ text: string; draft?: RouteDraft }> {
+    const prior = this.lastPrompt.get(chatId);
+    this.lastPrompt.set(chatId, prompt);
     await this.noteCorrection(chatId, prompt).catch(report);
     const draft = await this.draftFor(chatId, prompt).catch(() => undefined);
     this.prompted.set(chatId, {
@@ -78,6 +84,7 @@ export class RouteRecorder {
       fromMemory: false,
       draft: Boolean(draft),
       watcher: false,
+      corrected: prior !== undefined && isWordCorrection(prior, prompt),
     });
     return { text: prompt, ...(draft ? { draft } : {}) };
   }
@@ -93,6 +100,7 @@ export class RouteRecorder {
       fromMemory: false,
       draft: false,
       watcher: true,
+      corrected: false,
     });
   }
 
@@ -137,6 +145,7 @@ export class RouteRecorder {
     run.fromMemory = prompt.fromMemory;
     run.draft = prompt.draft;
     run.watcher = prompt.watcher;
+    run.corrected = prompt.corrected;
     this.runs.set(chatId, run);
     return run;
   }
@@ -278,6 +287,7 @@ async function factsFor(
   const fromMemory = run.fromMemory && !run.corrected;
   const drafted = run.draft && !run.corrected && !fromMemory;
   const unmapped = await unmappedSite(site);
+  const saveAbility = await saveOfferWanted(run, site);
   return {
     chatId: run.chatId,
     runId: run.runId,
@@ -288,11 +298,28 @@ async function factsFor(
     path: pathOf(fromMemory, drafted, run.usedAbility),
     ...(run.partial ? { partial: run.partial } : {}),
     ...(fromMemory ? { fromMemory: true } : {}),
+    ...(saveAbility ? { saveAbility: true } : {}),
     ...(learnSite(unmapped, fromMemory, drafted, durationMs) ? { longFirstRun: true } : {}),
     ...(fingerprint ? { routeId: fingerprint } : {}),
     declined: await declinesFor(site),
     ...(run.ours ? { ours: true } : {}),
   };
+}
+
+/**
+ * One save offer for a run that worked after a failure or a correction, when the site has no
+ * ability that already covers it. A clean short run needs nothing, and a routine or an ability
+ * run is already the saved version.
+ */
+async function saveOfferWanted(run: LiveRun, site: string): Promise<boolean> {
+  if (run.watcher || run.usedAbility || run.ours || run.unsure) return false;
+  if (!run.stumbled && !run.corrected) return false;
+  if (!hasSuccess(flatSteps(run).map(observedStep))) return false;
+  try {
+    return (await matchAbilities(run.userPrompt, [site], 1)).length === 0;
+  } catch {
+    return false;
+  }
 }
 
 function learnSite(
