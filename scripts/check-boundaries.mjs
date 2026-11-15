@@ -7,17 +7,22 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRules = new Map([
   ["@aeon/protocol", []],
   ["@aeon/domain", []],
+  ["@aeon/location", []],
   ["@aeon/store", ["@aeon/domain"]],
-  ["@aeon/daemon", ["@aeon/protocol", "@aeon/domain", "@aeon/store", "@aeon/pi-adapter"]],
+  [
+    "@aeon/daemon",
+    ["@aeon/protocol", "@aeon/domain", "@aeon/location", "@aeon/store", "@aeon/pi-adapter"],
+  ],
   ["@aeon/pi-adapter", ["@aeon/domain", "@aeon/protocol"]],
   ["@aeon/native-host", []],
-  ["@aeon/cli", ["@aeon/protocol", "@aeon/pi-adapter"]],
+  ["@aeon/cli", ["@aeon/location", "@aeon/protocol", "@aeon/pi-adapter"]],
   ["@aeon/chrome-extension", ["@aeon/protocol", "@aeon/ui"]],
   ["@aeon/ui", ["@aeon/protocol"]],
 ]);
 const packagePaths = new Map([
   ["@aeon/protocol", "packages/protocol"],
   ["@aeon/domain", "packages/domain"],
+  ["@aeon/location", "packages/location"],
   ["@aeon/store", "packages/store"],
   ["@aeon/daemon", "apps/daemon"],
   ["@aeon/pi-adapter", "packages/pi-adapter"],

@@ -71,6 +71,9 @@ importers:
 
   apps/cli:
     dependencies:
+      "@aeon/location":
+        specifier: workspace:*
+        version: link:../../packages/location
       "@aeon/pi-adapter":
         specifier: workspace:*
         version: link:../../packages/pi-adapter
@@ -105,6 +108,9 @@ importers:
       "@aeon/domain":
         specifier: workspace:*
         version: link:../../packages/domain
+      "@aeon/location":
+        specifier: workspace:*
+        version: link:../../packages/location
       "@aeon/pi-adapter":
         specifier: workspace:*
         version: link:../../packages/pi-adapter
@@ -435,6 +441,12 @@ importers:
         version: link:../crawl
 
   packages/domain: {}
+
+  packages/location:
+    devDependencies:
+      "@types/node":
+        specifier: 26.6.3
+        version: 26.6.3
 
   packages/pi-adapter:
     dependencies:

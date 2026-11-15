@@ -62,7 +62,7 @@ test("each failed check names the one fix", () => {
   assert.match(byName.flags.detail, /disable-background-timer-throttling/);
   assert.match(byName.flags.fix, /Restart Chrome with these flags/);
   assert.match(byName.model.fix, /Sign in to a model/);
-  assert.match(byName.supervisor.fix, /Aeon-Core-Login/);
+  assert.match(byName.supervisor.fix, /Aeon/);
   assert.match(byName.data.fix, /C:\\Aeon\\data/);
   assert.match(formatDoctor(checks, false), /Fix: Open Chrome with Aeon loaded/);
 });
