@@ -1,6 +1,7 @@
-// Sets Aeon up from a fresh clone in one command (Windows; install.ps1 runs it): builds Aeon, installs the native host and its login task, puts the `aeon`
-// command and skill in place, adds Aeon's MCP server to the coding agents on this machine, then
-// opens chrome://extensions with the extension folder on the clipboard and waits for it.
+// Sets Aeon up from a fresh clone in one command (install.ps1 and install.sh run it): builds Aeon,
+// installs the native host and the background service for this OS, puts the `aeon` command and
+// skill in place, adds Aeon's MCP server to the coding agents on this machine, then presents the
+// extension and waits for it.
 //
 //   node scripts/setup.mjs              everything
 //   node scripts/setup.mjs --no-agents  leave coding agents' configs alone
@@ -15,9 +16,10 @@ const args = new Set(process.argv.slice(2));
 const extension = join(root, "apps", "chrome-extension", "native-dist");
 const cli = join(root, "apps", "cli", "dist", "cli.js");
 const say = (line) => process.stdout.write(line + "\n");
+const windows = process.platform === "win32";
 
-if (process.platform !== "win32") {
-  say("Aeon runs on Windows for now.");
+if (!windows && process.platform !== "darwin" && process.platform !== "linux") {
+  say(`Aeon does not support ${process.platform} yet.`);
   process.exit(1);
 }
 
@@ -29,43 +31,12 @@ run("pnpm", ["install", "--ignore-scripts"]);
 run("pnpm", ["build"]);
 
 say("2/4 Installing the native host and the background service…");
-const installed = (() => {
-  try {
-    execFileSync(
-      "reg.exe",
-      ["query", "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.aeon.native_host"],
-      { stdio: "ignore" },
-    );
-    return true;
-  } catch {
-    return false;
-  }
-})();
-run("powershell.exe", [
-  "-NoProfile",
-  "-ExecutionPolicy",
-  "Bypass",
-  "-File",
-  join("scripts", "setup-core.ps1"),
-  ...(installed ? ["-Update"] : []),
-]);
+if (windows) installWindowsHost();
+else run(process.execPath, [join("apps", "native-host", "scripts", "install.mjs")]);
 
 say("3/4 Installing the aeon command and skill…");
 run(process.execPath, [cli, "install"]);
-
-// The engine's setup pieces, built a moment ago.
-const bridge = join(root, "browser", "apps", "bridge", "dist");
-const { connectAgents } = await import(pathToFileURL(join(bridge, "connect-agents.js")).href);
-const { presentExtension } = await import(pathToFileURL(join(bridge, "setup-extension.js")).href);
-if (!args.has("--no-agents")) {
-  const results = await connectAgents({
-    name: "aeon",
-    command: process.execPath,
-    args: [cli, "mcp"],
-  });
-  for (const result of results)
-    say(`   ${result.done ? "Connected" : "Could not connect"} ${result.agent} (${result.detail})`);
-}
+await connectAgents();
 
 say("4/4 The extension");
 if (await extensionConnected()) {
@@ -74,10 +45,7 @@ if (await extensionConnected()) {
 }
 if (!existsSync(join(extension, "manifest.json"))) throw new Error("The extension did not build.");
 presentExtension(extension);
-say("Last step, in the chrome://extensions tab that just opened:");
-say("  1. Turn on Developer mode (top right).");
-say("  2. Click Load unpacked, paste the folder with Ctrl+V, press Enter, then Select Folder.");
-say("The folder is on your clipboard: " + extension);
+say(loadInstructions());
 if (args.has("--no-wait")) process.exit(0);
 say("Waiting for Aeon to connect (Ctrl+C to stop)…");
 for (let waited = 0; waited < 10 * 60_000; waited += 3000) {
@@ -90,6 +58,59 @@ for (let waited = 0; waited < 10 * 60_000; waited += 3000) {
 say("Still not connected; reload the extension in chrome://extensions and run this again.");
 process.exit(1);
 
+function installWindowsHost() {
+  const installed = (() => {
+    try {
+      execFileSync(
+        "reg.exe",
+        ["query", "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.aeon.native_host"],
+        { stdio: "ignore" },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  run("powershell.exe", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    join("scripts", "setup-core.ps1"),
+    ...(installed ? ["-Update"] : []),
+  ]);
+}
+
+/** The engine's setup pieces, built a moment ago. */
+async function connectAgents() {
+  if (args.has("--no-agents")) return;
+  const bridge = join(root, "browser", "apps", "bridge", "dist");
+  const { connectAgents: connect } = await import(
+    pathToFileURL(join(bridge, "connect-agents.js")).href
+  );
+  const results = await connect({ name: "aeon", command: process.execPath, args: [cli, "mcp"] });
+  for (const result of results)
+    say(`   ${result.done ? "Connected" : "Could not connect"} ${result.agent} (${result.detail})`);
+}
+
+function loadInstructions() {
+  if (windows)
+    return [
+      "Last step, in the chrome://extensions tab that just opened:",
+      "  1. Turn on Developer mode (top right).",
+      "  2. Click Load unpacked, paste the folder with Ctrl+V, press Enter, then Select Folder.",
+      "The folder is on your clipboard: " + extension,
+    ].join("\n");
+  const shortcut = process.platform === "darwin" ? "Cmd+Shift+Space" : "Ctrl+Shift+Space";
+  return [
+    "Last step, in the chrome://extensions tab that just opened:",
+    "  1. Turn on Developer mode (top right).",
+    "  2. Click Load unpacked and choose the folder below.",
+    `  3. Open Aeon from the toolbar, or press ${shortcut} on any page.`,
+    "The folder is on your clipboard: " + extension,
+  ].join("\n");
+}
+
 /** The extension answers through the daemon only once it is loaded and connected. */
 async function extensionConnected() {
   try {
@@ -98,4 +119,12 @@ async function extensionConnected() {
   } catch {
     return false;
   }
+}
+
+async function presentExtension(folder) {
+  const bridge = join(root, "browser", "apps", "bridge", "dist");
+  const { presentExtension: present } = await import(
+    pathToFileURL(join(bridge, "setup-extension.js")).href
+  );
+  present(folder);
 }

@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
 if (process.platform !== "win32") {
-  process.stdout.write("skipped: Windows-only (C# host)\n");
+  process.stdout.write(
+    "Native host: the Node implementation is used on macOS and Linux; nothing to compile.\n",
+  );
   process.exit(0);
 }
 const windows = process.env.WINDIR ?? "C:\\Windows";

@@ -14,7 +14,25 @@ It installs Git, Node.js and pnpm if they are missing, fetches Aeon into `%LOCAL
 
 Then, in Chrome: turn on **Developer mode**, click **Load unpacked**, paste the folder (Ctrl+V), press Enter and click **Select Folder**. The installer sees Aeon connect and finishes. Run the same line again to update.
 
-From a clone instead: `node scripts/setup.mjs` does the same from this folder. By hand: `pnpm install --ignore-scripts`, `pnpm build`, `scripts/setup-core.ps1`, then load `apps/chrome-extension/native-dist` in Chrome. The daemon (`apps/daemon`) supplies Pi sessions, the agent and local storage; the extension supplies the side panel, chat and browser control. Run `pnpm start` for a standalone daemon, or use the Windows login supervisor.
+## Install (macOS and Linux)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
+```
+
+It does the same on macOS and Linux: installs Git, Node.js 22 and pnpm when missing (Homebrew on macOS, apt/NodeSource on Debian and Ubuntu), fetches Aeon into `~/Library/Application Support/Aeon/aeon-browser` on macOS or `${XDG_DATA_HOME:-~/.local/share}/aeon/aeon-browser` on Linux (set `AEON_DIR` to choose another folder), builds it, registers the native messaging host for Google Chrome, Chrome for Testing and Chromium, and installs the background service: a `launchd` LaunchAgent `com.aeon.daemon` on macOS, a `systemd --user` unit `aeon-daemon` on Linux. The service starts at login and keeps one daemon supervisor (and one daemon) alive.
+
+On Linux, enable lingering once so the service also runs while you are logged out:
+
+```sh
+sudo loginctl enable-linger "$USER"
+```
+
+Then load `apps/chrome-extension/native-dist` in `chrome://extensions` as above. The installer prints the folder and copies it to the clipboard. Run the same line again to update; data in the Aeon data folder is preserved.
+
+Chrome picks native messaging manifests from its own profile. The installer writes the manifests for the default profiles (`~/.config/google-chrome`, `~/.config/google-chrome-for-testing`, `~/.config/chromium` on Linux; `~/Library/Application Support/{Google/Chrome,Google/Chrome for Testing,Chromium}` on macOS). If you start Chrome with a custom `--user-data-dir`, copy `com.aeon.native_host.json` from one of those folders into `<user-data-dir>/NativeMessagingHosts/` too.
+
+From a clone instead: `node scripts/setup.mjs` does the same from this folder. By hand: `pnpm install --ignore-scripts`, `pnpm build`, then `node apps/native-host/scripts/install.mjs`, and load `apps/chrome-extension/native-dist` in Chrome. The daemon (`apps/daemon`) supplies Pi sessions, the agent and local storage; the extension supplies the side panel, chat and browser control. Run `pnpm start` for a standalone daemon, or use the installed login service.
 
 ## What is in this repo
 

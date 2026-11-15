@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { appendFile, copyFile, readFile, stat, unlink, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { aeonAppRoot } from "@aeon/location";
 import { join, relative, resolve, sep } from "node:path";
 import type { Args } from "browserkit/dist/args.js";
 import { has } from "browserkit/dist/args.js";
@@ -32,16 +32,15 @@ export function rollbackCommand(): Command {
     summary: "switch the daemon to the previous build",
     help: `Usage: aeon rollback [--json]
 
-Points the daemon entrypoint at the previous versioned build under
-%LOCALAPPDATA%\\Aeon\\builds\\<version>-<sha>\\main.js and records the swap in release.json.
+Points the daemon entrypoint at the previous versioned build under Aeon's builds folder
+(Aeon's app folder, then builds/<version>-<sha>/main.js) and records the swap in release.json.
 Restart Aeon to run that build. Other host-config.json fields stay as they are.`,
     run: (args: Args) => runRollback(has(args, "json")),
   };
 }
 
 export function releasePaths(env: NodeJS.ProcessEnv = process.env): ReleasePaths {
-  const root =
-    env.AEON_HOME ?? join(env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Aeon");
+  const root = env.AEON_HOME ?? aeonAppRoot({ env });
   return { root, hostConfig: env.AEON_HOST_CONFIG ?? join(root, "host-config.json") };
 }
 
