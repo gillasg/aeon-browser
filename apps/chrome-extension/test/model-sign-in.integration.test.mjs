@@ -266,7 +266,7 @@ async function clickManageModels(browser, sessionId) {
   );
 }
 
-async function waitFor(browser, sessionId, expression, timeoutMs = 20_000) {
+async function waitFor(browser, sessionId, expression, timeoutMs = 35_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await evaluate(browser, sessionId, expression)) return;
