@@ -9,6 +9,7 @@ import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
 import { inferAbilityInputs, type AbilityDemonstration } from "./ability-infer.js";
+import { scrubAbility, type ScrubMark } from "./ability-scrub.js";
 import {
   contractBreaks,
   contractWarnings,
@@ -79,6 +80,8 @@ export interface AbilityWayApi {
   commit?: number;
   /** The shape this way's answer must keep. Absent: learned from its first success. */
   expect?: AbilityWayExpect;
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
   /** Values a later step takes from an earlier response, as `steps.<i>.<path>`. */
   refs?: AbilityReference[];
 }
@@ -100,6 +103,8 @@ export interface AbilityWaySteps {
   name?: string;
   params?: Record<string, unknown>;
   steps?: unknown[];
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
 }
 
 export interface AbilityWayScript {
@@ -111,6 +116,8 @@ export interface AbilityWayScript {
   input?: Json;
   /** The shape this way's answer must keep. Absent: learned from its first success. */
   expect?: AbilityWayExpect;
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
 }
 
 export interface AbilityWayPage {
@@ -122,6 +129,8 @@ export interface AbilityWayPage {
   extractor?: unknown;
   /** The shape this way's answer must keep. Absent: learned from its first success. */
   expect?: AbilityWayExpect;
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
 }
 
 export type AbilityWay = AbilityWayApi | AbilityWaySteps | AbilityWayScript | AbilityWayPage;
@@ -149,6 +158,17 @@ export interface AbilityStats {
   stale?: boolean;
   staleWhy?: string;
   lastDifferAt?: string;
+}
+
+/** A stored value that was a secret, and what the saver did about it. Never a permission gate. */
+export interface AbilityScrubbed {
+  at: string;
+  where: "way" | "test" | "ability";
+  via?: AbilityVia;
+  what: string;
+  /** The way or test is no longer stored: the secret was its whole request. */
+  dropped: boolean;
+  reason: "secret" | "personal";
 }
 
 export type { AbilityPostcondition, AbilityPrecondition, AbilityWayStats };
@@ -179,6 +199,8 @@ export interface Ability {
   promoted?: boolean;
   /** Inputs and references inferred from the run that saved this ability. */
   inferred?: { at: string; inputs: string[]; references: string[] };
+  /** Secret values removed when the ability was saved, and the way or test each came from. */
+  scrubbed?: AbilityScrubbed[];
   createdAt: string;
   updatedAt: string;
 }
@@ -308,8 +330,13 @@ export async function saveAbility(
   warnings: string[];
   tests?: AbilityTestReport;
   inferred?: { inputs: string[]; references: string[] };
+  scrubbed?: ScrubMark[];
 }> {
-  const prepared = withInferred(ability, options);
+  const scrub = scrubAbility(withInferred(ability, options), undefined, {
+    keepLast: options.check === false,
+  });
+  if (scrub.refused) throw new Error(scrub.refused);
+  const prepared = scrub.ability;
   const site = siteName(prepared.site);
   const name = validAbilityName(prepared.name);
   validateAbility({ ...prepared, name, site });
@@ -336,13 +363,24 @@ export async function saveAbility(
   const inferred = inferredOf(prepared);
   await versionChangedAbility(existing, next);
   await writeAtomic(path, JSON.stringify(next, null, 2) + "\n");
+  const warnings =
+    options.check === false ? [] : [...contractWarnings(next), ...scrubWarnings(scrub.marks)];
   return {
     ability: next,
     path,
-    warnings: options.check === false ? [] : contractWarnings(next),
+    warnings,
     ...(tests ? { tests } : {}),
     ...(inferred ? { inferred } : {}),
+    ...(scrub.marks.length ? { scrubbed: scrub.marks } : {}),
   };
+}
+
+function scrubWarnings(marks: ScrubMark[]): string[] {
+  return marks.map((mark) => {
+    if (mark.dropped) return `${mark.what} was dropped: it carried a secret`;
+    if (mark.reason === "secret") return `${mark.what}: a secret was not stored`;
+    return `${mark.what}: personal data was redacted`;
+  });
 }
 
 /** Fills examples and templates input values from the run, when the caller provided one. */
