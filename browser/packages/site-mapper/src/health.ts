@@ -1,8 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { detectChallenge } from "./challenge.js";
-import { schemaChanges, resolveAll } from "./diff.js";
-import { inferSchema } from "./infer/schema.js";
+import { breakingChanges, responseChanges } from "./diff.js";
 import { RecordingSession } from "./record.js";
 import { appendEvent, listFlows, siteDir, siteName } from "./registry.js";
 import type { Bridge } from "./runtime/bridge.js";
@@ -53,22 +52,16 @@ function safe(operation: Operation, includeActions: boolean): boolean {
   return includeActions || operation.role === "read";
 }
 
-/** Only a missing required field or a changed type breaks callers; new fields do not. */
-const isBreaking = (line: string) => /\(required\) missing|changed type/.test(line);
-
 function compare(
   client: SiteClient,
   operation: Operation,
   status: number,
   json: unknown,
 ): HealthResult {
-  const stored = Object.entries(operation.responses).find(([code]) => code.startsWith("2"))?.[1]
-    ?.schema;
-  if (!stored || json === undefined) return { id: operation.id, status: "ok", httpStatus: status };
-  const changes = schemaChanges(resolveAll(client.model, stored), inferSchema([json]));
+  const changes = responseChanges(client.model, operation, json);
   return {
     id: operation.id,
-    status: changes.some(isBreaking) ? "drift" : "ok",
+    status: breakingChanges(changes) ? "drift" : "ok",
     httpStatus: status,
     ...(changes.length ? { changes } : {}),
   };

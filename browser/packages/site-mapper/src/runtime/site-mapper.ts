@@ -1,11 +1,19 @@
 import { originMatches } from "../filter.js";
 import { detectChallenge, type Challenge } from "../challenge.js";
+import { breakingChanges, responseChanges } from "../diff.js";
 import { extractEmbedded, metaTags } from "../infer/html.js";
 import { getPointer } from "../infer/schema.js";
 import { loadModel, readOverrides, readSession, siteName } from "../registry.js";
+import {
+  readTransportPreferences,
+  recordTransportPreference,
+  type TransportNote,
+} from "../transport-preference.js";
 import type { Operation, PageEndpoint, SecurityScheme, SiteModel } from "../types.js";
 import { BrowserNotConnected, type Bridge } from "./bridge.js";
+import { Challenged, HttpError, SignedOut, WriteThroughApi } from "./errors.js";
 import { RateLimiter, RETRYABLE, retryDelay, sleep } from "./limits.js";
+import { isDnsFailure, isFetchFailure, isNetworkRefusal, isOk, withNotes } from "./outcome.js";
 import {
   buildRequest,
   dependencyFor,
@@ -30,6 +38,14 @@ import { docsExpression, docsTargets, type SiteDocs } from "./docs.js";
 import { paginate, type PaginateOptions } from "./paginate.js";
 import { applyPaceNotes, exportPaced, notePaceLimit, takePace } from "../pace.js";
 import { readSiteFacts } from "../site-notes.js";
+export {
+  Challenged,
+  HttpError,
+  SignedOut,
+  WriteThroughApi,
+  errorKind,
+  type ErrorKind,
+} from "./errors.js";
 
 // The runtime: `const api = await siteMapper("shop.example")`, then `await api.searchProducts({ q })`
 // or `for await (const item of api.paginate.searchProducts({ q }))`.
@@ -55,64 +71,6 @@ export interface SiteMapperOptions {
   actions?: Record<string, SiteAction>;
 }
 
-export class HttpError extends Error {
-  constructor(
-    public readonly operationId: string,
-    public readonly response: RuntimeResponse,
-  ) {
-    const detail =
-      response.json !== undefined ? JSON.stringify(response.json) : (response.text ?? "");
-    super(`${operationId} answered HTTP ${response.status}: ${detail.slice(0, 300)}`);
-    this.name = "HttpError";
-  }
-}
-
-/** The site refused the call as signed out (401/403 even after renewing auth). */
-export class SignedOut extends HttpError {
-  constructor(operationId: string, response: RuntimeResponse) {
-    super(operationId, response);
-    this.name = "SignedOut";
-    // A 401/403 also comes back when the site wants a sign-in header its own code adds; say both.
-    this.message = `The site refused the call as not signed in: ${this.message}. Either the browser is signed out of it (sign in, then call again), or the site adds a sign-in header browserkit has not seen yet: use the site in a tab once so its header can be borrowed, or read the page instead.`;
-  }
-}
-
-/** The site refused the call with a bot wall (Cloudflare, DataDome, PerimeterX, Akamai). */
-export class Challenged extends HttpError {
-  constructor(
-    operationId: string,
-    response: RuntimeResponse,
-    public readonly wall: Challenge,
-  ) {
-    super(operationId, response);
-    this.name = "Challenged";
-    this.message = `A ${wall.vendor} bot wall answered ${operationId} (${wall.evidence}). There is nothing to repair: open the site in a tab, clear the check like a person would, then call again. Re-recording only teaches the wall.`;
-  }
-}
-
-/** A write reached the API runtime. Writes go through the site's page UI, never through SiteMapper. */
-export class WriteThroughApi extends Error {
-  constructor(operationId: string) {
-    super(`${operationId} changes state; writes go through the site's page UI`);
-    this.name = "WriteThroughApi";
-  }
-}
-
-export type ErrorKind =
-  "signed-out" | "challenged" | "missing-input" | "browser-offline" | "broken" | "failed";
-
-/** What kind of failure an error is, so callers know what to do next. */
-export function errorKind(error: unknown): ErrorKind {
-  const cause = (error as { cause?: unknown } | undefined)?.cause;
-  if (cause instanceof Error) return errorKind(cause);
-  if (error instanceof Challenged) return "challenged";
-  if (error instanceof SignedOut) return "signed-out";
-  if (error instanceof MissingParams) return "missing-input";
-  if (error instanceof BrowserNotConnected) return "browser-offline";
-  if (error instanceof HttpError) return "broken";
-  return "failed";
-}
-
 const SESSION_FRESH_MS = 12 * 3600_000;
 const REFRESH_EVERY_MS = 10 * 60_000;
 
@@ -130,6 +88,7 @@ export class SiteClient {
   private readonly direct: Transport;
   private readonly cache = new Map<string, { value: string; at: number }>();
   private refreshedAt = 0;
+  private prefs?: Record<string, TransportNote>;
 
   constructor(
     readonly model: SiteModel,
@@ -173,19 +132,43 @@ export class SiteClient {
     const mode = this.options.transport ?? "auto";
     if (mode === "page") return this.page;
     if (mode === "direct") return this.direct;
-    if (operation.signing || this.options.signers?.[operation.id]) return this.page;
+    if (await this.needsBrowser(operation)) return this.page;
+    // The transport that answered last time starts the next call. A site that rotated its
+    // headers or changed its answer shape tends to keep answering the page; a public call that
+    // has only ever worked directly keeps its fast path.
+    return (await this.preferredTransport(operation.id)) === "page" ? this.page : this.direct;
+  }
+
+  /** True when only the browser can make the call: a signer, or auth with no fresh session. */
+  private async needsBrowser(operation: Operation): Promise<boolean> {
+    if (operation.signing || this.options.signers?.[operation.id]) return true;
     const schemes = this.schemes(operation);
     const needsBrowserState = schemes.some(
       (s) => s.type !== "apiKey" || (s.source && s.source.kind !== "constant"),
     );
-    if (!needsBrowserState) return this.direct;
+    if (!needsBrowserState) return false;
     const session = this.options.session;
     if (session && Date.now() - Date.parse(session.savedAt) >= SESSION_FRESH_MS)
       await this.refreshSession();
     const fresh =
       this.options.session &&
       Date.now() - Date.parse(this.options.session.savedAt) < SESSION_FRESH_MS;
-    return fresh ? this.direct : this.page;
+    return !fresh;
+  }
+
+  private async preferredTransport(id: string): Promise<TransportNote["transport"] | undefined> {
+    this.prefs ??= await readTransportPreferences(this.site).catch(
+      () => ({}) as Record<string, TransportNote>,
+    );
+    return this.prefs[id]?.transport;
+  }
+
+  private async rememberTransport(
+    id: string,
+    transport: TransportNote["transport"],
+  ): Promise<void> {
+    this.prefs = { ...(this.prefs ?? {}), [id]: { transport, at: new Date().toISOString() } };
+    await recordTransportPreference(this.site, id, transport).catch(() => undefined);
   }
 
   /** Renews the exported session from the browser (at most every 10 minutes); true when renewed. */
@@ -424,17 +407,23 @@ export class SiteClient {
     depth: number,
     sent: { request: RuntimeRequest; context: CallContext; transport: Transport },
     readOnly: boolean,
-  ): Promise<RuntimeResponse | undefined> {
+  ): Promise<{ response: RuntimeResponse; transport: Transport } | undefined> {
     if (!readOnly) return undefined;
     this.clearAuthCache();
     const refreshed = await this.retryAfterRefresh(sent, readOnly);
     if (refreshed) return refreshed;
     if (this.options.transport === "direct") return undefined;
     if (this.canRetryInPage(sent))
-      return this.send(this.page, sent.request, sent.context, readOnly);
+      return {
+        response: await this.send(this.page, sent.request, sent.context, readOnly),
+        transport: this.page,
+      };
     if (!this.schemes(operation).some((s) => s.refresh)) return undefined;
     Object.assign(sent.request.headers, await this.responseAuth(operation, params, depth));
-    return this.send(sent.transport, sent.request, sent.context, readOnly);
+    return {
+      response: await this.send(sent.transport, sent.request, sent.context, readOnly),
+      transport: sent.transport,
+    };
   }
 
   private clearAuthCache(): void {
@@ -444,11 +433,13 @@ export class SiteClient {
   private async retryAfterRefresh(
     sent: { request: RuntimeRequest; context: CallContext; transport: Transport },
     readOnly: boolean,
-  ): Promise<RuntimeResponse | undefined> {
+  ): Promise<{ response: RuntimeResponse; transport: Transport } | undefined> {
     if (sent.transport !== this.direct) return undefined;
     if (!(await this.refreshSession())) return undefined;
     const retried = await this.send(this.direct, sent.request, sent.context, readOnly);
-    return retried.status !== 401 && retried.status !== 403 ? retried : undefined;
+    return retried.status !== 401 && retried.status !== 403
+      ? { response: retried, transport: this.direct }
+      : undefined;
   }
 
   private canRetryInPage(sent: { transport: Transport }): boolean {
@@ -491,12 +482,104 @@ export class SiteClient {
       await this.metaAuth(operation, chosen),
     );
     const context = this.context(operation);
-    const { response, transport } = await this.sendWithFallback(chosen, request, context, readOnly);
-    if (response.status !== 401 && response.status !== 403) return response;
-    return (
-      (await this.retryAuth(operation, params, depth, { request, context, transport }, readOnly)) ??
-      response
+    const first = await this.sendWithFallback(chosen, request, context, readOnly);
+    const outcome = await this.settle(
+      operation,
+      params,
+      depth,
+      { request, context },
+      first,
+      readOnly,
     );
+    if (readOnly) await this.recordOutcome(operation, chosen, outcome);
+    return outcome.response;
+  }
+
+  /** Auth and drift retries, so the caller sees the answer that settled. */
+  private async settle(
+    operation: Operation,
+    params: Params,
+    depth: number,
+    sent: { request: RuntimeRequest; context: CallContext },
+    first: { response: RuntimeResponse; transport: Transport },
+    readOnly: boolean,
+  ): Promise<Outcome> {
+    let response = first.response;
+    let transport = first.transport;
+    let drifted = false;
+    if (readOnly && isOk(response)) {
+      const changes = responseChanges(this.model, operation, response.json);
+      drifted = breakingChanges(changes);
+      const retried = await this.retryDrift(sent, first, changes, readOnly);
+      if (retried) ({ response, transport } = retried);
+    }
+    let authRetried = false;
+    if (response.status === 401 || response.status === 403) {
+      const retried = await this.retryAuth(
+        operation,
+        params,
+        depth,
+        { ...sent, transport },
+        readOnly,
+      );
+      if (retried) {
+        ({ response, transport } = retried);
+        authRetried = true;
+      }
+    }
+    return { response, transport, drifted, authRetried };
+  }
+
+  /**
+   * A direct read whose shape no longer matches the recorded one is retried once through the
+   * page, which sees the site's current headers, cookies and signing. The page answer wins.
+   */
+  private async retryDrift(
+    sent: { request: RuntimeRequest; context: CallContext },
+    first: { response: RuntimeResponse; transport: Transport },
+    changes: string[],
+    readOnly: boolean,
+  ): Promise<{ response: RuntimeResponse; transport: Transport } | undefined> {
+    if (
+      !readOnly ||
+      !breakingChanges(changes) ||
+      first.transport !== this.direct ||
+      (this.options.transport ?? "auto") !== "auto" ||
+      !isOk(first.response)
+    )
+      return undefined;
+    const note = `The direct answer did not match the recorded shape (${changes.slice(0, 3).join("; ")}).`;
+    try {
+      const response = await this.send(this.page, sent.request, sent.context, readOnly);
+      response.notes = [...(response.notes ?? []), `${note} The call was retried in the browser.`];
+      return { response, transport: this.page };
+    } catch {
+      first.response.notes = [...(first.response.notes ?? []), `${note} The browser retry failed.`];
+      return undefined;
+    }
+  }
+
+  /**
+   * Learns the transport that answered. A transport error, a skipped tier or an offline browser
+   * leaves the preference alone; a success, a changed shape or a 401/403 moves it.
+   */
+  private async recordOutcome(
+    operation: Operation,
+    chosen: Transport,
+    outcome: Outcome,
+  ): Promise<void> {
+    if ((this.options.transport ?? "auto") !== "auto") return;
+    const { response, transport, drifted, authRetried } = outcome;
+    if (response.status === 401 || response.status === 403) {
+      await this.rememberTransport(operation.id, "page");
+      return;
+    }
+    if (!isOk(response)) return;
+    if (transport === chosen) {
+      await this.rememberTransport(operation.id, transport.name);
+      return;
+    }
+    if (drifted || authRetried) await this.rememberTransport(operation.id, transport.name);
   }
 
   /** The operation's data; throws HttpError on 4xx/5xx. */
@@ -624,39 +707,12 @@ export type SiteMapper = SiteClient &
     >;
   };
 
-/** A request that failed before the site answered: a fetch error in the page, not an HTTP status. */
-function isFetchFailure(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /Failed to fetch|NetworkError|Load failed|fetch failed|TypeError: fetch/i.test(message);
-}
-
-/** A request that failed below HTTP (reset, TLS refusal, timeout): a browser may still get in. */
-function isNetworkRefusal(error: unknown): boolean {
-  const text =
-    String((error as { cause?: { code?: string } })?.cause?.code ?? "") + " " + String(error);
-  return /ECONNRESET|EPROTO|ERR_SSL|UND_ERR_SOCKET|ECONNREFUSED|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|TimeoutError|aborted|fetch failed|socket hang up|other side closed/i.test(
-    text,
-  );
-}
-
-/** The name did not resolve: no browser can reach it either. */
-function isDnsFailure(error: unknown): boolean {
-  const text =
-    String((error as { cause?: { code?: string } })?.cause?.code ?? "") + " " + String(error);
-  return /ENOTFOUND|EAI_AGAIN|ENOENT/i.test(text);
-}
-
-/** The operation's data, with the response's notes when it had to take another transport. */
-function withNotes(response: RuntimeResponse): unknown {
-  const value = response.json ?? response.text;
-  if (!response.notes?.length || !value || typeof value !== "object" || Array.isArray(value))
-    return value;
-  const existing = (value as { notes?: unknown }).notes;
-  return {
-    ...value,
-    notes: [...(Array.isArray(existing) ? existing : []), ...response.notes],
-  };
-}
+type Outcome = {
+  response: RuntimeResponse;
+  transport: Transport;
+  drifted: boolean;
+  authRetried: boolean;
+};
 
 async function initialSession(
   model: SiteModel,

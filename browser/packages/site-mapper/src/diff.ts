@@ -1,3 +1,4 @@
+import { inferSchema } from "./infer/schema.js";
 import type { JsonSchema, Operation, SiteModel } from "./types.js";
 
 // What changed between two versions of a site's API, and between a stored schema and a live
@@ -118,6 +119,26 @@ export function resolveAll(
 
 export function isEmptyDiff(diff: ModelDiff): boolean {
   return !diff.added.length && !diff.removed.length && !diff.changed.length;
+}
+
+/** Only a missing recorded field or a changed type breaks callers; new fields do not. */
+export function breakingChanges(changes: string[]): boolean {
+  return changes.some((line) => /\(required\) missing|changed type/.test(line));
+}
+
+/**
+ * How a live body differs from the operation's recorded 2xx schema. Values are never compared,
+ * only recorded fields and their types, so a price, count or timestamp never reads as drift.
+ */
+export function responseChanges(
+  model: Pick<SiteModel, "components"> | undefined,
+  operation: Operation,
+  json: unknown,
+): string[] {
+  const stored = Object.entries(operation.responses).find(([code]) => code.startsWith("2"))?.[1]
+    ?.schema;
+  if (!stored || json === undefined) return [];
+  return schemaChanges(resolveAll(model, stored), inferSchema([json]));
 }
 
 export function formatDiff(diff: ModelDiff): string {

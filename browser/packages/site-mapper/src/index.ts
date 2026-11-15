@@ -24,6 +24,14 @@ export { hostsNamed, matchAbilities, scoreAbility, type AbilityMatch } from "./m
 export { abilityPlan, type AbilityPlan } from "./ability-plan.js";
 export { detectCapabilities, capabilityIndex } from "./infer/capabilities.js";
 export {
+  clearTransportPreferences,
+  readTransportPreference,
+  readTransportPreferences,
+  recordTransportPreference,
+  type TransportName,
+  type TransportNote,
+} from "./transport-preference.js";
+export {
   siteCapabilities,
   withWebMcp,
   type SiteCapabilities,
