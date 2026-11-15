@@ -133,8 +133,9 @@ export function createAskUserTool(chatId: string): ReturnType<typeof defineTool>
     name: "ask_user",
     label: "Ask",
     description:
-      "Ask the user a yes/no question, a choice, or for a typed answer, and wait for it. Required before submitting any form.",
-    promptSnippet: "Use ask_user to ask the user something, and before submitting any form.",
+      "Ask the user a yes/no question, a choice, or for a typed answer, and wait for it. Ask only when the context cannot settle a choice and a wrong guess is costly; otherwise act.",
+    promptSnippet:
+      "Ask only when the context cannot settle a choice and a wrong guess is costly; otherwise act.",
     promptGuidelines: GUIDELINES,
     parameters: Parameters,
     execute: async (_toolCallId, input, signal, _onUpdate, ctx): Promise<ToolText> => {
