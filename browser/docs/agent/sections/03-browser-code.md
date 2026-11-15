@@ -6,9 +6,7 @@ Globals: `browser`, `page`, `bu`, `siteMapper`, `google`, `skills`, `artifact`, 
 
 ```js
 const page = await browser.openTab("https://shop.example");
-await bu.state(); // host/path · title, then [id] role "name" under its row or dialog
-await bu.click(12); // act by bu id, role or visible text
-await page.locator("input[name=q]").fill("lamp");
+await page.locator("input[name=q]").fill("lamp"); // actions return the new page state
 await page.getByRole("button", { name: "Search" }).click();
 const rows = await page.list("tr"); // every row, scrolling lists that draw lazily
 await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, hold-to-record
@@ -50,7 +48,7 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
 - When you know a dialog is coming, set it first with `await page.dialog.expect("dismiss")`, `page.dialog.expect("accept")` or `page.dialog.expect("the text")`.
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
-- After a cell with actions the new page state prints automatically; never add blind sleeps (one right
+- An action returns the new page state, which prints after the cell; never add blind sleeps (one right
   after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A site
   that says "too many attempts" or "try again later", or answers 429, is rate-limiting: stop that
   path, use another way it offers, or end the task and report when to retry; never wait it out. A cell
