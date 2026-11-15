@@ -10,6 +10,7 @@
     "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
+    "@aeon/location": "workspace:*",
     "@aeon/pi-adapter": "workspace:*",
     "@aeon/protocol": "workspace:*",
     "@browserkit/credentials": "workspace:*",

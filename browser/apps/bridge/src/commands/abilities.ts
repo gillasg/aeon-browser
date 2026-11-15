@@ -139,6 +139,15 @@ async function show(args: Args): Promise<number> {
     out(`${ability.name} (${ability.kind}) on ${ability.site}`);
     if (ability.description) out(ability.description);
     out(`ways: ${ability.ways.map((way) => way.kind).join(", ")}`);
+    if (ability.writes?.length)
+      out(
+        `writes: ${ability.writes
+          .map(
+            (write) =>
+              `${write.kind} ${write.method ? `${write.method} ${write.path}` : write.what}`,
+          )
+          .join(", ")}`,
+      );
     out(
       `runs: ${ability.stats.runs}, failures: ${ability.stats.failures}${ability.stats.lastOkAt ? `, last ok: ${ability.stats.lastOkAt}` : ""}${ability.stats.stale ? `, stale: ${ability.stats.staleWhy ?? "ways disagreed"}` : ""}`,
     );
@@ -149,13 +158,23 @@ async function show(args: Args): Promise<number> {
 
 function printWayStats(
   ways:
-    | Record<string, { runs: number; failures: number; p50Ms?: number; retryAt?: string }>
+    | Record<
+        string,
+        {
+          runs: number;
+          failures: number;
+          p50Ms?: number;
+          retryAt?: string;
+          unverifiedWhy?: string;
+        }
+      >
     | undefined,
 ): void {
   for (const [id, stats] of Object.entries(ways ?? {})) {
     const latency = stats.p50Ms !== undefined ? `, p50 ${stats.p50Ms}ms` : "";
     const retry = stats.retryAt ? `, retry ${stats.retryAt}` : "";
-    out(`way ${id}: runs ${stats.runs}, failures ${stats.failures}${latency}${retry}`);
+    const unverified = stats.unverifiedWhy ? `, unverified: ${stats.unverifiedWhy}` : "";
+    out(`way ${id}: runs ${stats.runs}, failures ${stats.failures}${latency}${retry}${unverified}`);
   }
 }
 

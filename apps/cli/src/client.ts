@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol/version";
+import { aeonDataDirectory } from "@aeon/location";
 import WebSocket from "ws";
 
 // One connection to the running Aeon daemon through its local Core endpoint. The daemon writes
@@ -14,9 +15,7 @@ export interface AttentionChat {
 }
 
 export function dataDirectory(): string {
-  if (process.env.AEON_DATA_DIR) return process.env.AEON_DATA_DIR;
-  const local = process.env.LOCALAPPDATA ?? join(process.env.HOME ?? "", "AppData", "Local");
-  return join(local, "Aeon", "data");
+  return aeonDataDirectory();
 }
 
 export class AeonClient {

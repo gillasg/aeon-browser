@@ -9,7 +9,8 @@ import { wayId } from "./ability-stats.js";
 
 export interface AbilitySample {
   inputs: Record<string, unknown>;
-  result: unknown;
+  /** The answer, when the run recorded one. */
+  result?: unknown;
 }
 
 /** Records one stable fact from the run that produced the ability, unless tests were passed in. */

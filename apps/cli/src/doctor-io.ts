@@ -1,8 +1,10 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CoreHealthResultSchema } from "@aeon/protocol";
+import { aeonDataDirectory } from "@aeon/location";
 import type { DaemonHost } from "./host.js";
 import type { DataDir, HealthView } from "./doctor-checks.js";
 
@@ -28,9 +30,14 @@ export function dataDirPaths(
   env: NodeJS.ProcessEnv = process.env,
 ): { name: string; path: string }[] {
   const home = homedir();
-  const local = env.LOCALAPPDATA ?? join(home, "AppData", "Local");
+  const local =
+    process.platform === "win32"
+      ? (env.LOCALAPPDATA ?? join(home, "AppData", "Local"))
+      : process.platform === "darwin"
+        ? join(home, "Library", "Application Support")
+        : env.XDG_DATA_HOME || join(home, ".local", "share");
   return [
-    { name: "Aeon", path: env.AEON_DATA_DIR ?? join(local, "Aeon", "data") },
+    { name: "Aeon", path: aeonDataDirectory({ env }) },
     { name: "browserkit", path: env.BROWSERKIT_HOME ?? join(local, "browserkit") },
     { name: "site-to-api", path: env.SITE_TO_API_HOME ?? join(home, ".site-to-api") },
   ];
@@ -88,17 +95,45 @@ function viewOf(message: unknown): HealthView | undefined {
 }
 
 function readChromeCommandLines(): Promise<string[]> {
-  if (process.platform !== "win32") return Promise.resolve([]);
-  return execLines("powershell.exe", [
-    "-NoProfile",
-    "-NonInteractive",
-    "-Command",
-    "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Select-Object -ExpandProperty CommandLine",
-  ]);
+  if (process.platform === "win32")
+    return execLines("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Select-Object -ExpandProperty CommandLine",
+    ]);
+  if (process.platform === "darwin")
+    return execLines("ps", ["-axo", "command"]).then((lines) =>
+      lines.filter((line) => /Google Chrome|Chromium|chrome/i.test(line)),
+    );
+  return readProcCommandLines();
+}
+
+/** Linux: the main Chrome process carries every flag in /proc/<pid>/cmdline. */
+async function readProcCommandLines(): Promise<string[]> {
+  const lines: string[] = [];
+  for (const entry of await readdir("/proc").catch(() => [])) {
+    if (!/^\d+$/.test(entry)) continue;
+    const text = await readFile(join("/proc", entry, "cmdline"), "utf8").catch(() => "");
+    const command = text.split("\0").filter(Boolean).join(" ");
+    if (/chrome/i.test(command) && command.includes("--")) lines.push(command);
+  }
+  return lines;
 }
 
 function loginTaskPresent(): Promise<boolean> {
-  if (process.platform !== "win32") return Promise.resolve(false);
+  if (process.platform !== "win32") {
+    const path =
+      process.platform === "darwin"
+        ? join(homedir(), "Library", "LaunchAgents", "com.aeon.daemon.plist")
+        : join(
+            process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
+            "systemd",
+            "user",
+            "aeon-daemon.service",
+          );
+    return Promise.resolve(existsSync(path));
+  }
   return new Promise((resolve) => {
     execFile(
       "schtasks.exe",

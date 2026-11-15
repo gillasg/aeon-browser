@@ -7,6 +7,7 @@ import { abilityContent, contentDigest } from "./ability-digest.js";
 import { unusedInputs } from "./ability-contract.js";
 import { createRedactor, SECRET_KEYS } from "./redact.js";
 import type { Ability } from "./abilities.js";
+import type { AbilityWrite } from "./ability-effects.js";
 
 export interface PublicAbility {
   name: string;
@@ -17,7 +18,7 @@ export interface PublicAbility {
   outputs?: Record<string, unknown>;
   preconditions?: unknown;
   /** The write inventory, when the ability has one. */
-  writes?: unknown;
+  writes?: AbilityWrite[];
   ways: string[];
   /** A digest of the private content, so two versions are told apart without exposing it. */
   digest: string;
@@ -34,7 +35,7 @@ export interface PublishFinding {
 
 /** What a caller needs to choose and call this ability, without its code or recorded values. */
 export function publicAbility(ability: Ability): PublicAbility {
-  const writes = (ability as Ability & { writes?: unknown }).writes;
+  const writes = ability.writes;
   return {
     name: ability.name,
     site: ability.site,

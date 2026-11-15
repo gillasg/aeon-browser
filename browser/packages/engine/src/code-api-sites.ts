@@ -47,7 +47,12 @@ async function __mappedNote(url) {
   __announcedSites.add(host);
   var caps;
   try { caps = await __call({siteCapabilities: {host}}); } catch { return ''; }
-  var call = (item) => item.name + '(' + (item.inputs || []).join(', ') + ')';
+  var call = (item) => {
+    var said = item.name + '(' + (item.inputs || []).join(', ') + ')';
+    var writes = item.writes || [];
+    if (writes.length) said += ' [' + writes.map((w) => (w.kind === 'explicit' ? 'writes ' : 'may write ') + (w.method ? w.method + ' ' + w.path : w.what)).join(', ') + ']';
+    return said;
+  };
   var abilities = ((caps && caps.abilities) || []).slice(0, 12).map(call);
   var reads = ((caps && caps.operations) || []).filter((op) => op.does === 'read');
   var said = [];

@@ -13,7 +13,18 @@ const UPDATE =
 const RELOAD = "Reload the Aeon extension in chrome://extensions.";
 const OPEN_EXTENSION = "Open Chrome with the Aeon extension loaded.";
 const MODEL_FIX = "Sign in to a model from Aeon's Models page.";
-const TASK_FIX = "Reinstall the Aeon login task (Aeon-Core-Login) so the daemon starts at logon.";
+const TASK_FIX =
+  process.platform === "win32"
+    ? "Reinstall the Aeon login task (Aeon-Core-Login) so the daemon starts at logon."
+    : process.platform === "darwin"
+      ? "Reinstall the Aeon LaunchAgent (com.aeon.daemon) so the daemon starts at login."
+      : "Reinstall the Aeon user service (aeon-daemon) so the daemon starts at login.";
+const SUPERVISOR_NAME =
+  process.platform === "win32"
+    ? "Login task Aeon-Core-Login"
+    : process.platform === "darwin"
+      ? "LaunchAgent com.aeon.daemon"
+      : "User service aeon-daemon";
 const FLAGS_FIX = `Restart Chrome with these flags: ${CHROME_FLAGS.join(" ")}.`;
 
 export type CheckName =
@@ -60,8 +71,8 @@ export function doctorChecks(facts: DoctorFacts): Check[] {
       ? line("model", "ok", "A model account is signed in.", MODEL_FIX)
       : line("model", "fail", "No model account is signed in.", MODEL_FIX),
     facts.loginTask
-      ? line("supervisor", "ok", "Login task Aeon-Core-Login is registered.", TASK_FIX)
-      : line("supervisor", "fail", "Login task Aeon-Core-Login is not registered.", TASK_FIX),
+      ? line("supervisor", "ok", `${SUPERVISOR_NAME} is installed.`, TASK_FIX)
+      : line("supervisor", "fail", `${SUPERVISOR_NAME} is not installed.`, TASK_FIX),
     dataCheck(facts.dirs),
   ];
 }

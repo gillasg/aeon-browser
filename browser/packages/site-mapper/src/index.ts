@@ -24,6 +24,14 @@ export { hostsNamed, matchAbilities, scoreAbility, type AbilityMatch } from "./m
 export { abilityPlan, type AbilityPlan } from "./ability-plan.js";
 export { detectCapabilities, capabilityIndex } from "./infer/capabilities.js";
 export {
+  clearTransportPreferences,
+  readTransportPreference,
+  readTransportPreferences,
+  recordTransportPreference,
+  type TransportName,
+  type TransportNote,
+} from "./transport-preference.js";
+export {
   siteCapabilities,
   withWebMcp,
   type SiteCapabilities,
@@ -101,10 +109,21 @@ export {
   type AbilityWayStats,
   type AbilityWay,
   type AbilityWayApi,
+  type AbilityWayExpect,
+  type AbilityReference,
   type AbilityWayPage,
   type AbilityWayScript,
   type AbilityWaySteps,
 } from "./abilities.js";
+export { shapeOf, expectedShape, shapeDrift, type AnswerShape } from "./ability-shape.js";
+export {
+  inferAbilityInputs,
+  type AbilityDemonstration,
+  type AbilityTypedValue,
+  type InferredAbility,
+} from "./ability-infer.js";
+export { scrubAbility, type AbilityScrub, type ScrubMark } from "./ability-scrub.js";
+export { abilityWrites, type AbilityWrite, type AbilityWriteKind } from "./ability-effects.js";
 export {
   buildAbility,
   type BlockedReason,

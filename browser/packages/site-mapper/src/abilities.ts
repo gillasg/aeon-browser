@@ -8,6 +8,9 @@ import { testedAbility, withTested, type AbilityTested } from "./ability-digest.
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
+import { abilityWrites, type AbilityWrite } from "./ability-effects.js";
+import { inferAbilityInputs, type AbilityDemonstration } from "./ability-infer.js";
+import { scrubAbility, type AbilityScrub, type ScrubMark } from "./ability-scrub.js";
 import {
   contractBreaks,
   contractWarnings,
@@ -28,7 +31,7 @@ import { join } from "node:path";
 import type { AbilityCheck } from "./ability-records.js";
 import type { ReadBack, WriteOutcome } from "./ability-writes.js";
 import { builtinAbilities, builtinWay } from "./builtin-abilities.js";
-import { siteDir, siteName, writeAtomic } from "./registry.js";
+import { loadModel, siteDir, siteName, writeAtomic } from "./registry.js";
 import type { CollectRecipe, RecipePagination } from "./recipes.js";
 import type { Json } from "./types.js";
 export {
@@ -46,6 +49,14 @@ export {
 export type AbilityKind = "read" | "write";
 export type AbilityCreatedBy = "agent" | "user" | "import" | "builtin";
 export type AbilityVia = "api" | "steps" | "script" | "page";
+
+/** The answer a way accepted last time: required fields and types, and where its list lives. */
+export interface AbilityWayExpect {
+  /** A JSON Schema of the body. Values are never compared, only recorded fields and types. */
+  shape?: Record<string, unknown>;
+  /** JSON pointer to the list the way returns. A missing list is drift; an empty one is a result. */
+  list?: string;
+}
 
 export interface AbilityApiStep {
   operation: string;
@@ -68,6 +79,20 @@ export interface AbilityWayApi {
   input?: Json;
   /** Write abilities: index of the operation that applies the change (default: the last). */
   commit?: number;
+  /** The shape this way's answer must keep. Absent: learned from its first success. */
+  expect?: AbilityWayExpect;
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
+  /** Values a later step takes from an earlier response, as `steps.<i>.<path>`. */
+  refs?: AbilityReference[];
+}
+
+/** A param value taken from an earlier step's answer rather than from the caller. */
+export interface AbilityReference {
+  step: number;
+  param: string;
+  /** The pointer it was read from, e.g. `steps.0.items.0.id`. */
+  from: string;
 }
 
 export interface AbilityWaySteps {
@@ -79,6 +104,8 @@ export interface AbilityWaySteps {
   name?: string;
   params?: Record<string, unknown>;
   steps?: unknown[];
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
 }
 
 export interface AbilityWayScript {
@@ -88,6 +115,10 @@ export interface AbilityWayScript {
   code: string;
   runtime: "node" | "page";
   input?: Json;
+  /** The shape this way's answer must keep. Absent: learned from its first success. */
+  expect?: AbilityWayExpect;
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
 }
 
 export interface AbilityWayPage {
@@ -97,6 +128,10 @@ export interface AbilityWayPage {
   collect?: CollectRecipe;
   url?: string;
   extractor?: unknown;
+  /** The shape this way's answer must keep. Absent: learned from its first success. */
+  expect?: AbilityWayExpect;
+  /** A literal secret was removed from this way when it was saved. */
+  redacted?: true;
 }
 
 export type AbilityWay = AbilityWayApi | AbilityWaySteps | AbilityWayScript | AbilityWayPage;
@@ -126,6 +161,17 @@ export interface AbilityStats {
   lastDifferAt?: string;
 }
 
+/** A stored value that was a secret, and what the saver did about it. Never a permission gate. */
+export interface AbilityScrubbed {
+  at: string;
+  where: "way" | "test" | "ability";
+  via?: AbilityVia;
+  what: string;
+  /** The way or test is no longer stored: the secret was its whole request. */
+  dropped: boolean;
+  reason: "secret" | "personal";
+}
+
 export type { AbilityPostcondition, AbilityPrecondition, AbilityWayStats };
 
 export interface Ability {
@@ -152,6 +198,12 @@ export interface Ability {
   sourceKind?: string;
   /** Promoted from a route. */
   promoted?: boolean;
+  /** Inputs and references inferred from the run that saved this ability. */
+  inferred?: { at: string; inputs: string[]; references: string[] };
+  /** Secret values removed when the ability was saved, and the way or test each came from. */
+  scrubbed?: AbilityScrubbed[];
+  /** What the ways change, as an inventory. Never a permission gate. */
+  writes?: AbilityWrite[];
   createdAt: string;
   updatedAt: string;
 }
@@ -166,6 +218,8 @@ export interface AbilityRunResult {
   readBack?: { ok: boolean; missing: string[] };
   /** The way that ran only had part of the contract. */
   partial?: boolean;
+  /** Ways whose answer no longer matched the shape they recorded. The result may be one of them. */
+  unverified?: { via: AbilityVia; reason: string }[];
   /** A second way disagreed; the ability is marked stale. */
   stale?: boolean;
   staleWhy?: string;
@@ -266,6 +320,8 @@ export interface SaveAbilityOptions {
   test?: boolean;
   /** Inputs and result from the run that produced this ability. Recorded as the first test when none were passed. */
   sample?: AbilitySample;
+  /** The run itself: typed values and step answers, for inferring inputs and references. */
+  demonstration?: AbilityDemonstration;
 }
 
 export async function saveAbility(
@@ -276,17 +332,17 @@ export async function saveAbility(
   path: string;
   warnings: string[];
   tests?: AbilityTestReport;
+  inferred?: { inputs: string[]; references: string[] };
+  scrubbed?: ScrubMark[];
 }> {
-  const prepared = ability;
-  const site = siteName(prepared.site);
-  const name = validAbilityName(prepared.name);
-  validateAbility({ ...prepared, name, site });
-  await mkdir(abilityDirectory(site), { recursive: true });
-  const path = join(abilityDirectory(site), abilitySlug(name) + ".json");
-  const existing = await readAbilityFile(path);
-  if (existing && options.replace === false)
-    throw new Error(`ABILITY_EXISTS: ${site} already has ${name}`);
-  if (options.check !== false) checkContract(prepared, existing, options);
+  const {
+    ability: prepared,
+    site,
+    name,
+    path,
+    existing,
+    scrub,
+  } = await prepareSave(ability, options);
   const drafted = withSample(
     {
       ...prepared,
@@ -301,14 +357,82 @@ export async function saveAbility(
   const tests = await proveOnSave(drafted, existing, options);
   const testedNow = withTested(drafted, existing, tests !== undefined);
   const next = { ...testedNow, updatedAt: new Date().toISOString() };
+  const inferred = inferredOf(prepared);
   await versionChangedAbility(existing, next);
   await writeAtomic(path, JSON.stringify(next, null, 2) + "\n");
+  const warnings =
+    options.check === false ? [] : [...contractWarnings(next), ...scrubWarnings(scrub.marks)];
   return {
     ability: next,
     path,
-    warnings: options.check === false ? [] : contractWarnings(next),
+    warnings,
     ...(tests ? { tests } : {}),
+    ...(inferred ? { inferred } : {}),
+    ...(scrub.marks.length ? { scrubbed: scrub.marks } : {}),
   };
+}
+
+interface PreparedSave {
+  ability: Ability;
+  site: string;
+  name: string;
+  path: string;
+  existing: Ability | undefined;
+  scrub: AbilityScrub;
+}
+
+/** Infers, scrubs, inventories and applies the caller contract before anything is written. */
+async function prepareSave(ability: Ability, options: SaveAbilityOptions): Promise<PreparedSave> {
+  const scrub = scrubAbility(withInferred(ability, options), undefined, {
+    keepLast: options.check === false,
+  });
+  if (scrub.refused) throw new Error(scrub.refused);
+  const prepared = scrub.ability;
+  const site = siteName(prepared.site);
+  const name = validAbilityName(prepared.name);
+  if (options.check !== false) await addWrites(prepared, site);
+  validateAbility({ ...prepared, name, site });
+  await mkdir(abilityDirectory(site), { recursive: true });
+  const path = join(abilityDirectory(site), abilitySlug(name) + ".json");
+  const existing = await readAbilityFile(path);
+  if (existing && options.replace === false)
+    throw new Error(`ABILITY_EXISTS: ${site} already has ${name}`);
+  if (options.check !== false) checkContract(prepared, existing, options);
+  return { ability: prepared, site, name, path, existing, scrub };
+}
+
+function scrubWarnings(marks: ScrubMark[]): string[] {
+  return marks.map((mark) => {
+    if (mark.dropped) return `${mark.what} was dropped: it carried a secret`;
+    if (mark.reason === "secret") return `${mark.what}: a secret was not stored`;
+    return `${mark.what}: personal data was redacted`;
+  });
+}
+
+/** Fills examples and templates input values from the run, when the caller provided one. */
+function withInferred(ability: Ability, options: SaveAbilityOptions): Ability {
+  const demonstration = options.demonstration ?? {};
+  const inputs = { ...(options.sample?.inputs ?? {}), ...(demonstration.inputs ?? {}) };
+  const worth =
+    Object.keys(inputs).length > 0 ||
+    demonstration.typed?.length ||
+    demonstration.responses?.length;
+  if (!worth) return ability;
+  return inferAbilityInputs(ability, { ...demonstration, inputs }).ability;
+}
+
+function inferredOf(ability: Ability): { inputs: string[]; references: string[] } | undefined {
+  return ability.inferred
+    ? { inputs: ability.inferred.inputs, references: ability.inferred.references }
+    : undefined;
+}
+
+/** The writes each way performs, from the site model when it has one. Inventory only. */
+async function addWrites(ability: Ability, site: string): Promise<void> {
+  const model = await loadModel(site).catch(() => undefined);
+  const writes: AbilityWrite[] = abilityWrites(ability, model);
+  if (writes.length) ability.writes = writes;
+  else delete ability.writes;
 }
 
 /** Runs cases before the write. A throw leaves the file, and its ways, untouched. */

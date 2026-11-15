@@ -3,6 +3,7 @@
 // restore goes back through the same caller-contract checks as any other save.
 
 import { mkdir, readdir, readFile, stat, unlink } from "node:fs/promises";
+import { scrubAbility } from "./ability-scrub.js";
 import { basename, join } from "node:path";
 import type { Ability } from "./abilities.js";
 import { contentDigest } from "./ability-digest.js";
@@ -83,13 +84,16 @@ export async function countAbilityVersions(
   return { count: versions.length, ...(latest ? { latestAt: latest.at } : {}) };
 }
 
-/** Archives the previous content of an ability when the new content differs. */
+/**
+ * Archives the previous content of an ability when the new content differs. The archived copy is
+ * scrubbed like any save, so a version never keeps a credential the live file no longer has.
+ */
 export async function versionChangedAbility(
   previous: Ability | undefined,
   next: Ability,
 ): Promise<string | undefined> {
   if (!previous || contentDigest(previous) === contentDigest(next)) return undefined;
-  return saveAbilityVersion(previous);
+  return saveAbilityVersion(scrubAbility(previous, undefined, { keepLast: true }).ability);
 }
 
 /** Writes one version and drops the oldest past the cap. */

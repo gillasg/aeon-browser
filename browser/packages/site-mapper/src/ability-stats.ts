@@ -16,12 +16,25 @@ export interface AbilityWayStats {
   samplesMs?: number[];
   /** Not tried again until this time, after three failures in a row. */
   retryAt?: string;
+  /** The body shape this way answered with, learned on its first success. */
+  shape?: Record<string, unknown>;
+  /** JSON pointer to the list in that shape. */
+  list?: string;
+  shapeAt?: string;
+  /** The answer no longer matched the recorded shape. The way is kept and still tried. */
+  unverified?: boolean;
+  unverifiedWhy?: string;
+  unverifiedAt?: string;
 }
 
 export interface WayNote {
   way: AbilityWay;
   ok: boolean;
   ms: number;
+  /** The answer's shape, recorded when the way has no declared expectation. */
+  shape?: { shape: Record<string, unknown>; list?: string };
+  /** The shape that no longer matched; the way is marked unverified, never removed. */
+  unverified?: string;
 }
 
 export interface WayOrder {
@@ -46,9 +59,12 @@ export function inBackoff(stats: AbilityWayStats | undefined, now: number): bool
 /** Last success first, then stored order. A way in backoff is held back unless the caller named its kind. */
 export function orderWays(ability: Ability, now = Date.now(), via?: AbilityVia): WayOrder {
   const held: WayOrder["held"] = [];
-  const ready: { way: AbilityWay; index: number; ok: number }[] = [];
+  const ready: { way: AbilityWay; index: number; ok: number; verified: number }[] = [];
   ability.ways.forEach((way, index) => classifyWay(ability, way, index, now, via, held, ready));
-  ready.sort((left, right) => right.ok - left.ok || left.index - right.index);
+  ready.sort(
+    (left, right) =>
+      right.verified - left.verified || right.ok - left.ok || left.index - right.index,
+  );
   return { ways: ready.map((item) => item.way), held };
 }
 
@@ -59,7 +75,7 @@ function classifyWay(
   now: number,
   via: AbilityVia | undefined,
   held: WayOrder["held"],
-  ready: { way: AbilityWay; index: number; ok: number }[],
+  ready: { way: AbilityWay; index: number; ok: number; verified: number }[],
 ): void {
   const stats = ability.stats?.ways?.[wayId(way)];
   if (inBackoff(stats, now) && way.kind !== via) {
@@ -69,7 +85,12 @@ function classifyWay(
     });
     return;
   }
-  ready.push({ way, index, ok: stats?.lastOkAt ? Date.parse(stats.lastOkAt) : 0 });
+  ready.push({
+    way,
+    index,
+    ok: stats?.lastOkAt ? Date.parse(stats.lastOkAt) : 0,
+    verified: stats?.unverified ? 0 : 1,
+  });
 }
 
 export function withRunStats(
@@ -120,7 +141,37 @@ function nextWayStats(
     ...okFields(note.ok, at, current?.lastOkAt),
     ...latencyFields(samples, current?.p50Ms),
     ...retryFields(note.ok, failures, at),
+    ...shapeFields(note, current, at),
+    ...verifyFields(note, at),
   };
+}
+
+/** A way's first verified answer records the shape later answers are accepted by. */
+function shapeFields(
+  note: WayNote,
+  current: AbilityWayStats | undefined,
+  at: string,
+): Pick<AbilityWayStats, "shape" | "list" | "shapeAt"> {
+  if (!note.ok || !note.shape || current?.shape) {
+    const kept: Pick<AbilityWayStats, "shape" | "list" | "shapeAt"> = {};
+    if (current?.shape) kept.shape = current.shape;
+    if (current?.list !== undefined) kept.list = current.list;
+    if (current?.shapeAt) kept.shapeAt = current.shapeAt;
+    return kept;
+  }
+  return {
+    shape: note.shape.shape,
+    ...(note.shape.list !== undefined ? { list: note.shape.list } : {}),
+    shapeAt: at,
+  };
+}
+
+function verifyFields(
+  note: WayNote,
+  at: string,
+): Pick<AbilityWayStats, "unverified" | "unverifiedWhy" | "unverifiedAt"> {
+  if (!note.unverified) return {};
+  return { unverified: true, unverifiedWhy: note.unverified, unverifiedAt: at };
 }
 
 function okFields(ok: boolean, at: string, previous: string | undefined): { lastOkAt?: string } {

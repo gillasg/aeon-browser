@@ -9,6 +9,7 @@
   "dependencies": {
     "@modelcontextprotocol/client": "2.2.0",
     "@aeon/domain": "workspace:*",
+    "@aeon/location": "workspace:*",
     "@aeon/pi-adapter": "workspace:*",
     "@aeon/protocol": "workspace:*",
     "@aeon/store": "workspace:*",

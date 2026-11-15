@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../../packages/domain" },
+    { "path": "../../packages/location" },
     { "path": "../../packages/protocol" },
     { "path": "../../packages/store" },
     { "path": "../../packages/pi-adapter" }

@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/domain" },
+    { "path": "./packages/location" },
     { "path": "./packages/protocol" },
     { "path": "./packages/store" },
     { "path": "./apps/daemon" },

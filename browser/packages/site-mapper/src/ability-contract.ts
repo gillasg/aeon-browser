@@ -10,6 +10,8 @@ export interface AbilityTest {
   inputs: Record<string, unknown>;
   /** Values the result must contain. */
   expect?: Record<string, unknown>;
+  /** An example value was a secret and was not stored. */
+  redacted?: true;
 }
 
 export interface AbilityTestReport {

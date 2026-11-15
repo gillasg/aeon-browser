@@ -6,6 +6,10 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "references": [{ "path": "../../packages/protocol" }, { "path": "../../packages/pi-adapter" }],
+  "references": [
+    { "path": "../../packages/location" },
+    { "path": "../../packages/protocol" },
+    { "path": "../../packages/pi-adapter" }
+  ],
   "include": ["src/**/*.ts"]
 }
