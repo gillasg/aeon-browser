@@ -32,7 +32,6 @@ export function createLineReader(stream) {
           resolve(result);
         };
         const timer = setTimeout(() => waiter({ kind: "timeout" }), Math.max(0, timeoutMs));
-        timer.unref?.();
         waiters.push(waiter);
       });
     },
