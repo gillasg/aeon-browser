@@ -447,13 +447,14 @@ async function holdPressed(
   ms: number,
 ): Promise<void> {
   const at = await land(debuggee, x, y, "holdAt");
-  const pressedAt = Date.now();
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
     { type: "mousePressed", ...at, button: "left", clickCount: 1, buttons: 1 },
     { label: "holdAt" },
   );
+  // The hold starts once the press has been dispatched, so its measured length is at least `ms`.
+  const pressedAt = Date.now();
   let next = pressedAt + HOLD_JITTER_MIN_MS + Math.floor(Math.random() * HOLD_JITTER_SPAN_MS);
   while (Date.now() - pressedAt < ms) {
     const left = ms - (Date.now() - pressedAt);
