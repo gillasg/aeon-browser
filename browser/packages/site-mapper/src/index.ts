@@ -31,6 +31,18 @@ export {
   type SiteOperationSummary,
 } from "./site-capabilities.js";
 export {
+  ABILITY_HISTORY_LIMIT,
+  countAbilityVersions,
+  listAbilityVersions,
+  readAbilityVersion,
+  saveAbilityVersion,
+  versionChangedAbility,
+  versionStamp,
+  type AbilityVersion,
+} from "./ability-versions.js";
+export { restoreAbility, type RestoreAbilityOptions } from "./ability-restore.js";
+export { abilityContent, contentDigest, digestOf, type AbilityTested } from "./ability-digest.js";
+export {
   abilityDirectory,
   abilitySlug,
   createAbility,

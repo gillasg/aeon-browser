@@ -252,6 +252,14 @@ export const ManagementAbilitySchema = z
       })
       .strict()
       .optional(),
+    /** Earlier saves kept for restore. */
+    versions: z
+      .object({
+        count: z.number().int().nonnegative(),
+        latestAt: z.string().max(60).optional(),
+      })
+      .strict()
+      .optional(),
     updatedAt: z.string().max(60),
     running: z.boolean().optional(),
   })

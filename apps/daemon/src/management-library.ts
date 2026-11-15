@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  countAbilityVersions,
   coverage,
   builtinSites,
   listAbilities,
@@ -143,6 +144,8 @@ export interface AbilityCard {
   sources?: { runtime: "node" | "page"; code: string }[];
   inputs: { name: string; required: boolean; description?: string }[];
   stats?: { runs: number; failures: number; lastOkAt?: string; lastUsedAt?: string };
+  /** Earlier saves that can be restored. */
+  versions?: { count: number; latestAt?: string };
   updatedAt: string;
   running?: boolean;
 }
@@ -184,21 +187,22 @@ export async function abilityCards(): Promise<AbilityCard[]> {
   const sites = await allSites();
   return (
     await Promise.all(
-      sites
-        .slice(0, 200)
-        .map(async (item) =>
-          (await listAbilities(item.site).catch(() => [])).map((ability) =>
-            toAbilityCard(item.site, ability),
-          ),
-        ),
+      sites.slice(0, 200).map(async (item) => {
+        const abilities = await listAbilities(item.site).catch(() => []);
+        return Promise.all(abilities.map((ability) => toAbilityCard(item.site, ability)));
+      }),
     )
   ).flat();
 }
 
 type ListedAbility = Awaited<ReturnType<typeof listAbilities>>[number];
 
-function toAbilityCard(site: string, ability: ListedAbility): AbilityCard {
+async function toAbilityCard(site: string, ability: ListedAbility): Promise<AbilityCard> {
   const sources = scriptSources(ability);
+  const versions: { count: number; latestAt?: string } = await countAbilityVersions(
+    site,
+    ability.name,
+  ).catch(() => ({ count: 0 }));
   return {
     name: ability.name,
     site,
@@ -208,6 +212,14 @@ function toAbilityCard(site: string, ability: ListedAbility): AbilityCard {
     ...(sources.length ? { sources } : {}),
     inputs: abilityInputs(ability.inputs),
     stats: ability.stats,
+    ...(versions.count
+      ? {
+          versions: {
+            count: versions.count,
+            ...(versions.latestAt ? { latestAt: versions.latestAt } : {}),
+          },
+        }
+      : {}),
     updatedAt: ability.updatedAt,
   };
 }
@@ -249,7 +261,7 @@ async function siteCard(site: SiteSummary): Promise<SiteCard> {
     session: session !== undefined,
     sessionAccount: typeof stored?.account === "string" ? stored.account : null,
     sessionSavedAt: sessionSavedAt(stored),
-    abilities: abilities.map((ability) => toAbilityCard(site.site, ability)),
+    abilities: await Promise.all(abilities.map((ability) => toAbilityCard(site.site, ability))),
     notes,
     recording: isSiteRecording(site.site),
     suggestions: suggestionsOf(model),

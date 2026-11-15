@@ -27,4 +27,8 @@ export type ManagementActionName =
   | "start_site_recording"
   | "stop_site_recording"
   | "check_providers"
-  | "test_provider";
+  | "test_provider"
+  | "rename_ability"
+  | "forget_ability"
+  | "list_ability_versions"
+  | "restore_ability";

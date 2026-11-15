@@ -4,6 +4,8 @@
 
 import { mkdir, readdir, readFile, rename } from "node:fs/promises";
 import { defaultHost } from "./ability-attempt.js";
+import { abilityDirectory, abilitySlug } from "./ability-files.js";
+import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
 import {
   contractBreaks,
@@ -207,22 +209,10 @@ export interface AbilityHost {
   }) => Promise<unknown>;
 }
 
-const ABILITIES = "abilities";
 const TRASH = "trash";
 const NAME = /^[a-z0-9][a-z0-9 _.-]{0,80}$/i;
 
-export function abilityDirectory(site: string): string {
-  return join(siteDir(siteName(site)), ABILITIES);
-}
-
-export function abilitySlug(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
+export { abilityDirectory, abilitySlug };
 
 export async function listAbilities(site: string): Promise<Ability[]> {
   const folder = abilityDirectory(site);
@@ -307,6 +297,7 @@ export async function saveAbility(
   );
   const tests = await proveOnSave(drafted, existing, options);
   const next = { ...drafted, updatedAt: new Date().toISOString() };
+  await versionChangedAbility(existing, next);
   await writeAtomic(path, JSON.stringify(next, null, 2) + "\n");
   return {
     ability: next,

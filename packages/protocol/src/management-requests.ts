@@ -60,6 +60,8 @@ export const ManagementActionRequestSchema = z
           "test_provider",
           "rename_ability",
           "forget_ability",
+          "list_ability_versions",
+          "restore_ability",
           "report_wrong",
           "decline_offer",
         ]),
