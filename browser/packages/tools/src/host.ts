@@ -37,6 +37,7 @@ import {
   testAbility,
   trashAbility,
   type Ability,
+  type AbilityDemonstration,
   type AbilityVia,
 } from "@browserkit/site-mapper";
 
@@ -229,6 +230,10 @@ function isAbilitySaveRequest(value: unknown): value is AbilitySaveRequest {
   return Boolean(value && typeof (value as { abilitySave?: unknown }).abilitySave === "object");
 }
 
+function isDemonstration(value: unknown): value is AbilityDemonstration {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 /** Saves an ability an agent wrote: a full ability, or a demonstration's skill ({name, code}). */
 async function answerAbilitySave(spec: Record<string, unknown>): Promise<unknown> {
   const now = new Date().toISOString();
@@ -246,7 +251,7 @@ async function answerAbilitySave(spec: Record<string, unknown>): Promise<unknown
         ]
       : [];
   const existing = await readAbility(String(spec.site ?? ""), String(spec.name ?? ""));
-  const { breaking, code: _code, domains: _domains, ...rest } = spec;
+  const { breaking, code: _code, domains: _domains, demonstration, ...rest } = spec;
   const saved = await saveAbility(
     {
       kind: spec.kind === "write" ? "write" : "read",
@@ -263,6 +268,7 @@ async function answerAbilitySave(spec: Record<string, unknown>): Promise<unknown
     } as Ability,
     {
       breaking: breaking === true,
+      ...(isDemonstration(demonstration) ? { demonstration } : {}),
       ...(Array.isArray(spec.tests) && spec.tests.length ? { test: true } : {}),
     },
   );

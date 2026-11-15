@@ -106,6 +106,7 @@ async function attempt(
     const draft = abilityFrom(value, site, options);
     const saved = await saveAbility(draft, {
       breaking: true,
+      ...(options.example ? { demonstration: { inputs: options.example } } : {}),
       ...(draft.kind === "read" && draft.tests?.length ? { test: true } : {}),
     });
     const ability = saved.ability;

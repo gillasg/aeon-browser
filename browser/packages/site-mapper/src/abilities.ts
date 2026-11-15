@@ -8,6 +8,7 @@ import { testedAbility, withTested, type AbilityTested } from "./ability-digest.
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
+import { inferAbilityInputs, type AbilityDemonstration } from "./ability-infer.js";
 import {
   contractBreaks,
   contractWarnings,
@@ -176,6 +177,8 @@ export interface Ability {
   sourceKind?: string;
   /** Promoted from a route. */
   promoted?: boolean;
+  /** Inputs and references inferred from the run that saved this ability. */
+  inferred?: { at: string; inputs: string[]; references: string[] };
   createdAt: string;
   updatedAt: string;
 }
@@ -292,6 +295,8 @@ export interface SaveAbilityOptions {
   test?: boolean;
   /** Inputs and result from the run that produced this ability. Recorded as the first test when none were passed. */
   sample?: AbilitySample;
+  /** The run itself: typed values and step answers, for inferring inputs and references. */
+  demonstration?: AbilityDemonstration;
 }
 
 export async function saveAbility(
@@ -302,8 +307,9 @@ export async function saveAbility(
   path: string;
   warnings: string[];
   tests?: AbilityTestReport;
+  inferred?: { inputs: string[]; references: string[] };
 }> {
-  const prepared = ability;
+  const prepared = withInferred(ability, options);
   const site = siteName(prepared.site);
   const name = validAbilityName(prepared.name);
   validateAbility({ ...prepared, name, site });
@@ -327,6 +333,7 @@ export async function saveAbility(
   const tests = await proveOnSave(drafted, existing, options);
   const testedNow = withTested(drafted, existing, tests !== undefined);
   const next = { ...testedNow, updatedAt: new Date().toISOString() };
+  const inferred = inferredOf(prepared);
   await versionChangedAbility(existing, next);
   await writeAtomic(path, JSON.stringify(next, null, 2) + "\n");
   return {
@@ -334,7 +341,26 @@ export async function saveAbility(
     path,
     warnings: options.check === false ? [] : contractWarnings(next),
     ...(tests ? { tests } : {}),
+    ...(inferred ? { inferred } : {}),
   };
+}
+
+/** Fills examples and templates input values from the run, when the caller provided one. */
+function withInferred(ability: Ability, options: SaveAbilityOptions): Ability {
+  const demonstration = options.demonstration ?? {};
+  const inputs = { ...(options.sample?.inputs ?? {}), ...(demonstration.inputs ?? {}) };
+  const worth =
+    Object.keys(inputs).length > 0 ||
+    demonstration.typed?.length ||
+    demonstration.responses?.length;
+  if (!worth) return ability;
+  return inferAbilityInputs(ability, { ...demonstration, inputs }).ability;
+}
+
+function inferredOf(ability: Ability): { inputs: string[]; references: string[] } | undefined {
+  return ability.inferred
+    ? { inputs: ability.inferred.inputs, references: ability.inferred.references }
+    : undefined;
 }
 
 /** Runs cases before the write. A throw leaves the file, and its ways, untouched. */

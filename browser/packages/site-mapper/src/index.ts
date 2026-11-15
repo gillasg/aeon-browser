@@ -117,6 +117,12 @@ export {
 } from "./abilities.js";
 export { shapeOf, expectedShape, shapeDrift, type AnswerShape } from "./ability-shape.js";
 export {
+  inferAbilityInputs,
+  type AbilityDemonstration,
+  type AbilityTypedValue,
+  type InferredAbility,
+} from "./ability-infer.js";
+export {
   buildAbility,
   type BlockedReason,
   type BuildOptions as AbilityBuildOptions,
