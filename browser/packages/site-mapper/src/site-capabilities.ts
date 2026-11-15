@@ -7,6 +7,7 @@ import {
   type Ability,
   type AbilityPrecondition,
 } from "./abilities.js";
+import { untestedWays } from "./ability-digest.js";
 import { capabilityIndex } from "./infer/capabilities.js";
 import { inputParams } from "./params.js";
 import { loadModel, siteName } from "./registry.js";
@@ -22,6 +23,8 @@ export interface SiteAbilitySummary {
   /** A way only has part of the result. */
   partial?: boolean;
   stale?: boolean;
+  /** At least one way changed since its tests last passed. */
+  untested?: boolean;
   preconditions?: AbilityPrecondition;
   /** Read ability a write uses to confirm itself. */
   postcondition?: string;
@@ -87,10 +90,15 @@ function summarize(ability: Ability): SiteAbilitySummary {
     ways: ability.ways.map((way) => way.kind),
     ...(ability.ways.some((way) => way.partial) ? { partial: true } : {}),
     ...(ability.stats?.stale ? { stale: true } : {}),
+    ...untestedField(ability),
     ...(ability.preconditions ? { preconditions: ability.preconditions } : {}),
     ...(post ? { postcondition: post } : {}),
     stats: ability.stats,
   };
+}
+
+function untestedField(ability: Ability): { untested?: boolean } {
+  return untestedWays(ability).length ? { untested: true } : {};
 }
 
 function lookupsFirst(left: SiteAbilitySummary, right: SiteAbilitySummary): number {

@@ -41,7 +41,17 @@ export {
   type AbilityVersion,
 } from "./ability-versions.js";
 export { restoreAbility, type RestoreAbilityOptions } from "./ability-restore.js";
-export { abilityContent, contentDigest, digestOf, type AbilityTested } from "./ability-digest.js";
+export {
+  abilityContent,
+  contentDigest,
+  digestOf,
+  normalizedCode,
+  testedAbility,
+  untestedWays,
+  wayDigest,
+  withTested,
+  type AbilityTested,
+} from "./ability-digest.js";
 export {
   abilityDirectory,
   abilitySlug,

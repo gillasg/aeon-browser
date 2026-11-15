@@ -12,7 +12,6 @@ export interface AbilityTested {
   at: string;
   ok: boolean;
 }
-
 /** Everything that changes how the ability behaves. `stats`, `tested` and the timestamps do not. */
 export function abilityContent(ability: Ability): Record<string, unknown> {
   return {
@@ -46,6 +45,49 @@ export function wayDigest(ability: Ability, way: AbilityWay): string {
     tests: ability.tests,
     way: normalizedWay(way),
   });
+}
+
+/** Ways with no passing test for their current content. A changed way is untested again. */
+export function untestedWays(ability: Ability): AbilityWay[] {
+  if (!ability.tests?.length || ability.kind === "write") return [];
+  return ability.ways.filter((way) => ability.tested?.[wayDigest(ability, way)]?.ok !== true);
+}
+
+/** Stamps every way as tested now, with the given outcome. */
+export function testedAbility(
+  ability: Ability,
+  ok: boolean,
+  at = new Date().toISOString(),
+): Ability {
+  const tested: Record<string, AbilityTested> = {};
+  for (const way of ability.ways) {
+    const digest = wayDigest(ability, way);
+    tested[digest] = { digest, at, ok };
+  }
+  return { ...ability, tested };
+}
+
+/**
+ * The ability with test records for its current content: a matching earlier record is kept, and
+ * `proven` stamps every way when this save actually ran the cases. Stats and test records alone
+ * never mark a way tested.
+ */
+export function withTested(
+  ability: Ability,
+  previous: Ability | undefined,
+  proven: boolean,
+): Ability {
+  if (proven) return testedAbility(ability, true);
+  const tested: Record<string, AbilityTested> = {};
+  for (const way of ability.ways) {
+    const digest = wayDigest(ability, way);
+    const entry = ability.tested?.[digest] ?? previous?.tested?.[digest];
+    if (entry?.digest === digest) tested[digest] = entry;
+  }
+  const next: Ability = { ...ability };
+  if (Object.keys(tested).length) next.tested = tested;
+  else delete next.tested;
+  return next;
 }
 
 export function digestOf(value: unknown): string {

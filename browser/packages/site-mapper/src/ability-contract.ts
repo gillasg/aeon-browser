@@ -4,6 +4,7 @@
 // one whose output never changes whatever the input.
 
 import type { Ability } from "./abilities.js";
+import { untestedWays } from "./ability-digest.js";
 
 export interface AbilityTest {
   inputs: Record<string, unknown>;
@@ -16,6 +17,8 @@ export interface AbilityTestReport {
   cases: { inputs: Record<string, unknown>; ok: boolean; error?: string; missing?: string[] }[];
   /** Two or more cases with different inputs returned the same result. */
   constant: boolean;
+  /** Every way already had a passing test at this exact content, so nothing ran. */
+  skipped?: boolean;
 }
 
 function properties(schema: unknown): Record<string, Record<string, unknown>> {
@@ -84,6 +87,13 @@ export function contractWarnings(ability: Ability): string[] {
     warnings.push("no outputs declared: callers cannot rely on any field");
   if (ability.kind === "read" && !ability.tests?.length)
     warnings.push("no test cases: a broken or constant read goes unnoticed");
+  if (ability.tests?.length) {
+    const untested = untestedWays(ability);
+    if (untested.length)
+      warnings.push(
+        `${untested.length} way(s) have no passing test for their current content: run abilities test`,
+      );
+  }
   if (ability.kind === "write" && !ability.options.readBack)
     warnings.push("no readBack: a write cannot confirm it changed the site");
   return warnings;

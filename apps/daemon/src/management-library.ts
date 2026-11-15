@@ -10,6 +10,7 @@ import {
   readHealth,
   readSession,
   readSiteFacts,
+  untestedWays,
   type SiteNote,
 } from "@browserkit/site-mapper";
 import { listRuns, listWorkflows, readWorkflow } from "@browserkit/tools/workflow-store";
@@ -144,6 +145,8 @@ export interface AbilityCard {
   sources?: { runtime: "node" | "page"; code: string }[];
   inputs: { name: string; required: boolean; description?: string }[];
   stats?: { runs: number; failures: number; lastOkAt?: string; lastUsedAt?: string };
+  /** Ways that changed since their tests last passed, by way kind. */
+  untested?: string[];
   /** Earlier saves that can be restored. */
   versions?: { count: number; latestAt?: string };
   updatedAt: string;
@@ -203,6 +206,7 @@ async function toAbilityCard(site: string, ability: ListedAbility): Promise<Abil
     site,
     ability.name,
   ).catch(() => ({ count: 0 }));
+  const untested = [...new Set(untestedWays(ability).map((way) => way.kind))];
   return {
     name: ability.name,
     site,
@@ -212,6 +216,7 @@ async function toAbilityCard(site: string, ability: ListedAbility): Promise<Abil
     ...(sources.length ? { sources } : {}),
     inputs: abilityInputs(ability.inputs),
     stats: ability.stats,
+    ...(untested.length ? { untested } : {}),
     ...(versions.count
       ? {
           versions: {

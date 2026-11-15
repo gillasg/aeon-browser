@@ -4,6 +4,7 @@
 
 import { mkdir, readdir, readFile, rename } from "node:fs/promises";
 import { defaultHost } from "./ability-attempt.js";
+import { testedAbility, withTested, type AbilityTested } from "./ability-digest.js";
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
@@ -138,6 +139,8 @@ export interface Ability {
   ways: AbilityWay[];
   /** Cases `testAbility` runs: inputs and values the result must contain. */
   tests?: AbilityTest[];
+  /** Per-way test results, keyed by the way's content digest; an edited way is untested again. */
+  tested?: Record<string, AbilityTested>;
   /** What must be true before a run, checked when the host can answer. */
   preconditions?: AbilityPrecondition;
   /** Writes: the read-back that confirms the change. `options.readBack` still works. */
@@ -296,7 +299,8 @@ export async function saveAbility(
     options.sample,
   );
   const tests = await proveOnSave(drafted, existing, options);
-  const next = { ...drafted, updatedAt: new Date().toISOString() };
+  const testedNow = withTested(drafted, existing, tests !== undefined);
+  const next = { ...testedNow, updatedAt: new Date().toISOString() };
   await versionChangedAbility(existing, next);
   await writeAtomic(path, JSON.stringify(next, null, 2) + "\n");
   return {
@@ -439,11 +443,17 @@ export async function testAbility(
   if (!ability) throw new Error(`ABILITY_UNKNOWN: ${siteName(site)} has no ability ${name}`);
   if (ability.kind === "write")
     throw new Error(`ABILITY_TEST_WRITE: ${name} writes; its cases would change the site`);
-  return testAbilityCases(
+  const report = await testAbilityCases(
     ability,
     async (inputs) =>
       (await runAbility(site, name, inputs, options.host ? { host: options.host } : {})).result,
   );
+  // The result stays keyed to the content that ran; a later edit makes the ways untested again.
+  if (ability.tests?.length) {
+    const current = (await readAbility(site, name)) ?? ability;
+    await saveAbility(testedAbility(current, report.ok), { check: false });
+  }
+  return report;
 }
 
 /** A built-in ability runs the code written for these inputs. */
