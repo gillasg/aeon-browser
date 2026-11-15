@@ -8,8 +8,9 @@ import { testedAbility, withTested, type AbilityTested } from "./ability-digest.
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
+import { abilityWrites, type AbilityWrite } from "./ability-effects.js";
 import { inferAbilityInputs, type AbilityDemonstration } from "./ability-infer.js";
-import { scrubAbility, type ScrubMark } from "./ability-scrub.js";
+import { scrubAbility, type AbilityScrub, type ScrubMark } from "./ability-scrub.js";
 import {
   contractBreaks,
   contractWarnings,
@@ -30,7 +31,7 @@ import { join } from "node:path";
 import type { AbilityCheck } from "./ability-records.js";
 import type { ReadBack, WriteOutcome } from "./ability-writes.js";
 import { builtinAbilities, builtinWay } from "./builtin-abilities.js";
-import { siteDir, siteName, writeAtomic } from "./registry.js";
+import { loadModel, siteDir, siteName, writeAtomic } from "./registry.js";
 import type { CollectRecipe, RecipePagination } from "./recipes.js";
 import type { Json } from "./types.js";
 export {
@@ -201,6 +202,8 @@ export interface Ability {
   inferred?: { at: string; inputs: string[]; references: string[] };
   /** Secret values removed when the ability was saved, and the way or test each came from. */
   scrubbed?: AbilityScrubbed[];
+  /** What the ways change, as an inventory. Never a permission gate. */
+  writes?: AbilityWrite[];
   createdAt: string;
   updatedAt: string;
 }
@@ -332,20 +335,14 @@ export async function saveAbility(
   inferred?: { inputs: string[]; references: string[] };
   scrubbed?: ScrubMark[];
 }> {
-  const scrub = scrubAbility(withInferred(ability, options), undefined, {
-    keepLast: options.check === false,
-  });
-  if (scrub.refused) throw new Error(scrub.refused);
-  const prepared = scrub.ability;
-  const site = siteName(prepared.site);
-  const name = validAbilityName(prepared.name);
-  validateAbility({ ...prepared, name, site });
-  await mkdir(abilityDirectory(site), { recursive: true });
-  const path = join(abilityDirectory(site), abilitySlug(name) + ".json");
-  const existing = await readAbilityFile(path);
-  if (existing && options.replace === false)
-    throw new Error(`ABILITY_EXISTS: ${site} already has ${name}`);
-  if (options.check !== false) checkContract(prepared, existing, options);
+  const {
+    ability: prepared,
+    site,
+    name,
+    path,
+    existing,
+    scrub,
+  } = await prepareSave(ability, options);
   const drafted = withSample(
     {
       ...prepared,
@@ -375,6 +372,35 @@ export async function saveAbility(
   };
 }
 
+interface PreparedSave {
+  ability: Ability;
+  site: string;
+  name: string;
+  path: string;
+  existing: Ability | undefined;
+  scrub: AbilityScrub;
+}
+
+/** Infers, scrubs, inventories and applies the caller contract before anything is written. */
+async function prepareSave(ability: Ability, options: SaveAbilityOptions): Promise<PreparedSave> {
+  const scrub = scrubAbility(withInferred(ability, options), undefined, {
+    keepLast: options.check === false,
+  });
+  if (scrub.refused) throw new Error(scrub.refused);
+  const prepared = scrub.ability;
+  const site = siteName(prepared.site);
+  const name = validAbilityName(prepared.name);
+  if (options.check !== false) await addWrites(prepared, site);
+  validateAbility({ ...prepared, name, site });
+  await mkdir(abilityDirectory(site), { recursive: true });
+  const path = join(abilityDirectory(site), abilitySlug(name) + ".json");
+  const existing = await readAbilityFile(path);
+  if (existing && options.replace === false)
+    throw new Error(`ABILITY_EXISTS: ${site} already has ${name}`);
+  if (options.check !== false) checkContract(prepared, existing, options);
+  return { ability: prepared, site, name, path, existing, scrub };
+}
+
 function scrubWarnings(marks: ScrubMark[]): string[] {
   return marks.map((mark) => {
     if (mark.dropped) return `${mark.what} was dropped: it carried a secret`;
@@ -399,6 +425,14 @@ function inferredOf(ability: Ability): { inputs: string[]; references: string[] 
   return ability.inferred
     ? { inputs: ability.inferred.inputs, references: ability.inferred.references }
     : undefined;
+}
+
+/** The writes each way performs, from the site model when it has one. Inventory only. */
+async function addWrites(ability: Ability, site: string): Promise<void> {
+  const model = await loadModel(site).catch(() => undefined);
+  const writes: AbilityWrite[] = abilityWrites(ability, model);
+  if (writes.length) ability.writes = writes;
+  else delete ability.writes;
 }
 
 /** Runs cases before the write. A throw leaves the file, and its ways, untouched. */

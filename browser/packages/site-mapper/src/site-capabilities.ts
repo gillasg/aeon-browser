@@ -8,6 +8,7 @@ import {
   type AbilityPrecondition,
 } from "./abilities.js";
 import { untestedWays } from "./ability-digest.js";
+import type { AbilityWrite } from "./ability-effects.js";
 import { wayId } from "./ability-stats.js";
 import { capabilityIndex } from "./infer/capabilities.js";
 import { inputParams } from "./params.js";
@@ -28,6 +29,8 @@ export interface SiteAbilitySummary {
   untested?: boolean;
   /** Ways whose answer no longer matched the shape they recorded. */
   unverified?: { via: string; why?: string }[];
+  /** What the ways change, explicit or suspected. An inventory, never a gate. */
+  writes?: AbilityWrite[];
   preconditions?: AbilityPrecondition;
   /** Read ability a write uses to confirm itself. */
   postcondition?: string;
@@ -95,6 +98,7 @@ function summarize(ability: Ability): SiteAbilitySummary {
     ...(ability.stats?.stale ? { stale: true } : {}),
     ...untestedField(ability),
     ...unverifiedField(ability),
+    ...writesField(ability),
     ...(ability.preconditions ? { preconditions: ability.preconditions } : {}),
     ...(post ? { postcondition: post } : {}),
     stats: ability.stats,
@@ -103,6 +107,11 @@ function summarize(ability: Ability): SiteAbilitySummary {
 
 function untestedField(ability: Ability): { untested?: boolean } {
   return untestedWays(ability).length ? { untested: true } : {};
+}
+
+/** The writes inventory, shown to the model and the UI. Never read before a run. */
+function writesField(ability: Ability): { writes?: AbilityWrite[] } {
+  return ability.writes?.length ? { writes: ability.writes } : {};
 }
 
 /** Ways whose last answer no longer matched the recorded shape. They are kept, not removed. */

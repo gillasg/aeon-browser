@@ -123,6 +123,7 @@ export {
   type InferredAbility,
 } from "./ability-infer.js";
 export { scrubAbility, type AbilityScrub, type ScrubMark } from "./ability-scrub.js";
+export { abilityWrites, type AbilityWrite, type AbilityWriteKind } from "./ability-effects.js";
 export {
   buildAbility,
   type BlockedReason,

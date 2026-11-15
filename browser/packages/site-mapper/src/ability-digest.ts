@@ -26,6 +26,7 @@ export function abilityContent(ability: Ability): Record<string, unknown> {
     preconditions: ability.preconditions,
     postcondition: ability.postcondition,
     options: ability.options,
+    writes: ability.writes,
     createdBy: ability.createdBy,
     sourceKind: ability.sourceKind,
     promoted: ability.promoted,

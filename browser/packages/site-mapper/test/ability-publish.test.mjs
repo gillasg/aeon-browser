@@ -156,3 +156,20 @@ test("the review reply must be the agreed JSON shape", () => {
   assert.throws(() => parseReview("looks fine to me"), /ABILITY_REVIEW_UNPARSABLE/);
   assert.throws(() => parseReview('{"verdict":"maybe"}'), /verdict must be allow or deny/);
 });
+
+test("the public definition carries the writes inventory", () => {
+  const writes = [
+    {
+      id: "steps:0:0",
+      kind: "suspected",
+      what: "Sign out",
+      via: "steps",
+      step: 0,
+      method: "GET",
+      path: "/logout",
+    },
+  ];
+  const definition = publicAbility(ability({ writes }));
+  assert.deepEqual(definition.writes, writes);
+  assert.deepEqual(lintPublicAbility(ability({ writes })), []);
+});
