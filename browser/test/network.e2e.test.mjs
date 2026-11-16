@@ -247,12 +247,11 @@ async function findRunLogs(root) {
 }
 
 /** A port that was free a moment ago: connecting to it is refused. */
+// Port 1 (tcpmux) is privileged and unused on every CI and dev box, so a connection to it is
+// refused reliably. A freed ephemeral port is not: on a busy machine another process (the bridge,
+// Chrome, a parallel test) can bind it between close and use, and the "refused" fetch succeeds.
 async function closedPort() {
-  const server = createServer();
-  await new Promise((done) => server.listen(0, "127.0.0.1", done));
-  const { port } = server.address();
-  await new Promise((done) => server.close(done));
-  return port;
+  return 1;
 }
 
 async function waitFor(check, timeout = 15000) {
