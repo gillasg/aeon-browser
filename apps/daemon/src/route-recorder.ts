@@ -31,6 +31,7 @@ import {
   type SeenStep,
 } from "./route-observe.js";
 import { buildRunCard, type RunFacts } from "./run-card.js";
+import { unreadQuotes } from "./unread-quotes.js";
 
 export interface RunCardHub {
   publish(chatId: ChatId, event: PiSessionEvent): unknown;
@@ -140,7 +141,7 @@ export class RouteRecorder {
   private ensure(chatId: string, seen: { kind: string; state?: string }): LiveRun | undefined {
     const current = this.runs.get(chatId);
     if (current) return current;
-    if (seen.kind === "user" || seen.kind === "error") return undefined;
+    if (["user", "error", "tool", "answer"].includes(seen.kind)) return undefined;
     if (seen.kind === "run-state" && seen.state !== "running-unconfirmed") return undefined;
     const prompt = this.prompted.get(chatId);
     if (!prompt) return undefined;
@@ -304,6 +305,7 @@ async function factsFor(
     site,
     task,
     durationMs,
+    unread: unreadFor(run),
     ...(previousMs !== undefined ? { previousMs } : {}),
     path: pathOf(fromMemory, drafted, run.usedAbility),
     ...(run.partial ? { partial: run.partial } : {}),
@@ -314,6 +316,11 @@ async function factsFor(
     declined: await declinesFor(site),
     ...(run.ours ? { ours: true } : {}),
   };
+}
+
+function unreadFor(run: LiveRun): string[] {
+  if (!run.answer) return [];
+  return unreadQuotes(run.answer, [run.userPrompt, ...run.readText]);
 }
 
 /**

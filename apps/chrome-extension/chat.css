@@ -1226,6 +1226,13 @@ summary:focus-visible {
     Consolas,
     monospace;
 }
+.activity-narration {
+  margin: var(--aeon-s-2) 0 var(--aeon-s-2) 23px;
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
 .activity-nested {
   margin: var(--aeon-s-3) 0 var(--aeon-s-3) var(--aeon-s-3);
   padding-left: var(--aeon-s-3);

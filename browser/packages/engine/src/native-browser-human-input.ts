@@ -304,16 +304,15 @@ async function typeChar(debuggee: chrome.debugger.Debuggee, char: string): Promi
     return;
   }
   const { text: typed, ...event } = key;
-  await send(
-    debuggee,
-    "Input.dispatchKeyEvent",
-    { type: "keyDown", ...event, text: typed, unmodifiedText: typed },
-    { label: "humanType" },
-  );
-  await send(
-    debuggee,
-    "Input.dispatchKeyEvent",
-    { type: "keyUp", ...event },
-    { label: "humanType" },
-  );
+  // Both are queued on the same session, so the keyup still lands after the keydown; awaiting
+  // them together saves one round trip per character on a field that wants real keystrokes.
+  await Promise.all([
+    send(
+      debuggee,
+      "Input.dispatchKeyEvent",
+      { type: "keyDown", ...event, text: typed, unmodifiedText: typed },
+      { label: "humanType" },
+    ),
+    send(debuggee, "Input.dispatchKeyEvent", { type: "keyUp", ...event }, { label: "humanType" }),
+  ]);
 }

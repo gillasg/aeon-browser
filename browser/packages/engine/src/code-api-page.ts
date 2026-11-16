@@ -3,7 +3,7 @@
 import { locatorShorthandSource } from "./locator-shorthand.js";
 export const browserFastApi = `
 ${locatorShorthandSource}
-var __states = new Map(), __tabs = new Map(), __seen = new Map(), __dirty = new Map(), __opened = new Map(), __busy = new Set(), __keptTabs = new Set(), __closedTabs = new Map(), __focusedWindowId, __attachedTarget, __lastTarget;
+var __states = new Map(), __tabs = new Map(), __seen = new Map(), __dirty = new Map(), __valueOnly = new Map(), __opened = new Map(), __busy = new Set(), __keptTabs = new Set(), __closedTabs = new Map(), __focusedWindowId, __attachedTarget, __lastTarget;
 var __labels = new Map();
 var __key = target => JSON.stringify(target);
 // Steps are checked against a target key. Agents pass the id, label, or listed tab they were shown,
@@ -238,7 +238,9 @@ function __stealthProbe() {
   try { geolocationShim = !native.test(Function.prototype.toString.call(navigator.geolocation.getCurrentPosition)); } catch {}
   return {webdriver: navigator.webdriver === true, globals, overlays, wrapped, geolocationShim, leaks};
 }
-function __beginCell() { __speedBegin(); __dirty.clear(); __hasDelivered=false; __deliveryValue=undefined; }
+function __beginCell() { __speedBegin(); __dirty.clear(); __valueOnly.clear(); __hasDelivered=false; __deliveryValue=undefined; }
+// A batch's direct value set (a native select) is still a value-only change.
+function __markValueOnly(target) { var key = __key(target); if (!__dirty.has(key)) __valueOnly.set(key, target); __dirty.set(key, target); }
 // Page-side: the text the user selected, unless it sits in a field (the agent's own typing selects
 // field contents).
 function __pageSelection() {
@@ -289,8 +291,16 @@ async function __step(step, readOnly = false) {
   var action = ['click','hold','fill','press','scroll','navigate','evaluate','cdp','upload','pointer','keys','reconnect'].includes(step.op);
   if(step.op==='frames' && ['click','fill','cdp'].includes(step.action))action=true;
   if (readOnly) action=false;
-  var wasDirty = step.target && __dirty.has(__key(step.target));
-  if (action) __dirty.set(__key(step.target), step.target);
+  var actionKey = step.target && __key(step.target);
+  var wasDirty = actionKey && __dirty.has(actionKey);
+  if (action) {
+    __dirty.set(actionKey, step.target);
+    // A fill (or a select's own value set) changes only the control's value, which its readback
+    // already confirmed; it does not owe the cell a whole new page observation.
+    var valueOnly = step.op === 'fill' || (step.op === 'frames' && step.action === 'fill');
+    if (valueOnly && !wasDirty) __valueOnly.set(actionKey, step.target);
+    else if (!valueOnly) __valueOnly.delete(actionKey);
+  }
   if (step.target) await __learnOn(step.target, action ? step : undefined);
   var before = step.target && __tabs.get(__key(step.target))?.url;
   var result = await __call(step);
@@ -333,7 +343,8 @@ function __element(target, element) {
   if (!state) throw Error('STALE_REF: observe this page with bu.state() before using an id');
   var node = state.nodes.find(n => n.backendNodeId === element || n.ref === element || (typeof element === "string" && n.backendNodeId === Number(element)));
   if (!node) throw Error('STALE_REF: id absent from the latest state; observe again');
-  return node.backendNodeId && !node.frame ? {kind:'backend',backendNodeId:node.backendNodeId,documentEpoch:state.documentEpoch}
+  return node.backendNodeId && !node.frame ? {kind:'backend',backendNodeId:node.backendNodeId,documentEpoch:state.documentEpoch,
+      ...(node.role ? {role:String(node.role)} : {}), ...(node.name != null ? {name:String(node.name)} : {})}
     : {kind:'ref',snapshotId:state.snapshotId,ref:node.ref};
 }
 // XPath and filtered shorthands cannot travel in the engine's element schema; use a page-side
@@ -569,10 +580,12 @@ async function __fastProbe(target, url) {
 async function __finishCell() {
   __speedEnd();
   for (var target of [...__dirty.values()]) {
+    if (__valueOnly.has(__key(target))) continue;
     try { await bu.state({target, final: true}); }
     catch (error) { if (!/UNSUPPORTED/.test(String(error && error.message))) console.log('Final observation unavailable: ' + error.message); }
   }
   __dirty.clear();
+  __valueOnly.clear();
   await __wallNote();
   // Passive learning deletes the bodies it hands over. The [data] line has to read them first.
   await __harvestFooter(__lastTarget).catch(function () {});

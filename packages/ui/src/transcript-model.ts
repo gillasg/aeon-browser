@@ -35,6 +35,8 @@ export interface ToolStep {
   progress?: RunProgress;
   /** The latest finished step's words, from the engine. A value typed into a field is not here. */
   stepLabel?: string;
+  /** What the model wrote as it started this step, kept inside the work disclosure. */
+  narration?: string;
 }
 
 export interface ToolGroup {
@@ -268,22 +270,64 @@ export class TranscriptModel {
     if (!message || message.role !== "assistant") return;
     const calls = message.content.filter((block) => block.type === "tool-call");
     if (!calls.length || separatesToolBatch(message)) this.activeGroup = undefined;
-    if (
-      hasRenderableContent(message.content) ||
-      message.stopReason === "error" ||
-      message.stopReason === "aborted"
-    )
-      insertAssistantEntry(this.rows, entry);
-    const timestamp = timestampMs(entry.timestamp) ?? Date.now();
+    // Text beside a tool call is the model's running commentary. It is not a chat bubble (the
+    // answer is the message with no tool call), but it is not lost: it belongs with that step
+    // inside the work disclosure.
+    if (this.showsAssistantMessage(message, calls)) insertAssistantEntry(this.rows, entry);
+    const first = this.attachCalls(calls, timestampMs(entry.timestamp) ?? Date.now());
+    this.noteNarration(message, first);
+  }
+
+  private showsAssistantMessage(
+    message: PiMessageDto,
+    calls: readonly { toolCallId: string; toolName: string }[],
+  ): boolean {
+    const failed = message.stopReason === "error" || message.stopReason === "aborted";
+    return (!calls.length || failed) && (hasRenderableContent(message.content) || failed);
+  }
+
+  private attachCalls(
+    calls: readonly { toolCallId: string; toolName: string; arguments: Record<string, unknown> }[],
+    timestamp: number,
+  ): ToolStep | undefined {
+    let first: ToolStep | undefined;
     for (const block of calls) {
       const step = this.stepFor(block.toolCallId, block.toolName, undefined, timestamp);
+      if (!first) first = step;
       step.arguments = block.arguments;
       step.startedAt = timestamp;
     }
+    return first;
+  }
+
+  /** A model line beside a tool call stays on the step, for the work disclosure only. */
+  private noteNarration(message: PiMessageDto, step: ToolStep | undefined): void {
+    if (!step) return;
+    const text = message.content
+      .flatMap((block) => (block.type === "text" ? [block.text] : []))
+      .join("\n")
+      .trim();
+    if (text) step.narration = text;
   }
 
   private updateTransient(message: PiMessageDto): void {
     if (message.role === "custom" || !hasRenderableContent(message.content)) return;
+    if (
+      message.role === "assistant" &&
+      message.stopReason !== "error" &&
+      message.stopReason !== "aborted"
+    ) {
+      const calls = message.content.filter((block) => block.type === "tool-call");
+      if (calls.length) {
+        const first = calls[0];
+        this.noteNarration(
+          message,
+          first ? this.stepFor(first.toolCallId, first.toolName) : undefined,
+        );
+        this.removeTransient("assistant");
+        return;
+      }
+    }
     const key = `transient:${message.role}`;
     const index = this.rows.findIndex((row) => row.key === key);
     const row: TranscriptRow = { kind: "transient", key, message };
