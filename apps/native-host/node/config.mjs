@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { appRoot } from "./paths.mjs";
+import { dataDirectory } from "./paths.mjs";
 
 const MAX_CONFIG_BYTES = 16384;
 const KNOWN_KEYS = new Set([
@@ -79,10 +79,10 @@ function validate(config, options) {
   if (!existsSync(config.nodeExecutable))
     throw invalid("The configured Node executable is missing.");
   config.daemonEntrypoint = entrypoint(config.daemonEntrypoint);
-  const dataRoot = join(resolve(appRoot(options)), "data");
+  const dataRoot = dataDirectory(options);
   const data = relative(dataRoot, config.dataDirectory);
   if (data.startsWith("..") || isAbsolute(data))
-    throw invalid("Daemon data must live under the user-local Aeon data directory.");
+    throw invalid("Daemon data must live under " + dataRoot + ".");
   mkdirSync(config.dataDirectory, { recursive: true, mode: 0o700 });
 }
 

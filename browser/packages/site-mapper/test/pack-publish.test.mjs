@@ -64,6 +64,46 @@ test("a pack carries a public definition of each ability", async (t) => {
   assert.equal(JSON.stringify(definition).includes("void inputs.q"), false);
 });
 
+test("a pack's runnable ability is scrubbed of lint findings before it ships", async (t) => {
+  const leaky = ability({
+    inputs: { type: "object", properties: { q: { type: "string", example: "tea" } } },
+    ways: [
+      {
+        kind: "script",
+        runtime: "node",
+        code: "const headers = { authorization: 'Bearer ab12cd34ef56' }; void inputs.q; return { title: 'tea' };",
+      },
+      { kind: "api", operation: "search", params: { q: "{{inputs.q}}" } },
+    ],
+  });
+  const { out } = await site(t, leaky);
+  const exported = await exportSitePack({ site: "shop.example", out, publish: "warn" });
+  assert.ok(exported.findings.some((finding) => finding.code === "secret"));
+  assert.ok(exported.findings.some((finding) => finding.code === "input_recorded_value"));
+  const entries = unzip(await readFile(out));
+  const runnable = JSON.parse(entries["abilities/search.json"]);
+  assert.deepEqual(
+    runnable.ways.map((way) => way.kind),
+    ["api"],
+    "the credential-bearing script is not in the runnable file",
+  );
+  assert.equal(runnable.inputs.properties.q.example, undefined, "the recorded value is redacted");
+  assert.equal(entries["abilities/search.json"].includes("Bearer ab12"), false);
+  const definition = JSON.parse(entries["abilities/public/search.json"]);
+  assert.deepEqual(definition.ways, ["api"]);
+});
+
+test("a private value the scrub cannot remove stops even a warned pack", async (t) => {
+  const pinned = ability({
+    tests: [{ inputs: { q: "tea", account_id: 42 }, expect: { title: "tea" } }],
+  });
+  const { out } = await site(t, pinned);
+  await assert.rejects(
+    exportSitePack({ site: "shop.example", out, publish: "warn" }),
+    /ABILITY_NOT_PUBLISHABLE: search would ship a private value/,
+  );
+});
+
 test("a personal value blocks the pack unless the caller allows an unreviewed one", async (t) => {
   const personal = ability({
     tests: [{ inputs: { q: "me@example.com" }, expect: { title: "tea" } }],

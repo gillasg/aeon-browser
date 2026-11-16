@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createPortable } from "./footprint-paths.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const aeonRepo = resolve(repo, "..");
@@ -59,7 +60,10 @@ async function fromSurface() {
   // Machine paths in the prompt must not change the budget: the same source measured from the
   // main checkout, a worktree or a temp directory is the same prompt to the model. The surface
   // hash already strips them; the byte count has to as well.
-  const portable = (text) => text.replaceAll(root, "<workspace>").replaceAll(aeonRepo, "<aeon>");
+  const portable = createPortable([
+    [root, "<workspace>"],
+    [aeonRepo, "<aeon>"],
+  ]);
   const systemPrompt = Buffer.byteLength(portable(surface.systemPrompt));
   const tools = Buffer.byteLength(portable(JSON.stringify(surface.tools)));
   const firstTurn = Buffer.byteLength(portable(surface.firstTurn));

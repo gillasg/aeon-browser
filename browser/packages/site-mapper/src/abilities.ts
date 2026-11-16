@@ -25,7 +25,12 @@ import {
   type AbilityPostcondition,
   type AbilityPrecondition,
 } from "./ability-guard.js";
-import { proveSave, withSample, type AbilitySample } from "./ability-save-test.js";
+import {
+  proveSave,
+  withSample,
+  type AbilitySample,
+  type ProbeResult,
+} from "./ability-save-test.js";
 import { liveWayStats, withRunStats, type AbilityWayStats, type WayNote } from "./ability-stats.js";
 import { join } from "node:path";
 import type { AbilityCheck } from "./ability-records.js";
@@ -238,6 +243,8 @@ export interface AbilityRunOptions {
   complete?: boolean;
   /** Also run a second way and compare. Reads do this on their own every eighth run. */
   differ?: boolean;
+  /** Internal: called with the winning way's id, for the per-way test record. */
+  onWay?: (way: string) => void;
 }
 
 export interface AbilityHost {
@@ -355,7 +362,7 @@ export async function saveAbility(
     options.sample,
   );
   const tests = await proveOnSave(drafted, existing, options);
-  const testedNow = withTested(drafted, existing, tests !== undefined);
+  const testedNow = withTested(drafted, existing, tests?.ways);
   const next = { ...testedNow, updatedAt: new Date().toISOString() };
   const inferred = inferredOf(prepared);
   await versionChangedAbility(existing, next);
@@ -451,8 +458,14 @@ async function probeAbility(
   ability: Ability,
   inputs: Record<string, unknown>,
   host: AbilityHost,
-): Promise<unknown> {
-  return (await executeRead(ability, inputs, host, {})).result;
+): Promise<ProbeResult> {
+  let way: string | undefined;
+  const result = await executeRead(ability, inputs, host, {
+    onWay: (used) => {
+      way = used;
+    },
+  });
+  return { result: result.result, ...(way ? { way } : {}) };
 }
 
 function checkContract(
@@ -567,15 +580,21 @@ export async function testAbility(
   if (!ability) throw new Error(`ABILITY_UNKNOWN: ${siteName(site)} has no ability ${name}`);
   if (ability.kind === "write")
     throw new Error(`ABILITY_TEST_WRITE: ${name} writes; its cases would change the site`);
-  const report = await testAbilityCases(
-    ability,
-    async (inputs) =>
-      (await runAbility(site, name, inputs, options.host ? { host: options.host } : {})).result,
-  );
-  // The result stays keyed to the content that ran; a later edit makes the ways untested again.
+  const ways = new Set<string>();
+  const report = await testAbilityCases(ability, async (inputs) => {
+    const runOptions = {
+      ...(options.host ? { host: options.host } : {}),
+      onWay: (used: string) => {
+        ways.add(used);
+      },
+    };
+    return (await runAbility(site, name, inputs, runOptions)).result;
+  });
+  // The result stays keyed to the content that ran; only the ways that answered are proven, and
+  // a later edit makes them untested again.
   if (ability.tests?.length) {
     const current = (await readAbility(site, name)) ?? ability;
-    await saveAbility(testedAbility(current, report.ok), { check: false });
+    await saveAbility(testedAbility(current, report.ok, undefined, [...ways]), { check: false });
   }
   return report;
 }

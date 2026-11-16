@@ -105,6 +105,62 @@ test("an unchanged save does not run the cases again", async () => {
   });
 });
 
+test("running the stored cases proves only the way that answered", async () => {
+  await withHome(async () => {
+    const api = { kind: "api", operation: "search", params: { q: "{{inputs.q}}" } };
+    const page = { kind: "page", collect: { row: "body", fields: {} } };
+    await saveAbility(ability({ ways: [api, page] }));
+    const passed = await testAbility("example.com", "search", {
+      host: { call: async () => ({ title: "tea" }), collect: async () => ({ title: "tea" }) },
+    });
+    assert.equal(passed.ok, true);
+    const stored = await readAbility("example.com", "search");
+    assert.equal(Object.keys(stored.tested).length, 1, "only the api way ran");
+    assert.deepEqual(
+      untestedWays(stored).map((way) => way.kind),
+      ["page"],
+      "the page way is still untested",
+    );
+  });
+});
+
+test("a save tests each untested way, not only the first that answers", async () => {
+  await withHome(async () => {
+    const api = { kind: "api", operation: "search", params: { q: "{{inputs.q}}" } };
+    const page = { kind: "page", collect: { row: "body", fields: {} } };
+    const calls = [];
+    const host = (title) => ({
+      call: async () => {
+        calls.push("api");
+        return { title };
+      },
+      collect: async () => {
+        calls.push("page");
+        return { title };
+      },
+    });
+    await saveAbility(
+      ability({
+        ways: [api, page],
+        tests: [{ inputs: { q: "tea" }, expect: { title: "tea" } }],
+      }),
+      { host: host("tea") },
+    );
+    calls.length = 0;
+    // The changed test case changes both way digests, so no way is new: both are untested.
+    await saveAbility(
+      ability({
+        ways: [api, page],
+        tests: [{ inputs: { q: "coffee" }, expect: { title: "coffee" } }],
+      }),
+      { host: host("coffee") },
+    );
+    assert.ok(calls.includes("api"));
+    assert.ok(calls.includes("page"), "the page way ran too, not just the api way");
+    assert.equal(untestedWays(await readAbility("example.com", "search")).length, 0);
+  });
+});
+
 test("testAbility records its result, and a failure shows as untested", async () => {
   await withHome(async () => {
     await saveAbility(ability());

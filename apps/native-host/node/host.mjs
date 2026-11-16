@@ -1,13 +1,12 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hostPaths } from "./paths.mjs";
 import { loadConfig } from "./config.mjs";
 import { SupervisorLog } from "./supervisor-files.mjs";
 import { readFrame, writeFrame } from "./frames.mjs";
 import { bootstrapEnvelope, failure, matchesOrigin } from "./protocol.mjs";
+import { serviceState, startService } from "./service-state.mjs";
 import { runSupervisor } from "./supervisor.mjs";
 
 const ENTRY = fileURLToPath(new URL("./native-host.mjs", import.meta.url));
@@ -52,7 +51,7 @@ async function sendToSupervisor(config, origin, request, socketPath, log) {
     } catch {
       // The supervisor is not up yet, or it dropped between connects.
     }
-    if (attempt % 5 === 0) startSupervisor(config, log);
+    if (attempt % 5 === 0) ensureSupervisor(config, log);
     await new Promise((done) => setTimeout(done, CONNECT_WAIT_MS));
   }
   throw new Error("Daemon bootstrap did not become available.");
@@ -87,12 +86,26 @@ async function exchange(socketPath, envelope) {
   });
 }
 
-function startSupervisor(config, log) {
-  // The login service owns the supervisor. Starting a second one here only races systemd or
-  // launchd: the duplicate binds nothing, exits 0, and a Restart=always unit loops.
-  if (supervisorServiceInstalled()) return;
+/**
+ * Makes one supervisor available. The login service owns it while the service manager runs it; an
+ * installed-but-stopped service is asked to start before the host falls back to a direct
+ * supervisor, because a stopped unit must recover without a reinstall.
+ */
+export function ensureSupervisor(config, log, options = {}) {
+  const state = (options.serviceState ?? serviceState)();
+  if (state === "active") return "service";
+  if (state === "inactive") {
+    log.write("The Aeon service is installed but not running; asking it to start.");
+    if ((options.startService ?? startService)({ log })) return "service";
+    log.write("The Aeon service did not start; running a supervisor directly.");
+  }
+  spawnSupervisor(config, log, options.spawn);
+  return "manual";
+}
+
+function spawnSupervisor(config, log, spawnChild = spawn) {
   try {
-    const child = spawn(config.nodeExecutable, [ENTRY, "--daemon-supervisor"], {
+    const child = spawnChild(config.nodeExecutable, [ENTRY, "--daemon-supervisor"], {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -102,21 +115,6 @@ function startSupervisor(config, log) {
   } catch (error) {
     log.write("Supervisor start failed: " + error.message);
   }
-}
-
-function supervisorServiceInstalled() {
-  if (process.platform === "darwin")
-    return existsSync(join(homedir(), "Library", "LaunchAgents", "com.aeon.daemon.plist"));
-  if (process.platform === "linux")
-    return existsSync(
-      join(
-        process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-        "systemd",
-        "user",
-        "aeon-daemon.service",
-      ),
-    );
-  return false;
 }
 
 async function writeFailure(code, retryable) {

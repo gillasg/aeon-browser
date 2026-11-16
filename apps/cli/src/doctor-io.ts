@@ -121,19 +121,50 @@ async function readProcCommandLines(): Promise<string[]> {
   return lines;
 }
 
-function loginTaskPresent(): Promise<boolean> {
-  if (process.platform !== "win32") {
-    const path =
-      process.platform === "darwin"
-        ? join(homedir(), "Library", "LaunchAgents", "com.aeon.daemon.plist")
-        : join(
-            process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-            "systemd",
-            "user",
-            "aeon-daemon.service",
-          );
-    return Promise.resolve(existsSync(path));
+export interface ServiceProbeOptions {
+  platform?: NodeJS.Platform;
+  home?: string;
+  env?: NodeJS.ProcessEnv;
+  uid?: number;
+  exec?: (file: string, args: string[]) => Promise<boolean>;
+}
+
+/** Where the login service file lives; presence alone says nothing about it running. */
+export function serviceFilePath(options: ServiceProbeOptions = {}): string | undefined {
+  const platform = options.platform ?? process.platform;
+  const home = options.home ?? homedir();
+  const env = options.env ?? process.env;
+  if (platform === "darwin") return join(home, "Library", "LaunchAgents", "com.aeon.daemon.plist");
+  if (platform === "linux")
+    return join(
+      env.XDG_CONFIG_HOME || join(home, ".config"),
+      "systemd",
+      "user",
+      "aeon-daemon.service",
+    );
+  return undefined;
+}
+
+/** True only when the service manager reports the login service running. */
+export async function supervisorServiceActive(options: ServiceProbeOptions = {}): Promise<boolean> {
+  const file = serviceFilePath(options);
+  if (!file || !existsSync(file)) return false;
+  const exec = options.exec ?? commandAnswered;
+  if ((options.platform ?? process.platform) === "darwin") {
+    const uid = options.uid ?? process.getuid?.() ?? 501;
+    return exec("launchctl", ["print", `gui/${uid}/com.aeon.daemon`]);
   }
+  return exec("systemctl", ["--user", "is-active", "--quiet", "aeon-daemon.service"]);
+}
+
+function commandAnswered(file: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile(file, args, { timeout: 8000, windowsHide: true }, (error) => resolve(!error));
+  });
+}
+
+function loginTaskPresent(): Promise<boolean> {
+  if (process.platform !== "win32") return supervisorServiceActive();
   return new Promise((resolve) => {
     execFile(
       "schtasks.exe",

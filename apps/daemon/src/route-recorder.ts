@@ -43,6 +43,8 @@ const MARKER = new Set(["wrong", "incorrect", "nope", "instead", "not", "that"])
 
 interface Prompted {
   user: string;
+  /** The task a correction belongs to; fixed when the correction arrives. */
+  task: string;
   submitted: string;
   fromMemory: boolean;
   draft: boolean;
@@ -64,6 +66,7 @@ export class RouteRecorder {
   private readonly runs = new Map<string, LiveRun>();
   private readonly lastSite = new Map<string, string>();
   private readonly lastPrompt = new Map<string, string>();
+  private readonly lastTask = new Map<string, string>();
   private readonly due = new Map<string, Due[]>();
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -75,16 +78,21 @@ export class RouteRecorder {
   /** The user's words, plus a rung-1 draft when a saved route matches. */
   async prepare(chatId: string, prompt: string): Promise<{ text: string; draft?: RouteDraft }> {
     const prior = this.lastPrompt.get(chatId);
+    const corrected = prior !== undefined && isWordCorrection(prior, prompt);
+    // A correction is not the task: the offer and the ability match belong to what it corrects.
+    const task = corrected ? (this.lastTask.get(chatId) ?? prior ?? prompt) : prompt;
     this.lastPrompt.set(chatId, prompt);
+    this.lastTask.set(chatId, task);
     await this.noteCorrection(chatId, prompt).catch(report);
     const draft = await this.draftFor(chatId, prompt).catch(() => undefined);
     this.prompted.set(chatId, {
       user: prompt,
+      task,
       submitted: prompt,
       fromMemory: false,
       draft: Boolean(draft),
       watcher: false,
-      corrected: prior !== undefined && isWordCorrection(prior, prompt),
+      corrected,
     });
     return { text: prompt, ...(draft ? { draft } : {}) };
   }
@@ -96,6 +104,7 @@ export class RouteRecorder {
     if (current && !current.watcher) return;
     this.prompted.set(chatId, {
       user: prompt,
+      task: prompt,
       submitted: prompt,
       fromMemory: false,
       draft: false,
@@ -142,6 +151,7 @@ export class RouteRecorder {
       prompt.submitted,
       Date.now(),
     );
+    run.task = prompt.task;
     run.fromMemory = prompt.fromMemory;
     run.draft = prompt.draft;
     run.watcher = prompt.watcher;
@@ -170,7 +180,7 @@ export class RouteRecorder {
     const site = siteOf(steps);
     if (!site || !steps.length || run.ours) return;
     this.lastSite.set(run.chatId, site);
-    const task = contentWords(run.userPrompt).join(" ") || "task";
+    const task = contentWords(run.task).join(" ") || "task";
     const durationMs = Math.max(0, Date.now() - run.startedAt);
     const previousMs = await previousDuration(site, task);
     await rememberDuration(site, task, durationMs);
@@ -188,7 +198,7 @@ export class RouteRecorder {
   ): Promise<{ id: string; fingerprint: string } | undefined> {
     const result = await stageRun({
       site,
-      prompt: run.userPrompt,
+      prompt: run.task,
       steps: steps.map(observedStep),
       corrected: run.corrected,
       watcher: run.watcher,
@@ -316,7 +326,7 @@ async function saveOfferWanted(run: LiveRun, site: string): Promise<boolean> {
   if (!run.stumbled && !run.corrected) return false;
   if (!hasSuccess(flatSteps(run).map(observedStep))) return false;
   try {
-    return (await matchAbilities(run.userPrompt, [site], 1)).length === 0;
+    return (await matchAbilities(run.task, [site], 1)).length === 0;
   } catch {
     return false;
   }

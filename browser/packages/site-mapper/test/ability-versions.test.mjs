@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -8,9 +8,12 @@ import { maintainAbilities } from "../dist/abilities.js";
 import {
   ABILITY_HISTORY_LIMIT,
   countAbilityVersions,
+  isVersionId,
   listAbilityVersions,
   readAbilityVersion,
+  versionStamp,
 } from "../dist/ability-versions.js";
+import { abilityHistoryDirectory } from "../dist/ability-files.js";
 import { restoreAbility } from "../dist/ability-restore.js";
 
 async function withHome(run) {
@@ -86,6 +89,21 @@ test("history is capped per ability", async () => {
   });
 });
 
+test("counting versions reads the directory instead of parsing every history file", async () => {
+  await withHome(async () => {
+    await saveAbility(ability({ description: "first" }));
+    await saveAbility(ability({ description: "second" }));
+    await saveAbility(ability({ description: "third" }));
+    const folder = abilityHistoryDirectory("example.com", "search");
+    const files = (await readdir(folder)).filter((file) => file.endsWith(".json")).sort();
+    assert.equal(files.length, 2);
+    for (const file of files) await writeFile(join(folder, file), "not json\n");
+    const counted = await countAbilityVersions("example.com", "search");
+    assert.equal(counted.count, 2, "a count needs no parse");
+    assert.equal(counted.latestAt, files.at(-1).slice(0, -".json".length));
+  });
+});
+
 test("restore obeys the same caller contract as a save", async () => {
   await withHome(async () => {
     await saveAbility(ability());
@@ -135,5 +153,24 @@ test("an unknown version is refused without touching the current file", async ()
       /ABILITY_VERSION_UNKNOWN/,
     );
     assert.equal((await readAbility("example.com", "search")).description, "Find products");
+  });
+});
+
+test("a version id cannot carry a path separator", async () => {
+  assert.equal(versionStamp(String.raw`..\..\..\Users\x\file`).includes("\\"), false);
+  assert.equal(versionStamp("2026-11-16T12:34:56.789Z"), "2026-11-16T12-34-56-789Z");
+  assert.equal(isVersionId("2026-11-16T12-34-56-789Z"), true);
+  assert.equal(isVersionId("2026-11-16T12-34-56-789Z-2"), true);
+  for (const id of ["..\\..\\outside", "../../outside", "/etc/passwd", "2026-11-16"]) {
+    assert.equal(isVersionId(id), false);
+  }
+  await withHome(async (root) => {
+    await saveAbility(ability({ description: "first" }));
+    await saveAbility(ability({ description: "second" }));
+    await writeFile(join(root, "outside.json"), JSON.stringify(ability()));
+    assert.equal(
+      await readAbilityVersion("example.com", "search", String.raw`..\..\outside`),
+      undefined,
+    );
   });
 });

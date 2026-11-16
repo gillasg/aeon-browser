@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import type { Ability, AbilityWay } from "./abilities.js";
+import { wayId } from "./ability-stats.js";
 
 /** What a stored test run covered: the way at this digest, when, and whether it passed. */
 export interface AbilityTested {
@@ -54,14 +55,17 @@ export function untestedWays(ability: Ability): AbilityWay[] {
   return ability.ways.filter((way) => ability.tested?.[wayDigest(ability, way)]?.ok !== true);
 }
 
-/** Stamps every way as tested now, with the given outcome. */
+/** Stamps the ways that ran (all when no ids are given) as tested now, with the outcome. */
 export function testedAbility(
   ability: Ability,
   ok: boolean,
   at = new Date().toISOString(),
+  ways?: string[],
 ): Ability {
+  const ran = ways ? new Set(ways) : undefined;
   const tested: Record<string, AbilityTested> = {};
   for (const way of ability.ways) {
+    if (ran && !ran.has(wayId(way))) continue;
     const digest = wayDigest(ability, way);
     tested[digest] = { digest, at, ok };
   }
@@ -69,19 +73,24 @@ export function testedAbility(
 }
 
 /**
- * The ability with test records for its current content: a matching earlier record is kept, and
- * `proven` stamps every way when this save actually ran the cases. Stats and test records alone
- * never mark a way tested.
+ * The ability with test records for its current content: `proven` names the ways this save
+ * actually ran and passed, so only those are stamped, and every other way keeps a matching
+ * earlier record (or stays untested). Stats and test records alone never mark a way tested.
  */
 export function withTested(
   ability: Ability,
   previous: Ability | undefined,
-  proven: boolean,
+  proven: string[] | undefined,
 ): Ability {
-  if (proven) return testedAbility(ability, true);
+  const ran = new Set(proven ?? []);
+  const at = new Date().toISOString();
   const tested: Record<string, AbilityTested> = {};
   for (const way of ability.ways) {
     const digest = wayDigest(ability, way);
+    if (ran.has(wayId(way))) {
+      tested[digest] = { digest, at, ok: true };
+      continue;
+    }
     const entry = ability.tested?.[digest] ?? previous?.tested?.[digest];
     if (entry?.digest === digest) tested[digest] = entry;
   }

@@ -22,9 +22,16 @@ export interface AbilityVersion {
   bytes: number;
 }
 
-/** File stamps sort as dates; `:` and `.` are not safe in every file system. */
+/** File stamps sort as dates; separators are not safe in a version id on any file system. */
 export function versionStamp(iso = new Date().toISOString()): string {
-  return iso.replace(/[:.]/g, "-");
+  return iso.replace(/[^0-9A-Za-z-]/g, "-");
+}
+
+const VERSION_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(?:-\d+)?$/;
+
+/** A version id names one file in the history folder and nothing outside it. */
+export function isVersionId(value: string): boolean {
+  return VERSION_ID.test(value);
 }
 
 /** Previous content, newest first. Each entry is one archived save. */
@@ -61,11 +68,9 @@ export async function readAbilityVersion(
   name: string,
   at: string,
 ): Promise<Ability | undefined> {
+  if (!isVersionId(at)) return undefined;
   try {
-    const raw = await readFile(
-      join(abilityHistoryDirectory(site, name), versionStamp(at) + ".json"),
-      "utf8",
-    );
+    const raw = await readFile(join(abilityHistoryDirectory(site, name), at + ".json"), "utf8");
     const value = JSON.parse(raw) as Ability;
     return value && typeof value.name === "string" && Array.isArray(value.ways)
       ? { ...value, options: value.options ?? {}, inputs: value.inputs ?? {} }
@@ -75,13 +80,22 @@ export async function readAbilityVersion(
   }
 }
 
+/** A version file, named by its own stamp. */
+const VERSION_FILE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(?:-\d+)?\.json$/;
+
+/**
+ * How many earlier saves an ability has. The count comes from the directory entries: the library
+ * asks for it on every render and a parse of every archived ability is not worth it.
+ */
 export async function countAbilityVersions(
   site: string,
   name: string,
 ): Promise<{ count: number; latestAt?: string }> {
-  const versions = await listAbilityVersions(site, name);
-  const latest = versions[0];
-  return { count: versions.length, ...(latest ? { latestAt: latest.at } : {}) };
+  const files = (await readdir(abilityHistoryDirectory(site, name)).catch(() => [] as string[]))
+    .filter((file) => VERSION_FILE.test(file))
+    .sort();
+  const latest = files.at(-1);
+  return { count: files.length, ...(latest ? { latestAt: latest.slice(0, -".json".length) } : {}) };
 }
 
 /**

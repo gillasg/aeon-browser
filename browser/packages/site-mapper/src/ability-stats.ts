@@ -16,11 +16,15 @@ export interface AbilityWayStats {
   samplesMs?: number[];
   /** Not tried again until this time, after three failures in a row. */
   retryAt?: string;
-  /** The body shape this way answered with, learned on its first success. */
+  /** The body shape this way answered with, learned from its verified answers. */
   shape?: Record<string, unknown>;
   /** JSON pointer to the list in that shape. */
   list?: string;
   shapeAt?: string;
+  /** Verified answers the shape was learned from. */
+  shapeSamples?: number;
+  /** How many of those answers had each schema property, by pointer. */
+  shapeSeen?: Record<string, number>;
   /** The answer no longer matched the recorded shape. The way is kept and still tried. */
   unverified?: boolean;
   unverifiedWhy?: string;
@@ -146,24 +150,126 @@ function nextWayStats(
   };
 }
 
-/** A way's first verified answer records the shape later answers are accepted by. */
+/**
+ * A way's verified answers record the shape later answers are accepted by. A field is required
+ * only when it was present in every verified answer and there was more than one: one answer
+ * cannot tell a required field from an optional one (pagination keys, sparse objects).
+ */
 function shapeFields(
   note: WayNote,
   current: AbilityWayStats | undefined,
   at: string,
-): Pick<AbilityWayStats, "shape" | "list" | "shapeAt"> {
-  if (!note.ok || !note.shape || current?.shape) {
-    const kept: Pick<AbilityWayStats, "shape" | "list" | "shapeAt"> = {};
-    if (current?.shape) kept.shape = current.shape;
-    if (current?.list !== undefined) kept.list = current.list;
-    if (current?.shapeAt) kept.shapeAt = current.shapeAt;
-    return kept;
-  }
+): Pick<AbilityWayStats, "shape" | "list" | "shapeAt" | "shapeSamples" | "shapeSeen"> {
+  if (!note.ok || !note.shape) return keptShape(current);
+  if (current?.shape) return grownShape(current, note.shape.shape);
+  const seen = presenceOf(note.shape.shape);
   return {
-    shape: note.shape.shape,
+    shape: withPresence(note.shape.shape, seen, 1),
     ...(note.shape.list !== undefined ? { list: note.shape.list } : {}),
     shapeAt: at,
+    shapeSamples: 1,
+    shapeSeen: seen,
   };
+}
+
+type ShapeFields = Pick<
+  AbilityWayStats,
+  "shape" | "list" | "shapeAt" | "shapeSamples" | "shapeSeen"
+>;
+
+function keptShape(current: AbilityWayStats | undefined): ShapeFields {
+  const kept: ShapeFields = {};
+  if (current?.shape) kept.shape = current.shape;
+  if (current?.list !== undefined) kept.list = current.list;
+  if (current?.shapeAt) kept.shapeAt = current.shapeAt;
+  if (current?.shapeSamples !== undefined) kept.shapeSamples = current.shapeSamples;
+  if (current?.shapeSeen) kept.shapeSeen = current.shapeSeen;
+  return kept;
+}
+
+function grownShape(current: AbilityWayStats, shape: Record<string, unknown>): ShapeFields {
+  const seen = mergePresence(current.shapeSeen ?? presenceOf(current.shape ?? {}), shape);
+  const samples = (current.shapeSamples ?? 1) + 1;
+  return {
+    shape: withPresence(current.shape as Record<string, unknown>, seen, samples),
+    ...(current.list !== undefined ? { list: current.list } : {}),
+    ...(current.shapeAt ? { shapeAt: current.shapeAt } : {}),
+    shapeSamples: samples,
+    shapeSeen: seen,
+  };
+}
+
+interface SchemaNode {
+  properties?: Record<string, SchemaNode>;
+  items?: SchemaNode;
+  anyOf?: SchemaNode[];
+  required?: string[];
+}
+
+/** The shape with `required` set only on fields present in every one of `samples` answers. */
+function withPresence(
+  shape: Record<string, unknown>,
+  seen: Record<string, number>,
+  samples: number,
+): Record<string, unknown> {
+  const next = structuredClone(shape) as SchemaNode;
+  markRequired(next, "", seen, samples);
+  return next as Record<string, unknown>;
+}
+
+function markRequired(
+  schema: SchemaNode,
+  pointer: string,
+  seen: Record<string, number>,
+  samples: number,
+): void {
+  if (schema.properties) {
+    const required = Object.keys(schema.properties).filter(
+      (key) => samples > 1 && seen[propertyPointer(pointer, key)] === samples,
+    );
+    if (required.length) schema.required = required;
+    else delete schema.required;
+    for (const [key, child] of Object.entries(schema.properties))
+      markRequired(child, propertyPointer(pointer, key), seen, samples);
+  }
+  if (schema.items) markRequired(schema.items, pointer, seen, samples);
+  for (const child of schema.anyOf ?? []) markRequired(child, pointer, seen, samples);
+}
+
+/** Every property pointer a schema declares, with array items sharing their array's pointer. */
+function schemaPointers(shape: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  collectPointers(shape as SchemaNode, "", out);
+  return out;
+}
+
+function collectPointers(schema: SchemaNode, pointer: string, out: string[]): void {
+  for (const [key, child] of Object.entries(schema.properties ?? {})) {
+    const next = propertyPointer(pointer, key);
+    out.push(next);
+    collectPointers(child, next, out);
+  }
+  if (schema.items) collectPointers(schema.items, pointer, out);
+  for (const child of schema.anyOf ?? []) collectPointers(child, pointer, out);
+}
+
+function propertyPointer(pointer: string, key: string): string {
+  return `${pointer}/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`;
+}
+
+function presenceOf(shape: Record<string, unknown>): Record<string, number> {
+  return Object.fromEntries(schemaPointers(shape).map((pointer) => [pointer, 1]));
+}
+
+/** Adds one verified answer to the counts, ignoring fields the learned shape does not know. */
+function mergePresence(
+  seen: Record<string, number>,
+  shape: Record<string, unknown>,
+): Record<string, number> {
+  const next = { ...seen };
+  for (const pointer of schemaPointers(shape))
+    if (pointer in next) next[pointer] = (next[pointer] ?? 0) + 1;
+  return next;
 }
 
 function verifyFields(

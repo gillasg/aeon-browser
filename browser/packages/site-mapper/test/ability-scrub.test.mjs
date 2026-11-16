@@ -63,6 +63,37 @@ test("an api request that carried a secret is dropped, and the other way survive
   });
 });
 
+test("a script way with a bearer or api-key literal is dropped, not stored", async () => {
+  await withHome(async (root) => {
+    const saved = await saveAbility(
+      base({
+        ways: [
+          {
+            kind: "script",
+            runtime: "node",
+            code: 'const headers = { authorization: "Bearer ab12cd34ef56" }; void inputs.q; return { ok: true };',
+          },
+          {
+            kind: "script",
+            runtime: "node",
+            code: 'const apiKey = "live-1234567890abcdef"; void inputs.q; return { ok: true };',
+          },
+          page,
+        ],
+      }),
+    );
+    assert.deepEqual(
+      saved.ability.ways.map((way) => way.kind),
+      ["page"],
+      "both credential-bearing scripts are gone",
+    );
+    assert.equal(saved.scrubbed.filter((mark) => mark.dropped && mark.via === "script").length, 2);
+    const file = await readFile(join(root, "sites/example.com/abilities/search.json"), "utf8");
+    assert.ok(!file.includes("Bearer ab12"));
+    assert.ok(!file.includes("live-1234567890"));
+  });
+});
+
 test("an ability whose only request carried a secret is refused by name", async () => {
   await withHome(async () => {
     await assert.rejects(
@@ -99,6 +130,39 @@ test("a password typed into a step becomes a caller input with no example", asyn
     assert.ok(stored.scrubbed.some((mark) => /steps: Password/.test(mark.what)));
     const file = await readFile(join(root, "sites/example.com/abilities/search.json"), "utf8");
     assert.ok(!file.includes("hunter2000"));
+  });
+});
+
+test("a typed secret keeps the other arguments and an upload keeps its type", async () => {
+  await withHome(async (root) => {
+    await saveAbility(
+      base({
+        ways: [
+          {
+            kind: "steps",
+            steps: [
+              { kind: "fill", target: { name: "Password" }, args: ["hunter2000", "keep-me"] },
+              {
+                kind: "upload",
+                target: { name: "Passport" },
+                args: ["/home/user/passport.pdf", "image/png"],
+                sensitive: true,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const stored = await readAbility("example.com", "search");
+    const [fill, upload] = stored.ways[0].steps;
+    assert.deepEqual(fill.args, ["{{inputs.password}}", "keep-me"]);
+    assert.deepEqual(upload.args, ["{{inputs.passport}}", "image/png"]);
+    assert.equal(upload.kind, "upload");
+    assert.equal(stored.inputs.properties.passport.format, "path");
+    assert.equal(stored.inputs.properties.passport["x-upload"], true);
+    const file = await readFile(join(root, "sites/example.com/abilities/search.json"), "utf8");
+    assert.ok(!file.includes("hunter2000"));
+    assert.ok(!file.includes("/home/user/passport.pdf"));
   });
 });
 

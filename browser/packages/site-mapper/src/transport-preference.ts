@@ -3,7 +3,7 @@
 // transport error or an offline browser leaves it where it was.
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { siteDir, siteName, writeAtomic } from "./registry.js";
 
@@ -64,19 +64,60 @@ export function recordTransportPreference(
   operationId: string,
   transport: TransportName,
 ): Promise<void> {
-  return serialised(site, async () => {
-    if (!mapped(site)) return;
-    const notes = await readTransportPreferences(site);
-    notes[operationId] = { transport, at: new Date().toISOString() };
-    await mkdir(siteDir(siteName(site)), { recursive: true });
-    await writeAtomic(pathOf(site), JSON.stringify(notes, null, 2) + "\n");
-  });
+  return serialised(site, () =>
+    withLock(site, async () => {
+      if (!mapped(site)) return;
+      // Read-modify-write under a lock, so the daemon and a CLI keep each other's notes.
+      const notes = await readTransportPreferences(site);
+      if (notes[operationId]?.transport === transport) return;
+      notes[operationId] = { transport, at: new Date().toISOString() };
+      await mkdir(siteDir(siteName(site)), { recursive: true });
+      await writeAtomic(pathOf(site), JSON.stringify(notes, null, 2) + "\n");
+    }),
+  );
 }
 
 export function clearTransportPreferences(site: string): Promise<void> {
-  return serialised(site, async () => {
-    await writeAtomic(pathOf(site), JSON.stringify({}, null, 2) + "\n");
-  });
+  return serialised(site, () =>
+    withLock(site, async () => {
+      await writeAtomic(pathOf(site), JSON.stringify({}, null, 2) + "\n");
+    }),
+  );
+}
+
+const LOCK = ".transport.lock";
+const LOCK_WAIT_MS = 2000;
+
+/** A short cross-process lock beside the file; a stale one is dropped rather than waited on. */
+async function withLock<T>(site: string, work: () => Promise<T>): Promise<T> {
+  const lock = join(siteDir(siteName(site)), LOCK);
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  while (!(await takeLock(lock))) {
+    if (Date.now() > deadline) {
+      await rm(lock, { recursive: true, force: true }).catch(() => undefined);
+      if (!(await takeLock(lock))) return work();
+      break;
+    }
+    await delay(10);
+  }
+  try {
+    return await work();
+  } finally {
+    await rm(lock, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function takeLock(lock: string): Promise<boolean> {
+  try {
+    await mkdir(lock);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "EEXIST";
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function serialised<T>(key: string, work: () => Promise<T>): Promise<T> {

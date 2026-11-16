@@ -117,6 +117,42 @@ test("a direct answer that changed shape is retried in the page and remembered",
   });
 });
 
+test("a drifted direct answer survives a page retry that is signed out or failing", async (t) => {
+  for (const status of [401, 500]) {
+    await withSite(t, async (_root, model) => {
+      const direct = transport("direct", () => reply({ surprise: true }));
+      const page = transport("page", () => reply({ error: "no" }, status));
+      const api = await siteMapper(model.site, {
+        model,
+        transports: { direct, page },
+        retries: 0,
+        session: false,
+      });
+      const answer = await api.list();
+      assert.equal(answer.surprise, true, `the direct 2xx is kept over a ${status}`);
+      assert.match(answer.notes.join(" "), /kept, unverified/);
+      assert.match(answer.notes.join(" "), /did not match the recorded shape/);
+    });
+  }
+});
+
+test("a successful read that keeps the learned transport does not rewrite the file", async (t) => {
+  await withSite(t, async (root, model) => {
+    await recordTransportPreference(model.site, "list", "direct");
+    const file = join(root, "sites", model.site, "transport.json");
+    const before = await readFile(file, "utf8");
+    const direct = transport("direct", () => reply({ ok: true, items: [] }));
+    const page = transport("page", () => assert.fail("the page was not needed"));
+    const api = await siteMapper(model.site, {
+      model,
+      transports: { direct, page },
+      session: false,
+    });
+    await api.list();
+    assert.equal(await readFile(file, "utf8"), before, "the stored note is already right");
+  });
+});
+
 test("a transport error moves no preference", async (t) => {
   await withSite(t, async (_root, model) => {
     const direct = transport("direct", () => {

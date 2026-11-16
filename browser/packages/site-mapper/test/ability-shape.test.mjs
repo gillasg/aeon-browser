@@ -100,7 +100,7 @@ test("a recorded list must be there; an empty list is a result", async () => {
   });
 });
 
-test("the first verified answer records a shape, and a later one that breaks it is unverified", async () => {
+test("a shape needs two verified answers before a missing field is drift", async () => {
   await withHome(async () => {
     await saveAbility(base({ ways: [{ kind: "api", operation: "feed" }, fallback] }));
     let answer = { id: "a", price: 10 };
@@ -111,20 +111,58 @@ test("the first verified answer records a shape, and a later one that breaks it 
     const learned = await readAbility("example.com", "feed");
     const api = learned.stats.ways[wayId(learned.ways[0])];
     assert.ok(api.shape, "the shape was recorded");
-    assert.deepEqual(api.shape.required.sort(), ["id", "price"]);
+    assert.equal(api.shape.required, undefined, "one answer cannot make a field required");
+    assert.equal(api.shapeSamples, 1);
+
+    answer = { id: "b", price: 12 };
+    const second = await runAbility("example.com", "feed", {}, { host });
+    assert.equal(second.via, "api");
+    const twice = await readAbility("example.com", "feed");
+    assert.deepEqual(
+      twice.stats.ways[wayId(twice.ways[0])].shape.required.sort(),
+      ["id", "price"],
+      "fields present twice become required",
+    );
 
     answer = { price: 99, extra: true };
-    const second = await runAbility("example.com", "feed", {}, { host });
-    assert.equal(second.via, "page");
-    assert.equal(second.unverified[0].via, "api");
+    const third = await runAbility("example.com", "feed", {}, { host });
+    assert.equal(third.via, "page");
+    assert.equal(third.unverified[0].via, "api");
 
     // A value change is not drift: asking the api way again accepts the same shape.
-    answer = { id: "b", price: 12 };
-    const third = await runAbility("example.com", "feed", {}, { via: "api", host });
-    assert.equal(third.via, "api");
+    answer = { id: "c", price: 13 };
+    const fourth = await runAbility("example.com", "feed", {}, { via: "api", host });
+    assert.equal(fourth.via, "api");
     const after = await readAbility("example.com", "feed");
     const again = after.stats.ways[wayId(after.ways[0])];
     assert.equal(again.unverified, undefined, "a matching answer clears the mark");
+  });
+});
+
+test("a field that comes and goes is learned as optional, so a normal answer is not drift", async () => {
+  await withHome(async () => {
+    await saveAbility(base({ ways: [{ kind: "api", operation: "feed" }, fallback] }));
+    let answer = { items: [{ id: "a" }], next: "page-2" };
+    const host = { call: async () => answer, collect };
+
+    await runAbility("example.com", "feed", {}, { host });
+    answer = { items: [{ id: "b" }] };
+    const lastPage = await runAbility("example.com", "feed", {}, { host });
+    assert.equal(lastPage.via, "api", "the last page without next is still the api way");
+    assert.equal(lastPage.unverified, undefined);
+    const learned = await readAbility("example.com", "feed");
+    const api = learned.stats.ways[wayId(learned.ways[0])];
+    assert.deepEqual(api.shape.required, ["items"]);
+    assert.equal(api.shapeSamples, 2);
+
+    answer = { items: [{ id: "c" }], next: "page-3" };
+    const again = await runAbility("example.com", "feed", {}, { via: "api", host });
+    assert.equal(again.unverified, undefined);
+
+    answer = { next: "page-4" };
+    const broken = await runAbility("example.com", "feed", {}, { host });
+    assert.equal(broken.via, "page", "a missing required list is still drift");
+    assert.match(broken.unverified[0].reason, /the recorded list at \/items is missing/);
   });
 });
 
