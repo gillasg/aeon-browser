@@ -106,6 +106,7 @@ export function sendQueuedAfterStop(
 export async function submitToPi(
   session: AgentSession,
   candidate: Parameters<PiSessionHandle["submit"]>[0],
+  chatId?: string,
 ): Promise<void> {
   const input = typeof candidate === "string" ? { text: candidate } : candidate;
   const decoded = decodePiInput(input);
@@ -121,7 +122,7 @@ export async function submitToPi(
   }
   const context = await hiddenTurn(prompt, browserContexts, decoded.routeDraft);
   await sendHiddenTurn(session, context, browserContexts);
-  if (input.budget) watchBudget(session, input.budget);
+  if (input.budget) watchBudget(session, input.budget, chatId);
   await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
 }
 

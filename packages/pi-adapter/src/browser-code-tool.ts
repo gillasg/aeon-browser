@@ -26,6 +26,7 @@ import { tallyCell, writeRunLog } from "./run-log.js";
 import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
 import { formatCell } from "./cell-grammar.js";
 export { formatStepLine } from "./cell-grammar.js";
+import { cellTimeoutMs } from "./run-budget.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
@@ -47,6 +48,37 @@ export interface BrowserCodeOptions {
 }
 
 export type BrowserNameProvider = (chatId: string) => Promise<string | undefined>;
+
+function openCell(
+  run: BrowserToolRunner | undefined,
+  chatId: string,
+  envelope: () => object,
+):
+  | { ok: true; timeoutMs: number; run: BrowserToolRunner }
+  | { ok: false; result: ReturnType<typeof offlineCell> } {
+  if (!run) return { ok: false, result: offlineCell(envelope) };
+  const timeoutMs = cellTimeoutMs(chatId, CELL_TIMEOUT_MS);
+  if (timeoutMs <= 0) return { ok: false, result: spentBudget(envelope) };
+  return { ok: true, timeoutMs, run };
+}
+
+function spentBudget(envelope: () => object): {
+  content: ReturnType<typeof browserContent>;
+  isError: true;
+  details: undefined;
+} {
+  return {
+    content: browserContent(
+      JSON.stringify({
+        ...envelope(),
+        error:
+          "Not run: the time budget is spent. Answer with what you have; do not start another browser cell.",
+      }),
+    ),
+    isError: true,
+    details: undefined,
+  };
+}
 
 function offlineCell(envelope: () => object): {
   content: ReturnType<typeof browserContent>;
@@ -109,40 +141,43 @@ export function createBrowserCodeTool(
           content: browserContent(JSON.stringify(envelope())),
           details: liveDetails(progress, steps),
         });
-      if (!run) return offlineCell(envelope);
+      const opened = openCell(run, chatId, envelope);
+      if (!opened.ok) return opened.result;
+      const timeoutMs = opened.timeoutMs;
       // A steer while the cell hands off to the user ends the cell, so the model reads it now.
       const wait = openUserWait(chatId, signal, () => steps.some(handingOff));
-      const output = await run(
-        chatId,
-        toolCallId,
-        {
-          codeCell: {
-            code,
-            timeoutMs: CELL_TIMEOUT_MS,
-            onCall: cellCall({
-              chatId,
-              source: options?.source ?? "chat",
-              ...(options?.siteRules ? { siteRules: options.siteRules } : {}),
-              ...(options?.model ? { model: options.model } : {}),
-              ...(options?.browserName ? { browserName: options.browserName } : {}),
-              skills,
-              workspace,
-              writes,
-              files,
-              steps: () => steps,
-              report: (next) => {
-                progress = next;
+      const output = await opened
+        .run(
+          chatId,
+          toolCallId,
+          {
+            codeCell: {
+              code,
+              timeoutMs,
+              onCall: cellCall({
+                chatId,
+                source: options?.source ?? "chat",
+                ...(options?.siteRules ? { siteRules: options.siteRules } : {}),
+                ...(options?.model ? { model: options.model } : {}),
+                ...(options?.browserName ? { browserName: options.browserName } : {}),
+                skills,
+                workspace,
+                writes,
+                files,
+                steps: () => steps,
+                report: (next) => {
+                  progress = next;
+                  update();
+                },
+              }),
+              onProgress: (next) => {
+                steps = next.map(compactStep);
                 update();
               },
-            }),
-            onProgress: (next) => {
-              steps = next.map(compactStep);
-              update();
             },
           },
-        },
-        wait.signal,
-      )
+          wait.signal,
+        )
         // A steer cancels the cell, which rejects: that is the steer's answer, not a failure.
         .catch((error: unknown) => {
           if (wait.steered()) return undefined;
