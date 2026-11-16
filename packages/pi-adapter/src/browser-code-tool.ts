@@ -14,7 +14,7 @@ import { compactBrowserTrace } from "./browser-recovery.js";
 import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { browserContent, type BrowserToolRunner } from "./browser-tool.js";
+import { browserContent, modelImageBlocks, type BrowserToolRunner } from "./browser-tool.js";
 import { createSiteScriptTool } from "./site-script-tool.js";
 import { createBrowserContextTool } from "./browser-context-tool.js";
 import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
@@ -268,7 +268,7 @@ async function browserCodeResult(options: {
   const details = resultDetails(actions, writes);
   const delivered = !failed && isDelivery(cell.value);
   return {
-    content: modelContent(body, options.startedAt),
+    content: await modelContent(body, options.startedAt),
     isError: failed,
     details: Object.keys(details).length ? details : undefined,
     // finish_from_js handed the answer over: the run ends after this call.
@@ -372,7 +372,7 @@ function isWorkspaceWrite(request: { workspace: string }): boolean {
 
 // The model rereads this on every later call, so it gets one line per step plus the cell's own
 // output instead of the raw envelope with its repeated tab identities. Screenshots stay images.
-function modelContent(
+async function modelContent(
   body: {
     steps: Record<string, unknown>[];
     output: string;
@@ -384,24 +384,30 @@ function modelContent(
     tabStats?: CellOutput["tabStats"];
   },
   startedAt: number,
-): ReturnType<typeof browserContent> {
-  const images = browserContent(JSON.stringify({ steps: body.steps })).slice(1);
+): Promise<ReturnType<typeof browserContent>> {
+  const fitted = await modelImageBlocks(
+    browserContent(JSON.stringify({ steps: body.steps })).filter((block) => block.type === "image"),
+  );
+  const note = fitted
+    .filter((block): block is { type: "text"; text: string } => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+  const text = formatCell({
+    steps: body.steps,
+    output: body.output,
+    startedAt,
+    ...(body.value !== undefined ? { value: body.value } : {}),
+    ...(body.error !== undefined ? { error: body.error } : {}),
+    ...(body.reset !== undefined ? { reset: body.reset } : {}),
+    ...(body.runLog !== undefined ? { runLog: body.runLog } : {}),
+    ...(body.hint !== undefined ? { hint: body.hint } : {}),
+    ...(body.tabStats ? { tabStats: body.tabStats } : {}),
+  });
   return [
-    {
-      type: "text",
-      text: formatCell({
-        steps: body.steps,
-        output: body.output,
-        startedAt,
-        ...(body.value !== undefined ? { value: body.value } : {}),
-        ...(body.error !== undefined ? { error: body.error } : {}),
-        ...(body.reset !== undefined ? { reset: body.reset } : {}),
-        ...(body.runLog !== undefined ? { runLog: body.runLog } : {}),
-        ...(body.hint !== undefined ? { hint: body.hint } : {}),
-        ...(body.tabStats ? { tabStats: body.tabStats } : {}),
-      }),
-    },
-    ...images,
+    { type: "text", text: note ? `${text}\n${note}` : text },
+    ...fitted.filter(
+      (block): block is { type: "image"; data: string; mimeType: string } => block.type === "image",
+    ),
   ];
 }
 

@@ -1,3 +1,5 @@
+import { fitModelImages, type ModelImage } from "./model-image.js";
+
 export type BrowserCodeCell = {
   code: string;
   timeoutMs: number;
@@ -17,6 +19,20 @@ export type BrowserToolRunner = (
   input: BrowserInput,
   signal?: AbortSignal,
 ) => Promise<string>;
+
+type ContentBlock = { type: "text"; text: string } | ModelImage;
+
+/** Image blocks from a tool result, capped before they are handed to the model. */
+export async function modelImageBlocks(blocks: readonly ContentBlock[]): Promise<ContentBlock[]> {
+  const text = blocks.filter(
+    (block): block is { type: "text"; text: string } => block.type === "text",
+  );
+  const images = blocks.filter((block): block is ModelImage => block.type === "image");
+  if (!images.length) return [...text];
+  const fitted = await fitModelImages(images);
+  const notes = fitted.notes.map((line) => ({ type: "text" as const, text: line }));
+  return [...text, ...notes, ...fitted.images];
+}
 
 export function browserContent(
   output: string,
