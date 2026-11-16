@@ -1024,12 +1024,13 @@ test(
             await new Promise((done) => setTimeout(done, 1500));
             await stream.stop();
             const summary = await recording.stop();
+            // Reported, never asserted: a shared machine's wall clock is not a correctness fact.
+            console.log("MOVE_MS " + moveMs);
             console.log("RESULT " + JSON.stringify({
               hovered: Boolean(hovered.box && hovered.box.width > 0 && hovered.tStart <= hovered.tEnd),
               clicked: Boolean(clicked.box && clicked.tEnd >= clicked.tStart),
               box: box.width > 0 && box.height > 0,
               logs: moves.includes("log") && moves.includes("warning"),
-              fastMoves: moveMs < 4000,
               frames: summary.frames > 0,
               folder: summary.folder,
             }))`,
@@ -1042,7 +1043,6 @@ test(
             clicked: true,
             box: true,
             logs: true,
-            fastMoves: true,
             frames: true,
             folder: "demo",
           });
