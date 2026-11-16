@@ -5,7 +5,11 @@ import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { SupervisorLog, SupervisorStatus } from "../node/supervisor-files.mjs";
+import {
+  startupFailureMessage,
+  SupervisorLog,
+  SupervisorStatus,
+} from "../node/supervisor-files.mjs";
 
 test(
   "a log written outside the installer is 0600 in a 0700 folder",
@@ -27,6 +31,18 @@ test(
       const statusPath = join(app, "daemon-supervisor-status.json");
       new SupervisorStatus(statusPath).setReady(42);
       assert.equal(statSync(statusPath).mode & 0o777, 0o600);
+      const failed = new SupervisorStatus(statusPath);
+      failed.setRestarting("startup-failed", "Refusing /tmp/aeon: it is owned by uid 65534.");
+      assert.equal(failed.read().error, "Refusing /tmp/aeon: it is owned by uid 65534.");
+      assert.equal(failed.read().state, "restarting");
+      assert.equal(
+        startupFailureMessage("AEON_DAEMON_FAILED Refusing /tmp/aeon: it is owned by uid 65534."),
+        "Refusing /tmp/aeon: it is owned by uid 65534.",
+      );
+      assert.equal(startupFailureMessage("AEON_DAEMON_PHASE lock"), undefined);
+      failed.setReady(7);
+      assert.equal(failed.read().error, undefined);
+      assert.equal(failed.read().state, "ready");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

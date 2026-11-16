@@ -2,17 +2,22 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
+import {
+  agentTargets,
+  jsonServerValue,
+  opencodeValue,
+  tomlBlock,
+  yamlBlock,
+  type AgentTarget,
+  type McpServer,
+} from "./agent-table.js";
+import { spliceJson, spliceToml, spliceYaml } from "./config-text.js";
 
-// Adds an MCP server to the coding agents installed on this machine, so setup is one command.
-// Only agents that are already set up are touched (their config file or command exists); an
-// entry that is already there is replaced, everything else in the file is kept. Safe to rerun.
+export type { McpServer } from "./agent-table.js";
 
-export interface McpServer {
-  name: string;
-  command: string;
-  args: string[];
-}
+// Adds an MCP server to the coding agents already set up on this machine. An entry that is
+// already there is replaced. Comments and every other key stay. Safe to rerun.
 
 export interface AgentResult {
   agent: string;
@@ -20,27 +25,126 @@ export interface AgentResult {
   detail: string;
 }
 
-export async function connectAgents(server: McpServer): Promise<AgentResult[]> {
-  const home = homedir();
-  const appData = process.env.APPDATA ?? join(home, "AppData", "Roaming");
-  const results = [
-    claudeCode(server),
-    await jsonServers("Cursor", join(home, ".cursor", "mcp.json"), server),
-    await jsonServers("Gemini CLI", join(home, ".gemini", "settings.json"), server),
-    await jsonServers(
-      "Claude Desktop",
-      process.platform === "win32"
-        ? join(appData, "Claude", "claude_desktop_config.json")
-        : join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
-      server,
-    ),
-    await opencode(join(home, ".config", "opencode", "opencode.json"), server),
-    await codex(join(home, ".codex", "config.toml"), server),
-  ];
-  return results.filter((result): result is AgentResult => result !== undefined);
+export interface ConnectOptions {
+  /** Throwaway or real home. Defaults to the current user. */
+  home?: string;
+  /** Flag ids (`opencode`, `cursor`). Absent means every agent whose config directory exists. */
+  agents?: string[];
+  /** Remove only this server's row. */
+  uninstall?: boolean;
+  /** Ask on a terminal. A pipe never waits: it reports the ids instead. */
+  pick?: boolean;
+  input?: NodeJS.ReadableStream;
+  output?: NodeJS.WritableStream;
 }
 
-function claudeCode(server: McpServer): AgentResult | undefined {
+export async function connectAgents(
+  server: McpServer,
+  options: ConnectOptions = {},
+): Promise<AgentResult[]> {
+  const home = options.home ?? homedir();
+  const explicit = options.home !== undefined;
+  const selected = await selectTargets(agentTargets(home, explicit), options);
+  if (!Array.isArray(selected)) return [selected];
+  const results: AgentResult[] = [];
+  if (wantClaude(options)) {
+    const claude = claudeCode(server, options.uninstall === true);
+    if (claude) results.push(claude);
+  }
+  for (const target of selected)
+    results.push(await editTarget(target, server, options.uninstall === true));
+  return results;
+}
+
+async function selectTargets(
+  targets: AgentTarget[],
+  options: ConnectOptions,
+): Promise<AgentTarget[] | AgentResult> {
+  const wanted = wantedIds(options.agents);
+  if (wanted) return targets.filter((target) => wanted.has(target.id));
+  if (!options.pick) return targets;
+  const input = options.input ?? process.stdin;
+  const output = options.output ?? process.stdout;
+  const ids = targets.map((target) => target.id).join(", ");
+  if (!isTerminal(input)) {
+    return {
+      agent: "picker",
+      done: false,
+      detail: `Pass --agent <id>. Config directories found: ${ids || "none"}`,
+    };
+  }
+  output.write(
+    `Agents with a config directory (${ids || "none"}).\nType ids separated by commas, or * for all:\n> `,
+  );
+  const answer = (await readLine(input)).trim();
+  if (answer === "*") return targets;
+  const chosen = new Set(answer.split(",").map((item) => item.trim()));
+  return targets.filter((target) => chosen.has(target.id));
+}
+
+function wantedIds(agents: string[] | undefined): Set<string> | undefined {
+  if (!agents?.length) return undefined;
+  const ids = agents
+    .flatMap((item) => item.split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return new Set(ids);
+}
+
+function wantClaude(options: ConnectOptions): boolean {
+  const wanted = wantedIds(options.agents);
+  if (wanted) return wanted.has("claude");
+  return options.pick !== true;
+}
+
+async function editTarget(
+  target: AgentTarget,
+  server: McpServer,
+  uninstall: boolean,
+): Promise<AgentResult> {
+  try {
+    await editFile(target.file, (text) => edited(text, target, server, uninstall));
+    const verb = uninstall ? "removed from" : "updated";
+    return { agent: target.name, done: true, detail: `${verb} ${target.file}` };
+  } catch (error) {
+    return {
+      agent: target.name,
+      done: false,
+      detail:
+        error instanceof Error ? error.message : `could not read ${target.file}; left as it was`,
+    };
+  }
+}
+
+function edited(text: string, target: AgentTarget, server: McpServer, uninstall: boolean): string {
+  if (target.kind === "toml")
+    return spliceToml(
+      text,
+      target.container,
+      server.name,
+      uninstall ? undefined : tomlBlock(server),
+    );
+  if (target.kind === "yaml") {
+    const child = `  ${server.name}:`;
+    return spliceYaml(text, target.container, uninstall ? undefined : yamlBlock(server), child);
+  }
+  const value = uninstall
+    ? undefined
+    : target.id === "opencode"
+      ? opencodeValue(server)
+      : jsonServerValue(server);
+  return spliceJson(text, target.container, server.name, value);
+}
+
+async function editFile(path: string, edit: (text: string) => string): Promise<void> {
+  const text = existsSync(path) ? await readFile(path, "utf8") : "";
+  if (text.includes("\0")) throw new Error(`could not read ${path} as text; left as it was`);
+  const next = edit(text);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, next.endsWith("\n") || next === "" ? next : `${next}\n`);
+}
+
+function claudeCode(server: McpServer, uninstall: boolean): AgentResult | undefined {
   const claude = process.platform === "win32" ? "claude.cmd" : "claude";
   try {
     execFileSync(claude, ["--version"], {
@@ -61,82 +165,35 @@ function claudeCode(server: McpServer): AgentResult | undefined {
     try {
       run(["mcp", "remove", "--scope", "user", server.name]);
     } catch {
-      // Not added yet.
+      // Not added yet, or already gone.
     }
+    if (uninstall)
+      return { agent: "Claude Code", done: true, detail: "claude mcp remove --scope user" };
     run(["mcp", "add", "--scope", "user", server.name, "--", server.command, ...server.args]);
     return { agent: "Claude Code", done: true, detail: "claude mcp add --scope user" };
   } catch (error) {
     return {
       agent: "Claude Code",
       done: false,
-      detail: String(error instanceof Error ? error.message : error),
+      detail: error instanceof Error ? error.message : String(error),
     };
   }
 }
 
-async function readJson(path: string): Promise<Record<string, unknown> | undefined> {
-  if (!existsSync(path)) return undefined;
-  try {
-    return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
+function isTerminal(input: NodeJS.ReadableStream): boolean {
+  return "isTTY" in input && (input as { isTTY?: boolean }).isTTY === true;
 }
 
-/** The common shape: {"mcpServers": {name: {command, args}}}. */
-async function jsonServers(
-  agent: string,
-  path: string,
-  server: McpServer,
-): Promise<AgentResult | undefined> {
-  if (!existsSync(dirname(path))) return undefined;
-  const config = (await readJson(path)) ?? (existsSync(path) ? undefined : {});
-  if (!config) return { agent, done: false, detail: `could not read ${path}; left as it was` };
-  const servers = (config.mcpServers ?? {}) as Record<string, unknown>;
-  servers[server.name] = { command: server.command, args: server.args };
-  config.mcpServers = servers;
-  await writeFile(path, JSON.stringify(config, null, 2) + "\n");
-  return { agent, done: true, detail: path };
-}
-
-async function opencode(path: string, server: McpServer): Promise<AgentResult | undefined> {
-  if (!existsSync(dirname(path))) return undefined;
-  const config =
-    (await readJson(path)) ??
-    (existsSync(path) ? undefined : { $schema: "https://opencode.ai/config.json" });
-  if (!config)
-    return { agent: "opencode", done: false, detail: `could not read ${path}; left as it was` };
-  const servers = (config.mcp ?? {}) as Record<string, unknown>;
-  servers[server.name] = {
-    type: "local",
-    command: [server.command, ...server.args],
-    enabled: true,
-  };
-  config.mcp = servers;
-  await writeFile(path, JSON.stringify(config, null, 2) + "\n");
-  return { agent: "opencode", done: true, detail: path };
-}
-
-/** Codex keeps TOML: our table is replaced as a whole block, the rest of the file untouched. */
-async function codex(path: string, server: McpServer): Promise<AgentResult | undefined> {
-  if (!existsSync(dirname(path))) return undefined;
-  const text = existsSync(path) ? await readFile(path, "utf8") : "";
-  const header = `[mcp_servers.${server.name}]`;
-  const block = [
-    header,
-    `command = ${JSON.stringify(server.command)}`,
-    `args = ${JSON.stringify(server.args)}`,
-    "",
-  ].join("\n");
-  const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === header);
-  let next = text;
-  if (start >= 0) {
-    let end = start + 1;
-    while (end < lines.length && !/^\s*\[/.test(lines[end] ?? "")) end += 1;
-    next = [...lines.slice(0, start), ...block.split("\n"), ...lines.slice(end)].join("\n");
-  } else next = (text && !text.endsWith("\n") ? text + "\n" : text) + "\n" + block;
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, next);
-  return { agent: "Codex", done: true, detail: path };
+function readLine(input: NodeJS.ReadableStream): Promise<string> {
+  return new Promise((resolve) => {
+    let data = "";
+    const onData = (chunk: Buffer | string): void => {
+      data += String(chunk);
+      if (!data.includes("\n")) return;
+      input.off?.("data", onData);
+      resolve(data.split("\n")[0] ?? "");
+    };
+    input.on("data", onData);
+    input.resume?.();
+  });
 }

@@ -86,7 +86,7 @@ async function tabs(args: Args): Promise<number> {
 }
 
 async function status(args: Args): Promise<number> {
-  const bridge = await BridgeClient.connect();
+  const bridge = await BridgeClient.connect({ launch: false });
   try {
     const reply = await bridge.request("status");
     if (has(args, "json")) out(JSON.stringify(reply));
@@ -130,7 +130,16 @@ async function register(args: Args): Promise<number> {
   out("Native host registered for Chrome, Edge, Chromium, Brave, Vivaldi, Opera, Arc and Helium.");
   const folder = await extensionFolder(out);
   if (!has(args, "no-agents")) {
-    const results = await connectAgents({ name: "browserkit", ...mcpCommand() });
+    const agent = flag(args, "agent");
+    const agents = typeof agent === "string" ? agent.split(",") : undefined;
+    const results = await connectAgents(
+      { name: "browserkit", ...mcpCommand() },
+      {
+        ...(agents ? { agents } : {}),
+        pick: has(args, "pick"),
+        uninstall: has(args, "uninstall-agents"),
+      },
+    );
     for (const result of results)
       out(`${result.done ? "Connected" : "Could not connect"} ${result.agent} (${result.detail})`);
     if (!results.length) out(nextSteps());
@@ -189,11 +198,12 @@ export const browserGroup: Command[] = [
 
 Registers the native messaging host for Chromium browsers (Chrome, Edge, Brave, Arc and others),
 finds the extension (the built folder, or the latest release downloaded), adds the browserkit
-MCP server to the coding agents on this machine (Claude Code, Codex, opencode, Cursor, Gemini
-CLI, Claude Desktop), links the browserkit skill into ~/.agents/skills, then opens
-chrome://extensions with the extension folder on the clipboard and waits until it connects.
---no-register only writes the host files; --no-agents leaves agent configs alone; --no-wait
-returns without waiting.`,
+MCP server to coding agents that already have a config directory, and keeps comments in JSONC,
+TOML and YAML. --agent cursor,codex limits the list; --pick asks on a terminal and never waits
+on a pipe; --uninstall-agents removes only the browserkit row. It links the browserkit skill into
+~/.agents/skills, then opens chrome://extensions with the extension folder on the clipboard and
+waits until it connects. --no-register only writes the host files; --no-agents leaves agent
+configs alone; --no-wait returns without waiting.`,
     run: register,
   },
   {

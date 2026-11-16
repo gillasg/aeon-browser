@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
+import { localRefusal } from "./local-client.js";
 
 // A local DevTools Protocol endpoint over every tab. A client can read, drive and close any tab,
 // including the user's and another session's. Only browser-level Target.* bookkeeping is answered
@@ -72,9 +74,7 @@ export class CdpServer {
     private readonly token: string,
     private readonly adapter: CdpAdapter,
   ) {
-    this.server.on("upgrade", (request, socket, head) =>
-      this.upgrade(request, socket as never, head),
-    );
+    this.server.on("upgrade", (request, socket, head) => this.upgrade(request, socket, head));
   }
 
   async start(port: number): Promise<number> {
@@ -147,7 +147,9 @@ export class CdpServer {
 
   private async http(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? "/", `http://127.0.0.1:${this.port}`);
-    if (!this.authorised(url, request)) return fail(response, 401, "A token is required");
+    const refusal = localRefusal(request.headers);
+    if (refusal) return fail(response, 403, refusal);
+    if (!this.tokenOk(url, request)) return fail(response, 401, "A token is required");
     if (url.pathname === "/json/version" || url.pathname === "/json/version/") {
       return json(response, {
         Browser: "Chrome/browserkit",
@@ -183,19 +185,21 @@ export class CdpServer {
     fail(response, 404, "Not found");
   }
 
-  private authorised(url: URL, request: IncomingMessage): boolean {
+  private tokenOk(url: URL, request: IncomingMessage): boolean {
     if (url.searchParams.get("token") === this.token) return true;
-    const header = String(request.headers.authorization ?? "");
-    return header === `Bearer ${this.token}`;
+    const header = request.headers.authorization;
+    return typeof header === "string" && header === `Bearer ${this.token}`;
   }
 
-  private upgrade(request: IncomingMessage, socket: never, head: Buffer): void {
+  private upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
     const url = new URL(request.url ?? "/", `http://127.0.0.1:${this.port}`);
-    if (!url.pathname.startsWith("/devtools/browser/") || !this.authorised(url, request)) {
-      (socket as unknown as { destroy(): void }).destroy();
+    const refusal = localRefusal(request.headers);
+    const allowed = url.pathname.startsWith("/devtools/browser/") && this.tokenOk(url, request);
+    if (refusal || !allowed) {
+      refuseSocket(socket, refusal ? 403 : 401, refusal ?? "A token is required");
       return;
     }
-    this.sockets.handleUpgrade(request, socket as never, head, (ws) => this.accept(ws));
+    this.sockets.handleUpgrade(request, socket, head, (ws) => this.accept(ws));
   }
 
   private accept(socket: WebSocket): void {
@@ -506,4 +510,13 @@ function json(response: ServerResponse, body: unknown): void {
 function fail(response: ServerResponse, status: number, message: string): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify({ error: message }));
+}
+
+function refuseSocket(socket: Duplex, status: number, message: string): void {
+  const reason = status === 403 ? "Forbidden" : "Unauthorized";
+  const body = JSON.stringify({ error: message });
+  socket.write(
+    `HTTP/1.1 ${status} ${reason}\r\ncontent-type: application/json; charset=utf-8\r\ncontent-length: ${Buffer.byteLength(body)}\r\nconnection: close\r\n\r\n${body}`,
+  );
+  socket.destroy();
 }

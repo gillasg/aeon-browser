@@ -7,6 +7,8 @@ export const agentTabViewKey = "aeonAgentTabView";
 // (Aperture) rely on them (the agent's work in the visible tab, no second cursor); keep them.
 export const agentInFrontKey = "aeonAgentInFront";
 export const hideAgentCursorKey = "aeonHideAgentCursor";
+/** Curved pointer and real keystrokes. Off by default; speed wins until the user turns it on. */
+export const humanLikeInputKey = "aeonHumanLikeInput";
 export function useAgentFlag(key: string): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(false);
   useEffect(() => {

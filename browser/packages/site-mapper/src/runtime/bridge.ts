@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { ensurePrivateDir } from "@aeon/location";
 
 // The connection to the user's browser: browserkit's local bridge. Each call
 // runs a small piece of browser code in a named session; tabs and variables persist per session.
@@ -67,11 +68,14 @@ export class BridgeClient implements Bridge {
   }
 
   static async connect(): Promise<BridgeClient> {
+    const home = bridgeDataDirectory();
+    await ensurePrivateDir(home, {
+      create: false,
+      fix: "Set BROWSERKIT_HOME to a directory you own with mode 700.",
+    });
     let state: { port: number; token: string };
     try {
-      state = JSON.parse(
-        await readFile(join(bridgeDataDirectory(), "bridge.json"), "utf8"),
-      ) as typeof state;
+      state = JSON.parse(await readFile(join(home, "bridge.json"), "utf8")) as typeof state;
     } catch {
       throw new BrowserNotConnected("The browser bridge has never run on this machine.");
     }

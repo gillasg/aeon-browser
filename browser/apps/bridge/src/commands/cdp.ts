@@ -6,7 +6,7 @@ import type { Command } from "../usage.js";
 // A local DevTools Protocol endpoint for Playwright/Puppeteer. It is opt-in: this command starts
 // the endpoint inside the bridge, prints how to connect, and can report or stop it.
 async function cdp(args: Args): Promise<number> {
-  const bridge = await BridgeClient.connect();
+  const bridge = await BridgeClient.connect(has(args, "status") ? { launch: false } : undefined);
   try {
     const reply = has(args, "status")
       ? await bridge.request("cdp.status")

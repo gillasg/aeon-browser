@@ -13,6 +13,14 @@ import { dirname } from "node:path";
 
 const MAX_LOG_BYTES = 262144;
 const MESSAGE_LIMIT = 2000;
+const FAILURE_PREFIX = "AEON_DAEMON_FAILED ";
+
+/** The daemon's own start failure. Any other supervisor line is not a cause. */
+export function startupFailureMessage(line) {
+  if (typeof line !== "string" || !line.startsWith(FAILURE_PREFIX)) return undefined;
+  const message = line.slice(FAILURE_PREFIX.length).trim();
+  return message || undefined;
+}
 
 /** Append-only supervisor log, best effort and never fatal, rotated at 256 KiB. */
 export class SupervisorLog {
@@ -52,12 +60,14 @@ export class SupervisorStatus {
     this.phase = "spawn";
     this.daemonPid = 0;
     this.restarts = 0;
+    this.error = "";
   }
 
   setPhase(phase) {
     this.state = "starting";
     this.phase = phase;
     this.daemonPid = 0;
+    this.error = "";
     this.write();
   }
 
@@ -65,14 +75,16 @@ export class SupervisorStatus {
     this.state = "ready";
     this.phase = "";
     this.daemonPid = pid;
+    this.error = "";
     this.write();
   }
 
-  setRestarting(reason) {
+  setRestarting(reason, message) {
     this.state = "restarting";
     this.phase = reason;
     this.daemonPid = 0;
     this.restarts += 1;
+    this.error = String(message ?? "").slice(0, MESSAGE_LIMIT);
     this.write();
   }
 
@@ -104,6 +116,7 @@ export class SupervisorStatus {
         startedAt: this.startedAt,
         updatedAt: new Date().toISOString(),
         restarts: this.restarts,
+        ...(this.error ? { error: this.error } : {}),
       };
       const temporary = this.path + ".tmp";
       writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 });

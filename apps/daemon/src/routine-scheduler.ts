@@ -13,6 +13,7 @@ import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
 import { createAeonHostHandler, siteMapperRequest } from "@aeon/pi-adapter";
 import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
+import { countBusyRoutines } from "./daemon-activity.js";
 
 const TICK_MS = 10_000;
 const MAX_RUNS_PER_TICK = 32;
@@ -63,6 +64,11 @@ export class RoutineScheduler {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     void this.tick();
+  }
+
+  /** Runs that have left the queue. A due slot is not work yet. */
+  busyCount(): number {
+    return countBusyRoutines(this.store.listOpenRoutineRuns());
   }
 
   close(): void {

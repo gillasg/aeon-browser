@@ -1,14 +1,15 @@
 import { Buffer } from "node:buffer";
 import type { PiSessionInput } from "@aeon/domain";
+import { fitModelImages } from "./model-image.js";
 
-export function decodePiInput(input: PiSessionInput): {
+export async function decodePiInput(input: PiSessionInput): Promise<{
   text: string;
   attachmentText: string;
   images: Array<{ type: "image"; data: string; mimeType: string }>;
   browserContext?: PiSessionInput["browserContext"];
   browserContexts?: PiSessionInput["browserContexts"];
   routeDraft?: NonNullable<PiSessionInput["routeDraft"]>;
-} {
+}> {
   if (!input.text.trim()) throw new Error("Prompt text must not be empty.");
   const attachments = input.attachments ?? [];
   if (attachments.length > 3) throw new Error("At most three attachments are allowed per message.");
@@ -22,10 +23,12 @@ export function decodePiInput(input: PiSessionInput): {
     if (decoded.image) images.push(decoded.image);
     if (decoded.text !== undefined) textParts.push(decoded.text);
   }
+  const fitted = await fitModelImages(images);
+  const note = fitted.notes.length ? `\n\n${fitted.notes.join("\n")}` : "";
   return {
     text: input.text,
-    attachmentText: textParts.join(""),
-    images,
+    attachmentText: textParts.join("") + note,
+    images: fitted.images,
     ...(input.browserContext ? { browserContext: input.browserContext } : {}),
     ...(input.browserContexts ? { browserContexts: input.browserContexts } : {}),
     ...(input.routeDraft ? { routeDraft: input.routeDraft } : {}),

@@ -14,6 +14,7 @@ import { watchStalls } from "./stall-watch.js";
 import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { isSupervisorHealthLine, supervisorHealthLine } from "./health-ping.js";
+import { reportManagedFailure } from "./start-report.js";
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
@@ -42,6 +43,7 @@ async function main(): Promise<void> {
     await runLocalFixture();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown startup error.";
+    if (mode === "--managed-daemon") reportManagedFailure(message);
     process.stderr.write(`Aeon development mode failed: ${message}\n`);
     process.exitCode = 1;
   }
@@ -85,12 +87,14 @@ async function runManagedDaemon(): Promise<void> {
       runtime.attention,
     );
     phase("core");
+    const activity = runtime.activity;
     coreTransport = await startCoreTransport(
       dataDirectory,
       runtime.service,
       runtime.browserControl,
       runtime.threadCoordination,
       runtime.attention,
+      activity,
     );
     phase("ready");
     writeReply("AEON_DAEMON_READY\n");

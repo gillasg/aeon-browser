@@ -4,6 +4,11 @@ import {
   groupMode,
   setAgentTabGrouping,
 } from "./native-browser-groups.js";
+import {
+  HUMAN_LIKE_INPUT_KEY,
+  applyHumanLikeInput,
+  humanLikeInputOn,
+} from "./native-browser-human-input.js";
 
 // browser.settings(): read or change how agents look and run in this browser, when the user asks
 // ("always use split view", "close idle tabs after half an hour"). Presentation and run settings
@@ -72,6 +77,17 @@ registerSetting("idleTabMinutes", {
   values: [10, 30, 60, 0],
   read: stored(IDLE_TAB_MINUTES_KEY, 10),
   write: store(IDLE_TAB_MINUTES_KEY),
+});
+registerSetting("humanLikeInput", {
+  about:
+    "Human-like mouse and typing: a curved pointer, eased scrolling and a real keystroke per character. Off is faster",
+  values: [true, false],
+  read: async () => humanLikeInputOn(await stored(HUMAN_LIKE_INPUT_KEY, false)()),
+  write: async (value) => {
+    const on = value === true;
+    await chrome.storage.local.set({ [HUMAN_LIKE_INPUT_KEY]: on });
+    applyHumanLikeInput(humanLikeInputOn(on));
+  },
 });
 registerSetting("cursor", {
   about: "Show the agent's cursor and caption on the pages it works on",

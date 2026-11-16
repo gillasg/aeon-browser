@@ -74,6 +74,18 @@ export class CoreAttention {
       })),
     };
   }
+  /** Chats whose run or hand-off is still open. An update waits for these. */
+  workingCount(): number {
+    let count = 0;
+    for (const record of this.records.values()) if (record.working) count += 1;
+    return count;
+  }
+  /** Chats waiting on a person, even when the run itself is idle. */
+  askingCount(): number {
+    let count = 0;
+    for (const asks of this.asks.values()) if (asks.size) count += 1;
+    return count;
+  }
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

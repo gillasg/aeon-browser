@@ -8,6 +8,7 @@ import {
   type Bridge,
 } from "@browserkit/tools/site-to-api";
 import type { BrowserToolRunner } from "./browser-tool.js";
+import { cellTimeoutMs } from "./run-budget.js";
 
 // site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they
 // run in the user's Chrome through the same executor as browser_code: each (chat, session) pair
@@ -18,6 +19,14 @@ const chats = new AsyncLocalStorage<{ chatId: string }>();
 const BACKGROUND = "aeon-background";
 const MIN_TIMEOUT_MS = 1_000;
 const MAX_TIMEOUT_MS = 600_000;
+
+function boundedCellTimeout(chatId: string, requested: number | undefined): number {
+  const wanted = Math.min(Math.max(requested ?? 60_000, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS);
+  const timeoutMs = cellTimeoutMs(chatId, wanted);
+  if (timeoutMs <= 0)
+    throw new Error("Not run: the time budget is spent. Answer with what you have.");
+  return timeoutMs;
+}
 
 /** A stable UUID for a chat's named session (the executor keys runtimes by chat id). */
 export function sessionChatId(chatId: string, session: string): string {
@@ -36,10 +45,7 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
   return {
     async run(code, options = {}) {
       const chatId = chats.getStore()?.chatId ?? BACKGROUND;
-      const timeoutMs = Math.min(
-        Math.max(options.timeoutMs ?? 60_000, MIN_TIMEOUT_MS),
-        MAX_TIMEOUT_MS,
-      );
+      const timeoutMs = boundedCellTimeout(chatId, options.timeoutMs);
       const output = await run(
         sessionChatId(chatId, options.session ?? "default"),
         `site-${randomUUID()}`,

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol/version";
 import { aeonDataDirectory } from "@aeon/location";
 import WebSocket from "ws";
+import { notRunningMessage, readStartFailure } from "./start-failure.js";
 
 // One connection to the running Aeon daemon through its local Core endpoint. The daemon writes
 // the endpoint and a fresh token to core-connection.json in its data folder each time it starts.
@@ -22,6 +23,7 @@ export class AeonClient {
   private readonly waiting = new Map<string, (message: Json) => void>();
   private readonly attentionListeners = new Set<(chats: AttentionChat[]) => void>();
   private openWaiters = new Map<string, (reply: Json) => void>();
+  private lastChats: { working?: boolean; asking?: unknown }[] = [];
   private pinger: ReturnType<typeof setInterval> | undefined;
 
   private constructor(private readonly socket: WebSocket) {
@@ -34,9 +36,7 @@ export class AeonClient {
     try {
       state = JSON.parse(await readFile(file, "utf8")) as { endpoint: string; token: string };
     } catch {
-      throw new Error(
-        "Aeon is not running. Open Chrome with Aeon loaded (the daemon starts with it), then retry.",
-      );
+      throw new Error(notRunningMessage(await readStartFailure()));
     }
     const socket = new WebSocket(state.endpoint);
     await new Promise<void>((resolve, reject) => {
@@ -219,6 +219,21 @@ export class AeonClient {
     return this.ask("core.health", {}, "core.health.result", timeoutMs);
   }
 
+  /** Chats, routines, cells and abilities still running. Older daemons never answer this. */
+  activity(timeoutMs = 1500): Promise<{ idle: boolean; busy: string[] }> {
+    return this.ask("core.activity", {}, "core.activity.result", timeoutMs).then((message) => ({
+      idle: message.idle === true,
+      busy: Array.isArray(message.busy)
+        ? message.busy.filter((item): item is string => typeof item === "string")
+        : [],
+    }));
+  }
+
+  /** The latest attention snapshot, for an update that is talking to an older daemon. */
+  snapshotChats(): { working?: boolean; asking?: unknown }[] {
+    return this.lastChats;
+  }
+
   /** Lists the connected browsers (one per Chrome profile), naming one first if asked. */
   browsers(rename?: { browser: string; name: string }): Promise<Json> {
     return this.ask("core.browsers", rename ? { rename } : {}, "core.browsers.result");
@@ -348,6 +363,9 @@ export class AeonClient {
 
   private receive(message: Json): void {
     if (message.kind === "core.attention.snapshot") {
+      this.lastChats = Array.isArray(message.chats)
+        ? (message.chats as { working?: boolean; asking?: unknown }[])
+        : [];
       for (const listener of this.attentionListeners) listener(message.chats as AttentionChat[]);
       return;
     }

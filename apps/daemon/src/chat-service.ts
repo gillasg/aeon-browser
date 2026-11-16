@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import {
   asActivationId,
+  asChatId,
   type ActivationId,
   type ChatEventCursor,
   type ChatId,
@@ -63,7 +64,9 @@ export class ChatService {
   private stoppedListener: ((chatId: ChatId) => void) | undefined;
   private readonly commandGate = new ChatCommandGate();
   private readonly eventHub = new ChatEventHub();
-  private readonly routes = new RouteRecorder(this.eventHub);
+  private readonly routes = new RouteRecorder(this.eventHub, undefined, (chatId) =>
+    workspaceOf(this.store, chatId),
+  );
   private readonly observedSessions = new Map<ChatId, ObservedSession>();
   /** Submissions waiting for their run; stop marks them so a run that starts late is stopped too. */
   private readonly starting = new Map<ChatId, { stopped: boolean }>();
@@ -515,4 +518,15 @@ export class ChatService {
 
 function externalToolAnswer(value: unknown): { content: unknown[]; isError: boolean } {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 1) }], isError: false };
+}
+
+function workspaceOf(
+  store: { getChat(chatId: ChatId): { workingDirectory: string } | undefined },
+  chatId: string,
+): string | undefined {
+  try {
+    return store.getChat(asChatId(chatId))?.workingDirectory;
+  } catch {
+    return undefined;
+  }
 }

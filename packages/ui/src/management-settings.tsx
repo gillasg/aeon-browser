@@ -2,6 +2,7 @@ import { useMessageSendMode } from "./message-send-mode.js";
 import {
   agentInFrontKey,
   hideAgentCursorKey,
+  humanLikeInputKey,
   useAgentFlag,
   useAgentTabView,
   type AgentTabView,
@@ -109,6 +110,7 @@ function AgentTabSettings(): ReactElement {
   // Both switches are relied on by screen recorders (Aperture); keep them.
   const [inFront, setInFront] = useAgentFlag(agentInFrontKey);
   const [hideCursor, setHideCursor] = useAgentFlag(hideAgentCursorKey);
+  const [humanLike, setHumanLike] = useAgentFlag(humanLikeInputKey);
   return (
     <SettingsGroup title="Agent tabs">
       <MenuRow<AgentTabView>
@@ -133,6 +135,12 @@ function AgentTabSettings(): ReactElement {
         detail="For screen recorders that draw their own."
         checked={hideCursor}
         onChange={setHideCursor}
+      />
+      <SwitchRow
+        label="Human-like mouse and typing"
+        detail="Curved pointer and real keystrokes. Off keeps every action fast."
+        checked={humanLike}
+        onChange={setHumanLike}
       />
     </SettingsGroup>
   );

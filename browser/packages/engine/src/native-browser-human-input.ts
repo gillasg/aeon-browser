@@ -1,5 +1,6 @@
 // Human-like pointer and keyboard timing for input sent through the debugger.
 import { send } from "./cdp/send.js";
+import { onEngineInstall } from "./native-engine-install.js";
 
 type Point = { x: number; y: number };
 type Params = Record<string, unknown>;
@@ -81,10 +82,48 @@ const tabs = new Map<number, TabState>();
 let enabled = false;
 let generatorUsers = 0;
 
-/** Turn the curved pointer and key timing on. Production leaves this off. */
+/** chrome.storage key. Off unless this is true. Settings, `aeon settings` and browser.settings write it. */
+export const HUMAN_LIKE_INPUT_KEY = "aeonHumanLikeInput";
+
+function stealthEnv(): string | undefined {
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  return proc?.env?.AEON_HUMAN_INPUT;
+}
+
+/** True when the stored setting is on, or AEON_HUMAN_INPUT=1 for a stealth run in this process. */
+export function humanLikeInputOn(stored: unknown, env: string | undefined = stealthEnv()): boolean {
+  if (env === "1" || env === "true") return true;
+  return stored === true;
+}
+
+/** The switch the settings page, the CLI and browser.settings share. */
+export function applyHumanLikeInput(on: boolean): void {
+  enabled = on;
+}
+
+/** Turn the curved pointer and key timing on. Production leaves this off until the setting says so. */
 export function setHumanInputEnabled(value: boolean): void {
   enabled = value;
 }
+
+function installHumanLike(): void {
+  const storage = chrome.storage?.local;
+  if (!storage?.get) return;
+  void storage.get(HUMAN_LIKE_INPUT_KEY).then(
+    (all) => {
+      const record = all as Record<string, unknown>;
+      if (!(HUMAN_LIKE_INPUT_KEY in record) && !humanLikeInputOn(undefined)) return;
+      applyHumanLikeInput(humanLikeInputOn(record[HUMAN_LIKE_INPUT_KEY]));
+    },
+    () => undefined,
+  );
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if (area !== "local" || changes[HUMAN_LIKE_INPUT_KEY] === undefined) return;
+    applyHumanLikeInput(humanLikeInputOn(changes[HUMAN_LIKE_INPUT_KEY]?.newValue));
+  });
+}
+
+onEngineInstall(installHumanLike);
 
 /**
  * The Bezier pointer (tremor, overshoot) is the recorder's visual, and nowhere else.

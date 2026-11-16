@@ -1,9 +1,14 @@
 import { NativeSettingsRequestSchema, type AgentSettings } from "@aeon/protocol";
 import {
+  applyHumanLikeInput,
+  humanLikeInputOn,
+} from "@browserkit/engine/native-browser-human-input";
+import {
   AGENT_IN_FRONT_KEY,
   AGENT_TAB_VIEW_KEY,
   readAgentTabViewSetting,
   HIDE_AGENT_CURSOR_KEY,
+  HUMAN_LIKE_INPUT_KEY,
   RECORD_AGENT_TABS_KEY,
   readAgentFlag,
 } from "./agent-tab-view.js";
@@ -31,11 +36,14 @@ async function applySettings(set: {
   if (set.hideAgentCursor !== undefined) changes[HIDE_AGENT_CURSOR_KEY] = set.hideAgentCursor;
   if (set.recordAgentTabs !== undefined) changes[RECORD_AGENT_TABS_KEY] = set.recordAgentTabs;
   if (set.agentTabView !== undefined) changes[AGENT_TAB_VIEW_KEY] = set.agentTabView;
+  if (set.humanLikeInput !== undefined) changes[HUMAN_LIKE_INPUT_KEY] = set.humanLikeInput;
   if (Object.keys(changes).length) await chrome.storage.local.set(changes);
+  if (set.humanLikeInput !== undefined) applyHumanLikeInput(humanLikeInputOn(set.humanLikeInput));
   return {
     agentInFront: await readAgentFlag(AGENT_IN_FRONT_KEY),
     hideAgentCursor: await readAgentFlag(HIDE_AGENT_CURSOR_KEY),
     agentTabView: await readAgentTabViewSetting(),
     recordAgentTabs: await readAgentFlag(RECORD_AGENT_TABS_KEY),
+    humanLikeInput: humanLikeInputOn(await readAgentFlag(HUMAN_LIKE_INPUT_KEY)),
   };
 }

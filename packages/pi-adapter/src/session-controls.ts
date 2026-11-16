@@ -28,7 +28,7 @@ type Controls = Pick<
 export function createSessionControls(session: AgentSession, chatId: string): Controls {
   return {
     queue: async (input, mode) => {
-      const decoded = decodePiInput(input);
+      const decoded = await decodePiInput(input);
       if (decoded.browserContext || decoded.browserContexts?.length)
         throw new Error("Wait for Pi to finish before sending a message with page context.");
       const text = `${decoded.text}${decoded.attachmentText}`;
@@ -106,9 +106,10 @@ export function sendQueuedAfterStop(
 export async function submitToPi(
   session: AgentSession,
   candidate: Parameters<PiSessionHandle["submit"]>[0],
+  chatId?: string,
 ): Promise<void> {
   const input = typeof candidate === "string" ? { text: candidate } : candidate;
-  const decoded = decodePiInput(input);
+  const decoded = await decodePiInput(input);
   const prompt = `${decoded.text}${decoded.attachmentText}`;
   const browserContexts = [
     ...(decoded.browserContext ? [decoded.browserContext] : []),
@@ -121,14 +122,14 @@ export async function submitToPi(
   }
   const context = await hiddenTurn(prompt, browserContexts, decoded.routeDraft);
   await sendHiddenTurn(session, context, browserContexts);
-  if (input.budget) watchBudget(session, input.budget);
+  if (input.budget) watchBudget(session, input.budget, chatId);
   await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
 }
 
 async function hiddenTurn(
   prompt: string,
   browserContexts: PiBrowserContextRecord[],
-  routeDraft: ReturnType<typeof decodePiInput>["routeDraft"],
+  routeDraft: Awaited<ReturnType<typeof decodePiInput>>["routeDraft"],
 ): Promise<string> {
   const turn = await liveFirstTurn(prompt, browserContexts, routeDraft);
   const context = turn.endsWith(`\n\n${prompt}`) ? turn.slice(0, -(prompt.length + 2)) : turn;

@@ -15,12 +15,14 @@ import { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { CapabilityRegistry } from "./capability-registry.js";
 import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
+import { type ActivityCounts } from "./daemon-activity.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
 import { chatBrowserName } from "./core-browsers.js";
 import {
   abilityCards,
   lastActionNote,
   providerCards,
+  runningWorkflowCount,
   siteCards,
   workflowCards,
 } from "./management-library.js";
@@ -40,6 +42,8 @@ export function createProductionRuntime(dataDirectory: string): {
   threadCoordination: ThreadCoordinationService;
   browserControl: BrowserControlService;
   ready: Promise<void>;
+  /** Chats, routines, cells and abilities still running. `aeon update` polls this. */
+  activity(): ActivityCounts;
   /** Warms the next chat's resources once the daemon answers (see warmAfterReady). */
   warm(): void;
   close(): Promise<void>;
@@ -66,20 +70,7 @@ export function createProductionRuntime(dataDirectory: string): {
   const siteRules = new BrowserSiteRules();
   const service = new ChatService({ dataDirectory: dataRoot, store, pi, siteRules });
   service.setStoppedListener((chatId) => browserControl.tidyChat(chatId));
-  browserControl.useOwnerTitles((chatId) => {
-    const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
-    if (!chat) return undefined;
-    const title = chat.title.trim().slice(0, 80) || "Chat";
-    return chat.origin === "routine" ? `Routine · ${title}` : title;
-  });
-  // An Aeon agent chat keeps its tabs in the user's window, however it was started (the panel,
-  // `aeon run`, MCP's aeon_run, another chat). Routines, other extensions and outside tool sessions
-  // (`aeon tool`, MCP's browser_code) get their own background window.
-  browserControl.useDefaultSpaces((chatId) => {
-    const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
-    if (!chat) return "window";
-    return ["user", "agent", "cli", "mcp"].includes(chat.origin) ? "tabs" : "window";
-  });
+  bindChatLabels(browserControl, store);
   service.setExternalContextReader(() =>
     outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
   );
@@ -124,6 +115,7 @@ export function createProductionRuntime(dataDirectory: string): {
     threadCoordination,
     browserControl,
     ready,
+    activity: () => readDaemonActivity(attention, routines, siteRules, browserControl),
     warm: () => warmAfterReady(service),
     close: async () => {
       stopPreparing();
@@ -135,6 +127,43 @@ export function createProductionRuntime(dataDirectory: string): {
       siteScripts.close();
       closeRuntimeStores(service, store);
     },
+  };
+}
+
+function bindChatLabels(
+  browser: BrowserControlService,
+  store: ReturnType<typeof openChatStore>,
+): void {
+  browser.useOwnerTitles((chatId) => ownerTitle(store, chatId));
+  browser.useDefaultSpaces((chatId) => defaultSpace(store, chatId));
+}
+
+function ownerTitle(store: ReturnType<typeof openChatStore>, chatId: string): string | undefined {
+  const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
+  if (!chat) return undefined;
+  const title = chat.title.trim().slice(0, 80) || "Chat";
+  return chat.origin === "routine" ? `Routine · ${title}` : title;
+}
+
+/** Agent chats stay in the user's window. Routines and outside sessions get their own window. */
+function defaultSpace(store: ReturnType<typeof openChatStore>, chatId: string): "window" | "tabs" {
+  const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
+  if (!chat) return "window";
+  return ["user", "agent", "cli", "mcp"].includes(chat.origin) ? "tabs" : "window";
+}
+
+function readDaemonActivity(
+  attention: CoreAttention,
+  routines: RoutineScheduler,
+  siteRules: BrowserSiteRules,
+  browser: BrowserControlService,
+): ActivityCounts {
+  return {
+    workingChats: attention.workingCount(),
+    askingChats: attention.askingCount(),
+    routines: Math.max(routines.busyCount(), siteRules.activeRoutineCount()),
+    cells: browser.activeCellCount(),
+    abilities: runningWorkflowCount(),
   };
 }
 

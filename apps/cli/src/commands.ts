@@ -26,6 +26,7 @@ import { rollbackCommand } from "./rollback.js";
 import { packCommand } from "./pack.js";
 import { listTools, runTool } from "./tools.js";
 import { abilitiesCommand } from "./abilities-cmd.js";
+import { probeDaemonActivity, runUpdateWhenIdle } from "./update-idle.js";
 
 // Every command Aeon has: its own chat commands, then browserkit's commands in the same groups,
 // with the few that are about a bridge or a password-manager folder replaced by Aeon's own.
@@ -580,7 +581,7 @@ is not a terminal.`,
       name: "settings",
       group: "Aeon",
       summary: "the agent settings in the connected Chrome",
-      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true agentTabView=auto|split|thumbnails`,
+      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true humanLikeInput=true agentTabView=auto|split|thumbnails\n\nhumanLikeInput (Human-like mouse and typing) is off by default. Set it true for a stealth run; AEON_HUMAN_INPUT=1 does the same for a process that loads the engine.`,
       run: async (args) => settingsCommand(await host.connect(), args.positional),
     },
     {
@@ -692,7 +693,9 @@ connect({browserURL: url}). Tabs opened through the endpoint close when the clie
     summary: "update Aeon and browserkit, rebuild, and set everything up again",
     help: `Usage: aeon update
 
-Runs scripts/setup.mjs in this checkout after pulling it (fast-forward only): it pulls and builds
+Waits until no chat, ability, or routine is running, then runs scripts/setup.mjs in this checkout
+after pulling it (fast-forward only). A chat that is still working is left running; Ctrl+C stops
+only the update. If Aeon is not running, the update starts at once. Setup pulls and builds
 browserkit, rebuilds Aeon, updates the native host and waits for the extension to reconnect
 (reload it in chrome://extensions).`,
     run: () => updateAeon(),
@@ -703,19 +706,28 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
   return [...aeonOnlyCommands(host), ...browsersCommands(host), ...commands];
 }
 
-/** aeon update: pull this checkout (fast-forward only), then run the one-command setup again. */
+/** aeon update: wait until nothing is running, then pull and run the one-command setup again. */
 function updateAeon(): Promise<number> {
+  return runUpdateWhenIdle({
+    probe: probeDaemonActivity,
+    update: rebuildCheckout,
+    write: (line) => process.stdout.write(line),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  });
+}
+
+function rebuildCheckout(): number {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
   const git = (args: string[]): string =>
     execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
   if (git(["status", "--porcelain"])) {
     process.stdout.write(`Local changes in ${root}; commit or stash them first.\n`);
-    return Promise.resolve(1);
+    return 1;
   }
   git(["pull", "--ff-only"]);
   execFileSync(process.execPath, [join(root, "scripts", "setup.mjs"), "--no-agents"], {
     cwd: root,
     stdio: "inherit",
   });
-  return Promise.resolve(0);
+  return 0;
 }

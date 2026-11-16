@@ -65,6 +65,10 @@ export function isWorkflowRunning(name: string): boolean {
   return running.has(name);
 }
 
+export function runningWorkflowCount(): number {
+  return running.size;
+}
+
 const progress = new Map<string, { step: number; total: number; id: string; action: string }>();
 
 export function markWorkflowProgress(

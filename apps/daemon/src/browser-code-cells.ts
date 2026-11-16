@@ -42,6 +42,11 @@ export class BrowserCodeCells {
   private readonly cells = new Map<string, Pending>();
   constructor(private readonly adopt: (chatId: string, target: BrowserTargetKey) => void) {}
 
+  /** Cells still in flight, including an ability or a routine check. */
+  activeCount(): number {
+    return this.cells.size;
+  }
+
   run(
     socket: WebSocket,
     clientInstanceId: string,

@@ -68,7 +68,7 @@ export async function runDoctor(): Promise<number> {
 
   if (state) {
     try {
-      const bridge = await BridgeClient.connect();
+      const bridge = await BridgeClient.connect({ launch: false });
       try {
         const reply = await bridge.request("status");
         const browsers = Number(reply.browsers ?? 0);
