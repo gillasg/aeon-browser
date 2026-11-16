@@ -11,6 +11,7 @@ import {
   type PublishFinding,
 } from "./ability-publish.js";
 import { createRedactor, SECRET_HEADERS, SECRET_KEYS } from "./redact.js";
+import { scrubAbility } from "./ability-scrub.js";
 import { siteDir, siteName } from "./registry.js";
 import { importPackAbilities } from "./abilities-migrate.js";
 
@@ -121,11 +122,13 @@ export async function exportSitePack(options: {
     add(`flows/${name}`, scrubFile(name, await readFile(path, "utf8"), redactor));
   }
   // The site's abilities travel with it (the migration bookkeeping does not), each with the
-  // public definition a stranger can review before calling it.
+  // public definition a stranger can review before calling it. The installer needs the runnable
+  // file, so it ships scrubbed: a lint finding on it is either redacted before the write or stops
+  // the pack (see shareAbility).
   const abilities = await readAbilityFiles(join(root, "abilities"));
-  for (const entry of abilities)
-    add(`abilities/${entry.file}`, scrubFile(entry.file, entry.text, redactor));
-  const published = publishAbilities(abilities, add, redactor, options.publish ?? "block");
+  const shared = abilities.map((entry) => shareAbility(entry, redactor));
+  for (const entry of shared) add(`abilities/${entry.file}`, entry.text);
+  const published = publishAbilities(shared, add, redactor, options.publish ?? "block");
   const skills = (options.skills ?? []).map(sanitizeSkill);
   for (const skill of skills)
     add(`skills/${skill.name}.json`, JSON.stringify(skill, null, 2) + "\n");
@@ -391,9 +394,85 @@ async function readAbilityFiles(folder: string): Promise<{ file: string; text: s
   );
 }
 
+interface SharedAbility {
+  file: string;
+  text: string;
+  /** The runnable ability the pack writes, after scrubbing; absent when the file is not one. */
+  ability?: Ability;
+  /** What the lint said about the original, reported to the caller either way. */
+  findings: (PublishFinding & { ability: string })[];
+}
+
+/**
+ * The runnable ability a pack ships. It keeps its ways (the installer runs it) but is scrubbed
+ * like a save; a lint finding that cannot be redacted is refused, because the private copy
+ * travels beside the public definition. Notices about recorded values are removed here.
+ */
+function shareAbility(
+  entry: { file: string; text: string },
+  redactor: ReturnType<typeof createRedactor>,
+): SharedAbility {
+  const ability = parseAbility(entry.text);
+  if (!ability)
+    return { file: entry.file, text: scrubFile(entry.file, entry.text, redactor), findings: [] };
+  const findings = lintPublicAbility(ability).map((finding) => ({
+    ...finding,
+    ability: ability.name,
+  }));
+  const scrub = scrubAbility(ability, redactor);
+  if (scrub.refused) throw new Error(scrub.refused);
+  redactNotices(scrub.ability, findings);
+  refuseSurvivingLeaks(scrub.ability);
+  return {
+    file: entry.file,
+    text: JSON.stringify(scrub.ability, null, 2) + "\n",
+    ability: scrub.ability,
+    findings,
+  };
+}
+
+/** Lint findings about a value pinned into the runnable file are removable without losing it. */
+function redactNotices(ability: Ability, findings: PublishFinding[]): void {
+  for (const finding of findings) {
+    if (finding.code === "input_single_value") deleteInputKey(ability, finding.path, "enum");
+    else if (finding.code === "input_recorded_value" || finding.code === "account_id")
+      deleteInputKey(ability, finding.path);
+  }
+}
+
+function deleteInputKey(ability: Ability, path: string, only?: string): void {
+  const [head, name, key] = path.split(".");
+  if (head !== "inputs" || !name || !key || path.split(".").length !== 3) return;
+  if (only && key !== only) return;
+  const inputs = ability.inputs as { properties?: Record<string, Record<string, unknown>> };
+  const spec = inputs.properties?.[name];
+  if (spec) delete spec[key];
+}
+
+const LEAK_CODES = new Set([
+  "secret",
+  "personal_data",
+  "account_id",
+  "input_recorded_value",
+  "input_single_value",
+]);
+
+/** A private value the scrub could not remove stops the pack in either mode. */
+function refuseSurvivingLeaks(ability: Ability): void {
+  const leaks = lintPublicAbility(ability).filter((finding) => LEAK_CODES.has(finding.code));
+  if (!leaks.length) return;
+  const shown = leaks
+    .slice(0, 4)
+    .map((finding) => formatFinding(finding))
+    .join("; ");
+  throw new Error(
+    `ABILITY_NOT_PUBLISHABLE: ${ability.name} would ship a private value (${shown}). Fix it before packing.`,
+  );
+}
+
 /** Writes a public definition per ability; blocks the pack when the lint finds an error. */
 function publishAbilities(
-  entries: { file: string; text: string }[],
+  entries: SharedAbility[],
   add: (path: string, text: string) => void,
   redactor: ReturnType<typeof createRedactor>,
   mode: "block" | "warn",
@@ -401,16 +480,11 @@ function publishAbilities(
   const findings: (PublishFinding & { ability: string })[] = [];
   let published = 0;
   for (const entry of entries) {
-    const ability = parseAbility(entry.text);
-    if (!ability) continue;
-    const found = lintPublicAbility(ability).map((finding) => ({
-      ...finding,
-      ability: ability.name,
-    }));
-    findings.push(...found);
-    const definition = redactor.json(publicAbility(ability));
+    findings.push(...entry.findings);
+    if (!entry.ability) continue;
+    const definition = redactor.json(publicAbility(entry.ability));
     add(
-      `abilities/public/${abilitySlug(ability.name)}.json`,
+      `abilities/public/${abilitySlug(entry.ability.name)}.json`,
       JSON.stringify(definition, null, 2) + "\n",
     );
     published += 1;
