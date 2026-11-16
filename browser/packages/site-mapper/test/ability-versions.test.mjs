@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -11,6 +11,7 @@ import {
   listAbilityVersions,
   readAbilityVersion,
 } from "../dist/ability-versions.js";
+import { abilityHistoryDirectory } from "../dist/ability-files.js";
 import { restoreAbility } from "../dist/ability-restore.js";
 
 async function withHome(run) {
@@ -83,6 +84,21 @@ test("history is capped per ability", async () => {
     );
     assert.ok(descriptions.includes(`save ${ABILITY_HISTORY_LIMIT + 2}`));
     assert.ok(!descriptions.includes("save 0"));
+  });
+});
+
+test("counting versions reads the directory instead of parsing every history file", async () => {
+  await withHome(async () => {
+    await saveAbility(ability({ description: "first" }));
+    await saveAbility(ability({ description: "second" }));
+    await saveAbility(ability({ description: "third" }));
+    const folder = abilityHistoryDirectory("example.com", "search");
+    const files = (await readdir(folder)).filter((file) => file.endsWith(".json")).sort();
+    assert.equal(files.length, 2);
+    for (const file of files) await writeFile(join(folder, file), "not json\n");
+    const counted = await countAbilityVersions("example.com", "search");
+    assert.equal(counted.count, 2, "a count needs no parse");
+    assert.equal(counted.latestAt, files.at(-1).slice(0, -".json".length));
   });
 });
 
