@@ -24,10 +24,10 @@ export async function acquireCoreLock(directory: string): Promise<() => Promise<
     });
   });
   return async () => {
+    // On Unix, closing the server removes its own socket path; a second daemon that binds the
+    // path afterwards must keep it. Do not unlink here: the window after close is exactly when a
+    // new owner can appear.
     await new Promise<void>((resolveClosed) => server.close(() => resolveClosed()));
-    // A Unix socket file outlives its listener; a killed daemon would otherwise block every
-    // restart with EADDRINUSE.
-    if (process.platform !== "win32") await unlink(address).catch(() => undefined);
   };
 }
 
