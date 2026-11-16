@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appRoot, dataDirectory, hostPaths } from "../node/paths.mjs";
 import { stopSupervisor } from "../node/host.mjs";
+import { launchAgent, systemdUnit } from "./service-files.mjs";
 
 // Installs the Mac/Linux half of Aeon: the Node native host wrapper, its Chrome manifests, the
 // host configuration and the login service that keeps one daemon supervisor running.
@@ -133,7 +134,7 @@ function installService() {
 function installSystemdUserService() {
   const path = servicePath();
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, systemdUnit());
+  writeFileSync(path, systemdUnit({ node, hostEntry }));
   run("systemctl", ["--user", "daemon-reload"]);
   try {
     run("systemctl", ["--user", "reset-failed", "aeon-daemon.service"]);
@@ -143,27 +144,6 @@ function installSystemdUserService() {
   run("systemctl", ["--user", "enable", "--now", "aeon-daemon.service"]);
   run("systemctl", ["--user", "restart", "aeon-daemon.service"]);
   enableLinger();
-}
-
-function systemdUnit() {
-  const quote = (value) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
-  return [
-    "[Unit]",
-    "Description=Aeon daemon supervisor",
-    "After=default.target",
-    "",
-    "[Service]",
-    "Type=simple",
-    `ExecStart=${quote(node)} ${quote(hostEntry)} --daemon-supervisor`,
-    "Restart=always",
-    "RestartSec=2",
-    "KillMode=mixed",
-    "TimeoutStopSec=30",
-    "",
-    "[Install]",
-    "WantedBy=default.target",
-    "",
-  ].join("\n");
 }
 
 function enableLinger() {
@@ -188,7 +168,7 @@ function enableLinger() {
 function installLaunchAgent() {
   const path = servicePath();
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, launchAgent());
+  writeFileSync(path, launchAgent({ node, hostEntry, root }));
   const uid = process.getuid();
   try {
     execFileSync("launchctl", ["bootout", `gui/${uid}/com.aeon.daemon`], { stdio: "ignore" });
@@ -200,23 +180,6 @@ function installLaunchAgent() {
   } catch {
     run("launchctl", ["load", "-w", path]);
   }
-}
-
-function launchAgent() {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.aeon.daemon</string>
-  <key>ProgramArguments</key>
-  <array><string>${escapeXml(node)}</string><string>${escapeXml(hostEntry)}</string><string>--daemon-supervisor</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>${escapeXml(join(root, "daemon-launchd.log"))}</string>
-  <key>StandardErrorPath</key><string>${escapeXml(join(root, "daemon-launchd.log"))}</string>
-</dict>
-</plist>
-`;
 }
 
 function servicePath() {
@@ -234,8 +197,4 @@ function writeJson(path, value) {
 
 function run(command, args) {
   execFileSync(command, args, { stdio: "inherit" });
-}
-
-function escapeXml(value) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

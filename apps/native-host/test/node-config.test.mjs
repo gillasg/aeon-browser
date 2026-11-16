@@ -106,3 +106,19 @@ test("a build directory launches main.js and release fields survive", async () =
     await cleanup(sandbox);
   }
 });
+
+test("a data directory chosen by AEON_DATA_DIR is accepted by the service", async () => {
+  const sandbox = createSandbox();
+  try {
+    const custom = join(sandbox.root, "aeon-data");
+    sandbox.env.AEON_DATA_DIR = custom;
+    writeConfig(sandbox, { dataDirectory: custom });
+    const loaded = await loadConfig(sandbox.config, options(sandbox));
+    assert.equal(loaded.dataDirectory, custom);
+
+    writeConfig(sandbox, { dataDirectory: join(sandbox.root, "elsewhere") });
+    await assert.rejects(loadConfig(sandbox.config, options(sandbox)), /must live under/);
+  } finally {
+    await cleanup(sandbox);
+  }
+});
