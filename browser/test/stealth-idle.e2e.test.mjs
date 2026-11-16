@@ -65,9 +65,15 @@ test(
       assert.ok(idle, result.stdout + result.stderr);
       assert.deepEqual(idle, emptyTells(), "the driven page kept something of Aeon");
 
-      // The extension's shared cursor paints from a page listener, not a page global.
+      // The cursor is an injected function, not a page listener: a page cannot paint it by
+      // dispatching the old event, and the script leaves no listener or global behind.
       const page = await attachPage(port, url);
       const cursorScript = await readFile(aeonCursor, "utf8");
+      assert.equal(
+        cursorScript.includes("aeon:cursor:paint"),
+        false,
+        "the built cursor listens for a page event",
+      );
       const painted = await evalValue(
         page,
         `${cursorScript}\nwindow.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail: ${JSON.stringify(
@@ -79,10 +85,13 @@ test(
         )} })); true`,
       );
       assert.equal(painted, true);
-      assert.equal(await evalValue(page, "!!document.getElementById('aeon-agent-cursor')"), true);
+      assert.equal(
+        await evalValue(page, "!!document.getElementById('aeon-agent-cursor')"),
+        false,
+        "a page event painted Aeon's cursor",
+      );
       assert.deepEqual(await evalValue(page, globalsOnly), [], "the cursor left a page global");
-      await evalValue(page, "document.getElementById('aeon-agent-cursor')?.remove(); true");
-      assert.deepEqual(await tellOn(page), emptyTells(), "the cursor left marks on an idle page");
+      assert.deepEqual(await tellOn(page), emptyTells(), "a page event left marks on an idle page");
     } finally {
       chrome?.kill();
       bridge.kill();

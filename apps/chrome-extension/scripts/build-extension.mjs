@@ -37,6 +37,7 @@ export async function buildExtension() {
   const output = join(appRoot, "native-dist");
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
+  const cursorPage = await import(pathToFileURL(engine("cursor-page")).href);
   const shared = {
     bundle: true,
     platform: "browser",
@@ -45,6 +46,7 @@ export async function buildExtension() {
     target: "chrome116",
     loader: { ".ttf": "file" },
     define: { __AEON_NATIVE_TRANSPORT__: "true" },
+    plugins: [cursorPaintPlugin(cursorPage)],
   };
   const entries = [
     [join(appRoot, "src/native-worker.ts"), "service-worker.js"],
@@ -75,20 +77,31 @@ export async function buildExtension() {
 
 async function writeCursorPage(output) {
   const module = await import(pathToFileURL(engine("cursor-page")).href);
-  // A page listener, not a page global: the worker dispatches one event per paint. Aeon's own
-  // extension pages still load this file as a script and call the function it leaves behind.
+  // Aeon's own extension pages load this file as a script and call the function it leaves behind.
+  // Web pages get the painter as an injected function (aeon:cursor-paint), never as a listener.
   const source = [
     "(() => {",
     "  const paint = " + module.cursorFunctionSource() + ";",
-    '  addEventListener("aeon:cursor:paint", (event) => {',
-    "    const detail = event && event.detail;",
-    '    if (detail && detail.update) paint(detail.update, detail.css || "", detail.mark || {});',
-    "  });",
     '  if (location.protocol === "chrome-extension:") globalThis.__aeonCursor = paint;',
     "})();",
     "",
   ].join("\n");
   await writeFile(join(output, "cursor-page.js"), source);
+}
+
+/** `aeon:cursor-paint` is the painter as a function literal the worker injects; no page event. */
+function cursorPaintPlugin(cursorPage) {
+  const namespace = "aeon-cursor-paint";
+  return {
+    name: namespace,
+    setup(builder) {
+      builder.onResolve({ filter: /^aeon:cursor-paint$/ }, () => ({ path: namespace, namespace }));
+      builder.onLoad({ filter: /.*/, namespace }, () => ({
+        contents: "export const paintCursor = " + cursorPage.cursorFunctionSource() + ";",
+        loader: "js",
+      }));
+    },
+  };
 }
 
 function buildViewerWorker(shared, output) {
