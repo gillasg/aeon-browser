@@ -288,6 +288,7 @@ function __waitRead(options) {
 
 function __extendPageData(target, base) {
   var inspect = (fn, arg) => base.inspect('(' + fn.toString() + ')(' + JSON.stringify(arg ?? {}) + ')');
+  var readElement = base.read;
   return Object.assign(base, {
     // A request made by the page itself: its cookies, its origin, its CSRF token (csrf: true).
     request: (url, init = {}) => inspect(__pageRequest, typeof url === 'object' ? url : {...init, url}),
@@ -321,8 +322,9 @@ function __extendPageData(target, base) {
     // One read of the page: data, the main repeated list, Markdown and the panels that scroll on
     // their own, merged and capped. It expands "show more" controls and waits for the content to
     // settle; both only here. Everything fits a time budget (timeMs), so a huge page returns what
-    // it has instead of running into the cell deadline.
-    read: async (options = {}) => {
+    // it has instead of running into the cell deadline. A selector still reads one element.
+    read: async (options = {}, settings = {}) => {
+      if (typeof options === 'string') return readElement(options, settings);
       __noteRead(target);
       var deadline = Date.now() + Math.max(5000, Number(options.timeMs) || 30000);
       var max = Math.max(2000, Math.min(200000, Number(options.max) || 40000));

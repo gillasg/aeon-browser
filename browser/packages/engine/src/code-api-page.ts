@@ -456,6 +456,12 @@ var bu = Object.freeze({
     if (!entry) throw Error('TARGET_LOST: tab ' + (target.tabId ?? target.target?.tabId ?? '?') + ' is not open; browser.tabs() lists live tabs, browser.attachTab(tab) attaches one');
     __lastTarget = target; globalThis.page = browser.page(target); return globalThis.page;
   },
+  // The overlay that covers the page: the short name TARGET_BLOCKED gives for page.overlays.dismiss().
+  clear: (options = {}) => {
+    var target = options.target || __lastTarget;
+    if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');
+    return browser.page(target).overlays.dismiss(options);
+  },
   state: async (options = {}) => {
     var target = options.target || __lastTarget;
     if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');

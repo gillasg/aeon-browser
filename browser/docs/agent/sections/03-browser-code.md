@@ -24,7 +24,8 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
   the user blocked answers `SITE_BLOCKED`, so tell them. Work through the user's tabs
   in place, all at once with `Promise.all`, navigating them too when the task is about them; for
   anything else open your own tab, so what the user is watching stays put.
-- `bu.state()` (the same call as `page.state()`) prints `host/path · title`, then the page in
+- `bu.state()` (the same call as `page.state({...})`; bare `page.state()` returns a quick
+  url/title/scroll/headings/forms/counts summary) prints `host/path · title`, then the page in
   sections. Open dialogs come first. A nav or footer is one line (`nav "Main" (14 links)`) until
   `{expand: ["nav"]}` or `{expand: ["all"]}`. Rows are named from their first cells, so identical
   buttons stay on their own line under the row (`[id] button "Edit"`). Controls are

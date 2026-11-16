@@ -733,6 +733,7 @@ async function realm(source) {
     context,
   );
   return {
+    context,
     steps,
     requests,
     rejected,
@@ -847,6 +848,139 @@ test("every documented code example sends only steps the engine schema accepts",
 function own(names, values) {
   return Object.fromEntries(names.map((name) => [name, values[name]]));
 }
+
+function agentTexts() {
+  return [...corpus().map((file) => ({ path: file.path, text: read(file.path) }))];
+}
+
+/** The help topics too: they carry the session and error calls the sections only point at. */
+async function helpTexts() {
+  const { HELP_TOPICS } = await import("../dist/code-api-help.js");
+  return Object.entries(HELP_TOPICS).map(([topic, text]) => ({ path: `help:${topic}`, text }));
+}
+
+/**
+ * Every call path the agent text names (`browser.session.finish(…)`, `page.overlays.dismiss()`).
+ * Only calls count: a site file name (`site.md`) or a domain (`google.com`) is not an API reference.
+ */
+function callPaths(files) {
+  const roots = ["browser", "page", "bu", "site", "siteMapper", "google", "tables", "skills"];
+  const pattern = new RegExp(
+    `\\b(${roots.join("|")})\\.([A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*)`,
+    "g",
+  );
+  const paths = [];
+  for (const file of files) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(file.text))) {
+      if (!/^\s*\(/.test(file.text.slice(match.index + match[0].length))) continue;
+      const line = file.text.slice(0, match.index).split("\n").length;
+      paths.push({ where: `${file.path}:${line}`, path: `${match[1]}.${match[2]}` });
+    }
+  }
+  return paths;
+}
+
+/** The realm's API roots with a page attached, the way a cell starts. */
+async function runtimeRoots(source) {
+  const box = await realm(source);
+  box.context.__attachedTarget = KEY;
+  vm.runInContext(
+    `__attachedTarget = ${JSON.stringify(KEY)}; __lastTarget = __attachedTarget; globalThis.page = browser.page(__attachedTarget);`,
+    box.context,
+  );
+  return box.context;
+}
+
+/** Object literal keys declared twice in one object, with the line the object starts on. */
+function duplicateKeys(source) {
+  const duplicates = [];
+  const walk = (node) => {
+    if (!node || typeof node.type !== "string") return;
+    if (node.type === "ObjectExpression") {
+      const seen = new Set();
+      for (const property of node.properties) {
+        if (property.type !== "Property" || property.computed) continue;
+        const key =
+          property.key.type === "Identifier"
+            ? property.key.name
+            : property.key.type === "Literal"
+              ? String(property.key.value)
+              : undefined;
+        if (key === undefined) continue;
+        if (seen.has(key)) duplicates.push(`${key} (object at line ${node.loc.start.line})`);
+        seen.add(key);
+      }
+    }
+    for (const [name, value] of Object.entries(node)) {
+      if (["start", "end", "loc", "range", "type"].includes(name)) continue;
+      if (Array.isArray(value)) value.forEach(walk);
+      else if (value && typeof value === "object") walk(value);
+    }
+  };
+  walk(parse(source, { ecmaVersion: "latest", locations: true }));
+  return duplicates;
+}
+
+test("every call the agent text names exists on the runtime object", async () => {
+  const source = await sandboxSource();
+  const roots = await runtimeRoots(source);
+  const paths = callPaths([...agentTexts(), ...(await helpTexts())]);
+  const missing = [];
+  for (const item of paths) {
+    const segments = item.path.split(".");
+    let value = roots[segments[0]];
+    let at = segments[0];
+    for (const segment of segments.slice(1)) {
+      if (value === null || value === undefined || !(segment in Object(value))) {
+        missing.push(`${item.where}: ${item.path}() — ${at} has no ${segment}`);
+        value = undefined;
+        break;
+      }
+      at = segment;
+      value = value[segment];
+    }
+    if (value !== undefined && typeof value !== "function")
+      missing.push(`${item.where}: ${item.path}() is not a function (${typeof value})`);
+  }
+  assert.ok(paths.length >= 300, `the agent text still names its calls (${paths.length})`);
+  assert.deepEqual(
+    missing,
+    [],
+    `calls in the agent text that the runtime cannot run:\n${missing.join("\n")}`,
+  );
+});
+
+test("no runtime object literal declares a key twice", async () => {
+  const duplicates = duplicateKeys(await sandboxSource());
+  assert.deepEqual(
+    duplicates,
+    [],
+    `a later key silently replaces the earlier one, and everything it held is gone:\n${duplicates.join("\n")}`,
+  );
+});
+
+test("a page extension adds to the page instead of replacing what it extends", async () => {
+  const source = await sandboxSource();
+  // page.state({query}) is what a cut observation and help('reading') send the agent to.
+  const state = await realm(source);
+  const observed = await state.cell("return await page.state({query: 'Save'})");
+  assert.equal(observed.error, undefined, observed.error?.message);
+  assert.ok(
+    observed.steps.some((step) => step.op === "observe" && step.query === "Save"),
+    "page.state({query}) still observes the page",
+  );
+  assert.equal(typeof observed.value, "string", "page.state({query}) prints the observation");
+  // page.read(selector) read one element before the whole-page read was added.
+  const read = await realm(source);
+  const element = await read.cell("return await page.read('#main')");
+  assert.equal(element.error, undefined, element.error?.message);
+  assert.ok(
+    element.steps.some((step) => step.op === "read" && step.selector === "#main"),
+    "page.read(selector) still reads one element",
+  );
+});
 
 test("partial examples are marked and counted", async () => {
   const { examples: found, skipped } = examples();
