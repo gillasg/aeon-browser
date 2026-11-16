@@ -22,7 +22,9 @@ export interface PrivateDirOptions {
 
 /**
  * Makes sure `dir` is a real directory this user owns, mode 700, under parents owned by this
- * user or root. A directory another user created first is refused and left unchanged.
+ * user or root. A loose directory this user already owns is chmodded to 700 and accepted.
+ * A directory another user created, a symlink, or one under a non-sticky other-writable
+ * parent is refused and left unchanged.
  */
 export async function ensurePrivateDir(
   dir: string,
@@ -139,6 +141,7 @@ async function openOwned(dir: string, uid: number, fix: string, create: boolean)
     if (stats.ino !== looked.ino || stats.dev !== looked.dev)
       throw new UntrustedDirError(dir, "it is not a real directory", fix);
     refuseUnowned(dir, stats, uid, fix);
+    await tightenOwned(dir, handle, stats.mode);
   } finally {
     await handle.close();
   }
@@ -146,7 +149,7 @@ async function openOwned(dir: string, uid: number, fix: string, create: boolean)
 
 function refuseUnowned(
   dir: string,
-  stats: { isSymbolicLink(): boolean; isDirectory(): boolean; uid: number; mode: number },
+  stats: { isSymbolicLink(): boolean; isDirectory(): boolean; uid: number },
   uid: number,
   fix: string,
 ): void {
@@ -154,9 +157,18 @@ function refuseUnowned(
     throw new UntrustedDirError(dir, "it is not a real directory", fix);
   if (stats.uid !== uid)
     throw new UntrustedDirError(dir, `it is owned by uid ${stats.uid}, not ${uid}`, fix);
-  const mode = stats.mode & 0o777;
-  if ((stats.mode & 0o077) !== 0)
-    throw new UntrustedDirError(dir, `it is mode ${mode.toString(8)}, not 700`, fix);
+}
+
+/** An owned directory with group or other bits becomes 700. A foreign one is never chmodded. */
+async function tightenOwned(
+  dir: string,
+  handle: { chmod(mode: number): Promise<void> },
+  mode: number,
+): Promise<void> {
+  const bits = mode & 0o777;
+  if ((bits & 0o077) === 0) return;
+  await handle.chmod(0o700);
+  process.stderr.write(`Tightened ${dir} from mode ${bits.toString(8)} to 700.\n`);
 }
 
 async function lookAt(dir: string, fix: string, create: boolean) {

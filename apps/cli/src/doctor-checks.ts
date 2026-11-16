@@ -51,7 +51,7 @@ export interface DataDir {
   name: string;
   path: string;
   writable: boolean;
-  /** Set when the folder is owned by someone else, loose, or reached through an unsafe parent. */
+  /** Set when the folder is owned by someone else, or reached through an unsafe parent. */
   trustError?: string;
   trustFix?: string;
 }
