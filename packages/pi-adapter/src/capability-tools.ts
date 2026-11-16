@@ -176,6 +176,8 @@ function createRoutineTools(
         "(e.g. const p = await browser.openTab(url); const price = await p.evaluate(() => ...); " +
         "await p.close(); price < 400 ? {price} : false). You are woken with the instruction only " +
         "when its last expression is truthy, and receive that value. Watchers may run every minute. " +
+        "'Tell me when' is that watcher now, not a wait in the cell. " +
+        "Fit everyMinutes to the horizon they named (minutes: 1, a few hours: 15, a day: 60, none named: 360). " +
         "Use them as event triggers: new items from a mapped API " +
         "(const r = await siteMapper.watch('shop.com', 'searchListings', {q: 'lamp'}); r.new.length ? r.new : false), " +
         "a new message or email (siteMapper.watch on the inbox's API, or count unread on the page), " +

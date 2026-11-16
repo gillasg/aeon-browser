@@ -50,7 +50,9 @@ function stage(cellId: string, value: string): void {
 }
 
 function drop(chatId: string): void {
-  realms.get(chatId)?.frame.remove();
+  const frame = realms.get(chatId)?.frame;
+  frame?.contentWindow?.postMessage({ kind: "stop" }, "*");
+  frame?.remove();
   realms.delete(chatId);
   for (const [jobId, job] of jobRealms)
     if (job.chatId === chatId) {

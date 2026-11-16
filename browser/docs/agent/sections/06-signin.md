@@ -21,11 +21,11 @@ password reset, or hand off so the user signs in and Aeon saves the new password
 `PASSWORD_MANAGER_FAILED`: hand off with "Your password manager is locked: unlock it (`aeon signin setup
 bitwarden`, or `pass-cli login` for Proton) and click Done, or sign in here yourself", then call
 `bu.signIn()` again if the form is still there. A login the user types during a hand-off is saved to
-the password manager like one you made. Never write a password into your answer, a file or a
-message, even one you made: say whether it was saved.
+the password manager like one you made. Never write a password or a one-time code into your
+answer, a file or a message, even one you made: say whether it was saved.
 
-A page that has held a password you did not type yourself (bu.signIn's, Chrome's autofill or the
-user's) runs none of your page code: it fails with `PASSWORD_PAGE`. Clicks still work, and `page.reload()` opens the page to code again.
+A page that holds a password you did not type (bu.signIn's, Chrome's autofill or the user's) still
+takes navigation, reads and clicks. The password value is hidden from you. `page.reload()` clears it.
 
 The password manager is set up once by the user: `browserkit signin setup bitwarden` (Bitwarden's
 `bw` CLI) or `signin setup proton` (Proton Pass's `pass-cli`).

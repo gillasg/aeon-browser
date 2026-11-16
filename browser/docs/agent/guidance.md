@@ -15,11 +15,11 @@ A task about the tab the user is on runs on `browser.activeTab()`. Anything else
 
 ---
 
-Read a page once: `await page.read()`. A list says whether it is complete or partial. Rows the page already loaded come back from `page.data(name)` with no new request. `help('reading')`.
+Read a page once: `await page.read()` returns an object; `.text` is the page text, and `data`, `list` and `markdown` stay. A list says whether it is complete or partial. Rows the page already loaded come back from `page.data(name)` with no new request. `help('reading')`.
 
 ---
 
-Do the task. Do not ask permission to continue. Signed out: `await bu.signIn()` (`help('signin')`). A check a person must finish: one click, then `bu.handoff(message)`. `SITE_BLOCKED`: stop and say so. `help('gated')`.
+Do the task. Do not ask permission to continue. Signed out: `await bu.signIn()` (`help('signin')`). A check a person must finish: one click, then `bu.handoff(message)`. `SITE_BLOCKED`: stop and say so. `help('gated')`. 'Tell me when X changes' is a watcher: `create_routine` with a check, and `everyMinutes` fitted to their horizon (minutes 1, a few hours 15, a day 60, none named 360).
 
 ---
 

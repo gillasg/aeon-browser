@@ -148,18 +148,27 @@ test(
         [{ name: "cart", count: 1 }],
         tools.stdout,
       );
-      // A page holding a password the agent did not type runs none of its code until reloaded.
+      // A password the agent did not type stays hidden; reads and clicks still run.
       const locked = await cell(`await page.goto(${JSON.stringify(siteUrl + "login")});
         const trial = async () => { try { return await page.evaluate(() => document.title); } catch (error) { return String(error.message).slice(0, 13); } };
         await page.fill('#mine', 'agent-chosen-pass');
         const own = await trial();
+        const ownValue = await page.evaluate(() => document.getElementById('mine').value);
         await page.getByRole('button', {name: 'Remember me'}).click();
         const person = await trial();
+        const leaked = await page.evaluate(() => document.getElementById('pw').value);
         await page.reload();
-        console.log("LOCK " + JSON.stringify({own, person, reloaded: await trial()}));`);
+        console.log("LOCK " + JSON.stringify({own, ownValue, person, leaked, reloaded: await trial()}));`);
+      assert.equal(locked.stdout.includes("typed-by-a-person-123"), false, locked.stdout);
       assert.deepEqual(
         JSON.parse(/LOCK (.*)/.exec(locked.stdout)?.[1] ?? "null"),
-        { own: "Sign in", person: "PASSWORD_PAGE", reloaded: "Sign in" },
+        {
+          own: "Sign in",
+          ownValue: "agent-chosen-pass",
+          person: "Sign in",
+          leaked: "[removed]",
+          reloaded: "Sign in",
+        },
         locked.stdout + locked.stderr,
       );
       // A sweep names each URL's outcome: a real page is ok, a 404 is dead.

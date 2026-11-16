@@ -1,18 +1,18 @@
 import type { BrowserStep } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
-import { send } from "./cdp/send.js";
+import { bringTabForward, send } from "./cdp/send.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { rememberSecrets } from "./native-browser-secrets.js";
 import { SessionMap } from "./native-session-map.js";
 
-// Agent code never runs in a page that holds, or has held, a password the agent did not type
-// itself: a password-manager sign-in or a person typing one. Reading a password field is plain
-// JavaScript, so hiding values from results is not enough on its own; the page is closed to the
-// agent's code instead. The mark lives in the extension's own isolated world, where page scripts
-// and agent code cannot reach it, and goes with the document: a reload or navigation opens the
-// page again. A sign-in reloads the page first when agent code ran in it (removing any script
-// it planted for new documents), and reloads it after signing in when the page stayed the same,
-// so nothing the page kept in memory outlives the sign-in.
+// A password the agent did not type (a password-manager sign-in, Chrome's autofill or a person)
+// stays hidden: the probe reads those field values in the extension's isolated world and remembers
+// them, and every result the agent sees has them removed. Navigation, reads and clicks still run.
+// The mark lives in that isolated world, where page scripts cannot reach it, and goes with the
+// document. A sign-in reloads the page first when agent code ran in it (removing any script it
+// planted for new documents), and reloads it after signing in when the page stayed the same, so
+// nothing the page kept in memory outlives the sign-in.
 
 // Kept across service worker restarts: forgetting them locked the agent out of its own sign-up.
 const typed = new SessionMap<Set<string>>(
@@ -33,9 +33,6 @@ const LEAVES_PAGE_ALONE = new Set([
   "Page.stopLoading",
 ]);
 const READ_ONLY_FRAME_ACTIONS = new Set(["list", "click", "fill", "snapshot"]);
-
-export const PASSWORD_PAGE =
-  "PASSWORD_PAGE: this page holds a password your code did not type (bu.signIn, Chrome's autofill or the user filled it), so code cannot run in it; carry on with clicks, or reload it (page.reload()) to read it again";
 
 /** Steps that run the agent's own code (or raw DevTools commands) inside the page. */
 export function runsPageCode(step: BrowserStep): boolean {
@@ -98,7 +95,7 @@ function probe(
   known: string[],
   mark: boolean,
   agent: boolean,
-): { password: boolean; agent: boolean; filled: boolean } {
+): { password: boolean; agent: boolean; filled: boolean; secrets: string[] } {
   const page = window as unknown as Record<string, boolean | undefined>;
   const dom = (globalThis as { chrome?: { dom?: typeof chrome.dom } }).chrome?.dom;
   const shadowOf = (el: Element) => {
@@ -109,20 +106,30 @@ function probe(
       return el.shadowRoot;
     }
   };
+  const secrets: string[] = [];
   const filled = (root: Document | ShadowRoot): boolean => {
-    for (const input of root.querySelectorAll("input"))
-      if (input.type === "password" && input.value && !known.includes(input.value)) return true;
+    let any = false;
+    for (const input of root.querySelectorAll("input")) {
+      if (input.type !== "password" || !input.value || known.includes(input.value)) continue;
+      any = true;
+      secrets.push(input.value);
+    }
     for (const el of root.querySelectorAll("*")) {
       const shadow = shadowOf(el);
-      if (shadow && filled(shadow)) return true;
+      if (shadow && filled(shadow)) any = true;
     }
-    return false;
+    return any;
   };
   const filledNow = filled(document);
   if (mark || filledNow) page.__aeonPasswordPage = true;
   const ran = page.__aeonAgentCode === true;
   if (agent) page.__aeonAgentCode = true;
-  return { password: page.__aeonPasswordPage === true, agent: ran, filled: filledNow };
+  return {
+    password: page.__aeonPasswordPage === true,
+    agent: ran,
+    filled: filledNow,
+    secrets,
+  };
 }
 
 // executeScript over all frames answers only once every frame has run, so one stuck frame (an ad or
@@ -134,6 +141,7 @@ interface ProbeState {
   password: boolean;
   agent: boolean;
   filled: boolean;
+  secrets?: string[];
 }
 type ProbeResult = chrome.scripting.InjectionResult<ProbeState>;
 
@@ -200,25 +208,40 @@ async function probeTab(
     password: states.some((state) => state.password),
     agent: states.some((state) => state.agent),
     filled: states.some((state) => state.filled),
+    secrets: states.flatMap((state) => state.secrets ?? []),
   };
 }
 
+/** A field value worth hiding. A page can set its own; skip blanks, essays and piles of them. */
+function keptSecrets(values: readonly string[] | undefined): string[] {
+  const kept: string[] = [];
+  for (const value of values ?? []) {
+    if (value.length < 4 || value.length > 1024 || /[\r\n]/.test(value)) continue;
+    kept.push(value);
+    if (kept.length === 8) break;
+  }
+  return kept;
+}
+
+function hidePasswordValues(state: ProbeState): void {
+  const secrets = keptSecrets(state.secrets);
+  if (secrets.length) rememberSecrets(secrets);
+}
+
 /**
- * Refuses a step that would run code in a page that has held a password. Once no field holds
- * one any more (the sign-in went through, often without a new document), the page is reloaded,
- * which clears what it kept in memory, and the step runs: the agent is never left blind.
+ * Hides a password the agent did not type, then lets the step run. Once no field holds one any
+ * more (the sign-in went through, often without a new document), the page is reloaded, which
+ * clears what it kept in memory, and the step runs.
  */
 export async function guardPageCode(step: BrowserStep): Promise<void> {
   if (!runsPageCode(step) || !("target" in step)) return;
   const tabId = step.target.tabId;
   await typed.ready;
   const state = await checkedProbe(tabId);
-  if (!state.password) return;
-  if (!state.filled) {
-    await reload(tabId);
-    if (!(await checkedProbe(tabId)).password) return;
-  }
-  throw new Error(PASSWORD_PAGE);
+  hidePasswordValues(state);
+  if (!state.password || state.filled) return;
+  await reload(tabId);
+  hidePasswordValues(await checkedProbe(tabId));
 }
 
 /** Chrome's answer when the page's document went away mid-check (it navigated, reloaded or was discarded). */
@@ -232,17 +255,29 @@ export function documentReplaced(message: string): boolean {
  * The probe, once more after a moment when the page was being replaced. A page Aeon still
  * cannot check runs no code either way; only the reason differs.
  */
-async function checkedProbe(tabId: number): Promise<{ password: boolean; filled: boolean }> {
+function unansweredPage(): BrowserActionError {
+  const seconds = (4 * PROBE_MS) / 1000;
+  return new BrowserActionError(
+    "TIMEOUT",
+    `The page did not answer within ${seconds} s (a busy page, or a background tab Chrome paused), so no code ran in it; the cell is still running: try again, or bring the tab to the front.`,
+  );
+}
+
+async function checkedProbe(tabId: number): Promise<ProbeState> {
+  let brought = false;
   for (let attempt = 0; ; attempt++) {
     try {
       return await probeTab(tabId, { agent: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/did not answer the check/.test(message))
-        throw new BrowserActionError(
-          "TIMEOUT",
-          `The page did not answer within ${(2 * PROBE_MS) / 1000} s (a busy page, or a background tab Chrome paused), so no code ran in it; the cell is still running: try again, or bring the tab to the front.`,
-        );
+      if (/did not answer the check/.test(message)) {
+        if (!brought) {
+          brought = true;
+          bringTabForward(tabId);
+          continue;
+        }
+        throw unansweredPage();
+      }
       const replaced = documentReplaced(message);
       if (replaced && attempt === 0) {
         await new Promise((resolve) => setTimeout(resolve, 500));

@@ -64,6 +64,10 @@
     "./tables": {
       "types": "./dist/tables.d.ts",
       "import": "./dist/tables.js"
+    },
+    "./shell-proxy": {
+      "types": "./dist/shell-proxy.d.ts",
+      "import": "./dist/shell-proxy.js"
     }
   },
   "scripts": {

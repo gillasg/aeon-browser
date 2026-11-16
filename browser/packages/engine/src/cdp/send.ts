@@ -1,8 +1,8 @@
 // One bounded send for chrome.debugger. A call that outlives its limit rejects, and that tab stays
-// single-flight until the late call settles, so a retry fails at once instead of waiting out another
-// limit. Reads are not retried: a retry would hit that rule and fail immediately. Slow machines
-// raise engineConfig.cdpLimitFactor. The happy path starts sendCommand in this turn and waits only
-// on that call.
+// single-flight until the late call settles, so a second send fails at once instead of waiting out
+// another limit. A read is not sent twice: when its window ends, the tab is brought forward and the
+// same in-flight call gets one more window. Slow machines raise engineConfig.cdpLimitFactor. The
+// happy path starts sendCommand in this turn and waits only on that call.
 
 import { beginLazyDomain, setDomainFailureNote } from "./domains.js";
 import { engineConfig } from "../engine-config.js";
@@ -27,7 +27,7 @@ export interface CallRecord {
 }
 
 const CLASS_MS: Record<Exclude<CallClass, "eval">, number> = {
-  read: 5_000,
+  read: 10_000,
   input: 5_000,
   emulate: 3_000,
   attach: 10_000,
@@ -104,6 +104,29 @@ export function sendWake<T = unknown>(
   o?: SendOptions,
 ): Promise<T> {
   return dispatch(d, method, params, o, true);
+}
+
+/**
+ * One foregrounding of a tab whose read did not answer. Fired beside the in-flight command:
+ * waiting on the wake would stall the second window when the renderer is what is hung.
+ */
+export function bringTabForward(tabId: number): void {
+  const update = chrome.tabs?.update as
+    ((id: number, props: { active: boolean }) => Promise<unknown>) | undefined;
+  if (typeof update === "function") {
+    try {
+      void Promise.resolve(update(tabId, { active: true })).catch(() => undefined);
+    } catch {
+      // A missing tabs API still leaves the read its second window.
+    }
+  }
+  try {
+    void Promise.resolve(
+      chrome.debugger.sendCommand({ tabId }, "Page.setWebLifecycleState", { state: "active" }),
+    ).catch(() => undefined);
+  } catch {
+    // The wake is best-effort. The read's own deadline still applies.
+  }
 }
 
 /** Time-limit for a promise that is not a CDP method (debugger.attach). Same single-flight map. */
@@ -219,7 +242,13 @@ function watch<T>(tabId: number | undefined, work: Promise<T>, meta: Meta, gate:
     return remember(entry(tabId, meta, ms, ok, err));
   };
   return new Promise((resolve, reject) => {
-    timer = setTimeout(() => onTimeout(tabId, work, meta, gate, stop, reject), meta.ms);
+    const fail = (waited = meta.ms) => onTimeout(tabId, work, meta, gate, stop, reject, waited);
+    timer = setTimeout(() => {
+      if (gate.done) return;
+      if (meta.cls !== "read" || tabId === undefined) return fail();
+      bringTabForward(tabId);
+      timer = setTimeout(() => fail(meta.ms * 2), meta.ms);
+    }, meta.ms);
     work.then(
       (value) => {
         if (gate.done) return;
@@ -242,10 +271,11 @@ function onTimeout<T>(
   gate: Gate,
   stop: (ok: boolean, err?: string, ms?: number) => CallRecord,
   reject: (error: Error) => void,
+  waited = meta.ms,
 ): void {
   if (gate.done) return;
-  const error = timeoutError(meta, tabId);
-  const record = stop(false, error.message, meta.ms);
+  const error = timeoutError(meta, tabId, waited);
+  const record = stop(false, error.message, waited);
   if (tabId !== undefined) armStuck(tabId, work, record, meta);
   if (meta.cls === "input" && tabId !== undefined) noteLateInput(tabId, callName(meta));
   reject(error);
@@ -284,9 +314,9 @@ function rejectStuck(tabId: number, method: string, label?: string): Promise<nev
   return Promise.reject(error);
 }
 
-function timeoutError(meta: Meta, tabId: number | undefined): Error {
+function timeoutError(meta: Meta, tabId: number | undefined, waited = meta.ms): Error {
   const code = meta.cls === "eval" || meta.cls === "nav" ? "TIMEOUT" : "TAB_UNRESPONSIVE";
-  const seconds = (meta.ms / 1000).toFixed(1);
+  const seconds = (waited / 1000).toFixed(1);
   let text = `${code}: ${callName(meta)} did not answer in ${seconds} s on tab ${tabId ?? "?"}`;
   if (meta.cls !== "input") return new Error(text);
   text += ` {"mayHaveLateEffects":true}`;

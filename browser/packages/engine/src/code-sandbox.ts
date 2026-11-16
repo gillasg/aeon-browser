@@ -1,7 +1,14 @@
 // One chat's browser_code realm. Runs in a manifest sandbox page, where eval is allowed and
 // no extension APIs exist; every browser or workspace request goes to the parent document.
 import { toReplScript } from "./code-repl.js";
-import { errorHint, errorNextCall, leadingCode, nameModelCodeError } from "@browserkit/protocol";
+import {
+  abilityRepairCall,
+  ABILITY_REPAIR_HINT,
+  errorHint,
+  errorNextCall,
+  leadingCode,
+  nameModelCodeError,
+} from "@browserkit/protocol";
 import { browserCodeApi } from "./code-api.js";
 import { browserFastApi } from "./code-api-page.js";
 import { browserCapabilityApi, browserDocumentApi } from "./code-api-hooks.js";
@@ -34,6 +41,7 @@ let sequence = 0;
 let queue: Promise<void> = Promise.resolve();
 let output = "";
 let asynchronousError: string | undefined;
+let stopped = false;
 
 function format(value: unknown): string {
   if (typeof value === "string") return value;
@@ -130,11 +138,17 @@ window.addEventListener("message", (event) => {
     pending.delete(String(message.callId));
     if (typeof message.error === "string") waiter?.reject(new Error(message.error));
     else waiter?.resolve(message.value);
+  } else if (message.kind === "stop") {
+    // The host is dropping this frame because the cell's deadline passed. Reject what it is
+    // waiting on so an async cell unwinds; a sync loop still dies when the frame is removed.
+    stopped = true;
+    for (const waiter of pending.values()) waiter.reject(new Error("RUN_RESET"));
+    pending.clear();
   } else if (message.kind === "cell") {
-    // One cell at a time. A cell that outlived its deadline still owns the realm until its code
-    // returns; starting the next one now would overwrite cellId and hand the old cell's late
-    // result to the new cell. The queue keeps its variables and tabs without mixing results.
-    queue = queue.then(() => run(message)).catch(() => undefined);
+    // One cell at a time, and only while this frame is alive. A deadline stops the frame, so a
+    // timed-out cell does not keep running and its late result cannot reach the next cell.
+    if (stopped) return;
+    queue = queue.then(() => (stopped ? undefined : run(message))).catch(() => undefined);
   }
 });
 
@@ -164,8 +178,10 @@ async function run(message: Record<string, unknown>): Promise<void> {
       String(message.code),
     );
   }
+  // The frame is being removed. Do not observe or post a result the next cell could take.
+  if (stopped) return;
   // Calls the cell started but did not await still finish before the final observation.
-  for (let waited = 0; pending.size && waited < 10_000; waited += 5)
+  for (let waited = 0; pending.size && !stopped && waited < 10_000; waited += 5)
     await new Promise((resolve) => setTimeout(resolve, 5));
   try {
     const slept = String(evaluate("__sleepReport()") || "");
@@ -205,9 +221,11 @@ function withHint(message: string, raw: string, code: string): string {
   } catch {
     // No hint: the error stands as it is.
   }
-  // Without a hint of its own, the error's shared code still says how to recover.
-  hint ||= message.includes("\nHint: ") ? "" : errorHint(leadingCode(message) ?? "");
-  const next = /\nNext: /.test(message) ? "" : errorNextCall(leadingCode(message) ?? "");
+  // A drifted ability names its repair. Otherwise the shared code says how to recover.
+  const repair = abilityRepairCall(message);
+  if (repair) hint = ABILITY_REPAIR_HINT;
+  else hint ||= message.includes("\nHint: ") ? "" : errorHint(leadingCode(message) ?? "");
+  const next = /\nNext: /.test(message) ? "" : repair || errorNextCall(leadingCode(message) ?? "");
   const lines = [message, ...(hint ? [`Hint: ${hint}`] : []), ...(next ? [`Next: ${next}`] : [])];
   return lines.join("\n");
 }

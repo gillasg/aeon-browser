@@ -56,7 +56,9 @@ export class RoutineScheduler {
     this.started = true;
     await this.reconcileOpenRuns();
     this.listeners.start();
-    await this.tick();
+    // Due checks can sit on a page that is gone. Ready must not wait for that first tick:
+    // initialization is killed if it has not finished in about 15 s.
+    void this.tick();
   }
 
   wake(): void {

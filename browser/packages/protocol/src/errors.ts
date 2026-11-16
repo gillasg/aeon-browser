@@ -9,9 +9,17 @@
 //
 // A failure no code names is INTERNAL (ours): an unnamed failure is itself a bug.
 
-import { errorNext, formatCandidateLines, type ErrorContext } from "./error-next.js";
+import {
+  abilityRepairCall,
+  ABILITY_REPAIR_HINT,
+  errorNext,
+  formatCandidateLines,
+  type ErrorContext,
+} from "./error-next.js";
 
 export {
+  abilityRepairCall,
+  ABILITY_REPAIR_HINT,
   effectNext,
   errorNext,
   formatCandidateLines,
@@ -79,7 +87,7 @@ export const ERRORS = {
   ],
   PASSWORD_PAGE: [
     "user",
-    "a password this code did not type is in the page, so no code runs in it; clicks still work: click the filled form's Log in / Sign in button, else page.reload() to read it again",
+    "a password this code did not type is in the page, so its value is hidden; navigation, reads and clicks still work",
   ],
   UNSUPPORTED: ["page", "this browser cannot do that here: use another way"],
   INVALID_TARGET: ["model", "the target is malformed: pass a tab, a page or a bu id"],
@@ -158,8 +166,9 @@ export function errorNextCall(code: string, ctx?: ErrorContext): string {
 /** "CODE: detail", the candidates, the recovery hint, and the call to run next. */
 export function describeError(code: string, detail = "", ctx?: ErrorContext): string {
   const head = detail && detail !== code ? `${code}: ${detail}` : code;
-  const hint = errorHint(code);
-  const next = errorNextCall(code, ctx);
+  const repair = abilityRepairCall(detail);
+  const hint = repair ? ABILITY_REPAIR_HINT : errorHint(code);
+  const next = repair || errorNextCall(code, ctx);
   return [
     head,
     ...formatCandidateLines(ctx?.candidates),

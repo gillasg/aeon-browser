@@ -64,18 +64,18 @@ export class BrowserCodeCells {
       };
       const expire = () => {
         const stage = this.cells.get(cellId)?.stage ?? "sent";
-        // A realm that never began evaluating cannot be trusted: drop it so the next cell starts
-        // clean. A cell that was evaluating keeps its variables, as before.
+        // Always drop the realm. An evaluating cell left running keeps its loop, interval or
+        // observer alive in the extension renderer for the rest of the Chrome session.
         const neverEvaluated =
           stage === "sent" ||
           stage === "received" ||
           stage === "offscreen" ||
           stage === "realm-ready";
-        cancel(neverEvaluated);
+        cancel(true);
         finish(
           undefined,
           new Error(
-            `${neverEvaluated ? "INTERNAL: the browser never started this code; " : "TIMEOUT: "}browser code exceeded its deadline (last stage: ${stage}); that cell stopped, and its variables and tabs ${neverEvaluated ? "were reset" : "are still there"}.`,
+            `${neverEvaluated ? "INTERNAL: the browser never started this code; " : "TIMEOUT: "}browser code exceeded its deadline (last stage: ${stage}); that cell stopped and its realm was reset.`,
           ),
         );
       };
