@@ -64,18 +64,12 @@ export function mergeActivity(
 /** Null when nothing is listening. A failed activity read falls back to the attention snapshot. */
 export async function probeDaemonActivity(): Promise<ActivityReply | null> {
   const { AeonClient } = await import("./client.js");
-  let client: InstanceType<typeof AeonClient> | undefined;
+  const client = await AeonClient.connect().catch(() => undefined);
+  if (!client) return null;
   try {
-    client = await AeonClient.connect();
+    return await client.activity();
   } catch {
-    return null;
-  }
-  try {
-    try {
-      return await client.activity();
-    } catch {
-      return mergeActivity(undefined, client.snapshotChats());
-    }
+    return mergeActivity(undefined, client.snapshotChats());
   } finally {
     client.close();
   }
