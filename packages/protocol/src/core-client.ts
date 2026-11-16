@@ -380,4 +380,19 @@ export const CorePingResultSchema = z
     ok: z.literal(true),
   })
   .strict();
+/** Whether a chat, ability, or routine is running. `aeon update` waits while this is busy. */
+export const CoreActivityRequestSchema = z
+  .object({
+    kind: z.literal("core.activity"),
+    requestId: z.string().uuid(),
+  })
+  .strict();
+export const CoreActivityResultSchema = z
+  .object({
+    kind: z.literal("core.activity.result"),
+    requestId: z.string().uuid(),
+    idle: z.boolean(),
+    busy: z.array(z.string().max(200)).max(20),
+  })
+  .strict();
 export type CoreBrowserSummary = z.infer<typeof CoreBrowserSummarySchema>;

@@ -22,6 +22,7 @@ export class AeonClient {
   private readonly waiting = new Map<string, (message: Json) => void>();
   private readonly attentionListeners = new Set<(chats: AttentionChat[]) => void>();
   private openWaiters = new Map<string, (reply: Json) => void>();
+  private lastChats: { working?: boolean; asking?: unknown }[] = [];
   private pinger: ReturnType<typeof setInterval> | undefined;
 
   private constructor(private readonly socket: WebSocket) {
@@ -219,6 +220,21 @@ export class AeonClient {
     return this.ask("core.health", {}, "core.health.result", timeoutMs);
   }
 
+  /** Chats, routines, cells and abilities still running. Older daemons never answer this. */
+  activity(timeoutMs = 1500): Promise<{ idle: boolean; busy: string[] }> {
+    return this.ask("core.activity", {}, "core.activity.result", timeoutMs).then((message) => ({
+      idle: message.idle === true,
+      busy: Array.isArray(message.busy)
+        ? message.busy.filter((item): item is string => typeof item === "string")
+        : [],
+    }));
+  }
+
+  /** The latest attention snapshot, for an update that is talking to an older daemon. */
+  snapshotChats(): { working?: boolean; asking?: unknown }[] {
+    return this.lastChats;
+  }
+
   /** Lists the connected browsers (one per Chrome profile), naming one first if asked. */
   browsers(rename?: { browser: string; name: string }): Promise<Json> {
     return this.ask("core.browsers", rename ? { rename } : {}, "core.browsers.result");
@@ -348,6 +364,9 @@ export class AeonClient {
 
   private receive(message: Json): void {
     if (message.kind === "core.attention.snapshot") {
+      this.lastChats = Array.isArray(message.chats)
+        ? (message.chats as { working?: boolean; asking?: unknown }[])
+        : [];
       for (const listener of this.attentionListeners) listener(message.chats as AttentionChat[]);
       return;
     }

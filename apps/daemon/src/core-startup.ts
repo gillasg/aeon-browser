@@ -71,12 +71,14 @@ export async function startStandaloneCore(): Promise<void> {
   try {
     runtime = createProductionRuntime(directory);
     await runtime.ready;
+    const activity = runtime.activity;
     core = await startCoreTransport(
       directory,
       runtime.service,
       runtime.browserControl,
       runtime.threadCoordination,
       runtime.attention,
+      activity,
     );
     const origin = process.env.AEON_BROWSER_ORIGIN;
     if (origin)

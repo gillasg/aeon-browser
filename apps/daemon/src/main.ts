@@ -85,12 +85,14 @@ async function runManagedDaemon(): Promise<void> {
       runtime.attention,
     );
     phase("core");
+    const activity = runtime.activity;
     coreTransport = await startCoreTransport(
       dataDirectory,
       runtime.service,
       runtime.browserControl,
       runtime.threadCoordination,
       runtime.attention,
+      activity,
     );
     phase("ready");
     writeReply("AEON_DAEMON_READY\n");

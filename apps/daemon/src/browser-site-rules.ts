@@ -52,6 +52,13 @@ export class BrowserSiteRules {
     this.routineRuns.set(chatId, runs);
   }
 
+  /** Routine runs the agent is inside right now. */
+  activeRoutineCount(): number {
+    let count = 0;
+    for (const runs of this.routineRuns.values()) count += runs.size;
+    return count;
+  }
+
   /** The run ended (or the daemon lost it): the chat is back to the user's own messages. */
   endRoutineRun(chatId: string, runId: string): void {
     const runs = this.routineRuns.get(chatId);

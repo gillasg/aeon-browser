@@ -25,6 +25,7 @@ import { handleBrowserRun } from "./core-browser.js";
 import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
 import { handleCoreHealth, handleCorePing } from "./core-health.js";
+import { handleCoreActivity, idleActivity, type ActivityCounts } from "./daemon-activity.js";
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
 
@@ -34,6 +35,7 @@ export async function startCoreTransport(
   browser: BrowserControlService,
   threads: ThreadCoordinationService,
   attention: CoreAttention,
+  activity: () => ActivityCounts = idleActivity,
 ): Promise<{ close(): Promise<void> }> {
   const token = randomBytes(32).toString("base64url");
   const server = new WebSocketServer({
@@ -46,7 +48,7 @@ export async function startCoreTransport(
       callback(!info.req.headers.origin, 403, "NATIVE_CLIENT_REQUIRED"),
   });
   server.on("connection", (socket) =>
-    authenticate(socket, token, service, browser, threads, attention, directory),
+    authenticate(socket, token, service, browser, threads, attention, directory, activity),
   );
   await once(server, "listening");
   const address = server.address();
@@ -85,6 +87,7 @@ function authenticate(
   threads: ThreadCoordinationService,
   attention: CoreAttention,
   directory: string,
+  activity: () => ActivityCounts,
 ): void {
   const timer = setTimeout(() => socket.close(1008, "AUTHENTICATION_TIMEOUT"), 3000);
   socket.once("close", () => clearTimeout(timer));
@@ -121,7 +124,8 @@ function authenticate(
       () => true,
       (chatId, target, url) => browser.attachContext(chatId, target, url),
       threads,
-      (candidate) => routeAuthenticated(socket, candidate, attention, service, browser, directory),
+      (candidate) =>
+        routeAuthenticated(socket, candidate, attention, service, browser, directory, activity),
     );
   };
   socket.on("message", onMessage);
@@ -134,8 +138,10 @@ function routeAuthenticated(
   service: ChatService,
   browser: BrowserControlService,
   directory: string,
+  activity: () => ActivityCounts,
 ): boolean {
   const routes = [
+    () => handleCoreActivity(socket, candidate, activity),
     () => handleAttentionMessage(socket, candidate, attention),
     () => handleOpenChat(socket, candidate, service, browser),
     () => handleChatStop(socket, candidate, service, browser),

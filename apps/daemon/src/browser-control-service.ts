@@ -66,6 +66,10 @@ export class BrowserControlService {
   useDefaultSpaces(lookup: (chatId: string) => "window" | "tabs" | undefined): void {
     this.spaceForChat = lookup;
   }
+  /** Browser-code cells that have not finished. `aeon update` waits for these. */
+  activeCellCount(): number {
+    return this.cells.activeCount();
+  }
   resyncScripts(clientId: string): void {
     const socket = this.executors.get(clientId);
     if (this.scriptClients.has(clientId) && socket?.readyState === WebSocket.OPEN)
