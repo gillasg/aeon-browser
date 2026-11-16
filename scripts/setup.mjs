@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { pnpmCommand, runCommand } from "./setup-process.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = new Set(process.argv.slice(2));
@@ -24,11 +25,11 @@ if (!windows && process.platform !== "darwin" && process.platform !== "linux") {
 }
 
 const run = (command, commandArgs, options = {}) =>
-  execFileSync(command, commandArgs, { cwd: root, stdio: "inherit", shell: true, ...options });
+  runCommand(command, commandArgs, { cwd: root, stdio: "inherit", ...options });
 
 say("1/4 Building Aeon…");
-run("pnpm", ["install", "--ignore-scripts"]);
-run("pnpm", ["build"]);
+run(pnpmCommand(), ["install", "--ignore-scripts"]);
+run(pnpmCommand(), ["build"]);
 
 say("2/4 Installing the native host and the background service…");
 if (windows) installWindowsHost();
