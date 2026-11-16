@@ -1,58 +1,40 @@
-import { send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { engineDebug } from "./native-debug-log.js";
 import { withLock } from "./native-browser-scheduler.js";
 import { guardAgentTab } from "./native-browser-tab-cleanup.js";
-import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { handoffActive } from "./native-browser-control.js";
 import { noteUserLogin } from "./native-browser-vault.js";
-import {
-  agentNeedsExpression,
-  showAgentBadge,
-  showAgentNeeds,
-  tabRecording,
-} from "./native-browser-cursor.js";
+import { hideHandoffAsk, showHandoffAsk } from "./native-browser-ask.js";
+import { showAgentBadge, showAgentNeeds, tabRecording } from "./native-browser-cursor.js";
 
 // Hand-off: the agent pauses and asks the user to do something in the real tab (sign in, 2FA,
 // pick an option). The cursor turns amber, points at the element when one is given, and its pill
 // carries the request with Done and Cancel; the cell waits until one is clicked. Login flows
-// navigate, so the pill is shown again on each new document. A system notification is sent only
-// when the user cannot see the tab (its window is not in front, or the tab is being recorded,
-// when the page shows nothing of ours); the chat's card carries it too.
+// navigate, so the pill and the ask are shown again on each new document. The typed answer lives
+// in the isolated world (native-browser-ask.ts), never where the page can read or forge it. A
+// system notification is sent only when the user cannot see the tab (its window is not in front,
+// or the tab is being recorded, when the page shows nothing of ours); the chat's card carries it.
 const POLL_MS = 600;
 const MAX_WAIT_MS = 30 * 60_000;
 
-function handoffKey(): string {
-  return "aeon.handoff." + Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-/**
- * The hand-off's state in the page: Done or Cancel in the cursor's pill sets it, and so does an
- * answer typed into the pill instead ({answer}). "fresh" means a new document (the site
- * navigated), so the pill is shown again. The key is random per hand-off, so a page cannot name it.
- */
-function stateExpression(key: string): string {
-  return `(() => {
-  const state = globalThis[Symbol.for(${JSON.stringify(key)})];
-  if (state === "done" || state === "cancelled") return state;
-  if (state && typeof state === "object" && typeof state.answer === "string") return { answer: state.answer };
-  if (!state) { globalThis[Symbol.for(${JSON.stringify(key)})] = "waiting"; return "fresh"; }
-  return "waiting";
-})()`;
-}
-
-function clearExpression(key: string): string {
-  return `(() => { delete globalThis[Symbol.for(${JSON.stringify(key)})]; })()`;
-}
-
-// Answers given from the chat's hand-off card, keyed by tab; the next poll picks them up.
+// Answers given from the chat's hand-off card or from the cursor's ask, keyed by tab; the next
+// poll picks them up.
 const answers = new Map<number, "done" | "cancelled">();
 onEngineInstall(() => {
   chrome.runtime.onMessage.addListener((message, sender) => {
     if (sender.id !== chrome.runtime.id || message?.kind !== "aeon.handoff.answer") return;
+    // The ask includes its tab; the chat's hand-off card names the target too. Only fall back to
+    // the sender's tab when the message carries none (a card in a chat tab must not answer for
+    // the chat tab itself).
+    const tabId = Number.isSafeInteger(message.tabId) ? message.tabId : sender.tab?.id;
+    if (tabId === undefined) return;
     if (message.answer === "done" || message.answer === "cancelled")
-      answers.set(Number(message.tabId), message.answer);
+      answers.set(tabId, message.answer);
+    else if (message.answer && typeof message.answer.answer === "string") {
+      typed.set(tabId, message.answer.answer.slice(0, 2000));
+      answers.set(tabId, "done");
+    }
   });
 });
 
@@ -71,6 +53,25 @@ async function userSees(tabId: number, windowId: number): Promise<boolean> {
   const window = await chrome.windows.get(windowId).catch(() => undefined);
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   return Boolean(window?.focused && window.state !== "minimized" && tab?.active);
+}
+
+/** Keep the request and its ask up across a login flow's navigations. */
+function followNavigation(
+  tabId: number,
+  message: string,
+  spotlight?: { x: number; y: number; width: number; height: number },
+): (details: { tabId: number; frameId: number }) => void {
+  const point = spotlight
+    ? {
+        x: Math.round(spotlight.x + spotlight.width / 2),
+        y: Math.round(spotlight.y + spotlight.height / 2),
+      }
+    : undefined;
+  return (details) => {
+    if (details.tabId !== tabId || details.frameId !== 0) return;
+    showAgentNeeds(tabId, message, spotlight);
+    void showHandoffAsk(tabId, point);
+  };
 }
 
 export async function handOffToUser(
@@ -101,43 +102,43 @@ export async function handOffToUser(
       })
       .catch(() => undefined);
   const deadline = Date.now() + MAX_WAIT_MS;
-  const key = handoffKey();
   answers.delete(tabId);
   typed.delete(tabId);
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
-  showAgentNeeds(tabId, message, spotlight, key);
+  showAgentNeeds(tabId, message, spotlight);
+  const follow = followNavigation(tabId, message, spotlight);
+  chrome.webNavigation.onCommitted.addListener(follow);
+  void showHandoffAsk(
+    tabId,
+    spotlight
+      ? {
+          x: Math.round(spotlight.x + spotlight.width / 2),
+          y: Math.round(spotlight.y + spotlight.height / 2),
+        }
+      : undefined,
+  );
   engineDebug("handoff", "shown", { tab: tabId });
   const startedAt = Date.now();
   try {
     while (active() && Date.now() < deadline) {
-      if (!(await chrome.tabs.get(tabId).catch(() => undefined))) throw new Error("TARGET_LOST");
       const answered = answers.get(tabId);
       if (answered) return answered;
+      if (!(await chrome.tabs.get(tabId).catch(() => undefined))) throw new Error("TARGET_LOST");
       // A password the user types here is kept (never shown to the agent) so it can be saved.
       await noteUserLogin(tabId);
-      const state = tabRecording(tabId) ? "waiting" : await evaluate(tabId, stateExpression(key));
-      engineDebug("handoff", "poll", { tab: tabId, state, ms: Date.now() - startedAt });
-      if (state === "done" || state === "cancelled") return state;
-      if (typeof (state as { answer?: unknown } | null)?.answer === "string") {
-        typed.set(tabId, (state as { answer: string }).answer);
-        return "done";
-      }
-      if (state === "fresh") {
-        void showAgentBadge(tabId, true);
-        await evaluate(tabId, agentNeedsExpression(message, spotlight, key)).catch(() => undefined);
-      }
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     }
     return "cancelled";
   } finally {
+    chrome.webNavigation.onCommitted.removeListener(follow);
     engineDebug("handoff", "end", { tab: tabId, ms: Date.now() - startedAt });
     guardAgentTab(tabId, false);
     handoffActive(tabId, false);
+    void hideHandoffAsk(tabId);
     showAgentNeeds(tabId, null);
     answers.delete(tabId);
     void chrome.notifications.clear(notification).catch(() => undefined);
-    void evaluate(tabId, clearExpression(key)).catch(() => undefined);
   }
 }
 
@@ -155,22 +156,3 @@ onEngineInstall(() => {
     );
   });
 });
-
-async function evaluate(tabId: number, expression: string): Promise<unknown> {
-  // A page mid-navigation has no context to evaluate in; that poll just reports "waiting".
-  const result = await withBrowserDebugger(tabId, (debuggee) =>
-    send(
-      debuggee,
-      "Runtime.evaluate",
-      { expression, returnByValue: true, silent: true },
-      { label: "evaluate", ms: 5_000 },
-    ),
-  ).catch((error: unknown) => {
-    engineDebug("handoff", "probe-failed", {
-      tab: tabId,
-      error: String(error).slice(0, 300),
-    });
-    return undefined;
-  });
-  return (result as { result?: { value?: unknown } } | undefined)?.result?.value ?? "waiting";
-}
