@@ -217,13 +217,18 @@ function inferSteps(steps: unknown[] | undefined, context: Context): unknown[] |
   });
 }
 
-function typedArg(value: unknown, step: { target?: { name?: string } }, context: Context): unknown {
+function typedArg(
+  value: unknown,
+  step: { kind?: unknown; target?: { name?: string } },
+  context: Context,
+): unknown {
   if (typeof value !== "string" || value.length < 3 || value.includes("{")) return value;
   if (SECRET_FIELD.test(step.target?.name ?? "")) return value;
+  const from = step.kind === "upload" ? "upload" : "typed";
   const named = context.demonstrated.get(value);
-  if (named) return template(named, value, "input", context);
+  if (named) return template(named, value, from, context);
   if (context.typed.has(value))
-    return template(inputName(context.typed.get(value), value), value, "typed", context);
+    return template(inputName(context.typed.get(value), value), value, from, context);
   return value;
 }
 
@@ -253,21 +258,13 @@ function safeDecode(value: string): string {
   }
 }
 
-function template(
-  name: string,
-  example: string,
-  from: "typed" | "input" | "query",
-  context: Context,
-): string {
+type InputFrom = "typed" | "input" | "query" | "upload";
+
+function template(name: string, example: string, from: InputFrom, context: Context): string {
   return `{{inputs.${ensureInput(name, example, from, context)}}}`;
 }
 
-function ensureInput(
-  wanted: string,
-  example: string,
-  from: "typed" | "input" | "query",
-  context: Context,
-): string {
+function ensureInput(wanted: string, example: string, from: InputFrom, context: Context): string {
   const base = camelName(wanted) || "value";
   if (context.properties[base]) return base;
   const same = Object.entries(context.properties).find(
@@ -275,12 +272,20 @@ function ensureInput(
   );
   if (same) return same[0];
   const name = freeName(base, context);
-  const secret = looksSecretValue(example);
+  const upload = from === "upload";
+  const secret = upload || looksSecretValue(example);
   context.properties[name] = {
     type: "string",
+    ...(upload ? { format: "path", "x-upload": true } : {}),
     ...(secret ? {} : { example }),
     "x-from": from,
-    ...(secret ? { description: "Typed during the run; the value was not stored" } : {}),
+    ...(secret
+      ? {
+          description: upload
+            ? "Workspace path of the file to upload; the recorded path was not stored"
+            : "Typed during the run; the value was not stored",
+        }
+      : {}),
   };
   context.added.push(name);
   return name;

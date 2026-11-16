@@ -123,6 +123,29 @@ test("a literal found more than once in earlier answers is left alone", () => {
   assert.deepEqual(inferred.references, []);
 });
 
+test("an upload step keeps its upload type and takes a file-path input", () => {
+  const inferred = inferAbilityInputs(
+    base({
+      inputs: { type: "object", properties: {} },
+      ways: [
+        {
+          kind: "steps",
+          steps: [{ kind: "upload", target: { name: "Resume" }, args: ["/tmp/cv.pdf", "second"] }],
+        },
+      ],
+    }),
+    { typed: [{ field: "Resume", value: "/tmp/cv.pdf" }] },
+  );
+  const step = inferred.ability.ways[0].steps[0];
+  assert.equal(step.kind, "upload", "it is still a file upload");
+  assert.equal(step.args[0], "{{inputs.resume}}");
+  assert.equal(step.args[1], "second");
+  const property = inferred.ability.inputs.properties.resume;
+  assert.equal(property.format, "path");
+  assert.equal(property["x-upload"], true);
+  assert.equal(property.example, undefined, "the recorded path is not stored");
+});
+
 test("a page-query value becomes an input and stays a template in the URL", async () => {
   await withHome(async () => {
     await saveAbility(

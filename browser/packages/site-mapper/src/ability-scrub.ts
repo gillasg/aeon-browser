@@ -41,7 +41,7 @@ interface Found {
   reason: "secret" | "personal";
 }
 
-const TYPING = new Set(["fill", "type", "select", "choose", "setValue", "setvalue"]);
+const TYPING = new Set(["fill", "type", "select", "choose", "setValue", "setvalue", "upload"]);
 const SECRET_NAME =
   /password|passcode|passwd|secret|token|otp|cvv|cvc|api[_-]?key|authorization|security code|card number/i;
 const JWT = /\beyJ[\w-]{6,4096}\.[\w-]{6,8192}\.[\w-]{6,4096}\b/;
@@ -77,8 +77,9 @@ function templateTypedSecrets(ability: Ability): ScrubMark[] {
     for (const step of way.steps) {
       if (!isTypedSecret(step)) continue;
       const field = String(step.target?.name ?? "secret");
-      const name = secretInputName(field, ability);
-      step.args = [`{{inputs.${name}}}`];
+      const upload = step.kind === "upload";
+      const name = secretInputName(field, ability, upload);
+      step.args = secretArgs(step.args, `{{inputs.${name}}}`);
       way.redacted = true;
       marks.push({
         where: "way",
@@ -92,7 +93,9 @@ function templateTypedSecrets(ability: Ability): ScrubMark[] {
   return marks;
 }
 
-function isTypedSecret(step: unknown): step is { args?: unknown[]; target?: { name?: string } } {
+function isTypedSecret(
+  step: unknown,
+): step is { args?: unknown[]; kind?: string; target?: { name?: string } } {
   if (!step || typeof step !== "object") return false;
   const value = step as {
     kind?: unknown;
@@ -103,13 +106,23 @@ function isTypedSecret(step: unknown): step is { args?: unknown[]; target?: { na
   return value.sensitive === true || SECRET_NAME.test(value.target?.name ?? "");
 }
 
-function secretInputName(field: string, ability: Ability): string {
+/** Only the argument that carried the secret is templated; a select keeps its label, and an
+ * upload keeps the upload step with a workspace-path input. */
+function secretArgs(args: unknown[] | undefined, template: string): unknown[] {
+  if (!args?.length) return [template];
+  return args.map((arg, index) => (index === 0 ? template : arg));
+}
+
+function secretInputName(field: string, ability: Ability, upload: boolean): string {
   const properties = inputProperties(ability);
   const base = camel(field) || "secret";
   if (properties[base]) return base;
   properties[base] = {
     type: "string",
-    description: "Typed during the run; the value was not stored",
+    ...(upload ? { format: "path", "x-upload": true } : {}),
+    description: upload
+      ? "Workspace path of the file to upload; the value was not stored"
+      : "Typed during the run; the value was not stored",
   };
   return base;
 }

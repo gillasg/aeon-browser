@@ -133,6 +133,39 @@ test("a password typed into a step becomes a caller input with no example", asyn
   });
 });
 
+test("a typed secret keeps the other arguments and an upload keeps its type", async () => {
+  await withHome(async (root) => {
+    await saveAbility(
+      base({
+        ways: [
+          {
+            kind: "steps",
+            steps: [
+              { kind: "fill", target: { name: "Password" }, args: ["hunter2000", "keep-me"] },
+              {
+                kind: "upload",
+                target: { name: "Passport" },
+                args: ["/home/user/passport.pdf", "image/png"],
+                sensitive: true,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const stored = await readAbility("example.com", "search");
+    const [fill, upload] = stored.ways[0].steps;
+    assert.deepEqual(fill.args, ["{{inputs.password}}", "keep-me"]);
+    assert.deepEqual(upload.args, ["{{inputs.passport}}", "image/png"]);
+    assert.equal(upload.kind, "upload");
+    assert.equal(stored.inputs.properties.passport.format, "path");
+    assert.equal(stored.inputs.properties.passport["x-upload"], true);
+    const file = await readFile(join(root, "sites/example.com/abilities/search.json"), "utf8");
+    assert.ok(!file.includes("hunter2000"));
+    assert.ok(!file.includes("/home/user/passport.pdf"));
+  });
+});
+
 test("a stored test case keeps its shape and loses the secret", async () => {
   await withHome(async (root) => {
     await saveAbility(
