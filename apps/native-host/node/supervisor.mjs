@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { chmodSync, mkdirSync, unlinkSync } from "node:fs";
+import { chmodSync, statSync, unlinkSync } from "node:fs";
 import net from "node:net";
 import { dirname } from "node:path";
-import { hostPaths } from "./paths.mjs";
+import { ensureSocketDirectory, hostPaths, socketOwnerProblem } from "./paths.mjs";
 import { loadConfig } from "./config.mjs";
 import { createLineReader } from "./line-reader.mjs";
 import { SupervisorLog, SupervisorStatus } from "./supervisor-files.mjs";
@@ -71,7 +71,9 @@ class Supervisor {
   }
 
   async run() {
-    if (!(await this.bind())) return 0;
+    const bound = await this.bind();
+    if (bound === "refused") return 1;
+    if (bound === "duplicate") return 0;
     this.status.write();
     this.log.write(`Supervisor started, process ${process.pid}, socket ${this.paths.socket}`);
     try {
@@ -88,15 +90,44 @@ class Supervisor {
       .catch((error) => this.log.write("Client failed: " + error.message));
   }
 
+  /** "ok" bound here, "duplicate" another supervisor of this user owns it, "refused" unsafe. */
   async bind() {
-    mkdirSync(dirname(this.paths.socket), { recursive: true, mode: 0o700 });
+    try {
+      ensureSocketDirectory(dirname(this.paths.socket));
+    } catch (error) {
+      this.log.write("Bootstrap socket refused: " + error.message);
+      return "refused";
+    }
+    // A restrictive umask closes the window between listen() and chmod(): the socket is never
+    // created with group or other access, even if our chmod fails.
+    const prior = process.platform === "win32" ? undefined : process.umask(0o077);
+    let state;
+    try {
+      state = await this.listenOnSocket();
+    } finally {
+      if (prior !== undefined) process.umask(prior);
+    }
+    if (state !== "ok") return state;
+    chmodSync(this.paths.socket, 0o600);
+    this.socketIdentity = statSync(this.paths.socket);
+    this.server.on("error", (error) => this.log.write("Bootstrap socket: " + error.message));
+    return "ok";
+  }
+
+  async listenOnSocket() {
     try {
       await listen(this.server, this.paths.socket);
+      return "ok";
     } catch (error) {
       if (error.code !== "EADDRINUSE") throw error;
+      const problem = socketOwnerProblem(this.paths.socket);
+      if (problem) {
+        this.log.write("Bootstrap socket refused: " + problem);
+        return "refused";
+      }
       if (await canConnect(this.paths.socket)) {
         this.log.write("Another supervisor already owns the daemon.");
-        return false;
+        return "duplicate";
       }
       try {
         unlinkSync(this.paths.socket);
@@ -104,10 +135,8 @@ class Supervisor {
         // Another process removed the stale socket first.
       }
       await listen(this.server, this.paths.socket);
+      return "ok";
     }
-    chmodSync(this.paths.socket, 0o600);
-    this.server.on("error", (error) => this.log.write("Bootstrap socket: " + error.message));
-    return true;
   }
 
   async restartForever() {
@@ -384,7 +413,15 @@ class Supervisor {
     await this.pending.catch(() => undefined);
     for (const [signal, handler] of this.signals) process.off(signal, handler);
     try {
-      unlinkSync(this.paths.socket);
+      // Only the socket this process bound: a same-user supervisor that took over after our
+      // server closed keeps its own socket.
+      const now = statSync(this.paths.socket);
+      if (
+        this.socketIdentity &&
+        now.dev === this.socketIdentity.dev &&
+        now.ino === this.socketIdentity.ino
+      )
+        unlinkSync(this.paths.socket);
     } catch {
       // Already gone.
     }
