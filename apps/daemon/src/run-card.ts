@@ -3,6 +3,7 @@
 // is never a card.
 
 import type { RunCard, RunCardItem } from "@aeon/protocol";
+import { missingFileLine } from "./missing-answer-files.js";
 import { unreadLine } from "./unread-quotes.js";
 
 export type SpeedPath = "from memory" | "with a saved draft" | "saved ability" | "first time";
@@ -27,6 +28,8 @@ export interface RunFacts {
   declined?: string[];
   /** Quotes in the answer that no text returned to the model this run contains. */
   unread?: string[];
+  /** Local files the answer links that are not in the workspace or its downloads/. */
+  missingFiles?: string[];
 }
 
 type Offer = Extract<RunCardItem, { kind: "offer" }>;
@@ -75,6 +78,8 @@ function noticesFor(facts: RunFacts): Notice[] {
   const notices: Notice[] = [];
   if (facts.unread?.length)
     notices.push({ kind: "notice", text: unreadLine(facts.unread).slice(0, 200) });
+  if (facts.missingFiles?.length)
+    notices.push({ kind: "notice", text: missingFileLine(facts.missingFiles).slice(0, 200) });
   if (facts.durationMs !== undefined && facts.path)
     notices.push({
       kind: "notice",

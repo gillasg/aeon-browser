@@ -30,6 +30,8 @@ import {
   type LiveRun,
   type SeenStep,
 } from "./route-observe.js";
+import { join } from "node:path";
+import { missingAnswerFiles } from "./missing-answer-files.js";
 import { buildRunCard, type RunFacts } from "./run-card.js";
 import { unreadQuotes } from "./unread-quotes.js";
 
@@ -74,6 +76,7 @@ export class RouteRecorder {
   constructor(
     private readonly hub: RunCardHub,
     private readonly settleMs = SETTLE_MS,
+    private readonly workspaceFor: (chatId: string) => string | undefined = () => undefined,
   ) {}
 
   /** The user's words, plus a rung-1 draft when a saved route matches. */
@@ -186,7 +189,15 @@ export class RouteRecorder {
     const previousMs = await previousDuration(site, task);
     await rememberDuration(site, task, durationMs);
     const staged = await this.stage(run, site, steps);
-    const facts = await factsFor(run, site, task, durationMs, previousMs, staged?.id);
+    const facts = await factsFor(
+      run,
+      site,
+      task,
+      durationMs,
+      previousMs,
+      staged?.id,
+      this.workspaceFor(run.chatId),
+    );
     const card = buildRunCard(facts);
     if (card) this.publish(run.chatId, card);
     if (staged && !run.corrected) this.arm(site, run, task, staged.fingerprint);
@@ -294,6 +305,7 @@ async function factsFor(
   durationMs: number,
   previousMs: number | undefined,
   fingerprint: string | undefined,
+  workspace: string | undefined,
 ): Promise<RunFacts> {
   const fromMemory = run.fromMemory && !run.corrected;
   const drafted = run.draft && !run.corrected && !fromMemory;
@@ -306,6 +318,7 @@ async function factsFor(
     task,
     durationMs,
     unread: unreadFor(run),
+    ...missingFields(run, workspace),
     ...(previousMs !== undefined ? { previousMs } : {}),
     path: pathOf(fromMemory, drafted, run.usedAbility),
     ...(run.partial ? { partial: run.partial } : {}),
@@ -321,6 +334,12 @@ async function factsFor(
 function unreadFor(run: LiveRun): string[] {
   if (!run.answer) return [];
   return unreadQuotes(run.answer, [run.userPrompt, ...run.readText]);
+}
+
+function missingFields(run: LiveRun, workspace: string | undefined): { missingFiles?: string[] } {
+  if (!run.answer || !workspace) return {};
+  const missingFiles = missingAnswerFiles(run.answer, [workspace, join(workspace, "downloads")]);
+  return missingFiles.length ? { missingFiles } : {};
 }
 
 /**
