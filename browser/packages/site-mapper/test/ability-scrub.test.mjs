@@ -63,6 +63,37 @@ test("an api request that carried a secret is dropped, and the other way survive
   });
 });
 
+test("a script way with a bearer or api-key literal is dropped, not stored", async () => {
+  await withHome(async (root) => {
+    const saved = await saveAbility(
+      base({
+        ways: [
+          {
+            kind: "script",
+            runtime: "node",
+            code: 'const headers = { authorization: "Bearer ab12cd34ef56" }; void inputs.q; return { ok: true };',
+          },
+          {
+            kind: "script",
+            runtime: "node",
+            code: 'const apiKey = "live-1234567890abcdef"; void inputs.q; return { ok: true };',
+          },
+          page,
+        ],
+      }),
+    );
+    assert.deepEqual(
+      saved.ability.ways.map((way) => way.kind),
+      ["page"],
+      "both credential-bearing scripts are gone",
+    );
+    assert.equal(saved.scrubbed.filter((mark) => mark.dropped && mark.via === "script").length, 2);
+    const file = await readFile(join(root, "sites/example.com/abilities/search.json"), "utf8");
+    assert.ok(!file.includes("Bearer ab12"));
+    assert.ok(!file.includes("live-1234567890"));
+  });
+});
+
 test("an ability whose only request carried a secret is refused by name", async () => {
   await withHome(async () => {
     await assert.rejects(
