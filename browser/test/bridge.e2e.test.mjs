@@ -294,7 +294,16 @@ test(
         assert.match(output, /deadline/i, output);
         const after = await run(
           process.execPath,
-          [cli, "repl", "--session", "deadline", "kept + 1"],
+          [
+            cli,
+            "repl",
+            "--session",
+            "deadline",
+            // Still running when the timed-out cell's own code returns (8 s from its start):
+            // without one cell at a time, that late result lands on this cell instead.
+            `await new Promise((done) => setTimeout(done, 3000));
+            kept + 1`,
+          ],
           { env },
         );
         assert.match(after.stdout, /→ 43/, after.stdout);
@@ -1420,6 +1429,7 @@ test(
               `page = await browser.openTab(${JSON.stringify(siteUrl + "thread")});
             const markdown = await page.markdown();
             const cut = await page.markdown({max: 80});
+            await page.evaluate(() => window.addLateReply(200));
             const read = await page.read({max: 4000});
             await page.evaluate(() => {
               const extra = document.createElement("p");
