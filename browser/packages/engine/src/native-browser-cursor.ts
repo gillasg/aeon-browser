@@ -51,8 +51,6 @@ export interface CursorUpdate {
   start?: { x: number; y: number };
   /** The agent waits for the user: amber cursor and spotlight, no glow, the message as caption. */
   needs?: string | null;
-  /** Where the cursor's typed answer goes: a random Symbol key per hand-off. */
-  answerKey?: string;
   /** The tab is being recorded with the cursor: show only the cursor, nothing else of ours. */
   clean?: boolean;
   /** Summoned cursor: remember this point. Ignored while the agent is already driving it. */
@@ -83,8 +81,17 @@ export function showAgentCursor(
   if (tabId !== undefined) lastPositions.set(tabId, { x: Math.round(x), y: Math.round(y) });
 }
 const lastPositions = new Map<number, { x: number; y: number }>();
+// A cursor paint is fire-and-forget. Removing the cursor bumps its tab's epoch, so a paint that
+// was already in flight cannot bring the host back after the agent's turn ended.
+const epochs = new Map<number, number>();
+function cursorEpoch(tabId: number): number {
+  return epochs.get(tabId) ?? 0;
+}
 onEngineInstall(() => {
-  chrome.tabs.onRemoved.addListener((tabId) => lastPositions.delete(tabId));
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    lastPositions.delete(tabId);
+    epochs.delete(tabId);
+  });
 });
 
 /** A caption without moving the cursor, e.g. while reading or navigating. */
@@ -116,35 +123,11 @@ export async function showAgentBadge(tabId: number, needs = false): Promise<void
   await chrome.action.setBadgeText({ tabId, text: " " }).catch(() => undefined);
   await chrome.action.setBadgeBackgroundColor({ tabId, color }).catch(() => undefined);
 }
-/**
- * Page code that draws a hand-off's ask (amber cursor, pill with Done and Cancel). Run by the
- * hand-off itself, so an ask shows even with the cursor setting off or no debugger attached.
- */
-export function agentNeedsExpression(
-  message: string,
-  spotlight?: { x: number; y: number; width: number; height: number },
-  answerKey?: string,
-): string {
-  const point = spotlight
-    ? {
-        x: Math.round(spotlight.x + spotlight.width / 2),
-        y: Math.round(spotlight.y + spotlight.height / 2),
-      }
-    : {};
-  return cursorExpression({
-    needs: message,
-    glow: false,
-    ...(answerKey ? { answerKey } : {}),
-    ...(spotlight ? { spotlight, ...point } : {}),
-  });
-}
-
 /** The agent waits for the user: the cursor turns amber, points (spotlight) and says why. */
 export function showAgentNeeds(
   tabId: number,
   message: string | null,
   spotlight?: { x: number; y: number; width: number; height: number },
-  answerKey?: string,
 ): void {
   const point = spotlight
     ? {
@@ -157,7 +140,6 @@ export function showAgentNeeds(
     { tabId },
     {
       needs: message,
-      ...(answerKey && message !== null ? { answerKey } : {}),
       ...(message !== null ? { glow: false } : { glow: true, hideSpotlight: true }),
       ...(spotlight && message !== null ? { spotlight, ...point } : {}),
     },
@@ -166,8 +148,10 @@ export function showAgentNeeds(
 
 /** The edge glow around a tab an agent drives; dimmed while the user has control. */
 export async function showAgentGlow(tabId: number, dim = false): Promise<void> {
+  const epoch = cursorEpoch(tabId);
   if (!(await engineConfig.agentGlow().catch(() => true))) return;
   const glowColor = await engineConfig.agentGlowColor().catch(() => NEUTRAL_GLOW);
+  if (epoch !== cursorEpoch(tabId)) return;
   updateAgentCursor({ tabId }, { glow: true, glowDim: dim, glowOnly: true, glowColor });
 }
 
@@ -213,19 +197,22 @@ function updateAgentCursor(debuggee: chrome.debugger.Debuggee, update: CursorUpd
   if (recorded && !recorded.cursor) return;
   if (recorded)
     update = recorded.pill ? { ...update, glow: false } : { ...update, clean: true, glow: false };
+  const tabId = debuggee.tabId;
+  const epoch = tabId === undefined ? 0 : cursorEpoch(tabId);
   void engineConfig
     .hideAgentCursor()
     .catch(() => false)
-    .then((hidden) =>
-      hidden
+    .then((hidden) => {
+      if (tabId !== undefined && epoch !== cursorEpoch(tabId)) return undefined;
+      return hidden
         ? undefined
         : send(
             debuggee,
             "Runtime.evaluate",
             { expression: cursorExpression(update), silent: true },
             { label: "updateAgentCursor", ms: 5_000 },
-          ),
-    )
+          );
+    })
     .catch(() => undefined);
 }
 
@@ -237,6 +224,7 @@ export async function clearAgentCursors(chatId?: string): Promise<void> {
 export async function removeAgentCursor(tabId: number): Promise<void> {
   // A recording that asked for no cursor drops it. Otherwise a summoned cursor glides home.
   const drop = recording.get(tabId)?.cursor === false;
+  epochs.set(tabId, cursorEpoch(tabId) + 1);
   await Promise.resolve()
     .then(() =>
       chrome.scripting.executeScript({

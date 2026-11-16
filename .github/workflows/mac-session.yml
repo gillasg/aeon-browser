@@ -374,6 +374,10 @@ jobs:
               echo "<string>${script}</string>"
               echo '</array>'
               echo '<key>RunAtLoad</key><true/>'
+              # A dropped tunnel must come back by itself; without KeepAlive launchd runs it once
+              # and the published SSH port stays dead for the rest of the session.
+              echo '<key>KeepAlive</key><true/>'
+              echo '<key>ThrottleInterval</key><integer>5</integer>'
               echo '</dict></plist>'
             } > "$plist"
             uid=$(id -u)
@@ -387,60 +391,42 @@ jobs:
             fi
             echo "$domain" > "/tmp/${label}.domain"
           }
-          agent_exited() {
-            label="$1"
-            domain=$(cat "/tmp/${label}.domain" 2>/dev/null || true)
-            [ -n "$domain" ] || return 1
-            state=$(launchctl print "${domain}/${label}" 2>/dev/null | awk -F ' = ' '/state = /{print $2; exit}' || true)
-            [ "$state" = "not running" ]
-          }
-          printf '#!/bin/bash\nexec %q local 22 --to bore.pub >>/tmp/bore.log 2>&1\n' "$bore_bin" > "$RUNNER_TEMP/run-bore.sh"
-          chmod +x "$RUNNER_TEMP/run-bore.sh"
-          start_agent com.aeon.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
-          host=""
+          # bore.pub accepts a chosen remote port, so a restart after a dropped connection keeps
+          # the same SSH line. Pick a free one, then let launchd (KeepAlive) re-run bore on it.
+          host="bore.pub"
           port=""
-          for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-            if grep -E 'listening at .+:[0-9]+' /tmp/bore.log >/dev/null 2>&1; then
-              listen=$(grep -E 'listening at .+:[0-9]+' /tmp/bore.log | tail -1)
-              host=$(printf '%s\n' "$listen" | sed -E 's/.*listening at ([^ ]+):([0-9]+).*/\1/')
-              port=$(printf '%s\n' "$listen" | sed -E 's/.*listening at ([^ ]+):([0-9]+).*/\2/')
-              break
-            fi
-            if agent_exited com.aeon.bore; then
-              echo "bore is not running"
-              cat /tmp/bore.log || true
-              break
-            fi
-            sleep 1
-          done
-          if [ -z "$port" ]; then
-            echo "bore did not publish a port; trying cloudflared"
-            cat /tmp/bore.log || true
-            curl -fsSL -o "$RUNNER_TEMP/cloudflared.tgz" \
-              "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz"
-            tar -xzf "$RUNNER_TEMP/cloudflared.tgz" -C "$RUNNER_TEMP"
-            cfd=$(find "$RUNNER_TEMP" -type f -name cloudflared | head -1)
-            chmod +x "$cfd"
-            printf '#!/bin/bash\nexec %q tunnel --no-autoupdate --url tcp://127.0.0.1:22 >>/tmp/cloudflared.log 2>&1\n' "$cfd" > "$RUNNER_TEMP/run-cloudflared.sh"
-            chmod +x "$RUNNER_TEMP/run-cloudflared.sh"
-            start_agent com.aeon.cloudflared "$RUNNER_TEMP/run-cloudflared.sh" /tmp/cloudflared.log
-            for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-              if grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log >/dev/null 2>&1; then
-                listen=$(grep -E 'tcp://[^:]+:[0-9]+' /tmp/cloudflared.log | tail -1)
-                host=$(printf '%s\n' "$listen" | sed -E 's/.*tcp:\/\/([^:]+):([0-9]+).*/\1/')
-                port=$(printf '%s\n' "$listen" | sed -E 's/.*tcp:\/\/([^:]+):([0-9]+).*/\2/')
+          attempt=0
+          while [ "$attempt" -lt 5 ] && [ -z "$port" ]; do
+            attempt=$((attempt + 1))
+            candidate=$(( (RANDOM % 20000) + 40000 ))
+            : > /tmp/bore.log
+            printf '#!/bin/bash\nexec %q local 22 --to %s --port %s >>/tmp/bore.log 2>&1\n' \
+              "$bore_bin" "$host" "$candidate" > "$RUNNER_TEMP/run-bore.sh"
+            chmod +x "$RUNNER_TEMP/run-bore.sh"
+            start_agent com.aeon.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
+            for _ in $(seq 1 30); do
+              if grep -q "listening at ${host}:${candidate}" /tmp/bore.log; then
+                port=$candidate
+                break
+              fi
+              if grep -q "port already in use" /tmp/bore.log; then
+                echo "bore port ${candidate} is taken; trying another"
                 break
               fi
               sleep 1
             done
-          fi
+          done
           if [ -z "$port" ]; then
             echo "No token-free TCP tunnel came up. bore log:"
             cat /tmp/bore.log || true
-            echo "cloudflared log:"
-            cat /tmp/cloudflared.log || true
             exit 1
           fi
+          # The tunnel is up as soon as bore says so; give the entry point a moment to accept.
+          for _ in $(seq 1 15); do
+            if nc -z "$host" "$port"; then break; fi
+            sleep 1
+          done
+          nc -z "$host" "$port"
           user=$(whoami)
           echo "SSH: ssh -p ${port} ${user}@${host}"
           printf '%s\n' "SSH: ssh -p ${port} ${user}@${host}" > "$GITHUB_WORKSPACE/mac-ssh.txt"
@@ -450,7 +436,7 @@ jobs:
             echo "SSH: ssh -p ${port} ${user}@${host}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "Tunnel is supervised by launchd and stays up after this step."
+          echo "Tunnel port ${port} is kept by launchd KeepAlive; a restart reuses the same port."
       - name: Upload SSH command
         uses: actions/upload-artifact@v4
         with:

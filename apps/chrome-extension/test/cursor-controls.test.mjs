@@ -74,6 +74,21 @@ test("the page cursor publishes button boxes and does not dispatch cursor events
   assert.equal(overlay.includes("aeon-cursor-transcript"), false);
 });
 
+test("the shared cursor is injected as a function, never as a page listener", async () => {
+  const build = await readFile(join(app, "scripts/build-extension.mjs"), "utf8");
+  assert.equal(
+    build.includes("aeon:cursor:paint"),
+    false,
+    "the builder still installs a page listener",
+  );
+  assert.equal(build.includes("CustomEvent"), false);
+  const worker = await readFile(join(app, "src/orb/orb-worker.ts"), "utf8");
+  assert.match(worker, /func: paintCursor/);
+  assert.equal(worker.includes("CustomEvent"), false);
+  const overlay = await readFile(join(repo, "browser/packages/engine/src/cursor-page.ts"), "utf8");
+  assert.equal(overlay.includes("aeon:cursor:paint"), false);
+});
+
 test("the buttons mount only while the pill shows them, then leave the page", async () => {
   const controls = await load("../src/orb/cursor-controls.ts");
   assert.equal(controls.controlsToShow(undefined), null);

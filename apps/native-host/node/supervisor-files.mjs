@@ -1,5 +1,6 @@
 import {
   appendFileSync,
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -23,7 +24,8 @@ export class SupervisorLog {
   write(message) {
     if (!message) return;
     try {
-      mkdirSync(dirname(this.path), { recursive: true });
+      mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
+      chmodSync(dirname(this.path), 0o700);
       if (existsSync(this.path) && statSync(this.path).size > MAX_LOG_BYTES) {
         rmSync(this.previous, { force: true });
         renameSync(this.path, this.previous);
@@ -31,7 +33,9 @@ export class SupervisorLog {
       appendFileSync(
         this.path,
         `${new Date().toISOString()} ${String(message).slice(0, MESSAGE_LIMIT)}\n`,
+        { mode: 0o600 },
       );
+      if ((statSync(this.path).mode & 0o077) !== 0) chmodSync(this.path, 0o600);
     } catch {
       // A log that cannot be written must never change what the daemon does.
     }
@@ -103,6 +107,7 @@ export class SupervisorStatus {
       };
       const temporary = this.path + ".tmp";
       writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 });
+      chmodSync(temporary, 0o600);
       renameSync(temporary, this.path);
     } catch {
       // Status is diagnostic only.

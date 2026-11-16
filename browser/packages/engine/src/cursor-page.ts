@@ -35,14 +35,6 @@ const PAGE_STYLE = [
   ".needs .p{display:block;white-space:normal;width:300px;max-width:min(340px,80vw);padding:10px 10px 8px 12px;",
   "border-radius:var(--aeon-r-14);pointer-events:auto;line-height:17px}",
   ".needs .p .sp,.needs .p > .tr,.needs .p > .stop{display:none}",
-  ".p .ask{display:flex;align-items:center;gap:6px;margin-top:8px}",
-  ".p .ask input{flex:1;min-width:0;height:28px;border:0;border-radius:var(--aeon-r-full);padding:0 12px;",
-  "background:var(--aeon-island-field);color:var(--aeon-island-ink);",
-  "font:500 var(--aeon-fs-md)/16px system-ui,-apple-system,Segoe UI,sans-serif;outline:none}",
-  ".p .ask input::placeholder{color:var(--aeon-island-ink-soft)}",
-  ".p .ask .done{border:0;border-radius:var(--aeon-r-full);padding:5px 13px;",
-  "font:600 var(--aeon-fs-sm)/16px system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer;",
-  "background:var(--aeon-island-ink);color:var(--aeon-island-needs-ink)}",
   ".clean .g,.clean .p,.clean .s,.clean .co,.clean .k,.clean svg.trail{display:none!important}",
   ".c{position:absolute;left:0;top:0;will-change:transform;transition:opacity .18s ease}",
   ".a,.t{position:absolute;left:-1px;top:-1px;filter:drop-shadow(0 1px 2px var(--aeon-cursor-shadow));",
@@ -241,7 +233,7 @@ const PAGE_BODY = `
   }
   if (update.needs) update.caption = update.needs;
   else if (update.caption && s.wrap.classList.contains("needs")) update.caption = undefined;
-  if (update.caption && !(update.soft && Date.now() - (s.captionAt || 0) < 1500)) paintCaption(s, update, make);
+  if (update.caption && !(update.soft && Date.now() - (s.captionAt || 0) < 1500)) paintCaption(s, update);
   if (s.publish) { s.publish(); requestAnimationFrame(function () { s.publish(); }); }
   function reduceMotion() { return matchMedia("(prefers-reduced-motion: reduce)").matches; }
   function glideTo(state, toX, toY, pressAfter) {
@@ -286,7 +278,7 @@ const PAGE_BODY = `
     state.callout.style.top = (callout.y > 60 ? callout.y - 44 : callout.y + (callout.height || 0) + 8) + "px";
     state.callout.classList.add("on");
   }
-  function paintCaption(state, next, makeNode) {
+  function paintCaption(state, next) {
     state.captionAt = Date.now();
     var text = String(next.caption).slice(0, next.needs ? 300 : 120);
     clearTimeout(state.hide); clearInterval(state.type);
@@ -300,26 +292,7 @@ const PAGE_BODY = `
         if (prefix + shown >= text.length) clearInterval(state.type);
       }, 22);
     } else state.text.textContent = text;
-    var old = state.pill.querySelector(".ask");
-    if (old) old.remove();
-    if (next.needs) paintAsk(state, makeNode, next.answerKey);
     if (!next.needs) state.hide = setTimeout(function () { state.pill.classList.remove("on"); state.publish(); }, next.transient ? 2000 : 6000);
-  }
-  function paintAsk(state, makeNode, answerKey) {
-    var ask = makeNode("div", { class: "ask" });
-    var field = makeNode("input", { type: "text", placeholder: "Or type the answer here…", "aria-label": "Type the answer" });
-    var answer = function (value) { globalThis[Symbol.for(answerKey || "aeon.handoff")] = value; state.wrap.classList.remove("needs"); state.pill.classList.remove("on"); state.publish(); };
-    var finish = function () { answer(field.value.trim() ? { answer: field.value.trim().slice(0, 2000) } : "done"); };
-    field.addEventListener("keydown", function (event) { event.stopPropagation(); if (event.key === "Enter" && !event.isComposing) finish(); });
-    ["keyup", "keypress", "input"].forEach(function (kind) { field.addEventListener(kind, function (event) { event.stopPropagation(); }); });
-    var done = makeNode("button", { class: "done" }, ["Done"]);
-    done.onclick = function (event) { event.stopPropagation(); finish(); };
-    var transcript = makeNode("button", { class: "ic tr", title: "Open the transcript in the side panel", "aria-label": "Open the transcript" }, ["☰"]);
-    transcript.onclick = function (event) { event.stopPropagation(); };
-    var cancel = makeNode("button", { class: "ic", title: "Cancel", "aria-label": "Cancel" }, ["✕"]);
-    cancel.onclick = function (event) { event.stopPropagation(); answer("cancelled"); };
-    ask.append(field, done, transcript, cancel);
-    state.pill.append(ask);
   }
   function applySummon(node) {
     var state = node.__s;

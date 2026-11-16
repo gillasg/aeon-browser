@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { hostPaths } from "./paths.mjs";
+import { hostPaths, verifySocketOwner } from "./paths.mjs";
 import { loadConfig } from "./config.mjs";
 import { SupervisorLog } from "./supervisor-files.mjs";
 import { readFrame, writeFrame } from "./frames.mjs";
@@ -10,9 +10,14 @@ import { serviceState, startService } from "./service-state.mjs";
 import { runSupervisor } from "./supervisor.mjs";
 
 const ENTRY = fileURLToPath(new URL("./native-host.mjs", import.meta.url));
-const CONNECT_ATTEMPTS = 80;
-const CONNECT_WAIT_MS = 200;
+const CONNECT_ATTEMPTS = numberEnv("AEON_CONNECT_ATTEMPTS", 80);
+const CONNECT_WAIT_MS = numberEnv("AEON_CONNECT_WAIT_MS", 200);
 const REPLY_TIMEOUT_MS = 10_000;
+
+function numberEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
 
 /** Chrome's native messaging entrypoint: one framed request in, one framed response out. */
 export async function runHost(args = process.argv.slice(2)) {
@@ -57,7 +62,9 @@ async function sendToSupervisor(config, origin, request, socketPath, log) {
   throw new Error("Daemon bootstrap did not become available.");
 }
 
-async function exchange(socketPath, envelope) {
+export async function exchange(socketPath, envelope, options = {}) {
+  // Never hand a bootstrap to a listener another local user left at the path.
+  if (process.platform !== "win32") verifySocketOwner(socketPath, options);
   const { connect } = await import("node:net");
   return new Promise((resolve, reject) => {
     const socket = connect(socketPath);
@@ -130,6 +137,12 @@ export async function stopSupervisor() {
   const { connect } = await import("node:net");
   const { socket } = hostPaths();
   return new Promise((resolve) => {
+    try {
+      if (process.platform !== "win32") verifySocketOwner(socket);
+    } catch {
+      resolve(1);
+      return;
+    }
     const client = connect(socket);
     const timer = setTimeout(() => {
       client.destroy();

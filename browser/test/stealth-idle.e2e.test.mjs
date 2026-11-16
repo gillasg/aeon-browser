@@ -61,13 +61,28 @@ test(
           env,
         },
       );
-      const idle = JSON.parse(/^IDLE (.*)$/m.exec(result.stdout)?.[1] ?? "null");
-      assert.ok(idle, result.stdout + result.stderr);
-      assert.deepEqual(idle, emptyTells(), "the driven page kept something of Aeon");
+      assert.match(result.stdout, /\[ok\] click changed/, result.stdout + result.stderr);
+      // The run ends when its executor goes away (the daemon closing a run, or the CLI's bridge
+      // stopping): the engine releases the session and its cursors by itself. Nothing in the test
+      // touches the page's DOM.
+      bridge.kill();
+      const idlePage = await attachPage(port, url);
+      const idleTells = await waitFor(async () => {
+        const tells = await tellOn(idlePage);
+        if (tells.overlays.length || tells.markers.length) throw new Error("cursor still there");
+        return tells;
+      }, 8000);
+      assert.deepEqual(idleTells, emptyTells(), "the driven page kept something of Aeon");
 
-      // The extension's shared cursor paints from a page listener, not a page global.
+      // The cursor is an injected function, not a page listener: a page cannot paint it by
+      // dispatching the old event, and the script leaves no listener or global behind.
       const page = await attachPage(port, url);
       const cursorScript = await readFile(aeonCursor, "utf8");
+      assert.equal(
+        cursorScript.includes("aeon:cursor:paint"),
+        false,
+        "the built cursor listens for a page event",
+      );
       const painted = await evalValue(
         page,
         `${cursorScript}\nwindow.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail: ${JSON.stringify(
@@ -79,10 +94,13 @@ test(
         )} })); true`,
       );
       assert.equal(painted, true);
-      assert.equal(await evalValue(page, "!!document.getElementById('aeon-agent-cursor')"), true);
+      assert.equal(
+        await evalValue(page, "!!document.getElementById('aeon-agent-cursor')"),
+        false,
+        "a page event painted Aeon's cursor",
+      );
       assert.deepEqual(await evalValue(page, globalsOnly), [], "the cursor left a page global");
-      await evalValue(page, "document.getElementById('aeon-agent-cursor')?.remove(); true");
-      assert.deepEqual(await tellOn(page), emptyTells(), "the cursor left marks on an idle page");
+      assert.deepEqual(await tellOn(page), emptyTells(), "a page event left marks on an idle page");
     } finally {
       chrome?.kill();
       bridge.kill();
@@ -102,10 +120,7 @@ test(
 function repl(url) {
   return `page = await browser.openTab(${JSON.stringify(url)});
     await page.click('text=Go');
-    await page.waitForTimeout(500);
-    await page.evaluate(() => document.getElementById("aeon-agent-cursor")?.remove());
-    await page.waitForTimeout(1600);
-    console.log("IDLE " + JSON.stringify(await page.evaluate(${tellsFn})));`;
+    await page.waitForTimeout(500);`;
 }
 
 const globalsOnly = `Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit|browserkit-)/.test(name))`;

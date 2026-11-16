@@ -29,18 +29,13 @@ let workerCdp;
 
 // What a page says about the hand-off and the cursor, read from its own main world.
 const PROBE = `(() => {
-  const state = globalThis[Symbol.for("aeon.handoff")];
   const cursor = document.getElementById("aeon-agent-cursor");
+  const ask = document.getElementById("aeon-agent-ask");
   return {
     url: location.href,
     title: document.title,
     readyState: document.readyState,
-    handoff:
-      state === undefined
-        ? null
-        : typeof state === "object"
-          ? JSON.parse(JSON.stringify(state))
-          : String(state),
+    handoff: ask ? "ask" : null,
     cursor: Boolean(cursor),
     cursorText: cursor ? String(cursor.innerText ?? "").slice(0, 300) : "",
     passwordFields: document.querySelectorAll("input[type=password]").length,
@@ -451,7 +446,10 @@ function findButton(node, inCursor) {
     const index = attributes.indexOf(name);
     return index >= 0 ? attributes[index + 1] : undefined;
   };
-  const here = inCursor || (pair("id") === "aeon-agent-cursor" && node.nodeName === "DIV");
+  const here =
+    inCursor ||
+    ((pair("id") === "aeon-agent-cursor" || pair("id") === "aeon-agent-ask") &&
+      node.nodeName === "DIV");
   if (here && node.nodeName === "BUTTON" && (pair("class") ?? "").split(/\s+/).includes("done"))
     return node;
   for (const child of node.children ?? []) {

@@ -3,6 +3,7 @@ import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
 import { CURSOR_LOCAL, isAeonTabPage, isCursorPage, summonUpdate } from "./orb-aeon-pages.js";
 import { CURSOR_MARK, CURSOR_TOKEN_CSS } from "@browserkit/engine/cursor-mark";
+import { paintCursor } from "aeon:cursor-paint";
 import {
   CURSOR_INSTALL,
   CURSOR_TRANSCRIPT,
@@ -95,33 +96,16 @@ async function drawOnAeonPage(tabId: number, x: number, y: number): Promise<void
 }
 
 async function installSharedCursor(tabId: number, x: number, y: number): Promise<void> {
-  const target = { tabId, frameIds: [0] };
-  // The painter listens for this event; nothing of it stays on window where a page can read it.
-  await chrome.scripting
-    .executeScript({ target, world: "MAIN", files: ["cursor-page.js"] })
-    .catch(() => undefined);
+  // The painter runs from the worker's own function: no page listener and no page global, so a
+  // page can neither paint Aeon's cursor nor fingerprint the profile by dispatching an event.
   await chrome.scripting
     .executeScript({
-      target,
+      target: { tabId, frameIds: [0] },
       world: "MAIN",
-      func: paintInstalledCursor,
-      args: [
-        {
-          update: summonUpdate(x, y),
-          css: CURSOR_TOKEN_CSS,
-          mark: CURSOR_MARK,
-        },
-      ],
+      func: paintCursor,
+      args: [summonUpdate(x, y), CURSOR_TOKEN_CSS, CURSOR_MARK],
     })
     .catch(() => undefined);
-}
-
-function paintInstalledCursor(detail: {
-  update: { x: number; y: number; summon: true; place: true };
-  css: string;
-  mark: object;
-}): void {
-  window.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail }));
 }
 
 async function updateBadge(): Promise<void> {

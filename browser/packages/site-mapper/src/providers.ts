@@ -567,28 +567,30 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
     if (!marked) await page.waitForTimeout(500);
   }
   if (!marked) throw new Error("PROVIDER_UI: no message box on the page; the user may be signed out, or the page changed");
-  const box = page.locator("[data-aeon-composer]").first();
-  await box.click();
-  // Some sites keep an unsent draft in the box: clear it so only this prompt is sent.
-  await page.keyboard("Control+a");
-  await page.keyboard("Backspace");
-  await page.cdp("Input.insertText", { text: prompt });
-  await page.waitForTimeout(400);
-  await box.press("Enter");
-  await page.waitForTimeout(1500);
-  const left = () => page.evaluate(() => { const el = document.querySelector("[data-aeon-composer]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
-  if (await left()) {
-    for (const selector of ${JSON.stringify(definition.ui.send)}) {
-      const send = page.locator(selector).first();
-      if (await send.count().catch(() => 0)) { await send.click().catch(() => {}); break; }
-    }
+  try {
+    const box = page.locator("[data-aeon-composer]").first();
+    await box.click();
+    // Some sites keep an unsent draft in the box: clear it so only this prompt is sent.
+    await page.keyboard("Control+a");
+    await page.keyboard("Backspace");
+    await page.cdp("Input.insertText", { text: prompt });
+    await page.waitForTimeout(400);
+    await box.press("Enter");
     await page.waitForTimeout(1500);
+    const left = () => page.evaluate(() => { const el = document.querySelector("[data-aeon-composer]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
     if (await left()) {
-      await page.evaluate(() => document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer"))).catch(() => {});
-      throw new Error("PROVIDER_NOT_SENT: the prompt stayed in ${definition.name}'s message box; the user is probably signed out there (sign in to ${definition.host} in Chrome), or the page changed");
+      for (const selector of ${JSON.stringify(definition.ui.send)}) {
+        const send = page.locator(selector).first();
+        if (await send.count().catch(() => 0)) { await send.click().catch(() => {}); break; }
+      }
+      await page.waitForTimeout(1500);
+      if (await left()) throw new Error("PROVIDER_NOT_SENT: the prompt stayed in ${definition.name}'s message box; the user is probably signed out there (sign in to ${definition.host} in Chrome), or the page changed");
     }
+  } finally {
+    // Any throw after the marker is set (a re-render, a navigation, a refused key) must not leave
+    // the marker on the page for the rest of the tab's life.
+    await page.evaluate(() => document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer"))).catch(() => {});
   }
-  await page.evaluate(() => document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer"))).catch(() => {});
 `;
 }
 

@@ -41,6 +41,27 @@ test(
         );
         return;
       }
+      if (request.url === "/attack") {
+        response.setHeader("content-type", "text/html");
+        response.end(
+          `<title>Attack</title><p>Nothing to see</p><script>
+  window.__attack = { scans: 0, attempts: 0, found: [] };
+  setInterval(() => {
+    window.__attack.scans += 1;
+    try {
+      for (const symbol of Object.getOwnPropertySymbols(window)) {
+        const key = Symbol.keyFor(symbol);
+        if (!key || !key.startsWith("aeon.handoff.")) continue;
+        window.__attack.attempts += 1;
+        window.__attack.found.push(key);
+        window[symbol] = { answer: "forged by the page" };
+      }
+    } catch (error) { window.__attack.error = String(error); }
+  }, 25);
+</script>`,
+        );
+        return;
+      }
       response.setHeader("content-type", "text/html");
       response.end(
         `<title>Fixture</title><h1>Shop</h1><input aria-label="Search"><button onclick="document.title='clicked';document.body.append(document.createElement('hr'))">Go</button><button>Nothing</button><button disabled>Disabled</button>`,
@@ -254,6 +275,53 @@ test(
           expression: `chrome.runtime.sendMessage({ kind: "aeon.handoff.answer", tabId: ${target.tabId}, answer: "done" })`,
         });
         assert.equal((await fromChat).value, "approved");
+      });
+
+      await t.test("a page cannot read or answer the hand-off", async () => {
+        const attackUrl = pageUrl + "attack";
+        const chat = randomUUID();
+        const secret = "s3cret-code-47";
+        const pending = core.run({
+          chatId: chat,
+          code: `page = await browser.openTab(${JSON.stringify(attackUrl)}); await bu.handoff('Type the code')`,
+          targets: [],
+        });
+        const ask = await handoffPage(port, attackUrl);
+        const early = await Promise.race([
+          pending.then((result) => ({ state: "settled", result })),
+          sleep(1200).then(() => ({ state: "waiting" })),
+        ]);
+        assert.equal(
+          early.state,
+          "waiting",
+          `the page answered for the user: ${JSON.stringify(early)}`,
+        );
+        await ask.type(secret);
+        const probe = await ask.evaluate(`(() => ({
+          symbols: Object.getOwnPropertySymbols(window).map((symbol) => {
+            let value; try { value = globalThis[symbol]; } catch {}
+            return [Symbol.keyFor(symbol) || String(symbol), typeof value === "object" ? JSON.stringify(value) : String(value)];
+          }),
+          inputs: [...document.querySelectorAll("input")].map((input) => input.value),
+          shadow: document.getElementById("aeon-agent-ask")?.shadowRoot ? "open" : "closed",
+          text: document.body.innerText
+        }))()`);
+        assert.equal(
+          JSON.stringify(probe).includes(secret),
+          false,
+          "the page could read the typed answer",
+        );
+        const attack = await ask.evaluate("window.__attack");
+        assert.ok(attack.scans > 0, "the page never scanned for a hand-off key");
+        assert.equal(
+          attack.attempts,
+          0,
+          `the page found a hand-off key: ${JSON.stringify(attack.found)}`,
+        );
+        await ask.answer("done");
+        const result = await pending;
+        assert.equal(result.error, undefined);
+        assert.equal(result.value, secret, "the cell got the user's answer, not the page's");
       });
 
       await t.test("network recording finds a site's JSON API and fetchJson calls it", async () => {
@@ -477,32 +545,94 @@ async function fakeCore() {
   };
 }
 
-// Finds the fixture tab waiting on a hand-off (the cursor pill's Done/Cancel) and answers it as the user would.
+// Finds the fixture tab waiting on a hand-off (the isolated-world ask) and acts as the user would.
 async function handoffPage(port, url) {
-  const key = `Object.getOwnPropertySymbols(window).find((symbol) => String(Symbol.keyFor(symbol) || "").startsWith("aeon.handoff."))`;
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 100; i++) {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     for (const item of targets.filter((entry) => entry.type === "page" && entry.url === url)) {
       const page = await connect(item.webSocketDebuggerUrl);
-      const check = async () =>
+      const present = async () =>
         (
           await page("Runtime.evaluate", {
-            expression: `(() => { const key = ${key}; return key ? globalThis[key] === "waiting" : false; })()`,
+            expression: `Boolean(document.getElementById("aeon-agent-ask"))`,
             returnByValue: true,
           })
         ).result?.result?.value === true;
-      if (await check())
-        return {
-          present: check,
-          answer: (state) =>
-            page("Runtime.evaluate", {
-              expression: `(() => { const key = ${key}; if (key) globalThis[key] = ${JSON.stringify(state)}; })()`,
-            }),
-        };
+      if (!(await present())) continue;
+      return {
+        present,
+        type: async (text) => {
+          const nodes = await askNodes(page);
+          await callOnNode(
+            page,
+            nodes.input,
+            "function (value) { this.value = value; this.dispatchEvent(new Event('input', { bubbles: true })); }",
+            [text],
+          );
+        },
+        answer: async (state) => {
+          const nodes = await askNodes(page);
+          if (state === "cancelled")
+            return callOnNode(page, nodes.cancel, "function () { this.click(); }");
+          if (state && typeof state === "object" && typeof state.answer === "string") {
+            await callOnNode(
+              page,
+              nodes.input,
+              "function (value) { this.value = value; this.dispatchEvent(new Event('input', { bubbles: true })); }",
+              [state.answer],
+            );
+          }
+          return callOnNode(page, nodes.done, "function () { this.click(); }");
+        },
+        evaluate: async (expression) =>
+          (
+            await page("Runtime.evaluate", {
+              expression,
+              returnByValue: true,
+              awaitPromise: true,
+            })
+          ).result?.result?.value,
+      };
     }
     await sleep(100);
   }
   throw new Error("Hand-off never appeared");
+}
+
+/** The ask's input and buttons, including inside its closed shadow root. */
+async function askNodes(page) {
+  const document = await page("DOM.getDocument", { depth: -1, pierce: true });
+  const nodes = {};
+  walkAsk(document.result?.root, false);
+  if (!nodes.input || !nodes.done) throw new Error("Hand-off ask has no field or Done");
+  return nodes;
+  function walkAsk(node, inAsk) {
+    if (!node) return;
+    const attributes = node.attributes ?? [];
+    const pair = (name) => {
+      const index = attributes.indexOf(name);
+      return index >= 0 ? attributes[index + 1] : undefined;
+    };
+    const here = inAsk || (pair("id") === "aeon-agent-ask" && node.nodeName === "DIV");
+    const classes = (pair("class") ?? "").split(/\s+/);
+    if (here && node.nodeName === "INPUT") nodes.input = node;
+    if (here && node.nodeName === "BUTTON" && classes.includes("done")) nodes.done = node;
+    if (here && node.nodeName === "BUTTON" && classes.includes("cancel")) nodes.cancel = node;
+    for (const child of node.children ?? []) walkAsk(child, here);
+    for (const root of node.shadowRoots ?? []) walkAsk(root, here);
+  }
+}
+
+async function callOnNode(page, node, functionDeclaration, args = []) {
+  if (!node) throw new Error("Hand-off node not found");
+  const resolved = await page("DOM.resolveNode", { backendNodeId: node.backendNodeId });
+  const objectId = resolved.result?.object?.objectId;
+  if (!objectId) throw new Error("Hand-off node not resolvable");
+  await page("Runtime.callFunctionOn", {
+    objectId,
+    functionDeclaration,
+    arguments: args.map((value) => ({ value })),
+  });
 }
 
 async function debugPort(profile) {
