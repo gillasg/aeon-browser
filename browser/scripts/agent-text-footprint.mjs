@@ -56,8 +56,12 @@ async function fromSurface() {
     agentDirectory: join(root, "agent"),
     sessionDirectory: join(root, "sessions"),
   });
-  const systemPrompt = Buffer.byteLength(surface.systemPrompt);
-  const tools = Buffer.byteLength(JSON.stringify(surface.tools));
-  const firstTurn = Buffer.byteLength(surface.firstTurn);
+  // Machine paths in the prompt must not change the budget: the same source measured from the
+  // main checkout, a worktree or a temp directory is the same prompt to the model. The surface
+  // hash already strips them; the byte count has to as well.
+  const portable = (text) => text.replaceAll(root, "<workspace>").replaceAll(aeonRepo, "<aeon>");
+  const systemPrompt = Buffer.byteLength(portable(surface.systemPrompt));
+  const tools = Buffer.byteLength(portable(JSON.stringify(surface.tools)));
+  const firstTurn = Buffer.byteLength(portable(surface.firstTurn));
   return { systemPrompt, tools, firstTurn, total: systemPrompt + tools + firstTurn };
 }
