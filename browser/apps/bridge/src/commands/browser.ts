@@ -131,10 +131,11 @@ async function register(args: Args): Promise<number> {
   const folder = await extensionFolder(out);
   if (!has(args, "no-agents")) {
     const agent = flag(args, "agent");
+    const agents = typeof agent === "string" ? agent.split(",") : undefined;
     const results = await connectAgents(
       { name: "browserkit", ...mcpCommand() },
       {
-        agents: typeof agent === "string" ? agent.split(",") : undefined,
+        ...(agents ? { agents } : {}),
         pick: has(args, "pick"),
         uninstall: has(args, "uninstall-agents"),
       },
