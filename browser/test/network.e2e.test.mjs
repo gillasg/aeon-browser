@@ -5,6 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createServer } from "node:http";
+import { connect as netConnect } from "node:net";
 import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -246,12 +247,36 @@ async function findRunLogs(root) {
   return found;
 }
 
-/** A port that was free a moment ago: connecting to it is refused. */
-// Port 1 (tcpmux) is privileged and unused on every CI and dev box, so a connection to it is
-// refused reliably. A freed ephemeral port is not: on a busy machine another process (the bridge,
-// Chrome, a parallel test) can bind it between close and use, and the "refused" fetch succeeds.
+/** A port a connection is refused on: verified just before use. */
+// Outside every kernel's ephemeral range (Linux 32768-60999, macOS and Windows 49152-65535) and
+// Chrome's restricted-port list, so neither the kernel nor the bridge can hand it to a socket
+// between this check and the fetch, and connecting to it is refused. A freed ephemeral port is
+// not: on a busy machine another process (the bridge, Chrome, a parallel test) can bind it.
 async function closedPort() {
-  return 1;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const port = 20000 + Math.floor(Math.random() * 10000);
+    if (await refused(port)) return port;
+  }
+  throw new Error("no port refused a connection");
+}
+
+function refused(port) {
+  return new Promise((done) => {
+    const socket = netConnect({ host: "127.0.0.1", port });
+    socket.setTimeout(500);
+    socket.once("connect", () => {
+      socket.destroy();
+      done(false);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      done(false);
+    });
+    socket.once("error", (error) => {
+      socket.destroy();
+      done(error.code === "ECONNREFUSED");
+    });
+  });
 }
 
 async function waitFor(check, timeout = 15000) {
