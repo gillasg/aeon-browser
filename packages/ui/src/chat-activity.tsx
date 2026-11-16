@@ -20,6 +20,7 @@ import { BrowserCallRows, browserActionValues } from "./activity-browser-call.js
 import { ShellToolDetails, CodeToolDetails, ToolStepFooter } from "./activity-tool-details.js";
 import { ToolResultView } from "./tool-result-view.js";
 import { ToolImages } from "./tool-images.js";
+import { ToolNarration } from "./tool-narration.js";
 import { StepMeta } from "./run-cards.js";
 import { formatProgress } from "./run-model.js";
 
@@ -129,6 +130,7 @@ function ToolStepRow({
         )}
         <DisclosureChevron />
       </summary>
+      <ToolNarration step={step} />
       <ToolBody step={step} />
       <ToolImages step={step} />
       {step.nestedCalls?.complete === false && (

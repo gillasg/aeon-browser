@@ -5,6 +5,7 @@ import { ActivityIcon, DisclosureChevron } from "./activity-icons.js";
 import { ToolStepFooter } from "./activity-tool-details.js";
 import { ToolResultView } from "./tool-result-view.js";
 import { ToolImages } from "./tool-images.js";
+import { ToolNarration } from "./tool-narration.js";
 export function BrowserCallRows({
   step,
   actions,
@@ -24,6 +25,7 @@ export function BrowserCallRows({
           <span>Browser call failed; expand its result for the exact details.</span>
         </div>
       )}
+      <ToolNarration step={step} />
       <ol className="activity-browser-action-rows">
         {actions.map((action, index) => (
           <BrowserOperationRow

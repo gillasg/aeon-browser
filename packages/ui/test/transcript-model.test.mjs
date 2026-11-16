@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { projectEditDiff, TranscriptModel } from "../dist/index.js";
+import { TranscriptTurn } from "../dist/transcript-turn.js";
 
 test("Pi model errors remain visible as assistant transcript entries", () => {
   const transcript = new TranscriptModel();
@@ -205,6 +208,82 @@ test("thread deliveries remain visible as Pi-owned causal transcript cards", () 
   transcript.apply({ kind: "entry-added", entry });
   assert.equal(transcript.rows.length, 1);
 });
+
+test("text beside a tool call stays on its step, not as a chat row", () => {
+  const transcript = narratedTranscript();
+  assert.equal(
+    transcript.rows.some((row) => row.kind === "transient"),
+    false,
+  );
+  assert.equal(
+    transcript.rows.some((row) => row.kind === "entry" && row.entry.message?.role === "assistant"),
+    true,
+    "only the final answer should be an assistant row",
+  );
+  const assistantRows = transcript.rows.filter(
+    (row) => row.kind === "entry" && row.entry.message?.role === "assistant",
+  );
+  assert.equal(assistantRows.length, 1);
+  assert.match(assistantRows[0].entry.message.content[0].text, /form is filled/);
+  const group = transcript.rows.find((row) => row.kind === "tool-group");
+  assert.ok(group, JSON.stringify(transcript.rows));
+  assert.equal(group.group.steps[0].narration, "Found 3 options; checking prices.");
+});
+
+test("the narration renders inside the work disclosure, not as a chat bubble", () => {
+  const transcript = narratedTranscript();
+  const html = renderToStaticMarkup(
+    createElement(TranscriptTurn, {
+      rows: [...transcript.rows],
+      actions: { actionsDisabled: true },
+    }),
+  );
+  assert.match(html, /class="activity-narration">Found 3 options; checking prices\./);
+  assert.equal(html.split("Found 3 options").length - 1, 1, html);
+  assert.match(html, /form is filled and was not sent\./, html);
+});
+
+function narratedTranscript() {
+  const transcript = new TranscriptModel();
+  transcript.apply({ kind: "run-state", state: "running-unconfirmed" });
+  const narration = {
+    role: "assistant",
+    stopReason: "toolUse",
+    content: [
+      { type: "text", text: "Found 3 options; checking prices." },
+      { type: "tool-call", toolCallId: "t1", toolName: "browser_code", arguments: {} },
+    ],
+  };
+  transcript.apply({ kind: "message-update", message: narration });
+  transcript.apply({ kind: "message-end", message: narration });
+  transcript.apply({
+    kind: "entry-added",
+    entry: {
+      entryId: "narrated",
+      parentEntryId: null,
+      category: "message",
+      timestamp: "2026-09-28T12:00:00.000Z",
+      message: narration,
+    },
+  });
+  const answer = {
+    role: "assistant",
+    stopReason: "stop",
+    content: [{ type: "text", text: "The form is filled and was not sent." }],
+  };
+  transcript.apply({ kind: "message-end", message: answer });
+  transcript.apply({
+    kind: "entry-added",
+    entry: {
+      entryId: "answer",
+      parentEntryId: null,
+      category: "message",
+      timestamp: "2026-09-28T12:00:01.000Z",
+      message: answer,
+    },
+  });
+  return transcript;
+}
 
 function userEntry(entryId, text) {
   return {
