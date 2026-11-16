@@ -175,7 +175,12 @@ export class RoutineScheduler {
             scheduledSlot: run.scheduledSlot,
             instruction,
           });
-          this.update(run.runId, "accepted", { piEntryId: accepted.piEntryId });
+          // A custom message that starts the turn waits for it, so the run may already be settled
+          // by the time this returns; never overwrite that with "accepted".
+          const settled = session.findRoutineRun(run.runId);
+          if (settled.state === "not-found")
+            this.update(run.runId, "accepted", { piEntryId: accepted.piEntryId });
+          else this.applyEvidence(run.chatId, run.runId, settled);
         } catch {
           const afterFailure = session.findRoutineRun(run.runId);
           if (afterFailure.state !== "not-found")

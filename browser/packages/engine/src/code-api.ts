@@ -1,5 +1,31 @@
 // The browser_code page API, evaluated once in each chat's sandbox realm. Browser steps go through __call.
 import { nativeSourcePreamble } from "./native-source.js";
+
+/**
+ * The realm is a manifest sandbox page with an opaque origin, so its own fetch is CORS-bound even
+ * for a site the extension may reach. Route plain fetch through browser.fetch (the extension's
+ * host permissions), so a check or a cell reads the same URLs the agent could, and hand back a
+ * real Response.
+ */
+export const browserFetchCompat = `
+globalThis.fetch = async function (input, init) {
+  var request = input && typeof input === 'object' && typeof input.url === 'string' ? input : undefined;
+  var url = typeof input === 'string' ? input : request ? request.url : String(input);
+  var options = Object.assign({},
+    request ? {method: request.method, headers: request.headers, body: request.body} : {},
+    init || {});
+  if (options.signal) delete options.signal;
+  var answer = await browser.fetch(url, options);
+  var headers = new Headers();
+  var raw = answer.headers || {};
+  for (var name of Object.keys(raw)) headers.set(name, String(raw[name]));
+  var body = answer.text !== undefined ? answer.text : answer.json !== undefined ? JSON.stringify(answer.json) : '';
+  var status = answer.status || 200;
+  var none = status === 204 || status === 205 || status === 304;
+  return new Response(none ? null : body, {status, headers});
+};
+`;
+
 export const browserCodeApi = `
 // Chrome accepts every alert/confirm/prompt by default; this lets the agent decline or answer them.
 function __dialogShim(policy) {
@@ -723,4 +749,5 @@ var browser = Object.freeze({
     },
   }))),
 });
+${browserFetchCompat}
 `;

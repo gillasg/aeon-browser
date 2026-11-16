@@ -3,7 +3,7 @@ import test from "node:test";
 import { RoutineScheduler } from "../dist/routine-scheduler.js";
 
 // One due run of a watcher routine against a fake browser that answers its check.
-async function runWatcher(checkResult) {
+async function runWatcher(checkResult, options = {}) {
   const run = {
     runId: "run-watch",
     routineId: "routine-watch",
@@ -49,7 +49,10 @@ async function runWatcher(checkResult) {
     withSession: async (_chatId, action) =>
       action({
         subscribeRoutineRuns: () => () => undefined,
-        findRoutineRun: () => ({ state: "not-found" }),
+        findRoutineRun: () =>
+          options.settledAfterInvoke && invoked.length
+            ? { state: "completed", piEntryId: "entry-1", acceptedTurnId: "turn-1" }
+            : { state: "not-found" },
         invokeRoutine: async (invocation) => {
           invoked.push(invocation);
           return { piEntryId: "entry-1" };
@@ -82,6 +85,16 @@ test("a failing check is recorded as failed, not run", async () => {
   assert.equal(invoked.length, 0);
   assert.equal(updates.at(-1).state, "failed");
   assert.match(updates.at(-1).lastError, /CHECK_FAILED: BROWSER_OFFLINE/);
+});
+
+test("a run that settled by the time invokeRoutine returned stays completed", async () => {
+  const { updates, invoked } = await runWatcher(
+    { value: { price: 380 }, output: "" },
+    { settledAfterInvoke: true },
+  );
+  assert.equal(invoked.length, 1);
+  assert.equal(updates.at(-1).state, "completed");
+  assert.equal(updates.at(-1).piEntryId, "entry-1");
 });
 
 test("a truthy check wakes the agent with the value it found", async () => {
