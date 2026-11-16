@@ -532,7 +532,9 @@ export class SiteClient {
 
   /**
    * A direct read whose shape no longer matches the recorded one is retried once through the
-   * page, which sees the site's current headers, cookies and signing. The page answer wins.
+   * page, which sees the site's current headers, cookies and signing. The page answer wins only
+   * when it is a success: a page refusal is worse than the direct answer already in hand, so the
+   * direct answer is kept (marked unverified) instead of becoming SignedOut.
    */
   private async retryDrift(
     sent: { request: RuntimeRequest; context: CallContext },
@@ -551,6 +553,13 @@ export class SiteClient {
     const note = `The direct answer did not match the recorded shape (${changes.slice(0, 3).join("; ")}).`;
     try {
       const response = await this.send(this.page, sent.request, sent.context, readOnly);
+      if (!isOk(response)) {
+        first.response.notes = [
+          ...(first.response.notes ?? []),
+          `${note} The browser retry answered ${response.status}, so the direct answer is kept, unverified.`,
+        ];
+        return undefined;
+      }
       response.notes = [...(response.notes ?? []), `${note} The call was retried in the browser.`];
       return { response, transport: this.page };
     } catch {
