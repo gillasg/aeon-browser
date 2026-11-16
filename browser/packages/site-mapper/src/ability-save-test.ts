@@ -21,42 +21,62 @@ export function withSample(ability: Ability, sample: AbilitySample | undefined):
   return { ...ability, tests: [{ inputs: sample.inputs, expect }] };
 }
 
+/** The result of one probe, with the way that answered it (its checked test record). */
+export interface ProbeResult {
+  result: unknown;
+  way?: string;
+}
+
 export async function proveSave(
   candidate: Ability,
   existing: Ability | undefined,
-  run: (ability: Ability, inputs: Record<string, unknown>) => Promise<unknown>,
+  run: (ability: Ability, inputs: Record<string, unknown>) => Promise<ProbeResult>,
 ): Promise<AbilityTestReport | undefined> {
   if (candidate.kind === "write") return undefined;
   const tests = candidate.tests ?? [];
   if (!tests.length) return undefined;
-  if (alreadyTested(existing, candidate))
-    return { ok: true, cases: [], constant: false, skipped: true };
-  const novel = novelWays(existing?.ways, candidate.ways);
-  const probes = novel.length ? novel.map((way) => ({ ...candidate, ways: [way] })) : [candidate];
-  return runProbes(candidate, probes, novel.length > 0, run);
+  const untested = untestedWays(existing, candidate);
+  if (!untested.length) return { ok: true, cases: [], constant: false, skipped: true, ways: [] };
+  const novel = new Set(novelWays(existing?.ways, candidate.ways).map(wayId));
+  const probes = untested.map((way) => ({ ...candidate, ways: [way] }));
+  return runProbes(candidate, probes, novel, run);
 }
 
-/** Every way already passed at this exact content (tests and outputs included). */
-function alreadyTested(existing: Ability | undefined, candidate: Ability): boolean {
-  if (!existing?.tested) return false;
-  return candidate.ways.every((way) => existing.tested?.[wayDigest(candidate, way)]?.ok === true);
+/** Ways with no passing test record at this exact content (tests and outputs included). */
+function untestedWays(existing: Ability | undefined, candidate: Ability): AbilityWay[] {
+  return candidate.ways.filter((way) => existing?.tested?.[wayDigest(candidate, way)]?.ok !== true);
 }
 
 async function runProbes(
   candidate: Ability,
   probes: Ability[],
-  novel: boolean,
-  run: (ability: Ability, inputs: Record<string, unknown>) => Promise<unknown>,
+  novel: Set<string>,
+  run: (ability: Ability, inputs: Record<string, unknown>) => Promise<ProbeResult>,
 ): Promise<AbilityTestReport> {
   const cases: AbilityTestReport["cases"] = [];
+  const proven = new Set<string>();
   let constant = false;
   for (const probe of probes) {
-    const report = await testAbilityCases(probe, (inputs) => run(probe, inputs));
-    if (!report.ok) throw failed(candidate, probe, novel, report);
+    const ran: (string | undefined)[] = [];
+    const report = await testAbilityCases(probe, async (inputs) => {
+      try {
+        const out = await run(probe, inputs);
+        ran.push(out.way);
+        return out.result;
+      } catch (error) {
+        ran.push(undefined);
+        throw error;
+      }
+    });
+    const way = probe.ways[0];
+    if (!report.ok) throw failed(candidate, probe, way ? novel.has(wayId(way)) : false, report);
+    report.cases.forEach((item, index) => {
+      if (item.ok && way) proven.add(ran[index] ?? wayId(way));
+    });
     cases.push(...report.cases);
     constant = constant || report.constant;
   }
-  return { ok: true, cases, constant };
+  return { ok: true, cases, constant, ways: [...proven] };
 }
 
 function failed(

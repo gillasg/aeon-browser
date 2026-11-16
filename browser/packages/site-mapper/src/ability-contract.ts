@@ -21,6 +21,8 @@ export interface AbilityTestReport {
   constant: boolean;
   /** Every way already had a passing test at this exact content, so nothing ran. */
   skipped?: boolean;
+  /** The ways that answered during this run, by way id. Only these were proven. */
+  ways?: string[];
 }
 
 function properties(schema: unknown): Record<string, Record<string, unknown>> {

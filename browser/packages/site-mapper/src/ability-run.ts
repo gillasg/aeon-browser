@@ -68,6 +68,7 @@ export async function executeRead(
   record?: RunRecorder,
 ): Promise<AbilityRunResult> {
   const run = await runRead(ability, inputs, host, options, record);
+  if (run.used) options.onWay?.(wayId(run.used));
   try {
     assertInputsApplied(ability, inputs, run.result);
   } catch (error) {
