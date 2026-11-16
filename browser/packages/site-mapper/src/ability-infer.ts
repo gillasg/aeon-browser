@@ -163,31 +163,44 @@ function scalarOf(
   return reference;
 }
 
-/** `{{steps.<i>.<path>}}` when the value came from an answer an earlier step already got. */
+/**
+ * `{{steps.<i>.<path>}}` when the value came from an earlier answer, and exactly one place in
+ * those answers holds it. A literal that appears twice (or in two answers) stays a literal: a
+ * guessed reference would send another answer's value on a later run.
+ */
 function referenceOf(
   value: string,
   before: number,
   param: string,
   context: Context,
 ): string | undefined {
-  for (let index = before - 1; index >= 0; index--) {
-    const path = pathOf(context.responses[index], value);
-    if (!path) continue;
-    const from = `steps.${index}.${path}`;
-    context.refs.push({ step: before, param, from });
-    return `{{${from}}}`;
-  }
-  return undefined;
+  const matches = earlierMatches(context.responses, before, value);
+  if (matches.length !== 1) return undefined;
+  const match = matches[0];
+  if (!match) return undefined;
+  const from = `steps.${match.index}.${match.path}`;
+  context.refs.push({ step: before, param, from });
+  return `{{${from}}}`;
 }
 
-function pathOf(response: unknown, value: string): string | undefined {
-  if (response === undefined) return undefined;
+function earlierMatches(
+  responses: unknown[],
+  before: number,
+  value: string,
+): { index: number; path: string }[] {
+  const matches: { index: number; path: string }[] = [];
+  for (let index = 0; index < before; index++)
+    for (const path of pathsOf(responses[index], value)) matches.push({ index, path });
+  return matches;
+}
+
+function* pathsOf(response: unknown, value: string): Generator<string> {
+  if (response === undefined) return;
   for (const [pointer, leaf] of leaves(response)) {
     if (!pointer || !isScalar(leaf)) continue;
     if (String(leaf) !== value) continue;
-    return pointer.slice(1).replace(/\//g, ".");
+    yield pointer.slice(1).replace(/\//g, ".");
   }
-  return undefined;
 }
 
 function inferSteps(steps: unknown[] | undefined, context: Context): unknown[] | undefined {

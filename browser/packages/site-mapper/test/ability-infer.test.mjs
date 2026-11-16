@@ -96,6 +96,33 @@ test("a value a later step took from an earlier answer becomes a steps reference
   });
 });
 
+test("a literal found more than once in earlier answers is left alone", () => {
+  const inferred = inferAbilityInputs(
+    base({
+      inputs: { type: "object", properties: { q: { type: "string" } } },
+      ways: [
+        {
+          kind: "api",
+          operations: [
+            { operation: "search", params: { q: "{{inputs.q}}" } },
+            { operation: "detail", params: { id: "Paris" } },
+          ],
+        },
+      ],
+    }),
+    {
+      inputs: { q: "hotels" },
+      responses: [{ items: [{ name: "Paris" }], city: "Paris" }, {}],
+    },
+  );
+  assert.equal(
+    inferred.ability.ways[0].operations[1].params.id,
+    "Paris",
+    "two matches are ambiguous",
+  );
+  assert.deepEqual(inferred.references, []);
+});
+
 test("a page-query value becomes an input and stays a template in the URL", async () => {
   await withHome(async () => {
     await saveAbility(
