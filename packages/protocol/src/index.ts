@@ -48,6 +48,7 @@ export {
   type ChatCatalogItemDto,
   type ChatSummaryDto,
   type ChatViewSnapshotDto,
+  type BrowserTraceActionDto,
   type PiEntryDto,
   type PiContentBlockDto,
   type PiMessageDto,

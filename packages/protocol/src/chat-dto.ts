@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { PiBrowserContextRecordSchema, StepEventSchema } from "@browserkit/protocol";
+import {
+  PiBrowserContextRecordSchema,
+  StepEffectSchema,
+  StepEventSchema,
+} from "@browserkit/protocol";
 import { RunCardSchema } from "./run-card.js";
 import { ChatCatalogItemSchema, ChatIdSchema, ChatSummarySchema } from "./chat-catalog-dto.js";
 export {
@@ -182,8 +186,13 @@ const BrowserTraceActionSchema = z
       .strict()
       .optional(),
     failed: z.boolean().optional(),
+    /** What the input step caused, from the engine's closed effect vocabulary. */
+    effect: StepEffectSchema.optional(),
+    /** The short readback the effect rests on. */
+    evidence: z.string().min(1).max(240).optional(),
   })
   .strict();
+export type BrowserTraceActionDto = z.infer<typeof BrowserTraceActionSchema>;
 
 const PiMessageSchema = z
   .object({

@@ -12,6 +12,7 @@ import { WebSocket } from "ws";
 import { ChatService } from "./chat-service.js";
 import { type PublishedChatEvent } from "./chat-event-hub.js";
 import { sendDevChatMessage } from "./dev-chat-send.js";
+import { withoutUnknownKeys, type ParseIssue } from "./chat-event-degrade.js";
 
 export interface LiveView {
   chatId: ChatId;
@@ -82,16 +83,13 @@ async function sendSnapshot(
       continue;
     }
     views.set(result.subscriptionId, { chatId, unsubscribe: result.unsubscribe });
-    sendDevChatMessage(
-      socket,
-      ChatSnapshotMessageSchema.parse({
-        kind: "chat.snapshot",
-        requestId: request.requestId,
-        subscriptionId: result.subscriptionId,
-        cursor: view.cursor,
-        snapshot: view.snapshot,
-      }),
-    );
+    sendChatSnapshot(socket, request.chatId, {
+      kind: "chat.snapshot",
+      requestId: request.requestId,
+      subscriptionId: result.subscriptionId,
+      cursor: view.cursor,
+      snapshot: view.snapshot,
+    });
     buffer.prepare(result.subscriptionId, view.cursor.revision);
     // The snapshot holds finished entries only: replay calls still running (a waiting hand-off)
     // at the snapshot's cursor, so the page's cursor never moves back.
@@ -107,6 +105,25 @@ async function sendSnapshot(
     "INVALID_COMMAND",
     "Pi events advanced during each snapshot; subscribe again for a fresh snapshot.",
   );
+}
+
+/** A stored entry with a field this build does not know must not stop the view from opening. */
+function sendChatSnapshot(socket: WebSocket, chatId: string, candidate: unknown): void {
+  const parsed = ChatSnapshotMessageSchema.safeParse(candidate);
+  if (parsed.success) {
+    sendDevChatMessage(socket, parsed.data);
+    return;
+  }
+  const retry = ChatSnapshotMessageSchema.safeParse(
+    withoutUnknownKeys(candidate, parsed.error.issues),
+  );
+  if (retry.success) {
+    logRepaired(chatId, "snapshot", parsed.error.issues);
+    sendDevChatMessage(socket, retry.data);
+    return;
+  }
+  logDropped(chatId, "snapshot", retry.error.issues);
+  throw retry.error;
 }
 
 function hasViewCapacity(
@@ -190,6 +207,28 @@ function errorMessage(error: unknown): string {
     : "The daemon could not complete this request.";
 }
 
+/** One line per degraded or dropped event, with the field the view's schema rejected. */
+function logRepaired(chatId: string, kind: string, issues: readonly ParseIssue[]): void {
+  const fields = [
+    ...new Set(
+      issues
+        .filter((issue) => issue.code === "unrecognized_keys")
+        .flatMap((issue) => issue.keys ?? []),
+    ),
+  ];
+  process.stderr.write(
+    `Aeon daemon: dropped unknown fields from a ${kind} chat event for ${chatId}: ${fields.slice(0, 5).join(", ")}\n`,
+  );
+}
+
+function logDropped(chatId: string, kind: string, issues: readonly ParseIssue[]): void {
+  const issue = issues[0];
+  const detail = issue ? `${issue.path.join(".") || "event"}: ${issue.message}` : "invalid event";
+  process.stderr.write(
+    `Aeon daemon: dropped a ${kind} chat event for ${chatId}: ${detail.slice(0, 300)}\n`,
+  );
+}
+
 class BufferedEvents {
   private readonly buffered: PublishedChatEvent[] = [];
   private ready = false;
@@ -223,15 +262,30 @@ class BufferedEvents {
   }
 
   private write(event: PublishedChatEvent): void {
-    sendDevChatMessage(
-      this.socket,
-      ChatEventMessageSchema.parse({
-        kind: "chat.event",
-        subscriptionId: this.subscriptionId,
-        chatId: this.chatId,
-        event,
-      }),
+    const candidate = {
+      kind: "chat.event",
+      subscriptionId: this.subscriptionId,
+      chatId: this.chatId,
+      event,
+    };
+    const parsed = ChatEventMessageSchema.safeParse(candidate);
+    if (parsed.success) {
+      sendDevChatMessage(this.socket, parsed.data);
+      return;
+    }
+    // A field the engine added before this view's schema learned it: drop just that field and
+    // keep the event, so the answer still reaches the user.
+    const retry = ChatEventMessageSchema.safeParse(
+      withoutUnknownKeys(candidate, parsed.error.issues),
     );
+    if (retry.success) {
+      logRepaired(this.chatId, event.event.kind, parsed.error.issues);
+      sendDevChatMessage(this.socket, retry.data);
+      return;
+    }
+    // Anything else on one event must not throw into the run that published it: skip this event
+    // for this view, and let the next events and the chat keep going.
+    logDropped(this.chatId, event.event.kind, retry.error.issues);
   }
 
   flush(): void {
