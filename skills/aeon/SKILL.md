@@ -24,7 +24,7 @@ await page.getByRole('button', {name: 'Continue'}).click();
 return await page.read();
 ```
 
-A task about the tab the user is on runs on `browser.activeTab()`. Anything else opens its own tab, so theirs stays put. `help('when')`.
+A task about the tab the user is on runs on `browser.activeTab()`. Anything else opens its own tab, so theirs stays put. `help('when')`. An ability result may add `unverified`: that part is not verified, so say which part or re-read it in the page. A bracketed `[writes …]` on a site line is the way's inventory, never a permission gate.
 
 ---
 
