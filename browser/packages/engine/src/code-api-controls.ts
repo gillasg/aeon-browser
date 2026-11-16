@@ -180,19 +180,21 @@ function __pageControls(arg) {
     return els;
   };
   var tagged = (attr) => deep('[' + attr + '="' + arg.token + '"]')[0];
-  var find = () => {
-    for (var old of deep('[data-aeon-t],[data-aeon-s]')) { old.removeAttribute('data-aeon-t'); old.removeAttribute('data-aeon-s'); }
-    var t = arg.find, els = candidates(t), seen = els.filter(visible);
+  var findOne = (t, attr, token, clear) => {
+    // A find clears only the previous step's tag; the batch's data-aeon-f tags stay for later fields.
+    if (clear) for (var old of deep('[data-aeon-t]')) old.removeAttribute('data-aeon-t');
+    var els = candidates(t), seen = els.filter(visible);
     if (seen.length) els = seen;
     if (t.nth != null) els = els.slice(t.nth, t.nth === -1 ? undefined : t.nth + 1);
     if (els.length !== 1) return {count: els.length, matches: els.slice(0, 6).map((el) => roleOf(el) + ' ' + JSON.stringify(labelOf(el) || cut(ownText(el), 60)))};
     var el = els[0];
     // A hidden styled checkbox is clicked through its label; its state is still read from it.
     var act = !shown(el) && el.labels && [...el.labels].find(shown) || el;
-    act.setAttribute('data-aeon-t', arg.token);
-    el.setAttribute('data-aeon-s', arg.token);
-    return {count: 1, control: {...describe(el), text: cut(ownText(el), 2000)}};
+    act.setAttribute(attr, token);
+    el.setAttribute('data-aeon-s', token);
+    return {count: 1, control: {...describe(el), tag: el.tagName.toLowerCase(), text: cut(ownText(el), 2000)}};
   };
+  var find = () => findOne(arg.find, 'data-aeon-t', arg.token, true);
   var select = () => {
     var el = tagged('data-aeon-s');
     if (!el) throw new Error('STALE_REF: the control is gone');
@@ -211,8 +213,17 @@ function __pageControls(arg) {
     return {selected: picked.map(optionText)};
   };
   if (arg.mode === 'find') return find();
+  if (arg.mode === 'findMany') {
+    // fillForm's fields: one page scan tags each control so its fill needs no second find.
+    for (var stale of deep('[data-aeon-f]')) stale.removeAttribute('data-aeon-f');
+    return arg.finds.map((spec, index) => {
+      var token = arg.token + '-' + index;
+      var result = findOne(spec, 'data-aeon-f', token, index === 0);
+      return {...result, token, selector: '[data-aeon-f="' + token + '"]'};
+    });
+  }
   if (arg.mode === 'select') return select();
-  if (arg.mode === 'cleanup') { for (var el of deep('[data-aeon-t],[data-aeon-s]')) { el.removeAttribute('data-aeon-t'); el.removeAttribute('data-aeon-s'); } return true; }
+  if (arg.mode === 'cleanup') { for (var el of deep('[data-aeon-t],[data-aeon-s],[data-aeon-f]')) { el.removeAttribute('data-aeon-t'); el.removeAttribute('data-aeon-s'); el.removeAttribute('data-aeon-f'); } return true; }
   return list();
 }
 // Frames worth reading: real pages, not ad or tracking frames, at most eight.
@@ -247,7 +258,8 @@ function __batchStep(op, index) {
   var needsTarget = !['readUrl', 'wait'].includes(action);
   if (needsTarget && (!target || typeof target !== 'object' || !__TARGET_KEYS.some((key) => target[key] != null)))
     throw Error(where + ' (' + action + ') needs a target: {label}, {role, name}, {text}, {placeholder} or {css}, plus {frame: urlPart} inside an iframe and {nth} for one of several');
-  if ((action === 'fill' || action === 'type') && typeof op.value !== 'string' && typeof op.value !== 'number') throw Error(where + ': fill needs a string value');
+  if ((action === 'fill' || action === 'type') && typeof op.value !== 'string' && typeof op.value !== 'number' && !(op.field && typeof op.value === 'boolean'))
+    throw Error(where + ': fill needs a string value');
   if (action === 'select' && op.value == null) throw Error(where + ': select needs a value (option text or value, or a list)');
   if (action === 'press' && !op.value && !op.key) throw Error(where + ': press needs a key');
   if (action === 'readUrl' && op.expect == null) throw Error(where + ': readUrl needs expect (part of the URL)');
@@ -307,8 +319,9 @@ async function __batchSelect(target, op, found) {
   var scope = found.frame ? (fn, arg) => found.frame.evaluate(fn, arg) : (fn, arg) => browser.page(target).inspect(fn, arg);
   var result = await scope(__pageControls, {mode: 'select', token: found.token, values: op.value});
   if (!result.custom) {
-    // Set in the page directly, so mark the tab changed for the observation that ends the cell.
-    __dirty.set(__key(target), target);
+    // Set in the page directly, so mark the tab changed for the log; a value-only change does
+    // not need the cell's final observation.
+    __markValueOnly(target);
     return result;
   }
   // A custom dropdown: open it, then click the option.
@@ -339,6 +352,7 @@ async function __batchRun(target, op) {
   if (op.action === 'readUrl') return __batchUrl(target, op);
   if (op.action === 'read') return __batchRead(target, op);
   if (op.action === 'wait' && !op.target) { await __sleep(Math.min(10000, op.ms ?? 500)); return {effect: 'confirmed', label: 'Wait'}; }
+  if (op.field) return op.ready ? __batchReady(target, op) : __batchField(target, op);
   var found = await __batchFind(target, op);
   if (op.action === 'wait') return {found: found.control.label || found.control.text};
   if (op.action === 'select') return __batchSelect(target, op, found);
@@ -358,26 +372,59 @@ async function __batchRun(target, op) {
 async function __fillForm(target, values, options = {}) {
   if (!values || typeof values !== 'object' || Array.isArray(values))
     throw Error('page.fillForm takes {label: value}, e.g. {Email: "a@b.c", Country: "India", "I agree": true}');
-  var steps = [], exact = options.exact ? {exact: true} : {};
-  for (var [label, value] of Object.entries(values)) {
-    var where = {label, frame: options.frame, ...exact}, found;
-    try { found = await __batchFind(target, {target: where, timeout: options.timeout ?? 4000}); }
-    catch (error) {
-      if (!/TARGET_NOT_FOUND/.test(String(error.message))) throw error;
-      where = {placeholder: label, frame: options.frame, ...exact};
-      found = await __batchFind(target, {target: where, timeout: 300});
-    }
-    var role = found.control.role;
-    var action = ['checkbox', 'switch', 'radio'].includes(role) ? (value === false ? 'uncheck' : 'check')
-      : found.control.options ? 'select' : 'fill';
-    steps.push({action, target: where, ...(action === 'fill' || action === 'select' ? {value} : {})});
-  }
+  var steps = [], exact = options.exact ? {exact: true} : {}, entries = Object.entries(values);
+  // One page scan tags every field, then each step acts on its own tag: no find per field.
+  if (!options.frame) {
+    var specs = entries.map(([label]) => ({label, ...exact}));
+    var scanned = await browser.page(target).inspect(__pageControls, {mode: 'findMany', token: 'ff' + (++__tagSeq), finds: specs});
+    entries.forEach(([label, value], index) => {
+      var hit = scanned && scanned[index];
+      steps.push(hit && hit.count === 1 ? __fieldStep(hit, value) : {action: 'fill', target: {label, ...exact}, value, field: true});
+    });
+  } else for (var [label, value] of entries)
+    steps.push({action: 'fill', target: {label, frame: options.frame, ...exact}, value, field: true});
   if (options.submit) steps.push({action: 'click', target: {role: 'button', name: String(options.submit), frame: options.frame}});
   var url = options.expect != null && String(options.expect).startsWith('/');
   if (url) steps.push({action: 'readUrl', expect: options.expect});
   var result = await __batch(target, steps, {pace: options.pace, observe: options.expect == null, __checked: true});
   if (options.expect != null && !url) result.expect = await __waitText(target, String(options.expect), options.timeout ?? 10000);
   return result;
+}
+// A scanned fillForm control: its shape chooses fill, select or check, all against its own tag.
+function __fieldStep(hit, value) {
+  var control = hit.control, role = control.role;
+  var action = ['checkbox', 'switch', 'radio'].includes(role) ? (value === false ? 'uncheck' : 'check')
+    : control.options && control.tag !== 'select' ? 'select' : 'fill';
+  return {
+    action,
+    target: {css: hit.selector},
+    ...(action === 'fill' ? {value: String(value)} : action === 'select' ? {value} : {}),
+    field: true,
+    ready: {token: hit.token, selector: hit.selector, control},
+  };
+}
+async function __batchReady(target, op) {
+  if (op.action === 'check' || op.action === 'uncheck') return __batchCheck(target, op, op.ready);
+  if (op.action === 'select') return __batchSelect(target, op, op.ready);
+  return __batchDone(await __batchAct(target, op.ready, 'fill', op.value), 'fill', op.ready);
+}
+// One fillForm field with no scan hit: find it, then the control's own shape decides the action.
+async function __batchField(target, op) {
+  var found;
+  try { found = await __batchFind(target, {...op, timeout: op.timeout ?? 4000}); }
+  catch (error) {
+    if (!/TARGET_NOT_FOUND/.test(String(error.message)) || op.target.label == null) throw error;
+    var placeholder = {...op.target, placeholder: op.target.label};
+    delete placeholder.label;
+    found = await __batchFind(target, {...op, target: placeholder, timeout: 300});
+  }
+  var role = found.control.role;
+  if (['checkbox', 'switch', 'radio'].includes(role)) {
+    var want = op.value !== false;
+    return __batchCheck(target, {...op, action: want ? 'check' : 'uncheck'}, found);
+  }
+  if (found.control.options) return __batchSelect(target, {...op, action: 'select'}, found);
+  return __batchDone(await __batchAct(target, found, 'fill', op.value), 'fill', found);
 }
 // Waits until the page's text shows the given words (case and spacing ignored).
 async function __waitText(target, text, timeout) {

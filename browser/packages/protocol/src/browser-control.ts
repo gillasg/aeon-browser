@@ -326,6 +326,16 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
       evidence: z.string().max(240),
       /** Words for this step, from labelFor. A value typed into a field is never included. */
       label: z.string().max(200).optional(),
+      /** Where the input landed, measured just before it was sent (viewport CSS pixels). */
+      box: z
+        .object({
+          x: z.number(),
+          y: z.number(),
+          width: z.number(),
+          height: z.number(),
+        })
+        .strict()
+        .optional(),
       /**
        * The one call to run when the effect was not confirmed (a read, or clickAt when a child
        * holds the handler). Absent when the step was confirmed or refused.

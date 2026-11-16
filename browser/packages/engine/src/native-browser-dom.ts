@@ -268,11 +268,12 @@ function focusedInput() {
   );
 }
 
+/** Fills a text control and returns the value it read back, or undefined when it could not. */
 export async function fillTextNode(
   debuggee: chrome.debugger.Debuggee,
   id: number,
   value: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const group = "aeon-fill-" + crypto.randomUUID();
   try {
     const source = (await send(
@@ -301,18 +302,20 @@ export async function fillTextNode(
     )) as { node?: { backendNodeId?: number } };
     if (!node.node?.backendNodeId) throw new Error("STALE_REF");
     const keys = selected.result.objectId
-      ? await listensForKeys(debuggee, selected.result.objectId)
+      ? await listensForKeys(debuggee, selected.result.objectId, { deep: false })
       : false;
     if (value) await humanType(debuggee, value, { keys });
     else await clearSelection(debuggee);
     const field = node.node.backendNodeId;
-    if (await retained(debuggee, field, value)) return;
+    const kept = await retained(debuggee, field, value);
+    if (kept !== undefined) return kept;
     // Rich-text editors (Draft.js, ProseMirror, Lexical, Slate, Quill) can drop or reorder typed
     // characters; the editing command and a paste are what they reliably accept.
     for (const replace of [insertTextCommand, pasteText]) {
       if (!value || !(await onNode<boolean>(debuggee, field, isRichText))) break;
       await onNode(debuggee, field, replace, [value]);
-      if (await retained(debuggee, field, value)) return;
+      const after = await retained(debuggee, field, value);
+      if (after !== undefined) return after;
     }
     throw new BrowserActionError(
       "INPUT_FAILED",
@@ -329,11 +332,17 @@ export async function fillTextNode(
 }
 const KEY_LISTENS = new Set(["keydown", "keypress", "keyup", "beforeinput"]);
 
-/** True when the node, an ancestor, the document, or the window listens for keys. */
+/**
+ * True when the node, an ancestor, the document, or the window listens for keys. A fill asks
+ * about the control only (`deep: false`): a document-level hotkey or analytics listener is not
+ * a reason to type a value one key at a time.
+ */
 export async function listensForKeys(
   debuggee: chrome.debugger.Debuggee,
   objectId: string,
+  options?: { deep?: boolean },
 ): Promise<boolean> {
+  if (options?.deep === false) return objectListens(debuggee, objectId);
   let current: string | undefined = objectId;
   let release = false;
   const seen = new Set<string>();
@@ -421,18 +430,18 @@ function selectTextInput(this: HTMLInputElement | HTMLTextAreaElement) {
 function inputValue(this: HTMLInputElement | HTMLTextAreaElement) {
   return this.isContentEditable ? this.innerText : this.value;
 }
-/** Editors render spaces as nbsp and add a trailing line break; inputs must match exactly. */
+/** The value the control holds, when it is the one just typed (editors may adjust spaces). */
 async function retained(
   debuggee: chrome.debugger.Debuggee,
   id: number,
   value: string,
-): Promise<boolean> {
+): Promise<string | undefined> {
   const actual = await onNode<string>(debuggee, id, inputValue);
-  if (actual === value) return true;
-  if (!(await onNode<boolean>(debuggee, id, isRichText))) return false;
+  if (actual === value) return actual;
+  if (!(await onNode<boolean>(debuggee, id, isRichText))) return undefined;
   const norm = (text: string) =>
-    text.replace(/ /g, " ").replace(/\r/g, "").replace(/\n+/g, "\n").trim();
-  return norm(actual) === norm(value);
+    text.replace(/ /g, " ").replace(/\r/g, "").replace(/\n+/g, "\n").trim();
+  return norm(actual) === norm(value) ? actual : undefined;
 }
 function isRichText(this: HTMLElement) {
   return this.isContentEditable;

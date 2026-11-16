@@ -37,6 +37,9 @@ export async function resolveElement(
     );
     if (direct) return direct;
   }
+  // A CSS/label/placeholder target resolves by its own selector; only the chosen node needs an
+  // accessibility record. The full tree is for role and ref lookups, not for a fill by selector.
+  if (element.kind === "query") return resolveQueryFast(debuggee, element, documentEpoch);
   const nodes = await getAxTree(debuggee);
   if (element.kind === "backend") return resolveBackend(nodes, element, documentEpoch);
   if (element.kind === "ref") {
@@ -66,7 +69,6 @@ export async function resolveElement(
     return prior;
   }
   if (element.kind === "point") throw new Error("STALE_REF");
-  if (element.kind === "query") return resolveQuery(debuggee, nodes, element);
   return resolveRole(debuggee, nodes, element);
 }
 async function resolveByNodeId(
@@ -88,7 +90,18 @@ async function describeBackend(
   element: Extract<BrowserElementTarget, { kind: "backend" }>,
   documentEpoch?: number,
 ): Promise<AxRef | undefined> {
-  if (documentEpoch !== element.documentEpoch) throw new Error("STALE_REF");
+  if (documentEpoch !== undefined && documentEpoch !== element.documentEpoch)
+    throw new Error("STALE_REF");
+  // The observation that printed this id already carried the node's words; use them instead of
+  // asking the accessibility tree again. A backend id that no longer exists fails on the first
+  // DOM call (scroll, resolve or the input itself), so a stale name cannot act on another node.
+  if (element.role)
+    return {
+      backendNodeId: element.backendNodeId,
+      documentEpoch: element.documentEpoch,
+      role: element.role,
+      name: element.name ?? "",
+    };
   // One node's accessibility record, not the whole tree: callers label receipts and compare
   // the live role and name, so an empty one is a miss, not a sparse reference.
   const partial = (await send(
@@ -221,26 +234,25 @@ function uniqueNode(
     ...(node.frameId ? { frameId: node.frameId } : {}),
   };
 }
-async function resolveQuery(
+async function resolveQueryFast(
   debuggee: chrome.debugger.Debuggee,
-  nodes: AxNode[],
   query: Extract<BrowserElementTarget, { kind: "query" }>,
+  documentEpoch?: number,
 ): Promise<AxRef> {
   const ids = await queryNodes(debuggee, query);
   const visible = await visibleNodes(debuggee, ids);
-  if (visible.length > 1) throw ambiguousQuery(nodes, visible, query.value);
+  if (visible.length > 1) throw ambiguousQuery([], visible, query.value);
   const id = visible[0];
   if (id === undefined && ids[0] !== undefined)
-    throw await hiddenQuery(debuggee, nodes, ids[0], query.value);
-  if (id === undefined) throw notFoundError(nodes, "", query.value);
-  const node = nodes.find((node) => node.backendDOMNodeId === id);
-  return {
-    backendNodeId: id,
-    role: textValue(node?.role?.value),
-    name: textValue(node?.name?.value),
-    ...(node?.sessionId ? { sessionId: node.sessionId } : {}),
-    ...(node?.frameId ? { frameId: node.frameId } : {}),
-  };
+    throw await hiddenQuery(debuggee, [], ids[0], query.value);
+  if (id === undefined) throw notFoundError([], "", query.value);
+  const ref = await describeBackend(
+    debuggee,
+    { kind: "backend", backendNodeId: id, documentEpoch: documentEpoch ?? 0 },
+    documentEpoch,
+  );
+  if (!ref) throw new Error("STALE_REF");
+  return ref;
 }
 
 function ambiguousQuery(nodes: AxNode[], ids: number[], value: string): Error {

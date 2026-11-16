@@ -61,9 +61,14 @@ function __timeActions(locator) {
     var action = locator[name];
     if (typeof action !== 'function') continue;
     locator[name] = ((run) => async (...args) => {
-      var box = await locator.boundingBox().catch(() => null), tStart = Date.now();
-      var result = await run(...args);
-      var timing = {box, tStart, tEnd: Date.now()};
+      var tStart = Date.now();
+      var result = await run(...args), tEnd = Date.now();
+      // The engine measured the box just before it sent the input; only an action that did not
+      // report one pays a separate read.
+      var box = result && typeof result === 'object' && !Array.isArray(result) && result.box
+        ? result.box
+        : await locator.boundingBox().catch(() => null);
+      var timing = {box, tStart, tEnd};
       return result && typeof result === 'object' && !Array.isArray(result) ? {...result, ...timing} : {value: result, ...timing};
     })(action);
   }

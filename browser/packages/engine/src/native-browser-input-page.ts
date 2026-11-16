@@ -37,6 +37,7 @@ function activateNode(this: HTMLElement): void {
 function scrollNearest(this: HTMLElement): void {
   this.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
+
 function hitPoint(this: HTMLElement) {
   const box = this.getBoundingClientRect();
   const left = Math.max(0, box.left),

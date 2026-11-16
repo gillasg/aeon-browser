@@ -90,6 +90,17 @@ export async function actionablePoint(
   if (!state.visible) throw await hiddenTargetError(debuggee, id);
   if (!state.enabled) throw new Error("TARGET_DISABLED");
   if (editable && !state.editable) throw new Error("NOT_EDITABLE");
+  // A fill focuses the control programmatically, so it needs no stable click point; it still
+  // checks once that nothing covers the control, which is the only part of the pointer test a
+  // fill needs. The 50 ms stability loop stays for clicks.
+  if (editable) {
+    const point = await onNode<Point & { hit: boolean }>(debuggee, id, hitPoint);
+    if (!point.hit) {
+      const cover = await onNode<string>(debuggee, id, coveringElement).catch(() => "");
+      throw cover ? new BrowserActionError("TARGET_BLOCKED", cover) : new Error("TARGET_BLOCKED");
+    }
+    return { x: point.x, y: point.y };
+  }
   let prior: Point | undefined;
   for (let attempt = 0; attempt < 12; attempt++) {
     const current = await onNode<Point & { hit: boolean }>(debuggee, id, hitPoint);
@@ -102,23 +113,35 @@ export async function actionablePoint(
   const cover = await onNode<string>(debuggee, id, coveringElement).catch(() => "");
   throw cover ? new BrowserActionError("TARGET_BLOCKED", cover) : new Error("TARGET_BLOCKED");
 }
+// A field whose value the password vault may need: a password, or the identity beside it. Other
+// fields do not pay the form probe; an unnamed control always does, since its shape is unknown.
+const VAULT_FIELD =
+  /password|passcode|one[- ]?time|\botp\b|verification code|security code|email|username|user|login|account|identifier|phone|mobile/i;
+
+export function vaultField(name: string | undefined): boolean {
+  return !name || VAULT_FIELD.test(name);
+}
+
+/** Fills a control and returns the value it read back, when that is the value it set. */
 export async function fillNode(
   debuggee: chrome.debugger.Debuggee,
   id: number,
   value: string,
-): Promise<void> {
+  options: { vault?: boolean } = {},
+): Promise<string | undefined> {
   // A control's focus handler runs only while its document is the focused one, and a combobox
   // can move focus into a replacement input there. Aeon fills tabs the user is not looking at,
   // so emulate focus for the fill or the value lands in an input we never measured.
-  await withFocusEmulation(debuggee.tabId, async () => {
+  return withFocusEmulation(debuggee.tabId, async () => {
     const native = await onNode<string>(debuggee, id, setNativeValue, [value]);
     if (native === "done") {
-      await noteVaultFill(debuggee, id).catch(() => undefined);
-      return;
+      if (options.vault !== false) await noteVaultFill(debuggee, id).catch(() => undefined);
+      return undefined;
     }
     if (native !== "text") throw new Error(native);
-    await fillTextNode(debuggee, id, value);
-    await noteVaultFill(debuggee, id).catch(() => undefined);
+    const readback = await fillTextNode(debuggee, id, value);
+    if (options.vault !== false) await noteVaultFill(debuggee, id).catch(() => undefined);
+    return readback;
   });
 }
 function setNativeValue(this: HTMLInputElement | HTMLSelectElement, value: string): string {
@@ -387,7 +410,9 @@ export async function prepareElement(
         ? await rootFramePoint(debuggee, node.frameId, point)
         : { ...point, offsetX: 0, offsetY: 0 };
       showAgentCursor(debuggee, top.x, top.y, false, elementCaption(request, node, editable));
-      await revalidate();
+      // A fill came through a checked target moments ago and is about to resolve this node again;
+      // a click still re-checks because it may have opened or moved something.
+      if (!editable) await revalidate();
       return { node, point, frame, top };
     } catch (caught) {
       const error = normalizePreparationError(caught);
@@ -569,25 +594,32 @@ export async function performAction(
   let note: string | undefined;
   let changes: number | undefined;
   let readback: string | undefined;
+  let box: { x: number; y: number; width: number; height: number } | undefined;
   let silent = false;
   let childPoint: { x: number; y: number } | undefined;
   const actionId = beginReceipt(tabId);
   try {
     const scroll = await withDebugger(tabId, async (debuggee) => {
-      await revalidateTarget(request, tabId);
+      const filled = request.step.op === "fill";
+      // A fill's own read-back is its verification; preparing it checks the target again just
+      // before the input. Settling a page for a value that was set synchronously only adds wait.
+      if (!filled) await revalidateTarget(request, tabId);
       if (request.step.op === "scroll")
         return scrollWithFeedback(debuggee, { ...request, step: request.step });
-      const before = await primeBrowserSettle(debuggee);
+      const before = filled ? undefined : await primeBrowserSettle(debuggee);
       const since = Date.now();
       const dispatched = await dispatchAction(debuggee, request, revalidateTarget);
       readback = dispatched?.readback;
-      const settled = await settleBrowserPage(debuggee, 800, since, 80);
-      outcome = pageOutcome(before, settled.probe);
-      // The mutation count the page reported between the two probes: evidence for a DOM change.
-      if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
-      silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
-      if (silent && dispatched?.nodeId)
-        childPoint = await childHandlerPoint(dispatched.frame ?? debuggee, dispatched.nodeId);
+      box = dispatched?.box;
+      if (!filled) {
+        const settled = await settleBrowserPage(debuggee, 800, since, 80);
+        outcome = pageOutcome(before, settled.probe);
+        // The mutation count the page reported between the two probes: evidence for a DOM change.
+        if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
+        silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
+        if (silent && dispatched?.nodeId)
+          childPoint = await childHandlerPoint(dispatched.frame ?? debuggee, dispatched.nodeId);
+      }
       return undefined;
     });
     if (scroll) await revalidateTarget(request, tabId);
@@ -647,6 +679,7 @@ export async function performAction(
       ...(note ? { note } : {}),
       ...(observation ? { observation } : {}),
       ...(scroll ? { scroll } : {}),
+      ...(box ? { box } : {}),
       label: actionLabel(request.step),
     });
   } finally {
@@ -670,8 +703,16 @@ async function dispatchAction(
   debuggee: chrome.debugger.Debuggee,
   request: ActionRequest,
   revalidateTarget: RevalidateTarget,
-): Promise<{ readback?: string; nodeId?: number; frame?: chrome.debugger.Debuggee } | undefined> {
-  await revalidateTarget(request, request.step.target.tabId);
+): Promise<
+  | {
+      readback?: string;
+      nodeId?: number;
+      frame?: chrome.debugger.Debuggee;
+      box?: { x: number; y: number; width: number; height: number };
+    }
+  | undefined
+> {
+  // An element action revalidates inside prepareElement, just before it resolves the target.
   if (request.step.op === "click" && request.step.element.kind === "point") {
     await clickScreenshotPoint(debuggee, request);
     return undefined;
@@ -704,17 +745,27 @@ async function dispatchAction(
   if (request.step.op === "click" || request.step.op === "hold") {
     const pointer = await deliverAt(debuggee, request.step, top.x, top.y, !!box.activate);
     if (pointer === "activate") await onNode(frame, node.backendNodeId, activateNode);
-    return { nodeId: node.backendNodeId, frame };
+    return { nodeId: node.backendNodeId, frame, ...(measured ? { box: measured } : {}) };
   } else if (request.step.op === "fill") {
-    await fillNode(frame, node.backendNodeId, request.step.value);
-    const readback = await readFieldValue(frame, node.backendNodeId);
-    return readback !== undefined ? { readback } : undefined;
+    const typed = await fillNode(frame, node.backendNodeId, request.step.value, {
+      vault: vaultField(node.name),
+    });
+    // The text path already read the value back to verify it; only the native select path needs
+    // a separate read for its label.
+    const readback = typed !== undefined ? typed : await readFieldValue(frame, node.backendNodeId);
+    return {
+      ...(readback !== undefined ? { readback } : {}),
+      ...(measured ? { box: measured } : {}),
+    };
   } else if (request.step.op === "paste") {
     await pasteNode(frame, node.backendNodeId, request.step.text, request.step.html);
     const readback = await readFieldValue(frame, node.backendNodeId);
-    return readback !== undefined ? { readback } : undefined;
+    return {
+      ...(readback !== undefined ? { readback } : {}),
+      ...(measured ? { box: measured } : {}),
+    };
   } else await scrollAt(debuggee, top.x, top.y, request.step.direction, request.step.amount);
-  return undefined;
+  return measured ? { box: measured } : undefined;
 }
 
 async function scrollViewport(
