@@ -170,14 +170,19 @@ function classTable() {
   assert.equal(callClass("Emulation.setCPUThrottlingRate"), "emulate");
   assert.equal(callClass("Target.attachToTarget"), "attach");
   assert.equal(callClass("DOM.getDocument"), "read");
+  assert.equal(callClass("Page.printToPDF"), "capture");
+  assert.equal(callClass("Page.captureSnapshot"), "capture");
+  assert.equal(callClass("Page.captureScreenshot"), "capture");
   assert.equal(callLimitMs("DOM.getDocument"), 10_000);
   assert.equal(callLimitMs("Input.dispatchMouseEvent"), 10_000);
   assert.equal(callLimitMs("Emulation.setCPUThrottlingRate"), 6_000);
   assert.equal(callLimitMs("Target.attachToTarget"), 20_000);
+  assert.equal(callLimitMs("Page.printToPDF"), 60_000);
   assert.equal(callLimitMs("Page.navigate"), 60_000);
   assert.equal(callLimitMs("Runtime.evaluate", 4_000), 10_000);
   engineConfig.cdpLimitFactor = 0;
   assert.equal(callLimitMs("DOM.getDocument"), 5_000);
+  assert.equal(callLimitMs("Page.printToPDF"), 30_000);
   engineConfig.cdpLimitFactor = 0.02;
 }
 

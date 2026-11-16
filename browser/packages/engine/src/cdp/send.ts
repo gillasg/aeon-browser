@@ -8,7 +8,7 @@ import { beginLazyDomain, setDomainFailureNote } from "./domains.js";
 import { engineConfig } from "../engine-config.js";
 import { noteLateInput, noteLateInputLanded } from "../native-browser-receipts.js";
 
-export type CallClass = "read" | "input" | "eval" | "nav" | "attach" | "emulate";
+export type CallClass = "read" | "input" | "eval" | "nav" | "attach" | "emulate" | "capture";
 
 export interface SendOptions {
   ms?: number;
@@ -32,9 +32,13 @@ const CLASS_MS: Record<Exclude<CallClass, "eval">, number> = {
   emulate: 3_000,
   attach: 10_000,
   nav: 30_000,
+  // Chrome renders a PDF or a full page snapshot inside the renderer; a long or busy page takes
+  // far longer than a normal read, and cutting it off at 5 s marks a working tab as hung.
+  capture: 30_000,
 };
 const NAV = new Set(["Page.navigate", "Page.reload", "Page.navigateToHistoryEntry"]);
 const EVAL = new Set(["Runtime.evaluate", "Runtime.callFunctionOn", "Runtime.awaitPromise"]);
+const CAPTURE = new Set(["Page.printToPDF", "Page.captureSnapshot", "Page.captureScreenshot"]);
 const RING = 200;
 
 interface Meta {
@@ -71,6 +75,7 @@ export function callClass(method: string): CallClass {
   if (method === "Target.attachToTarget" || method === "attach") return "attach";
   if (NAV.has(method)) return "nav";
   if (EVAL.has(method)) return "eval";
+  if (CAPTURE.has(method)) return "capture";
   return "read";
 }
 
