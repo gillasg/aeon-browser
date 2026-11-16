@@ -11,6 +11,7 @@ import {
   isChromeRole,
   isDialogRole,
   isSkippableText,
+  matchesQuery,
   pageHeading,
   tableText,
   type Line,
@@ -304,9 +305,8 @@ export function hotNodes(
 ): Set<string> {
   const byId = new Map(nodes.map((node) => [node.axId, node]));
   const hot = new Set<string>();
-  const query = focus?.toLowerCase();
   for (const node of nodes) {
-    if (!nodeIsHot(node, query, delta)) continue;
+    if (!nodeIsHot(node, focus, delta)) continue;
     let current: TreeNode | undefined = node;
     let guard = 0;
     while (current && guard++ < 200) {
@@ -322,7 +322,6 @@ function nodeIsHot(
   query: string | undefined,
   delta: Set<number> | undefined,
 ): boolean {
-  if (query && `${node.role} ${node.name} ${node.value ?? ""}`.toLowerCase().includes(query))
-    return true;
+  if (query && matchesQuery(`${node.role} ${node.name} ${node.value ?? ""}`, query)) return true;
   return delta !== undefined && node.backendNodeId !== undefined && delta.has(node.backendNodeId);
 }

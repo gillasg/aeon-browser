@@ -44,9 +44,10 @@ function render(ax, options = {}) {
       .join("\n");
   const filtered = filterVisibleTextNodes(ax, visible);
   const semantic = createSemanticNodes(filtered, options.query ? { query: options.query } : {});
+  const shown = shownNodes(filtered, options.query, semantic);
   const tree = buildSemanticTree({
     ax,
-    shown: semantic.nodes,
+    shown,
     url,
     ...(options.title ? { title: options.title } : {}),
     ...(options.clickables ? { clickables: options.clickables } : {}),
@@ -59,6 +60,11 @@ function render(ax, options = {}) {
     ...(options.expand ? { expand: options.expand } : {}),
   });
   return { view, nodes: semantic.nodes, url };
+}
+
+function shownNodes(filtered, query, semantic) {
+  if (!query) return semantic.nodes;
+  return createSemanticNodes(filtered).nodes;
 }
 
 function legacy(url, nodes) {
@@ -507,6 +513,45 @@ test("a query keeps the matching control and its row", () => {
   assert.match(view, /button "Return"/);
   assert.match(view, /row "1182 · USB cable"/);
   assert.doesNotMatch(view, /button "Edit"/);
+  assert.doesNotMatch(view, /0 of \d+ elements match/);
+});
+
+test("a query that matches nothing says so in one line", () => {
+  seq = 0;
+  const ax = el("RootWebArea", "Your Orders", [
+    el("main", "", [
+      el("button", "Edit", [], { backend: 1 }),
+      el("button", "Return", [], { backend: 2 }),
+    ]),
+  ]);
+  const { view } = render(ax, { query: "missing" });
+  assert.match(view, /0 of [1-9]\d* elements match query "missing"/);
+  assert.doesNotMatch(view, /0 of 0 elements/);
+  assert.equal((view.match(/0 of \d+ elements match/g) ?? []).length, 1);
+  assert.doesNotMatch(view, /button "Edit"/);
+  assert.match(view, /shorter word/);
+});
+
+test("a query with a bar keeps either word", () => {
+  seq = 0;
+  const ax = el("RootWebArea", "Your Orders", [
+    el("main", "", [
+      el("button", "Edit", [], { backend: 1 }),
+      el("button", "Return", [], { backend: 2 }),
+      el("button", "Track", [], { backend: 3 }),
+    ]),
+  ]);
+  const { view, nodes } = render(ax, { query: "edit|return" });
+  assert.match(view, /button "Edit"/);
+  assert.match(view, /button "Return"/);
+  assert.doesNotMatch(view, /button "Track"/);
+  assert.doesNotMatch(view, /0 of \d+ elements match/);
+  assert.ok(nodes.some((node) => node.name === "Edit"));
+  assert.ok(nodes.some((node) => node.name === "Return"));
+  assert.equal(
+    nodes.some((node) => node.name === "Track"),
+    false,
+  );
 });
 
 test("delta marks a changed control and a quiet page hides the rest", () => {
@@ -605,6 +650,44 @@ test("an unnamed single-child container folds, and a dialog does not", () => {
   const dialog = render(el("RootWebArea", "Ask", [el("dialog", "", [el("button", "OK")])])).view;
   assert.match(dialog, /^dialog$/m);
   assert.match(dialog, /button "OK"/);
+});
+
+test("hints name empty and shared controls and skip a named row", async () => {
+  const { hintTargets } = await import("../dist/observe/hints.js");
+  seq = 0;
+  const ax = el("RootWebArea", "Hints", [
+    el("main", "", [
+      el("button", "Save"),
+      el("button", ""),
+      el("table", "", [
+        el("row", "", [el("cell", "Order 9"), el("cell", "", [el("button", "Delete")])]),
+      ]),
+      el("button", "Delete"),
+    ]),
+  ]);
+  const shown = createSemanticNodes(ax).nodes;
+  const tree = buildSemanticTree({ ax, shown, url: URL, clickables: [], offscreen: [] });
+  const picked = hintTargets(tree.nodes).map((node) => `${node.role}:${node.name}`);
+  assert.deepEqual(picked, ["button:", "button:Delete"]);
+});
+
+test("a supplied hint is printed and the accessible name stays empty", () => {
+  seq = 0;
+  const ax = el("RootWebArea", "Hints", [el("main", "", [el("button", "")])]);
+  const shown = createSemanticNodes(ax).nodes;
+  const button = shown.find((node) => node.role === "button");
+  const view = renderCaptured({
+    ax,
+    shown,
+    url: URL,
+    title: "Hints",
+    clickables: [],
+    offscreen: [],
+    truncated: false,
+    hints: new Map([[button.backendNodeId, "icon:icon-trash"]]),
+  });
+  assert.match(view, /button "" hint="icon:icon-trash"/);
+  assert.equal(button.name, "");
 });
 
 test("a truncated observation points at page.state when the budget can hold the note", () => {

@@ -210,7 +210,8 @@ async function __clickIndexed(target, element, index, options, hold) {
   }
   var page = browser.page(target);
   if (hold) return page.holdAt(box.x, box.y, options);
-  return options && options.clickCount === 2 ? page.doubleClickAt(box.x, box.y) : page.clickAt(box.x, box.y);
+  var gesture = __pointerFields(options);
+  return options && options.clickCount === 2 ? page.doubleClickAt(box.x, box.y, gesture) : page.clickAt(box.x, box.y, gesture);
 }
 // A fill is only done when the field reads back what was typed (Playwright's fill returns nothing).
 async function __checkFilled(target, element, index, value) {
@@ -243,20 +244,34 @@ function __extendLocator(target, element, base, index) {
     allTextContents: () => read((found) => found.map((el) => el.textContent || '')),
     evaluate: (fn, arg) => read('(found, arg) => (' + fn.toString() + ')(found[0], arg)', arg),
     evaluateAll: (fn, arg) => read('(found, arg) => (' + fn.toString() + ')(found, arg)', arg),
-    waitFor: (options = {}) => __waitUntil(() => read((found) => found.length), options.timeout ?? 10000),
+    // Playwright states. visible is the default. hidden and detached succeed when nothing
+    // matches, so a spinner wait does not return while the node is still on the page.
+    waitFor: (options = {}) => {
+      var state = __waitStateName(options.state);
+      return __waitUntil(() => read(function (found, state) {
+        function shown(el) {
+          var rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+        }
+        if (state === 'attached') return found.length > 0;
+        if (state === 'detached') return found.length === 0;
+        if (state === 'hidden') return found.every(function (el) { return !shown(el); });
+        return found.some(shown);
+      }, state), options.timeout ?? options.timeoutMs ?? 10000, state);
+    },
     ...(indexed ? {
       click: (options) => __clickIndexed(target, element, at0, options),
       hold: (options) => __clickIndexed(target, element, at0, options, true),
-      dblclick: () => __clickIndexed(target, element, at0, {clickCount: 2}),
+      dblclick: (options) => __clickIndexed(target, element, at0, Object.assign({}, options, {clickCount: 2})),
       fill: async (value) => { await __clickIndexed(target, element, at0); await browser.page(target).keyboard('ControlOrMeta+a'); await browser.page(target).keyboard(String(value)); await __checkFilled(target, element, at0, String(value)); },
     } : {
-      dblclick: async () => __clickIndexed(target, element, 0, {clickCount: 2}),
+      dblclick: (options) => __clickIndexed(target, element, 0, Object.assign({}, options, {clickCount: 2})),
     }),
     // Key by key, like Playwright: for fields that react to keystrokes (autocomplete, search
     // as you type, code boxes). fill() stays the fast way to set a value.
     type: async (value) => { await self().click(); return browser.page(target).keyboard(String(value)); },
     pressSequentially: async (value) => { await self().click(); return browser.page(target).keyboard(String(value)); },
-    selectOption: (value) => self().fill(Array.isArray(value) ? value[0] : (value && value.label) || (value && value.value) || value),
+    selectOption: (value) => __locatorSelect(target, element, index, value),
     check: async () => { if (!(await self().isChecked())) await self().click(); },
     uncheck: async () => { if (await self().isChecked()) await self().click(); },
     // Page-side reads only see what is inside the op, so the not-found check is inline.
@@ -310,10 +325,15 @@ function __parseGoogle(html, limit) {
     throw new Error('GOOGLE_BLOCKED: Google asked for a check. Use the websearch tool, or open the results in a tab.');
   return results;
 }
-async function __waitUntil(check, timeout) {
+function __waitStateName(state) {
+  if (state === undefined || state === null || state === '') return 'visible';
+  if (state === 'attached' || state === 'detached' || state === 'visible' || state === 'hidden') return state;
+  throw new Error('INVALID_INPUT: state must be attached, detached, visible or hidden');
+}
+async function __waitUntil(check, timeout, pending) {
   var deadline = Date.now() + timeout;
   while (Date.now() < deadline) { if (await check()) return; await new Promise((done) => setTimeout(done, 250)); }
-  throw new Error('TIMEOUT: element did not appear');
+  throw new Error(pending ? 'TIMEOUT: element did not become ' + pending : 'TIMEOUT: element did not appear');
 }
 function __extendPage(target, base) {
   var css = (selector) => base.locator(selector);
@@ -341,7 +361,17 @@ function __extendPage(target, base) {
     domSnapshot: (options = {}) => bu.state({...options, target}),
     goto: (url, options) => base.navigate(url, options),
     hover: (a, b) => typeof a === 'string' ? css(a).first().hover() : coordHover(a, b),
-    reload: () => base.cdp('Page.reload', {}),
+    reload: async (options = {}) => {
+      // The address already known for this tab. Reading it from the page is code, and a page
+      // holding a password the agent did not type refuses that; reload is how that page reopens.
+      var href = String(base.url || "");
+      if (!/^https?:/i.test(href)) href = await base.evaluate(() => location.href);
+      var timeoutMs = options.timeoutMs || options.timeout;
+      var result = await __step({op:'navigate', target, url: href, reload: true,
+        ...(timeoutMs ? {timeoutMs: Math.max(500, Math.min(Number(timeoutMs) || 0, 120000))} : {})});
+      if (result && result.data && result.data.note) console.log(result.data.note);
+      return result;
+    },
     goBack: () => base.evaluate(() => history.back()),
     goForward: () => base.evaluate(() => history.forward()),
     content: () => base.evaluate(() => document.documentElement.outerHTML),
@@ -355,12 +385,12 @@ function __extendPage(target, base) {
     inputValue: (selector) => css(selector).first().inputValue(),
     isVisible: (selector) => css(selector).isVisible(),
     hoverSelector: (selector) => css(selector).first().hover(),
-    waitForSelector: (selector, options = {}) => base.locator(selector).first().waitFor({timeout: options.timeout ?? options.timeoutMs ?? 5000}),
+    waitForSelector: (selector, options = {}) => base.locator(selector).first().waitFor({state: options.state, timeout: options.timeout ?? options.timeoutMs ?? 5000}),
     bringToFront: async () => undefined,
     check: (selector) => css(selector).first().check(),
     uncheck: (selector) => css(selector).first().uncheck(),
     selectOption: (selector, value) => css(selector).first().selectOption(value),
-    dblclick: (selector) => css(selector).first().dblclick(),
+    dblclick: (selector, options) => css(selector).first().dblclick(options),
     type: (selector, value) => css(selector).first().fill(value),
     waitForLoadState: (state, options = {}) => base.waitFor(state === 'domcontentloaded' ? () => document.readyState !== 'loading' : () => document.readyState === 'complete', {timeoutMs: options.timeout ?? 8000}),
     waitForURL: (pattern, options = {}) => __waitUntil(async () => {
@@ -376,8 +406,8 @@ function __extendPage(target, base) {
     links: (selector = 'body') => base.inspect('(' + __readLinks.toString() + ')(' + JSON.stringify(selector) + ')'),
     keyboard,
     mouse: Object.freeze({
-      click: (x, y, options = {}) => options.clickCount === 2 ? base.doubleClickAt(x, y) : base.clickAt(x, y),
-      dblclick: (x, y) => base.doubleClickAt(x, y),
+      click: (x, y, options = {}) => options.clickCount === 2 ? base.doubleClickAt(x, y, options) : base.clickAt(x, y, options),
+      dblclick: (x, y, options = {}) => base.doubleClickAt(x, y, options),
       // {steps} moves in that many small mouse events from the last position, as a person would.
       move: async (x, y, options = {}) => {
         var steps = Math.max(1, Math.min(200, Math.round(options.steps ?? 1))), from = __mouseAt.get(__key(target)) || {x, y};

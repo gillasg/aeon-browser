@@ -175,6 +175,7 @@ async function runWithBrowserDebugger<T>(
         "TARGET_NOT_FOUND",
         "TARGET_HIDDEN",
         "TARGET_DISABLED",
+        "FILE_INPUT",
         "TARGET_BLOCKED",
         "NOT_EDITABLE",
         "INPUT_FAILED",

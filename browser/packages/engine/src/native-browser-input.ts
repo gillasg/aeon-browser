@@ -11,7 +11,7 @@ import "./native-browser-download-reissue.js";
 import { labelForAction } from "./evidence/label.js";
 import { focusFilledPassword, noteVaultFill } from "./native-browser-vault.js";
 import { withFocusEmulation } from "./native-browser-session.js";
-import { humanMouse, humanType, paceKey } from "./native-browser-human-input.js";
+import { humanType, paceKey } from "./native-browser-human-input.js";
 import { pasteNode } from "./native-browser-paste.js";
 import {
   type BrowserExecutorRequest,
@@ -24,6 +24,7 @@ import {
   resolveElement,
   clickAt,
   deliverAt,
+  pointerPress,
   pointHold,
   getViewportCenter,
   scrollAt,
@@ -55,12 +56,14 @@ import {
   primeBrowserSettle,
   settleBrowserPage,
   pageOutcome,
+  pageStillChanging,
 } from "./native-browser-navigation.js";
 import { frameContext, rootFramePoint } from "./native-browser-frames.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
 import { hiddenTargetError } from "./native-browser-reveal.js";
 import { send } from "./cdp/send.js";
+import { dispatchPointer } from "./native-browser-pointer.js";
 import { KEY_CODES, KEY_MASKS } from "./native-browser-keys.js";
 
 interface Point {
@@ -82,11 +85,14 @@ export async function actionablePoint(
     },
   );
   await onNode(debuggee, id, scrollNearest).catch(() => undefined);
-  const state = await onNode<{ visible: boolean; enabled: boolean; editable: boolean }>(
-    debuggee,
-    id,
-    nodeState,
-  );
+  const state = await onNode<{
+    visible: boolean;
+    enabled: boolean;
+    editable: boolean;
+    file: boolean;
+  }>(debuggee, id, nodeState);
+  // Before any pointer event: a click here would open the OS file dialog.
+  if (state.file) throw new Error("FILE_INPUT");
   if (!state.visible) throw await hiddenTargetError(debuggee, id);
   if (!state.enabled) throw new Error("TARGET_DISABLED");
   if (editable && !state.editable) throw new Error("NOT_EDITABLE");
@@ -223,69 +229,12 @@ export async function pressKey(debuggee: chrome.debugger.Debuggee, key: string):
 }
 
 type Step = Extract<BrowserExecutorRequest["step"], { op: "pointer" | "keys" }>;
-type PointerStep = Extract<Step, { op: "pointer" }>;
 export async function executeInteraction(
   debuggee: chrome.debugger.Debuggee,
   step: Step,
 ): Promise<unknown> {
   if (step.op === "keys") return keyboard(debuggee, step.keys);
-  const mouse = async (type: string, x: number, y: number, extra: Record<string, unknown> = {}) => {
-    const params = await humanMouse(debuggee, type, { x, y, ...extra });
-    return send(
-      debuggee,
-      "Input.dispatchMouseEvent",
-      { type, ...params },
-      {
-        label: "executeInteraction",
-      },
-    );
-  };
-  if (step.action === "drag" && step.toX !== undefined && step.toY !== undefined)
-    showAgentCursor(debuggee, step.toX, step.toY, false, {
-      from: { x: step.x, y: step.y },
-      transient: true,
-      caption: "Dragging",
-    });
-  else
-    showAgentCursor(debuggee, step.x, step.y, step.action !== "hover", {
-      transient: true,
-      caption: step.action === "hover" ? "Hovering" : "Clicking",
-    });
-  await mouse("mouseMoved", step.x, step.y);
-  if (step.action === "hover") return { hovered: true };
-  return withFocusEmulation(debuggee.tabId, () => pressPointer(step, mouse));
-}
-
-async function pressPointer(
-  step: PointerStep,
-  mouse: (type: string, x: number, y: number, extra?: Record<string, unknown>) => Promise<unknown>,
-): Promise<unknown> {
-  if (step.action === "drag") {
-    if (step.toX === undefined || step.toY === undefined) throw new Error("INVALID_TARGET");
-    await mouse("mousePressed", step.x, step.y, { button: "left", buttons: 1, clickCount: 1 });
-    try {
-      for (let i = 1; i <= 12; i++)
-        await mouse(
-          "mouseMoved",
-          step.x + ((step.toX - step.x) * i) / 12,
-          step.y + ((step.toY - step.y) * i) / 12,
-          { button: "left", buttons: 1 },
-        );
-    } finally {
-      await mouse("mouseReleased", step.toX, step.toY, {
-        button: "left",
-        buttons: 0,
-        clickCount: 1,
-      });
-    }
-    return { dragged: true };
-  }
-  const count = step.action === "doubleClick" ? 2 : 1;
-  for (let click = 1; click <= count; click++) {
-    await mouse("mousePressed", step.x, step.y, { button: "left", clickCount: click });
-    await mouse("mouseReleased", step.x, step.y, { button: "left", clickCount: click });
-  }
-  return { clicked: true };
+  return dispatchPointer(debuggee, step);
 }
 const IS_MAC = /Mac/i.test(globalThis.navigator?.platform ?? "");
 const MAC_COMMANDS: Record<string, string> = {
@@ -391,6 +340,11 @@ export async function prepareElement(
   top: { x: number; y: number; offsetX: number; offsetY: number };
 }> {
   if (!("target" in request.step)) throw new Error("INVALID_TARGET");
+  const missing = {
+    started: Date.now(),
+    quietSince: Date.now(),
+    seen: undefined as number | undefined,
+  };
   for (let attempt = 0; ; attempt++) {
     await revalidate();
     try {
@@ -416,11 +370,29 @@ export async function prepareElement(
       return { node, point, frame, top };
     } catch (caught) {
       const error = normalizePreparationError(caught);
+      if (await holdMissingTarget(debuggee, error, missing)) continue;
       if (attempt >= 2 || !(error instanceof Error) || !retryablePreparation(error, element))
         throw error;
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
+}
+
+// A missing target is retried only while the page is still changing, and abandoned after 500 ms quiet.
+async function holdMissingTarget(
+  debuggee: chrome.debugger.Debuggee,
+  error: unknown,
+  clock: { started: number; quietSince: number; seen: number | undefined },
+): Promise<boolean> {
+  if (!(error instanceof Error) || error.message !== "TARGET_NOT_FOUND") return false;
+  const moving = await pageStillChanging(debuggee, clock.seen);
+  clock.seen = moving.changes;
+  if (moving.active) clock.quietSince = Date.now();
+  const quiet = Date.now() - clock.quietSince >= 500;
+  const capped = Date.now() - clock.started >= 3_000;
+  if (quiet || capped) throw error;
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  return true;
 }
 
 function retryablePreparation(error: Error, element: BrowserElementTarget): boolean {
@@ -480,6 +452,7 @@ export async function clickScreenshotPoint(
     debuggee,
     Math.round(point.viewport.width * request.step.element.x),
     Math.round(point.viewport.height * request.step.element.y),
+    pointerPress(request.step),
   );
 }
 
@@ -503,11 +476,15 @@ export async function interactFrame(
       await fillNode(debuggee, node.node.backendNodeId, value);
       return { filled: true };
     }
-    const point = await onNode<{ x: number; y: number; activated?: boolean }>(
-      debuggee,
-      node.node.backendNodeId,
-      framePoint,
-    );
+    const point = await onNode<{
+      x: number;
+      y: number;
+      activated?: boolean;
+      disabled?: boolean;
+      file?: boolean;
+    }>(debuggee, node.node.backendNodeId, framePoint);
+    if (point.file) throw new Error("FILE_INPUT");
+    if (point.disabled) throw new Error("TARGET_DISABLED");
     if (point.activated) return { clicked: true, activated: "dom" };
     // Input is sent to this frame's renderer session; same-process frames need the owner offset.
     const offset = await frameOffset(debuggee, frameId);

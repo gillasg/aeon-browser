@@ -84,11 +84,18 @@ function hitPoint(this: HTMLElement) {
 
 // Page-side: the point to click for an element in a frame. A target inside the element that is hit
 // (hidden or pointer-events:none control) is clicked through its label, else activated in the DOM.
-function framePoint(this: HTMLElement): { x: number; y: number; activated?: boolean } {
+// aria-disabled is a hint. A throw here is reported as STALE_REF, so a real refusal is a field.
+function framePoint(this: HTMLElement): {
+  x: number;
+  y: number;
+  activated?: boolean;
+  disabled?: boolean;
+  file?: boolean;
+} {
+  if (this.matches('input[type="file"]')) return { x: 0, y: 0, file: true };
   this.scrollIntoView({ block: "center", inline: "center" });
   const box = this.getBoundingClientRect();
-  if (!box.width || !box.height || this.matches(':disabled,[aria-disabled="true"]'))
-    throw Error("TARGET_DISABLED");
+  if (!box.width || !box.height || this.matches(":disabled")) return { x: 0, y: 0, disabled: true };
   const at = (x: number, y: number) => {
     let hit = this.ownerDocument.elementFromPoint(x, y);
     while (hit?.shadowRoot) {

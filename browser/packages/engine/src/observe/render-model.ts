@@ -69,6 +69,28 @@ export function roleLabel(role: string): string {
   return ROLE_LABEL[role] ?? role;
 }
 
+/** `a|b` is either word. An empty query matches everything. */
+export function queryParts(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split("|")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+export function matchesQuery(hay: string, query: string): boolean {
+  const parts = queryParts(query);
+  if (parts.length === 0) return true;
+  const text = hay.toLowerCase();
+  return parts.some((part) => text.includes(part));
+}
+
+/** One line when a query keeps nothing, so a header is not read as an empty page. */
+export function noMatchText(query: string, total: number): string {
+  const shown = query.replace(/\s+/g, " ").trim().slice(0, 80);
+  return `0 of ${total} elements match query "${shown}". Try a shorter word, a|b for either, or page.state() without a query.`;
+}
+
 export function pageHeading(url: string, title: string): string {
   const where = locationOf(url);
   const name = clip(title, 60);
@@ -104,6 +126,7 @@ export function quote(text: string): string {
 export function controlText(node: TreeNode, pageUrl: string, token: string): string {
   const name = node.name || node.placeholder || "";
   const parts = [`[${token}] ${node.role} ${quote(name)}`];
+  if (node.hint) parts.push(` hint=${quote(node.hint)}`);
   if (node.value !== undefined) parts.push(` = ${showValue(node.value)}`);
   if (node.options?.length) parts.push(` ${optionSummary(node.options)}`);
   const path = node.url ? sameSitePath(pageUrl, node.url) : undefined;

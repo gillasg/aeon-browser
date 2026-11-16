@@ -345,28 +345,69 @@ function centerOf(coordinates: (number | undefined)[]): number {
   return Math.round(total / coordinates.length);
 }
 
+export const pointerButtonBits = { left: 1, right: 2, middle: 4, back: 8, forward: 16 } as const;
+const MODIFIER_BITS: Record<string, number> = { alt: 1, control: 2, meta: 4, shift: 8 };
+
+export interface PointerPress {
+  button?: keyof typeof pointerButtonBits;
+  modifiers?: number;
+}
+
+/** The CDP button and modifier mask for a click step. Omitted fields stay a plain left click. */
+export function pointerPress(step: {
+  button?: string | undefined;
+  modifiers?: readonly string[] | undefined;
+}): PointerPress {
+  const button =
+    step.button && step.button in pointerButtonBits
+      ? (step.button as PointerPress["button"])
+      : undefined;
+  const modifiers = (step.modifiers ?? []).reduce(
+    (mask, name) => mask | (MODIFIER_BITS[name] ?? 0),
+    0,
+  );
+  return { ...(button ? { button } : {}), ...(modifiers ? { modifiers } : {}) };
+}
+
 export async function clickAt(
   debuggee: chrome.debugger.Debuggee,
   x: number,
   y: number,
+  spec?: PointerPress,
 ): Promise<void> {
   showAgentCursor(debuggee, x, y, true);
   noteActionTiming(debuggee.tabId, { tAct: Date.now(), point: { x, y } });
-  await withFocusEmulation(debuggee.tabId, () => pressAt(debuggee, x, y));
+  await withFocusEmulation(debuggee.tabId, () => pressAt(debuggee, x, y, spec));
 }
 
-async function pressAt(debuggee: chrome.debugger.Debuggee, x: number, y: number): Promise<void> {
-  const at = await land(debuggee, x, y, "clickAt");
+function mouseBits(spec: PointerPress | undefined, phase: "move" | "down" | "up") {
+  const button = spec?.button ?? "left";
+  const modifiers = spec?.modifiers ?? 0;
+  return {
+    ...(phase === "move"
+      ? {}
+      : { button, buttons: phase === "down" ? pointerButtonBits[button] : 0 }),
+    ...(modifiers ? { modifiers } : {}),
+  };
+}
+
+async function pressAt(
+  debuggee: chrome.debugger.Debuggee,
+  x: number,
+  y: number,
+  spec?: PointerPress,
+): Promise<void> {
+  const at = await land(debuggee, x, y, "clickAt", spec?.modifiers ?? 0);
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
-    { type: "mousePressed", ...at, button: "left", clickCount: 1 },
+    { type: "mousePressed", ...at, ...mouseBits(spec, "down"), clickCount: 1 },
     { label: "clickAt" },
   );
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
-    { type: "mouseReleased", ...at, button: "left", clickCount: 1 },
+    { type: "mouseReleased", ...at, ...mouseBits(spec, "up"), clickCount: 1 },
     { label: "clickAt" },
   );
 }
@@ -405,14 +446,22 @@ export async function pointHold(
 /** Click or hold at a point. A click whose box asks for DOM activation is left to the caller. */
 export async function deliverAt(
   debuggee: chrome.debugger.Debuggee,
-  step: { op: string; ms?: number | undefined },
+  step: {
+    op: string;
+    ms?: number | undefined;
+    button?: string | undefined;
+    modifiers?: readonly string[] | undefined;
+  },
   x: number,
   y: number,
   activate: boolean,
 ): Promise<"activate" | "sent"> {
-  if (step.op === "click" && activate) return "activate";
+  const spec = pointerPress(step);
+  const plain = !spec.button && !spec.modifiers;
+  // A DOM activate is a plain left click. Another button or a held modifier has to be a real press.
+  if (step.op === "click" && activate && plain) return "activate";
   if (step.op === "hold") await holdAt(debuggee, x, y, step.ms);
-  else await clickAt(debuggee, x, y);
+  else await clickAt(debuggee, x, y, spec);
   return "sent";
 }
 
@@ -421,14 +470,21 @@ async function land(
   x: number,
   y: number,
   label: string,
+  modifiers = 0,
 ): Promise<{ x: number; y: number }> {
+  const held = modifiers ? { modifiers } : {};
   // One direct move, unless the recorder's pointer is on: then the curve plays and this is the landing.
-  const moved = await humanMouse(debuggee, "mouseMoved", { x, y });
+  const moved = await humanMouse(debuggee, "mouseMoved", { x, y, ...held });
   const at = {
     x: typeof moved.x === "number" ? moved.x : x,
     y: typeof moved.y === "number" ? moved.y : y,
   };
-  await send(debuggee, "Input.dispatchMouseEvent", { type: "mouseMoved", ...at }, { label });
+  await send(
+    debuggee,
+    "Input.dispatchMouseEvent",
+    { type: "mouseMoved", ...at, ...held },
+    { label },
+  );
   return at;
 }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { browserExtraSteps } from "./browser-extra-steps.js";
-import { browserCapabilitySteps } from "./browser-capability-steps.js";
+import { browserCapabilitySteps, pointerGesture } from "./browser-capability-steps.js";
 import { BrowserTabSchema, BrowserTargetKeySchema } from "./browser-inventory.js";
 
 const HttpUrlSchema = z
@@ -94,6 +94,7 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       target: BrowserTargetKeySchema,
       element: BrowserElementTargetSchema,
       observe: z.boolean().optional(),
+      ...pointerGesture,
     })
     .strict(),
   z
@@ -418,6 +419,7 @@ export const BrowserOperationResultSchema = z.discriminatedUnion("ok", [
         "TARGET_NOT_FOUND",
         "TARGET_HIDDEN",
         "TARGET_DISABLED",
+        "FILE_INPUT",
         "TARGET_BLOCKED",
         "NOT_EDITABLE",
         "INPUT_FAILED",

@@ -45,6 +45,10 @@ export const ERRORS = {
     "the element is not visible: open the menu or section that holds it first",
   ],
   TARGET_DISABLED: ["model", "the control is disabled: fill what it depends on first"],
+  FILE_INPUT: [
+    "model",
+    "clicking a file input opens the OS file dialog, which cannot be closed from here: set its files with page.upload",
+  ],
   TARGET_BLOCKED: ["page", "something covers the element: close the overlay first (bu.clear())"],
   TARGET_LOST: ["page", "the element or page changed under the step: read bu.state() again"],
   NOT_EDITABLE: ["model", "the element does not take typing: target its input"],
