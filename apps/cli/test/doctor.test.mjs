@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { ENGINE_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
 import { CHROME_FLAGS, doctorChecks, formatDoctor } from "../dist/doctor-checks.js";
-import { directoryWritable, modelSignedIn } from "../dist/doctor-io.js";
+import { directoryWritable, modelSignedIn, supervisorServiceActive } from "../dist/doctor-io.js";
 import { runDoctor } from "../dist/doctor.js";
 
 const version = SUPPORTED_PROTOCOL_VERSION;
@@ -35,6 +35,7 @@ test("doctor is all ok when the ping, flags, model, task and folders agree", () 
     ["ok", "ok", "ok", "ok", "ok", "ok", "ok"],
   );
   assert.match(formatDoctor(checks, false), /daemon +ok +The daemon answered/);
+  assert.match(checks.find((check) => check.name === "supervisor").detail, /is running\./);
   assert.equal(formatDoctor(checks, false).includes("Fix:"), false);
   const json = JSON.parse(formatDoctor(checks, true));
   assert.equal(json.ok, true);
@@ -62,6 +63,7 @@ test("each failed check names the one fix", () => {
   assert.match(byName.flags.detail, /disable-background-timer-throttling/);
   assert.match(byName.flags.fix, /Restart Chrome with these flags/);
   assert.match(byName.model.fix, /Sign in to a model/);
+  assert.match(byName.supervisor.detail, /is not running\./);
   assert.match(byName.supervisor.fix, /Aeon/);
   assert.match(byName.data.fix, /C:\\Aeon\\data/);
   assert.match(formatDoctor(checks, false), /Fix: Open Chrome with Aeon loaded/);
@@ -103,6 +105,69 @@ test("an engine protocol other than this build fails the protocol check", () => 
   const protocol = checks.find((check) => check.name === "protocol");
   assert.equal(protocol.status, "fail");
   assert.match(protocol.detail, /Engine protocol/);
+});
+
+test("the supervisor check follows the service manager, not the unit file", async () => {
+  const root = await mkdtemp(join(tmpdir(), "aeon-doctor-service-"));
+  const home = join(root, "home");
+  const env = { XDG_CONFIG_HOME: join(home, ".config") };
+  const unit = join(env.XDG_CONFIG_HOME, "systemd", "user", "aeon-daemon.service");
+  try {
+    assert.equal(
+      await supervisorServiceActive({
+        platform: "linux",
+        home,
+        env,
+        exec: async () => {
+          throw new Error("must not run without a unit file");
+        },
+      }),
+      false,
+    );
+    await mkdir(dirname(unit), { recursive: true });
+    await writeFile(unit, "unit");
+    const calls = [];
+    assert.equal(
+      await supervisorServiceActive({
+        platform: "linux",
+        home,
+        env,
+        exec: async (file, args) => {
+          calls.push([file, ...args]);
+          return true;
+        },
+      }),
+      true,
+    );
+    assert.deepEqual(calls, [
+      ["systemctl", "--user", "is-active", "--quiet", "aeon-daemon.service"],
+    ]);
+    assert.equal(
+      await supervisorServiceActive({ platform: "linux", home, env, exec: async () => false }),
+      false,
+    );
+
+    const plist = join(home, "Library", "LaunchAgents", "com.aeon.daemon.plist");
+    await mkdir(dirname(plist), { recursive: true });
+    await writeFile(plist, "plist");
+    const macCalls = [];
+    assert.equal(
+      await supervisorServiceActive({
+        platform: "darwin",
+        home,
+        env,
+        uid: 42,
+        exec: async (file, args) => {
+          macCalls.push([file, ...args]);
+          return true;
+        },
+      }),
+      true,
+    );
+    assert.deepEqual(macCalls, [["launchctl", "print", "gui/42/com.aeon.daemon"]]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("a model credential is signed in, and a writable folder is", async () => {
