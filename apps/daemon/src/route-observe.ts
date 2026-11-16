@@ -22,7 +22,7 @@ export interface SeenStep {
 }
 
 export interface SeenEvent {
-  kind: "run-state" | "user" | "steps" | "error";
+  kind: "run-state" | "user" | "steps" | "error" | "tool" | "answer";
   state?: string;
   text?: string;
   toolCallId?: string;
@@ -54,6 +54,10 @@ export interface LiveRun {
   /** The run ended without a known outcome; it is not a success to learn from. */
   unsure: boolean;
   partial?: { have: number; total: number };
+  /** Text every tool result returned, for checking the answer's quotes against what was read. */
+  readText: string[];
+  /** The answer with no tool call, kept for that check. */
+  answer?: string;
 }
 
 export interface Absorb {
@@ -86,6 +90,7 @@ export function openRun(
     draft: false,
     watcher: false,
     unsure: false,
+    readText: [],
   };
 }
 
@@ -93,14 +98,17 @@ export function openRun(
 export function absorb(run: LiveRun | undefined, event: SeenEvent, now: number): Absorb {
   if (event.kind === "run-state") return onState(run, event.state, now);
   if (!run) return { finish: false };
-  if (event.kind === "user") return { run: onUser(run, event.text ?? ""), finish: false };
-  if (event.kind === "steps") return { run: onSteps(run, event), finish: false };
+  return { run: onRunEvent(run, event), finish: false };
+}
+
+function onRunEvent(run: LiveRun, event: SeenEvent): LiveRun {
+  if (event.kind === "user") return onUser(run, event.text ?? "");
+  if (event.kind === "steps") return onSteps(run, event);
+  if (event.kind === "tool") return onRead(run, event.result ?? "");
+  if (event.kind === "answer") return onAnswer(run, event.text ?? "");
   if (event.kind === "error")
-    return {
-      run: OURS.test(event.result ?? "") ? { ...run, ours: true } : { ...run, stumbled: true },
-      finish: false,
-    };
-  return { run, finish: false };
+    return OURS.test(event.result ?? "") ? { ...run, ours: true } : { ...run, stumbled: true };
+  return run;
 }
 
 export function flatSteps(run: LiveRun): SeenStep[] {
@@ -120,6 +128,20 @@ function onUser(run: LiveRun, text: string): LiveRun {
   const trimmed = text.trim();
   if (!trimmed || trimmed === run.submitted.trim()) return run;
   return { ...run, corrected: true };
+}
+
+const READ_CAP = 400_000;
+const READ_TOTAL_CAP = 2_000_000;
+
+function onRead(run: LiveRun, text: string): LiveRun {
+  const total = run.readText.reduce((sum, item) => sum + item.length, 0);
+  if (!text || total >= READ_TOTAL_CAP) return run;
+  const room = Math.min(READ_CAP, READ_TOTAL_CAP - total);
+  return { ...run, readText: [...run.readText, text.slice(0, room)] };
+}
+
+function onAnswer(run: LiveRun, text: string): LiveRun {
+  return text.trim() ? { ...run, answer: text } : run;
 }
 
 function onSteps(run: LiveRun, event: SeenEvent): LiveRun {
@@ -158,8 +180,15 @@ export function seenFrom(event: PiSessionEvent): SeenEvent | undefined {
   if (event.kind === "run-state") return { kind: "run-state", state: event.state };
   if (event.kind === "message-end" && event.message.role === "user")
     return { kind: "user", text: textOf(event.message.content) };
+  if (event.kind === "message-end" && event.message.role === "assistant") {
+    const called = event.message.content.some((block) => block.type === "tool-call");
+    return called ? undefined : { kind: "answer", text: textOf(event.message.content) };
+  }
   if (event.kind === "tool-update") return stepsSeen(event.toolCallId, event.steps, event.progress);
-  if (event.kind === "tool-end" && event.isError) return { kind: "error", result: event.result };
+  if (event.kind === "tool-end")
+    return event.isError
+      ? { kind: "error", result: event.result }
+      : { kind: "tool", result: event.result };
   return undefined;
 }
 

@@ -55,6 +55,21 @@ test("a draft run is not labelled from memory and does not offer fresh", () => {
   );
 });
 
+test("an answer quoting text no read returned gets one line under it", () => {
+  const card = buildRunCard({
+    ...base,
+    durationMs: 1200,
+    path: "first time",
+    unread: ["your application was approved"],
+  });
+  const notice = card.items.find((item) => item.kind === "notice");
+  assert.match(notice.text, /^Not read this run: “your application was approved”$/);
+  assert.equal(
+    card.items.some((item) => item.kind === "offer"),
+    false,
+  );
+});
+
 test("declined offers, empty checks and ours errors are not cards", () => {
   const declined = buildRunCard({
     ...base,

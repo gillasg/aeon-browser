@@ -113,6 +113,36 @@ test("a finished run saves a route and the next prompt gets the draft", async ()
   }
 });
 
+test("a run flags a quoted claim its reads never returned", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders 2024"));
+    await recorder.observe("chat", {
+      kind: "tool-end",
+      toolCallId: "t",
+      toolName: "browser_code",
+      result: '{"list":{"items":[{"text":"Order 2024"}]}}',
+      isError: false,
+    });
+    await recorder.observe("chat", {
+      kind: "message-end",
+      message: {
+        role: "assistant",
+        stopReason: "endTurn",
+        content: [{ type: "text", text: 'Your order "Order 2024" shipped; "Order 2025" failed.' }],
+      },
+    });
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    const notice = cards
+      .flatMap((event) => event.card.items)
+      .find((item) => item.kind === "notice" && /Not read this run/.test(item.text));
+    assert.ok(notice, JSON.stringify(cards));
+    assert.match(notice.text, /“Order 2025”/);
+    assert.doesNotMatch(notice.text, /“Order 2024”/);
+  });
+});
+
 test("a new task that says instead or wrong does not block the route", async () => {
   await withRecorder(async (recorder) => {
     await finishRun(recorder, "chat", "orders for 2024", "shop.test");

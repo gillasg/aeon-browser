@@ -3,6 +3,7 @@
 // is never a card.
 
 import type { RunCard, RunCardItem } from "@aeon/protocol";
+import { unreadLine } from "./unread-quotes.js";
 
 export type SpeedPath = "from memory" | "with a saved draft" | "saved ability" | "first time";
 
@@ -24,6 +25,8 @@ export interface RunFacts {
   abilityId?: string;
   ours?: boolean;
   declined?: string[];
+  /** Quotes in the answer that no text returned to the model this run contains. */
+  unread?: string[];
 }
 
 type Offer = Extract<RunCardItem, { kind: "offer" }>;
@@ -69,8 +72,15 @@ function learnedItem(learned: NonNullable<RunFacts["learned"]>): RunCardItem {
 }
 
 function noticesFor(facts: RunFacts): Notice[] {
-  if (facts.durationMs === undefined || !facts.path) return [];
-  return [{ kind: "notice", text: speedText(facts.durationMs, facts.path, facts.previousMs) }];
+  const notices: Notice[] = [];
+  if (facts.unread?.length)
+    notices.push({ kind: "notice", text: unreadLine(facts.unread).slice(0, 200) });
+  if (facts.durationMs !== undefined && facts.path)
+    notices.push({
+      kind: "notice",
+      text: speedText(facts.durationMs, facts.path, facts.previousMs),
+    });
+  return notices;
 }
 
 function offersFor(facts: RunFacts): Offer[] {
