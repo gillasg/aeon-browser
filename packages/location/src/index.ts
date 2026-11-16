@@ -1,6 +1,9 @@
 import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
 
+export { ensurePrivateDir, foreignSocket, UntrustedDirError } from "./private-dir.js";
+export type { PrivateDirOptions } from "./private-dir.js";
+
 /** Where Aeon keeps its configuration and data on this OS. */
 export interface AeonLocationOptions {
   env?: NodeJS.ProcessEnv;

@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CoreHealthResultSchema } from "@aeon/protocol";
-import { aeonDataDirectory } from "@aeon/location";
+import { aeonDataDirectory, ensurePrivateDir, UntrustedDirError } from "@aeon/location";
 import type { DaemonHost } from "./host.js";
 import type { DataDir, HealthView } from "./doctor-checks.js";
 
@@ -176,9 +176,28 @@ function loginTaskPresent(): Promise<boolean> {
 }
 
 async function readDataDirs(): Promise<DataDir[]> {
-  const dirs = dataDirPaths();
-  const writable = await Promise.all(dirs.map((dir) => directoryWritable(dir.path)));
-  return dirs.map((dir, index) => ({ ...dir, writable: writable[index] === true }));
+  return Promise.all(dataDirPaths().map((dir) => inspectDataDir(dir)));
+}
+
+async function inspectDataDir(dir: { name: string; path: string }): Promise<DataDir> {
+  const fix = trustFix(dir.name);
+  try {
+    await ensurePrivateDir(dir.path, { fix });
+  } catch (error) {
+    return {
+      ...dir,
+      writable: false,
+      trustError: error instanceof Error ? error.message : String(error),
+      trustFix: error instanceof UntrustedDirError ? error.fix : fix,
+    };
+  }
+  return { ...dir, writable: await directoryWritable(dir.path) };
+}
+
+function trustFix(name: string): string {
+  if (name === "browserkit") return "Set BROWSERKIT_HOME to a directory you own with mode 700.";
+  if (name === "site-to-api") return "Set SITE_TO_API_HOME to a directory you own with mode 700.";
+  return "Set AEON_DATA_DIR to a directory you own with mode 700.";
 }
 
 function execLines(file: string, args: string[]): Promise<string[]> {

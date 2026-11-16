@@ -307,6 +307,9 @@ importers:
 
   browser/packages/crawl:
     dependencies:
+      "@aeon/location":
+        specifier: workspace:*
+        version: link:../../../packages/location
       "@mozilla/readability":
         specifier: 0.6.0
         version: 0.6.0
@@ -396,6 +399,9 @@ importers:
 
   browser/packages/site-mapper:
     dependencies:
+      "@aeon/location":
+        specifier: workspace:*
+        version: link:../../../packages/location
       fflate:
         specifier: 0.8.3
         version: 0.8.3

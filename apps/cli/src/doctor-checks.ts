@@ -51,6 +51,9 @@ export interface DataDir {
   name: string;
   path: string;
   writable: boolean;
+  /** Set when the folder is owned by someone else, loose, or reached through an unsafe parent. */
+  trustError?: string;
+  trustFix?: string;
 }
 
 export interface DoctorFacts {
@@ -162,6 +165,9 @@ function fewestMissing(lines: string[]): string[] {
 }
 
 function dataCheck(dirs: DataDir[]): Check {
+  const untrusted = dirs.find((dir) => dir.trustError);
+  if (untrusted?.trustError)
+    return line("data", "fail", untrusted.trustError, untrusted.trustFix ?? untrusted.trustError);
   const blocked = dirs.filter((dir) => !dir.writable);
   if (!blocked.length)
     return line("data", "ok", "Data folders are writable.", "Make the Aeon data folders writable.");

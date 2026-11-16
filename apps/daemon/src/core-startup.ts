@@ -3,18 +3,25 @@ import { createServer, connect } from "node:net";
 import { existsSync } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { aeonDataDirectory } from "@aeon/location";
+import {
+  aeonDataDirectory,
+  ensurePrivateDir,
+  foreignSocket,
+  UntrustedDirError,
+} from "@aeon/location";
 import { createProductionRuntime } from "./production-runtime.js";
 import { startCoreTransport } from "./core-transport.js";
 
 export async function acquireCoreLock(directory: string): Promise<() => Promise<void>> {
-  await mkdir(directory, { recursive: true });
+  const fix = "Set AEON_DATA_DIR to a directory you own with mode 700.";
+  if (process.platform === "win32") await mkdir(directory, { recursive: true });
+  else await ensurePrivateDir(directory, { fix });
   const identity = createHash("sha256").update(resolve(directory).toLowerCase()).digest("hex");
   const address =
     process.platform === "win32"
       ? "\\\\.\\pipe\\aeon-core-owner-" + identity
       : join(directory, "core-owner.sock");
-  if (process.platform !== "win32") await clearStaleCoreSocket(address);
+  if (process.platform !== "win32") await claimCoreSocket(address, fix);
   const server = createServer((socket) => socket.destroy());
   await new Promise<void>((resolveReady, reject) => {
     server.once("error", reject);
@@ -29,6 +36,13 @@ export async function acquireCoreLock(directory: string): Promise<() => Promise<
     // new owner can appear.
     await new Promise<void>((resolveClosed) => server.close(() => resolveClosed()));
   };
+}
+
+/** A foreign socket is refused before connect. A dead file is removed. A live owner blocks the start. */
+async function claimCoreSocket(address: string, fix: string): Promise<void> {
+  const problem = foreignSocket(address);
+  if (problem) throw new UntrustedDirError(address, problem, fix);
+  await clearStaleCoreSocket(address);
 }
 
 /** A socket that refuses connections is a dead daemon's leftover; a live one is the single owner. */
