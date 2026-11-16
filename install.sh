@@ -57,9 +57,14 @@ fi
 major=$(node --version | sed 's/^v//' | cut -d. -f1)
 [ "$major" -ge 22 ] || die "Aeon needs Node.js 22 or newer (found $(node --version))."
 if ! command -v pnpm >/dev/null 2>&1; then
-  say "Installing pnpm..."
-  npm install --global pnpm@11.4.0 --silent
+  say "Installing pnpm into $HOME/.local..."
+  # npm's global prefix is root-owned when Node came from NodeSource, so install where the user
+  # can write and the PATH refresh above finds it. Keep npm's output: it is the only diagnosis.
+  if ! npm install --global --prefix "$HOME/.local" pnpm@11.4.0; then
+    die "pnpm could not be installed (see npm above). Install pnpm 11 yourself, then run this again."
+  fi
   refresh_path
+  command -v pnpm >/dev/null 2>&1 || die "pnpm was installed but is not on PATH. Add $HOME/.local/bin to PATH, then run this again."
 fi
 
 if [ -d "$DIR/.git" ]; then
