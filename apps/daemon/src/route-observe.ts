@@ -36,6 +36,8 @@ export interface LiveRun {
   runId: string;
   /** What the user typed, without a draft prefix. */
   userPrompt: string;
+  /** The task this run belongs to: the prompt itself, or the one a short correction points at. */
+  task: string;
   /** The text submitted, so the opening message is not a correction. */
   submitted: string;
   startedAt: number;
@@ -72,6 +74,7 @@ export function openRun(
     chatId,
     runId,
     userPrompt,
+    task: userPrompt,
     submitted,
     startedAt: now,
     stepsByTool: {},

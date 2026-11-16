@@ -7,6 +7,7 @@ import { listRoutes, saveAbility, settleRoutes, stageRun } from "@browserkit/sit
 import { isWordCorrection, RouteRecorder } from "../dist/route-recorder.js";
 import { absorb, openRun } from "../dist/route-observe.js";
 import { draftPrompt } from "../dist/route-draft.js";
+import { rememberDecline } from "../dist/route-memory.js";
 
 test("a steer during a run is a correction and the opening prompt is not", () => {
   const run = openRun("chat", "run", "orders for 2024", "orders for 2024", 1);
@@ -209,6 +210,39 @@ test("a correction in the next message makes that run worth saving", async () =>
     await finishRun(recorder, "chat", "orders for 2024", "shop.test");
     await finishRun(recorder, "chat", "nope", "shop.test");
     assert.equal(saveOffers(cards.at(-1)).length, 1);
+  });
+});
+
+test("a save offer after a correction is keyed to the task, so a decline sticks", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await finishRun(recorder, "chat", "orders for 2024", "shop.test");
+    await finishRun(recorder, "chat", "nope", "shop.test");
+    const offers = saveOffers(cards.at(-1));
+    assert.equal(offers.length, 1);
+    assert.equal(offers[0].id, "save-ability:shop.test:2024 orders");
+
+    await rememberDecline("shop.test", offers[0].id);
+    await recorder.prepare("chat", "orders for 2024");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", {
+      kind: "tool-end",
+      toolCallId: "t1",
+      toolName: "browser_code",
+      result: "TIMEOUT: the click did not land",
+      isError: true,
+    });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    assert.equal(saveOffers(cards.at(-1)).length, 0, "the declined task stays declined");
+  });
+});
+
+test("a correction still finds an ability that covers the task it corrects", async () => {
+  await withRecorder(async (recorder, cards) => {
+    await saveAbility(ability("orders"));
+    await finishRun(recorder, "chat", "orders for 2024", "shop.test");
+    await finishRun(recorder, "chat", "nope", "shop.test");
+    assert.equal(saveOffers(cards.at(-1)).length, 0);
   });
 });
 
