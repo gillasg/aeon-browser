@@ -412,11 +412,9 @@ async function answerHandoff(profile, target, beforeDone, known = new Set()) {
   const cdp = await connect(page.webSocketDebuggerUrl);
   try {
     await waitFor(async () => {
-      const waiting = await cdpCall(cdp, "Runtime.evaluate", {
-        expression: "globalThis[Symbol.for('aeon.handoff')] === 'waiting'",
-        returnByValue: true,
-      });
-      if (waiting.result?.result?.value !== true) throw new Error("hand-off not shown yet");
+      // The cursor lives in a closed shadow root and the answer key is random per hand-off, so
+      // find the real Done button through DevTools and click it like a person would.
+      if ((await cursorDone(cdp)) === undefined) throw new Error("hand-off not shown yet");
     }, 20_000);
   } catch (error) {
     const evidence = await handoffEvidence({ port, target, page, cdp }).catch((failure) => ({
@@ -428,9 +426,43 @@ async function answerHandoff(profile, target, beforeDone, known = new Set()) {
     throw error;
   }
   await beforeDone?.();
-  await cdp("Runtime.evaluate", {
-    expression: "globalThis[Symbol.for('aeon.handoff')] = 'done'",
+  const button = await cursorDone(cdp);
+  if (button === undefined) throw new Error("hand-off Done not found");
+  const resolved = await cdp("DOM.resolveNode", { backendNodeId: button });
+  const objectId = resolved.result?.object?.objectId;
+  if (!objectId) throw new Error("hand-off Done not resolvable");
+  await cdp("Runtime.callFunctionOn", {
+    objectId,
+    functionDeclaration: "function () { this.click(); }",
   });
+}
+
+/** The backend id of the cursor's Done button inside its closed shadow root, if it is up. */
+async function cursorDone(cdp) {
+  const document = await cdpCall(cdp, "DOM.getDocument", { depth: -1, pierce: true });
+  const found = findButton(document.result?.root, false);
+  return found?.backendNodeId;
+}
+
+function findButton(node, inCursor) {
+  if (!node) return undefined;
+  const attributes = node.attributes ?? [];
+  const pair = (name) => {
+    const index = attributes.indexOf(name);
+    return index >= 0 ? attributes[index + 1] : undefined;
+  };
+  const here = inCursor || (pair("id") === "aeon-agent-cursor" && node.nodeName === "DIV");
+  if (here && node.nodeName === "BUTTON" && (pair("class") ?? "").split(/\s+/).includes("done"))
+    return node;
+  for (const child of node.children ?? []) {
+    const hit = findButton(child, here);
+    if (hit) return hit;
+  }
+  for (const root of node.shadowRoots ?? []) {
+    const hit = findButton(root, here);
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 /** Everything a stalled hand-off should show: the watched page, every other page, the worker. */
