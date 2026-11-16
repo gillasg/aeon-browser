@@ -136,6 +136,23 @@ test("a drifted direct answer survives a page retry that is signed out or failin
   }
 });
 
+test("a successful read that keeps the learned transport does not rewrite the file", async (t) => {
+  await withSite(t, async (root, model) => {
+    await recordTransportPreference(model.site, "list", "direct");
+    const file = join(root, "sites", model.site, "transport.json");
+    const before = await readFile(file, "utf8");
+    const direct = transport("direct", () => reply({ ok: true, items: [] }));
+    const page = transport("page", () => assert.fail("the page was not needed"));
+    const api = await siteMapper(model.site, {
+      model,
+      transports: { direct, page },
+      session: false,
+    });
+    await api.list();
+    assert.equal(await readFile(file, "utf8"), before, "the stored note is already right");
+  });
+});
+
 test("a transport error moves no preference", async (t) => {
   await withSite(t, async (_root, model) => {
     const direct = transport("direct", () => {

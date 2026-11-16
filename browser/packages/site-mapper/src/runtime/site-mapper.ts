@@ -167,6 +167,8 @@ export class SiteClient {
     id: string,
     transport: TransportNote["transport"],
   ): Promise<void> {
+    // The map is the source of truth in memory; an unchanged answer writes nothing.
+    if (this.prefs?.[id]?.transport === transport) return;
     this.prefs = { ...(this.prefs ?? {}), [id]: { transport, at: new Date().toISOString() } };
     await recordTransportPreference(this.site, id, transport).catch(() => undefined);
   }
