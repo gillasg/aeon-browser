@@ -1,7 +1,10 @@
 ## Reading pages
 
-**One `page.read()` per page, every tab at once with `Promise.all`.** It returns the whole page;
-never `page.evaluate(() => document.body.innerText)`, and never slice a page across cells.
+**One `page.read()` per page, every tab at once with `Promise.all`.** It returns an object, not
+text: `url`, `title`, `text`, `markdown`, `data`, `list`, `partial`, `notes`, plus `scrollers`,
+`embedded` and `artifact` when those apply. `text` is the page text (the same string as
+`markdown`); a check uses `(await page.read()).text`. Never `page.evaluate(() => document.body.innerText)`,
+and never slice a page across cells.
 
 Start with `page.read({max})`: data, the main repeated list and Markdown in one answer, with
 `partial: true` and notes when it saw less. It expands "Show more"/"Show replies" controls, waits

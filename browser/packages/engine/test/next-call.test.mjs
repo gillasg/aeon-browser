@@ -76,6 +76,25 @@ test("an ambiguous target names a state read, not a click, and lists the matches
   assert.equal(text.includes("page.click"), false);
 });
 
+test("an ability that fails as drift names the repair call, and a plain site error does not", () => {
+  const drifted = describeError(
+    "SITE_BROKEN",
+    "ABILITY_FAILED: notes.example feed (api: unverified: the recorded shape changed: /id (required) missing)",
+  );
+  assert.match(drifted, /Next: site_mapper\(\{action:"heal"/);
+  assert.match(drifted, /action:"edit"/);
+  assert.equal(drifted.includes("await bu.state()"), false);
+  const gone = describeError(
+    "SITE_BROKEN",
+    "ABILITY_FAILED: notes.example list (api: list answered HTTP 410: gone)",
+  );
+  assert.match(gone, /Next: site_mapper\(\{action:"heal",site:"notes.example",repair:true\}/);
+  assert.match(gone, /action:"edit"/);
+  const other = describeError("SITE_BROKEN", "the listing answered HTTP 500: no");
+  assert.match(other, /Next: await bu\.state\(\)/);
+  assert.equal(other.includes("site_mapper"), false);
+});
+
 test("a non-confirmed effect names a read, and clickAt only when a child has the handler", () => {
   assert.equal(effectNext("confirmed", { op: "click", childPoint: { x: 4, y: 5 } }), null);
   assert.equal(effectNext("refused"), null);

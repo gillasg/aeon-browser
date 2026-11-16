@@ -7,9 +7,9 @@ import { fieldPoint, scanFields, type SignInFields } from "./native-browser-sign
 // Chrome never hands a saved password to an extension, but it fills one for a person: a real
 // click in the sign-in field opens its suggestions, and ArrowDown then Enter picks the first.
 // The engine only learns whether the field filled, never the value; the page is already marked
-// as a password page, so agent code cannot read it afterwards. Chrome shows its suggestions only
-// in the active tab of a focused window, as it would to a person, so the tab comes forward for
-// the sign-in and the tab the user was on goes back in front afterwards.
+// as a password page, so that value is hidden from agent code afterwards. Chrome shows its
+// suggestions only in the active tab of a focused window, as it would to a person, so the tab
+// comes forward for the sign-in and the tab the user was on goes back in front afterwards.
 
 const OPEN_WAIT_MS = 1200;
 const PICK_WAIT_MS = 300;

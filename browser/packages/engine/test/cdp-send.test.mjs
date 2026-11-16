@@ -120,6 +120,61 @@ function actionResult(lateReply) {
   };
 }
 
+test("a read that is still in flight is brought forward once and can still answer", async () => {
+  engineConfig.cdpLimitFactor = 1;
+  const updates = [];
+  chrome.tabs.update = async (id, info) => {
+    updates.push({ id, info });
+  };
+  let release = () => undefined;
+  chrome.debugger.sendCommand = (debuggee, method) => {
+    calls.push({ method, debuggee });
+    if (method === "Page.setWebLifecycleState") return Promise.resolve({});
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  };
+  try {
+    calls.length = 0;
+    mock.timers.enable({ apis: ["setTimeout"] });
+    const pending = send({ tabId: 41 }, "Page.getFrameTree", undefined, { label: "read" });
+    mock.timers.tick(10_000);
+    assert.equal(updates.length, 1);
+    assert.deepEqual(updates[0], { id: 41, info: { active: true } });
+    assert.equal(calls.filter((call) => call.method === "Page.getFrameTree").length, 1);
+    assert.equal(calls.filter((call) => call.method === "Page.setWebLifecycleState").length, 1);
+    release({ ok: true });
+    assert.deepEqual(await pending, { ok: true });
+    const hung = send({ tabId: 42 }, "Page.getFrameTree", undefined, { label: "hung" });
+    mock.timers.tick(10_000);
+    mock.timers.tick(10_000);
+    const error = await hung.then(
+      () => {
+        throw new Error("resolved");
+      },
+      (caught) => caught,
+    );
+    assert.match(error.message, /did not answer in 20\.0 s/);
+    const blocked = await send({ tabId: 42 }, "Page.getFrameTree", undefined, {
+      label: "next",
+    }).then(
+      () => {
+        throw new Error("resolved");
+      },
+      (caught) => caught,
+    );
+    assert.match(blocked.message, /has not answered an earlier call yet/);
+    assert.equal(calls.filter((call) => call.method === "Page.getFrameTree").length, 2);
+  } finally {
+    engineConfig.cdpLimitFactor = 0.02;
+    chrome.debugger.sendCommand = sendCommand;
+    delete chrome.tabs.update;
+    release();
+    mock.timers.reset();
+    await pause(0);
+  }
+});
+
 test("a swallowed CDP failure is counted for doctor", async () => {
   const tab = nextTab();
   const original = chrome.debugger.sendCommand;
@@ -173,7 +228,7 @@ function classTable() {
   assert.equal(callClass("Page.printToPDF"), "capture");
   assert.equal(callClass("Page.captureSnapshot"), "capture");
   assert.equal(callClass("Page.captureScreenshot"), "capture");
-  assert.equal(callLimitMs("DOM.getDocument"), 10_000);
+  assert.equal(callLimitMs("DOM.getDocument"), 20_000);
   assert.equal(callLimitMs("Input.dispatchMouseEvent"), 10_000);
   assert.equal(callLimitMs("Emulation.setCPUThrottlingRate"), 6_000);
   assert.equal(callLimitMs("Target.attachToTarget"), 20_000);
@@ -181,7 +236,7 @@ function classTable() {
   assert.equal(callLimitMs("Page.navigate"), 60_000);
   assert.equal(callLimitMs("Runtime.evaluate", 4_000), 10_000);
   engineConfig.cdpLimitFactor = 0;
-  assert.equal(callLimitMs("DOM.getDocument"), 5_000);
+  assert.equal(callLimitMs("DOM.getDocument"), 10_000);
   assert.equal(callLimitMs("Page.printToPDF"), 30_000);
   engineConfig.cdpLimitFactor = 0.02;
 }

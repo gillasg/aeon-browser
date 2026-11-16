@@ -131,6 +131,19 @@ function contextOf(ctx: ErrorContext | undefined): ErrorContext {
   return ctx && typeof ctx === "object" ? ctx : {};
 }
 
+const ABILITY_DRIFT = /unverified:|recorded shape|\bdrift\b|HTTP [45]\d\d/;
+
+export const ABILITY_REPAIR_HINT =
+  "the saved ability no longer matches the site: site_mapper heal re-records it; site_mapper edit changes it in words";
+
+/** The repair call when a saved ability failed because the site no longer matches. Empty otherwise. */
+export function abilityRepairCall(detail: string): string {
+  if (!/ABILITY_FAILED\b/.test(detail) || !ABILITY_DRIFT.test(detail)) return "";
+  const site = /ABILITY_FAILED:\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/.exec(detail)?.[1] ?? "";
+  const where = site && site.length <= 80 ? `,site:${JSON.stringify(site)}` : "";
+  return `site_mapper({action:"heal"${where},repair:true}) or site_mapper({action:"edit"${where},change:"what no longer matches"})`;
+}
+
 /** The call to run after this failure, or null when none is safe. */
 export function errorNext(code: string, ctx?: ErrorContext): string | null {
   const next = (ERROR_NEXT as Record<string, NextFn | null | undefined>)[code];

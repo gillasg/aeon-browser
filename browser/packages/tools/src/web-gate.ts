@@ -1,15 +1,16 @@
-// The user's blocked sites hold for Node-side web access too, not only for the browser: crawl's
-// plain HTTP (every page it follows, every redirect) and mapped-site calls ask this gate first.
-// The list is browserkit's site-rules.json, the same one the extension enforces.
+// The user's blocked sites hold for every web client the agent has, not only the browser: crawl's
+// plain HTTP (every page it follows, every redirect), mapped-site calls, and the shell proxy ask
+// this gate first. The list is browserkit's site-rules.json, the same one the extension enforces.
 import { useWebGate } from "browser-crawl";
 import { readBlockedSites, siteName } from "./host.js";
 
 const FRESH_MS = 5_000;
-let cached: { at: number; sites: Promise<string[]> } | undefined;
+let cached: { home: string; at: number; sites: Promise<string[]> } | undefined;
 
 function blockedSites(): Promise<string[]> {
-  if (!cached || Date.now() - cached.at > FRESH_MS)
-    cached = { at: Date.now(), sites: readBlockedSites() };
+  const home = process.env.BROWSERKIT_HOME ?? process.env.BROWSER_USE_EXTENSION_HOME ?? "";
+  if (!cached || cached.home !== home || Date.now() - cached.at > FRESH_MS)
+    cached = { home, at: Date.now(), sites: readBlockedSites() };
   return cached.sites;
 }
 

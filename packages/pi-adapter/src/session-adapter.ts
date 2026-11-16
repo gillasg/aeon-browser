@@ -27,6 +27,7 @@ import {
 } from "@aeon/domain";
 import type { ThreadToolHost } from "./thread-tools.js";
 import { createChatTools } from "./chat-tools.js";
+import { gatedBashTool, startShellGate } from "./shell-gate.js";
 import { createLocalFixtureModel, fixtureSessionOptions } from "./fixture-model.js";
 import { invalidatePiModelCatalog, readCachedPiModelCatalog } from "./session-model-catalog.js";
 import { wrapPiSession } from "./session-projection.js";
@@ -335,6 +336,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
       this.testModel && this.agentDirectory
         ? await createLocalFixtureModel(this.agentDirectory)
         : undefined;
+    await startShellGate();
     const options = {
       cwd: input.workingDirectory,
       agentDir: this.agentDirectory ?? resolvePiAgentDirectory(),
@@ -344,17 +346,20 @@ export class PiSdkSessionAdapter implements PiSessionPort {
       ...(modelRuntime ? { modelRuntime } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
       ...fixtureSessionOptions(fixture, this.fixtureToolAllowlist),
-      customTools: createChatTools({
-        chatId: input.chatId,
-        workingDirectory: input.workingDirectory,
-        sessionDirectory: this.sessionDirectory,
-        completion: this.completionOptions(),
-        browserTool: this.browserTool,
-        threadToolHost: this.threadToolHost,
-        capabilityToolHost: this.capabilityToolHost,
-        siteRules: this.siteRulesHost,
-        browserName: this.browserNameHost,
-      }),
+      customTools: [
+        ...createChatTools({
+          chatId: input.chatId,
+          workingDirectory: input.workingDirectory,
+          sessionDirectory: this.sessionDirectory,
+          completion: this.completionOptions(),
+          browserTool: this.browserTool,
+          threadToolHost: this.threadToolHost,
+          capabilityToolHost: this.capabilityToolHost,
+          siteRules: this.siteRulesHost,
+          browserName: this.browserNameHost,
+        }),
+        gatedBashTool(input.workingDirectory, settingsManager),
+      ],
     };
     const { session } = await timeStartupStep("agent-session-created", () =>
       createAgentSession(options),

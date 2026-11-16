@@ -273,7 +273,7 @@ test(
         assert.match(stdout, new RegExp("→ " + siteUrl.replaceAll(".", "\\.")));
       });
 
-      await t.test("a timed-out cell keeps its variables and tabs for the next cell", async () => {
+      await t.test("a timed-out cell does not keep running into the next cell", async () => {
         const timed = await run(
           process.execPath,
           [
@@ -292,31 +292,13 @@ test(
         ).catch((error) => error);
         const output = String(timed.stdout ?? "") + String(timed.stderr ?? "");
         assert.match(output, /deadline/i, output);
+        assert.match(output, /realm was reset/, output);
         const after = await run(
           process.execPath,
-          [
-            cli,
-            "repl",
-            "--session",
-            "deadline",
-            // Still running when the timed-out cell's own code returns (8 s from its start):
-            // without one cell at a time, that late result lands on this cell instead.
-            `await new Promise((done) => setTimeout(done, 3000));
-            kept + 1`,
-          ],
+          [cli, "repl", "--session", "deadline", "typeof kept"],
           { env },
         );
-        assert.match(after.stdout, /→ 43/, after.stdout);
-        const pageAfter = await run(
-          process.execPath,
-          [cli, "repl", "--session", "deadline", "page.url"],
-          { env },
-        );
-        assert.match(
-          pageAfter.stdout,
-          new RegExp(siteUrl.replaceAll(".", "\\.")),
-          pageAfter.stdout,
-        );
+        assert.match(after.stdout, /undefined/, after.stdout);
       });
 
       await t.test("openTab makes the new tab current and bu.use takes a tab id", async () => {

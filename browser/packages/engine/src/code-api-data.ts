@@ -405,6 +405,9 @@ function __extendPageData(target, base) {
         result.list.partial = true;
         if (guard.total != null) result.list.total = guard.total;
       }
+      // text is the page text (the same string as markdown) so a check can match it.
+      // data, list, markdown and the rest stay.
+      result.text = String(result.markdown || '');
       return result;
     },
     status: async () => {

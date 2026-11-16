@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { setImmediate } from "node:timers";
 import { RoutineScheduler } from "../dist/routine-scheduler.js";
 
 // One due run of a watcher routine against a fake browser that answers its check.
@@ -61,7 +62,9 @@ async function runWatcher(checkResult, options = {}) {
   };
   const scheduler = new RoutineScheduler(store, chats, browser, "data");
   try {
+    // start() reports ready before the tick finishes, so a fast check is seen on the next turn.
     await scheduler.start();
+    await new Promise((done) => setImmediate(done));
   } finally {
     scheduler.close();
   }

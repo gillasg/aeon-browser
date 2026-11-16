@@ -16,6 +16,7 @@ import { browserRuntimePrimer } from "./browser-code-guidance.js";
 import { browserProfileGuard } from "./browser-profile-guard.js";
 import { idleWaitGuard } from "./idle-wait-guard.js";
 import { browserAbilitySearch } from "./browser-ability-search.js";
+import { signInCodeGuard } from "./sign-in-code-guard.js";
 
 /** Skills written for agents outside Aeon (they drive Aeon from a shell). */
 const OUTSIDE_AGENT_SKILLS = new Set(["aeon"]);
@@ -64,6 +65,7 @@ export function createPiResourceLoader(input: {
     }),
     ...(input.browserGuidance ? [browserAbilitySearch()] : []),
     browserProfileGuard(),
+    signInCodeGuard(),
     idleWaitGuard(),
     ...(input.additionalFactories ?? []),
   ];
