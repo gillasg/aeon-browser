@@ -30,6 +30,27 @@ test("a public-looking hostname that resolves private is refused", () => {
   assert.equal(resolvedTarget("example.com", ["93.184.216.34"]), undefined);
 });
 
+test("IPv4-mapped, compatible, NAT64 and unspecified addresses are private", () => {
+  const mapped = new URL("http://[::ffff:169.254.169.254]/latest/meta-data").hostname.replace(
+    /^\[|\]$/g,
+    "",
+  );
+  assert.equal(mapped, "::ffff:a9fe:a9fe");
+  assert.match(String(privateAddress(mapped)), /metadata|private/);
+  assert.ok(privateTarget("http://[::ffff:a9fe:a9fe]/latest/meta-data"));
+  assert.ok(privateAddress("::ffff:7f00:1"));
+  assert.ok(privateAddress("::ffff:0:0"));
+  assert.equal(privateAddress("::"), "private address ::");
+  assert.ok(privateTarget("http://[::]/"));
+  assert.ok(privateAddress("::7f00:1"));
+  assert.ok(privateAddress("::a9fe:a9fe"));
+  assert.ok(privateAddress("64:ff9b::a9fe:a9fe"));
+  assert.ok(privateTarget("http://[64:ff9b::a9fe:a9fe]/"));
+  assert.equal(privateAddress("::ffff:808:808"), undefined);
+  assert.ok(resolvedTarget("shop.example", ["::ffff:a9fe:a9fe"]));
+  assert.ok(privateTarget("http://[::ffff:7f00:1]:3000/meta", [3000]));
+});
+
 test("the private DNR rules use their own id band and cover literals", () => {
   const rules = privateTabRules(42);
   for (const rule of rules) assert.ok(rule.id >= 790_000 && rule.id < 799_000, String(rule.id));

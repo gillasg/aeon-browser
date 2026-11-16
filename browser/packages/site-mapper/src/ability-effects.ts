@@ -30,6 +30,15 @@ const ACTING = /^(click|press|submit|select|check|uncheck|choose|fill|type)$/i;
 const SUSPECT =
   /\b(logout|log out|sign out|signout|unsubscribe|delete|remove|archive|trash|destroy|deactivate|revoke|purge|cancel account|close account|clear all)\b/i;
 
+/**
+ * A declared read that contains an explicit write is a write. Suspected writes stay a note
+ * and do not change the kind. A declared write stays a write.
+ */
+export function kindFromWrites(ability: Ability): Ability["kind"] {
+  if (ability.kind === "write") return "write";
+  return ability.writes?.some((write) => write.kind === "explicit") ? "write" : ability.kind;
+}
+
 export function abilityWrites(ability: Ability, model?: SiteModel): AbilityWrite[] {
   const found: AbilityWrite[] = [];
   ability.ways.forEach((way, index) => {
@@ -51,7 +60,9 @@ function collectApi(
   const commit = Math.min(way.commit ?? steps.length - 1, steps.length - 1);
   steps.forEach((step, stepIndex) => {
     const operation = model?.operations.find((item) => item.id === step.operation);
-    if (operation?.role === "action") {
+    // A non-GET is an explicit write even when the caller marked the ability read, and even
+    // when the model calls the operation auth rather than action.
+    if (operation && (operation.role === "action" || !SAFE.has(operation.method.toUpperCase()))) {
       out.push(operationWrite(operation, index, stepIndex));
       return;
     }

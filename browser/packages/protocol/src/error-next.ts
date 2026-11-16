@@ -89,6 +89,8 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   USER_HAS_CONTROL: ask("You are using this tab. Should I wait and continue?"),
   USER_TOOK_CONTROL: waitForControl,
   EXPECTATION_FAILED: readState,
+  // The message names the page to open. A fixed call would open the wrong origin.
+  REPLAY_ORIGIN: null,
   PROTECTED_UI: ask(
     "Another extension's popup is blocking this tab. Close it or finish the step, then tell me to continue.",
   ),
@@ -126,6 +128,8 @@ export const NO_NEXT_REASON: Partial<Record<ErrorCode, string>> = {
   UNSUPPORTED: "this browser cannot do that here, and no one read replaces it",
   CHROME_ERROR: "Chrome refused the step; repeating the same call repeats it",
   RATE_LIMITED: "another request repeats the limit; the recovery is to report it to the user",
+  REPLAY_ORIGIN:
+    "the message names the page to open; a fixed next call would open the wrong origin",
   INTERNAL: "an unexpected failure is a bug; repeating the same call repeats it",
 };
 

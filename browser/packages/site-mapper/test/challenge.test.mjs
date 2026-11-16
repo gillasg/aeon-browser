@@ -37,6 +37,16 @@ test("a normal answer is never a wall", () => {
   assert.equal(detectChallenge(answer(200, {}, "<p>Say hello to every human here</p>")), undefined);
   assert.equal(detectChallenge(answer(500, {}, "Internal Server Error")), undefined);
   assert.equal(detectChallenge(answer(404, {}, "Not Found")), undefined);
+  assert.equal(detectChallenge(answer(418, {}, "I am a teapot")), undefined);
+});
+
+test("a 200 check page is a wall, and a title change alone is not", async () => {
+  const wall = "<title>Just a moment...</title><p>Checking your browser</p>";
+  assert.equal(detectChallenge(answer(200, {}, wall))?.vendor, "cloudflare");
+  const { pageSnapshot } = await import("../dist/challenge.js");
+  const shop = `<title>Shop</title><p>Just a moment... ${"lamp ".repeat(80)}</p>`;
+  const renamed = shop.replace("<title>Shop</title>", "<title>Store</title>");
+  assert.equal(detectChallenge(answer(200, {}, renamed), pageSnapshot(shop)), undefined);
 });
 
 test("a wall thrown from a call is its own kind, not a broken API", async () => {

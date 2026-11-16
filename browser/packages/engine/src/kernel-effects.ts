@@ -104,7 +104,7 @@ export const EFFECTS = [
     call: "page.network.list/waitFor/get/body/save, page.replay()",
     does: "the tab's recorded requests, and replaying one",
     needs: ["tab"],
-    errors: ["TIMEOUT", "INVALID_INPUT"],
+    errors: ["TIMEOUT", "INVALID_INPUT", "REPLAY_ORIGIN"],
   },
   {
     name: "net.rules",

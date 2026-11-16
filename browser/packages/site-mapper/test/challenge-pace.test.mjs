@@ -131,3 +131,33 @@ test("a normal write does not halve the pace", async () => {
   await api.write("save", {});
   assert.equal(paceLimited(site), false);
 });
+
+const CHECK_PAGE = "<title>Just a moment...</title><p>Checking your browser</p>";
+
+test("a 200 check page is a block with its vendor, not data", async () => {
+  resetPace();
+  const site = "html.wall";
+  const api = client(site, async () => ({ status: 200, headers: {}, text: CHECK_PAGE }));
+  await assert.rejects(api.call("load"), /SITE_BLOCKED:.*cloudflare/);
+  assert.equal(paceLimited(site), true);
+});
+
+test("a second challenge after a cleared one asks for a fresh browser", async () => {
+  resetPace();
+  const site = "again.wall";
+  const answers = [
+    { status: 200, headers: {}, text: CHECK_PAGE },
+    { status: 200, headers: {}, json: { ok: true }, text: '{"ok":true}' },
+    { status: 403, headers: { "cf-mitigated": "challenge" }, text: "" },
+  ];
+  let n = 0;
+  const api = client(site, async () => answers[n++]);
+  const first = await api.call("load").then(
+    () => undefined,
+    (error) => error,
+  );
+  assert.match(first.message, /SITE_BLOCKED/);
+  assert.doesNotMatch(first.message, /fresh browser needed/);
+  assert.deepEqual(await api.call("load"), { ok: true });
+  await assert.rejects(api.call("load"), /SITE_BLOCKED:.*fresh browser needed/);
+});

@@ -152,7 +152,98 @@ function redactHarCookies(header: string | undefined, raw: boolean): HarHeader[]
     });
 }
 
-export function redactHarBody(body: string | undefined, raw: boolean): string | undefined {
+/** Values of headers whose names are secrets, plus cookie values, bearer tokens, and encodings. */
+export function secretHeaderValues(...groups: Array<Record<string, string> | undefined>): string[] {
+  const values: string[] = [];
+  for (const headers of groups)
+    for (const [name, value] of Object.entries(headers ?? {}))
+      if (value && SECRET_HEADERS.test(name)) values.push(...headerSecrets(name, value));
+  return [...new Set(values)];
+}
+
+function headerSecrets(name: string, value: string): string[] {
+  return [value, ...cookieValues(name, value), ...authTokens(value)].flatMap(secretForms);
+}
+
+function cookieValues(name: string, value: string): string[] {
+  const lower = name.toLowerCase();
+  if (lower !== "cookie" && lower !== "set-cookie") return [];
+  const pairs = lower === "set-cookie" ? value.split(";").slice(0, 1) : value.split(";");
+  const found: string[] = [];
+  for (const pair of pairs) {
+    const index = pair.indexOf("=");
+    if (index > 0) found.push(pair.slice(index + 1).trim());
+  }
+  return found;
+}
+
+function authTokens(value: string): string[] {
+  const match = /^(?:bearer|basic)\s+(\S+)/i.exec(value.trim());
+  return match?.[1] ? [match[1]] : [];
+}
+
+function secretForms(value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  const forms = [trimmed];
+  pushEncoded(forms, trimmed);
+  forms.push(...base64Forms(trimmed));
+  return forms;
+}
+
+function base64Forms(value: string): string[] {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const padded = btoa(binary);
+  const bare = padded.replace(/=+$/, "");
+  return [
+    padded,
+    bare,
+    padded.replaceAll("+", "-").replaceAll("/", "_"),
+    bare.replaceAll("+", "-").replaceAll("/", "_"),
+  ];
+}
+
+function pushEncoded(forms: string[], value: string): void {
+  try {
+    const encoded = encodeURIComponent(value);
+    if (encoded !== value) forms.push(encoded);
+  } catch {
+    // The value is not a URI component. The raw form is already listed.
+  }
+  try {
+    const decoded = decodeURIComponent(value);
+    if (decoded !== value) forms.push(decoded);
+  } catch {
+    // The value is not percent-encoded.
+  }
+}
+
+/**
+ * Replaces secret header values echoed in a body. A value under 8 characters is replaced only
+ * where it stands alone, so a short token cannot cut a word in half.
+ */
+export function redactSecretValues(text: string, secrets: readonly string[]): string {
+  const values = [...new Set(secrets.filter((value) => value.length > 0))].sort(
+    (left, right) => right.length - left.length,
+  );
+  let result = text;
+  for (const value of values) result = applySecret(result, value);
+  return result;
+}
+
+function applySecret(text: string, value: string): string {
+  if (value.length >= 8) return text.split(value).join("<redacted>");
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`(?<![A-Za-z0-9])${escaped}(?![A-Za-z0-9])`, "g"), "<redacted>");
+}
+
+export function redactHarBody(
+  body: string | undefined,
+  raw: boolean,
+  secrets: readonly string[] = [],
+): string | undefined {
   if (body === undefined || raw) return body;
   try {
     const redact = (value: unknown): unknown => {
@@ -164,12 +255,33 @@ export function redactHarBody(body: string | undefined, raw: boolean): string | 
             SECRET_KEYS.test(key) && typeof item !== "object" ? "<redacted>" : redact(item),
           ]),
         );
-      return typeof value === "string" ? redactHarText(value) : value;
+      return typeof value === "string" ? redactString(value, secrets) : value;
     };
     return JSON.stringify(redact(JSON.parse(body)));
   } catch {
-    return redactHarText(body);
+    return redactString(body, secrets);
   }
+}
+
+/** One `\u` decode and one URI decode, for a body that is not JSON or still holds those forms. */
+function decodeSecretLayers(body: string): string {
+  const unicode = body.replace(/\\u([0-9a-fA-F]{4})/g, (_match, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
+  try {
+    return decodeURIComponent(unicode);
+  } catch {
+    return unicode;
+  }
+}
+
+function redactString(value: string, secrets: readonly string[]): string {
+  const direct = redactSecretValues(redactHarText(value), secrets);
+  const decoded = decodeSecretLayers(value);
+  if (decoded === value) return direct;
+  const plain = redactHarText(decoded);
+  const cleaned = redactSecretValues(plain, secrets);
+  return cleaned === plain ? direct : cleaned;
 }
 
 export function redactHarQuery(url: string, raw = false): HarHeader[] {
@@ -194,6 +306,7 @@ function header(headers: Record<string, string> | undefined, name: string): stri
 
 function harEntry(entry: NetworkEntry, raw: boolean): Record<string, unknown> {
   const requestType = header(entry.requestHeaders, "content-type") ?? "";
+  const secrets = secretHeaderValues(entry.requestHeaders, entry.responseHeaders);
   return {
     startedDateTime: new Date(entry.startedAt).toISOString(),
     time: entry.durationMs ?? 0,
@@ -212,7 +325,7 @@ function harEntry(entry: NetworkEntry, raw: boolean): Record<string, unknown> {
         ? {
             postData: {
               mimeType: requestType,
-              text: redactHarBody(entry.requestBody, raw) ?? "",
+              text: redactHarBody(entry.requestBody, raw, secrets) ?? "",
             },
           }
         : {}),
@@ -226,7 +339,9 @@ function harEntry(entry: NetworkEntry, raw: boolean): Record<string, unknown> {
       content: {
         size: entry.bodyBytes ?? entry.size ?? 0,
         mimeType: entry.mimeType ?? "",
-        ...(entry.body !== undefined ? { text: redactHarBody(entry.body, raw) ?? "" } : {}),
+        ...(entry.body !== undefined
+          ? { text: redactHarBody(entry.body, raw, secrets) ?? "" }
+          : {}),
       },
       redirectURL: header(entry.responseHeaders, "location") ?? "",
       headersSize: -1,

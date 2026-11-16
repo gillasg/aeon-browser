@@ -3,6 +3,8 @@
 
 import type { Challenge } from "../challenge.js";
 import { BrowserNotConnected } from "./bridge.js";
+import { isRateLimited } from "./limits.js";
+import { withNotes } from "./outcome.js";
 import { MissingParams, type RuntimeResponse } from "./request.js";
 
 export class HttpError extends Error {
@@ -36,8 +38,26 @@ export class Challenged extends HttpError {
   ) {
     super(operationId, response);
     this.name = "Challenged";
-    this.message = `A ${wall.vendor} bot wall answered ${operationId} (${wall.evidence}). There is nothing to repair: open the site in a tab, clear the check like a person would, then call again. Re-recording only teaches the wall.`;
+    const named = `SITE_BLOCKED: A ${wall.vendor} bot wall answered ${operationId} (${wall.evidence})`;
+    this.message = wall.repeat
+      ? `${named}. A check already cleared in this tab; fresh browser needed.`
+      : `${named}. There is nothing to repair: open the site in a tab, clear the check like a person would, then call again. Re-recording only teaches the wall.`;
   }
+}
+
+/** The call's value, or the error its status actually is. A rate limit is not data. */
+export function finishRead(id: string, response: RuntimeResponse, wall?: Challenge): unknown {
+  if (wall) throw new Challenged(id, response, wall);
+  if (isRateLimited(response)) throw rateLimited(id, response);
+  if (response.status === 401 || response.status === 403) throw new SignedOut(id, response);
+  if (response.status >= 400 || response.status === 0) throw new HttpError(id, response);
+  return withNotes(response);
+}
+
+function rateLimited(id: string, response: RuntimeResponse): HttpError {
+  const error = new HttpError(id, response);
+  error.message = `RATE_LIMITED: ${id} answered HTTP ${response.status} with a rate limit. Next: wait and read again.`;
+  return error;
 }
 
 /** A write reached the API runtime. Writes go through the site's page UI, never through SiteMapper. */

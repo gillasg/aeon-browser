@@ -10,3 +10,11 @@ export * from "./site-scripts.js";
 export * from "./native-bootstrap.js";
 export * from "./errors.js";
 export * from "./step-event.js";
+export {
+  connectionAddress,
+  literalLoopback,
+  preflightHost,
+  privateAddress,
+  privateTarget,
+  resolvedTarget,
+} from "./private-network.js";

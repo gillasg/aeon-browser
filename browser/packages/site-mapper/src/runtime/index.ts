@@ -46,6 +46,7 @@ export {
   bridgeDataDirectory,
 } from "./bridge.js";
 export { PageTransport, DirectTransport, type Transport, type CallContext } from "./transports.js";
+export { RedirectRefused, hopRefusal, reachOf, type Reach } from "./net-guard.js";
 export {
   buildRequest,
   MissingParams,

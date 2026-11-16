@@ -5,6 +5,7 @@
 import { attemptWay, fill } from "./ability-attempt.js";
 import { compareWays, oracleFor, shouldDiffer, type DifferResult } from "./ability-differ.js";
 import { queueHeal } from "./ability-heal.js";
+import { unknownInputMessage } from "./ability-contract.js";
 import { contractGap, isPartial, readBackOf } from "./ability-guard.js";
 import { needsError } from "./ability-needs.js";
 import {
@@ -15,15 +16,18 @@ import {
   usesRecordRuntime,
   type AbilityPage,
 } from "./ability-records.js";
-import { expectedShape, shapeDrift, shapeOf } from "./ability-shape.js";
+import { resultMismatch } from "./ability-assert.js";
+import { expectedShape, shapeDrift, shapeOf, unusableAnswer } from "./ability-shape.js";
 import { inBackoff, orderWays, wayId, type WayNote } from "./ability-stats.js";
 import {
   AbilityWriteError,
-  answerRepeat,
+  claimWriteKey,
   classifyFailure,
-  findWriteKey,
+  commitReceipt,
+  READ_BACK_NOTE,
   readBack,
   recordWriteKey,
+  releaseWriteKey,
   writeKey,
   type WriteOutcome,
 } from "./ability-writes.js";
@@ -67,6 +71,8 @@ export async function executeRead(
   options: AbilityRunOptions,
   record?: RunRecorder,
 ): Promise<AbilityRunResult> {
+  const unknown = unknownInputMessage(ability, inputs);
+  if (unknown) throw new Error(unknown);
   const run = await runRead(ability, inputs, host, options, record);
   if (run.used) options.onWay?.(wayId(run.used));
   try {
@@ -92,9 +98,23 @@ export async function executeWrite(
   record: RunRecorder,
 ): Promise<AbilityRunResult> {
   const key = writeKey(ability, inputs, options.key);
-  const repeat = await repeatedWrite(ability, key);
-  if (repeat) return repeat;
-  return runWrite(ability, inputs, host, options, key, record);
+  if (key) {
+    const replay = await claimWriteKey(ability, key);
+    if (replay)
+      return {
+        result: replay.result,
+        via: "api",
+        tried: [],
+        write: { write_status: "applied", key, replayed: true },
+      };
+  }
+  try {
+    return await runWrite(ability, inputs, host, options, key, record);
+  } catch (error) {
+    if (key && error instanceof AbilityWriteError && !error.outcome.possible_commit)
+      await releaseWriteKey(ability, key);
+    throw error;
+  }
 }
 
 async function runRead(
@@ -233,11 +253,15 @@ async function judged(
   tried: TrackedRun["tried"],
   notes: WayNote[],
 ): Promise<WayHit | undefined> {
+  const blocked = unusableAnswer(ability.site, result);
+  if (blocked) return noteSkip(way, blocked, ms, false, tried, notes);
   const gap = contractGap(ability, result);
   if (gap) {
     await noteFreshness(ability, way, `contract: ${gap}`);
     return noteSkip(way, `contract: ${gap}`, ms, false, tried, notes);
   }
+  const mismatch = resultMismatch(ability, way, result);
+  if (mismatch) return noteSkip(way, mismatch, ms, false, tried, notes);
   const why = shapeDrift(expectedShape(ability, way), result);
   if (why) return drifted(ability, way, result, ms, why, tried, notes);
   const partial = isPartial(way, result);
@@ -459,6 +483,8 @@ async function runWrite(
   key: string | undefined,
   record: RunRecorder,
 ): Promise<AbilityRunResult> {
+  const unknown = unknownInputMessage(ability, inputs);
+  if (unknown) throw new Error(unknown);
   const tried: TrackedRun["tried"] = [];
   const notes: WayNote[] = [];
   let last: WriteOutcome | undefined;
@@ -502,7 +528,9 @@ async function attemptWrite(
 ): Promise<
   { done: true; run: { result: unknown; via: AbilityVia } } | { done: false; outcome: WriteOutcome }
 > {
-  const progress = { reachedCommit: way.kind !== "api" };
+  // A page collect has no commit step of its own. Steps and scripts start clear and set this
+  // when their commit step runs, so a miss before that step can still try another way.
+  const progress = { reachedCommit: way.kind === "page" };
   const started = Date.now();
   try {
     const result = await attemptWay(ability, way, inputs, host, progress);
@@ -511,23 +539,11 @@ async function attemptWrite(
   } catch (error) {
     notes.push({ way, ok: false, ms: Date.now() - started });
     tried.push({ via: way.kind, error: messageOf(error) });
-    return { done: false, outcome: classifyFailure(error, progress.reachedCommit) };
+    return {
+      done: false,
+      outcome: classifyFailure(error, progress.reachedCommit, commitReceipt(error)),
+    };
   }
-}
-
-async function repeatedWrite(
-  ability: Ability,
-  key: string | undefined,
-): Promise<AbilityRunResult | undefined> {
-  const entry = key ? await findWriteKey(ability, key) : undefined;
-  const repeat = key && entry ? answerRepeat(ability, key, entry) : undefined;
-  if (!repeat || !key) return undefined;
-  return {
-    result: repeat.result,
-    via: "api",
-    tried: [],
-    write: { write_status: "applied", key, replayed: true },
-  };
 }
 
 async function appliedWrite(
@@ -590,8 +606,9 @@ async function failedWrite(
   const outcome = last ?? failedOutcome();
   if (key && outcome.possible_commit)
     await recordWriteKey(ability, key, { write_status: "may_have_applied" });
+  const readBack = outcome.possible_commit ? ` ${READ_BACK_NOTE}` : "";
   throw new AbilityWriteError(
-    `ABILITY_FAILED: ${ability.site} ${ability.name} (${triedText(tried)})`,
+    `ABILITY_FAILED: ${ability.site} ${ability.name} (${triedText(tried)})${readBack}`,
     outcome,
   );
 }

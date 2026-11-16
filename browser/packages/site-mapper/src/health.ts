@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { detectChallenge } from "./challenge.js";
+import { detectChallenge, pageSnapshot } from "./challenge.js";
+import { isRateLimited } from "./runtime/limits.js";
 import { breakingChanges, responseChanges } from "./diff.js";
 import { RecordingSession } from "./record.js";
 import { appendEvent, listFlows, siteDir, siteName } from "./registry.js";
@@ -71,13 +72,23 @@ async function probe(client: SiteClient, operation: Operation): Promise<HealthRe
   try {
     const response = await client.request(operation.id, sampleParams(operation));
     const status = response.status;
-    const challenge = detectChallenge(response);
+    const challenge = detectChallenge(
+      response,
+      pageSnapshot(operation.samples.at(-1)?.responseBody),
+    );
     if (challenge)
       return {
         id: operation.id,
         status: "challenged",
         httpStatus: status,
-        error: `${challenge.vendor} bot wall (${challenge.evidence}): use the site in a tab, then probe again`,
+        error: `SITE_BLOCKED: ${challenge.vendor} bot wall (${challenge.evidence}): use the site in a tab, then probe again`,
+      };
+    if (isRateLimited(response))
+      return {
+        id: operation.id,
+        status: "skipped",
+        httpStatus: status,
+        error: "rate limited; not a site change",
       };
     if (status === 401 || status === 403)
       return { id: operation.id, status: "signed-out", httpStatus: status };

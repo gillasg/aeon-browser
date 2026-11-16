@@ -673,7 +673,7 @@ var browser = Object.freeze({
       waitFor: async (options = {}, extra = {}) => {
         var filter = typeof options === 'string' || options instanceof RegExp ? {match: options} : {...options, ...extra};
         if (filter.match instanceof RegExp) { filter.regex = true; filter.match = filter.match.source; }
-        if (!filter.match && !filter.method && !filter.status) throw Error('page.network.waitFor needs a match (a URL part or /regex/), a method or a status');
+        if (!filter.match && !filter.method && !filter.status && !filter.type) throw Error('page.network.waitFor needs a match (a URL part or /regex/), a method, a status or a type');
         return __call({network:'waitFor', target, ...filter});
       },
       get: (id) => __call({network:'get', target, id}),

@@ -2,7 +2,9 @@
 // required fields and their types through diff.ts, so a price, count or timestamp never reads as
 // drift; a recorded list that is missing is drift even when an empty answer would look fine.
 // A way that drifts is tried, then the next way; it is marked unverified, never deleted.
+// An empty list is not shape drift. When the saved answer had rows, ability-assert.ts rejects it.
 
+import { blockedAnswer } from "./challenge.js";
 import { breakingChanges, schemaChanges, resolveAll } from "./diff.js";
 import { getPointer, inferSchema } from "./infer/schema.js";
 import type { Ability, AbilityWay, AbilityWayExpect } from "./abilities.js";
@@ -54,6 +56,14 @@ function expectOf(
   return expect;
 }
 
+/**
+ * A bot check or a bare 429 body is not a changed shape. The caller reports this and does not
+ * heal. Undefined when the result should be judged against the recorded shape.
+ */
+export function unusableAnswer(site: string, result: unknown): string | undefined {
+  return blockedAnswer(site, result);
+}
+
 /** Why the answer is not the recorded shape, or undefined when it is. */
 export function shapeDrift(
   expected: AbilityWayExpect | undefined,
@@ -69,7 +79,7 @@ export function shapeDrift(
   return `the recorded shape changed: ${breaking.slice(0, 4).join("; ")}`;
 }
 
-/** A recorded list must still be there; an empty one is a result, a missing one is drift. */
+/** A recorded list must still be there. An empty one is not shape drift; saved checks may reject it. */
 function listDrift(pointer: string | undefined, result: unknown): string | undefined {
   if (pointer === undefined) return undefined;
   const value = getPointer(result, pointer);

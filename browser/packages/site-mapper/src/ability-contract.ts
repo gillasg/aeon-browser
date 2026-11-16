@@ -25,6 +25,53 @@ export interface AbilityTestReport {
   ways?: string[];
 }
 
+/** The workflow error for an input the ability does not declare, or undefined when every name is. */
+export function unknownInputMessage(
+  ability: Ability,
+  inputs: Record<string, unknown>,
+): string | undefined {
+  const declared = Object.keys(properties(ability.inputs));
+  const known = new Set(declared);
+  for (const name of Object.keys(inputs)) {
+    if (known.has(name)) continue;
+    const list = declared.length ? declared.join(", ") : "none";
+    const near = closestName(name, declared);
+    const hint = near ? ` Did you mean "${near}"?` : "";
+    return `Unknown input "${name}". Declared: ${list}.${hint}`;
+  }
+  return undefined;
+}
+
+function closestName(name: string, declared: string[]): string | undefined {
+  let best: string | undefined;
+  let score = 3;
+  for (const candidate of declared) {
+    const distance = edits(name, candidate);
+    if (distance > 0 && distance < score) {
+      score = distance;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+function edits(left: string, right: string): number {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i++) stepEdits(left, right, row, i);
+  return row[right.length] ?? left.length;
+}
+
+function stepEdits(left: string, right: string, row: number[], i: number): void {
+  let previous = i - 1;
+  row[0] = i;
+  for (let j = 1; j <= right.length; j++) {
+    const current = row[j] ?? 0;
+    const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+    row[j] = Math.min((row[j - 1] ?? 0) + 1, current + 1, previous + cost);
+    previous = current;
+  }
+}
+
 function properties(schema: unknown): Record<string, Record<string, unknown>> {
   const value = schema as { properties?: Record<string, Record<string, unknown>> } | undefined;
   if (value?.properties && typeof value.properties === "object") return value.properties;

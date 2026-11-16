@@ -11,6 +11,8 @@ export async function queueHeal(
   way: string,
   reason: string,
 ): Promise<void> {
+  // A bot check or a rate limit is not a broken ability. Repairing it would learn the wall.
+  if (/SITE_BLOCKED|RATE_LIMITED|bot wall|fresh browser needed/i.test(reason)) return;
   const folder = siteDir(siteName(site));
   await mkdir(folder, { recursive: true });
   const line = JSON.stringify({ at: new Date().toISOString(), name, way, reason }) + "\n";

@@ -1,10 +1,14 @@
 import type { NetworkEntry } from "./native-browser-network-format.js";
+import { matchesType } from "./native-browser-network-list.js";
 
 // One request by what it looks like: a URL substring or regex, optionally a method and statuses.
 // page.network.waitFor uses it, so a click can be followed by the call it causes without a sleep.
 
 /** What a waiter looks at: enough to tell requests apart, whether done or not. */
-export type Waitable = Pick<NetworkEntry, "url" | "method" | "status" | "failed" | "done">;
+export type Waitable = Pick<NetworkEntry, "url" | "method" | "status" | "failed" | "done"> & {
+  type?: string;
+  mimeType?: string;
+};
 
 type StatusTest = (status: number) => boolean;
 
@@ -16,10 +20,12 @@ export function waitMatcher(options: Record<string, unknown>): (entry: Waitable)
     options.regex === true,
   );
   const method = typeof options.method === "string" ? options.method.toUpperCase() : undefined;
+  const type = typeof options.type === "string" && options.type ? options.type : undefined;
   const status = statusMatcher(options.status);
   return (entry) =>
     urls(entry.url) &&
     (!method || entry.method === method) &&
+    (!type || matchesType(entry, type)) &&
     (!status || (entry.status !== undefined && status(entry.status)));
 }
 
@@ -79,6 +85,7 @@ export function describeWait(options: Record<string, unknown>): string {
   const parts = [match ? (options.regex === true ? `/${match}/` : `"${match}"`) : "any URL"];
   if (typeof options.method === "string" && options.method)
     parts.push(options.method.toUpperCase());
+  if (typeof options.type === "string" && options.type) parts.push("type " + options.type);
   const status =
     typeof options.status === "string" || typeof options.status === "number"
       ? String(options.status)

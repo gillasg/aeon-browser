@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { lookup } from "node:dns/promises";
+import { dnsAnswers } from "./dns-answers.js";
 import { createHostHandler } from "@browserkit/tools/host";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -327,12 +327,10 @@ export class Bridge {
 
   private async answerDns(executor: Executor, message: Json): Promise<void> {
     const requestId = Number(message.requestId);
-    const host = String(message.host ?? "").toLowerCase();
+    const host = String(message.host ?? "");
     let addresses: string[] = [];
     try {
-      addresses = /^[0-9a-f:.]+$/i.test(host)
-        ? [host]
-        : (await lookup(host, { all: true })).map((row) => row.address);
+      addresses = await dnsAnswers(host);
     } catch {
       // An unresolvable host is refused by the engine while the policy is on.
     }
