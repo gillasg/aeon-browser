@@ -1,4 +1,14 @@
-import { DROP_ORDER, RANK, cost, quote, tableText, type Line } from "./render-model.js";
+import {
+  DROP_ORDER,
+  RANK,
+  cost,
+  matchesQuery,
+  noMatchText,
+  queryParts,
+  quote,
+  tableText,
+  type Line,
+} from "./render-model.js";
 
 export function prepareLines(
   lines: Line[],
@@ -126,21 +136,37 @@ function rowLabel(line: Line, lines: readonly Line[]): string {
 }
 
 function applyFocus(lines: Line[], focus: string | undefined): Line[] {
-  if (!focus) return lines;
-  const query = focus.toLowerCase();
+  if (!focus || queryParts(focus).length === 0) return lines;
+  const matched = keepMatches(lines, focus);
+  if (matched.hits > 0) return matched.lines;
+  const note = noMatchText(focus, elementCount(lines));
+  return [...matched.lines, noteLine(note, 80)];
+}
+
+function keepMatches(lines: Line[], query: string): { lines: Line[]; hits: number } {
   const byKey = new Map(lines.map((line) => [line.key, line]));
   const keep = new Set<string>();
+  let hits = 0;
   for (const line of lines) {
-    if (line.section === "header" || line.section === "notice" || line.hay.includes(query)) {
-      let current: Line | undefined = line;
-      let guard = 0;
-      while (current && guard++ < 40) {
-        keep.add(current.key);
-        current = current.parentKey ? byKey.get(current.parentKey) : undefined;
-      }
+    const structural =
+      line.section === "header" || line.section === "notice" || line.kind === "note";
+    const hit = !structural && matchesQuery(line.hay, query);
+    if (!structural && !hit) continue;
+    if (hit) hits += 1;
+    let current: Line | undefined = line;
+    let guard = 0;
+    while (current && guard++ < 40) {
+      keep.add(current.key);
+      current = current.parentKey ? byKey.get(current.parentKey) : undefined;
     }
   }
-  return lines.filter((line) => keep.has(line.key));
+  return { lines: lines.filter((line) => keep.has(line.key)), hits };
+}
+
+function elementCount(lines: readonly Line[]): number {
+  return lines.filter(
+    (line) => line.section !== "header" && line.section !== "notice" && line.kind !== "note",
+  ).length;
 }
 
 function applyDelta(
@@ -198,8 +224,10 @@ function ancestorChain(line: Line, byKey: Map<string, Line>): Line[] {
 function finish(all: Line[], kept: Line[], hidden: number): Line[] {
   const keys = new Set(kept.map((line) => line.key));
   const body = kept.map((line) => recount(line, all, keys));
+  const prior = all.filter((line) => line.kind === "note");
   return arrange([
     ...body,
+    ...prior,
     ...cutNotes(all, keys),
     ...(hidden ? [noteLine(hiddenText(hidden), 90)] : []),
   ]);

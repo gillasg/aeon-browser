@@ -87,11 +87,12 @@ async function navigateOpenedTab(
 ): Promise<string | undefined> {
   try {
     noteAgentNavigation(tabId);
-    await withBrowserDebugger(tabId, async () => {
+    const note = await withBrowserDebugger(tabId, async () => {
       await captureFromTabStart(tabId);
-      await navigateReady(tabId, url, timeoutMs, referer);
+      const ready = await navigateReady(tabId, url, timeoutMs, referer);
+      return ready.note;
     });
-    return undefined;
+    return note?.slice(0, 400);
   } catch (error) {
     // The reason names Chrome's own error (net::ERR_CONNECTION_REFUSED…), not just our code.
     const detail = error instanceof BrowserActionError ? error.detail : undefined;

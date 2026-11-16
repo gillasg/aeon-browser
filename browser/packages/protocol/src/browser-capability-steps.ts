@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { BrowserTargetKeySchema as target } from "./browser-inventory.js";
 const frame = { frameId: z.string().max(256).optional(), frameKey: z.string().max(256).optional() };
+/** Which mouse button, and which modifiers are held, for a click. */
+export const pointerGesture = {
+  button: z.enum(["left", "middle", "right", "back", "forward"]).optional(),
+  modifiers: z
+    .array(z.enum(["alt", "control", "meta", "shift"]))
+    .max(4)
+    .optional(),
+};
 const method = z
   .string()
   .regex(/^[A-Za-z]+\.[A-Za-z]+$/)
@@ -62,6 +70,7 @@ export const browserCapabilitySteps = [
       y: z.number().finite().min(0).max(50000),
       toX: z.number().finite().min(0).max(50000).optional(),
       toY: z.number().finite().min(0).max(50000).optional(),
+      ...pointerGesture,
     })
     .strict(),
   z

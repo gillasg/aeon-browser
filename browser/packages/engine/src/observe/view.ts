@@ -2,12 +2,23 @@ import type { BrowserSemanticNode } from "@browserkit/protocol";
 import type { AxNode, AxRef } from "../native-browser-common.js";
 import { buildSemanticTree } from "./tree.js";
 import { renderState } from "./render.js";
+import { matchesQuery } from "./render-model.js";
 import {
   VIEW_CHAR_LIMIT,
   clampBudget,
   type ExpandSection,
   type ResolvedClickable,
+  type TreeNode,
 } from "./types.js";
+
+export interface CaptureTree {
+  ax: readonly AxNode[];
+  shown: readonly BrowserSemanticNode[];
+  url: string;
+  title?: string;
+  clickables: readonly ResolvedClickable[];
+  offscreen: readonly string[];
+}
 
 export function attachClickables(
   semantic: { refs: Map<string, AxRef>; nodes: BrowserSemanticNode[] },
@@ -16,10 +27,9 @@ export function attachClickables(
 ): void {
   const used = new Set(semantic.nodes.map((node) => node.backendNodeId));
   let next = nextRef(semantic.nodes);
-  const needle = query?.toLowerCase();
   for (const hit of hits) {
     if (semantic.nodes.length >= 220 || used.has(hit.backendNodeId)) continue;
-    if (needle && !`clickable ${hit.text}`.toLowerCase().includes(needle)) continue;
+    if (query && !matchesQuery(`clickable ${hit.text}`, query)) continue;
     const ref = `e${next}`;
     next += 1;
     const name = hit.text.slice(0, 80);
@@ -39,21 +49,12 @@ function nextRef(nodes: readonly BrowserSemanticNode[]): number {
   return max + 1;
 }
 
-export function renderCaptured(input: {
-  ax: readonly AxNode[];
-  shown: readonly BrowserSemanticNode[];
-  url: string;
-  title?: string;
-  clickables: readonly ResolvedClickable[];
-  offscreen: readonly string[];
-  budget?: number;
-  focus?: string;
-  delta?: Set<number>;
-  expand?: ExpandSection[];
-  truncated: boolean;
-}): string {
-  const budget = clampBudget(input.budget);
-  const tree = buildSemanticTree({
+export function capturedNodes(input: CaptureTree): TreeNode[] {
+  return semanticTree(input).nodes;
+}
+
+function semanticTree(input: CaptureTree) {
+  return buildSemanticTree({
     ax: input.ax,
     shown: input.shown,
     url: input.url,
@@ -61,6 +62,21 @@ export function renderCaptured(input: {
     clickables: input.clickables,
     offscreen: input.offscreen,
   });
+}
+
+export function renderCaptured(
+  input: CaptureTree & {
+    budget?: number;
+    focus?: string;
+    delta?: Set<number>;
+    expand?: ExpandSection[];
+    truncated: boolean;
+    hints?: ReadonlyMap<number, string>;
+  },
+): string {
+  const budget = clampBudget(input.budget);
+  const tree = semanticTree(input);
+  applyHints(tree.nodes, input.hints);
   const view = renderState(tree, {
     budget,
     ...(input.focus ? { focus: input.focus } : {}),
@@ -69,6 +85,14 @@ export function renderCaptured(input: {
   });
   const noted = noteTruncation(view, input.truncated, budget);
   return noted.length > VIEW_CHAR_LIMIT ? noted.slice(0, VIEW_CHAR_LIMIT) : noted;
+}
+
+function applyHints(nodes: TreeNode[], hints: ReadonlyMap<number, string> | undefined): void {
+  if (!hints) return;
+  for (const node of nodes) {
+    const hint = node.backendNodeId === undefined ? undefined : hints.get(node.backendNodeId);
+    if (hint) node.hint = hint;
+  }
 }
 
 function noteTruncation(view: string, truncated: boolean, budget: number): string {

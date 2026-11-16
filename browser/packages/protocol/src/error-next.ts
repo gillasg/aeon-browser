@@ -1,6 +1,7 @@
 // The one call a failure can run as it is. A read, a wait, a reload, help, or ask_user.
-// Never a click or a fill: a wrong next is worse than none. Null only when no call is safe,
-// and then NO_NEXT_REASON says why.
+// Never a click or a fill: a wrong next is worse than none. A file-input click is the exception:
+// the next call is page.upload, because the click would open a dialog the agent cannot close.
+// Null only when no call is safe, and then NO_NEXT_REASON says why.
 import type { ErrorCode } from "./errors.js";
 
 export interface ErrorCandidate {
@@ -37,9 +38,9 @@ type NextFn = (ctx: ErrorContext) => string;
 const STATE = "await bu.state()";
 
 const READ_NEXT =
-  /^(?:await bu\.state\(\)|await bu\.state\(\{query: "(?:[^"\\]|\\.){1,160}"\}\)|browser\.tabs\(\)|await page\.reload\(\)|await page\.waitForControl\(\)|await page\.read\(\)|await page\.network\.list\(\)|await help\(\)|ask_user: [^\n]{1,220})$/;
+  /^(?:await bu\.state\(\)|await bu\.state\(\{query: "(?:[^"\\]|\\.){1,160}"\}\)|browser\.tabs\(\)|await page\.reload\(\)|await page\.waitForControl\(\)|await page\.read\(\)|await page\.network\.list\(\)|await help\(\)|await page\.upload\(selector, files\)|ask_user: [^\n]{1,220})$/;
 
-/** A next call an error may name: a read, a wait, a reload, help, or ask_user. */
+/** A next call an error may name: a read, a wait, a reload, help, ask_user, or page.upload. */
 export function isReadNext(call: string): boolean {
   return READ_NEXT.test(call);
 }
@@ -76,6 +77,7 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   AMBIGUOUS_TARGET: readState,
   TARGET_HIDDEN: readState,
   TARGET_DISABLED: readState,
+  FILE_INPUT: () => "await page.upload(selector, files)",
   TARGET_BLOCKED: readState,
   TARGET_LOST: readState,
   NOT_EDITABLE: readState,

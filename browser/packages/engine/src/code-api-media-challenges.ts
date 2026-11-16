@@ -120,10 +120,54 @@ async function __handoffUntilClear(message, target, options) {
   __states.delete(__key(target));
   return {solved: outcome === 'cleared' || outcome === 'done', by: outcome, waitedMs: Date.now() - started};
 }
-// After openTab or goto: a page that loaded as a bot check or captcha says so at once, so a
-// challenge is never read as the page itself.
+// A short page that is still checking the browser, with nothing for a person to click or type.
+// The words and the markup are the signal. A vendor name is not.
+function __challengeGate() {
+  var title = document.title || "";
+  var body = document.body ? String(document.body.innerText || "").slice(0, 4000) : "";
+  var compact = body.replace(/\\s+/g, " ").trim();
+  var text = (title + "\\n" + compact).toLowerCase();
+  var short = compact.length < 2500;
+  var shown = function (el) {
+    var rect = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    return rect.width > 8 && rect.height > 8 && style.visibility !== "hidden" && style.display !== "none";
+  };
+  var controls = document.body
+    ? [...document.body.querySelectorAll("input, textarea, select, button, [role=checkbox], [role=button]")].filter(shown)
+    : [];
+  var asks = /press (&|and) hold|verify you are human|i am human|click to verify|not a robot|complete the captcha|are you a robot/.test(text);
+  var waiting = /just a moment|checking your browser|please wait|one moment|verifying your|attention required|un instant|einen moment|security check|checking if the site connection is secure/.test(text);
+  var marked = false;
+  if (short && document.body) {
+    var nodes = document.body.querySelectorAll("[id], [class], iframe");
+    for (var i = 0; i < nodes.length && i < 400; i++) {
+      var className = nodes[i].className && nodes[i].className.baseVal || nodes[i].className || "";
+      var name = String(nodes[i].id || "") + " " + String(className) + " " + String(nodes[i].getAttribute ? nodes[i].getAttribute("src") || "" : "");
+      if (/\\bchallenge\\b/i.test(name)) { marked = true; break; }
+    }
+  }
+  return {nonInteractive: Boolean(short && !asks && !controls.length && (waiting || marked)), evidence: String(title || compact).slice(0, 80)};
+}
+// A page that checks the browser by itself gets up to 15s to finish before it is reported.
+async function __waitOutChallenge(target) {
+  var gate = await browser.page(target).inspect(__challengeGate).catch(() => null);
+  if (!gate || !gate.nonInteractive) return null;
+  var deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    await new Promise((done) => setTimeout(done, 400));
+    var next = await browser.page(target).inspect(__challengeGate).catch(() => null);
+    if (!next || !next.nonInteractive) return null;
+    gate = next;
+  }
+  return gate;
+}
+// After openTab or goto: wait out a non-interactive check, then say what is still in the way.
 async function __noteChallenge(target, url) {
+  var gate = await __waitOutChallenge(target);
   var note = await __challengeNote(target, url, 'open').catch(() => '');
+  if (!note && gate && gate.nonInteractive)
+    note = "challenge: bot-check (page, " + gate.evidence + "). " + __CHALLENGE_ADVICE["bot-check"];
   if (note) console.log('[warn] ' + note.split('\\n').join('\\n[warn] ') + ' (or bu.handoff(message, {wait: true}) and continue when it clears)');
   var mapped = await __mappedNote(url).catch(() => '');
   if (mapped) console.log('[site] ' + mapped);

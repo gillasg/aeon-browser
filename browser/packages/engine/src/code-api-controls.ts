@@ -14,7 +14,8 @@ var __classifyGate = ${classifyGate};
 var __pickAffirmative = ${affirmativeIndex};
 // Page-side. mode 'list': controls with their state. mode 'find': the one element a batch target
 // names, tagged with data-aeon-t so the engine acts on it. mode 'select': picks options in a
-// native select. Open shadow roots are searched; iframes are the caller's job.
+// native select. mode 'popup': whether an ARIA combobox is open or aria-disabled. mode 'pick':
+// the visible option inside aria-controls. Open shadow roots are searched; iframes are the caller's job.
 function __pageControls(arg) {
   var clean = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
   var cut = (s, n) => { s = clean(s); return s.length > n ? s.slice(0, n - 1) + '\\u2026' : s; };
@@ -212,6 +213,43 @@ function __pageControls(arg) {
     el.dispatchEvent(new Event('change', {bubbles: true}));
     return {selected: picked.map(optionText)};
   };
+  // aria-controls wins, even before the popup exists. A missing id stays empty so a stray
+  // role=option elsewhere on the page is not a candidate. No owner: the listbox, or the document.
+  var optionRoot = (el) => {
+    var controls = el.getAttribute('aria-controls');
+    if (controls) return byId(el, controls.split(' ')[0]);
+    var owns = el.getAttribute('aria-owns');
+    if (owns) return byId(el, owns.split(' ')[0]);
+    if (roleOf(el) === 'listbox' || (el.querySelector && el.querySelector('[role=option]'))) return el;
+    return document;
+  };
+  var visibleOptions = (root) => root ? [...root.querySelectorAll('[role=option]')].filter(shown) : [];
+  var optionName = (o) => labelOf(o) || cut(ownText(o), 60);
+  var optionValue = (o) => o.getAttribute('data-value') || o.getAttribute('value') || '';
+  var popup = () => {
+    var el = tagged('data-aeon-s');
+    if (!el) throw new Error('STALE_REF: the control is gone');
+    if (el.getAttribute('aria-disabled') === 'true') return {disabled: true};
+    var root = optionRoot(el);
+    return {open: roleOf(el) === 'listbox' || visibleOptions(root).length > 0};
+  };
+  // Already-selected multi options are reported, not tagged: clicking one would toggle it off.
+  var pick = () => {
+    var el = tagged('data-aeon-s');
+    if (!el) throw new Error('STALE_REF: the control is gone');
+    var root = optionRoot(el), options = visibleOptions(root);
+    if (!options.length) return {waiting: true};
+    var want = String(arg.want);
+    var hit = options.find((o) => matches(optionName(o), want, true) || optionValue(o) === want) ||
+      options.find((o) => matches(optionName(o), want, false) || (optionValue(o) && matches(optionValue(o), want, false)));
+    var listed = options.slice(0, 20).map((o) => optionName(o) || optionValue(o));
+    if (!hit) return {waiting: false, options: listed};
+    var multi = (root && root.getAttribute && root.getAttribute('aria-multiselectable') === 'true') || el.getAttribute('aria-multiselectable') === 'true';
+    var name = optionName(hit) || optionValue(hit);
+    if (multi && hit.getAttribute('aria-selected') === 'true') return {already: true, name};
+    hit.setAttribute('data-aeon-o', arg.tag);
+    return {name, selector: '[data-aeon-o="' + arg.tag + '"]'};
+  };
   if (arg.mode === 'find') return find();
   if (arg.mode === 'findMany') {
     // fillForm's fields: one page scan tags each control so its fill needs no second find.
@@ -223,7 +261,9 @@ function __pageControls(arg) {
     });
   }
   if (arg.mode === 'select') return select();
-  if (arg.mode === 'cleanup') { for (var el of deep('[data-aeon-t],[data-aeon-s],[data-aeon-f]')) { el.removeAttribute('data-aeon-t'); el.removeAttribute('data-aeon-s'); el.removeAttribute('data-aeon-f'); } return true; }
+  if (arg.mode === 'popup') return popup();
+  if (arg.mode === 'pick') return pick();
+  if (arg.mode === 'cleanup') { for (var el of deep('[data-aeon-t],[data-aeon-s],[data-aeon-f],[data-aeon-o]')) { el.removeAttribute('data-aeon-t'); el.removeAttribute('data-aeon-s'); el.removeAttribute('data-aeon-f'); el.removeAttribute('data-aeon-o'); } return true; }
   return list();
 }
 // Frames worth reading: real pages, not ad or tracking frames, at most eight.
@@ -315,25 +355,59 @@ async function __batchUrl(target, op) {
   } while (Date.now() < deadline);
   throw Error('EXPECTATION_FAILED: the URL is ' + url + ', without ' + JSON.stringify(String(op.expect)));
 }
+function __optionWant(item) {
+  if (item && typeof item === 'object') return String(item.label != null ? item.label : item.value ?? '');
+  return item;
+}
+// Polls the open list. A miss names the options that were actually visible.
+async function __pickOption(scope, token, value) {
+  var deadline = Date.now() + 4000, last;
+  do {
+    last = await scope(__pageControls, {mode: 'pick', token, want: String(value), tag: 'o' + (++__tagSeq)});
+    if (!last.waiting) break;
+    await __sleep(100);
+  } while (Date.now() < deadline);
+  if (!last || last.waiting) throw Error('NO_OPTION: ' + JSON.stringify(String(value)) + ' is not one of (no options appeared)');
+  if (!last.selector && !last.already) throw Error('NO_OPTION: ' + JSON.stringify(String(value)) + ' is not one of ' + (last.options || []).join(' | '));
+  return last;
+}
 async function __batchSelect(target, op, found) {
   var scope = found.frame ? (fn, arg) => found.frame.evaluate(fn, arg) : (fn, arg) => browser.page(target).inspect(fn, arg);
-  var result = await scope(__pageControls, {mode: 'select', token: found.token, values: op.value});
+  var values = [].concat(op.value).map(__optionWant);
+  var result = await scope(__pageControls, {mode: 'select', token: found.token, values});
   if (!result.custom) {
     // Set in the page directly, so mark the tab changed for the log; a value-only change does
     // not need the cell's final observation.
     __markValueOnly(target);
     return result;
   }
-  // A custom dropdown: open it, then click the option.
-  await __batchAct(target, found, 'click');
+  // A custom widget: refuse aria-disabled, open it unless it is already a list, then click the
+  // option that lives inside aria-controls.
+  var popup = await scope(__pageControls, {mode: 'popup', token: found.token});
+  if (popup.disabled) throw Error('TARGET_DISABLED: the control is aria-disabled');
+  if (!popup.open) await __batchAct(target, found, 'click');
   var picked = [];
-  for (var value of [].concat(op.value)) {
-    var option = await __batchFind(target, {target: {role: 'option', name: String(value), frame: op.target.frame}, timeout: 4000})
-      .catch(() => __batchFind(target, {target: {text: String(value), frame: op.target.frame}, timeout: 2000}));
-    await __batchAct(target, option, 'click');
-    picked.push(option.control.label || option.control.text);
+  for (var value of values) {
+    var hit = await __pickOption(scope, found.token, value);
+    if (!hit.already) await __batchAct(target, {...found, selector: hit.selector}, 'click');
+    picked.push(hit.name);
   }
   return {selected: picked};
+}
+// selectOption tags the locator's element, then uses the same select path as page.batch.
+async function __locatorSelect(target, element, index, value) {
+  var token = 's' + (++__tagSeq);
+  await __locatorRead(target, element, index, function (found, token) {
+    var el = found[0];
+    if (!el) throw new Error('TARGET_NOT_FOUND: no element matches');
+    el.setAttribute('data-aeon-t', token);
+    el.setAttribute('data-aeon-s', token);
+  }, token);
+  try {
+    return await __batchSelect(target, {value: value, target: {}}, {token: token, selector: '[data-aeon-t="' + token + '"]'});
+  } finally {
+    await browser.page(target).inspect(__pageControls, {mode: 'cleanup'}).catch(function () {});
+  }
 }
 async function __batchCheck(target, op, found) {
   var want = op.action === 'check';
@@ -366,9 +440,9 @@ async function __batchRun(target, op) {
   return __batchDone(await __batchAct(target, found, 'fill', op.value), 'fill', found);
 }
 // page.fillForm({label: value}, {submit, expect}): page.batch for the common case. Each key names
-// a field by label (or placeholder); the field decides the action: a list with options is
-// selected, a checkbox, switch or radio is checked for true and unchecked for false, anything
-// else is filled.
+// a field by label (or placeholder); the field decides the action: a combobox or listbox is
+// selected (opened first when its options are not showing yet), a checkbox, switch or radio is
+// checked for true and unchecked for false, anything else is filled.
 async function __fillForm(target, values, options = {}) {
   if (!values || typeof values !== 'object' || Array.isArray(values))
     throw Error('page.fillForm takes {label: value}, e.g. {Email: "a@b.c", Country: "India", "I agree": true}');
@@ -394,7 +468,7 @@ async function __fillForm(target, values, options = {}) {
 function __fieldStep(hit, value) {
   var control = hit.control, role = control.role;
   var action = ['checkbox', 'switch', 'radio'].includes(role) ? (value === false ? 'uncheck' : 'check')
-    : control.options && control.tag !== 'select' ? 'select' : 'fill';
+    : role === 'combobox' || role === 'listbox' ? 'select' : 'fill';
   return {
     action,
     target: {css: hit.selector},
@@ -423,7 +497,7 @@ async function __batchField(target, op) {
     var want = op.value !== false;
     return __batchCheck(target, {...op, action: want ? 'check' : 'uncheck'}, found);
   }
-  if (found.control.options) return __batchSelect(target, {...op, action: 'select'}, found);
+  if (found.control.role === 'combobox' || found.control.role === 'listbox') return __batchSelect(target, {...op, action: 'select'}, found);
   return __batchDone(await __batchAct(target, found, 'fill', op.value), 'fill', found);
 }
 // Waits until the page's text shows the given words (case and spacing ignored).

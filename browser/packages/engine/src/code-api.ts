@@ -110,10 +110,28 @@ function __holdFields(options) {
   var ms = __holdMs(options);
   return ms === undefined ? {} : {ms: ms};
 }
+// Playwright's button and modifiers, as the protocol fields. Unknown names are left out.
+function __pointerFields(options) {
+  if (!options) return {};
+  var fields = {};
+  var button = String(options.button || '').toLowerCase();
+  if ({left:1, middle:1, right:1, back:1, forward:1}[button]) fields.button = button;
+  var raw = options.modifiers;
+  if (raw === undefined || raw === null || raw === '') return fields;
+  var alias = {command:'meta', ctrl:'control'};
+  var names = Array.isArray(raw) ? raw : String(raw).split(/[+,]/);
+  var modifiers = [];
+  for (var i = 0; i < names.length && modifiers.length < 4; i++) {
+    var key = alias[String(names[i]).trim().toLowerCase()] || String(names[i]).trim().toLowerCase();
+    if ({alt:1, control:1, meta:1, shift:1}[key] && modifiers.indexOf(key) < 0) modifiers.push(key);
+  }
+  if (modifiers.length) fields.modifiers = modifiers;
+  return fields;
+}
 function __locator(target, element, index) {
   var loc = Object.freeze(__timeActions(__extendLocator(target, element, {
     element,
-    click: () => __step({op:'click',target,element:__wire(element),observe:false}),
+    click: (options) => __step(Object.assign({op:'click',target,element:__wire(element),observe:false}, __pointerFields(options))),
     hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
     fill: (value) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false}),
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
@@ -448,10 +466,10 @@ var browser = Object.freeze({
     // or any element with a background image); {all:true} saves every match. Uses the user's cookies.
     saveMedia: (what, options = {}) => __saveMedia(target, what, options),
     setFileInputFiles: (backendNodeId, files) => __step({op:'upload',target,backendNodeId,files}),
-    clickAt: (x,y) => __step({op:'pointer',target,action:'click',x,y}),
+    clickAt: (x,y,options) => __step(Object.assign({op:'pointer',target,action:'click',x,y}, __pointerFields(options))),
     hold: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.hold(options) : __step(Object.assign({op:'hold',target,element:__wire(__element(target, element)),observe:false}, __holdFields(options))); },
     holdAt: (x, y, options) => __step(Object.assign({op:'hold',target,x:Number(x),y:Number(y),observe:false}, __holdFields(options))),
-    doubleClickAt: (x,y) => __step({op:'pointer',target,action:'doubleClick',x,y}),
+    doubleClickAt: (x,y,options) => __step(Object.assign({op:'pointer',target,action:'doubleClick',x,y}, __pointerFields(options))),
     hover: (x,y) => __step({op:'pointer',target,action:'hover',x,y}),
     drag: (x,y,toX,toY) => __step({op:'pointer',target,action:'drag',x,y,toX,toY}),
     keyboard: (keys) => __step({op:'keys',target,keys}),
@@ -486,6 +504,7 @@ var browser = Object.freeze({
           ...(options.present === false ? {present:false} : {}),
           ...(options.timeoutMs ? {timeoutMs: Math.max(500, Math.min(Number(options.timeoutMs) || 0, 120000))} : {})});
         __lastErrors.delete(__key(target));
+        if (result && result.data && result.data.note) console.log(result.data.note);
         await __noteChallenge(target, destination);
         return result;
       } catch (error) {
@@ -582,7 +601,7 @@ var browser = Object.freeze({
     screenshot: (options = {}) => options.labels ? __labeledScreenshot(target) : __step({op:'observe', target, kind:'screenshot'}),
     diffScreenshot: (baseline, options = {}) => __diffScreenshot(target, baseline, options),
     recordDemonstration: (options = {}) => __recordDemonstration(target, options),
-    click: (element) => { var loc = __locatorFor(target, element); return loc ? loc.click() : __step({op:'click',target,element:__wire(__element(target,element)),observe:false}); },
+    click: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.click(options) : __step(Object.assign({op:'click',target,element:__wire(__element(target,element)),observe:false}, __pointerFields(options))); },
     fill: (element, value) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false}); },
     paste: (element, html, text = '') => __step({op:'paste',target,element:__wire(__element(target,element)),html:String(html),text:String(text || html.replace(/<[^>]+>/g, ' ')),observe:false}),
     evaluate: async (fn, arg) => (__readNudge(fn), (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value),

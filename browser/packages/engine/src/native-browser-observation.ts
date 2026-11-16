@@ -18,11 +18,18 @@ import {
 } from "./native-browser-common.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { getAxTree, withDebugger } from "./native-browser-debugger.js";
-import { scopedBackendIds } from "./native-browser-dom.js";
+import { onNode, scopedBackendIds } from "./native-browser-dom.js";
+import { controlHint, hintTargets } from "./observe/hints.js";
 import { emptyScan, readPageScan, resolveClickables } from "./observe/scan.js";
-import { attachClickables, renderCaptured } from "./observe/view.js";
+import { matchesQuery } from "./observe/render-model.js";
+import {
+  attachClickables,
+  capturedNodes,
+  renderCaptured,
+  type CaptureTree,
+} from "./observe/view.js";
 import { changedIds, rememberNodes } from "./observe/baseline.js";
-import { CLICKABLE_NODE_LIMIT, type ResolvedClickable } from "./observe/types.js";
+import { CLICKABLE_NODE_LIMIT, type ResolvedClickable, type TreeNode } from "./observe/types.js";
 
 interface Capture {
   viewport: { width: number; height: number };
@@ -32,6 +39,20 @@ interface Capture {
   dataBase64: string;
 }
 export async function captureViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture> {
+  let failure: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await readViewport(debuggee);
+    } catch (error) {
+      failure = error;
+      // One retry when the capture straddled a commit. A second miss is still stale.
+      if (attempt === 1 || !(error instanceof Error) || error.message !== "STALE_REF") throw error;
+    }
+  }
+  throw failure;
+}
+
+async function readViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture> {
   const metrics = (await send(debuggee, "Page.getLayoutMetrics", undefined, {
     label: "captureViewport",
   })) as {
@@ -173,7 +194,7 @@ function relevant(node: AxNode, options: Options, depth: number): boolean {
   if (options.summary && !SUMMARY_ROLES.has(role) && !interactiveRoles.has(role)) return false;
   if (!name && !interactiveRoles.has(role) && !SUMMARY_ROLES.has(role)) return false;
   if (["generic", "none", "presentation", "inlinetextbox"].includes(role)) return false;
-  return !options.query || `${role} ${name}`.toLowerCase().includes(options.query.toLowerCase());
+  return !options.query || matchesQuery(`${role} ${name}`, options.query);
 }
 function priority(node: AxNode): number {
   if (booleanProperty(node, "focused").focused) return 0;
@@ -411,20 +432,22 @@ async function scopeAx(
   return rooted.filter((node) => ids.has(node.backendDOMNodeId ?? -1));
 }
 
-function semanticResult(
+async function semanticResult(
   request: BrowserExecutorRequest,
   target: BrowserTargetKey,
   current: { documentEpoch: number; url: string },
   tab: chrome.tabs.Tab,
   scoped: AxNode[],
   captured: PageCapture,
-): BrowserExecutorResult {
+): Promise<BrowserExecutorResult> {
   const step = request.step.op === "observe" ? request.step : undefined;
   const options = step ?? {};
-  const semantic = createSemanticNodes(filterVisibleTextNodes(scoped, captured.text), options);
+  const visible = filterVisibleTextNodes(scoped, captured.text);
+  const semantic = createSemanticNodes(visible, options);
   attachClickables(semantic, captured.clickables, step?.query);
+  const fullNodes = viewNodes(visible, options, semantic.nodes, step?.query);
   const pinKey = `${targetIdentity(target)}:${current.documentEpoch}`;
-  const baseline = baselineFor(scoped, captured.text, options, semantic.nodes, step);
+  const baseline = baselineFor(fullNodes, semantic.nodes, step);
   const delta = changedIds(pinKey, baseline, Boolean(step?.delta));
   rememberNodes(pinKey, baseline, Boolean(step?.pin) || Boolean(step?.delta));
   const snapshotId = crypto.randomUUID();
@@ -435,6 +458,14 @@ function semanticResult(
   trimOldRefs(snapshotId);
   const diff = step?.diff ? compareTree(key, current.documentEpoch, semantic.nodes) : undefined;
   const url = tab.url ?? current.url;
+  const hints = await loadSnapshotHints(target.tabId, {
+    ax: scoped,
+    shown: fullNodes,
+    url,
+    clickables: clickableHits(semantic.nodes),
+    offscreen: captured.offscreen,
+    ...(tab.title ? { title: tab.title } : {}),
+  });
   return BrowserExecutorResultSchema.parse({
     kind: "semantic",
     source: "website",
@@ -446,25 +477,36 @@ function semanticResult(
     nodes: semantic.nodes,
     truncated: semantic.truncated,
     text: captured.text,
-    view: viewOf(step, scoped, semantic, captured, url, tab.title, delta),
+    view: viewOf(step, scoped, fullNodes, semantic, captured, url, tab.title, delta, hints),
     ...(diff ? { diff } : {}),
   });
 }
 
-function baselineFor(
-  scoped: AxNode[],
-  text: string,
+function viewNodes(
+  visible: AxNode[],
   options: Options,
+  filtered: BrowserSemanticNode[],
+  query: string | undefined,
+): BrowserSemanticNode[] {
+  if (!query) return filtered;
+  return createSemanticNodes(visible, withoutQuery(options)).nodes;
+}
+
+function withoutQuery(options: Options): Options {
+  const rest = { ...options };
+  delete rest.query;
+  return rest;
+}
+
+function baselineFor(
+  fullNodes: readonly BrowserSemanticNode[],
   nodes: BrowserSemanticNode[],
   step:
     | { query?: string | undefined; pin?: boolean | undefined; delta?: boolean | undefined }
     | undefined,
 ): BrowserSemanticNode[] {
   if (!step?.query || (!step.pin && !step.delta)) return nodes;
-  const rest = { ...options };
-  delete rest.query;
-  const full = createSemanticNodes(filterVisibleTextNodes(scoped, text), rest);
-  return full.nodes.concat(nodes.filter((node) => node.role === "clickable"));
+  return fullNodes.concat(nodes.filter((node) => node.role === "clickable"));
 }
 
 function viewOf(
@@ -476,30 +518,62 @@ function viewOf(
         diff?: boolean | undefined;
       }
     | undefined,
-  scoped: AxNode[],
+  ax: readonly AxNode[],
+  shown: readonly BrowserSemanticNode[],
   semantic: { nodes: BrowserSemanticNode[]; truncated: boolean },
   captured: PageCapture,
   url: string,
   title: string | undefined,
   delta: Set<number> | undefined,
+  hints: ReadonlyMap<number, string>,
 ): string {
   return renderCaptured({
-    ax: scoped,
-    shown: semantic.nodes,
+    ax,
+    shown,
     url,
-    clickables: semantic.nodes.flatMap((node) =>
-      node.role === "clickable" && node.backendNodeId !== undefined
-        ? [{ backendNodeId: node.backendNodeId, text: node.name }]
-        : [],
-    ),
+    clickables: clickableHits(semantic.nodes),
     offscreen: captured.offscreen,
     truncated: semantic.truncated,
+    hints,
     ...(title ? { title } : {}),
     ...(step?.budget !== undefined ? { budget: step.budget } : {}),
     ...(step?.query ? { focus: step.query } : {}),
     ...(delta ? { delta } : {}),
     ...(step?.expand?.length ? { expand: step.expand } : {}),
   });
+}
+
+function clickableHits(nodes: readonly BrowserSemanticNode[]): CaptureTree["clickables"] {
+  return nodes.flatMap((node) =>
+    node.role === "clickable" && node.backendNodeId !== undefined
+      ? [{ backendNodeId: node.backendNodeId, text: node.name }]
+      : [],
+  );
+}
+
+async function loadSnapshotHints(tabId: number, input: CaptureTree): Promise<Map<number, string>> {
+  try {
+    return await withDebugger(tabId, (debuggee) =>
+      readControlHints(debuggee, capturedNodes(input)),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+async function readControlHints(
+  debuggee: chrome.debugger.Debuggee,
+  nodes: readonly TreeNode[],
+): Promise<Map<number, string>> {
+  const found = await Promise.all(
+    hintTargets(nodes).map(async (node) => {
+      const id = node.backendNodeId;
+      if (id === undefined) return undefined;
+      const text = await onNode<string>(debuggee, id, controlHint).catch(() => "");
+      return typeof text === "string" && text.trim() ? ([id, text.trim()] as const) : undefined;
+    }),
+  );
+  return new Map(found.flatMap((item) => (item ? [item] : [])));
 }
 
 export function compareTree(

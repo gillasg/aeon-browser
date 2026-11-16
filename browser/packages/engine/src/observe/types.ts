@@ -46,6 +46,8 @@ export interface TreeNode {
   container?: boolean;
   /** Collected from the cursor/click scan, not from the accessibility tree. */
   clickable?: boolean;
+  /** Icon, image, attribute or row clue. Never copied into the accessible name. */
+  hint?: string;
 }
 
 export interface SemanticTree {

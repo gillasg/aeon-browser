@@ -85,6 +85,8 @@ export const browserExtraSteps = [
       referer: z.string().url().max(8192).optional(),
       /** How long to wait for the page to load; a slow page is reported, not waited on forever. */
       timeoutMs: z.number().int().min(500).max(120000).optional(),
+      /** Reload the current document instead of navigating to url. url is the document to name if it never commits. */
+      reload: z.boolean().optional(),
     })
     .strict(),
   z.object({ op: z.literal("diagnostics"), target, clear: z.boolean().default(false) }).strict(),

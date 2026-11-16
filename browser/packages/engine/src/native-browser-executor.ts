@@ -293,7 +293,7 @@ export async function performExtra(
           await guardPrivateTab(tabId, await engineConfig.privateNetworkPorts());
         // Recorded from the first request, so page.network.list() has the new page's calls.
         await captureFromTabStart(tabId);
-        return navigateReady(tabId, step.url, step.timeoutMs, step.referer);
+        return navigateReady(tabId, step.url, step.timeoutMs, step.referer, step.reload === true);
       }
       if (step.op === "diagnostics") {
         await enableConsoleCapture(tabId);

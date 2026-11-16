@@ -324,8 +324,50 @@ function domQuietProbe() {
   }
 }
 
+async function showingDocument(tabId: number, fallback: string): Promise<string> {
+  const live = (await send(
+    { tabId },
+    "Runtime.evaluate",
+    { expression: "location.href", returnByValue: true },
+    { label: "stopPendingNavigation", ms: 5_000 },
+  ).catch(() => undefined)) as { result?: { value?: string } } | undefined;
+  if (typeof live?.result?.value === "string" && live.result.value) return live.result.value;
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  return tab?.url || fallback;
+}
+
+// A navigation that never committed is stopped, so the tab does not stay on a dead load.
+// The call still resolves: timedOut is a result, and note names the document that remains.
+async function navigationTimedOut(
+  tabId: number,
+  requested: string,
+  committed: boolean,
+): Promise<{ url: string; note?: string }> {
+  if (committed) {
+    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+    return { url: tab?.url ?? requested };
+  }
+  await send({ tabId }, "Page.stopLoading", {}, { label: "stopPendingNavigation" }).catch(
+    () => undefined,
+  );
+  const showing = await showingDocument(tabId, requested);
+  return { url: showing, note: `still showing ${showing}; retry with a longer timeout` };
+}
+
 export async function waitPageInteractive(tabId: number, timeoutMs = 2000): Promise<boolean> {
   return (await settleBrowserPage({ tabId }, timeoutMs)).why === "quiet";
+}
+
+/** True when the DOM or the network moved since the last sample. The first sample is the baseline. */
+export async function pageStillChanging(
+  debuggee: chrome.debugger.Debuggee,
+  seen: number | undefined,
+): Promise<{ active: boolean; changes: number | undefined }> {
+  const state = await primeBrowserSettle(debuggee).catch(() => undefined);
+  const changes = state?.changes;
+  const net = networkState(debuggee.tabId ?? -1, Date.now() - 500);
+  const moved = seen !== undefined && changes !== undefined && changes !== seen;
+  return { active: moved || net.pending > 0 || net.active, changes };
 }
 
 export async function viewportFingerprint(debuggee: chrome.debugger.Debuggee): Promise<string> {
@@ -375,62 +417,74 @@ export async function navigateReady(
   url: string,
   timeoutMs = 8000,
   referer?: string,
-): Promise<{ url: string; timedOut: boolean }> {
-  const navigation = await new Promise<{ url: string; timedOut: boolean }>((resolve, reject) => {
-    let committed = false;
-    const top = (event: { tabId: number; frameId: number }) =>
-      event.tabId === tabId && event.frameId === 0;
-    const clean = () => {
-      clearTimeout(timer);
-      chrome.webNavigation.onCommitted.removeListener(commit);
-      chrome.webNavigation.onDOMContentLoaded.removeListener(ready);
-      chrome.webNavigation.onErrorOccurred.removeListener(error);
-      chrome.webNavigation.onHistoryStateUpdated.removeListener(sameDocument);
-      chrome.webNavigation.onReferenceFragmentUpdated.removeListener(sameDocument);
-    };
-    const finish = (nextUrl: string, timedOut = false) => {
-      clean();
-      resolve({ url: nextUrl, timedOut });
-    };
-    // A new-tab, extension or blank page committed on the way is not the requested page.
-    const interim = (eventUrl: string) => INTERIM_PAGE.test(eventUrl) && !INTERIM_PAGE.test(url);
-    const commit = (event: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
-      if (top(event) && !interim(event.url)) committed = true;
-    };
-    const ready = (event: chrome.webNavigation.WebNavigationFramedCallbackDetails) => {
-      if (top(event) && committed && !interim(event.url)) finish(event.url);
-    };
-    const sameDocument = (event: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
-      if (top(event) && !interim(event.url)) finish(event.url);
-    };
-    const error = (event: chrome.webNavigation.WebNavigationFramedErrorCallbackDetails) => {
-      if (top(event) && !event.error.includes("ERR_ABORTED")) {
+  reload = false,
+): Promise<{ url: string; timedOut: boolean; note?: string }> {
+  const navigation = await new Promise<{ url: string; timedOut: boolean; note?: string }>(
+    (resolve, reject) => {
+      let committed = false;
+      const top = (event: { tabId: number; frameId: number }) =>
+        event.tabId === tabId && event.frameId === 0;
+      const clean = () => {
+        clearTimeout(timer);
+        chrome.webNavigation.onCommitted.removeListener(commit);
+        chrome.webNavigation.onDOMContentLoaded.removeListener(ready);
+        chrome.webNavigation.onErrorOccurred.removeListener(error);
+        chrome.webNavigation.onHistoryStateUpdated.removeListener(sameDocument);
+        chrome.webNavigation.onReferenceFragmentUpdated.removeListener(sameDocument);
+      };
+      const finish = (nextUrl: string, timedOut = false) => {
         clean();
-        reject(new BrowserActionError("CHROME_ERROR", "navigation failed: " + event.error));
-      }
-    };
-    const timer = setTimeout(
-      () => {
+        resolve({ url: nextUrl, timedOut });
+      };
+      // A new-tab, extension or blank page committed on the way is not the requested page.
+      const interim = (eventUrl: string) => INTERIM_PAGE.test(eventUrl) && !INTERIM_PAGE.test(url);
+      const commit = (event: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
+        if (top(event) && !interim(event.url)) committed = true;
+      };
+      const ready = (event: chrome.webNavigation.WebNavigationFramedCallbackDetails) => {
+        if (top(event) && committed && !interim(event.url)) finish(event.url);
+      };
+      const sameDocument = (event: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
+        if (top(event) && !interim(event.url)) finish(event.url);
+      };
+      const error = (event: chrome.webNavigation.WebNavigationFramedErrorCallbackDetails) => {
+        if (top(event) && !event.error.includes("ERR_ABORTED")) {
+          clean();
+          reject(new BrowserActionError("CHROME_ERROR", "navigation failed: " + event.error));
+        }
+      };
+      const timer = setTimeout(
+        () => {
+          const wasCommitted = committed;
+          clean();
+          void navigationTimedOut(tabId, url, wasCommitted).then(
+            (shown) =>
+              resolve({
+                url: shown.url,
+                timedOut: true,
+                ...(shown.note ? { note: shown.note } : {}),
+              }),
+            reject,
+          );
+        },
+        Math.max(100, timeoutMs - 2000),
+      );
+      chrome.webNavigation.onCommitted.addListener(commit);
+      chrome.webNavigation.onDOMContentLoaded.addListener(ready);
+      chrome.webNavigation.onErrorOccurred.addListener(error);
+      chrome.webNavigation.onHistoryStateUpdated.addListener(sameDocument);
+      chrome.webNavigation.onReferenceFragmentUpdated.addListener(sameDocument);
+      const navigate = reload
+        ? send({ tabId }, "Page.reload", {}, { label: "reloadReady" })
+        : referer
+          ? send({ tabId }, "Page.navigate", { url, referrer: referer }, { label: "navigateReady" })
+          : chrome.tabs.update(tabId, { url });
+      void navigate.catch((cause) => {
         clean();
-        void chrome.tabs
-          .get(tabId)
-          .then((tab) => resolve({ url: tab.url ?? url, timedOut: true }), reject);
-      },
-      Math.max(100, timeoutMs - 2000),
-    );
-    chrome.webNavigation.onCommitted.addListener(commit);
-    chrome.webNavigation.onDOMContentLoaded.addListener(ready);
-    chrome.webNavigation.onErrorOccurred.addListener(error);
-    chrome.webNavigation.onHistoryStateUpdated.addListener(sameDocument);
-    chrome.webNavigation.onReferenceFragmentUpdated.addListener(sameDocument);
-    const navigate = referer
-      ? send({ tabId }, "Page.navigate", { url, referrer: referer }, { label: "navigateReady" })
-      : chrome.tabs.update(tabId, { url });
-    void navigate.catch((cause) => {
-      clean();
-      reject(cause);
-    });
-  });
+        reject(cause);
+      });
+    },
+  );
   const interactive = await waitPageInteractive(tabId);
   return { ...navigation, timedOut: navigation.timedOut || !interactive };
 }

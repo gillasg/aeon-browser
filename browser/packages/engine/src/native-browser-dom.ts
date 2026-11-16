@@ -58,6 +58,7 @@ export function nodeState(this: HTMLElement): {
   visible: boolean;
   enabled: boolean;
   editable: boolean;
+  file: boolean;
 } {
   const box = this.getBoundingClientRect();
   const style = getComputedStyle(this);
@@ -68,10 +69,13 @@ export function nodeState(this: HTMLElement): {
       box.height > 0 &&
       style.visibility !== "hidden" &&
       style.display !== "none",
-    enabled: !this.matches(":disabled,[aria-disabled='true']") && !this.closest("[inert]"),
+    // aria-disabled is a hint the state still prints. Only a native disabled control or an
+    // inert subtree refuses the click.
+    enabled: !this.matches(":disabled") && !this.closest("[inert]"),
     editable:
       this.matches("input:not([readonly]),textarea:not([readonly]),select") ||
       this.isContentEditable,
+    file: this.matches('input[type="file"]'),
   };
 }
 

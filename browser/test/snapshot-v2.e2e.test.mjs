@@ -1,4 +1,5 @@
-// Real-Chrome check for snapshot v2: twelve named rows stay separate, and a pointer div is a clickable.
+// Real-Chrome check for snapshot v2: twelve named rows stay separate, a pointer div is a clickable,
+// and an unnamed or repeated control outside a named row carries a DOM hint.
 // Run alone, from browser/: node --test test/snapshot-v2.e2e.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -20,7 +21,7 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const run = promisify(execFile);
 
 test(
-  "bu.state names each Edit row and includes a non-semantic clickable",
+  "bu.state names each Edit row, includes a clickable, and hints an unnamed control",
   {
     skip:
       !process.env.REQUIRE_E2E &&
@@ -40,6 +41,11 @@ test(
         <main><h1>Your orders</h1>
           <table><tbody>${rows}</tbody></table>
           <div id="track" style="cursor:pointer;display:inline-block;width:140px;height:32px">Track shipment</div>
+          <button>Save</button>
+          <button><svg width="16" height="16"><use href="#icon-trash"></use></svg></button>
+          <button><img alt="" src="/icons/pencil.png"></button>
+          <table><tbody><tr><td>Order 9</td><td><button>Delete</button></td></tr></tbody></table>
+          <button data-testid="overflow-delete">Delete</button>
         </main>`);
     });
     await new Promise((done) => site.listen(0, "127.0.0.1", done));
@@ -83,6 +89,18 @@ test(
       const ids = [...out.matchAll(/\[(?:f\d+:)?e?\d+\] button "Edit"/g)].map((match) => match[0]);
       assert.equal(new Set(ids).size, 12, out);
       assert.match(out, /clickable "Track shipment"/, out);
+      assert.match(out, /hint="icon:icon-trash"/, out);
+      assert.match(out, /hint="img:pencil"/, out);
+      assert.match(out, /button "Delete" hint="data-testid:overflow-delete"/, out);
+      const lines = out.split("\n");
+      assert.ok(
+        lines.some((line) => /button "Delete"/.test(line) && !line.includes("hint=")),
+        out,
+      );
+      assert.ok(!lines.some((line) => /button "Edit"/.test(line) && line.includes("hint=")), out);
+      const save = lines.find((line) => /button "Save"/.test(line));
+      assert.ok(save && !save.includes("hint="), out);
+      assert.match(out, /row "Order 9 · Delete"/, out);
     } finally {
       chrome?.kill();
       bridge.kill();

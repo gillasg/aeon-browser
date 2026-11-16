@@ -17,6 +17,13 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
 - Hold a control with `page.hold(target, {ms})`, `bu.hold(id, {ms})` or `page.holdAt(x, y, {ms})`
   (1500 ms unless `{ms}` says otherwise, at most 15000): a hold-to-confirm button, a long-press
   menu or hold-to-record. The receipt matches a click. `help('visual')`.
+- A click takes a button and held modifiers: `page.click(target, {button, modifiers})`,
+  `page.locator(target).click({button, modifiers})`, `page.clickAt(x, y, {button, modifiers})`,
+  and the same fields on `dblclick` and `doubleClickAt`. `button` is `left` (the default),
+  `right`, `middle`, `back` or `forward`. `modifiers` is any of `alt`, `control`, `meta` and
+  `shift`, held for the move, the press and the release. A right click opens a context menu.
+  A meta-click (Command on macOS; Control there opens the menu) opens a link in a new tab, and
+  Control does that on Linux and Windows.
 - One `page` per site: `browser.openTab` on a site you already have a tab for navigates it
   (`{newTab: true}` for another tab). `browser.activeTab()` is the tab the user is on;
   `browser.tabs(query?)` lists tabs (`mine:true` only for tabs this chat or session opened). Any
@@ -52,7 +59,9 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
 - After a cell with actions the new page state prints automatically; never add blind sleeps (one right
-  after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A site
+  after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A missing
+  control is retried while the page is still changing and is `TARGET_NOT_FOUND` once the page has been
+  quiet, so do not sleep for it to appear. A site
   that says "too many attempts" or "try again later", or answers 429, is rate-limiting: stop that
   path, use another way it offers, or end the task and report when to retry; never wait it out. A cell
   returns its last expression: end with one object holding what you found, and print only what you

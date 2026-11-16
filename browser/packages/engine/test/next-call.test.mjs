@@ -170,6 +170,13 @@ test("a described failure carries its hint and its next call", () => {
   );
 });
 
+test("a file-input click names page.upload and nothing that opens the dialog", () => {
+  assert.equal(errorNextCall("FILE_INPUT"), "await page.upload(selector, files)");
+  const text = describeError("FILE_INPUT");
+  assert.match(text, /Next: await page\.upload\(selector, files\)/);
+  assert.equal(text.includes("click("), false);
+});
+
 test("a narrow code leads to its shared code's next call", () => {
   assert.equal(leadingCode("NO_OPTION: no option named Blue"), "TARGET_NOT_FOUND");
   assert.equal(

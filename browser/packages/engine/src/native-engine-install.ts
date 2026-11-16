@@ -2,6 +2,8 @@
 // module (in a test, or a page that only needs a helper) never touches `chrome`. The service
 // worker calls installEngineListeners() once, synchronously at load, as MV3 requires.
 
+import { installLastTabGuard } from "./keep-last-tab.js";
+
 const installers: Array<() => void> = [];
 let installed = false;
 
@@ -20,6 +22,12 @@ export function installEngineListeners(): void {
   if (installed) return;
   installed = true;
   const errors: unknown[] = [];
+  // Before other wrappers, so Page.close is a tab close and later debugger wrappers chain to it.
+  try {
+    installLastTabGuard();
+  } catch (error) {
+    errors.push(error);
+  }
   for (const install of installers) {
     try {
       install();
