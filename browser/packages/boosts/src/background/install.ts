@@ -207,28 +207,54 @@ export async function checkUpdates(
 }
 
 const INSTALLABLE = /\.user\.(js|css)(?:[?#]|$)/i;
-const skipOnce = new Set<string>();
+const SKIP_MS = 30_000;
+/** URLs whose raw source the person asked to see once, with the moment the pass expires. */
+const skipOnce = new Map<string, number>();
 
 /** Lets the next visit to this URL show the raw file. */
 export function showSourceOnce(url: string): void {
-  skipOnce.add(url);
+  skipOnce.set(url, Date.now() + SKIP_MS);
+}
+
+function skipRequested(url: string): boolean {
+  const until = skipOnce.get(url);
+  if (until === undefined) return false;
+  skipOnce.delete(url);
+  return Date.now() <= until;
+}
+
+function installable(details: chrome.webNavigation.WebNavigationBaseCallbackDetails): boolean {
+  if (details.frameId !== 0) return false;
+  try {
+    return INSTALLABLE.test(new URL(details.url).pathname + "#");
+  } catch {
+    return false;
+  }
+}
+
+function openInstallPage(tabId: number, url: string): void {
+  void chrome.tabs.update(tabId, {
+    url: chrome.runtime.getURL(`install.html?url=${encodeURIComponent(url)}`),
+  });
 }
 
 /** Opens the install page instead of showing raw .user.js and .user.css files. */
 export function interceptInstalls(): void {
-  chrome.webNavigation.onBeforeNavigate.addListener(
-    (details) => {
-      if (details.frameId !== 0 || !INSTALLABLE.test(new URL(details.url).pathname + "#")) return;
-      if (skipOnce.delete(details.url)) return;
-      void chrome.tabs.update(details.tabId, {
-        url: chrome.runtime.getURL(`install.html?url=${encodeURIComponent(details.url)}`),
-      });
-    },
-    {
-      url: [
-        { schemes: ["http", "https"], pathSuffix: ".user.js" },
-        { schemes: ["http", "https"], pathSuffix: ".user.css" },
-      ],
-    },
-  );
+  const filter = {
+    url: [
+      { schemes: ["http", "https"], pathSuffix: ".user.js" },
+      { schemes: ["http", "https"], pathSuffix: ".user.css" },
+    ],
+  };
+  chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+    if (!installable(details) || skipOnce.has(details.url)) return;
+    openInstallPage(details.tabId, details.url);
+  }, filter);
+  // A navigation can slip past the earlier listener (the update lost the race, or the event was
+  // missed while the service worker woke). Once it commits, the raw file is already on screen, so
+  // send the tab to the install page then. A requested one-time source view still wins.
+  chrome.webNavigation.onCommitted.addListener((details) => {
+    if (!installable(details) || skipRequested(details.url)) return;
+    openInstallPage(details.tabId, details.url);
+  }, filter);
 }
