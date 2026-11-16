@@ -118,14 +118,14 @@ export class FakeBrowser {
 
   async fetch(url, init) {
     const headers = { ...(init.headers ?? {}) };
-    if (this.cookies.size)
+    if (this.cookies.size && init.credentials !== "omit")
       headers.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
     this.calls.push({ url, method: init.method ?? "GET", headers });
     const response = await fetch(url, {
       method: init.method ?? "GET",
       headers,
       body: init.body,
-      redirect: "follow",
+      redirect: init.redirect ?? "follow",
     });
     if (this.recording) await this.record(url, init, headers, response.clone());
     for (const line of response.headers.getSetCookie()) {

@@ -1,6 +1,9 @@
+import { SECRET_HEADERS } from "../redact.js";
 import { parseJson } from "../infer/schema.js";
 import type { SecurityScheme } from "../types.js";
 import { sharedBridge, type Bridge } from "./bridge.js";
+import { followRedirects, type HopTarget, type SingleHop } from "./net-guard.js";
+import { pinnedRequest } from "./pinned-request.js";
 import type { RuntimeRequest, RuntimeResponse } from "./request.js";
 import { cookieHeader, storeSetCookies, type SessionFile } from "./session.js";
 
@@ -48,29 +51,44 @@ const PAGE_CALL = `async (req) => {
     if (!Object.keys(headers).some((key) => key.toLowerCase() === name)) headers[name] = value;
   const forbidden = /^(cookie|cookie2|host|origin|referer|user-agent|content-length|connection|accept-encoding|sec-.*|proxy-.*|te|trailer|transfer-encoding|upgrade|via|keep-alive|date|dnt|expect)$/i;
   for (const name of Object.keys(headers)) if (forbidden.test(name)) delete headers[name];
+  if (req.crossSite) {
+    const secret = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|apikey|x-auth-token|x-access-token|x-csrf-token|x-xsrf-token|csrf-token|x-amz-security-token)$|token|secret|session|password|signature|x-.*-key$/i;
+    for (const name of Object.keys(headers)) if (secret.test(name) || /^(origin|referer)$/i.test(name)) delete headers[name];
+  }
+  const credentials = req.crossSite ? 'omit' : 'include';
   const request = { url: req.url, method: req.method, headers, body: req.body };
   if (req.signer) return await (SIGNER)(request);
   if (req.via === 'xhr') return await new Promise((resolve) => {
-    const x = new XMLHttpRequest(); x.open(req.method, req.url, true); x.withCredentials = true;
+    const x = new XMLHttpRequest(); x.open(req.method, req.url, true); x.withCredentials = credentials === 'include';
     for (const [k, v] of Object.entries(headers)) { try { x.setRequestHeader(k, v); } catch {} }
     x.onload = () => resolve({ status: x.status, url: x.responseURL, headers: Object.fromEntries(x.getAllResponseHeaders().trim().split(/\\r?\\n/).filter(Boolean).map((l) => [l.slice(0, l.indexOf(':')).toLowerCase(), l.slice(l.indexOf(':') + 1).trim()])), text: x.responseText.slice(0, 8000000) });
     x.onerror = () => resolve({ status: 0, headers: {}, text: 'network error' });
     x.send(req.body ?? null);
   });
-  const response = await fetch(req.url, { method: req.method, headers, body: req.body, credentials: 'include', redirect: 'follow' });
-  return { status: response.status, url: response.url, headers: Object.fromEntries(response.headers), text: (await response.text()).slice(0, 8000000) };
+  const response = await fetch(req.url, { method: req.method, headers, body: req.body, credentials, redirect: 'manual' });
+  if (response.type === 'opaqueredirect')
+    return { status: 0, url: response.url || req.url, headers: {}, text: '', type: 'opaqueredirect' };
+  const headersOut = Object.fromEntries(response.headers);
+  const location = response.headers.get('location') || '';
+  const text = (await response.text()).slice(0, 8000000);
+  return { status: response.status, url: response.url || req.url, headers: headersOut, text, location };
 }`;
 
 /** Stands in the call expression for the borrowed sign-in headers; the browser code fills it. */
 const BORROWED = "__SITE_TO_API_BORROWED_HEADERS__";
 
-export function pageCallExpression(request: RuntimeRequest, context: CallContext): string {
+export function pageCallExpression(
+  request: RuntimeRequest,
+  context: CallContext,
+  bare = false,
+): string {
   const arg = {
     ...request,
-    auth: context.auth,
+    auth: bare ? [] : context.auth,
     via: context.via ?? "fetch",
-    signer: context.signer ? true : undefined,
-    borrowed: BORROWED,
+    signer: bare ? undefined : context.signer ? true : undefined,
+    borrowed: bare ? {} : BORROWED,
+    crossSite: bare,
   };
   const fn = PAGE_CALL.replace("(SIGNER)", `(${context.signer ?? "null"})`);
   return `(${fn})(${JSON.stringify(arg)})`;
@@ -133,14 +151,33 @@ ${borrow}await __tab.inspect(${run})`;
   }
 
   async send(request: RuntimeRequest, context: CallContext): Promise<RuntimeResponse> {
+    const raw = await followRedirects({
+      url: request.url,
+      method: request.method,
+      ...(request.body !== undefined ? { body: request.body } : {}),
+      home: context.home,
+      request: (hop) => this.pageHop(request, context, hop),
+    });
+    return finish(raw);
+  }
+
+  private async pageHop(
+    request: RuntimeRequest,
+    context: CallContext,
+    hop: HopTarget,
+  ): Promise<SingleHop> {
+    const next: RuntimeRequest = { ...request, url: hop.url, method: hop.method };
+    if (hop.crossSite) next.headers = crossSiteHeaders(next.headers);
+    if (hop.body !== undefined) next.body = hop.body;
+    else delete next.body;
     const raw = (await this.inPage(
       context.home,
-      pageCallExpression(request, context),
+      pageCallExpression(next, context, hop.crossSite),
       120_000,
-      request.url,
-    )) as Parameters<typeof finish>[0];
+      hop.crossSite ? undefined : hop.url,
+    )) as SingleHop;
     if (!raw || typeof raw.status !== "number") throw new Error("The page returned no response.");
-    return finish(raw);
+    return raw;
   }
 }
 
@@ -191,23 +228,62 @@ export class DirectTransport implements Transport {
       ...request.headers,
     };
     this.authHeaders(context, headers);
-    const cookies = this.session ? cookieHeader(this.session, request.url) : "";
-    if (cookies) headers.cookie = cookies;
-    const response = await fetch(request.url, {
+    const raw = await followRedirects({
+      url: request.url,
       method: request.method,
-      headers,
-      body: request.body,
-      redirect: "follow",
+      ...(request.body !== undefined ? { body: request.body } : {}),
+      home: context.home,
+      request: (hop) => this.oneHop(headers, hop),
     });
-    if (this.session)
-      storeSetCookies(this.session, request.url, response.headers.getSetCookie?.() ?? []);
-    return finish({
-      status: response.status,
-      url: response.url,
-      headers: Object.fromEntries(response.headers),
-      text: await response.text(),
-    });
+    return finish(raw);
   }
+
+  private async oneHop(headers: Record<string, string>, hop: HopTarget): Promise<SingleHop> {
+    const hopHeaders = hopHeadersFor(headers, hop.crossSite);
+    const cookies = this.session && !hop.crossSite ? cookieHeader(this.session, hop.url) : "";
+    if (cookies) hopHeaders.cookie = cookies;
+    const response = await pinnedRequest({
+      url: hop.url,
+      method: hop.method,
+      headers: hopHeaders,
+      ...(hop.body !== undefined ? { body: hop.body } : {}),
+      address: hop.address,
+      host: hop.host,
+      publicReach: hop.publicReach,
+    });
+    if (this.session) storeSetCookies(this.session, hop.url, response.setCookies);
+    const redirect = response.status >= 300 && response.status < 400;
+    return {
+      status: response.status,
+      url: hop.url,
+      headers: response.headers,
+      location: response.location,
+      ...(redirect ? {} : { text: response.text }),
+    };
+  }
+}
+
+function hopHeadersFor(
+  headers: Record<string, string>,
+  crossSite: boolean,
+): Record<string, string> {
+  return crossSite ? crossSiteHeaders(headers) : dropCookie(headers);
+}
+
+/** Headers that may leave the call's origin. Secrets, cookies, and origin stay behind. */
+export function crossSiteHeaders(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([name]) => {
+      const lower = name.toLowerCase();
+      return !SECRET_HEADERS.test(lower) && lower !== "origin" && lower !== "referer";
+    }),
+  );
+}
+
+function dropCookie(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([name]) => name.toLowerCase() !== "cookie"),
+  );
 }
 
 function storageValue(

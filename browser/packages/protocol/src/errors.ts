@@ -72,6 +72,10 @@ export const ERRORS = {
     "model",
     "the page is not in the state the code expected: read bu.state() and adjust",
   ],
+  REPLAY_ORIGIN: [
+    "model",
+    "the tab left the page that sent this request: open that page, then replay; the request was not sent",
+  ],
   PROTECTED_UI: [
     "user",
     "another extension's popup (usually a password manager's menu) keeps blocking this tab: ask the user to close it or finish the step (bu.handoff), then continue",

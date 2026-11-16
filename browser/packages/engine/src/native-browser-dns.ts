@@ -3,7 +3,7 @@
 // address. A preflight is only as good as this answer; rebinding after it is caught in the network
 // recorder from the response's remote address.
 import { engineConfig } from "./engine-config.js";
-import { privateAddress, privateTarget, resolvedTarget } from "./native-browser-policy.js";
+import { preflightHost, resolvedTarget } from "./native-browser-policy.js";
 
 interface Pending {
   resolve: (addresses: string[]) => void;
@@ -56,16 +56,15 @@ export function handleBrowserDnsMessage(candidate: unknown): boolean {
 export async function assertBrowserNetwork(url: string): Promise<void> {
   if (!(await engineConfig.privateNetwork())) return;
   const ports = await engineConfig.privateNetworkPorts();
-  const literal = privateTarget(url, ports);
-  if (literal) throw new Error(`PRIVATE_NETWORK: ${literal}`);
+  const decision = preflightHost(url, ports);
+  if (decision === "allow") return;
+  if (decision !== "resolve") throw new Error(`PRIVATE_NETWORK: ${decision}`);
   let host: string;
   try {
     host = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, "");
   } catch {
     throw new Error("PRIVATE_NETWORK: invalid url");
   }
-  // A literal loopback host on an allowed development port stops here; everything else resolves.
-  if (privateAddress(host) || host === "localhost") return;
   const addresses = await resolveBrowserHost(host);
   if (!addresses.length) throw new Error(`PRIVATE_NETWORK: could not resolve ${host}`);
   const resolved = resolvedTarget(host, addresses);

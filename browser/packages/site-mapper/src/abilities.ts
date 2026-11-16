@@ -3,18 +3,20 @@
 // action, workflow, skill and site-tool stores; site notes hold facts that are not callable.
 
 import { mkdir, readdir, readFile, rename } from "node:fs/promises";
+import { withResultAsserts, type AbilityAssert } from "./ability-assert.js";
 import { defaultHost } from "./ability-attempt.js";
 import { testedAbility, withTested, type AbilityTested } from "./ability-digest.js";
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { versionChangedAbility } from "./ability-versions.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
-import { abilityWrites, type AbilityWrite } from "./ability-effects.js";
+import { abilityWrites, kindFromWrites, type AbilityWrite } from "./ability-effects.js";
 import { inferAbilityInputs, type AbilityDemonstration } from "./ability-infer.js";
 import { scrubAbility, type AbilityScrub, type ScrubMark } from "./ability-scrub.js";
 import {
   contractBreaks,
   contractWarnings,
   testAbilityCases,
+  unknownInputMessage,
   unusedInputs,
   type AbilityTest,
   type AbilityTestReport,
@@ -59,7 +61,7 @@ export type AbilityVia = "api" | "steps" | "script" | "page";
 export interface AbilityWayExpect {
   /** A JSON Schema of the body. Values are never compared, only recorded fields and types. */
   shape?: Record<string, unknown>;
-  /** JSON pointer to the list the way returns. A missing list is drift; an empty one is a result. */
+  /** JSON pointer to the list the way returns. A missing list is drift. An empty one is not shape drift. */
   list?: string;
 }
 
@@ -109,6 +111,8 @@ export interface AbilityWaySteps {
   name?: string;
   params?: Record<string, unknown>;
   steps?: unknown[];
+  /** Write abilities: index of the step that applies the change (default: the last). */
+  commit?: number;
   /** A literal secret was removed from this way when it was saved. */
   redacted?: true;
 }
@@ -147,6 +151,8 @@ export interface AbilityOptions {
   dryRun?: boolean;
   /** Rules a read's rows must satisfy when the caller passed the input. */
   checks?: AbilityCheck[];
+  /** Result checks derived at save. An empty list or null where the saved answer had data fails the way. */
+  asserts?: AbilityAssert[];
   /** Write abilities: a read run afterwards to confirm the change. */
   readBack?: ReadBack;
   /** Old fields with no dedicated home live here (write receipts, render, thread, derive…). */
@@ -350,15 +356,18 @@ export async function saveAbility(
     existing,
     scrub,
   } = await prepareSave(ability, options);
-  const drafted = withSample(
-    {
-      ...prepared,
-      name,
-      site,
-      stats: liveWayStats(prepared.stats ?? { runs: 0, failures: 0 }, prepared.ways),
-      createdAt: prepared.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
+  const drafted = withResultAsserts(
+    withSample(
+      {
+        ...prepared,
+        name,
+        site,
+        stats: liveWayStats(prepared.stats ?? { runs: 0, failures: 0 }, prepared.ways),
+        createdAt: prepared.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      options.sample,
+    ),
     options.sample,
   );
   const tests = await proveOnSave(drafted, existing, options);
@@ -404,7 +413,14 @@ async function prepareSave(ability: Ability, options: SaveAbilityOptions): Promi
   const existing = await readAbilityFile(path);
   if (existing && options.replace === false)
     throw new Error(`ABILITY_EXISTS: ${site} already has ${name}`);
-  if (options.check !== false) checkContract(prepared, existing, options);
+  // Classify after the contract check. A caller who says "read" over a stored read, while the
+  // way posts, is saved as a write — that is not the "read became a write" refusal, which still
+  // applies when the caller themselves changes a stored read's kind to write. A stats save
+  // (check: false) keeps the kind it was given.
+  if (options.check !== false) {
+    checkContract(prepared, existing, options);
+    prepared.kind = kindFromWrites(prepared);
+  }
   return { ability: prepared, site, name, path, existing, scrub };
 }
 
@@ -562,6 +578,8 @@ export async function runAbility(
 ): Promise<AbilityRunResult> {
   const ability = withBuiltinWay(await readAbility(site, name), inputs);
   if (!ability) throw new Error(`ABILITY_UNKNOWN: ${siteName(site)} has no ability ${name}`);
+  const unknown = unknownInputMessage(ability, inputs);
+  if (unknown) throw new Error(unknown);
   const host = options.host ?? defaultHost(site);
   const blocked = await preconditionError(ability, host);
   if (blocked) throw new Error(blocked);

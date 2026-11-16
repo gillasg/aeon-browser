@@ -32,6 +32,7 @@ export async function proveSave(
   existing: Ability | undefined,
   run: (ability: Ability, inputs: Record<string, unknown>) => Promise<ProbeResult>,
 ): Promise<AbilityTestReport | undefined> {
+  // Kind is already classified, so a read that contained an explicit write is not probed.
   if (candidate.kind === "write") return undefined;
   const tests = candidate.tests ?? [];
   if (!tests.length) return undefined;

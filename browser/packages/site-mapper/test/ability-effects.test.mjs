@@ -92,6 +92,67 @@ test("writes are listed with explicit and suspected kinds, per way", async () =>
   });
 });
 
+test("a read that sends a non-GET is saved as a write; a suspected step stays a note", async () => {
+  await withHome(async () => {
+    const looked = await saveAbility(base());
+    assert.equal(looked.ability.kind, "read");
+    assert.equal(looked.ability.writes, undefined);
+
+    const posted = await saveAbility(
+      base({ name: "sign in", kind: "read", ways: [{ kind: "api", operation: "login" }] }),
+    );
+    assert.equal(posted.ability.kind, "write");
+    assert.equal(posted.ability.writes[0].kind, "explicit");
+    assert.equal(posted.ability.writes[0].method, "POST");
+
+    // Replacing a stored read is classified, not refused: the caller still said "read".
+    const stored = await saveAbility(base({ name: "find" }));
+    assert.equal(stored.ability.kind, "read");
+    const widened = await saveAbility(
+      base({ name: "find", kind: "read", ways: [{ kind: "api", operation: "login" }] }),
+    );
+    assert.equal(widened.ability.kind, "write");
+
+    // The caller changing a stored read's kind to write is still a contract break.
+    await saveAbility(base({ name: "browse" }));
+    await assert.rejects(
+      saveAbility(
+        base({ name: "browse", kind: "write", ways: [{ kind: "api", operation: "search" }] }),
+      ),
+      /read became a write/,
+    );
+
+    // A stats save keeps the kind it was given and does not inventory.
+    const held = await saveAbility(
+      base({ name: "sign in later", kind: "read", ways: [{ kind: "api", operation: "login" }] }),
+      { check: false },
+    );
+    assert.equal(held.ability.kind, "read");
+    assert.equal(held.ability.writes, undefined);
+
+    const noted = await saveAbility(
+      base({
+        name: "leave",
+        kind: "read",
+        ways: [
+          {
+            kind: "steps",
+            steps: [
+              {
+                kind: "click",
+                target: { role: "button", name: "Sign out" },
+                expectRequest: { method: "GET", path: "/logout" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    assert.equal(noted.ability.kind, "read");
+    assert.equal(noted.ability.writes[0].kind, "suspected");
+  });
+});
+
 test("a write ability's commit operation is explicit from the site model", async () => {
   await withHome(async () => {
     const saved = await saveAbility(

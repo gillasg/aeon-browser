@@ -143,12 +143,15 @@ test("a write that may have applied stops, reports it, and refuses the same key"
       .catch((error) => error);
     assert.equal(failure.outcome.write_status, "may_have_applied");
     assert.equal(failure.outcome.possible_commit, true);
-    assert.equal(failure.outcome.retry, "new_key");
+    assert.equal(failure.outcome.retry, "never");
+    assert.match(failure.message, /read the site back/);
     assert.doesNotMatch(failure.message, /second way ran/, "no fallback after a possible commit");
-    await assert.rejects(
-      runAbility("example.com", "order", { item: "tea" }, { host, key: "k" }),
-      /WRITE_UNCERTAIN/,
-    );
+    const again = await runAbility("example.com", "order", { item: "tea" }, { host, key: "k" })
+      .then(() => undefined)
+      .catch((error) => error);
+    assert.match(again.message, /WRITE_UNCERTAIN/);
+    assert.match(again.message, /read the site back/);
+    assert.equal(again.outcome.retry, "never");
   });
 });
 
@@ -173,6 +176,116 @@ test("a refused write is not applied and may fall through to the next way", asyn
     const answer = await runAbility("example.com", "order", {}, { host });
     assert.equal(answer.result, "by script");
     assert.equal(answer.write.write_status, "applied");
+  });
+});
+
+test("an unanswered write stays unknown and is not retried when the page says invalid", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [
+          { kind: "api", operation: "order" },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    const error = new Error("Invalid coupon");
+    error.receipt = { requests: [{ method: "POST", url: "https://shop.example/api/order" }] };
+    const failure = await runAbility(
+      "example.com",
+      "order",
+      {},
+      {
+        host: {
+          call: async () => {
+            throw error;
+          },
+        },
+      },
+    )
+      .then(() => undefined)
+      .catch((caught) => caught);
+    assert.equal(failure.outcome.write_status, "may_have_applied");
+    assert.equal(failure.outcome.code, "outcome_unknown");
+    assert.equal(failure.outcome.retry, "never");
+    assert.equal(failure.outcome.possible_commit, true);
+    assert.doesNotMatch(failure.message, /second way ran/);
+  });
+});
+
+test("a page refusal settles not applied once every write request has answered", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [
+          { kind: "api", operation: "order" },
+          { kind: "script", runtime: "node", code: "return 'by script';" },
+        ],
+      }),
+    );
+    const error = new Error("the click returned");
+    error.receipt = {
+      requests: [{ method: "POST", url: "https://shop.example/api/order", status: 422 }],
+      dialog: "Invalid coupon",
+    };
+    const answer = await runAbility(
+      "example.com",
+      "order",
+      {},
+      {
+        host: {
+          call: async () => {
+            throw error;
+          },
+        },
+      },
+    );
+    assert.equal(answer.result, "by script");
+    assert.equal(answer.write.write_status, "applied");
+  });
+});
+
+test("a processing answer is not applied and is not retried", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [
+          { kind: "api", operation: "order" },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    const failure = await runAbility(
+      "example.com",
+      "order",
+      {},
+      {
+        host: {
+          call: async () => ({
+            ok: true,
+            receipt: {
+              processing: true,
+              requests: [{ method: "POST", url: "https://shop.example/api/order", status: 202 }],
+            },
+          }),
+        },
+      },
+    )
+      .then(() => undefined)
+      .catch((caught) => caught);
+    assert.equal(failure.outcome.code, "outcome_unknown");
+    assert.equal(failure.outcome.retry, "never");
+    assert.equal(failure.outcome.write_status, "may_have_applied");
+    assert.doesNotMatch(failure.message, /second way ran/);
   });
 });
 
@@ -343,5 +456,198 @@ test("a way the host cannot run is refused up front, never half-run", async () =
         /ABILITY_NEEDS: .*steps way \(no workflow\)/.test(error.message),
     );
     assert.equal(calls, 0, "the API way never ran without its page");
+  });
+});
+
+test("a steps write that misses its control has not committed, so the next way runs", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [
+          {
+            kind: "steps",
+            steps: [{ kind: "click", target: { role: "button", name: "Save" } }],
+          },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    let acted = 0;
+    const answer = await runAbility(
+      "example.com",
+      "order",
+      {},
+      {
+        host: {
+          controls: async () => [],
+          act: async () => {
+            acted += 1;
+            return {};
+          },
+        },
+      },
+    );
+    assert.equal(acted, 0, "the click never ran");
+    assert.equal(answer.result, "second way ran");
+    assert.equal(answer.write.write_status, "applied");
+  });
+});
+
+test("a steps write that reaches its commit does not try another way", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [
+          {
+            kind: "steps",
+            commit: 1,
+            steps: [
+              { kind: "click", target: { role: "button", name: "Open" } },
+              { kind: "click", target: { role: "button", name: "Save" } },
+            ],
+          },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    const acted = [];
+    const failure = await runAbility(
+      "example.com",
+      "order",
+      {},
+      {
+        host: {
+          controls: async () => [
+            { role: "button", name: "Open" },
+            { role: "button", name: "Save" },
+          ],
+          act: async (step) => {
+            acted.push(step.target?.name);
+            if (step.target?.name === "Save") throw new Error("request timed out");
+            return {};
+          },
+        },
+      },
+    )
+      .then(() => undefined)
+      .catch((error) => error);
+    assert.deepEqual(acted, ["Open", "Save"]);
+    assert.equal(failure.outcome.possible_commit, true);
+    assert.equal(failure.outcome.write_status, "may_have_applied");
+    assert.doesNotMatch(failure.message, /second way ran/);
+  });
+});
+
+test("a script write counts as committed only once the script starts", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [
+          { kind: "script", runtime: "page", code: "return 1;" },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    const answer = await runAbility("example.com", "order", {}, { host: {} });
+    assert.equal(answer.result, "second way ran");
+    await saveAbility(
+      ability({
+        name: "charge",
+        kind: "write",
+        inputs: {},
+        ways: [
+          { kind: "script", runtime: "node", code: "throw new Error('request timed out');" },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    const failure = await runAbility("example.com", "charge", {}, { host: {} })
+      .then(() => undefined)
+      .catch((error) => error);
+    assert.equal(failure.outcome.possible_commit, true);
+    assert.doesNotMatch(failure.message, /second way ran/);
+  });
+});
+
+test("two runs with the same key cannot both send", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [{ kind: "api", operation: "order" }],
+      }),
+    );
+    let started = 0;
+    let release = () => {};
+    const hold = new Promise((resolve) => {
+      release = resolve;
+    });
+    let entered = () => {};
+    const inside = new Promise((resolve) => {
+      entered = resolve;
+    });
+    const host = {
+      call: async () => {
+        started += 1;
+        entered();
+        await hold;
+        return { ok: true };
+      },
+    };
+    const first = runAbility("example.com", "order", {}, { host, key: "k" });
+    const second = runAbility("example.com", "order", {}, { host, key: "k" });
+    try {
+      await inside;
+      assert.equal(started, 1);
+      const blocked = await second.then(() => undefined).catch((error) => error);
+      assert.match(blocked.message, /WRITE_UNCERTAIN/);
+      assert.equal(blocked.outcome.retry, "never");
+      assert.equal(started, 1);
+    } finally {
+      release();
+    }
+    const saved = await first;
+    assert.equal(saved.write.write_status, "applied");
+    assert.equal(started, 1);
+  });
+});
+
+test("a refused write drops its in-flight key so the same key can be sent again", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "order",
+        kind: "write",
+        inputs: {},
+        ways: [{ kind: "api", operation: "order" }],
+      }),
+    );
+    let calls = 0;
+    const host = {
+      call: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("HTTP 422 invalid size");
+        return { ok: true };
+      },
+    };
+    const failure = await runAbility("example.com", "order", {}, { host, key: "k" })
+      .then(() => undefined)
+      .catch((error) => error);
+    assert.equal(failure.outcome.write_status, "not_applied");
+    assert.equal(calls, 1);
+    const again = await runAbility("example.com", "order", {}, { host, key: "k" });
+    assert.equal(again.write.write_status, "applied");
+    assert.equal(calls, 2);
   });
 });

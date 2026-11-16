@@ -5,6 +5,7 @@ import {
   withBrowserDebugger,
 } from "./native-browser-session.js";
 import { toHar, type NetworkEntry } from "./native-browser-network-format.js";
+import { replayUrlRefusal } from "./code-api-data.js";
 import { privateAddress } from "./native-browser-policy.js";
 import { listEntries, recentOf } from "./native-browser-network-list.js";
 import {
@@ -411,6 +412,14 @@ export async function networkCall(
   if (action === "learn-start") return learnStart(tabId);
   // For site API calls made from the site's page (site-to-api's page transport) only.
   if (action === "session-headers") return sessionHeadersFor(String(options.url ?? ""));
+  if (action === "guard")
+    return (
+      replayUrlRefusal(
+        String(options.id ?? "replay"),
+        String(options.url ?? ""),
+        String(options.recorded ?? ""),
+      ) ?? null
+    );
   if (action === "state") return stateOf(tabId);
   if (action === "take") {
     const recorder = recorders.get(tabId) ?? stopped.get(tabId);

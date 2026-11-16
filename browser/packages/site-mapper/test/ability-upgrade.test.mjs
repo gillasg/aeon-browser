@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { readAbility, runAbility, saveAbility } from "../dist/abilities.js";
+import { classifyFailure } from "../dist/ability-writes.js";
 import { wayId } from "../dist/ability-stats.js";
 import { siteCapabilities } from "../dist/site-capabilities.js";
 
@@ -404,4 +405,74 @@ test("capabilities list lookups and changes apart", async () => {
       ["read", "write"],
     );
   });
+});
+
+test("a write receipt overrides the error text", () => {
+  const open = classifyFailure(new Error("Invalid coupon"), true, {
+    requests: [{ method: "POST", url: "https://shop.example/api/order" }],
+  });
+  assert.equal(open.write_status, "may_have_applied");
+  assert.equal(open.code, "outcome_unknown");
+  assert.equal(open.retry, "never");
+  assert.equal(open.possible_commit, true);
+
+  const server = classifyFailure(new Error("Invalid coupon"), true, {
+    requests: [{ method: "POST", url: "https://shop.example/api/order", status: 503 }],
+  });
+  assert.equal(server.write_status, "may_have_applied");
+  assert.equal(server.retry, "never");
+
+  const refused = classifyFailure(new Error("the click returned"), true, {
+    requests: [{ method: "POST", url: "https://shop.example/api/order", status: 422 }],
+    dialog: "Invalid coupon",
+  });
+  assert.equal(refused.write_status, "not_applied");
+  assert.equal(refused.possible_commit, false);
+  assert.equal(refused.retry, "fix_input");
+
+  const processing = classifyFailure(new Error("still working"), true, {
+    processing: true,
+    requests: [{ method: "POST", url: "https://shop.example/api/order", status: 202 }],
+  });
+  assert.equal(processing.code, "outcome_unknown");
+  assert.equal(processing.retry, "never");
+  assert.equal(processing.write_status, "may_have_applied");
+
+  const reading = classifyFailure(new Error("Invalid coupon"), true, {
+    requests: [{ method: "GET", url: "https://shop.example/api/search" }],
+  });
+  assert.equal(reading.write_status, "not_applied");
+
+  const saved = classifyFailure(new Error("saved"), true, {
+    requests: [{ method: "POST", url: "https://shop.example/api/order", status: 201 }],
+    dialog: "Saved. You can't change this order.",
+  });
+  assert.equal(saved.write_status, "may_have_applied");
+  assert.equal(saved.retry, "never");
+  assert.equal(saved.possible_commit, true);
+
+  const mixed = classifyFailure(new Error("saved"), true, {
+    requests: [
+      { method: "POST", url: "https://shop.example/api/order", status: 200 },
+      { method: "POST", url: "https://shop.example/api/order", status: 404 },
+    ],
+    dialog: "Saved. You can't change this order.",
+  });
+  assert.notEqual(mixed.write_status, "not_applied");
+  assert.equal(mixed.retry, "never");
+
+  const every = classifyFailure(new Error("saved"), true, {
+    requests: [
+      { method: "POST", url: "https://shop.example/api/order", status: 400 },
+      { method: "POST", url: "https://shop.example/api/order", status: 422 },
+    ],
+  });
+  assert.equal(every.write_status, "not_applied");
+  assert.equal(every.retry, "fix_input");
+
+  const timedOut = classifyFailure(new Error("request timed out"), true);
+  assert.equal(timedOut.code, "no_response");
+  assert.equal(timedOut.write_status, "may_have_applied");
+  assert.equal(timedOut.possible_commit, true);
+  assert.equal(timedOut.retry, "never");
 });

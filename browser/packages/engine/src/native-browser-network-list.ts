@@ -23,7 +23,7 @@ export function listEntries(
     .filter((entry) => since === undefined || entry.startedAt > since)
     .filter((entry) => !match || entry.url.includes(match))
     .filter((entry) => !method || entry.method === method)
-    .filter((entry) => typeof options.type !== "string" || entry.type === options.type)
+    .filter((entry) => typeof options.type !== "string" || matchesType(entry, options.type))
     .map(summarize);
 }
 
@@ -34,6 +34,26 @@ export function recentOf(entries: readonly NetworkEntry[]): string[] {
     .map(
       (entry) => entry.method + " " + pathOf(entry.url) + (entry.status ? " " + entry.status : ""),
     );
+}
+
+/** A Chrome resource type (Fetch, XHR, Document) or a MIME: json, html, image/png, image/, +json. */
+export function matchesType(entry: { type?: string; mimeType?: string }, wanted: string): boolean {
+  if (entry.type === wanted) return true;
+  return mimeMatches(mimeOf(entry.mimeType), wanted.toLowerCase());
+}
+
+function mimeOf(mime: string | undefined): string {
+  return (mime ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+function mimeMatches(mime: string, want: string): boolean {
+  if (!mime || !want) return false;
+  if (want === "json") return mime.includes("json");
+  if (want === "+json") return mime.includes("+json");
+  if (want === "html") return mime.includes("/html") || mime.endsWith("html");
+  if (want.endsWith("/")) return mime.startsWith(want);
+  if (want.includes("/")) return mime === want || mime.startsWith(`${want}+`);
+  return false;
 }
 
 function pathOf(url: string): string {

@@ -2,6 +2,7 @@
 // or a script. The runner decides the order and what a failure means; this file only attempts.
 
 import { runNodeScript } from "./ability-node.js";
+import { refuseUnsettled } from "./ability-writes.js";
 import { matchControl, type FallbackTarget } from "./step-fallbacks.js";
 import type {
   Ability,
@@ -23,9 +24,9 @@ export async function attemptWay(
   progress?: { reachedCommit: boolean },
 ): Promise<unknown> {
   if (way.kind === "api") return attemptApi(way, inputs, host, progress);
-  if (way.kind === "steps") return attemptSteps(way, inputs, host);
+  if (way.kind === "steps") return attemptSteps(way, inputs, host, progress);
   if (way.kind === "page") return attemptPage(way, inputs, host);
-  return attemptScript(ability, way, inputs, host);
+  return attemptScript(ability, way, inputs, host, progress);
 }
 
 async function attemptApi(
@@ -45,6 +46,7 @@ async function attemptApi(
   for (const [index, step] of operations.entries()) {
     if (progress && index >= commit) progress.reachedCommit = true;
     result = await callApiStep(step, way, inputs, stepResults, call, host);
+    refuseUnsettled(result, progress?.reachedCommit === true);
   }
   return result;
 }
@@ -86,9 +88,12 @@ async function attemptSteps(
   way: AbilityWaySteps,
   inputs: Record<string, unknown>,
   host: AbilityHost,
+  progress?: { reachedCommit: boolean },
 ): Promise<unknown> {
-  if (host.act && host.controls && savedSteps(way).length) return replaySaved(way, inputs, host);
+  if (host.act && host.controls && savedSteps(way).length)
+    return replaySaved(way, inputs, host, progress);
   if (!host.workflow) throw new Error("No workflow runtime is attached");
+  if (progress) progress.reachedCommit = true;
   return host.workflow({
     ...(way.name ? { name: way.name } : {}),
     ...(way.workflow ? { workflow: way.workflow } : {}),
@@ -118,18 +123,23 @@ async function replaySaved(
   way: AbilityWaySteps,
   inputs: Record<string, unknown>,
   host: AbilityHost,
+  progress?: { reachedCommit: boolean },
 ): Promise<unknown> {
   const act = host.act;
   if (!act || !host.controls) throw new Error("No step replay is attached");
+  const steps = savedSteps(way);
+  const commit = Math.min(way.commit ?? steps.length - 1, Math.max(steps.length - 1, 0));
   let last: unknown;
-  for (const step of savedSteps(way)) {
+  for (const [index, step] of steps.entries()) {
     const target = fillTarget(step.target, inputs);
     await assertCurrent(step, target, host);
+    if (progress && index >= commit) progress.reachedCommit = true;
     last = await act({
       kind: step.kind,
       ...(target ? { target } : {}),
       args: fillArgs(step.args, inputs),
     });
+    refuseUnsettled(last, progress?.reachedCommit === true);
   }
   return last;
 }
@@ -186,8 +196,14 @@ async function attemptScript(
   way: AbilityWayScript,
   inputs: Record<string, unknown>,
   host: AbilityHost,
+  progress?: { reachedCommit: boolean },
 ): Promise<unknown> {
-  if (way.runtime === "page") return runPageScript(way, inputs, host);
+  if (way.runtime === "page") {
+    if (!host.script) throw new Error("No browser is attached for a page script");
+    if (progress) progress.reachedCommit = true;
+    return runPageScript(way, inputs, host);
+  }
+  if (progress) progress.reachedCommit = true;
   return runNodeScript(
     way.code,
     inputs,

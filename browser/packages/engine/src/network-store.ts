@@ -8,6 +8,7 @@ import type { NetworkEntry } from "./native-browser-network-format.js";
 import {
   redactHarBody,
   redactHarHeaders,
+  secretHeaderValues,
   redactHarQuery,
   redactHarUrl,
 } from "./native-browser-network-format.js";
@@ -220,46 +221,51 @@ export function harGlobal(filter: StoreFilter = {}): unknown {
     log: {
       version: "1.2",
       creator: { name: "browserkit", version: "1" },
-      entries: rows.map((entry) => ({
-        startedDateTime: new Date(entry.startedAt).toISOString(),
-        time: entry.durationMs ?? 0,
-        request: {
-          method: entry.method,
-          url: raw ? entry.url : redactHarUrl(entry.url),
-          httpVersion: "HTTP/1.1",
-          headers: redactHarHeaders(entry.requestHeaders, raw),
-          queryString: redactHarQuery(entry.url, raw),
-          cookies: [],
-          headersSize: -1,
-          bodySize: entry.requestBody?.length ?? 0,
-          ...(entry.requestBody
-            ? {
-                postData: {
-                  mimeType: entry.mimeType ?? "text/plain",
-                  text: redactHarBody(entry.requestBody, raw) ?? "",
-                },
-              }
-            : {}),
-        },
-        response: {
-          status: entry.status,
-          statusText: "",
-          httpVersion: "HTTP/1.1",
-          headers: redactHarHeaders(entry.responseHeaders, raw),
-          cookies: [],
-          content: {
-            size: entry.body?.length ?? entry.size ?? 0,
-            mimeType: entry.mimeType ?? "",
-            ...(entry.body === undefined ? {} : { text: redactHarBody(entry.body, raw) ?? "" }),
+      entries: rows.map((entry) => {
+        const secrets = secretHeaderValues(entry.requestHeaders, entry.responseHeaders);
+        return {
+          startedDateTime: new Date(entry.startedAt).toISOString(),
+          time: entry.durationMs ?? 0,
+          request: {
+            method: entry.method,
+            url: raw ? entry.url : redactHarUrl(entry.url),
+            httpVersion: "HTTP/1.1",
+            headers: redactHarHeaders(entry.requestHeaders, raw),
+            queryString: redactHarQuery(entry.url, raw),
+            cookies: [],
+            headersSize: -1,
+            bodySize: entry.requestBody?.length ?? 0,
+            ...(entry.requestBody
+              ? {
+                  postData: {
+                    mimeType: entry.mimeType ?? "text/plain",
+                    text: redactHarBody(entry.requestBody, raw, secrets) ?? "",
+                  },
+                }
+              : {}),
           },
-          redirectURL: "",
-          headersSize: -1,
-          bodySize: entry.size ?? 0,
-        },
-        cache: {},
-        timings: { send: 0, wait: entry.durationMs ?? 0, receive: 0 },
-        ...(entry.tabId ? { _tabId: entry.tabId } : {}),
-      })),
+          response: {
+            status: entry.status,
+            statusText: "",
+            httpVersion: "HTTP/1.1",
+            headers: redactHarHeaders(entry.responseHeaders, raw),
+            cookies: [],
+            content: {
+              size: entry.body?.length ?? entry.size ?? 0,
+              mimeType: entry.mimeType ?? "",
+              ...(entry.body === undefined
+                ? {}
+                : { text: redactHarBody(entry.body, raw, secrets) ?? "" }),
+            },
+            redirectURL: "",
+            headersSize: -1,
+            bodySize: entry.size ?? 0,
+          },
+          cache: {},
+          timings: { send: 0, wait: entry.durationMs ?? 0, receive: 0 },
+          ...(entry.tabId ? { _tabId: entry.tabId } : {}),
+        };
+      }),
     },
   };
 }

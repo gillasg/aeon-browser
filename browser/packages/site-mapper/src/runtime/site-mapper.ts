@@ -1,5 +1,5 @@
 import { originMatches } from "../filter.js";
-import { detectChallenge, type Challenge } from "../challenge.js";
+import { type Challenge, observeExchange } from "../challenge.js";
 import { breakingChanges, responseChanges } from "../diff.js";
 import { extractEmbedded, metaTags } from "../infer/html.js";
 import { getPointer } from "../infer/schema.js";
@@ -11,9 +11,9 @@ import {
 } from "../transport-preference.js";
 import type { Operation, PageEndpoint, SecurityScheme, SiteModel } from "../types.js";
 import { BrowserNotConnected, type Bridge } from "./bridge.js";
-import { Challenged, HttpError, SignedOut, WriteThroughApi } from "./errors.js";
-import { RateLimiter, RETRYABLE, retryDelay, sleep } from "./limits.js";
-import { isDnsFailure, isFetchFailure, isNetworkRefusal, isOk, withNotes } from "./outcome.js";
+import { finishRead, WriteThroughApi } from "./errors.js";
+import { isRateLimited, RateLimiter, retryDelay, shouldRetryRead, sleep } from "./limits.js";
+import { isDnsFailure, isFetchFailure, isNetworkRefusal, isOk } from "./outcome.js";
 import {
   buildRequest,
   dependencyFor,
@@ -24,6 +24,7 @@ import {
   type RuntimeResponse,
 } from "./request.js";
 import type { SessionFile } from "./session.js";
+import { stopsRetry } from "./net-guard.js";
 import { DirectTransport, PageTransport, type CallContext, type Transport } from "./transports.js";
 import { pageExtractExpression } from "./page-extract.js";
 import { runAction, type ActionResult, type SiteAction } from "./actions.js";
@@ -76,8 +77,8 @@ const REFRESH_EVERY_MS = 10 * 60_000;
 
 /** Halves the site's pace on a 429 or a challenge page. Returns the wall when there was one. */
 function paceOnChallenge(site: string, response: RuntimeResponse): Challenge | undefined {
-  const wall = detectChallenge(response);
-  if (wall || response.status === 429) notePaceLimit(site);
+  const wall = observeExchange(site, response);
+  if (wall || isRateLimited(response)) notePaceLimit(site);
   return wall;
 }
 
@@ -294,10 +295,10 @@ export class SiteClient {
     for (let attempt = 0; ; attempt++) {
       try {
         const response = await this.limiter.run(() => transport.send(request, context));
-        if (!readOnly || !RETRYABLE.has(response.status) || attempt >= retries) return response;
+        if (!shouldRetryRead(readOnly, response, attempt, retries)) return response;
         await sleep(retryDelay(attempt, response.headers["retry-after"]));
       } catch (error) {
-        if (!readOnly || error instanceof BrowserNotConnected || attempt >= retries) throw error;
+        if (stopsRetry(readOnly, error, attempt, retries)) throw error;
         await sleep(retryDelay(attempt));
       }
     }
@@ -599,10 +600,7 @@ export class SiteClient {
     if (options?.pace !== false) await takePace(this.site);
     const response = await this.request(id, params);
     const wall = paceOnChallenge(this.site, response);
-    if (wall) throw new Challenged(id, response, wall);
-    if (response.status === 401 || response.status === 403) throw new SignedOut(id, response);
-    if (response.status >= 400 || response.status === 0) throw new HttpError(id, response);
-    return withNotes(response);
+    return finishRead(id, response, wall);
   }
 
   /** The site's saved multi-step actions (overrides.actions). */

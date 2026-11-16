@@ -115,7 +115,19 @@ export {
   type AbilityWayScript,
   type AbilityWaySteps,
 } from "./abilities.js";
-export { shapeOf, expectedShape, shapeDrift, type AnswerShape } from "./ability-shape.js";
+export {
+  shapeOf,
+  expectedShape,
+  shapeDrift,
+  unusableAnswer,
+  type AnswerShape,
+} from "./ability-shape.js";
+export {
+  deriveResultAsserts,
+  resultMismatch,
+  withResultAsserts,
+  type AbilityAssert,
+} from "./ability-assert.js";
 export {
   inferAbilityInputs,
   type AbilityDemonstration,

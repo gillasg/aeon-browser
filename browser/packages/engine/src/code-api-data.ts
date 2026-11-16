@@ -1,9 +1,133 @@
 // Data helpers for browser_code: calling a site's endpoints from inside its page, the page's
 // embedded data and metadata, clean Markdown, session export, fetching without a tab, and a
 // pool that works through many URLs in parallel tabs. Evaluated in the sandbox realm.
+import { literalLoopback, privateTarget } from "@browserkit/protocol";
+
+/** Origin of a captured URL. An opaque page and an unreadable URL are "null". */
+function originOf(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "null";
+  }
+}
+
+/** The page to open again: the one that sent the request, else the request's own origin. */
+function replayHome(requestOrigin: string | undefined, sentFrom: string | undefined): string {
+  if (sentFrom && sentFrom !== "null") return sentFrom;
+  return requestOrigin && requestOrigin !== "null" ? requestOrigin : "";
+}
+
+function sentPhrase(
+  requestOrigin: string | undefined,
+  sentFrom: string | undefined,
+  home: string,
+): string {
+  const opaque = "a page with an opaque origin (such as about:blank)";
+  if (sentFrom === "null") return `sent from ${opaque} to ${requestOrigin}`;
+  if (sentFrom && requestOrigin && sentFrom !== requestOrigin)
+    return `sent from ${sentFrom} to ${requestOrigin}`;
+  return `sent from ${home}`;
+}
+
+function replayLeft(
+  id: string,
+  requestOrigin: string | undefined,
+  sentFrom: string | undefined,
+  tab: string,
+): string {
+  const opaque = "a page with an opaque origin (such as about:blank)";
+  const home = replayHome(requestOrigin, sentFrom);
+  const here = tab === "null" ? opaque : tab;
+  const go = home ? (home.endsWith("/") ? home : `${home}/`) : "";
+  const next = go
+    ? `\nNext: await page.goto(${JSON.stringify(go)})`
+    : "\nNext: await page.network.list()";
+  const where = home ? `go ${home} first` : "open the page that sent it first";
+  const from = sentPhrase(requestOrigin, sentFrom, home || "an unknown page");
+  return `REPLAY_ORIGIN: ${id} was ${from}, the tab is on ${here}; ${where}${next}`;
+}
+
+/**
+ * Why page.replay must not send, or undefined when this tab can.
+ * Allowed: the tab is on the request's origin, or still on the page that sent it.
+ * Anything else is refused before fetch. The functions are copied into the sandbox.
+ */
+export function replayOriginRefusal(
+  id: string,
+  requestUrl: string,
+  sentFromUrl: string | undefined,
+  tabOrigin: string,
+): string | undefined {
+  const requestOrigin = requestUrl ? originOf(requestUrl) : undefined;
+  const tab = tabOrigin || "null";
+  const sentFrom = sentFromUrl ? originOf(sentFromUrl) : undefined;
+  if (samePage(tab, requestOrigin)) return undefined;
+  if (sentFrom && sentFrom !== "null" && tab === sentFrom) return undefined;
+  return replayLeft(id, requestOrigin, sentFrom, tab);
+}
+
+function samePage(tab: string, requestOrigin: string | undefined): boolean {
+  return Boolean(
+    requestOrigin && requestOrigin !== "null" && tab !== "null" && tab === requestOrigin,
+  );
+}
+
+/**
+ * changes.url may only change the path and query of the recorded request. Another origin, a
+ * downgrade, or a private or mapped address is refused before fetch. Same-origin loopback
+ * (a dev site replaying itself) stays allowed.
+ */
+export function replayUrlRefusal(
+  id: string,
+  nextUrl: string,
+  recordedUrl: string,
+): string | undefined {
+  let next: URL;
+  let recorded: URL;
+  try {
+    next = new URL(nextUrl);
+    recorded = new URL(recordedUrl);
+  } catch {
+    return `REPLAY_ORIGIN: ${id} has a URL that is not an address; the request was not sent`;
+  }
+  if (next.origin === recorded.origin && literalLoopback(next.hostname)) return undefined;
+  const blocked = privateTarget(next.href);
+  if (!blocked && next.origin === recorded.origin) return undefined;
+  const why = blocked ?? `another origin ${next.origin}`;
+  const home = `${recorded.origin}/`;
+  return (
+    `REPLAY_ORIGIN: ${id} would leave ${recorded.origin} for ${next.href} (${why}); the request was not sent` +
+    `\nNext: await page.goto(${JSON.stringify(home)})`
+  );
+}
+
+/** Browser-owned headers are always dropped. Secret headers are dropped once the hop leaves the origin. */
+export function replayHeaders(
+  headers: Record<string, string>,
+  crossSite: boolean,
+): Record<string, string> {
+  const browser =
+    /^(?::|host$|connection$|content-length$|cookie$|origin$|referer$|accept-encoding$|keep-alive$|transfer-encoding$|te$|upgrade$|via$|proxy-|sec-|priority$)/i;
+  const secret =
+    /^(authorization|proxy-authorization|x-api-key|api-key|apikey|x-auth-token|x-access-token|x-csrf-token|x-xsrf-token|csrf-token)$|token|secret|session|password|signature/i;
+  const kept: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (browser.test(name)) continue;
+    if (crossSite && secret.test(name)) continue;
+    kept[name] = value;
+  }
+  return kept;
+}
+
 export const browserDataApi = `
-// Headers the browser sets itself; a replayed request must not carry the recorded copies.
-var __replayDropped = /^(:|host$|connection$|content-length$|cookie$|origin$|referer$|accept-encoding$|keep-alive$|transfer-encoding$|te$|upgrade$|via$|proxy-|sec-|priority$)/i;
+${originOf.toString()}
+${replayHome.toString()}
+${sentPhrase.toString()}
+${replayLeft.toString()}
+${samePage.toString()}
+${replayOriginRefusal.toString()}
+${replayHeaders.toString()}
 
 function __pageRequest(request) {
   return (async () => {
@@ -18,11 +142,14 @@ function __pageRequest(request) {
     var body = request.json !== undefined ? JSON.stringify(request.json) : request.body;
     if (request.json !== undefined && !headers.has('content-type')) headers.set('content-type', 'application/json');
     var response = await fetch(request.url, {method: request.method || 'GET', headers, body,
-      credentials: request.credentials || 'include', redirect: 'follow'});
+      credentials: request.credentials || 'include', redirect: request.redirect || 'follow'});
+    if (response.type === 'opaqueredirect')
+      return {status: 0, ok: false, url: request.url, type: 'opaqueredirect', headers: {}};
     var text = await response.text();
     var result = {status: response.status, ok: response.ok, url: response.url,
       headers: Object.fromEntries(response.headers)};
     try { result.json = JSON.parse(text); } catch { result.text = text.slice(0, 2000000); }
+    if (response.type) result.type = response.type;
     return result;
   })();
 }
@@ -295,16 +422,27 @@ function __extendPageData(target, base) {
     // Re-sends a recorded request (page.network.list) from the page, with optional changes.
     replay: async (id, changes = {}) => {
       var entry = await __call({network: 'get', target, id});
-      var headers = {};
-      for (var [name, value] of Object.entries(entry.requestHeaders || {})) if (!__replayDropped.test(name)) headers[name] = value;
       var url = new URL(changes.url || entry.url);
       for (var [key, value] of Object.entries(changes.query || {})) url.searchParams.set(key, String(value));
-      var request = {url: url.href, method: changes.method || entry.method, headers: {...headers, ...(changes.headers || {})}};
+      var blocked = await __call({network: 'guard', target, id: String(id), url: url.href, recorded: entry.url});
+      if (blocked) throw Error(blocked);
+      var crossSite = new URL(entry.url).origin !== url.origin;
+      var headers = replayHeaders(entry.requestHeaders || {}, crossSite);
+      Object.assign(headers, changes.headers || {});
+      var request = {url: url.href, method: changes.method || entry.method, headers,
+        credentials: crossSite ? 'omit' : 'include', redirect: 'manual'};
       if (changes.json !== undefined) {
         // No merge with the recording: an omitted field must not be silently replayed.
         request.json = changes.json;
       } else if (changes.body !== undefined) request.body = changes.body;
-      return inspect(__pageRequest, request);
+      // Fail before fetch: a tab that has left the sending page would lose cookies or be blocked.
+      var tabOrigin = await base.inspect('location.origin');
+      var refusal = replayOriginRefusal(String(id), url.href, entry.documentURL, tabOrigin == null ? 'null' : String(tabOrigin));
+      if (refusal) throw Error(refusal);
+      var sent = await inspect(__pageRequest, request);
+      if (sent && (sent.type === 'opaqueredirect' || (sent.status >= 300 && sent.status < 400)))
+        sent.note = 'The response was a redirect and was not followed, so nothing was sent to a second URL. Next: await page.network.list() or read the page.';
+      return sent;
     },
     data: async (options = {}) => {
       if (typeof options === 'string') return __harvestRows(target, options);

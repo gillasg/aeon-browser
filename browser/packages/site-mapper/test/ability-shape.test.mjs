@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -194,5 +194,85 @@ test("a declared expectation is authoritative and is not overwritten", async () 
     );
     const stored = await readAbility("example.com", "feed");
     assert.equal(stored.stats.ways[wayId(stored.ways[0])].shape, undefined);
+  });
+});
+
+async function noHeal(root) {
+  await assert.rejects(access(join(root, "sites/example.com/heal.jsonl")));
+}
+
+test("a bot check is a block, not drift, and a second one needs a fresh browser", async () => {
+  await withHome(async (root) => {
+    const challenge = await import("../dist/challenge.js");
+    challenge.resetChallenges?.();
+    await saveAbility(base({ ways: [base().ways[0]] }));
+    const wall = {
+      title: "Just a moment...",
+      text: "Checking your browser before accessing the site",
+    };
+    const blocked = await runAbility(
+      "example.com",
+      "feed",
+      {},
+      { host: { call: async () => wall } },
+    ).then(
+      () => undefined,
+      (error) => error,
+    );
+    assert.match(blocked.message, /SITE_BLOCKED/);
+    assert.match(blocked.message, /cloudflare/);
+    assert.doesNotMatch(blocked.message, /fresh browser needed|recorded shape/);
+    const stored = await readAbility("example.com", "feed");
+    assert.equal(stored.stats.stale, undefined);
+    assert.equal(stored.stats.ways[wayId(stored.ways[0])].unverified, undefined);
+    await noHeal(root);
+
+    const ok = await runAbility(
+      "example.com",
+      "feed",
+      {},
+      {
+        host: { call: async () => ({ id: "a" }) },
+      },
+    );
+    assert.equal(ok.result.id, "a");
+
+    const again = await runAbility(
+      "example.com",
+      "feed",
+      {},
+      { host: { call: async () => wall } },
+    ).then(
+      () => undefined,
+      (error) => error,
+    );
+    assert.match(again.message, /SITE_BLOCKED/);
+    assert.match(again.message, /fresh browser needed/);
+    assert.equal((await readAbility("example.com", "feed")).stats.stale, undefined);
+    await noHeal(root);
+    challenge.resetChallenges?.();
+  });
+});
+
+test("a rate-limit body is not drift and is not healed", async () => {
+  await withHome(async (root) => {
+    await saveAbility(base({ ways: [base().ways[0]] }));
+    const failure = await runAbility(
+      "example.com",
+      "feed",
+      {},
+      {
+        host: { call: async () => ({ error: { code: 429 } }) },
+      },
+    ).then(
+      () => undefined,
+      (error) => error,
+    );
+    assert.match(failure.message, /RATE_LIMITED/);
+    assert.doesNotMatch(failure.message, /recorded shape/);
+    const stored = await readAbility("example.com", "feed");
+    assert.equal(stored.stats.stale, undefined);
+    assert.equal(stored.stats.ways[wayId(stored.ways[0])].unverified, undefined);
+    await noHeal(root);
   });
 });
