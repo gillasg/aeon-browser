@@ -7,7 +7,14 @@ export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
 export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
 // Record every tab a chat drives, for screen recorders (Aperture) that build takes; keep it.
 export const RECORD_AGENT_TABS_KEY = "aeonRecordAgentTabs";
-const FLAGS = [AGENT_IN_FRONT_KEY, HIDE_AGENT_CURSOR_KEY, RECORD_AGENT_TABS_KEY];
+/** Same key the engine reads. Off until Settings or `aeon settings` stores true. */
+export const HUMAN_LIKE_INPUT_KEY = "aeonHumanLikeInput";
+const FLAGS = [
+  AGENT_IN_FRONT_KEY,
+  HIDE_AGENT_CURSOR_KEY,
+  RECORD_AGENT_TABS_KEY,
+  HUMAN_LIKE_INPUT_KEY,
+];
 
 // The Blocked sites setting: a JSON list in page localStorage, read by the browser engine from
 // chrome.storage.local under "blocked-sites".

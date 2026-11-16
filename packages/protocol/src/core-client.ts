@@ -257,6 +257,8 @@ export const AgentSettingsSchema = z
     hideAgentCursor: z.boolean(),
     agentTabView: z.enum(["auto", "split", "thumbnails"]),
     recordAgentTabs: z.boolean().default(false),
+    /** Curved pointer and real keystrokes. Off by default so actions stay fast. */
+    humanLikeInput: z.boolean().default(false),
   })
   .strict();
 export type AgentSettings = z.infer<typeof AgentSettingsSchema>;

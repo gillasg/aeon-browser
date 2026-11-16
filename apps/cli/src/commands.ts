@@ -580,7 +580,7 @@ is not a terminal.`,
       name: "settings",
       group: "Aeon",
       summary: "the agent settings in the connected Chrome",
-      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true agentTabView=auto|split|thumbnails`,
+      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true humanLikeInput=true agentTabView=auto|split|thumbnails\n\nhumanLikeInput (Human-like mouse and typing) is off by default. Set it true for a stealth run; AEON_HUMAN_INPUT=1 does the same for a process that loads the engine.`,
       run: async (args) => settingsCommand(await host.connect(), args.positional),
     },
     {

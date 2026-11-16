@@ -2,13 +2,15 @@ import type { AeonClient } from "./client.js";
 
 // `aeon settings`: read or change Aeon's agent settings in the connected Chrome. Screen recorders
 // (Aperture) switch these on for a recording and restore them after; keep the names.
-const FLAGS = ["agentInFront", "hideAgentCursor", "recordAgentTabs"];
+const FLAGS = ["agentInFront", "hideAgentCursor", "recordAgentTabs", "humanLikeInput"];
 const VIEWS = ["auto", "split", "thumbnails"];
 
 export const settingsUsage = `  settings [get]                the agent settings in the connected Chrome
   settings set key=value ...    agentInFront=true|false hideAgentCursor=true|false
                                 recordAgentTabs=true|false
-                                agentTabView=auto|split|thumbnails`;
+                                humanLikeInput=true|false
+                                agentTabView=auto|split|thumbnails
+humanLikeInput is off by default (faster). Set it true, or AEON_HUMAN_INPUT=1, for a stealth run.`;
 
 export async function settingsCommand(client: AeonClient, rest: string[]): Promise<number> {
   const [action = "get", ...pairs] = rest;
