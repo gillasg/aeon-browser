@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildRunCard, speedText } from "../dist/run-card.js";
 import { fillRouteDraft } from "../dist/route-draft.js";
+import { PiSessionEventSchema } from "@aeon/protocol";
 
 const base = {
   chatId: "chat",
@@ -38,6 +39,31 @@ test("a card has the speed line, one learned item, fresh and get-all", () => {
   );
   assert.equal(card.wrong.routeId, "r1");
   assert.match(card.items[0].text, /1\.1 s · from memory \(was 38 s\)/);
+});
+
+// The daemon publishes the built card as a run-card event; the chat schema must carry every item
+// the builder writes.
+test("a built run card parses as the chat event the daemon publishes", () => {
+  const card = buildRunCard({
+    ...base,
+    durationMs: 1100,
+    previousMs: 38000,
+    path: "from memory",
+    fromMemory: true,
+    saveAbility: true,
+    partial: { have: 20, total: 143 },
+    learned: { abilityId: "shop.test/orders", name: "orders", site: "shop.test" },
+    routeId: "r1",
+    abilityId: "shop.test/orders",
+  });
+  assert.ok(card);
+  const event = PiSessionEventSchema.parse({ kind: "run-card", card });
+  assert.equal(event.kind, "run-card");
+  assert.deepEqual(
+    event.card.items.map(({ kind }) => kind),
+    card.items.map(({ kind }) => kind),
+  );
+  assert.equal(event.card.wrong.abilityId, "shop.test/orders");
 });
 
 test("a draft run is not labelled from memory and does not offer fresh", () => {

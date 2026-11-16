@@ -1,4 +1,18 @@
 import type { BrowserTraceAction } from "@aeon/domain";
+import type { BrowserTraceActionDto } from "@aeon/protocol";
+
+// The daemon parses these actions with the protocol DTO before a view sees them. A field this
+// projection can emit that the DTO lacks would fail that parse and drop the whole tool message,
+// so keep the two field sets equal at compile time.
+type SameFields<A, B> = [keyof A] extends [keyof B]
+  ? [keyof B] extends [keyof A]
+    ? true
+    : false
+  : false;
+type Assert<T extends true> = T;
+export type BrowserTraceActionFieldsMatchProtocol = Assert<
+  SameFields<BrowserTraceAction, BrowserTraceActionDto>
+>;
 
 // The timed actions of one browser_code call, from the steps the browser recorded: kept in the
 // tool result's details (not shown to the model) and surfaced by `aeon trace`. Screen recorders
