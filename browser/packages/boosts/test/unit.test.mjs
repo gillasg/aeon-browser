@@ -36,6 +36,7 @@ import {
   toZip,
   unifiedDiff,
 } from "../build-test/lib.mjs";
+import { startSite } from "./fixture-site.mjs";
 
 test("site rules match the URLs they should", () => {
   assert.ok(ruleMatches({ type: "domain", value: "example.com" }, "https://www.example.com/a"));
@@ -411,4 +412,23 @@ test("scripts reach only the hosts they declare", () => {
     mayConnect("https://anything.test/", "https://a.test/", undefined),
     "boosts can reach any site",
   );
+});
+
+test("the scripted model answers a CORS preflight", async () => {
+  const site = await startSite();
+  try {
+    const reply = await fetch(`${site.origin}/model/v1/chat/completions`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "chrome-extension://kcfodpkdfapojnbhkgdlpkikipneejpf",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    });
+    assert.equal(reply.status, 204);
+    assert.equal(reply.headers.get("access-control-allow-origin"), "*");
+    assert.match(reply.headers.get("access-control-allow-methods"), /POST/);
+  } finally {
+    await site.close();
+  }
 });

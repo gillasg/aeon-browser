@@ -360,6 +360,11 @@ cases.push([
     const question = await ext("author.run", { tabId, request: "make it unclear" });
     assert.equal(question.boost, undefined);
     assert.match(question.reply, /Which part/);
+    assert.equal(
+      site.state.modelCalls.length,
+      3,
+      "the local scripted model answered every request, not a network provider",
+    );
     await page.close();
   },
 ]);

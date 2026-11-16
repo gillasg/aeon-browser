@@ -24,12 +24,24 @@ const page = `<!doctype html><title>hold</title>
 <button id="hold">Hold to confirm</button>
 <script>
   const button = document.querySelector("#hold");
-  let timer = 0;
+  const seen = window.__hold = {downs: 0, ups: 0, clicks: 0, dwell: 0};
+  let timer = 0, downAt = -1;
   button.addEventListener("mousedown", () => {
+    seen.downs += 1;
+    downAt = performance.now();
     timer = setTimeout(() => { document.title = "held"; }, 1000);
   });
-  button.addEventListener("mouseup", () => clearTimeout(timer));
+  button.addEventListener("mouseup", () => {
+    seen.ups += 1;
+    clearTimeout(timer);
+    // The page's own clock decides, as a real hold-to-confirm does: a timer the runner delivers
+    // late must not turn a full-length press into a click.
+    seen.dwell = downAt < 0 ? 0 : performance.now() - downAt;
+    if (seen.dwell >= 1000) document.title = "held";
+    downAt = -1;
+  });
   button.addEventListener("click", () => {
+    seen.clicks += 1;
     if (document.title !== "held") document.title = "clicked";
   });
 </script>`;
@@ -79,12 +91,21 @@ test(
           "hold",
           `page = await browser.openTab(${JSON.stringify(url)}, { foreground: true });
            await page.hold('#hold', {ms: 1200});
-           console.log('TITLE ' + (await page.title()));`,
+           const seen = await page.evaluate(() => window.__hold);
+           console.log('TITLE ' + (await page.title()) + ' ' + JSON.stringify(seen));`,
         ],
         { env },
       );
       assert.match(result.stdout, /TITLE held/, result.stdout + result.stderr);
       assert.doesNotMatch(result.stdout, /TITLE clicked/, result.stdout + result.stderr);
+      // What a hold-to-confirm control itself sees: one press, one release, a second of dwell.
+      const seen = JSON.parse(/TITLE \S+ (\{.*\})/.exec(result.stdout)[1]);
+      assert.deepEqual(
+        [seen.downs, seen.ups, seen.clicks],
+        [1, 1, 1],
+        result.stdout + result.stderr,
+      );
+      assert.ok(seen.dwell >= 1000, `the page saw ${seen.dwell} ms of press: ${result.stdout}`);
     } finally {
       chrome?.kill();
       bridge.kill();

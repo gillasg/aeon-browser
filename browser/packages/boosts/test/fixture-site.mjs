@@ -176,16 +176,37 @@ export async function startSite() {
     },
   };
   const server = createServer(async (request, response) => {
-    const route = routes[new URL(request.url ?? "/", "http://x").pathname];
-    const [body, type = "text/html; charset=utf-8", headers = {}] = route
-      ? await route(request)
-      : ["Not found", "text/plain"];
-    response.writeHead(route ? 200 : 404, {
-      "content-type": type,
-      "access-control-allow-origin": "*",
-      ...headers,
-    });
-    response.end(body);
+    try {
+      // A cross-origin JSON post from a page (or a browser that does not let the extension's host
+      // permission skip the check) asks first. Without this the route below parses an empty body,
+      // the request is never answered, and the test sits on the fetch until its whole timeout.
+      if (request.method === "OPTIONS") {
+        response.writeHead(204, {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "GET, POST, OPTIONS",
+          "access-control-allow-headers":
+            request.headers["access-control-request-headers"] ?? "content-type",
+          "access-control-allow-private-network": "true",
+          "access-control-max-age": "600",
+        });
+        response.end();
+        return;
+      }
+      const route = routes[new URL(request.url ?? "/", "http://x").pathname];
+      const [body, type = "text/html; charset=utf-8", headers = {}] = route
+        ? await route(request)
+        : ["Not found", "text/plain"];
+      response.writeHead(route ? 200 : 404, {
+        "content-type": type,
+        "access-control-allow-origin": "*",
+        ...headers,
+      });
+      response.end(body);
+    } catch (error) {
+      // Answer a broken route instead of leaving the caller waiting for the socket to time out.
+      if (!response.headersSent) response.writeHead(500, { "content-type": "text/plain" });
+      response.end(String(error instanceof Error ? error.message : error));
+    }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = server.address().port;

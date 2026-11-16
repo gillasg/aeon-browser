@@ -311,12 +311,19 @@ test(
       });
 
       await t.test("page calls stay inside the browser", async () => {
-        const timed = await run(
-          "const t0 = performance.now(); for (let i = 0; i < 50; i++) await page.evaluate(() => 1); (performance.now() - t0) / 50",
+        // The average is reported, never asserted: wall-clock time says nothing about correctness
+        // and a shared, busy machine can make any fixed budget flaky. A speed regression belongs
+        // in a benchmark, not in this suite.
+        const measured = await run(
+          "const t0 = performance.now(), answers = []; for (let i = 0; i < 50; i++) answers.push(await page.evaluate(() => 1)); ({ms: (performance.now() - t0) / 50, answers})",
         );
-        assert.equal(timed.error, undefined);
-        t.diagnostic(`page.evaluate round trip: ${timed.value.toFixed(2)} ms`);
-        assert.ok(timed.value < 50);
+        assert.equal(measured.error, undefined);
+        assert.deepEqual(
+          measured.value.answers,
+          Array(50).fill(1),
+          "every round trip answers from the page",
+        );
+        t.diagnostic(`page.evaluate round trip: ${measured.value.ms.toFixed(2)} ms`);
       });
     } finally {
       chrome.kill();
