@@ -258,7 +258,7 @@ function __expandRead(options) {
 }
 
 // Waits for the main content to settle: the text stops growing and no new resources arrive for
-// a short while, capped at five seconds. Called only by page.read.
+// two ticks after the page has had its first 1.5s, capped at five seconds. Called only by page.read.
 function __waitRead(options) {
   var root = document.querySelector('main, [role="main"], #main, #content, .content') || document.body;
   var max = Math.max(200, Math.min(5000, Number(options.maxMs) || 5000));
@@ -272,8 +272,12 @@ function __waitRead(options) {
       if (text === lastText && resources === lastResources) stable += 1;
       else { stable = 0; lastText = text; lastResources = resources; }
       // The floor counts from the page's own load, not this call: a page that loaded long ago and
-      // is quiet returns after two quiet ticks; a fresh one still gets time to render.
-      if (stable >= 2 && performance.now() >= min) return finish(true);
+      // is quiet returns after two quiet ticks; a fresh one still gets time to render. The ticks
+      // before the floor do not count: a page in its first 1.5s can still gain its first content
+      // (a client render, a timer), and ending on a tick that ran before the floor read the page
+      // one tick too early (the flaky "Late reply" read on a loaded CI runner).
+      if (performance.now() < min) stable = 0;
+      else if (stable >= 2) return finish(true);
       if (Date.now() - started >= max) return finish(false);
       setTimeout(tick, 200);
     };
