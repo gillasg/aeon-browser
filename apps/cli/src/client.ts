@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol/version";
 import { aeonDataDirectory } from "@aeon/location";
 import WebSocket from "ws";
+import { notRunningMessage, readStartFailure } from "./start-failure.js";
 
 // One connection to the running Aeon daemon through its local Core endpoint. The daemon writes
 // the endpoint and a fresh token to core-connection.json in its data folder each time it starts.
@@ -35,9 +36,7 @@ export class AeonClient {
     try {
       state = JSON.parse(await readFile(file, "utf8")) as { endpoint: string; token: string };
     } catch {
-      throw new Error(
-        "Aeon is not running. Open Chrome with Aeon loaded (the daemon starts with it), then retry.",
-      );
+      throw new Error(notRunningMessage(await readStartFailure()));
     }
     const socket = new WebSocket(state.endpoint);
     await new Promise<void>((resolve, reject) => {

@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { ensureSocketDirectory, hostPaths, socketOwnerProblem } from "./paths.mjs";
 import { loadConfig } from "./config.mjs";
 import { createLineReader } from "./line-reader.mjs";
-import { SupervisorLog, SupervisorStatus } from "./supervisor-files.mjs";
+import { startupFailureMessage, SupervisorLog, SupervisorStatus } from "./supervisor-files.mjs";
 import { corePing } from "./health.mjs";
 import { readFrame, writeFrame } from "./frames.mjs";
 import {
@@ -165,8 +165,10 @@ class Supervisor {
       return await this.serve(child);
     } catch (error) {
       if (error instanceof StopRequested || this.stopping) return "stopped";
-      this.log.write("Daemon restarting: " + error.message);
-      this.status.setRestarting(error.reason ?? "startup-failed");
+      const message = error instanceof Error ? error.message : String(error);
+      this.log.write("Daemon restarting: " + message);
+      const reason = error && typeof error === "object" ? error.reason : undefined;
+      this.status.setRestarting(reason ?? "startup-failed", message);
       return "never-started";
     } finally {
       await this.finishSession(child);
@@ -217,6 +219,8 @@ class Supervisor {
       const result = await this.waitOrStop(lines.next(Math.max(0, deadline - Date.now())));
       if (result.kind === "line") {
         if (result.line === "AEON_DAEMON_READY") return;
+        const failed = startupFailureMessage(result.line);
+        if (failed) throw named("startup-failed", failed);
         const next = phaseOf(result.line);
         if (next) {
           phase = next;
@@ -255,7 +259,8 @@ class Supervisor {
     });
     await Promise.race([exited, this.stopPromise]);
     if (this.stopping) return "stopped";
-    this.status.setRestarting(this.exitReason ?? "daemon-exited");
+    const reason = this.exitReason ?? "daemon-exited";
+    this.status.setRestarting(reason, `The daemon exited (${reason}).`);
     return "crashed";
   }
 

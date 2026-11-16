@@ -32,5 +32,13 @@ async function loadFacts(io: DoctorIo): Promise<DoctorFacts> {
     io.loginTask(),
     io.dataDirs(),
   ]);
-  return { daemon, chromeCommandLines, modelSignedIn, loginTask, dirs };
+  const startError = io.startFailure ? await io.startFailure() : undefined;
+  return {
+    daemon,
+    chromeCommandLines,
+    modelSignedIn,
+    loginTask,
+    dirs,
+    ...(startError ? { startError } : {}),
+  };
 }

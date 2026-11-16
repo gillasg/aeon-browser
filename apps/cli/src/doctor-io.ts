@@ -7,6 +7,7 @@ import { CoreHealthResultSchema } from "@aeon/protocol";
 import { aeonDataDirectory, ensurePrivateDir, UntrustedDirError } from "@aeon/location";
 import type { DaemonHost } from "./host.js";
 import type { DataDir, HealthView } from "./doctor-checks.js";
+import { readStartFailure } from "./start-failure.js";
 
 export interface DoctorIo {
   daemon(): Promise<HealthView | undefined>;
@@ -14,6 +15,8 @@ export interface DoctorIo {
   modelSignedIn(): Promise<boolean>;
   loginTask(): Promise<boolean>;
   dataDirs(): Promise<DataDir[]>;
+  /** Optional so existing fakes stay valid. Absent means no remembered start cause. */
+  startFailure?(): Promise<string | undefined>;
 }
 
 export function liveDoctorIo(host: DaemonHost): DoctorIo {
@@ -23,6 +26,7 @@ export function liveDoctorIo(host: DaemonHost): DoctorIo {
     modelSignedIn: () => modelSignedIn(modelAuthPath()),
     loginTask: loginTaskPresent,
     dataDirs: readDataDirs,
+    startFailure: readStartFailure,
   };
 }
 

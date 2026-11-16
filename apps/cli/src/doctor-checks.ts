@@ -62,11 +62,13 @@ export interface DoctorFacts {
   modelSignedIn: boolean;
   loginTask: boolean;
   dirs: DataDir[];
+  /** Set when the daemon is down and the supervisor remembered why the last start failed. */
+  startError?: string;
 }
 
 export function doctorChecks(facts: DoctorFacts): Check[] {
   return [
-    daemonCheck(facts.daemon),
+    daemonCheck(facts.daemon, facts.startError),
     protocolCheck(facts.daemon),
     extensionCheck(facts.daemon),
     flagsCheck(facts.chromeCommandLines),
@@ -88,14 +90,19 @@ export function formatDoctor(checks: Check[], json: boolean): string {
   return checks.map(formatLine).join("");
 }
 
-function daemonCheck(report: HealthView | undefined): Check {
-  if (!report) return line("daemon", "fail", "The daemon did not answer.", OPEN_AEON);
+function daemonCheck(report: HealthView | undefined, startError?: string): Check {
+  if (!report) return line("daemon", "fail", daemonDidNotAnswer(startError), OPEN_AEON);
   return line(
     "daemon",
     "ok",
     "The daemon answered the health ping." + failureText(report),
     OPEN_AEON,
   );
+}
+
+function daemonDidNotAnswer(startError: string | undefined): string {
+  if (!startError) return "The daemon did not answer.";
+  return `The daemon did not answer. Last start failed: ${startError}`;
 }
 
 function failureText(report: HealthView): string {

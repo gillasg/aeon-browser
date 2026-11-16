@@ -8,6 +8,15 @@ import { statePath, type BridgeState } from "./paths.js";
 type Json = Record<string, unknown>;
 const cli = fileURLToPath(new URL("./cli.js", import.meta.url));
 
+/** A bridge that is already answering. A status check uses this and never starts one. */
+async function existingBridge(): Promise<BridgeState> {
+  const current = await readState();
+  if (current && (await reachable(current))) return current;
+  throw new Error(
+    "Bridge is not running. Start it with `browserkit serve`; a status check does not start one.",
+  );
+}
+
 /** Returns a running bridge, starting one in the background when none answers. */
 export async function ensureBridge(): Promise<BridgeState> {
   const current = await readState();
@@ -95,11 +104,12 @@ export class BridgeClient {
     });
   }
 
-  static async connect(): Promise<BridgeClient> {
+  static async connect(options?: { launch?: boolean }): Promise<BridgeClient> {
     // An app that runs browser code itself installs a host; its commands then never need a bridge.
     const host = cliHost();
     if (host) return new BridgeClient(undefined, host);
-    const state = await ensureBridge();
+    // launch: false reuses a live bridge. It must not supply a start for a replacement.
+    const state = options?.launch === false ? await existingBridge() : await ensureBridge();
     const socket = new WebSocket(`ws://127.0.0.1:${state.port}/client`);
     await new Promise<void>((resolve, reject) => {
       socket.once("error", reject);

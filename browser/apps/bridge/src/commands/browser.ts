@@ -86,7 +86,7 @@ async function tabs(args: Args): Promise<number> {
 }
 
 async function status(args: Args): Promise<number> {
-  const bridge = await BridgeClient.connect();
+  const bridge = await BridgeClient.connect({ launch: false });
   try {
     const reply = await bridge.request("status");
     if (has(args, "json")) out(JSON.stringify(reply));
