@@ -305,7 +305,9 @@ async function __learnFromCell() {
       var key = __key(target);
       for (var entry of entries) {
         var at = Date.parse(entry.startedDateTime);
-        var cause = __actions.filter(a => a.key === key && a.at <= at + 50 && at - a.at < 15000).pop();
+        // Only an action recorded before the request started can have sent it; a look-back would
+        // credit page-load requests that were already queued when the next action was sent.
+        var cause = __actions.filter(a => a.key === key && a.at <= at && at - a.at < 15000).pop();
         if (cause) entry._step = cause.label;
       }
       var url = (__tabs.get(key) && __tabs.get(key).url) || entries[0].request.url;
@@ -318,7 +320,6 @@ async function __learnFromCell() {
         if (__announced.has(seen)) continue;
         __announced.add(seen);
         lines.push(__learnedLine(result.site, op));
-        __siteFacts.delete(result.site);
       }
     } catch {}
   }

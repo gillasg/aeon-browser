@@ -982,6 +982,65 @@ test("a page extension adds to the page instead of replacing what it extends", a
   );
 });
 
+test("a cell announces every operation it caused, and not a request that started before the action", async () => {
+  const source = await sandboxSource();
+  const box = await realm(source);
+  const context = box.context;
+  const actionAt = Date.now();
+  vm.runInContext(
+    `__actions.length = 0;
+    __actions.push({at: ${actionAt}, key: __key(${JSON.stringify(KEY)}), label: 'click "Load lamps"'});
+    __learnTouched.clear();
+    __learnTouched.set(__key(${JSON.stringify(KEY)}), ${JSON.stringify(KEY)});`,
+    context,
+  );
+  const entry = (at, url) => ({
+    startedDateTime: new Date(at).toISOString(),
+    request: { url },
+    method: "GET",
+  });
+  const har = {
+    log: {
+      entries: [
+        entry(actionAt - 20, "https://shop.example/before"),
+        entry(actionAt + 20, "https://shop.example/after"),
+      ],
+    },
+  };
+  let learnedHar;
+  context.__call = async (request) => {
+    if (request.network === "take") return har;
+    if (request.siteMapper === "learn-live") {
+      learnedHar = request.har;
+      return {
+        site: "shop.example",
+        learned: learnedHar.log.entries.map((item, index) => ({
+          id: index === 0 ? "before" : "after",
+          role: "read",
+          related: Boolean(item._step),
+          how: "await siteMapper.call('shop.example', 'read', {})",
+          params: [],
+          varies: [],
+        })),
+      };
+    }
+    return {};
+  };
+  await vm.runInContext("__learnFromCell()", context);
+  const learned = box.logs.filter((line) => line.startsWith("Learned on "));
+  assert.deepEqual(
+    learned.map((line) => /shop\.example: ([^ ]+)/.exec(line)[1]),
+    ["after"],
+    "only the operation this cell's action caused is announced",
+  );
+  assert.equal(learnedHar.log.entries[0]._step, undefined, "the earlier request is not credited");
+  assert.equal(
+    learnedHar.log.entries[1]._step,
+    'click "Load lamps"',
+    "the caused request is credited",
+  );
+});
+
 test("partial examples are marked and counted", async () => {
   const { examples: found, skipped } = examples();
   assert.ok(skipped.length <= 3, `${skipped.length} examples are marked no-run; keep this small`);
