@@ -81,8 +81,17 @@ export function showAgentCursor(
   if (tabId !== undefined) lastPositions.set(tabId, { x: Math.round(x), y: Math.round(y) });
 }
 const lastPositions = new Map<number, { x: number; y: number }>();
+// A cursor paint is fire-and-forget. Removing the cursor bumps its tab's epoch, so a paint that
+// was already in flight cannot bring the host back after the agent's turn ended.
+const epochs = new Map<number, number>();
+function cursorEpoch(tabId: number): number {
+  return epochs.get(tabId) ?? 0;
+}
 onEngineInstall(() => {
-  chrome.tabs.onRemoved.addListener((tabId) => lastPositions.delete(tabId));
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    lastPositions.delete(tabId);
+    epochs.delete(tabId);
+  });
 });
 
 /** A caption without moving the cursor, e.g. while reading or navigating. */
@@ -139,8 +148,10 @@ export function showAgentNeeds(
 
 /** The edge glow around a tab an agent drives; dimmed while the user has control. */
 export async function showAgentGlow(tabId: number, dim = false): Promise<void> {
+  const epoch = cursorEpoch(tabId);
   if (!(await engineConfig.agentGlow().catch(() => true))) return;
   const glowColor = await engineConfig.agentGlowColor().catch(() => NEUTRAL_GLOW);
+  if (epoch !== cursorEpoch(tabId)) return;
   updateAgentCursor({ tabId }, { glow: true, glowDim: dim, glowOnly: true, glowColor });
 }
 
@@ -186,19 +197,22 @@ function updateAgentCursor(debuggee: chrome.debugger.Debuggee, update: CursorUpd
   if (recorded && !recorded.cursor) return;
   if (recorded)
     update = recorded.pill ? { ...update, glow: false } : { ...update, clean: true, glow: false };
+  const tabId = debuggee.tabId;
+  const epoch = tabId === undefined ? 0 : cursorEpoch(tabId);
   void engineConfig
     .hideAgentCursor()
     .catch(() => false)
-    .then((hidden) =>
-      hidden
+    .then((hidden) => {
+      if (tabId !== undefined && epoch !== cursorEpoch(tabId)) return undefined;
+      return hidden
         ? undefined
         : send(
             debuggee,
             "Runtime.evaluate",
             { expression: cursorExpression(update), silent: true },
             { label: "updateAgentCursor", ms: 5_000 },
-          ),
-    )
+          );
+    })
     .catch(() => undefined);
 }
 
@@ -210,6 +224,7 @@ export async function clearAgentCursors(chatId?: string): Promise<void> {
 export async function removeAgentCursor(tabId: number): Promise<void> {
   // A recording that asked for no cursor drops it. Otherwise a summoned cursor glides home.
   const drop = recording.get(tabId)?.cursor === false;
+  epochs.set(tabId, cursorEpoch(tabId) + 1);
   await Promise.resolve()
     .then(() =>
       chrome.scripting.executeScript({

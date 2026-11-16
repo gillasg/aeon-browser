@@ -61,9 +61,18 @@ test(
           env,
         },
       );
-      const idle = JSON.parse(/^IDLE (.*)$/m.exec(result.stdout)?.[1] ?? "null");
-      assert.ok(idle, result.stdout + result.stderr);
-      assert.deepEqual(idle, emptyTells(), "the driven page kept something of Aeon");
+      assert.match(result.stdout, /\[ok\] click changed/, result.stdout + result.stderr);
+      // The run ends when its executor goes away (the daemon closing a run, or the CLI's bridge
+      // stopping): the engine releases the session and its cursors by itself. Nothing in the test
+      // touches the page's DOM.
+      bridge.kill();
+      const idlePage = await attachPage(port, url);
+      const idleTells = await waitFor(async () => {
+        const tells = await tellOn(idlePage);
+        if (tells.overlays.length || tells.markers.length) throw new Error("cursor still there");
+        return tells;
+      }, 8000);
+      assert.deepEqual(idleTells, emptyTells(), "the driven page kept something of Aeon");
 
       // The cursor is an injected function, not a page listener: a page cannot paint it by
       // dispatching the old event, and the script leaves no listener or global behind.
@@ -111,10 +120,7 @@ test(
 function repl(url) {
   return `page = await browser.openTab(${JSON.stringify(url)});
     await page.click('text=Go');
-    await page.waitForTimeout(500);
-    await page.evaluate(() => document.getElementById("aeon-agent-cursor")?.remove());
-    await page.waitForTimeout(1600);
-    console.log("IDLE " + JSON.stringify(await page.evaluate(${tellsFn})));`;
+    await page.waitForTimeout(500);`;
 }
 
 const globalsOnly = `Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit|browserkit-)/.test(name))`;
