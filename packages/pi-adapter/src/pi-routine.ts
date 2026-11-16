@@ -31,7 +31,15 @@ export function createPiRoutineSupport(
   manager: SessionManager,
   chatId: ChatId,
 ): PiRoutinePort {
-  return new PiRoutineTracker(session, manager, chatId);
+  const tracker = new PiRoutineTracker(session, manager, chatId);
+  // Own properties, like the thread port: a session handle is built by spreading this object, and
+  // a class instance's methods live on the prototype, so spreading one would silently drop them.
+  return {
+    invokeRoutine: (input) => tracker.invokeRoutine(input),
+    findRoutineRun: (runId) => tracker.findRoutineRun(runId),
+    subscribeRoutineRuns: (listener) => tracker.subscribeRoutineRuns(listener),
+    close: () => tracker.close(),
+  };
 }
 
 type PiSessionEvent = Parameters<AgentSession["subscribe"]>[0] extends (event: infer Event) => void
@@ -115,6 +123,9 @@ class PiRoutineTracker implements PiRoutinePort {
   private onSessionEvent(event: PiSessionEvent): void {
     if (event.type === "turn_start") this.startTurn();
     else if (event.type === "message_start") this.acceptRoutineEntry(event);
+    // Pi persists a custom message after notifying message_end listeners, so look again once the
+    // current stack has drained: that is the first moment the invocation entry is readable.
+    else if (event.type === "message_end") queueMicrotask(() => this.acceptRoutineEntry(event));
     else if (event.type === "turn_end") this.finishTurn();
   }
 
@@ -130,7 +141,7 @@ class PiRoutineTracker implements PiRoutinePort {
     }
   }
 
-  private acceptRoutineEntry(event: MessageStartEvent): void {
+  private acceptRoutineEntry(event: Pick<MessageStartEvent, "message">): void {
     const details = this.routineDetails(event);
     if (!details) return;
     const runId = stringProperty(details, "runId");
@@ -142,7 +153,9 @@ class PiRoutineTracker implements PiRoutinePort {
       this.assign(runId, this.activeTurnId, entry.id);
   }
 
-  private routineDetails(event: MessageStartEvent): Record<string, unknown> | undefined {
+  private routineDetails(
+    event: Pick<MessageStartEvent, "message">,
+  ): Record<string, unknown> | undefined {
     if (event.message.role !== "custom" || !isRecord(event.message.details)) return;
     return event.message.details.kind === PI_ROUTINE_INVOCATION_TYPE
       ? event.message.details

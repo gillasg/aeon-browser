@@ -1,5 +1,31 @@
 // The browser_code page API, evaluated once in each chat's sandbox realm. Browser steps go through __call.
 import { nativeSourcePreamble } from "./native-source.js";
+
+/**
+ * The realm is a manifest sandbox page with an opaque origin, so its own fetch is CORS-bound even
+ * for a site the extension may reach. Route plain fetch through browser.fetch (the extension's
+ * host permissions), so a check or a cell reads the same URLs the agent could, and hand back a
+ * real Response.
+ */
+export const browserFetchCompat = `
+globalThis.fetch = async function (input, init) {
+  var request = input && typeof input === 'object' && typeof input.url === 'string' ? input : undefined;
+  var url = typeof input === 'string' ? input : request ? request.url : String(input);
+  var options = Object.assign({},
+    request ? {method: request.method, headers: request.headers, body: request.body} : {},
+    init || {});
+  if (options.signal) delete options.signal;
+  var answer = await browser.fetch(url, options);
+  var headers = new Headers();
+  var raw = answer.headers || {};
+  for (var name of Object.keys(raw)) headers.set(name, String(raw[name]));
+  var body = answer.text !== undefined ? answer.text : answer.json !== undefined ? JSON.stringify(answer.json) : '';
+  var status = answer.status || 200;
+  var none = status === 204 || status === 205 || status === 304;
+  return new Response(none ? null : body, {status, headers});
+};
+`;
+
 export const browserCodeApi = `
 // Chrome accepts every alert/confirm/prompt by default; this lets the agent decline or answer them.
 function __dialogShim(policy) {
@@ -143,11 +169,14 @@ var browser = Object.freeze({
     {list: async (query) => browser.tabs(query)}),
   // The tabs this chat or session opened; browser.tabs({mine:true}) answers the same list.
   myTabs: () => browser.tabs({mine:true}),
-  // This session's space: its tabs, their stable labels, and finishing or handing it over.
+  // This session's space: its tabs, their stable labels, finishing or handing it over, and the
+  // tidy-up that closes everything this chat or session opened.
   session: Object.freeze({
     spaces: async () => (await __step({op:'session', target: __hostTarget(), action:'list'})).data.spaces,
     finish: async (options = {}) => (await __step({op:'session', target: __hostTarget(), action:'finish', keep: (options.keep || []).map(String)})).data,
     claim: async () => (await __step({op:'session', target: __hostTarget(), action:'claim'})).data,
+    close: () => __call({session:'close'}),
+    reap: () => __call({session:'reap'}), // everything it opened, closed: a failed run leaves no stray tabs
   }),
   // Close any tab: this session's, the user's or another session's. A tab in Split View is
   // unsplit first.
@@ -338,11 +367,6 @@ var browser = Object.freeze({
   pool: (items, worker, options = {}) => __pool(items, worker, options),
   // Close every tab this chat/session opened (page.keep tabs stay), returning {closed, remaining}.
   reset: () => __call({tabs:'reset'}),
-  // Everything this chat or session opened, closed: a failed run leaves no stray tabs.
-  session: Object.freeze({
-    close: () => __call({session:'close'}),
-    reap: () => __call({session:'reap'}),
-  }),
   // Many pages past the cell deadline: start a job, then check it in a later cell.
   job: __job,
   // Act at an exact moment with a warmed tab, a prefilled form and retries: browser.snipe({at, url, prepare, fire, done}).
@@ -723,4 +747,5 @@ var browser = Object.freeze({
     },
   }))),
 });
+${browserFetchCompat}
 `;

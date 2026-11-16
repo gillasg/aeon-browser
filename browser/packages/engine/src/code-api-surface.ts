@@ -229,6 +229,8 @@ async function __autoAfter(target, step) {
 
 // ---------- page additions ----------
 function __extendPageSurface(target, base) {
+  var observe = base.state;
+  var summary = async () => (await __step({op:'evaluate', target, expression: '(' + __stateOf.toString() + ')()'})).data.value;
   return Object.assign(base, {
     // The rendered HTML, with scripts and styles removed by default.
     html: async (options = {}) => (await __step({op:'evaluate', target, expression: '(' + __htmlOf.toString() + ')(' + JSON.stringify({
@@ -237,8 +239,9 @@ function __extendPageSurface(target, base) {
       stripScripts: options.stripScripts !== false,
       max: Math.min(Math.max(options.max || 200000, 1000), 1000000),
     }) + ')'})).data.value,
-    // Where the page is: url, title, scroll, headings, forms and counts.
-    state: async () => (await __step({op:'evaluate', target, expression: '(' + __stateOf.toString() + ')()'})).data.value,
+    // Where the page is: url, title, scroll, headings, forms and counts. With options it is
+    // bu.state's observation ({query}, {selector}, {max}), which is what a cut page points at.
+    state: (options) => options && typeof options === 'object' && Object.keys(options).length ? observe(options) : summary(),
     // Find text on the page without reading all of it.
     find: async (text, options = {}) => (await __step({op:'evaluate', target, expression: '(' + __findIn.toString() + ')(' + JSON.stringify(String(text)) + ',' + JSON.stringify({
       max: options.max || 20,
