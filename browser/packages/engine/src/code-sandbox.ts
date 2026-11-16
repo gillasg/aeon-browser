@@ -31,6 +31,7 @@ const evaluate = (source: string): unknown => (0, eval)(source);
 const pending = new Map<string, Waiter>();
 let cellId = "";
 let sequence = 0;
+let queue: Promise<void> = Promise.resolve();
 let output = "";
 let asynchronousError: string | undefined;
 
@@ -129,7 +130,12 @@ window.addEventListener("message", (event) => {
     pending.delete(String(message.callId));
     if (typeof message.error === "string") waiter?.reject(new Error(message.error));
     else waiter?.resolve(message.value);
-  } else if (message.kind === "cell") void run(message);
+  } else if (message.kind === "cell") {
+    // One cell at a time. A cell that outlived its deadline still owns the realm until its code
+    // returns; starting the next one now would overwrite cellId and hand the old cell's late
+    // result to the new cell. The queue keeps its variables and tabs without mixing results.
+    queue = queue.then(() => run(message)).catch(() => undefined);
+  }
 });
 
 async function run(message: Record<string, unknown>): Promise<void> {

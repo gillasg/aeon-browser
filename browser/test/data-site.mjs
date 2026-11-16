@@ -57,13 +57,17 @@ const THREAD = `<!doctype html><html><head><title>Thread</title></head><body>
 </div>
 </main>
 <script>
-setTimeout(function () {
-  var article = document.createElement("article");
-  article.setAttribute("data-testid", "tweet");
-  article.setAttribute("data-id", "5");
-  article.innerHTML = '<a href="/dave/status/5">Dave</a><p>Late reply, after the content settled started.</p>';
-  document.getElementById("replies").append(article);
-}, 1500);
+// The test triggers the late reply after its quick markdown snapshot, so "markdown did not
+// wait" does not depend on how fast the machine got there; page.read waits and sees it.
+window.addLateReply = function (delay) {
+  setTimeout(function () {
+    var article = document.createElement("article");
+    article.setAttribute("data-testid", "tweet");
+    article.setAttribute("data-id", "5");
+    article.innerHTML = '<a href="/dave/status/5">Dave</a><p>Late reply, after the content settled started.</p>';
+    document.getElementById("replies").append(article);
+  }, delay || 0);
+};
 </script>
 </body></html>`;
 
