@@ -196,11 +196,13 @@ async function __recordDemonstration(target, options) {
     if (!running) throw new Error('DEMONSTRATION_STOPPED: the recorder has already stopped');
     running = false;
     await loop.catch(function () {});
-    await __isolatedEval(target, uninstall).catch(function () {});
+    // Drain before uninstalling: a click or fill made just before stop is still in the page's
+    // buffer, and uninstalling first threw it away.
     try {
       var drained = await __isolatedEval(target, drain);
       if (Array.isArray(drained)) for (var i = 0; i < drained.length; i++) append(drained[i]);
     } catch (error) {}
+    await __isolatedEval(target, uninstall).catch(function () {});
     var formatted = __demoFormat(steps, startedUrl);
     var result = { startedUrl: startedUrl, endedUrl: lastUrl, steps: steps, code: formatted.code, functionName: formatted.functionName };
     if (options.skill !== false) result.skill = __demoSkill(result);
