@@ -453,7 +453,9 @@ async function holdPressed(
     { type: "mousePressed", ...at, button: "left", clickCount: 1, buttons: 1 },
     { label: "holdAt" },
   );
-  // The hold starts once the press has been dispatched, so its measured length is at least `ms`.
+  // The page times its dwell from the mousedown it receives, so the clock starts when the press
+  // has landed. Counting from before the send made a slow renderer shorten the hold (a 1.2s hold
+  // against a 1s control released before the page had seen a second pass).
   const pressedAt = Date.now();
   let next = pressedAt + HOLD_JITTER_MIN_MS + Math.floor(Math.random() * HOLD_JITTER_SPAN_MS);
   while (Date.now() - pressedAt < ms) {
