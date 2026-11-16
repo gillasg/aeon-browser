@@ -1487,7 +1487,9 @@ test(
             "repl",
             "--session",
             "learn",
-            `page = await browser.openTab(${JSON.stringify(siteUrl + "learn")});
+            // localhost is a fresh mapped site here: earlier tests map 127.0.0.1, so their
+            // known operations would keep this cell's search from being announced as learned.
+            `page = await browser.openTab(${JSON.stringify(siteUrl.replace("127.0.0.1", "localhost") + "learn")});
             await page.waitFor(() => window.__loaded);
             await page.getByRole("button", { name: "Load lamps" }).click();`,
           ],
@@ -1615,13 +1617,10 @@ test(
         );
         assert.match(stdout, /RESULT /, stdout);
         const result = JSON.parse(/RESULT (.*)/.exec(stdout)[1]);
-        // Nothing was mapped by hand: the fixture site's API was learned while the earlier
-        // steps used it.
-        assert.deepEqual(
-          result.sites.map((site) => site.site),
-          ["127.0.0.1"],
-        );
-        assert.ok(result.sites[0].operations > 0);
+        // Nothing was mapped by hand: the fixture's APIs were learned while the earlier steps
+        // used them (the learned-lines case opens the same fixture as localhost, a fresh site).
+        assert.deepEqual(result.sites.map((site) => site.site).sort(), ["127.0.0.1", "localhost"]);
+        for (const site of result.sites) assert.ok(site.operations > 0, JSON.stringify(site));
         assert.match(result.missing, /not mapped/);
       });
 

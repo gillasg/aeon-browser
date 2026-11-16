@@ -195,6 +195,12 @@ async function attachPage(port, url, targetId) {
   });
   const page = connect(target.webSocketDebuggerUrl);
   await page.opened;
+  // A target can exist while its document is still loading; reading page attributes then races
+  // a null documentElement.
+  await waitFor(async () => {
+    if ((await evalValue(page, "document.readyState").catch(() => "")) !== "complete")
+      throw new Error("page not loaded");
+  });
   return page;
 }
 
