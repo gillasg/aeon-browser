@@ -82,6 +82,34 @@ jobs:
             sudo apt-get satisfy -y --no-install-recommends "$pkg"
           done < "$deps"
       - run: pnpm check
+      # On main the Mac session reuses these built outputs instead of rebuilding from scratch.
+      # The paths mirror the pnpm workspace build outputs; name carries the commit so the session
+      # only restores it when its own commit matches.
+      - name: Upload macOS build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'macOS' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeon-macos-build-${{ github.sha }}
+          path: |
+            apps/daemon/dist
+            apps/cli/dist
+            packages/domain/dist
+            packages/location/dist
+            packages/protocol/dist
+            packages/store/dist
+            packages/pi-adapter/dist
+            packages/ui/dist
+            browser/apps/bridge/dist
+            browser/packages/protocol/dist
+            browser/packages/credentials/dist
+            browser/packages/site-mapper/dist
+            browser/packages/crawl/dist
+            browser/packages/tools/dist
+            browser/packages/cdp/dist
+            browser/packages/engine/dist
+            apps/chrome-extension/native-dist
+          if-no-files-found: error
+          retention-days: 7
       # After the build: the canary runs the built bridge and the built extension.
       - name: Canary
         if: runner.os != 'Linux'
