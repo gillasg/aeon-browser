@@ -39,9 +39,15 @@ export async function dispatchPointer(
       transient: true,
       caption: step.action === "hover" ? "Hovering" : "Clicking",
     });
-  await mouse("mouseMoved", step.x, step.y, held);
-  if (step.action === "hover") return { hovered: true };
-  return withFocusEmulation(debuggee.tabId, () => pressPointer(step, mouse));
+  // The whole gesture, including its landing move, runs while the tab is focus-emulated.
+  // On macOS an Input.dispatchMouseEvent sent after a previous click turned focus emulation off
+  // is never answered: the browser waits for the window to be key. Keeping the move inside the
+  // same focus window as the press makes every click, hover and drag independent of tab focus.
+  return withFocusEmulation(debuggee.tabId, async () => {
+    await mouse("mouseMoved", step.x, step.y, held);
+    if (step.action === "hover") return { hovered: true };
+    return pressPointer(step, mouse);
+  });
 }
 
 function heldModifiers(step: {

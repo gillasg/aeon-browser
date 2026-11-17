@@ -176,10 +176,11 @@ await hit("DBL", () => page.locator("#box").dblclick({modifiers: ["shift"]}));
 await page.evaluate(() => { history.pushState({}, "", "#a"); history.pushState({}, "", "#b"); });
 await hit("BACK", () => page.locator("#box").click({button: "back"}));
 await hit("FORWARD", () => page.locator("#box").click({button: "forward"}));
+// A new tab is Command-click on macOS; Control-click there opens the context menu instead.
 const before = (await browser.tabs()).length;
 let stayed = true;
 try {
-  await page.locator("#link").click({modifiers: ["control"]});
+  await page.locator("#link").click({modifiers: [${JSON.stringify(process.platform === "darwin" ? "meta" : "control")}]});
   stayed = !(await page.evaluate(() => location.pathname)).endsWith("/next");
 } catch (error) { stayed = false; }
 let after = before;
