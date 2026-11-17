@@ -15,7 +15,7 @@ import WebSocket from "ws";
 
 const chromePath =
   process.env.CHROME_PATH ??
-  resolve("../.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe");
+  resolve("../.slice0-audit/chrome-for-testing-157.0.8103.78/chrome-win64/chrome.exe");
 const extension = resolve("apps/extension/build");
 const aeonCursor = resolve("../apps/chrome-extension/native-dist/cursor-page.js");
 const cli = resolve("apps/bridge/dist/cli.js");
