@@ -117,6 +117,8 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   const before = loadState(folder);
   const opts: RecordOptions = { source: before.source, ffmpeg: before.ffmpeg, log };
   const state = await stopCapture(folder, opts);
+  // The chat usually starts after the recording, so stop can name it too.
+  if (typeof args.flags?.chat === "string") state.chatId = args.flags.chat;
   const size = frameSize(folder, ffprobeBinary(opts));
   const durationMs = state.frames > 1 ? Math.round(((state.frames - 1) / state.fps) * 1000) : 0;
   const clip = {
@@ -154,7 +156,7 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
     help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>]
-       aeon record stop [--out <dir>]
+       aeon record stop [--out <dir>] [--chat <id>]
        aeon record gif|video|trace …   (the original screen recordings)
 
 start captures the real window (x11grab on Linux, avfoundation on macOS, gdigrab on
