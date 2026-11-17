@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const bundled = resolve(
   root,
-  "../.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe",
+  "../.slice0-audit/chrome-for-testing-157.0.8103.78/chrome-win64/chrome.exe",
 );
 const chrome = process.env.CHROME_PATH ?? (existsSync(bundled) ? bundled : "");
 if (!chrome) {

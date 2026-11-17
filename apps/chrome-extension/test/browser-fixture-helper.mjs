@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 // Chrome for Testing 154. The CI job sets CHROME_PATH; the fallback matches that job's layout.
 export function chromeForTestingPath() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-  const root = resolve(".slice0-audit/chrome-for-testing-154.0.8037.57");
+  const root = resolve(".slice0-audit/chrome-for-testing-157.0.8103.78");
   if (process.platform === "darwin") {
     return join(
       root,

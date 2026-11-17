@@ -15,7 +15,7 @@ import { dataRoutes } from "./data-site.mjs";
 
 const chromePath =
   process.env.CHROME_PATH ??
-  resolve("../.slice0-audit/chrome-for-testing-154.0.8037.57/chrome-win64/chrome.exe");
+  resolve("../.slice0-audit/chrome-for-testing-157.0.8103.78/chrome-win64/chrome.exe");
 const extension = resolve("apps/extension/build");
 const cli = resolve("apps/bridge/dist/cli.js");
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
