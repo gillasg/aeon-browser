@@ -15,13 +15,21 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const installScript = fileURLToPath(new URL("../install.sh", import.meta.url));
+// install.sh is a POSIX shell installer; Windows installs with install.ps1 and has no /bin/sh.
+const skipOnWindows =
+  process.platform === "win32"
+    ? "install.sh is a POSIX installer; Windows uses install.ps1"
+    : false;
 
 function sandbox(options = {}) {
   const root = mkdtempSync(join(tmpdir(), "aeon-install-sh-"));
   const home = join(root, "home");
-  const bin = join(root, "bin");
+  // install.sh's refresh_path prepends $HOME/.local/bin ahead of homebrew and /usr/local/bin.
+  // Put the fakes there so they win over a real node/git/pnpm on the CI runner: the test must not
+  // depend on what the machine running it happens to have installed.
+  const bin = join(home, ".local", "bin");
   const checkout = join(root, "checkout");
-  for (const folder of [home, bin, join(checkout, ".git")]) mkdirSync(folder, { recursive: true });
+  for (const folder of [bin, join(checkout, ".git")]) mkdirSync(folder, { recursive: true });
   writeFakes(bin);
   const env = {
     ...process.env,
@@ -98,25 +106,29 @@ function install(env) {
   });
 }
 
-test("pnpm is installed into the user prefix, not npm's root-owned global prefix", () => {
-  const box = sandbox();
-  try {
-    const result = install(box.env);
-    assert.equal(result.status, 0, result.stderr);
-    const args = readFileSync(join(box.root, "npm-args"), "utf8").trim();
-    assert.match(args, /--global/);
-    assert.match(args, /--prefix /);
-    assert.match(args, new RegExp(box.home + "/\\.local"));
-    assert.match(args, /pnpm@11\.4\.0/);
-    assert.equal(args.includes("--silent"), false);
-    assert.equal(existsSync(join(box.home, ".local", "bin", "pnpm")), true);
-    assert.equal(existsSync(join(box.root, "setup-ran")), true);
-  } finally {
-    box.cleanup();
-  }
-});
+test(
+  "pnpm is installed into the user prefix, not npm's root-owned global prefix",
+  { skip: skipOnWindows },
+  () => {
+    const box = sandbox();
+    try {
+      const result = install(box.env);
+      assert.equal(result.status, 0, result.stderr);
+      const args = readFileSync(join(box.root, "npm-args"), "utf8").trim();
+      assert.match(args, /--global/);
+      assert.match(args, /--prefix /);
+      assert.match(args, new RegExp(box.home + "/\\.local"));
+      assert.match(args, /pnpm@11\.4\.0/);
+      assert.equal(args.includes("--silent"), false);
+      assert.equal(existsSync(join(box.home, ".local", "bin", "pnpm")), true);
+      assert.equal(existsSync(join(box.root, "setup-ran")), true);
+    } finally {
+      box.cleanup();
+    }
+  },
+);
 
-test("a failed pnpm install says why and stops", () => {
+test("a failed pnpm install says why and stops", { skip: skipOnWindows }, () => {
   const box = sandbox({ env: { FAIL_NPM: "1" } });
   try {
     const result = install(box.env);
