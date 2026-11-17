@@ -79,11 +79,24 @@ type TabState = {
 };
 
 const tabs = new Map<number, TabState>();
+// A tab that has shown a bot check or challenge keeps human-like timing until it closes, even
+// though the setting stays off for speed everywhere else. The setting is a global default; this
+// set is the per-tab exception the stealth audit asked for.
+const challengeTabs = new Set<number>();
 let enabled = false;
 let generatorUsers = 0;
 
 /** chrome.storage key. Off unless this is true. Settings, `aeon settings` and browser.settings write it. */
 export const HUMAN_LIKE_INPUT_KEY = "aeonHumanLikeInput";
+
+/** A bot check or challenge was seen in this tab: switch human-like timing on for it alone. */
+export function noteChallengeSeen(tabId: number | undefined): void {
+  if (tabId !== undefined) challengeTabs.add(tabId);
+}
+
+function humanOn(tabId: number | undefined): boolean {
+  return enabled || (tabId !== undefined && challengeTabs.has(tabId));
+}
 
 function stealthEnv(): string | undefined {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
@@ -124,6 +137,10 @@ function installHumanLike(): void {
 }
 
 onEngineInstall(installHumanLike);
+onEngineInstall(() => {
+  // The per-tab exception lives only as long as the tab.
+  chrome.tabs.onRemoved?.addListener((tabId) => forgetHumanInput(tabId));
+});
 
 /**
  * The Bezier pointer (tremor, overshoot) is the recorder's visual, and nowhere else.
@@ -134,12 +151,13 @@ export function setPointerGenerator(on: boolean): void {
   if (generatorUsers < 0) generatorUsers = 0;
 }
 
-function curvedPointer(): boolean {
-  return enabled || generatorUsers > 0;
+function curvedPointer(tabId?: number): boolean {
+  return humanOn(tabId) || generatorUsers > 0;
 }
 
 export function forgetHumanInput(tabId: number): void {
   tabs.delete(tabId);
+  challengeTabs.delete(tabId);
 }
 
 function state(tabId: number): TabState {
@@ -166,7 +184,7 @@ export async function humanMouse(
   method: string,
   params: Params,
 ): Promise<Params> {
-  if (!curvedPointer() || debuggee.tabId === undefined) return params;
+  if (!curvedPointer(debuggee.tabId) || debuggee.tabId === undefined) return params;
   const tab = state(debuggee.tabId);
   let output: Params = params;
   const run = tab.queue.then(async () => {
@@ -259,7 +277,7 @@ function glide(dx: number, dy: number): Point[] {
 
 /** Space consecutive key presses like a person. */
 export async function paceKey(debuggee: chrome.debugger.Debuggee): Promise<void> {
-  if (!curvedPointer() || debuggee.tabId === undefined) return;
+  if (!curvedPointer(debuggee.tabId) || debuggee.tabId === undefined) return;
   const tab = state(debuggee.tabId);
   const gap = random(30, 110) - (Date.now() - tab.lastKeyAt);
   if (gap > 0 && tab.lastKeyAt > 0 && Date.now() - tab.lastKeyAt < 1000) await sleep(gap);
@@ -328,7 +346,7 @@ export async function humanType(
   text: string,
   options?: { keys?: boolean },
 ): Promise<void> {
-  const keys = options?.keys ?? enabled;
+  const keys = options?.keys ?? humanOn(debuggee.tabId);
   if (!keys) {
     await send(debuggee, "Input.insertText", { text }, { label: "humanType" });
     return;

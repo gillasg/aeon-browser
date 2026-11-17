@@ -86,6 +86,13 @@ export const EFFECTS = [
     errors: [],
   },
   {
+    name: "tab.humanInput",
+    call: "a bot check or challenge seen in a tab",
+    does: "turns human-like pointer and key timing on for this tab until it closes",
+    needs: ["tab"],
+    errors: [],
+  },
+  {
     name: "page.recording",
     call: "page.recordVideo(), page.recordTab()",
     does: "records the tab as a video or frames in the workspace",

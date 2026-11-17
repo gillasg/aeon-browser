@@ -14,6 +14,7 @@ import {
   type AxRef,
   sameTarget,
   targetIdentity,
+  snapshotKey,
   type ScreenshotRef,
 } from "./native-browser-common.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
@@ -352,8 +353,13 @@ export const browserObservationRefs = { refs, latestSnapshots };
 type RevalidateTarget = (request: BrowserExecutorRequest, tabId: number) => Promise<void>;
 
 /** The nodes under one observed ref, or an iframe ref's whole frame. */
-function rootScope(nodes: AxNode[], target: BrowserTargetKey, ref: string): AxNode[] {
-  const snapshotId = latestSnapshots.get(targetIdentity(target));
+function rootScope(
+  nodes: AxNode[],
+  target: BrowserTargetKey,
+  ref: string,
+  chatId: string | undefined,
+): AxNode[] {
+  const snapshotId = latestSnapshots.get(snapshotKey(chatId, target));
   const prior = snapshotId ? refs.get(snapshotId)?.get(ref) : undefined;
   if (!prior) throw new Error("STALE_REF");
   const root = nodes.find((node) => node.backendDOMNodeId === prior.backendNodeId);
@@ -424,7 +430,7 @@ async function scopeAx(
   target: BrowserTargetKey,
 ): Promise<AxNode[]> {
   const step = request.step.op === "observe" ? request.step : undefined;
-  const rooted = step?.root ? rootScope(ax, target, step.root) : ax;
+  const rooted = step?.root ? rootScope(ax, target, step.root, request.chatId) : ax;
   if (!step?.selector) return rooted;
   const ids = await withDebugger(target.tabId, (debuggee) =>
     scopedBackendIds(debuggee, step.selector ?? ""),
@@ -451,12 +457,15 @@ async function semanticResult(
   const delta = changedIds(pinKey, baseline, Boolean(step?.delta));
   rememberNodes(pinKey, baseline, Boolean(step?.pin) || Boolean(step?.delta));
   const snapshotId = crypto.randomUUID();
-  const key = targetIdentity(target);
+  const key = snapshotKey(request.chatId, target);
   for (const ref of semantic.refs.values()) ref.documentEpoch = current.documentEpoch;
   refs.set(snapshotId, semantic.refs);
   latestSnapshots.set(key, snapshotId);
   trimOldRefs(snapshotId);
-  const diff = step?.diff ? compareTree(key, current.documentEpoch, semantic.nodes) : undefined;
+  // Diffs are a property of the tab's document, not of a chat's refs.
+  const diff = step?.diff
+    ? compareTree(targetIdentity(target), current.documentEpoch, semantic.nodes)
+    : undefined;
   const url = tab.url ?? current.url;
   const hints = await loadSnapshotHints(target.tabId, {
     ax: scoped,
@@ -513,6 +522,8 @@ function viewOf(
   step:
     | {
         query?: string | undefined;
+        root?: string | undefined;
+        selector?: string | undefined;
         budget?: number | undefined;
         expand?: ("nav" | "footer" | "all")[] | undefined;
         diff?: boolean | undefined;
@@ -540,7 +551,26 @@ function viewOf(
     ...(step?.query ? { focus: step.query } : {}),
     ...(delta ? { delta } : {}),
     ...(step?.expand?.length ? { expand: step.expand } : {}),
+    ...(scopeNote(step) ? { scopeNote: scopeNote(step) } : {}),
   });
+}
+
+/** The short "what this read excluded" note for a scoped state/observe call. */
+function scopeNote(
+  step:
+    | { query?: string | undefined; root?: string | undefined; selector?: string | undefined }
+    | undefined,
+): string | undefined {
+  if (!step) return undefined;
+  if (step.selector) return `scoped to selector ${clipText(step.selector, 60)}`;
+  if (step.root) return "scoped to a subtree";
+  if (step.query) return `only lines matching ${clipText(step.query, 40)}`;
+  return undefined;
+}
+
+function clipText(value: string, max: number): string {
+  const text = `"${value.replace(/\s+/g, " ").slice(0, max)}"`;
+  return value.length > max ? `${text.slice(0, -1)}…"` : text;
 }
 
 function clickableHits(nodes: readonly BrowserSemanticNode[]): CaptureTree["clickables"] {

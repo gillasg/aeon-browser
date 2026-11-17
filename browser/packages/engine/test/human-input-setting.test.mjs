@@ -51,6 +51,28 @@ test("the setting is off by default and a stored true turns real keystrokes on",
   assert.ok(calls.filter((method) => method === "Input.dispatchKeyEvent").length >= 4);
 });
 
+test("a challenge seen in one tab turns human input on there only, until the tab closes", async () => {
+  reset();
+  await human.humanType({ tabId: 40 }, "ab");
+  assert.deepEqual(calls, ["Input.insertText"]);
+
+  reset();
+  human.noteChallengeSeen(41);
+  await human.humanType({ tabId: 41 }, "ab");
+  assert.equal(calls.includes("Input.insertText"), false);
+  assert.ok(calls.filter((method) => method === "Input.dispatchKeyEvent").length >= 4);
+
+  // The setting stays off for speed in every other tab.
+  reset();
+  await human.humanType({ tabId: 42 }, "ab");
+  assert.deepEqual(calls, ["Input.insertText"]);
+
+  human.forgetHumanInput(41);
+  reset();
+  await human.humanType({ tabId: 41 }, "ab");
+  assert.deepEqual(calls, ["Input.insertText"]);
+});
+
 test("prints the time cost of a move and a short type with human-like input on and off", async () => {
   const move = async (tabId, on) => {
     reset();

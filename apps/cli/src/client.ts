@@ -29,6 +29,25 @@ export function dataDirectory(): string {
   return aeonDataDirectory();
 }
 
+/**
+ * A daemon that was just updated closes an old client with `UPDATE_REQUIRED:<version>`. Say what
+ * the gap is and the exact step to reconnect, instead of leaving the user at a bare close code.
+ */
+export function connectionCloseMessage(code: number, reason: string): string {
+  const daemon = /^UPDATE_REQUIRED:(\d+\.\d+)/.exec(reason)?.[1];
+  if (daemon && code === 1008)
+    return (
+      `This Aeon command speaks protocol ${SUPPORTED_PROTOCOL_VERSION.major}.${SUPPORTED_PROTOCOL_VERSION.minor}; the running daemon speaks ${daemon}. ` +
+      "Update Aeon so the command, the daemon and the extension are the same build, then reload the extension in chrome://extensions and retry the command."
+    );
+  if (reason === "UPDATE_REQUIRED")
+    return (
+      `This Aeon command does not match the running daemon. ` +
+      "Update Aeon so the command, the daemon and the extension are the same build, then reload the extension in chrome://extensions and retry the command."
+    );
+  return `Aeon closed the connection (${code} ${reason}).`;
+}
+
 export class AeonClient {
   private readonly waiting = new Map<string, (message: Json) => void>();
   private readonly attentionListeners = new Set<(chats: AttentionChat[]) => void>();
@@ -66,7 +85,7 @@ export class AeonClient {
       });
       socket.once("close", (code, reason) => {
         clearTimeout(timer);
-        reject(new Error(`Aeon closed the connection (${code} ${String(reason)}).`));
+        reject(new Error(connectionCloseMessage(code, String(reason))));
       });
     });
     socket.send(

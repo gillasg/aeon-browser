@@ -165,6 +165,8 @@ async function __waitOutChallenge(target) {
 // After openTab or goto: wait out a non-interactive check, then say what is still in the way.
 async function __noteChallenge(target, url) {
   var gate = await __waitOutChallenge(target);
+  // A short, self-checking interstitial counts even when __pageChallenge named nothing.
+  if (gate && gate.nonInteractive) await __call({humanInput: {target}}).catch(() => {});
   var note = await __challengeNote(target, url, 'open').catch(() => '');
   if (!note && gate && gate.nonInteractive)
     note = "challenge: bot-check (page, " + gate.evidence + "). " + __CHALLENGE_ADVICE["bot-check"];
@@ -175,6 +177,8 @@ async function __noteChallenge(target, url) {
 // A line for bu.state (and one for opening the page), once per page and kind.
 async function __challengeNote(target, url, scope = 'state') {
   var found = await __challenges(target), lines = [];
+  // A page is scoring the browser now: keep human-like timing on for this tab until it closes.
+  if (found.length) await __call({humanInput: {target}}).catch(() => {});
   for (var c of found) {
     var key = scope + '|' + __key(target) + '|' + String(url).split('#')[0] + '|' + c.kind + '|' + c.provider;
     if (__challengeSeen.has(key)) continue;

@@ -4,6 +4,7 @@ import { activeProvider } from "@browserkit/credentials";
 import { listSites, registryRoot, bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 import { has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
+import { waitForBrowser } from "./browser-wait.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
@@ -69,13 +70,14 @@ async function daemonCheck(data: string): Promise<Check> {
 
 async function browserCheck(host: DaemonHost): Promise<Check> {
   try {
-    const browsers = await (await host.connect()).settings(undefined);
+    const client = await host.connect();
+    const browsers = await waitForBrowser(() => client.settings(undefined));
     return {
       status: browsers.length ? "ok" : "fail",
       label: "browser connection",
       message: browsers.length
         ? `${browsers.length} browser${browsers.length === 1 ? "" : "s"} connected`
-        : "no browser connected; reload Aeon at chrome://extensions",
+        : "no browser connected yet; it reconnects after a restart, otherwise reload Aeon at chrome://extensions",
     };
   } catch (error) {
     return {

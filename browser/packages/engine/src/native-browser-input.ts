@@ -355,6 +355,7 @@ export async function prepareElement(
         browserObservationRefs.refs,
         browserObservationRefs.latestSnapshots,
         request.expectedDocumentEpoch,
+        request.chatId,
       );
       // A frame's node acts through its own session: DOM ids and Input coordinates are local to it.
       const frame = node.sessionId ? { ...debuggee, sessionId: node.sessionId } : debuggee;

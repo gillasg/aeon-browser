@@ -5,6 +5,8 @@
   together (`Promise.all` over the tabs, `browser.pool(urls, fn)`); steps in one tab queue.
   `help('parallel')`.
 - Use the site's own search, filters and sort before reading by hand.
+- Never screenshot just to check; read the page (`page.read()`, `bu.state()`). A screenshot is for
+  layout, an image or a visual problem, not to find text or confirm a step.
 - Never repeat a failing action more than twice; change strategy.
 - Big jobs: try a small sample first, report it, then scale up. Many pages or sites: `browser.sweep`
   (outcomes, checkpoint, evidence) or `browser.job` (or `crawl` for plain reads), never one long

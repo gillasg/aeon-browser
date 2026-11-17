@@ -7,6 +7,7 @@ import {
   forgetBatchStreak,
   noteBrowserCell,
   STREAK_GAP_MS,
+  WRITE_THEN_READ_NUDGE,
 } from "../dist/batch-nudge.js";
 
 // A live nudge, not a tip after the run: the third cell in a row that did one quick step (or
@@ -28,6 +29,18 @@ test("the third tiny cell in a row is nudged, and every third after", () => {
   assert.equal(nudged(3000), undefined);
   assert.equal(nudged(4000), undefined);
   assert.equal(nudged(5000), BATCH_NUDGE);
+});
+
+test("a write then a read nudges at the second cell and names the read it saves", () => {
+  forgetBatchStreak("chat-two");
+  assert.equal(noteBrowserCell("chat-two", cellBehaviour([click])), undefined);
+  const nudge = noteBrowserCell("chat-two", cellBehaviour([read]));
+  assert.equal(nudge, WRITE_THEN_READ_NUDGE);
+  assert.match(nudge, /page state prints after each cell/);
+  // Two reads or two writes are still the general three-cell streak.
+  forgetBatchStreak("chat-two-reads");
+  assert.equal(noteBrowserCell("chat-two-reads", cellBehaviour([read])), undefined);
+  assert.equal(noteBrowserCell("chat-two-reads", cellBehaviour([read])), undefined);
 });
 
 test("cells that only read count toward the run", () => {

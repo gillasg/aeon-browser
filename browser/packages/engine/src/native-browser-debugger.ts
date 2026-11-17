@@ -3,7 +3,7 @@ import { hiddenTargetError } from "./native-browser-reveal.js";
 import { showAgentCursor } from "./native-browser-cursor.js";
 import {
   BrowserActionError,
-  targetIdentity,
+  snapshotKey,
   textValue,
   type AxNode,
   type AxRef,
@@ -24,6 +24,7 @@ export async function resolveElement(
   refs: Map<string, Map<string, AxRef>>,
   latestSnapshots: Map<string, string>,
   documentEpoch?: number,
+  chatId?: string,
 ): Promise<AxRef> {
   if (!element) throw new Error("INVALID_TARGET");
   if (element.kind === "backend" || element.kind === "ref") {
@@ -34,6 +35,7 @@ export async function resolveElement(
       refs,
       latestSnapshots,
       documentEpoch,
+      chatId,
     );
     if (direct) return direct;
   }
@@ -43,8 +45,8 @@ export async function resolveElement(
   const nodes = await getAxTree(debuggee);
   if (element.kind === "backend") return resolveBackend(nodes, element, documentEpoch);
   if (element.kind === "ref") {
-    const key = targetIdentity(target);
-    if (latestSnapshots.get(key) !== element.snapshotId) throw new Error("STALE_REF");
+    if (latestSnapshots.get(snapshotKey(chatId, target)) !== element.snapshotId)
+      throw new Error("STALE_REF");
     const prior = refs.get(element.snapshotId)?.get(element.ref);
     if (!prior) throw new Error("STALE_REF");
     if (documentEpoch !== undefined && prior.documentEpoch !== documentEpoch)
@@ -78,10 +80,11 @@ async function resolveByNodeId(
   refs: Map<string, Map<string, AxRef>>,
   latestSnapshots: Map<string, string>,
   documentEpoch?: number,
+  chatId?: string,
 ): Promise<AxRef | undefined> {
   if (element.kind === "backend") return describeBackend(debuggee, element, documentEpoch);
   if (element.kind === "ref")
-    return describeRef(debuggee, element, target, refs, latestSnapshots, documentEpoch);
+    return describeRef(debuggee, element, target, refs, latestSnapshots, documentEpoch, chatId);
   return undefined;
 }
 
@@ -127,8 +130,9 @@ async function describeRef(
   refs: Map<string, Map<string, AxRef>>,
   latestSnapshots: Map<string, string>,
   documentEpoch?: number,
+  chatId?: string,
 ): Promise<AxRef | undefined> {
-  if (latestSnapshots.get(targetIdentity(target)) !== element.snapshotId)
+  if (latestSnapshots.get(snapshotKey(chatId, target)) !== element.snapshotId)
     throw new Error("STALE_REF");
   const prior = refs.get(element.snapshotId)?.get(element.ref);
   if (!prior) throw new Error("STALE_REF");

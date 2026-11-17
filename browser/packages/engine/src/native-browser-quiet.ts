@@ -1,6 +1,5 @@
 import { onEngineInstall } from "./native-engine-install.js";
 import { noteInjectedScript } from "./stealth.js";
-import { nativeSourcePreamble } from "./native-source.js";
 import { send } from "./cdp/send.js";
 import { onBrowserDebuggerAttached } from "./native-browser-session.js";
 
@@ -76,12 +75,10 @@ const ALL_TYPES = [
 // Hooks play() and mutes what is already in the document. A one-shot sweep is not enough: it runs
 // on the blank tab, then the real page calls play() after navigation.
 const MEDIA_BODY = `
-  const realPlay = HTMLMediaElement.prototype.play;
   const play = function () {
     try { this.autoplay = false; this.muted = true; this.pause(); } catch {}
     return Promise.resolve();
   };
-  __keepNative(play, realPlay);
   HTMLMediaElement.prototype.play = play;
   const quiet = () => {
     for (const media of document.querySelectorAll('video,audio')) {
@@ -98,15 +95,11 @@ const MEDIA_BODY = `
 `;
 
 const MEDIA_SCRIPT = `(() => {
-  ${nativeSourcePreamble}
   ${MEDIA_BODY}
 })();`;
 
 const QUIET_SCRIPT = `(() => {
-  ${nativeSourcePreamble}
-  const realOpen = window.open;
   const open = function () { return null; };
-  __keepNative(open, realOpen);
   window.open = open;
   ${MEDIA_BODY}
 })();`;

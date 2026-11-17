@@ -705,6 +705,40 @@ test("a truncated observation points at page.state when the budget can hold the 
   assert.match(view, /\[observation truncated; page\.state\(\{query\}\) for a focused look\]/);
 });
 
+test("a scoped observation says what it left out", () => {
+  seq = 0;
+  const ax = el("RootWebArea", "Home", [el("main", "", [el("button", "Go")])]);
+  const base = {
+    ax,
+    shown: createSemanticNodes(ax).nodes,
+    url: URL,
+    title: "Home",
+    clickables: [],
+    offscreen: [],
+    truncated: false,
+  };
+  const selectorView = renderCaptured({
+    ...base,
+    focus: "Go",
+    scopeNote: 'scoped to selector "main"',
+  });
+  assert.match(
+    selectorView,
+    /scoped to selector "main"; rest of the page left out; page\.state\(\) reads it all/,
+  );
+  const queryView = renderCaptured({
+    ...base,
+    focus: "Go",
+    scopeNote: 'only lines matching "Go"',
+  });
+  assert.match(
+    queryView,
+    /only lines matching "Go"; rest of the page left out; page\.state\(\) reads it all/,
+  );
+  // A full read has no exclusion note.
+  assert.doesNotMatch(renderCaptured(base), /rest of the page left out/);
+});
+
 test("Chrome's layout-table roles read as a table, row and cell", async () => {
   const { canonicalRole } = await import("../dist/observe/tree.js");
   assert.equal(canonicalRole("LayoutTable"), "table");

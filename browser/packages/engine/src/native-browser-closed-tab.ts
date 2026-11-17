@@ -16,8 +16,15 @@ export async function closedByAction(
   error: unknown,
 ): Promise<BrowserExecutorResult> {
   if (!closingSteps.has(step.op) || !("target" in step)) throw error;
-  if (!/TARGET_LOST|TAB_DEAD|detached|No tab with id/i.test(String(error))) throw error;
-  if (await chrome.tabs.get(step.target.tabId).then(Boolean, () => false)) throw error;
+  // A renderer destroyed by window.close() mid-click need not answer Input.dispatchMouseEvent at
+  // all, so CDP reports TAB_UNRESPONSIVE after the input limit instead of a detach. The tab-gone
+  // check below is what makes that safe to call a self-close, whatever the transport called it.
+  const lateInput =
+    /TAB_UNRESPONSIVE/.test(String(error)) &&
+    (error as { mayHaveLateEffects?: boolean })?.mayHaveLateEffects === true;
+  if (!lateInput && !/TARGET_LOST|TAB_DEAD|detached|No tab with id/i.test(String(error)))
+    throw error;
+  if (await tabStillOpen(step.target.tabId, lateInput)) throw error;
   const opener = tab.openerTabId;
   return {
     kind: "action",
@@ -35,6 +42,26 @@ export async function closedByAction(
   };
 }
 const closingSteps = new Set<string>(["click", "press", "fill", "paste"]);
+
+/**
+ * window.close() can destroy the renderer before the input CDP answer, and the tab can still be
+ * listed for a moment after that answer times out. Give a late input a brief window to disappear;
+ * a tab that stays open keeps its original error. Never wait on the ordinary detach path.
+ */
+async function tabStillOpen(tabId: number, lateInput: boolean): Promise<boolean> {
+  const gone = () =>
+    chrome.tabs.get(tabId).then(
+      (tab) => !tab,
+      () => true,
+    );
+  if (await gone()) return false;
+  if (!lateInput) return true;
+  for (let waited = 0; waited < 1000; waited += 100) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (await gone()) return false;
+  }
+  return true;
+}
 
 /** A write that queued behind another session's says how long, so slow steps explain themselves. */
 export function withWaitNote(result: BrowserExecutorResult, tabId: number): BrowserExecutorResult {

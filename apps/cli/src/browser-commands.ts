@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { flag, has, type Args } from "browserkit/dist/args.js";
 import { out, printJson, printRows } from "browserkit/dist/output.js";
 import type { Command } from "browserkit/dist/usage.js";
+import { waitForBrowser } from "./browser-wait.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { readJournal } from "./host.js";
@@ -15,12 +16,16 @@ const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: 
 
 async function status(host: DaemonHost, args: Args): Promise<number> {
   const client = await host.connect();
-  const browsers = await client.settings(undefined);
+  const browsers = await waitForBrowser(() => client.settings(undefined));
   if (has(args, "json")) {
     printJson({ running: true, browsers: browsers.length });
     return 0;
   }
-  out(`Aeon is running; ${browsers.length} browser(s) connected.`);
+  out(
+    browsers.length
+      ? `Aeon is running; ${browsers.length} browser(s) connected.`
+      : "Aeon is running; no browser connected yet. It reconnects on its own after a restart; if it stays this way, load Aeon in Chrome.",
+  );
   return 0;
 }
 
