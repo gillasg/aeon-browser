@@ -11,14 +11,50 @@ export interface AbilitySample {
   inputs: Record<string, unknown>;
   /** The answer, when the run recorded one. */
   result?: unknown;
+  /** What makes this sample different, e.g. "another region", "an empty listing". */
+  purpose?: string;
+}
+
+/**
+ * Records one case per differing public sample, capped at eight, each with its purpose, so an
+ * ability that works on one store, region or template is caught on another at build time. Tests
+ * passed in by the caller always win.
+ */
+export function withSamples(
+  ability: Ability,
+  sample: AbilitySample | undefined,
+  samples: readonly AbilitySample[] = [],
+): Ability {
+  if (ability.tests?.length) return ability;
+  const pool = [sample, ...samples].filter((item): item is AbilitySample => Boolean(item));
+  if (!pool.length) return ability;
+  const first = pool[0] as AbilitySample;
+  const tests: AbilityTest[] = [];
+  const seen = new Set<string>();
+  for (const item of pool.slice(0, 8)) {
+    const key = JSON.stringify(item.inputs);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const expect = stableFact(item.result);
+    if (!expect) continue;
+    // One sample keeps the old single-case shape; a varied set names why each case is kept.
+    const purpose = pool.length > 1 ? (item.purpose ?? purposeOf(item, first)) : item.purpose;
+    tests.push({ inputs: item.inputs, expect, ...(purpose ? { purpose } : {}) });
+  }
+  return tests.length ? { ...ability, tests } : ability;
+}
+
+function purposeOf(item: AbilitySample, first: AbilitySample): string | undefined {
+  if (item === first) return "the run that produced the ability";
+  const changed = Object.keys(item.inputs).filter(
+    (key) => JSON.stringify(item.inputs[key]) !== JSON.stringify(first.inputs[key]),
+  );
+  return changed.length ? `different ${changed.join(", ")}` : undefined;
 }
 
 /** Records one stable fact from the run that produced the ability, unless tests were passed in. */
 export function withSample(ability: Ability, sample: AbilitySample | undefined): Ability {
-  if (!sample || ability.tests?.length) return ability;
-  const expect = stableFact(sample.result);
-  if (!expect) return ability;
-  return { ...ability, tests: [{ inputs: sample.inputs, expect }] };
+  return withSamples(ability, sample);
 }
 
 /** The result of one probe, with the way that answered it (its checked test record). */

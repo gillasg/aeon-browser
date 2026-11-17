@@ -36,6 +36,10 @@ none set up) whether the user clicked Save in Chrome's prompt when Aeon asked. T
 answer: never log out, reopen the form or look for the login elsewhere to check it. If the user did
 not confirm Chrome's prompt, say in your answer that the login may not be saved.
 
+With several sign-in methods on screen, the named, saved-preference or owner-picked one settles it:
+list them all, never pick by a password-first order, and never switch method after a code was sent
+(that can spend or void it).
+
 Do it yourself first, every time: sign-in with `bu.signIn()`, codes with `bu.fillCode()`, banners
 and pop-ups with `page.overlays.dismiss()`, a checkbox check with one click like a person. Hand
 back with `bu.handoff("...")` only for what is left: a code that never arrived, a passkey or

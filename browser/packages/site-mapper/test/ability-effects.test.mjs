@@ -20,6 +20,7 @@ async function withHome(run) {
         { id: "search", method: "GET", path: "/api/search", role: "read", params: [] },
         { id: "order", method: "POST", path: "/api/order", role: "action", params: [] },
         { id: "login", method: "POST", path: "/api/login", role: "auth", params: [] },
+        { id: "markVisited", method: "POST", path: "/api/visited", role: "action", params: [] },
       ],
     }),
   );
@@ -150,6 +151,48 @@ test("a read that sends a non-GET is saved as a write; a suspected step stays a 
     );
     assert.equal(noted.ability.kind, "read");
     assert.equal(noted.ability.writes[0].kind, "suspected");
+  });
+});
+
+test("opening a page the site only marks visited stays a read", async () => {
+  await withHome(async () => {
+    // A site records the open with a POST to a visited/progress marker. With no answer or form
+    // submitted that is still a read; asked as a write, the same request stays a write.
+    const read = await saveAbility(
+      base({ name: "browse items", ways: [{ kind: "api", operation: "markVisited" }] }),
+    );
+    assert.equal(read.ability.kind, "read", "a visit marker does not reclassify the read");
+    assert.equal(read.ability.writes, undefined);
+
+    const readStep = await saveAbility(
+      base({
+        name: "browse steps",
+        ways: [
+          {
+            kind: "steps",
+            steps: [
+              {
+                kind: "click",
+                target: { role: "link", name: "Item" },
+                expectRequest: { method: "POST", path: "/api/visited" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    assert.equal(readStep.ability.kind, "read");
+    assert.equal(readStep.ability.writes, undefined);
+
+    const write = await saveAbility(
+      base({
+        name: "record visit",
+        kind: "write",
+        ways: [{ kind: "api", operation: "markVisited" }],
+      }),
+    );
+    assert.equal(write.ability.kind, "write", "an explicit write keeps its write kind");
+    assert.ok(write.ability.writes?.[0]);
   });
 });
 

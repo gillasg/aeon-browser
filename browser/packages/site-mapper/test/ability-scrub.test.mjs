@@ -63,7 +63,7 @@ test("an api request that carried a secret is dropped, and the other way survive
   });
 });
 
-test("a script way with a bearer or api-key literal is dropped, not stored", async () => {
+test("a script way with a bearer or api-key literal keeps the way and templates the key", async () => {
   await withHome(async (root) => {
     const saved = await saveAbility(
       base({
@@ -84,10 +84,14 @@ test("a script way with a bearer or api-key literal is dropped, not stored", asy
     );
     assert.deepEqual(
       saved.ability.ways.map((way) => way.kind),
-      ["page"],
-      "both credential-bearing scripts are gone",
+      ["script", "script", "page"],
+      "both credential-bearing scripts survive",
     );
-    assert.equal(saved.scrubbed.filter((mark) => mark.dropped && mark.via === "script").length, 2);
+    assert.equal(saved.scrubbed.filter((mark) => mark.dropped && mark.via === "script").length, 0);
+    assert.match(saved.ability.ways[0].code, /Bearer " \+ inputs\["authToken"\] \+ ""/);
+    assert.match(saved.ability.ways[1].code, /apiKey = inputs\["apiKey"\]/);
+    assert.ok(saved.ability.inputs.properties.authToken, "the caller input is declared");
+    assert.ok(saved.ability.inputs.properties.apiKey, "the caller input is declared");
     const file = await readFile(join(root, "sites/example.com/abilities/search.json"), "utf8");
     assert.ok(!file.includes("Bearer ab12"));
     assert.ok(!file.includes("live-1234567890"));

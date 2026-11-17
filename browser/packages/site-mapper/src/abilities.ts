@@ -29,7 +29,7 @@ import {
 } from "./ability-guard.js";
 import {
   proveSave,
-  withSample,
+  withSamples,
   type AbilitySample,
   type ProbeResult,
 } from "./ability-save-test.js";
@@ -335,6 +335,8 @@ export interface SaveAbilityOptions {
   test?: boolean;
   /** Inputs and result from the run that produced this ability. Recorded as the first test when none were passed. */
   sample?: AbilitySample;
+  /** Other public samples (other store, region, template, empty state), one case each, capped at eight. */
+  samples?: readonly AbilitySample[];
   /** The run itself: typed values and step answers, for inferring inputs and references. */
   demonstration?: AbilityDemonstration;
 }
@@ -359,7 +361,7 @@ export async function saveAbility(
     scrub,
   } = await prepareSave(ability, options);
   const drafted = withResultAsserts(
-    withSample(
+    withSamples(
       {
         ...prepared,
         name,
@@ -369,6 +371,7 @@ export async function saveAbility(
         updatedAt: new Date().toISOString(),
       },
       options.sample,
+      options.samples,
     ),
     options.sample,
   );

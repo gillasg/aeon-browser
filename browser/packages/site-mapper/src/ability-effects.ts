@@ -29,6 +29,15 @@ const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
 const ACTING = /^(click|press|submit|select|check|uncheck|choose|fill|type)$/i;
 const SUSPECT =
   /\b(logout|log out|sign out|signout|unsubscribe|delete|remove|archive|trash|destroy|deactivate|revoke|purge|cancel account|close account|clear all)\b/i;
+// Opening a page a site then marks visited, seen or in progress is part of a read: the marker
+// records that the page was opened, with no answer or form submitted. It is not a write unless the
+// caller declared one (i.e. asked to change that progress).
+const VISIT_MARKER =
+  /\b(visit(ed)?|seen|view(ed)?|read|progress|impression|beacon|analytics|track(ing)?)\b/i;
+
+function visitMarker(path: string | undefined): boolean {
+  return Boolean(path && VISIT_MARKER.test(path));
+}
 
 /**
  * A declared read that contains an explicit write is a write. Suspected writes stay a note
@@ -63,7 +72,9 @@ function collectApi(
     // A non-GET is an explicit write even when the caller marked the ability read, and even
     // when the model calls the operation auth rather than action.
     if (operation && (operation.role === "action" || !SAFE.has(operation.method.toUpperCase()))) {
-      out.push(operationWrite(operation, index, stepIndex));
+      if (ability.kind !== "read" || !visitMarker(operation.path)) {
+        out.push(operationWrite(operation, index, stepIndex));
+      }
       return;
     }
     if (operation || ability.kind !== "write" || stepIndex !== commit) return;
@@ -141,7 +152,10 @@ function isExplicit(
   ability: Ability,
 ): boolean {
   if (saved.write === true) return true;
-  if (method !== undefined && !SAFE.has(method)) return true;
+  if (method !== undefined && !SAFE.has(method)) {
+    if (ability.kind === "read" && visitMarker(saved.expectRequest?.path)) return false;
+    return true;
+  }
   if (ability.kind !== "write" || stepIndex !== count - 1) return false;
   return ACTING.test(typeof saved.kind === "string" ? saved.kind : "");
 }

@@ -128,6 +128,28 @@ export function vaultField(name: string | undefined): boolean {
   return !name || VAULT_FIELD.test(name);
 }
 
+/** A field that holds a secret: only these need the strict empty check, not a prefilled username. */
+function isSecretField(this: HTMLElement): boolean {
+  const field = this as HTMLInputElement;
+  return (
+    field.tagName === "INPUT" &&
+    (field.type === "password" || /one-time-code|\botp\b|2fa|mfa/i.test(field.autocomplete ?? ""))
+  );
+}
+
+/** Clears a credential field we are about to (re)fill, so a later focus refill is distinguishable. */
+function clearCredentialField(this: HTMLInputElement): void {
+  this.value = "";
+  this.dispatchEvent(new Event("input", { bubbles: true }));
+  this.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/** A credential field must be empty before typing: a letterless mask (••••) still counts as empty. */
+export function credentialFieldEmpty(value: string | undefined): boolean {
+  if (value === undefined) return true;
+  return value.trim() === "" || /^[^\p{L}\p{N}]+$/u.test(value);
+}
+
 /** Fills a control and returns the value it read back, when that is the value it set. */
 export async function fillNode(
   debuggee: chrome.debugger.Debuggee,
@@ -139,6 +161,23 @@ export async function fillNode(
   // can move focus into a replacement input there. Aeon fills tabs the user is not looking at,
   // so emulate focus for the fill or the value lands in an input we never measured.
   return withFocusEmulation(debuggee.tabId, async () => {
+    // A page script that refills a credential field on focus can make a planted value look like one
+    // the user typed. Clear the field (a re-fill of the same password is legitimate), focus it so
+    // any focus handler runs, then re-read: a non-empty value now was planted, so refuse and never
+    // submit. The usual retained() check still guards the value after typing.
+    if (
+      options.vault !== false &&
+      (await onNode<boolean>(debuggee, id, isSecretField).catch(() => false))
+    ) {
+      await onNode(debuggee, id, clearCredentialField).catch(() => undefined);
+      await focusNode(debuggee, id).catch(() => undefined);
+      const afterFocus = await readFieldValue(debuggee, id);
+      if (!credentialFieldEmpty(afterFocus))
+        throw new BrowserActionError(
+          "NOT_EMPTIED",
+          "The credential field was refilled when focused, so a planted value was not attributed to the user.",
+        );
+    }
     const native = await onNode<string>(debuggee, id, setNativeValue, [value]);
     if (native === "done") {
       if (options.vault !== false) await noteVaultFill(debuggee, id).catch(() => undefined);

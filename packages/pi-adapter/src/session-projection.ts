@@ -26,6 +26,7 @@ import { reloadPiResources } from "./sdk-resources.js";
 import { createSessionTools } from "./session-tools.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { projectMessage } from "./pi-message-projection.js";
+import { signInCodes, type SignInCodes } from "./sign-in-codes.js";
 import { projectChangeDiff } from "./pi-change-diff.js";
 import { toEntryProjection } from "./session-entry-projection.js";
 import { closeBrowserSessionLifecycle } from "./browser-session-lifecycle.js";
@@ -55,7 +56,7 @@ export function wrapPiSession(
     effectiveResources: () => projectEffectiveResources(session, chatId, getMcpServers()),
     reloadResources: () => reloadPiResources(session),
     snapshot: () => {
-      const entries = manager.getBranch().map(toEntryProjection);
+      const entries = manager.getBranch().map((entry) => toEntryProjection(entry));
       const active = !session.isIdle || session.isStreaming;
       return {
         reference,
@@ -68,7 +69,13 @@ export function wrapPiSession(
       };
     },
     subscribe: (listener) => {
-      const unsubscribeSession = subscribeSession(session, manager, extensionUi, listener);
+      const unsubscribeSession = subscribeSession(
+        session,
+        manager,
+        extensionUi,
+        listener,
+        signInCodes(chatId),
+      );
       const unsubscribeUi = extensionUi.subscribe((event) => {
         listener(event);
         if (event.kind !== "extension-ui-request" && event.kind !== "extension-ui-resolved") return;
@@ -77,7 +84,7 @@ export function wrapPiSession(
           kind: "run-state",
           state: deriveRunState(
             !session.isIdle || session.isStreaming,
-            manager.getBranch().map(toEntryProjection),
+            manager.getBranch().map((entry) => toEntryProjection(entry)),
             pending,
           ),
         });
@@ -95,10 +102,11 @@ function subscribeSession(
   manager: SessionManager,
   extensionUi: ExtensionUiBridge,
   listener: PiSessionEventListener,
+  codes: SignInCodes,
 ): () => void {
   return session.subscribe((event) => {
     const eventType = event.type as string;
-    const mapped = toSessionEvent(event, manager, extensionUi);
+    const mapped = toSessionEvent(event, manager, extensionUi, codes);
     if (mapped) listener(mapped);
     if (
       eventType === "agent_settled" ||
@@ -115,7 +123,7 @@ function subscribeSession(
       );
     if (event.type === "message_end") {
       queueMicrotask(() =>
-        publishPersistedMessage(session.sessionManager, event.message, listener),
+        publishPersistedMessage(session.sessionManager, event.message, listener, codes),
       );
     }
   });
@@ -143,6 +151,7 @@ function publishPersistedMessage(
   manager: SessionManager,
   message: AgentMessageFromEvent,
   listener: PiSessionEventListener,
+  codes: SignInCodes,
 ): void {
   for (const entry of manager.getEntries()) {
     const sameCustom =
@@ -151,7 +160,7 @@ function publishPersistedMessage(
       entry.customType === message.customType &&
       sameCustomDetails(entry.details, message.details);
     if ((entry.type === "message" && entry.message === message) || sameCustom) {
-      listener({ kind: "entry-added", entry: toEntryProjection(entry) });
+      listener({ kind: "entry-added", entry: toEntryProjection(entry, codes) });
       return;
     }
   }
@@ -170,11 +179,17 @@ function toSessionEvent(
   event: AgentSessionEvent,
   manager: SessionManager,
   extensionUi: ExtensionUiBridge,
+  codes: SignInCodes,
 ): PiSessionEvent | undefined {
   if (event.type === "entry_appended")
-    return { kind: "entry-added", entry: toEntryProjection(event.entry) };
-  if (isMessageEvent(event)) return projectMessageEvent(event);
-  if (isToolEvent(event)) return projectToolEvent(event);
+    return { kind: "entry-added", entry: toEntryProjection(event.entry, codes) };
+  if (isMessageEvent(event)) return projectMessageEvent(event, codes);
+  if (isToolEvent(event)) {
+    // Note codes before the assistant streams its answer, so streaming updates are masked too.
+    if (event.type === "tool_execution_end") noteResultCodes(codes, event.result);
+    else if (event.type === "tool_execution_update") noteResultCodes(codes, event.partialResult);
+    return projectToolEvent(event);
+  }
   if (event.type === "turn_start" || event.type === "turn_end")
     return { kind: "turn-boundary", active: event.type === "turn_start" };
   if (event.type === "agent_start") return { kind: "run-state", state: "running-unconfirmed" };
@@ -206,6 +221,7 @@ function isMessageEvent(
 
 function projectMessageEvent(
   event: Extract<AgentSessionEvent, { type: "message_start" | "message_update" | "message_end" }>,
+  codes: SignInCodes,
 ): PiSessionEvent {
   const kind =
     event.type === "message_start"
@@ -213,7 +229,7 @@ function projectMessageEvent(
       : event.type === "message_update"
         ? "message-update"
         : "message-end";
-  return { kind, message: projectMessage(event.message) };
+  return { kind, message: projectMessage(event.message, codes) };
 }
 
 function isToolEvent(
@@ -227,6 +243,18 @@ function isToolEvent(
     event.type === "tool_execution_update" ||
     event.type === "tool_execution_end"
   );
+}
+
+/** Codes can sit in text blocks or in structured fields; note both within a bounded size. */
+function noteResultCodes(codes: SignInCodes, value: unknown): void {
+  codes.note(resultText(value));
+  if (value && typeof value === "object") {
+    try {
+      codes.note(JSON.stringify(value).slice(0, 20_000));
+    } catch {
+      // A circular result still gave us its text blocks.
+    }
+  }
 }
 
 function projectToolEvent(
@@ -302,7 +330,7 @@ function stepsPath(result: unknown): ToolPath | undefined {
 }
 
 function settledRunState(manager: SessionManager): PiSessionEvent {
-  const entries = manager.getBranch().map(toEntryProjection);
+  const entries = manager.getBranch().map((entry) => toEntryProjection(entry));
   return { kind: "run-state", state: deriveRunState(false, entries) };
 }
 

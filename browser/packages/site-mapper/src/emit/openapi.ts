@@ -1,5 +1,7 @@
 import { createRedactor, type Redactor } from "../redact.js";
 import { documentedParams } from "../params.js";
+import { publicAbility } from "../ability-publish.js";
+import type { Ability } from "../abilities.js";
 import type {
   JsonSchema,
   Operation,
@@ -228,7 +230,11 @@ function buildPaths(model: SiteModel, redactor: Redactor): Record<string, Doc> {
   return paths;
 }
 
-export function toOpenApi(model: SiteModel, rules: Overrides["redact"] = {}): Doc {
+export function toOpenApi(
+  model: SiteModel,
+  rules: Overrides["redact"] = {},
+  abilities: readonly Ability[] = [],
+): Doc {
   const redactor = createRedactor(rules);
   const tags = new Set([...model.operations.map(tag), ...(model.pages.length ? ["pages"] : [])]);
   return {
@@ -241,6 +247,9 @@ export function toOpenApi(model: SiteModel, rules: Overrides["redact"] = {}): Do
     },
     servers: model.origins.map((url) => ({ url })),
     tags: [...tags].map((name) => ({ name })),
+    // Saved abilities travel beside the raw operations as their reviewable definition: the
+    // tested tool's name stays stable while the endpoint it calls moves.
+    ...(abilities.length ? { "x-abilities": abilities.map(publicAbility) } : {}),
     paths: buildPaths(model, redactor),
     components: {
       schemas: model.components,

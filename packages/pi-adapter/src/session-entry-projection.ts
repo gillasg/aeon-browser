@@ -2,11 +2,12 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { PiEntryCategory, PiEntryProjection, PiMessageProjection } from "@aeon/domain";
 import { projectRoutineSettlement, PI_ROUTINE_SETTLEMENT_TYPE } from "./pi-routine.js";
 import { projectCustomMessage, projectMessage } from "./pi-message-projection.js";
+import type { SignInCodes } from "./sign-in-codes.js";
 
-export function toEntryProjection(entry: SessionEntry): PiEntryProjection {
+export function toEntryProjection(entry: SessionEntry, codes?: SignInCodes): PiEntryProjection {
   const category = categoryOf(entry);
   let message: PiMessageProjection | null = null;
-  if (entry.type === "message") message = projectMessage(entry.message);
+  if (entry.type === "message") message = projectMessage(entry.message, codes);
   if (entry.type === "custom_message")
     message = projectCustomMessage(entry.customType, entry.details);
   if (entry.type === "custom")
