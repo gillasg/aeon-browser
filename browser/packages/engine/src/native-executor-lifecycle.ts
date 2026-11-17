@@ -15,30 +15,47 @@ export function installNativeStartup(connect: () => Promise<unknown>, retry: () 
   chrome.windows.onFocusChanged.addListener((windowId) => {
     if (windowId !== chrome.windows.WINDOW_ID_NONE) warm();
   });
-  // A service worker can sleep while the daemon restarts; an alarm wakes it to retry the link.
-  const alarm = "aeon-executor-reconnect";
-  void chrome.alarms?.create(alarm, { periodInMinutes: 1 });
+  // A service worker can sleep while the daemon restarts; alarms wake it to retry the link. Keep
+  // a slow periodic one as a safety net and let scheduleExecutorReconnect arm a faster one-shot.
+  void chrome.alarms?.create(RECONNECT_ALARM, { periodInMinutes: 1 });
   chrome.alarms?.onAlarm.addListener((fired) => {
-    if (fired.name === alarm) warm();
+    if (fired.name === RECONNECT_ALARM || fired.name === RECONNECT_NOW_ALARM) warm();
   });
   warm();
 }
 
+const RECONNECT_ALARM = "aeon-executor-reconnect";
+const RECONNECT_NOW_ALARM = "aeon-executor-reconnect-now";
 let timer: number | undefined;
 let attempts = 0;
-/** Re-establish the browser executor without replaying any browser operation. */
+/**
+ * Re-establish the browser executor without replaying any browser operation.
+ *
+ * A MV3 service worker discards plain timers when it sleeps, so a daemon restart that outlasts the
+ * short backoff used to leave the link dead until the user restarted Chrome. Alongside the fast
+ * timer we arm a one-shot chrome alarm: Chrome wakes the worker to fire it even after sleep, and a
+ * fresh bootstrap (new grant, new endpoint) is attempted there. The alarm is cleared once the link
+ * is live, so a healthy extension does no extra wake-ups.
+ */
 export function scheduleExecutorReconnect(connect: () => Promise<unknown>): void {
   if (timer !== undefined) return;
-  const delay = Math.min(250 * 2 ** Math.min(attempts++, 3), 2000);
+  const delay = Math.min(250 * 2 ** Math.min(attempts++, 4), 4000);
+  if (chrome.alarms?.create)
+    void chrome.alarms.create(RECONNECT_NOW_ALARM, { when: Date.now() + Math.max(delay, 30_000) });
   timer = globalThis.setTimeout(() => {
     timer = undefined;
-    void connect().then(
-      () => {
-        attempts = 0;
-      },
-      () => scheduleExecutorReconnect(connect),
-    );
+    void connect().then(noteExecutorConnected, () => scheduleExecutorReconnect(connect));
   }, delay);
+}
+
+/** Stop retrying once a connection is live: clear the timer, the wake alarm and the backoff. */
+export function noteExecutorConnected(): void {
+  attempts = 0;
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    timer = undefined;
+  }
+  if (chrome.alarms?.clear) void chrome.alarms.clear(RECONNECT_NOW_ALARM);
 }
 
 export function startExecutorHeartbeat(

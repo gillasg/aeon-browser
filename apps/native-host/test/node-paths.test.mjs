@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { posix, win32 } from "node:path";
 import test from "node:test";
-import { appRoot, dataDirectory, runtimeDirectory, socketPath } from "../node/paths.mjs";
+import { appRoot, dataDirectory, hostPaths, runtimeDirectory, socketPath } from "../node/paths.mjs";
 
 test("the app root follows each OS convention", () => {
   const home = "/home/tester";
@@ -42,6 +44,44 @@ test("the bootstrap socket lives in a per-user runtime directory, not a shared /
     const socket = socketPath({ env: {}, platform, home, uid: 1001 });
     assert.ok(socket.startsWith("/tmp/aeon-1001/"), socket);
     assert.ok(socket.length < 104, socket);
+  }
+});
+
+test("macOS uses the per-user private temp dir for both host and supervisor", () => {
+  // The Chrome-launched host and the launchd supervisor both call hostPaths(); a single resolved
+  // runtime directory is what makes them agree on the bootstrap socket.
+  const privateTemp = mkdtempSync(posix.join(tmpdir(), "aeon-mac-tmp-"));
+  try {
+    const options = { env: { TMPDIR: privateTemp }, platform: "darwin", home: "/Users/tester" };
+    const expected = posix.join(privateTemp, "aeon");
+    assert.equal(runtimeDirectory(options), expected);
+    // The host and the supervisor both derive the socket from these paths.
+    assert.ok(hostPaths(options).socket.startsWith(expected + "/"));
+    assert.ok(hostPaths(options).socket.length < 104);
+  } finally {
+    rmSync(privateTemp, { recursive: true, force: true });
+  }
+});
+
+test("macOS falls back to owner-checked /tmp/<uid> when the private temp dir is unusable", () => {
+  const home = "/Users/tester";
+  for (const env of [{ TMPDIR: "/tmp" }, { TMPDIR: "/private/tmp" }, { TMPDIR: "/no/such/dir" }])
+    assert.equal(runtimeDirectory({ env, platform: "darwin", home, uid: 1001 }), "/tmp/aeon-1001");
+});
+
+test("AEON_RUNTIME_DIR is the override on every POSIX OS", () => {
+  for (const platform of ["darwin", "linux"]) {
+    const options = {
+      env: {
+        AEON_RUNTIME_DIR: "/custom/run",
+        XDG_RUNTIME_DIR: "/run/user/1",
+        TMPDIR: "/var/folders/private/T",
+      },
+      platform,
+      home: "/home/tester",
+      uid: 1001,
+    };
+    assert.equal(runtimeDirectory(options), "/custom/run/aeon");
   }
 });
 
