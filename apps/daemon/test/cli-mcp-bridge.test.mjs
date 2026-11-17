@@ -164,7 +164,6 @@ test("the CLI bridge speaks 2026-07-28 discover and _meta without breaking initi
 
 test("notifications/cancelled aborts a running call and sends no reply", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "aeon-cli-cancel-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
   // A long-running CLI: cancellation must stop it, and no result may be written for the request.
   await writeFile(join(root, "sleep.mjs"), `setInterval(() => {}, 1000);\n`, "utf8");
   const registryPath = join(root, "capabilities.json");
@@ -206,6 +205,8 @@ test("notifications/cancelled aborts a running call and sends no reply", async (
     await childClosed;
     clearTimeout(forceKill);
     lines.close();
+    // Remove the folder only after the bridge (and its CLI) closed: Windows keeps a cwd busy.
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
 
   child.stdin.write(
