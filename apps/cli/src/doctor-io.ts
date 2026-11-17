@@ -7,6 +7,8 @@ import { CoreHealthResultSchema } from "@aeon/protocol";
 import { aeonDataDirectory, ensurePrivateDir, UntrustedDirError } from "@aeon/location";
 import type { DaemonHost } from "./host.js";
 import type { DataDir, HealthView } from "./doctor-checks.js";
+import type { StealthFacts } from "./doctor-stealth-checks.js";
+import { gatherStealthFacts } from "./doctor-stealth-io.js";
 import { readStartFailure } from "./start-failure.js";
 
 export interface DoctorIo {
@@ -17,6 +19,8 @@ export interface DoctorIo {
   dataDirs(): Promise<DataDir[]>;
   /** Optional so existing fakes stay valid. Absent means no remembered start cause. */
   startFailure?(): Promise<string | undefined>;
+  /** Only used by `aeon doctor --stealth`; opens and closes one hidden tab. */
+  stealthFacts?(): Promise<StealthFacts>;
 }
 
 export function liveDoctorIo(host: DaemonHost): DoctorIo {
@@ -27,6 +31,7 @@ export function liveDoctorIo(host: DaemonHost): DoctorIo {
     loginTask: loginTaskPresent,
     dataDirs: readDataDirs,
     startFailure: readStartFailure,
+    stealthFacts: () => gatherStealthFacts(host),
   };
 }
 
