@@ -72,6 +72,8 @@ export function renderCaptured(
     expand?: ExpandSection[];
     truncated: boolean;
     hints?: ReadonlyMap<number, string>;
+    /** What a scoped read left out, so filtered text is never mistaken for the whole page. */
+    scopeNote?: string | undefined;
   },
 ): string {
   const budget = clampBudget(input.budget);
@@ -84,7 +86,8 @@ export function renderCaptured(
     ...(input.expand?.length ? { expand: input.expand } : {}),
   });
   const noted = noteTruncation(view, input.truncated, budget);
-  return noted.length > VIEW_CHAR_LIMIT ? noted.slice(0, VIEW_CHAR_LIMIT) : noted;
+  const scoped = noteScope(noted, input.scopeNote, budget);
+  return scoped.length > VIEW_CHAR_LIMIT ? scoped.slice(0, VIEW_CHAR_LIMIT) : scoped;
 }
 
 function applyHints(nodes: TreeNode[], hints: ReadonlyMap<number, string> | undefined): void {
@@ -98,6 +101,14 @@ function applyHints(nodes: TreeNode[], hints: ReadonlyMap<number, string> | unde
 function noteTruncation(view: string, truncated: boolean, budget: number): string {
   if (!truncated || view.includes("page.state({query})")) return view;
   const note = "[observation truncated; page.state({query}) for a focused look]";
+  const next = view ? `${view}\n${note}` : note;
+  return next.length <= budget ? next : view;
+}
+
+/** Says what a scoped snapshot excluded. Kept short; a full read is page.state() with no scope. */
+function noteScope(view: string, scopeNote: string | undefined, budget: number): string {
+  if (!scopeNote) return view;
+  const note = `[${scopeNote}; rest of the page left out; page.state() reads it all]`;
   const next = view ? `${view}\n${note}` : note;
   return next.length <= budget ? next : view;
 }

@@ -15,7 +15,7 @@ A task about the tab the user is on runs on `browser.activeTab()`. Anything else
 
 ---
 
-Read a page once: `await page.read()` returns an object; `.text` is the page text, and `data`, `list` and `markdown` stay. A list says whether it is complete or partial. Rows the page already loaded come back from `page.data(name)` with no new request. `help('reading')`.
+Read a page once: `await page.read()` returns an object; `.text` is the page text, and `data`, `list` and `markdown` stay. A list says whether it is complete or partial. Rows the page already loaded come back from `page.data(name)` with no new request. Never screenshot just to check; read the page (`page.read()`, `bu.state()`). A screenshot is for layout, an image or a visual problem, not to find text or confirm a step. `help('reading')`.
 
 ---
 

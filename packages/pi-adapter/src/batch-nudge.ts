@@ -8,9 +8,13 @@
 
 /** The live hint, on the third tiny cell in a row. One line, so it costs few tokens. */
 export const BATCH_NUDGE =
-  "Three cells in a row did one quick step each; every cell costs a model turn. Put the next steps in one cell: fill, click and read together (locators wait for their element, and the page state prints after the cell).";
+  "Three cells in a row did one quick step each; every cell costs a model turn. Put the write and its read in one cell: fill, click and read together (locators wait for their element, and the page state prints after the cell).";
 
-/** Tiny cells in a row before the first nudge, and between nudges. */
+/** One write then one read is the commonest two-turn pattern, so nudge one cell earlier there. */
+export const WRITE_THEN_READ_NUDGE =
+  "Two cells in a row: one write, then a read. The page state prints after each cell, so read in the write's cell and save a model turn. Batch fill, click and read together.";
+
+/** Tiny cells in a row before the general nudge, and between nudges. */
 export const STREAK_LEN = 3;
 
 /** A pause longer than this ends a streak: the agent stopped and started again. */
@@ -48,9 +52,12 @@ export interface CellBehaviour {
   reset?: boolean;
 }
 
+type CellKind = "write" | "read" | "other";
+
 interface Streak {
   count: number;
   last: number;
+  kind: CellKind;
 }
 
 const streaks = new Map<string, Streak>();
@@ -86,7 +93,18 @@ export function noteBrowserCell(
   if (cell.steps === 0) return undefined;
   const prior = streaks.get(chatId);
   const count = prior && now - prior.last <= STREAK_GAP_MS ? prior.count + 1 : 1;
-  remember(chatId, { count, last: now });
+  const kind = cellKind(cell);
+  remember(chatId, { count, last: now, kind });
+  return nudgeFor(count, prior, kind);
+}
+
+function cellKind(cell: CellBehaviour): CellKind {
+  if (cell.actions === 0) return "read";
+  return cell.actions === 1 && cell.steps === 1 ? "write" : "other";
+}
+
+function nudgeFor(count: number, prior: Streak | undefined, kind: CellKind): string | undefined {
+  if (count === 2 && prior?.kind === "write" && kind === "read") return WRITE_THEN_READ_NUDGE;
   return count % STREAK_LEN === 0 ? BATCH_NUDGE : undefined;
 }
 

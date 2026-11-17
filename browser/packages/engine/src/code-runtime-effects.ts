@@ -28,6 +28,7 @@ import { permissionCall } from "./native-browser-permissions.js";
 import { googleCall } from "./native-browser-google.js";
 import { fetchCall, isFetchRequest } from "./native-browser-fetch.js";
 import { mappedNotice, noteFetchStatus } from "./native-browser-fetch-guard.js";
+import { noteChallengeSeen } from "./native-browser-human-input.js";
 
 type Value = Record<string, unknown>;
 
@@ -147,6 +148,17 @@ function tabEffects(host: EffectHost): Effect<Cell>[] {
       match: has("quiet"),
       tab: inner("quiet"),
       run: (_, value, tabId = 0) => quietCall(tabId, value.quiet as { enabled?: unknown }),
+    },
+    {
+      name: "tab.humanInput",
+      // A bot check seen in a tab turns curved pointer and key timing on for that tab alone;
+      // the global setting stays off for speed. forgetHumanInput clears it when the tab closes.
+      match: has("humanInput"),
+      tab: inner("humanInput"),
+      run: async (_, _value, tabId = 0) => {
+        noteChallengeSeen(tabId);
+        return { humanInput: true };
+      },
     },
     {
       name: "tab.takes",

@@ -74,6 +74,16 @@ export function targetIdentity(target: BrowserTargetKey): string {
   return `${target.clientInstanceId}/${target.browserRunId}/${target.tabId}/${target.tabIncarnation}`;
 }
 
+/**
+ * Snapshot ownership key. The debugger is shared per tab, but refs belong to the chat that read
+ * them: without the chat id a second reader of the same tab retires the first chat's refs and the
+ * next action is STALE_REF. A missing chat id is the legacy key, so callers without one behave as
+ * before.
+ */
+export function snapshotKey(chatId: string | undefined, target: BrowserTargetKey): string {
+  return chatId ? `${chatId}:${targetIdentity(target)}` : targetIdentity(target);
+}
+
 export function sameTarget(left: BrowserTargetKey, right: BrowserTargetKey): boolean {
   return targetIdentity(left) === targetIdentity(right);
 }

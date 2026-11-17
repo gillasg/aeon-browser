@@ -112,7 +112,11 @@ function authenticate(
       version.major !== SUPPORTED_PROTOCOL_VERSION.major ||
       version.minor > SUPPORTED_PROTOCOL_VERSION.minor
     )
-      return socket.close(1008, "UPDATE_REQUIRED");
+      // Name the daemon's version in the close reason so an older CLI can say what to update.
+      return socket.close(
+        1008,
+        `UPDATE_REQUIRED:${SUPPORTED_PROTOCOL_VERSION.major}.${SUPPORTED_PROTOCOL_VERSION.minor}`,
+      );
     watchSocketHealth(socket);
     socket.send(
       JSON.stringify({ kind: "core.ready", protocolVersion: SUPPORTED_PROTOCOL_VERSION }),
