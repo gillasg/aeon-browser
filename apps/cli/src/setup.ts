@@ -1,5 +1,7 @@
+import { execFileSync } from "node:child_process";
 import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { activeProvider } from "@browserkit/credentials";
 import { listSites, registryRoot, bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 import { has, type Args } from "browserkit/dist/args.js";
@@ -24,6 +26,16 @@ async function exists(path: string): Promise<boolean> {
 }
 
 async function setup(args: Args): Promise<number> {
+  if (has(args, "again")) {
+    // Re-run the one-command installer, which skips every piece that is already in place and
+    // repeats only what is missing or broken (native host, service, extension).
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+    execFileSync(process.execPath, [join(root, "scripts", "setup.mjs"), "--again"], {
+      cwd: root,
+      stdio: "inherit",
+    });
+    return 0;
+  }
   const code = await install();
   if (has(args, "no-register"))
     process.stdout.write("The native host is registered by Aeon's installer; nothing to skip.\n");
@@ -130,11 +142,12 @@ export function setupCommands(host: DaemonHost): Command[] {
       name: "setup",
       group: "Browser",
       summary: "install the aeon command and the Aeon skill for agents",
-      help: `Usage: aeon setup [--no-register]
+      help: `Usage: aeon setup [--no-register] [--again]
 
 Puts the aeon command on the PATH and links the Aeon skill into ~/.agents/skills (and
 ~/.claude/skills). Aeon's native host runs the same install; --no-register is accepted for
-symmetry with browserkit.`,
+symmetry with browserkit. --again re-runs the installer, repeating only the pieces that are
+missing or broken (native host, service, extension).`,
       run: setup,
     },
     {

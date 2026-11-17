@@ -11,7 +11,8 @@ const OPEN_AEON = "Open Chrome with Aeon loaded so the daemon starts.";
 const UPDATE =
   "Update Aeon so the command, the daemon and the extension are the same build, then reload the extension.";
 const RELOAD = "Reload the Aeon extension in chrome://extensions.";
-const OPEN_EXTENSION = "Open Chrome with the Aeon extension loaded.";
+const OPEN_EXTENSION =
+  "Run `aeon setup --again`, then restart Chrome with the Aeon extension loaded (in chrome://extensions: turn on Developer mode, click Load unpacked and choose Aeon's folder).";
 const MODEL_FIX = "Sign in to a model from Aeon's Models page.";
 const TASK_FIX =
   process.platform === "win32"
