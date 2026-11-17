@@ -683,20 +683,27 @@ test("two runs with the same key cannot both send", async () => {
         return { ok: true };
       },
     };
-    const first = runAbility("example.com", "order", {}, { host, key: "k" });
-    const second = runAbility("example.com", "order", {}, { host, key: "k" });
-    try {
-      await inside;
-      assert.equal(started, 1);
-      const blocked = await second.then(() => undefined).catch((error) => error);
-      assert.match(blocked.message, /WRITE_UNCERTAIN/);
-      assert.equal(blocked.outcome.retry, "never");
-      assert.equal(started, 1);
-    } finally {
-      release();
-    }
-    const saved = await first;
-    assert.equal(saved.write.write_status, "applied");
+    // Either run may win the key lock; exactly one sends and the other is refused.
+    const runs = [
+      runAbility("example.com", "order", {}, { host, key: "k" }),
+      runAbility("example.com", "order", {}, { host, key: "k" }),
+    ].map((run) =>
+      run.then(
+        (value) => ({ value }),
+        (error) => ({ error }),
+      ),
+    );
+    await inside;
+    assert.equal(started, 1);
+    const blocked = await Promise.race(runs);
+    assert.match(blocked.error?.message ?? "", /WRITE_UNCERTAIN/);
+    assert.equal(blocked.error.outcome.retry, "never");
+    assert.equal(started, 1);
+    release();
+    const settled = await Promise.all(runs);
+    const sent = settled.filter((result) => result.value);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].value.write.write_status, "applied");
     assert.equal(started, 1);
   });
 });

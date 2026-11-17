@@ -85,3 +85,22 @@ test("the run's signal reaches the MCP call, and a cancelled call is not retried
   await pending;
   assert.equal(state.calls.length, 1, "one attempt only, never replayed after cancel");
 });
+
+test("a server connected after the first listing is found by one fresh listing", async () => {
+  const { manager, state } = fakeManager();
+  const original = manager.listMcpTools.bind(manager);
+  let connected = false;
+  manager.listMcpTools = async (serverId, signal) => {
+    const reply = await original(serverId, signal);
+    if (connected)
+      reply.servers.push({ serverId: "cap_late", tools: [{ name: "echo", description: "Late" }] });
+    return reply;
+  };
+  const bridge = new McpCodeBridge(manager);
+  await bridge.list();
+  connected = true;
+  const value = await bridge.call("cap_late", "echo", { text: "late", n: 1 });
+  assert.deepEqual(value, { echoed: "late", n: 1 });
+  assert.equal(state.lists, 2);
+  await assert.rejects(bridge.call("cap_none", "echo", {}), /no MCP tool named cap_none\.echo/);
+});

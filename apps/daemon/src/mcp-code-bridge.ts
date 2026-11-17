@@ -59,7 +59,12 @@ export class McpCodeBridge implements McpBridge {
     // populates the manager's discovery cache that callMcpTool needs.
     if (!this.refs) await this.list(signal);
     const name = `${server}.${tool}`;
-    const target = this.targets.get(name);
+    // A server connected after the first listing is found by one fresh listing before refusing.
+    let target = this.targets.get(name);
+    if (!target) {
+      await this.list(signal);
+      target = this.targets.get(name);
+    }
     if (!target) {
       const names = (this.refs ?? []).map((ref) => ref.name);
       throw new Error(
