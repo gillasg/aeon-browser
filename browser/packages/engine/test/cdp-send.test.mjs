@@ -175,6 +175,26 @@ test("a read that is still in flight is brought forward once and can still answe
   }
 });
 
+test("restoring the viewport clears device metrics only when an override was set", async () => {
+  const tab = nextTab();
+  tabActive = false;
+  hangOn = () => false;
+  calls.length = 0;
+  await session.restoreBrowserViewport(tab);
+  assert.equal(
+    calls.some((call) => call.method === "Emulation.clearDeviceMetricsOverride"),
+    false,
+  );
+  // This tab was never overridden, so activation must not send a pointless clear.
+  await session.ensureBrowserViewport(tab);
+  calls.length = 0;
+  await session.restoreBrowserViewport(tab);
+  assert.equal(
+    calls.some((call) => call.method === "Emulation.clearDeviceMetricsOverride"),
+    true,
+  );
+});
+
 test("a swallowed CDP failure is counted for doctor", async () => {
   const tab = nextTab();
   const original = chrome.debugger.sendCommand;
@@ -609,8 +629,15 @@ function sessionFaults({ read, emulate }) {
     fault("ensureBrowserViewport", "Emulation.setDeviceMetricsOverride", emulate, (tabId) =>
       session.ensureBrowserViewport(tabId),
     ),
-    fault("restoreBrowserViewport", "Emulation.clearDeviceMetricsOverride", emulate, (tabId) =>
-      session.restoreBrowserViewport(tabId),
+    fault(
+      "restoreBrowserViewport",
+      "Emulation.clearDeviceMetricsOverride",
+      emulate,
+      async (tabId) => {
+        // The clear is only sent once this code has set an override.
+        await session.ensureBrowserViewport(tabId);
+        await session.restoreBrowserViewport(tabId);
+      },
     ),
     fault("withBrowserDebugger", "Page.enable", read, async (tabId) => {
       session.bindBrowserSession(tabId, "chat");

@@ -1,6 +1,7 @@
 // What Aeon can do, in the user's words, for the Learn page. Each entry has an example that
 // "Try it" puts in the ask box. Kept in step with the feature list: a new user-visible feature
 // that someone would ask for gets an entry here in the same change.
+import { summonShortcut } from "./platform.js";
 
 export type LearnTopic = "browse" | "watch" | "sites" | "shortcuts";
 
@@ -183,7 +184,7 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "shortcuts",
     title: "Call Aeon on any page",
-    body: "Ctrl+Shift+Space opens Aeon with the page you're on as context.",
+    body: `${summonShortcut} opens Aeon with the page you're on as context.`,
     example: "Summarise the page I have open in five bullets",
   },
   {

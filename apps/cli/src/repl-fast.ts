@@ -1,5 +1,6 @@
 import { parseArgs } from "browserkit/dist/args.js";
-import { printError } from "browserkit/dist/output.js";
+import { out, printError } from "browserkit/dist/output.js";
+import { errorKind } from "@browserkit/tools/site-to-api";
 import { cellErrorMessage, runCellOn, type BrowserCell, type CellOptions } from "./cell-run.js";
 import { AeonClient } from "./client.js";
 import { repl } from "./repl.js";
@@ -33,7 +34,19 @@ export async function runRepl(argv: string[]): Promise<number> {
     const args = parseArgs(argv);
     return await repl(runner, { ...args, positional: args.positional.slice(1) });
   } catch (error) {
-    printError(error);
+    if (process.argv.includes("--json")) {
+      out(
+        JSON.stringify({
+          ok: false,
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+            kind: errorKind(error),
+          },
+        }),
+      );
+    } else {
+      printError(error);
+    }
     return 1;
   } finally {
     await runner.close();

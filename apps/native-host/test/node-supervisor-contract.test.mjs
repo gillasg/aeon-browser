@@ -148,6 +148,27 @@ test(
 );
 
 test(
+  "a daemon that reports phases forever still hits an overall boot budget",
+  { timeout: 25_000, skip: process.platform === "win32" ? "Mac/Linux Node host" : false },
+  async () => {
+    const sandbox = createSandbox();
+    writeConfig(sandbox);
+    const supervisor = await startSupervisor(sandbox, {
+      FAKE_DAEMON_MODE: "phase-forever",
+      AEON_PHASE_TIMEOUT_MS: "5000", // per-phase never fires: lines keep resetting it
+      AEON_BOOT_TIMEOUT_MS: "400",
+    });
+    try {
+      await waitFor(() => starts(sandbox) >= 2, 10_000);
+      assert.match(readLog(sandbox), /boot-timeout: daemon did not become ready within 400ms/);
+    } finally {
+      await stopSupervisor(sandbox);
+      await cleanup(sandbox, supervisor.child);
+    }
+  },
+);
+
+test(
   "a foreign origin is refused before any supervisor starts",
   { timeout: 15_000, skip: process.platform === "win32" ? "Mac/Linux Node host" : false },
   async () => {

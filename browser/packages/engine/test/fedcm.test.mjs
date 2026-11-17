@@ -2,22 +2,42 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const sent = [];
+const eventListeners = [];
 globalThis.chrome = {
   debugger: {
     sendCommand: async (_target, method, params) => sent.push([method, params]),
-    onEvent: { addListener() {} },
+    onEvent: {
+      addListener(listener) {
+        eventListeners.push(listener);
+      },
+    },
   },
   tabs: { onRemoved: { addListener() {} } },
   runtime: { onInstalled: { addListener() {} } },
 };
 const { answerDialog, ensureFedCm, fedcmEnabled, noteAgentClick, takeFedCmNote } =
   await import("../dist/native-browser-fedcm.js");
+const { installEngineListeners } = await import("../dist/native-engine-install.js");
 
 const one = {
   dialogId: "d1",
   dialogType: "AccountChooser",
   accounts: [{ email: "test@gmail.com" }],
 };
+
+test("a fired FedCm.dialogShown event reaches the CDP answer through the real listener", async () => {
+  installEngineListeners();
+  assert.ok(eventListeners.length >= 1);
+  const tab = 99;
+  noteAgentClick(tab);
+  await ensureFedCm(tab);
+  sent.length = 0;
+  for (const listener of eventListeners)
+    listener({ tabId: tab }, "FedCm.dialogShown", { ...one, dialogId: "d2" });
+  await new Promise((done) => setImmediate(done));
+  assert.deepEqual(sent, [["FedCm.selectAccount", { dialogId: "d2", accountIndex: 0 }]]);
+  assert.match(takeFedCmNote(tab), /test@gmail\.com/);
+});
 
 test("a sign-in dialog the page opened by itself is dismissed, never answered", async () => {
   sent.length = 0;

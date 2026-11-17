@@ -4,6 +4,12 @@
 // - after the agent clicked in the tab (it asked for this sign-in) and one account is offered,
 //   pick that account; with several, leave it open and tell the agent which call picks one;
 // - a dialog the page opened by itself (One Tap) is dismissed: no site is signed into unasked.
+//
+// A native Chrome crash in FedCmAccountSelectionView::CreateDialogWidget (null widget) was seen on
+// "Continue with Google" sign-ups during evals. It is inside Chrome's own dialog UI, not this JS,
+// and needs a real signed-in Google account to reproduce; eval Chrome launches with
+// --disable-features=FedCm as a workaround. Keep answering dialogs here — disabling FedCm in the
+// product would remove Google sign-in.
 import { send } from "./cdp/send.js";
 import { onEngineInstall } from "./native-engine-install.js";
 

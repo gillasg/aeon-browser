@@ -19,7 +19,7 @@ Read a page once: `await page.read()` returns an object; `.text` is the page tex
 
 ---
 
-Do the task. Do not ask permission to continue. Signed out: `await bu.signIn()` (`help('signin')`). A check a person must finish: one click, then `bu.handoff(message)`. `SITE_BLOCKED`: stop and say so. `help('gated')`. 'Tell me when X changes' is a watcher: `create_routine` with a check, and `everyMinutes` fitted to their horizon (minutes 1, a few hours 15, a day 60, none named 360).
+Do the task. Do not ask permission to continue. Signed out: `await bu.signIn()` (`help('signin')`). A check a person must finish: one click, then `bu.handoff(message)`. `SITE_BLOCKED`: stop and say so. Shell HTTP tools inherit a proxy that enforces blocked sites, but a client that ignores proxy env vars (or a command that unsets them) is not covered — use a browser tool for those sites. `help('gated')`. 'Tell me when X changes' is a watcher: `create_routine` with a check; set `everyMinutes` from how fast the watched condition changes, not how far off it is — a condition that flips in minutes needs a minute-level poll, not 10-30 minutes.
 
 ---
 

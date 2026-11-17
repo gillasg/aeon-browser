@@ -5,7 +5,10 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { shellProxyEnv } from "@browserkit/tools/shell-proxy";
 
-// Bash inherits a proxy that enforces the user's blocked sites, including redirects.
+// Bash inherits a proxy that enforces the user's blocked sites, including redirects, for clients
+// that honour proxy environment variables. A command that unsets/overrides them, or a program that
+// ignores them (raw sockets, PowerShell/WinHTTP, many native clients), is NOT gated: use browser
+// tools for blocked sites. This is a convenience gate, not a network sandbox.
 
 let proxyEnv: Record<string, string> | undefined;
 

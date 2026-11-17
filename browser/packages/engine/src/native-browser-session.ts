@@ -444,7 +444,9 @@ async function resizeWindow(windowId: number): Promise<boolean> {
   }
 }
 export async function restoreBrowserViewport(tabId: number): Promise<void> {
-  if (emulated.has(tabId)) return;
+  // Tab activation fires this on every switch. Sending a clear when no override was ever set is a
+  // pointless CDP call that fails on many tabs and shows up as a doctor failure count.
+  if (emulated.has(tabId) || !overridden.has(tabId)) return;
   overridden.delete(tabId);
   await send({ tabId }, "Emulation.clearDeviceMetricsOverride", undefined, {
     label: "restoreBrowserViewport",

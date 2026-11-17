@@ -152,6 +152,7 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
         "site_mapper",
         "extract",
         "chat_review",
+        "routine",
       ]),
       session: z.string().min(1).max(100),
       arguments: z.record(z.string(), z.unknown()),

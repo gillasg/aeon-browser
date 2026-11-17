@@ -66,3 +66,31 @@ test("curl cannot read a blocked site, or follow a redirect into one", async () 
     open.server.close();
   }
 });
+
+test("an unreachable allowed host reports a network error, never SITE_BLOCKED", async () => {
+  const home = await mkdtemp(join(tmpdir(), "shell-gate-unreachable-"));
+  const previous = process.env.BROWSERKIT_HOME;
+  // Reserve a port, then close it: nothing is listening, so the proxy's outbound connect fails.
+  const closed = await listen("127.0.0.1", (_request, response) => response.end());
+  const deadPort = closed.port;
+  closed.server.close();
+  process.env.BROWSERKIT_HOME = home;
+  await writeFile(join(home, "site-rules.json"), JSON.stringify({ blocked: [] }) + "\n");
+  const env = { ...process.env, ...(await shellProxyEnv()) };
+  try {
+    const { stdout, stderr } = await run(
+      "curl",
+      ["-sS", "-i", "--max-time", "5", `http://127.0.0.1:${deadPort}/`],
+      { env },
+    ).then(
+      (result) => result,
+      (error) => ({ stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? "") }),
+    );
+    const body = `${stdout}\n${stderr}`;
+    assert.doesNotMatch(body, /SITE_BLOCKED/);
+    assert.match(body, /SITE_UNREACHABLE|502/);
+  } finally {
+    if (previous === undefined) delete process.env.BROWSERKIT_HOME;
+    else process.env.BROWSERKIT_HOME = previous;
+  }
+});

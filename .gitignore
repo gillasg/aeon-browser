@@ -67,3 +67,4 @@ apps/chrome-extension/test/.orb-module-*
 /benchmarks/stealth/results/
 /benchmarks/chaos/results/
 /benchmarks/kernel/results/
+/benchmarks/installed/results/

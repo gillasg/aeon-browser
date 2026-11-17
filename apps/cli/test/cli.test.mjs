@@ -129,6 +129,21 @@ test("the CLI says plainly when Aeon is not running", async () => {
   }
 });
 
+test("--json prints errors as JSON on stdout, not plain text on stderr", async () => {
+  const home = await mkdtemp(join(tmpdir(), "aeon-cli-json-"));
+  try {
+    const { code, stdout, stderr } = await runCli(["chats", "--json"], { AEON_DATA_DIR: home });
+    assert.equal(code, 1);
+    assert.equal(stderr, "");
+    const parsed = JSON.parse(stdout.trim());
+    assert.equal(parsed.ok, false);
+    assert.match(parsed.error.message, /Aeon is not running/);
+    assert.equal(typeof parsed.error.kind, "string");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test("a quiet run still opens its chat as a tab, so the user can answer it, and submits through the daemon", async () => {
   const client = fakeClient();
   const [result] = await runTasks(client, ["Find the price"], {
@@ -252,7 +267,9 @@ function runCli(args, env) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [cli, ...args], { env: { ...process.env, ...env } });
     let stderr = "";
+    let stdout = "";
     child.stderr.on("data", (chunk) => (stderr += chunk));
-    child.on("close", (code) => resolve({ code, stderr }));
+    child.stdout.on("data", (chunk) => (stdout += chunk));
+    child.on("close", (code) => resolve({ code, stderr, stdout }));
   });
 }

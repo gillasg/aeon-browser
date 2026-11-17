@@ -1,20 +1,24 @@
 // Bytes and tokens of the system prompt, the tool definitions and the first turn.
 // Growth over browser/docs/agent/footprint-baseline.json fails unless --bump is passed.
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+//
+// Measured from SOURCE, never from a checked-in dist: pi-adapter is compiled fresh to a temp
+// directory before the surface is built. A stale or missing dist, or a different checkout path,
+// can no longer change the number — the same commit measures the same bytes anywhere.
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import { createPortable } from "./footprint-paths.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const aeonRepo = resolve(repo, "..");
 const baselinePath = join(repo, "docs", "agent", "footprint-baseline.json");
 const bump = process.argv.includes("--bump");
-const surfacePath = join(aeonRepo, "packages", "pi-adapter", "dist", "agent-surface.js");
+const piAdapter = join(aeonRepo, "packages", "pi-adapter");
 
 const measured = await measure();
-if (!measured) process.exit(0);
 const tokens = Math.ceil(measured.total / 4);
 process.stdout.write(
   `footprint bytes system ${measured.systemPrompt} tools ${measured.tools} firstTurn ${measured.firstTurn} total ${measured.total} (~${tokens} tokens)\n`,
@@ -35,37 +39,54 @@ if (measured.total > baseline.total) {
 }
 
 async function measure() {
-  if (!existsSync(surfacePath)) {
-    process.stdout.write("footprint skipped: adapter dist is not built\n");
-    return undefined;
-  }
+  // The compiled surface imports workspace packages, so the temp output must live inside the
+  // checkout for Node's package resolution to find node_modules. The random suffix is neutralised
+  // by createPortable below so it never reaches the byte count.
+  const temp = await mkdtemp(join(piAdapter, ".agent-footprint-"));
+  let scratch;
   try {
-    return await fromSurface();
-  } catch (error) {
-    process.stdout.write(
-      `footprint skipped: ${error instanceof Error ? error.message : String(error)}\n`,
+    const out = join(temp, "out");
+    const tsc = join(aeonRepo, "node_modules", ".bin", "tsc");
+    const compiled = spawnSync(
+      tsc,
+      [
+        "-p",
+        join(piAdapter, "tsconfig.json"),
+        "--outDir",
+        out,
+        "--tsBuildInfoFile",
+        join(temp, "tsconfig.tsbuildinfo"),
+        "--pretty",
+        "false",
+      ],
+      { encoding: "utf8", cwd: aeonRepo },
     );
-    return undefined;
+    if (compiled.status !== 0) {
+      throw new Error(
+        `Could not compile pi-adapter source for the footprint check:\n${compiled.stdout ?? ""}${compiled.stderr ?? ""}`,
+      );
+    }
+    const { buildAgentSurface } = await import(pathToFileURL(join(out, "agent-surface.js")).href);
+    scratch = await mkdtemp(join(tmpdir(), "aeon-footprint-"));
+    const surface = await buildAgentSurface({
+      workingDirectory: join(scratch, "workspace"),
+      agentDirectory: join(scratch, "agent"),
+      sessionDirectory: join(scratch, "sessions"),
+    });
+    // Machine paths in the prompt must not change the budget: the same source measured from the
+    // main checkout, a worktree or a temp directory is the same prompt to the model. Strip the
+    // scratch root, the checkout root and this compile directory (raw and JSON-escaped forms).
+    const portable = createPortable([
+      [scratch, "<workspace>"],
+      [temp, "<surface>"],
+      [aeonRepo, "<aeon>"],
+    ]);
+    const systemPrompt = Buffer.byteLength(portable(surface.systemPrompt));
+    const tools = Buffer.byteLength(portable(JSON.stringify(surface.tools)));
+    const firstTurn = Buffer.byteLength(portable(surface.firstTurn));
+    return { systemPrompt, tools, firstTurn, total: systemPrompt + tools + firstTurn };
+  } finally {
+    if (scratch) await rm(scratch, { recursive: true, force: true });
+    await rm(temp, { recursive: true, force: true });
   }
-}
-
-async function fromSurface() {
-  const { buildAgentSurface } = await import(pathToFileURL(surfacePath).href);
-  const root = await mkdtemp(join(tmpdir(), "aeon-footprint-"));
-  const surface = await buildAgentSurface({
-    workingDirectory: join(root, "workspace"),
-    agentDirectory: join(root, "agent"),
-    sessionDirectory: join(root, "sessions"),
-  });
-  // Machine paths in the prompt must not change the budget: the same source measured from the
-  // main checkout, a worktree or a temp directory is the same prompt to the model. The surface
-  // hash already strips them; the byte count has to as well.
-  const portable = createPortable([
-    [root, "<workspace>"],
-    [aeonRepo, "<aeon>"],
-  ]);
-  const systemPrompt = Buffer.byteLength(portable(surface.systemPrompt));
-  const tools = Buffer.byteLength(portable(JSON.stringify(surface.tools)));
-  const firstTurn = Buffer.byteLength(portable(surface.firstTurn));
-  return { systemPrompt, tools, firstTurn, total: systemPrompt + tools + firstTurn };
 }
