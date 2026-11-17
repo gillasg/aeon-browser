@@ -39,6 +39,7 @@ if (existsSync(join(aeonRepo, "skills", "aeon"))) {
     parts.get("10-handoff"),
     parts.get("30-abilities"),
     parts.get("20-routines"),
+    parts.get("35-video"),
     parts.get("40-review"),
   ]);
   outputs.push({ path: join(aeonRepo, "skills", "aeon", "SKILL.md"), content: aeonSkill });

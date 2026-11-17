@@ -1,0 +1,172 @@
+// The recording log. Every folder Aeon records gets an events.json: the clip's metadata, and the
+// things Aeon did while it recorded, on the same clock as the clip. An editor reads this to zoom
+// and place the cursor honestly: it never invents an action that is not in this file.
+// Times are milliseconds from the clip's t=0 (the first captured frame), `at` is the wall clock
+// (epoch ms) for correlating with a run trace, and points are page CSS px unless named `window`.
+
+export type VideoEventKind = "click" | "type" | "press" | "scroll" | "navigate" | "tab-switch";
+
+export type Point = { x: number; y: number };
+
+/** One thing Aeon did. `page` is viewport CSS px; `window` is px in the captured window image. */
+export type VideoEvent = {
+  id: string;
+  kind: VideoEventKind;
+  /** ms from clip t=0. Drives playback; the editor may only zoom at these times. */
+  t: number;
+  /** epoch ms at which the action happened (trace clock), for auditing t. */
+  at: number;
+  tabId?: number;
+  page?: Point;
+  window?: Point;
+  /** Typed text, key pressed, destination URL or tab title. Never a secret (callers scrub). */
+  text?: string;
+  scroll?: Point;
+};
+
+export type ClipMeta = {
+  file: string;
+  source: "window" | "screen" | "tabs";
+  width: number;
+  height: number;
+  fps: number;
+  /** epoch ms of the clip's first frame (its t=0). */
+  startedAt: number;
+  durationMs: number;
+  frames: number;
+  tabId?: number;
+};
+
+export type RecordingEvents = {
+  version: 1;
+  recorder: "aeon";
+  /** `t` is ms from clip t=0; the clip's frames use the same origin. */
+  clock: "clip";
+  clip: ClipMeta;
+  /** With --tabs there is one clip per recorded tab; the first is also `clip`. */
+  clips?: ClipMeta[];
+  events: VideoEvent[];
+  /** Set when the action list is incomplete (no trace was reachable at stop time). */
+  note?: string;
+};
+
+/** Write events.json atomically so a reader never sees a half-written log. */
+export async function writeEvents(
+  folder: string,
+  events: RecordingEvents,
+  write: (path: string, data: string) => Promise<void> = async (path, data) => {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(path, data, "utf8");
+  },
+  rename: (from: string, to: string) => Promise<void> = async (from, to) => {
+    const { rename: fsRename } = await import("node:fs/promises");
+    await fsRename(from, to);
+  },
+): Promise<string> {
+  const { join } = await import("node:path");
+  const target = join(folder, "events.json");
+  const temp = join(folder, ".events.json.tmp");
+  await write(temp, JSON.stringify(events, null, 2) + "\n");
+  await rename(temp, target);
+  return target;
+}
+
+/** A trace action as Aeon's engine emits it (subset of the trace schema we need). */
+export type TraceAction = {
+  kind: string;
+  tabId?: number;
+  tStart: number;
+  tEnd?: number;
+  box?: { x: number; y: number; width: number; height: number };
+  point?: { x: number; y: number };
+  text?: string;
+  url?: string;
+  scroll?: { x?: number; y?: number; direction?: string; amount?: number };
+  failed?: boolean;
+};
+export type Trace = {
+  chatId?: string;
+  trace: { at?: string; actions?: TraceAction[] }[];
+};
+
+const NAV = new Set(["navigate", "openTab", "goto", "back", "forward", "reload"]);
+const CLICK = new Set(["click", "pointer", "dblclick", "tap", "check", "uncheck"]);
+const TYPE = new Set(["fill", "type", "insertText"]);
+const KEYS = new Set(["press", "keys"]);
+
+type LooseEvent = { [K in keyof VideoEvent]?: VideoEvent[K] | undefined };
+const clip = (t: number, at: number, kind: VideoEventKind, patch: LooseEvent = {}): VideoEvent =>
+  ({
+    id: `e${t}-${kind}`,
+    kind,
+    t: Math.max(0, Math.round(t)),
+    at: Math.round(at),
+    ...patch,
+  }) as VideoEvent;
+
+function pointOf(a: TraceAction): Point | undefined {
+  return (
+    a.point ?? (a.box ? { x: a.box.x + a.box.width / 2, y: a.box.y + a.box.height / 2 } : undefined)
+  );
+}
+
+function kindOf(kind: string): VideoEventKind | undefined {
+  if (NAV.has(kind)) return "navigate";
+  if (CLICK.has(kind)) return "click";
+  if (TYPE.has(kind)) return "type";
+  if (KEYS.has(kind)) return "press";
+  if (kind === "scroll") return "scroll";
+  if (kind === "tab-switch" || kind === "switchTab" || kind === "selectTab") return "tab-switch";
+  return undefined;
+}
+
+function textOf(a: TraceAction, kind: VideoEventKind): string | undefined {
+  if (kind === "navigate") return a.url ?? a.text ?? a.kind;
+  if (kind === "press") return a.text ?? a.kind;
+  if (kind === "scroll") return a.scroll?.direction;
+  return a.text;
+}
+
+function oneEvent(
+  a: TraceAction,
+  t: number,
+  common: { at: number; tabId?: number },
+  point: Point | undefined,
+  win: (p: Point) => Point | undefined,
+): VideoEvent | undefined {
+  const kind = kindOf(a.kind);
+  if (!kind) return undefined;
+  if (kind === "scroll" && !a.scroll && !point) return undefined;
+  return clip(t, common.at, kind, {
+    ...common,
+    ...(point ? { page: point, window: win(point) } : {}),
+    ...(kind === "scroll" ? { scroll: { x: a.scroll?.x ?? 0, y: a.scroll?.y ?? 0 } } : {}),
+    text: textOf(a, kind),
+  });
+}
+
+/**
+ * Turn Aeon's timed trace into honest events. `t0` is the clip's wall-clock start, so every event
+ * lands on the clip's clock. `windowOffset`/`scale` place page coordinates into window-space when
+ * a window capture was calibrated; page coordinates are kept either way.
+ */
+export function eventsFromTrace(
+  trace: Trace,
+  t0: number,
+  options: { windowOffset?: Point; scale?: number } = {},
+): VideoEvent[] {
+  const scale = options.scale ?? 1;
+  const off = options.windowOffset;
+  const win = (p: Point): Point | undefined =>
+    off ? { x: Math.round(off.x + p.x * scale), y: Math.round(off.y + p.y * scale) } : undefined;
+  const out: VideoEvent[] = [];
+  for (const a of trace.trace.flatMap((step) => step.actions ?? [])) {
+    if (a.failed || a.tStart < t0) continue; // failed or before the first frame is not in the clip
+    const common = { at: a.tStart, ...(a.tabId === undefined ? {} : { tabId: a.tabId }) };
+    const event = oneEvent(a, a.tStart - t0, common, pointOf(a), win);
+    if (event) out.push(event);
+  }
+  return out
+    .sort((a, b) => a.t - b.t || a.id.localeCompare(b.id))
+    .map((e, i) => ({ ...e, id: `e${i + 1}` }));
+}
