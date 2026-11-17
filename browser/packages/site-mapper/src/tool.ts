@@ -10,7 +10,8 @@ import { toYaml } from "./emit/yaml.js";
 import { checkHealth, repair } from "./health.js";
 import { loadCapture } from "./load/index.js";
 import { loadModel, readOverrides, siteName } from "./registry.js";
-import { listAbilities, runAbility, testAbility } from "./abilities.js";
+import { listAbilities, readAbility, runAbility, testAbility } from "./abilities.js";
+import { RateLimiter } from "./runtime/limits.js";
 import type { ChannelOptions } from "./runtime/channels.js";
 import { exportSession } from "./runtime/session-export.js";
 import { siteMapper } from "./runtime/site-mapper.js";
@@ -42,6 +43,8 @@ export interface SiteToolInput {
   operation?: string;
   /** ability/action: inputs; channel: { send, seconds, match }. */
   params?: Record<string, unknown>;
+  /** ability (reads): one call per input, up to 20, paced; writes stay one per call. */
+  inputs?: Record<string, unknown>[];
   /** ability: only try this way (api, steps, script, page). */
   via?: "api" | "steps" | "script" | "page";
   /** ability (writes): the same key never applies twice within a day. */
@@ -98,7 +101,7 @@ export async function exportSite(site: string, dir: string): Promise<string[]> {
   if (!model) throw new Error(`${siteName(site)} is not mapped yet.`);
   const overrides = await readOverrides(site);
   await mkdir(dir, { recursive: true });
-  const openapi = toOpenApi(model, overrides.redact);
+  const openapi = toOpenApi(model, overrides.redact, await listAbilities(model.site));
   const asyncapi = toAsyncApi(model);
   const files: Record<string, string> = {
     "openapi.json": JSON.stringify(openapi, null, 2),
@@ -168,17 +171,56 @@ const require = (value: string | undefined, what: string): string => {
 const modelFor = async (input: SiteToolInput): Promise<ModelLike | undefined> =>
   typeof input.model === "function" ? input.model() : input.model;
 
+/** Runs one read per input (cap 20), paced; each item keeps its own ok/result or error. */
+export async function runBatched(
+  batch: readonly Record<string, unknown>[],
+  run: (inputs: Record<string, unknown>) => Promise<unknown>,
+  cap = 20,
+): Promise<{
+  items: { input: Record<string, unknown>; ok: boolean; result?: unknown; error?: string }[];
+}> {
+  const limiter = new RateLimiter();
+  const items = await Promise.all(
+    batch.slice(0, cap).map((one) =>
+      limiter.run(async () => {
+        try {
+          return { input: one, ok: true, result: await run(one) };
+        } catch (error) {
+          return {
+            input: one,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    ),
+  );
+  return { items };
+}
+
 const HANDLERS: Record<SiteToolAction, (input: SiteToolInput) => Promise<unknown>> = {
   docs: (input) => readDocs(input.site),
   ability: async (input) => {
     if (!input.name) return listAbilities(input.site);
     if (input.test) return testAbility(input.site, input.name);
-    return runAbility(input.site, input.name, input.params ?? {}, {
+    const options = {
       ...(input.via ? { via: input.via } : {}),
       ...(input.key ? { key: input.key } : {}),
       ...(input.limit ? { limit: input.limit } : {}),
       ...(input.cursor ? { cursor: input.cursor } : {}),
-    });
+    };
+    const batch = input.inputs;
+    if (!batch?.length) return runAbility(input.site, input.name, input.params ?? {}, options);
+    // One call per input on a read ability, paced through the site's politeness limits. Writes stay
+    // one per call so a key and its commit rules never batch: a repeated key could double-submit.
+    const ability = await readAbility(input.site, input.name);
+    if (ability?.kind === "write")
+      throw new Error(
+        "ABILITY_BATCH_READS_ONLY: batch inputs are for read abilities; run a write with one params object and a key.",
+      );
+    const site = input.site;
+    const name = input.name;
+    return runBatched(batch, (one) => runAbility(site, name, one, options));
   },
   channel,
   session: async (input) => {

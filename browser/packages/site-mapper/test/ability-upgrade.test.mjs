@@ -150,6 +150,35 @@ test("a new way that fails its test is refused and the saved ways stay", async (
   });
 });
 
+test("varied public samples become one case each, with a purpose", async () => {
+  await withHome(async () => {
+    const host = {
+      call: async (_op, params) => ({ title: `tea from ${params.q}` }),
+    };
+    const saved = await saveAbility(ability({ name: "varied" }), {
+      host,
+      sample: { inputs: { q: "tea" }, result: { title: "tea from tea" } },
+      samples: [
+        {
+          inputs: { q: "coffee" },
+          result: { title: "tea from coffee" },
+          purpose: "another region",
+        },
+        { inputs: { q: "" }, result: { title: "tea from " }, purpose: "empty listing" },
+        // A duplicate input is not a second case.
+        { inputs: { q: "coffee" }, result: { title: "tea from coffee" } },
+      ],
+    });
+    assert.equal(saved.ability.tests.length, 3);
+    assert.deepEqual(
+      saved.ability.tests.map((test) => test.purpose),
+      ["the run that produced the ability", "another region", "empty listing"],
+    );
+    const read = await readAbility("example.com", "varied");
+    assert.equal(read.tests.length, 3, "the varied cases are stored");
+  });
+});
+
 test("a new way that passes its test is saved, and a sample becomes the first test", async () => {
   await withHome(async () => {
     const host = { call: async () => ({ title: "tea" }) };

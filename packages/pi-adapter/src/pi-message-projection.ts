@@ -2,6 +2,8 @@ import { storedTraceActions } from "./browser-trace-actions.js";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { PiMessageProjection } from "@aeon/domain";
 import { projectContent, resultText, safeJsonObject } from "./pi-content-projection.js";
+import type { SignInCodes } from "./sign-in-codes.js";
+import { maskAnswerBlock } from "./sign-in-codes.js";
 import {
   browserContextFromDetails,
   PI_BROWSER_CONTEXT_CUSTOM_TYPE,
@@ -12,14 +14,22 @@ import { projectChangeDiff } from "./pi-change-diff.js";
 
 type AgentMessageFromEvent = Extract<AgentSessionEvent, { type: "message_start" }>["message"];
 
-export function projectMessage(message: AgentMessageFromEvent): PiMessageProjection {
+export function projectMessage(
+  message: AgentMessageFromEvent,
+  codes?: SignInCodes,
+): PiMessageProjection {
   if (message.role === "user") {
     return { role: "user", content: projectContent(message.content) };
   }
   if (message.role === "assistant") {
+    // Mask before projecting so streaming message_update events never show a sign-in code the
+    // agent read from a tool result. The model's own message is left intact by the guard.
+    const content = codes
+      ? message.content.map((block) => maskAnswerBlock(codes, block))
+      : message.content;
     return {
       role: "assistant",
-      content: projectContent(message.content),
+      content: projectContent(content),
       stopReason: message.stopReason,
       ...(message.errorMessage ? { errorMessage: message.errorMessage.slice(0, 2000) } : {}),
       ...usageOf(message.usage),

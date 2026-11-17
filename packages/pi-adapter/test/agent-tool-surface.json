@@ -238,6 +238,14 @@
           "type": "object",
           "description": "For call, ability, watch and channel: the inputs, flat by name."
         },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "maxItems": 20,
+          "description": "For a read ability: run one call per input (cap 20), paced. Answers {items:[{input, ok, result|error}]}; the single params shape is unchanged and writes stay one per call."
+        },
         "transport": {
           "type": "string",
           "enum": ["auto", "page", "direct"]

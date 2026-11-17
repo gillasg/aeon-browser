@@ -12,6 +12,7 @@ import {
   htmlReport,
   redactedSamples,
   createRedactor,
+  siteTools,
 } from "../dist/index.js";
 import { startFixtureSite } from "./fixture-site.mjs";
 import { browseShop } from "./helpers.mjs";
@@ -27,6 +28,47 @@ async function shopModel(t) {
 }
 
 const SECRETS = [/secret-pass/, /eyJhbGciOiJIUzI1NiJ9\.eyJ/, /demo@example\.com/];
+
+const readAbility = {
+  name: "find product",
+  site: "shop.example",
+  kind: "read",
+  description: "find a product by query",
+  inputs: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+  ways: [
+    { kind: "api", operation: "search" },
+    { kind: "page", collect: {} },
+  ],
+  preconditions: { signedIn: false },
+  options: {},
+  stats: { runs: 0, failures: 0 },
+};
+
+test("saved abilities export beside operations in OpenAPI and as MCP tools", async (t) => {
+  const model = await shopModel(t);
+  const doc = toOpenApi(model, {}, [readAbility]);
+  assert.equal(doc["x-abilities"].length, 1);
+  const published = doc["x-abilities"][0];
+  assert.equal(published.name, "find product");
+  assert.equal(published.effect, "read");
+  assert.deepEqual(published.ways, ["api", "page"]);
+  assert.deepEqual(published.inputs.required, ["q"]);
+  assert.equal(typeof published.digest, "string");
+  assert.equal(doc["x-abilities"][0].code, undefined, "the reviewable shape carries no code");
+
+  const tools = siteTools(model, {}, [readAbility]);
+  const abilityTool = tools.find((tool) => tool.name === "find_product");
+  assert.ok(abilityTool, "one MCP tool per ability, beside the operations");
+  assert.match(abilityTool.description, /a read ability/);
+  assert.match(abilityTool.description, /ways api\/page/);
+  assert.equal(abilityTool.annotations.readOnlyHint, true);
+  assert.deepEqual(abilityTool.inputSchema.required, ["q"]);
+  const opName = model.operations[0].id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
+  assert.ok(
+    tools.some((tool) => tool.name === opName),
+    "raw operations still present",
+  );
+});
 
 test("OpenAPI 3.1: paths, security schemes, extensions, variants", async (t) => {
   const model = await shopModel(t);

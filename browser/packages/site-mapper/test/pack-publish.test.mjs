@@ -78,19 +78,21 @@ test("a pack's runnable ability is scrubbed of lint findings before it ships", a
   });
   const { out } = await site(t, leaky);
   const exported = await exportSitePack({ site: "shop.example", out, publish: "warn" });
-  assert.ok(exported.findings.some((finding) => finding.code === "secret"));
   assert.ok(exported.findings.some((finding) => finding.code === "input_recorded_value"));
   const entries = unzip(await readFile(out));
   const runnable = JSON.parse(entries["abilities/search.json"]);
+  // The credential-bearing script survives with its key templated to a caller input, so the way
+  // is not lost and no secret ships in the pack.
   assert.deepEqual(
     runnable.ways.map((way) => way.kind),
-    ["api"],
-    "the credential-bearing script is not in the runnable file",
+    ["script", "api"],
   );
+  assert.match(runnable.ways[0].code, /Bearer ['"] \+ inputs\["authToken"\] \+ ['"]/);
+  assert.ok(runnable.inputs.properties.authToken, "the key is a caller input");
   assert.equal(runnable.inputs.properties.q.example, undefined, "the recorded value is redacted");
   assert.equal(entries["abilities/search.json"].includes("Bearer ab12"), false);
   const definition = JSON.parse(entries["abilities/public/search.json"]);
-  assert.deepEqual(definition.ways, ["api"]);
+  assert.deepEqual(definition.ways, ["script", "api"]);
 });
 
 test("a private value the scrub cannot remove stops even a warned pack", async (t) => {

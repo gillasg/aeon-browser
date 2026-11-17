@@ -195,12 +195,21 @@ var __runPageAbility = async (plan) => {
   try { return await fn(tab, bu, plan.input); }
   finally { if (current) globalThis.page = current; }
 };
-function __abilityOutcome(name, raw) {
+function __abilityOutcome(name, raw, site) {
   var value = raw && typeof raw === 'object' ? raw : {result: raw};
   var ok = value.ok !== false;
   var effect = value.effect || (ok ? 'confirmed' : 'refused');
   var steps = Array.isArray(value.steps) && value.steps.length ? value.steps : [{label: 'Run “' + name + '”', effect, kind: 'ability', write: Boolean(value.write)}];
-  return Object.assign({}, value, {ok, effect, steps});
+  var out = Object.assign({}, value, {ok, effect, steps});
+  // A way that drifted can still answer: it returns unverified instead of throwing, so the error
+  // path never names its repair. Give that result the same heal/edit next step as a thrown drift.
+  if (Array.isArray(value.unverified) && value.unverified.length && site) {
+    var where = ',site:' + JSON.stringify(site);
+    out.next = 'site_mapper({action:"heal"' + where + ',repair:true}) or site_mapper({action:"edit"' + where + ',change:"what no longer matches"})';
+    console.log('Hint: the saved ability no longer matches the site; check what is unverified.');
+    console.log('Next: ' + out.next);
+  }
+  return out;
 }
 var __siteAbilities = {
   run: async (name, inputs = {}, options = {}) => {
@@ -209,8 +218,8 @@ var __siteAbilities = {
     var host = await __siteHostName(options.site);
     // Page code (built-in abilities, page-script reads) runs right here, in this cell's tabs.
     var plan = await __call({abilityRun: {site: host, name, inputs, plan: true, ...(options.via ? {via: options.via} : {})}});
-    if (plan && plan.local) return __abilityOutcome(name, {result: await __runPageAbility(plan), via: 'script', tried: []});
-    return __abilityOutcome(name, await __call({abilityRun: {site: host, name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {}), ...(options.complete ? {complete: true} : {})}}));
+    if (plan && plan.local) return __abilityOutcome(name, {result: await __runPageAbility(plan), via: 'script', tried: []}, host);
+    return __abilityOutcome(name, await __call({abilityRun: {site: host, name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {}), ...(options.complete ? {complete: true} : {})}}), host);
   },
   test: async (name, site) => __call({abilityRun: {site: await __siteHostName(site), name, test: true}}),
   // Moves an ability to the site's trash/ (nothing is hard-deleted); returns {removed}.

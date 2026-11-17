@@ -79,6 +79,9 @@ pass back `steps` as `since`); `aeon_run_status` lists chats waiting on a questi
 - **Long jobs.** One `aeon tool` call runs up to 60 s; for hours, start a durable
   `browser.sweep`/`browser.job` and check it with `aeon job`, or `aeon sweep @urls.txt --pilot 5`
   (`help('sweep')`). Keep other state with `checkpoint`/`loadCheckpoint`.
+- **Varied samples.** A build takes 5–8 public samples (other store, region, template, empty or
+  closed record), each with what makes it different, and stores one test per differing trait; a
+  write rehearses its steps read-only on them before the first save, capped by time.
 - **Login codes.** Email: read the newest message in the inbox. SMS: messages.google.com/web.
 - **Phone and desktop apps:** proxy through mitmproxy, then `site_mapper action=import`.
 - **An MCP server or SDK for a site.** Map it (`explore`, `actions: true` also maps actions in dry

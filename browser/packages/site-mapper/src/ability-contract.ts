@@ -12,6 +12,8 @@ export interface AbilityTest {
   expect?: Record<string, unknown>;
   /** An example value was a secret and was not stored. */
   redacted?: true;
+  /** Why this case was kept, e.g. "another region" or "an empty listing". */
+  purpose?: string;
 }
 
 export interface AbilityTestReport {

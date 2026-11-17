@@ -7,6 +7,8 @@ import { siteMapper, type SiteMapper, type SiteMapperOptions } from "./runtime/s
 import type { SiteAction } from "./runtime/actions.js";
 import type { ChannelOptions } from "./runtime/channels.js";
 import { isDerived } from "./params.js";
+import { listAbilities, runAbility, type Ability } from "./abilities.js";
+import { contentDigest } from "./ability-digest.js";
 import type { JsonSchema, Operation, PageEndpoint, Param, SiteModel } from "./types.js";
 
 // A stdio MCP server. With a site: one tool per operation and page endpoint, with typed inputs.
@@ -53,7 +55,54 @@ function toolName(id: string): string {
   return id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
 }
 
-function siteTools(model: SiteModel, saved: Record<string, SiteAction> = {}): Json[] {
+/**
+ * One tool per saved ability, beside the raw operations: the tested tool keeps its stable name
+ * while the endpoint moves. Inputs come from the ability's contract; the writes inventory is
+ * listed as an inventory, never a gate.
+ */
+function abilityDescription(ability: Ability, site: string): string {
+  const ways = ability.ways?.length ? ability.ways.map((way) => way.kind).join("/") : "";
+  const writes = ability.writes?.length ? ability.writes.map((write) => write.what).join(", ") : "";
+  const preconditions = ability.preconditions
+    ? Object.entries(ability.preconditions)
+        .filter(([, value]) => value !== undefined && value !== false)
+        .map(([key, value]) => (value === true ? key : `${key}: ${String(value)}`))
+        .join(", ")
+    : "";
+  const details = [
+    `a ${ability.kind} ability on ${site}`,
+    ways ? `ways ${ways}` : "",
+    writes ? `writes ${writes} (inventory, not a permission gate)` : "",
+    preconditions ? `preconditions ${preconditions}` : "",
+    `version ${contentDigest(ability)}`,
+  ].filter(Boolean);
+  return `${ability.description ?? ability.name}: ${details.join("; ")}.`;
+}
+
+function abilityTools(abilities: readonly Ability[], site: string, used: Set<string>): Json[] {
+  return abilities.flatMap((ability) => {
+    const name = toolName(ability.name);
+    if (!name || used.has(name)) return [];
+    used.add(name);
+    return [
+      {
+        name,
+        description: abilityDescription(ability, site),
+        inputSchema: { type: "object", ...(ability.inputs as Json) },
+        annotations: {
+          readOnlyHint: ability.kind === "read",
+          destructiveHint: Boolean(ability.writes?.some((write) => write.kind === "explicit")),
+        },
+      },
+    ];
+  });
+}
+
+export function siteTools(
+  model: SiteModel,
+  saved: Record<string, SiteAction> = {},
+  abilities: readonly Ability[] = [],
+): Json[] {
   const ops = model.operations.map((op) => ({
     name: toolName(op.id),
     description: `${op.summary ?? op.description ?? op.id}: ${op.method} ${op.path} on ${model.site} (${op.role}, ${op.bucket} confidence${op.capabilities?.length ? `, ${op.capabilities.join("/")}` : ""}).`,
@@ -75,12 +124,18 @@ function siteTools(model: SiteModel, saved: Record<string, SiteAction> = {}): Js
     description: `${action.description ?? name}: runs ${action.steps.map((step) => step.operation).join(" → ")} on ${model.site}.`,
     inputSchema: { type: "object", properties: {}, additionalProperties: true },
   }));
-  return [...ops, ...pages, ...actions];
+  const tools = [...ops, ...pages, ...actions];
+  const used = new Set(tools.map((tool) => String(tool.name)));
+  return [...tools, ...abilityTools(abilities, model.site, used)];
 }
 
-function listOperations(model: SiteModel, saved: Record<string, SiteAction>): Json {
+function listOperations(
+  model: SiteModel,
+  saved: Record<string, SiteAction>,
+  abilities: readonly Ability[] = [],
+): Json {
   return {
-    operations: siteTools(model, saved).map((tool) => ({
+    operations: siteTools(model, saved, abilities).map((tool) => ({
       name: tool.name,
       description: tool.description,
       input: tool.inputSchema,
@@ -218,6 +273,46 @@ function watchTool(args: Json): Promise<unknown> {
   });
 }
 
+function generalDispatch(
+  api: (name: string) => Promise<SiteMapper>,
+): Record<string, (args: Json) => Promise<unknown>> {
+  return {
+    list_sites: () => listSites(),
+    list_operations: async (args) => {
+      const found = await loadModel(String(args.site));
+      if (!found) throw new Error(`${String(args.site)} is not mapped`);
+      return listOperations(
+        found,
+        (await readOverrides(found.site)).actions ?? {},
+        await listAbilities(found.site).catch(() => []),
+      );
+    },
+    run_action: async (args) =>
+      (await api(String(args.site))).action(
+        String(args.action),
+        (args.inputs as Json | undefined) ?? {},
+      ),
+    listen_channel: async (args) =>
+      (await api(String(args.site))).channel(String(args.channel), channelOptions(args)),
+    watch_operation: watchTool,
+    site_docs: (args) => readDocs(String(args.site)),
+    explore_sites: (args) =>
+      explore(args.sites as string[], {
+        ...(typeof args.goal === "string" ? { goal: args.goal } : {}),
+        ...(args.actions === true ? { actions: true } : {}),
+        ...(args.quiet === false ? { quiet: false } : {}),
+        ...(typeof args.parallel === "number" ? { parallel: args.parallel } : {}),
+      }),
+    call_operation: async (args) => {
+      const maxItems = typeof args.maxItems === "number" ? { maxItems: args.maxItems } : {};
+      return callTool(await api(String(args.site)), String(args.operation), {
+        ...((args.params as Json | undefined) ?? {}),
+        ...maxItems,
+      });
+    },
+  };
+}
+
 function textResult(value: unknown, isError = false): Json {
   let text = typeof value === "string" ? value : (JSON.stringify(value, null, 2) ?? "null");
   if (text.length > LIMIT)
@@ -244,45 +339,18 @@ export async function runMcpServer(site?: string, options: SiteMapperOptions = {
   const model = site ? await loadModel(site) : undefined;
   if (site && !model) throw new Error(`${siteName(site)} is not mapped yet.`);
   const saved = model ? ((await readOverrides(model.site)).actions ?? {}) : {};
+  const abilities = model ? await listAbilities(model.site).catch(() => []) : [];
   const siteTool = async (current: SiteModel, name: unknown, args: Json): Promise<unknown> => {
     const ids = [...current.operations.map((op) => op.id), ...current.pages.map((p) => p.id)];
     const id = ids.find((item) => toolName(item) === name);
     const action = Object.keys(saved).find((item) => toolName(item) === name);
     if (!id && action) return (await api(current.site)).action(action, args);
+    const ability = abilities.find((item) => toolName(item.name) === name);
+    if (!id && ability) return runAbility(current.site, ability.name, args, {});
     if (!id) throw new Error(`Unknown tool ${String(name)}`);
     return callTool(await api(current.site), id, args);
   };
-  const general: Record<string, (args: Json) => Promise<unknown>> = {
-    list_sites: () => listSites(),
-    list_operations: async (args) => {
-      const found = await loadModel(String(args.site));
-      if (!found) throw new Error(`${String(args.site)} is not mapped`);
-      return listOperations(found, (await readOverrides(found.site)).actions ?? {});
-    },
-    run_action: async (args) =>
-      (await api(String(args.site))).action(
-        String(args.action),
-        (args.inputs as Json | undefined) ?? {},
-      ),
-    listen_channel: async (args) =>
-      (await api(String(args.site))).channel(String(args.channel), channelOptions(args)),
-    watch_operation: watchTool,
-    site_docs: (args) => readDocs(String(args.site)),
-    explore_sites: (args) =>
-      explore(args.sites as string[], {
-        ...(typeof args.goal === "string" ? { goal: args.goal } : {}),
-        ...(args.actions === true ? { actions: true } : {}),
-        ...(args.quiet === false ? { quiet: false } : {}),
-        ...(typeof args.parallel === "number" ? { parallel: args.parallel } : {}),
-      }),
-    call_operation: async (args) => {
-      const maxItems = typeof args.maxItems === "number" ? { maxItems: args.maxItems } : {};
-      return callTool(await api(String(args.site)), String(args.operation), {
-        ...((args.params as Json | undefined) ?? {}),
-        ...maxItems,
-      });
-    },
-  };
+  const general = generalDispatch(api);
   const generalTool = (name: unknown, args: Json): Promise<unknown> => {
     const run = general[String(name)];
     if (!run) throw new Error(`Unknown tool ${String(name)}`);
@@ -293,7 +361,7 @@ export async function runMcpServer(site?: string, options: SiteMapperOptions = {
     if (message.method === "initialize") return initializeResult(params, model);
     if (message.method === "ping") return {};
     if (message.method === "tools/list")
-      return { tools: model ? siteTools(model, saved) : GENERAL_TOOLS };
+      return { tools: model ? siteTools(model, saved, abilities) : GENERAL_TOOLS };
     if (message.method !== "tools/call")
       throw new Error(`Unsupported method: ${String(message.method)}`);
     const args = (params.arguments ?? {}) as Json;

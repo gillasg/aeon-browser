@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { signInCodeGuard } from "../dist/sign-in-code-guard.js";
+import { signInCodes, maskAnswerBlock } from "../dist/sign-in-codes.js";
 
 // A code the agent read for a sign-in is a secret: the answer must not repeat it. An order
 // number, or digits the agent never read, stays. No wall-clock asserts.
@@ -57,4 +58,27 @@ test("an order number, a payment code and an unread number stay visible", () => 
     },
   });
   assert.equal(ended, undefined);
+});
+
+test("codes are kept per chat, so one chat cannot mask another chat's answer", () => {
+  const a = signInCodes("chat-a");
+  const b = signInCodes("chat-b");
+  a.note("Your verification code is 482913.");
+  assert.equal(signInCodes("chat-a"), a, "the same chat reuses its store");
+  assert.notEqual(a, b);
+  assert.match(a.mask("the code is 482913"), /\[removed\]/);
+  assert.equal(b.mask("the code is 482913").includes("482913"), true, "b never noted that code");
+});
+
+test("a streaming answer block is masked, and an unchanged block is reused", () => {
+  const codes = signInCodes("chat-stream");
+  codes.note("Your verification code is 339120.");
+  const typed = { type: "text", text: "Code 339120 typed" };
+  const masked = maskAnswerBlock(codes, typed);
+  assert.equal(masked.text.includes("339120"), false);
+  assert.match(masked.text, /\[removed\]/);
+  const thinking = { type: "thinking", thinking: "enter 339120" };
+  assert.match(maskAnswerBlock(codes, thinking).thinking, /\[removed\]/);
+  const clean = { type: "text", text: "nothing secret here" };
+  assert.equal(maskAnswerBlock(codes, clean), clean, "a clean block is not reallocated");
 });

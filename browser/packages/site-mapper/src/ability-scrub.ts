@@ -48,6 +48,10 @@ const JWT = /\beyJ[\w-]{6,4096}\.[\w-]{6,8192}\.[\w-]{6,4096}\b/;
 // A credential written into code (script ways are a string, so key-name checks never see it).
 const CREDENTIAL =
   /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}|\b(?:authorization|api[_-]?key|apikey|x-api-key|access[_-]?token|secret[_-]?key)\b\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{8,}/i;
+// The same credential, with its value captured so it can be templated into a caller input before
+// the scrub sees it. Bracket notation in the replacement (inputs["x"]) keeps it from re-matching.
+const SCRIPT_CREDENTIAL =
+  /(?<scheme>\b(?:Bearer|Basic))\s+(?<token>[A-Za-z0-9._~+/=-]{8,})|(?<key>\b(?:authorization|api[_-]?key|apikey|x-api-key|access[_-]?token|secret[_-]?key))\b\s*[:=]\s*(?<quote>["']?)(?<value>[A-Za-z0-9._~+/=-]{8,})\k<quote>/gi;
 
 export function scrubAbility(
   ability: Ability,
@@ -56,6 +60,7 @@ export function scrubAbility(
 ): AbilityScrub {
   const next = structuredClone(ability);
   const marks = templateTypedSecrets(next);
+  templateScriptCredentials(next, marks);
   const found: Found[] = [];
   const cleaned = scrubValue(next, "", undefined, found, redactor) as Ability;
   const ways = settleWays(cleaned, found, options, marks);
@@ -91,6 +96,76 @@ function templateTypedSecrets(ability: Ability): ScrubMark[] {
     }
   }
   return marks;
+}
+
+/**
+ * A script that hard-codes a key cannot be replayed safely as-is. Instead of dropping it, point
+ * the literal at a caller input (which is never stored) so the way survives without the secret.
+ */
+function templateScriptCredentials(ability: Ability, marks: ScrubMark[]): void {
+  for (const way of ability.ways) {
+    if (way.kind !== "script" || typeof way.code !== "string") continue;
+    const code = way.code;
+    let used = 0;
+    const next = code.replace(SCRIPT_CREDENTIAL, (whole, ...rest: unknown[]) => {
+      const groups = rest[rest.length - 1] as Record<string, string | undefined>;
+      const offset = rest[rest.length - 3] as number;
+      used += 1;
+      if (groups.scheme && groups.token) {
+        const ref = `inputs[${JSON.stringify(credentialInputName(groups.scheme, ability))}]`;
+        const quote = enclosingQuote(code, offset);
+        const splice = quote === "`" ? `\${${ref}}` : quote ? `${quote} + ${ref} + ${quote}` : ref;
+        return whole.replace(groups.token, splice);
+      }
+      const name = credentialInputName(groups.key ?? "secret", ability);
+      const quoted = `${groups.quote ?? ""}${groups.value ?? ""}${groups.quote ?? ""}`;
+      return whole.replace(quoted, `inputs[${JSON.stringify(name)}]`);
+    });
+    if (!used) continue;
+    way.code = next;
+    way.redacted = true;
+    marks.push({
+      where: "way",
+      via: "script",
+      what: "script: credential templated to a caller input",
+      dropped: false,
+      reason: "secret",
+    });
+  }
+}
+
+/** A stable, unique input name for a credential found in a script. */
+function credentialInputName(key: string, ability: Ability): string {
+  const base = /authorization|bearer|basic/i.test(key)
+    ? "authToken"
+    : /api[_-]?key/i.test(key)
+      ? "apiKey"
+      : /access[_-]?token/i.test(key)
+        ? "accessToken"
+        : /secret[_-]?key/i.test(key)
+          ? "secretKey"
+          : "credential";
+  const properties = inputProperties(ability);
+  if (!properties[base])
+    properties[base] = {
+      type: "string",
+      description: "Supplied by the caller at run time; the value was not stored",
+    };
+  return base;
+}
+
+/** The quote a credential sits inside, so a token can be spliced out as valid JS. */
+function enclosingQuote(code: string, index: number): "'" | '"' | "`" | undefined {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const char = code[i];
+    if (char === "\\") {
+      i -= 1;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") return char;
+    if (char === "\n" || char === ";") return undefined;
+  }
+  return undefined;
 }
 
 function isTypedSecret(

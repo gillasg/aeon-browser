@@ -307,6 +307,8 @@ export type SiteMapperToolInput = {
   goal?: string;
   operation?: string;
   params?: Record<string, unknown>;
+  /** ability: batch inputs on a read ability (cap 20), paced; writes stay one per call. */
+  inputs?: Record<string, unknown>[];
   transport?: "auto" | "page" | "direct";
   /** ability: only try this way (api, steps, script, page). */
   via?: "api" | "steps" | "script" | "page";
@@ -383,6 +385,13 @@ const siteMapperParameters: JsonObjectSchema = {
       type: "object",
       description: "For call, ability, watch and channel: the inputs, flat by name.",
     },
+    inputs: {
+      type: "array",
+      items: { type: "object" },
+      maxItems: 20,
+      description:
+        "For a read ability: run one call per input (cap 20), paced. Answers {items:[{input, ok, result|error}]}; the single params shape is unchanged and writes stay one per call.",
+    },
     transport: { type: "string", enum: ["auto", "page", "direct"] },
     via: { type: "string", enum: ["api", "steps", "script", "page"] },
     files: {
@@ -438,7 +447,7 @@ export const siteMapperTool: AgentToolDefinition<SiteMapperToolInput> = {
     { name: "docs", params: ["site"] },
     {
       name: "ability",
-      params: ["site", "name", "params", "via", "key", "limit", "cursor", "test"],
+      params: ["site", "name", "params", "inputs", "via", "key", "limit", "cursor", "test"],
     },
     { name: "channel", params: ["site", "name", "params"] },
     { name: "session", params: ["site"] },

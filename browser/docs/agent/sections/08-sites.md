@@ -47,6 +47,12 @@ limit, cursor})` or `site.<name>(inputs)`. An ability is not a mapped operation:
   read may say `partial` when a way saw only part; `{complete: true}` skips those ways. Saving
   runs the new way's tests first: a failure names the reason and leaves the old ways in place.
   Details: `help('abilities')`.
+- **Test values only when asked:** if a build is asked to use test/synthetic/sample values, fill
+  each open field with a plausible value in the site's required format as this run's input, never as
+  a literal in the ability; never a credential, one-time code, payment detail or signature, and a
+  bare mention of test data authorizes nothing.
+- **Visited pages stay reads:** opening a page a site then marks visited or in progress, with no
+  answer or form submitted, is still a read unless the request asks to change that progress.
 - **Site APIs** (or `siteMapper` in browser code) only work on sites that are mapped: a mapped
   site shows `[api]` on the first turn, and a `[site]` line when you open it. `browserkit sites`
   lists them when nothing on the turn matches. To map a site: `map`, `describe`, `learn`, or use
@@ -54,6 +60,9 @@ limit, cursor})` or `site.<name>(inputs)`. An ability is not a mapped operation:
 - `call` reads. A write the page made successfully can be repeated with `siteMapper.write`; the
   same change on many items is `siteMapper.batch` in one call (paced, stops at the first error).
   Paying, ordering, sending, posting, deleting and account changes always stay in the page.
+  For a write that pays, books or orders, re-check the total right before the commit when a step
+  after approval can change it; if you cannot see it then, re-read after that step and stop if it
+  rose above what was approved.
 - `watch` is one check, not a monitor: it calls the operation and returns only the items new or
   changed since the last watch of the same call; nothing runs in between. For ongoing monitoring,
   schedule the command yourself.

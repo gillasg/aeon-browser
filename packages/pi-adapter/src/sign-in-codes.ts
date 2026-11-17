@@ -27,6 +27,43 @@ export class SignInCodes {
   }
 }
 
+// A code is a secret for one chat, not for one resource loader: a resource reload rebuilds the
+// extension (and its own store), and two chats must not mask each other's answers. The projection
+// layer masks streaming updates from this per-chat store, so digits cannot flash before
+// message_end. Codes noted before a reload still apply to the rest of that chat.
+const MAX_CHATS = 60;
+const chats = new Map<string, SignInCodes>();
+
+/** The code store for one chat, created on first use and kept across resource reloads. */
+export function signInCodes(chatId: string): SignInCodes {
+  let store = chats.get(chatId);
+  if (!store) {
+    store = new SignInCodes();
+    if (chats.size >= MAX_CHATS) {
+      const oldest = chats.keys().next().value;
+      if (oldest !== undefined) chats.delete(oldest);
+    }
+    chats.set(chatId, store);
+  }
+  return store;
+}
+
+/** A text/thinking block after masking; the object is reused when nothing changed. */
+export function maskAnswerBlock<T extends { type?: string; text?: string; thinking?: string }>(
+  codes: SignInCodes,
+  block: T,
+): T {
+  if (block.type === "text" && block.text) {
+    const text = codes.mask(block.text);
+    return text === block.text ? block : { ...block, text };
+  }
+  if (block.type === "thinking" && block.thinking) {
+    const thinking = codes.mask(block.thinking);
+    return thinking === block.thinking ? block : { ...block, thinking };
+  }
+  return block;
+}
+
 /** Every way a value commonly shows up in text: as typed, URL- or form-encoded, JSON, base64. */
 function formsOf(value: string): string[] {
   const forms = new Set([
