@@ -38,7 +38,17 @@ export function chromeFlagsCommand(platform: NodeJS.Platform = process.platform)
 const FLAGS_FIX = `Restart Chrome with these flags: ${chromeFlagsCommand()}`;
 
 export type CheckName =
-  "daemon" | "protocol" | "extension" | "flags" | "model" | "supervisor" | "data";
+  | "daemon"
+  | "protocol"
+  | "extension"
+  | "flags"
+  | "model"
+  | "supervisor"
+  | "data"
+  // `aeon doctor --stealth` reports these three, one line each, with the exact fix.
+  | "webrtc"
+  | "geo"
+  | "tells";
 
 export interface Check {
   name: CheckName;
