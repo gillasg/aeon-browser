@@ -1,4 +1,4 @@
-import { noteDeviceEmulation } from "./native-browser-session.js";
+import { noteDeviceEmulation, withFocusEmulation } from "./native-browser-session.js";
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
 import { callClass, send } from "./cdp/send.js";
@@ -538,12 +538,19 @@ export async function executePageCode(
       );
     const refused = refusedCdp(step.method, step.params as Record<string, unknown>);
     if (refused) throw new BrowserActionError("UNSUPPORTED", refused);
-    value = await send(
-      debuggee,
-      step.method,
-      step.params,
-      sendOpts("executePageCode", step.method, step.params),
-    );
+    const issue = () =>
+      send(
+        debuggee,
+        step.method,
+        step.params,
+        sendOpts("executePageCode", step.method, step.params),
+      );
+    // A synthetic mouse move or press through page.cdp needs the tab focus-emulated too: after a
+    // click turned it off, macOS Chrome leaves the next Input.dispatchMouseEvent unanswered.
+    value =
+      step.method === "Input.dispatchMouseEvent"
+        ? await withFocusEmulation(debuggee.tabId, issue)
+        : await issue();
     if (debuggee.tabId !== undefined) noteDeviceEmulation(debuggee.tabId, step.method, step.params);
   }
   return {

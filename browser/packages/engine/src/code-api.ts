@@ -43,9 +43,24 @@ function __geolocationShim(coords) {
   if (!geo || !/native code/.test(Function.prototype.toString.call(geo.getCurrentPosition))) return;
   var real = { get: geo.getCurrentPosition.bind(geo), watch: geo.watchPosition.bind(geo) };
   var position = () => ({ coords: { ...coords, altitude: null, altitudeAccuracy: null, heading: null, speed: null }, timestamp: Date.now() });
-  var fallback = (ok, fail) => (error) => (error && error.code === 1 ? ok(position()) : fail && fail(error));
-  geo.getCurrentPosition = (ok, fail, options) => real.get(ok, fallback(ok, fail), options);
-  geo.watchPosition = (ok, fail, options) => real.watch(ok, fallback(ok, fail), options);
+  // Use the real location when it answers: the user's position is more useful than the preset one.
+  // Fall back on a denial, and on macOS when the OS location service never answers at all: without
+  // a deadline getCurrentPosition hangs the page's evaluate forever instead of giving the coords.
+  var answer = (call, ok, fail, options) => {
+    var done = false;
+    var timer = setTimeout(() => { if (!done) { done = true; ok(position()); } }, 1500);
+    var settle = (value, error) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (!error) ok(value);
+      else if (error.code === 1) ok(position());
+      else if (fail) fail(error);
+    };
+    return call((value) => settle(value), (error) => settle(undefined, error), options);
+  };
+  geo.getCurrentPosition = (ok, fail, options) => answer(real.get, ok, fail, options);
+  geo.watchPosition = (ok, fail, options) => answer(real.watch, ok, fail, options);
 }
 // What the engine's strict step schema accepts of a locator; filters and regexes resolve in the page.
 function __wire(element) {

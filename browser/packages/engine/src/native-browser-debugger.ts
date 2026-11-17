@@ -575,10 +575,12 @@ export async function scrollAt(
     deltaX: direction === "left" || direction === "right" ? amount * positive : 0,
     deltaY: direction === "up" || direction === "down" ? amount * positive : 0,
   });
-  await send(
-    debuggee,
-    "Input.dispatchMouseEvent",
-    { type: "mouseWheel", ...params },
-    { label: "scrollAt" },
+  await withFocusEmulation(debuggee.tabId, () =>
+    send(
+      debuggee,
+      "Input.dispatchMouseEvent",
+      { type: "mouseWheel", ...params },
+      { label: "scrollAt" },
+    ),
   );
 }
