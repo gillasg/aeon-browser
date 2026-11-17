@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol/version";
 import { aeonDataDirectory } from "@aeon/location";
 import WebSocket from "ws";
+import { getSamplingBridge } from "./mcp-sampling.js";
 import { notRunningMessage, readStartFailure } from "./start-failure.js";
 
 // One connection to the running Aeon daemon through its local Core endpoint. The daemon writes
@@ -225,23 +226,40 @@ export class AeonClient {
     });
   }
 
-  /** One tool-calling completion with Aeon's default model (the AI commands use this). */
+  /**
+   * One tool-calling completion for the AI commands. In an MCP session that offered sampling (and
+   * has no Aeon model, or asked to prefer the agent's), the calling agent's model answers instead.
+   */
   modelComplete(
     body: { systemPrompt: string; messages: unknown[]; tools: unknown[] },
     timeoutMs = 5 * 60_000,
+    signal?: AbortSignal,
   ): Promise<Json> {
+    const sampler = getSamplingBridge();
+    if (sampler?.active) return sampler.complete(body, timeoutMs, signal);
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const finish = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         this.waiting.delete(requestId);
+      };
+      const timer = setTimeout(() => {
+        finish();
         reject(new Error("The model did not answer in time."));
       }, timeoutMs);
+      const onAbort = () => {
+        finish();
+        reject(new Error("MCP_REQUEST_CANCELLED: the model request was cancelled."));
+      };
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.model.result") return;
-        clearTimeout(timer);
-        this.waiting.delete(requestId);
+        finish();
         resolve(message);
       });
+      if (signal?.aborted) return;
       this.socket.send(JSON.stringify({ kind: "core.model.complete", requestId, ...body }));
     });
   }

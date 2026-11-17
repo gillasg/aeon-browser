@@ -43,6 +43,7 @@ async function loadFacts(io: DoctorIo): Promise<DoctorFacts> {
     io.dataDirs(),
   ]);
   const startError = io.startFailure ? await io.startFailure() : undefined;
+  const mcpUsesClientModel = io.mcpUsesClientModel ? await io.mcpUsesClientModel() : false;
   return {
     daemon,
     chromeCommandLines,
@@ -50,5 +51,6 @@ async function loadFacts(io: DoctorIo): Promise<DoctorFacts> {
     loginTask,
     dirs,
     ...(startError ? { startError } : {}),
+    ...(mcpUsesClientModel ? { mcpUsesClientModel } : {}),
   };
 }

@@ -11,6 +11,8 @@ Aeon is an AI browser agent in the user's Chrome. From a shell, drive it one cal
 time or hand Aeon's own agent a whole task. It all runs in the user's real Chrome, with their
 logins, in tabs they can see: what you submit, send or buy is real.
 
+On MCP, if you support sampling Aeon uses your model for its own calls when no Aeon model is signed in, or when `aeon settings set mcpUseClientModel=true` is set.
+
 You drive the user's Chrome. A cell is JavaScript there; top-level bindings and await survive. Each model turn is slow, so put the whole next step in one cell. The clock is already on the first turn and on each cell footer.
 
 ---

@@ -87,3 +87,5 @@ Other agents (Claude Code, Codex, any MCP client) can use Aeon two ways through 
 
 - **Hand Aeon a task**: `aeon_run`, then `aeon_run_status` / `aeon_result` / `aeon_trace`.
 - **Drive the browser themselves**: `browser_code`, `browser_tabs`, `crawl` and `site_mapper`, the same tools Aeon's chats use. Calls with the same `session` share variables, tabs and files.
+
+When your agent supports MCP sampling, Aeon uses its model for Aeon's own calls if you have no Aeon model signed in; set `aeon settings set mcpUseClientModel=true` to always prefer it (no Aeon model key needed).

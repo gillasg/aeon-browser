@@ -20,6 +20,8 @@ import {
   mcpResult,
   mcpSessionFromMeta,
 } from "@aeon/protocol";
+import { modelAuthPath, modelSignedIn } from "./doctor-io.js";
+import { SamplingBridge, readUseClientModel, setSamplingBridge } from "./mcp-sampling.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -306,11 +308,19 @@ function learnConnection(params: Json, method: string, conn: McpConnection): voi
   if (method === "initialize") conn.modern = false;
 }
 
-function cancelMcpCall(message: Json, params: Json, pending: Map<string, AbortController>): void {
+function cancelMcpCall(
+  message: Json,
+  params: Json,
+  pending: Map<string, AbortController>,
+  sampler: SamplingBridge,
+): void {
   // Notifications need no answer. A 2026-07-28 cancel stops the in-flight call; its answer is
-  // dropped, so a cancelled write is never replayed.
-  if (message.method === "notifications/cancelled" && params.requestId !== undefined)
-    pending.get(String(params.requestId))?.abort();
+  // dropped, so a cancelled write is never replayed. The same id may be a sampling request.
+  if (message.method === "notifications/cancelled" && params.requestId !== undefined) {
+    const id = String(params.requestId);
+    pending.get(id)?.abort();
+    sampler.abort(id);
+  }
 }
 
 /** A tool call runs without blocking the read loop, so a cancel can arrive while it is in flight. */
@@ -360,30 +370,46 @@ export async function runMcpServer(site?: string): Promise<void> {
     pending: new Map<string, AbortController>(),
     conn: { modern: false },
   };
+  // A model call is routed to the agent when it offered sampling and Aeon has no model of its own,
+  // or the user asked to prefer the agent's model. Both facts are read once, here at session start.
+  const sampler = new SamplingBridge();
+  sampler.setSender((request) => process.stdout.write(`${JSON.stringify(request)}\n`));
+  sampler.setUseClientModel(
+    (await readUseClientModel()) || !(await modelSignedIn(modelAuthPath())),
+  );
+  setSamplingBridge(sampler);
   const lines = createInterface({ input: process.stdin });
-  for await (const line of lines) {
-    if (!line.trim()) continue;
-    let message: Json;
-    try {
-      message = JSON.parse(line) as Json;
-    } catch {
-      reply(null, undefined, "Parse error");
-      continue;
-    }
-    const params = mcpParams(message);
-    if (message.id === undefined) {
-      cancelMcpCall(message, params, deps.pending);
-      continue;
-    }
-    const method = String(message.method ?? "");
-    learnConnection(params, method, deps.conn);
-    const modern = deps.conn.modern;
-    const session = mcpSessionFromMeta(params);
-    if (method === "tools/call") void answerCall(message, message.id, deps, modern, session);
-    else await answerRequest(message, message.id, deps, modern, session);
-  }
+  for await (const line of lines) await processMcpLine(line, deps, sampler);
   for (const controller of deps.pending.values()) controller.abort();
+  sampler.close();
+  setSamplingBridge(undefined);
   client?.close();
+}
+
+/** One stdin line: a client request, a notification, or a reply to our own sampling request. */
+async function processMcpLine(line: string, deps: McpDeps, sampler: SamplingBridge): Promise<void> {
+  if (!line.trim()) return;
+  let message: Json;
+  try {
+    message = JSON.parse(line) as Json;
+  } catch {
+    reply(null, undefined, "Parse error");
+    return;
+  }
+  const params = mcpParams(message);
+  // A reply to one of our own sampling/createMessage requests is not a client request.
+  if (message.id !== undefined && sampler.receive(String(message.id), message)) return;
+  if (message.id === undefined) {
+    cancelMcpCall(message, params, deps.pending, sampler);
+    return;
+  }
+  const method = String(message.method ?? "");
+  learnConnection(params, method, deps.conn);
+  sampler.learnCapabilities(params);
+  const modern = deps.conn.modern;
+  const session = mcpSessionFromMeta(params);
+  if (method === "tools/call") void answerCall(message, message.id, deps, modern, session);
+  else await answerRequest(message, message.id, deps, modern, session);
 }
 
 function initializeResult(params: Json): Json {

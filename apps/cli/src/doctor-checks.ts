@@ -82,6 +82,8 @@ export interface DoctorFacts {
   modelSignedIn: boolean;
   loginTask: boolean;
   dirs: DataDir[];
+  /** Aeon uses the calling agent's model through MCP instead of a signed-in model. */
+  mcpUsesClientModel?: boolean;
   /** Set when the daemon is down and the supervisor remembered why the last start failed. */
   startError?: string;
 }
@@ -92,9 +94,11 @@ export function doctorChecks(facts: DoctorFacts): Check[] {
     protocolCheck(facts.daemon),
     extensionCheck(facts.daemon),
     flagsCheck(facts.chromeCommandLines),
-    facts.modelSignedIn
-      ? line("model", "ok", "A model account is signed in.", MODEL_FIX)
-      : line("model", "fail", "No model account is signed in.", MODEL_FIX),
+    facts.mcpUsesClientModel
+      ? line("model", "ok", "Aeon uses your agent's model through MCP.", MODEL_FIX)
+      : facts.modelSignedIn
+        ? line("model", "ok", "A model account is signed in.", MODEL_FIX)
+        : line("model", "fail", "No model account is signed in.", MODEL_FIX),
     facts.loginTask
       ? line("supervisor", "ok", `${SUPERVISOR_NAME} is running.`, TASK_FIX)
       : line("supervisor", "fail", `${SUPERVISOR_NAME} is not running.`, TASK_FIX),
