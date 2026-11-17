@@ -303,6 +303,33 @@ export {
 export { reportWrong, type WrongReport } from "./route-wrong.js";
 export { actRoute, dropActRoute, readActRoute, saveActRoute, type ActStep } from "./act-route.js";
 export { queueHeal } from "./ability-heal.js";
+export {
+  autoSaveAbility,
+  autoSaveBlocker,
+  abilityNameFor,
+  buildAutoAbility,
+  findDuplicate,
+  inferScriptInputs,
+  type AutoSaveDeps,
+  type AutoSaveOutcome,
+  type AutoSaveRun,
+  type InferredScript,
+  type VaryingValue,
+} from "./ability-autosave.js";
+export {
+  IdleScheduler,
+  DEFAULT_IDLE_CONFIG,
+  classifyFailure,
+  failedCheckNote,
+  repairAbilityWhileIdle,
+  withCheckNote,
+  type AbilityCheckNote,
+  type FailureKind,
+  type IdleConfig,
+  type IdleDeps,
+  type IdleRepairDeps,
+  type IdleRepairResult,
+} from "./ability-idle.js";
 export { matchControl, type FallbackTarget, type PageControl } from "./step-fallbacks.js";
 export { testAllAbilities, type AbilityTestRow } from "./ability-test-all.js";
 export type {

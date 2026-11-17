@@ -6,7 +6,12 @@ import { installChatPreparation, warmAfterReady } from "./chat-preparation.js";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
-import { PiSdkSessionAdapter, resolvePiAgentDirectory, sessionChatId } from "@aeon/pi-adapter";
+import {
+  PiSdkSessionAdapter,
+  resolvePiAgentDirectory,
+  sessionChatId,
+  siteToolModel,
+} from "@aeon/pi-adapter";
 import { openChatStore } from "@aeon/store";
 import { SiteScriptService } from "./site-script-service.js";
 import { browserControlFor } from "./password-saving-sync.js";
@@ -37,6 +42,7 @@ import { outsideContextAnswer, type OutsideTab } from "./outside-context.js";
 import { migrateAllAbilities } from "@browserkit/site-mapper";
 import { McpClientManager } from "./mcp-client-manager.js";
 import { McpCodeBridge } from "./mcp-code-bridge.js";
+import { AbilityIdleWorker } from "./ability-idle-worker.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -100,11 +106,17 @@ export function createProductionRuntime(dataDirectory: string): {
   pi.setThreadToolHost(threadCoordination);
   pi.setCapabilityToolHost(capabilityTools);
   installManagementActions(service, browserControl, capabilityTools, dataRoot);
-  service.management.setReader((selectedChatId) =>
-    readManagementSnapshot(service, store, capabilityTools, pins, dataRoot, selectedChatId),
-  );
-  service.management.setHomeReader(() => readHomeManagementSnapshot(service, store));
-  const ready = initializeRuntime(
+  const idleAbilities = installAbilityIdle({
+    attention,
+    routines,
+    siteRules,
+    browserControl,
+    dataRoot,
+    piAgentDirectory,
+  });
+  installManagementReaders(service, store, capabilityTools, pins, dataRoot);
+  const ready = runtimeReady(
+    idleAbilities,
     registry,
     mcpMigration,
     threadCoordination,
@@ -113,7 +125,7 @@ export function createProductionRuntime(dataDirectory: string): {
     service,
     store,
     dataRoot,
-  ).then(() => migrateAbilitiesOnStartup(dataRoot));
+  );
   return {
     service,
     attention,
@@ -124,6 +136,7 @@ export function createProductionRuntime(dataDirectory: string): {
     warm: () => warmAfterReady(service),
     close: async () => {
       stopPreparing();
+      idleAbilities.close();
       await attention.close();
       routines.close();
       pins.close();
@@ -371,6 +384,64 @@ function createPiAdapter(
     browserTool: browserControl.execute.bind(browserControl),
   });
   return pi;
+}
+
+function installManagementReaders(
+  service: ChatService,
+  store: ReturnType<typeof openChatStore>,
+  capabilityTools: CapabilityToolService,
+  pins: PinnedResults,
+  dataDirectory: string,
+): void {
+  service.management.setReader((selectedChatId) =>
+    readManagementSnapshot(service, store, capabilityTools, pins, dataDirectory, selectedChatId),
+  );
+  service.management.setHomeReader(() => readHomeManagementSnapshot(service, store));
+}
+
+function runtimeReady(
+  idle: AbilityIdleWorker,
+  ...args: Parameters<typeof initializeRuntime>
+): Promise<void> {
+  return initializeRuntime(...args).then(async () => {
+    await migrateAbilitiesOnStartup(args[7]);
+    idle.start();
+  });
+}
+
+/** Idle ability repair: hidden cells, no site writes, stops the moment anything is busy. */
+function installAbilityIdle(options: {
+  attention: CoreAttention;
+  routines: RoutineScheduler;
+  siteRules: BrowserSiteRules;
+  browserControl: BrowserControlService;
+  dataRoot: string;
+  piAgentDirectory: string | undefined;
+}): AbilityIdleWorker {
+  const { attention, routines, siteRules, browserControl, dataRoot, piAgentDirectory } = options;
+  return new AbilityIdleWorker({
+    activity: () => readDaemonActivity(attention, routines, siteRules, browserControl),
+    cell: async (code) => {
+      const chatId = sessionChatId("external", "ability-idle");
+      const output = await browserControl.execute(chatId, `ability-idle-${randomUUID()}`, {
+        codeCell: {
+          code,
+          timeoutMs: 60_000,
+          ownerTitle: "Ability check",
+          onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+          onProgress: () => undefined,
+        },
+      });
+      const parsed = JSON.parse(output) as { value?: unknown; error?: string };
+      if (parsed.error) throw new Error(parsed.error);
+      return parsed.value;
+    },
+    model: siteToolModel({
+      sessionDirectory: dataRoot,
+      agentDirectory: piAgentDirectory,
+      preferredInitialModel: undefined,
+    }),
+  });
 }
 
 function installManagementActions(

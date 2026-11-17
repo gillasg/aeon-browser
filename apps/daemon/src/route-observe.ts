@@ -22,13 +22,23 @@ export interface SeenStep {
 }
 
 export interface SeenEvent {
-  kind: "run-state" | "user" | "steps" | "error" | "tool" | "answer";
+  kind: "run-state" | "user" | "steps" | "error" | "tool" | "answer" | "code";
   state?: string;
   text?: string;
   toolCallId?: string;
+  /** browser_code source, captured at tool-start so a finished run can become an ability. */
+  code?: string;
+  isError?: boolean;
   steps?: SeenStep[];
   progress?: { done: number; total?: number };
   result?: string;
+}
+
+/** One browser_code cell in a run, kept until the run settles. */
+export interface SeenCell {
+  toolCallId: string;
+  code: string;
+  ok: boolean;
 }
 
 export interface LiveRun {
@@ -58,6 +68,8 @@ export interface LiveRun {
   readText: string[];
   /** The answer with no tool call, kept for that check. */
   answer?: string;
+  /** browser_code cells, for quietly learning a finished run as an ability. */
+  cells: SeenCell[];
 }
 
 export interface Absorb {
@@ -91,6 +103,7 @@ export function openRun(
     watcher: false,
     unsure: false,
     readText: [],
+    cells: [],
   };
 }
 
@@ -104,11 +117,29 @@ export function absorb(run: LiveRun | undefined, event: SeenEvent, now: number):
 function onRunEvent(run: LiveRun, event: SeenEvent): LiveRun {
   if (event.kind === "user") return onUser(run, event.text ?? "");
   if (event.kind === "steps") return onSteps(run, event);
-  if (event.kind === "tool") return onRead(run, event.result ?? "");
+  if (event.kind === "code") return onCode(run, event);
+  if (event.kind === "tool" || event.kind === "error") return onToolEnd(run, event);
   if (event.kind === "answer") return onAnswer(run, event.text ?? "");
-  if (event.kind === "error")
-    return OURS.test(event.result ?? "") ? { ...run, ours: true } : { ...run, stumbled: true };
   return run;
+}
+
+function onCode(run: LiveRun, event: SeenEvent): LiveRun {
+  return {
+    ...run,
+    cells: [...run.cells, { toolCallId: event.toolCallId ?? "", code: event.code ?? "", ok: true }],
+  };
+}
+
+function onToolEnd(run: LiveRun, event: SeenEvent): LiveRun {
+  const settled = event.toolCallId
+    ? run.cells.map((cell) =>
+        cell.toolCallId === event.toolCallId ? { ...cell, ok: event.isError === false } : cell,
+      )
+    : run.cells;
+  const next = { ...run, cells: settled };
+  if (event.kind === "tool") return onRead(next, event.result ?? "");
+  if (OURS.test(event.result ?? "")) return { ...next, ours: true };
+  return { ...next, stumbled: true };
 }
 
 export function flatSteps(run: LiveRun): SeenStep[] {
@@ -185,11 +216,18 @@ export function seenFrom(event: PiSessionEvent): SeenEvent | undefined {
     return called ? undefined : { kind: "answer", text: textOf(event.message.content) };
   }
   if (event.kind === "tool-update") return stepsSeen(event.toolCallId, event.steps, event.progress);
+  if (event.kind === "tool-start") return codeStart(event);
   if (event.kind === "tool-end")
     return event.isError
-      ? { kind: "error", result: event.result }
-      : { kind: "tool", result: event.result };
+      ? { kind: "error", result: event.result, toolCallId: event.toolCallId, isError: true }
+      : { kind: "tool", result: event.result, toolCallId: event.toolCallId, isError: false };
   return undefined;
+}
+
+function codeStart(event: PiSessionEvent): SeenEvent | undefined {
+  if (event.kind !== "tool-start" || event.toolName !== "browser_code") return undefined;
+  if (typeof event.arguments.code !== "string") return undefined;
+  return { kind: "code", code: event.arguments.code, toolCallId: event.toolCallId };
 }
 
 function stepsSeen(

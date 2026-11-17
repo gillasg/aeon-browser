@@ -85,6 +85,13 @@ function AbilityRow({
           </small>
           <CodeBadge ways={ability.ways} />
           <AbilitySource sources={ability.sources} />
+          {ability.checkNote && (
+            <small className="ability-check-note">
+              {ability.checkNote.repairFailed
+                ? `Needs a look: ${ability.checkNote.detail}`
+                : `${ability.checkNote.reason}: ${ability.checkNote.detail}`}
+            </small>
+          )}
         </span>
         <Health ability={ability} />
         {ability.running ? (

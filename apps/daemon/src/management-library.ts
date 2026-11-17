@@ -153,6 +153,8 @@ export interface AbilityCard {
   untested?: string[];
   /** Earlier saves that can be restored. */
   versions?: { count: number; latestAt?: string };
+  /** One line from the last idle check. */
+  checkNote?: { ok: boolean; reason: string; detail: string; repairFailed?: boolean };
   updatedAt: string;
   running?: boolean;
 }
@@ -229,6 +231,20 @@ async function toAbilityCard(site: string, ability: ListedAbility): Promise<Abil
           },
         }
       : {}),
+    ...(() => {
+      const note = ability.options.abilityCheck as
+        | { at?: string; ok?: boolean; reason?: string; detail?: string; repairFailed?: boolean }
+        | undefined;
+      if (!note || note.ok || !note.detail) return {};
+      return {
+        checkNote: {
+          ok: false,
+          reason: String(note.reason ?? "unknown").slice(0, 40),
+          detail: String(note.detail).slice(0, 200),
+          ...(note.repairFailed ? { repairFailed: true } : {}),
+        },
+      };
+    })(),
     updatedAt: ability.updatedAt,
   };
 }

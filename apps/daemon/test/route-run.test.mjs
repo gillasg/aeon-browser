@@ -3,7 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { listRoutes, saveAbility, settleRoutes, stageRun } from "@browserkit/site-mapper";
+import {
+  listAbilities,
+  listRoutes,
+  saveAbility,
+  settleRoutes,
+  stageRun,
+} from "@browserkit/site-mapper";
 import { isWordCorrection, RouteRecorder } from "../dist/route-recorder.js";
 import { absorb, openRun } from "../dist/route-observe.js";
 import { draftPrompt } from "../dist/route-draft.js";
@@ -65,6 +71,49 @@ function stepEvent(site, label) {
     ],
   };
 }
+
+test("a clean browser_code run becomes an ability without a prompt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "route-autosave-"));
+  const previous = process.env.SITE_TO_API_HOME;
+  process.env.SITE_TO_API_HOME = root;
+  const cards = [];
+  const recorder = new RouteRecorder({ publish: (_chat, event) => cards.push(event) }, 60_000);
+  try {
+    await recorder.prepare("chat", "check my orders on shop.test");
+    await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("chat", {
+      kind: "tool-start",
+      toolCallId: "cell-1",
+      toolName: "browser_code",
+      arguments: {
+        code: "await page.goto('https://shop.test/orders'); return await page.read();",
+      },
+    });
+    await recorder.observe("chat", stepEvent("shop.test", "Orders"));
+    await recorder.observe("chat", {
+      kind: "tool-end",
+      toolCallId: "cell-1",
+      toolName: "browser_code",
+      result: "{}",
+      isError: false,
+    });
+    await recorder.observe("chat", {
+      kind: "message-end",
+      message: { role: "assistant", content: [{ type: "text", text: "Here are your orders." }] },
+    });
+    await recorder.observe("chat", { kind: "run-state", state: "idle" });
+    const saved = (await listAbilities("shop.test")).filter((item) => item.createdBy !== "builtin");
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].ways[0].kind, "script");
+    assert.equal(saved[0].ways[0].runtime, "page");
+    assert.ok(cards.some((card) => card.card.items.some((item) => item.kind === "learned")));
+  } finally {
+    recorder.close();
+    if (previous === undefined) delete process.env.SITE_TO_API_HOME;
+    else process.env.SITE_TO_API_HOME = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("a finished run saves a route and the next prompt gets the draft", async () => {
   const root = await mkdtemp(join(tmpdir(), "route-run-"));

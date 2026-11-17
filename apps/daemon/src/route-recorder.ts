@@ -5,6 +5,7 @@
 import type { ChatId, PiSessionEvent } from "@aeon/domain";
 import type { RunCard } from "@aeon/protocol";
 import {
+  autoSaveAbility,
   cancelPending,
   contentWords,
   hasSuccess,
@@ -198,7 +199,8 @@ export class RouteRecorder {
       staged?.id,
       this.workspaceFor(run.chatId),
     );
-    const card = buildRunCard(facts);
+    const learned = await autoLearn(run, site);
+    const card = buildRunCard({ ...facts, ...(learned ? { learned } : {}) });
     if (card) this.publish(run.chatId, card);
     if (staged && !run.corrected) this.arm(site, run, task, staged.fingerprint);
   }
@@ -295,6 +297,43 @@ export class RouteRecorder {
 
   private publish(chatId: string, card: RunCard): void {
     this.hub.publish(chatId as ChatId, { kind: "run-card", card });
+  }
+}
+
+function autoLearnWanted(run: LiveRun): boolean {
+  return (
+    !run.corrected && !run.watcher && !run.ours && !run.unsure && !run.stumbled && !run.usedAbility
+  );
+}
+
+/**
+ * A clean successful browser_code run becomes an ability without a prompt. A corrected, failed,
+ * one-off or already-saved run is skipped; an existing ability covering the same script is updated
+ * instead of duplicated. saveAbility does the inference, scrubbing and version archiving.
+ */
+async function autoLearn(run: LiveRun, site: string): Promise<RunFacts["learned"] | undefined> {
+  if (!autoLearnWanted(run)) return undefined;
+  const cell = [...run.cells].reverse().find((entry) => entry.ok && entry.code.trim().length >= 40);
+  if (!cell) return undefined;
+  if (!hasSuccess(flatSteps(run).map(observedStep))) return undefined;
+  try {
+    const outcome = await autoSaveAbility({
+      site,
+      request: run.task,
+      code: cell.code,
+      ...(run.answer ? { result: { answer: run.answer } } : {}),
+      ok: true,
+      at: new Date().toISOString(),
+    });
+    if (outcome.status === "skipped" || !outcome.ability) return undefined;
+    return {
+      abilityId: `${site}:${outcome.ability.name}`,
+      name: outcome.ability.name,
+      site,
+    };
+  } catch (error) {
+    report(error);
+    return undefined;
   }
 }
 
