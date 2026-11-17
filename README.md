@@ -10,27 +10,37 @@ In PowerShell:
 irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 | iex
 ```
 
-It installs Git, Node.js and pnpm if they are missing, fetches Aeon into `%LOCALAPPDATA%\Aeon\aeon-browser` (set `AEON_DIR` to choose another folder), builds it, installs the native host and the background service that starts at login, puts the `aeon` command and skill in place, adds Aeon's MCP server to the coding agents it finds (Claude Code, Codex, opencode, Cursor, Gemini CLI, Claude Desktop), and opens `chrome://extensions` with the extension folder on your clipboard.
+Aeon installs everything itself: Git and Node.js if they are missing, the background service that starts at login, and the `aeon` command. It then opens `chrome://extensions` and puts the Aeon folder on your clipboard. Three steps are left in Chrome: turn on **Developer mode** (top right), click **Load unpacked**, then paste the folder (Ctrl+V) and choose it. Aeon notices the moment it connects and finishes on its own. Run the same line again to update; you will not need to do these three steps again.
 
-Then, in Chrome: turn on **Developer mode**, click **Load unpacked**, paste the folder (Ctrl+V), press Enter and click **Select Folder**. The installer sees Aeon connect and finishes. Run the same line again to update.
+Chrome shows a *Disable developer mode extensions* warning at the top. That is normal: Chrome shows it whenever an extension is loaded from a folder on your computer instead of the Chrome Web Store. Aeon is not in the store, so dismiss the warning and leave Developer mode on.
 
-## Install (macOS and Linux)
+## Install (macOS)
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
 ```
 
-It does the same on macOS and Linux: installs Git, Node.js 22 and pnpm when missing (Homebrew on macOS, apt/NodeSource on Debian and Ubuntu), fetches Aeon into `~/Library/Application Support/Aeon/aeon-browser` on macOS or `${XDG_DATA_HOME:-~/.local/share}/aeon/aeon-browser` on Linux (set `AEON_DIR` to choose another folder), builds it, registers the native messaging host for Google Chrome, Chrome for Testing and Chromium, and installs the background service: a `launchd` LaunchAgent `com.aeon.daemon` on macOS, a `systemd --user` unit `aeon-daemon` on Linux. The service starts at login and keeps one daemon supervisor (and one daemon) alive.
+Aeon installs Git, Node.js and pnpm when they are missing, fetches Aeon into `~/Library/Application Support/Aeon/aeon-browser` (set `AEON_DIR` to choose another folder), builds it, installs the background service that starts at login, and puts the `aeon` command in place. It then opens `chrome://extensions` and puts the Aeon folder on your clipboard. Three steps are left in Chrome: turn on **Developer mode** (top right), click **Load unpacked**, then paste the folder (Cmd+V) and choose it. Aeon notices the moment it connects and finishes on its own. Run the same line again to update; you will not need to do these three steps again.
 
-On Linux, enable lingering once so the service also runs while you are logged out:
+Chrome shows a *Disable developer mode extensions* warning at the top. That is normal: Chrome shows it whenever an extension is loaded from a folder on your computer instead of the Chrome Web Store. Aeon is not in the store, so dismiss the warning and leave Developer mode on.
+
+## Install (Linux)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
+```
+
+Aeon installs Git, Node.js and pnpm when they are missing, fetches Aeon into `${XDG_DATA_HOME:-~/.local/share}/aeon/aeon-browser` (set `AEON_DIR` to choose another folder), builds it, installs the background service, and puts the `aeon` command in place. It then opens `chrome://extensions` and puts the Aeon folder on your clipboard. Three steps are left in Chrome: turn on **Developer mode** (top right), click **Load unpacked**, then paste the folder (Ctrl+V) and choose it. Aeon notices the moment it connects and finishes on its own. Run the same line again to update; you will not need to do these three steps again.
+
+Chrome shows a *Disable developer mode extensions* warning at the top. That is normal: Chrome shows it whenever an extension is loaded from a folder on your computer instead of the Chrome Web Store. Aeon is not in the store, so dismiss the warning and leave Developer mode on.
+
+Enable lingering once so the service also runs while you are logged out:
 
 ```sh
 sudo loginctl enable-linger "$USER"
 ```
 
-Then load `apps/chrome-extension/native-dist` in `chrome://extensions` as above. The installer prints the folder and copies it to the clipboard. Run the same line again to update; data in the Aeon data folder is preserved.
-
-Chrome picks native messaging manifests from its own profile. The installer writes the manifests for the default profiles (`~/.config/google-chrome`, `~/.config/google-chrome-for-testing`, `~/.config/chromium` on Linux; `~/Library/Application Support/{Google/Chrome,Google/Chrome for Testing,Chromium}` on macOS). If you start Chrome with a custom `--user-data-dir`, copy `com.aeon.native_host.json` from one of those folders into `<user-data-dir>/NativeMessagingHosts/` too.
+Aeon keeps its files in the data folder (`~/.local/share/aeon` on Linux, `~/Library/Application Support/Aeon` on macOS, `%LOCALAPPDATA%\Aeon` on Windows). Updates keep that data. If you start Chrome with a custom `--user-data-dir`, copy `com.aeon.native_host.json` from the default profile into `<user-data-dir>/NativeMessagingHosts/` too.
 
 From a clone instead: `node scripts/setup.mjs` does the same from this folder. By hand: `pnpm install --ignore-scripts`, `pnpm build`, then `node apps/native-host/scripts/install.mjs`, and load `apps/chrome-extension/native-dist` in Chrome. The daemon (`apps/daemon`) supplies Pi sessions, the agent and local storage; the extension supplies the side panel, chat and browser control. Run `pnpm start` for a standalone daemon, or use the installed login service.
 
