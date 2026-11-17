@@ -114,7 +114,7 @@ test(
     } finally {
       attacker.stop();
       sudo(["rm", "-rf", runtime]);
-      rmSync(runtime, { recursive: true, force: true });
+      rmSync(runtime, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       rmSync(sandbox.root, { recursive: true, force: true });
     }
   },
@@ -199,6 +199,9 @@ function attackSocket(directory, path) {
       }
     },
     stop() {
+      // SIGKILL on sudo is not relayed, so the attacker's python could outlive the test and keep
+      // its socket directory; kill it as its own user before cleaning up.
+      sudo(["pkill", "-KILL", "-f", countFile]);
       child.kill("SIGKILL");
       sudo(["rm", "-f", countFile]);
       rmSync(countFile, { force: true });
