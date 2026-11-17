@@ -47,21 +47,28 @@ test("the bootstrap socket lives in a per-user runtime directory, not a shared /
   }
 });
 
-test("macOS uses the per-user private temp dir for both host and supervisor", () => {
-  // The Chrome-launched host and the launchd supervisor both call hostPaths(); a single resolved
-  // runtime directory is what makes them agree on the bootstrap socket.
-  const privateTemp = mkdtempSync(posix.join(tmpdir(), "aeon-mac-tmp-"));
-  try {
-    const options = { env: { TMPDIR: privateTemp }, platform: "darwin", home: "/Users/tester" };
-    const expected = posix.join(privateTemp, "aeon");
-    assert.equal(runtimeDirectory(options), expected);
-    // The host and the supervisor both derive the socket from these paths.
-    assert.ok(hostPaths(options).socket.startsWith(expected + "/"));
-    assert.ok(hostPaths(options).socket.length < 104);
-  } finally {
-    rmSync(privateTemp, { recursive: true, force: true });
-  }
-});
+test(
+  "macOS uses the per-user private temp dir for both host and supervisor",
+  // The private-temp check is POSIX ownership and mode; a Windows temp dir cannot pass it.
+  {
+    skip: process.platform === "win32" ? "POSIX ownership checks; runs on macOS and Linux" : false,
+  },
+  () => {
+    // The Chrome-launched host and the launchd supervisor both call hostPaths(); a single resolved
+    // runtime directory is what makes them agree on the bootstrap socket.
+    const privateTemp = mkdtempSync(posix.join(tmpdir(), "aeon-mac-tmp-"));
+    try {
+      const options = { env: { TMPDIR: privateTemp }, platform: "darwin", home: "/Users/tester" };
+      const expected = posix.join(privateTemp, "aeon");
+      assert.equal(runtimeDirectory(options), expected);
+      // The host and the supervisor both derive the socket from these paths.
+      assert.ok(hostPaths(options).socket.startsWith(expected + "/"));
+      assert.ok(hostPaths(options).socket.length < 104);
+    } finally {
+      rmSync(privateTemp, { recursive: true, force: true });
+    }
+  },
+);
 
 test("macOS falls back to owner-checked /tmp/<uid> when the private temp dir is unusable", () => {
   const home = "/Users/tester";
