@@ -265,6 +265,16 @@ export const ManagementAbilitySchema = z
       })
       .strict()
       .optional(),
+    /** One line from the last idle check, when it found a problem it could not fix. */
+    checkNote: z
+      .object({
+        ok: z.boolean(),
+        reason: z.string().max(40),
+        detail: z.string().max(200),
+        repairFailed: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     updatedAt: z.string().max(60),
     running: z.boolean().optional(),
   })
