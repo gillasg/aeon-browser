@@ -208,7 +208,7 @@ var browser = Object.freeze({
     var tabs = await browser.tabs();
     var tab = tabs.find(listed => listed.active && (__focusedWindowId === undefined || listed.windowId === __focusedWindowId))
       || tabs.find(listed => listed.active);
-    if (!tab) throw Error('TARGET_LOST: the active tab is not a web page (a new tab or browser page)');
+    if (!tab) throw Error('TARGET_LOST: the active tab is not a web page (a new tab or browser page). browser.openTab(url) opens in the background: keep the page it returns (const p = await browser.openTab(url)) instead of calling browser.activeTab()');
     await browser.attachTab(tab.target);
     return tab;
   },

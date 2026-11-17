@@ -28,7 +28,7 @@ export class CapabilityRegistry {
 
   async initialize(): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const registry = await this.readOrCreate();
+    const registry = await this.readOrCreate(true);
     const latestAudit = this.store.listCapabilityAudit(1)[0];
     if (registry.revision > 0 && (latestAudit?.revision ?? 0) < registry.revision) {
       this.store.appendCapabilityAudit({
@@ -43,7 +43,7 @@ export class CapabilityRegistry {
   }
 
   async snapshot(): Promise<CapabilityRegistryFile> {
-    return this.readOrCreate();
+    return this.readOrCreate(true);
   }
 
   register(
@@ -131,9 +131,17 @@ export class CapabilityRegistry {
     });
   }
 
-  private async readOrCreate(): Promise<CapabilityRegistryFile> {
+  /** `tolerant` reads skip a bad entry with a warning; a change (mutate) stays strict. */
+  private async readOrCreate(tolerant = false): Promise<CapabilityRegistryFile> {
     try {
-      return parseRegistry(await readFile(this.filePath, "utf8"));
+      const raw = await readFile(this.filePath, "utf8");
+      return tolerant
+        ? parseRegistry(raw, (index, reason) =>
+            process.stderr.write(
+              `capabilities.json entry ${index + 1} skipped: ${reason} Fix or remove it in ${this.filePath}.\n`,
+            ),
+          )
+        : parseRegistry(raw);
     } catch (error) {
       if (!isNotFound(error)) throw error;
       const empty: CapabilityRegistryFile = {
