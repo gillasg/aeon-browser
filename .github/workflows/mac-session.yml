@@ -284,6 +284,15 @@ jobs:
           name: screen-capture-check
           path: screen-capture-check.png
           if-no-files-found: warn
+      - name: Model key for a real task
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.aeon-ci"
+          # Read only inside a session command (never printed); empty when the secret is unset.
+          printf '%s' "${OPENCODE_API_KEY:-}" > "$HOME/.aeon-ci/opencode-key"
       - name: Open SSH
         env:
           CLAUDE_SSH_PUBKEY: ${{ secrets.CLAUDE_SSH_PUBKEY }}
