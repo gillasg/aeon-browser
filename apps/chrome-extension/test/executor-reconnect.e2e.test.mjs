@@ -105,6 +105,79 @@ test(
   },
 );
 
+test(
+  "a dropped native link heals itself without a daemon restart, a manual alarm or a Chrome restart",
+  {
+    skip:
+      existsSync(chromePath) && existsSync(extension)
+        ? false
+        : "Chrome for Testing or the built extension is missing",
+    timeout: 120_000,
+  },
+  async () => {
+    const profile = await mkdtemp(join(tmpdir(), "aeon-drop-heal-e2e-"));
+    const chrome = spawn(
+      chromePath,
+      [
+        `--user-data-dir=${profile}`,
+        "--remote-debugging-port=0",
+        `--load-extension=${extension}`,
+        `--disable-extensions-except=${extension}`,
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--headless=new",
+        ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
+        "about:blank",
+      ],
+      { stdio: "ignore" },
+    );
+    const core = await fakeCore();
+    try {
+      const port = await debugPort(profile);
+      const worker = await waitForTarget(port, (item) => item.url.endsWith("/service-worker.js"));
+      const cdp = await connect(worker.webSocketDebuggerUrl);
+      for (let i = 0; i < 100; i++) {
+        const ready = await cdp("Runtime.evaluate", {
+          expression: "typeof chrome?.runtime?.id",
+          returnByValue: true,
+        });
+        if (ready.result?.result?.value === "string") break;
+        await sleep(100);
+      }
+      debug("worker ready");
+      // One literal endpoint for the whole test: a drop does NOT move the endpoint and the daemon
+      // process is never restarted. The extension must re-bootstrap and reconnect by itself.
+      await cdp("Runtime.evaluate", {
+        expression: `chrome.runtime.sendNativeMessage = (_host, request, callback) => callback({
+          kind: "native.bootstrap.result", protocolVersion: request.protocolVersion, ok: true,
+          endpoint: "ws://127.0.0.1:${core.port}/aeon/v1", connectionGrant: "${"A".repeat(43)}",
+          expiresAt: Date.now() + 600000, daemonProtocolVersion: request.protocolVersion });`,
+      });
+      const browserCdp = await connect(
+        (await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json()))
+          .webSocketDebuggerUrl,
+      );
+      await browserCdp("Target.createTarget", { url: "about:blank" });
+      await withTimeout(core.connected, 20_000, "first connection");
+      debug("link up");
+
+      // Drop the daemon's side of the port. Nothing restarts: same endpoint, same daemon process,
+      // same Chrome, and no alarm is fired by the test. The extension has to heal the link itself.
+      core.drop();
+      debug("dropped the native link; waiting for self-heal");
+      await withTimeout(core.waitForConnection(2), 30_000, "self-heal after link drop");
+      assert.equal(chrome.exitCode, null, "Chrome was restarted to reconnect");
+      debug("link came back on its own");
+    } finally {
+      await core.close().catch(() => undefined);
+      chrome.kill();
+      await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => undefined,
+      );
+    }
+  },
+);
+
 function withTimeout(promise, ms, label) {
   let timer;
   return Promise.race([
@@ -119,6 +192,8 @@ async function fakeCore() {
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/aeon/v1" });
   await new Promise((done) => server.once("listening", done));
   let socket;
+  let connections = 0;
+  const waiters = [];
   const connected = new Promise((done) =>
     server.on("connection", (ws) => {
       socket = ws;
@@ -141,7 +216,9 @@ async function fakeCore() {
               lastSequence: 0,
             }),
           );
+          connections += 1;
           done();
+          waiters.splice(0).forEach((waiter) => waiter(connections));
         } else if (message.kind === "browser.executor.heartbeat")
           ws.send(
             JSON.stringify({
@@ -156,6 +233,12 @@ async function fakeCore() {
   return {
     port: server.address().port,
     connected,
+    count: () => connections,
+    // Resolves once the extension has opened (and inventoried) the nth link on its own.
+    waitForConnection(n) {
+      if (connections >= n) return Promise.resolve(connections);
+      return new Promise((done) => waiters.push(done));
+    },
     drop() {
       socket?.close();
     },

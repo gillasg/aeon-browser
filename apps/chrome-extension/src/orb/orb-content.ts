@@ -17,14 +17,14 @@ import { OrbOverlay } from "./orb-overlay.js";
 
 declare global {
   interface Window {
-    __aeonOrbLoaded?: boolean;
+    __orbLoaded?: boolean;
   }
 }
 
 const aeonPage = location.protocol === "chrome-extension:";
 
-if (!window.__aeonOrbLoaded && (!aeonPage || window.parent === window)) {
-  window.__aeonOrbLoaded = true;
+if (!window.__orbLoaded && (!aeonPage || window.parent === window)) {
+  window.__orbLoaded = true;
   start();
 }
 

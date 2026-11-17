@@ -62,6 +62,7 @@ function showAsk(detail: AskDetail): void {
     chrome.runtime
       .sendMessage({ kind: "aeon.handoff.answer", tabId: detail.tabId, answer: value })
       .catch(() => undefined);
+    host.dispatchEvent(new Event("aeon-ask-remove"));
     host.remove();
   }
   function finish(): void {
@@ -84,15 +85,20 @@ function showAsk(detail: AskDetail): void {
     node.textContent = detail.style;
     return node;
   }
+  // The cursor publishes its point over a neutral event, never in the page DOM. This ask lives in
+  // the isolated world and listens there, so page scripts cannot read where the cursor is either.
+  let cursorPoint = detail.point;
+  function onState(event: Event): void {
+    const state = (event as CustomEvent<{ point?: { x: number; y: number } }>).detail;
+    if (state?.point && typeof state.point.x === "number") cursorPoint = state.point;
+    place();
+  }
+  window.addEventListener("cursor-overlay-state", onState);
+  host.addEventListener("aeon-ask-remove", () =>
+    window.removeEventListener("cursor-overlay-state", onState),
+  );
   function place(): void {
-    const cursor = document.getElementById("aeon-agent-cursor");
-    let point: { x?: unknown; y?: unknown } = detail.point ?? {};
-    try {
-      const shown = JSON.parse(cursor?.getAttribute("data-aeon-point") || "") as typeof point;
-      if (typeof shown.x === "number" && typeof shown.y === "number") point = shown;
-    } catch {
-      // No cursor yet: keep the spotlight's point.
-    }
+    const point: { x?: unknown; y?: unknown } = cursorPoint ?? {};
     const x = typeof point.x === "number" ? point.x + 14 : window.innerWidth / 2 - 160;
     const y = typeof point.y === "number" ? point.y + 44 : window.innerHeight - 120;
     host.style.left = Math.max(8, Math.min(window.innerWidth - 328, x)) + "px";
@@ -122,5 +128,8 @@ function showAsk(detail: AskDetail): void {
 
 /** Runs in the tab's isolated world: drops the ask without touching anything else. */
 function removeAsk(): void {
-  document.getElementById("aeon-agent-ask")?.remove();
+  const ask = document.getElementById("aeon-agent-ask");
+  if (!ask) return;
+  ask.dispatchEvent(new Event("aeon-ask-remove"));
+  ask.remove();
 }

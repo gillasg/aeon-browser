@@ -67,13 +67,13 @@ export function isCursorLocal(value: unknown): value is CursorLocal {
   );
 }
 
-type CursorPage = { __aeonCursor?: (next: object, css: string, cursor: object) => void };
+type CursorPage = { __cursorPaint?: (next: object, css: string, cursor: object) => void };
 
 /** On an Aeon page: load the shared page cursor from the extension and draw it. */
 export async function drawLocalCursor(message: CursorLocal): Promise<void> {
   const page = globalThis as CursorPage;
-  if (!page.__aeonCursor) await loadScript(chrome.runtime.getURL("cursor-page.js"));
-  page.__aeonCursor?.(message.update, message.css, message.mark);
+  if (!page.__cursorPaint) await loadScript(chrome.runtime.getURL("cursor-page.js"));
+  page.__cursorPaint?.(message.update, message.css, message.mark);
 }
 
 function loadScript(src: string): Promise<void> {

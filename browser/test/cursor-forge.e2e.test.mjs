@@ -78,8 +78,8 @@ function repl(url) {
     console.log("FORGED " + (await page.evaluate(() => document.documentElement.dataset.forged || "")));
     console.log("TITLE " + (await page.title()));
     console.log("CONTROLS " + (await page.evaluate(() => {
-      const host = document.getElementById("aeon-agent-cursor");
-      return host && host.dataset.aeonControls ? host.dataset.aeonControls.length : 0;
+      const host = [...document.documentElement.children].find((n) => n.__cursorSurface);
+      return host && host.__s && host.__s.controls ? JSON.stringify(host.__s.controls).length : 0;
     })));`;
 }
 

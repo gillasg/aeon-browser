@@ -65,11 +65,13 @@ test("chat stays in the extension and orb.html is the only dynamic web resource"
   assert.equal(frame.isOrbPath("/a/b/orb.html"), false);
 });
 
-test("the page cursor publishes button boxes and does not dispatch cursor events", async () => {
+test("the page cursor publishes button boxes over a neutral event and has no page selector", async () => {
   const overlay = await readFile(join(repo, "browser/packages/engine/src/cursor-page.ts"), "utf8");
-  assert.match(overlay, /dataset\.aeonControls/);
+  assert.match(overlay, /state\.controls = \{ tr: first\("\.tr"\), stop: first\("\.stop"\) \}/);
   assert.match(overlay, /\.p\.on \.tr,\.p\.on \.stop\{pointer-events:none\}/);
-  assert.equal(overlay.includes("dispatchEvent"), false);
+  assert.match(overlay, /new CustomEvent\(STATE_EVENT/);
+  assert.equal(overlay.includes("dataset.aeonControls"), false);
+  assert.equal(overlay.includes('id = "aeon-agent-cursor"'), false);
   assert.equal(overlay.includes("aeon-cursor-stop"), false);
   assert.equal(overlay.includes("aeon-cursor-transcript"), false);
 });
@@ -104,16 +106,11 @@ test("the buttons mount only while the pill shows them, then leave the page", as
     (kind) => sent.push(kind),
     () => false,
   );
-  const controlHosts = () =>
-    dom.documentElement.children.filter((node) => node.id === "aeon-cursor-controls");
+  const controlHosts = () => dom.documentElement.children.filter((node) => node.hasCursorShadow);
   // Nothing is on screen: no host, no buttons, nothing appended.
   assert.deepEqual(controlHosts(), []);
 
-  dom.cursor.dataset.aeonControls = JSON.stringify({
-    tr: { x: 4, y: 5, w: 24, h: 24 },
-    stop: null,
-  });
-  dom.mutated();
+  dom.publish({ tr: { x: 4, y: 5, w: 24, h: 24 }, stop: null });
   const host = controlHosts()[0];
   assert.ok(host, "the buttons did not mount with a pill box on screen");
   assert.equal(host.shadow.children.length, 3);
@@ -125,34 +122,29 @@ test("the buttons mount only while the pill shows them, then leave the page", as
   transcript.listeners.click({ isTrusted: true, preventDefault() {}, stopPropagation() {} });
   assert.deepEqual(sent, ["aeon.cursor.transcript"]);
 
-  dom.cursor.dataset.aeonControls = JSON.stringify({ tr: null, stop: null });
-  dom.mutated();
+  dom.publish({ tr: null, stop: null });
   assert.deepEqual(controlHosts(), [], "the buttons stayed after the pill went away");
 });
 
-/** The few DOM pieces cursor-controls.ts touches, with observers the test can fire by hand. */
+/** The few DOM pieces cursor-controls.ts touches; state arrives on a neutral window event. */
 function fakePage() {
-  observers.length = 0;
   const documentElement = new FakeNode("html");
-  const cursor = new FakeNode("div");
-  cursor.id = "aeon-agent-cursor";
-  documentElement.append(cursor);
+  const listeners = {};
   globalThis.document = {
     documentElement,
     createElement: (tag) => new FakeNode(tag),
-    getElementById: (id) => byId(documentElement, id),
   };
-  globalThis.MutationObserver = FakeObserver;
-  return {
-    documentElement,
-    cursor,
-    mutated: () => {
-      for (const observer of observers) observer.callback([], observer);
+  globalThis.window = {
+    addEventListener: (kind, fn) => {
+      listeners[kind] = fn;
     },
   };
+  return {
+    documentElement,
+    publish: (controls) =>
+      listeners["cursor-overlay-state"]?.({ detail: { present: true, controls } }),
+  };
 }
-
-const observers = [];
 
 class FakeNode {
   constructor(tag) {
@@ -195,27 +187,10 @@ class FakeNode {
   }
   attachShadow() {
     this.shadow = new FakeNode("shadow");
+    this.hasCursorShadow = true;
     return this.shadow;
   }
   get lastElementChild() {
     return this.children.at(-1) ?? null;
   }
-}
-
-class FakeObserver {
-  constructor(callback) {
-    this.callback = callback;
-    observers.push(this);
-  }
-  observe() {}
-  disconnect() {}
-}
-
-function byId(node, id) {
-  if (node.id === id) return node;
-  for (const child of node.children) {
-    const hit = byId(child, id);
-    if (hit) return hit;
-  }
-  return undefined;
 }

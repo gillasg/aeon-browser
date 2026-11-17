@@ -180,7 +180,7 @@ test(
 
       await t.test("the agent cursor appears without entering the page state", async () => {
         const result = await run(
-          "await new Promise((r) => setTimeout(r, 50)); [!!document, await page.evaluate(() => !!document.getElementById('aeon-agent-cursor'))]",
+          "await new Promise((r) => setTimeout(r, 50)); [!!document, await page.evaluate(() => [...document.documentElement.children].some((n) => n.__cursorSurface))]",
         );
         assert.deepEqual(result.value, [true, true]);
         assert.doesNotMatch((await run("await bu.state()")).output, /aeon-agent-cursor/);

@@ -33,6 +33,14 @@ export function attachNativeExecutor(
   attention?: CoreAttention,
 ): void {
   if (attention) attachAttentionSocket(socket, attention);
+  process.stderr.write(
+    `[aeon-native] executor authenticated: instance=${executor.clientInstanceId} run=${executor.browserRunId}\n`,
+  );
+  socket.once("close", (code, reason) =>
+    process.stderr.write(
+      `[aeon-native] executor link closed: code=${code} reason=${String(reason)}\n`,
+    ),
+  );
   const state = { inventoryReady: false };
   socket.on("message", (data: RawData, binary: boolean) => {
     const candidate = parseJson(data, binary);

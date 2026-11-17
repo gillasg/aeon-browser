@@ -5,6 +5,7 @@ import {
   type OrbToContent,
   type OrbVisualState,
 } from "./orb-messages.js";
+import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "@browserkit/engine/cursor-bus";
 import type { OrbBox, OrbCursorStep } from "./orb-run.js";
 import { OVERLAY_STYLE, spotlightGradient } from "./orb-overlay-style.js";
 import {
@@ -30,6 +31,18 @@ interface Point {
   x: number;
   y: number;
 }
+
+// The main-world cursor publishes its position and presence over neutral events; the page DOM has
+// no id, class or attribute for it. Cache the latest values here in the isolated world.
+let cursorPoint: Point | undefined;
+let cursorPresent = false;
+window.addEventListener(CURSOR_STATE_EVENT, (event) => {
+  const detail = (event as CustomEvent<{ present?: boolean; point?: Point }>).detail;
+  if (!detail) return;
+  cursorPresent = detail.present !== false;
+  if (detail.point && Number.isFinite(detail.point.x) && Number.isFinite(detail.point.y))
+    cursorPoint = detail.point;
+});
 
 export class OrbOverlay {
   private readonly host = document.createElement("div");
@@ -144,10 +157,12 @@ export class OrbOverlay {
     removeEventListener("pointerdown", this.clickAway, { capture: true });
     this.stopWatching();
     this.host.remove();
-    const glyph = document.getElementById("aeon-agent-cursor");
-    if (!glyph) return;
-    if (this.acting) glyph.removeAttribute("data-aeon-summon");
-    else glyph.remove();
+    if (!cursorPresent) return;
+    if (this.acting)
+      window.dispatchEvent(
+        new CustomEvent(CURSOR_COMMAND_EVENT, { detail: { x: 0, y: 0, release: true } }),
+      );
+    else cursorPresent = false;
   }
 
   private buildDom(nonce: string): void {
@@ -347,25 +362,24 @@ export class OrbOverlay {
   }
 
   private glyphPoint(): Point {
-    const raw = document.getElementById("aeon-agent-cursor")?.dataset.aeonPoint;
-    return (raw && parsePoint(raw)) || this.point;
+    return cursorPoint ?? this.point;
   }
 
   private writeSummon(place: boolean, release: boolean): void {
-    const glyph = document.getElementById("aeon-agent-cursor");
-    if (!glyph) return;
+    if (!cursorPresent) return;
     const x = Math.round(this.target.x);
     const y = Math.round(this.target.y);
-    const payload = JSON.stringify({ x, y, place, release });
     const key = JSON.stringify({ x, y, place, release: false });
     if (key === this.summonKey && !release) return;
     this.summonKey = key;
-    glyph.setAttribute("data-aeon-summon", payload);
+    window.dispatchEvent(
+      new CustomEvent(CURSOR_COMMAND_EVENT, { detail: { x, y, place, release } }),
+    );
   }
 
   private ensureCursor(): void {
     if (this.arming || this.acting || !chrome.runtime?.id) return;
-    if (document.getElementById("aeon-agent-cursor")) return;
+    if (cursorPresent) return;
     this.arming = true;
     const home = this.home();
     void chrome.runtime
@@ -419,14 +433,4 @@ function send(kind: string): void {
 
 function clampSize(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function parsePoint(raw: string): Point | null {
-  try {
-    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
-    if (typeof parsed.x !== "number" || typeof parsed.y !== "number") return null;
-    return { x: parsed.x, y: parsed.y };
-  } catch {
-    return null;
-  }
 }

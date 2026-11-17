@@ -82,7 +82,7 @@ async function writeCursorPage(output) {
   const source = [
     "(() => {",
     "  const paint = " + module.cursorFunctionSource() + ";",
-    '  if (location.protocol === "chrome-extension:") globalThis.__aeonCursor = paint;',
+    '  if (location.protocol === "chrome-extension:") globalThis.__cursorPaint = paint;',
     "})();",
     "",
   ].join("\n");

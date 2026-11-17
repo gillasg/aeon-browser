@@ -8,6 +8,7 @@ import {
   noteDownloadReissueDone,
   noteNavigationDone,
   noteNavigationStart,
+  rebaseReceipt,
   noteRequestEnd,
   noteRequestStart,
   chooseReceipt,
@@ -132,6 +133,12 @@ export function beginReceipt(tabId: number): string {
   return actionId;
 }
 
+/** Rebases the action's causal window on the moment its input is dispatched (see rebaseReceipt). */
+export function noteActionStart(actionId: string, now = Date.now()): void {
+  const live = lives.get(actionId);
+  if (live) rebaseReceipt(live.open, now);
+}
+
 /** Waits until this action's caused work is quiet, then returns the receipt. */
 export async function finishReceipt(actionId: string): Promise<ActionReceipt> {
   const live = lives.get(actionId);
@@ -224,6 +231,19 @@ function keptRequests(requests: TrackedRequest[]): ReceiptRequest[] {
   return [...failed, ...rest].slice(0, MAX_REQUESTS);
 }
 
+/**
+ * A CDP event can sit in a busy worker's message queue for longer than the 500ms causal window.
+ * `Date.now()` on delivery then makes a request the action really caused look out of window and the
+ * receipt drops it ("missing POST" under load). Chrome stamps every Network event with `wallTime`
+ * (seconds since the epoch, in the browser); using that keeps attribution tied to when the request
+ * actually happened, no matter how late the event was delivered. Fall back to the local clock for
+ * events that have no stamp.
+ */
+function eventTime(params: Record<string, unknown>): number {
+  const wall = Number((params as { wallTime?: number }).wallTime);
+  return Number.isFinite(wall) && wall > 0 ? Math.round(wall * 1000) : Date.now();
+}
+
 function onRequest(live: LiveReceipt, params: Record<string, unknown>): void {
   if (params.type !== "XHR" && params.type !== "Fetch" && params.type !== "Document") return;
   const request = (params.request ?? {}) as { method?: string; url?: string };
@@ -231,19 +251,19 @@ function onRequest(live: LiveReceipt, params: Record<string, unknown>): void {
     id: String(params.requestId ?? ""),
     method: String(request.method ?? "GET"),
     url: String(request.url ?? ""),
-    at: Date.now(),
+    at: eventTime(params),
   });
 }
 
 function onResponse(live: LiveReceipt, params: Record<string, unknown>): void {
   const status = Number((params.response as { status?: number } | undefined)?.status ?? 0);
-  noteRequestEnd(live.open, { id: String(params.requestId ?? ""), at: Date.now(), status });
+  noteRequestEnd(live.open, { id: String(params.requestId ?? ""), at: eventTime(params), status });
 }
 
 function onFailed(live: LiveReceipt, params: Record<string, unknown>): void {
   noteRequestEnd(live.open, {
     id: String(params.requestId ?? ""),
-    at: Date.now(),
+    at: eventTime(params),
     error: String(params.errorText ?? "failed"),
   });
 }
@@ -368,5 +388,5 @@ function applyNetwork(live: LiveReceipt, method: string, params: Record<string, 
   else if (method === "Network.responseReceived") onResponse(live, params);
   else if (method === "Network.loadingFailed") onFailed(live, params);
   else if (method === "Network.loadingFinished")
-    noteRequestEnd(live.open, { id: String(params.requestId ?? ""), at: Date.now() });
+    noteRequestEnd(live.open, { id: String(params.requestId ?? ""), at: eventTime(params) });
 }

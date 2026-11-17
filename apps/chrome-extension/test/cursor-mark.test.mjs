@@ -46,14 +46,14 @@ test("glide midpoint matches the bent ease-out", async () => {
   assert.deepEqual(mark.glidePoint(0, 0, 100, 0, 0.5), { x: 87.5, y: 3.9375 });
 });
 
-test("the page painter is the one cursor and does not dispatch events", async () => {
+test("the page painter is the one cursor and dispatches only neutral state events", async () => {
   const page = await load("../../../browser/packages/engine/src/cursor-page.ts");
   const source = page.cursorExpression({});
   assert.match(source, /M 1\.2 1\.2/);
   assert.match(source, /\.p\.on \.tr,\.p\.on \.stop\{pointer-events:none\}/);
-  assert.equal(source.includes("dispatchEvent"), false);
   assert.equal(source.includes("aeon-cursor-stop"), false);
   assert.equal(source.includes("aeon-cursor-transcript"), false);
+  assert.match(source, /new CustomEvent\(STATE_EVENT/);
 });
 
 test("cursor token values are the last ones in tokens.css", async () => {

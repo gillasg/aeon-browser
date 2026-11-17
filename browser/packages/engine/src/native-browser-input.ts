@@ -5,6 +5,7 @@ import {
   beginReceipt,
   dropReceipt,
   finishReceipt,
+  noteActionStart,
   takeReceipt,
 } from "./native-browser-receipts.js";
 import "./native-browser-download-reissue.js";
@@ -625,6 +626,9 @@ export async function performAction(
         return scrollWithFeedback(debuggee, { ...request, step: request.step });
       const before = filled ? undefined : await primeBrowserSettle(debuggee);
       const since = Date.now();
+      // The click lands now, not when beginReceipt ran: pre-click validation can outlast the
+      // causal window under load. Anchor the receipt here so its request is not dropped.
+      noteActionStart(actionId, since);
       const dispatched = await dispatchAction(debuggee, request, revalidateTarget);
       readback = dispatched?.readback;
       box = dispatched?.box;
