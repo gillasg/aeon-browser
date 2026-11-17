@@ -9,6 +9,7 @@ import type { DaemonHost } from "./host.js";
 import type { DataDir, HealthView } from "./doctor-checks.js";
 import type { StealthFacts } from "./doctor-stealth-checks.js";
 import { gatherStealthFacts } from "./doctor-stealth-io.js";
+import { readUseClientModel } from "./mcp-sampling.js";
 import { readStartFailure } from "./start-failure.js";
 
 export interface DoctorIo {
@@ -21,6 +22,8 @@ export interface DoctorIo {
   startFailure?(): Promise<string | undefined>;
   /** Only used by `aeon doctor --stealth`; opens and closes one hidden tab. */
   stealthFacts?(): Promise<StealthFacts>;
+  /** Optional so existing fakes stay valid; absent means Aeon does not prefer the agent's model. */
+  mcpUsesClientModel?(): Promise<boolean>;
 }
 
 export function liveDoctorIo(host: DaemonHost): DoctorIo {
@@ -32,6 +35,7 @@ export function liveDoctorIo(host: DaemonHost): DoctorIo {
     dataDirs: readDataDirs,
     startFailure: readStartFailure,
     stealthFacts: () => gatherStealthFacts(host),
+    mcpUsesClientModel: readUseClientModel,
   };
 }
 
