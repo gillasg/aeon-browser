@@ -89,7 +89,14 @@ function parseMcpCapability(
   };
 }
 
-export function parseRegistry(raw: string): CapabilityRegistryFile {
+/**
+ * `onSkip` makes reading tolerant: an invalid entry is skipped and reported instead of failing the
+ * whole file, so one bad hand-edited line never stops Aeon from starting. Writes stay strict.
+ */
+export function parseRegistry(
+  raw: string,
+  onSkip?: (index: number, reason: string) => void,
+): CapabilityRegistryFile {
   let candidate: unknown;
   try {
     candidate = JSON.parse(raw) as unknown;
@@ -105,7 +112,15 @@ export function parseRegistry(raw: string): CapabilityRegistryFile {
     candidate.capabilities.length > MAX_CAPABILITIES
   )
     throw new Error("capabilities.json has an unsupported schema or revision.");
-  const capabilities = candidate.capabilities.map((item) => parseCapability(item, true));
+  const capabilities = candidate.capabilities.flatMap((item, index) => {
+    if (!onSkip) return [parseCapability(item, true)];
+    try {
+      return [parseCapability(item, true)];
+    } catch (error) {
+      onSkip(index, error instanceof Error ? error.message : String(error));
+      return [];
+    }
+  });
   if (new Set(capabilities.map(({ id }) => id)).size !== capabilities.length)
     throw new Error("capabilities.json contains duplicate capability IDs.");
   return {

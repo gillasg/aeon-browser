@@ -50,47 +50,52 @@ async function aeon(home, args, env = {}) {
   }
 }
 
-test("aeon record start/stop writes frames, a clip and an honest events.json on a fake ffmpeg", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-record-"));
-  try {
-    const { ffmpeg, ffprobe } = fakeFfmpeg(home);
-    const folder = join(home, "recording");
-    const env = { AEON_FFMPEG: ffmpeg, AEON_FFPROBE: ffprobe };
-    const start = await aeon(
-      home,
-      ["record", "start", "--screen", "--out", folder, "--fps", "30"],
-      env,
-    );
-    assert.equal(start.code, 0, start.stderr);
-    assert.match(start.stdout, /Recording screen/);
-    const initial = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
-    assert.equal(initial.clip.source, "screen");
-    assert.ok(initial.note, "an in-progress log says so");
+test(
+  "aeon record start/stop writes frames, a clip and an honest events.json on a fake ffmpeg",
+  // The fake ffmpeg is a POSIX shell script; Windows cannot run it as a program.
+  { skip: process.platform === "win32" ? "the fake ffmpeg is a /bin/sh script" : false },
+  async () => {
+    const home = await mkdtemp(join(tmpdir(), "aeon-record-"));
+    try {
+      const { ffmpeg, ffprobe } = fakeFfmpeg(home);
+      const folder = join(home, "recording");
+      const env = { AEON_FFMPEG: ffmpeg, AEON_FFPROBE: ffprobe };
+      const start = await aeon(
+        home,
+        ["record", "start", "--screen", "--out", folder, "--fps", "30"],
+        env,
+      );
+      assert.equal(start.code, 0, start.stderr);
+      assert.match(start.stdout, /Recording screen/);
+      const initial = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
+      assert.equal(initial.clip.source, "screen");
+      assert.ok(initial.note, "an in-progress log says so");
 
-    const stopped = await aeon(home, ["record", "stop", "--out", folder], env);
-    assert.equal(stopped.code, 0, stopped.stderr);
-    assert.match(stopped.stdout, /Stopped/);
-    const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
-    assert.equal(events.version, 1);
-    assert.equal(events.recorder, "aeon");
-    assert.equal(events.clock, "clip");
-    assert.equal(events.clip.fps, 30);
-    assert.equal(events.clip.width, 1280);
-    assert.equal(events.clip.height, 800);
-    assert.ok(events.clip.startedAt > 0);
-    assert.ok(events.clip.frames >= 1);
-    assert.ok(Array.isArray(events.events));
-    assert.ok((await readdir(join(folder, "frames"))).some((f) => f.endsWith(".jpg")));
-    assert.ok(existsSync(join(folder, "clip.mp4")));
-    assert.equal(
-      existsSync(join(folder, ".recording.json")),
-      false,
-      "stop clears the active marker",
-    );
-  } finally {
-    await rm(home, { recursive: true, force: true });
-  }
-});
+      const stopped = await aeon(home, ["record", "stop", "--out", folder], env);
+      assert.equal(stopped.code, 0, stopped.stderr);
+      assert.match(stopped.stdout, /Stopped/);
+      const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
+      assert.equal(events.version, 1);
+      assert.equal(events.recorder, "aeon");
+      assert.equal(events.clock, "clip");
+      assert.equal(events.clip.fps, 30);
+      assert.equal(events.clip.width, 1280);
+      assert.equal(events.clip.height, 800);
+      assert.ok(events.clip.startedAt > 0);
+      assert.ok(events.clip.frames >= 1);
+      assert.ok(Array.isArray(events.events));
+      assert.ok((await readdir(join(folder, "frames"))).some((f) => f.endsWith(".jpg")));
+      assert.ok(existsSync(join(folder, "clip.mp4")));
+      assert.equal(
+        existsSync(join(folder, ".recording.json")),
+        false,
+        "stop clears the active marker",
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);
 
 test("aeon video kit copies the Remotion starter kit without adding a dependency to Aeon", async () => {
   const home = await mkdtemp(join(tmpdir(), "aeon-kit-"));

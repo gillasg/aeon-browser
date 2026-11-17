@@ -393,6 +393,8 @@ function __extendPage(target, base) {
     dblclick: (selector, options) => css(selector).first().dblclick(options),
     type: (selector, value) => css(selector).first().fill(value),
     waitForLoadState: (state, options = {}) => base.waitFor(state === 'domcontentloaded' ? () => document.readyState !== 'loading' : () => document.readyState === 'complete', {timeoutMs: options.timeout ?? 8000}),
+    // A common guess from other tools; same as waitForLoadState('load').
+    waitForLoad: (options = {}) => base.waitFor(() => document.readyState === 'complete', {timeoutMs: options.timeout ?? options.timeoutMs ?? 8000}),
     waitForURL: (pattern, options = {}) => __waitUntil(async () => {
       var url = await base.evaluate(() => location.href);
       return pattern instanceof RegExp ? pattern.test(url) : String(url).includes(String(pattern).replace(/\\*\\*/g, ''));
