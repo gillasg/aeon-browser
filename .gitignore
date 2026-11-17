@@ -38,6 +38,7 @@ coverage/
 # The skill is generated from these sources, and the bench has its own README.
 !/skills/aeon/parts/*.md
 !/benchmarks/README.md
+!/templates/video/*.md
 # Aeon-only lines for the generated browser guidance.
 !/packages/pi-adapter/guidance-extra.md
 # The engine's agent text sources, its skills and its package docs (public, generated from or
