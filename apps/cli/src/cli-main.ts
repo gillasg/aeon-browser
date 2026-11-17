@@ -76,9 +76,21 @@ main(process.argv.slice(2)).then(
   },
   async (error: unknown) => {
     // Errors come from browserkit's commands too; in Aeon they must not name another product.
-    printError(
-      error instanceof Error ? new Error(error.message.replace(/\bbrowserkit\b/g, "aeon")) : error,
-    );
+    const renamed =
+      error instanceof Error ? new Error(error.message.replace(/\bbrowserkit\b/g, "aeon")) : error;
+    if (process.argv.includes("--json")) {
+      out(
+        JSON.stringify({
+          ok: false,
+          error: {
+            message: renamed instanceof Error ? renamed.message : String(renamed),
+            kind: errorKind(error),
+          },
+        }),
+      );
+    } else {
+      printError(renamed);
+    }
     await close();
     process.exit(EXIT_CODES[errorKind(error)] ?? 1);
   },

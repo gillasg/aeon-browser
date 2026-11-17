@@ -20,6 +20,10 @@ import {
 } from "./protocol.mjs";
 
 const PHASE_TIMEOUT_MS = numberEnv("AEON_PHASE_TIMEOUT_MS", 90_000);
+// A per-phase deadline is not enough: a daemon that keeps emitting phase lines (or a loop of
+// them) resets it forever and the supervisor never leaves "starting". This overall budget bounds
+// the whole boot no matter how many phases it reports.
+const BOOT_TIMEOUT_MS = numberEnv("AEON_BOOT_TIMEOUT_MS", 180_000);
 const SPAWN_TIMEOUT_MS = 90_000;
 const HEALTH_WAIT_MS = numberEnv("AEON_HEALTH_WAIT_MS", 2500);
 const BOOTSTRAP_REPLY_MS = numberEnv("AEON_BOOTSTRAP_REPLY_MS", 15_000);
@@ -215,7 +219,13 @@ class Supervisor {
   async waitForReady(child, lines) {
     let phase = "spawn";
     let deadline = Date.now() + PHASE_TIMEOUT_MS;
+    const bootDeadline = Date.now() + BOOT_TIMEOUT_MS;
     while (true) {
+      if (Date.now() >= bootDeadline)
+        throw named(
+          "boot-timeout",
+          `boot-timeout: daemon did not become ready within ${BOOT_TIMEOUT_MS}ms`,
+        );
       const result = await this.waitOrStop(lines.next(Math.max(0, deadline - Date.now())));
       if (result.kind === "line") {
         if (result.line === "AEON_DAEMON_READY") return;

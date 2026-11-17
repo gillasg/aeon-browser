@@ -177,7 +177,8 @@ function createRoutineTools(
         "await p.close(); price < 400 ? {price} : false). You are woken with the instruction only " +
         "when its last expression is truthy, and receive that value. Watchers may run every minute. " +
         "'Tell me when' is that watcher now, not a wait in the cell. " +
-        "Fit everyMinutes to the horizon they named (minutes: 1, a few hours: 15, a day: 60, none named: 360). " +
+        "For 'tell me when', set everyMinutes from how fast the watched condition changes, not from how far off it is: " +
+        "a condition that can flip in minutes needs a minute-level poll, not 10-30 minutes; keep long intervals for steady things and one-time moments. " +
         "Use them as event triggers: new items from a mapped API " +
         "(const r = await siteMapper.watch('shop.com', 'searchListings', {q: 'lamp'}); r.new.length ? r.new : false), " +
         "a new message or email (siteMapper.watch on the inbox's API, or count unread on the page), " +

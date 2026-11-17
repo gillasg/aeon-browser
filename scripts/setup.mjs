@@ -18,6 +18,7 @@ const extension = join(root, "apps", "chrome-extension", "native-dist");
 const cli = join(root, "apps", "cli", "dist", "cli.js");
 const say = (line) => process.stdout.write(line + "\n");
 const windows = process.platform === "win32";
+const summonShortcut = process.platform === "darwin" ? "Cmd+Shift+Space" : "Ctrl+Shift+Space";
 
 if (!windows && process.platform !== "darwin" && process.platform !== "linux") {
   say(`Aeon does not support ${process.platform} yet.`);
@@ -41,7 +42,7 @@ await connectAgents();
 
 say("4/4 The extension");
 if (await extensionConnected()) {
-  say("Aeon is connected. Open it from the toolbar, or press Ctrl+Shift+Space on any page.");
+  say(`Aeon is connected. Open it from the toolbar, or press ${summonShortcut} on any page.`);
   process.exit(0);
 }
 if (!existsSync(join(extension, "manifest.json"))) throw new Error("The extension did not build.");
@@ -52,7 +53,7 @@ say("Waiting for Aeon to connect (Ctrl+C to stop)…");
 for (let waited = 0; waited < 10 * 60_000; waited += 3000) {
   await new Promise((resolve) => setTimeout(resolve, 3000));
   if (await extensionConnected()) {
-    say("Connected. Open Aeon from the toolbar, or press Ctrl+Shift+Space on any page.");
+    say(`Connected. Open Aeon from the toolbar, or press ${summonShortcut} on any page.`);
     process.exit(0);
   }
 }
@@ -102,12 +103,11 @@ function loadInstructions() {
       "  2. Click Load unpacked, paste the folder with Ctrl+V, press Enter, then Select Folder.",
       "The folder is on your clipboard: " + extension,
     ].join("\n");
-  const shortcut = process.platform === "darwin" ? "Cmd+Shift+Space" : "Ctrl+Shift+Space";
   return [
     "Last step, in the chrome://extensions tab that just opened:",
     "  1. Turn on Developer mode (top right).",
     "  2. Click Load unpacked and choose the folder below.",
-    `  3. Open Aeon from the toolbar, or press ${shortcut} on any page.`,
+    `  3. Open Aeon from the toolbar, or press ${summonShortcut} on any page.`,
     "The folder is on your clipboard: " + extension,
   ].join("\n");
 }

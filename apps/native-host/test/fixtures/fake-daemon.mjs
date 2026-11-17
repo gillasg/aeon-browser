@@ -41,6 +41,17 @@ if (mode === "stall") {
     tick();
   });
 }
+if (mode === "phase-forever") {
+  // Models the boot hang: keep reporting progress so the per-phase deadline is always reset,
+  // but never become ready. Only an overall boot budget can end this.
+  let tick = 0;
+  const loop = () => {
+    write(`AEON_DAEMON_PHASE loop-${tick++}`);
+    setTimeout(loop, 50);
+  };
+  loop();
+  await new Promise(() => undefined);
+}
 
 write("AEON_DAEMON_PHASE ready");
 write("AEON_DAEMON_READY");

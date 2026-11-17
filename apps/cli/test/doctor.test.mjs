@@ -4,12 +4,26 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { ENGINE_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
-import { CHROME_FLAGS, doctorChecks, formatDoctor } from "../dist/doctor-checks.js";
+import {
+  CHROME_FLAGS,
+  chromeFlagsCommand,
+  doctorChecks,
+  formatDoctor,
+} from "../dist/doctor-checks.js";
 import { directoryWritable, modelSignedIn, supervisorServiceActive } from "../dist/doctor-io.js";
 import { runDoctor } from "../dist/doctor.js";
 
 const version = SUPPORTED_PROTOCOL_VERSION;
 const flags = CHROME_FLAGS.join(" ");
+
+test("the flags fix prints the exact relaunch command for each OS", () => {
+  assert.match(chromeFlagsCommand("darwin"), /^\/Applications\/Google\\ Chrome\.app/);
+  assert.match(chromeFlagsCommand("win32"), /^chrome\.exe /);
+  assert.match(chromeFlagsCommand("linux"), /^google-chrome /);
+  for (const platform of ["darwin", "win32", "linux"]) {
+    assert.ok(chromeFlagsCommand(platform).includes(flags));
+  }
+});
 
 function facts(overrides = {}) {
   return {

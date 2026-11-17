@@ -1,6 +1,13 @@
 // The shell is a second browser. curl, wget and anything else that honors the proxy environment
 // goes through here, including a redirect from an allowed host into a blocked one. The page is
 // never contacted: the answer is the same SITE_BLOCKED the browser would give.
+//
+// COVERAGE, STATED HONESTLY: this guard is proxy environment variables injected into the child
+// process, not a network-level sandbox. It covers clients that honour HTTP(S)_PROXY/ALL_PROXY and
+// NO_PROXY. A command that opts out (`curl --noproxy`, `env -u HTTP_PROXY`, an explicit NO_PROXY,
+// an `unset`) or a program that ignores proxy env vars entirely (raw sockets, PowerShell/WinHTTP,
+// many native clients) reaches the site without asking this proxy. useBrowser tools are the
+// enforced path for those; do not treat the shell proxy as a guarantee.
 import {
   createServer,
   request as httpRequest,
@@ -56,9 +63,9 @@ function listen(): Promise<string> {
   });
 }
 
-function refuse(res: ServerResponse, reason: string): void {
+function refuse(res: ServerResponse, reason: string, status = 403): void {
   if (res.headersSent) return;
-  res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
+  res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
   res.end(reason);
 }
 
@@ -67,7 +74,7 @@ async function forward(req: IncomingMessage, res: ServerResponse): Promise<void>
   try {
     target = new URL(req.url ?? "");
   } catch {
-    refuse(res, "SITE_BLOCKED: that address is not a URL the shell proxy can check");
+    refuse(res, "SITE_UNREACHABLE: that address is not a URL the shell proxy can check", 400);
     return;
   }
   const reason = await blockedSiteReason(target.href);
@@ -92,8 +99,16 @@ async function forward(req: IncomingMessage, res: ServerResponse): Promise<void>
       void answer(target.href, upstream, res);
     },
   );
-  outbound.on("error", () =>
-    refuse(res, "SITE_BLOCKED: the shell proxy could not reach that site"),
+  // A transport failure on an ALLOWED host is a network problem, never a user block. Saying
+  // SITE_BLOCKED here made agents stop and tell the user the site was blocked when it was merely
+  // unreachable, and the terminal no-recovery SITE_BLOCKED handling made them stop for good.
+  outbound.on("error", (error: NodeJS.ErrnoException) =>
+    refuse(
+      res,
+      `SITE_UNREACHABLE: the shell proxy could not reach ${target.host} (${error.code ?? "network error"}). ` +
+        "This is a connection failure, not a blocked site; retry or report the network problem.",
+      502,
+    ),
   );
   req.pipe(outbound);
 }

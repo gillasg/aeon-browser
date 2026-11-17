@@ -10,7 +10,29 @@ import {
   DaemonUiResponseSchema,
   BrowserContextDraftSchema,
   BrowserContextHandoffSchema,
+  CoreToolRequestSchema,
 } from "../dist/index.js";
+
+test("a core.tool.call accepts every tool the CLI and MCP expose, including routine", () => {
+  const call = {
+    kind: "core.tool.call",
+    requestId: "3ee73dc0-f996-4aac-94ae-198773512ab3",
+    session: "cli",
+    arguments: { action: "list" },
+  };
+  for (const tool of [
+    "browser_code",
+    "browser_tabs",
+    "crawl",
+    "site_mapper",
+    "extract",
+    "chat_review",
+    "routine",
+  ]) {
+    assert.equal(CoreToolRequestSchema.parse({ ...call, tool }).tool, tool);
+  }
+  assert.throws(() => CoreToolRequestSchema.parse({ ...call, tool: "not_a_tool" }));
+});
 
 test("hello and server responses share the closed discriminated wire schema", () => {
   assert.equal(HelloSchema.parse(validHello).role, "ui");

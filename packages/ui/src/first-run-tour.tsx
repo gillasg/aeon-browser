@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from "react";
+import { summonShortcut } from "./platform.js";
 
 // A short tour the first time home opens. It replaces the old action-bar note, whose message is
 // now one of the steps. Settings can show it again.
@@ -8,7 +9,7 @@ export const TOUR_KEY = "aeonTour";
 const STEPS: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: "Call Aeon on any page",
-    body: "Press Ctrl+Shift+Space on any page, Aeon's own included. The Aeon cursor opens with the page as context; press it again to close.",
+    body: `Press ${summonShortcut} on any page, Aeon's own included. The Aeon cursor opens with the page as context; press it again to close.`,
   },
   {
     title: "Watch it work",

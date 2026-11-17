@@ -25,7 +25,16 @@ const SUPERVISOR_NAME =
     : process.platform === "darwin"
       ? "LaunchAgent com.aeon.daemon"
       : "User service aeon-daemon";
-const FLAGS_FIX = `Restart Chrome with these flags: ${CHROME_FLAGS.join(" ")}.`;
+/** The exact command to relaunch Chrome with, so a normal install can fix the flags check. */
+export function chromeFlagsCommand(platform: NodeJS.Platform = process.platform): string {
+  const flags = CHROME_FLAGS.join(" ");
+  if (platform === "darwin")
+    return `/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome ${flags}`;
+  if (platform === "win32") return `chrome.exe ${flags}`;
+  return `google-chrome ${flags}`;
+}
+
+const FLAGS_FIX = `Restart Chrome with these flags: ${chromeFlagsCommand()}`;
 
 export type CheckName =
   "daemon" | "protocol" | "extension" | "flags" | "model" | "supervisor" | "data";

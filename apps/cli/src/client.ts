@@ -9,6 +9,16 @@ import { notRunningMessage, readStartFailure } from "./start-failure.js";
 // One connection to the running Aeon daemon through its local Core endpoint. The daemon writes
 // the endpoint and a fresh token to core-connection.json in its data folder each time it starts.
 type Json = Record<string, unknown>;
+
+// A request the daemon does not recognise is dropped without a reply (for example a tool name
+// added to a newer CLI than the daemon supports). Every wait is bounded and names the operation so
+// an ignored request never hangs the CLI forever and the error says what to do about it.
+const CONNECT_TIMEOUT_MS = 15_000;
+function noReply(what: string): Error {
+  return new Error(
+    `Aeon did not answer ${what}. It may be running an older version that ignores this request; update Aeon and retry.`,
+  );
+}
 export interface AttentionChat {
   chatId: string;
   working: boolean;
@@ -44,14 +54,20 @@ export class AeonClient {
       socket.once("error", () => reject(new Error("Could not reach the Aeon daemon.")));
     });
     const ready = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(noReply("the connection handshake")),
+        CONNECT_TIMEOUT_MS,
+      );
       socket.once("message", (raw) => {
+        clearTimeout(timer);
         const message = JSON.parse(String(raw)) as Json;
         if (message.kind === "core.ready") resolve();
         else reject(new Error("Aeon refused the connection."));
       });
-      socket.once("close", (code, reason) =>
-        reject(new Error(`Aeon closed the connection (${code} ${String(reason)}).`)),
-      );
+      socket.once("close", (code, reason) => {
+        clearTimeout(timer);
+        reject(new Error(`Aeon closed the connection (${code} ${String(reason)}).`));
+      });
     });
     socket.send(
       JSON.stringify({
@@ -98,6 +114,7 @@ export class AeonClient {
   /** Lists Aeon's chat tools for outside agents, or calls one in a named session. */
   tool(body: Json, timeoutMs = 11 * 60_000, signal?: AbortSignal): Promise<Json> {
     const requestId = randomUUID();
+    const what = `the ${String(body.tool ?? "tool")} request`;
     return new Promise((resolve, reject) => {
       const finish = () => {
         clearTimeout(timer);
@@ -106,7 +123,7 @@ export class AeonClient {
       };
       const timer = setTimeout(() => {
         finish();
-        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+        reject(noReply(what));
       }, timeoutMs);
       // A 2026-07-28 notifications/cancelled stops waiting on this reply. The call is not retried.
       const onAbort = () => {
@@ -151,11 +168,13 @@ export class AeonClient {
     timeoutMs = 11 * 60_000,
   ): Promise<Json> {
     const requestId = randomUUID();
+    // A cell asked to run longer than the default still gets its own time plus a minute.
+    const wait = Math.max(timeoutMs, (body.timeoutMs ?? 0) + 60_000);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
         reject(new Error("The browser did not answer in time. Update Aeon and retry."));
-      }, timeoutMs);
+      }, wait);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.browser.result") return;
         clearTimeout(timer);
@@ -276,9 +295,16 @@ export class AeonClient {
   }
 
   /** Shows a chat as a tab in the connected Chrome; resolves with how many browsers were asked. */
-  openChat(chatId: string, active = false): Promise<number> {
-    return new Promise((resolve) => {
-      this.openWaiters.set(chatId, (reply) => resolve(Number(reply.browsers)));
+  openChat(chatId: string, active = false, timeoutMs = 30_000): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.openWaiters.delete(chatId);
+        reject(noReply("the open-chat request"));
+      }, timeoutMs);
+      this.openWaiters.set(chatId, (reply) => {
+        clearTimeout(timer);
+        resolve(Number(reply.browsers));
+      });
       this.socket.send(JSON.stringify({ kind: "core.chat.open", chatId, active }));
     });
   }
@@ -290,15 +316,21 @@ export class AeonClient {
   openTypedChat(
     chatId: string,
     prompt: string,
+    timeoutMs = 30_000,
   ): Promise<{ typed: boolean; recording: boolean; error?: string }> {
-    return new Promise((resolve) => {
-      this.openWaiters.set(chatId, (reply) =>
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.openWaiters.delete(chatId);
+        reject(noReply("the typed-chat request"));
+      }, timeoutMs);
+      this.openWaiters.set(chatId, (reply) => {
+        clearTimeout(timer);
         resolve({
           typed: reply.typed === true,
           recording: reply.recording === true,
           ...(typeof reply.error === "string" ? { error: reply.error } : {}),
-        }),
-      );
+        });
+      });
       this.socket.send(JSON.stringify({ kind: "core.chat.open", chatId, typed: prompt }));
     });
   }

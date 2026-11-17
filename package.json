@@ -21,6 +21,7 @@
     "agent-text:check": "node browser/scripts/build-agent-text.mjs --check",
     "bench": "node benchmarks/run.mjs --dry-run",
     "bench:live": "node benchmarks/run.mjs --allow-browser",
+    "bench:installed": "node benchmarks/installed/run.mjs",
     "dev:handshake": "pnpm build:core && node apps/daemon/dist/main.js --dev-handshake",
     "dev:chat": "pnpm build:core && node apps/daemon/dist/main.js --dev-chat",
     "start": "node apps/daemon/dist/main.js --core",
