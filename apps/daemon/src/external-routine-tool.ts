@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AeonProductStore, ChatId, RoutineRecord } from "@aeon/domain";
 import { exploreForRoutine } from "@aeon/pi-adapter";
+import { optionalListen } from "./routine-listen.js";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 
 // Routines for outside agents (the CLI and MCP). A routine created this way lives in a chat that
@@ -29,6 +30,16 @@ export const EXTERNAL_ROUTINE_TOOL = {
         maxLength: 20_000,
         description:
           "Optional browser_code that runs first; the agent run happens only when it returns true.",
+      },
+      listen: {
+        type: "object",
+        additionalProperties: false,
+        description:
+          "Live watcher: react to matching responses on an open tab instead of only on the timer.",
+        properties: {
+          url: { type: "string", minLength: 1, maxLength: 2000 },
+          type: { type: "string", minLength: 1, maxLength: 100 },
+        },
       },
       sites: {
         type: "array",
@@ -71,11 +82,12 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
   const title = optionalString(options.args.title).slice(0, 120) || instruction.slice(0, 60);
   const check = optionalString(options.args.check) || null;
   const checkShell = optionalString(options.args.checkShell) || null;
+  const listen = optionalListen(options.args.listen);
   const now = new Date();
   const schedule = parseRoutineSchedule(
     scheduleValue(options.args.schedule),
     now,
-    check || checkShell ? 1 : 5,
+    check || checkShell || listen ? 1 : 5,
   );
   const sites = sitesOf(options.args.sites);
   const chatId = await chatFor(options, origin);
@@ -88,6 +100,7 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
     check,
     checkShell,
     sites,
+    listen,
     schedule,
     nextDueAt: nextRoutineOccurrence(schedule, now),
     requiredBrowserInstanceId: null,
@@ -140,6 +153,7 @@ function pause(options: ExternalRoutineOptions, origin: Origin): unknown {
         check: routine.check ?? null,
         checkShell: routine.checkShell ?? null,
         sites: routine.sites ?? [],
+        listen: routine.listen ?? null,
         schedule: routine.schedule,
         requiredBrowserInstanceId: routine.requiredBrowserInstanceId ?? null,
         enabled: false,
@@ -178,6 +192,7 @@ function project(routine: RoutineRecord): Record<string, unknown> {
     enabled: routine.enabled,
     sites: routine.sites ?? [],
     check: Boolean(routine.check),
+    ...(routine.listen ? { listen: routine.listen } : {}),
     createdAt: routine.createdAt,
   };
 }

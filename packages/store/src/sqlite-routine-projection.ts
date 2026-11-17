@@ -1,5 +1,5 @@
 import { asChatId } from "@aeon/domain";
-import type { RoutineRecord, RoutineRunRecord } from "@aeon/domain";
+import type { RoutineListen, RoutineRecord, RoutineRunRecord } from "@aeon/domain";
 
 export interface RoutineRow {
   routine_id: string;
@@ -9,6 +9,7 @@ export interface RoutineRow {
   check_code: string | null;
   check_shell: string | null;
   sites_json: string | null;
+  listen_json: string | null;
   schedule_json: string;
   next_due_at: string | null;
   required_browser_instance_id: string | null;
@@ -43,6 +44,7 @@ export function toRoutine(row: RoutineRow): RoutineRecord {
     check: row.check_code ?? null,
     checkShell: row.check_shell ?? null,
     sites: sitesOf(row.sites_json),
+    listen: listenOf(row.listen_json),
     schedule: JSON.parse(row.schedule_json) as RoutineRecord["schedule"],
     nextDueAt: row.next_due_at,
     requiredBrowserInstanceId: row.required_browser_instance_id,
@@ -69,6 +71,21 @@ export function toRoutineRun(row: RoutineRunRow): RoutineRunRecord {
     completedAt: row.completed_at,
     lastError: row.last_error,
   };
+}
+
+/** The optional live-watch filter; a database from before it has null. */
+function listenOf(value: string | null): RoutineListen | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed.url !== "string" || !parsed.url) return null;
+    return {
+      url: parsed.url,
+      ...(typeof parsed.type === "string" && parsed.type ? { type: parsed.type } : {}),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** The optional "only these sites" list; a database from before it has null. */

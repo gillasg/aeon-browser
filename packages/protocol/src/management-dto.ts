@@ -59,6 +59,14 @@ const ManagementRoutineSchema = z
     kind: z.literal("snipe").optional(),
     /** The opt-in local command its check runs; shown so the editor can keep it. */
     checkShell: z.string().max(2000).optional(),
+    /** Live watcher: react to matching responses on an open tab instead of only on the timer. */
+    listen: z
+      .object({
+        url: z.string().min(1).max(2000),
+        type: z.string().min(1).max(100).optional(),
+      })
+      .nullable()
+      .optional(),
     /** Sites this routine may use; empty means it is not restricted. */
     sites: z.array(z.string().min(1).max(200)).max(50),
     nextDueAt: z.string().datetime().nullable(),

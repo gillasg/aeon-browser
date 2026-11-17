@@ -69,15 +69,19 @@ function __extendPageEvents(target, base) {
     // Resolves with the first new response whose URL contains match (and passes options.filter).
     waitForResponse: async (match = '', options = {}) => {
       await recording();
-      var listed = await __call({network: 'list', target, match});
+      // type is a resource type (Fetch, XHR, Document) or a MIME (json, image/, +json), like
+      // page.network.list; only matching responses get their body read, lazily, when they finish.
+      var filter = {match: match, type: options.type};
+      var listed = await __call({network: 'list', target, ...filter});
       var seen = new Set(listed.map((entry) => entry.id)), deadline = deadlineOf(options);
       while (Date.now() < deadline) {
         await __sleep(300);
-        for (var entry of await __call({network: 'list', target, match})) {
+        for (var entry of await __call({network: 'list', target, ...filter})) {
           if (seen.has(entry.id) || !entry.status) continue;
           seen.add(entry.id);
           var body = await __call({network: 'body', target, id: entry.id}).catch(() => undefined);
-          var found = {id: entry.id, url: entry.url, method: entry.method, status: entry.status, body};
+          var found = {id: entry.id, url: entry.url, method: entry.method, status: entry.status,
+            type: entry.type, mimeType: entry.mimeType, body};
           if (!options.filter || options.filter(found)) return found;
         }
       }

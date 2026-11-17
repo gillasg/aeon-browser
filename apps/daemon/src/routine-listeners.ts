@@ -1,9 +1,12 @@
 import type { RoutineRecord } from "@aeon/domain";
+import { isLive } from "./routine-listen.js";
 
-// Listening routines: a check that starts with "use listen"; runs back to back instead of once per
-// slot. Each run waits inside the browser for something to happen (page.waitForChange,
-// page.waitForResponse, page.waitForMessage) and returns as soon as it does, so the routine wakes
-// within seconds instead of on the next minute. Scheduled slots of a listening routine are skipped.
+// Listening routines: a check that starts with "use listen", or a routine with a live `listen`
+// filter. They run back to back instead of once per slot. Each run waits inside the browser for
+// something to happen (page.waitForResponse and the routine's check) and returns as soon as it
+// does, so the routine wakes within seconds instead of on the next minute. Scheduled slots of a
+// listening routine are skipped, unless it is a live routine with no matching tab open: then it
+// stays idle and the normal timer check runs (the fallback).
 
 export const LISTEN_DIRECTIVE = /^\s*["']use listen["'];?/;
 export const LISTEN_TIMEOUT_MS = 58_000;
@@ -16,7 +19,9 @@ export const isListening = (routine: Pick<RoutineRecord, "check">): boolean =>
 export interface ListenerHost {
   routines(): readonly RoutineRecord[];
   available(routine: RoutineRecord): boolean;
-  check(routine: RoutineRecord): Promise<{ met: boolean; value?: unknown; error?: string }>;
+  check(
+    routine: RoutineRecord,
+  ): Promise<{ met: boolean; value?: unknown; error?: string; idle?: boolean }>;
   heard(routine: RoutineRecord, value: unknown): void;
 }
 
@@ -51,7 +56,7 @@ export class RoutineListeners {
   }
 
   private wanted(routine: RoutineRecord): boolean {
-    return routine.enabled && !routine.deletedAt && isListening(routine);
+    return routine.enabled && !routine.deletedAt && (isListening(routine) || isLive(routine));
   }
 
   private current(routineId: string): RoutineRecord | undefined {
@@ -68,10 +73,13 @@ export class RoutineListeners {
       }
       const result = await this.host.check(routine).catch((error: unknown) => ({
         met: false,
+        idle: false,
         error: error instanceof Error ? error.message : String(error),
       }));
       if (result.met) this.host.heard(routine, (result as { value?: unknown }).value);
       else if (result.error) await pause(ERROR_BACKOFF_MS);
+      else if (result.idle)
+        await pause(POLL_MS); // no matching tab / response yet: let the timer run
       else await pause(250);
     }
   }

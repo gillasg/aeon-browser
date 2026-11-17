@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const STORE_SCHEMA_VERSION = 12;
+export const STORE_SCHEMA_VERSION = 13;
 
 export function migrate(database: Database.Database): void {
   database.exec(`
@@ -33,7 +33,16 @@ const MIGRATIONS: readonly [number, (database: Database.Database) => void][] = [
   [10, migrateRoutineSites],
   [11, migrateChatOrigin],
   [12, migrateRoutineShellCheck],
+  [13, migrateRoutineListen],
 ];
+
+function migrateRoutineListen(database: Database.Database): void {
+  database.transaction(() => {
+    // Live watcher option for a routine: a URL/MIME filter, or null when timer-only.
+    database.exec("ALTER TABLE routines ADD COLUMN listen_json TEXT;");
+    markVersion(database, 13);
+  })();
+}
 
 function migrateRoutineShellCheck(database: Database.Database): void {
   database.transaction(() => {

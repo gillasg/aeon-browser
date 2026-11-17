@@ -24,11 +24,19 @@ const capabilityId = Type.Object(
   },
   { additionalProperties: false },
 );
+const routineListen = Type.Object(
+  {
+    url: Type.String({ minLength: 1, maxLength: 2000 }),
+    type: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+  },
+  { additionalProperties: false },
+);
 const routineCreate = Type.Object(
   {
     title: Type.String({ minLength: 1, maxLength: 120 }),
     instruction: Type.String({ minLength: 1, maxLength: 20_000 }),
     check: Type.Optional(Type.String({ minLength: 1, maxLength: 8000 })),
+    listen: Type.Optional(routineListen),
     sites: Type.Optional(
       Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 50 }),
     ),
@@ -45,6 +53,7 @@ const routineUpdate = Type.Object(
     title: Type.String({ minLength: 1, maxLength: 120 }),
     instruction: Type.String({ minLength: 1, maxLength: 20_000 }),
     check: Type.Optional(Type.Union([Type.String({ minLength: 1, maxLength: 8000 }), Type.Null()])),
+    listen: Type.Optional(Type.Union([routineListen, Type.Null()])),
     sites: Type.Optional(
       Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 50 }),
     ),
@@ -185,6 +194,7 @@ function createRoutineTools(
         "new rows on a page (const r = browser.changes('lamps', (await p.list()).items); r.new.length ? r.new : false; " +
         "browser.changes returns {new, changed, gone} against its last run, keyed by id, url or href). " +
         "Check variables persist between runs. " +
+        "For a tell-me-when on a site the user keeps open, set listen: {url: '<part of the response URL>', type?: 'json'} beside the schedule: the check gets `response` (its `body` is that response, parsed when JSON) on each matching load, with no extra requests; the timer runs when no such tab is open. " +
         "When the user wants it kept to particular sites ('only example.com'), pass sites: ['example.com']: " +
         "its own runs then use those sites and no others. " +
         'For instant triggers, start the check with "use listen"; and make it wait: it then runs continuously ' +
