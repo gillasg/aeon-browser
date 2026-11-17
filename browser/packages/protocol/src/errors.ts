@@ -14,6 +14,7 @@ import {
   ABILITY_REPAIR_HINT,
   errorNext,
   formatCandidateLines,
+  INPUT_MAY_HAVE_LANDED_NOTE,
   type ErrorContext,
 } from "./error-next.js";
 
@@ -23,6 +24,7 @@ export {
   effectNext,
   errorNext,
   formatCandidateLines,
+  INPUT_MAY_HAVE_LANDED_NOTE,
   isReadNext,
   NO_NEXT_REASON,
   usableCandidates,
@@ -53,6 +55,10 @@ export const ERRORS = {
   TARGET_LOST: ["page", "the element or page changed under the step: read bu.state() again"],
   NOT_EDITABLE: ["model", "the element does not take typing: target its input"],
   INPUT_FAILED: ["ours", "typing did not land: click the field, then type again"],
+  INPUT_MAY_HAVE_LANDED: [
+    "page",
+    "the action was sent but its result is unknown: " + INPUT_MAY_HAVE_LANDED_NOTE,
+  ],
   STALE_REF: ["model", "that bu id is from an older read: read bu.state() again"],
   TAB_DEAD: ["page", "the tab was closed or crashed: open a new one with browser.openTab(url)"],
   TAB_UNRESPONSIVE: [

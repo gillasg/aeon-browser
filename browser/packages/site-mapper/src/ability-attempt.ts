@@ -44,7 +44,7 @@ async function attemptApi(
   const commit = Math.min(way.commit ?? operations.length - 1, operations.length - 1);
   let result: unknown;
   for (const [index, step] of operations.entries()) {
-    if (progress && index >= commit) progress.reachedCommit = true;
+    if (progress && index >= commit && !step.settings) progress.reachedCommit = true;
     result = await callApiStep(step, way, inputs, stepResults, call, host);
     refuseUnsettled(result, progress?.reachedCommit === true);
   }
@@ -106,6 +106,8 @@ interface SavedStep {
   target?: FallbackTarget;
   args?: string[];
   onPageType?: string;
+  /** Click only changes a choice that spends nothing until a later step commits. */
+  settings?: true;
 }
 
 function savedSteps(way: AbilityWaySteps): SavedStep[] {
@@ -133,7 +135,7 @@ async function replaySaved(
   for (const [index, step] of steps.entries()) {
     const target = fillTarget(step.target, inputs);
     await assertCurrent(step, target, host);
-    if (progress && index >= commit) progress.reachedCommit = true;
+    if (progress && index >= commit && !step.settings) progress.reachedCommit = true;
     last = await act({
       kind: step.kind,
       ...(target ? { target } : {}),

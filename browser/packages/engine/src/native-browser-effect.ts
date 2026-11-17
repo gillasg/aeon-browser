@@ -5,6 +5,7 @@
 // than a failure. Cua Driver's ActionResult.effect, adapted to what Aeon can see in one step.
 import {
   effectNext,
+  INPUT_MAY_HAVE_LANDED_NOTE,
   type BrowserElementTarget,
   type BrowserStep,
   type EffectNextContext,
@@ -46,6 +47,25 @@ const shorten = (text: string) =>
 /** The effect of a step that did not run: it was refused, and the code is the evidence. */
 export function refusedEffect(code: string): EffectVerdict {
   return { effect: "refused", evidence: shorten(code || "refused") };
+}
+
+/**
+ * A write action that was sent and then failed or timed out. Its effect is unknown, not refused:
+ * the text or click may have landed, so the verdict carries no next-step hint to repeat it.
+ */
+export function sentActionEffect(code: string): EffectVerdict {
+  return {
+    effect: "unverifiable",
+    evidence: shorten(`${code || "action failed"}; ${INPUT_MAY_HAVE_LANDED_NOTE}`),
+  };
+}
+
+const SENT_THEN_FAILED =
+  /^(TIMEOUT|CHROME_ERROR|TAB_UNRESPONSIVE|TAB_DEAD|NETWORK|SITE_BROKEN|RATE_LIMITED|INTERNAL|INPUT_FAILED|EXPECTATION_FAILED|DEBUGGER_DETACHED|TARGET_LOST|ABILITY_TIMEOUT|INPUT_MAY_HAVE_LANDED)\b/;
+
+/** Whether a failed input step might already have reached the page. */
+export function mayHaveLanded(code: string): boolean {
+  return SENT_THEN_FAILED.test(code || "");
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   type SiteRecipe,
 } from "../recipes.js";
 import { mapRecords, matchesFilters, pickPath, recordKey } from "../recipe-map.js";
+import { boundedExec } from "../bounded-regex.js";
 import type { SiteModel } from "../types.js";
 
 /** A strategy that cannot run here (no browser for collect, site not mapped): try the next one. */
@@ -137,7 +138,10 @@ function deriveInputs(
   for (const [name, rule] of Object.entries(recipe.derive ?? {})) {
     const source = inputs[rule.from];
     if (source === undefined || source === null) continue;
-    const match = new RegExp(rule.pattern, rule.flags ?? "").exec(String(source));
+    const match = boundedExec(rule.pattern, String(source), {
+      flags: rule.flags ?? "",
+      label: "derive pattern",
+    });
     if (match) inputs[name] = match[rule.group ?? 1] ?? match[0];
   }
   return inputs;

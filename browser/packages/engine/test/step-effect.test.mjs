@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inputStepEffect, refusedEffect, scrollEffect } from "../dist/native-browser-effect.js";
+import {
+  inputStepEffect,
+  mayHaveLanded,
+  refusedEffect,
+  scrollEffect,
+  sentActionEffect,
+} from "../dist/native-browser-effect.js";
 
 // What an input step caused, as a closed value: confirmed needs readback, a step that ran
 // without evidence is unverifiable, a bounded unchanged state is a suspected no-op.
@@ -111,6 +117,25 @@ test("a refused step carries its code, and evidence stays short", () => {
     url: "https://a.test/" + "x".repeat(400),
   });
   assert.ok(long.evidence.length <= 200, String(long.evidence.length));
+});
+
+test("a sent action reports an unknown effect with no hint to repeat it", () => {
+  const effect = sentActionEffect("TIMEOUT");
+  assert.equal(effect.effect, "unverifiable");
+  assert.match(effect.evidence, /may have landed/);
+  assert.equal(effect.next, undefined);
+  assert.deepEqual(refusedEffect("TARGET_DISABLED"), {
+    effect: "refused",
+    evidence: "TARGET_DISABLED",
+  });
+  assert.equal(mayHaveLanded("TIMEOUT"), true);
+  assert.equal(mayHaveLanded("CHROME_ERROR"), true);
+  assert.equal(mayHaveLanded("TARGET_DISABLED"), false);
+  assert.equal(mayHaveLanded("NOT_EDITABLE"), false);
+  assert.equal(
+    inputStepEffect("click", { outcome: "unchanged" }, undefined, { sent: true }).next,
+    undefined,
+  );
 });
 
 test("a scroll's own offset is its readback", () => {

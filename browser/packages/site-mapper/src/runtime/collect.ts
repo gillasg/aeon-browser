@@ -4,6 +4,7 @@
 // a text filter or every match. Dotted names ("quoted.text") build nested records.
 
 import type { CollectFieldSpec, CollectRecipe } from "../recipes.js";
+import { INPUT_LIMIT, validatePattern } from "../bounded-regex.js";
 
 export type CollectInput = CollectRecipe;
 
@@ -27,6 +28,11 @@ export function collectExpression(input: CollectInput): string {
   const fields = Object.fromEntries(
     Object.entries(input.fields).map(([name, field]) => [name, normaliseCollectField(field)]),
   );
+  // The regex runs in the page, outside the Node vm, so refuse an unusable pattern here and
+  // cap the text the page feeds it. A catastrophic pattern cannot spin up a Node-side budget.
+  for (const field of Object.values(fields))
+    if (field.match)
+      validatePattern(field.match, { flags: field.flags || "", label: "field match" });
   const spec = {
     url: input.url ?? null,
     row: input.row,
@@ -35,6 +41,7 @@ export function collectExpression(input: CollectInput): string {
     expand: input.expand ?? [],
     max: Math.min(Math.max(input.max ?? 200, 1), 2000),
     idleRounds: Math.min(Math.max(input.idleRounds ?? 3, 1), 20),
+    matchCap: INPUT_LIMIT,
   };
   return `(async () => {
   const spec = ${JSON.stringify(spec)};
@@ -49,7 +56,7 @@ export function collectExpression(input: CollectInput): string {
       if (typeof value === "string") {
         value = value.trim();
         if (field.match) {
-          const match = new RegExp(field.match, field.flags || "").exec(value);
+          const match = new RegExp(field.match, field.flags || "").exec(value.slice(0, spec.matchCap));
           value = match ? (match[field.group ?? 1] ?? match[0]) : null;
         }
         if (typeof value === "string" && field.strip) value = value.split(field.strip).join("").trim();

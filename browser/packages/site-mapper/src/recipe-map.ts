@@ -4,6 +4,7 @@
 // capture). Everything here is pure so mappings can be tested without a browser or network.
 
 import type { Json } from "./types.js";
+import { boundedExec, boundedTest } from "./bounded-regex.js";
 
 export type FieldTransform =
   "string" | "number" | "boolean" | "trim" | "lower" | "upper" | "iso" | "unix-ms" | "unix-s";
@@ -156,7 +157,10 @@ function rawValue(record: unknown, rule: FieldRule): unknown {
 
 function applyPattern(value: unknown, rule: FieldRule): unknown {
   if (typeof value !== "string" || !rule.pattern) return value;
-  const match = new RegExp(rule.pattern, rule.flags ?? "").exec(value);
+  const match = boundedExec(rule.pattern, value, {
+    flags: rule.flags ?? "",
+    label: "field pattern",
+  });
   return match ? (match[rule.group ?? 1] ?? match[0]) : undefined;
 }
 
@@ -249,7 +253,7 @@ function matchesFilter(record: Record<string, unknown>, filter: RecipeFilter): b
     case "contains":
       return textOf(value).includes(textOf(expected));
     case "regex":
-      return new RegExp(textOf(expected)).test(textOf(value));
+      return boundedTest(textOf(expected), textOf(value), { label: "filter pattern" });
     case "gt":
       return Number(value) > Number(expected);
     case "lt":

@@ -1,9 +1,56 @@
 import { randomUUID } from "node:crypto";
 import {
   BrowserOperationCallSchema,
+  INPUT_MAY_HAVE_LANDED_NOTE,
   type BrowserStep,
   type BrowserExecutorResult,
 } from "@aeon/protocol";
+
+// A click, type, press or fill that was sent and then failed or timed out may already have landed.
+const WRITE_OPS = new Set(["click", "fill", "paste", "type", "press", "select", "check", "upload"]);
+const SENT_THEN_FAILED = new Set([
+  "TIMEOUT",
+  "CHROME_ERROR",
+  "TAB_UNRESPONSIVE",
+  "TAB_DEAD",
+  "NETWORK",
+  "SITE_BROKEN",
+  "RATE_LIMITED",
+  "INTERNAL",
+  "INPUT_FAILED",
+  "INPUT_MAY_HAVE_LANDED",
+]);
+
+/** Drops a retry suggestion from an error detail once the action may have applied. */
+function withoutNext(detail: string): string {
+  return detail
+    .split("\n")
+    .filter((line) => !/^Next:/.test(line))
+    .join("\n");
+}
+
+/** The failed step line: a sent write carries an unknown effect and no hint to repeat it. */
+function failedStep(
+  index: number,
+  outcome: { code?: string; detail?: string },
+  write: boolean,
+): Record<string, unknown> {
+  const code = outcome.code ?? "INTERNAL";
+  const mayLanded = write && SENT_THEN_FAILED.has(code);
+  const detail = mayLanded
+    ? [outcome.detail && withoutNext(outcome.detail), INPUT_MAY_HAVE_LANDED_NOTE]
+        .filter(Boolean)
+        .join("\n")
+    : outcome.detail;
+  return {
+    index,
+    disposition: "failed",
+    code,
+    ...(mayLanded ? { effect: "unverifiable" } : {}),
+    ...(detail ? { detail } : {}),
+  };
+}
+
 export async function executeBrowserBatch(
   raw: unknown,
   toolCallId: string,
@@ -32,12 +79,7 @@ export async function executeBrowserBatch(
     steps.push(
       outcome.result
         ? { index, disposition: "completed", result: outcome.result }
-        : {
-            index,
-            disposition: "failed",
-            code: outcome.code ?? "INTERNAL",
-            detail: outcome.detail,
-          },
+        : failedStep(index, outcome, WRITE_OPS.has(step.op)),
     );
     if (!outcome.result) {
       for (let next = index + 1; next < parsed.data.steps.length; next++)

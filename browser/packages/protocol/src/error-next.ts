@@ -31,7 +31,13 @@ export interface EffectNextContext {
   query?: string;
   /** The clicked node has no handler and a child does, at this viewport point. */
   childPoint?: { x: number; y: number };
+  /** The input was sent and then failed or timed out, so it may already have landed. */
+  sent?: boolean;
 }
+
+/** Said when a write action was sent but its effect cannot be verified. */
+export const INPUT_MAY_HAVE_LANDED_NOTE =
+  "the input may have landed; do not repeat the action; check the page before any retry";
 
 type NextFn = (ctx: ErrorContext) => string;
 
@@ -82,6 +88,8 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   TARGET_LOST: readState,
   NOT_EDITABLE: readState,
   INPUT_FAILED: readState,
+  // The action may have applied. No next call: a repeat could submit it twice.
+  INPUT_MAY_HAVE_LANDED: null,
   STALE_REF: readState,
   TAB_DEAD: tabs,
   TAB_UNRESPONSIVE: tabs,
@@ -124,6 +132,8 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
 
 /** Why a code has no next call. Every null in ERROR_NEXT has one. */
 export const NO_NEXT_REASON: Partial<Record<ErrorCode, string>> = {
+  INPUT_MAY_HAVE_LANDED:
+    "the input may have landed; repeating the action could apply it twice, so check the page first",
   SITE_BLOCKED: "the user blocked this site; another route would ignore that choice",
   UNSUPPORTED: "this browser cannot do that here, and no one read replaces it",
   CHROME_ERROR: "Chrome refused the step; repeating the same call repeats it",
@@ -173,6 +183,9 @@ function safePoint(point: { x: number; y: number } | undefined): point is { x: n
  * the node has no handler and a child does. A confirmed or refused effect names nothing here.
  */
 export function effectNext(effect: string, ctx: EffectNextContext = {}): string | null {
+  // A sent write whose outcome is unknown gets no next hint at all: a read-then-repeat suggestion
+  // invites the agent to click or type a second time and double-submit.
+  if (ctx.sent === true) return null;
   if (effect !== "unverifiable" && effect !== "suspected_noop") return null;
   const point = ctx.childPoint;
   if (effect === "suspected_noop" && ctx.op === "click" && safePoint(point))
