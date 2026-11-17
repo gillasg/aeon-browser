@@ -1,8 +1,10 @@
 param([string]$BrowserRoot, [switch]$Update, [switch]$Unvirtualized, [string]$NodeExecutable, [string]$ImportDataFrom)
 $ErrorActionPreference = 'Stop'
 if (-not $Unvirtualized) {
-    $setupNode = & node -p 'require("node:fs").realpathSync(process.execPath)'
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the setup Node executable.' }
+    # Ask PowerShell for node.exe directly: passing a quoted JS expression to `node -p` loses
+    # the quotes in Windows PowerShell 5.1, which makes Node parse require(node:fs) and fail.
+    $setupNode = (Get-Command node.exe -ErrorAction Stop).Source
+    if (-not $setupNode) { throw 'Cannot resolve the setup Node executable.' }
     $delegated = & (Join-Path $PSScriptRoot 'run-unvirtualized-setup.ps1') -Installer $PSCommandPath -BrowserRoot $BrowserRoot -NodeExecutable $setupNode.Trim() -Update:$Update
     if ($delegated) { return }
 }
@@ -21,8 +23,10 @@ function Write-AtomicJson([string]$Path, $Value) {
 }
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 # Persist the actual installation, never an fnm shell junction that disappears on logout.
-$node = if ($NodeExecutable) { $NodeExecutable } else { & node -p 'require("node:fs").realpathSync(process.execPath)' }
-if ((-not $NodeExecutable -and $LASTEXITCODE -ne 0) -or -not (Test-Path -LiteralPath $node -PathType Leaf)) {
+$node = if ($NodeExecutable) { $NodeExecutable } else { (Get-Command node.exe -ErrorAction Stop).Source }
+# Get-Command throws when node is missing; a stale $LASTEXITCODE from an earlier native call
+# must not decide this (the old node -p check left a nonzero code behind on GitHub runners).
+if (-not $node -or -not (Test-Path -LiteralPath $node -PathType Leaf)) {
     throw 'A permanent Node executable could not be resolved.'
 }
 $nodeFull = [IO.Path]::GetFullPath($node.Trim())

@@ -1,0 +1,262 @@
+# One third of an aeon-eval run on a GitHub runner. The lead's scripts/three-way.sh dispatches the
+# mac and Windows shards alongside the Linux shard on the VPS, downloads these artifacts and merges.
+name: eval-shard
+# run-name can use inputs; the static name: cannot. The lead script matches these titles by seed.
+run-name: eval-shard ${{ inputs.platform }} ${{ inputs.suite }} seed=${{ inputs.seed }} shard=${{ inputs.shard }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Which runner owns this shard"
+        required: true
+        default: mac
+        type: choice
+        options:
+          - mac
+          - windows
+      suite:
+        description: "aeon-eval suite (fixtures for runners; stealth stays on the home IP)"
+        required: true
+        default: fixtures
+        type: string
+      seed:
+        description: "Deterministic split seed for this run"
+        required: true
+        default: s1
+        type: string
+      shard:
+        description: "Shard k/n, one-indexed (the lead sends 2/3 and 3/3)"
+        required: true
+        default: 2/3
+        type: string
+      ids:
+        description: "Optional comma-separated task ids for a tiny proof shard"
+        required: false
+        default: ""
+        type: string
+      eval-ref:
+        description: "aeon-eval ref to run (main after merge; the feature branch for the proof)"
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    # One platform per dispatch: the lead sends 2/3 to mac and 3/3 to windows, so a run has
+    # exactly one `eval-run` artifact to download.
+    runs-on: ${{ inputs.platform == 'windows' && 'windows-latest' || 'macos-26' }}
+    timeout-minutes: 90
+    steps:
+      - name: Resolve runner details
+        shell: bash
+        env:
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          if [ "$PLATFORM" = windows ]; then
+            echo "CHROME_PLATFORM=win64" >> "$GITHUB_ENV"
+            echo "CHROME_BINARY=chrome-win64/chrome.exe" >> "$GITHUB_ENV"
+          else
+            echo "CHROME_PLATFORM=mac-arm64" >> "$GITHUB_ENV"
+            echo "CHROME_BINARY=chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" >> "$GITHUB_ENV"
+          fi
+      - name: Check out Aeon
+        uses: actions/checkout@v4
+        with:
+          path: aeon-browser
+      - name: Check out aeon-eval (private repo; the run token only sees aeon-browser)
+        uses: actions/checkout@v4
+        with:
+          repository: gillasg/aeon-eval
+          ref: ${{ inputs.eval-ref }}
+          path: aeon-eval
+          token: ${{ secrets.AEON_EVAL_TOKEN }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Aeon's dependencies
+        working-directory: aeon-browser
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install aeon-eval's dependencies
+        working-directory: aeon-eval
+        run: pnpm install --frozen-lockfile
+      # Same key as ci.yml (and the faster-Mac-session branch), so a green CI run warms it.
+      - name: Cache Chrome for Testing
+        uses: actions/cache@v4
+        with:
+          path: aeon-browser/.slice0-audit/chrome-for-testing-157.0.8103.78
+          key: chrome-for-testing-157.0.8103.78-${{ env.CHROME_PLATFORM }}
+      - name: Install Chrome for Testing
+        shell: bash
+        working-directory: aeon-browser
+        run: |
+          set -euo pipefail
+          dir=".slice0-audit/chrome-for-testing-157.0.8103.78"
+          bin="$dir/$CHROME_BINARY"
+          if [ ! -f "$bin" ]; then
+            mkdir -p "$dir"
+            curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/$CHROME_PLATFORM/chrome-$CHROME_PLATFORM.zip" -o "$dir/chrome.zip"
+            if [ "${{ runner.os }}" = "Windows" ]; then
+              powershell.exe -NoProfile -Command "Expand-Archive -LiteralPath '$dir/chrome.zip' -DestinationPath '$dir' -Force"
+            else
+              unzip -q "$dir/chrome.zip" -d "$dir"
+            fi
+            rm -f "$dir/chrome.zip"
+          fi
+          if [ "${{ runner.os }}" != "Windows" ]; then chmod +x "$bin"; fi
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
+          fi
+          echo "CHROME_PATH=$GITHUB_WORKSPACE/aeon-browser/$bin" >> "$GITHUB_ENV"
+      - name: Sign the model in (Pi auth.json, mode 600, never echoed)
+        shell: bash
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo "OPENCODE_API_KEY is empty; set it on aeon-browser" >&2
+            exit 1
+          fi
+          agent="$HOME/.pi/agent"
+          mkdir -p "$agent"
+          node -e '
+            const fs = require("node:fs");
+            const dir = process.argv[1];
+            const body = { "opencode-go": { type: "api_key", key: process.env.OPENCODE_API_KEY } };
+            fs.writeFileSync(dir + "/auth.json", JSON.stringify(body) + "\n", { mode: 0o600 });
+          ' "$agent"
+          chmod 600 "$agent/auth.json"
+      # This is what install.sh / install.ps1 end up running, with the interactive wait and
+      # coding-agent config edits turned off: build, native host + service, CLI, skill, extension.
+      - name: Install Aeon (the normal installer path)
+        shell: bash
+        working-directory: aeon-browser
+        run: node scripts/setup.mjs --no-wait --no-agents
+      - name: Resolve run id
+        shell: bash
+        env:
+          EVAL_SUITE: ${{ inputs.suite }}
+          EVAL_SEED: ${{ inputs.seed }}
+          EVAL_SHARD: ${{ inputs.shard }}
+        run: |
+          safe="$(printf '%s' "$EVAL_SHARD" | tr -c 'A-Za-z0-9_-' '-')"
+          echo "EVAL_RUN_ID=$EVAL_SUITE-$EVAL_SEED-$safe" >> "$GITHUB_ENV"
+      # A custom --user-data-dir only reads NativeMessagingHosts from that same profile dir.
+      - name: Register the native host in the eval Chrome profile (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile="$RUNNER_TEMP/aeon-eval-profile"
+          mkdir -p "$profile/NativeMessagingHosts"
+          cp "$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.aeon.native_host.json" "$profile/NativeMessagingHosts/"
+          echo "CHROME_PROFILE=$profile" >> "$GITHUB_ENV"
+      - name: Register the native host in the eval Chrome profile (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $profile = Join-Path $env:RUNNER_TEMP 'aeon-eval-profile'
+          New-Item -ItemType Directory -Force -Path (Join-Path $profile 'NativeMessagingHosts') | Out-Null
+          Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'Aeon\com.aeon.native_host.json') -Destination (Join-Path $profile 'NativeMessagingHosts\com.aeon.native_host.json') -Force
+          "CHROME_PROFILE=$profile" >> $env:GITHUB_ENV
+      - name: Start Chrome for Testing with the extension (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          extension="$HOME/Library/Application Support/Aeon/data/extension"
+          "$CHROME_PATH" \
+            --user-data-dir="$CHROME_PROFILE" \
+            --load-extension="$extension" \
+            --disable-extensions-except="$extension" \
+            --silent-debugger-extension-api \
+            --disable-background-timer-throttling \
+            --disable-renderer-backgrounding \
+            --disable-backgrounding-occluded-windows \
+            --no-first-run --no-default-browser-check \
+            --remote-debugging-port=9222 about:blank > "$RUNNER_TEMP/chrome.log" 2>&1 &
+          cli="$GITHUB_WORKSPACE/aeon-browser/apps/cli/dist/cli.js"
+          for i in $(seq 1 60); do
+            if node "$cli" settings >/dev/null 2>&1; then
+              echo "Aeon extension connected"
+              # aeon run --browser eval keeps chats in this one profile; name it before the shard.
+              id="$(node "$cli" browsers --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const b=(JSON.parse(s).browsers||[])[0];if(!b)process.exit(1);process.stdout.write(b.clientInstanceId)})')"
+              node "$cli" browsers name "$id" eval
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Aeon extension did not connect" >&2
+          cat "$RUNNER_TEMP/chrome.log" >&2 || true
+          exit 1
+      - name: Start Chrome for Testing with the extension (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $extension = Join-Path $env:LOCALAPPDATA 'Aeon\data\extension'
+          $flags = @(
+            "--user-data-dir=$env:CHROME_PROFILE",
+            "--load-extension=$extension",
+            "--disable-extensions-except=$extension",
+            '--silent-debugger-extension-api',
+            '--disable-background-timer-throttling',
+            '--disable-renderer-backgrounding',
+            '--disable-backgrounding-occluded-windows',
+            '--no-first-run', '--no-default-browser-check',
+            '--remote-debugging-port=9222', 'about:blank'
+          )
+          Start-Process -FilePath $env:CHROME_PATH -ArgumentList $flags
+          $cli = Join-Path $env:GITHUB_WORKSPACE 'aeon-browser\apps\cli\dist\cli.js'
+          for ($i = 0; $i -lt 60; $i++) {
+            node $cli settings 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Output 'Aeon extension connected'
+              $list = node $cli browsers --json | ConvertFrom-Json
+              $id = $list.browsers[0].clientInstanceId
+              node $cli browsers name $id eval
+              exit 0
+            }
+            Start-Sleep -Seconds 2
+          }
+          Write-Error 'Aeon extension did not connect'
+          exit 1
+      - name: Run the shard
+        shell: bash
+        working-directory: aeon-eval
+        env:
+          AEON_REPO: ${{ github.workspace }}/aeon-browser
+          AEON_CLI: ${{ github.workspace }}/aeon-browser/apps/cli/dist/cli.js
+          AEON_EVAL_ALLOW_DIRECT: "1"
+          EVAL_SUITE: ${{ inputs.suite }}
+          EVAL_SEED: ${{ inputs.seed }}
+          EVAL_SHARD: ${{ inputs.shard }}
+          EVAL_IDS: ${{ inputs.ids }}
+        run: |
+          set -euo pipefail
+          args=(run --suite "$EVAL_SUITE" --split-seed "$EVAL_SEED" \
+            --run-id "$EVAL_RUN_ID" --model opencode-go/deepseek-v4.1-flash --thinking high)
+          if [ -n "$EVAL_IDS" ]; then
+            # Proof override: run exactly these few tasks on both runners, so a 2-task proof
+            # does not leave one of the three shards empty. Normal runs use the seeded split.
+            args+=(--id "$EVAL_IDS")
+          else
+            args+=(--shard "$EVAL_SHARD")
+          fi
+          node src/cli.ts "${args[@]}"
+      - name: Upload the run folder
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-run
+          path: aeon-eval/runs/${{ env.EVAL_RUN_ID }}
+          if-no-files-found: warn
+          retention-days: 7
