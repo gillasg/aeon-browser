@@ -96,19 +96,31 @@ export class AeonClient {
   }
 
   /** Lists Aeon's chat tools for outside agents, or calls one in a named session. */
-  tool(body: Json, timeoutMs = 11 * 60_000): Promise<Json> {
+  tool(body: Json, timeoutMs = 11 * 60_000, signal?: AbortSignal): Promise<Json> {
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const finish = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         this.waiting.delete(requestId);
+      };
+      const timer = setTimeout(() => {
+        finish();
         reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
       }, timeoutMs);
+      // A 2026-07-28 notifications/cancelled stops waiting on this reply. The call is not retried.
+      const onAbort = () => {
+        finish();
+        reject(new Error("MCP_REQUEST_CANCELLED: the tool call was cancelled."));
+      };
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.tool.result") return;
-        clearTimeout(timer);
-        this.waiting.delete(requestId);
+        finish();
         resolve(message);
       });
+      if (signal?.aborted) return;
       this.socket.send(JSON.stringify({ ...body, requestId }));
     });
   }

@@ -53,6 +53,7 @@ import {
   installBrowserSessionLifecycle,
 } from "./browser-session-lifecycle.js";
 import type { CapabilityToolHost } from "./capability-tools.js";
+import type { McpBridge } from "./browser-code-tool.js";
 import { ExtensionUiBridge } from "./extension-ui-bridge.js";
 import { bindPiExtensions } from "./sdk-resources.js";
 
@@ -73,6 +74,8 @@ export interface PiSdkSessionAdapterOptions {
    */
   browserGuidance?: boolean;
   capabilityToolHost?: CapabilityToolHost;
+  /** Connected MCP tools callable inside browser_code. */
+  mcpBridge?: McpBridge;
 }
 
 export class PiSdkSessionAdapter implements PiSessionPort {
@@ -86,6 +89,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   private threadToolHost: ThreadToolHost | undefined;
   private siteRulesHost: SiteRulesProvider | undefined;
   private browserNameHost: BrowserNameProvider | undefined;
+  private mcpBridge: McpBridge | undefined;
   private readonly liveSessions = new Map<string, Promise<PiSessionHandle>>();
   private readonly pendingResourceReloads = new Set<string>();
   private readonly preparedRuntime: PreparedModelRuntime | undefined;
@@ -105,6 +109,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
         siteToolModel(this.completionOptions()),
       );
     this.capabilityToolHost = options.capabilityToolHost;
+    this.mcpBridge = options.mcpBridge;
     this.resources = new PreparedSessionResources(
       this.agentDirectory ?? resolvePiAgentDirectory(),
       options.browserGuidance ?? Boolean(this.browserTool),
@@ -225,6 +230,11 @@ export class PiSdkSessionAdapter implements PiSessionPort {
   /** The named Chrome profile a chat runs in, so its sign-ins use that profile's vault. */
   setBrowserNameHost(host: BrowserNameProvider): void {
     this.browserNameHost = host;
+  }
+
+  /** The chat's connected MCP tools, callable inside browser_code as mcp.<server>.<tool>(). */
+  setMcpBridge(bridge: McpBridge): void {
+    this.mcpBridge = bridge;
   }
 
   setCapabilityToolHost(host: CapabilityToolHost): void {
@@ -357,6 +367,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
           capabilityToolHost: this.capabilityToolHost,
           siteRules: this.siteRulesHost,
           browserName: this.browserNameHost,
+          mcp: this.mcpBridge,
         }),
         gatedBashTool(input.workingDirectory, settingsManager),
       ],
