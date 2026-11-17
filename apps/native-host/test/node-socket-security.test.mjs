@@ -76,11 +76,12 @@ test(
     // cannot traverse even when the leaf is chmod 0777, so the attacker could never start.
     const runtime = mkdtempSync(join("/tmp", "aeon-runtime-"));
     chmodSync(runtime, 0o777);
-    const env = { ...sandbox.env, XDG_RUNTIME_DIR: runtime };
-    const directory = runtimeDirectory({ env, platform: "linux", home: sandbox.home });
+    // AEON_RUNTIME_DIR points every POSIX OS at the same world-writable parent (macOS otherwise
+    // uses a fixed /tmp/aeon-<uid> that the test must not touch).
+    const env = { ...sandbox.env, XDG_RUNTIME_DIR: runtime, AEON_RUNTIME_DIR: runtime };
+    const directory = runtimeDirectory({ env, home: sandbox.home });
     const path = socketPath({
       env,
-      platform: "linux",
       home: sandbox.home,
       uid: process.getuid(),
     });
@@ -103,6 +104,7 @@ test(
       const { result } = await nativeBootstrap(sandbox, bootstrapRequest(), {
         env: {
           XDG_RUNTIME_DIR: runtime,
+          AEON_RUNTIME_DIR: runtime,
           AEON_CONNECT_ATTEMPTS: "1",
           AEON_CONNECT_WAIT_MS: "10",
         },

@@ -37,6 +37,8 @@ export function runtimeDirectory(options = {}) {
   const platform = options.platform ?? process.platform;
   const uid = options.uid ?? (typeof process.getuid === "function" ? process.getuid() : undefined);
   if (platform === "win32") return undefined;
+  // An explicit parent (tests, unusual setups); the same ownership checks still apply inside it.
+  if (env.AEON_RUNTIME_DIR) return posix.join(env.AEON_RUNTIME_DIR, "aeon");
   if (platform === "linux" && env.XDG_RUNTIME_DIR) return posix.join(env.XDG_RUNTIME_DIR, "aeon");
   return posix.join("/tmp", `aeon-${uid ?? "user"}`);
 }
