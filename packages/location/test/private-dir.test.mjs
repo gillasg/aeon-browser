@@ -49,6 +49,9 @@ test(
       const link = join(root, "link");
       symlinkSync(dir, link);
       await assert.rejects(ensurePrivateDir(link, { fix }), /not a real directory/);
+      chmodSync(root, 0o775);
+      await ensurePrivateDir(join(root, "grouped"), { fix });
+      assert.equal(lstatSync(join(root, "grouped")).mode & 0o777, 0o700);
       chmodSync(root, 0o777);
       await assert.rejects(ensurePrivateDir(join(root, "child"), { fix }), /sticky/);
     } finally {

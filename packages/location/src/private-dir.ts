@@ -95,13 +95,26 @@ async function trustEntry(
       `${entry} is owned by uid ${stats.uid}, not ${uid} or root`,
       fix,
     );
-  if ((stats.mode & 0o022) !== 0 && (stats.mode & 0o1000) === 0)
+  if (writableByOthers(stats, uid))
     throw new UntrustedDirError(
       target,
       `${entry} is writable by others without the sticky bit`,
       fix,
     );
   return entry;
+}
+
+/**
+ * A parent others can write to without the sticky bit lets them swap the child. Group write is
+ * fine when this user owns the directory and the group is their own primary group (the Linux
+ * default: umask 002 with a private per-user group makes ~/.local 775).
+ */
+function writableByOthers(stats: { uid: number; gid: number; mode: number }, uid: number): boolean {
+  if ((stats.mode & 0o1000) !== 0) return false;
+  if ((stats.mode & 0o002) !== 0) return true;
+  if ((stats.mode & 0o020) === 0) return false;
+  const ownGroup = stats.uid === uid && stats.gid === process.getgid?.();
+  return !ownGroup;
 }
 
 async function readEntry(entry: string, create: boolean) {
