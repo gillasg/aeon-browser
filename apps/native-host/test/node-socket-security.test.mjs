@@ -70,14 +70,12 @@ test(
   async () => {
     const sandbox = createSandbox();
     writeConfig(sandbox);
-    // A world-writable runtime root: the other user creates the per-user socket directory first
-    // and listens inside it. The victim must refuse the directory, not trust it. Use /tmp itself,
-    // not os.tmpdir(): on macOS the latter is the runner's private T folder, which a second user
-    // cannot traverse even when the leaf is chmod 0777, so the attacker could never start.
+    // A world-writable runtime root like /tmp: the other user creates the per-user socket
+    // directory first and listens inside it. The victim must refuse the directory, not trust it.
     const runtime = mkdtempSync(join("/tmp", "aeon-runtime-"));
     chmodSync(runtime, 0o777);
-    // AEON_RUNTIME_DIR points every POSIX OS at the same world-writable parent (macOS otherwise
-    // uses a fixed /tmp/aeon-<uid> that the test must not touch).
+    // AEON_RUNTIME_DIR points every POSIX OS at this world-writable parent; macOS otherwise uses
+    // a private per-user temp dir the other user cannot traverse.
     const env = { ...sandbox.env, XDG_RUNTIME_DIR: runtime, AEON_RUNTIME_DIR: runtime };
     const directory = runtimeDirectory({ env, home: sandbox.home });
     const path = socketPath({

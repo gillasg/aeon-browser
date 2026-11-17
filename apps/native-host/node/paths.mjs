@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { chmodSync, lstatSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { posix, win32 } from "node:path";
 
 // The same app root the daemon and the CLI resolve (see @aeon/location). Paths are computed here
@@ -35,12 +35,46 @@ export function dataDirectory(options = {}) {
 export function runtimeDirectory(options = {}) {
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
-  const uid = options.uid ?? (typeof process.getuid === "function" ? process.getuid() : undefined);
   if (platform === "win32") return undefined;
-  // An explicit parent (tests, unusual setups); the same ownership checks still apply inside it.
+  const uid = options.uid ?? (typeof process.getuid === "function" ? process.getuid() : undefined);
+  return posixRuntimeDirectory(platform, env, uid);
+}
+
+/** An explicit parent wins on every POSIX OS; the same ownership checks apply inside it. */
+function posixRuntimeDirectory(platform, env, uid) {
   if (env.AEON_RUNTIME_DIR) return posix.join(env.AEON_RUNTIME_DIR, "aeon");
   if (platform === "linux" && env.XDG_RUNTIME_DIR) return posix.join(env.XDG_RUNTIME_DIR, "aeon");
+  if (platform === "darwin") {
+    const mac = macRuntimeDirectory(env, uid);
+    if (mac) return mac;
+  }
   return posix.join("/tmp", `aeon-${uid ?? "user"}`);
+}
+
+/**
+ * macOS gives each user a private temp dir (confstr _CS_DARWIN_USER_TEMP_DIR), exposed by Node as
+ * os.tmpdir()/$TMPDIR. The Chrome-launched host and the launchd supervisor resolve the same path,
+ * so they agree on the socket. A shared /tmp is not good enough; fall back to /tmp/aeon-<uid>.
+ */
+function macRuntimeDirectory(env, uid) {
+  const base = env.TMPDIR ?? tmpdir();
+  return privateTempDir(base, uid) ? posix.join(base, "aeon") : undefined;
+}
+
+/** True when `base` is this user's own temp dir and safe to hold the socket directory. */
+function privateTempDir(base, uid) {
+  if (typeof base !== "string" || !posix.isAbsolute(base)) return false;
+  if (base === "/tmp" || base === "/private/tmp") return false;
+  try {
+    const stats = lstatSync(base);
+    return (
+      stats.isDirectory() &&
+      !stats.isSymbolicLink() &&
+      (typeof uid !== "number" || stats.uid === uid)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function thisUid(options = {}) {

@@ -24,6 +24,7 @@ import { handlePasswordSavingMessage } from "./native-worker-password-saving.js"
 import { migrateLegacyChromeStorage } from "@browserkit/engine/legacy-storage-migration";
 import {
   installNativeStartup,
+  noteExecutorConnected,
   scheduleExecutorReconnect,
   startExecutorHeartbeat,
 } from "@browserkit/engine/native-executor-lifecycle";
@@ -335,6 +336,7 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   socket.addEventListener("message", (event) => handleExecutorMessage(connection, event.data));
   socket.addEventListener("close", () => dropExecutor(connection), { once: true });
   executor = connection;
+  noteExecutorConnected();
   rebindBrowserCodeSocket(socket);
   if (linkDownTimer !== undefined) globalThis.clearTimeout(linkDownTimer);
   linkDownTimer = undefined;
