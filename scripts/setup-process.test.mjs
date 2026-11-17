@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -19,7 +19,9 @@ test("a setup step runs a path with spaces and metacharacters without a shell", 
       cwd: root,
       encoding: "utf8",
     });
-    assert.deepEqual(JSON.parse(output), { argv: ["arg with spaces"], cwd: root });
+    // macOS /tmp is a symlink to /private/tmp: process.cwd() reports the real path, so compare
+    // realpaths rather than the mkdtemp spelling.
+    assert.deepEqual(JSON.parse(output), { argv: ["arg with spaces"], cwd: realpathSync(root) });
     assert.equal(existsSync(join(root, "injected")), false);
   } finally {
     rmSync(root, { recursive: true, force: true });

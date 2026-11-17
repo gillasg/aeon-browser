@@ -70,9 +70,11 @@ test(
   async () => {
     const sandbox = createSandbox();
     writeConfig(sandbox);
-    // A world-writable runtime root like /tmp: the other user creates the per-user socket
-    // directory first and listens inside it. The victim must refuse the directory, not trust it.
-    const runtime = mkdtempSync(join(tmpdir(), "aeon-runtime-"));
+    // A world-writable runtime root: the other user creates the per-user socket directory first
+    // and listens inside it. The victim must refuse the directory, not trust it. Use /tmp itself,
+    // not os.tmpdir(): on macOS the latter is the runner's private T folder, which a second user
+    // cannot traverse even when the leaf is chmod 0777, so the attacker could never start.
+    const runtime = mkdtempSync(join("/tmp", "aeon-runtime-"));
     chmodSync(runtime, 0o777);
     const env = { ...sandbox.env, XDG_RUNTIME_DIR: runtime };
     const directory = runtimeDirectory({ env, platform: "linux", home: sandbox.home });
@@ -149,7 +151,8 @@ function sudo(args) {
 
 /** Runs the other user's listener; the file it writes counts the bytes it received. */
 function attackSocket(directory, path) {
-  const countFile = join(tmpdir(), "aeon-attack-" + process.pid + "-" + Date.now());
+  // The attacker (nobody) must be able to write this file; os.tmpdir() is private on macOS.
+  const countFile = join("/tmp", "aeon-attack-" + process.pid + "-" + Date.now());
   const script = [
     "import os, socket, sys, time",
     "path, count = sys.argv[1], sys.argv[2]",

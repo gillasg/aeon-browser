@@ -65,7 +65,10 @@ test(
   "a second local user cannot pre-create Aeon's data directory",
   { skip: skipAttacker() },
   async () => {
-    const parent = mkdtempSync(join(tmpdir(), "aeon-attacker-"));
+    // os.tmpdir() is the runner's private T folder on macOS, which nobody cannot traverse, so the
+    // second user could never create the directory and the test would fail before testing Aeon.
+    // /tmp is world-traversable on every supported OS.
+    const parent = mkdtempSync(join("/tmp", "aeon-attacker-"));
     chmodSync(parent, 0o1777);
     const dir = join(parent, "data");
     try {
