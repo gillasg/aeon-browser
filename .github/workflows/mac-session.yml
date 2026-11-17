@@ -8,9 +8,20 @@ on:
         required: false
         default: 60
         type: number
+      screen-capture:
+        description: Grant screen capture permission and save a check image (slow, ~2 min)
+        required: false
+        default: false
+        type: boolean
+      aeon:
+        description: Restore or build Aeon, install the native host and pre-launch Chrome with the extension
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   session:
@@ -27,6 +38,172 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
+      # SSH first: the caller can connect and wait for ~/READY while the slow steps run.
+      - name: Open SSH
+        env:
+          CLAUDE_SSH_PUBKEY: ${{ secrets.CLAUDE_SSH_PUBKEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLAUDE_SSH_PUBKEY:-}" ]; then
+            echo "CLAUDE_SSH_PUBKEY secret is empty"
+            exit 1
+          fi
+          case "$CLAUDE_SSH_PUBKEY" in
+            *PRIVATE*) echo "CLAUDE_SSH_PUBKEY must be a public key"; exit 1 ;;
+          esac
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$CLAUDE_SSH_PUBKEY" >> "$HOME/.ssh/authorized_keys"
+          chmod 700 "$HOME/.ssh"
+          chmod 600 "$HOME/.ssh/authorized_keys"
+          sudo mkdir -p /etc/ssh/sshd_config.d
+          if ! grep -q 'sshd_config.d' /etc/ssh/sshd_config; then
+            tmp=$(mktemp)
+            printf '%s\n' 'Include /etc/ssh/sshd_config.d/*.conf' | cat - /etc/ssh/sshd_config > "$tmp"
+            sudo cp "$tmp" /etc/ssh/sshd_config
+            rm -f "$tmp"
+          fi
+          sudo sed -i '' -E 's/^[# ]*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+          sudo sed -i '' -E 's/^[# ]*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config
+          sudo sed -i '' -E 's/^[# ]*ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+          sudo sed -i '' -E 's/^[# ]*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+          sudo tee /etc/ssh/sshd_config.d/99-aeon-key-only.conf >/dev/null <<'EOF'
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          ChallengeResponseAuthentication no
+          PubkeyAuthentication yes
+          AuthenticationMethods publickey
+          EOF
+          sudo systemsetup -setremotelogin on || true
+          if ! sudo launchctl print system/com.openssh.sshd >/dev/null 2>&1; then
+            sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist \
+              || sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+          fi
+          sudo launchctl kickstart -k system/com.openssh.sshd || true
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+            if nc -z 127.0.0.1 22; then
+              echo "sshd is listening"
+              break
+            fi
+            sleep 1
+          done
+          nc -z 127.0.0.1 22
+          echo "authorized keys:"
+          ssh-keygen -lf "$HOME/.ssh/authorized_keys"
+          ls -ld "$HOME" "$HOME/.ssh" "$HOME/.ssh/authorized_keys"
+          sudo sshd -T | grep -E '^(authorizedkeysfile|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|strictmodes|authenticationmethods)' || true
+          # Prove key-only login works before publishing the tunnel: a key this job generates is
+          # added, tried over loopback and removed again. The secret key itself is never logged.
+          self_key="$RUNNER_TEMP/self-check-key"
+          rm -f "$self_key" "$self_key.pub"
+          ssh-keygen -q -t ed25519 -N '' -C aeon-self-check -f "$self_key"
+          cat "$self_key.pub" >> "$HOME/.ssh/authorized_keys"
+          if ! ssh -i "$self_key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no \
+               -o ConnectTimeout=10 "$(whoami)@127.0.0.1" 'echo SSH_LOCAL_OK'; then
+            echo "key-only SSH login to loopback failed; sshd said:"
+            sudo log show --last 2m --predicate 'process == "sshd"' --style compact 2>/dev/null | tail -20 || true
+            exit 1
+          fi
+          sed -i '' "\|$(cut -d' ' -f2 "$self_key.pub")|d" "$HOME/.ssh/authorized_keys"
+          rm -f "$self_key" "$self_key.pub"
+          bore_dir="$RUNNER_TEMP/bore"
+          mkdir -p "$bore_dir"
+          curl -fsSL -o "$bore_dir/bore.tar.gz" \
+            "https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-aarch64-apple-darwin.tar.gz"
+          tar -xzf "$bore_dir/bore.tar.gz" -C "$bore_dir"
+          bore_bin=$(find "$bore_dir" -type f -name bore | head -1)
+          chmod +x "$bore_bin"
+          start_agent() {
+            label="$1"
+            script="$2"
+            log="$3"
+            plist="$HOME/Library/LaunchAgents/${label}.plist"
+            mkdir -p "$HOME/Library/LaunchAgents"
+            rm -f "$log"
+            {
+              echo '<?xml version="1.0" encoding="UTF-8"?>'
+              echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+              echo '<plist version="1.0"><dict>'
+              echo "<key>Label</key><string>${label}</string>"
+              echo '<key>ProgramArguments</key><array>'
+              echo "<string>${script}</string>"
+              echo '</array>'
+              echo '<key>RunAtLoad</key><true/>'
+              # A dropped tunnel must come back by itself; without KeepAlive launchd runs it once
+              # and the published SSH port stays dead for the rest of the session.
+              echo '<key>KeepAlive</key><true/>'
+              echo '<key>ThrottleInterval</key><integer>5</integer>'
+              echo '</dict></plist>'
+            } > "$plist"
+            uid=$(id -u)
+            domain="gui/${uid}"
+            launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+            if ! launchctl bootstrap "$domain" "$plist"; then
+              echo "gui bootstrap failed for ${label}; trying the user domain"
+              domain="user/${uid}"
+              launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+              launchctl bootstrap "$domain" "$plist"
+            fi
+            echo "$domain" > "/tmp/${label}.domain"
+          }
+          # bore.pub accepts a chosen remote port, so a restart after a dropped connection keeps
+          # the same SSH line. Pick a free one, then let launchd (KeepAlive) re-run bore on it.
+          host="bore.pub"
+          port=""
+          attempt=0
+          while [ "$attempt" -lt 5 ] && [ -z "$port" ]; do
+            attempt=$((attempt + 1))
+            candidate=$(( (RANDOM % 20000) + 40000 ))
+            : > /tmp/bore.log
+            printf '#!/bin/bash\nexec %q local 22 --to %s --port %s >>/tmp/bore.log 2>&1\n' \
+              "$bore_bin" "$host" "$candidate" > "$RUNNER_TEMP/run-bore.sh"
+            chmod +x "$RUNNER_TEMP/run-bore.sh"
+            start_agent com.aeon.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
+            for _ in $(seq 1 30); do
+              if grep -q "listening at ${host}:${candidate}" /tmp/bore.log; then
+                port=$candidate
+                break
+              fi
+              if grep -q "port already in use" /tmp/bore.log; then
+                echo "bore port ${candidate} is taken; trying another"
+                break
+              fi
+              sleep 1
+            done
+          done
+          if [ -z "$port" ]; then
+            echo "No token-free TCP tunnel came up. bore log:"
+            cat /tmp/bore.log || true
+            exit 1
+          fi
+          # The tunnel is up as soon as bore says so; give the entry point a moment to accept.
+          for _ in $(seq 1 15); do
+            if nc -z "$host" "$port"; then break; fi
+            sleep 1
+          done
+          nc -z "$host" "$port"
+          user=$(whoami)
+          echo "SSH: ssh -p ${port} ${user}@${host}"
+          printf '%s\n' "SSH: ssh -p ${port} ${user}@${host}" > "$GITHUB_WORKSPACE/mac-ssh.txt"
+          {
+            echo "SSH_PORT=${port}"
+            echo "SSH_USER=${user}"
+          } >> "$GITHUB_ENV"
+          {
+            echo "## SSH"
+            echo '```'
+            echo "SSH: ssh -p ${port} ${user}@${host}"
+            echo '```'
+            echo "Setup is done when ~/READY exists on the runner."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Tunnel port ${port} is kept by launchd KeepAlive; a restart reuses the same port."
+      - name: Upload SSH command
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-ssh
+          path: mac-ssh.txt
+          if-no-files-found: error
+      # Everything below is the slow setup; SSH is already live and its artifact is uploaded.
       - uses: pnpm/action-setup@v4
         with:
           version: 11.4.0
@@ -34,12 +211,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Resolve pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm store and node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.pnpm-store.outputs.path }}
+            node_modules
+            apps/**/node_modules
+            packages/**/node_modules
+            browser/node_modules
+            browser/apps/**/node_modules
+            browser/packages/**/node_modules
+          key: aeon-pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # Same key as ci.yml, so a green CI run on main warms this cache for the session.
       - name: Cache Chrome for Testing
         uses: actions/cache@v4
         with:
           path: .slice0-audit/chrome-for-testing-157.0.8103.78
           key: chrome-for-testing-157.0.8103.78-mac-arm64
+      - name: Install dependencies
+        if: ${{ inputs.aeon }}
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install Chrome for Testing
         run: |
           set -euo pipefail
@@ -54,7 +249,77 @@ jobs:
           chmod +x "$bin"
           xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
           echo "CHROME_PATH=$(pwd)/$bin" >> "$GITHUB_STEP_SUMMARY"
+      - name: Download prebuilt Aeon
+        if: ${{ inputs.aeon }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          name="aeon-macos-build-${{ github.sha }}"
+          echo "Looking for artifact ${name}"
+          artifact="$(
+            gh api "repos/${{ github.repository }}/actions/artifacts?name=${name}&per_page=100" \
+              --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | (.workflow_run.id // 0) | tostring' \
+              2>/dev/null || true
+          )"
+          if [ -n "$artifact" ] && [ "$artifact" != "0" ]; then
+            gh run download "$artifact" -n "$name" -D .
+            echo "Restored prebuilt Aeon from run ${artifact}"
+          else
+            echo "No prebuilt Aeon for ${{ github.sha }}; building from source."
+            echo "need_build=1" >> "$GITHUB_ENV"
+          fi
+      - name: Build Aeon
+        if: ${{ inputs.aeon && env.need_build == '1' }}
+        run: pnpm build
+      - name: Install native host and pre-launch Chrome
+        if: ${{ inputs.aeon }}
+        run: |
+          set -euo pipefail
+          # Registers the native host, its Chrome manifests and the launchd daemon service.
+          node apps/native-host/scripts/install.mjs
+
+          # A custom --user-data-dir makes Chrome read NativeMessagingHosts from the profile,
+          # not from ~/Library/Application Support, so copy the manifest into the profile.
+          profile="$RUNNER_TEMP/aeon-chrome-profile"
+          mkdir -p "$profile/NativeMessagingHosts"
+          manifest="$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.aeon.native_host.json"
+          if [ ! -f "$manifest" ]; then
+            echo "Native messaging manifest missing at $manifest"
+            exit 1
+          fi
+          cp "$manifest" "$profile/NativeMessagingHosts/"
+
+          extension="$PWD/apps/chrome-extension/native-dist"
+          chrome=".slice0-audit/chrome-for-testing-157.0.8103.78/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+          nohup "$PWD/$chrome" \
+            --user-data-dir="$profile" \
+            --load-extension="$extension" \
+            --disable-extensions-except="$extension" \
+            --no-first-run --no-default-browser-check \
+            --remote-debugging-port=9222 \
+            about:blank > "$RUNNER_TEMP/aeon-chrome.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/aeon-chrome.pid"
+
+          # The daemon is a launchd agent; wait until it is actually running, and until Chrome's
+          # debug port answers. Report honestly if either stays down.
+          uid=$(id -u)
+          for _ in $(seq 1 30); do
+            if launchctl print "gui/${uid}/com.aeon.daemon" 2>/dev/null | grep -q 'state = running'; then
+              echo "Aeon daemon is running"
+              break
+            fi
+            sleep 1
+          done
+          launchctl print "gui/${uid}/com.aeon.daemon" 2>/dev/null | grep -E 'state =|path =' || true
+          for _ in $(seq 1 30); do
+            if nc -z 127.0.0.1 9222; then break; fi
+            sleep 1
+          done
+          nc -z 127.0.0.1 9222
+          echo "Chrome launched with the Aeon extension; CDP on port 9222."
       - name: Grant screen capture and verify
+        if: ${{ inputs['screen-capture'] }}
         run: |
           set -euo pipefail
           sw_vers
@@ -278,7 +543,7 @@ jobs:
             echo "before_bytes=$before_bytes check_bytes=$check_bytes"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload screen capture
-        if: always()
+        if: always() && inputs['screen-capture']
         uses: actions/upload-artifact@v4
         with:
           name: screen-capture-check
@@ -293,171 +558,32 @@ jobs:
           mkdir -p "$HOME/.aeon-ci"
           # Read only inside a session command (never printed); empty when the secret is unset.
           printf '%s' "${OPENCODE_API_KEY:-}" > "$HOME/.aeon-ci/opencode-key"
-      - name: Open SSH
-        env:
-          CLAUDE_SSH_PUBKEY: ${{ secrets.CLAUDE_SSH_PUBKEY }}
+      - name: Video capture help
         run: |
           set -euo pipefail
-          if [ -z "${CLAUDE_SSH_PUBKEY:-}" ]; then
-            echo "CLAUDE_SSH_PUBKEY secret is empty"
-            exit 1
-          fi
-          case "$CLAUDE_SSH_PUBKEY" in
-            *PRIVATE*) echo "CLAUDE_SSH_PUBKEY must be a public key"; exit 1 ;;
-          esac
-          umask 077
-          mkdir -p "$HOME/.ssh"
-          printf '%s\n' "$CLAUDE_SSH_PUBKEY" >> "$HOME/.ssh/authorized_keys"
-          chmod 700 "$HOME/.ssh"
-          chmod 600 "$HOME/.ssh/authorized_keys"
-          sudo mkdir -p /etc/ssh/sshd_config.d
-          if ! grep -q 'sshd_config.d' /etc/ssh/sshd_config; then
-            tmp=$(mktemp)
-            printf '%s\n' 'Include /etc/ssh/sshd_config.d/*.conf' | cat - /etc/ssh/sshd_config > "$tmp"
-            sudo cp "$tmp" /etc/ssh/sshd_config
-            rm -f "$tmp"
-          fi
-          sudo sed -i '' -E 's/^[# ]*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-          sudo sed -i '' -E 's/^[# ]*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config
-          sudo sed -i '' -E 's/^[# ]*ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
-          sudo sed -i '' -E 's/^[# ]*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-          sudo tee /etc/ssh/sshd_config.d/99-aeon-key-only.conf >/dev/null <<'EOF'
-          PasswordAuthentication no
-          KbdInteractiveAuthentication no
-          ChallengeResponseAuthentication no
-          PubkeyAuthentication yes
-          AuthenticationMethods publickey
+          cat > "$HOME/VIDEO.md" <<EOF
+          # Recording this Mac session
+
+          Start a clip with the built-in recorder (no install needed):
+            screencapture -v ~/clip.mov      # stop from the menu-bar recorder
+
+          Or, if ffmpeg is installed:
+            ffmpeg -f avfoundation -r 30 -i "1:none" -t 30 ~/clip.mp4
+
+          Copy the clip back from your machine:
+            scp -P ${SSH_PORT} ${SSH_USER}@bore.pub:~/clip.mov .
           EOF
-          sudo systemsetup -setremotelogin on || true
-          if ! sudo launchctl print system/com.openssh.sshd >/dev/null 2>&1; then
-            sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist \
-              || sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
-          fi
-          sudo launchctl kickstart -k system/com.openssh.sshd || true
-          for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-            if nc -z 127.0.0.1 22; then
-              echo "sshd is listening"
-              break
-            fi
-            sleep 1
-          done
-          nc -z 127.0.0.1 22
-          echo "authorized keys:"
-          ssh-keygen -lf "$HOME/.ssh/authorized_keys"
-          ls -ld "$HOME" "$HOME/.ssh" "$HOME/.ssh/authorized_keys"
-          sudo sshd -T | grep -E '^(authorizedkeysfile|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|strictmodes|authenticationmethods)' || true
-          # Prove key-only login works before publishing the tunnel: a key this job generates is
-          # added, tried over loopback and removed again. The secret key itself is never logged.
-          self_key="$RUNNER_TEMP/self-check-key"
-          rm -f "$self_key" "$self_key.pub"
-          ssh-keygen -q -t ed25519 -N '' -C aeon-self-check -f "$self_key"
-          cat "$self_key.pub" >> "$HOME/.ssh/authorized_keys"
-          if ! ssh -i "$self_key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no \
-               -o ConnectTimeout=10 "$(whoami)@127.0.0.1" 'echo SSH_LOCAL_OK'; then
-            echo "key-only SSH login to loopback failed; sshd said:"
-            sudo log show --last 2m --predicate 'process == "sshd"' --style compact 2>/dev/null | tail -20 || true
-            exit 1
-          fi
-          sed -i '' "\|$(cut -d' ' -f2 "$self_key.pub")|d" "$HOME/.ssh/authorized_keys"
-          rm -f "$self_key" "$self_key.pub"
-          bore_dir="$RUNNER_TEMP/bore"
-          mkdir -p "$bore_dir"
-          curl -fsSL -o "$bore_dir/bore.tar.gz" \
-            "https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-aarch64-apple-darwin.tar.gz"
-          tar -xzf "$bore_dir/bore.tar.gz" -C "$bore_dir"
-          bore_bin=$(find "$bore_dir" -type f -name bore | head -1)
-          chmod +x "$bore_bin"
-          start_agent() {
-            label="$1"
-            script="$2"
-            log="$3"
-            plist="$HOME/Library/LaunchAgents/${label}.plist"
-            mkdir -p "$HOME/Library/LaunchAgents"
-            rm -f "$log"
-            {
-              echo '<?xml version="1.0" encoding="UTF-8"?>'
-              echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
-              echo '<plist version="1.0"><dict>'
-              echo "<key>Label</key><string>${label}</string>"
-              echo '<key>ProgramArguments</key><array>'
-              echo "<string>${script}</string>"
-              echo '</array>'
-              echo '<key>RunAtLoad</key><true/>'
-              # A dropped tunnel must come back by itself; without KeepAlive launchd runs it once
-              # and the published SSH port stays dead for the rest of the session.
-              echo '<key>KeepAlive</key><true/>'
-              echo '<key>ThrottleInterval</key><integer>5</integer>'
-              echo '</dict></plist>'
-            } > "$plist"
-            uid=$(id -u)
-            domain="gui/${uid}"
-            launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
-            if ! launchctl bootstrap "$domain" "$plist"; then
-              echo "gui bootstrap failed for ${label}; trying the user domain"
-              domain="user/${uid}"
-              launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
-              launchctl bootstrap "$domain" "$plist"
-            fi
-            echo "$domain" > "/tmp/${label}.domain"
-          }
-          # bore.pub accepts a chosen remote port, so a restart after a dropped connection keeps
-          # the same SSH line. Pick a free one, then let launchd (KeepAlive) re-run bore on it.
-          host="bore.pub"
-          port=""
-          attempt=0
-          while [ "$attempt" -lt 5 ] && [ -z "$port" ]; do
-            attempt=$((attempt + 1))
-            candidate=$(( (RANDOM % 20000) + 40000 ))
-            : > /tmp/bore.log
-            printf '#!/bin/bash\nexec %q local 22 --to %s --port %s >>/tmp/bore.log 2>&1\n' \
-              "$bore_bin" "$host" "$candidate" > "$RUNNER_TEMP/run-bore.sh"
-            chmod +x "$RUNNER_TEMP/run-bore.sh"
-            start_agent com.aeon.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
-            for _ in $(seq 1 30); do
-              if grep -q "listening at ${host}:${candidate}" /tmp/bore.log; then
-                port=$candidate
-                break
-              fi
-              if grep -q "port already in use" /tmp/bore.log; then
-                echo "bore port ${candidate} is taken; trying another"
-                break
-              fi
-              sleep 1
-            done
-          done
-          if [ -z "$port" ]; then
-            echo "No token-free TCP tunnel came up. bore log:"
-            cat /tmp/bore.log || true
-            exit 1
-          fi
-          # The tunnel is up as soon as bore says so; give the entry point a moment to accept.
-          for _ in $(seq 1 15); do
-            if nc -z "$host" "$port"; then break; fi
-            sleep 1
-          done
-          nc -z "$host" "$port"
-          user=$(whoami)
-          echo "SSH: ssh -p ${port} ${user}@${host}"
-          printf '%s\n' "SSH: ssh -p ${port} ${user}@${host}" > "$GITHUB_WORKSPACE/mac-ssh.txt"
-          {
-            echo "## SSH"
-            echo '```'
-            echo "SSH: ssh -p ${port} ${user}@${host}"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "Tunnel port ${port} is kept by launchd KeepAlive; a restart reuses the same port."
-      - name: Upload SSH command
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-ssh
-          path: mac-ssh.txt
-          if-no-files-found: error
-      - name: Build Aeon
-        run: pnpm build
+          cat "$HOME/VIDEO.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Mark ready
+        run: |
+          set -euo pipefail
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > "$HOME/READY"
+          echo "READY at $(cat "$HOME/READY")" >> "$GITHUB_STEP_SUMMARY"
+          echo "Video capture one-liners are in ~/VIDEO.md." >> "$GITHUB_STEP_SUMMARY"
       - name: Wait until stop
         run: |
           set -euo pipefail
-          echo "Waiting until /tmp/stop or the job timeout."
+          echo "Setup is marked by ~/READY. Waiting until /tmp/stop or the job timeout."
           while [ ! -f /tmp/stop ]; do
             sleep 10
           done
