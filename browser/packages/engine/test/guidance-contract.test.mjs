@@ -149,3 +149,11 @@ test("every help topic the agent text names exists, and guidance lists them all"
   const listed = /help\(\) lists topics \(([^)]*)\)/.exec(guidance)[1].split(/,\s*/);
   assert.deepEqual([...listed].sort(), [...topics].sort(), "guidance.md's help() topic list");
 });
+
+test("help('video') is present and teaches the recording, kit and honesty rule", async () => {
+  const { HELP_TOPICS } = await import("../dist/code-api-help.js");
+  assert.ok(HELP_TOPICS.video, "the video topic exists");
+  assert.match(HELP_TOPICS.video, /events\.json/);
+  assert.match(HELP_TOPICS.video, /Remotion/);
+  assert.match(HELP_TOPICS.video, /never show Aeon doing anything it did not do/);
+});

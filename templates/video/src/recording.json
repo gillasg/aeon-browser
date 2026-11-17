@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "recorder": "aeon",
+  "clock": "clip",
+  "clip": {
+    "file": "clip.mp4",
+    "source": "window",
+    "width": 1280,
+    "height": 800,
+    "fps": 30,
+    "startedAt": 0,
+    "durationMs": 2000,
+    "frames": 60
+  },
+  "events": [
+    {
+      "id": "e1",
+      "kind": "click",
+      "t": 800,
+      "at": 800,
+      "tabId": 1,
+      "page": { "x": 420, "y": 300 },
+      "window": { "x": 470, "y": 360 },
+      "text": "Get started"
+    },
+    {
+      "id": "e2",
+      "kind": "type",
+      "t": 1300,
+      "at": 1300,
+      "tabId": 1,
+      "page": { "x": 640, "y": 460 },
+      "text": "hello"
+    }
+  ],
+  "note": "Tiny fixture. Replace this file with your recording's events.json and put its frames in public/frames/."
+}

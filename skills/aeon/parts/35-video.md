@@ -1,0 +1,5 @@
+## Video demos: record, then render with Remotion
+
+Aeon records; it does not ship a renderer. From a shell, `aeon record start [--window chrome|--screen|--tabs] [--out dir] [--chat id]` then `aeon record stop` write a recording folder: frames, `clip.mp4` and `events.json`. The log has the clip's size, fps and start time, and every click, type, press, scroll, navigate and tab switch with its tab id, page and window position and a time on the clip clock. `aeon video kit <dir>` copies a plain Remotion starter kit; install and render it yourself (it has a full README example). You can render 16:9, 9:16 or square, a Chrome frame with horizontal or vertical tabs in light or dark, captions, a title card, a "sped up N×" badge, an end card and a code-wallpaper background, and choose which tab shows when.
+
+House style: clean and readable on a phone. A real-window recording fills the frame and keeps its real pointer. The honesty rule: zooms, speed-ups and the cursor come only from `events.json`; never show Aeon doing anything it did not do, and every speed-up carries its badge. See `help('video')`.

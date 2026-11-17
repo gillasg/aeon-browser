@@ -27,6 +27,7 @@ import { packCommand } from "./pack.js";
 import { listTools, runTool } from "./tools.js";
 import { abilitiesCommand } from "./abilities-cmd.js";
 import { probeDaemonActivity, runUpdateWhenIdle } from "./update-idle.js";
+import { recordCommand, videoCommand } from "./record-cmd.js";
 
 // Every command Aeon has: its own chat commands, then browserkit's commands in the same groups,
 // with the few that are about a bridge or a password-manager folder replaced by Aeon's own.
@@ -502,6 +503,18 @@ with what it has.`,
     },
     ...outsideAgentCommands(host),
     ...chatToolCommands(host),
+    {
+      name: "video",
+      group: "Aeon",
+      summary: "copy the Remotion starter kit for rendering a recording",
+      help: `Usage: aeon video kit <dir>
+
+Copies the plain Remotion starter kit into <dir>: a Chrome frame (horizontal or
+vertical tabs, light or dark), scenes, a drawn cursor and zoom-from-events logic,
+a speed badge, captions, title and end cards, and a README with a full example
+that reads events.json from \`aeon record\`. Aeon does not render; Remotion does.`,
+      run: (args) => videoCommand(args),
+    },
   ];
 }
 
@@ -702,6 +715,9 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
   });
   const abilities = BROWSERKIT_COMMANDS.find((command) => command.name === "abilities");
   if (abilities) overrides.set("abilities", abilitiesCommand(abilities));
+  // Aeon owns `record start|stop`; the original gif/video/trace commands stay available.
+  const originalRecord = BROWSERKIT_COMMANDS.find((command) => command.name === "record");
+  overrides.set("record", recordCommand(originalRecord, host));
   const commands = BROWSERKIT_COMMANDS.map((command) => overrides.get(command.name) ?? command);
   return [...aeonOnlyCommands(host), ...browsersCommands(host), ...commands];
 }
