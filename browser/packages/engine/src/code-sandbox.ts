@@ -31,6 +31,7 @@ import { browserSurfaceApi, browserWindowApi } from "./code-api-surface.js";
 import { browserActApi } from "./code-api-act.js";
 import { browserSleepApi } from "./code-api-sleep.js";
 import { browserSpeedApi } from "./code-api-speed.js";
+import { browserMcpApi } from "./code-api-mcp.js";
 
 type Waiter = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 const scope = globalThis as unknown as Record<string, unknown>;
@@ -122,6 +123,7 @@ evaluate(
     browserActApi,
     browserSleepApi,
     browserSpeedApi,
+    browserMcpApi,
   ].join("\n"),
 );
 

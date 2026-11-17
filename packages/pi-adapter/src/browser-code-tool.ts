@@ -36,6 +36,19 @@ import {
 
 const CELL_TIMEOUT_MS = 60_000;
 
+/** The chat's connected MCP tools, exposed inside browser_code as mcp.<server>.<tool>(args). The daemon owns this. */
+export interface McpBridge {
+  /** Names and one-line descriptions, as {name: 'server.tool', description}. */
+  list(signal?: AbortSignal): Promise<{ name: string; description: string }[]>;
+  /** Call one tool with JSON args; throws the tool's text on error. */
+  call(
+    server: string,
+    tool: string,
+    args: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<unknown>;
+}
+
 export interface BrowserCodeOptions {
   /** Which sites this chat's runs must stay off, answered by the daemon. */
   siteRules?: SiteRulesProvider;
@@ -45,6 +58,8 @@ export interface BrowserCodeOptions {
   model?: () => Promise<ModelLike | undefined>;
   /** The name of the Chrome profile this chat runs in, so it signs in with that profile's vault. */
   browserName?: BrowserNameProvider;
+  /** Connected MCP tools callable from a cell; without one, mcp.* says there are none. */
+  mcp?: McpBridge;
 }
 
 export type BrowserNameProvider = (chatId: string) => Promise<string | undefined>;
@@ -124,6 +139,7 @@ export function createBrowserCodeTool(
     ),
     executionMode: "sequential",
     execute: async (toolCallId, { code }, signal, onUpdate) => {
+      const opts: BrowserCodeOptions = options ?? {};
       const operationId = randomUUID();
       const startedAt = Date.now();
       let steps: Record<string, unknown>[] = [];
@@ -156,10 +172,14 @@ export function createBrowserCodeTool(
               timeoutMs,
               onCall: cellCall({
                 chatId,
-                source: options?.source ?? "chat",
-                ...(options?.siteRules ? { siteRules: options.siteRules } : {}),
-                ...(options?.model ? { model: options.model } : {}),
-                ...(options?.browserName ? { browserName: options.browserName } : {}),
+                source: opts.source ?? "chat",
+                ...(opts.siteRules ? { siteRules: opts.siteRules } : {}),
+                ...(opts.model ? { model: opts.model } : {}),
+                ...(opts.browserName ? { browserName: opts.browserName } : {}),
+                mcp: opts.mcp,
+                // One cell's signal covers every MCP call it makes: a cancel stops the request,
+                // including a reply still being read, and is never retried.
+                signal: wait.signal,
                 skills,
                 workspace,
                 writes,
@@ -325,6 +345,8 @@ function cellCall(context: {
   siteRules?: SiteRulesProvider;
   model?: () => Promise<ModelLike | undefined>;
   browserName?: BrowserNameProvider;
+  mcp: McpBridge | undefined;
+  signal: AbortSignal;
   skills: string | undefined;
   workspace: string | undefined;
   writes: SiteWrites;
@@ -338,7 +360,15 @@ function cellCall(context: {
     ...(context.siteRules ? { siteRules: context.siteRules } : {}),
     siteMapper: (request) => siteMapperRequest(context.chatId, request),
     ...(context.model ? { model: context.model } : {}),
-    extra: (request) => serveCall(request, context.workspace, context.steps(), context.skills),
+    extra: (request) =>
+      serveCall(
+        request,
+        context.workspace,
+        context.steps(),
+        context.skills,
+        context.mcp,
+        context.signal,
+      ),
   });
   const requestContext: HostRequestContext = {
     source: context.source,
@@ -433,12 +463,37 @@ function stepEvents(steps: readonly Record<string, unknown>[]): StepEvent[] {
   return events.slice(-500);
 }
 
+/** One mcp.* call from a cell: list, or call one tool with JSON args and the run's signal. */
+async function serveMcp(
+  request: Record<string, unknown>,
+  mcp: McpBridge | undefined,
+  signal: AbortSignal | undefined,
+  steps: Record<string, unknown>[],
+): Promise<unknown> {
+  if (!mcp)
+    throw new Error("No MCP tools are connected to this chat; there is nothing for mcp.* to call.");
+  if (request.list === true) return mcp.list(signal);
+  const server = String(request.server ?? "");
+  const tool = String(request.tool ?? "");
+  const args =
+    request.args && typeof request.args === "object" && !Array.isArray(request.args)
+      ? (request.args as Record<string, unknown>)
+      : {};
+  const value = await mcp.call(server, tool, args, signal);
+  steps.push({ action: "mcp", result: value, server, tool });
+  return value;
+}
+
 async function serveCall(
   request: unknown,
   workspace: string | undefined,
   steps: Record<string, unknown>[],
   skills: string | undefined,
+  mcp?: McpBridge,
+  signal?: AbortSignal,
 ): Promise<unknown> {
+  const mcpRequest = (request as { mcp?: Record<string, unknown> } | null)?.mcp;
+  if (mcpRequest) return serveMcp(mcpRequest, mcp, signal, steps);
   if (isSiteSkillRequest(request)) {
     if (!skills) throw new Error("Site skills are unavailable");
     return siteSkillCall(skills, request);

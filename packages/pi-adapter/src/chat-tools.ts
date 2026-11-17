@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { defineTool } from "@earendil-works/pi-coding-agent";
-import type { BrowserNameProvider } from "./browser-code-tool.js";
+import type { BrowserNameProvider, McpBridge } from "./browser-code-tool.js";
 import { createBrowserTools } from "./browser-code-tool.js";
 import type { SiteRulesProvider } from "./browser-host-requests.js";
 import type { BrowserToolRunner } from "./browser-tool.js";
@@ -23,6 +23,8 @@ export interface ChatToolInput {
   capabilityToolHost?: CapabilityToolHost | undefined;
   siteRules?: SiteRulesProvider | undefined;
   browserName?: BrowserNameProvider | undefined;
+  /** Connected MCP tools callable inside browser_code. */
+  mcp?: McpBridge | undefined;
 }
 
 /** The tools a new chat registers. The session opener and the agent-surface export both use this. */
@@ -30,6 +32,7 @@ export function createChatTools(input: ChatToolInput): ReturnType<typeof defineT
   const browserOptions = {
     ...(input.siteRules ? { siteRules: input.siteRules } : {}),
     ...(input.browserName ? { browserName: input.browserName } : {}),
+    ...(input.mcp ? { mcp: input.mcp } : {}),
     model: fastToolModel(input.completion),
   };
   return [

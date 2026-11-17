@@ -35,6 +35,8 @@ import { backfillChatOrigins } from "./chat-origin-backfill.js";
 import { migrateAeonSettings } from "./settings-migration.js";
 import { outsideContextAnswer, type OutsideTab } from "./outside-context.js";
 import { migrateAllAbilities } from "@browserkit/site-mapper";
+import { McpClientManager } from "./mcp-client-manager.js";
+import { McpCodeBridge } from "./mcp-code-bridge.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -66,6 +68,9 @@ export function createProductionRuntime(dataDirectory: string): {
   const browserControl = browserControlFor(dataRoot);
   const siteScripts = attachSiteScripts(dataRoot, browserControl);
   const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
+  // browser_code reaches the chat's connected MCP tools through this bridge: sandbox -> daemon ->
+  // McpClientManager.callMcpTool. Only MCP capabilities are listed, never Aeon's own browser tools.
+  pi.setMcpBridge(new McpCodeBridge(new McpClientManager(registry)));
   warmModels(pi);
   const siteRules = new BrowserSiteRules();
   const service = new ChatService({ dataDirectory: dataRoot, store, pi, siteRules });

@@ -11,6 +11,15 @@ import { inspect, runTasks, type RunOptions } from "./run.js";
 import type { ChatResult } from "./results.js";
 import { searchAeon } from "./search.js";
 import { answer, questions, send, waitForChange } from "./converse.js";
+import {
+  MCP_PROTOCOLS,
+  chooseMcpSession,
+  isModernMcp,
+  mcpDiscoverResult,
+  mcpListResult,
+  mcpResult,
+  mcpSessionFromMeta,
+} from "@aeon/protocol";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -219,20 +228,36 @@ async function chatTools(aeon: () => Promise<AeonClient>): Promise<unknown[]> {
   }
 }
 
-async function callChatTool(client: AeonClient, name: string, args: Json = {}): Promise<unknown> {
+async function callChatTool(
+  client: AeonClient,
+  name: string,
+  args: Json = {},
+  defaultSession = "mcp",
+  signal?: AbortSignal,
+): Promise<unknown> {
   const { session, ...rest } = args;
+  // An explicit session argument always wins; the caller's _meta session is the default so
+  // parallel subagents of one client do not share a REPL.
+  const chosen = chooseMcpSession(session, defaultSession);
   // One discrete action is one browser_code cell; the tool lists and the semantics are shared.
   if (name === "browser_action")
-    return callChatTool(client, "browser_code", {
-      ...(typeof session === "string" ? { session } : {}),
-      code: browserActionCode(rest as never),
-    });
-  const reply = await client.tool({
-    kind: "core.tool.call",
-    tool: name,
-    session: typeof session === "string" && session ? session : "mcp",
-    arguments: rest,
-  });
+    return callChatTool(
+      client,
+      "browser_code",
+      { ...(chosen ? { session: chosen } : {}), code: browserActionCode(rest as never) },
+      defaultSession,
+      signal,
+    );
+  const reply = await client.tool(
+    {
+      kind: "core.tool.call",
+      tool: name,
+      session: chosen,
+      arguments: rest,
+    },
+    undefined,
+    signal,
+  );
   return { content: reply.content, isError: reply.isError === true };
 }
 
@@ -259,47 +284,161 @@ function searchTool(client: AeonClient, args: Json): Promise<unknown> {
   );
 }
 
+interface McpConnection {
+  modern: boolean;
+}
+interface McpDeps {
+  aeon: () => Promise<AeonClient>;
+  runs: Map<string, Run>;
+  pending: Map<string, AbortController>;
+  conn: McpConnection;
+}
+
+function mcpParams(message: Json): Json {
+  return message.params && typeof message.params === "object" && !Array.isArray(message.params)
+    ? (message.params as Json)
+    : {};
+}
+
+/** Learn the caller's identity from a 2026-07-28 request, or fall back to the older handshake. */
+function learnConnection(params: Json, method: string, conn: McpConnection): void {
+  if (isModernMcp(method, params)) conn.modern = true;
+  if (method === "initialize") conn.modern = false;
+}
+
+function cancelMcpCall(message: Json, params: Json, pending: Map<string, AbortController>): void {
+  // Notifications need no answer. A 2026-07-28 cancel stops the in-flight call; its answer is
+  // dropped, so a cancelled write is never replayed.
+  if (message.method === "notifications/cancelled" && params.requestId !== undefined)
+    pending.get(String(params.requestId))?.abort();
+}
+
+/** A tool call runs without blocking the read loop, so a cancel can arrive while it is in flight. */
+async function answerCall(
+  message: Json,
+  id: unknown,
+  deps: McpDeps,
+  modern: boolean,
+  session: string | undefined,
+): Promise<void> {
+  const controller = new AbortController();
+  const key = String(id);
+  deps.pending.set(key, controller);
+  try {
+    const result = await handle(message, deps.aeon, deps.runs, modern, session, controller.signal);
+    if (!controller.signal.aborted) reply(id, mcpResult(result as Json, modern));
+  } catch (error) {
+    if (!controller.signal.aborted)
+      reply(id, undefined, error instanceof Error ? error.message : String(error));
+  } finally {
+    if (deps.pending.get(key) === controller) deps.pending.delete(key);
+  }
+}
+
+async function answerRequest(
+  message: Json,
+  id: unknown,
+  deps: McpDeps,
+  modern: boolean,
+  session: string | undefined,
+): Promise<void> {
+  try {
+    const result = await handle(message, deps.aeon, deps.runs, modern, session);
+    reply(id, mcpResult(result as Json, modern));
+  } catch (error) {
+    reply(id, undefined, error instanceof Error ? error.message : String(error));
+  }
+}
+
 export async function runMcpServer(site?: string): Promise<void> {
   // One mapped site as its own MCP server: one tool per operation, called with the user's logins.
   if (site) return runSiteMcpServer(siteName(site));
   let client: AeonClient | undefined;
-  const aeon = async () => (client ??= await AeonClient.connect());
-  const runs = new Map<string, Run>();
+  const deps: McpDeps = {
+    aeon: async () => (client ??= await AeonClient.connect()),
+    runs: new Map<string, Run>(),
+    pending: new Map<string, AbortController>(),
+    conn: { modern: false },
+  };
   const lines = createInterface({ input: process.stdin });
   for await (const line of lines) {
     if (!line.trim()) continue;
-    const message = JSON.parse(line) as Json;
-    if (message.id === undefined) continue;
+    let message: Json;
     try {
-      reply(message.id, await handle(message, aeon, runs));
-    } catch (error) {
-      reply(message.id, undefined, error instanceof Error ? error.message : String(error));
+      message = JSON.parse(line) as Json;
+    } catch {
+      reply(null, undefined, "Parse error");
+      continue;
     }
+    const params = mcpParams(message);
+    if (message.id === undefined) {
+      cancelMcpCall(message, params, deps.pending);
+      continue;
+    }
+    const method = String(message.method ?? "");
+    learnConnection(params, method, deps.conn);
+    const modern = deps.conn.modern;
+    const session = mcpSessionFromMeta(params);
+    if (method === "tools/call") void answerCall(message, message.id, deps, modern, session);
+    else await answerRequest(message, message.id, deps, modern, session);
   }
+  for (const controller of deps.pending.values()) controller.abort();
   client?.close();
+}
+
+function initializeResult(params: Json): Json {
+  const asked = params.protocolVersion;
+  const version = MCP_PROTOCOLS.find((candidate) => candidate === asked) ?? MCP_PROTOCOLS[0];
+  return {
+    protocolVersion: version,
+    capabilities: { tools: { listChanged: false } },
+    serverInfo: { name: "aeon", version: "0.1.0" },
+  };
+}
+
+function listResult(method: string, modern: boolean): Json {
+  return mcpListResult(method === "resources/list" ? { resources: [] } : { prompts: [] }, modern);
+}
+
+async function callToolResult(
+  params: { name: string; arguments?: Json },
+  aeon: () => Promise<AeonClient>,
+  runs: Map<string, Run>,
+  session: string | undefined,
+  signal: AbortSignal | undefined,
+): Promise<unknown> {
+  if (CHAT_TOOLS.has(params.name))
+    return callChatTool(await aeon(), params.name, params.arguments, session, signal);
+  try {
+    return text(await callTool(params.name, params.arguments ?? {}, aeon, runs, session, signal));
+  } catch (error) {
+    return { ...text(error instanceof Error ? error.message : String(error)), isError: true };
+  }
 }
 
 async function handle(
   message: Json,
   aeon: () => Promise<AeonClient>,
   runs: Map<string, Run>,
+  modern = false,
+  session?: string,
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  if (message.method === "initialize")
-    return {
-      protocolVersion: (message.params as Json | undefined)?.protocolVersion ?? "2025-06-18",
-      capabilities: { tools: {} },
-      serverInfo: { name: "aeon", version: "0.1.0" },
-    };
-  if (message.method === "tools/list") return { tools: [...tools, ...(await chatTools(aeon))] };
-  if (message.method === "ping") return {};
-  if (message.method !== "tools/call") throw new Error("Method not found");
-  const params = message.params as { name: string; arguments?: Json };
-  if (CHAT_TOOLS.has(params.name)) return callChatTool(await aeon(), params.name, params.arguments);
-  try {
-    return text(await callTool(params.name, params.arguments ?? {}, aeon, runs));
-  } catch (error) {
-    return { ...text(error instanceof Error ? error.message : String(error)), isError: true };
-  }
+  const method = String(message.method ?? "");
+  if (method === "initialize") return initializeResult(mcpParams(message));
+  if (method === "server/discover") return mcpDiscoverResult({ name: "aeon", version: "0.1.0" });
+  if (method === "tools/list")
+    return mcpListResult({ tools: [...tools, ...(await chatTools(aeon))] }, modern);
+  if (method === "resources/list" || method === "prompts/list") return listResult(method, modern);
+  if (method === "ping") return mcpResult({}, modern);
+  if (method !== "tools/call") throw new Error("Method not found");
+  return callToolResult(
+    message.params as { name: string; arguments?: Json },
+    aeon,
+    runs,
+    session,
+    signal,
+  );
 }
 
 async function callTool(
@@ -307,6 +446,8 @@ async function callTool(
   args: Json,
   aeon: () => Promise<AeonClient>,
   runs: Map<string, Run>,
+  defaultSession?: string,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const client = await aeon();
   if (name === "aeon_stop") return { stopped: await client.stop(String(args.chatId)) };
@@ -314,7 +455,7 @@ async function callTool(
   if (["aeon_send", "aeon_answer", "aeon_wait"].includes(name))
     return converseTool(client, name, args);
   if (["aeon_chats", "aeon_search", "aeon_context", "aeon_routine"].includes(name))
-    return chatTool(client, name, args);
+    return chatTool(client, name, args, defaultSession, signal);
   return inspectTool(client, name, args);
 }
 
@@ -368,12 +509,19 @@ async function converseTool(client: AeonClient, name: string, args: Json): Promi
   });
 }
 
-async function chatTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
+async function chatTool(
+  client: AeonClient,
+  name: string,
+  args: Json,
+  defaultSession?: string,
+  signal?: AbortSignal,
+): Promise<unknown> {
   if (name === "aeon_chats")
     return (await client.command("chat.list", { limit: Number(args.limit ?? 20) })).chats;
   if (name === "aeon_search") return searchTool(client, args);
-  if (name === "aeon_context") return toolValue(client, "context", {}, "context");
-  return toolValue(client, "routine", args, "routine");
+  if (name === "aeon_context")
+    return toolValue(client, "context", {}, "context", defaultSession, signal);
+  return toolValue(client, "routine", args, "routine", defaultSession, signal);
 }
 
 async function toolValue(
@@ -381,13 +529,19 @@ async function toolValue(
   tool: string,
   args: Json,
   label: string,
+  defaultSession = "mcp",
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  const reply = await client.tool({
-    kind: "core.tool.call",
-    tool,
-    session: "mcp",
-    arguments: args,
-  });
+  const reply = await client.tool(
+    {
+      kind: "core.tool.call",
+      tool,
+      session: chooseMcpSession(args.session, defaultSession),
+      arguments: args,
+    },
+    undefined,
+    signal,
+  );
   const output = ((reply.content as { text?: string }[] | undefined) ?? [])
     .map((part) => part.text ?? "")
     .join("");

@@ -3,6 +3,13 @@ import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { CliCapability } from "@aeon/domain";
+import {
+  MCP_PROTOCOLS,
+  isModernMcp,
+  mcpDiscoverResult,
+  mcpListResult,
+  mcpResult,
+} from "@aeon/protocol";
 import { parseRegistry } from "./capability-parsing.js";
 import {
   HELP_TIMEOUT_MS,
@@ -57,12 +64,17 @@ type JsonRecord = Record<string, unknown>;
 export function startCliMcpBridge(registryPath: string): void {
   let activeCliCommand = false;
   const pending = new Map<RequestId, AbortController>();
+  const cancelled = new Set<RequestId>();
+  // A pooled connection may speak the modern era (per-request _meta) or the older initialize era.
+  const state = { modern: false };
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
   input.on("line", (line) => {
     void handleLine(
       line,
       registryPath,
       pending,
+      cancelled,
+      state,
       () => activeCliCommand,
       (value) => {
         activeCliCommand = value;
@@ -74,10 +86,18 @@ export function startCliMcpBridge(registryPath: string): void {
   });
 }
 
+/** A modern request keeps the modern result shape; an initialize handshake keeps the old one. */
+function learnState(method: string, params: JsonRecord, state: { modern: boolean }): void {
+  if (isModernMcp(method, params)) state.modern = true;
+  if (method === "initialize") state.modern = false;
+}
+
 async function handleLine(
   line: string,
   registryPath: string,
   pending: Map<RequestId, AbortController>,
+  cancelled: Set<RequestId>,
+  state: { modern: boolean },
   isCliCommandActive: () => boolean,
   setCliCommandActive: (active: boolean) => void,
 ): Promise<void> {
@@ -97,27 +117,43 @@ async function handleLine(
       });
     return;
   }
-  if (handleNotification(message, pending)) return;
+  const params = isRecord(message.params) ? message.params : {};
+  learnState(message.method, params, state);
+  if (handleNotification(message, pending, cancelled)) return;
   if (!isRequestId(message.id)) return;
   const id = message.id;
+  const modern = state.modern;
   try {
     const result = await dispatchRequest(
       message,
       id,
       registryPath,
       pending,
+      cancelled,
       isCliCommandActive,
       setCliCommandActive,
+      modern,
     );
-    if (result === METHOD_NOT_FOUND) return;
-    writeMessage({ jsonrpc: "2.0", id, result });
+    answerRequest(id, result, modern, cancelled);
   } catch (error) {
-    writeMessage({
-      jsonrpc: "2.0",
-      id,
-      error: { code: -32603, message: safeError(error) },
-    });
+    answerError(id, error, cancelled);
   }
+}
+
+/** A cancelled call gets no answer: its signal covered the whole reply, so nothing is replayed. */
+function answerRequest(
+  id: RequestId,
+  result: unknown,
+  modern: boolean,
+  cancelled: Set<RequestId>,
+): void {
+  if (result === METHOD_NOT_FOUND || cancelled.delete(id)) return;
+  writeMessage({ jsonrpc: "2.0", id, result: mcpResult(result as JsonRecord, modern) });
+}
+
+function answerError(id: RequestId, error: unknown, cancelled: Set<RequestId>): void {
+  if (cancelled.delete(id)) return;
+  writeMessage({ jsonrpc: "2.0", id, error: { code: -32603, message: safeError(error) } });
 }
 
 async function callTool(
@@ -227,35 +263,43 @@ async function dispatchRequest(
   id: RequestId,
   registryPath: string,
   pending: Map<RequestId, AbortController>,
+  cancelled: Set<RequestId>,
   isCliCommandActive: () => boolean,
   setCliCommandActive: (active: boolean) => void,
+  modern: boolean,
 ): Promise<unknown> {
   let result: unknown;
   if (message.method === "initialize") {
     const params = isRecord(message.params) ? message.params : {};
+    const asked = params.protocolVersion;
+    const version = MCP_PROTOCOLS.find((candidate) => candidate === asked) ?? MCP_PROTOCOLS[0];
     result = {
-      protocolVersion:
-        typeof params.protocolVersion === "string" ? params.protocolVersion : "2025-06-18",
+      protocolVersion: version,
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "aeon-cli", version: VERSION },
     };
+  } else if (message.method === "server/discover") {
+    result = mcpDiscoverResult({ name: "aeon-cli", version: VERSION }, undefined, {
+      tools: { listChanged: false },
+    });
   } else if (message.method === "ping") {
-    result = {};
+    result = mcpResult({}, modern);
   } else if (message.method === "tools/list") {
-    result = { tools: TOOL_DEFINITIONS };
+    result = mcpListResult({ tools: TOOL_DEFINITIONS }, modern);
   } else if (message.method === "tools/call") {
     result = await dispatchToolCall(
       message,
       id,
       registryPath,
       pending,
+      cancelled,
       isCliCommandActive,
       setCliCommandActive,
     );
   } else if (message.method === "resources/list") {
-    result = { resources: [] };
+    result = mcpListResult({ resources: [] }, modern);
   } else if (message.method === "prompts/list") {
-    result = { prompts: [] };
+    result = mcpListResult({ prompts: [] }, modern);
   } else {
     writeMessage({
       jsonrpc: "2.0",
@@ -273,6 +317,7 @@ async function dispatchToolCall(
   id: RequestId,
   registryPath: string,
   pending: Map<RequestId, AbortController>,
+  cancelled: Set<RequestId>,
   isCliCommandActive: () => boolean,
   setCliCommandActive: (active: boolean) => void,
 ): Promise<unknown> {
@@ -281,6 +326,7 @@ async function dispatchToolCall(
   const args = isRecord(params.arguments) ? params.arguments : {};
   const controller = new AbortController();
   pending.set(id, controller);
+  if (cancelled.has(id)) controller.abort();
   try {
     return await callTool(
       params.name,
@@ -306,11 +352,17 @@ function cliFailed(result: {
 function handleNotification(
   message: JsonRecord,
   pending: Map<RequestId, AbortController>,
+  cancelled: Set<RequestId>,
 ): boolean {
   if (message.method === "notifications/initialized") return true;
   if (message.method === "notifications/cancelled") {
     const params = isRecord(message.params) ? message.params : {};
-    if (isRequestId(params.requestId)) pending.get(params.requestId)?.abort();
+    if (isRequestId(params.requestId)) {
+      // Abort the in-flight CLI (its signal covers the whole reply, including output reads), and
+      // mark the request so no result is written for it: a cancelled write is never replayed.
+      cancelled.add(params.requestId);
+      pending.get(params.requestId)?.abort();
+    }
     return true;
   }
   return false;

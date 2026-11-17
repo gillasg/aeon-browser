@@ -84,6 +84,7 @@ export * from "./image-asset.js";
 export { ProjectSchema, type ProjectDto } from "./projects.js";
 
 export * from "./core-client.js";
+export * from "./mcp-protocol.js";
 export {
   CompanionRequestSchema,
   CompanionResultSchema,

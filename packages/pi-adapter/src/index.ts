@@ -39,6 +39,7 @@ export {
 export type { PiSdkSessionAdapterOptions } from "./session-adapter.js";
 export type { ThreadToolHost } from "./thread-tools.js";
 export type { CapabilityToolHost } from "./capability-tools.js";
+export type { McpBridge } from "./browser-code-tool.js";
 export type {
   OpenPiSessionInput,
   PiEntryCategory,
