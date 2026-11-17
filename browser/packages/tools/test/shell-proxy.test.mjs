@@ -26,14 +26,15 @@ test("curl cannot read a blocked site, or follow a redirect into one", async () 
   const home = await mkdtemp(join(tmpdir(), "shell-gate-"));
   const previous = process.env.BROWSERKIT_HOME;
   let hits = 0;
-  const blocked = await listen("127.0.0.2", (_request, response) => {
+  // The blocked site is named "localhost" so the test runs on macOS too (only 127.0.0.1 exists there).
+  const blocked = await listen("127.0.0.1", (_request, response) => {
     hits += 1;
     response.end(SECRET);
   });
   const open = await listen("127.0.0.1", (request, response) => {
     if (request.url === "/go") {
       response.writeHead(302, {
-        Location: `http://127.0.0.2:${blocked.port}/secret`,
+        Location: `http://localhost:${blocked.port}/secret`,
       });
       response.end();
       return;
@@ -41,7 +42,7 @@ test("curl cannot read a blocked site, or follow a redirect into one", async () 
     response.end("open-page");
   });
   process.env.BROWSERKIT_HOME = home;
-  await writeFile(join(home, "site-rules.json"), JSON.stringify({ blocked: ["127.0.0.2"] }) + "\n");
+  await writeFile(join(home, "site-rules.json"), JSON.stringify({ blocked: ["localhost"] }) + "\n");
   const env = { ...process.env, ...(await shellProxyEnv()) };
   const curl = (url) =>
     run("curl", ["-sS", "-L", "--max-time", "5", url], { env }).then(
@@ -49,7 +50,7 @@ test("curl cannot read a blocked site, or follow a redirect into one", async () 
       (error) => `${error.stdout ?? ""}\n${error.stderr ?? ""}`,
     );
   try {
-    const direct = await curl(`http://127.0.0.2:${blocked.port}/secret`);
+    const direct = await curl(`http://localhost:${blocked.port}/secret`);
     const hopped = await curl(`http://127.0.0.1:${open.port}/go`);
     const allowed = await curl(`http://127.0.0.1:${open.port}/ok`);
     assert.match(direct, /SITE_BLOCKED/);

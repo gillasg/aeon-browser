@@ -26,7 +26,7 @@ test("a commented opencode.json is edited in place and uninstall removes only ae
   process.env.HOME = home;
   process.env.PATH = "/usr/bin:/bin";
   try {
-    const added = await connectAgents(server);
+    const added = await connectAgents(server, { home });
     const opencode = added.find((result) => result.agent === "opencode");
     assert.equal(opencode?.done, true);
     const text = readFileSync(path, "utf8");
@@ -35,7 +35,7 @@ test("a commented opencode.json is edited in place and uninstall removes only ae
     assert.match(text, /"aeon"/);
     assert.match(text, /"type": "local"/);
 
-    const removed = await connectAgents(server, { uninstall: true, agents: ["opencode"] });
+    const removed = await connectAgents(server, { home, uninstall: true, agents: ["opencode"] });
     assert.equal(removed.find((result) => result.agent === "opencode")?.done, true);
     const after = readFileSync(path, "utf8");
     assert.match(after, /\/\/ keep me/);
