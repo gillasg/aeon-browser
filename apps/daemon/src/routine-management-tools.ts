@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ChatId, AeonProductStore, RoutineRecord } from "@aeon/domain";
+import { optionalListen } from "./routine-listen.js";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 import type { RoutineScheduler } from "./routine-scheduler.js";
 import { exploreForRoutine } from "@aeon/pi-adapter";
@@ -49,7 +50,12 @@ export class RoutineManagementTools {
     const now = new Date();
     const check = optionalCheck(args.check, null);
     const checkShell = optionalShellCheck(args.checkShell, null);
-    const schedule = parseRoutineSchedule(args.schedule, now, check || checkShell ? 1 : 5);
+    const listen = optionalListen(args.listen);
+    const schedule = parseRoutineSchedule(
+      args.schedule,
+      now,
+      check || checkShell || listen ? 1 : 5,
+    );
     const timestamp = now.toISOString();
     const saved = this.store.createRoutine({
       routineId: randomUUID(),
@@ -59,6 +65,7 @@ export class RoutineManagementTools {
       check,
       checkShell,
       sites: optionalSites(args.sites, []),
+      listen,
       schedule,
       nextDueAt: nextRoutineOccurrence(schedule, now),
       requiredBrowserInstanceId: optionalNullableUuid(
@@ -84,7 +91,12 @@ export class RoutineManagementTools {
     const current = this.requireOwned(id, chatId);
     const check = optionalCheck(args.check, current.check);
     const checkShell = optionalShellCheck(args.checkShell, current.checkShell);
-    const schedule = parseRoutineSchedule(args.schedule, new Date(), check || checkShell ? 1 : 5);
+    const listen = optionalListen(args.listen, current.listen ?? null);
+    const schedule = parseRoutineSchedule(
+      args.schedule,
+      new Date(),
+      check || checkShell || listen ? 1 : 5,
+    );
     const enabled = boolean(args.enabled, "enabled");
     const updated = this.store.updateRoutine(
       id,
@@ -95,6 +107,7 @@ export class RoutineManagementTools {
         check,
         checkShell,
         sites: optionalSites(args.sites, current.sites),
+        listen,
         schedule,
         requiredBrowserInstanceId: optionalNullableUuid(
           args.requiredBrowserInstanceId,

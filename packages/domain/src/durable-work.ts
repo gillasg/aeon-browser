@@ -6,6 +6,18 @@ export type RoutineSchedule =
   /** One run at an exact time: a snipe starts a little before its moment to warm up. */
   | { kind: "once"; atUtc: string; timeZone: string };
 
+/**
+ * Live watcher option: while a tab of the watched site is open in the user's Chrome, react to the
+ * responses that page already loads instead of waiting for the timer. No extra requests are made.
+ * `url` matches response URLs (a substring, or a /regex/); `type` is a resource type or MIME (e.g.
+ * "json"). The check runs with `response` (its `.body` is the parsed response) as input.
+ * When no matching tab is open the routine falls back to its normal schedule.
+ */
+export interface RoutineListen {
+  url: string;
+  type?: string;
+}
+
 export type RoutineRunState =
   | "due"
   | "pending"
@@ -32,6 +44,8 @@ export interface RoutineRecord {
   checkShell: string | null;
   /** Sites this routine may use (browserkit's "only" list); empty means no restriction. */
   sites: string[];
+  /** Live watcher: react to matching responses on an open tab; null means timer-only. */
+  listen: RoutineListen | null;
   schedule: RoutineSchedule;
   nextDueAt: string | null;
   requiredBrowserInstanceId: string | null;
@@ -191,6 +205,7 @@ export interface AeonProductStore {
       | "check"
       | "checkShell"
       | "sites"
+      | "listen"
       | "schedule"
       | "nextDueAt"
       | "requiredBrowserInstanceId"
