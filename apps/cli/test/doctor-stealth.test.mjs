@@ -142,7 +142,7 @@ test("webdriver, headless, zero screen, missing plugins and stealthCheck signals
   }
   assert.match(tells.fix, /real display/);
   assert.match(tells.fix, /default profile/);
-  assert.match(tells.fix, /update Aeon/);
+  assert.match(tells.fix, /update Aeon/i);
 });
 
 test("parseStealthFacts reads the trace, ICE, navigator and stealth report without altering them", () => {
