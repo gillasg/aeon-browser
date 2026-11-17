@@ -67,10 +67,19 @@ test(
         !shown.report.signals.some((line) => /settle probe|page's own world/.test(line)),
         `an isolated-world helper was reported as a page-visible tell: ${result.stdout}`,
       );
-      // Nothing of ours but the cursor that may be drawing: no second overlay beside it.
+      // The cursor draws in a closed shadow root with no page-visible id or attribute. A page
+      // query finds nothing of ours at all, even while the agent is driving this tab.
+      assert.deepEqual(
+        shown.main.overlays,
+        [],
+        `a page-visible overlay was on a driven page: ${result.stdout}`,
+      );
+      // The cursor really is shown, yet a page script has no selector for it.
+      assert.equal(shown.main.cursorShown, true, result.stdout);
+      assert.equal(shown.main.pageCanFindCursor, false, result.stdout);
       assert.ok(
-        shown.main.overlays.every((name) => name === "#aeon-agent-cursor"),
-        `an overlay other than the cursor was on a driven page: ${result.stdout}`,
+        !shown.report.signals.some((line) => /agent overlay/.test(line)),
+        `the cursor was reported as a page-visible tell: ${result.stdout}`,
       );
     } finally {
       chrome?.kill();
@@ -90,11 +99,14 @@ test(
 
 function repl(url) {
   return `page = await browser.openTab(${JSON.stringify(url)});
+    await page.click('text=Go');
     await page.waitForTimeout(300);
     const report = await page.stealthCheck();
     const main = await page.evaluate(() => ({
       globals: Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit)/.test(name)),
-      overlays: [...document.querySelectorAll('[id^="aeon-"],[data-aeon-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase())
+      overlays: [...document.querySelectorAll('[id^="aeon-"],[data-aeon-overlay],#aeon-agent-cursor')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase()),
+      cursorShown: [...document.documentElement.children].some((n) => n.__cursorSurface),
+      pageCanFindCursor: !!document.querySelector('#aeon-agent-cursor, [data-aeon-overlay], [id^="aeon-"][data-aeon-cursor]')
     }));
     console.log("STEALTH " + JSON.stringify({report, main}));`;
 }

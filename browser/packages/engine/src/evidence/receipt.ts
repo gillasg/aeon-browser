@@ -60,6 +60,16 @@ export function createOpenReceipt(actionId: string, tabId: number, now = Date.no
   };
 }
 
+/**
+ * Moves the causal window to when the input actually lands. Revalidating a target and priming the
+ * page can take longer than the window under load; anchored at receipt creation, the request the
+ * click really caused would then start outside the window and be dropped ("missing POST").
+ */
+export function rebaseReceipt(receipt: OpenReceipt, now: number): void {
+  receipt.startedAt = now;
+  receipt.lastProgressAt = now;
+}
+
 /** A request counts only inside 500ms of the action, of a dialog close, or of the close hold. */
 export function inCausalWindow(receipt: OpenReceipt, now: number): boolean {
   if (now - receipt.startedAt <= CAUSAL_MS) return true;

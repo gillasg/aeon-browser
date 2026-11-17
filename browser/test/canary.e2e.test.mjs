@@ -64,7 +64,7 @@ test(
            console.log("SUM " + (1 + 1));
            await page.click('text=Go');
            console.log("TITLE " + (await page.title()));
-           console.log("CURSOR " + (await page.evaluate(() => !!document.getElementById('aeon-agent-cursor'))));
+           console.log("CURSOR " + (await page.evaluate(() => [...document.documentElement.children].some((n) => n.__cursorSurface))));
            console.log("CAPS " + Array.isArray((await site.capabilities()).abilities));`,
         ],
         { env },

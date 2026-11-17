@@ -889,7 +889,7 @@ test(
             const latitude = await page.evaluate(() => new Promise((done) =>
               navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude), (e) => done("error " + e.code))));
             await page.getByRole("button", { name: "Buy" }).click();
-            const cursor = await page.evaluate(() => Boolean(document.getElementById("aeon-agent-cursor")));
+            const cursor = await page.evaluate(() => [...document.documentElement.children].some((n) => n.__cursorSurface));
             console.log("RESULT " + JSON.stringify({ reused: a.target.tabId === b.target.tabId, flat, latitude, cursor }))`,
           ],
           { env },
@@ -2031,7 +2031,7 @@ test(
             `page = await browser.openTab(${JSON.stringify(siteUrl + "catalog")});
             await page.waitForSelector("#q");
             await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-            await page.evaluate(() => { document.getElementById("aeon-agent-cursor")?.remove(); document.documentElement.style.background = "#fff"; document.body.style.background = "#fff"; });
+            await page.evaluate(() => { [...document.documentElement.children].find((n) => n.__cursorSurface)?.remove(); document.documentElement.style.background = "#fff"; document.body.style.background = "#fff"; });
             await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
             const before = await page.screenshot();
             const same = await page.diffScreenshot(before);

@@ -16,6 +16,7 @@ import {
   noteRequestEnd,
   noteRequestStart,
   overlapText,
+  rebaseReceipt,
   settledRequests,
 } from "../dist/evidence/receipt.js";
 
@@ -112,6 +113,23 @@ test("a download during the post-dialog hold is seen, and one after close is not
   assert.equal(late.sawDownload, false);
   noteDownload(late, CAUSAL_MS + QUIET_MS + 1);
   assert.equal(late.sawDownload, true);
+});
+
+test("a slow pre-click validation does not push the click's request out of the causal window", () => {
+  const receipt = createOpenReceipt("a1", 1, 0);
+  // Revalidating the target and priming the page took 900ms under load; the input lands at 900.
+  rebaseReceipt(receipt, 900);
+  assert.equal(
+    noteRequestStart(receipt, {
+      id: "post",
+      method: "POST",
+      url: "https://shop.test/slow",
+      at: 950,
+    }),
+    true,
+    "the request the click caused must still be attributed to this receipt",
+  );
+  assert.equal(settledRequests(receipt)[0]?.method, "POST");
 });
 
 test("constant polling outside the causal window does not join", () => {

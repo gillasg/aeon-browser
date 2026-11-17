@@ -69,38 +69,19 @@ test(
       const idlePage = await attachPage(port, url);
       const idleTells = await waitFor(async () => {
         const tells = await tellOn(idlePage);
-        if (tells.overlays.length || tells.markers.length) throw new Error("cursor still there");
+        const cursors = await evalValue(
+          idlePage,
+          "[...document.documentElement.children].filter((n) => n.__cursorSurface).length",
+        );
+        if (tells.overlays.length || tells.markers.length || cursors)
+          throw new Error("cursor still there");
         return tells;
       }, 8000);
       assert.deepEqual(idleTells, emptyTells(), "the driven page kept something of Aeon");
 
       // The cursor is an injected function, not a page listener: a page cannot paint it by
       // dispatching the old event, and the script leaves no listener or global behind.
-      const page = await attachPage(port, url);
-      const cursorScript = await readFile(aeonCursor, "utf8");
-      assert.equal(
-        cursorScript.includes("aeon:cursor:paint"),
-        false,
-        "the built cursor listens for a page event",
-      );
-      const painted = await evalValue(
-        page,
-        `${cursorScript}\nwindow.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail: ${JSON.stringify(
-          {
-            update: { x: 20, y: 30, summon: true, place: true },
-            css: "",
-            mark: { path: "M1.2 1.2 L20 10 L8 20 Z", width: 22, height: 20, viewBox: "0 0 25 23" },
-          },
-        )} })); true`,
-      );
-      assert.equal(painted, true);
-      assert.equal(
-        await evalValue(page, "!!document.getElementById('aeon-agent-cursor')"),
-        false,
-        "a page event painted Aeon's cursor",
-      );
-      assert.deepEqual(await evalValue(page, globalsOnly), [], "the cursor left a page global");
-      assert.deepEqual(await tellOn(page), emptyTells(), "a page event left marks on an idle page");
+      await assertNoPagePaint(await attachPage(port, url));
     } finally {
       chrome?.kill();
       bridge.kill();
@@ -116,6 +97,36 @@ test(
   },
   60000,
 );
+
+async function assertNoPagePaint(page) {
+  const cursorScript = await readFile(aeonCursor, "utf8");
+  assert.equal(
+    cursorScript.includes("aeon:cursor:paint"),
+    false,
+    "the built cursor listens for a page event",
+  );
+  const painted = await evalValue(
+    page,
+    `${cursorScript}\nwindow.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail: ${JSON.stringify(
+      {
+        update: { x: 20, y: 30, summon: true, place: true },
+        css: "",
+        mark: { path: "M1.2 1.2 L20 10 L8 20 Z", width: 22, height: 20, viewBox: "0 0 25 23" },
+      },
+    )} })); true`,
+  );
+  assert.equal(painted, true);
+  assert.equal(
+    await evalValue(
+      page,
+      "!![...document.documentElement.children].find((n) => n.__cursorSurface)",
+    ),
+    false,
+    "a page event painted Aeon's cursor",
+  );
+  assert.deepEqual(await evalValue(page, globalsOnly), [], "the cursor left a page global");
+  assert.deepEqual(await tellOn(page), emptyTells(), "a page event left marks on an idle page");
+}
 
 function repl(url) {
   return `page = await browser.openTab(${JSON.stringify(url)});

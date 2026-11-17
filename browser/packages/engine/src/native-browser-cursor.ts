@@ -237,13 +237,24 @@ export async function removeAgentCursor(tabId: number): Promise<void> {
     .catch(() => undefined);
 }
 function removeCursor(drop?: boolean): void {
-  const host = document.getElementById("aeon-agent-cursor");
-  if (!host) return;
-  if (!drop && host.hasAttribute("data-aeon-summon")) {
-    host.setAttribute("data-aeon-release", "1");
+  // This function is injected with chrome.scripting, so it may only use page globals: no imports.
+  const parent = document.documentElement || document.body;
+  let host: HTMLElement | undefined;
+  for (const child of Array.from(parent.children)) {
+    if ((child as HTMLElement & { __cursorSurface?: boolean }).__cursorSurface) {
+      host = child as HTMLElement;
+      break;
+    }
+  }
+  const surface = host as (HTMLElement & { __s?: { summoned?: boolean } }) | undefined;
+  if (!host || !surface) return;
+  if (!drop && surface.__s?.summoned) {
+    // A summoned cursor glides home: dispatch a neutral command, never a page-visible attribute.
+    dispatchEvent(
+      new CustomEvent("cursor-overlay-command", { detail: { x: 0, y: 0, release: true } }),
+    );
     return;
   }
-  host.removeAttribute("data-aeon-summon");
   host.style.transition = "opacity 300ms ease";
   host.style.opacity = "0";
   setTimeout(() => host.remove(), 320);

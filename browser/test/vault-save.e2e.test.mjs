@@ -29,7 +29,7 @@ let workerCdp;
 
 // What a page says about the hand-off and the cursor, read from its own main world.
 const PROBE = `(() => {
-  const cursor = document.getElementById("aeon-agent-cursor");
+  const cursor = [...document.documentElement.children].find((n) => n.__cursorSurface);
   const ask = document.getElementById("aeon-agent-ask");
   return {
     url: location.href,
@@ -446,10 +446,7 @@ function findButton(node, inCursor) {
     const index = attributes.indexOf(name);
     return index >= 0 ? attributes[index + 1] : undefined;
   };
-  const here =
-    inCursor ||
-    ((pair("id") === "aeon-agent-cursor" || pair("id") === "aeon-agent-ask") &&
-      node.nodeName === "DIV");
+  const here = inCursor || pair("id") === "aeon-agent-ask";
   if (here && node.nodeName === "BUTTON" && (pair("class") ?? "").split(/\s+/).includes("done"))
     return node;
   for (const child of node.children ?? []) {

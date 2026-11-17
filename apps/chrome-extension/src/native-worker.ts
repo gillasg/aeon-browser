@@ -24,6 +24,7 @@ import { handlePasswordSavingMessage } from "./native-worker-password-saving.js"
 import { migrateLegacyChromeStorage } from "@browserkit/engine/legacy-storage-migration";
 import {
   installNativeStartup,
+  logNativeLink,
   noteExecutorConnected,
   scheduleExecutorReconnect,
   startExecutorHeartbeat,
@@ -313,6 +314,7 @@ async function ensureInventoryExecutor(): Promise<ExecutorConnection> {
 }
 
 async function connectExecutor(): Promise<ExecutorConnection> {
+  logNativeLink("connect attempt: bootstrapping native host");
   const identity = await withConnectionTimeout(getBrowserIdentity(), 5_000);
   const native = await sendNativeBootstrap(identity);
   const hello = AuthHelloSchema.parse({
@@ -324,6 +326,10 @@ async function connectExecutor(): Promise<ExecutorConnection> {
   });
   const socket = new WebSocket(native.endpoint);
   const reply = await authenticate(socket, hello);
+  logNativeLink("daemon auth reply", {
+    kind: reply?.kind,
+    ...(reply && reply.kind === "auth.rejected" ? { code: reply.code } : {}),
+  });
   if (!reply || reply.kind !== "auth.ready" || reply.role !== "extension-executor")
     throw new Error(reply?.kind === "auth.rejected" ? reply.code : "CONNECTION_TIMEOUT");
 
@@ -334,7 +340,7 @@ async function connectExecutor(): Promise<ExecutorConnection> {
     pending: new Map(),
   };
   socket.addEventListener("message", (event) => handleExecutorMessage(connection, event.data));
-  socket.addEventListener("close", () => dropExecutor(connection), { once: true });
+  socket.addEventListener("close", (event) => dropExecutor(connection, event), { once: true });
   executor = connection;
   noteExecutorConnected();
   rebindBrowserCodeSocket(socket);
@@ -370,7 +376,12 @@ async function sendNativeBootstrap(identity: BrowserIdentity) {
       });
     });
   });
-  if (result.error) throw new Error(hostErrorCode(result.error));
+  if (result.error) {
+    // `chrome.runtime.lastError` is the only reason Chrome gives when the native port is gone
+    // (host crashed, not installed, worker evicted with the port open). Record it verbatim.
+    logNativeLink("native bootstrap failed", { lastError: result.error });
+    throw new Error(hostErrorCode(result.error));
+  }
   const parsed = NativeBootstrapResponseSchema.safeParse(result.response);
   if (!parsed.success) throw new Error("BOOTSTRAP_UNAVAILABLE");
   if (!parsed.data.ok) throw new Error(parsed.data.code);
@@ -470,8 +481,12 @@ function handleExecutorMessage(connection: ExecutorConnection, data: unknown): v
   pending.resolve(response.data);
 }
 
-function dropExecutor(connection: ExecutorConnection): void {
+function dropExecutor(connection: ExecutorConnection, event?: CloseEvent): void {
   if (connection.heartbeatTimer !== undefined) globalThis.clearInterval(connection.heartbeatTimer);
+  const reason = event
+    ? { code: event.code, reason: event.reason, wasClean: event.wasClean }
+    : { code: undefined, reason: "no close event", wasClean: false };
+  logNativeLink("native link dropped", { ...reason, wasCurrent: executor === connection });
   if (executor === connection) {
     executor = undefined;
     reportLink("reconnecting", "browser link closed");

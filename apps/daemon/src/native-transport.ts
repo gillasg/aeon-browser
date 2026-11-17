@@ -55,6 +55,15 @@ export async function startNativeTransport(
     },
   });
   server.on("connection", (socket, request) => {
+    process.stderr.write(`[aeon-native] socket opened from ${request.headers.origin ?? "?"}\n`);
+    socket.once("close", (code, reason) =>
+      process.stderr.write(
+        `[aeon-native] socket closed: code=${code} reason=${String(reason)} origin=${request.headers.origin ?? "?"}\n`,
+      ),
+    );
+    socket.once("error", (error) =>
+      process.stderr.write(`[aeon-native] socket error: ${error.message}\n`),
+    );
     watchSocketHealth(socket);
     authenticateSocket(
       socket,

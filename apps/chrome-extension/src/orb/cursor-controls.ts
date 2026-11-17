@@ -2,6 +2,7 @@
 // isolated world, are the ones that act. A page-dispatched event is not trusted and does nothing.
 
 import { CURSOR_STOP, CURSOR_TRANSCRIPT } from "./orb-messages.js";
+import { CURSOR_STATE_EVENT } from "@browserkit/engine/cursor-bus";
 
 export interface ControlBox {
   x: number;
@@ -74,7 +75,6 @@ export function startCursorControls(send: (kind: string) => void, summoned: () =
 
 function mountButtons(onClick: (action: Action, event: MouseEvent) => void): ControlButtons {
   const host = document.createElement("div");
-  host.id = "aeon-cursor-controls";
   host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none";
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
@@ -113,22 +113,14 @@ function placeButton(node: HTMLButtonElement, box: ControlBox | null): void {
 }
 
 function watchCursor(sync: () => void): void {
-  let watched: Element | undefined;
-  const hostObserver = new MutationObserver(sync);
-  const attach = () => {
-    const host = document.getElementById("aeon-agent-cursor");
-    if (host === watched) return;
-    watched = host ?? undefined;
-    hostObserver.disconnect();
-    if (host)
-      hostObserver.observe(host, { attributes: true, attributeFilter: ["data-aeon-controls"] });
-  };
-  const rootObserver = new MutationObserver(() => {
-    attach();
+  // The main-world cursor publishes its control boxes over a neutral event. Nothing is written into
+  // the page DOM, so there is no host to observe and no id to look up.
+  window.addEventListener(CURSOR_STATE_EVENT, (event) => {
+    currentControls = JSON.stringify(
+      (event as CustomEvent<{ controls?: unknown }>).detail?.controls ?? null,
+    );
     sync();
   });
-  rootObserver.observe(document.documentElement, { childList: true });
-  attach();
 }
 
 function raise(host: HTMLElement): void {
@@ -136,8 +128,10 @@ function raise(host: HTMLElement): void {
   if (parent.lastElementChild !== host) parent.append(host);
 }
 
+let currentControls: string | undefined;
+
 function cursorAttribute(): string | undefined {
-  return document.getElementById("aeon-agent-cursor")?.dataset.aeonControls;
+  return currentControls;
 }
 
 function box(value: unknown): ControlBox | null {

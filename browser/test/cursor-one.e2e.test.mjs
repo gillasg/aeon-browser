@@ -57,6 +57,7 @@ test(
       assert.match(result.stdout, /TITLE continued/);
       assert.match(result.stdout, /CONTROLS [^0]/);
       assert.match(result.stdout, /CURSOR 1 M 1\.2 1\.2/);
+      assert.match(result.stdout, /HIDDEN true/);
     } finally {
       chrome?.kill();
       bridge.kill();
@@ -79,14 +80,15 @@ function repl(url) {
     console.log("FORGED " + (await page.evaluate(() => document.documentElement.dataset.forged || "")));
     console.log("TITLE " + (await page.title()));
     console.log("CONTROLS " + (await page.evaluate(() => {
-      const host = document.getElementById("aeon-agent-cursor");
-      return host && host.dataset.aeonControls ? host.dataset.aeonControls.length : 0;
+      const host = [...document.documentElement.children].find((n) => n.__cursorSurface);
+      return host && host.__s && host.__s.controls ? JSON.stringify(host.__s.controls).length : 0;
     })));
     console.log("CURSOR " + (await page.evaluate(() => {
-      const hosts = document.querySelectorAll("#aeon-agent-cursor");
-      const path = hosts[0] && hosts[0].dataset.aeonCursor ? hosts[0].dataset.aeonCursor.slice(0, 9) : "";
+      const hosts = [...document.documentElement.children].filter((n) => n.__cursorSurface);
+      const path = hosts[0] && hosts[0].__s && hosts[0].__s.markPath ? hosts[0].__s.markPath.slice(0, 9) : "";
       return hosts.length + " " + path;
-    })));`;
+    })));
+    console.log("HIDDEN " + (await page.evaluate(() => !document.querySelector("#aeon-agent-cursor"))));`;
 }
 
 function chromeArgs(profile) {

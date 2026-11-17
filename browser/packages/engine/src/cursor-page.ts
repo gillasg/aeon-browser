@@ -1,6 +1,7 @@
 // Page-world painter for the one cursor. The engine evaluates this source through CDP, and the
 // Aeon extension installs the same source, so both worlds share one host and one glide.
 import { CURSOR_MARK, CURSOR_TOKEN_CSS, glideDuration, glidePoint } from "./cursor-mark.js";
+import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "./cursor-bus.js";
 
 /** What the painter is showing right now. Nothing shown means the host leaves the page. */
 export interface CursorPaint {
@@ -74,6 +75,8 @@ const PAGE_STYLE = [
 
 const PAGE_BODY = `
   var styleText = ${JSON.stringify(PAGE_STYLE)};
+  var STATE_EVENT = ${JSON.stringify(CURSOR_STATE_EVENT)};
+  var COMMAND_EVENT = ${JSON.stringify(CURSOR_COMMAND_EVENT)};
   var make = function (tag, attrs, kids, ns) {
     var node = ns ? document.createElementNS(ns, tag) : document.createElement(tag);
     var values = attrs || {};
@@ -83,14 +86,17 @@ const PAGE_BODY = `
   };
   var svg = function (tag, attrs, kids) { return make(tag, attrs, kids, "http://www.w3.org/2000/svg"); };
   var sheet = function (text) { var style = document.createElement("style"); style.textContent = text; return style; };
-  var id = "aeon-agent-cursor";
-  var host = document.getElementById(id);
+  // No id, class or data-* attribute on the host: a page script has no selector for the cursor,
+  // and the closed shadow root hides everything inside it. The painter finds its own host by a
+  // non-enumerable expando instead (invisible to other worlds, and unfathomable without a host).
+  var host;
+  var kids = (document.documentElement || document.body).children;
+  for (var hi = 0; hi < kids.length; hi++) {
+    if (kids[hi].__cursorSurface) { host = kids[hi]; break; }
+  }
   if (!host) {
     host = document.createElement("div");
-    host.id = id;
-    host.setAttribute("data-aeon-overlay", "");
-    host.setAttribute("aria-hidden", "true");
-    host.dataset.aeonCursor = String(mark && mark.path || "");
+    Object.defineProperty(host, "__cursorSurface", { value: true });
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:strict";
     var root = host.attachShadow({ mode: "closed" });
     var arrow = svg("svg", { class: "a", width: String(mark.width || 22), height: String(mark.height || 20), viewBox: String(mark.viewBox || "0 0 25 23") }, [
@@ -125,12 +131,18 @@ const PAGE_BODY = `
       root: root, wrap: wrap, cursor: root.querySelector(".c"), ripple: root.querySelector("i"),
       glow: root.querySelector(".g"), glowColor: "", pill: root.querySelector(".p"), text: root.querySelector(".p .tx"),
       trail: root.querySelector("svg.trail"), spotlight: root.querySelector(".s"), callout: root.querySelector(".co"),
-      keys: root.querySelector(".k"), pageX: bornX, pageY: bornY, frame: 0, idle: 0, hide: 0, type: 0, cursorShown: false, agent: false
+      keys: root.querySelector(".k"), pageX: bornX, pageY: bornY, frame: 0, idle: 0, hide: 0, type: 0, cursorShown: false, agent: false, summoned: false,
+      markPath: String(mark && mark.path || "")
+    };
+    state.emit = function () {
+      dispatchEvent(new CustomEvent(STATE_EVENT, { detail: {
+        present: true, point: state.point, controls: state.controls
+      }}));
     };
     state.place = function () {
       var x = state.pageX - scrollX, y = state.pageY - scrollY;
       state.cursor.style.transform = "translate(" + x + "px," + y + "px)";
-      host.dataset.aeonPoint = JSON.stringify({ x: Math.round(x), y: Math.round(y) });
+      state.point = { x: Math.round(x), y: Math.round(y) };
       state.publish();
     };
     state.publish = function () {
@@ -146,7 +158,8 @@ const PAGE_BODY = `
         for (var i = 0; i < nodes.length; i++) { var box = rect(nodes[i]); if (box) return box; }
         return null;
       };
-      host.dataset.aeonControls = JSON.stringify({ tr: first(".tr"), stop: first(".stop") });
+      state.controls = { tr: first(".tr"), stop: first(".stop") };
+      state.emit();
     };
     state.shown = function () {
       return cursorVisible({
@@ -167,6 +180,8 @@ const PAGE_BODY = `
         state.restWatch.disconnect();
         cancelAnimationFrame(state.frame);
         clearTimeout(state.hide); clearTimeout(state.keysHide); clearInterval(state.type);
+        dispatchEvent(new CustomEvent(STATE_EVENT, { detail: { present: false } }));
+        window.removeEventListener(COMMAND_EVENT, state.onCommand);
         host.remove();
       }, 1200);
     };
@@ -178,7 +193,13 @@ const PAGE_BODY = `
       if (!state.wrap.classList.contains("needs")) state.hide = setTimeout(function () { state.pill.classList.remove("on"); state.publish(); }, 2500);
     });
     addEventListener("scroll", state.place, { passive: true, capture: true });
-    new MutationObserver(function () { applySummon(host); }).observe(host, { attributes: true, attributeFilter: ["data-aeon-summon", "data-aeon-release"] });
+    state.onCommand = function (event) {
+      var data = event.detail;
+      if (!data || typeof data.x !== "number" || typeof data.y !== "number") return;
+      if (data.release) state.agent = false;
+      applySummon(state, data);
+    };
+    window.addEventListener(COMMAND_EVENT, state.onCommand);
     (document.documentElement || document.body).append(host);
     state.place();
   }
@@ -196,7 +217,6 @@ const PAGE_BODY = `
   if (update.clean !== undefined) s.wrap.classList.toggle("clean", update.clean);
   if (update.needs !== undefined) {
     s.wrap.classList.toggle("needs", Boolean(update.needs));
-    host.setAttribute("aria-hidden", update.needs ? "false" : "true");
     if (update.needs) { s.cursor.style.opacity = "1"; s.cursorShown = true; }
     else { s.spotlight.classList.remove("on"); s.pill.classList.remove("on"); }
   }
@@ -220,6 +240,7 @@ const PAGE_BODY = `
     s.keysHide = setTimeout(function () { s.keys.classList.remove("on"); }, 2400);
   }
   var summonIgnored = update.summon && s.agent;
+  if (!summonIgnored && update.summon) s.summoned = true;
   if (!summonIgnored && (update.summon || update.release)) s.agent = false;
   else if (!summonIgnored && typeof update.x === "number" && typeof update.y === "number") s.agent = true;
   if (!summonIgnored && typeof update.x === "number" && typeof update.y === "number") {
@@ -228,9 +249,7 @@ const PAGE_BODY = `
     else glideTo(s, toX, toY, Boolean(update.press));
     if (update.from) trail(s, update.from.x, update.from.y, update.x, update.y);
   } else if (update.press) press(s);
-  if (update.summon && typeof update.x === "number") {
-    host.setAttribute("data-aeon-summon", JSON.stringify({ x: update.x, y: update.y, place: Boolean(update.place), release: false }));
-  }
+  if (update.release) rest(s, hostFor(s));
   if (update.needs) update.caption = update.needs;
   else if (update.caption && s.wrap.classList.contains("needs")) update.caption = undefined;
   if (update.caption && !(update.soft && Date.now() - (s.captionAt || 0) < 1500)) paintCaption(s, update);
@@ -294,24 +313,23 @@ const PAGE_BODY = `
     } else state.text.textContent = text;
     if (!next.needs) state.hide = setTimeout(function () { state.pill.classList.remove("on"); state.publish(); }, next.transient ? 2000 : 6000);
   }
-  function applySummon(node) {
-    var state = node.__s;
-    if (!state) return;
-    if (node.getAttribute("data-aeon-release") === "1") {
-      node.removeAttribute("data-aeon-release");
-      rest(state, node);
-    }
-    var data = null;
-    try { data = JSON.parse(node.getAttribute("data-aeon-summon") || ""); } catch (ignore) { data = null; }
-    if (!data || typeof data.x !== "number" || typeof data.y !== "number") return;
-    if (data.release) state.agent = false;
+  function applySummon(state, data) {
+    if (!state || !data || typeof data.x !== "number" || typeof data.y !== "number") return;
+    if (data.release) { rest(state, hostFor(state)); return; }
+    state.summoned = true;
     if (state.agent) return;
     var destX = data.x + scrollX, destY = data.y + scrollY;
     if (data.place) { cancelAnimationFrame(state.frame); state.pageX = destX; state.pageY = destY; state.place(); }
     else glideTo(state, destX, destY, false);
   }
+  function hostFor(state) {
+    var kids = (document.documentElement || document.body).children;
+    for (var i = 0; i < kids.length; i++) if (kids[i].__s === state) return kids[i];
+    return null;
+  }
   function rest(state, node) {
     state.agent = false;
+    state.summoned = false;
     state.wrap.classList.remove("needs");
     state.wrap.classList.remove("clean");
     state.glow.classList.remove("on");
@@ -319,7 +337,6 @@ const PAGE_BODY = `
     state.spotlight.classList.remove("on");
     state.callout.classList.remove("on");
     state.keys.classList.remove("on");
-    node.setAttribute("aria-hidden", "true");
     state.publish();
   }
   function toRgb(color) {
