@@ -46,10 +46,13 @@ async function measure() {
   let scratch;
   try {
     const out = join(temp, "out");
-    const tsc = join(aeonRepo, "node_modules", ".bin", "tsc");
+    // Run TypeScript's own entry through Node: node_modules/.bin/tsc is a .cmd shim on Windows,
+    // which spawnSync cannot start without a shell.
+    const tsc = join(aeonRepo, "node_modules", "typescript", "bin", "tsc");
     const compiled = spawnSync(
-      tsc,
+      process.execPath,
       [
+        tsc,
         "-p",
         join(piAdapter, "tsconfig.json"),
         "--outDir",
@@ -63,7 +66,7 @@ async function measure() {
     );
     if (compiled.status !== 0) {
       throw new Error(
-        `Could not compile pi-adapter source for the footprint check:\n${compiled.stdout ?? ""}${compiled.stderr ?? ""}`,
+        `Could not compile pi-adapter source for the footprint check:\n${compiled.error?.message ?? ""}${compiled.stdout ?? ""}${compiled.stderr ?? ""}`,
       );
     }
     const { buildAgentSurface } = await import(pathToFileURL(join(out, "agent-surface.js")).href);
