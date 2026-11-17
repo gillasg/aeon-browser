@@ -281,7 +281,11 @@ export function refuseUnsettled(result: unknown, reachedCommit: boolean): void {
   throw error;
 }
 
-/** How a failed way left the site, from the commit receipt when there is one, else the error text. */
+/**
+ * How a failed way left the site, from the commit receipt when there is one, else the error text.
+ * `reachedCommit` stays false through steps marked as settings: they only change a choice and spend
+ * nothing, so a refusal after just those settles not_applied and leaves the retry key free.
+ */
 export function classifyFailure(
   error: unknown,
   reachedCommit: boolean,

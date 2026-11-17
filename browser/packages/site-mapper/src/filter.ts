@@ -1,4 +1,5 @@
 import type { Category, Exchange, NoiseReport, Overrides } from "./types.js";
+import { boundedTest } from "./bounded-regex.js";
 
 // Keeps the requests that make up a site's API and drops everything else, saying why.
 
@@ -201,7 +202,9 @@ function analyticsHost(url: URL): boolean {
 }
 
 const matchesAny = (patterns: string[] | undefined, url: URL) =>
-  !!patterns?.some((pattern) => new RegExp(pattern, "i").test(url.href));
+  !!patterns?.some((pattern) =>
+    boundedTest(pattern, url.href, { flags: "i", label: "url pattern" }),
+  );
 
 function transportReason(exchange: Exchange): string | undefined {
   if (exchange.method === "OPTIONS") return "CORS preflight";

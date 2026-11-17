@@ -68,6 +68,8 @@ export interface AbilityWayExpect {
 export interface AbilityApiStep {
   operation: string;
   params?: Record<string, unknown>;
+  /** Click/call only changes a choice that spends nothing until a later step commits. */
+  settings?: true;
 }
 
 export interface AbilityWayApi {

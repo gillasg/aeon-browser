@@ -1,4 +1,5 @@
 import { TEXT_CAP, truncationNote } from "./sync-text.js";
+import { boundedReplace } from "./bounded-regex.js";
 import type { Overrides } from "./types.js";
 
 // Redaction for everything that leaves the machine or goes into a shareable file: reports,
@@ -28,7 +29,7 @@ export interface Redactor {
 export function createRedactor(rules: Overrides["redact"] = {}): Redactor {
   const extraHeaders = (rules.headers ?? []).map((h) => h.toLowerCase());
   const extraKeys = new Set((rules.keys ?? []).map((k) => k.toLowerCase()));
-  const patterns = (rules.patterns ?? []).map((pattern) => new RegExp(pattern, "g"));
+  const patterns = rules.patterns ?? [];
   const text = (value: string): string => {
     if (value.length > TEXT_CAP) return truncationNote("redact.text", value.length);
     let out = value.replace(JWT, "<jwt>").replace(EMAIL, "<email>");
@@ -38,7 +39,12 @@ export function createRedactor(rules: Overrides["redact"] = {}): Redactor {
         ? "<phone>"
         : match,
     );
-    for (const pattern of patterns) out = out.replace(pattern, "<redacted>");
+    for (const pattern of patterns)
+      out = boundedReplace(pattern, out, "<redacted>", {
+        flags: "g",
+        inputLimit: TEXT_CAP,
+        label: "redact pattern",
+      });
     return out;
   };
   const json = <T>(value: T): T =>

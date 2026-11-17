@@ -544,6 +544,84 @@ test("a steps write that reaches its commit does not try another way", async () 
   });
 });
 
+test("a refusal after only settings steps falls through to the next way", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "preference",
+        kind: "write",
+        inputs: {},
+        ways: [
+          {
+            kind: "steps",
+            commit: 1,
+            steps: [
+              { kind: "click", target: { role: "button", name: "Tip" }, settings: true },
+              { kind: "click", target: { role: "button", name: "Pay" } },
+            ],
+          },
+          { kind: "script", runtime: "node", code: "return 'second way ran';" },
+        ],
+      }),
+    );
+    let calls = 0;
+    const host = {
+      controls: async () => [
+        { role: "button", name: "Tip" },
+        { role: "button", name: "Pay" },
+      ],
+      act: async (step) => {
+        calls += 1;
+        assert.equal(step.target?.name, "Tip", "only the settings step ran");
+        throw new Error("request timed out");
+      },
+    };
+    const answer = await runAbility("example.com", "preference", {}, { host, key: "k" });
+    assert.equal(answer.result, "second way ran", "the next way still runs");
+    assert.equal(answer.write.write_status, "applied");
+    assert.deepEqual(answer.tried, [{ via: "steps", error: "request timed out" }]);
+    assert.equal(calls, 1);
+  });
+});
+
+test("a settings-only refusal keeps the same key reusable", async () => {
+  await withHome(async () => {
+    await saveAbility(
+      ability({
+        name: "preference",
+        kind: "write",
+        inputs: {},
+        ways: [
+          {
+            kind: "api",
+            commit: 1,
+            operations: [
+              { operation: "savePreference", settings: true },
+              { operation: "placeOrder" },
+            ],
+          },
+        ],
+      }),
+    );
+    let calls = 0;
+    const host = {
+      call: async (operation) => {
+        calls += 1;
+        assert.equal(operation, "savePreference", "the real commit was never reached");
+        throw new Error("request timed out");
+      },
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const failure = await runAbility("example.com", "preference", {}, { host, key: "k" })
+        .then(() => undefined)
+        .catch((error) => error);
+      assert.equal(failure.outcome.write_status, "not_applied");
+      assert.doesNotMatch(failure.message, /WRITE_UNCERTAIN/);
+    }
+    assert.equal(calls, 2, "the key was released after the settings-only refusal");
+  });
+});
+
 test("a script write counts as committed only once the script starts", async () => {
   await withHome(async () => {
     await saveAbility(

@@ -23,7 +23,7 @@ import {
 } from "./native-browser-common.js";
 import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.js";
 import { stepFailure } from "./code-step-errors.js";
-import { refusedEffect } from "./native-browser-effect.js";
+import { mayHaveLanded, refusedEffect, sentActionEffect } from "./native-browser-effect.js";
 import { jobs } from "./code-runtime-jobs.js";
 import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
@@ -389,13 +389,18 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     recordScreenshot(cell, step, result);
     return result;
   } catch (error) {
-    // An input step that did not run says so in the closed effect vocabulary too: refused,
-    // with its code as the evidence. The step line the model reads is unchanged.
-    const refused = INPUT_OPS.has(step.op) ? refusedEffect(errorCode(error)) : undefined;
+    // An input step that did not run is refused, with its code as evidence. One that was sent and
+    // then failed or timed out has an unknown effect: report that it may have landed and attach no
+    // next-step hint, so the agent does not click or type the same action a second time.
+    const effect = INPUT_OPS.has(step.op)
+      ? mayHaveLanded(errorCode(error))
+        ? sentActionEffect(errorCode(error))
+        : refusedEffect(errorCode(error))
+      : undefined;
     Object.assign(entry, {
       disposition: "failed",
       code: describe(error),
-      ...(refused ? { effect: refused.effect, evidence: refused.evidence } : {}),
+      ...(effect ? { effect: effect.effect, evidence: effect.evidence } : {}),
     });
     throw await scrubError(await stepFailure(step, error));
   } finally {

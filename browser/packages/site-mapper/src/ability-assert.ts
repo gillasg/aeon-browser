@@ -3,8 +3,7 @@
 // pattern is refused when it is too long, invalid, or matches a stored secret. Each run bounds
 // matches: pattern ≤500 characters, 100 ms in a vm, the first 64 KB, 1 s for the run, ≤50 checks.
 
-import { performance } from "node:perf_hooks";
-import vm from "node:vm";
+import { boundedTest, validatePattern, type RegexBudget } from "./bounded-regex.js";
 import type { Ability, AbilityWay } from "./abilities.js";
 import type { AbilitySample } from "./ability-save-test.js";
 import { getPointer } from "./infer/schema.js";
@@ -19,9 +18,6 @@ export interface AbilityAssert {
 
 const LIST_KEYS = ["items", "records", "results", "data"];
 const ASSERT_LIMIT = 50;
-const PATTERN_LIMIT = 500;
-const MATCH_TIMEOUT_MS = 100;
-const MATCH_INPUT_LIMIT = 64 * 1024;
 const BUDGET_MS = 1000;
 const CREDENTIAL = /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/;
 const FORMATS: RegExp[] = [
@@ -31,9 +27,7 @@ const FORMATS: RegExp[] = [
   /^-?[$€£]?\d{1,12}(\.\d{1,8})?$/,
 ];
 
-interface Budget {
-  remainingMs: number;
-}
+type Budget = RegexBudget;
 
 /** Stores checks from the saved answer. Caller-supplied checks are kept, minus refused patterns. */
 export function withResultAsserts(ability: Ability, sample: AbilitySample | undefined): Ability {
@@ -176,9 +170,9 @@ function matchAssert(
   secrets: string[],
   budget: Budget,
 ): AbilityAssert | undefined {
-  if (typeof check.value !== "string" || check.value.length > PATTERN_LIMIT) return undefined;
+  if (typeof check.value !== "string") return undefined;
   try {
-    new RegExp(check.value);
+    validatePattern(check.value, { label: "matches" });
   } catch {
     return undefined;
   }
@@ -242,30 +236,7 @@ function valuesAt(result: unknown, path: string): unknown[] {
 }
 
 function boundedMatch(pattern: string, text: string, budget: Budget): boolean {
-  if (pattern.length > PATTERN_LIMIT) throw new Error("matches pattern is over 500 characters");
-  try {
-    new RegExp(pattern);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`matches needs a valid regex (${message})`, { cause: error });
-  }
-  if (budget.remainingMs <= 0) throw new Error("matches ran out of the 1s regex budget");
-  const limit = Math.max(1, Math.min(MATCH_TIMEOUT_MS, Math.floor(budget.remainingMs)));
-  const context = vm.createContext({
-    pattern,
-    text: String(text).slice(0, MATCH_INPUT_LIMIT),
-  });
-  const script = new vm.Script("new RegExp(pattern).test(text)");
-  const started = performance.now();
-  try {
-    return script.runInContext(context, { timeout: limit }) === true;
-  } catch (error) {
-    if (timedOut(error))
-      throw new Error("matches pattern took too long; simplify it", { cause: error });
-    throw error;
-  } finally {
-    budget.remainingMs -= performance.now() - started;
-  }
+  return boundedTest(pattern, text, { label: "matches", budget });
 }
 
 function patternHits(pattern: string, secret: string, budget: Budget): boolean {
@@ -306,13 +277,6 @@ function walkSecrets(
   }
   if (!value || typeof value !== "object") return;
   for (const [name, item] of Object.entries(value)) walkSecrets(item, found, redactor, name);
-}
-
-function timedOut(error: unknown): boolean {
-  if (typeof error === "object" && error !== null && "code" in error)
-    return error.code === "ERR_SCRIPT_EXECUTION_TIMEOUT";
-  const message = error instanceof Error ? error.message : String(error);
-  return /timed out/i.test(message);
 }
 
 function knownOp(op: unknown): op is AbilityAssert["op"] {

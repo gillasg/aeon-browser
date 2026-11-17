@@ -116,6 +116,22 @@ test("a non-confirmed effect names a read, and clickAt only when a child has the
   );
 });
 
+test("a sent action with an unknown effect is never invited to repeat", () => {
+  assert.equal(effectNext("unverifiable", { op: "click", sent: true }), null);
+  assert.equal(
+    effectNext("suspected_noop", { op: "click", sent: true, childPoint: { x: 8, y: 9 } }),
+    null,
+  );
+  assert.equal(effectNext("refused", { op: "click", sent: true }), null);
+  assert.equal(errorNextCall("INPUT_MAY_HAVE_LANDED"), "");
+  assert.match(errorHint("INPUT_MAY_HAVE_LANDED"), /may have landed/);
+  assert.match(
+    describeError("INPUT_MAY_HAVE_LANDED", "click then timeout"),
+    /effect|may have landed|check the page/,
+  );
+  assert.doesNotMatch(describeError("INPUT_MAY_HAVE_LANDED"), /^Next:/m);
+});
+
 test("random contexts never make next throw or return a write", () => {
   const junk = [
     "",
