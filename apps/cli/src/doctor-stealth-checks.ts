@@ -186,7 +186,7 @@ function tellsCheck(page: StealthFacts["page"]): Check {
     "tells",
     "fail",
     `Page tells: ${issues.join("; ")}.`,
-    `To fix: ${fixes.join("; ")}.`,
+    `${fixes.map((f) => f.charAt(0).toUpperCase() + f.slice(1)).join("; ")}.`,
   );
 }
 
