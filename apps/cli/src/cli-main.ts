@@ -1,3 +1,4 @@
+import { exitAfterFlush } from "./exit.js";
 import { readFileSync } from "node:fs";
 import { closeSharedBridge as closeCrawlBridge } from "@browserkit/tools/browser-crawl";
 import { closeSharedBridge, errorKind } from "@browserkit/tools/site-to-api";
@@ -72,7 +73,7 @@ async function close(): Promise<void> {
 main(process.argv.slice(2)).then(
   async (code) => {
     await close();
-    process.exit(code);
+    await exitAfterFlush(code);
   },
   async (error: unknown) => {
     // Errors come from browserkit's commands too; in Aeon they must not name another product.
@@ -92,6 +93,6 @@ main(process.argv.slice(2)).then(
       printError(renamed);
     }
     await close();
-    process.exit(EXIT_CODES[errorKind(error)] ?? 1);
+    await exitAfterFlush(EXIT_CODES[errorKind(error)] ?? 1);
   },
 );
