@@ -44,6 +44,10 @@ const page = `<!doctype html><title>hold</title>
     seen.clicks += 1;
     if (document.title !== "held") document.title = "clicked";
   });
+  window.__holdReset = () => {
+    Object.assign(seen, {downs: 0, ups: 0, clicks: 0, dwell: 0});
+    downAt = -1; document.title = "hold";
+  };
 </script>`;
 
 test(
@@ -92,7 +96,19 @@ test(
           `page = await browser.openTab(${JSON.stringify(url)}, { foreground: true });
            await page.hold('#hold', {ms: 1200});
            const seen = await page.evaluate(() => window.__hold);
-           console.log('TITLE ' + (await page.title()) + ' ' + JSON.stringify(seen));`,
+           console.log('TITLE ' + (await page.title()) + ' ' + JSON.stringify(seen));
+           // A transient overlay covers the button at press time. It clears after 500 ms, inside
+           // the engine's re-land window, so the press waits for the button instead of hitting it.
+           await page.evaluate(() => {
+             const r = document.querySelector('#hold').getBoundingClientRect();
+             const ov = document.createElement('div');
+             ov.style.cssText = 'position:fixed;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;background:#f00;z-index:99999';
+             document.body.append(ov);
+             setTimeout(() => ov.remove(), 500);
+             window.__holdReset();
+           });
+           await page.hold('#hold', {ms: 300});
+           console.log('OVERLAY ' + JSON.stringify(await page.evaluate(() => window.__hold)));`,
         ],
         { env },
       );
@@ -106,6 +122,14 @@ test(
         result.stdout + result.stderr,
       );
       assert.ok(seen.dwell >= 1000, `the page saw ${seen.dwell} ms of press: ${result.stdout}`);
+      // The overlay was over the button when the press landed. A press sent blind would have gone
+      // to the overlay, leaving the button with a mouseup and no mousedown or click.
+      const overlay = JSON.parse(/OVERLAY (\{.*\})/.exec(result.stdout)?.[1] ?? "null");
+      assert.deepEqual(
+        overlay && [overlay.downs, overlay.ups, overlay.clicks],
+        [1, 1, 1],
+        result.stdout + result.stderr,
+      );
     } finally {
       chrome?.kill();
       bridge.kill();
