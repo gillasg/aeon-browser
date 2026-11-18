@@ -284,7 +284,9 @@ async function browserCodeResult(options: {
   // Three tiny cells in a row get one line asking for fuller cells; an error never carries it.
   const hint = failed ? undefined : noteBrowserCell(chatId, cellBehaviour(steps));
   const body = resultBody({ cell, steps, result, runLog, hint, failed });
-  const actions = traceActions(cell.steps ?? []);
+  // A cell that timed out returns no steps of its own: its last progress keeps the actions (and
+  // the tabs it opened) in the trace.
+  const actions = traceActions(cell.steps ?? (failed ? steps : []));
   const details = resultDetails(actions, writes);
   const delivered = !failed && isDelivery(cell.value);
   return {

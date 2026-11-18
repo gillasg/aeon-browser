@@ -164,7 +164,7 @@ export function summarize(
     answer: error ?? answerOf(snapshot.entries),
     toolCalls: trace.length,
     toolErrors: trace.filter((step) => step.error).length,
-    tabsOpened: trace.reduce((count, step) => count + countOpened(step.summary), 0),
+    tabsOpened: trace.reduce((count, step) => count + countOpened(step), 0),
     contextTokens: snapshot.contextUsage?.tokens ?? null,
     ...cacheOf(snapshot.entries),
     ...speedOf(snapshot.entries),
@@ -197,8 +197,14 @@ function lastOf(entries: Entry[], role: string): Entry | undefined {
   return [...entries].reverse().find((entry) => entry.message?.role === role);
 }
 
-function countOpened(summary: string): number {
-  return summary.match(/- openTab /g)?.length ?? 0;
+// Tabs opened in a step: the openTab actions browser_code recorded, else the summary's lines.
+function countOpened(step: TraceStep): number {
+  const opened = new Set(
+    (step.actions ?? [])
+      .filter((action) => action.kind === "openTab" && !action.failed)
+      .map((action, index) => action.tabId ?? `untracked-${index}`),
+  );
+  return opened.size || (step.summary.match(/- openTab /g)?.length ?? 0);
 }
 
 // The error message when the last assistant turn ended in an error or was aborted.
