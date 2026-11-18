@@ -27,6 +27,14 @@ test("a missing link is named once and an existing file is not", () => {
   assert.ok(line.length <= 200);
 });
 
+test("files in a folder the answer names by absolute path are not missing", () => {
+  const workspace = mkdtempSync(join(tmpdir(), "aeon-missing-"));
+  const notes = mkdtempSync(join(tmpdir(), "aeon-notes-"));
+  writeFileSync(join(notes, "hn-a-perfect-simcity.md"), "# ok\n");
+  const answer = `Wrote one note per story into \`${notes}\`:\n- \`hn-a-perfect-simcity.md\`\n- \`gone.md\``;
+  assert.deepEqual(missingAnswerFiles(answer, [workspace]), ["gone.md"]);
+});
+
 test("the run card shows one notice for a missing file and none when the list is empty", () => {
   const base = { chatId: "chat", runId: "run", site: "shop.test", task: "orders" };
   const card = buildRunCard({
