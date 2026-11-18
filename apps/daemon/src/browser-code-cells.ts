@@ -5,6 +5,7 @@ import {
   BrowserCodeProgressSchema,
   BrowserCodeResultSchema,
   BrowserCodeRunSchema,
+  BrowserTargetKeySchema,
   type BrowserCodeResult,
   type BrowserCodeStage,
   type BrowserTargetKey,
@@ -31,6 +32,8 @@ interface Pending {
   closeTimer?: ReturnType<typeof setTimeout>;
   /** The last hop the extension reported; a deadline names it. */
   stage: BrowserCodeStage;
+  /** Tabs progress showed this cell opening; a cell that fails still hands them to its chat. */
+  opened: Map<number, BrowserTargetKey>;
 }
 
 const LINK_GRACE_MS = 60_000;
@@ -109,7 +112,12 @@ export class BrowserCodeCells {
         if (result) {
           for (const target of result.opened) this.adopt(chatId, target);
           resolve(result);
-        } else reject(error ?? new Error("INTERNAL: the cell ended without a result"));
+        } else {
+          // A timed-out or reset cell sends no result, but the tabs it opened are still open and
+          // are the chat's; unowned, they would be closed before the chat could read them.
+          for (const target of cell?.opened.values() ?? []) this.adopt(chatId, target);
+          reject(error ?? new Error("INTERNAL: the cell ended without a result"));
+        }
       };
       this.cells.set(cellId, {
         clientInstanceId,
@@ -118,6 +126,7 @@ export class BrowserCodeCells {
         finish,
         waiting,
         stage: "sent",
+        opened: new Map(),
       });
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("close", close);
@@ -191,6 +200,7 @@ export class BrowserCodeCells {
       // Any word from the browser about this cell proves it arrived.
       cell.stage = progress.data.stage ?? (cell.stage === "sent" ? "received" : cell.stage);
       if (progress.data.waitingForUser !== undefined) cell.waiting(progress.data.waitingForUser);
+      rememberOpened(cell.opened, progress.data.steps);
       cell.input.onProgress(progress.data.steps);
       return;
     }
@@ -232,6 +242,19 @@ export class BrowserCodeCells {
           error: (error instanceof Error ? error.message : String(error)).slice(0, 20000),
         }),
     );
+  }
+}
+
+/** Tabs a cell's progress shows it opening, kept so a cell that fails still hands them over. */
+function rememberOpened(
+  opened: Map<number, BrowserTargetKey>,
+  steps: Record<string, unknown>[],
+): void {
+  for (const step of steps) {
+    const result = step.result as { kind?: unknown; tab?: { target?: unknown } } | undefined;
+    if (result?.kind !== "tab") continue;
+    const target = BrowserTargetKeySchema.safeParse(result.tab?.target);
+    if (target.success) opened.set(target.data.tabId, target.data);
   }
 }
 
