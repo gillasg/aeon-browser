@@ -718,8 +718,13 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
   // Aeon owns `record start|stop`; the original gif/video/trace commands stay available.
   const originalRecord = BROWSERKIT_COMMANDS.find((command) => command.name === "record");
   overrides.set("record", recordCommand(originalRecord, host));
-  const commands = BROWSERKIT_COMMANDS.map((command) => overrides.get(command.name) ?? command);
-  return [...aeonOnlyCommands(host), ...browsersCommands(host), ...commands];
+  const own = [...aeonOnlyCommands(host), ...browsersCommands(host)];
+  // A command Aeon defines itself (pack) replaces browserkit's; help lists each name once.
+  const taken = new Set(own.map((command) => command.name));
+  const commands = BROWSERKIT_COMMANDS.filter((command) => !taken.has(command.name)).map(
+    (command) => overrides.get(command.name) ?? command,
+  );
+  return [...own, ...commands];
 }
 
 /** aeon update: wait until nothing is running, then pull and run the one-command setup again. */
