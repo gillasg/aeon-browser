@@ -40,7 +40,7 @@ function toAction(step: Record<string, unknown>, stored = false): BrowserTraceAc
       kind: kind.slice(0, 40),
       tStart: step.tStart,
       tEnd: step.tEnd,
-      ...numberField("tabId", step.tabId),
+      ...numberField("tabId", tabIdOf(step, action)),
       ...numberField("tAct", step.tAct),
       ...numberField("dpr", step.dpr),
       ...flags(step),
@@ -49,6 +49,24 @@ function toAction(step: Record<string, unknown>, stored = false): BrowserTraceAc
       ...effectFields(step),
     },
   ];
+}
+
+/**
+ * The tab a step ran in. The engine's timing usually carries it; a step whose timing could not be
+ * read (an openTab whose page is still loading) falls back to the tab it opened or targeted, so
+ * the run report and anything keyed on tab ids (evals, cleanup) still see that tab.
+ */
+function tabIdOf(
+  step: Record<string, unknown>,
+  action: Record<string, unknown> | undefined,
+): unknown {
+  if (typeof step.tabId === "number") return step.tabId;
+  const result = isRecord(step.result) ? step.result : undefined;
+  const opened =
+    isRecord(result?.tab) && isRecord(result.tab.target) ? result.tab.target.tabId : undefined;
+  if (typeof opened === "number") return opened;
+  const target = isRecord(action?.target) ? action.target.tabId : undefined;
+  return typeof target === "number" ? target : undefined;
 }
 
 /** The closed effect of an input step, on the result the engine recorded or the stored row. */

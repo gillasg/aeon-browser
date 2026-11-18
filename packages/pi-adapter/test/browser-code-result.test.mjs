@@ -144,3 +144,29 @@ test("a Playwright text selector gets a CSS hint", async () => {
   assert.match(failed.content[0].text, /Hint: Playwright text selectors are not CSS/);
   assert.match(failed.content[0].text, /getByText/);
 });
+
+test("a cell that times out keeps the tab it opened in its trace actions", async () => {
+  const tool = createBrowserCodeTool("chat-timeout", async (_chat, _call, input) => {
+    input.codeCell.onProgress([
+      {
+        index: 0,
+        action: {
+          op: "openTab",
+          clientInstanceId: target.clientInstanceId,
+          url: "https://a.test/",
+        },
+        disposition: "completed",
+        tStart: 10,
+        tEnd: 20,
+        result: { kind: "tab", tab: { target: { tabId: 88 } } },
+      },
+    ]);
+    return JSON.stringify({ error: "TIMEOUT: browser code exceeded its deadline" });
+  });
+  const result = await tool.execute("call-1", { code: "x" }, undefined, undefined);
+  assert.equal(result.isError, true);
+  assert.deepEqual(
+    result.details.actions.map((action) => [action.kind, action.tabId]),
+    [["openTab", 88]],
+  );
+});

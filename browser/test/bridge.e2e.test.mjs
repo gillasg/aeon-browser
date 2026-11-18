@@ -2020,6 +2020,8 @@ test(
         assert.equal(result.skill, true);
       });
 
+      // Waits use timers, not animation frames: macOS gives a background tab no frames, so a
+      // requestAnimationFrame wait hung there.
       await t.test("screenshot diff finds a visual change and writes a diff PNG", async () => {
         const { stdout } = await run(
           process.execPath,
@@ -2030,9 +2032,9 @@ test(
             "diff",
             `page = await browser.openTab(${JSON.stringify(siteUrl + "catalog")});
             await page.waitForSelector("#q");
-            await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+            await page.evaluate(() => new Promise((done) => setTimeout(done, 100)));
             await page.evaluate(() => { [...document.documentElement.children].find((n) => n.__cursorSurface)?.remove(); document.documentElement.style.background = "#fff"; document.body.style.background = "#fff"; });
-            await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+            await page.evaluate(() => new Promise((done) => setTimeout(done, 100)));
             const before = await page.screenshot();
             const same = await page.diffScreenshot(before);
             await page.evaluate(() => { document.body.style.background = "#123456"; });

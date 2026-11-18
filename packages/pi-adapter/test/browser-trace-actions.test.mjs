@@ -216,3 +216,29 @@ test("a real engine step event survives a tool-update on the daemon's schema", (
   });
   assert.equal(event.steps?.[0]?.evidence?.request?.status, 200);
 });
+
+test("an openTab step keeps the tab it opened when its timing has no tab id", () => {
+  const [opened] = traceActions([
+    {
+      action: { op: "openTab", url: "https://example.test/" },
+      disposition: "completed",
+      tStart: 100,
+      tEnd: 900,
+      result: { kind: "tab", tab: { target: { tabId: 77 } } },
+    },
+  ]);
+  assert.equal(opened.kind, "openTab");
+  assert.equal(opened.tabId, 77);
+});
+
+test("a step in a known tab keeps that tab when its timing has no tab id", () => {
+  const [read] = traceActions([
+    {
+      action: { op: "evaluate", target: { tabId: 12 } },
+      disposition: "running",
+      tStart: 1,
+      tEnd: 2,
+    },
+  ]);
+  assert.equal(read.tabId, 12);
+});

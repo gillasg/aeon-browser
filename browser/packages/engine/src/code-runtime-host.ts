@@ -1,5 +1,6 @@
 import { stepTrace, takeActionTiming } from "./native-browser-action-timing.js";
 import { recordStep } from "./evidence/step-record.js";
+import { progressSteps } from "./code-runtime-progress.js";
 import type { StepEvent } from "@browserkit/protocol";
 import { runEffect, type KernelChecks } from "./kernel.js";
 import { cellEffects } from "./code-runtime-effects.js";
@@ -656,7 +657,7 @@ function sendStage(cell: Cell, stage: BrowserCodeStage): void {
   send(cell.socket, {
     kind: "browser.code.progress",
     cellId: cell.run.cellId,
-    steps: progressSteps(cell),
+    steps: progressSteps(cell.steps, MAX_TRACE),
     stage,
   });
 }
@@ -668,7 +669,7 @@ function setWaiting(cell: Cell, waiting: boolean): void {
   send(cell.socket, {
     kind: "browser.code.progress",
     cellId: cell.run.cellId,
-    steps: progressSteps(cell),
+    steps: progressSteps(cell.steps, MAX_TRACE),
     waitingForUser: waiting,
   });
 }
@@ -752,17 +753,9 @@ function progress(cell: Cell): void {
     send(cell.socket, {
       kind: "browser.code.progress",
       cellId: cell.run.cellId,
-      steps: progressSteps(cell),
+      steps: progressSteps(cell.steps, MAX_TRACE),
     });
   }, 150);
-}
-
-// Progress is for the live activity view; images and full observations wait for the result.
-function progressSteps(cell: Cell): Record<string, unknown>[] {
-  return cell.steps.slice(-MAX_TRACE).map(({ result, ...rest }) => ({
-    ...rest,
-    ...(result ? { result: { kind: (result as { kind?: unknown }).kind } } : {}),
-  }));
 }
 
 // The bridge accepts frames up to 32 MB. A cell that returns more is refused here so the failure
