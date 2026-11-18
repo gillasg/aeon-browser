@@ -1,0 +1,359 @@
+# A stranger's install, on a machine that has nothing but the runner image.
+#
+# The Aeon steps below are the README commands verbatim: the one-line installer does the clone,
+# dependency install, build, native-host/service registration and CLI install. There is no
+# pnpm/action-setup, no `pnpm install`, no `pnpm build` and no repo-internal setup call.
+#
+# Three things are runner aids, not Aeon shortcuts, and are called out in the report:
+#  1. actions/checkout + a git insteadOf rule point the installer's clone at the commit under test
+#     (a stranger's clone comes from main; CI must test the branch).
+#  2. The installer script is served from that checkout over loopback HTTP so the exact
+#     `curl ... | sh` / `irm ... | iex` shape is exercised.
+#  3. Chrome for Testing loads the *unpacked* extension with --load-extension in a private profile.
+#     Branded Chrome ignores that switch and a runner has no human to do the three clicks in
+#     chrome://extensions. Native messaging is still real: the documented per-profile manifest
+#     copy from README "Local connections" is done before Chrome starts.
+name: Clean install
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "install.sh"
+      - "install.ps1"
+      - "README.md"
+      - "scripts/setup.mjs"
+      - "scripts/setup-process.mjs"
+      - "scripts/setup-core.ps1"
+      - "apps/native-host/**"
+      - "apps/cli/src/install.ts"
+      - "apps/chrome-extension/**"
+      - ".github/workflows/clean-install.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  clean-install:
+    name: clean install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            chrome-platform: linux64
+            chrome-binary: chrome-linux64/chrome
+            python: python3
+          - os: macos-26
+            chrome-platform: mac-arm64
+            chrome-binary: chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+            python: python3
+          - os: windows-latest
+            chrome-platform: win64
+            chrome-binary: chrome-win64/chrome.exe
+            python: python
+    env:
+      CHROME_VERSION: 157.0.8103.78
+      SERVE_PORT: "8932"
+      FIXTURE_PORT: "8931"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # CI-only: the installer clones $REPO. Redirect that one URL to this checkout so every
+      # run (dispatch, PR, push to main) installs the commit it is meant to verify.
+      - name: Point the installer's clone at this checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="file://$(printf '%s' "$GITHUB_WORKSPACE" | tr '\\' '/')"
+          git config --global "url.$url.insteadof" "https://github.com/gillasg/aeon-browser.git"
+          git config --global --get-regexp 'url\..*insteadof'
+          echo "Installer clone redirected to $url"
+
+      - name: Install Chrome for Testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$GITHUB_WORKSPACE/.slice0-audit/chrome-for-testing-$CHROME_VERSION"
+          bin="$dir/${{ matrix.chrome-binary }}"
+          if [ ! -f "$bin" ]; then
+            mkdir -p "$dir"
+            curl -fsSL "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_VERSION/${{ matrix.chrome-platform }}/chrome-${{ matrix.chrome-platform }}.zip" -o "$dir/chrome.zip"
+            if [ "$RUNNER_OS" = "Windows" ]; then
+              powershell.exe -NoProfile -Command "Expand-Archive -LiteralPath '$(printf '%s' "$dir/chrome.zip" | tr '/' '\\')' -DestinationPath '$(printf '%s' "$dir" | tr '/' '\\')' -Force"
+            else
+              unzip -q "$dir/chrome.zip" -d "$dir"
+            fi
+            rm -f "$dir/chrome.zip"
+          fi
+          if [ "$RUNNER_OS" != "Windows" ]; then chmod +x "$bin"; fi
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
+          fi
+          posix_bin="$bin"
+          if [ "$RUNNER_OS" = "Windows" ]; then posix_bin="$(cygpath -u "$bin")"; fi
+          printf 'CHROME_PATH=%s\n' "$posix_bin" >> "$GITHUB_ENV"
+          echo "Chrome for Testing: $posix_bin"
+
+      # Runner aids: a display and Chrome's shared libraries. A normal desktop already has them;
+      # they are not part of Aeon's install.
+      - name: Runner aids (Linux display and Chrome libraries)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          deps="$(dirname "$CHROME_PATH")/deb.deps"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          while IFS= read -r pkg || [ -n "$pkg" ]; do
+            pkg="${pkg%%#*}"
+            pkg="$(printf '%s' "$pkg" | xargs)"
+            [ -z "$pkg" ] && continue
+            sudo apt-get satisfy -y --no-install-recommends "$pkg"
+          done < "$deps"
+          Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          printf 'DISPLAY=:99\n' >> "$GITHUB_ENV"
+          echo "Xvfb on :99"
+
+      - name: Resolve install paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            tmp="$(cygpath -u "$RUNNER_TEMP")"
+            localappdata="$(cygpath -u "$LOCALAPPDATA")"
+            appdata="$(cygpath -u "$APPDATA")"
+            echo "EXTENSION_FOLDER=$localappdata/Aeon/data/extension" >> "$GITHUB_ENV"
+            echo "MANIFEST_SRC=$localappdata/Aeon/com.aeon.native_host.json" >> "$GITHUB_ENV"
+            echo "AEON_BIN_DIR=$appdata/npm" >> "$GITHUB_ENV"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            echo "EXTENSION_FOLDER=$HOME/Library/Application Support/Aeon/data/extension" >> "$GITHUB_ENV"
+            echo "MANIFEST_SRC=$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.aeon.native_host.json" >> "$GITHUB_ENV"
+            echo "AEON_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
+          else
+            echo "EXTENSION_FOLDER=${XDG_DATA_HOME:-$HOME/.local/share}/aeon/data/extension" >> "$GITHUB_ENV"
+            echo "MANIFEST_SRC=${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome-for-testing/NativeMessagingHosts/com.aeon.native_host.json" >> "$GITHUB_ENV"
+            echo "AEON_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
+          fi
+          echo "CHROME_PROFILE=$tmp/aeon-chrome-profile" >> "$GITHUB_ENV"
+          echo "MARKER=$tmp/aeon-extension-loaded" >> "$GITHUB_ENV"
+          echo "LOADER_LOG=$tmp/aeon-loader.log" >> "$GITHUB_ENV"
+          echo "CHROME_LOG=$tmp/aeon-chrome.log" >> "$GITHUB_ENV"
+
+      # CI-only: serve the installer from the checkout over loopback, so the README's pipe-to-shell
+      # command is what actually runs.
+      - name: Serve the installer over loopback
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup "${{ matrix.python }}" -m http.server "$SERVE_PORT" --bind 127.0.0.1 --directory "$GITHUB_WORKSPACE" > "$RUNNER_TEMP/serve-installer.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/serve-installer.pid"
+          if [ "$RUNNER_OS" = "Windows" ]; then installer="install.ps1"; else installer="install.sh"; fi
+          for i in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:$SERVE_PORT/$installer" -o /dev/null 2>/dev/null; then
+              echo "Installer served on $SERVE_PORT"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/serve-installer.log" >&2
+          exit 1
+
+      # CI-only stand-in for the three chrome://extensions clicks. It waits for the installer to
+      # present the extension, copies the native-messaging manifest into the private profile
+      # exactly as README "Local connections" instructs, then starts the browser.
+      - name: Arm the extension loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper="$RUNNER_TEMP/aeon-load-extension.sh"
+          cat > "$helper" <<'EOS'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 600 ))
+          while true; do
+            if [ -f "$MANIFEST_SRC" ] && [ -f "$EXTENSION_FOLDER/manifest.json" ]; then break; fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "Installer never presented the extension (manifest=$MANIFEST_SRC, extension=$EXTENSION_FOLDER)" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          mkdir -p "$CHROME_PROFILE/NativeMessagingHosts"
+          cp "$MANIFEST_SRC" "$CHROME_PROFILE/NativeMessagingHosts/com.aeon.native_host.json"
+          # GitHub's Ubuntu image disables unprivileged user namespaces, so Chrome needs
+          # --no-sandbox there. A desktop install does not; this flag never changes Aeon.
+          if [ "$(uname -s)" = "Linux" ]; then SANDBOX_FLAG=--no-sandbox; else SANDBOX_FLAG=; fi
+          "$CHROME_PATH" \
+            --user-data-dir="$CHROME_PROFILE" \
+            --load-extension="$EXTENSION_FOLDER" \
+            --disable-extensions-except="$EXTENSION_FOLDER" \
+            $SANDBOX_FLAG \
+            --silent-debugger-extension-api \
+            --disable-background-timer-throttling \
+            --disable-renderer-backgrounding \
+            --disable-backgrounding-occluded-windows \
+            --no-first-run --no-default-browser-check \
+            --remote-debugging-port=9222 \
+            about:blank > "$CHROME_LOG" 2>&1 &
+          disown || true
+          printf 'loaded\n' > "$MARKER"
+          echo "Extension loaded from $EXTENSION_FOLDER"
+          EOS
+          chmod +x "$helper"
+          nohup bash "$helper" > "$LOADER_LOG" 2>&1 &
+          echo "Extension loader armed (log: $LOADER_LOG)"
+
+      # The README install steps, verbatim. The interactive wait at the end of setup.mjs is
+      # satisfied by the loader above; a stranger does the same wait with three Chrome clicks.
+      - name: Install Aeon (README one-liner, Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -eo pipefail
+          curl -fsSL "http://127.0.0.1:$SERVE_PORT/install.sh" | sh 2>&1 | tee "$RUNNER_TEMP/aeon-install.log"
+
+      - name: Install Aeon (README one-liner, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $ErrorActionPreference = 'Stop'
+          irm "http://127.0.0.1:$env:SERVE_PORT/install.ps1" | iex
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Prove the loader did the Chrome half
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "--- loader ---"; cat "$LOADER_LOG" || true
+          echo "--- chrome ---"; cat "$CHROME_LOG" || true
+          if [ ! -f "$MARKER" ]; then
+            echo "Chrome was never launched with the installed extension" >&2
+            exit 1
+          fi
+          [ -f "$EXTENSION_FOLDER/manifest.json" ] || { echo "No installed extension" >&2; exit 1; }
+          echo "Extension folder: $EXTENSION_FOLDER"
+
+      # The installed `aeon` command, not apps/cli/dist/cli.js from the checkout.
+      - name: Put the installed aeon command on PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # aeon install picks %APPDATA%\npm when that is already on PATH, else ~/.local/bin.
+            printf '%s\n' "$HOME/.local/bin" "$(cygpath -u "$APPDATA")/npm" >> "$GITHUB_PATH"
+          else
+            printf '%s\n' "$AEON_BIN_DIR" >> "$GITHUB_PATH"
+          fi
+          echo "aeon command directories added to PATH"
+          command -v aeon || command -v aeon.cmd || true
+
+      - name: Doctor (every check but the model check must be ok)
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
+          "$AEON" doctor --json > "$RUNNER_TEMP/doctor.json" 2>&1 || true
+          echo "--- aeon doctor --json ---"; cat "$RUNNER_TEMP/doctor.json"
+          node -e '
+            const fs = require("node:fs");
+            const text = fs.readFileSync(process.argv[1], "utf8");
+            const start = text.indexOf("{");
+            if (start < 0) { console.error("doctor printed no JSON"); process.exit(1); }
+            const report = JSON.parse(text.slice(start));
+            const checks = report.checks ?? [];
+            const bad = checks.filter((c) => c.status !== "ok" && c.name !== "model");
+            const names = checks.map((c) => `${c.name}=${c.status}`).join(", ");
+            console.log("doctor checks: " + names);
+            if (!checks.some((c) => c.name === "extension" && c.status === "ok")) {
+              console.error("extension check is not ok"); process.exit(1);
+            }
+            if (!checks.some((c) => c.name === "flags" && c.status === "ok")) {
+              console.error("flags check is not ok"); process.exit(1);
+            }
+            if (!checks.some((c) => c.name === "supervisor" && c.status === "ok")) {
+              console.error("supervisor check is not ok"); process.exit(1);
+            }
+            if (bad.length) { console.error("unexpected doctor failures: " + JSON.stringify(bad)); process.exit(1); }
+            const model = checks.find((c) => c.name === "model");
+            console.log(model?.status === "ok" ? "model: signed in" : "model: skipped (no key in CI; the only allowed non-ok check)");
+          ' "$RUNNER_TEMP/doctor.json"
+
+      # A local page, served by this job: no external site, so the proof is hermetic.
+      - name: Serve the fixture page
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$RUNNER_TEMP/aeon-fixture"
+          mkdir -p "$fixture"
+          cat > "$fixture/index.html" <<'EOF'
+          <!doctype html>
+          <html><head><title>Aeon clean install fixture</title></head>
+          <body><h1>Hello from a clean install</h1></body></html>
+          EOF
+          nohup "${{ matrix.python }}" -m http.server "$FIXTURE_PORT" --bind 127.0.0.1 --directory "$fixture" > "$RUNNER_TEMP/fixture.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/fixture.pid"
+          for i in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:$FIXTURE_PORT/" | grep -q "Aeon clean install fixture"; then
+              echo "Fixture page served"
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      # Model-free: browser_code through aeon repl, no chat and no model key.
+      - name: Browser action (repl opens, reads and closes the page)
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
+          cell="$RUNNER_TEMP/clean-install-check.js"
+          cat > "$cell" <<EOF
+          const page = await browser.openTab("http://127.0.0.1:$FIXTURE_PORT/");
+          const title = await page.title();
+          console.log("FIXTURE_TITLE: " + title);
+          await page.close();
+          return title;
+          EOF
+          out="$("$AEON" repl --session clean-install --timeout 90 "@$cell")"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q "FIXTURE_TITLE: Aeon clean install fixture"
+          echo "A clean install opened, read and closed a page without a model."
+
+      - name: aeon --help and aeon tools print
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
+          help="$("$AEON" --help)"
+          printf '%s\n' "$help" | head -30
+          printf '%s\n' "$help" | grep -q 'aeon <command>'
+          tools="$("$AEON" tools)"
+          printf '%s\n' "$tools" | head -30
+          [ -n "${tools//[[:space:]]/}" ] || { echo "aeon tools printed nothing" >&2; exit 1; }
+          echo "aeon --help and aeon tools both print."
+
+      - name: Collect logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-install-logs-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/aeon-install.log
+            ${{ runner.temp }}/aeon-loader.log
+            ${{ runner.temp }}/aeon-chrome.log
+            ${{ runner.temp }}/doctor.json
+            ${{ runner.temp }}/fixture.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,5 +1,15 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readlinkSync } from "node:fs";
-import { chmod, mkdir, readFile, rmdir, symlink, unlink, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  chmod,
+  mkdir,
+  readFile,
+  rmdir,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +43,83 @@ async function installCommand(): Promise<string> {
   );
   await chmod(shell, 0o755).catch(() => undefined);
   return folder;
+}
+
+/**
+ * A command nobody can type is not installed. The bin folder is often absent from a fresh
+ * PATH (always on Windows when npm's folder is not there, and in macOS zsh), so persist it.
+ * Idempotent: running the installer again never grows the PATH or the startup file.
+ */
+async function addToPath(folder: string): Promise<string | undefined> {
+  if (onPath(folder)) return undefined;
+  return process.platform === "win32" ? addToWindowsPath(folder) : addToShellProfile(folder);
+}
+
+/** Already reachable in this shell (Ubuntu's ~/.profile adds ~/.local/bin, for one): nothing to add. */
+function onPath(folder: string): boolean {
+  const sep = process.platform === "win32" ? ";" : ":";
+  const same = (entry: string) =>
+    process.platform === "win32"
+      ? resolve(entry).toLowerCase() === resolve(folder).toLowerCase()
+      : resolve(entry) === resolve(folder);
+  return (process.env.PATH ?? "").split(sep).filter(Boolean).some(same);
+}
+
+function addToWindowsPath(folder: string): string | undefined {
+  const key = "HKCU\\Environment";
+  try {
+    let query = "";
+    try {
+      query = execFileSync("reg.exe", ["query", key, "/v", "Path"], {
+        encoding: "utf8",
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      // No user Path value yet (a fresh account): create it below.
+    }
+    const match = /^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/im.exec(query);
+    const entries = (match?.[1]?.trim() ?? "").split(";").filter(Boolean);
+    if (entries.some((entry) => entry.toLowerCase() === folder.toLowerCase())) return undefined;
+    // REG_EXPAND_SZ keeps %VARIABLES% intact instead of freezing them into literal paths.
+    execFileSync(
+      "reg.exe",
+      ["add", key, "/v", "Path", "/t", "REG_EXPAND_SZ", "/d", [...entries, folder].join(";"), "/f"],
+      { stdio: "ignore", windowsHide: true },
+    );
+    return `Added ${folder} to your user PATH.`;
+  } catch {
+    return `Add ${folder} to your PATH yourself.`;
+  }
+}
+
+async function addToShellProfile(folder: string): Promise<string | undefined> {
+  const profiles =
+    process.platform === "darwin" ? [".zprofile", ".zshrc"] : [".profile", ".bashrc"];
+  const line = `export PATH='${folder.replace(/'/g, "'\\''")}':$PATH`;
+  const texts = await Promise.all(
+    profiles.map(async (name) => ({ name, text: await readProfile(name) })),
+  );
+  if (texts.some(({ text }) => text?.includes(folder))) return undefined;
+  for (const { name, text } of texts) {
+    if (text === undefined) continue;
+    try {
+      await appendFile(join(homedir(), name), `\n# Aeon command\n${line}\n`, { mode: 0o600 });
+      return `Added ${folder} to ~/${name}.`;
+    } catch {
+      // Try the next startup file the user's shell reads.
+    }
+  }
+  return `Add ${folder} to your PATH yourself.`;
+}
+
+/** The profile's text, or undefined when it cannot be read (an empty string when absent). */
+async function readProfile(name: string): Promise<string | undefined> {
+  try {
+    return await readFile(join(homedir(), name), "utf8");
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? "" : undefined;
+  }
 }
 
 /** Where the link already points, or undefined when nothing is there. */
@@ -83,6 +170,8 @@ export async function install(skillDirectory = skill): Promise<number> {
   const hasSkill = existsSync(join(skillDirectory, "SKILL.md"));
   const bin = await installCommand();
   process.stdout.write(`Installed the aeon command in ${bin}\n`);
+  const pathNote = await addToPath(bin);
+  if (pathNote) process.stdout.write(`${pathNote} Open a new terminal for aeon to be found.\n`);
   if (!hasSkill) {
     process.stdout.write(
       `The Aeon skill is not in this checkout (${skillDirectory}); the command is installed without it.\n`,

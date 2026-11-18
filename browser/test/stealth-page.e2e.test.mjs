@@ -166,7 +166,7 @@ async function connectExtension(profile, env) {
     const found = targets.find((item) => item.url.endsWith("/service-worker.js"));
     if (!found) throw new Error("no worker yet");
     return found;
-  });
+  }, 60000);
   const reply = await nativeBootstrap(env);
   const cdp = connect(worker.webSocketDebuggerUrl);
   await cdp.opened;
