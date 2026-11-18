@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -67,3 +68,46 @@ test("install removes a linked browserkit skill and leaves a real folder alone",
   );
   assert.equal((await lstat(real)).isDirectory(), true);
 });
+
+test(
+  "install puts the aeon command on the shell PATH once (POSIX)",
+  { skip: process.platform === "win32" },
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), "aeon-install-path-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const skill = join(root, "skills", "aeon");
+    await mkdir(skill, { recursive: true });
+    await writeFile(join(skill, "SKILL.md"), "---\nname: aeon\ndescription: Aeon\n---\n");
+    const profile = join(root, process.platform === "darwin" ? ".zprofile" : ".profile");
+    await withHome(root, async () => {
+      await install(skill);
+      const first = await readFile(profile, "utf8");
+      assert.match(first, /export PATH='.*\.local\/bin':\$PATH/);
+      // A fresh machine can run the one-line installer twice to update; PATH must not grow.
+      await install(skill);
+      assert.equal(await readFile(profile, "utf8"), first);
+    });
+  },
+);
+
+test(
+  "install leaves the shell profile alone when the folder is already on PATH",
+  { skip: process.platform === "win32" },
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), "aeon-install-onpath-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const skill = join(root, "skills", "aeon");
+    await mkdir(skill, { recursive: true });
+    await writeFile(join(skill, "SKILL.md"), "---\nname: aeon\ndescription: Aeon\n---\n");
+    const profile = join(root, process.platform === "darwin" ? ".zprofile" : ".profile");
+    const before = process.env.PATH;
+    process.env.PATH = `${join(root, ".local", "bin")}:${before}`;
+    t.after(() => {
+      process.env.PATH = before;
+    });
+    await withHome(root, async () => {
+      await install(skill);
+      assert.equal(existsSync(profile), false);
+    });
+  },
+);
