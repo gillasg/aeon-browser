@@ -252,15 +252,19 @@ async function openChatPage(port, extensionId, endpoint) {
 }
 
 async function clickManageModels(browser, sessionId) {
-  await waitFor(browser, sessionId, "!!document.querySelector('#model-picker')");
+  // An empty Chat renders HomeStart's pickers (#home-model-picker); a Chat with content renders the
+  // composer's (#model-picker). Both render the same manage button. Wait for the button this test
+  // actually clicks, not one variant's id: on macOS CI the incidental error notice that kept the
+  // composer on screen was absent, so #model-picker never existed and the test hung for 35 s.
+  await waitFor(browser, sessionId, "!!document.querySelector('.pi-picker-manage')");
   await evaluate(
     browser,
     sessionId,
     `(() => {
-      const picker = document.querySelector('#model-picker');
-      const details = picker?.closest('details');
+      const manage = document.querySelector('.pi-picker-manage');
+      const details = manage?.closest('details');
       if (details) details.open = true;
-      document.querySelector('.pi-picker-manage')?.click();
+      manage?.click();
       return true;
     })()`,
   );
