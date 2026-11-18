@@ -124,14 +124,43 @@ export function focusedWindowId(windows: readonly BrowserWindow[]): number | und
   return windows.find((window) => window.focused)?.windowId;
 }
 
-export async function refreshInventoryTab(tabId: number): Promise<BrowserTab | undefined> {
+/**
+ * Queues one tab refresh on the shared inventory chain. That chain serialises every tab change
+ * for every chat (including daemon acknowledgement round trips), so an engine-wide read such as
+ * browser.tabs() must not wait for the whole backlog: a caller that only needs current state can
+ * pass `maxWaitMs` and get the tab as it is now if the chain is busy. The queued work still runs
+ * in order; only this caller stops waiting for it.
+ */
+export async function refreshInventoryTab(
+  tabId: number,
+  maxWaitMs?: number,
+): Promise<BrowserTab | undefined> {
   const session = active;
   if (!session) return undefined;
-  session.chain = session.chain
+  const work = session.chain
     .then(() => upsertTab(tabId))
     .catch(() => session.socket.close(4001, "Inventory sync required"));
-  await session.chain;
+  session.chain = work;
+  if (maxWaitMs === undefined) await work;
+  else await withTimeout(work, maxWaitMs);
   return active === session ? session.tabs.get(tabId) : undefined;
+}
+
+/** A bounded wait that never cancels `work`; a caller that gives up just reads current state. */
+export function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => resolve(undefined as T), ms);
+    work.then(
+      (value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        globalThis.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function installListeners(): void {

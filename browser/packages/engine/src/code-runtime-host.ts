@@ -138,25 +138,27 @@ export function rebindBrowserCodeSocket(socket: WebSocket): void {
   for (const job of jobs.values()) if (job.status === "running") job.socket = socket;
 }
 
-const RESET_ANSWER_MS = 5000;
+// The offscreen reset handler answers synchronously. No answer for this long means the document's
+// thread is blocked (a synchronous loop in some realm); every chat in it is already stuck.
+const RESET_ANSWER_MS = 15_000;
 
-/** Drops a chat's REPL realm (session closed or runtime reset). */
+/**
+ * Drops one chat's REPL realm (session closed or runtime reset). The offscreen document hosts a
+ * realm per chat, and its `reset` handler removes only this chat's frames. A document that is merely
+ * busy still answers, and the other chats keep running. Only a document that cannot answer for
+ * RESET_ANSWER_MS is closed: its thread is blocked by a synchronous loop, so every chat in it is
+ * already stuck, and closing it is the only way to get any chat working again.
+ */
 export async function resetRealm(chatId: string): Promise<void> {
   cancelJobs(chatId);
   if (!(await chrome.offscreen.hasDocument())) return;
-  const reset = chrome.runtime
-    .sendMessage({ target: "aeon-code-offscreen", kind: "reset", chatId })
-    .then(
+  const answered = await Promise.race([
+    chrome.runtime.sendMessage({ target: "aeon-code-offscreen", kind: "reset", chatId }).then(
       () => true,
       // No document listening: nothing is hung, so nothing to close.
       () => true,
-    );
-  // A synchronous infinite loop blocks the realm's thread; closing the document is the only kill.
-  // Closing it also ends every other chat's running cell, so only a thread that stays blocked for
-  // seconds (never one merely busy for a moment while other chats work) is killed this way.
-  const answered = await Promise.race([
-    reset,
-    new Promise((done) => setTimeout(done, RESET_ANSWER_MS, false)),
+    ),
+    new Promise<boolean>((done) => setTimeout(done, RESET_ANSWER_MS, false)),
   ]);
   if (!answered) {
     await chrome.offscreen.closeDocument().catch(() => undefined);

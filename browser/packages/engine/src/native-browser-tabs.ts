@@ -53,12 +53,16 @@ export async function listTabs(request: BrowserExecutorRequest): Promise<Browser
 // Chrome only reports activation for a focused window, so a tab opened in a background or
 // headless window can sit in the inventory as inactive. Ask each window which tab is active at
 // list time, so browser.tabs() and browser.activeTab() both describe Chrome as it is now.
+// The refresh is bounded: the inventory chain is shared by every chat and every tab change, and a
+// busy renderer can keep it queued. browser.tabs() is an engine-wide read; it must never sit 50 s
+// behind one tab's inventory (or CDP) work. The queued refresh still runs, just not on this call.
+const ACTIVE_REFRESH_MS = 2000;
 async function refreshActiveTabs(): Promise<void> {
   const windowIds = [...new Set(currentInventoryTabs().map((tab) => tab.windowId))];
   await Promise.all(
     windowIds.map(async (windowId) => {
       const [live] = await chrome.tabs.query({ active: true, windowId }).catch(() => []);
-      if (live?.id !== undefined) await refreshInventoryTab(live.id);
+      if (live?.id !== undefined) await refreshInventoryTab(live.id, ACTIVE_REFRESH_MS);
     }),
   );
 }

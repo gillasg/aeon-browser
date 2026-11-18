@@ -27,6 +27,9 @@ const DEFAULT_IDLE_MINUTES = 10;
 const MAX_CHAT_TABS = 6;
 // A tab used this recently is still part of the work (parallel reads, a page it will return to).
 const BUSY_MS = 30_000;
+// How long a group change leaves a recently used tab alone before it can be untracked. A parallel
+// chat's grouping must not steal the owning chat's tab while that chat is still driving it.
+const GROUP_UNTRACK_MS = 5 * 60_000;
 
 const tracked = new Map<number, Tracked>();
 const stats = new Map<string, Stats>();
@@ -435,11 +438,17 @@ onEngineInstall(() => {
     if (entry && tab.url) entry.url = tab.url;
     if (change.pinned) forgetAgentTab(tabId);
     if (change.groupId === undefined) return;
+    // A parallel chat can regroup a tab it borrowed (Split View, its own agent group). That must
+    // not strip the owning chat's tracking while it is still working in the tab: once untracked,
+    // the tab is no longer "mine" and the end-of-run tidy loses the one tab it should keep. Only
+    // forget on a group change once the tab has been idle long enough to be someone else's.
+    const recentlyUsed = entry !== undefined && Date.now() - entry.touched < GROUP_UNTRACK_MS;
     if (change.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && grouped.has(tabId)) {
-      forgetAgentTab(tabId);
+      if (!recentlyUsed) forgetAgentTab(tabId);
       return;
     }
     if (
+      !recentlyUsed &&
       change.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE &&
       !grouped.has(tabId) &&
       !isAgentGroupId(change.groupId) &&
