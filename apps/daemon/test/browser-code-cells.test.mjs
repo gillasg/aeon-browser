@@ -73,6 +73,43 @@ test("a deadline names the last stage and resets a realm that was evaluating", a
   }
 });
 
+test("a cell that times out still hands the tabs it opened to its chat", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const messages = [];
+    const adopted = [];
+    const cells = new BrowserCodeCells((chatId, target) => adopted.push({ chatId, target }));
+    const connection = socket(messages);
+    const chatId = randomUUID();
+    const run = cells.run(connection, randomUUID(), chatId, "call-1", [], {
+      code: "await browser.openTab('https://example.com'); while (true) {}",
+      timeoutMs: 1000,
+      onCall: async () => ({}),
+      onProgress: () => undefined,
+    });
+    const target = {
+      clientInstanceId: randomUUID(),
+      browserRunId: randomUUID(),
+      tabId: 88,
+      tabIncarnation: randomUUID(),
+    };
+    cells.handle(
+      {
+        kind: "browser.code.progress",
+        cellId: messages[0].cellId,
+        steps: [{ action: { op: "openTab" }, result: { kind: "tab", tab: { target } } }],
+        stage: "evaluating",
+      },
+      connection,
+    );
+    mock.timers.tick(6001);
+    await assert.rejects(run, /TIMEOUT/);
+    assert.deepEqual(adopted, [{ chatId, target }]);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test("a short link drop keeps the cell and it answers on the new socket", async () => {
   const first = [];
   const second = [];
