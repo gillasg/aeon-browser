@@ -253,13 +253,18 @@ function addCalls(entry: Entry, steps: TraceStep[], byCall: Map<string, TraceSte
   }
 }
 
+/** Characters of each tool result kept in the run report. */
+const STEP_OUTPUT_CHARS = 2500;
+
 function addResult(entry: Entry, byCall: Map<string, TraceStep>): void {
   const message = entry.message;
   if (!message) return;
   const step = message.toolCallId ? byCall.get(message.toolCallId) : undefined;
   if (!step) return;
   const text = message.content.map((block) => block.text ?? "").join("\n");
-  step.summary += "\n" + text.slice(0, 600);
+  // Enough of each result for a grader to see what the agent read (600 chars showed only a page's
+  // menu, so correct answers were judged unsupported).
+  step.summary += "\n" + text.slice(0, STEP_OUTPUT_CHARS);
   step.error = Boolean(message.isError);
   const ms = Date.parse(entry.timestamp) - Date.parse(step.at);
   if (Number.isFinite(ms) && ms >= 0) step.seconds = Math.round(ms / 100) / 10;
