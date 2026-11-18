@@ -5,6 +5,7 @@ const calls = [];
 const session = {};
 const local = {};
 const TAB_ID = 7;
+let nodeAtPoint = () => ({ backendNodeId: 42 });
 
 function sink() {
   return { addListener() {}, removeListener() {}, hasListener: () => false };
@@ -43,6 +44,9 @@ function sendCommand(_debuggee, method, params) {
   if (method === "Page.getFrameTree")
     return Promise.resolve({ frameTree: { frame: { id: "frame" } } });
   if (method === "Page.createIsolatedWorld") return Promise.resolve({ executionContextId: 3 });
+  if (method === "DOM.resolveNode") return Promise.resolve({ object: { objectId: "obj" } });
+  if (method === "Runtime.callFunctionOn")
+    return Promise.resolve({ result: { value: nodeAtPoint(params).backendNodeId === 42 } });
   if (method === "Runtime.evaluate") {
     const expression = String(params?.expression ?? "");
     if (expression.includes("__aeonQuiet")) {
@@ -298,4 +302,52 @@ test("press-and-hold", async (t) => {
     assert.ok(press > 0 && release > press);
     assert.ok(events[release].at - events[press].at >= 40);
   });
+
+  const target = {
+    debuggee: { tabId: 3 },
+    backendNodeId: 42,
+    offsetX: 0,
+    offsetY: 0,
+  };
+
+  await t.test("the press waits until the intended target is under the point", async () => {
+    calls.length = 0;
+    let checks = 0;
+    // A transient overlay sits over the button for the first two landing checks, then clears.
+    nodeAtPoint = () => ({ backendNodeId: ++checks < 3 ? 999 : 42 });
+    try {
+      await holdAt({ tabId: 3 }, 100, 200, 30, target);
+    } finally {
+      nodeAtPoint = () => ({ backendNodeId: 42 });
+    }
+    const locations = calls.filter((call) => call.method === "DOM.resolveNode");
+    assert.ok(locations.length >= 3, `only ${locations.length} landing checks`);
+    const events = mice();
+    const press = events.findIndex((event) => event.params.type === "mousePressed");
+    const release = events.findLastIndex((event) => event.params.type === "mouseReleased");
+    assert.ok(press > 0 && release > press);
+    // No press was sent while the overlay was still under the point.
+    assert.ok(
+      events[press].at >= locations[2].at,
+      `press preceded the good landing check: ${events[press].at} < ${locations[2].at}`,
+    );
+    assert.equal(events[press].params.x, 100);
+    assert.equal(events[press].params.y, 200);
+  });
+
+  await t.test(
+    "a target that never arrives is reported, never pressed and released blind",
+    async () => {
+      calls.length = 0;
+      nodeAtPoint = () => ({ backendNodeId: 999 });
+      try {
+        await assert.rejects(holdAt({ tabId: 3 }, 100, 200, 30, target), /TARGET_LOST/);
+      } finally {
+        nodeAtPoint = () => ({ backendNodeId: 42 });
+      }
+      const events = mice();
+      assert.equal(events.filter((event) => event.params.type === "mousePressed").length, 0);
+      assert.equal(events.filter((event) => event.params.type === "mouseReleased").length, 0);
+    },
+  );
 });

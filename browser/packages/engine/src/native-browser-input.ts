@@ -764,15 +764,15 @@ async function dispatchAction(
     tAct: Date.now(),
   });
   if (request.step.op === "click" || request.step.op === "hold") {
-    const pointer = await deliverAt(debuggee, request.step, top.x, top.y, !!box.activate);
+    const press = { debuggee: frame, backendNodeId: node.backendNodeId, ...top };
+    const pointer = await deliverAt(debuggee, request.step, top.x, top.y, !!box.activate, press);
     if (pointer === "activate") await onNode(frame, node.backendNodeId, activateNode);
     return { nodeId: node.backendNodeId, frame, ...(measured ? { box: measured } : {}) };
   } else if (request.step.op === "fill") {
     const typed = await fillNode(frame, node.backendNodeId, request.step.value, {
       vault: vaultField(node.name),
     });
-    // The text path already read the value back to verify it; only the native select path needs
-    // a separate read for its label.
+    // The text path read the value back; only the native select path needs a separate label read.
     const readback = typed !== undefined ? typed : await readFieldValue(frame, node.backendNodeId);
     return {
       ...(readback !== undefined ? { readback } : {}),

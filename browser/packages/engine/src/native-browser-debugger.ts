@@ -373,15 +373,31 @@ export function pointerPress(step: {
   return { ...(button ? { button } : {}), ...(modifiers ? { modifiers } : {}) };
 }
 
+/**
+ * The element a press is meant to land on. `debuggee` is the frame session whose DOM ids match
+ * `backendNodeId`; `offsetX`/`offsetY` translate a main-viewport landing point back to that frame.
+ * Input still goes out on the root session, so a layout shift or a transient overlay between
+ * measurement and press can hit something else and lose the mousedown entirely (the release then
+ * lands on the control, giving a mouseup with no mousedown and no click). No press is sent until
+ * the intended element is confirmed under the point; a persistent mismatch is reported instead.
+ */
+export interface PressTarget {
+  debuggee: chrome.debugger.Debuggee;
+  backendNodeId: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 export async function clickAt(
   debuggee: chrome.debugger.Debuggee,
   x: number,
   y: number,
   spec?: PointerPress,
+  target?: PressTarget,
 ): Promise<void> {
   showAgentCursor(debuggee, x, y, true);
   noteActionTiming(debuggee.tabId, { tAct: Date.now(), point: { x, y } });
-  await withFocusEmulation(debuggee.tabId, () => pressAt(debuggee, x, y, spec));
+  await withFocusEmulation(debuggee.tabId, () => pressAt(debuggee, x, y, spec, target));
 }
 
 function mouseBits(spec: PointerPress | undefined, phase: "move" | "down" | "up") {
@@ -400,8 +416,10 @@ async function pressAt(
   x: number,
   y: number,
   spec?: PointerPress,
+  target?: PressTarget,
 ): Promise<void> {
   const at = await land(debuggee, x, y, "clickAt", spec?.modifiers ?? 0);
+  await verifyPressTarget(debuggee, at, target, false);
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
@@ -431,10 +449,13 @@ export async function holdAt(
   x: number,
   y: number,
   ms?: number,
+  target?: PressTarget,
 ): Promise<void> {
   showAgentCursor(debuggee, x, y, true);
   noteActionTiming(debuggee.tabId, { tAct: Date.now(), point: { x, y } });
-  await withFocusEmulation(debuggee.tabId, () => holdPressed(debuggee, x, y, clampHoldMs(ms)));
+  await withFocusEmulation(debuggee.tabId, () =>
+    holdPressed(debuggee, x, y, clampHoldMs(ms), target),
+  );
 }
 
 /** A coordinate hold. Anything else (a click with no element, one axis) is not a target. */
@@ -459,13 +480,14 @@ export async function deliverAt(
   x: number,
   y: number,
   activate: boolean,
+  target?: PressTarget,
 ): Promise<"activate" | "sent"> {
   const spec = pointerPress(step);
   const plain = !spec.button && !spec.modifiers;
   // A DOM activate is a plain left click. Another button or a held modifier has to be a real press.
   if (step.op === "click" && activate && plain) return "activate";
-  if (step.op === "hold") await holdAt(debuggee, x, y, step.ms);
-  else await clickAt(debuggee, x, y, spec);
+  if (step.op === "hold") await holdAt(debuggee, x, y, step.ms, target);
+  else await clickAt(debuggee, x, y, spec, target);
   return "sent";
 }
 
@@ -490,6 +512,87 @@ async function land(
     { label },
   );
   return at;
+}
+
+// A freshly opened or hydrating page can put a different element under the press point for a few
+// frames, even after the target's box was measured. Re-land and re-check for a short window before
+// giving up; a 120 ms beat is enough for a transient overlay to clear and for layout to settle.
+const PRESS_SETTLE_TRIES = 8;
+const PRESS_SETTLE_MS = 120;
+
+// Compare with the page's own hit test rather than a CDP backend id: elementFromPoint crosses
+// shadow roots through composedPath, works inside a frame's own session, and ignores elements
+// with pointer-events:none (so Aeon's own cursor overlay can never be mistaken for a hit).
+const PRESS_HIT_FUNCTION = `function (x, y) {
+  var el = document.elementFromPoint(x, y);
+  if (!el) return false;
+  var path = typeof el.composedPath === "function" ? el.composedPath() : [];
+  if (path.indexOf(this) >= 0) return true;
+  for (var n = el; n; n = n.parentElement || n.parentNode) if (n === this) return true;
+  // A transparent child over its ancestor: the ancestor is still the intended control.
+  var r = this.getBoundingClientRect && this.getBoundingClientRect();
+  if (r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+    for (var m = this; m; m = m.parentElement || m.parentNode) if (m === el) return true;
+  }
+  return false;
+}`;
+
+/** True when the page's own hit test at `x,y` lands on the intended element `target`. */
+async function underPressPoint(target: PressTarget, x: number, y: number): Promise<boolean> {
+  const node = await send<{ object?: { objectId?: string } }>(
+    target.debuggee,
+    "DOM.resolveNode",
+    { backendNodeId: target.backendNodeId },
+    { label: "pressTarget" },
+  ).catch(() => undefined);
+  const objectId = node?.object?.objectId;
+  if (!objectId) return true; // Cannot verify: let the press through rather than break a working page.
+  const answer = await send<{ result?: { value?: boolean } }>(
+    target.debuggee,
+    "Runtime.callFunctionOn",
+    {
+      objectId,
+      functionDeclaration: PRESS_HIT_FUNCTION,
+      arguments: [{ value: x }, { value: y }],
+      returnByValue: true,
+    },
+    { label: "pressTarget", ms: 2_000 },
+  ).catch(() => undefined);
+  if (answer?.result?.value === undefined) return true; // Same: an unreadable hit is not proof of loss.
+  return answer.result.value === true;
+}
+
+/**
+ * Confirm the intended element is under the landing point before any press goes out. A hold
+ * reports a target that never arrives; a click only settles and re-lands (clicks have their own
+ * readback, and a strict check there would reject legitimate ancestor/shadow hits).
+ */
+async function verifyPressTarget(
+  debuggee: chrome.debugger.Debuggee,
+  at: { x: number; y: number },
+  target: PressTarget | undefined,
+  required: boolean,
+): Promise<void> {
+  if (!target) return;
+  const x = at.x - target.offsetX;
+  const y = at.y - target.offsetY;
+  for (let attempt = 0; attempt < PRESS_SETTLE_TRIES; attempt++) {
+    if (await underPressPoint(target, x, y)) return;
+    if (attempt + 1 < PRESS_SETTLE_TRIES) {
+      await sleep(PRESS_SETTLE_MS);
+      // Re-land the pointer at the same main-viewport point; the page may have shifted under it.
+      await send(
+        debuggee,
+        "Input.dispatchMouseEvent",
+        { type: "mouseMoved", ...at },
+        { label: "pressTarget" },
+      ).catch(() => undefined);
+    }
+  }
+  // Reporting beats pressing blind: a press onto the wrong element gives a release with no
+  // matching mousedown and no click, which a caller cannot distinguish from a no-op.
+  if (required)
+    throw new Error("TARGET_LOST: the target is not under the press point; no press was sent");
 }
 
 const HOLD_JITTER_MIN_MS = 140;
@@ -517,8 +620,10 @@ async function holdPressed(
   x: number,
   y: number,
   ms: number,
+  target?: PressTarget,
 ): Promise<void> {
   const at = await land(debuggee, x, y, "holdAt");
+  await verifyPressTarget(debuggee, at, target, true);
   await send(
     debuggee,
     "Input.dispatchMouseEvent",
