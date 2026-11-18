@@ -159,7 +159,7 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     name: "record",
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
-    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>]
+    help: `Usage: aeon record start [--window chrome|--screen] [--out <dir>] [--fps 30] [--chat <id>]
        aeon record stop [--out <dir>] [--chat <id>]
        aeon record gif|video|trace …   (the original screen recordings)
 
