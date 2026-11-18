@@ -419,7 +419,11 @@ function run(binary: string, args: string[]): Promise<void> {
 
 /** Best-effort frame size: ffprobe when available, else the first JPEG's SOF marker. */
 export function frameSize(folder: string, probe: string): { width: number; height: number } {
-  const first = readdirSync(join(folder, "frames")).find((f) => f.endsWith(".jpg"));
+  const frames = join(folder, "frames");
+  // A recording that has not written its first frame yet (or a mode that writes no frames at all,
+  // like --tabs) has no frames/ dir. That is not an error: report an unknown size instead.
+  if (!existsSync(frames)) return { width: 0, height: 0 };
+  const first = readdirSync(frames).find((f) => f.endsWith(".jpg"));
   if (!first) return { width: 0, height: 0 };
   const file = join(folder, "frames", first);
   try {
