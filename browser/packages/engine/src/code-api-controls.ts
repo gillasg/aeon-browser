@@ -621,14 +621,38 @@ function __pageOverlay(arg) {
   return null;
 }
 var __CONSENT_FRAMES = /consent|cmp|sourcepoint|privacy-mgmt|cookie|trustarc|didomi|usercentrics/i;
+// A click only takes effect once the page's renderer has run the handler it registered. Reading the
+// page after a fixed nap is a race: on a slow runner the click has landed but the banner is still
+// in the DOM, so the same control is mistaken for one that "did not close it". Wait for the tagged
+// control to actually leave the DOM instead, bounded so a genuinely dead click still settles.
+async function __overlayCleared(evaluate, token, timeoutMs = 3000) {
+  var deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    var present = await evaluate(
+      (t) => !!document.querySelector('[data-aeon-t="' + t + '"]'),
+      token,
+    ).catch(() => false);
+    if (!present) return true;
+    await __sleep(100);
+  }
+  return false;
+}
 async function __overlayRound(target, accept) {
   var token = 'o' + (++__tagSeq), page = browser.page(target);
   var hit = await page.inspect(__pageOverlay, {token, accept});
-  if (hit) return hit.blocked ? hit : {...hit, act: () => page.locator('[data-aeon-t="' + token + '"]').click()};
+  if (hit) return hit.blocked ? hit : {
+    ...hit,
+    act: () => page.locator('[data-aeon-t="' + token + '"]').click(),
+    cleared: () => __overlayCleared((fn, arg) => page.inspect(fn, arg), token),
+  };
   // Consent tools that live in their own iframe.
   for (var frame of await __otherFrames(target, __CONSENT_FRAMES)) {
     var inFrame = await frame.evaluate(__pageOverlay, {token, accept}).catch(() => null);
-    if (inFrame && !inFrame.blocked) return {...inFrame, act: () => frame.click('[data-aeon-t="' + token + '"]')};
+    if (inFrame && !inFrame.blocked) return {
+      ...inFrame,
+      act: () => frame.click('[data-aeon-t="' + token + '"]'),
+      cleared: () => __overlayCleared((fn, arg) => frame.evaluate(fn, arg), token),
+    };
   }
   return null;
 }
@@ -643,7 +667,8 @@ async function __dismissOverlays(target, options = {}) {
     previous = key;
     await hit.act();
     dismissed.push({kind: hit.kind, clicked: hit.label});
-    await __sleep(400);
+    // Wait for this click's own effect, not a wall-clock nap, before looking for the next overlay.
+    await hit.cleared();
   }
   return {dismissed, ...(left ? {left} : {})};
 }
