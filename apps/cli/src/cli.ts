@@ -5,5 +5,6 @@ const argv = process.argv.slice(2);
 const help = argv.some((arg) => arg === "--help" || arg === "-h");
 if (argv[0] === "repl" && !help) {
   const { runRepl } = await import("./repl-fast.js");
-  process.exit(await runRepl(argv));
+  const { exitAfterFlush } = await import("./exit.js");
+  await exitAfterFlush(await runRepl(argv));
 } else await import("./cli-main.js");
