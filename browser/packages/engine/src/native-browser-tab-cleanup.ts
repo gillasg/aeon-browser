@@ -64,6 +64,49 @@ export function touchAgentTab(tabId: number): void {
   save();
 }
 
+/**
+ * A cell that timed out or was reset still opened tabs: keep them with its chat, so only the
+ * normal end-of-run tidy closes them. Re-tracking also covers a reset that dropped the realm
+ * before the open step's own bookkeeping ran. Borrowed tabs are never passed here.
+ */
+export function keepAgentTabs(
+  chatId: string,
+  targets: readonly { tabId: number; url?: string }[],
+): void {
+  let changed = false;
+  for (const { tabId, url } of targets) {
+    const entry = tracked.get(tabId);
+    if (entry) {
+      entry.chatId = chatId;
+      entry.touched = Date.now();
+    } else {
+      tracked.set(tabId, {
+        touched: Date.now(),
+        chatId,
+        ...(url ? { url } : {}),
+      });
+    }
+    changed = true;
+  }
+  if (changed) save();
+}
+
+/**
+ * The tabs a failed cell's steps opened, kept for its chat until the normal tidy. Only openTab
+ * steps count: attachTab also returns a tab, but that tab is the user's or another chat's and the
+ * tidy must never close it.
+ */
+export function keepStepsTabs(chatId: string, steps: readonly Record<string, unknown>[]): void {
+  const targets = steps.flatMap((step) => {
+    if ((step.action as { op?: unknown } | undefined)?.op !== "openTab") return [];
+    const result = step.result as
+      { kind?: unknown; tab?: { target?: { tabId?: unknown } } } | undefined;
+    const tabId = result?.kind === "tab" ? result.tab?.target?.tabId : undefined;
+    return typeof tabId === "number" ? [{ tabId }] : [];
+  });
+  keepAgentTabs(chatId, targets);
+}
+
 // Activations Aeon causes itself (pairing a tab with the chat in Split View, working in front)
 // fire the same Chrome event as the user's own clicks. They must not count as the user looking:
 // a tab only Aeon showed is still the agent's, grouped while kept and closed at the run's end.

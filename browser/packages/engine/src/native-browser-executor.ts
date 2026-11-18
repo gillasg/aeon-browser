@@ -18,6 +18,7 @@ import {
   reconnectBrowserSession,
   assertRequestActive,
   bindBrowserSession,
+  browserSessionHolder,
   handleBrowserRelease,
   registerBrowserRequest,
   completeBrowserRequest,
@@ -549,6 +550,10 @@ async function executeStep(
   if (step.op === "listTabs") return listTabs(request);
   if (step.op === "openTab") return openTab(identity, request);
   if (step.op === "attachTab") return attachTab(step.target);
+  // A tab another chat is driving is still usable, but it gets a short wait: a busy tab there
+  // must fail with TAB_BUSY, not hold this cell until its own deadline.
+  const holder = browserSessionHolder(step.target.tabId);
+  const budgetMs = holder && holder !== request.chatId ? 5000 : undefined;
   if (controlOf(step.target.tabId) === "user" && step.op !== "control" && step.op !== "session")
     throw new Error(controlError(step.target.tabId));
   // The user clicked or typed here: wait until they are done, then carry on with this step.
@@ -580,6 +585,7 @@ async function executeStep(
       }
     },
     tab.windowId,
+    budgetMs,
   );
 }
 

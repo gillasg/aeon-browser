@@ -44,6 +44,26 @@ let output = "";
 let asynchronousError: string | undefined;
 let stopped = false;
 
+/** A promise that outlives `ms` fails; the cell still posts its result. */
+function bounded<T>(work: T | Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("TIMEOUT: final observation did not answer")),
+      ms,
+    );
+    Promise.resolve(work).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function format(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === undefined) return "undefined";
@@ -191,8 +211,10 @@ async function run(message: Record<string, unknown>): Promise<void> {
   } catch {
     // The report is a hint; a cell never fails on it.
   }
+  // The final observation is not the cell's work: it must never burn the whole deadline when a
+  // tab is hung or held by another chat. Give it a short, fixed budget and still answer.
   try {
-    await evaluate("__finishCell()");
+    await bounded(evaluate("__finishCell()"), 5000);
   } catch (caught) {
     print("Final observation unavailable:", String(caught));
   }

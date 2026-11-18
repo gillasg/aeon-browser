@@ -36,6 +36,8 @@ export const BrowserTabSchema = z
     mine: z.boolean().optional(),
     /** Who is driving: the agent (default) or the user, after taking the tab over. */
     control: z.enum(["agent", "user"]).optional(),
+    /** True when another chat is driving this tab; browser.activeTab() skips it. */
+    heldByOther: z.boolean().optional(),
     /** Stable session label (p1, p2…), accepted anywhere a tab id is. */
     label: z
       .string()

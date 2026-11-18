@@ -9,6 +9,7 @@ import {
   currentInventoryTabs,
   refreshInventoryTab,
 } from "./native-inventory-client.js";
+import { browserSessionHolder } from "./native-browser-session.js";
 import { ensureAgentTabsRestored, mineTabIds } from "./native-browser-tab-cleanup.js";
 import { safePage, sameTarget } from "./native-browser-common.js";
 import { controlOf } from "./native-browser-control.js";
@@ -35,6 +36,12 @@ export async function listTabs(request: BrowserExecutorRequest): Promise<Browser
       ...tab,
       mine: mine.has(tab.target.tabId),
       control: controlOf(tab.target.tabId),
+      // The user's active tab is available to any chat, but a tab another chat is driving is
+      // not: default-tab picks must not hand it over or start a cross-chat CDP wait.
+      heldByOther: (() => {
+        const holder = browserSessionHolder(tab.target.tabId);
+        return holder !== undefined && holder !== request.chatId;
+      })(),
       ...(labelOf(request.chatId, tab.target.tabId)
         ? { label: labelOf(request.chatId, tab.target.tabId) }
         : {}),

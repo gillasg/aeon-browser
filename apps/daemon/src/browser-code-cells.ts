@@ -251,6 +251,8 @@ function rememberOpened(
   steps: Record<string, unknown>[],
 ): void {
   for (const step of steps) {
+    // attachTab also returns a tab, but it is the user's or another chat's: never adopt it.
+    if ((step.action as { op?: unknown } | undefined)?.op !== "openTab") continue;
     const result = step.result as { kind?: unknown; tab?: { target?: unknown } } | undefined;
     if (result?.kind !== "tab") continue;
     const target = BrowserTargetKeySchema.safeParse(result.tab?.target);
