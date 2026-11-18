@@ -4,6 +4,7 @@ import recording from "./recording.json";
 import { emptyEdit, OUTPUTS, style } from "./presets";
 import { fromEvents } from "./zooms-from-events";
 import { Video } from "./Video";
+import { rawDurationInFrames, rawProps, RAW_FPS } from "./raw";
 import type { Frame, RecordingEvents, RenderProps, Style, Theme, FrameKind } from "./types";
 
 const events = recording as unknown as RecordingEvents;
@@ -82,6 +83,16 @@ const Root: React.FC = () => (
       fps={30}
       width={1080}
       height={1080}
+    />
+    {/* The one-command demo render: a real-window take, full-bleed, no invented effects. */}
+    <Composition
+      id="RecordingVertical"
+      component={Video}
+      defaultProps={rawProps()}
+      durationInFrames={rawDurationInFrames()}
+      fps={RAW_FPS}
+      width={720}
+      height={1280}
     />
   </>
 );

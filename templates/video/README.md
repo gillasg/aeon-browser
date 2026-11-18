@@ -102,6 +102,20 @@ edge to edge and show the real pointer — do not draw a second cursor over them
 **Honesty rule:** zooms, speed-ups and the cursor come only from `events.json`. Never show Aeon
 doing anything it did not do. A log with no events produces no zooms, no speed badge and no cursor.
 
+## One-command demo video (recording Chrome, separate from eval)
+
+The VPS has a second, branded Chrome on its own Xvfb display and profile, connected to the same
+daemon as browser `recording`; eval and its services are never touched. The profile loads Aeon
+unpacked via Developer mode Preferences (branded Chrome ignores `--load-extension`) and holds the
+native host manifest plus `agentInFront`/cursor settings for filming. Setup is idempotent.
+From this kit: `npm install` once, then
+`scripts/demo-video.sh "<task>" [--out out/demo.mp4] [--fps 15] [--max-seconds 30]`.
+Set `AEON_RECORDING_PROXY` (e.g. a socks5 URL) to film through another network exit.
+It starts `aeon record start --window chrome`, runs `aeon run --browser recording "<task>"`, stops
+with `--chat <id>` (real actions in `events.json`), copies frames + log in, and renders
+`RecordingVertical`: 720×1280, ≤30 s, H.264, real frames edge to edge, Aeon's own cursor only — no drawn
+cursor, zooms, captions, speed-ups or title cards. Prints the output path. One render at a time.
+
 ## Files
 
 | File | What it is |
