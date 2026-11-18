@@ -273,3 +273,32 @@ function runCli(args, env) {
     child.on("close", (code) => resolve({ code, stderr, stdout }));
   });
 }
+
+test("the report keeps enough of each tool result for a grader to see what was read", () => {
+  const page = "Menu ".repeat(150) + "DEFINITION: perfect, with no problems";
+  const result = summarize(
+    "chat-2",
+    "Define a word",
+    {
+      chat: { chatId: "chat-2", title: "Define a word" },
+      runState: "idle",
+      contextUsage: null,
+      entries: [
+        entry({
+          role: "assistant",
+          content: [
+            { type: "tool-call", toolCallId: "a", toolName: "browser_code", arguments: {} },
+          ],
+        }),
+        entry({
+          role: "tool",
+          toolCallId: "a",
+          content: [{ type: "text", text: `value: "${page}"` }],
+        }),
+      ],
+    },
+    1_000,
+    "finished",
+  );
+  assert.match(result.trace[0].summary, /DEFINITION: perfect/);
+});
