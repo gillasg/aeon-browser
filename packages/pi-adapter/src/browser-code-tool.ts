@@ -27,6 +27,7 @@ import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
 import { formatCell } from "./cell-grammar.js";
 export { formatStepLine } from "./cell-grammar.js";
 import { cellTimeoutMs } from "./run-budget.js";
+import { cellSleepMs, cellSleepRefusal } from "./cell-sleep-guard.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
@@ -64,16 +65,33 @@ export interface BrowserCodeOptions {
 
 export type BrowserNameProvider = (chatId: string) => Promise<string | undefined>;
 
+function tooLongCell(
+  envelope: () => object,
+  timeoutMs: number,
+  sleepMs: number,
+): ReturnType<typeof offlineCell> {
+  return {
+    content: browserContent(
+      JSON.stringify({ ...envelope(), error: cellSleepRefusal(timeoutMs, sleepMs) }),
+    ),
+    isError: true,
+    details: undefined,
+  };
+}
+
 function openCell(
   run: BrowserToolRunner | undefined,
   chatId: string,
   envelope: () => object,
+  code: string,
 ):
   | { ok: true; timeoutMs: number; run: BrowserToolRunner }
   | { ok: false; result: ReturnType<typeof offlineCell> } {
   if (!run) return { ok: false, result: offlineCell(envelope) };
   const timeoutMs = cellTimeoutMs(chatId, CELL_TIMEOUT_MS);
   if (timeoutMs <= 0) return { ok: false, result: spentBudget(envelope) };
+  const sleepMs = cellSleepMs(code);
+  if (sleepMs > timeoutMs) return { ok: false, result: tooLongCell(envelope, timeoutMs, sleepMs) };
   return { ok: true, timeoutMs, run };
 }
 
@@ -157,7 +175,7 @@ export function createBrowserCodeTool(
           content: browserContent(JSON.stringify(envelope())),
           details: liveDetails(progress, steps),
         });
-      const opened = openCell(run, chatId, envelope);
+      const opened = openCell(run, chatId, envelope, code);
       if (!opened.ok) return opened.result;
       const timeoutMs = opened.timeoutMs;
       // A steer while the cell hands off to the user ends the cell, so the model reads it now.
