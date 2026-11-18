@@ -11,6 +11,12 @@ export function EmptyChatStart(props: ChatSurfaceProps): ReactElement {
           modelCatalog: controls
             ? { models: controls.availableModels, defaultModel: controls.effectiveModel }
             : null,
+          // An empty Chat is still a Chat: keep the same model-management capability as the
+          // composer's pickers, so "Add or manage models" stays reachable from a brand-new chat.
+          ...(props.composer.onManageModels
+            ? { onConnectModel: props.composer.onManageModels }
+            : {}),
+          ...(props.composer.modelLogin ? { modelLogin: props.composer.modelLogin } : {}),
           chatId: props.chatId,
           browserContext: props.composer.browserContext,
           onRemoveContext: props.composer.onRemoveBrowserContext,
