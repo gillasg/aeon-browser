@@ -97,7 +97,14 @@ test("a cell that times out still hands the tabs it opened to its chat", async (
       {
         kind: "browser.code.progress",
         cellId: messages[0].cellId,
-        steps: [{ action: { op: "openTab" }, result: { kind: "tab", tab: { target } } }],
+        steps: [
+          { action: { op: "openTab" }, result: { kind: "tab", tab: { target } } },
+          // A tab the cell only attached to is the user's: never handed to the chat.
+          {
+            action: { op: "attachTab" },
+            result: { kind: "tab", tab: { target: { ...target, tabId: 99 } } },
+          },
+        ],
         stage: "evaluating",
       },
       connection,

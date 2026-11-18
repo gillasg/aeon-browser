@@ -40,24 +40,42 @@ export function lockScope(step: BrowserStep, tabId: number, windowId?: number): 
   return undefined;
 }
 
-export async function inTabQueue<T>(tabId: number, work: () => Promise<T>): Promise<T> {
+export async function inTabQueue<T>(
+  tabId: number,
+  work: () => Promise<T>,
+  deadline?: number,
+): Promise<T> {
   const queue = queues.get(tabId) ?? { tail: Promise.resolve(), depth: 0 };
   queues.set(tabId, queue);
   queue.depth += 1;
-  const run = queue.tail.then(work, work);
-  queue.tail = run.then(
-    () => undefined,
-    () => undefined,
-  );
+  // An unbounded queue wait let a cell burn its whole deadline behind one hung step on the tab,
+  // especially when another chat held it. Bound the wait and never start work after giving up.
+  let expired = false;
+  const run = withDeadline(
+    queue.tail,
+    remaining(deadline),
+    `TAB_BUSY: tab ${tabId} is busy with an earlier step`,
+  ).then(() => (expired ? (undefined as T) : work()));
+  // The next step waits for the earlier work too, even when this one gave up waiting for it:
+  // two steps must never run on one tab at once.
+  const previous = queue.tail;
+  queue.tail = Promise.allSettled([previous, run]).then(() => undefined);
   try {
     return await run;
+  } catch (error) {
+    expired = true;
+    throw error;
   } finally {
     queue.depth -= 1;
     if (queue.depth === 0 && queues.get(tabId) === queue) queues.delete(tabId);
   }
 }
 
-export async function withLock<T>(scope: string, work: () => Promise<T>): Promise<T> {
+export async function withLock<T>(
+  scope: string,
+  work: () => Promise<T>,
+  deadline?: number,
+): Promise<T> {
   const gate = gates.get(scope) ?? { tail: Promise.resolve(), held: false, waiting: 0 };
   gates.set(scope, gate);
   const previous = gate.tail;
@@ -68,7 +86,7 @@ export async function withLock<T>(scope: string, work: () => Promise<T>): Promis
   gate.waiting += 1;
   let acquired = false;
   try {
-    await withDeadline(previous, writeWaitMs, `BUSY_TIMEOUT: ${scope} was busy for 30s`);
+    await withDeadline(previous, remaining(deadline), `BUSY_TIMEOUT: ${scope} was busy`);
     acquired = true;
     gate.held = true;
     return await work();
@@ -117,17 +135,33 @@ export async function scheduleStep<T>(
   tabId: number,
   dispatch: () => Promise<T>,
   windowId?: number,
+  budgetMs = writeWaitMs,
 ): Promise<T> {
   const scope = lockScope(step, tabId, windowId);
   if (!scope) return dispatch();
   const queued = Date.now();
-  return inTabQueue(tabId, () =>
-    withLock(scope, () => {
-      const waited = Date.now() - queued;
-      if (waited >= WAIT_NOTE_MS) writeWaits.set(tabId, waited);
-      return dispatch();
-    }),
+  // One budget for both waits: a cell must never spend its whole deadline queued behind a step
+  // that belongs to another chat (or a call that hung) before it even starts its own work.
+  const deadline = queued + budgetMs;
+  return inTabQueue(
+    tabId,
+    () =>
+      withLock(
+        scope,
+        () => {
+          const waited = Date.now() - queued;
+          if (waited >= WAIT_NOTE_MS) writeWaits.set(tabId, waited);
+          return dispatch();
+        },
+        deadline,
+      ),
+    deadline,
   );
+}
+
+/** Wait budget left for one queue or lock, with a floor so a stale deadline still makes progress. */
+function remaining(deadline?: number): number {
+  return deadline === undefined ? writeWaitMs : Math.max(1, deadline - Date.now());
 }
 
 /** How long the last write in a tab waited for a shared lock, when it was long. */

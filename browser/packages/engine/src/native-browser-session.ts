@@ -90,6 +90,16 @@ export function browserSessionOwner(tabId: number): string | undefined {
   return owners.get(followReplacement(tabId));
 }
 
+/**
+ * The chat actively driving a tab: its debugger is attached for that chat's steps. An owner that
+ * has gone idle (or was only borrowed once) is not a holder, so a user can hand a tab to another
+ * chat after a pause. Two chats driving one tab at once is never legitimate: the second must fail
+ * fast rather than queue behind CDP calls on a tab the first chat owns.
+ */
+export function browserSessionHolder(tabId: number): string | undefined {
+  return attachments.get(followReplacement(tabId))?.chatId;
+}
+
 export function bindBrowserSession(tabId: number, chatId: string): void {
   owners.set(tabId, chatId);
   persistBrowserOwners(owners);

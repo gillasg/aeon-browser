@@ -60,7 +60,7 @@ import { handOffToUser, takeTypedAnswer } from "./native-browser-handoff.js";
 import { engineDebug } from "./native-debug-log.js";
 import { presentBrowserTask, presentsBrowserTask } from "./native-browser-layout.js";
 import { engineConfig } from "./engine-config.js";
-import { agentTabSummary, unusedAgentTabs } from "./native-browser-tab-cleanup.js";
+import { agentTabSummary, keepStepsTabs, unusedAgentTabs } from "./native-browser-tab-cleanup.js";
 import { setOwnerTitle } from "./native-browser-owner.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
@@ -234,6 +234,8 @@ function finalize(
 ): void {
   cells.delete(cell.run.cellId);
   void releaseTabs(cell.guarded);
+  // A failed cell's opened tabs stay with the chat until the normal end-of-run tidy.
+  if (result.error) keepStepsTabs(cell.run.chatId, cell.steps);
   for (const waiter of cell.calls.values()) waiter.reject(new Error("Browser cell finished"));
   const used = new Set<number>();
   for (const entry of cell.steps) {

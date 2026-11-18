@@ -220,10 +220,10 @@ var browser = Object.freeze({
   },
   // The tab the user is looking at: the active tab of the window they last focused, as a page.
   activeTab: async () => {
-    var tabs = await browser.tabs();
+    var tabs = (await browser.tabs()).filter(tab => !tab.heldByOther);
     var tab = tabs.find(listed => listed.active && (__focusedWindowId === undefined || listed.windowId === __focusedWindowId))
       || tabs.find(listed => listed.active);
-    if (!tab) throw Error('TARGET_LOST: the active tab is not a web page (a new tab or browser page). browser.openTab(url) opens in the background: keep the page it returns (const p = await browser.openTab(url)) instead of calling browser.activeTab()');
+    if (!tab) throw Error('TARGET_LOST: the active tab is not one this chat can use (it is a new tab, a browser page, or a tab another chat is driving). browser.openTab(url) opens in the background: keep the page it returns (const p = await browser.openTab(url)) instead of calling browser.activeTab()');
     await browser.attachTab(tab.target);
     return tab;
   },
