@@ -97,6 +97,20 @@ test(
   },
 );
 
+test("aeon record start --tabs fails clearly instead of leaving an empty folder", async () => {
+  const home = await mkdtemp(join(tmpdir(), "aeon-record-tabs-"));
+  try {
+    const folder = join(home, "tabs-recording");
+    const result = await aeon(home, ["record", "start", "--tabs", "--out", folder]);
+    assert.notEqual(result.code, 0, "tabs mode refuses to start");
+    assert.match(result.stderr + result.stdout, /--tabs is unavailable/);
+    assert.match(result.stderr + result.stdout, /no daemon API to collect/);
+    assert.equal(existsSync(folder), false, "no empty folder is left behind");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test("aeon video kit copies the Remotion starter kit without adding a dependency to Aeon", async () => {
   const home = await mkdtemp(join(tmpdir(), "aeon-kit-"));
   try {

@@ -39,7 +39,9 @@ test(
       if (path.startsWith("/silent")) {
         response.setHeader("content-type", "text/html");
         response.end(
-          `<title>Silent card</title><div id="card" style="width:240px;height:120px;border:1px solid;position:relative"><span id="open" style="position:absolute;right:4px;top:4px;padding:8px">Open details</span></div><p id="out"></p><script>document.getElementById('open').addEventListener('click', () => { document.getElementById('out').textContent = 'opened'; });</script>`,
+          // No favicon request: a request landing in the click's settle window marks the page
+          // active and suppresses the "nothing happened" note, which made this flake on macOS.
+          `<title>Silent card</title><link rel="icon" href="data:,"><div id="card" style="width:240px;height:120px;border:1px solid;position:relative"><span id="open" style="position:absolute;right:4px;top:4px;padding:8px">Open details</span></div><p id="out"></p><script>document.getElementById('open').addEventListener('click', () => { document.getElementById('out').textContent = 'opened'; });</script>`,
         );
         return;
       }
@@ -149,7 +151,8 @@ test(
             "repl",
             "--session",
             "silent-click",
-            `page = await browser.openTab(${JSON.stringify(siteUrl + "silent")});
+            `page = await browser.openTab(${JSON.stringify(siteUrl + "silent")}, { foreground: true });
+            await page.waitForSelector("#open");
             const result = await page.locator("#card").click();
             const before = await page.textContent("#out");
             await page.locator("#open").click();

@@ -63,6 +63,10 @@ function optionsOf(args: Args): RecordOptions {
 
 async function start(args: Args): Promise<number> {
   const opts = optionsOf(args);
+  if (opts.source === "tabs")
+    throw new Error(
+      "--tabs is unavailable: Aeon has no daemon API to collect a chat's tab takes into a recording folder; use --window chrome or --screen instead.",
+    );
   const folder = defaultFolder(opts.out);
   mkdirSync(folder, { recursive: true });
   remember(folder, opts.out);
@@ -160,8 +164,9 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
        aeon record gif|video|trace …   (the original screen recordings)
 
 start captures the real window (x11grab on Linux, avfoundation on macOS, gdigrab on
-Windows) into a folder with frames, clip.mp4 and events.json. --tabs uses Aeon's own
-hidden tab takes instead of a screen. stop finalises the clip and writes the event log.
+Windows) into a folder with frames, clip.mp4 and events.json. --tabs is unavailable:
+Aeon has no daemon API to collect a chat's tab takes into the folder. stop finalises the
+clip and writes the event log.
 The folder is a recording, not a video: render it with Remotion (see \`aeon video kit\`).`,
     run: async (args: Args) => {
       const action = args.positional[0];

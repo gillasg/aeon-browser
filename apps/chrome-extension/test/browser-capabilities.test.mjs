@@ -62,12 +62,14 @@ async function frameCase(f) {
   await new Promise((resolve) => server.listen(0, "0.0.0.0", resolve));
   try {
     await f.send("Page.navigate", { url: "http://127.0.0.1:" + server.address().port + "/" });
+    // The frame tree learns the child before the auto-attach event gives it its own renderer
+    // session. Wait for both things the assertions below need, not just the first one to arrive.
     let child;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 60; i++) {
       child = (await f.api.discoverFrames(f.debuggee)).find((frame) =>
         frame.url.includes("localhost"),
       );
-      if (child?.frameKey.split(":").at(-1)) break;
+      if (child?.frameKey?.split(":").at(-1) && child.sessionId) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.ok(child);
@@ -154,11 +156,16 @@ async function viewportCase(f) {
   await f.api.ensureBrowserViewport(1);
   assert.equal((await f.send("Page.getLayoutMetrics")).cssVisualViewport.clientWidth, 1280);
   await f.api.restoreBrowserViewport(1);
-  // CDP acknowledges the clear before the renderer applies the next layout.
-  await f.evaluate(
-    "new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))",
-  );
-  assert.equal((await f.send("Page.getLayoutMetrics")).cssVisualViewport.clientWidth, before);
+  // CDP acknowledges the clear before the renderer applies the next layout. Poll the metric we
+  // actually assert, not a fixed delay or animation frames (a background tab gets no frames):
+  // slow Windows runners can take longer than a tick, and a short wait saw 1280 instead of 764.
+  let width = 1280;
+  for (let i = 0; i < 60; i++) {
+    width = (await f.send("Page.getLayoutMetrics")).cssVisualViewport.clientWidth;
+    if (width === before) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(width, before);
 }
 
 async function eventsCase(f, request) {
