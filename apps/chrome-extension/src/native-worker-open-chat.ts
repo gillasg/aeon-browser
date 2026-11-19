@@ -1,4 +1,5 @@
 import { NativeOpenChatSchema } from "@aeon/protocol";
+import { trackAgentTab } from "@browserkit/engine/native-browser-tab-cleanup";
 import { recordChatTab } from "@browserkit/engine/native-browser-takes";
 import { chatUrl, findExistingChat } from "./native-worker-tabs.js";
 
@@ -86,5 +87,11 @@ async function openChat(chatId: string, active: boolean): Promise<number | undef
     active,
     ...(window?.id !== undefined ? { windowId: window.id } : {}),
   });
+  // A tab Core opened for a chat is Aeon's, not the user's. Registering it with the ordinary agent
+  // tab tracker lets the existing idle sweep close it after a run, so a batch of chats (an eval
+  // suite, for instance) does not leave one live chat page per task spinning in the background.
+  // A chat opened in front of the user is theirs to keep: only background chat tabs are tracked.
+  if (created.id !== undefined && !active)
+    trackAgentTab(created.id, chatId, { url: chatUrl(chatId) });
   return created.id;
 }

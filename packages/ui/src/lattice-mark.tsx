@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactElement } from "react";
+import { runVisibleFrames } from "./visible-work.js";
 
 // Aeon's mark on home: a globe drawn as dotted latitude and longitude lines. It turns very slowly
 // at rest and faster while agents work. The orb on web pages stays the nebula swarm.
@@ -24,7 +25,7 @@ export function LatticeMark({
   useEffect(() => {
     const context = canvas.current?.getContext("2d");
     if (!context) return;
-    return animate(context, size, turning, shades(context.canvas));
+    return animate(context, size, turning, shades(context.canvas), context.canvas);
   }, [size, turning]);
   return (
     <canvas
@@ -72,19 +73,24 @@ function animate(
   size: number,
   turning: boolean,
   colors: [string, string],
+  canvas: HTMLCanvasElement,
 ): () => void {
   const points = latticePoints(size);
   context.setTransform(2, 0, 0, 2, 0, 0);
-  const still = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   const pace = turning ? PACE.working : PACE.rest;
-  let frame = 0;
+  const still =
+    !turning || (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+  // At rest the mark turns once every 24 s: that is imperceptible, so idle draws one frame and
+  // schedules nothing. It only loops while agents are working and the page can be seen.
+  if (still) {
+    paint(context, points, size, colors, REST);
+    return () => {};
+  }
   const start = performance.now();
-  const draw = (time: number): void => {
+  const draw = (time: number): void =>
     paint(context, points, size, colors, REST + (time - start) / pace);
-    if (!still) frame = requestAnimationFrame(draw);
-  };
   draw(start);
-  return () => cancelAnimationFrame(frame);
+  return runVisibleFrames(canvas, draw, 8);
 }
 
 function paint(
