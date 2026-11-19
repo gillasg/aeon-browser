@@ -32,6 +32,9 @@ test(
     const { port } = server.address();
     const command = [
       `. '${script.replaceAll("'", "''")}'`,
+      // Warm up first: a cold runner's first TcpClient load takes about a second, which is not
+      // the budget under test.
+      "Test-CorePing 1 | Out-Null",
       "$sw = [Diagnostics.Stopwatch]::StartNew()",
       `Test-CorePing ${port} | Out-Null`,
       "Write-Output $sw.ElapsedMilliseconds",

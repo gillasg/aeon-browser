@@ -31,8 +31,8 @@ function Test-DaemonHealth {
 
 function Test-CorePing([int]$Port) {
     # One 2s budget for connect, handshake, and the ping. Each step uses only the time left.
-    $client = New-Object Net.Sockets.TcpClient
     $deadline = [DateTime]::UtcNow.AddSeconds(2)
+    $client = New-Object Net.Sockets.TcpClient
     try {
         $left = [int]($deadline - [DateTime]::UtcNow).TotalMilliseconds
         if ($left -le 0 -or -not $client.ConnectAsync('127.0.0.1', $Port).Wait($left)) { return $false }

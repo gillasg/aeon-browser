@@ -66,3 +66,38 @@ test("invalid completion metadata cannot prevent Core startup", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("attention stays bounded: old records are dropped and a refused claim is never re-decided", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-attention-bounded-"));
+  let publish;
+  let lookups = 0;
+  const service = {
+    getChat: () => {
+      lookups += 1;
+      return { origin: "cli" };
+    },
+    subscribeAllEvents: (listener) => {
+      publish = listener;
+      return () => {};
+    },
+  };
+  const attention = new CoreAttention(directory, service);
+  try {
+    for (let index = 0; index < 260; index += 1) {
+      const chatId = randomUUID();
+      publish(chatId, { kind: "run-state", state: "running-unconfirmed" });
+      publish(chatId, { kind: "run-state", state: "idle" });
+    }
+    const chats = attention.snapshot().chats;
+    assert.ok(chats.length <= 200, `records: ${chats.length}`);
+    const { chatId, completionId } = chats.at(-1);
+    const request = { kind: "core.attention.claim", chatId, completionId };
+    assert.equal(attention.handle({}, request).granted, false);
+    lookups = 0;
+    assert.equal(attention.handle({}, request).granted, false);
+    assert.ok(lookups <= 1, "a decided claim does not re-check the chat's origin");
+  } finally {
+    await attention.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
