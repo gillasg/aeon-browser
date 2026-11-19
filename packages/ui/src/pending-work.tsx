@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { MiniSwarm } from "./mini-swarm.js";
+import { runVisibleInterval } from "./visible-work.js";
 
 // Motion, not status text: while Aeon connects or starts, the swarm says so; the words stay for
 // screen readers. Once work has started, the elapsed time is real information, so it shows.
@@ -14,8 +15,9 @@ export function PendingWork({
     [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (connecting || preparing) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    // The elapsed seconds are only information while someone can see them; a hidden chat tab
+    // must not re-render once a second for a number nobody is reading.
+    return runVisibleInterval(() => setNow(Date.now()), 1000);
   }, [connecting, preparing]);
   const waiting = connecting || preparing;
   return (

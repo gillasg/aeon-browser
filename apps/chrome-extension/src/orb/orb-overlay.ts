@@ -67,6 +67,13 @@ export class OrbOverlay {
   private readonly timers = new Set<number>();
   private readonly stopWatching: () => void;
   private raf = 0;
+  /** Frame cap: the cursor eases over hundreds of ms, so 30 fps is already more than enough. */
+  private frameLast = 0;
+  private readonly frameGap = 1000 / 30;
+  /** Cached once per label change; reading offsetWidth every frame forces a synchronous layout. */
+  private pillWidth = 0;
+  private frameW = -1;
+  private frameH = -1;
   /** False until the saved position loads, so a new page never shows the cursor sliding in. */
   private placed = false;
   private summonKey = "";
@@ -88,7 +95,8 @@ export class OrbOverlay {
     this.stopWatching = watchOrbPosition((position) => this.moveHome(position));
     addEventListener("resize", this.resize);
     addEventListener("pointerdown", this.clickAway, { capture: true });
-    this.raf = requestAnimationFrame(this.tick);
+    document.addEventListener("visibilitychange", this.onVisibility);
+    this.onVisibility();
   }
 
   get bubbleOpen(): boolean {
@@ -141,6 +149,8 @@ export class OrbOverlay {
     this.pill.dataset.state = this.state;
     this.pillLabel.textContent = this.label;
     this.pillLabel.title = this.label;
+    // One layout read when the label changes, instead of one on every animation frame.
+    this.pillWidth = this.pill.hidden ? 0 : this.pill.offsetWidth;
   }
 
   /** The setting in Aeon adds to the system's reduce-motion; it never turns that off. */
@@ -155,6 +165,7 @@ export class OrbOverlay {
     clearTimeout(this.fadeTimer);
     removeEventListener("resize", this.resize);
     removeEventListener("pointerdown", this.clickAway, { capture: true });
+    document.removeEventListener("visibilitychange", this.onVisibility);
     this.stopWatching();
     this.host.remove();
     if (!cursorPresent) return;
@@ -321,26 +332,49 @@ export class OrbOverlay {
     this.hideBubble();
   };
 
-  private readonly tick = (): void => {
-    if (!this.acting) this.ensureCursor();
-    const ease = this.reducedMotion ? 1 : 0.16;
-    this.point.x += (this.target.x - this.point.x) * ease;
-    this.point.y += (this.target.y - this.point.y) * ease;
-    if (!this.acting && this.state !== "needs")
-      this.writeSummon(this.drag?.moved === true, this.releasePending);
-    this.releasePending = false;
-    this.placeChrome(this.glyphPoint());
+  /** A hidden tab does no cursor work at all; visibilitychange restarts the loop. */
+  private readonly onVisibility = (): void => {
+    if (document.hidden) {
+      if (this.raf) cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    } else if (!this.raf) {
+      this.frameLast = 0;
+      this.raf = requestAnimationFrame(this.tick);
+    }
+  };
+
+  private readonly tick = (time: number): void => {
+    this.raf = 0;
+    if (document.hidden) return;
+    if (time - this.frameLast >= this.frameGap - 4) {
+      this.frameLast = time;
+      if (!this.acting) this.ensureCursor();
+      const ease = this.reducedMotion ? 1 : 0.16;
+      this.point.x += (this.target.x - this.point.x) * ease;
+      this.point.y += (this.target.y - this.point.y) * ease;
+      if (!this.acting && this.state !== "needs")
+        this.writeSummon(this.drag?.moved === true, this.releasePending);
+      this.releasePending = false;
+      this.placeChrome(this.glyphPoint());
+    }
     this.raf = requestAnimationFrame(this.tick);
   };
 
   /** The box opens beside the cursor's tip, where the pill would be, on the side with room. */
   private placeFrame(at: Point): void {
+    if (!this.open) return; // the closed box is visibility:hidden; don't lay it out every frame
     const { width, height } = this.panel;
     let left = at.x + 24;
     if (left + width > innerWidth - 8) left = at.x - 8 - width;
     const top = clampSize(at.y + 16, 8, innerHeight - height - 8);
-    this.frame.style.width = width + "px";
-    this.frame.style.height = height + "px";
+    if (width !== this.frameW) {
+      this.frame.style.width = width + "px";
+      this.frameW = width;
+    }
+    if (height !== this.frameH) {
+      this.frame.style.height = height + "px";
+      this.frameH = height;
+    }
     this.frame.style.left = clampSize(left, 8, innerWidth - width - 8) + "px";
     this.frame.style.top = top + "px";
     this.frame.style.transformOrigin = left > at.x ? "0 0" : "100% 0";
@@ -356,7 +390,7 @@ export class OrbOverlay {
 
   private placePill(x: number, y: number): void {
     if (this.pill.hidden) return;
-    const width = this.pill.offsetWidth;
+    const width = this.pillWidth;
     const left = x + 24 + width > innerWidth - 8 ? x - 8 - width : x + 24;
     this.pill.style.transform = `translate(${left}px, ${y + 16}px)`;
   }

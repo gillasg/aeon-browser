@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactElement } from "react";
+import { runVisibleFrames } from "./visible-work.js";
 
 // The orb's swarm, small: Aeon's mark on its own pages (home, running cards, the chat's steps).
 // Points spread evenly over a sphere that turns slowly; the near side is lighter, so it reads as
@@ -29,7 +30,7 @@ export function MiniSwarm({
   useEffect(() => {
     const context = canvas.current?.getContext("2d");
     if (!context) return;
-    return animate(context, size, tone, shades(context.canvas, tone));
+    return animate(context, size, tone, shades(context.canvas, tone), context.canvas);
   }, [size, tone]);
   return (
     <canvas
@@ -67,17 +68,19 @@ function animate(
   size: number,
   tone: SwarmTone,
   colors: [string, string],
+  canvas: HTMLCanvasElement,
 ): () => void {
   const points = spherePoints(size < 30 ? 30 : size < 60 ? 60 : 90);
   context.setTransform(2, 0, 0, 2, 0, 0);
   const still = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-  let frame = 0;
-  const draw = (time: number): void => {
-    paint(context, points, size, colors, time / PACE[tone]);
-    if (!still) frame = requestAnimationFrame(draw);
-  };
+  const draw = (time: number): void => paint(context, points, size, colors, time / PACE[tone]);
+  // One still frame keeps the mark from ever flashing blank; the gated loop only runs while the
+  // page is on screen, and slowly enough that 20 fps looks identical to 60.
   draw(still ? 0.6 * PACE[tone] : performance.now());
-  return () => cancelAnimationFrame(frame);
+  if (still) return () => {};
+  // A slow 16px globe: 8 fps is smooth here and costs a third of a 60 fps canvas loop. Combined
+  // with the visibility gate, a hidden or off-screen swarm schedules no frames at all.
+  return runVisibleFrames(canvas, draw, 8);
 }
 
 function paint(
