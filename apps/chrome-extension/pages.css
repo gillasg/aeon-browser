@@ -973,7 +973,6 @@
   --aeon-primary-ink: light-dark(var(--aeon-c-ffffff), var(--aeon-c-0a0a0a));
 }
 .aeon-button[data-tone="primary"],
-.tour-actions .tour-next,
 .learn-row .aeon-button {
   border-color: transparent;
   background: var(--aeon-primary);

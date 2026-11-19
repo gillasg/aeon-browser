@@ -35,7 +35,10 @@ export function chromeFlagsCommand(platform: NodeJS.Platform = process.platform)
   return `google-chrome ${flags}`;
 }
 
-const FLAGS_FIX = `Restart Chrome with these flags: ${chromeFlagsCommand()}`;
+// None of these flags is needed to use Aeon: a normal Chrome launch pairs the extension and runs
+// every tool. They hide Chrome's debugger bar (shown while Aeon drives a page through the debugger) and
+// keep background tabs' timers warm, so this check is informational rather than a gate.
+const FLAGS_FIX = `Optional: relaunch Chrome with ${chromeFlagsCommand()} to hide the debugger bar and keep background tabs fast.`;
 
 export type CheckName =
   | "daemon"
@@ -176,22 +179,14 @@ function extensionCheck(report: HealthView | undefined): Check {
 }
 
 function flagsCheck(lines: string[]): Check {
-  const missing = fewestMissing(lines);
+  const missing = CHROME_FLAGS.filter((flag) => !lines.some((command) => command.includes(flag)));
   if (!missing.length) return line("flags", "ok", "Chrome has Aeon's flags.", FLAGS_FIX);
-  const detail = lines.length
-    ? `Chrome is missing ${missing.join(", ")}.`
-    : "Chrome is not running with Aeon's flags.";
-  return line("flags", "fail", detail, FLAGS_FIX);
-}
-
-/** Flags still absent from the Chrome process that already has the most of them. */
-function fewestMissing(lines: string[]): string[] {
-  return lines.reduce(
-    (fewest, command) => {
-      const missing = CHROME_FLAGS.filter((flag) => !command.includes(flag));
-      return missing.length < fewest.length ? [...missing] : fewest;
-    },
-    [...CHROME_FLAGS],
+  // Not a gate: Aeon works without them; Chrome just shows its debugger bar and slows background tabs.
+  return line(
+    "flags",
+    "ok",
+    "A normal Chrome launch works. Optional flags are off: Chrome shows its debugger bar and slows background tabs.",
+    FLAGS_FIX,
   );
 }
 

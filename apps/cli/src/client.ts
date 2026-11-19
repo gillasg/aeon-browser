@@ -439,7 +439,9 @@ export class AeonClient {
 
   close(): void {
     if (this.pinger) clearInterval(this.pinger);
-    this.socket.close();
+    // The CLI is exiting: drop the socket now instead of waiting for a close handshake that can
+    // keep the process (and a command substitution's stdout pipe) alive for minutes on macOS.
+    this.socket.terminate();
   }
 
   private receive(message: Json): void {

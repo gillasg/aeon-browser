@@ -12,9 +12,9 @@ export function doctorCommand(host: DaemonHost): Command {
     summary: "check that Aeon can run",
     help: `Usage: aeon doctor [--json] [--stealth]
 
-Checks the daemon health ping, protocol versions, the extension and engine, Chrome's flags,
-a signed-in model, the Aeon-Core-Login task, and that data folders are writable. Each line is
-ok or fail with the one fix. --json prints the same checks.
+Checks the daemon health ping, protocol versions, the extension and engine, a normal Chrome
+launch (extra Chrome flags are optional), a signed-in model, the login task, and that data
+folders are writable. Each line is ok or fail with the one fix. --json prints the same checks.
 
 --stealth instead opens one hidden tab and reports WebRTC leaks, exit IP vs time zone and
 languages, and page tells, one line per check with the exact environment fix. It never spoofs.`,

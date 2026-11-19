@@ -2,43 +2,22 @@
 
 A browser agent that lives in your Chrome.
 
-## Install (Windows)
+## Install
 
-In PowerShell:
+One command installs Aeon; `aeon setup` (which the installer already runs) then guides you through the only step Chrome requires. Aeon builds itself, installs the background service and the `aeon` command, opens `chrome://extensions` and puts the extension folder on your clipboard. In that Chrome tab:
 
-```powershell
-irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 | iex
-```
+1. Turn on **Developer mode** (top right).
+2. Click **Load unpacked**.
+3. Paste the folder (Ctrl+V / Cmd+V) and choose it.
 
-Aeon installs everything itself: Git and Node.js if they are missing, the background service that starts at login, and the `aeon` command. It then opens `chrome://extensions` and puts the Aeon folder on your clipboard. Three steps are left in Chrome: turn on **Developer mode** (top right), click **Load unpacked**, then paste the folder (Ctrl+V) and choose it. Aeon notices the moment it connects and finishes on its own. Run the same line again to update; you will not need to do these three steps again.
+Aeon notices the connection, opens its Chat and shows one line about itself with three example tasks. **No Chrome flags are needed**: a normal Chrome launch works. `aeon doctor` checks each piece and names the one fix if something is missing; `aeon setup` repeats the guided steps any time. Re-run the install command to update — the three clicks are needed only once.
 
-Chrome shows a *Disable developer mode extensions* warning at the top. That is normal: Chrome shows it whenever an extension is loaded from a folder on your computer instead of the Chrome Web Store. Aeon is not in the store, so dismiss the warning and leave Developer mode on.
+| OS                   | One-line install                                                                          |
+| -------------------- | ----------------------------------------------------------------------------------------- |
+| Windows (PowerShell) | `irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 \| iex`      |
+| macOS / Linux        | `curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh \| sh` |
 
-## Install (macOS)
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
-```
-
-Aeon installs Git, Node.js and pnpm when they are missing, fetches Aeon into `~/Library/Application Support/Aeon/aeon-browser` (set `AEON_DIR` to choose another folder), builds it, installs the background service that starts at login, and puts the `aeon` command in place. It then opens `chrome://extensions` and puts the Aeon folder on your clipboard. Three steps are left in Chrome: turn on **Developer mode** (top right), click **Load unpacked**, then paste the folder (Cmd+V) and choose it. Aeon notices the moment it connects and finishes on its own. Run the same line again to update; you will not need to do these three steps again.
-
-Chrome shows a *Disable developer mode extensions* warning at the top. That is normal: Chrome shows it whenever an extension is loaded from a folder on your computer instead of the Chrome Web Store. Aeon is not in the store, so dismiss the warning and leave Developer mode on.
-
-## Install (Linux)
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
-```
-
-Aeon installs Git, Node.js and pnpm when they are missing, fetches Aeon into `${XDG_DATA_HOME:-~/.local/share}/aeon/aeon-browser` (set `AEON_DIR` to choose another folder), builds it, installs the background service, and puts the `aeon` command in place. It then opens `chrome://extensions` and puts the Aeon folder on your clipboard. Three steps are left in Chrome: turn on **Developer mode** (top right), click **Load unpacked**, then paste the folder (Ctrl+V) and choose it. Aeon notices the moment it connects and finishes on its own. Run the same line again to update; you will not need to do these three steps again.
-
-Chrome shows a *Disable developer mode extensions* warning at the top. That is normal: Chrome shows it whenever an extension is loaded from a folder on your computer instead of the Chrome Web Store. Aeon is not in the store, so dismiss the warning and leave Developer mode on.
-
-Enable lingering once so the service also runs while you are logged out:
-
-```sh
-sudo loginctl enable-linger "$USER"
-```
+Chrome shows a _Disable developer mode extensions_ banner whenever an extension is loaded from a folder instead of the Chrome Web Store. Aeon is not in the store; dismiss the banner and leave Developer mode on. On Linux, `sudo loginctl enable-linger "$USER"` is optional: it keeps the service running while you are logged out.
 
 Aeon keeps its files in the data folder (`~/.local/share/aeon` on Linux, `~/Library/Application Support/Aeon` on macOS, `%LOCALAPPDATA%\Aeon` on Windows). Updates keep that data. If you start Chrome with a custom `--user-data-dir`, copy `com.aeon.native_host.json` from the default profile into `<user-data-dir>/NativeMessagingHosts/` too.
 

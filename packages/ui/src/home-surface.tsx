@@ -18,7 +18,6 @@ import { HomeCore } from "./home-core.js";
 import type { HomeRunActions, HomeRunPreview } from "./home-live.js";
 import { ActivityPanel } from "./activity-panel.js";
 import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
-import { FirstRunTour } from "./first-run-tour.js";
 import { ModelAccounts } from "./model-accounts.js";
 import { BrowserAccounts } from "./browser-accounts.js";
 import { Segmented } from "./segmented.js";
@@ -223,7 +222,6 @@ function HomeLanding({
 }): ReactElement {
   return (
     <>
-      <FirstRunTour />
       <HomeCore
         working={props.runningChatIds?.size ?? 0}
         waiting={props.needsChatIds?.size ?? 0}

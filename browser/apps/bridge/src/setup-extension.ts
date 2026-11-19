@@ -81,14 +81,33 @@ export function presentExtension(folder: string): void {
   } catch {
     // No clipboard tool: the path is printed anyway.
   }
+  openChromePage("chrome://extensions");
+}
+
+export const AEON_EXTENSION_ID = "npcdopokfkpfmepknhoecppgdgmkmihh";
+
+/** After the extension connects, show the new user Aeon's Chat rather than leaving them on chrome://extensions. */
+export function openFirstRunPage(): void {
+  openChromePage(`chrome-extension://${AEON_EXTENSION_ID}/home.html`);
+}
+
+function openChromePage(page: string): void {
   const open: [string, string[]] =
     process.platform === "win32"
-      ? ["cmd", ["/c", "start", "", "chrome", "chrome://extensions"]]
+      ? ["cmd", ["/c", "start", "", "chrome", page]]
       : process.platform === "darwin"
-        ? ["open", ["-a", "Google Chrome", "chrome://extensions"]]
-        : ["google-chrome", ["chrome://extensions"]];
+        ? ["open", ["-a", "Google Chrome", page]]
+        : ["google-chrome", [page]];
   try {
-    spawn(open[0], open[1], { stdio: "ignore", detached: true, windowsHide: true }).unref();
+    const child = spawn(open[0], open[1], {
+      stdio: "ignore",
+      detached: true,
+      windowsHide: true,
+    });
+    // A missing Chrome is normal (Chrome for Testing, no desktop name): never let the unhandled
+    // 'error' event take down setup. The printed steps say where to go instead.
+    child.on("error", () => undefined);
+    child.unref();
   } catch {
     // Chrome not found under that name: the steps say where to go.
   }

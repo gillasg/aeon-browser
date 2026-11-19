@@ -10,7 +10,7 @@ import {
 import type { ReactElement } from "react";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { ORB_REDUCE_MOTION_KEY, ORB_SOUNDS_KEY } from "./orb-prefs.js";
-import { resetTour } from "./first-run-tour.js";
+import { resetWelcome } from "./new-user-welcome.js";
 import { PrivacySettings } from "./privacy-settings.js";
 import { ActionRow, MenuRow, SettingsGroup, SwitchRow, ValueRow } from "./settings-list.js";
 
@@ -70,11 +70,11 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
         onChange={setSounds}
       />
       <ActionRow
-        label="Tour"
-        detail="The four-step introduction from your first day."
+        label="Welcome"
+        detail="The one-line introduction and example tasks from your first day."
         action="Show again"
         onClick={() => {
-          resetTour();
+          resetWelcome();
           location.assign("home.html");
         }}
       />

@@ -44,6 +44,7 @@ const BOOLEAN = new Set([
   "typed",
   "steer",
   "wait",
+  "yes",
   "secure",
   "site",
   "static",

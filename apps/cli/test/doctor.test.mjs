@@ -25,6 +25,14 @@ test("the flags fix prints the exact relaunch command for each OS", () => {
   }
 });
 
+test("a normal Chrome launch passes the flags check; the flags are optional", () => {
+  const check = doctorChecks(facts({ chromeCommandLines: [] })).find(
+    (item) => item.name === "flags",
+  );
+  assert.equal(check?.status, "ok");
+  assert.match(check?.detail ?? "", /normal Chrome launch/);
+});
+
 function facts(overrides = {}) {
   return {
     daemon: {
@@ -73,9 +81,9 @@ test("each failed check names the one fix", () => {
   assert.equal(byName.protocol.status, "fail");
   assert.equal(byName.extension.status, "fail");
   assert.match(byName.extension.fix, /Aeon extension loaded/);
-  assert.equal(byName.flags.status, "fail");
-  assert.match(byName.flags.detail, /disable-background-timer-throttling/);
-  assert.match(byName.flags.fix, /Restart Chrome with these flags/);
+  assert.equal(byName.flags.status, "ok");
+  assert.match(byName.flags.detail, /normal Chrome launch/);
+  assert.match(byName.flags.fix, /Optional: relaunch Chrome/);
   assert.match(byName.model.fix, /Sign in to a model/);
   assert.match(byName.supervisor.detail, /is not running\./);
   assert.match(byName.supervisor.fix, /Aeon/);

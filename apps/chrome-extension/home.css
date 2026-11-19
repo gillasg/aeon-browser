@@ -1641,91 +1641,36 @@ body[data-embedded="true"] .chat-navigation {
     flex: none;
   }
 }
-.first-run-tour {
-  position: fixed;
-  right: var(--aeon-s-6);
-  bottom: var(--aeon-s-6);
-  z-index: 20;
-  width: min(340px, calc(100vw - 48px));
-  padding: var(--aeon-s-4);
-  border: 1px solid var(--aeon-line);
-  border-radius: var(--aeon-r-md);
-  background: var(--aeon-surface-raised);
-  box-shadow: var(--aeon-elev-3);
-  color: var(--aeon-text);
-  animation: tour-in 420ms var(--aeon-spring) both;
-}
-@keyframes tour-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-}
-.first-run-tour h2 {
-  margin: 0 0 var(--aeon-s-1);
-  font-size: var(--aeon-fs-15);
-}
-.first-run-tour p {
-  margin: 0;
+.new-user-welcome {
+  width: min(100%, 760px);
+  margin: 0 auto var(--aeon-s-4);
   color: var(--aeon-muted);
   font-size: var(--aeon-fs-md);
   line-height: 1.5;
+  text-align: center;
 }
-.first-run-tour .tour-count {
+.new-user-line {
+  margin: 0 0 var(--aeon-s-2);
+}
+.new-user-examples {
   display: flex;
-  gap: 5px;
-  margin-bottom: var(--aeon-s-3);
-}
-.tour-count i {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--aeon-r-3);
-  background: var(--aeon-line);
-  transition:
-    width 300ms var(--aeon-spring),
-    background 300ms var(--aeon-spring);
-}
-.tour-count i[data-on="true"] {
-  width: 16px;
-  background: var(--aeon-accent);
-}
-.tour-actions {
-  display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--aeon-s-2);
-  margin-top: var(--aeon-s-4);
 }
-.tour-actions button {
+.new-user-examples button {
   padding: 6px var(--aeon-s-3);
   border: 1px solid var(--aeon-line);
   border-radius: var(--aeon-r-8);
   background: none;
   color: var(--aeon-text);
   font: inherit;
-  font-size: var(--aeon-fs-md);
+  font-size: var(--aeon-fs-sm);
   cursor: pointer;
 }
-.tour-actions .tour-skip {
-  margin-right: auto;
-  padding-inline: 0;
-  border-color: transparent;
-  color: var(--aeon-muted);
-}
-.tour-actions .tour-skip:hover {
+.new-user-examples button:hover {
+  border-color: var(--aeon-accent);
   color: var(--aeon-text);
-}
-.tour-actions .tour-next {
-  border-color: transparent;
-  background: var(--aeon-accent);
-  color: var(--aeon-accent-ink);
-  font-weight: 600;
-}
-@media (prefers-reduced-motion: reduce) {
-  .first-run-tour,
-  .tour-count i {
-    animation: none;
-    transition: none;
-  }
 }
 .watcher-row {
   display: flex;

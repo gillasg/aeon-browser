@@ -12,6 +12,7 @@ import type { PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
+import { NewUserWelcome } from "./new-user-welcome.js";
 import { PromptField } from "./prompt-field.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
@@ -45,8 +46,16 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
     if (selection.model)
       props.onAsk(value, selection.model, selection.thinkingLevel, files.attachments);
   };
+  const tryExample = (text: string): void => {
+    setQuery(text);
+    requestAnimationFrame(() => document.getElementById("home-query")?.focus());
+  };
+  const needsModel = Boolean(
+    props.modelCatalog && !props.modelCatalog.models.length && props.onConnectModel,
+  );
   return (
     <section className="home-start" aria-label="Ask Aeon">
+      <NewUserWelcome needsModel={needsModel} onExample={tryExample} />
       <ProjectChip name={props.projectName} projectId={props.projectId} />
       <PageContextTray
         chatId={props.chatId}
