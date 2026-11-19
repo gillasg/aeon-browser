@@ -10,6 +10,9 @@ import {
 } from "@aeon/protocol";
 let send: ((request: CoreAttentionRequest) => void) | undefined;
 let pending = Promise.resolve();
+// Each completion is claimed once. Every snapshot lists every unread chat, so re-claiming on each
+// one (a presence ping every 10 s per chat page) turned old unread chats into a constant loop.
+const claimed = new Set<string>();
 export function installCoreAttentionBridge(sender: (request: CoreAttentionRequest) => void): void {
   send = sender;
   sender({ kind: "core.attention.watch" });
@@ -47,11 +50,7 @@ async function mirror(
     if (chat.completionId) values["aeon-completion-id-" + chat.chatId] = chat.completionId;
     if (chat.unread && chat.completionId) {
       values["piper-unread-" + chat.chatId] = "done";
-      send?.({
-        kind: "core.attention.claim",
-        chatId: chat.chatId,
-        completionId: chat.completionId,
-      });
+      claimOnce(chat.chatId, chat.completionId);
     }
   }
   const stale = Object.keys(existing).filter(
@@ -62,6 +61,11 @@ async function mirror(
   );
   if (stale.length) await chrome.storage.session.remove(stale);
   await chrome.storage.session.set(values);
+}
+function claimOnce(chatId: string, completionId: string): void {
+  if (claimed.has(completionId)) return;
+  claimed.add(completionId);
+  send?.({ kind: "core.attention.claim", chatId, completionId });
 }
 chrome.runtime.onMessage.addListener((request, sender) => {
   if (sender.id !== chrome.runtime.id) return;

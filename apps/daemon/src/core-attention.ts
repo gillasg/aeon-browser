@@ -18,6 +18,10 @@ interface AttentionRecord {
   notified: boolean;
 }
 const PROGRAM_ORIGINS = new Set<string>(["cli", "mcp", "agent", "companion"]);
+// Every snapshot carries every record, and the browser answers each unread one with a claim, so
+// the record count must not grow with history: hundreds of finished eval chats turned each
+// presence ping into hundreds of claims and kept the daemon and the extension busy while idle.
+const MAX_RECORDS = 200;
 
 export class CoreAttention {
   private readonly records = new Map<string, AttentionRecord>();
@@ -58,6 +62,7 @@ export class CoreAttention {
             working: false,
             notified: saved[index].notified === true,
           });
+      this.prune();
     } catch {
       process.stderr.write("Core ignored invalid completion metadata; chats are preserved.\n");
     }
@@ -157,9 +162,10 @@ export class CoreAttention {
     request: Extract<CoreAttentionRequest, { kind: "core.attention.claim" }>,
   ): unknown {
     const granted = this.notifies(record, request.chatId, request.completionId);
-    if (record && granted) {
+    // A claim is decided once per completion: granted or not, the chat is never claimed again.
+    if (record && !record.notified && record.completionId === request.completionId) {
       record.notified = true;
-      this.changed();
+      if (granted) this.changed();
     }
     const title = this.service.getChat(request.chatId as ChatId)?.title;
     const summary = this.answers.get(request.chatId);
@@ -194,7 +200,9 @@ export class CoreAttention {
       previous.notified = false;
     }
     previous.working = working;
+    this.records.delete(chatId); // re-insert: the map's order is oldest activity first
     this.records.set(chatId, previous);
+    this.prune();
     this.changed();
   }
   /** A question opened or answered: the extension shows it on the orb in the user's tab. */
@@ -231,6 +239,16 @@ export class CoreAttention {
     if (!text) return;
     const sentence = /^(.{12,}?[.!?])(\s|$)/.exec(text)?.[1] ?? text;
     this.answers.set(chatId, sentence.length > 180 ? sentence.slice(0, 179) + "…" : sentence);
+  }
+
+  /** Drops the oldest finished records past MAX_RECORDS; working or asking chats stay. */
+  private prune(): void {
+    for (const chatId of this.records.keys()) {
+      if (this.records.size <= MAX_RECORDS) return;
+      const record = this.records.get(chatId);
+      if (record?.working || this.asks.get(chatId)?.size) continue;
+      this.records.delete(chatId);
+    }
   }
 
   private changed(): void {
