@@ -179,16 +179,20 @@ test("the frame cap draws far fewer times than the display refresh", () => {
 test("every continuous visual routes through the visibility gate", async () => {
   const ui = fileURLToPath(new URL("../../../packages/ui/src/", import.meta.url));
   const ext = fileURLToPath(new URL("../src/", import.meta.url));
-  const [swarm, lattice, pending, orb] = await Promise.all([
+  const [swarm, lattice, pending, activity, turn, orb] = await Promise.all([
     readFile(join(ui, "mini-swarm.tsx"), "utf8"),
     readFile(join(ui, "lattice-mark.tsx"), "utf8"),
     readFile(join(ui, "pending-work.tsx"), "utf8"),
+    readFile(join(ui, "chat-activity.tsx"), "utf8"),
+    readFile(join(ui, "transcript-turn.tsx"), "utf8"),
     readFile(join(ext, "orb/orb-overlay.ts"), "utf8"),
   ]);
   for (const [name, source] of [
     ["mini-swarm", swarm],
     ["lattice-mark", lattice],
     ["pending-work", pending],
+    ["chat-activity", activity],
+    ["transcript-turn", turn],
   ]) {
     assert.match(source, /from "\.\/visible-work\.js"/, `${name} must use the visibility gate`);
     assert.doesNotMatch(source, /requestAnimationFrame\(/, `${name} must not schedule raw frames`);
@@ -200,6 +204,9 @@ test("every continuous visual routes through the visibility gate", async () => {
     "an idle home mark must draw once and schedule nothing",
   );
   assert.match(orb, /visibilitychange/, "the cursor loop must pause when the tab is hidden");
+  const favicon = await readFile(join(ext, "status-favicon.ts"), "utf8");
+  assert.match(favicon, /document\.hidden/, "the chat favicon spinner must pause when hidden");
+  assert.match(favicon, /visibilitychange/, "the chat favicon spinner must resume only when seen");
   assert.match(orb, /frameGap/, "the cursor loop must cap its frame rate");
   const placePill = orb.match(/private placePill[\s\S]*?\n\s{2}\}/)?.[0] ?? "";
   assert.doesNotMatch(placePill, /offsetWidth/, "the cursor must not force layout every frame");

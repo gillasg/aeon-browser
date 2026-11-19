@@ -78,14 +78,19 @@ function refresh(): void {
   // Only a chat's own tab spins or turns blue; home and other Aeon pages always show the lattice.
   working = Boolean(chatFilter) && values.includes("working");
   done = Boolean(chatFilter) && !working && values.includes("done");
-  if (working && !timer)
+  // A finished chat's tab stays mounted; painting a favicon 50 times a second in one that is
+  // hidden (or in a background window) is pure cost. Stop the spinner until the page is seen.
+  if (working && !timer && !document.hidden)
     timer = window.setInterval(() => {
+      if (document.hidden) {
+        stopSpinner();
+        return;
+      }
       frame = (frame + 1) % FRAMES;
       draw();
     }, 1200 / FRAMES);
   if (!working && timer) {
-    clearInterval(timer);
-    timer = 0;
+    stopSpinner();
     frame = 0;
   }
   draw();
@@ -136,7 +141,15 @@ function draw(): void {
     context.drawImage(orbit, 0, 0, 32, 32);
   icon.href = canvas.toDataURL("image/png");
 }
-window.addEventListener("pagehide", () => clearInterval(timer), { once: true });
+function stopSpinner(): void {
+  clearInterval(timer);
+  timer = 0;
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopSpinner();
+  else if (working) refresh();
+});
+window.addEventListener("pagehide", () => stopSpinner(), { once: true });
 draw();
 
 window.addEventListener("aeon.chat-status-request", (event) => {

@@ -115,6 +115,8 @@ export function keepStepsTabs(chatId: string, steps: readonly Record<string, unk
 // a tab only Aeon showed is still the agent's, grouped while kept and closed at the run's end.
 const SELF_ACTIVATION_MS = 2_000;
 const selfActivated = new Map<number, number>();
+/** A tab Core opens in front activates before its id is known; suppress that first activation. */
+let expectNextActivation = 0;
 
 /** Aeon is about to activate (or show in Split View) these tabs itself. */
 export function expectAgentActivation(...tabIds: (number | undefined)[]): void {
@@ -122,7 +124,16 @@ export function expectAgentActivation(...tabIds: (number | undefined)[]): void {
   for (const id of tabIds) if (id !== undefined) selfActivated.set(id, now);
 }
 
+/** Called just before Core opens a chat tab for the user to watch. */
+export function expectNextAgentActivation(): void {
+  expectNextActivation = Date.now() + SELF_ACTIVATION_MS;
+}
+
 function activatedByAeon(tabId: number): boolean {
+  if (expectNextActivation > Date.now()) {
+    expectNextActivation = 0;
+    return true;
+  }
   const at = selfActivated.get(tabId);
   if (at === undefined) return false;
   if (Date.now() - at > SELF_ACTIVATION_MS) {
