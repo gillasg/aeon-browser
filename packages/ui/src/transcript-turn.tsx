@@ -6,6 +6,7 @@ import { TranscriptMessage } from "./transcript-message.js";
 import { TurnThinking } from "./turn-thinking.js";
 import { AnswerLines } from "./answer-lines-view.js";
 import type { AnswerOffer } from "./answer-lines.js";
+import { runVisibleInterval } from "./visible-work.js";
 export interface TranscriptActions {
   actionsDisabled: boolean;
   onEditEntry?: (entryId: string) => Promise<void> | void;
@@ -225,8 +226,9 @@ function useTurnClock(active: boolean, outer: React.RefObject<HTMLDetailsElement
     }
     if (!initialized.current && outer.current) outer.current.open = true;
     initialized.current = true;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
+    // Only a visible chat needs a live elapsed time; a background tab's 250 ms tick re-renders
+    // every turn and tool row even when nobody can see it.
+    return runVisibleInterval(() => setNow(Date.now()), 250);
   }, [active]);
   return now;
 }

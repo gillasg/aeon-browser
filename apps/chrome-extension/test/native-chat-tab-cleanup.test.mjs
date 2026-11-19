@@ -19,6 +19,16 @@ test("chat tabs opened for a run are registered with the agent tab tracker", asy
     /trackAgentTab\(created\.id, chatId/,
     "the newly created tab must be registered to its chat",
   );
+  assert.match(
+    source,
+    /if \(active\) expectNextAgentActivation/,
+    "a shown chat tab's own activation is Aeon's",
+  );
+  assert.match(
+    source,
+    /expectAgentActivation\(created\.id\)/,
+    "a shown chat tab stays un-seen until the user clicks it",
+  );
 });
 
 test("the tracker has an idle sweep that closes untouched agent tabs", async () => {

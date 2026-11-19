@@ -23,6 +23,7 @@ import { ToolImages } from "./tool-images.js";
 import { ToolNarration } from "./tool-narration.js";
 import { StepMeta } from "./run-cards.js";
 import { formatProgress } from "./run-model.js";
+import { runVisibleInterval } from "./visible-work.js";
 
 export function ChatActivityGroup({
   group,
@@ -311,8 +312,9 @@ function useActivityClock(active: boolean): number {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!active) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    // Finished chats stay mounted (an eval leaves one tab per task). Ticking an elapsed-time
+    // label in a hidden tab re-renders the whole transcript four times a second for nothing.
+    return runVisibleInterval(() => setNow(Date.now()), 1000);
   }, [active]);
   return now;
 }
