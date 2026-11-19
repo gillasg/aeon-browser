@@ -11,7 +11,8 @@
 #     `curl ... | sh` / `irm ... | iex` shape is exercised.
 #  3. Chrome for Testing loads the *unpacked* extension with --load-extension in a private profile.
 #     Branded Chrome ignores that switch and a runner has no human to do the three clicks in
-#     chrome://extensions. Native messaging is still real: the documented per-profile manifest
+#     chrome://extensions, so the guided path is exercised as output by `aeon setup --yes
+#     --no-wait` below. Native messaging is still real: the documented per-profile manifest
 #     copy from README "Local connections" is done before Chrome starts.
 name: Clean install
 
@@ -256,6 +257,24 @@ jobs:
           echo "aeon command directories added to PATH"
           command -v aeon || command -v aeon.cmd || true
 
+      # The guided path, driven non-interactively: --yes shortens the wait and skips opening a
+      # first-run tab; --no-wait prints the three clicks even though the loader already paired.
+      - name: Guided setup prints the three clicks (non-interactive)
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
+          "$AEON" setup --yes --no-wait > "$RUNNER_TEMP/aeon-guided.txt" 2>&1
+          cat "$RUNNER_TEMP/aeon-guided.txt"
+          grep -q 'Developer mode' "$RUNNER_TEMP/aeon-guided.txt"
+          grep -q 'Load unpacked' "$RUNNER_TEMP/aeon-guided.txt"
+          folder="$EXTENSION_FOLDER"
+          if [ "$RUNNER_OS" = "Windows" ]; then folder="$(cygpath -w "$folder")"; fi
+          grep -Fi "$folder" "$RUNNER_TEMP/aeon-guided.txt"
+          grep -q 'no special flags' "$RUNNER_TEMP/aeon-guided.txt"
+          echo "Guided setup printed the three clicks and the extension folder."
+
       - name: Doctor (every check but the model check must be ok)
         shell: bash
         timeout-minutes: 10
@@ -336,12 +355,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
-          help="$("$AEON" --help)"
-          printf '%s\n' "$help" | head -30
-          printf '%s\n' "$help" | grep -q 'aeon <command>'
-          tools="$("$AEON" tools)"
-          printf '%s\n' "$tools" | head -30
-          [ -n "${tools//[[:space:]]/}" ] || { echo "aeon tools printed nothing" >&2; exit 1; }
+          "$AEON" --help > "$RUNNER_TEMP/aeon-help.txt"
+          head -30 "$RUNNER_TEMP/aeon-help.txt"
+          grep -q 'aeon <command>' "$RUNNER_TEMP/aeon-help.txt"
+          "$AEON" tools > "$RUNNER_TEMP/aeon-tools.txt"
+          head -30 "$RUNNER_TEMP/aeon-tools.txt"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/aeon-tools.txt" || { echo "aeon tools printed nothing" >&2; exit 1; }
           echo "aeon --help and aeon tools both print."
 
       - name: Collect logs on failure
@@ -355,5 +374,8 @@ jobs:
             ${{ runner.temp }}/aeon-chrome.log
             ${{ runner.temp }}/doctor.json
             ${{ runner.temp }}/fixture.log
+            ${{ runner.temp }}/aeon-guided.txt
+            ${{ runner.temp }}/aeon-help.txt
+            ${{ runner.temp }}/aeon-tools.txt
           if-no-files-found: ignore
           retention-days: 7

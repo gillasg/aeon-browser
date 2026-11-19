@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,8 +12,9 @@ import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
 
-// `aeon setup` is `aeon install` (the shim and the skill; the native host installs it too), and
-// `aeon doctor` says which piece is missing, like browserkit's own doctor does.
+// `aeon setup` installs the shim and the skill, then guides the user through the only manual step:
+// loading the unpacked extension in Chrome. The script opens chrome://extensions, copies the folder
+// and polls `aeon doctor` until the extension pairs. `aeon doctor` says what is still missing.
 
 type Status = "ok" | "warn" | "fail";
 
@@ -26,21 +28,25 @@ async function exists(path: string): Promise<boolean> {
 }
 
 async function setup(args: Args): Promise<number> {
-  if (has(args, "again")) {
-    // Re-run the one-command installer, which skips every piece that is already in place and
-    // repeats only what is missing or broken (native host, service, extension).
-    const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-    execFileSync(process.execPath, [join(root, "scripts", "setup.mjs"), "--again"], {
-      cwd: root,
-      stdio: "inherit",
-    });
-    return 0;
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const script = join(root, "scripts", "setup.mjs");
+  if (!existsSync(script)) {
+    process.stdout.write(`Aeon setup script not found at ${script}.\n`);
+    return 1;
   }
-  const code = await install();
-  if (has(args, "no-register"))
-    process.stdout.write("The native host is registered by Aeon's installer; nothing to skip.\n");
-  process.stdout.write("Next: keep Chrome open with Aeon loaded, then try `aeon status`.\n");
-  return code;
+  const flags = [
+    ...(has(args, "again") ? ["--again"] : ["--extension"]),
+    ...(has(args, "yes") ? ["--yes"] : []),
+    ...(has(args, "no-wait") ? ["--no-wait"] : []),
+  ];
+  if (!has(args, "again")) {
+    const code = await install();
+    if (code !== 0) return code;
+    if (has(args, "no-register"))
+      process.stdout.write("The native host is registered by Aeon's installer; nothing to skip.\n");
+  }
+  execFileSync(process.execPath, [script, ...flags], { cwd: root, stdio: "inherit" });
+  return 0;
 }
 
 async function doctor(host: DaemonHost): Promise<number> {
@@ -141,13 +147,13 @@ export function setupCommands(host: DaemonHost): Command[] {
     {
       name: "setup",
       group: "Browser",
-      summary: "install the aeon command and the Aeon skill for agents",
-      help: `Usage: aeon setup [--no-register] [--again]
+      summary: "finish setup by loading the Aeon extension in Chrome",
+      help: `Usage: aeon setup [--no-register] [--again] [--yes] [--no-wait]
 
-Puts the aeon command on the PATH and links the Aeon skill into ~/.agents/skills (and
-~/.claude/skills). Aeon's native host runs the same install; --no-register is accepted for
-symmetry with browserkit. --again re-runs the installer, repeating only the pieces that are
-missing or broken (native host, service, extension).`,
+Installs the aeon command and the Aeon skill, opens chrome://extensions, puts the extension
+folder on your clipboard, prints the three clicks and waits until Aeon connects. No Chrome
+flags are needed. --again repeats any missing install step (native host, service, extension).
+--no-wait prints the clicks without waiting; --yes is the short, non-interactive wait for CI.`,
       run: setup,
     },
     {

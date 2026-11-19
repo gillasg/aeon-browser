@@ -26,3 +26,30 @@ test("a large result written just before exit reaches a pipe whole", async () =>
   assert.equal(code, 3);
   assert.equal(length, size);
 });
+
+// On macOS a command that has just closed its daemon WebSocket can sit on the async drain
+// callback for minutes (a clean-install step took 15). The bounded exit must still end the run.
+test("exitAfterFlush ends even when a drain callback never fires", async () => {
+  const script = `
+    const { exitAfterFlush } = await import(${JSON.stringify("file://" + exitModule.replace(/\\/g, "/"))});
+    setInterval(() => {}, 1000); // a handle that keeps Node alive, like an unclosed socket
+    for (const stream of [process.stdout, process.stderr]) {
+      stream.write = () => false; // never call the flush callback
+    }
+    await exitAfterFlush(3, 200); // a short cap keeps this regression test fast
+  `;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script]);
+  const started = Date.now();
+  const code = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve("timeout");
+    }, 6000);
+    child.on("close", (value) => {
+      clearTimeout(timer);
+      resolve(value);
+    });
+  });
+  assert.equal(code, 3);
+  assert.ok(Date.now() - started < 6000, "exitAfterFlush did not end the process");
+});
