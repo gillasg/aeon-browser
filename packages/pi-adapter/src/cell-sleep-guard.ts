@@ -89,7 +89,16 @@ export function cellSleepMs(code: string): number {
   return estimate(withoutLiterals(code), 1);
 }
 
+// Fixed waits that fill most of the deadline leave no time for the page work between them: a
+// 10 x 6 s polling loop against a 60 s cell always times out once its reads are added.
+const HEADROOM = 0.85;
+
+/** True when a cell's fixed waits alone use up its deadline (with room left for real work). */
+export function sleepsPastDeadline(sleepMs: number, timeoutMs: number): boolean {
+  return sleepMs > 0 && sleepMs >= timeoutMs * HEADROOM;
+}
+
 export function cellSleepRefusal(timeoutMs: number, sleepMs: number): string {
   const seconds = (ms: number) => Math.round(ms / 1000);
-  return `BLOCKED: this cell's fixed waits add up to ~${seconds(sleepMs)} s, past its ${seconds(timeoutMs)} s deadline. Split the work into shorter cells (the REPL keeps variables), wait for a real condition with page.waitFor, or use browser.job for a long sweep.`;
+  return `BLOCKED: this cell's fixed waits add up to ~${seconds(sleepMs)} s, leaving no room in its ${seconds(timeoutMs)} s deadline. Split the work into shorter cells (the REPL keeps variables), wait for a real condition with page.waitFor, or use browser.job for a long sweep.`;
 }

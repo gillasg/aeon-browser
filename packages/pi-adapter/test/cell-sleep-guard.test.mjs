@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cellSleepMs, cellSleepRefusal } from "../dist/cell-sleep-guard.js";
+import { cellSleepMs, cellSleepRefusal, sleepsPastDeadline } from "../dist/cell-sleep-guard.js";
 
 test("a polling loop past the cell deadline is rejected", () => {
   const code = `for (let i = 0; i < 60; i++) await sleep(2000);\nreturn 'done';`;
@@ -44,4 +44,13 @@ test("real work and waits on conditions are never blocked", () => {
   for (const code of allowed) assert.ok(cellSleepMs(code) <= 60_000, code);
   for (const code of allowed.slice(0, 2).concat(allowed.slice(3)))
     assert.equal(cellSleepMs(code), 0, code);
+});
+
+test("waits that fill the deadline are refused; a short wait is not", () => {
+  const loop = `for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 6000)); await p.read(); }`;
+  assert.equal(cellSleepMs(loop), 60_000);
+  assert.ok(sleepsPastDeadline(cellSleepMs(loop), 60_000));
+  assert.ok(sleepsPastDeadline(52_000, 60_000));
+  assert.ok(!sleepsPastDeadline(30_000, 60_000));
+  assert.ok(!sleepsPastDeadline(0, 60_000));
 });

@@ -27,7 +27,7 @@ import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
 import { formatCell } from "./cell-grammar.js";
 export { formatStepLine } from "./cell-grammar.js";
 import { cellTimeoutMs } from "./run-budget.js";
-import { cellSleepMs, cellSleepRefusal } from "./cell-sleep-guard.js";
+import { cellSleepMs, cellSleepRefusal, sleepsPastDeadline } from "./cell-sleep-guard.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
   createAeonHostHandler,
@@ -91,7 +91,8 @@ function openCell(
   const timeoutMs = cellTimeoutMs(chatId, CELL_TIMEOUT_MS);
   if (timeoutMs <= 0) return { ok: false, result: spentBudget(envelope) };
   const sleepMs = cellSleepMs(code);
-  if (sleepMs > timeoutMs) return { ok: false, result: tooLongCell(envelope, timeoutMs, sleepMs) };
+  if (sleepsPastDeadline(sleepMs, timeoutMs))
+    return { ok: false, result: tooLongCell(envelope, timeoutMs, sleepMs) };
   return { ok: true, timeoutMs, run };
 }
 
