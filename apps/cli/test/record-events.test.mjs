@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { eventsFromTrace, writeEvents } from "../dist/record-events.js";
+import { eventsFromTrace, tabClips, writeEvents } from "../dist/record-events.js";
 
 test("writeEvents writes an atomic, readable events.json", async () => {
   const folder = await mkdtemp(join(tmpdir(), "aeon-events-"));
@@ -93,4 +93,44 @@ test("eventsFromTrace puts each action on the clip clock with page and window po
   assert.equal(events[3].text, "Enter");
   assert.equal(events[5].tabId, 5);
   assert.ok(events.every((e, i) => i === 0 || e.t >= events[i - 1].t));
+});
+
+test("a second tab opened mid-run is its own clip", () => {
+  const t0 = 5_000;
+  const trace = {
+    trace: [
+      {
+        actions: [
+          { kind: "navigate", tabId: 7, tStart: t0 + 100, url: "https://demo.test/" },
+          { kind: "click", tabId: 7, tStart: t0 + 400, point: { x: 10, y: 10 }, text: "Open" },
+        ],
+      },
+      {
+        actions: [
+          { kind: "openTab", tabId: 8, tStart: t0 + 700, url: "https://demo.test/next" },
+          { kind: "click", tabId: 8, tStart: t0 + 900, point: { x: 20, y: 30 }, text: "Go" },
+        ],
+      },
+    ],
+  };
+  const events = eventsFromTrace(trace, t0);
+  const clips = tabClips(events, {
+    file: "takes/",
+    source: "tabs",
+    width: 1280,
+    height: 800,
+    fps: 30,
+    startedAt: t0,
+    durationMs: 900,
+    frames: 0,
+  });
+  assert.deepEqual(
+    clips.map((clip) => clip.tabId),
+    [7, 8],
+  );
+  assert.equal(clips[0].file, "takes/7.webm");
+  assert.equal(clips[1].file, "takes/8.webm");
+  assert.equal(clips[1].source, "tabs");
+  assert.ok(events.some((event) => event.tabId === 8 && event.kind === "navigate"));
+  assert.ok(events.some((event) => event.tabId === 8 && event.kind === "click"));
 });

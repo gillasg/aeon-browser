@@ -33,6 +33,8 @@ export type RecordState = {
   tabSession?: string;
   /** Chat whose trace supplies events.json at stop. */
   chatId?: string;
+  /** The recordAgentTabs value before --tabs turned it on, so stop can put it back. */
+  recordAgentTabsWas?: boolean;
 };
 
 export const isWindows = process.platform === "win32";
@@ -316,7 +318,10 @@ export async function stopCapture(
   opts: Partial<RecordOptions> = {},
 ): Promise<RecordState> {
   const state = loadState(folder);
-  if (state.source === "tabs") return state;
+  if (state.source === "tabs") {
+    rmSync(join(folder, STATE), { force: true });
+    return state;
+  }
   if (state.pid) {
     const done = exited(state.pid);
     try {

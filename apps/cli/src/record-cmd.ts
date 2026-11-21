@@ -13,12 +13,20 @@ import {
   ffprobeBinary,
   frameSize,
   loadState,
+  saveState,
   startCapture,
   stopCapture,
   type RecordOptions,
+  type RecordState,
   type Source,
 } from "./record-capture.js";
-import { eventsFromTrace, writeEvents, type RecordingEvents, type Trace } from "./record-events.js";
+import {
+  eventsFromTrace,
+  tabClips,
+  writeEvents,
+  type RecordingEvents,
+  type Trace,
+} from "./record-events.js";
 
 const log = (line: string) => process.stdout.write(line + "\n");
 
@@ -61,16 +69,13 @@ function optionsOf(args: Args): RecordOptions {
   };
 }
 
-async function start(args: Args): Promise<number> {
+async function start(host: DaemonHost, args: Args): Promise<number> {
   const opts = optionsOf(args);
-  if (opts.source === "tabs")
-    throw new Error(
-      "--tabs is unavailable: Aeon has no daemon API to collect a chat's tab takes into a recording folder; use --window chrome or --screen instead.",
-    );
   const folder = defaultFolder(opts.out);
   mkdirSync(folder, { recursive: true });
   remember(folder, opts.out);
   const state = await startCapture(folder, opts);
+  if (opts.source === "tabs") await armTabTakes(host, state);
   const chatId = typeof args.flags?.chat === "string" ? args.flags.chat : undefined;
   if (chatId) {
     state.chatId = chatId;
@@ -102,6 +107,38 @@ async function start(args: Args): Promise<number> {
   if (state.source === "tabs") log("Aeon's hidden tab takes are on; they are collected at stop.");
   else log("Keep the window unminimized. Run `aeon record stop` when done.");
   return 0;
+}
+
+/** Turn on per-tab takes for this recording. A missing daemon still leaves a folder stop can finish. */
+async function armTabTakes(host: DaemonHost, state: RecordState): Promise<void> {
+  try {
+    const client = await host.connect();
+    const browsers = await client.settings(undefined, 3_000);
+    const was = browsers.some((browser) => browser.recordAgentTabs === true);
+    state.recordAgentTabsWas = was;
+    if (!was) await client.settings({ recordAgentTabs: true }, 3_000);
+    saveState(state.folder, state);
+  } catch {
+    // No Chrome: stop still writes a clip for every tab the trace opened.
+  }
+}
+
+/** Tab ids the engine recorded for this chat, when the daemon is up. */
+async function recordedTabIds(host: DaemonHost, chatId: string | undefined): Promise<number[]> {
+  if (!chatId) return [];
+  try {
+    const listed = (await host.runInBrowser(
+      `return await browser.takes(${JSON.stringify(chatId)})`,
+      {
+        session: "aeon-record",
+        timeoutMs: 8_000,
+      },
+    )) as { tabId?: unknown }[] | undefined;
+    if (!Array.isArray(listed)) return [];
+    return listed.flatMap((take) => (typeof take?.tabId === "number" ? [take.tabId] : []));
+  } catch {
+    return [];
+  }
 }
 
 /** Pull the chat's trace through the daemon, best effort; a recording must never hang on it. */
@@ -136,11 +173,21 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   };
   const trace = state.chatId ? await traceOf(host, state.chatId) : undefined;
   const events = trace ? eventsFromTrace(trace, state.startedAt) : [];
+  const clips =
+    state.source === "tabs" ? tabClips(events, clip, await recordedTabIds(host, state.chatId)) : [];
+  if (state.source === "tabs" && state.recordAgentTabsWas === false) {
+    try {
+      await (await host.connect()).settings({ recordAgentTabs: false }, 3_000);
+    } catch {
+      // The setting stays on if Chrome is gone; the user can turn it off.
+    }
+  }
   const result: RecordingEvents = {
     version: 1,
     recorder: "aeon",
     clock: "clip",
-    clip,
+    clip: clips[0] ?? clip,
+    ...(clips.length ? { clips } : {}),
     events,
     ...(trace
       ? {}
@@ -159,18 +206,17 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     name: "record",
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
-    help: `Usage: aeon record start [--window chrome|--screen] [--out <dir>] [--fps 30] [--chat <id>]
+    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>]
        aeon record stop [--out <dir>] [--chat <id>]
        aeon record gif|video|trace …   (the original screen recordings)
 
 start captures the real window (x11grab on Linux, avfoundation on macOS, gdigrab on
-Windows) into a folder with frames, clip.mp4 and events.json. --tabs is unavailable:
-Aeon has no daemon API to collect a chat's tab takes into the folder. stop finalises the
-clip and writes the event log.
+Windows) into a folder with frames, clip.mp4 and events.json. --tabs records every tab
+the chat drives, including one opened mid-run, and stop writes one clip per tab.
 The folder is a recording, not a video: render it with Remotion (see \`aeon video kit\`).`,
     run: async (args: Args) => {
       const action = args.positional[0];
-      if (action === "start") return start(args);
+      if (action === "start") return start(host, args);
       if (action === "stop") return stop(host, args);
       if (original) return original.run({ ...args, positional: args.positional.slice(1) });
       throw new Error("Usage: aeon record start|stop|gif|video|trace");

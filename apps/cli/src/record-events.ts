@@ -50,6 +50,30 @@ export type RecordingEvents = {
   note?: string;
 };
 
+/**
+ * One clip per tab, in the order each tab first appears. A tab opened mid-run is its own clip
+ * on the same clock as the recording, so an editor can show it beside the first.
+ */
+export function tabClips(
+  events: VideoEvent[],
+  recording: ClipMeta,
+  extraTabIds: number[] = [],
+): ClipMeta[] {
+  const ids: number[] = [];
+  const add = (id: number | undefined) => {
+    if (id === undefined || ids.includes(id)) return;
+    ids.push(id);
+  };
+  for (const event of events) add(event.tabId);
+  for (const id of extraTabIds) add(id);
+  return ids.map((tabId) => ({
+    ...recording,
+    file: `takes/${tabId}.webm`,
+    source: "tabs",
+    tabId,
+  }));
+}
+
 /** Write events.json atomically so a reader never sees a half-written log. */
 export async function writeEvents(
   folder: string,
