@@ -33,6 +33,7 @@ coverage/
 
 # Minimal public project introduction
 !/README.md
+!/docs/evals.md
 # The Aeon skill ships with the CLI: agents install it with `aeon install`.
 !/skills/aeon/SKILL.md
 # The skill is generated from these sources, and the bench has its own README.
