@@ -4,7 +4,7 @@ import type { InlineExtension } from "@earendil-works/pi-coding-agent";
 // DeepSeek (opencode-go) sometimes writes its tool call as text instead of a tool call. Pi then
 // ends the run and that text becomes the chat's answer (DSML: `<｜DSML｜ invoke name="…">`).
 // Turn the leaked markup back into the call the model meant to make, before the answer is shown.
-// Pi 1.5.2 has no parser for this format and no setting to turn one on, so the fix is here: a
+// Pi 1.6.0 has no parser for this format and no setting to turn one on, so the fix is here: a
 // message_end handler can replace the finalized message in place, and the agent loop then
 // executes any toolCall blocks it finds in that same message.
 

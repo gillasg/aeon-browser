@@ -66,7 +66,17 @@ test(
       await clickManageModels(browser, sessionId);
       const models = `chrome-extension://${extensionId}/home.html?view=models`;
       const opened = await waitForTarget(port, (item) => item.url.startsWith(models));
-      assert.equal(opened.url, models);
+      // The page remembers the Chat's tab, so "Return to Aeon" can go back to it.
+      assert.match(
+        opened.url,
+        /^chrome-extension:\/\/[a-p]{32}\/home\.html\?view=models&return=\d+$/,
+      );
+      // chrome-extension: URLs have an opaque origin in Node, so compare scheme, host and path.
+      const url = new URL(opened.url);
+      assert.equal(
+        `${url.protocol}//${url.host}${url.pathname}`,
+        `chrome-extension://${extensionId}/home.html`,
+      );
     } finally {
       chrome.kill();
       core.close();

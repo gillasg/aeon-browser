@@ -17,7 +17,7 @@ export async function defaultModel(
     available[0];
   if (!model)
     throw new Error(
-      "No AI model is connected. Sign in from Aeon's Models page (Settings → Models).",
+      "No AI model is connected. Run `aeon login`, or sign in from Aeon's Models page (Settings → Models).",
     );
   return { models, model };
 }

@@ -21,6 +21,7 @@ import type { ChatResult } from "./results.js";
 import { settingsCommand } from "./settings.js";
 import { signinCommand } from "./signin.js";
 import { setupCommands } from "./setup.js";
+import { loginCommands } from "./model-login-cmd.js";
 import { doctorCommand } from "./doctor.js";
 import { rollbackCommand } from "./rollback.js";
 import { packCommand } from "./pack.js";
@@ -678,6 +679,7 @@ export function aeonCommands(host: DaemonHost): Command[] {
   const overrides = new Map<string, Command>();
   for (const command of [
     ...setupCommands(host),
+    ...loginCommands(host),
     ...browserCommands(host),
     ...providerCommands(host),
     ...blockedCommands(host),

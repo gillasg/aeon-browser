@@ -5,6 +5,7 @@ import type {
   ModelProvider,
   ModelSignInFlow,
 } from "@aeon/ui";
+import { announceModelsChanged, returnTarget } from "./model-broadcast.js";
 
 // The Models tab. Core runs the sign-in service on 127.0.0.1 (the same one Pi apps use) and hands
 // this page its address and token; the page talks to it directly and follows its live updates.
@@ -47,7 +48,38 @@ export class HomeModelAccounts {
       onSignOut: (provider) => void this.signOut(provider),
       onDefaultModel: (choice) => void this.call("default-model", choice ?? {}),
       onOpenUrl: (url) => void chrome.tabs.create({ url }),
+      onStartChat: () => void this.startChat(),
+      startChatLabel: this.returnTo() === undefined ? "Start chatting" : "Return to Aeon",
     };
+  }
+
+  private returnTo(): number | "panel" | undefined {
+    return returnTarget(globalThis.location?.href);
+  }
+
+  /**
+   * Back to work: the tab (or side panel) that sent the user here gets the focus and this tab
+   * closes; opened on its own, the page goes to Home, where the composer is.
+   */
+  private async startChat(): Promise<void> {
+    const target = this.returnTo();
+    if (target !== undefined) {
+      const back =
+        target === "panel" ||
+        (await chrome.tabs.update(target, { active: true }).then(
+          () => true,
+          () => false,
+        ));
+      const self = await chrome.tabs.getCurrent().catch(() => undefined);
+      if (back && self?.id !== undefined) return void (await chrome.tabs.remove(self.id));
+    }
+    location.assign(chrome.runtime.getURL("home.html"));
+  }
+
+  /** The pickers on this page and every other open Aeon view catch up right away. */
+  private modelsChanged(): void {
+    this.onModelsChanged();
+    announceModelsChanged();
   }
 
   /** After the page (re)connects to core: the page may have opened before it could ask. */
@@ -84,7 +116,7 @@ export class HomeModelAccounts {
     const source = new EventSource(`${endpoint.origin}/api/events?token=${endpoint.token}`);
     source.addEventListener("state", () => {
       void this.reload();
-      this.onModelsChanged();
+      this.modelsChanged();
     });
     // The service stops when idle; the next action asks core to start it again.
     source.onerror = () => {
@@ -124,7 +156,7 @@ export class HomeModelAccounts {
     if (this.flow.result) {
       this.login?.source.close();
       this.login = undefined;
-      if (this.flow.result.kind === "done") this.onModelsChanged();
+      if (this.flow.result.kind === "done") this.modelsChanged();
     }
     this.onChange();
   }

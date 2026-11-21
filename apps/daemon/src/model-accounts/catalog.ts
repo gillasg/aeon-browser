@@ -112,3 +112,42 @@ export async function availableModels(models: Models): Promise<ModelSummary[]> {
     return summary;
   });
 }
+
+/**
+ * The model Pi starts each provider on (Pi 1.6.0's per-provider defaults), so a first sign-in
+ * lands on the same model the Pi CLI would pick. Providers not listed use their first model.
+ */
+export const PROVIDER_DEFAULT_MODELS: Readonly<Record<string, string>> = {
+  anthropic: "claude-opus-5-5",
+  openai: "gpt-6.2-sol",
+  "openai-codex": "gpt-6.2-sol",
+  "github-copilot": "gpt-6.1-sol",
+  google: "gemini-4-argon",
+  openrouter: "moonshotai/kimi-k2.7-code",
+  xai: "grok-4.7",
+  deepseek: "deepseek-v4-pro",
+  groq: "openai/gpt-oss-120b",
+  mistral: "devstral-medium-latest",
+};
+
+/**
+ * A default for someone who has none yet: the provider just connected first, then the popular
+ * ones, each on Pi's own default for it. Undefined when nothing is available.
+ */
+export function suggestDefaultModel(
+  available: readonly { provider: string; id: string }[],
+  preferProvider?: string,
+): { provider: string; model: string } | undefined {
+  const order = [
+    ...(preferProvider ? [preferProvider] : []),
+    ...PREFERRED_PROVIDERS,
+    ...available.map((model) => model.provider),
+  ];
+  for (const provider of order) {
+    const own = available.filter((model) => model.provider === provider);
+    const pick = own.find((model) => model.id === PROVIDER_DEFAULT_MODELS[provider]) ?? own[0];
+    if (!pick) continue;
+    return { provider, model: pick.id };
+  }
+  return undefined;
+}

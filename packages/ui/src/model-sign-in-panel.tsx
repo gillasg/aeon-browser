@@ -1,6 +1,10 @@
 import { useState, type ReactElement } from "react";
 import { ProviderIcon } from "./provider-icon.js";
-import type { ModelAccountsProps, ModelSignInFlow } from "./model-accounts-types.js";
+import {
+  defaultModelName,
+  type ModelAccountsProps,
+  type ModelSignInFlow,
+} from "./model-accounts-types.js";
 
 type PanelProps = ModelAccountsProps & { flow: ModelSignInFlow };
 
@@ -146,7 +150,8 @@ function PromptStep({
   );
 }
 
-function FlowFooter({ flow, onCancel, onCloseFlow }: PanelProps): ReactElement {
+function FlowFooter(props: PanelProps): ReactElement {
+  const { flow, onCancel, onCloseFlow } = props;
   const result = flow.result;
   if (!result)
     return (
@@ -163,18 +168,43 @@ function FlowFooter({ flow, onCancel, onCloseFlow }: PanelProps): ReactElement {
         </button>
       </footer>
     );
-  const message =
-    result.kind === "done"
-      ? `Connected to ${flow.provider.name}.`
-      : result.kind === "error"
-        ? result.message
-        : "Sign-in cancelled.";
+  if (result.kind === "done") return <SignedIn {...props} />;
+  const message = result.kind === "error" ? result.message : "Sign-in cancelled.";
   return (
     <footer className="model-flow-foot" data-result={result.kind}>
       <span className="model-flow-result">{message}</span>
       <button type="button" className="aeon-quiet-button" onClick={onCloseFlow}>
-        {result.kind === "done" ? "Done" : "Back"}
+        Back
       </button>
+    </footer>
+  );
+}
+
+/** The sign-in worked: say which model Aeon will use, and go straight back to work. */
+function SignedIn({
+  flow,
+  state,
+  onCloseFlow,
+  onStartChat,
+  startChatLabel,
+}: PanelProps): ReactElement {
+  const model = defaultModelName(state);
+  return (
+    <footer className="model-flow-foot model-flow-success" data-result="done" role="status">
+      <span className="model-flow-result">
+        <strong>Connected to {flow.provider.name}.</strong>
+        {model && <span> Aeon will use {model} unless you pick another model.</span>}
+      </span>
+      <div className="model-flow-actions">
+        {onStartChat && (
+          <button type="button" className="aeon-primary-button" onClick={onStartChat}>
+            {startChatLabel ?? "Start chatting"}
+          </button>
+        )}
+        <button type="button" className="aeon-quiet-button" onClick={onCloseFlow}>
+          {onStartChat ? "Connect another" : "Done"}
+        </button>
+      </div>
     </footer>
   );
 }

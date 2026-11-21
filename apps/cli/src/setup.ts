@@ -11,6 +11,7 @@ import { waitForBrowser } from "./browser-wait.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
+import { modelLoginStatus } from "./model-login-cmd.js";
 
 // `aeon setup` installs the shim and the skill, then guides the user through the only manual step:
 // loading the unpacked extension in Chrome. The script opens chrome://extensions, copies the folder
@@ -46,6 +47,12 @@ async function setup(args: Args): Promise<number> {
       process.stdout.write("The native host is registered by Aeon's installer; nothing to skip.\n");
   }
   execFileSync(process.execPath, [script, ...flags], { cwd: root, stdio: "inherit" });
+  // Chats need a model; say how to connect one instead of letting the first chat fail.
+  const models = await modelLoginStatus().catch(() => undefined);
+  if (models && !models.connected.length)
+    process.stdout.write(
+      "Next: connect an AI model with `aeon login` (or Settings → Models in Aeon).\n",
+    );
   return 0;
 }
 
@@ -56,6 +63,7 @@ async function doctor(host: DaemonHost): Promise<number> {
     await daemonCheck(data),
     await browserCheck(host),
     await sitesCheck(),
+    await modelCheck(),
     await signInCheck(),
   ];
   return report(checks);
@@ -112,6 +120,18 @@ async function sitesCheck(): Promise<Check> {
     status: sites.length ? "ok" : "warn",
     label: "mapped sites",
     message: sites.length ? `${sites.length} site(s) in ${registryRoot()}` : "none yet",
+  };
+}
+
+async function modelCheck(): Promise<Check> {
+  const status = await modelLoginStatus().catch(() => undefined);
+  const names = status?.connected.map((provider) => provider.name) ?? [];
+  return {
+    status: names.length ? "ok" : "warn",
+    label: "AI model",
+    message: names.length
+      ? `${names.join(", ")}${status?.defaultModel ? `; default ${status.defaultModel}` : ""}`
+      : "none connected; run `aeon login`",
   };
 }
 

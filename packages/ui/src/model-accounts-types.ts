@@ -62,4 +62,43 @@ export interface ModelAccountsProps {
   onSignOut(provider: ModelProvider): void;
   onDefaultModel(choice: { provider: string; model: string } | undefined): void;
   onOpenUrl(url: string): void;
+  /**
+   * Leaves the Models page for work: back to the chat that asked for a model, or a new chat.
+   * Shown after a sign-in and whenever a model is ready.
+   */
+  onStartChat?: (() => void) | undefined;
+  /** "Return to chat" when another Aeon view sent the user here, else "Start chatting". */
+  startChatLabel?: string | undefined;
+}
+
+/** How a provider is connected, as a short badge: a subscription, a saved key or the environment. */
+export function connectionBadge(provider: ModelProvider): string | undefined {
+  const connection = provider.connection;
+  if (!connection) return undefined;
+  if (!connection.stored) return "Environment";
+  if (connection.type === "api_key") return "API key";
+  return provider.methods.some((method) => method.type === "oauth" && method.subscription)
+    ? "Subscription"
+    : "Account";
+}
+
+/** The providers most people start with, in the order the Models page lists them. */
+export const POPULAR_PROVIDERS: readonly string[] = [
+  "anthropic",
+  "openai",
+  "openai-codex",
+  "github-copilot",
+  "google",
+  "xai",
+  "openrouter",
+];
+
+/** The default model's display name, or its id when the catalog does not list it. */
+export function defaultModelName(state: ModelAccountsState | null): string | undefined {
+  const choice = state?.defaultModel;
+  if (!choice) return undefined;
+  return (
+    state.models.find((model) => model.provider === choice.provider && model.id === choice.model)
+      ?.name ?? choice.model
+  );
 }

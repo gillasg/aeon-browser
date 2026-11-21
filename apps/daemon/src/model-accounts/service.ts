@@ -5,6 +5,7 @@ import { createAeonModelRuntime, refreshInBackground } from "@aeon/pi-adapter";
 import {
   availableModels,
   providerStatuses,
+  suggestDefaultModel,
   type ModelSummary,
   type ProviderStatus,
 } from "./catalog.js";
@@ -108,6 +109,8 @@ export class LoginService extends EventEmitter {
     const models = await this.models();
     if (!models.getProvider(providerId)) throw new LoginError(`Unknown provider ${providerId}`);
     await models.logout(providerId);
+    // A default on the provider just signed out would leave chats with nothing to run on.
+    await this.ensureDefaultModel().catch(() => undefined);
     this.emit("change");
   }
 
@@ -119,15 +122,39 @@ export class LoginService extends EventEmitter {
     this.emit("change");
   }
 
+  /**
+   * Picks a default model when there is none, or when the saved one is no longer available (its
+   * provider was signed out), so chats, the CLI and other extensions work right after a sign-in.
+   * Returns the new choice, or undefined when the current one stands.
+   */
+  async ensureDefaultModel(preferProvider?: string): Promise<ModelChoice | undefined> {
+    const models = await this.models();
+    const available = await models.getAvailable().catch(() => []);
+    const current = await this.settings.defaultModel();
+    if (
+      current &&
+      available.some((model) => model.provider === current.provider && model.id === current.model)
+    )
+      return undefined;
+    const choice = suggestDefaultModel(available, preferProvider);
+    if (choice) await this.settings.setDefaultModel(choice);
+    return choice;
+  }
+
   /** Cancels every running sign-in. */
   close(): void {
     for (const session of this.sessions.values()) session.cancel();
   }
 
   private finished(session: LoginSession): void {
-    this.emit("change");
-    if (session.state === "done") this.emit("connected", session.providerId);
     setTimeout(() => this.sessions.delete(session.id), FINISHED_SESSION_TTL_MS).unref();
+    if (session.state !== "done") return void this.emit("change");
+    void this.ensureDefaultModel(session.providerId)
+      .catch(() => undefined)
+      .then(() => {
+        this.emit("change");
+        this.emit("connected", session.providerId);
+      });
   }
 }
 

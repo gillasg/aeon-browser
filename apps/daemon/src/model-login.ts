@@ -6,29 +6,40 @@ import type { LoginServer } from "./model-accounts/server.js";
 // Chrome tabs itself. Logins land in Pi's own auth.json, so chats, the Pi CLI and other Pi apps
 // all see them.
 const IDLE_CLOSE_MS = 30 * 60_000;
-let active: LoginServer | undefined;
+let active: { server: LoginServer; agentDir: string | undefined } | undefined;
+/** Everyone who asked for the service hears every change, not only the first caller. */
+const listeners = new Set<() => void>();
 
 /** Starts (or reuses) the sign-in service and returns its address. `onChange` runs after each sign-in or sign-out. */
 export async function openModelLogin(
   agentDir: string | undefined,
   onChange: () => void,
 ): Promise<string> {
-  if (active) return active.url;
+  listeners.add(onChange);
+  if (active && active.agentDir === agentDir) return active.server.url;
+  // Another agent directory (a test, a profile switch): its logins live elsewhere, so start over.
+  if (active) await closeActive(active.server);
   // Loaded on first use: the provider SDKs are only needed while signing in.
   const { startLoginServer } = await import("./model-accounts/server.js");
   const server = await startLoginServer(agentDir ? { agentDir } : {});
-  active = server;
-  server.service.on("change", onChange);
-  const close = () => {
-    if (active !== server) return;
-    active = undefined;
-    clearTimeout(timer);
-    void server.close();
-  };
-  const timer = setTimeout(close, IDLE_CLOSE_MS);
+  active = { server, agentDir };
+  server.service.on("change", () => {
+    for (const listener of listeners) listener();
+  });
+  const timer = setTimeout(() => void closeActive(server), IDLE_CLOSE_MS);
   timer.unref();
+  const close = () => {
+    clearTimeout(timer);
+    void closeActive(server);
+  };
   server.events.once("done", close).once("closed", close);
   return server.url;
+}
+
+async function closeActive(server: LoginServer): Promise<void> {
+  if (active?.server !== server) return;
+  active = undefined;
+  await server.close();
 }
 
 /**

@@ -1302,3 +1302,61 @@
 .home-top-nav svg {
   display: block;
 }
+.model-badge {
+  display: inline-block;
+  margin-left: var(--aeon-s-1);
+  padding: 0 6px;
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-md);
+  color: var(--aeon-muted);
+  font-size: var(--aeon-fs-sm);
+  font-weight: 400;
+  vertical-align: 1px;
+}
+.model-ready {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aeon-s-3);
+  margin-bottom: var(--aeon-s-4);
+  padding: var(--aeon-s-3) var(--aeon-s-4);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
+  background: var(--aeon-surface);
+  font-size: var(--aeon-fs-md);
+}
+.model-flow-success {
+  flex-wrap: wrap;
+}
+.model-flow-success .model-flow-result span {
+  color: var(--aeon-muted);
+}
+.model-key-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-2);
+  margin-bottom: var(--aeon-s-2);
+}
+.model-key-tools .aeon-search {
+  flex: 1;
+  margin: 0;
+}
+.model-filter {
+  display: flex;
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-md);
+  overflow: hidden;
+}
+.model-filter button {
+  padding: var(--aeon-s-1) var(--aeon-s-3);
+  border: 0;
+  background: none;
+  color: var(--aeon-muted);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  cursor: pointer;
+}
+.model-filter button[aria-pressed="true"] {
+  background: var(--aeon-surface-raised);
+  color: var(--aeon-text);
+}
