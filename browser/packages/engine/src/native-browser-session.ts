@@ -38,6 +38,7 @@ const closing = new Map<number, Promise<void>>();
 /** Tabs that must stay attached while idle, e.g. while their network traffic is being recorded. */
 const held = new Set<number>();
 const attachListeners = new Set<(tabId: number) => Promise<void> | void>();
+const boundListeners = new Set<(tabId: number) => void>();
 
 /** Keeps (or stops keeping) a tab's debugger attached through idle periods. */
 export function holdBrowserDebugger(tabId: number, hold: boolean): void {
@@ -48,6 +49,11 @@ export function holdBrowserDebugger(tabId: number, hold: boolean): void {
 /** Runs after every debugger attach, so features can re-enable the CDP domains they need. */
 export function onBrowserDebuggerAttached(listener: (tabId: number) => Promise<void> | void): void {
   attachListeners.add(listener);
+}
+
+/** Runs when a tab is newly bound to a chat, including one opened mid-run. */
+export function onBrowserSessionBound(listener: (tabId: number) => void): void {
+  boundListeners.add(listener);
 }
 
 function idleDetach(tabId: number): void {
@@ -101,8 +107,10 @@ export function browserSessionHolder(tabId: number): string | undefined {
 }
 
 export function bindBrowserSession(tabId: number, chatId: string): void {
+  const changed = owners.get(tabId) !== chatId;
   owners.set(tabId, chatId);
   persistBrowserOwners(owners);
+  if (changed) for (const listener of boundListeners) listener(tabId);
 }
 
 /** Attaches for a caller that sends its own debugger commands (CDP clients); errors stay its own. */

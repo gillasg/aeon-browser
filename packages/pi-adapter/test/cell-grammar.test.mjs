@@ -40,6 +40,51 @@ test("a read's contradiction, partial list and location are in the cell", () => 
   assert.match(text, /list: 20 of 143 \(partial\)/);
 });
 
+test("five identical reads collapse to one line, and internal CDP stays off it", () => {
+  const read = {
+    action: { op: "observe", url: "https://razorpay.typeform.com/to/Aj64eENJ" },
+    event: {
+      id: "c:0",
+      cellId: "11111111-1111-4111-8111-111111111111",
+      chatId: "22222222-2222-4222-8222-222222222222",
+      tabId: 7,
+      at: 100,
+      ms: 20,
+      kind: "read",
+      label: "Read razorpay.typeform.com",
+      site: "razorpay.typeform.com",
+      effect: "unverifiable",
+      write: false,
+    },
+  };
+  const text = formatCell(
+    {
+      steps: [
+        read,
+        read,
+        read,
+        read,
+        read,
+        {
+          internal: true,
+          action: { op: "cdp", method: "Page.getFrameTree", target: { tabId: 7 } },
+        },
+        {
+          internal: true,
+          action: { op: "cdp", method: "Page.createIsolatedWorld", target: { tabId: 7 } },
+        },
+        { action: { op: "cdp", method: "Page.getFrameTree", target: { tabId: 7 } } },
+      ],
+      output: "",
+    },
+    now,
+  );
+  assert.equal(text.split("Read razorpay.typeform.com").length - 1, 1);
+  assert.match(text, /Read razorpay\.typeform\.com → unverifiable ×5/);
+  assert.doesNotMatch(text, /createIsolatedWorld/);
+  assert.match(text, /\[did\] cdp tab 7 Page\.getFrameTree/);
+});
+
 test("a confirmed click does not grow a next line", () => {
   const text = formatCell(
     {

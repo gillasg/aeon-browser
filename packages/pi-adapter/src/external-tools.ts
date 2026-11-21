@@ -28,6 +28,10 @@ export interface ExternalToolDefinition {
 export interface ExternalToolResult {
   content: Content[];
   isError: boolean;
+  /** The JSON value a browser_code cell returned. Absent for tools that have none. */
+  value?: unknown;
+  /** Absolute paths of screenshots that cell saved. */
+  screenshots?: string[];
 }
 
 const SESSION = {
@@ -125,6 +129,16 @@ export async function runExternalTool(
   const result = await inChat(sessionChatId("external", session), () =>
     full ? fullOutput(execute) : execute(),
   );
-  const outcome = result as unknown as { content: Content[]; isError?: boolean };
-  return { content: outcome.content, isError: outcome.isError === true };
+  const outcome = result as unknown as {
+    content: Content[];
+    isError?: boolean;
+    value?: unknown;
+    screenshots?: string[];
+  };
+  return {
+    content: outcome.content,
+    isError: outcome.isError === true,
+    ...(outcome.value !== undefined ? { value: outcome.value } : {}),
+    ...(outcome.screenshots ? { screenshots: outcome.screenshots } : {}),
+  };
 }

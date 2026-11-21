@@ -229,8 +229,23 @@ async function run(message: Record<string, unknown>): Promise<void> {
   }
   error ??= asynchronousError;
   if (!error) tip(String(message.code));
+  let screenshots: string[] = [];
+  try {
+    const shots = evaluate("__shotPaths");
+    if (Array.isArray(shots))
+      screenshots = shots.filter((shot): shot is string => typeof shot === "string").slice(0, 32);
+  } catch {
+    // A cell with no screenshot helper still finishes.
+  }
   parent.postMessage(
-    { kind: "done", cellId, value: portable(value), output, ...(error ? { error } : {}) },
+    {
+      kind: "done",
+      cellId,
+      value: portable(value),
+      output,
+      ...(screenshots.length ? { screenshots } : {}),
+      ...(error ? { error } : {}),
+    },
     "*",
   );
 }

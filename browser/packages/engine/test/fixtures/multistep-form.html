@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Builder application</title>
+<main>
+  <section data-step="1">
+    <h1>About you</h1>
+    <label>First name <input aria-label="First name" name="first" /></label>
+    <label>Email <input aria-label="Email" type="email" name="email" /></label>
+    <button type="button" data-next>Next</button>
+  </section>
+  <section data-step="2" hidden>
+    <h1>Will you build this year?</h1>
+    <label><input type="radio" name="build" value="yes" aria-label="Yes" /> Yes</label>
+    <label><input type="radio" name="build" value="no" aria-label="No" /> No</label>
+    <button type="button" data-next>Next</button>
+  </section>
+  <section data-step="3" hidden>
+    <h1>Review</h1>
+    <p>Nothing is sent until you submit.</p>
+    <button type="submit" id="submit">Submit</button>
+  </section>
+</main>
+<script>
+  const steps = [...document.querySelectorAll("[data-step]")];
+  let index = 0;
+  const show = (next) => {
+    index = next;
+    steps.forEach((step, i) => step.toggleAttribute("hidden", i !== index));
+  };
+  document
+    .querySelectorAll("[data-next]")
+    .forEach((button) =>
+      button.addEventListener("click", () => show(Math.min(steps.length - 1, index + 1))),
+    );
+  document.getElementById("submit").addEventListener("click", () => {
+    document.body.dataset.submitted = "yes";
+  });
+</script>

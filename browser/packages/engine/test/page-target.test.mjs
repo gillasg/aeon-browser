@@ -150,6 +150,7 @@ async function realm(source) {
   context.window = context;
   context.__call = async (request) => {
     if (request && typeof request.op === "string") {
+      if (request.internal === true) delete request.internal;
       const parsed = BrowserStepSchema.safeParse(request);
       if (!parsed.success) {
         throw new Error(

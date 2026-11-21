@@ -715,6 +715,8 @@ async function realm(source) {
   context.__call = async (request) => {
     requests.push(request);
     if (request && typeof request.op === "string") {
+      // The host drops this before the strict step schema. Helper CDP is not an agent step.
+      if (request.internal === true) delete request.internal;
       const parsed = BrowserStepSchema.safeParse(request);
       if (!parsed.success) {
         const message = `INVALID_INPUT: ${request.op} ${issueText(parsed.error)}`;

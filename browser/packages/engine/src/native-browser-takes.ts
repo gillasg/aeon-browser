@@ -9,6 +9,7 @@ import {
   browserSessionOwner,
   holdBrowserDebugger,
   onBrowserDebuggerAttached,
+  onBrowserSessionBound,
 } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
@@ -66,6 +67,13 @@ function tabLook(tab: chrome.tabs.Tab | undefined): { title?: string; favicon?: 
   };
 }
 
+/** A tab bound mid-run (a demo that opens a second tab) is recorded too, not only the first attach. */
+export function followBoundTabs(): void {
+  onBrowserSessionBound((tabId) => {
+    setTimeout(() => void recordAgentTab(tabId), 0);
+  });
+}
+
 onEngineInstall(() => {
   // A take keeps its tab's latest title and favicon, for a recorder drawing the tab.
   chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
@@ -77,6 +85,7 @@ onEngineInstall(() => {
   onBrowserDebuggerAttached((tabId) => {
     setTimeout(() => void recordAgentTab(tabId), 0);
   });
+  followBoundTabs();
 });
 
 async function dropTake(tabId: number): Promise<unknown> {

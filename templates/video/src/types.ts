@@ -28,6 +28,15 @@ export type ClipMeta = {
   frames: number;
   tabId?: number;
 };
+/** One chunk of a terminal cast. `t` is ms on the clip clock. `in` is the command. */
+export type TerminalEvent = { t: number; kind: "in" | "out" | "err"; text: string };
+/** Asciinema-style capture written by `aeon record terminal` as events.json `terminal`. */
+export type TerminalCast = {
+  version: 1;
+  command: string;
+  startedAt: number;
+  events: TerminalEvent[];
+};
 /** The on-disk log. Import it from src/recording.json (copied from the recording folder). */
 export type RecordingEvents = {
   version: 1;
@@ -36,6 +45,7 @@ export type RecordingEvents = {
   clip: ClipMeta;
   clips?: ClipMeta[];
   events: VideoEvent[];
+  terminal?: TerminalCast;
   note?: string;
 };
 
@@ -96,4 +106,6 @@ export type RenderProps = {
   base: string;
   /** The drawn cursor and zoom path, derived only from events.json. */
   cursor: { t: number; x: number; y: number }[];
+  /** Present when the recording folder has a terminal cast. Drawn beside the tab. */
+  terminal?: TerminalCast;
 };

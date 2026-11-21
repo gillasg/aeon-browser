@@ -72,13 +72,28 @@ export function formatStepLine(step: Record<string, unknown>): string {
 }
 
 function didLines(steps: Record<string, unknown>[]): string[] {
-  const lines = steps.filter((step) => step.action !== undefined).flatMap(stepLines);
-  if (lines.length <= 40) return lines;
-  return [...lines.slice(0, 10), "...", ...lines.slice(-29)];
+  const chunks: { lines: string[]; count: number }[] = [];
+  for (const step of steps) {
+    const lines = stepLines(step);
+    if (!lines.length) continue;
+    const last = chunks[chunks.length - 1];
+    if (last && last.lines.length === 1 && lines.length === 1 && last.lines[0] === lines[0]) {
+      last.count += 1;
+      continue;
+    }
+    chunks.push({ lines, count: 1 });
+  }
+  const flat = chunks.flatMap((chunk) => {
+    if (chunk.count === 1) return chunk.lines;
+    const [head, ...rest] = chunk.lines;
+    return head ? [`${head} ×${chunk.count}`, ...rest] : rest;
+  });
+  if (flat.length <= 40) return flat;
+  return [...flat.slice(0, 10), "...", ...flat.slice(-29)];
 }
 
 function stepLines(step: Record<string, unknown>): string[] {
-  if (step.loopFolded) return [];
+  if (step.loopFolded || step.internal === true) return [];
   const did = didText(step);
   if (!did) return [];
   const lines = [`[did] ${did}`];
@@ -132,14 +147,16 @@ function effectOf(step: Record<string, unknown>): string {
   return typeof result?.effect === "string" ? result.effect : "";
 }
 
+function shownStep(step: Record<string, unknown>): boolean {
+  return step.action !== undefined && !step.loopFolded && step.internal !== true;
+}
+
 export function ranLines(steps: Record<string, unknown>[]): string[] {
-  return steps
-    .filter((step) => step.action !== undefined && !step.loopFolded)
-    .map((step, index) => `[ran] ${index + 1} ${didText(step)}`);
+  return steps.filter(shownStep).map((step, index) => `[ran] ${index + 1} ${didText(step)}`);
 }
 
 function actionCount(steps: Record<string, unknown>[]): number {
-  return steps.filter((step) => step.action !== undefined && !step.loopFolded).length;
+  return steps.filter(shownStep).length;
 }
 
 function valueNotes(value: unknown): string[] {
