@@ -68,10 +68,12 @@ export class RoutineManagementTools {
       listen,
       schedule,
       nextDueAt: nextRoutineOccurrence(schedule, now),
-      requiredBrowserInstanceId: optionalNullableUuid(
-        args.requiredBrowserInstanceId,
-        "requiredBrowserInstanceId",
-      ),
+      // A routine runs in its chat's browser: with several Chrome profiles connected, a check with
+      // no browser fails AMBIGUOUS_BROWSER on every run and the watcher never fires.
+      requiredBrowserInstanceId:
+        optionalNullableUuid(args.requiredBrowserInstanceId, "requiredBrowserInstanceId") ??
+        this.routines.browserForChat(chatId) ??
+        null,
       enabled: true,
       deletedAt: null,
       revision: 1,

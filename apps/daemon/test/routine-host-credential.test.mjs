@@ -79,6 +79,8 @@ test("a routine check's recorded outcome never carries the credential", async (t
     {},
     {},
     {
+      browserForChat: () => undefined,
+      pinChat: () => undefined,
       async execute(_realm, _id, input) {
         credential = await input.codeCell.onCall({
           credential: "login",

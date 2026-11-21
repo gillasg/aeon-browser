@@ -132,10 +132,13 @@ function harness(options = {}) {
     revision: 1,
   };
   const executed = [];
+  const pins = new Map();
   const browser = {
     isInstanceAvailable: () => true,
+    browserForChat: () => options.chatBrowser,
+    pinChat: (chatId, clientInstanceId) => pins.set(chatId, clientInstanceId),
     execute: async (chatId, toolCallId, raw) => {
-      const input = { chatId, toolCallId, ...raw.codeCell };
+      const input = { chatId, toolCallId, pinnedTo: pins.get(chatId), ...raw.codeCell };
       executed.push(input);
       return options.answer ? options.answer(input, executed) : JSON.stringify({ value: false });
     },
@@ -232,6 +235,39 @@ test("a routine without a listen option is untouched by the live listener", asyn
     await scheduler.start();
     await settle(400);
     assert.ok(executed.every((c) => !c.code.includes("__liveIdle")));
+  } finally {
+    scheduler.close();
+  }
+});
+
+test("a watcher's checks run in its chat's browser, so several connected profiles never make it ambiguous", async () => {
+  const { scheduler, executed } = harness({
+    listen: null,
+    check: '"use listen"; false',
+    chatBrowser: "11111111-1111-4111-8111-111111111111",
+  });
+  try {
+    await scheduler.start();
+    await settle(400);
+    assert.ok(executed.length >= 1, "the listening check ran");
+    assert.ok(executed.every((c) => c.pinnedTo === "11111111-1111-4111-8111-111111111111"));
+  } finally {
+    scheduler.close();
+  }
+});
+
+test("a listening check that errors is reported, not swallowed", async () => {
+  const seen = [];
+  const { scheduler } = harness({
+    listen: null,
+    check: '"use listen"; false',
+    answer: () => JSON.stringify({ error: "AMBIGUOUS_BROWSER" }),
+  });
+  scheduler.onCheck = (_routine, check) => seen.push(check);
+  try {
+    await scheduler.start();
+    await settle(400);
+    assert.ok(seen.some((c) => c.met === false && /AMBIGUOUS_BROWSER/.test(String(c.error))));
   } finally {
     scheduler.close();
   }
