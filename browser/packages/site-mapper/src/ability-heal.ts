@@ -47,11 +47,85 @@ export async function queueHeal(
 ): Promise<void> {
   // A bot check or a rate limit is not a broken ability. Repairing it would learn the wall.
   if (/SITE_BLOCKED|RATE_LIMITED|bot wall|fresh browser needed/i.test(reason)) return;
-  const folder = siteDir(siteName(site));
-  await mkdir(folder, { recursive: true });
-  const line = JSON.stringify({ at: new Date().toISOString(), name, way, reason }) + "\n";
-  await appendFile(join(folder, "heal.jsonl"), line, "utf8");
+  await appendHealLog(site, { event: "drift", name, way, reason });
   await markHealPending(site, name, way, reason);
+}
+
+/** One line of `heal.jsonl`: a drift, a repair attempt, its outcome, or a version change. */
+export interface HealLogEntry {
+  at: string;
+  name: string;
+  event: "drift" | "attempt" | "repaired" | "unrepaired" | "not-drift" | "ok";
+  way?: string;
+  reason?: string;
+  /** Operations of the site model that were failing and passed to the repair. */
+  operations?: string[];
+  fromVersion?: number;
+  toVersion?: number;
+}
+
+const LOG_FILE = "heal.jsonl";
+/** Lines kept per site. The oldest go first, so a long-lived install stays small. */
+export const HEAL_LOG_LIMIT = 500;
+const logWrites = new Map<string, Promise<unknown>>();
+
+/**
+ * Appends one entry. Writes for a site are serialised; each line is capped and written whole, and
+ * when the file passes the limit it is rewritten atomically with the newest lines only.
+ */
+export function appendHealLog(
+  site: string,
+  entry: Omit<HealLogEntry, "at"> & { at?: string },
+): Promise<void> {
+  const key = siteName(site);
+  const previous = logWrites.get(key) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(() => appendUnlocked(key, entry));
+  logWrites.set(key, next);
+  return next;
+}
+
+async function appendUnlocked(
+  site: string,
+  entry: Omit<HealLogEntry, "at"> & { at?: string },
+): Promise<void> {
+  const folder = siteDir(site);
+  await mkdir(folder, { recursive: true });
+  const record: HealLogEntry = {
+    ...entry,
+    at: entry.at ?? new Date().toISOString(),
+    ...(entry.reason ? { reason: entry.reason.slice(0, 300) } : {}),
+    ...(entry.operations ? { operations: entry.operations.slice(0, 50) } : {}),
+  };
+  const line = JSON.stringify(record);
+  await appendFile(join(folder, LOG_FILE), line + "\n", "utf8");
+  const lines = await logLines(site);
+  if (lines.length > HEAL_LOG_LIMIT)
+    await writeAtomic(join(folder, LOG_FILE), lines.slice(-HEAL_LOG_LIMIT).join("\n") + "\n");
+}
+
+async function logLines(site: string): Promise<string[]> {
+  const text = await readFile(join(siteDir(siteName(site)), LOG_FILE), "utf8").catch(() => "");
+  return text.split("\n").filter((line) => line.trim());
+}
+
+/** Self-heal history, oldest first. A torn or foreign line is skipped, never thrown. */
+export async function readHealLog(
+  site: string,
+  options: { name?: string; limit?: number } = {},
+): Promise<HealLogEntry[]> {
+  const entries: HealLogEntry[] = [];
+  for (const line of await logLines(site)) {
+    try {
+      const value = JSON.parse(line) as Partial<HealLogEntry> & { event?: string };
+      if (!value || typeof value.name !== "string" || typeof value.at !== "string") continue;
+      // Lines from before the event field were drifts.
+      const entry = { ...value, event: value.event ?? "drift" } as HealLogEntry;
+      if (!options.name || entry.name === options.name) entries.push(entry);
+    } catch {
+      continue;
+    }
+  }
+  return options.limit ? entries.slice(-options.limit) : entries;
 }
 
 /** Every ability's heal state for a site: what drifted and the last repair. Empty when none. */

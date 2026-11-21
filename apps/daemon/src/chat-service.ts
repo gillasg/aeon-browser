@@ -54,6 +54,13 @@ import {
 } from "./chat-event-hub.js";
 import type { BrowserSiteRules } from "./browser-site-rules.js";
 import { RouteRecorder } from "./route-recorder.js";
+import {
+  rung0Card,
+  rung0Eligible,
+  rung0Sites,
+  tryRung0,
+  type Rung0Outcome,
+} from "./rung0-replay.js";
 export class ChatService {
   private readonly store: ChatStore & ThreadCoordinationStore;
   private readonly pi: PiSessionPort;
@@ -75,17 +82,24 @@ export class ChatService {
   readonly management: ChatManagementCommands;
   private readonly reviews: ChatReviews;
   private readonly siteRules: BrowserSiteRules | undefined;
+  private readonly rung0: ((prompt: string, sites: string[]) => Promise<Rung0Outcome>) | undefined;
   constructor(options: {
     dataDirectory: string;
     store: ChatStore & ThreadCoordinationStore;
     pi: PiSessionPort;
     siteRules?: BrowserSiteRules;
+    /** Rung 0 (a promoted route run with no model). Default on; `false` turns it off. */
+    rung0?: ((prompt: string, sites: string[]) => Promise<Rung0Outcome>) | false;
   }) {
     const dataDirectory = resolve(options.dataDirectory);
     this.dataDirectory = dataDirectory;
     this.store = options.store;
     this.pi = options.pi;
     this.siteRules = options.siteRules;
+    this.rung0 =
+      options.rung0 === false
+        ? undefined
+        : (options.rung0 ?? ((text, sites) => tryRung0(text, { sites })));
     this.projects = new ProjectService(dataDirectory);
     this.threadSupport = new ChatThreadSupport(dataDirectory, this.store, this.pi);
     this.metadata = new ChatMetadataService(this.store, this.eventHub);
@@ -339,6 +353,7 @@ export class ChatService {
         this.observeSession(chatId, session);
         try {
           await configureInitialPrompt(session, selection);
+          if (await this.answeredAtRung0(chatId, prompt, pending)) return chat;
           const prepared = await this.routes.prepare(chatId, prompt.text);
           if (!pending.stopped)
             await session.submit({
@@ -355,6 +370,18 @@ export class ChatService {
       .finally(() => {
         if (this.starting.get(chatId) === pending) this.starting.delete(chatId);
       });
+  }
+  /** A clean rung-0 hit answers with no model turn; anything else returns false and Pi runs. */
+  private async answeredAtRung0(
+    chatId: ChatId,
+    prompt: PiSessionInput,
+    pending: { stopped: boolean },
+  ): Promise<boolean> {
+    if (!this.rung0 || !rung0Eligible(prompt)) return false;
+    const outcome = await this.rung0(prompt.text, rung0Sites(prompt)).catch(() => undefined);
+    if (!outcome?.hit || pending.stopped) return false;
+    this.eventHub.publish(chatId, rung0Card(chatId, `rung0-${randomUUID()}`, prompt.text, outcome));
+    return true;
   }
   async getControls(chatId: ChatId): Promise<PiSessionControlState | null> {
     // A Chat whose last activation failed is opened again, so the page gets the real reason

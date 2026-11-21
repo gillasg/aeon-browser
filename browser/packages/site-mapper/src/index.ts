@@ -16,7 +16,22 @@ export {
   encodeTnetstring,
 } from "./load/index.js";
 export { filterExchanges, learnNoise, type FilterOptions } from "./filter.js";
-export { inputParams, documentedParams, isDerived, bodyInputs, operationInputs } from "./params.js";
+export {
+  inputParams,
+  documentedParams,
+  isDerived,
+  bodyInputs,
+  graphqlInputs,
+  operationInputs,
+} from "./params.js";
+export {
+  COOKIE_XSRF_HEADERS,
+  SESSION_LIVE_HEADER,
+  SESSION_SECRET_HEADER,
+  cookieXsrfHeaders,
+  isSessionSecretHeader,
+  withoutSessionValues,
+} from "./session-headers.js";
 export { inferSchema } from "./infer/schema.js";
 export { templatePaths } from "./infer/templates.js";
 export { builtinAbilities, builtinSites } from "./builtin-abilities.js";
@@ -304,7 +319,9 @@ export {
   type StageInput,
   type StageResult,
 } from "./route-store.js";
+export { apiWayFor, runnableWays, scriptWayFor, stepLine, wayProblem } from "./route-runnable.js";
 export {
+  abilityFromRoute,
   forgetAbility,
   promoteRoute,
   promotionReady,
@@ -314,6 +331,10 @@ export {
 export { reportWrong, type WrongReport } from "./route-wrong.js";
 export { actRoute, dropActRoute, readActRoute, saveActRoute, type ActStep } from "./act-route.js";
 export {
+  HEAL_LOG_LIMIT,
+  appendHealLog,
+  readHealLog,
+  type HealLogEntry,
   healLine,
   lastHeal,
   markHealPending,
@@ -350,12 +371,14 @@ export {
   type AbilityCheckNote,
   type FailureKind,
   type IdleConfig,
+  type IdleCheckVerdict,
   type IdleDeps,
   type IdleRepairDeps,
   type IdleRepairResult,
 } from "./ability-idle.js";
 export { matchControl, type FallbackTarget, type PageControl } from "./step-fallbacks.js";
 export { testAllAbilities, type AbilityTestRow } from "./ability-test-all.js";
+export { readOnlyHost } from "./ability-attempt.js";
 export type {
   ObservedStep,
   Route,

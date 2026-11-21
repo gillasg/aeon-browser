@@ -7,7 +7,7 @@
 
 import type { Ability } from "./abilities.js";
 import { saveAbility } from "./abilities.js";
-import { markHealPending, type HealReceipt } from "./ability-heal.js";
+import { appendHealLog, markHealPending, type HealReceipt } from "./ability-heal.js";
 import { wayId } from "./ability-stats.js";
 import { siteName } from "./registry.js";
 
@@ -198,11 +198,18 @@ export function failedCheckNote(
   return { at, ok: false, reason, detail };
 }
 
+/** What a check found. `operations` names the site-model operations that failed, for repair. */
+export interface IdleCheckVerdict {
+  ok: boolean;
+  reason?: string;
+  operations?: string[];
+}
+
 export interface IdleRepairDeps {
   /** Runs the read-only check. Writes get a rehearsal; this never performs a real write. */
-  check: (ability: Ability) => Promise<{ ok: boolean; reason?: string }>;
+  check: (ability: Ability) => Promise<IdleCheckVerdict>;
   /** Re-learns a drifted ability in the background and returns a fresh draft, or undefined. */
-  relearn: (ability: Ability) => Promise<Ability | undefined>;
+  relearn: (ability: Ability, failure: IdleCheckVerdict) => Promise<Ability | undefined>;
   now?: () => number;
 }
 
@@ -223,8 +230,14 @@ export async function repairAbilityWhileIdle(
   ability: Ability,
   deps: IdleRepairDeps,
 ): Promise<IdleRepairResult> {
+  const result = await checkAndRepair(ability, deps);
+  await logOutcome(ability, result).catch(() => undefined);
+  return result;
+}
+
+async function checkAndRepair(ability: Ability, deps: IdleRepairDeps): Promise<IdleRepairResult> {
   const at = new Date(deps.now?.() ?? Date.now()).toISOString();
-  let verdict: { ok: boolean; reason?: string };
+  let verdict: IdleCheckVerdict;
   try {
     verdict = await deps.check(ability);
   } catch (error) {
@@ -242,7 +255,8 @@ export async function repairAbilityWhileIdle(
     const note = failedCheckNote(reason, detail, at);
     return { ability: withCheckNote(ability, note), status: "not-drift", note };
   }
-  const saved = await relearnAndSave(ability, detail, deps);
+  await logAttempt(ability, detail, verdict.operations);
+  const saved = await relearnAndSave(ability, { ...verdict, reason: detail }, deps);
   if (saved) {
     const note: AbilityCheckNote = { at, ok: true, reason: "drift", detail: "re-learned" };
     return {
@@ -262,15 +276,46 @@ export async function repairAbilityWhileIdle(
   return { ability: withCheckNote(ability, note), status: "unrepaired", note };
 }
 
+async function logAttempt(
+  ability: Ability,
+  reason: string,
+  operations: string[] | undefined,
+): Promise<void> {
+  await appendHealLog(ability.site, {
+    event: "attempt",
+    name: ability.name,
+    reason,
+    ...(operations?.length ? { operations } : {}),
+    ...(ability.version ? { fromVersion: ability.version } : {}),
+  }).catch(() => undefined);
+}
+
+/** Repairs and failures go to `heal.jsonl`; a plain passing check does not, so the log stays small. */
+async function logOutcome(before: Ability, result: IdleRepairResult): Promise<void> {
+  if (result.status === "ok") return;
+  await appendHealLog(before.site, {
+    event: result.status,
+    name: before.name,
+    ...(result.note?.detail ? { reason: result.note.detail } : {}),
+    ...(result.status === "repaired"
+      ? {
+          fromVersion: result.healed?.fromVersion ?? before.version ?? 1,
+          toVersion: result.healed?.toVersion ?? result.ability.version ?? 1,
+          ...(result.healed ? { way: result.healed.toWay } : {}),
+        }
+      : {}),
+  });
+}
+
 /** Re-learns a drifted ability and saves it as the next version; undefined when nothing came back. */
 async function relearnAndSave(
   ability: Ability,
-  detail: string,
+  failure: IdleCheckVerdict & { reason: string },
   deps: IdleRepairDeps,
 ): Promise<Awaited<ReturnType<typeof saveAbility>> | undefined> {
   let fresh: Ability | undefined;
   try {
-    fresh = await deps.relearn(ability);
+    fresh = await deps.relearn(ability, failure);
   } catch {
     fresh = undefined;
   }
@@ -278,7 +323,9 @@ async function relearnAndSave(
   const first = ability.ways[0];
   // A check that failed outside a run has not queued a heal; the save below is its repair.
   if (first)
-    await markHealPending(ability.site, ability.name, wayId(first), detail).catch(() => undefined);
+    await markHealPending(ability.site, ability.name, wayId(first), failure.reason).catch(
+      () => undefined,
+    );
   return saveAbility(
     {
       ...fresh,

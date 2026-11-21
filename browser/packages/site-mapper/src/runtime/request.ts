@@ -1,6 +1,7 @@
 import { randomUUID, randomBytes } from "node:crypto";
 import { parseJson } from "../infer/schema.js";
 import { declaredInputs, plainInputName } from "./bad-request.js";
+import { isSessionSecretHeader } from "../session-headers.js";
 import type { Dependency, Operation, Param } from "../types.js";
 
 // Builds a concrete request from an operation and the caller's parameters. The last recorded
@@ -96,14 +97,78 @@ function generatedTargets(operation: Operation): Map<string, NonNullable<Param["
   return map;
 }
 
-function graphqlBody(body: unknown, params: Params, consumed: Set<string>): unknown {
-  const record = (Array.isArray(body) ? body[0] : body) as Record<string, unknown> | undefined;
-  const base = record && typeof record === "object" ? record : {};
+/**
+ * The GraphQL envelope: the recorded document (query, operationName, persisted-query extensions)
+ * and the caller's variables. Variables come from `variables`, or from top-level params named
+ * like a declared variable; a variable that never changed across recordings is filled in.
+ */
+export function graphqlPayload(
+  operation: Operation,
+  params: Params,
+  consumed: Set<string>,
+): Record<string, unknown> {
   consumed.add("variables");
   return {
-    ...base,
-    variables: { ...((params.variables as object | undefined) ?? {}) },
+    ...graphqlEnvelope(operation),
+    variables: graphqlVariables(operation, params, consumed),
   };
+}
+
+/** The recorded call with the template's document, so a newer query wins over an old sample. */
+function graphqlEnvelope(operation: Operation): Record<string, unknown> {
+  const sample = lastSampleBody(operation) ?? lastSampleQuery(operation);
+  const record = Array.isArray(sample) ? (sample[0] as unknown) : sample;
+  const base: Record<string, unknown> = isRecord(record) ? { ...record } : {};
+  const template = operation.graphql;
+  if (template?.query) base.query = template.query;
+  if (template?.operationName) base.operationName = template.operationName;
+  if (template?.extensions) base.extensions = template.extensions;
+  else if (typeof base.extensions === "string") base.extensions = parseJson(base.extensions);
+  return base;
+}
+
+function graphqlVariables(
+  operation: Operation,
+  params: Params,
+  consumed: Set<string>,
+): Record<string, unknown> {
+  const declared = operation.graphql?.variables ?? [];
+  const variables: Record<string, unknown> = {};
+  for (const variable of declared)
+    if (variable.constant !== undefined) variables[variable.name] = variable.constant;
+  if (isRecord(params.variables)) Object.assign(variables, params.variables);
+  for (const { name } of declared) {
+    if (params[name] === undefined || consumed.has(name)) continue;
+    variables[name] = params[name];
+    consumed.add(name);
+  }
+  return variables;
+}
+
+/** GET GraphQL keeps its envelope in the query string. */
+function lastSampleQuery(operation: Operation): Record<string, unknown> | undefined {
+  const url = operation.samples[operation.samples.length - 1]?.url;
+  if (!url || operation.graphql?.variablesPath !== "query:variables") return undefined;
+  try {
+    const params = Object.fromEntries(new URL(url).searchParams);
+    return Object.keys(params).length ? params : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function graphqlBody(operation: Operation, params: Params, consumed: Set<string>): unknown {
+  return graphqlPayload(operation, params, consumed);
+}
+
+/** Writes a GET GraphQL call's envelope into the URL, as the site's client does. */
+function graphqlQuery(operation: Operation, url: URL, params: Params, consumed: Set<string>): void {
+  const payload = graphqlPayload(operation, params, consumed);
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) continue;
+    if (key === "variables" && isRecord(value) && !Object.keys(value).length) continue;
+    url.searchParams.set(key, typeof value === "string" ? value : JSON.stringify(value));
+  }
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -139,7 +204,7 @@ function jsonBody(operation: Operation, params: Params, consumed: Set<string>): 
 }
 
 function bodyFor(operation: Operation, params: Params, consumed: Set<string>): unknown {
-  if (operation.kind === "graphql") return graphqlBody(lastSampleBody(operation), params, consumed);
+  if (operation.kind === "graphql") return graphqlBody(operation, params, consumed);
   if (operation.match?.rpcMethod) return rpcBody(operation, params, consumed);
   return jsonBody(operation, params, consumed);
 }
@@ -155,10 +220,6 @@ function serializeBody(operation: Operation, body: unknown): string | undefined 
     ).toString();
   return typeof body === "string" ? body : JSON.stringify(body);
 }
-
-/** Values that belong to the user's session (CSRF tokens, auth headers): never replayed from a recording. */
-const SESSION_HEADER =
-  /^(authorization|x-csrf-token|x-xsrf-token|csrf-token|x-xsrftoken|x-csrftoken)$/i;
 
 type Resolved = { value?: string; missing?: boolean };
 
@@ -188,7 +249,9 @@ function paramValue(operation: Operation, param: Param, inputs: Inputs): Resolve
 
 /** What to send when nobody passed a value and nothing produces one. */
 function fallbackValue(param: Param): Resolved {
-  if (param.in === "header" && SESSION_HEADER.test(param.name)) return {};
+  // Values that belong to the user's session (CSRF tokens, auth headers) are never replayed from a
+  // recording: the transport reads them from the live tab, its cookies or the site's own calls.
+  if (param.in === "header" && isSessionSecretHeader(param.name)) return {};
   if (param.constant !== undefined) return { value: param.constant };
   // A page number is semantic, not recorded: the first page is safe.
   if (param.in === "query" && /^(page|pageNum|pageNumber)$/i.test(param.name) && param.required)
@@ -237,7 +300,8 @@ function applyParams(operation: Operation, inputs: Inputs, consumed: Set<string>
 
 function buildBody(operation: Operation, inputs: Inputs, consumed: Set<string>): unknown {
   const hasBody =
-    operation.requestBody || operation.samples.some((s) => s.requestBody !== undefined);
+    operation.method !== "GET" &&
+    (operation.requestBody || operation.samples.some((s) => s.requestBody !== undefined));
   let body = hasBody ? bodyFor(operation, inputs.params, consumed) : undefined;
   for (const [target, value] of Object.entries(inputs.sets))
     if (target.startsWith("body:")) body = setPointer(body, target.slice(5), value);
@@ -267,6 +331,8 @@ export function buildRequest(
   const consumed = new Set<string>([SET]);
   const { path, url, headers, missing } = applyParams(operation, inputs, consumed);
   const body = buildBody(operation, inputs, consumed);
+  if (operation.kind === "graphql" && operation.method === "GET")
+    graphqlQuery(operation, url, params, consumed);
   extraQuery(operation, url, inputs, consumed);
   url.pathname = path;
   const mime = operation.requestBody?.mime;

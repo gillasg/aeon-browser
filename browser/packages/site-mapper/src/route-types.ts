@@ -11,6 +11,8 @@ export interface RouteStep {
   kind: string;
   target?: TargetWithFallbacks;
   args?: string[];
+  /** Where a navigation landed, with `{slot}` placeholders. */
+  url?: string;
   onPageType: string;
   expectEffect: "confirmed" | "unverifiable" | "suspected_noop" | "refused";
   expectRequest?: { method: string; path: string };

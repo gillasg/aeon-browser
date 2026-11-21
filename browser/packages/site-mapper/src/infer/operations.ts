@@ -1,6 +1,7 @@
 import { documentShape } from "./html.js";
 import { isTelemetry, type Classified } from "../filter.js";
-import type { Exchange, Operation, Param } from "../types.js";
+import { isSessionSecretHeader, withoutSessionValues } from "../session-headers.js";
+import type { Exchange, GraphqlVariable, Operation, Param } from "../types.js";
 import {
   ACTION_FIELDS,
   actionField,
@@ -60,7 +61,7 @@ function discriminator(member: Member): {
     else if (member.graphql.hash) graphql.hash = member.graphql.hash;
     return {
       kind: "graphql",
-      key: `gql:${graphql.operationName ?? graphql.hash ?? "anonymous"}`,
+      key: `gql:${graphql.operationName ?? graphql.hash ?? (member.graphql.field ? `field:${member.graphql.field}` : "anonymous")}`,
       match: { graphql },
     };
   }
@@ -196,6 +197,16 @@ function collectParams(
     for (const [name, value] of list) values.set(name, [...(values.get(name) ?? []), value]);
   return [...values.entries()].map(([name, list]) => {
     const presence = lists.filter((pairs) => pairs.some(([key]) => key === name)).length;
+    // A sign-in or anti-forgery header comes from the live session at call time. Its recorded
+    // values are never kept: no example, no constant.
+    if (location === "header" && isSessionSecretHeader(name))
+      return {
+        name,
+        in: location,
+        required: presence === total,
+        schema: { type: "string" },
+        derived: "session",
+      };
     const param: Param = {
       name,
       in: location,
@@ -309,14 +320,64 @@ function requestBody(group: Group): Operation["requestBody"] {
 }
 
 function graphqlTemplate(group: Group): Operation["graphql"] {
-  const call = group.members.map((member) => member.graphql).find(Boolean);
+  const calls = group.members
+    .map((member) => member.graphql)
+    .filter((call): call is GraphqlCall => !!call);
+  const call = calls.at(-1);
   if (!call) return undefined;
   const template: NonNullable<Operation["graphql"]> = { variablesPath: call.variablesPath };
+  // The latest document wins when a site changed its query between recordings.
   if (call.query) template.query = call.query;
   if (call.hash) template.hash = call.hash;
   if (call.operationName) template.operationName = call.operationName;
+  else if (call.field) template.field = call.field;
+  const extensions = invariant(calls.map((item) => item.extensions));
+  if (extensions && typeof extensions === "object")
+    template.extensions = extensions as Record<string, unknown>;
+  const variables = graphqlVariables(calls);
+  if (variables.length) template.variables = variables;
   return template;
 }
+
+/** The one value every recording had, or undefined when they differ or any is missing. */
+function invariant(values: unknown[]): unknown {
+  if (!values.length || values.some((value) => value === undefined)) return undefined;
+  const first = JSON.stringify(values[0]);
+  return values.every((value) => JSON.stringify(value) === first) ? values[0] : undefined;
+}
+
+/**
+ * One entry per top-level variable seen. A variable that had the same value in two or more
+ * recordings is a constant; one whose name or value looks like a secret is never kept.
+ */
+export function graphqlVariables(calls: readonly GraphqlCall[]): GraphqlVariable[] {
+  const records = calls.map((call) =>
+    call.variables && typeof call.variables === "object" && !Array.isArray(call.variables)
+      ? (call.variables as Record<string, unknown>)
+      : {},
+  );
+  const names = [...new Set(records.flatMap((record) => Object.keys(record)))];
+  return names.map((name) => {
+    const values = records.filter((record) => name in record).map((record) => record[name]);
+    const secret = PASSWORD_KEY.test(name) || SECRET_VARIABLE.test(name);
+    const variable: GraphqlVariable = {
+      name,
+      required: values.length === records.length,
+      schema: inferSchema(values),
+    };
+    if (!secret) {
+      const constant = records.length >= 2 ? invariant(values) : undefined;
+      if (constant !== undefined && values.length === records.length) variable.constant = constant;
+      variable.examples = [...new Map(values.map((v) => [JSON.stringify(v), v])).values()].slice(
+        0,
+        3,
+      );
+    }
+    return variable;
+  });
+}
+
+const SECRET_VARIABLE = /token|secret|password|csrf|xsrf|session|api_?key|authorization/i;
 
 const PASSWORD_KEY =
   /^(password|passwd|pwd|pass|otp|pin|cvv|cvc|card_?number|new_?password|current_?password)$/i;
@@ -367,7 +428,7 @@ export function buildOperation(group: Group): Operation {
       url: exchange.url,
       method: exchange.method,
       status: exchange.status,
-      requestHeaders: exchange.requestHeaders,
+      requestHeaders: withoutSessionValues(exchange.requestHeaders),
       ...(exchange.requestBody !== undefined
         ? { requestBody: withoutPasswords(exchange.requestBody) }
         : {}),
@@ -397,7 +458,8 @@ const VERBS: Record<string, string> = {
 
 /** Names from what tells an operation apart: its GraphQL name, RPC method or action field. */
 function matchedName(operation: Operation): string | undefined {
-  if (operation.graphql?.operationName) return camel(operation.graphql.operationName);
+  const graphql = graphqlName(operation);
+  if (graphql) return graphql;
   if (operation.match?.rpcMethod) return camel(operation.match.rpcMethod);
   const field = operation.match?.field;
   if (field) {
@@ -408,7 +470,16 @@ function matchedName(operation: Operation): string | undefined {
       .pop();
     return camel(`get ${noun ?? ""} ${field.value}`);
   }
-  if (operation.graphql?.hash) return "graphql" + operation.graphql.hash.slice(0, 8);
+  return undefined;
+}
+
+/** A GraphQL operation's name, its persisted-query hash, or its first root field. */
+function graphqlName(operation: Operation): string | undefined {
+  const graphql = operation.graphql;
+  if (!graphql) return undefined;
+  if (graphql.operationName) return camel(graphql.operationName);
+  if (graphql.hash) return "graphql" + graphql.hash.slice(0, 8);
+  if (graphql.field) return camel(`${operation.role === "action" ? "" : "get "}${graphql.field}`);
   return undefined;
 }
 

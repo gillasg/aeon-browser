@@ -10,11 +10,15 @@ import {
   listAbilities,
   listSites,
   readHealth,
+  readOnlyHost,
   repair,
   repairAbilityWhileIdle,
+  testAbility,
   testAllAbilities,
   type Ability,
   type AbilityCheckNote,
+  type AbilityHost,
+  type IdleCheckVerdict,
   type IdleConfig,
   type ModelLike,
 } from "@browserkit/site-mapper";
@@ -27,9 +31,16 @@ export interface IdleWorkerOptions extends Partial<IdleConfig> {
   /** The current daemon activity, to stop the moment a chat starts. */
   activity: () => ActivityCounts;
   /** Runs a read-only check for one ability. */
-  check?: (ability: Ability) => Promise<{ ok: boolean; reason?: string }>;
+  check?: (ability: Ability) => Promise<IdleCheckVerdict>;
   /** Re-learns a drifted ability in the background. */
-  relearn?: (ability: Ability) => Promise<Ability | undefined>;
+  relearn?: (ability: Ability, failure: IdleCheckVerdict) => Promise<Ability | undefined>;
+  /**
+   * The host a live read-only check runs stored cases through. Default: the site's own host with
+   * writes refused, used only when a background cell runner (a browser) is available.
+   */
+  liveHost?: (site: string) => AbilityHost;
+  /** Re-records the flows behind failing operations. Default: site-mapper's `repair`. */
+  repairOperations?: typeof repair;
   /** A background browser_code cell runner, for read-only rehearsals and re-learning. */
   cell?: IdleCellRunner;
   model?: () => Promise<ModelLike>;
@@ -102,8 +113,8 @@ export class AbilityIdleWorker {
       for (const ability of this.scheduler.plan(abilities)) {
         if (!this.scheduler.canStart()) break;
         const result = await repairAbilityWhileIdle(ability, {
-          check: this.options.check ?? defaultCheck,
-          relearn: this.options.relearn ?? this.defaultRelearn(site, ability),
+          check: this.options.check ?? ((item) => this.defaultCheck(item)),
+          relearn: this.options.relearn ?? this.defaultRelearn(site),
         });
         this.scheduler.recordCheck();
         if (result.note) this.options.onNote?.(result.ability, result.note);
@@ -113,19 +124,44 @@ export class AbilityIdleWorker {
     }
   }
 
-  private defaultRelearn(site: string, ability: Ability) {
-    return async (): Promise<Ability | undefined> => {
-      const { cell, model } = this.options;
-      if (!cell || !model) return undefined;
-      const bridge = {
-        run: (code: string) => cell(code),
-        status: () => Promise.resolve({ browsers: 1 }),
-        close: () => undefined,
-      };
-      await repair(site, [], { bridge } as never);
+  /** The browser behind the cell runner, as site-mapper's repair and build paths expect it. */
+  private bridge(): CellBridge | undefined {
+    const { cell } = this.options;
+    return cell ? cellBridge(cell) : undefined;
+  }
+
+  /** Stored health, then a live read-only run of the stored cases, then a dry check. */
+  private async defaultCheck(ability: Ability): Promise<IdleCheckVerdict> {
+    const contract = await healthVerdict(ability);
+    if (contract) return contract;
+    const host = this.liveHost(ability.site);
+    if (host && ability.kind === "read" && ability.createdBy !== "builtin" && ability.tests?.length)
+      return liveVerdict(ability, host);
+    return dryVerdict(ability);
+  }
+
+  private liveHost(site: string): AbilityHost | undefined {
+    if (this.options.liveHost) return this.options.liveHost(site);
+    return this.options.cell ? readOnlyHost(site) : undefined;
+  }
+
+  private defaultRelearn(site: string) {
+    return async (ability: Ability, failure: IdleCheckVerdict): Promise<Ability | undefined> => {
+      const { model } = this.options;
+      const bridge = this.bridge();
+      if (!bridge || !model) return undefined;
+      if (!(await bridge.status()).browsers) return undefined;
+      const operations = failure.operations?.length
+        ? failure.operations
+        : abilityOperations(ability);
+      // Re-record the failing operations first so the rebuilt site model knows the new shape.
+      if (operations.length)
+        await (this.options.repairOperations ?? repair)(site, operations, {
+          bridge: () => Promise.resolve(bridge),
+        }).catch(report);
       const built = await buildAbility(site, ability.description ?? ability.name, {
         model: await model(),
-        bridge: () => Promise.resolve(bridge as never),
+        bridge: () => Promise.resolve(bridge),
         name: ability.name,
         kind: ability.kind,
       });
@@ -135,13 +171,79 @@ export class AbilityIdleWorker {
   }
 }
 
-/** Read-only: stored cases in dry mode, plus the last health report's drift status. */
-async function defaultCheck(ability: Ability): Promise<{ ok: boolean; reason?: string }> {
+interface CellBridge {
+  run(code: string): Promise<unknown>;
+  status(): Promise<{ browsers: number }>;
+  close(): void;
+}
+
+/** A bridge over the background cell runner. Its status asks the browser, not a stub. */
+export function cellBridge(cell: IdleCellRunner): CellBridge {
+  return {
+    run: (code) => cell(code),
+    status: async () => {
+      try {
+        await cell("return 1;");
+        return { browsers: 1 };
+      } catch {
+        return { browsers: 0 };
+      }
+    },
+    close: () => undefined,
+  };
+}
+
+/** The site-model operations an ability's API ways call. */
+export function abilityOperations(ability: Ability): string[] {
+  const found = new Set<string>();
+  for (const way of ability.ways) {
+    if (way.kind !== "api") continue;
+    if (way.operation) found.add(way.operation);
+    for (const step of way.operations ?? []) found.add(step.operation);
+  }
+  return [...found];
+}
+
+/** The last health report's drift for this ability's operations (any, when it names none). */
+async function healthVerdict(ability: Ability): Promise<IdleCheckVerdict | undefined> {
   const health = await readHealth(ability.site).catch(() => undefined);
-  const failing = health?.results.find(
-    (item) => item.status === "drift" || item.status === "broken",
+  const used = new Set(abilityOperations(ability));
+  const failing = (health?.results ?? []).filter(
+    (item) =>
+      (item.status === "drift" || item.status === "broken") && (!used.size || used.has(item.id)),
   );
-  if (failing) return { ok: false, reason: `contract: ${failing.id} ${failing.status}` };
+  const first = failing[0];
+  if (!first) return undefined;
+  return {
+    ok: false,
+    reason: `contract: ${first.id} ${first.status}`,
+    operations: failing.map((item) => item.id),
+  };
+}
+
+/** Runs the stored cases against the live site through a host that refuses writes. */
+async function liveVerdict(ability: Ability, host: AbilityHost): Promise<IdleCheckVerdict> {
+  try {
+    const result = await testAbility(ability.site, ability.name, { host });
+    if (result.ok) return { ok: true };
+    const operations = abilityOperations(ability);
+    return {
+      ok: false,
+      reason: `contract: live case failed${result.constant ? " (constant output)" : ""}`,
+      ...(operations.length ? { operations } : {}),
+    };
+  } catch (error) {
+    const operations = abilityOperations(ability);
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error),
+      ...(operations.length ? { operations } : {}),
+    };
+  }
+}
+
+/** Stored cases in dry mode: no site is called. */
+async function dryVerdict(ability: Ability): Promise<IdleCheckVerdict> {
   const rows = await testAllAbilities({ dry: true, sites: [ability.site] }).catch(() => []);
   const row = rows.find((item) => item.site === ability.site && item.name === ability.name);
   if (row && !row.ok && !row.skipped) return { ok: false, reason: row.error ?? "case failed" };

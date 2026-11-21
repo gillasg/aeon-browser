@@ -86,7 +86,33 @@ function fillStep(
   });
   const target = fillTarget(step.target, candidates, used);
   if (target.ambiguous) ambiguous = true;
-  return { step: toRouteStep(step, nextArgs, target.target), used, ambiguous };
+  let url = landingUrl(step);
+  if (url) {
+    const hits = hitsIn(url, candidates, false);
+    if (hits.length > 1) ambiguous = true;
+    else if (hits[0]) {
+      used.push(hits[0]);
+      url = url.split(hits[0].value).join(token(hits[0]));
+    }
+  }
+  return { step: toRouteStep(step, nextArgs, target.target, url), used, ambiguous };
+}
+
+/** Where a navigation landed, kept so replay can go straight there. Never a URL with a secret. */
+function landingUrl(step: ObservedStep): string | undefined {
+  const url =
+    step.evidence?.navigated ?? (/^(navigate|goto|open)$/.test(step.kind) ? step.url : "");
+  if (!url || !/^https?:\/\//.test(url)) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password) return undefined;
+    for (const [key, value] of parsed.searchParams)
+      if (looksSecret(value) || /token|secret|password|session|auth|sig/i.test(key))
+        return undefined;
+  } catch {
+    return undefined;
+  }
+  return url;
 }
 
 function fillTarget(
@@ -159,7 +185,8 @@ function looksSecret(value: string): boolean {
 
 function redactStep(step: ObservedStep, candidates: Candidate[]): RouteStep {
   const args = (step.args ?? []).map((arg) => redactArg(step, arg));
-  return toRouteStep(step, args, redactTarget(step.target, candidates));
+  const url = scrub(landingUrl(step), candidates);
+  return toRouteStep(step, args, redactTarget(step.target, candidates), url);
 }
 
 function redactArg(step: ObservedStep, arg: string): string {
@@ -199,12 +226,14 @@ function toRouteStep(
   step: ObservedStep,
   args: string[],
   target: TargetWithFallbacks | undefined,
+  url?: string,
 ): RouteStep {
   const request = step.evidence?.request;
   return {
     kind: step.kind,
     ...(target && hasTarget(target) ? { target } : {}),
     ...(args.length ? { args } : {}),
+    ...(url ? { url } : {}),
     onPageType: step.pageType || pageTypeOf(step.url),
     expectEffect: step.effect || "unverifiable",
     ...(request ? { expectRequest: { method: request.method, path: request.path } } : {}),

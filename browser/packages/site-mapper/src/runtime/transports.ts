@@ -5,6 +5,7 @@ import { sharedBridge, type Bridge } from "./bridge.js";
 import { followRedirects, type HopTarget, type SingleHop } from "./net-guard.js";
 import { pinnedRequest } from "./pinned-request.js";
 import type { RuntimeRequest, RuntimeResponse } from "./request.js";
+import { COOKIE_XSRF_HEADERS, cookieXsrfHeaders } from "../session-headers.js";
 import { cookieHeader, storeSetCookies, type SessionFile } from "./session.js";
 
 // Two ways to make a call:
@@ -31,6 +32,7 @@ export interface Transport {
 // Runs in the page. Resolves auth values the page holds (cookies, meta tags, storage), then
 // calls with the page's own fetch or XMLHttpRequest so the site's hooks apply.
 const PAGE_CALL = `async (req) => {
+  const COOKIE_XSRF = COOKIE_XSRF_PAIRS;
   const pointer = (value, path) => path.split('/').slice(1).reduce((v, k) => v == null ? v : v[k === '*' ? 0 : k.replace(/~1/g, '/').replace(/~0/g, '~')], value);
   const cookie = (name) => { const hit = document.cookie.split('; ').find((c) => c.startsWith(name + '=')); return hit ? decodeURIComponent(hit.slice(name.length + 1)) : undefined; };
   const headers = { ...req.headers };
@@ -49,6 +51,9 @@ const PAGE_CALL = `async (req) => {
   // in memory where no recipe can read it (filled in by the page transport; never saved).
   for (const [name, value] of Object.entries(typeof req.borrowed === 'object' && req.borrowed || {}))
     if (!Object.keys(headers).some((key) => key.toLowerCase() === name)) headers[name] = value;
+  // Anti-forgery headers the site's own code copies from a cookie, read from the live jar now.
+  if (!req.crossSite) for (const [name, header] of COOKIE_XSRF)
+    if (!Object.keys(headers).some((key) => key.toLowerCase() === header)) { const value = cookie(name); if (value) headers[header] = value; }
   const forbidden = /^(cookie|cookie2|host|origin|referer|user-agent|content-length|connection|accept-encoding|sec-.*|proxy-.*|te|trailer|transfer-encoding|upgrade|via|keep-alive|date|dnt|expect)$/i;
   for (const name of Object.keys(headers)) if (forbidden.test(name)) delete headers[name];
   if (req.crossSite) {
@@ -90,7 +95,10 @@ export function pageCallExpression(
     borrowed: bare ? {} : BORROWED,
     crossSite: bare,
   };
-  const fn = PAGE_CALL.replace("(SIGNER)", `(${context.signer ?? "null"})`);
+  const fn = PAGE_CALL.replace("(SIGNER)", `(${context.signer ?? "null"})`).replace(
+    "COOKIE_XSRF_PAIRS",
+    JSON.stringify(COOKIE_XSRF_HEADERS.map((item) => [item.cookie, item.header])),
+  );
   return `(${fn})(${JSON.stringify(arg)})`;
 }
 
@@ -228,6 +236,15 @@ export class DirectTransport implements Transport {
       ...request.headers,
     };
     this.authHeaders(context, headers);
+    // Same as the page: the session's XSRF cookie goes into the header the site expects.
+    const host = new URL(request.url).hostname;
+    const jar = (this.session?.cookies ?? []).filter((item) =>
+      host.endsWith(item.domain.replace(/^\./, "")),
+    );
+    Object.assign(
+      headers,
+      cookieXsrfHeaders((name) => jar.find((item) => item.name === name)?.value, headers),
+    );
     const raw = await followRedirects({
       url: request.url,
       method: request.method,

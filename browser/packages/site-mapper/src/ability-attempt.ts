@@ -253,6 +253,14 @@ export function defaultHost(site: string): AbilityHost {
   };
 }
 
+/** The default host with every write refused: for background checks that must never change a site. */
+export function readOnlyHost(site: string): AbilityHost {
+  const host = defaultHost(site);
+  const refuse = (): Promise<never> =>
+    Promise.reject(new Error("ABILITY_READ_ONLY: a background check never writes"));
+  return { ...host, write: refuse };
+}
+
 /** Wraps a page script so it runs on a tab of its own site, opening one in the background if needed. */
 function onSite(site: string, code: string): string {
   const host = siteName(site);

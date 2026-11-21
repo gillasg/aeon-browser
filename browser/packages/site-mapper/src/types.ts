@@ -78,6 +78,16 @@ export interface Param {
   examples?: string[];
 }
 
+export interface GraphqlVariable {
+  name: string;
+  /** Sent in every recording. */
+  required: boolean;
+  schema: JsonSchema;
+  /** The same value in every recording (two or more): replay fills it in. */
+  constant?: unknown;
+  examples?: unknown[];
+}
+
 export interface Dependency {
   /** Where the value goes: `path:productId`, `query:cursor`, `body:/items/0/id`, `header:x-csrf-token`. */
   target: string;
@@ -142,7 +152,18 @@ export interface Operation {
     rpcMethod?: string;
     field?: { in: "query" | "body"; name: string; value: string };
   };
-  graphql?: { query?: string; hash?: string; operationName?: string; variablesPath: string };
+  graphql?: {
+    query?: string;
+    hash?: string;
+    operationName?: string;
+    variablesPath: string;
+    /** The query's first root field, naming an anonymous operation (`{ viewer { … } }`). */
+    field?: string;
+    /** `extensions` (persisted query hash and version) when it was the same in every recording. */
+    extensions?: Record<string, unknown>;
+    /** The operation's variables: what the caller passes, and values that never changed. */
+    variables?: GraphqlVariable[];
+  };
   params: Param[];
   requestBody?: {
     mime: string;

@@ -1,11 +1,12 @@
-// The sign-in headers a site's own code adds to its API calls (Authorization, CSRF tokens), as
+// The sign-in headers a site's own code adds to its API calls (Authorization, CSRF tokens, API
+// keys, and the plain flags modern single-page apps require such as x-requested-with), as
 // last seen in recorded tabs, per origin. A site API call made from that site's page can then
 // carry the header the site itself just sent, when the site keeps the value in memory where no
 // recipe can read it. Memory only: never saved or learned, and not part of the documented
 // browser-code API (only site-to-api's page transport asks for it).
 
 const SESSION_HEADER =
-  /^(authorization|x-csrf-token|x-xsrf-token|csrf-token|x-xsrftoken|x-csrftoken)$/i;
+  /^(authorization|x-csrf-token|x-xsrf-token|csrf-token|x-xsrftoken|x-csrftoken|x-api-key|x-auth-token|x-access-token|x-client-transaction-id|x-requested-with|x-twitter-active-user|x-twitter-auth-type|x-twitter-client-language)$/i;
 const FRESH_MS = 30 * 60_000;
 const MAX_ORIGINS = 200;
 

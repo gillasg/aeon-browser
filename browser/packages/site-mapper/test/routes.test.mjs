@@ -159,7 +159,11 @@ test("two successes with different inputs promote, and Wrong drops the route", a
     assert.equal(route.okRuns, 2);
     const promoted = await promoteRoute(route);
     assert.equal(promoted.learned.site, "shop.test");
-    assert.equal(promoted.ability.ways[0].kind, "steps");
+    // The first way runs with no model: a browser script, slots read from inputs.
+    const [script, saved] = promoted.ability.ways;
+    assert.equal(script.kind, "script");
+    assert.match(script.code, /page\.goto\(fill\("https:\/\/shop\.test\/orders\/\{value\}"\)\)/);
+    assert.equal(saved.kind, "steps");
     assert.equal(promoted.ability.preconditions, undefined);
     const wrong = await reportWrong({
       site: "shop.test",

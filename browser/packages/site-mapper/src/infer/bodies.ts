@@ -42,6 +42,9 @@ export interface GraphqlCall {
   hash?: string;
   query?: string;
   type: "query" | "mutation" | "subscription";
+  /** The first root field, for an anonymous operation. */
+  field?: string;
+  extensions?: Record<string, unknown>;
   variables?: unknown;
   /** Where the variables live: the JSON body, or the `variables` query parameter for GET. */
   variablesPath: string;
@@ -54,6 +57,17 @@ function operationFromQuery(query: string | undefined): {
   const match = /^\s*(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)?/.exec(query ?? "");
   const type = (match?.[1] as GraphqlCall["type"] | undefined) ?? "query";
   return match?.[2] ? { name: match[2], type } : { type };
+}
+
+/** The first field selected at the root of a query: `query { viewer { id } }` gives viewer. */
+export function rootField(query: string | undefined): string | undefined {
+  if (!query) return undefined;
+  const text = query.replace(/#[^\n]*/g, "").replace(/"(?:[^"\\]|\\.)*"/g, '""');
+  const start = /^\s*(?:(?:query|mutation|subscription)\b[^{(]*(?:\([^)]*\))?[^{]*)?\{/.exec(text);
+  if (!start) return undefined;
+  const rest = text.slice(start[0].length);
+  const field = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*:\s*)?([A-Za-z_][A-Za-z0-9_]*)/.exec(rest);
+  return field?.[1];
 }
 
 const fromJsonText = (value: unknown): unknown =>
@@ -74,21 +88,27 @@ function graphqlFrom(
   source: Record<string, unknown>,
   variablesPath: string,
 ): GraphqlCall | undefined {
-  const extensions = fromJsonText(source.extensions) as
-    { persistedQuery?: { sha256Hash?: string } } | undefined;
-  const hash = extensions?.persistedQuery?.sha256Hash;
+  const extensions = recordOf(fromJsonText(source.extensions));
+  const persisted = recordOf(extensions?.persistedQuery);
+  const hash = typeof persisted?.sha256Hash === "string" ? persisted.sha256Hash : undefined;
   const query = graphqlText(source);
   if (!query && !hash) return undefined;
   const parsed = operationFromQuery(query);
-  const call: GraphqlCall = { type: parsed.type, variablesPath };
   const named = typeof source.operationName === "string" ? source.operationName : "";
   const name = named || parsed.name;
-  if (name) call.operationName = name;
-  if (hash) call.hash = hash;
-  if (query) call.query = query;
+  const field = name ? undefined : rootField(query);
   const variables = fromJsonText(source.variables);
-  if (variables !== undefined) call.variables = variables;
+  const call: GraphqlCall = { type: parsed.type, variablesPath };
+  const extra = { operationName: name || undefined, field, hash, query, extensions, variables };
+  for (const [key, value] of Object.entries(extra))
+    if (value !== undefined) (call as unknown as Record<string, unknown>)[key] = value;
   return call;
+}
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 export function graphqlCall(

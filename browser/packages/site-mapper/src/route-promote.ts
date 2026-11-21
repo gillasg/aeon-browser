@@ -8,8 +8,11 @@ import {
   trashAbility,
   type Ability,
 } from "./abilities.js";
+import { loadModel } from "./registry.js";
 import { saveRouteEdits, type StageInput } from "./route-store.js";
+import { runnableWays } from "./route-runnable.js";
 import type { Route } from "./route-types.js";
+import type { SiteModel } from "./types.js";
 
 const WORDS = /\b(again|every|whenever)\b/i;
 
@@ -29,7 +32,8 @@ export async function promoteRoute(
   options: { prompt?: string; watcher?: boolean } = {},
 ): Promise<Promotion | undefined> {
   if (!promotionReady(route, options.prompt ?? "", options.watcher === true)) return undefined;
-  const drafted = abilityFromRoute(route);
+  const model = await loadModel(route.site).catch(() => undefined);
+  const drafted = abilityFromRoute(route, model);
   const saved = await createAbility(drafted);
   const abilityId = `${saved.ability.site}/${saved.ability.name}`;
   await saveRouteEdits(route.site, { ...route, abilityId });
@@ -55,7 +59,14 @@ function distinctInputs(route: Route): number {
   return new Set(route.inputHistory.map((item) => JSON.stringify(item))).size;
 }
 
-function abilityFromRoute(route: Route): Omit<Ability, "stats" | "createdAt" | "updatedAt"> {
+/**
+ * The ability a route becomes. Its first ways are executable with no model (the mapped API call,
+ * then a browser script); the recorded steps stay last for hosts that replay controls.
+ */
+export function abilityFromRoute(
+  route: Route,
+  model?: SiteModel,
+): Omit<Ability, "stats" | "createdAt" | "updatedAt"> {
   const name = abilityName(route);
   const properties = Object.fromEntries(
     route.inputs.map((input) => [input.name, { type: "string" }]),
@@ -69,9 +80,14 @@ function abilityFromRoute(route: Route): Omit<Ability, "stats" | "createdAt" | "
     site: route.site,
     description: route.summary,
     kind: route.writes ? "write" : "read",
-    inputs: { type: "object", properties },
+    inputs: {
+      type: "object",
+      properties,
+      ...(route.inputs.length ? { required: route.inputs.map((input) => input.name) } : {}),
+    },
     outputs: { type: "object", properties: { result: { type: "string" } } },
     ways: [
+      ...(route.ambiguous ? [] : runnableWays(route, model)),
       { kind: "steps", steps: route.steps, ...(Object.keys(params).length ? { params } : {}) },
     ],
     ...(route.writes ? {} : { tests: [{ inputs: example, expect: { result: route.summary } }] }),

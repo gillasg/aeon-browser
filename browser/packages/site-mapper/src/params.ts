@@ -1,10 +1,8 @@
 // Which parameters are the caller's, and which the site supplies itself. One place, so listings,
 // the spec, the typed client and MCP tools never ask for a value nobody can pass.
 
+import { isSessionSecretHeader } from "./session-headers.js";
 import type { Operation, Param } from "./types.js";
-
-const SESSION_HEADER =
-  /^(authorization|x-csrf-token|x-xsrf-token|csrf-token|x-xsrftoken|x-csrftoken)$/i;
 
 /**
  * A value the site's own code supplies: a signature the page's JavaScript builds, a nonce, or a
@@ -12,7 +10,7 @@ const SESSION_HEADER =
  */
 export function isDerived(param: Param): boolean {
   if (param.derived) return true;
-  return param.in === "header" && SESSION_HEADER.test(param.name);
+  return param.in === "header" && isSessionSecretHeader(param.name);
 }
 
 /** The parameters a caller supplies (ops listings, MCP tool inputs, the typed client). */
@@ -37,6 +35,17 @@ export function bodyInputs(operation: Operation): string[] {
 /** Everything a caller supplies for an operation: its parameters, then its varying body fields. */
 export function operationInputs(operation: Operation): string[] {
   return [
-    ...new Set([...inputParams(operation).map((param) => param.name), ...bodyInputs(operation)]),
+    ...new Set([
+      ...inputParams(operation).map((param) => param.name),
+      ...bodyInputs(operation),
+      ...graphqlInputs(operation),
+    ]),
   ];
+}
+
+/** GraphQL variables a caller passes by name: those that changed between recordings. */
+export function graphqlInputs(operation: Operation): string[] {
+  return (operation.graphql?.variables ?? [])
+    .filter((variable) => variable.constant === undefined)
+    .map((variable) => variable.name);
 }
