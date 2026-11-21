@@ -1,15 +1,18 @@
 import {
   appendFile,
+  lstat,
   mkdir,
   readFile,
   readdir,
+  readlink,
   writeFile,
   rename,
   realpath,
   stat,
   unlink,
 } from "node:fs/promises";
-import { resolve, relative, dirname, isAbsolute, extname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { resolve, relative, dirname, isAbsolute, extname, join, basename, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 interface Request {
   workspace: string;
@@ -22,6 +25,8 @@ export function isWorkspaceRequest(value: unknown): value is Request {
 }
 export async function workspaceCall(root: string, request: Request): Promise<unknown> {
   if (request.workspace === "list") return await listWorkspace(root, request.name);
+  if (request.workspace === "screenshot" || request.workspace === "screenshot-append")
+    return saveScreenshot(root, request, request.workspace === "screenshot-append");
   const path = await workspacePath(root, request.name);
   const read = await readAction(path, request);
   if (read !== undefined) return read;
@@ -128,6 +133,183 @@ async function workspacePath(root: string, name: string): Promise<string> {
     throw new Error("Workspace symlink escapes its root");
   return path;
 }
+interface ShotPlace {
+  path?: string;
+  relative?: string;
+  base?: string;
+  note?: string;
+}
+
+/** The [did] line for a workspace write. A screenshot names the absolute file that was written. */
+export function workspaceDid(action: string, result: unknown): string {
+  if (action !== "screenshot") return action;
+  const saved = shotPath(result);
+  return saved ? `screenshot ${saved}` : action;
+}
+
+/** Record a workspace write on the cell. Chunks after the first screenshot add no second line. */
+export function noteWorkspaceStep(
+  steps: Record<string, unknown>[],
+  request: { workspace: string },
+  result: unknown,
+): void {
+  if (request.workspace === "screenshot-append") return;
+  steps.push({ action: workspaceDid(request.workspace, result), result, workspace: true });
+}
+
+function shotPath(result: unknown): string {
+  if (typeof result !== "object" || result === null) return "";
+  const path = (result as { path?: unknown }).path;
+  return typeof path === "string" ? path : "";
+}
+
+function contained(base: string, target: string): boolean {
+  const rel = relative(resolve(base), resolve(target));
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
+function screensName(name: string): string {
+  const cleaned = name.replace(/^(?:\.\/)+/, "").replace(/^\/+/, "");
+  if (!cleaned || cleaned.split("/").includes(".."))
+    throw new Error("File is outside the workspace");
+  return cleaned.startsWith("screens/") ? cleaned : `screens/${cleaned}`;
+}
+
+async function realBase(path: string): Promise<string> {
+  return realpath(path).catch(() => path);
+}
+
+async function matchingRoot(bases: readonly string[], target: string): Promise<string | undefined> {
+  for (const base of bases) {
+    if (contained(base, target)) return realBase(base);
+  }
+  return undefined;
+}
+
+async function allowedBase(root: string, target: string): Promise<string | undefined> {
+  const session = resolve(root);
+  const sessionHit = await matchingRoot([session, await realBase(session)], target);
+  if (sessionHit) return sessionHit;
+  const temps = new Set<string>([resolve(tmpdir()), "/tmp"].map((seed) => resolve(seed)));
+  for (const seed of [...temps]) temps.add(await realBase(seed));
+  return matchingRoot([...temps], target);
+}
+
+function shotLeaf(asked: string): string {
+  const leaf = basename(asked)
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^\.+/, "");
+  return leaf || "shot.png";
+}
+
+async function placeAbsolute(root: string, asked: string): Promise<ShotPlace> {
+  const target = resolve(asked);
+  const base = await allowedBase(root, target);
+  if (base) return { path: target, base };
+  return {
+    relative: screensName(shotLeaf(asked)),
+    note: `saved in the session screens folder; ${asked} is outside the session folder and the temp directory`,
+  };
+}
+
+async function placeScreenshot(root: string, name: string): Promise<ShotPlace> {
+  const asked = name.trim();
+  if (!asked) return { relative: `screens/${Date.now()}.png` };
+  if (isAbsolute(asked)) return placeAbsolute(root, asked);
+  return { relative: screensName(asked.replace(/\\/g, "/")) };
+}
+
+function shotBytes(request: Request): Buffer {
+  const data = request.value;
+  if (typeof data !== "string" && !Array.isArray(data))
+    throw new Error("Workspace output must be text or bytes");
+  const bytes = Array.isArray(data)
+    ? Buffer.from(data)
+    : Buffer.from(data, request.base64 ? "base64" : "utf8");
+  if (bytes.length > 16_000_000) throw new Error("Artifact exceeded 16 MB; split it into files");
+  return bytes;
+}
+
+async function linkTarget(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return resolve(dirname(path), await readlink(path));
+  }
+}
+
+async function guardLink(base: string, path: string): Promise<void> {
+  const info = await lstat(path);
+  if (!info.isSymbolicLink()) return;
+  if (!contained(base, await linkTarget(path)))
+    throw new Error("Workspace symlink escapes its root");
+}
+
+async function nearestExisting(base: string, start: string): Promise<string> {
+  let cursor = start;
+  while (true) {
+    const found = await anchored(base, cursor);
+    if (found) return found;
+    const parent = dirname(cursor);
+    if (parent === cursor) throw new Error("File is outside the workspace");
+    cursor = parent;
+  }
+}
+
+async function anchored(base: string, path: string): Promise<string | undefined> {
+  try {
+    await guardLink(base, path);
+    return await realpath(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return undefined;
+  }
+}
+
+async function confirmInside(placed: ShotPlace): Promise<void> {
+  if (!placed.path || !placed.base) throw new Error("File is outside the workspace");
+  const real = await nearestExisting(placed.base, placed.path);
+  if (!contained(placed.base, real)) throw new Error("Workspace symlink escapes its root");
+}
+
+async function writeRelative(
+  root: string,
+  placed: ShotPlace,
+  bytes: Buffer,
+  action: string,
+): Promise<unknown> {
+  if (!placed.relative) throw new Error("File is outside the workspace");
+  const path = await workspacePath(root, placed.relative);
+  await mkdir(dirname(path), { recursive: true });
+  await workspacePath(root, placed.relative);
+  await writeWorkspaceFile(path, action, bytes);
+  return placed.note
+    ? { path, bytes: bytes.length, note: placed.note }
+    : { path, bytes: bytes.length };
+}
+
+async function writePlaced(
+  root: string,
+  placed: ShotPlace,
+  bytes: Buffer,
+  append: boolean,
+): Promise<unknown> {
+  const action = append ? "append" : "screenshot";
+  if (placed.relative) return writeRelative(root, placed, bytes, action);
+  if (!placed.path) throw new Error("File is outside the workspace");
+  await confirmInside(placed);
+  await mkdir(dirname(placed.path), { recursive: true });
+  await confirmInside(placed);
+  await writeWorkspaceFile(placed.path, action, bytes);
+  return { path: placed.path, bytes: bytes.length };
+}
+
+async function saveScreenshot(root: string, request: Request, append: boolean): Promise<unknown> {
+  const placed = await placeScreenshot(root, String(request.name ?? ""));
+  return writePlaced(root, placed, shotBytes(request), append);
+}
+
 export async function validateUploadFiles(files: string[], root: string): Promise<string[]> {
   return Promise.all(
     files.map(async (file) => {

@@ -49,6 +49,27 @@ test("the runtime's timers and sleeps with no recent action keep their full time
   assert.ok((await timed(() => busy.api("await new Promise((r) => setTimeout(r, 900));"))) >= 880);
 });
 
+test("sleep(ms) waits the full time and never longer than 60s", async () => {
+  const delays = [];
+  const context = vm.createContext({
+    setTimeout: (fn, ms) => {
+      delays.push(ms);
+      fn();
+      return 1;
+    },
+    clearTimeout,
+    console,
+    __step: async () => ({ data: { settled: false } }),
+  });
+  vm.runInContext(browserSleepApi, context, { filename: "aeon-api.js" });
+  await vm.runInContext(
+    `(async () => { await sleep(3000); await sleep(120000); await sleep(-5); await sleep("20"); })()`,
+    context,
+    { filename: "aeon-cell.js" },
+  );
+  assert.deepEqual(delays, [3000, 60000, 0, 20]);
+});
+
 test("clearTimeout still cancels a shortened sleep", async () => {
   const page = realm(50);
   await page.cell("__noteActed({tabId: 1});");
