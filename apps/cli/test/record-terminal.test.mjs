@@ -1,4 +1,4 @@
-// Terminal casts land in events.json and survive record stop. The kit's line picker is the pane.
+// Terminal casts land in events.json and survive record stop.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { promisify } from "node:util";
 import { alignCast, attachTerminal, terminalCast } from "../dist/record-terminal.js";
-import { terminalFrame, terminalLines } from "../../../templates/video/src/terminal.ts";
 
 const run = promisify(execFile);
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
@@ -41,15 +40,9 @@ test("a terminal cast is timestamped, ordered, and aligned to the clip clock", (
     aligned.events.map((event) => event.t),
     [1000, 1040, 1040],
   );
-  const lines = terminalLines(aligned, 1040);
-  assert.equal(lines[0].text, "$ aeon tool");
-  assert.equal(lines[1].text, "hello-term");
-  assert.equal(lines[2].kind, "err");
-  const wide = terminalFrame(1920, 1080, true);
-  assert.ok(wide.term.x >= wide.chrome.w);
-  assert.ok(wide.term.w > 0);
-  const tall = terminalFrame(1080, 1920, true);
-  assert.ok(tall.term.y >= tall.chrome.h);
+  assert.equal(aligned.events[1].text, "hello-term\n");
+  assert.equal(aligned.events[2].kind, "err");
+  assert.equal(aligned.events[2].text, "warn\n");
   const bare = attachTerminal(undefined, cast);
   assert.equal(bare.terminal.command, "aeon tool");
   assert.equal(bare.version, 1);

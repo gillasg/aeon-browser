@@ -8,7 +8,8 @@
     "still": "remotion still src/Root.tsx Video out/frame.png --frame=30",
     "render": "remotion render src/Root.tsx Video out/video.mp4",
     "render:vertical": "remotion render src/Root.tsx VideoVertical out/video-vertical.mp4",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
