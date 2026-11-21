@@ -1,6 +1,5 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { OpenPiSessionInput, PiSessionHandle } from "@aeon/domain";
-import { modelUnavailable } from "./model-unavailable.js";
 export function verifyCachedHandle(
   handle: PiSessionHandle,
   input: OpenPiSessionInput,
@@ -15,15 +14,15 @@ export async function setInitialModel(
   preferred: { provider: string; id: string } | undefined,
   fixture: unknown,
 ): Promise<void> {
-  if (!input.reference && preferred && !fixture) {
-    const { provider, id } = preferred;
-    const model = session.modelRuntime
-      .getAvailableSnapshot()
-      .find((candidate) => candidate.provider === provider && candidate.id === id);
-    if (!model) {
-      session.dispose();
-      throw modelUnavailable(provider, id);
-    }
-    await session.setModel(model, { persist: false });
-  }
+  // Aeon's preferred model only fills in when the person has not chosen a default, and only when
+  // it is connected; otherwise Pi's own choice (their default, else the first connected) stands.
+  if (input.reference || !preferred || fixture) return;
+  const settings = session.settingsManager;
+  if (settings.getDefaultProvider() && settings.getDefaultModel()) return;
+  const model = session.modelRuntime
+    .getAvailableSnapshot()
+    .find(
+      (candidate) => candidate.provider === preferred.provider && candidate.id === preferred.id,
+    );
+  if (model) await session.setModel(model, { persist: false });
 }

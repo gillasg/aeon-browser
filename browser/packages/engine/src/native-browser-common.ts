@@ -1,4 +1,9 @@
-import { usableCandidates, type BrowserTargetKey, type ErrorContext } from "@browserkit/protocol";
+import {
+  leadingCode,
+  usableCandidates,
+  type BrowserTargetKey,
+  type ErrorContext,
+} from "@browserkit/protocol";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 
@@ -100,6 +105,9 @@ export function errorCode(error: unknown): string {
   // A message that leads with its code ("TARGET_BLOCKED: covered by …") is that code.
   const head = /^(?:Error: )*([A-Z_]+)(?::|$)/.exec(value)?.[1] ?? "";
   if (head === "EXTENSION_BLOCKED" || isKernelErrorCode(head)) return head;
+  // A narrower code ("MODEL_FAILED: 403 …") stands for its shared one (NETWORK), never Chrome.
+  const shared = leadingCode(value);
+  if (shared && isKernelErrorCode(shared)) return shared;
   const lower = value.toLowerCase();
   if (lower.includes("detached while handling command")) return "TARGET_LOST";
   if (/different extension|cannot access a chrome-extension/.test(lower)) return "PROTECTED_UI";
