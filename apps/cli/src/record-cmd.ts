@@ -27,6 +27,7 @@ import {
   type RecordingEvents,
   type Trace,
 } from "./record-events.js";
+import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
 
 const log = (line: string) => process.stdout.write(line + "\n");
 
@@ -95,12 +96,14 @@ async function start(host: DaemonHost, args: Args): Promise<number> {
     durationMs: 0,
     frames: 0,
   };
+  const terminal = keptTerminal(folder);
   await writeEvents(folder, {
     version: 1,
     recorder: "aeon",
     clock: "clip",
     clip,
     events: [],
+    ...(terminal ? { terminal } : {}),
     note: "Recording in progress; run `aeon record stop` to finish the log.",
   });
   log(`Recording ${state.source} into ${folder}`);
@@ -182,6 +185,7 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
       // The setting stays on if Chrome is gone; the user can turn it off.
     }
   }
+  const terminal = keptTerminal(folder);
   const result: RecordingEvents = {
     version: 1,
     recorder: "aeon",
@@ -189,6 +193,7 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
     clip: clips[0] ?? clip,
     ...(clips.length ? { clips } : {}),
     events,
+    ...(terminal ? { terminal } : {}),
     ...(trace
       ? {}
       : {
@@ -200,6 +205,24 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   return 0;
 }
 
+/** Record one shell command into the folder's events.json. Run it after start and before stop. */
+async function terminal(_host: DaemonHost, args: Args): Promise<number> {
+  const command = typeof args.flags?.run === "string" ? args.flags.run : "";
+  if (!command) throw new Error('Usage: aeon record terminal --out <dir> --run "<command>"');
+  const out = typeof args.flags?.out === "string" ? args.flags.out : undefined;
+  let folder: string;
+  try {
+    folder = out ? defaultFolder(out) : remembered();
+  } catch {
+    throw new Error('Usage: aeon record terminal --out <dir> --run "<command>"');
+  }
+  mkdirSync(folder, { recursive: true });
+  const { code, cast } = await runTerminal(command);
+  await writeEvents(folder, attachTerminal(readRecording(folder), cast));
+  log(`Recorded the terminal into ${folder} (${cast.events.length} event(s), exit ${code}).`);
+  return code;
+}
+
 /** `aeon record`: start/stop are ours; gif/video/trace stay the browserkit command's. */
 export function recordCommand(original: Command | undefined, host: DaemonHost): Command {
   return {
@@ -208,16 +231,20 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     summary: "record the real Chrome window or screen into an editable folder",
     help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>]
        aeon record stop [--out <dir>] [--chat <id>]
+       aeon record terminal --out <dir> --run "<command>"
        aeon record gif|video|trace …   (the original screen recordings)
 
 start captures the real window (x11grab on Linux, avfoundation on macOS, gdigrab on
 Windows) into a folder with frames, clip.mp4 and events.json. --tabs records every tab
 the chat drives, including one opened mid-run, and stop writes one clip per tab.
+terminal records a command and its output into that folder's events.json; the video
+kit draws it beside the tab. Run it after start and before stop.
 The folder is a recording, not a video: render it with Remotion (see \`aeon video kit\`).`,
     run: async (args: Args) => {
       const action = args.positional[0];
       if (action === "start") return start(host, args);
       if (action === "stop") return stop(host, args);
+      if (action === "terminal") return terminal(host, args);
       if (original) return original.run({ ...args, positional: args.positional.slice(1) });
       throw new Error("Usage: aeon record start|stop|gif|video|trace");
     },

@@ -51,18 +51,24 @@ import type { RenderProps } from "./types";
 
 export function twoClipEdit(portrait: boolean): RenderProps {
   const vp = { width: events.clip.width, height: events.clip.height };
-  const derived = fromEvents(events as any, vp);                 // zooms + cursor + segments
+  const derived = fromEvents(events as any, vp); // zooms + cursor + segments
   const frames = Array.from({ length: events.clip.frames }, (_, i) => ({
     t: (i * 1000) / events.clip.fps,
     f: `${String(i + 1).padStart(6, "0")}.jpg`,
   }));
   return {
     base: staticFile("frames/"),
-    cursor: derived.cursor,                                      // only from events.json
+    cursor: derived.cursor, // only from events.json
     edit: {
       ...emptyEdit(portrait ? OUTPUTS["9x16"]! : OUTPUTS["16x9"]!, vp, events.clip.fps),
       frames,
-      source: { viewport: vp, fps: events.clip.fps, duration: events.clip.durationMs, mobile: false, url: "https://example.com" },
+      source: {
+        viewport: vp,
+        fps: events.clip.fps,
+        duration: events.clip.durationMs,
+        mobile: false,
+        url: "https://example.com",
+      },
       // horizontal tabs on 16:9, vertical tabs on 9:16; switch theme: 'light' or 'dark'
       style: style({ frame: portrait ? "vertical" : "horizontal", theme: "dark" }),
       zooms: derived.zooms,
@@ -101,6 +107,8 @@ edge to edge and show the real pointer — do not draw a second cursor over them
 
 **Honesty rule:** zooms, speed-ups and the cursor come only from `events.json`. Never show Aeon
 doing anything it did not do. A log with no events produces no zooms, no speed badge and no cursor.
+A `terminal` cast in that log is drawn as a pane beside the tab: the command and the output it
+actually printed, at the times they arrived.
 
 ## One-command demo video (recording Chrome, separate from eval)
 
@@ -118,12 +126,13 @@ cursor, zooms, captions, speed-ups or title cards. Prints the output path. One r
 
 ## Files
 
-| File | What it is |
-|---|---|
-| `src/ChromeFrame.tsx` | drawn Chrome window, horizontal/vertical tabs, light/dark, split panes |
-| `src/Scene.tsx` | real frames, camera zoom, drawn Aeon cursor and click press |
-| `src/Video.tsx` | background, title card, captions, speed badge, end card |
-| `src/zooms-from-events.ts` | cursor path, zooms and speed segments derived from `events.json` |
-| `src/layout.ts`, `src/camera.ts`, `src/timeline.ts` | framing, spring camera, source↔video time |
-| `src/Root.tsx`, `src/index.ts` | the three compositions (16:9, 9:16, square) |
-| `EVENTS.md` | the `events.json` format |
+| File                                                | What it is                                                             |
+| --------------------------------------------------- | ---------------------------------------------------------------------- |
+| `src/ChromeFrame.tsx`                               | drawn Chrome window, horizontal/vertical tabs, light/dark, split panes |
+| `src/Scene.tsx`                                     | real frames, camera zoom, drawn Aeon cursor and click press            |
+| `src/Video.tsx`                                     | background, title card, captions, speed badge, end card, terminal pane |
+| `src/terminal.ts`                                   | lines of an events.json `terminal` cast at a clip time                 |
+| `src/zooms-from-events.ts`                          | cursor path, zooms and speed segments derived from `events.json`       |
+| `src/layout.ts`, `src/camera.ts`, `src/timeline.ts` | framing, spring camera, source↔video time                              |
+| `src/Root.tsx`, `src/index.ts`                      | the three compositions (16:9, 9:16, square)                            |
+| `EVENTS.md`                                         | the `events.json` format                                               |

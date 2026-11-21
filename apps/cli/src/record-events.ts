@@ -37,6 +37,17 @@ export type ClipMeta = {
   tabId?: number;
 };
 
+/** One chunk of a terminal cast. `t` is ms on the clip clock. `in` is the command. */
+export type TerminalEvent = { t: number; kind: "in" | "out" | "err"; text: string };
+
+/** Asciinema-style capture of one command, written as events.json `terminal`. */
+export type TerminalCast = {
+  version: 1;
+  command: string;
+  startedAt: number;
+  events: TerminalEvent[];
+};
+
 export type RecordingEvents = {
   version: 1;
   recorder: "aeon";
@@ -46,6 +57,8 @@ export type RecordingEvents = {
   /** With --tabs there is one clip per recorded tab; the first is also `clip`. */
   clips?: ClipMeta[];
   events: VideoEvent[];
+  /** A terminal session recorded beside the tab. The kit draws it as a pane. */
+  terminal?: TerminalCast;
   /** Set when the action list is incomplete (no trace was reachable at stop time). */
   note?: string;
 };

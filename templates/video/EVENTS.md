@@ -22,7 +22,7 @@ window image, when the window was calibrated).
     "durationMs": 12400,
     "frames": 372
   },
-  "clips": [ { "...": "one entry per tab with --tabs; the first is also `clip`" } ],
+  "clips": [{ "...": "one entry per tab with --tabs; the first is also `clip`" }],
   "events": [
     {
       "id": "e1",
@@ -34,8 +34,25 @@ window image, when the window was calibrated).
       "window": { "x": 462, "y": 368 },
       "text": "Get started"
     },
-    { "id": "e2", "kind": "type", "t": 1310, "at": 1731000001310, "tabId": 4, "page": { "x": 640, "y": 460 }, "text": "hello" }
+    {
+      "id": "e2",
+      "kind": "type",
+      "t": 1310,
+      "at": 1731000001310,
+      "tabId": 4,
+      "page": { "x": 640, "y": 460 },
+      "text": "hello"
+    }
   ],
+  "terminal": {
+    "version": 1,
+    "command": "aeon tool browser_code ...",
+    "startedAt": 1731000002000,
+    "events": [
+      { "t": 2000, "kind": "in", "text": "aeon tool browser_code ..." },
+      { "t": 2400, "kind": "out", "text": "done\\n" }
+    ]
+  },
   "note": "optional: why the action list is incomplete"
 }
 ```
@@ -56,6 +73,10 @@ window image, when the window was calibrated).
   - `scroll`: scroll delta when it is known.
 - `note`: present when the action list is incomplete (e.g. no trace was attached at start). The clip
   metadata and frames are still valid.
+- `terminal`: optional asciinema-style cast from `aeon record terminal --out dir --run "<command>"`.
+  `command` is what ran, `startedAt` is its wall clock, and `events[]` are `{t, kind, text}` with
+  `kind` `in` (the command), `out` or `err`. `t` is on the same clip clock. The kit draws this as a
+  pane beside the tab. It shows only what the command printed.
 
 ## Rules for an editor
 
