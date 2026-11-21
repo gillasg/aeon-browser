@@ -125,6 +125,7 @@ function __holdFields(options) {
 function __pointerFields(options) {
   if (!options) return {};
   var fields = {};
+  if (options.human === true) fields.human = true;
   var button = String(options.button || '').toLowerCase();
   if ({left:1, middle:1, right:1, back:1, forward:1}[button]) fields.button = button;
   var raw = options.modifiers;
@@ -144,7 +145,7 @@ function __locator(target, element, index) {
     element,
     click: (options) => __step(Object.assign({op:'click',target,element:__wire(element),observe:false}, __pointerFields(options))),
     hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
-    fill: (value) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false}),
+    fill: (value, options) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {})}),
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
     getByRole: (role, options = {}) => {
       if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with page.locator(css).getByRole(...)');
@@ -484,7 +485,7 @@ var browser = Object.freeze({
     doubleClickAt: (x,y,options) => __step(Object.assign({op:'pointer',target,action:'doubleClick',x,y}, __pointerFields(options))),
     hover: (x,y) => __step({op:'pointer',target,action:'hover',x,y}),
     drag: (x,y,toX,toY) => __step({op:'pointer',target,action:'drag',x,y,toX,toY}),
-    keyboard: (keys) => __step({op:'keys',target,keys}),
+    keyboard: (keys, options) => __step({op:'keys',target,keys,...(options && options.human === true ? {human:true} : {})}),
     reconnect: () => __step({op:'reconnect',target}),
     download: async (url, filename) => (await __step({op:'downloads',target,action:'start',url,...(filename?{filename}:{})})).data,
     resolveDownload: async (token) => (await __step({op:'downloads',target,action:'resolve',token})).data,
@@ -614,7 +615,7 @@ var browser = Object.freeze({
     diffScreenshot: (baseline, options = {}) => __diffScreenshot(target, baseline, options),
     recordDemonstration: (options = {}) => __recordDemonstration(target, options),
     click: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.click(options) : __step(Object.assign({op:'click',target,element:__wire(__element(target,element)),observe:false}, __pointerFields(options))); },
-    fill: (element, value) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false}); },
+    fill: (element, value, options) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value, options) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {})}); },
     paste: (element, html, text = '') => __step({op:'paste',target,element:__wire(__element(target,element)),html:String(html),text:String(text || html.replace(/<[^>]+>/g, ' ')),observe:false}),
     evaluate: async (fn, arg) => (__readNudge(fn), (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value),
     control: async () => (await __step({op:'control', target, action:'status'})).data,

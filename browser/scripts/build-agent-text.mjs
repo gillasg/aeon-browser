@@ -144,8 +144,9 @@ async function guidanceSource() {
   const shared = split(await read(join(repo, "docs", "agent", "guidance.md")));
   const extra = split(await read(join(aeonRepo, "packages", "pi-adapter", "guidance-extra.md")));
   const paragraphs = [...shared];
-  paragraphs[0] = `${paragraphs[0]}\n${extra[0] ?? ""}`.trim();
-  const primer = extra[1] ?? "";
+  // guidance-extra.md is "[lead ---] primer": a lead, when present, extends the first paragraph.
+  const [lead, primer = ""] = extra.length > 1 ? extra : ["", extra[0]];
+  if (lead) paragraphs[0] = `${paragraphs[0]}\n${lead}`;
   // The one-line browser_code description is browserkit's primer, so both tools open the same way.
   const summary = (await read(join(repo, "docs", "agent", "primer-browserkit.md"))).trim();
   return [

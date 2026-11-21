@@ -5,10 +5,28 @@ import { onEngineInstall } from "./native-engine-install.js";
 type Point = { x: number; y: number };
 type Params = Record<string, unknown>;
 
-const random = (min: number, max: number) => min + Math.random() * (max - min);
-const noise = (scale: number) => (Math.random() + Math.random() + Math.random() - 1.5) * scale;
-const sleep = (ms: number) =>
-  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+/** Randomness, clock and wait, swappable so tests run deterministic and without real delays. */
+export type HumanInputTiming = {
+  random: () => number;
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+};
+const realTiming: HumanInputTiming = {
+  random: Math.random,
+  now: Date.now,
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+let timing = realTiming;
+
+/** Replaces the timing source; call with no argument to restore the real one. */
+export function setHumanInputTiming(next?: Partial<HumanInputTiming>): void {
+  timing = next ? { ...realTiming, ...next } : realTiming;
+}
+
+const unit = () => timing.random();
+const random = (min: number, max: number) => min + unit() * (max - min);
+const noise = (scale: number) => (unit() + unit() + unit() - 1.5) * scale;
+const sleep = (ms: number) => (ms > 0 ? timing.sleep(ms) : Promise.resolve());
 const minimumJerk = (t: number) => t * t * t * (10 - 15 * t + 6 * t * t);
 
 function bezier(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
@@ -28,7 +46,7 @@ export function trajectory(from: Point, to: Point): { point: Point; delay: numbe
   // Fitts' law with a ~40 px target, plus personal variation.
   const duration = Math.min(1100, (90 + 110 * Math.log2(distance / 40 + 1)) * random(0.85, 1.25));
   const normal = { x: -dy / distance, y: dx / distance };
-  const bow = (Math.random() < 0.5 ? -1 : 1) * random(0.04, 0.18) * distance;
+  const bow = (unit() < 0.5 ? -1 : 1) * random(0.04, 0.18) * distance;
   const c1 = {
     x: from.x + dx * random(0.2, 0.35) + normal.x * bow,
     y: from.y + dy * random(0.2, 0.35) + normal.y * bow,
@@ -37,7 +55,7 @@ export function trajectory(from: Point, to: Point): { point: Point; delay: numbe
     x: from.x + dx * random(0.65, 0.8) + normal.x * bow * 0.6,
     y: from.y + dy * random(0.65, 0.8) + normal.y * bow * 0.6,
   };
-  const overshoot = distance > 250 && Math.random() < 0.25;
+  const overshoot = distance > 250 && unit() < 0.25;
   const end = overshoot
     ? { x: to.x + (dx / distance) * random(4, 12), y: to.y + (dy / distance) * random(4, 12) }
     : to;
@@ -94,7 +112,8 @@ export function noteChallengeSeen(tabId: number | undefined): void {
   if (tabId !== undefined) challengeTabs.add(tabId);
 }
 
-function humanOn(tabId: number | undefined): boolean {
+/** True when input on this tab is human-paced: the setting is on, or the tab showed a challenge. */
+export function humanOn(tabId: number | undefined): boolean {
   return enabled || (tabId !== undefined && challengeTabs.has(tabId));
 }
 
@@ -226,11 +245,11 @@ async function paceMouse(
   )
     await travel(debuggee, tab, { x, y }, params);
   if (method === "mousePressed") {
-    await sleep(random(45, 130) - (Date.now() - tab.arrivedAt));
-    tab.pressedAt = Date.now();
+    await sleep(random(45, 130) - (timing.now() - tab.arrivedAt));
+    tab.pressedAt = timing.now();
   }
   if (method === "mouseReleased" && tab.pressedAt !== undefined) {
-    await sleep(random(60, 140) - (Date.now() - tab.pressedAt));
+    await sleep(random(60, 140) - (timing.now() - tab.pressedAt));
     delete tab.pressedAt;
   }
   tab.pointer = { x, y };
@@ -247,7 +266,7 @@ async function travel(
   const from = tab.pointer ?? { x: to.x + random(-260, 260), y: to.y + random(-180, 180) };
   const path = trajectory(from, to);
   for (const { point, delay } of path) {
-    const sent = Date.now();
+    const sent = timing.now();
     await dispatch(debuggee, "mouseMoved", {
       x: point.x,
       y: point.y,
@@ -255,9 +274,9 @@ async function travel(
       ...(typeof params.buttons === "number" ? { buttons: params.buttons } : {}),
       ...(typeof params.modifiers === "number" ? { modifiers: params.modifiers } : {}),
     });
-    await sleep(delay - (Date.now() - sent));
+    await sleep(delay - (timing.now() - sent));
   }
-  tab.arrivedAt = Date.now();
+  tab.arrivedAt = timing.now();
 }
 
 /** Per-frame wheel deltas for one scroll: a quick start that eases out, at ~60 Hz. */
@@ -279,9 +298,9 @@ function glide(dx: number, dy: number): Point[] {
 export async function paceKey(debuggee: chrome.debugger.Debuggee): Promise<void> {
   if (!curvedPointer(debuggee.tabId) || debuggee.tabId === undefined) return;
   const tab = state(debuggee.tabId);
-  const gap = random(30, 110) - (Date.now() - tab.lastKeyAt);
-  if (gap > 0 && tab.lastKeyAt > 0 && Date.now() - tab.lastKeyAt < 1000) await sleep(gap);
-  tab.lastKeyAt = Date.now();
+  const gap = random(30, 110) - (timing.now() - tab.lastKeyAt);
+  if (gap > 0 && tab.lastKeyAt > 0 && timing.now() - tab.lastKeyAt < 1000) await sleep(gap);
+  tab.lastKeyAt = timing.now();
 }
 
 // US-layout keys for typed characters, so a typed letter is a real key press (keydown, input,
@@ -346,12 +365,30 @@ export async function humanType(
   text: string,
   options?: { keys?: boolean },
 ): Promise<void> {
-  const keys = options?.keys ?? humanOn(debuggee.tabId);
+  // A challenge tab always gets real keystrokes at a person's cadence: a field that receives a
+  // whole value in one insertText is exactly what bot checks score.
+  const human = humanOn(debuggee.tabId);
+  const keys = options?.keys || human;
   if (!keys) {
     await send(debuggee, "Input.insertText", { text }, { label: "humanType" });
     return;
   }
-  for (const char of text) await typeChar(debuggee, char);
+  let previous = "";
+  for (const char of text) {
+    if (human && previous) await sleep(keyGap(previous, char));
+    await typeChar(debuggee, char);
+    previous = char;
+  }
+}
+
+/** Milliseconds between two typed characters: faster inside a word, slower after a space or a stop. */
+export function keyGap(previous: string, next: string): number {
+  const base = random(45, 140);
+  if (/[\s]/.test(previous)) return base + random(20, 90);
+  if (/[.,;:!?]/.test(previous)) return base + random(80, 220);
+  if (/[A-Z]/.test(next)) return base + random(15, 60);
+  // An occasional hesitation, as a person checks the field.
+  return unit() < 0.06 ? base + random(120, 320) : base;
 }
 
 async function typeChar(debuggee: chrome.debugger.Debuggee, char: string): Promise<void> {

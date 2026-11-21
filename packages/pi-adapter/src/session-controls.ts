@@ -15,6 +15,7 @@ import type {
 import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
 import { liveFirstTurn } from "./first-turn-live.js";
+import { turnContextDelta } from "./turn-context-delta.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
 import { markRunAborted } from "./stream-retry.js";
@@ -122,21 +123,22 @@ export async function submitToPi(
   } catch {
     // A session without subscribe still sends the turn.
   }
-  const context = await hiddenTurn(prompt, browserContexts, decoded.routeDraft);
+  const context = await hiddenTurn(session, prompt, browserContexts, decoded.routeDraft);
   await sendHiddenTurn(session, context, browserContexts);
   if (input.budget) watchBudget(session, input.budget, chatId);
   await session.prompt(prompt, decoded.images.length ? { images: decoded.images } : undefined);
 }
 
 async function hiddenTurn(
+  session: AgentSession,
   prompt: string,
   browserContexts: PiBrowserContextRecord[],
   routeDraft: Awaited<ReturnType<typeof decodePiInput>>["routeDraft"],
 ): Promise<string> {
   const turn = await liveFirstTurn(prompt, browserContexts, routeDraft);
   const context = turn.endsWith(`\n\n${prompt}`) ? turn.slice(0, -(prompt.length + 2)) : turn;
-  const banner = browserContexts.map(browserContextPrompt).join("\n\n");
-  return [context, banner].filter((part) => part.trim()).join("\n\n");
+  // Only what changed since the last message goes out again (see turn-context-delta).
+  return turnContextDelta(session, context, browserContexts.map(browserContextPrompt));
 }
 
 async function sendHiddenTurn(

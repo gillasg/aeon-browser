@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { BridgeClient } from "../client.js";
 import { spillText } from "../spill.js";
 import { startBridge } from "../bridge-server.js";
@@ -7,7 +9,12 @@ import { formatResult } from "../format.js";
 import { runMcpServer } from "../mcp.js";
 import { connectAgents } from "../connect-agents.js";
 import { mcpCommand, nextSteps, setup } from "../setup.js";
-import { extensionFolder, presentExtension } from "../setup-extension.js";
+import {
+  extensionFolder,
+  loadUnpackedSteps,
+  openFirstRunPage,
+  presentExtension,
+} from "../setup-extension.js";
 import { flag, has, type Args } from "../args.js";
 import { out } from "../output.js";
 import type { Command } from "../usage.js";
@@ -150,25 +157,51 @@ async function register(args: Args): Promise<number> {
     out('The extension is connected. Try: browserkit repl "(await browser.tabs()).length"');
     return 0;
   }
-  if (interactive) presentExtension(folder);
+  const shown = interactive ? presentExtension(folder) : { copied: undefined };
   out("");
-  out("Last step: load the extension. In chrome://extensions, turn on");
-  out(
-    "Developer mode, click Load unpacked and choose this folder (its path is on your clipboard):",
-  );
-  out(`  ${folder}`);
+  for (const line of loadUnpackedSteps(folder, {
+    copied: shown.copied,
+    ...("browser" in shown && shown.browser
+      ? { browser: shown.browser.name, page: shown.browser.extensionsPage }
+      : {}),
+  }))
+    out(line);
   out("Then restart your agent so it picks up the browserkit MCP server.");
   if (!interactive) return 0;
+  out("");
   out("Waiting for the extension to connect (Ctrl+C to stop)…");
-  for (let waited = 0; waited < 10 * 60_000; waited += 2000) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    if (await browserConnected()) {
-      out('Connected. Try: browserkit repl "(await browser.tabs()).length"');
-      return 0;
-    }
+  const started = Date.now();
+  const connected = await waitForConnection({ timeoutMs: 10 * 60_000, everyMs: 1000 });
+  if (connected) {
+    const seconds = Math.round((Date.now() - started) / 1000);
+    out(
+      green(`✔ Connected in ${seconds}s.`) +
+        ' Try: browserkit repl "(await browser.tabs()).length"',
+    );
+    // Aeon's extension has a Manage page to land on; browserkit's own does not.
+    if (existsSync(join(folder, "home.html")))
+      openFirstRunPage("browser" in shown ? shown.browser : undefined);
+    return 0;
   }
   out("Still not connected; run `browserkit doctor` to see why.");
   return 1;
+}
+
+/** Polls the bridge until a browser connects or the time runs out. */
+export async function waitForConnection(
+  options: { timeoutMs: number; everyMs: number },
+  connected: () => Promise<boolean> = browserConnected,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((done) => setTimeout(done, ms)),
+): Promise<boolean> {
+  for (let waited = 0; waited < options.timeoutMs; waited += options.everyMs) {
+    await sleep(options.everyMs);
+    if (await connected()) return true;
+  }
+  return false;
+}
+
+function green(text: string): string {
+  return process.stdout.isTTY && !process.env.NO_COLOR ? `\u001b[32m${text}\u001b[0m` : text;
 }
 
 async function browserConnected(): Promise<boolean> {

@@ -308,6 +308,13 @@ async function __step(step, readOnly = false) {
     var bound = await __boundTarget(step.target);
     if (bound !== step.target) step = {...step, target: bound};
   }
+  // {human: true} on an action asks for human-paced pointer and keys in this tab from now on,
+  // the same switch a seen challenge flips.
+  if (step && step.human) {
+    var {human: __human, ...__rest} = step;
+    step = __rest;
+    if (step.target) await __call({humanInput: {target: step.target}}).catch(() => {});
+  }
   if (step.target && __closedTabs.has(step.target.tabId)) {
     var closed = __closedTabs.get(step.target.tabId);
     var note = 'closed by you (tab ' + step.target.tabId + (closed.url ? ', ' + closed.url : '') + ')';
