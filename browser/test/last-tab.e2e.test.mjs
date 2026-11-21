@@ -4,10 +4,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import WebSocket from "ws";
+import { chromePort } from "./helpers/chrome-port.mjs";
 
 const chromePath =
   process.env.CHROME_PATH ??
@@ -62,9 +63,7 @@ test(
     const profile = await mkdtemp(join(tmpdir(), "bue-last-tab-"));
     const chrome = spawn(chromePath, chromeArgs(profile), { stdio: "ignore" });
     try {
-      const port = await waitFor(async () =>
-        Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-      );
+      const port = await chromePort(profile);
       const worker = await waitFor(async () => {
         const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) =>
           response.json(),

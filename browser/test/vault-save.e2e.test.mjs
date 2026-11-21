@@ -7,13 +7,14 @@ import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import WebSocket from "ws";
 import { fakeVault, NEW, SAVED, vaultRoutes } from "./vault-site.mjs";
+import { chromePort } from "./helpers/chrome-port.mjs";
 
 const chromePath =
   process.env.CHROME_PATH ??
@@ -379,9 +380,7 @@ async function waitFor(check, timeout = 15_000) {
 
 /** The page targets already showing `target`, so the hand-off watcher only takes a new one. */
 async function handoffTargets(profile, target) {
-  const port = await waitFor(async () =>
-    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-  );
+  const port = await chromePort(profile);
   const tabs = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) =>
     response.json(),
   );
@@ -393,9 +392,7 @@ async function handoffTargets(profile, target) {
 // Answers the hand-off the way the cursor's Done does, from the page itself. `beforeDone` runs
 // after the card is up and before Done, like a person unlocking their password manager first.
 async function answerHandoff(profile, target, beforeDone, known = new Set()) {
-  const port = await waitFor(async () =>
-    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-  );
+  const port = await chromePort(profile);
   const page = await waitFor(async () => {
     const tabs = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     const found = tabs.find(
@@ -567,9 +564,7 @@ function cdpCall(cdp, method, params = {}, ms = 5_000) {
 // Chrome only finds native hosts registered for the real browser, so the test answers the
 // extension's bootstrap itself with what the native host returns (as bridge.e2e.test.mjs does).
 async function connectExtension(profile, env) {
-  const port = await waitFor(async () =>
-    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-  );
+  const port = await chromePort(profile);
   const worker = await waitFor(async () => {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     const found = targets.find((item) => item.url.endsWith("/service-worker.js"));

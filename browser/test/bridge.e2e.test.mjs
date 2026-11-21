@@ -12,6 +12,7 @@ import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import WebSocket from "ws";
 import { uiScript } from "../packages/tools/dist/providers.js";
+import { chromePort } from "./helpers/chrome-port.mjs";
 
 const chromePath =
   process.env.CHROME_PATH ??
@@ -2142,9 +2143,7 @@ test(
 // Chrome only finds native hosts registered for the real browser, so the test answers the
 // extension's bootstrap itself with what the native host returns.
 async function connectExtension(profile, env) {
-  const port = await waitFor(async () =>
-    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-  );
+  const port = await chromePort(profile);
   const worker = await waitFor(async () => {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     const found = targets.find((item) => item.url.endsWith("/service-worker.js"));

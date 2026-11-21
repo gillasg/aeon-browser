@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import WebSocket from "ws";
+import { chromePort } from "./helpers/chrome-port.mjs";
 
 // The small browser e2e set for this task: tab reuse/closed notes, a silent click, and the
 // site-code CLI. The full e2e file remains the broad regression suite.
@@ -219,9 +220,7 @@ test(
 );
 
 async function connectExtension(profile, env) {
-  const port = await waitFor(async () =>
-    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-  );
+  const port = await chromePort(profile);
   const worker = await waitFor(async () => {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     const found = targets.find((item) => item.url.endsWith("/service-worker.js"));
