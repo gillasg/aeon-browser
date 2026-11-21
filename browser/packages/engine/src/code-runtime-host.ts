@@ -1,6 +1,7 @@
 import { stepTrace, takeActionTiming } from "./native-browser-action-timing.js";
 import { recordStep } from "./evidence/step-record.js";
 import { progressSteps } from "./code-runtime-progress.js";
+import { cellPayload, interruptCell, takeInternal, type CellOutcome } from "./code-runtime-cell.js";
 import type { StepEvent } from "@browserkit/protocol";
 import { runEffect, type KernelChecks } from "./kernel.js";
 import { cellEffects } from "./code-runtime-effects.js";
@@ -118,23 +119,15 @@ export function handleBrowserCodeMessage(
   if (cancel.success) {
     const cell = cells.get(cancel.data.cellId);
     const reset = cancel.data.reset === true;
-    if (cell && reset) {
+    if (!cell) return true;
+    if (reset) {
       void resetRealm(cell.run.chatId);
       finish(cell, {
         output: "",
         error: "RUN_RESET: browser workflow cancelled; runtime reset",
         reset: true,
       });
-    } else if (cell) {
-      // A deadline interrupts the cell and keeps the realm. The sandbox posts the partial value;
-      // startCell finishes from that, instead of wiping what the cell already built.
-      void toOffscreen({
-        target: "aeon-code-offscreen",
-        kind: "interrupt",
-        chatId: cell.run.chatId,
-        cellId: cell.run.cellId,
-      }).catch(() => undefined);
-    }
+    } else interruptCell(cell.run.chatId, cell.run.cellId);
     return true;
   }
   return false;
@@ -208,7 +201,7 @@ async function startCell(identity: BrowserIdentity, socket: WebSocket, run: Brow
       code: run.code,
       timeoutMs: run.timeoutMs,
       attached: run.targets[0],
-    })) as { value?: unknown; output?: string; error?: string; reset?: boolean } | undefined;
+    })) as CellOutcome | undefined;
     finish(
       cell,
       result ?? {
@@ -226,10 +219,7 @@ async function startCell(identity: BrowserIdentity, socket: WebSocket, run: Brow
   }
 }
 
-function finish(
-  cell: Cell,
-  result: { value?: unknown; output?: string; error?: string; reset?: boolean },
-): void {
+function finish(cell: Cell, result: CellOutcome): void {
   if (cell.done) return;
   cell.done = true;
   if (cell.progressTimer) clearTimeout(cell.progressTimer);
@@ -238,10 +228,7 @@ function finish(
   finalize(cell, result);
 }
 
-function finalize(
-  cell: Cell,
-  result: { value?: unknown; output?: string; error?: string; reset?: boolean },
-): void {
+function finalize(cell: Cell, result: CellOutcome): void {
   cells.delete(cell.run.cellId);
   void releaseTabs(cell.guarded);
   // A failed cell's opened tabs stay with the chat until the normal end-of-run tidy.
@@ -270,7 +257,7 @@ function finalize(
     kind: "browser.code.result",
     cellId: cell.run.cellId,
     output: ((result.output ?? "") + note).slice(0, 1_000_000),
-    ...(result.value !== undefined ? { value: result.value } : {}),
+    ...cellPayload(result),
     ...(result.error ? { error: result.error.slice(0, 20000) } : {}),
     ...(result.reset ? { reset: true } : {}),
     steps: cell.steps.slice(-MAX_TRACE),
@@ -289,13 +276,8 @@ function finalize(
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.target !== "aeon-code-host") return;
   if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL(OFFSCREEN)) return;
-  if (message.kind === "jobDone") {
-    finishJob(message as Record<string, unknown>);
-    reply({ ok: true });
-    return true;
-  }
-  if (message.kind === "jobLost") {
-    loseJob(message as Record<string, unknown>);
+  if (message.kind === "jobDone" || message.kind === "jobLost") {
+    (message.kind === "jobDone" ? finishJob : loseJob)(message as Record<string, unknown>);
     reply({ ok: true });
     return true;
   }
@@ -357,6 +339,7 @@ async function enforceSites(cell: Cell, step: BrowserStep): Promise<void> {
 async function serve(cell: Cell, request: unknown): Promise<unknown> {
   const value = request as Record<string, unknown> | null;
   if (!value || typeof value.op !== "string") return serveCall(cell, value);
+  const internal = takeInternal(value);
   const step = await prepare(cell, value);
   authorize(cell, step);
   await enforceSites(cell, step);
@@ -366,6 +349,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
     action: step,
     disposition: "running",
     tStart: Date.now(),
+    ...(internal ? { internal: true } : {}),
   };
   cell.steps.push(entry);
   progress(cell);
