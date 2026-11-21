@@ -119,7 +119,7 @@ export const ERRORS = {
   ],
   NOT_MAPPED: [
     "model",
-    "that site has no learned API yet: use the page, or site_mapper explore it first",
+    'no learned API yet. Fastest: site_mapper({action:"explore", sites:["host"]}) learns search, product, price and link. Until then, read the page.',
   ],
   SIGNED_OUT: ["user", "the site needs the user signed in: try bu.signIn(), else ask the user"],
   BOT_WALL: [
@@ -137,7 +137,7 @@ export const ERRORS = {
   ],
   RATE_LIMITED: [
     "page",
-    "the page is rate limiting this browser: do not send another request; report the limit to the user",
+    "this page is a throttle interstitial, not the site: retry after a pause and open fewer tabs in parallel",
   ],
   INTERNAL: ["ours", "browserkit failed unexpectedly: report it; do not retry the same call"],
 } as const satisfies Record<string, readonly [ErrorOwner, string]>;
@@ -177,18 +177,102 @@ export function errorNextCall(code: string, ctx?: ErrorContext): string {
   return errorNext(code, ctx) ?? "";
 }
 
+const HOST_IN_TEXT = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})/gi;
+
+/** The explore call that learns one site, when the failure names its host. */
+export function exploreCall(detail: string, ctx?: ErrorContext): string {
+  const host = hostFrom(ctx?.url) || hostFrom(detail);
+  if (!host) return "";
+  return `site_mapper({action:"explore", sites:[${JSON.stringify(host)}]})`;
+}
+
+const NOT_A_HOST = new Set([
+  "ts",
+  "js",
+  "mjs",
+  "cjs",
+  "md",
+  "json",
+  "css",
+  "html",
+  "map",
+  "txt",
+  "yaml",
+  "yml",
+]);
+
+function hostFrom(value: string | undefined): string {
+  if (!value) return "";
+  HOST_IN_TEXT.lastIndex = 0;
+  let found: RegExpExecArray | null;
+  while ((found = HOST_IN_TEXT.exec(value))) {
+    const host = found[1]?.toLowerCase().replace(/^www\./, "") ?? "";
+    const tld = host.slice(host.lastIndexOf(".") + 1);
+    if (!host || host.length > 80 || NOT_A_HOST.has(tld)) continue;
+    return host;
+  }
+  return "";
+}
+
 /** "CODE: detail", the candidates, the recovery hint, and the call to run next. */
 export function describeError(code: string, detail = "", ctx?: ErrorContext): string {
   const head = detail && detail !== code ? `${code}: ${detail}` : code;
   const repair = abilityRepairCall(detail);
-  const hint = repair ? ABILITY_REPAIR_HINT : errorHint(code);
-  const next = repair || errorNextCall(code, ctx);
+  const learn = !repair && code === "NOT_MAPPED" ? exploreCall(detail, ctx) : "";
+  const hint = repair
+    ? ABILITY_REPAIR_HINT
+    : learn
+      ? `no learned API yet. Fastest learn: ${learn} (search, product, price, link; one site). Until then, read the page.`
+      : errorHint(code);
+  const next = repair || learn || errorNextCall(code, ctx);
   return [
     head,
     ...formatCandidateLines(ctx?.candidates),
     ...(hint ? [`Hint: ${hint}`] : []),
     ...(next ? [`Next: ${next}`] : []),
   ].join("\n");
+}
+
+const TIMEOUT_MIN_MS = 1000;
+const TIMEOUT_MAX_MS = 600_000;
+
+/** A cell timeout of 1–999 ms is the minimum. Zero stays zero: the budget is spent. */
+export function clampTimeoutMs(timeoutMs: number): { timeoutMs: number; warn?: string } {
+  if (!(timeoutMs > 0) || timeoutMs >= TIMEOUT_MIN_MS) return { timeoutMs };
+  return { timeoutMs: TIMEOUT_MIN_MS, warn: "[warn] timeoutMs raised to 1000 (minimum)" };
+}
+
+interface SchemaIssue {
+  path?: unknown[];
+  code?: string;
+  minimum?: number;
+  maximum?: number;
+  message?: string;
+}
+
+/** A zod issue list as one INVALID_INPUT line. Anything else is left for the caller. */
+export function readableSchemaError(message: string): string | undefined {
+  const start = message.indexOf("[");
+  if (start < 0) return undefined;
+  const slice = message.slice(start).trim();
+  if (!/^\[\s*\{/.test(slice)) return undefined;
+  let issues: SchemaIssue[];
+  try {
+    issues = JSON.parse(slice) as SchemaIssue[];
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(issues) || !issues[0] || typeof issues[0] !== "object") return undefined;
+  const issue = issues[0];
+  const path = Array.isArray(issue.path) ? issue.path : [];
+  const field = path.length ? String(path[path.length - 1]) : "input";
+  if (field === "timeoutMs")
+    return `INVALID_INPUT: timeoutMs must be an integer from ${TIMEOUT_MIN_MS} to ${TIMEOUT_MAX_MS}`;
+  if (issue.code === "too_small" && issue.minimum != null)
+    return `INVALID_INPUT: ${field} must be >= ${issue.minimum}`;
+  if (issue.code === "too_big" && issue.maximum != null)
+    return `INVALID_INPUT: ${field} must be <= ${issue.maximum}`;
+  return `INVALID_INPUT: ${field} ${issue.message ?? "is invalid"}`;
 }
 
 /**

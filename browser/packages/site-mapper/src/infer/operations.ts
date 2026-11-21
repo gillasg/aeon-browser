@@ -240,11 +240,11 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
 
 // Default to write. A request is a read only when it is provably safe: a GET/HEAD whose path
 // does not change state, a GraphQL query, a read-shaped RPC method, or a read-shaped final path
-// segment (search, query, list...). Anything uncertain is an action: a missed read costs one
-// page fallback, while a passed write can delete or buy something.
+// segment (search, query, list, fetch...). Anything uncertain is an action: a missed read costs
+// one page fallback, while a passed write can delete or buy something.
 const STATE_CHANGING_PATH =
   /(^|\/)(logout|signout|sign-out|unsubscribe|delete|remove|destroy|archive|block|mute|like|unlike|follow|unfollow|vote|report|send|submit|create|update|edit|save|add|checkout|order|buy|pay|purchase|book|reserve|cancel|refund|invite|accept|reject|approve|join|leave|upload|post|comment|reply|message|share|subscribe)(\/|$)/i;
-const READ_SEGMENT = /^(search|query|list|find|filter|lookup|suggest|autocomplete|browse)$/i;
+const READ_SEGMENT = /^(search|query|list|find|filter|lookup|suggest|autocomplete|browse|fetch)$/i;
 const READ_RPC =
   /(^|\.)(get|list|search|query|find|fetch|read|view|lookup|check|status|info|describe)(\.|$)/i;
 

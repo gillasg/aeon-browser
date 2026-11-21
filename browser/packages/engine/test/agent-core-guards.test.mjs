@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { harvestCaptured, harvestReply } from "../dist/harvest.js";
 import { pageGuard } from "../dist/page-guard.js";
-import { rateLimitWarning } from "../dist/rate-limit.js";
+import { rateLimitError, rateLimitWarning, THROTTLE_PAGE_JS } from "../dist/rate-limit.js";
+import vm from "node:vm";
 import { readGuard } from "../dist/read-guards.js";
 
 const orders = JSON.stringify([
@@ -46,10 +47,39 @@ test("page.data name returns those rows and the footer names the call", () => {
   assert.equal(other.count, 0);
 });
 
-test("a short rate-limit page warns once and does not suggest a retry", () => {
+test("a short rate-limit page warns once and a long page does not", () => {
   assert.match(rateLimitWarning("Too many requests. Try again later.", 200), /RATE_LIMITED/);
-  assert.match(rateLimitWarning("ok", 429), /report it/);
+  assert.match(rateLimitWarning("ok", 429), /fewer tabs/);
   assert.equal(rateLimitWarning("a long page ".repeat(80), 200), undefined);
+});
+
+test("rush-hour and heavy-traffic interstitials are RATE_LIMITED, not page content", () => {
+  const amazon = "Oops! It's rush hour and traffic is piling up on that page.";
+  const limited = rateLimitError(amazon, 503, "503 - Service Unavailable Error");
+  assert.match(limited, /RATE_LIMITED/);
+  assert.match(limited, /retry after a pause/);
+  assert.match(limited, /fewer tabs/);
+  const flipkart = "We're experiencing heavy traffic. Please wait a moment.";
+  assert.match(rateLimitError(flipkart, 200, "Flipkart.com"), /RATE_LIMITED/);
+  const catalog = `${amazon}\n${"PlayStation 5 console ₹49990 ".repeat(200)}`;
+  assert.equal(rateLimitError(catalog, 200, "Amazon.in"), undefined);
+  const guard = pageGuard({
+    kind: "read",
+    title: "503 - Service Unavailable Error",
+    text: amazon,
+    count: 0,
+  });
+  assert.match(String(guard.rateLimited), /not the site/);
+  const context = vm.createContext({});
+  vm.runInContext(THROTTLE_PAGE_JS, context);
+  const page = vm.runInContext(
+    `__throttlePage("503 - Service Unavailable Error", ${JSON.stringify(amazon)})`,
+    context,
+  );
+  assert.match(page, /RATE_LIMITED/);
+  const source = readFileSync(new URL("../src/code-api-data.ts", import.meta.url), "utf8");
+  const read = source.slice(source.indexOf("read: async"));
+  assert.ok(read.indexOf("__throttlePage") < read.indexOf("return result;"));
 });
 
 test("a read that contradicts itself, or shows a location, says so", () => {

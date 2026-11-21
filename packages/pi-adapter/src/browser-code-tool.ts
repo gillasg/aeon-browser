@@ -1,8 +1,10 @@
 import { dirname, join } from "node:path";
 import {
+  clampTimeoutMs,
   describeError,
   errorNextCall,
   leadingCode,
+  readableSchemaError,
   StepEventSchema,
   type StepEvent,
 } from "@aeon/protocol";
@@ -90,15 +92,20 @@ function openCell(
   envelope: () => object,
   code: string,
 ):
-  | { ok: true; timeoutMs: number; run: BrowserToolRunner }
+  | { ok: true; timeoutMs: number; warn?: string; run: BrowserToolRunner }
   | { ok: false; result: ReturnType<typeof offlineCell> } {
   if (!run) return { ok: false, result: offlineCell(envelope) };
-  const timeoutMs = cellTimeoutMs(chatId, CELL_TIMEOUT_MS);
-  if (timeoutMs <= 0) return { ok: false, result: spentBudget(envelope) };
+  const bounded = clampTimeoutMs(cellTimeoutMs(chatId, CELL_TIMEOUT_MS));
+  if (bounded.timeoutMs <= 0) return { ok: false, result: spentBudget(envelope) };
   const sleepMs = cellSleepMs(code);
-  if (sleepsPastDeadline(sleepMs, timeoutMs))
-    return { ok: false, result: tooLongCell(envelope, timeoutMs, sleepMs) };
-  return { ok: true, timeoutMs, run };
+  if (sleepsPastDeadline(sleepMs, bounded.timeoutMs))
+    return { ok: false, result: tooLongCell(envelope, bounded.timeoutMs, sleepMs) };
+  return {
+    ok: true,
+    timeoutMs: bounded.timeoutMs,
+    ...(bounded.warn ? { warn: bounded.warn } : {}),
+    run,
+  };
 }
 
 function spentBudget(envelope: () => object): {
@@ -243,6 +250,7 @@ export function createBrowserCodeTool(
         writes,
         files,
         startedAt,
+        ...(opened.warn ? { timeoutWarn: opened.warn } : {}),
       });
     },
   });
@@ -296,12 +304,18 @@ async function browserCodeResult(options: {
   writes: SiteWrites;
   files: string[];
   startedAt: number;
+  timeoutWarn?: string;
 }) {
   const { chatId, workspace, operationId, writes, files } = options;
   let { steps } = options;
   const cell = JSON.parse(options.output) as CellOutput;
   if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
-  const result = { value: cell.value, output: cell.output ?? "" };
+  const result = {
+    value: cell.value,
+    output: options.timeoutWarn
+      ? `${options.timeoutWarn}${cell.output ? `\n${cell.output}` : ""}`
+      : (cell.output ?? ""),
+  };
   await journalOutput(result, workspace, operationId);
   // The run log grows with every cell; this result names it for the model and the trace.
   const runLog = await cellRunLog(chatId, workspace, files, cell);
@@ -611,6 +625,9 @@ function compactStep(step: Record<string, unknown>): Record<string, unknown> {
 }
 
 function browserCodeError(message = "INTERNAL", detail?: string): string {
+  const readable =
+    readableSchemaError(message) ?? (detail ? readableSchemaError(detail) : undefined);
+  if (readable) return withNextCall(readable);
   const text = detail ? `${message}: ${detail}` : message;
   if (/\nHint: /.test(text)) return withNextCall(text);
   const selector = selectorHint(text);

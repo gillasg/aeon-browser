@@ -2,6 +2,7 @@
 // embedded data and metadata, clean Markdown, session export, fetching without a tab, and a
 // pool that works through many URLs in parallel tabs. Evaluated in the sandbox realm.
 import { literalLoopback, privateTarget } from "@browserkit/protocol";
+import { THROTTLE_PAGE_JS } from "./rate-limit.js";
 
 /** Origin of a captured URL. An opaque page and an unreadable URL are "null". */
 function originOf(value: string): string {
@@ -128,6 +129,7 @@ ${replayLeft.toString()}
 ${samePage.toString()}
 ${replayOriginRefusal.toString()}
 ${replayHeaders.toString()}
+${THROTTLE_PAGE_JS}
 
 function __pageRequest(request) {
   return (async () => {
@@ -471,6 +473,9 @@ function __extendPageData(target, base) {
         : await inspect(__expandRead, {max: options.maxClicks ?? 10}).catch(() => ({clicked: [], skipped: []}));
       var waited = await inspect(__waitRead, {maxMs: options.waitMs ?? 5000}).catch(() => ({settled: false, partial: true, note: 'the settle wait failed'}));
       var markdown = await inspect(__readMarkdown, {...options, max});
+      var pageTitle = await base.inspect(() => document.title);
+      var throttled = __throttlePage(pageTitle, String(markdown.markdown || ''));
+      if (throttled) throw Error(throttled);
       var data = await base.inspect(
         '(' + __readPageData.toString() + ')(' + __readMetadata.toString() + ', ' + JSON.stringify({...options, summary: options.summary === true}) + ')'
       );
@@ -502,7 +507,7 @@ function __extendPageData(target, base) {
       var partial = !!(markdown.partial || (data && data.partial) || (list && list.partial) || waited.partial || panels.some((panel) => !panel.complete));
       var result = {
         url: await base.inspect(() => location.href),
-        title: await base.inspect(() => document.title),
+        title: pageTitle,
         data,
         list,
         markdown: markdown.markdown,
@@ -536,7 +541,8 @@ function __extendPageData(target, base) {
           result.notes.push('list and data omitted to keep the read under ' + max + ' characters');
         }
       }
-      var guard = await __call({guard: {kind: 'read', text: String(result.markdown || '').slice(0, 4000), count: result.list && result.list.items ? result.list.items.length : 0, shown: result.list && result.list.count != null ? result.list.count : (result.list && result.list.items ? result.list.items.length : undefined), total: result.list ? result.list.total : undefined}}).catch(function () { return null; });
+      var guard = await __call({guard: {kind: 'read', text: String(result.markdown || '').slice(0, 4000), title: String(result.title || ''), count: result.list && result.list.items ? result.list.items.length : 0, shown: result.list && result.list.count != null ? result.list.count : (result.list && result.list.items ? result.list.items.length : undefined), total: result.list ? result.list.total : undefined}}).catch(function () { return null; });
+      if (guard && guard.rateLimited) throw Error(String(guard.rateLimited));
       if (guard && guard.contradiction) result.contradiction = guard.contradiction;
       if (guard && guard.location) result.location = guard.location;
       if (guard && guard.partial && result.list) {

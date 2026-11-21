@@ -6,6 +6,7 @@ import {
   BrowserCodeResultSchema,
   BrowserCodeRunSchema,
   BrowserTargetKeySchema,
+  clampTimeoutMs,
   type BrowserCodeResult,
   type BrowserCodeStage,
   type BrowserTargetKey,
@@ -34,6 +35,8 @@ interface Pending {
   stage: BrowserCodeStage;
   /** Tabs progress showed this cell opening; a cell that fails still hands them to its chat. */
   opened: Map<number, BrowserTargetKey>;
+  /** Set when a 1–999 ms timeout was raised to the schema minimum. */
+  timeoutWarn?: string;
 }
 
 const LINK_GRACE_MS = 60_000;
@@ -119,6 +122,7 @@ export class BrowserCodeCells {
           reject(error ?? new Error("INTERNAL: the cell ended without a result"));
         }
       };
+      const bounded = clampTimeoutMs(input.timeoutMs);
       this.cells.set(cellId, {
         clientInstanceId,
         socket,
@@ -127,6 +131,7 @@ export class BrowserCodeCells {
         waiting,
         stage: "sent",
         opened: new Map(),
+        ...(bounded.warn ? { timeoutWarn: bounded.warn } : {}),
       });
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("close", close);
@@ -140,7 +145,7 @@ export class BrowserCodeCells {
             toolCallId,
             code: input.code,
             targets,
-            timeoutMs: input.timeoutMs,
+            timeoutMs: bounded.timeoutMs,
             ...(input.ownerTitle ? { ownerTitle: input.ownerTitle } : {}),
             ...(input.space ? { space: input.space } : {}),
           }),
@@ -207,7 +212,7 @@ export class BrowserCodeCells {
     const result = BrowserCodeResultSchema.safeParse(candidate);
     if (!result.success) return this.rejectUnreadable(candidate, result.error, socket);
     const cell = this.cells.get(result.data.cellId);
-    if (cell?.socket === socket) cell.finish(result.data);
+    if (cell?.socket === socket) cell.finish(withTimeoutWarn(result.data, cell.timeoutWarn));
   }
 
   /** A result this daemon can't read fails its cell now, with the reason, instead of waiting
@@ -258,6 +263,11 @@ function rememberOpened(
     const target = BrowserTargetKeySchema.safeParse(result.tab?.target);
     if (target.success) opened.set(target.data.tabId, target.data);
   }
+}
+
+function withTimeoutWarn(result: BrowserCodeResult, warn?: string): BrowserCodeResult {
+  if (!warn || result.output.startsWith(warn)) return result;
+  return { ...result, output: `${warn}${result.output ? `\n${result.output}` : ""}` };
 }
 
 function reply(socket: WebSocket, message: unknown): void {

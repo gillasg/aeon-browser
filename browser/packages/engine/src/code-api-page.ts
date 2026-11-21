@@ -185,6 +185,25 @@ function __waitSelector(target, selector, options) {
   var state = {detached: 'hidden', attached: 'attached', visible: 'visible', hidden: 'hidden', editable: 'editable'}[options.state] || 'visible';
   return __untilDeadline(options.timeoutMs ?? options.timeout ?? 5000, (timeoutMs) => __step({op:'wait', target, selector: String(selector), state, timeoutMs}));
 }
+function __waitInput(fn, options) {
+  if (fn && typeof fn === 'object') {
+    if (fn.time == null && fn.timeoutMs == null && fn.timeout == null) throw Error('INVALID_INPUT: page.waitFor takes a function, a condition string, a number of milliseconds, or {time: seconds}. An object is not page code.');
+    options = fn;
+    fn = undefined;
+  } else if (typeof fn === 'number') { options = fn; fn = undefined; }
+  var ms;
+  if (typeof options === 'number') ms = options;
+  else if (options && options.time != null && options.timeoutMs == null && options.timeout == null) {
+    var n = Number(options.time);
+    ms = n <= 120 ? Math.round(n * 1000) : Math.round(n);
+  } else if (options) ms = options.timeoutMs != null ? options.timeoutMs : options.timeout;
+  if (ms == null || !isFinite(ms)) ms = fn == null && options && options.time != null ? NaN : 5000;
+  if (!isFinite(ms)) throw Error('INVALID_INPUT: page.waitFor time must be a number of seconds (up to 120) or milliseconds.');
+  if (fn == null) return {sleep: ms};
+  if (typeof fn === 'function') return {expression: '(' + fn.toString() + ')()', timeoutMs: ms};
+  if (typeof fn === 'string') return {expression: fn, timeoutMs: ms};
+  throw Error('INVALID_INPUT: page.waitFor takes a function, a condition string, a number of milliseconds, or {time: seconds}. An object is not page code.');
+}
 function __waitCondition(target, expression, timeout) {
   return __untilDeadline(timeout, (timeoutMs) => __step({op:'waitFor', target, expression, timeoutMs}));
 }

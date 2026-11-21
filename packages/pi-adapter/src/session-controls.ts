@@ -17,6 +17,7 @@ import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-
 import { liveFirstTurn } from "./first-turn-live.js";
 import { modelUnavailable } from "./model-unavailable.js";
 import { watchBudget } from "./run-budget.js";
+import { markRunAborted } from "./stream-retry.js";
 import { watchGuards } from "./run-guards.js";
 import { endUserWaits, waitingOnUser } from "./user-waits.js";
 
@@ -41,6 +42,7 @@ export function createSessionControls(session: AgentSession, chatId: string): Co
     },
     editQueue: (input) => editSessionQueue(session, input),
     abort: async () => {
+      markRunAborted(session);
       await session.abort();
       sendQueuedAfterStop(session);
     },
