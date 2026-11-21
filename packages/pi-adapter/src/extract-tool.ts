@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import type { AssistantMessage, Tool } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type, type Static, type TSchema } from "typebox";
@@ -42,8 +42,10 @@ async function source(input: Input, workspace: string | undefined): Promise<stri
   if (input.text) return input.text.slice(0, MAX_INPUT);
   if (!input.file) throw new Error("Give text, or file (a path in the workspace)");
   if (!workspace) throw new Error("This chat has no workspace");
-  const path = resolve(workspace, input.file);
-  if (!path.startsWith(resolve(workspace))) throw new Error("file must be inside the workspace");
+  const root = resolve(workspace);
+  const path = resolve(root, input.file);
+  if (path !== root && !path.startsWith(root + sep))
+    throw new Error("file must be inside the workspace");
   return (await readFile(path, "utf8")).slice(0, MAX_INPUT);
 }
 

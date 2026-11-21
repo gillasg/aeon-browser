@@ -26,8 +26,35 @@ export class SiteWrites {
   private readonly writes = new Map<string, SiteWrite>();
   /** The cell called a mapped site API at all (read or write). */
   usedApi = false;
+  /** The cell ran a saved ability. */
+  usedAbility = false;
+  /** The cell ran a compiled API-backed ability. */
+  compiled = false;
+  /** Version an ability was repaired to during this cell, when observed. */
+  repairedVersion?: number;
+  /** First mapped site touched by API or ability calls in this cell. */
+  site?: string;
 
   constructor(private readonly rewindOf?: RewindLookup) {}
+
+  private trackAbility(site: string | undefined, sent: Promise<unknown>): Promise<unknown> {
+    this.usedAbility = true;
+    if (site && !this.site) this.site = site;
+    return sent.then((value) => {
+      const record = value as { compiled?: unknown; healed?: { toVersion?: unknown } } | null;
+      if (record && typeof record === "object") {
+        if (record.compiled === true) {
+          this.usedApi = true;
+          this.compiled = true;
+        }
+        const toVersion = record.healed?.toVersion;
+        if (typeof toVersion === "number" && Number.isInteger(toVersion) && toVersion > 0) {
+          this.repairedVersion = toVersion;
+        }
+      }
+      return value;
+    });
+  }
 
   track(request: unknown, sent: Promise<unknown>): Promise<unknown> {
     const call = request as {
@@ -35,9 +62,15 @@ export class SiteWrites {
       site?: string;
       operation?: string;
       params?: unknown;
+      abilityRun?: { site?: string; name?: string };
     };
-    if (call.siteMapper === "call" || call.siteMapper === "write" || call.siteMapper === "watch")
+    if (call.siteMapper === "call" || call.siteMapper === "write" || call.siteMapper === "watch") {
       this.usedApi = true;
+      if (call.site && !this.site) this.site = call.site;
+    }
+    if (call.abilityRun && typeof call.abilityRun === "object") {
+      return this.trackAbility(call.abilityRun.site, sent);
+    }
     if (call.siteMapper !== "write" || !call.site || !call.operation) return sent;
     const key = call.site + "|" + call.operation;
     const write = this.writes.get(key) ?? {

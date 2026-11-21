@@ -218,6 +218,23 @@ function addActions(totals: RunLogTotals, steps: readonly Record<string, unknown
   }
 }
 
+function isSensitiveEntry(entry: Record<string, unknown>): boolean {
+  const event = entry.event as { sensitive?: unknown } | undefined;
+  return entry.sensitive === true || event?.sensitive === true;
+}
+
+function applyReplayInput(
+  replay: RunAction,
+  action: Record<string, unknown>,
+  sensitive: boolean,
+): void {
+  if (sensitive) return;
+  if (action.value !== undefined && action.value !== "[hidden password]") {
+    replay.value = action.value;
+  }
+  if (typeof action.key === "string") replay.key = action.key;
+}
+
 function replayAction(entry: Record<string, unknown>): RunAction | undefined {
   const action = entry.action as Record<string, unknown> | undefined;
   const op = typeof action?.op === "string" ? action.op : "";
@@ -226,8 +243,7 @@ function replayAction(entry: Record<string, unknown>): RunAction | undefined {
   if (typeof action.url === "string") replay.url = action.url;
   const element = action.element as Record<string, unknown> | undefined;
   if (element && typeof element === "object") replay.element = element;
-  if (action.value !== undefined) replay.value = action.value;
-  if (typeof action.key === "string") replay.key = action.key;
+  applyReplayInput(replay, action, isSensitiveEntry(entry));
   return replay;
 }
 

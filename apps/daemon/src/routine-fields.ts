@@ -79,5 +79,46 @@ function assertWebhookUrl(url: string): string {
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
     throw new Error("webhook url must be an http(s) URL.");
+  if (isBlockedWebhookHost(parsed.hostname))
+    throw new Error(
+      "webhook url must target a public host, not a local or private network address.",
+    );
   return url;
+}
+
+function isBlockedWebhookHost(rawHost: string): boolean {
+  const host = rawHost.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    !host ||
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal")
+  )
+    return true;
+  if (
+    host === "::" ||
+    host === "::1" ||
+    host.startsWith("fe80:") ||
+    /^f[cd][0-9a-f]{2}:/.test(host)
+  )
+    return true;
+  if (host.startsWith("::ffff:")) return isBlockedIpv4(host.slice(7));
+  return isBlockedIpv4(host);
+}
+
+const BLOCKED_IPV4_FIRST_OCTETS = new Set([0, 10, 127]);
+
+function isBlockedIpv4(host: string): boolean {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const a = Number(match[1]);
+  const b = Number(match[2]);
+  if (BLOCKED_IPV4_FIRST_OCTETS.has(a)) return true;
+  return (
+    (a === 169 && b === 254) ||
+    (a === 192 && b === 168) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 100 && b >= 64 && b <= 127)
+  );
 }

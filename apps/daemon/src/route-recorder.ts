@@ -180,27 +180,60 @@ export class RouteRecorder {
     );
   }
 
+  private resolveFinishSite(run: LiveRun, steps: SeenStep[]): string {
+    return (
+      siteOf(steps) ||
+      run.proofSite ||
+      sitesNamed(run.task)[0] ||
+      this.lastSite.get(run.chatId) ||
+      ""
+    );
+  }
+
+  private async trackDuration(
+    chatId: string,
+    site: string,
+    task: string,
+    durationMs: number,
+  ): Promise<number | undefined> {
+    if (!site) return undefined;
+    this.lastSite.set(chatId, site);
+    const previousMs = await previousDuration(site, task);
+    await rememberDuration(site, task, durationMs);
+    return previousMs;
+  }
+
   private async finish(run: LiveRun): Promise<void> {
     if (this.prompted.get(run.chatId)?.user === run.userPrompt) this.prompted.delete(run.chatId);
     const steps = flatSteps(run);
-    const site = siteOf(steps);
-    if (!site || !steps.length || run.ours) return;
-    this.lastSite.set(run.chatId, site);
+    const site = this.resolveFinishSite(run, steps);
+    if (!shouldFinishRun(run, steps, site)) return;
     const task = contentWords(run.task).join(" ") || "task";
     const durationMs = Math.max(0, Date.now() - run.startedAt);
-    const previousMs = await previousDuration(site, task);
-    await rememberDuration(site, task, durationMs);
-    const staged = await this.stage(run, site, steps);
+    const previousMs = await this.trackDuration(run.chatId, site, task, durationMs);
+    await this.recordAndPublish(run, site, steps, task, durationMs, previousMs);
+  }
+
+  private async recordAndPublish(
+    run: LiveRun,
+    site: string,
+    steps: SeenStep[],
+    task: string,
+    durationMs: number,
+    previousMs: number | undefined,
+  ): Promise<void> {
+    const canRecord = Boolean(steps.length && site);
+    const staged = canRecord ? await this.stage(run, site, steps) : undefined;
     const facts = await factsFor(
       run,
-      site,
+      site || "browser",
       task,
       durationMs,
       previousMs,
       staged?.id,
       this.workspaceFor(run.chatId),
     );
-    const learned = await autoLearn(run, site);
+    const learned = canRecord ? await autoLearn(run, site) : undefined;
     const card = buildRunCard({ ...facts, ...(learned ? { learned } : {}) });
     if (card) this.publish(run.chatId, card);
     if (staged && !run.corrected) this.arm(site, run, task, staged.fingerprint);
@@ -372,20 +405,50 @@ async function factsFor(
   };
 }
 
-/** Receipt facts this recorder can see in the tool calls. Vault, repair and model-free runs are
- * not visible here, so they stay unset rather than guessed. */
+function hasObservedProof(run: LiveRun): boolean {
+  return Boolean(
+    run.vault ||
+    run.repairedVersion ||
+    run.usedApi ||
+    run.deterministicWatch ||
+    boostEffect(run.cells),
+  );
+}
+
+function shouldFinishRun(run: LiveRun, steps: readonly SeenStep[], site: string): boolean {
+  if (run.ours) return false;
+  return Boolean((steps.length && site) || hasObservedProof(run));
+}
+
+function boostProof(run: LiveRun, steps: readonly SeenStep[]) {
+  const boost = boostEffect(run.cells);
+  if (!boost) return undefined;
+  const url = steps.find((step) => step.url)?.url;
+  return url ? { ...boost, url } : boost;
+}
+
+function isPageOnlyOnMappedSite(
+  run: LiveRun,
+  steps: readonly SeenStep[],
+  usedApi: boolean,
+  unmapped: boolean,
+): boolean {
+  return steps.length > 0 && !usedApi && !run.usedAbility && !run.fromMemory && !unmapped;
+}
+
+/** Receipt facts this recorder directly observed in tool calls and session events. */
 function proofOf(run: LiveRun, unmapped: boolean): Pick<RunFacts, "proof"> {
   const steps = flatSteps(run);
-  const boost = boostEffect(run.cells);
-  const url = steps.find((step) => step.url)?.url;
-  const usedApi = steps.some((step) => step.via === "api");
-  const pageOnly = steps.length > 0 && !usedApi && !run.usedAbility && !run.fromMemory;
-  const proof: NonNullable<RunFacts["proof"]> = {
-    ...(boost ? { boost: { ...boost, ...(url ? { url } : {}) } } : {}),
-    ...(run.deterministicWatch ? { deterministicWatch: true } : {}),
-    ...(usedApi ? { usedApi: true } : {}),
-    ...(pageOnly && !unmapped ? { apiAvailable: true } : {}),
-  };
+  const usedApi = run.usedApi === true || steps.some((step) => step.via === "api");
+  const proof: NonNullable<RunFacts["proof"]> = {};
+  if (run.vault) proof.vault = true;
+  if (run.repairedVersion) proof.repairedVersion = run.repairedVersion;
+  if ((usedApi || run.usedAbility) && run.modelTurns === 0) proof.modelFree = true;
+  const boost = boostProof(run, steps);
+  if (boost) proof.boost = boost;
+  if (run.deterministicWatch) proof.deterministicWatch = true;
+  if (usedApi) proof.usedApi = true;
+  if (isPageOnlyOnMappedSite(run, steps, usedApi, unmapped)) proof.apiAvailable = true;
   return Object.keys(proof).length ? { proof } : {};
 }
 

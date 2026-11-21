@@ -9,9 +9,11 @@ import { ChatService } from "./chat-service.js";
 import {
   browserNamedFor,
   browserParentChat,
+  createAeonHostHandler,
   PiSdkSessionAdapter,
   resolvePiAgentDirectory,
   sessionChatId,
+  siteMapperRequest,
   siteToolModel,
 } from "@aeon/pi-adapter";
 import { openChatStore } from "@aeon/store";
@@ -459,12 +461,19 @@ function installAbilityIdle(options: {
     activity: () => readDaemonActivity(attention, routines, siteRules, browserControl),
     cell: async (code) => {
       const chatId = sessionChatId("external", "ability-idle");
+      const host = createAeonHostHandler({
+        source: "external",
+        siteRules: () => siteRules.answer(chatId),
+        siteMapper: (request) => siteMapperRequest(chatId, request),
+      });
       const output = await browserControl.execute(chatId, `ability-idle-${randomUUID()}`, {
         codeCell: {
           code,
           timeoutMs: 60_000,
           ownerTitle: "Ability check",
-          onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+          onCall: (request: Record<string, unknown>) =>
+            host(request, { source: "external", scope: chatId }) ??
+            Promise.resolve({ error: "UNSUPPORTED" }),
           onProgress: () => undefined,
         },
       });
@@ -491,12 +500,18 @@ function installManagementActions(
   const library = new LibraryActions(async (code, options = {}) => {
     const session = options.session ?? "management";
     const chatId = sessionChatId("external", session);
+    const host = createAeonHostHandler({
+      source: "external",
+      siteMapper: (request) => siteMapperRequest(chatId, request),
+    });
     const output = await browserControl.execute(chatId, `management-${randomUUID()}`, {
       codeCell: {
         code,
         timeoutMs: options.timeoutMs ?? 60_000,
         ownerTitle: `Management - ${session}`,
-        onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+        onCall: (request: Record<string, unknown>) =>
+          host(request, { source: "external", scope: chatId }) ??
+          Promise.resolve({ error: "UNSUPPORTED" }),
         onProgress: () => undefined,
       },
     });

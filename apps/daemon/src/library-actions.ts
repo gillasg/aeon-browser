@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
 import {
   declineOffer,
   forgetSavedAbility,
@@ -300,7 +301,9 @@ export class LibraryActions {
         ...(host.resolveOperation ? { resolveOperation: host.resolveOperation } : {}),
       },
     });
-    noteAction(true, `${site}/${name}: ${preview(answer.result)} via ${answer.via}`);
+    const healed = answer.healed ? ` · fixed itself (v${answer.healed.toVersion})` : "";
+    const timing = answer.receipt ? ` (${answer.receipt})` : ` via ${answer.via}`;
+    noteAction(true, `${site}/${name}: ${preview(answer.result)}${timing}${healed}`);
   }
 
   private async exportSite(input: Record<string, unknown>): Promise<void> {
@@ -318,7 +321,7 @@ export class LibraryActions {
   }
 
   private async importSite(input: Record<string, unknown>): Promise<void> {
-    const path = required(input, "path");
+    const path = this.importPath(required(input, "path"));
     const pack = await readSitePack(path);
     const installed = await installSitePack(pack);
     noteAction(true, `Imported ${installed.site} (${installed.written.length} file(s))`);
@@ -333,7 +336,7 @@ export class LibraryActions {
   }
 
   private async importRecipes(input: Record<string, unknown>): Promise<void> {
-    const path = required(input, "path");
+    const path = this.importPath(required(input, "path"));
     const site = typeof input.site === "string" ? input.site : undefined;
     const recipes = await importRecipes(path, site ? { site } : {});
     noteAction(true, `Imported ${recipes.length} recipe(s)`);
@@ -532,8 +535,26 @@ export class LibraryActions {
   }
 
   private exportPath(name: string, given: unknown): string {
-    if (typeof given === "string" && given.trim()) return given.trim();
-    return join(browserkitDataDirectory(), "exports", name.replace(/[^\w.-]+/g, "-"));
+    const root = resolve(browserkitDataDirectory(), "exports");
+    const safeDefault = join(root, name.replace(/[^\w.-]+/g, "-"));
+    if (typeof given !== "string" || !given.trim()) return safeDefault;
+    const candidate = resolve(root, given.trim());
+    if (!isInside(candidate, root)) throw new Error(`Export path must stay inside ${root}.`);
+    return candidate;
+  }
+
+  private importPath(given: string): string {
+    const trimmed = given.trim();
+    if (!trimmed || trimmed.includes("\0")) throw new Error("Invalid import path.");
+    const candidate = resolve(trimmed);
+    const allowedRoots = [
+      resolve(browserkitDataDirectory()),
+      ...(this.dataDirectory ? [resolve(this.dataDirectory)] : []),
+      resolve(homedir()),
+    ];
+    if (!allowedRoots.some((root) => isInside(candidate, root)))
+      throw new Error("Import path must be inside your home or Aeon data directory.");
+    return candidate;
   }
 
   private async renameAbility(input: Record<string, unknown>): Promise<void> {
@@ -657,4 +678,9 @@ function directTarget(element: Record<string, unknown>): Record<string, unknown>
       ...(typeof element.name === "string" ? { name: element.name } : {}),
     };
   return undefined;
+}
+
+function isInside(candidate: string, root: string): boolean {
+  const normalizedRoot = root.endsWith(sep) ? root : root + sep;
+  return candidate === root || candidate.startsWith(normalizedRoot);
 }

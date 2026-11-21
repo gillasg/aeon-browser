@@ -282,14 +282,22 @@ function projectToolEvent(
       ...toolStepFields(event.partialResult),
       ...(event.parentToolCallId ? { parentToolCallId: event.parentToolCallId } : {}),
     };
+  return projectToolEnd(event);
+}
+
+function projectToolEnd(
+  event: Extract<AgentSessionEvent, { type: "tool_execution_end" }>,
+): PiSessionEvent {
   const changeDiff = event.isError ? undefined : projectChangeDiff(event.result);
   const path = toolPath(event.toolName, event.result);
   const writes = event.isError ? undefined : toolWrites(event.result);
+  const proof = event.isError ? undefined : toolProof(event.result);
   return {
     kind: "tool-end",
     ...(changeDiff !== undefined ? { changeDiff } : {}),
     ...(path ? { path } : {}),
     ...(writes ? { writes } : {}),
+    ...(proof ? { proof } : {}),
     toolCallId: event.toolCallId,
     toolName: event.toolName,
     result: resultText(event.result),
@@ -302,6 +310,34 @@ function projectToolEvent(
   };
 }
 
+type ToolProof = NonNullable<Extract<PiSessionEvent, { kind: "tool-end" }>["proof"]>;
+
+function positiveInt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function trimmedSite(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const site = value.trim();
+  return site ? site.slice(0, 200) : undefined;
+}
+
+function toolProof(result: unknown): ToolProof | undefined {
+  const raw = (result as { details?: { proof?: Record<string, unknown> } } | undefined)?.details
+    ?.proof;
+  if (!raw || typeof raw !== "object") return undefined;
+  const proof: ToolProof = {};
+  if (raw.vault === true) proof.vault = true;
+  const repaired = positiveInt(raw.repairedVersion);
+  if (repaired) proof.repairedVersion = repaired;
+  if (raw.usedApi === true) proof.usedApi = true;
+  if (raw.compiled === true) proof.compiled = true;
+  if (raw.usedAbility === true) proof.usedAbility = true;
+  const site = trimmedSite(raw.site);
+  if (site) proof.site = site;
+  return Object.keys(proof).length ? proof : undefined;
+}
+
 type ToolPath = "recipe" | "site-mapper" | "data" | "url" | "read" | "ui";
 
 function toolPath(toolName: string, result: unknown): ToolPath | undefined {
@@ -312,9 +348,10 @@ function toolPath(toolName: string, result: unknown): ToolPath | undefined {
 
 /** A browser_code step that called a site's API went the site-API way, whatever else it did. */
 function usedSiteMapper(result: unknown): boolean {
-  return (
-    (result as { details?: { siteMapper?: boolean } } | undefined)?.details?.siteMapper === true
-  );
+  const details = (
+    result as { details?: { siteMapper?: boolean; proof?: { usedApi?: boolean } } } | undefined
+  )?.details;
+  return details?.siteMapper === true || details?.proof?.usedApi === true;
 }
 
 function stepsPath(result: unknown): ToolPath | undefined {

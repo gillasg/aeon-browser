@@ -257,12 +257,11 @@ export async function captureTypedPassword(tabId: number): Promise<void> {
   rememberVaultCandidate(tabId, form, agentTyped(tabId, form.password) ? "agent" : "user");
 }
 
-const SUBMIT_SETTLE_MS = 8000;
+const SUBMIT_SETTLE_MS = 3000;
 
 /**
- * The password form after a submit. Sites take a few seconds to move on (Instagram's reset page
- * stayed for ~3 s), and reading it at once took a slow success for a refusal, so the login was
- * never saved. The caller does not wait on this: a click returns after a short wait for the save.
+ * The password form after a submit. Sites take a couple of seconds to move on, and reading it at
+ * once took a slow success for a refusal, so the login was never saved.
  */
 async function formAfterSubmit(tabId: number): Promise<VaultForm | undefined> {
   const deadline = Date.now() + SUBMIT_SETTLE_MS;
@@ -271,7 +270,7 @@ async function formAfterSubmit(tabId: number): Promise<VaultForm | undefined> {
   while ((form === undefined || form.hasPassword) && Date.now() < deadline) {
     // A refusal named beside the form is final: no need to wait out a slow site's silence.
     if (form?.hasPassword && form.refused) return form;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 250));
     form = await probeVaultForm(tabId).catch(() => undefined);
   }
   return form;
@@ -352,8 +351,9 @@ export async function finishVaultCapture(
     refused: after?.refused,
   });
   if (!vaultSubmissionSucceeded(after)) {
-    // The form is still there: the site refused it, so there is nothing worth saving.
-    forgetVaultCandidate(tabId);
+    // Only discard when the site explicitly refused the login; a non-submit click (e.g. checkbox)
+    // leaves the password form intact so the real submit right after it can still save.
+    if (after?.refused) forgetVaultCandidate(tabId);
     return undefined;
   }
   candidates.delete(tabId);

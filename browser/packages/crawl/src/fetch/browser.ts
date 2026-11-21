@@ -128,15 +128,22 @@ export function pageCode(url: string, options: ScrapeOptions, outputs: BrowserOu
     options.handoff === false
       ? ""
       : `if (${LOGIN_WALL}) { await bu.use(tab.target); const done = await Promise.race([bu.handoff('Sign in or verify so the crawl can continue, then click Done.').then(() => true, () => false), new Promise((r) => setTimeout(() => r(false), ${limit}))]); if (done) await tab.navigate(${target}); }`;
+  const setup = setupCode(options);
+  const setupKey = JSON.stringify(setup);
   return `const out = { actionShots: [] };
 let tab = globalThis.__crawlTab;
 if (!tab) {
   tab = await browser.openTab(${target}, { new: true, quiet: true, ads: true });
   globalThis.__crawlTab = tab;
-  ${setupCode(options)}
+  globalThis.__crawlSetupKey = ${setupKey};
+  ${setup}
   await tab.network.start({});
   await tab.navigate(${target});
 } else {
+  if (globalThis.__crawlSetupKey !== ${setupKey}) {
+    globalThis.__crawlSetupKey = ${setupKey};
+    ${setup}
+  }
   await tab.network.clear();
   await tab.navigate(${target});
 }

@@ -346,6 +346,18 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
         )
         .max(20)
         .optional(),
+      /** Observed proof facts from the tool execution, for honest run receipts. */
+      proof: z
+        .object({
+          vault: z.boolean().optional(),
+          repairedVersion: z.number().int().positive().optional(),
+          usedApi: z.boolean().optional(),
+          compiled: z.boolean().optional(),
+          usedAbility: z.boolean().optional(),
+          site: z.string().max(200).optional(),
+        })
+        .strict()
+        .optional(),
       durationMs: z.number().int().nonnegative().optional(),
       parentToolCallId: z.string().min(1).max(160).optional(),
     })

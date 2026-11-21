@@ -20,9 +20,9 @@ function harness({ failCompanion = false } = {}) {
     submitPrompt: async (chatId, prompt) => prompts.push({ chatId, prompt }),
     modelComplete: async (system, messages, choice) => {
       completions.push({ system, messages, choice });
-      if (failCompanion && choice?.model === "opencode-go/deepseek-v4.1-flash")
+      if (failCompanion && choice?.model === "custom/missing-model")
         throw new Error(
-          "opencode-go/deepseek-v4.1-flash isn't available. Sign in to opencode-go again from the model picker.",
+          "custom/missing-model isn't available. Sign in to custom again from the model picker.",
         );
       return `${system}|${messages.map((m) => m.content).join(",")}`;
     },
@@ -43,24 +43,30 @@ function harness({ failCompanion = false } = {}) {
   return { ask, prompts, opened, origins, socket, service, browserControl, completions };
 }
 
-test("a companion model that is gone fails instead of quietly using another", async () => {
+test("an explicit companion model that is gone fails instead of quietly using another", async () => {
   const { ask, completions } = harness({ failCompanion: true });
   const reply = await ask("model.complete", {
     system: "S",
     messages: [{ role: "user", content: "hi" }],
+    model: "custom/missing-model",
   });
   assert.equal(reply.ok, false);
-  assert.match(reply.error, /deepseek-v4\.1-flash isn't available/);
+  assert.match(reply.error, /custom\/missing-model isn't available/);
   assert.equal(completions.length, 1, "no retry with a different model");
 });
 
-test("other extensions get completions with the user's model", async () => {
-  const { ask } = harness();
+test("other extensions get completions with the user's default model", async () => {
+  const { ask, completions } = harness();
   const reply = await ask("model.complete", {
     system: "S",
     messages: [{ role: "user", content: "hi" }],
   });
   assert.deepEqual(reply.value, { text: "S|hi" });
+  assert.equal(
+    completions[0].choice,
+    undefined,
+    "uses user's default model without hardcoded override",
+  );
   const empty = await ask("model.complete", { system: "S", messages: [] });
   assert.equal(empty.ok, false);
 });

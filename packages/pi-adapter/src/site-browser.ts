@@ -10,6 +10,7 @@ import {
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { clampTimeoutMs, RewindSchema, type Rewind } from "@aeon/protocol";
 import { cellTimeoutMs } from "./run-budget.js";
+import { createAeonHostHandler } from "./browser-host-requests.js";
 
 // site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they
 // run in the user's Chrome through the same executor as browser_code: each (chat, session) pair
@@ -60,6 +61,10 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
       const chatId = chats.getStore()?.chatId ?? BACKGROUND;
       const timeoutMs = boundedCellTimeout(chatId, options.timeoutMs);
       const child = sessionChatId(chatId, options.session ?? "default");
+      const host = createAeonHostHandler({
+        source: "external",
+        siteMapper: (request) => siteMapperRequest(chatId, request),
+      });
       if (options.browser) namedBrowser.set(child, options.browser);
       try {
         const output = await run(child, `site-${randomUUID()}`, {
@@ -71,7 +76,12 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
               : options.session === "browser-crawl-check"
                 ? { ownerTitle: "Site check" }
                 : {}),
-            onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
+            onCall: (request) =>
+              host(request, {
+                source: "external",
+                scope: chatId,
+                ...(options.browser ? { browser: options.browser } : {}),
+              }) ?? Promise.resolve({ error: "UNSUPPORTED" }),
             onProgress: () => undefined,
           },
         });

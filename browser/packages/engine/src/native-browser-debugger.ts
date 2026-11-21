@@ -559,19 +559,25 @@ async function land(
 const PRESS_SETTLE_TRIES = 8;
 const PRESS_SETTLE_MS = 120;
 
-// Compare with the page's own hit test rather than a CDP backend id: elementFromPoint crosses
-// shadow roots through composedPath, works inside a frame's own session, and ignores elements
-// with pointer-events:none (so Aeon's own cursor overlay can never be mistaken for a hit).
+// Compare with the page's own hit test rather than a CDP backend id: piercing open shadow roots
+// via shadowRoot.elementFromPoint works inside a frame's own session, crosses shadow boundaries,
+// and ignores pointer-events:none elements (so Aeon's cursor overlay is never mistaken for a hit).
 const PRESS_HIT_FUNCTION = `function (x, y) {
   var el = document.elementFromPoint(x, y);
+  while (el && el.shadowRoot && typeof el.shadowRoot.elementFromPoint === "function") {
+    var deeper = el.shadowRoot.elementFromPoint(x, y);
+    if (!deeper || deeper === el) break;
+    el = deeper;
+  }
   if (!el) return false;
-  var path = typeof el.composedPath === "function" ? el.composedPath() : [];
-  if (path.indexOf(this) >= 0) return true;
-  for (var n = el; n; n = n.parentElement || n.parentNode) if (n === this) return true;
+  var parentOf = function (node) {
+    return node.parentElement || node.parentNode || node.host || null;
+  };
+  for (var n = el; n; n = parentOf(n)) if (n === this) return true;
   // A transparent child over its ancestor: the ancestor is still the intended control.
   var r = this.getBoundingClientRect && this.getBoundingClientRect();
   if (r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-    for (var m = this; m; m = m.parentElement || m.parentNode) if (m === el) return true;
+    for (var m = this; m; m = parentOf(m)) if (m === el) return true;
   }
   return false;
 }`;

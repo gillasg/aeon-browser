@@ -22,8 +22,18 @@ export interface SeenStep {
   via?: "page" | "api" | "ability";
 }
 
+export interface SeenToolProof {
+  vault?: boolean;
+  repairedVersion?: number;
+  usedApi?: boolean;
+  compiled?: boolean;
+  usedAbility?: boolean;
+  site?: string;
+}
+
 export interface SeenEvent {
-  kind: "run-state" | "user" | "steps" | "error" | "tool" | "answer" | "code" | "watch";
+  kind:
+    "run-state" | "user" | "steps" | "error" | "tool" | "answer" | "model-turn" | "code" | "watch";
   state?: string;
   text?: string;
   toolCallId?: string;
@@ -33,6 +43,8 @@ export interface SeenEvent {
   steps?: SeenStep[];
   progress?: { done: number; total?: number };
   result?: string;
+  proof?: SeenToolProof;
+  site?: string;
 }
 
 /** One browser_code cell in a run, kept until the run settles. */
@@ -71,12 +83,22 @@ export interface LiveRun {
   readText: string[];
   /** The answer with no tool call, kept for that check. */
   answer?: string;
+  /** Assistant model turns observed during this run; 0 means strictly model-free. */
+  modelTurns: number;
   /** browser_code cells, for quietly learning a finished run as an ability. */
   cells: SeenCell[];
   /** create_routine calls with a no-model check, until they finish. */
   watchCalls?: string[];
   /** A watch with a no-model check was created this run. */
   deterministicWatch?: boolean;
+  /** The engine filled from the vault and the model never saw the value. */
+  vault?: boolean;
+  /** Drift repair bumped a saved ability to this version during the run. */
+  repairedVersion?: number;
+  /** A mapped site API or compiled ability answered during this run. */
+  usedApi?: boolean;
+  /** Site observed on proof-bearing tool calls (e.g. site_mapper, vault, create_routine). */
+  proofSite?: string;
 }
 
 export interface Absorb {
@@ -110,6 +132,7 @@ export function openRun(
     watcher: false,
     unsure: false,
     readText: [],
+    modelTurns: 0,
     cells: [],
   };
 }
@@ -125,11 +148,20 @@ function onRunEvent(run: LiveRun, event: SeenEvent): LiveRun {
   if (event.kind === "user") return onUser(run, event.text ?? "");
   if (event.kind === "steps") return onSteps(run, event);
   if (event.kind === "code") return onCode(run, event);
-  if (event.kind === "watch")
-    return { ...run, watchCalls: [...(run.watchCalls ?? []), event.toolCallId ?? ""] };
+  if (event.kind === "watch") return onWatch(run, event);
   if (event.kind === "tool" || event.kind === "error") return onToolEnd(run, event);
-  if (event.kind === "answer") return onAnswer(run, event.text ?? "");
+  if (event.kind === "model-turn") return { ...run, modelTurns: run.modelTurns + 1 };
+  if (event.kind === "answer")
+    return { ...onAnswer(run, event.text ?? ""), modelTurns: run.modelTurns + 1 };
   return run;
+}
+
+function onWatch(run: LiveRun, event: SeenEvent): LiveRun {
+  return {
+    ...run,
+    watchCalls: [...(run.watchCalls ?? []), event.toolCallId ?? ""],
+    ...(event.site && !run.proofSite ? { proofSite: event.site } : {}),
+  };
 }
 
 function onCode(run: LiveRun, event: SeenEvent): LiveRun {
@@ -154,10 +186,26 @@ function settleWatch(run: LiveRun, event: SeenEvent): LiveRun {
   return { ...run, watchCalls, ...(created ? { deterministicWatch: true } : {}) };
 }
 
+function mergeProof(run: LiveRun, proof: SeenToolProof | undefined): LiveRun {
+  if (!proof) return run;
+  const repairedVersion =
+    proof.repairedVersion !== undefined
+      ? Math.max(run.repairedVersion ?? 0, proof.repairedVersion)
+      : run.repairedVersion;
+  return {
+    ...run,
+    ...(proof.vault ? { vault: true } : {}),
+    ...(repairedVersion ? { repairedVersion } : {}),
+    ...(proof.usedApi || proof.compiled ? { usedApi: true } : {}),
+    ...(proof.usedAbility ? { usedAbility: true } : {}),
+    ...(proof.site && !run.proofSite ? { proofSite: proof.site } : {}),
+  };
+}
+
 function onToolEnd(run: LiveRun, event: SeenEvent): LiveRun {
   const settled = event.toolCallId ? run.cells.map((cell) => settleCell(cell, event)) : run.cells;
   const next = settleWatch({ ...run, cells: settled }, event);
-  if (event.kind === "tool") return onRead(next, event.result ?? "");
+  if (event.kind === "tool") return onRead(mergeProof(next, event.proof), event.result ?? "");
   if (OURS.test(event.result ?? "")) return { ...next, ours: true };
   return { ...next, stumbled: true };
 }
@@ -233,21 +281,32 @@ export function seenFrom(event: PiSessionEvent): SeenEvent | undefined {
     return { kind: "user", text: textOf(event.message.content) };
   if (event.kind === "message-end" && event.message.role === "assistant") {
     const called = event.message.content.some((block) => block.type === "tool-call");
-    return called ? undefined : { kind: "answer", text: textOf(event.message.content) };
+    return called
+      ? { kind: "model-turn" }
+      : { kind: "answer", text: textOf(event.message.content) };
   }
   if (event.kind === "tool-update") return stepsSeen(event.toolCallId, event.steps, event.progress);
   if (event.kind === "tool-start") return codeStart(event);
   if (event.kind === "tool-end")
     return event.isError
       ? { kind: "error", result: event.result, toolCallId: event.toolCallId, isError: true }
-      : { kind: "tool", result: event.result, toolCallId: event.toolCallId, isError: false };
+      : {
+          kind: "tool",
+          result: event.result,
+          toolCallId: event.toolCallId,
+          isError: false,
+          ...(event.proof ? { proof: event.proof } : {}),
+        };
   return undefined;
 }
 
 function codeStart(event: PiSessionEvent): SeenEvent | undefined {
   if (event.kind !== "tool-start") return undefined;
-  if (deterministicWatchCall(event.toolName, event.arguments))
-    return { kind: "watch", toolCallId: event.toolCallId };
+  if (deterministicWatchCall(event.toolName, event.arguments)) {
+    const sites = Array.isArray(event.arguments.sites) ? event.arguments.sites : [];
+    const site = typeof sites[0] === "string" && sites[0].trim() ? sites[0].trim() : undefined;
+    return { kind: "watch", toolCallId: event.toolCallId, ...(site ? { site } : {}) };
+  }
   if (event.toolName !== "browser_code") return undefined;
   if (typeof event.arguments.code !== "string") return undefined;
   return { kind: "code", code: event.arguments.code, toolCallId: event.toolCallId };

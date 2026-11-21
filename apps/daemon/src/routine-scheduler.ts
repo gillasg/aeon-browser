@@ -147,9 +147,8 @@ export class RoutineScheduler {
   }
 
   private async dispatchDueRuns(): Promise<void> {
-    for (const run of this.store.listDueRoutineRuns(MAX_RUNS_PER_TICK)) {
-      await this.dispatch(run);
-    }
+    const due = this.store.listDueRoutineRuns(MAX_RUNS_PER_TICK);
+    await Promise.allSettled(due.map((run) => this.dispatch(run)));
   }
 
   private async dispatch(run: RoutineRunRecord): Promise<void> {
@@ -228,7 +227,7 @@ export class RoutineScheduler {
     routine: RoutineRecord,
     run: RoutineRunRecord,
   ): Promise<string | undefined> {
-    if (!routine.check) return routine.instruction;
+    if (!routine.check && !routine.checkShell) return routine.instruction;
     const check = await this.watcherCheck(routine, run);
     this.onCheck?.(routine, check);
     if (!check.met) {

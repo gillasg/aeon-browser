@@ -47,6 +47,8 @@ async function postUntilDelivered(
   return { status: "failed", attempts: ATTEMPTS, error: lastError };
 }
 
+const WEBHOOK_TIMEOUT_MS = 15_000;
+
 async function postOnce(
   fetchImpl: typeof fetch,
   url: string,
@@ -54,7 +56,12 @@ async function postOnce(
   body: string,
 ): Promise<{ delivered: true } | { delivered: false; error: string }> {
   try {
-    const response = await fetchImpl(url, { method: "POST", headers, body });
+    const response = await fetchImpl(url, {
+      method: "POST",
+      headers,
+      body,
+      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+    });
     if (response.ok) return { delivered: true };
     return { delivered: false, error: `HTTP ${response.status}`.slice(0, 500) };
   } catch (error) {

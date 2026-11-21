@@ -184,6 +184,7 @@ async function runWithBrowserDebugger<T>(
     void chrome.action.setTitle({ tabId, title: engineConfig.controllingTitle(chatId) });
     return await action({ tabId });
   } catch (error) {
+    const code = error instanceof Error ? (error.message.split(":")[0]?.trim() ?? "") : "";
     if (
       attachments.get(tabId) !== entry ||
       !(error instanceof Error) ||
@@ -199,7 +200,7 @@ async function runWithBrowserDebugger<T>(
         "INPUT_FAILED",
         "INVALID_TARGET",
         "TIMEOUT",
-      ].includes(error.message)
+      ].includes(code)
     )
       await detach(tabId);
     throw error;

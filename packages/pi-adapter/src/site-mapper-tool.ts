@@ -39,6 +39,52 @@ function label(input: SiteMapperToolInput): string {
   return input.operation ? `${site}-${input.action}-${input.operation}` : `${site}-${input.action}`;
 }
 
+function repairedVersionOf(record: Record<string, unknown> | undefined): number | undefined {
+  const healed =
+    record?.healed && typeof record.healed === "object"
+      ? (record.healed as { toVersion?: unknown })
+      : undefined;
+  const version = healed?.toVersion ?? record?.toVersion;
+  return typeof version === "number" && Number.isInteger(version) && version > 0
+    ? version
+    : undefined;
+}
+
+function abilityProof(
+  action: "action" | "heal",
+  site: string | undefined,
+  result: unknown,
+): Record<string, unknown> | undefined {
+  const record =
+    result && typeof result === "object" ? (result as Record<string, unknown>) : undefined;
+  const repairedVersion = repairedVersionOf(record);
+  if (action === "heal") {
+    return repairedVersion ? { repairedVersion, ...(site ? { site } : {}) } : undefined;
+  }
+  const proof: Record<string, unknown> = { usedAbility: true };
+  if (record?.compiled === true) {
+    proof.usedApi = true;
+    proof.compiled = true;
+  }
+  if (repairedVersion) proof.repairedVersion = repairedVersion;
+  if (site) proof.site = site;
+  return proof;
+}
+
+function proofForAction(
+  input: SiteMapperToolInput,
+  result: unknown,
+): Record<string, unknown> | undefined {
+  const site = typeof input.site === "string" && input.site.trim() ? input.site.trim() : undefined;
+  if (input.action === "call" || input.action === "watch") {
+    return site ? { usedApi: true, site } : { usedApi: true };
+  }
+  if (input.action === "action" || input.action === "heal") {
+    return abilityProof(input.action, site, result);
+  }
+  return undefined;
+}
+
 async function runAction(
   input: SiteMapperToolInput,
   workspace: string | undefined,
@@ -59,7 +105,9 @@ async function runAction(
           },
     );
   }
-  return boundedResult(result, workspace, "site-mapper", label(input));
+  const output = await boundedResult(result, workspace, "site-mapper", label(input));
+  const proof = proofForAction(input, result);
+  return proof ? { ...output, details: { ...(output.details ?? {}), proof } } : output;
 }
 
 export function createSiteMapperTool(

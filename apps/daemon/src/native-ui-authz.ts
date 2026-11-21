@@ -34,11 +34,22 @@ function isCommandFor(request: UiRequest, operations: readonly string[]): boolea
   return request.kind === "command" && operations.includes(request.operation);
 }
 
+const CHAT_MANAGEMENT_ACTIONS = new Set([
+  "create_routine",
+  "pin_result",
+  "report_wrong",
+  "decline_offer",
+]);
+
 function authorizesChatScope(chatId: string, request: UiRequest): boolean {
   // These two are about the machine's models, not one Chat, so a Chat page may ask too.
   if (isCommandFor(request, ["chat.model-catalog", "chat.model-login"])) return true;
   const requestedChatId = requestedChatIdOf(request);
-  return requestedChatId === chatId && !isGlobalChatCommand(request);
+  if (requestedChatId !== chatId || isGlobalChatCommand(request)) return false;
+  if (request.kind === "command" && request.operation === "management.action") {
+    return CHAT_MANAGEMENT_ACTIONS.has(request.payload.action);
+  }
+  return true;
 }
 
 function requestedChatIdOf(request: UiRequest): string | undefined {
@@ -49,6 +60,9 @@ function requestedChatIdOf(request: UiRequest): string | undefined {
 function isGlobalChatCommand(request: UiRequest): boolean {
   return (
     request.kind === "command" &&
-    (request.operation === "chat.create" || request.operation === "chat.list")
+    (request.operation === "chat.create" ||
+      request.operation === "chat.list" ||
+      request.operation === "management.home" ||
+      request.operation === "management.get")
   );
 }

@@ -294,6 +294,11 @@ async function cellRunLog(
   return name;
 }
 
+function formatCellOutput(timeoutWarn: string | undefined, output: string | undefined): string {
+  if (!timeoutWarn) return output ?? "";
+  return output ? `${timeoutWarn}\n${output}` : timeoutWarn;
+}
+
 /** The tool result the model and the trace keep: steps, output, value and what was written. */
 async function browserCodeResult(options: {
   chatId: string;
@@ -307,14 +312,13 @@ async function browserCodeResult(options: {
   timeoutWarn?: string;
 }) {
   const { chatId, workspace, operationId, writes, files } = options;
-  let { steps } = options;
   const cell = JSON.parse(options.output) as CellOutput;
-  if (cell.steps) steps = [...cell.steps.map(compactStep), ...workspaceSteps(steps)];
+  const steps = cell.steps
+    ? [...cell.steps.map(compactStep), ...workspaceSteps(options.steps)]
+    : options.steps;
   const result = {
     value: cell.value,
-    output: options.timeoutWarn
-      ? `${options.timeoutWarn}${cell.output ? `\n${cell.output}` : ""}`
-      : (cell.output ?? ""),
+    output: formatCellOutput(options.timeoutWarn, cell.output),
   };
   await journalOutput(result, workspace, operationId);
   // The run log grows with every cell; this result names it for the model and the trace.
@@ -326,7 +330,7 @@ async function browserCodeResult(options: {
   // A cell that timed out returns no steps of its own: its last progress keeps the actions (and
   // the tabs it opened) in the trace.
   const actions = traceActions(cell.steps ?? (failed ? steps : []));
-  const details = resultDetails(actions, writes);
+  const details = resultDetails(actions, writes, cell.steps ?? []);
   const delivered = !failed && isDelivery(cell.value);
   return {
     content: await modelContent(body, options.startedAt),
@@ -394,16 +398,36 @@ function resultBody(options: {
   };
 }
 
+function buildCellProof(
+  writes: SiteWrites,
+  rawSteps: readonly Record<string, unknown>[],
+): Record<string, unknown> {
+  const vaultStep = rawSteps.find((step) => step.vault === true);
+  const vaultSite = typeof vaultStep?.site === "string" ? vaultStep.site : undefined;
+  const site = writes.site ?? vaultSite;
+  const proof: Record<string, unknown> = {};
+  if (vaultStep) proof.vault = true;
+  if (writes.repairedVersion) proof.repairedVersion = writes.repairedVersion;
+  if (writes.usedApi) proof.usedApi = true;
+  if (writes.compiled) proof.compiled = true;
+  if (writes.usedAbility) proof.usedAbility = true;
+  if (site) proof.site = site;
+  return proof;
+}
+
 /** What the trace keeps besides the text: the actions, the site API writes, the site that answered. */
 function resultDetails(
   actions: ReturnType<typeof traceActions>,
   writes: SiteWrites,
+  rawSteps: readonly Record<string, unknown>[],
 ): Record<string, unknown> {
   const written = writes.list();
+  const proof = buildCellProof(writes, rawSteps);
   return {
     ...(actions.length ? { actions } : {}),
     ...(written.length ? { writes: written } : {}),
     ...(writes.usedApi ? { siteMapper: true } : {}),
+    ...(Object.keys(proof).length ? { proof } : {}),
   };
 }
 

@@ -43,13 +43,21 @@ export function cutAtBoundary(text: string, limit: number): string {
 
 export interface ToolText {
   content: { type: "text"; text: string }[];
-  details: undefined;
+  details: Record<string, unknown> | undefined;
   isError?: boolean;
 }
 
-export function textResult(value: unknown, isError = false): ToolText {
+export function textResult(
+  value: unknown,
+  isError = false,
+  details?: Record<string, unknown>,
+): ToolText {
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 1);
-  return { content: [{ type: "text", text }], details: undefined, ...(isError ? { isError } : {}) };
+  return {
+    content: [{ type: "text", text }],
+    details,
+    ...(isError ? { isError } : {}),
+  };
 }
 
 /** Every failure is led by its shared code and recovery hint, as browserkit's tools name it. */

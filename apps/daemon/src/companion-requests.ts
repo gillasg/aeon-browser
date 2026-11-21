@@ -19,7 +19,6 @@ interface Deps {
 }
 
 const MAX_FIELD = 2000;
-const COMPANION_MODEL = "opencode-go/deepseek-v4.1-flash";
 const quote = (value: unknown): string =>
   JSON.stringify(typeof value === "string" ? value.slice(0, MAX_FIELD) : (value ?? null));
 
@@ -58,11 +57,13 @@ async function complete(data: Record<string, unknown>, deps: Deps): Promise<{ te
       )
     : [];
   if (!messages.length) throw new Error("No messages to complete");
-  // The user's choice for companion work: GPT-6 Luna at high thinking, unless the request names one.
-  const choice = {
-    model: typeof data.model === "string" && data.model ? data.model : COMPANION_MODEL,
-    thinking: typeof data.thinking === "string" ? data.thinking : "high",
-  };
+  const model = typeof data.model === "string" && data.model.trim() ? data.model.trim() : undefined;
+  const thinking =
+    typeof data.thinking === "string" && data.thinking.trim() ? data.thinking.trim() : undefined;
+  const choice =
+    model || thinking
+      ? { ...(model ? { model } : {}), ...(thinking ? { thinking } : {}) }
+      : undefined;
   const system = String(data.system ?? "");
   const text = await deps.service.modelComplete(system, messages, choice);
   return { text };

@@ -64,24 +64,43 @@ function secretEffects(host: EffectHost): Effect<Cell>[] {
       name: "secret.signIn",
       match: has("signIn"),
       tab: inner("signIn"),
-      run: (cell, value, tabId = 0) => {
+      run: async (cell, value, tabId = 0) => {
         void notePreviewActivity(cell.run.chatId, tabId);
         const account = (value.signIn as { account?: unknown }).account;
-        return signInToPage(tabId, { account }, (ask) => host.callCore(cell, ask));
+        const result = await signInToPage(tabId, { account }, (ask) => host.callCore(cell, ask));
+        if (result.signedIn === true) {
+          cell.steps.push({
+            internal: true,
+            vault: true,
+            ...(result.site ? { site: result.site } : {}),
+          });
+        }
+        return result;
       },
     },
     {
       name: "secret.fill",
       match: (value) => isObject(value.fillCode) || isObject(value.fillProfile),
       tab: (value) => ((value.fillCode ?? value.fillProfile) as { target?: unknown }).target,
-      run: (cell, value, tabId = 0): Promise<unknown> => {
+      run: async (cell, value, tabId = 0): Promise<unknown> => {
         const request = (value.fillCode ?? value.fillProfile) as {
           waitMs?: unknown;
           fields?: unknown;
         };
-        return value.fillCode
-          ? fillCodeOnPage(tabId, request)
-          : fillProfileOnPage(tabId, request, (ask) => host.callCore(cell, ask));
+        const result = value.fillCode
+          ? await fillCodeOnPage(tabId, request)
+          : await fillProfileOnPage(tabId, request, (ask) => host.callCore(cell, ask));
+        const filled = isObject(result)
+          ? result.filled === true || (Array.isArray(result.filled) && result.filled.length > 0)
+          : false;
+        if (filled) {
+          const site =
+            isObject(result) && "site" in result && typeof result.site === "string"
+              ? result.site
+              : undefined;
+          cell.steps.push({ internal: true, vault: true, ...(site ? { site } : {}) });
+        }
+        return result;
       },
     },
   ];

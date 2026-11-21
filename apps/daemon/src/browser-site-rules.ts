@@ -89,6 +89,8 @@ export function namedHosts(text: string): string[] {
   for (const match of text.matchAll(
     /(?:https?:\/\/)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/[^\s"'<>()]*)?/gi,
   )) {
+    const start = match.index ?? 0;
+    if (start > 0 && text[start - 1] === "@") continue;
     const site = hostOf(match[0]);
     if (site && !site.endsWith(".local")) hosts.add(site);
     if (hosts.size >= MAX_ALLOW) break;

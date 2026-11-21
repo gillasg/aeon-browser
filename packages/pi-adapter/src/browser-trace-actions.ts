@@ -94,6 +94,17 @@ function geometry(step: Record<string, unknown>): Partial<BrowserTraceAction> {
   return { ...(box ? { box } : {}), ...(point ? { point } : {}), ...(scroll ? { scroll } : {}) };
 }
 
+function visibleText(
+  step: Record<string, unknown>,
+  action: Record<string, unknown> | undefined,
+  stored: boolean,
+): string | undefined {
+  const event = isRecord(step.event) ? step.event : undefined;
+  if (step.sensitive === true || event?.sensitive === true) return undefined;
+  const raw = stringOf(stored ? step.text : action?.value);
+  return raw === "[hidden password]" ? undefined : raw;
+}
+
 function texts(
   step: Record<string, unknown>,
   action: Record<string, unknown> | undefined,
@@ -101,7 +112,7 @@ function texts(
 ): Partial<BrowserTraceAction> {
   const result = isRecord(step.result) ? step.result : undefined;
   const url = stringOf(action?.url) ?? stringOf(result?.url);
-  const text = stringOf(stored ? step.text : action?.value);
+  const text = visibleText(step, action, stored);
   return {
     ...(url ? { url: url.slice(0, 2000) } : {}),
     ...(text ? { text: text.slice(0, 200) } : {}),

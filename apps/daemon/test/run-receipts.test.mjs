@@ -145,3 +145,183 @@ test("site counts key loopback by port and leave other ports out", () => {
     { site: "127.0.0.1:3000", apis: 2, watches: 1 },
   ]);
 });
+
+import { RouteRecorder } from "../dist/route-recorder.js";
+import { parseWebhook } from "../dist/routine-fields.js";
+import { authorizeNativeUiScope } from "../dist/native-ui-authz.js";
+import { namedHosts } from "../dist/browser-site-rules.js";
+
+async function runToolReceiptCase(recorder, chatId, prompt, toolEvent, assistantText) {
+  await recorder.prepare(chatId, prompt);
+  await recorder.observe(chatId, { kind: "run-state", state: "running-unconfirmed" });
+  await recorder.observe(chatId, toolEvent);
+  if (assistantText) {
+    await recorder.observe(chatId, {
+      kind: "message-end",
+      message: {
+        id: `m-${chatId}`,
+        role: "assistant",
+        timestamp: Date.now(),
+        content: [{ type: "text", text: assistantText }],
+      },
+    });
+  }
+  await recorder.observe(chatId, { kind: "run-state", state: "idle" });
+}
+
+test("RouteRecorder emits vault, repaired, and zero-step watch receipts honestly", async () => {
+  const cards = [];
+  const recorder = new RouteRecorder({
+    publish: (_chatId, event) => {
+      if (event.kind === "run-card") cards.push(event.card);
+    },
+  });
+  try {
+    await runToolReceiptCase(
+      recorder,
+      "c1",
+      "sign in to shop.test",
+      {
+        kind: "tool-end",
+        toolCallId: "t1",
+        toolName: "browser_code",
+        result: "signed in",
+        isError: false,
+        proof: { vault: true, site: "shop.test" },
+      },
+      "Signed in.",
+    );
+    assert.deepEqual(
+      cards[0].items.find((i) => i.kind === "receipt"),
+      { kind: "receipt", receipt: "vault" },
+    );
+
+    await runToolReceiptCase(
+      recorder,
+      "c2",
+      "check orders on shop.test",
+      {
+        kind: "tool-end",
+        toolCallId: "t2",
+        toolName: "site_mapper",
+        result: "orders",
+        isError: false,
+        proof: {
+          usedAbility: true,
+          usedApi: true,
+          compiled: true,
+          repairedVersion: 3,
+          site: "shop.test",
+        },
+      },
+      "Here are your orders.",
+    );
+    assert.deepEqual(
+      cards[1].items.find((i) => i.kind === "receipt"),
+      { kind: "receipt", receipt: "repaired", version: 3 },
+    );
+    assert.ok(cards[1].items.some((i) => i.kind === "offer" && i.action === "copy-mcp"));
+
+    await recorder.prepare("c3", "watch price on shop.test");
+    await recorder.observe("c3", { kind: "run-state", state: "running-unconfirmed" });
+    await recorder.observe("c3", {
+      kind: "tool-start",
+      toolCallId: "t3",
+      toolName: "create_routine",
+      arguments: { check: "price < 50", sites: ["shop.test"] },
+    });
+    await recorder.observe("c3", {
+      kind: "tool-end",
+      toolCallId: "t3",
+      toolName: "create_routine",
+      result: "created",
+      isError: false,
+    });
+    await recorder.observe("c3", { kind: "run-state", state: "idle" });
+    assert.deepEqual(
+      cards[2].items.find((i) => i.kind === "receipt"),
+      { kind: "receipt", receipt: "watch" },
+    );
+  } finally {
+    recorder.close();
+  }
+});
+
+test("RouteRecorder gates speed receipt on zero model turns while keeping Copy MCP", async () => {
+  const cards = [];
+  const recorder = new RouteRecorder({
+    publish: (_chatId, event) => {
+      if (event.kind === "run-card") cards.push(event.card);
+    },
+  });
+  try {
+    await runToolReceiptCase(recorder, "c4", "orders on shop.test", {
+      kind: "tool-end",
+      toolCallId: "t4",
+      toolName: "site_mapper",
+      result: "ok",
+      isError: false,
+      proof: { usedApi: true, site: "shop.test" },
+    });
+    assert.equal(cards[0].items.find((i) => i.kind === "receipt")?.receipt, "speed");
+
+    await runToolReceiptCase(
+      recorder,
+      "c5",
+      "orders on shop.test",
+      {
+        kind: "tool-end",
+        toolCallId: "t5",
+        toolName: "site_mapper",
+        result: "ok",
+        isError: false,
+        proof: { usedApi: true, site: "shop.test" },
+      },
+      "Done.",
+    );
+    assert.equal(
+      cards[1].items.find((i) => i.kind === "receipt"),
+      undefined,
+    );
+    assert.ok(cards[1].items.some((i) => i.kind === "offer" && i.action === "copy-mcp"));
+  } finally {
+    recorder.close();
+  }
+});
+
+test("security guards block SSRF webhooks, overbroad chat management actions, and email hosts", () => {
+  assert.throws(() => parseWebhook("http://127.0.0.1:8080/hook", undefined, null), /public host/i);
+  assert.throws(
+    () => parseWebhook("http://169.254.169.254/latest/meta-data", undefined, null),
+    /public host/i,
+  );
+  assert.throws(() => parseWebhook("http://localhost:3000/hook", undefined, null), /public host/i);
+  assert.throws(() => parseWebhook("http://192.168.1.10/hook", undefined, null), /public host/i);
+  assert.throws(() => parseWebhook("http://[::1]/hook", undefined, null), /public host/i);
+  assert.equal(
+    parseWebhook("https://hooks.example.com/aeon", undefined, null)?.url,
+    "https://hooks.example.com/aeon",
+  );
+
+  const chatGrant = { role: "ui", scope: { kind: "chat", chatId: "chat-1" } };
+  assert.equal(
+    authorizeNativeUiScope(chatGrant, {
+      kind: "command",
+      requestId: "r1",
+      operation: "management.action",
+      payload: { chatId: "chat-1", action: "export_site", input: { site: "x.com" } },
+    }),
+    false,
+  );
+  assert.equal(
+    authorizeNativeUiScope(chatGrant, {
+      kind: "command",
+      requestId: "r2",
+      operation: "management.action",
+      payload: { chatId: "chat-1", action: "create_routine", input: {} },
+    }),
+    true,
+  );
+
+  assert.deepEqual(namedHosts("Email me at alice@chase.com about example.com"), ["example.com"]);
+});

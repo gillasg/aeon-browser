@@ -41,6 +41,12 @@ export class RoutineManagementTools {
       case "list_routines":
         return this.store.listRoutines(chatId).map((routine) => ({
           ...routine,
+          webhook: routine.webhook
+            ? {
+                url: routine.webhook.url,
+                ...(routine.webhook.secret ? { hasSecret: true } : {}),
+              }
+            : null,
           recentRuns: this.store.listRoutineRuns(routine.routineId, 10),
         }));
       case "run_routine":

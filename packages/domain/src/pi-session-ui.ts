@@ -110,6 +110,15 @@ export type PiSessionEvent =
       writes?: { site: string; operation: string; done: number; failed: number; items: string[] }[];
       /** Which fast path the tool used, for the speed chip and the orb. */
       path?: "recipe" | "site-mapper" | "data" | "url" | "read" | "ui";
+      /** Observed proof facts from the tool execution, for honest run receipts. */
+      proof?: {
+        vault?: boolean;
+        repairedVersion?: number;
+        usedApi?: boolean;
+        compiled?: boolean;
+        usedAbility?: boolean;
+        site?: string;
+      };
       durationMs?: number;
       parentToolCallId?: string;
     }
