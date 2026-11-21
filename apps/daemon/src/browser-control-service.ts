@@ -7,6 +7,7 @@ import {
   NativeChatTypedSchema,
   BrowserPopupSchema,
   BrowserOperationResultSchema,
+  readableSchemaError,
   type BrowserExecutorResult,
   type BrowserStep,
   type BrowserTargetKey,
@@ -271,7 +272,8 @@ export class BrowserControlService {
         ),
       );
     } catch (error) {
-      return JSON.stringify({ error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      return JSON.stringify({ error: readableSchemaError(message) ?? message });
     }
   }
   private pickCodeClient(chatId: string): { clientInstanceId?: string; available: string[] } {

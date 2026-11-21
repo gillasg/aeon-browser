@@ -14,15 +14,8 @@ import { BrowserNotConnected, type Bridge } from "./bridge.js";
 import { finishRead, WriteThroughApi } from "./errors.js";
 import { isRateLimited, RateLimiter, retryDelay, shouldRetryRead, sleep } from "./limits.js";
 import { isDnsFailure, isFetchFailure, isNetworkRefusal, isOk } from "./outcome.js";
-import {
-  buildRequest,
-  dependencyFor,
-  MissingParams,
-  SET,
-  type Params,
-  type RuntimeRequest,
-  type RuntimeResponse,
-} from "./request.js";
+import { buildRequest, type Params, type RuntimeRequest, type RuntimeResponse } from "./request.js";
+import { fillMissingInputs } from "./resolve-missing.js";
 import type { SessionFile } from "./session.js";
 import { stopsRetry } from "./net-guard.js";
 import { DirectTransport, PageTransport, type CallContext, type Transport } from "./transports.js";
@@ -134,9 +127,7 @@ export class SiteClient {
     if (mode === "page") return this.page;
     if (mode === "direct") return this.direct;
     if (await this.needsBrowser(operation)) return this.page;
-    // The transport that answered last time starts the next call. A site that rotated its
-    // headers or changed its answer shape tends to keep answering the page; a public call that
-    // has only ever worked directly keeps its fast path.
+    // The transport that answered last time starts the next call.
     return (await this.preferredTransport(operation.id)) === "page" ? this.page : this.direct;
   }
 
@@ -249,33 +240,6 @@ export class SiteClient {
     return value;
   }
 
-  /** Fills required inputs nobody passed from the operations that produce them. */
-  private async resolveMissing(
-    operation: Operation,
-    params: Params,
-    missing: string[],
-    depth: number,
-  ): Promise<Params> {
-    if (depth > 3) throw new MissingParams(operation, missing);
-    const sets: Params = { ...((params[SET] as Params | undefined) ?? {}) };
-    const unresolved: string[] = [];
-    for (const target of missing) {
-      const dep = dependencyFor(operation, target);
-      if (!dep) {
-        unresolved.push(target);
-        continue;
-      }
-      const source = this.operation(dep.source.operationId);
-      if (source.role !== "read") throw new WriteThroughApi(source.id);
-      const response = await this.request(dep.source.operationId, params, depth + 1);
-      const value = getPointer(response.json, dep.source.pointer.replace(/\*/g, "0"));
-      if (value === undefined) unresolved.push(target);
-      else sets[target] = value;
-    }
-    if (unresolved.length) throw new MissingParams(operation, unresolved);
-    return { ...params, [SET]: sets };
-  }
-
   private context(operation: Operation): CallContext {
     const context: CallContext = { auth: this.schemes(operation), home: this.home(operation) };
     if (operation.signing) context.via = operation.signing.via;
@@ -313,7 +277,7 @@ export class SiteClient {
     if (built.missing.length)
       built = buildRequest(
         operation,
-        await this.resolveMissing(operation, params, built.missing, depth),
+        await fillMissingInputs(operation, params, built.missing, depth, this),
       );
     return built.request;
   }
@@ -773,7 +737,6 @@ export async function siteMapper(
 
 /** Operations, page endpoints and actions as methods: api.searchProducts({ q }). */
 function callable(client: SiteClient): SiteMapper {
-  // api.paginate("listItems", params) and api.paginate.listItems(params) both work.
   const pagers = new Proxy(
     (id: string, params?: Params, opts?: PaginateOptions) => client.paginate(id, params, opts),
     {

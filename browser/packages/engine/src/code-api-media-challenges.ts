@@ -82,7 +82,9 @@ function __pageChallenge() {
   if (location.pathname.startsWith('/sorry/') || /unusual traffic from your computer/i.test(body)) add('bot-check', 'Google', 'unusual traffic page');
   if (/access denied/i.test(title) && /reference ?#|edgesuite/i.test(body)) add('blocked', 'Akamai', 'Access Denied with a reference number');
   else if (short && /you have been blocked|request (was )?blocked|access (to this page )?(has been )?denied|403 forbidden/i.test(head)) add('blocked', location.hostname, title || body.slice(0, 80));
-  if (short && /too many requests|rate limit(ed)?|error 429/i.test(head)) add('rate-limit', location.hostname, title || body.slice(0, 80));
+  if (short && /it'?s rush hour/i.test(body) && (/traffic is piling up/i.test(body) || /503|service unavailable/i.test(title))) add('rate-limit', location.hostname, 'rush hour');
+  else if (short && /we(?:'re| are) (?:experiencing|facing|seeing) (?:heavy|high|a lot of) traffic/i.test(body)) add('rate-limit', location.hostname, 'heavy traffic');
+  else if (short && /too many requests|rate limit(ed)?|error 429/i.test(head)) add('rate-limit', location.hostname, title || body.slice(0, 80));
   var password = [...document.querySelectorAll('input[type=password]')].some(shown);
   if (password && (/(log|sign)[-_]?in|auth|session/i.test(location.pathname + location.search) || /sign in|log in|login/i.test(title))) add('login', location.hostname, 'sign-in form');
   return found;

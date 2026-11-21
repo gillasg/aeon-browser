@@ -184,6 +184,7 @@ function __spec(element) {
 // Runs a read on the matched elements in the page: op receives (elements, arg). The expression is
 // assembled as source, not eval'd in the page, so strict Content-Security-Policy pages allow it.
 function __locatorRead(target, element, index, op, arg) {
+  if (op && typeof op === 'object') throw Error('INVALID_INPUT: this read takes a function. An object is not page code.');
   var expression = '(() => { var found = (' + __resolveInPage.toString() + ')(' + JSON.stringify(__spec(element)) + ');' +
     (index === undefined ? '' : ' var index = ' + Number(index) + '; found = index < 0 ? found.slice(index).slice(0, 1) : found.slice(index, index + 1);') +
     ' return (' + op.toString() + ')(found, ' + (arg === undefined ? 'undefined' : JSON.stringify(arg)) + '); })()';

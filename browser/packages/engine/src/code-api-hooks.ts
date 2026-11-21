@@ -36,7 +36,7 @@ function __framePage(target, info) {
     waitForEvent:(event,options={})=>__event(target,event,{...options,...scoped}),
   });
 }
-function __expression(fn,arg) {return typeof fn==='function' ? '('+fn.toString()+')('+(JSON.stringify(arg) ?? '')+')' : fn;}
+function __expression(fn,arg) { if (fn && typeof fn==='object') throw Error('INVALID_INPUT: pass a function or a condition string. An object is not page code.'); return typeof fn==='function' ? '('+fn.toString()+')('+(JSON.stringify(arg) ?? '')+')' : fn; }
 // Written in 1M-character pieces (whole base64 quads, whole surrogate pairs), so a large file
 // never becomes one oversized message.
 async function artifact(name,data) {

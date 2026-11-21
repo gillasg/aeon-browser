@@ -1,5 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { PiRunBudget } from "@aeon/domain";
+import { markRunAborted, streamRetrySlot } from "./stream-retry.js";
 
 // A run's limits (steps, minutes, cost). A minute budget keeps the smaller of 10% and 30s for a
 // delivery-only turn: tools are cleared and cells stop before that window, with no injected user
@@ -111,8 +112,12 @@ function settleDeadline(
 
 function capModelStream(session: AgentSession, chatId: string): void {
   const agent = session.agent;
-  const inner = agent?.streamFunction;
-  if (!agent || !inner || cappedStreams.has(inner)) return;
+  if (!agent?.streamFunction) return;
+  // Stream retry stays outside this deadline so it still sees the loop signal. A minute
+  // budget aborts only the provider call; that is not a dropped stream to retry.
+  const slot = streamRetrySlot(agent.streamFunction);
+  const inner = slot?.fn ?? agent.streamFunction;
+  if (!inner || cappedStreams.has(inner)) return;
   const wrapped: ModelStream = (model, context, options) => {
     const timeout = modelRequestTimeoutMs(chatId);
     if (timeout === undefined) return inner(model, context, options);
@@ -121,7 +126,8 @@ function capModelStream(session: AgentSession, chatId: string): void {
     return settleDeadline(stream, timed.cancel);
   };
   cappedStreams.add(wrapped);
-  agent.streamFunction = wrapped;
+  if (slot) slot.fn = wrapped;
+  else agent.streamFunction = wrapped;
 }
 
 function openDelivery(session: AgentSession, chatId: string | undefined): void {
@@ -150,7 +156,10 @@ export function watchBudget(
   }
   const check = () => {
     if (warnedAt !== undefined) {
-      if (state.steps > warnedAt + GRACE_STEPS) void session.abort();
+      if (state.steps > warnedAt + GRACE_STEPS) {
+        markRunAborted(session);
+        void session.abort();
+      }
       return;
     }
     if (!delivering && reserveOpen(budget, state.started, now())) {

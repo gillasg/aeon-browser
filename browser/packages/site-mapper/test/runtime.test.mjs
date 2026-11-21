@@ -364,3 +364,100 @@ test("a page fetch blocked by an extension retries directly and says so", async 
   assert.equal(value.items[0].id, 1);
   assert.match(value.notes[0], /retried directly/);
 });
+
+test("a search read does not fire a write just to fill a traced input", async () => {
+  const seen = [];
+  const param = (name, place, extra) => ({
+    name,
+    in: place,
+    required: false,
+    schema: { type: "string" },
+    ...extra,
+  });
+  const model = {
+    site: "amazon.in",
+    pages: [],
+    security: [],
+    origins: ["https://www.amazon.in"],
+    operations: [
+      {
+        id: "createMpVerify",
+        method: "POST",
+        origin: "https://www.amazon.in",
+        path: "/mp_verify",
+        kind: "rest",
+        params: [],
+        responses: {},
+        role: "action",
+        security: [],
+        dependencies: [],
+        confidence: 1,
+        bucket: "high",
+        flags: [],
+        sampleCount: 1,
+        sources: [],
+        pageUrls: [],
+        samples: [],
+      },
+      {
+        id: "sQuery",
+        method: "GET",
+        origin: "https://www.amazon.in",
+        path: "/s/query",
+        kind: "rest",
+        params: [
+          param("k", "query", { required: true }),
+          param("qid", "query"),
+          param("x-amzn-flow-closure-id", "header", { required: true, constant: "flow-1" }),
+        ],
+        responses: { 200: { mime: "application/json", schema: { type: "object" } } },
+        role: "read",
+        security: [],
+        dependencies: [
+          {
+            target: "query:qid",
+            source: { kind: "response", operationId: "createMpVerify", pointer: "/token" },
+            confidence: 1,
+          },
+          {
+            target: "header:x-amzn-flow-closure-id",
+            source: { kind: "response", operationId: "createMpVerify", pointer: "/token" },
+            confidence: 1,
+          },
+        ],
+        confidence: 1,
+        bucket: "high",
+        flags: [],
+        sampleCount: 1,
+        sources: [],
+        pageUrls: [],
+        samples: [],
+      },
+    ],
+  };
+  const api = await siteMapper("amazon.in", {
+    model,
+    transport: "direct",
+    session: false,
+    transports: {
+      direct: {
+        name: "direct",
+        async send(request) {
+          seen.push(request);
+          return {
+            status: 200,
+            headers: { "content-type": "application/json" },
+            json: { products: [{ title: "PS5", price: 44990, url: "/dp/B0XXX" }] },
+          };
+        },
+      },
+    },
+  });
+  const value = await api.call("sQuery", { k: "PlayStation 5" });
+  assert.equal(value.products[0].price, 44990);
+  assert.equal(seen.length, 1);
+  assert.match(seen[0].url, /[?&]k=PlayStation\+5|[?&]k=PlayStation%205/);
+  assert.doesNotMatch(seen[0].url, /qid=/);
+  assert.equal(seen[0].headers["x-amzn-flow-closure-id"], "flow-1");
+  assert.doesNotMatch(seen[0].url, /mp_verify/);
+});

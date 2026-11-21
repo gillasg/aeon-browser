@@ -555,7 +555,7 @@ async function describeOperations(site: string): Promise<unknown> {
   const model = await loadModel(site);
   if (!model)
     throw new Error(
-      `${site} has no API yet. Use the site in browser_code: its requests are learned as you go.`,
+      `${site} has no API yet. Fastest learn: site_mapper({action:"explore", sites:[${JSON.stringify(site)}]}) records search, product, price and link. Until then, use the page.`,
     );
   return { site, howToCall: HOW_TO_CALL, operations: model.operations.map(describeOperation) };
 }
