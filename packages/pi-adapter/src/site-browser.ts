@@ -8,6 +8,7 @@ import {
   type Bridge,
 } from "@browserkit/tools/site-to-api";
 import type { BrowserToolRunner } from "./browser-tool.js";
+import { clampTimeoutMs } from "@aeon/protocol";
 import { cellTimeoutMs } from "./run-budget.js";
 
 // site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they
@@ -24,7 +25,7 @@ const MAX_TIMEOUT_MS = 600_000;
 
 function boundedCellTimeout(chatId: string, requested: number | undefined): number {
   const wanted = Math.min(Math.max(requested ?? 60_000, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS);
-  const timeoutMs = cellTimeoutMs(chatId, wanted);
+  const timeoutMs = clampTimeoutMs(cellTimeoutMs(chatId, wanted)).timeoutMs;
   if (timeoutMs <= 0)
     throw new Error("Not run: the time budget is spent. Answer with what you have.");
   return timeoutMs;

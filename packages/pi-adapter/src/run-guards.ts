@@ -1,5 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { freshLoop, noteLoop, type LoopState } from "./loop-detector.js";
+import { markRunAborted } from "./stream-retry.js";
 
 const watched = new WeakSet<object>();
 
@@ -18,6 +19,7 @@ export async function deliverStop(
   session: { steer: (text: string) => Promise<unknown> | unknown; abort: () => void },
   reason: string,
 ): Promise<void> {
+  markRunAborted(session);
   await session.steer(reason);
   session.abort();
 }

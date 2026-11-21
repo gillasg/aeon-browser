@@ -44,6 +44,12 @@ test("a next call is a read, a reload, a wait or ask_user, never an action that 
     assert.equal(isReadNext(call), true, `${code}: ${call}`);
     assert.equal(/click|fill|type|press/.test(call), false, code);
   }
+  assert.equal(errorNextCall("NOT_MAPPED"), "await page.read()");
+  assert.match(errorHint("NOT_MAPPED"), /site_mapper\(\{action:"explore"/);
+  const learned = describeError("NOT_MAPPED", "amazon.in has no API yet");
+  assert.match(learned, /site_mapper\(\{action:"explore", sites:\["amazon\.in"\]\}\)/);
+  assert.match(learned, /Next: site_mapper\(\{action:"explore", sites:\["amazon\.in"\]\}\)/);
+  assert.match(describeError("NOT_MAPPED", "no learned API yet"), /Next: await page\.read\(\)/);
   assert.equal(errorNextCall("INTERNAL"), "", "an unexpected failure names no call");
   assert.equal(isReadNext("await page.click(412)"), false);
   assert.equal(isReadNext("await page.clickAt(1, 2)"), false);

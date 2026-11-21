@@ -1,6 +1,7 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { BrowserToolRunner } from "./browser-tool.js";
 import { finishRunLog, sealRunLog, settleRunLogs, startRunLog, unsealRunLog } from "./run-log.js";
+import { installStreamRetry } from "./stream-retry.js";
 
 // A follow-up often arrives seconds after the previous answer. Keep the tabs and their variables
 // alive through a short gap: release the run now, but tidy only after this delay, and cancel the
@@ -30,6 +31,7 @@ export function installBrowserSessionLifecycle(
   run?: BrowserToolRunner,
   options: BrowserSessionLifecycleOptions = {},
 ): void {
+  installStreamRetry(session);
   const delay = options.tidyDelayMs ?? DEFAULT_TIDY_DELAY_MS;
   let closed = false;
   let closing: Promise<void> | undefined;

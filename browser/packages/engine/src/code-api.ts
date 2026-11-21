@@ -746,7 +746,7 @@ var browser = Object.freeze({
     // Hands this tab to the user: it stays open after the run instead of being tidied away.
     keep: () => { __keptTabs.add(target.tabId); return __call({tabs:'keep', tabIds:[target.tabId]}); },
     close: () => browser.closeTab(target),
-    waitFor: (fn, options = {}) => __waitCondition(target, typeof fn === 'function' ? '('+fn.toString()+')()' : String(fn), typeof options === 'number' ? options : (options.timeoutMs ?? options.timeout ?? 5000)),
+    waitFor: (fn, options = {}) => { var w = __waitInput(fn, options); return w.sleep != null ? sleep(w.sleep) : __waitCondition(target, w.expression, w.timeoutMs); },
     // Also takes {direction, amount} or a wheel-style {deltaY}.
     scroll: async (direction = 'down', amount = 1200, element) => {
       if (direction && typeof direction === 'object') {

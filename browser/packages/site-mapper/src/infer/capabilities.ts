@@ -7,7 +7,10 @@ import type { Capability, JsonSchema, Operation } from "../types.js";
 const SEARCH_PATH = /(^|\/)(search|autocomplete|suggest|query|find|lookup)(\/|$)/i;
 const SEARCH_ID = /(search|autocomplete|suggest|find|lookup)/i;
 const SEARCH_PARAM = /^(q|query|term|search|searchterm|keyword|keywords|text|phrase)$/i;
+const SEARCH_REQUEST = /"pageUri"\s*:\s*"[^"]*\/search[?"']|"((q|query|keyword|searchTerm))"\s*:/i;
 const PRICE_FIELD = /^(price|prices|amount|cost|fare|total|rate|msrp|lowestprice|saleprice)$/i;
+const PRICE_RESPONSE =
+  /"(price|prices|finalPrice|sellingPrice|priceToPay|displayPrice|salePrice|lowestPrice)"\s*:/i;
 const AVAILABILITY_FIELD =
   /^(available|availability|instock|in_stock|stock|stockstatus|showtimes|sessions|seats|isavailable|slot|slots)$/i;
 
@@ -30,6 +33,17 @@ function responseFields(operation: Operation, depth = 3): string[] {
   };
   walk(schema, 0);
   return [...names];
+}
+
+function sampleText(operation: Operation, key: "requestBody" | "responseBody"): string {
+  let text = "";
+  for (const sample of operation.samples) {
+    const chunk = sample[key];
+    if (!chunk) continue;
+    text += `\n${chunk.slice(0, 100_000)}`;
+    if (text.length > 200_000) break;
+  }
+  return text;
 }
 
 function respondsJson(operation: Operation): boolean {
@@ -58,10 +72,13 @@ const VERBS: Partial<Record<Capability, (operation: Operation) => boolean>> = {
   search: (operation) =>
     SEARCH_PATH.test(operation.path) ||
     SEARCH_ID.test(operation.id) ||
-    operation.params.some((param) => param.in !== "path" && SEARCH_PARAM.test(param.name)),
+    operation.params.some((param) => param.in !== "path" && SEARCH_PARAM.test(param.name)) ||
+    SEARCH_REQUEST.test(sampleText(operation, "requestBody")),
   list: isList,
   detail: isDetail,
-  price: (operation) => responseFields(operation).some((name) => PRICE_FIELD.test(name)),
+  price: (operation) =>
+    responseFields(operation).some((name) => PRICE_FIELD.test(name)) ||
+    PRICE_RESPONSE.test(sampleText(operation, "responseBody")),
   availability: (operation) =>
     responseFields(operation).some((name) => AVAILABILITY_FIELD.test(name)),
 };
