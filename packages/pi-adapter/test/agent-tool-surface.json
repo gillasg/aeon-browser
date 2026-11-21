@@ -111,6 +111,11 @@
           "maxLength": 60,
           "description": "For check: what those paths should answer (json, html, m3u8, xml, text or a content type); the body's real shape is checked."
         },
+        "browser": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Chrome profile name (aeon browsers) to render pages in."
+        },
         "readiness": {
           "type": "boolean",
           "description": "For check: open each site and report typed readiness (ready, empty, loading, login, challenge, not-found, error) with evidence."
