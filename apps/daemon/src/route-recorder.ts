@@ -34,6 +34,7 @@ import {
 import { join } from "node:path";
 import { missingAnswerFiles } from "./missing-answer-files.js";
 import { buildRunCard, type RunFacts } from "./run-card.js";
+import { boostEffect } from "./run-effects.js";
 import { unreadQuotes } from "./unread-quotes.js";
 
 export interface RunCardHub {
@@ -367,7 +368,25 @@ async function factsFor(
     ...(fingerprint ? { routeId: fingerprint } : {}),
     declined: await declinesFor(site),
     ...(run.ours ? { ours: true } : {}),
+    ...proofOf(run, unmapped),
   };
+}
+
+/** Receipt facts this recorder can see in the tool calls. Vault, repair and model-free runs are
+ * not visible here, so they stay unset rather than guessed. */
+function proofOf(run: LiveRun, unmapped: boolean): Pick<RunFacts, "proof"> {
+  const steps = flatSteps(run);
+  const boost = boostEffect(run.cells);
+  const url = steps.find((step) => step.url)?.url;
+  const usedApi = steps.some((step) => step.via === "api");
+  const pageOnly = steps.length > 0 && !usedApi && !run.usedAbility && !run.fromMemory;
+  const proof: NonNullable<RunFacts["proof"]> = {
+    ...(boost ? { boost: { ...boost, ...(url ? { url } : {}) } } : {}),
+    ...(run.deterministicWatch ? { deterministicWatch: true } : {}),
+    ...(usedApi ? { usedApi: true } : {}),
+    ...(pageOnly && !unmapped ? { apiAvailable: true } : {}),
+  };
+  return Object.keys(proof).length ? { proof } : {};
 }
 
 function unreadFor(run: LiveRun): string[] {

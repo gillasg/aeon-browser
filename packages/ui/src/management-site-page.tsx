@@ -1,4 +1,5 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
+import { hashRoute } from "./manage-route.js";
 import { EmptyState } from "./empty-state.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
@@ -56,8 +57,17 @@ export function siteEntries(
 
 export function SitesPage(props: ManagementSurfaceProps): ReactElement {
   const entries = entriesOf(props);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(() => hashRoute().host);
   const [query, setQuery] = useState("");
+  // The cursor's X-Ray line opens Manage at `#sites?host=…`, also into a Manage tab already open.
+  useEffect(() => {
+    const follow = (): void => {
+      const host = hashRoute().host;
+      if (host) setSelected(host);
+    };
+    addEventListener("hashchange", follow);
+    return () => removeEventListener("hashchange", follow);
+  }, []);
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
   const entry = entries.find((item) => item.host === selected);
   return (

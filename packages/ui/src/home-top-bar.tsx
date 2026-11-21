@@ -3,47 +3,66 @@ import { useEffect, type ReactElement } from "react";
 // Home has no sidebar: Chrome's own tabs and sidebar already list open chats. A thin bar takes
 // you to each of Aeon's pages instead. Escape, or the page you are on again, returns home.
 
-// Chats (with Activity), Automations, Sites, Learn, and Settings behind the gear.
+// Manage's pages, in the order people need them: Models, Sites, Watches, Forms, Blocked, Learn.
+// Models, Forms and Blocked are Settings sections; the gear opens the rest of Settings. Chats live
+// in the side panel; `?view=chats` and the palette still reach the list here.
 export type HomeView =
   "home" | "chats" | "activity" | "automations" | "sites" | "learn" | "settings";
 
-const PAGES: ReadonlyArray<[Exclude<HomeView, "home" | "settings" | "activity">, string]> = [
-  ["chats", "Chats"],
-  ["automations", "Automations"],
-  ["sites", "Sites"],
-  ["learn", "Learn"],
+export type NavSection = "models" | "forms" | "blocked";
+
+interface NavItem {
+  id: string;
+  label: string;
+  view: Exclude<HomeView, "home" | "chats" | "activity">;
+  section?: NavSection;
+}
+
+export const MANAGE_NAV: readonly NavItem[] = [
+  { id: "models", label: "Models", view: "settings", section: "models" },
+  { id: "sites", label: "Sites", view: "sites" },
+  { id: "automations", label: "Watches", view: "automations" },
+  { id: "forms", label: "Forms", view: "settings", section: "forms" },
+  { id: "blocked", label: "Blocked", view: "settings", section: "blocked" },
+  { id: "learn", label: "Learn", view: "learn" },
 ];
+
+function isCurrent(item: NavItem, view: HomeView, section: string | undefined): boolean {
+  if (item.view !== view) return false;
+  return item.section === undefined || item.section === section;
+}
 
 export function HomeTopBar({
   view,
-  activityCount,
+  section,
   onView,
+  onSection,
 }: {
   view: HomeView;
-  activityCount: number;
+  /** The Settings section on show, so Models, Forms and Blocked can say they are current. */
+  section?: string;
   onView(view: HomeView): void;
+  onSection?(section: NavSection): void;
 }): ReactElement {
   useHomeEscape(view, onView);
+  const choose = (item: NavItem): void => {
+    if (isCurrent(item, view, section)) return onView("home");
+    if (item.section && onSection) return onSection(item.section);
+    onView(item.view);
+  };
   return (
     <header className="home-top-bar">
       <nav className="home-top-nav" aria-label="Aeon pages">
         <HomeButton view={view} onView={onView} />
-        {PAGES.map(([page, label]) => (
+        {MANAGE_NAV.map((item) => (
           <button
-            key={page}
+            key={item.id}
             type="button"
-            id={`home-${page}-link`}
-            aria-current={
-              view === page || (page === "chats" && view === "activity") ? "page" : undefined
-            }
-            onClick={() => onView(view === page ? "home" : page)}
+            id={`home-${item.id}-link`}
+            aria-current={isCurrent(item, view, section) ? "page" : undefined}
+            onClick={() => choose(item)}
           >
-            {label}
-            {page === "chats" && activityCount > 0 && (
-              <span className="home-top-count" aria-label={`${activityCount} today`}>
-                {activityCount}
-              </span>
-            )}
+            {item.label}
           </button>
         ))}
         <button
@@ -51,7 +70,7 @@ export function HomeTopBar({
           className="home-top-gear"
           aria-label="Settings"
           title="Settings"
-          aria-current={view === "settings" ? "page" : undefined}
+          aria-current={view === "settings" && !isNavSection(section) ? "page" : undefined}
           onClick={() => onView(view === "settings" ? "home" : "settings")}
         >
           <svg
@@ -72,6 +91,10 @@ export function HomeTopBar({
       </nav>
     </header>
   );
+}
+
+function isNavSection(section: string | undefined): boolean {
+  return section === "models" || section === "forms" || section === "blocked";
 }
 
 /** Escape leaves any page for home, the way the browser's back arrow would. */

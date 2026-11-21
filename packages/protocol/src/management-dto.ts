@@ -12,11 +12,24 @@ export const HomeRoutineCardSchema = z
   })
   .strict();
 
+/** Per site: saved APIs (mapped operations) and active watches, for the cursor's X-Ray line. */
+export const HomeSiteCountSchema = z
+  .object({
+    site: z.string().min(1).max(200),
+    apis: z.number().int().nonnegative(),
+    watches: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const HomeManagementSnapshotSchema = z
-  .object({ routines: z.array(HomeRoutineCardSchema).max(3) })
+  .object({
+    routines: z.array(HomeRoutineCardSchema).max(3),
+    sites: z.array(HomeSiteCountSchema).max(500).optional(),
+  })
   .strict();
 
 export type HomeRoutineCardDto = z.infer<typeof HomeRoutineCardSchema>;
+export type HomeSiteCountDto = z.infer<typeof HomeSiteCountSchema>;
 export type HomeManagementSnapshotDto = z.infer<typeof HomeManagementSnapshotSchema>;
 
 const RoutineScheduleSchema = z.discriminatedUnion("kind", [

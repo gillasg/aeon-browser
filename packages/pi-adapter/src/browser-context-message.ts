@@ -10,7 +10,20 @@ export function browserContextPrompt(record: PiBrowserContextRecord): string {
     "For this request, it is already the current page in browser_code (bu.state() works immediately). It is associated with the chat. Do not list/search tabs unless this target is lost or the user asks for another tab.",
     ...(record.title ? [`Page title: ${record.title}`] : []),
     ...(record.selectedText ? [`Selected text:\n${record.selectedText}`] : []),
+    ...(record.element ? [pointedElementLine(record.element)] : []),
   ].join("\n\n");
+}
+
+/** What "this" means in the request: the element under the pointer when the user asked. */
+function pointedElementLine(element: NonNullable<PiBrowserContextRecord["element"]>): string {
+  const facts = {
+    label: element.label,
+    ...(element.role ? { role: element.role } : {}),
+    ...(element.tag ? { tag: element.tag } : {}),
+    ...(element.selector ? { selector: element.selector } : {}),
+    ...(element.text ? { text: element.text } : {}),
+  };
+  return `The user pointed at this element when asking ("this" means it): ${JSON.stringify(facts)}`;
 }
 
 export function browserContextFromDetails(value: unknown): PiBrowserContextRecord | undefined {
@@ -35,8 +48,22 @@ function isValidContext(record: Record<string, unknown>, target: Record<string, 
     record.selectionTruncated === undefined || typeof record.selectionTruncated === "boolean",
     record.sourceStatus === undefined || isSourceStatus(record.sourceStatus),
     record.kind !== "selection" || hasSelectedText(record.selectedText),
+    record.element === undefined || isPointedElement(record.element),
   ];
   return valid.every(Boolean);
+}
+
+function isPointedElement(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.label === "string" &&
+    value.label.length > 0 &&
+    value.label.length <= 200 &&
+    optionalStringWithin(value.selector, 500) &&
+    optionalStringWithin(value.role, 40) &&
+    optionalStringWithin(value.tag, 40) &&
+    optionalStringWithin(value.text, 200)
+  );
 }
 
 function isTimestamp(value: unknown): boolean {

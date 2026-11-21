@@ -30,10 +30,32 @@ export interface RunFacts {
   unread?: string[];
   /** Local files the answer links that are not in the workspace or its downloads/. */
   missingFiles?: string[];
+  /** Proof facts. Each is set only when the daemon saw it happen; see receiptFor. */
+  proof?: RunProof;
+}
+
+/** What a receipt may claim. A field the daemon did not see stays unset, and nothing is shown. */
+export interface RunProof {
+  /** The engine filled a field from the credential store and the value never reached the model. */
+  vault?: boolean;
+  /** Drift repair bumped the ability to this version during the run. */
+  repairedVersion?: number;
+  /** The run made no model call at all (a saved site API answered). */
+  modelFree?: boolean;
+  /** Only when the cost was computed. */
+  costUsd?: number;
+  boost?: { boostId?: string; edit: boolean; url?: string };
+  /** A watch whose check runs with no model was created. */
+  deterministicWatch?: boolean;
+  /** The run read the site through its mapped API, so the site can be served over MCP. */
+  usedApi?: boolean;
+  /** The site has saved ways the run did not use; it went through the page instead. */
+  apiAvailable?: boolean;
 }
 
 type Offer = Extract<RunCardItem, { kind: "offer" }>;
 type Notice = Extract<RunCardItem, { kind: "notice" }>;
+type Receipt = Extract<RunCardItem, { kind: "receipt" }>;
 
 export function formatDuration(ms: number): string {
   const seconds = ms / 1000;
@@ -51,13 +73,16 @@ export function speedText(ms: number, path: SpeedPath, previousMs?: number): str
 export function buildRunCard(facts: RunFacts): RunCard | undefined {
   if (facts.ours) return undefined;
   const declined = new Set(facts.declined ?? []);
-  const notices = noticesFor(facts);
+  const receipt = receiptFor(facts);
+  const notices = noticesFor(facts, receipt);
   const learned = facts.learned ? [learnedItem(facts.learned)] : [];
-  const offers = offersFor(facts).filter((offer) => !declined.has(offer.id));
+  const offers = [...receiptOffers(facts, receipt), ...offersFor(facts)].filter(
+    (offer) => !declined.has(offer.id),
+  );
   const kept = offers.slice(0, 2);
   const extra = offers.length - kept.length;
   if (extra > 0) notices.push({ kind: "notice", text: `+${extra}` });
-  const items = [...notices, ...learned, ...kept];
+  const items = [...(receipt ? [receipt] : []), ...notices, ...learned, ...kept];
   if (!items.length) return undefined;
   return {
     chatId: facts.chatId,
@@ -74,13 +99,64 @@ function learnedItem(learned: NonNullable<RunFacts["learned"]>): RunCardItem {
   return { kind: "learned", abilityId: learned.abilityId, name: learned.name, site: learned.site };
 }
 
-function noticesFor(facts: RunFacts): Notice[] {
+/** The one receipt, by priority: vault > repaired > speed > boost > watch. */
+export function receiptFor(facts: RunFacts): Receipt | undefined {
+  const proof = facts.proof;
+  if (!proof) return undefined;
+  if (proof.vault) return { kind: "receipt", receipt: "vault" };
+  if (proof.repairedVersion) {
+    return { kind: "receipt", receipt: "repaired", version: proof.repairedVersion };
+  }
+  if (proof.modelFree && facts.durationMs !== undefined)
+    return {
+      kind: "receipt",
+      receipt: "speed",
+      durationMs: facts.durationMs,
+      ...(facts.previousMs !== undefined ? { previousMs: facts.previousMs } : {}),
+      ...(proof.costUsd !== undefined ? { costUsd: proof.costUsd } : {}),
+    };
+  if (proof.boost) return { kind: "receipt", receipt: "boost" };
+  if (proof.deterministicWatch) return { kind: "receipt", receipt: "watch" };
+  return undefined;
+}
+
+function boostOffer(facts: RunFacts, boost: NonNullable<RunProof["boost"]>): Offer {
+  const action = boost.edit ? "toggle-boost" : "undo-boost";
+  const args = {
+    ...(boost.boostId ? { boostId: boost.boostId } : {}),
+    ...(boost.url ? { url: boost.url } : {}),
+  };
+  return {
+    kind: "offer",
+    id: `${action}:${facts.site}:${facts.task}`,
+    text: "Boost on",
+    action,
+    args,
+  };
+}
+
+/** The receipt's own button comes first; it counts toward the two offers. */
+function receiptOffers(facts: RunFacts, receipt: Receipt | undefined): Offer[] {
+  const id = (action: string) => `${action}:${facts.site}:${facts.task}`;
+  const proof = facts.proof ?? {};
+  if (receipt?.receipt === "boost" && proof.boost) return [boostOffer(facts, proof.boost)];
+  if (receipt?.receipt === "speed" || proof.usedApi) {
+    const args = { site: facts.site };
+    return [{ kind: "offer", id: id("copy-mcp"), text: "Copy MCP", action: "copy-mcp", args }];
+  }
+  if (proof.apiAvailable)
+    return [{ kind: "offer", id: id("run-api"), text: "Run via API", action: "run-api" }];
+  return [];
+}
+
+function noticesFor(facts: RunFacts, receipt: Receipt | undefined): Notice[] {
   const notices: Notice[] = [];
   if (facts.unread?.length)
     notices.push({ kind: "notice", text: unreadLine(facts.unread).slice(0, 200) });
   if (facts.missingFiles?.length)
     notices.push({ kind: "notice", text: missingFileLine(facts.missingFiles).slice(0, 200) });
-  if (facts.durationMs !== undefined && facts.path)
+  // The speed receipt already says how long it took.
+  if (facts.durationMs !== undefined && facts.path && receipt?.receipt !== "speed")
     notices.push({
       kind: "notice",
       text: speedText(facts.durationMs, facts.path, facts.previousMs),

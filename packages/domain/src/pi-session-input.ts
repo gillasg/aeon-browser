@@ -14,6 +14,16 @@ export interface PiBrowserContextRecord {
   selectedText?: string | undefined;
   selectionTruncated?: boolean | undefined;
   sourceStatus?: "current" | "stale" | "lost" | "offline" | undefined;
+  /** The element the user pointed at when they summoned the cursor. Never its HTML. */
+  element?: PiPointedElement | undefined;
+}
+
+export interface PiPointedElement {
+  selector?: string | undefined;
+  label: string;
+  role?: string | undefined;
+  tag?: string | undefined;
+  text?: string | undefined;
 }
 
 /** Limits on one run: once one is reached the agent gets one last turn to deliver, without tools. */

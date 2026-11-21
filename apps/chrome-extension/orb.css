@@ -108,22 +108,6 @@ textarea::placeholder {
   color: var(--aeon-island-chip);
 }
 
-.isl-learn {
-  border: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-.isl-learn[aria-pressed="true"] {
-  background: var(--aeon-island-wash-strong);
-  color: var(--aeon-island-ink);
-}
-
-.isl-learn[aria-pressed="true"]::before {
-  content: "● ";
-  color: var(--aeon-island-ink);
-}
-
 button {
   font: inherit;
   font-size: var(--aeon-fs-sm);
@@ -303,17 +287,6 @@ button.icon:hover,
   color: var(--aeon-island-ink);
   background: var(--aeon-island-wash-10);
 }
-.isl-learn {
-  width: 26px;
-  height: 26px;
-}
-.isl-learn[aria-pressed="true"] {
-  color: var(--aeon-island-ink);
-  background: var(--aeon-island-wash-strong);
-}
-.isl-learn[aria-pressed="true"]::before {
-  content: none;
-}
 .isl-tabs {
   order: 10;
   flex-basis: 100%;
@@ -424,4 +397,205 @@ button.icon:hover,
 .answer-offer:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+/* What Aeon knows about this site: the island's first row. Words in muted and numbers in text,
+   because faint is under 4.5:1 on the island at 11 px. */
+.isl-xray {
+  display: block;
+  max-width: 100%;
+  height: 16px;
+  margin: 0 0 6px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--aeon-island-muted);
+  font-size: var(--aeon-fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.isl-xray:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+.isl-xray-num {
+  color: var(--aeon-island-text);
+}
+.isl-xray-sep,
+.isl-power-sep {
+  color: var(--aeon-island-faint);
+}
+
+/* Prompt starters under an empty prompt: plain text, no pills. */
+.isl-power {
+  margin: 6px 0 0;
+  color: var(--aeon-island-muted);
+  font-size: var(--aeon-fs-sm);
+  line-height: 1.4;
+}
+.isl-power button {
+  padding: 0;
+  border: 0;
+  border-radius: var(--aeon-r-full);
+  background: transparent;
+  color: var(--aeon-island-muted);
+  font-size: var(--aeon-fs-sm);
+}
+.isl-power button:hover {
+  background: transparent;
+  color: var(--aeon-island-text);
+}
+.isl-power button:focus-visible {
+  outline: 2px solid var(--aeon-island-focus);
+}
+
+/* Teach: a text button; while recording, a pill with a record-red dot and its own Stop/Done. */
+.isl-teach {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--aeon-r-full);
+  background: transparent;
+  color: var(--aeon-island-muted);
+  font-size: var(--aeon-fs-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+button.isl-teach:hover {
+  background: var(--aeon-island-wash-10);
+}
+.isl-teach[data-on="true"] {
+  background: var(--aeon-island-wash-10);
+  color: var(--aeon-island-muted);
+}
+.isl-rec {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--aeon-r-half);
+  background: var(--aeon-island-rec);
+  animation: isl-rec-pulse 1.6s ease-in-out infinite;
+}
+@keyframes isl-rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.isl-teach-stop {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--aeon-island-text);
+  font-size: var(--aeon-fs-sm);
+}
+.isl-teach-stop:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+.isl-learned {
+  margin: 6px 0 0;
+  color: var(--aeon-island-text);
+  font-size: var(--aeon-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The pointed-at element: the tab chip's shape, told apart by an inset line, before the tab. */
+.isl-chip.isl-target {
+  max-width: 160px;
+  box-shadow: inset 0 0 0 1px var(--aeon-island-glow-line);
+}
+
+/* A short answer, whole, in place. It grows downward and never scrolls inside. */
+.isl-answer {
+  max-height: 220px;
+  margin: 0 0 6px;
+  overflow: hidden;
+  color: var(--aeon-island-text);
+  font-size: var(--aeon-fs-md);
+  line-height: 1.45;
+  animation: isl-grow var(--aeon-dur) var(--aeon-ease);
+}
+@keyframes isl-grow {
+  from {
+    max-height: 40px;
+  }
+  to {
+    max-height: 220px;
+  }
+}
+.isl-answer p {
+  margin: 0;
+}
+.isl-answer a {
+  color: var(--aeon-island-ink);
+}
+.isl-answer code {
+  padding: 0 3px;
+  border-radius: var(--aeon-r-3);
+  background: var(--aeon-island-wash);
+  font: inherit;
+}
+.isl-table {
+  margin: 4px 0;
+  border-collapse: collapse;
+  font-size: var(--aeon-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.isl-table th,
+.isl-table td {
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--aeon-island-line);
+  text-align: left;
+}
+.isl-table th {
+  color: var(--aeon-island-muted);
+  font-weight: 500;
+}
+.isl-table td[data-numeric="true"] {
+  text-align: right;
+}
+
+/* The proof receipt under the answer, 4 px above the offers. */
+.answer-receipt {
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.answer-receipt-lead {
+  color: var(--aeon-island-text);
+}
+
+/* The switcher's last row: the way to the Manage tab. */
+.chat-switcher-manage {
+  margin: 0 4px 4px;
+  padding: 6px 8px;
+  border: 0;
+  border-top: 1px solid var(--aeon-island-line);
+  border-radius: 0;
+  text-align: left;
+  color: var(--aeon-island-muted);
+  font-size: var(--aeon-fs-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .isl-rec,
+  .isl-answer {
+    animation: none;
+  }
+}
+:root[data-reduced-motion] .isl-rec,
+:root[data-reduced-motion] .isl-answer {
+  animation: none;
 }

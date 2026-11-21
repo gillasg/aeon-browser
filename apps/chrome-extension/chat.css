@@ -1030,6 +1030,13 @@ summary:focus-visible {
 .answer-line[data-kind="learned"] {
   color: var(--aeon-text);
 }
+/* The proof receipt: the first phrase is the emphasis, the rest stays muted. */
+.answer-receipt {
+  font-variant-numeric: tabular-nums;
+}
+.answer-receipt-lead {
+  color: var(--aeon-fg-1);
+}
 .answer-line[data-kind="offer"] {
   display: flex;
   flex-wrap: wrap;

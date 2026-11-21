@@ -124,10 +124,8 @@ test("a failed sign-in from the home picker is shown there too", () => {
 });
 
 test("the home top bar has no brand and keeps the page tabs on the right", () => {
-  const html = renderToStaticMarkup(
-    createElement(HomeTopBar, { view: "chats", activityCount: 0, onView() {} }),
-  );
+  const html = renderToStaticMarkup(createElement(HomeTopBar, { view: "sites", onView() {} }));
   assert.doesNotMatch(html, /home-top-brand|Aeon home/);
   assert.match(html, /class="home-top-nav"/);
-  assert.match(html, /aria-current="page"[^>]*>Chats/);
+  assert.match(html, /aria-current="page"[^>]*>Sites/);
 });

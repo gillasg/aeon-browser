@@ -68,6 +68,15 @@ export { failureTitle } from "./failure-title.js";
 export { boxLine, type BoxLine } from "./box-line.js";
 export { AnswerLines } from "./answer-lines-view.js";
 export {
+  countsFor,
+  normalizeSite,
+  siteKey,
+  xrayParts,
+  xrayText,
+  type SiteCounts,
+  type XrayPart,
+} from "./site-xray.js";
+export {
   attachFooter,
   footerFromCard,
   mergeFooters,
@@ -76,8 +85,14 @@ export {
   type AnswerFooter,
   type AnswerLine,
   type AnswerOffer,
+  type AnswerReceipt,
   type AnswerWrong,
+  watchBelowLabel,
 } from "./answer-lines.js";
+export { formatReceipt, pickReceipt, RECEIPT_PRIORITY } from "./answer-receipt.js";
+export { hashRoute, parseHashRoute } from "./manage-route.js";
+export { MANAGE_NAV } from "./home-top-bar.js";
+export { WELCOME_EXAMPLES } from "./new-user-welcome.js";
 export {
   ACTIVITY_LOG_KEY,
   logApiWrites,

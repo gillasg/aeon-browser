@@ -16,6 +16,7 @@ async function view() {
     [
       'import { createElement } from "react";',
       "export function ChatSwitcher() { return null; }",
+      "export function xrayParts() { return []; }",
       "export function AnswerLines(props) {",
       "  if (!props.footer) return null;",
       '  const text = props.footer.lines.map((line) => line.text || line.label).join(" ");',

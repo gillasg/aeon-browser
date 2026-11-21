@@ -1,5 +1,10 @@
-// Lines that sit under a finished answer: the speed notice, what was learned, and at most
-// two offers. The daemon sends them as one run card. Nothing here is a separate card stream.
+import { pickReceipt, receiptFromItem, type AnswerReceipt } from "./answer-receipt.js";
+
+// Lines that sit under a finished answer: one proof receipt, the speed notice, what was learned,
+// and at most two offers. The daemon sends them as one run card. Nothing here is a separate card
+// stream.
+
+export type { AnswerReceipt } from "./answer-receipt.js";
 
 export interface AnswerNotice {
   kind: "notice";
@@ -18,9 +23,11 @@ export interface AnswerOffer {
   label: string;
   action: string;
   followUp: string;
+  /** What the daemon attached for the action (a boost id, a price, an MCP call). */
+  args?: Record<string, unknown>;
 }
 
-export type AnswerLine = AnswerNotice | AnswerLearned | AnswerOffer;
+export type AnswerLine = AnswerNotice | AnswerLearned | AnswerOffer | AnswerReceipt;
 
 export interface AnswerWrong {
   routeId?: string;
@@ -49,6 +56,10 @@ const OFFER_LABEL: Record<string, string> = {
   pin: "Pin",
   relearn: "Relearn",
   "add-to-table": "Add",
+  "copy-mcp": "Copy MCP",
+  "run-api": "Run via API",
+  "undo-boost": "Undo",
+  "toggle-boost": "Turn off",
 };
 
 const OFFER_FOLLOW_UP: Record<string, string> = {
@@ -60,6 +71,10 @@ const OFFER_FOLLOW_UP: Record<string, string> = {
   "save-file": "Save that as a file.",
   relearn: "That saved way broke. Learn it again.",
   pin: "",
+  "copy-mcp": "",
+  "run-api": "Run that again through the site's API, without the page.",
+  "undo-boost": "Undo the boost you just made.",
+  "toggle-boost": "Turn that boost off.",
 };
 
 /** The run-card payload, or undefined when this event is something else. */
@@ -116,6 +131,7 @@ function lineFromItem(item: unknown): AnswerLine[] {
   if (kind === "notice") return noticeLine(item);
   if (kind === "learned") return learnedLine(item);
   if (kind === "offer") return offerLine(item);
+  if (kind === "receipt") return receiptFromItem(item);
   return [];
 }
 
@@ -135,24 +151,61 @@ function offerLine(item: object): AnswerOffer[] {
   const id = clip((item as { id?: unknown }).id, 200);
   const text = clip((item as { text?: unknown }).text, 200);
   const action = clip((item as { action?: unknown }).action, 40);
+  const args = argsOf((item as { args?: unknown }).args);
   if (!id || !text || !action || INTERNAL.test(text)) return [];
+  const label = offerLabel(action, text, args);
+  if (!label) return [];
   return [
     {
       kind: "offer",
       id,
       text,
       action,
-      label: OFFER_LABEL[action] ?? text.slice(0, 40),
-      followUp: action in OFFER_FOLLOW_UP ? (OFFER_FOLLOW_UP[action] ?? "") : text,
+      label,
+      followUp: offerFollowUp(action, text, args),
+      ...(args ? { args } : {}),
     },
   ];
+}
+
+function argsOf(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/** The run's own price, as the daemon sent it, or nothing (no number, no offer). */
+function watchPrice(args: Record<string, unknown> | undefined): string {
+  const price = Number(args?.price);
+  if (!Number.isFinite(price) || price <= 0) return "";
+  const currency = typeof args?.currency === "string" ? args.currency.slice(0, 3) : "";
+  return currency + (Number.isInteger(price) ? String(price) : price.toFixed(2));
+}
+
+/** `Watch under ₹49999`, at most 18 characters, or no label. */
+export function watchBelowLabel(args: Record<string, unknown> | undefined): string {
+  const price = watchPrice(args);
+  const label = price ? `Watch under ${price}` : "";
+  return label.length <= 18 ? label : "";
+}
+
+function offerLabel(action: string, text: string, args: Record<string, unknown> | undefined) {
+  if (action === "watch-below") return watchBelowLabel(args);
+  return OFFER_LABEL[action] ?? text.slice(0, 40);
+}
+
+function offerFollowUp(action: string, text: string, args: Record<string, unknown> | undefined) {
+  if (action === "watch-below")
+    return `Tell me when the price on this page drops below ${watchPrice(args)}.`;
+  return action in OFFER_FOLLOW_UP ? (OFFER_FOLLOW_UP[action] ?? "") : text;
 }
 
 function mergeLines(current: readonly AnswerLine[], next: readonly AnswerLine[]): AnswerLine[] {
   const notices = uniqueNotices([...current, ...next]);
   const learned = [...current, ...next].filter(isLearned).at(-1);
   const offers = uniqueOffers([...current, ...next]).slice(0, OFFER_CAP);
-  return [...notices, ...(learned ? [learned] : []), ...offers];
+  const receipt = pickReceipt([...current, ...next]);
+  return [...(receipt ? [receipt] : []), ...notices, ...(learned ? [learned] : []), ...offers];
 }
 
 function uniqueNotices(lines: readonly AnswerLine[]): AnswerNotice[] {

@@ -2326,3 +2326,20 @@ body[data-embedded="true"] .home-top-bar {
 .palette li button .palette-hint {
   padding: 0;
 }
+
+/* "What can Aeon do?": a text link to Learn. fg-3 is under 4.5:1 on the canvas, so fg-2. */
+.new-user-learn {
+  display: block;
+  margin: var(--aeon-s-2) auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--aeon-fg-2);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  cursor: pointer;
+}
+.new-user-learn:hover {
+  background: transparent;
+  text-decoration: underline;
+}

@@ -4,6 +4,8 @@ import { configureEngine } from "@browserkit/engine/engine-config";
 import { registerSetting } from "@browserkit/engine/native-browser-settings";
 import { presentBrowserTask } from "@browserkit/engine/native-browser-layout";
 import { installBoosts } from "@browserkit/engine/native-browser-boosts";
+import { installManageOnFirstRun } from "./manage-tab.js";
+import { installSiteFacts } from "./site-facts-worker.js";
 import { installEngineListeners } from "@browserkit/engine/native-engine-install";
 import {
   AGENT_IN_FRONT_KEY,
@@ -175,6 +177,8 @@ attempt("context menus", () => installNativeBrowserContextMenus(() => ensureInve
 attempt("orb", () => installOrb());
 attempt("site answers", () => installSiteAnswers());
 attempt("browse learning", () => installBrowseLearning());
+attempt("manage tab", () => installManageOnFirstRun());
+attempt("site facts", () => installSiteFacts());
 attempt("native startup", () =>
   installNativeStartup(ensureExecutor, () => {
     reportLink("reconnecting", "connect failed");

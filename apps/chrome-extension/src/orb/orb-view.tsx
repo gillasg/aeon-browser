@@ -1,11 +1,22 @@
-import type { KeyboardEvent, ReactElement } from "react";
+import { useState, type KeyboardEvent, type ReactElement } from "react";
 import {
   AnswerLines,
   ChatSwitcher,
   type AnswerFooter,
   type AnswerOffer,
   type BoxLine,
+  type SiteCounts,
 } from "@aeon/ui";
+import { AnswerInPlace, answerFits } from "./orb-answer.js";
+import {
+  PowerRow,
+  TargetChip,
+  TeachControl,
+  XrayStrip,
+  type OrbTargetChip,
+} from "./orb-view-parts.js";
+
+export type { OrbTargetChip } from "./orb-view-parts.js";
 
 // The cursor's ask box: always a compose field. The first message starts a chat with this tab as
 // context, later ones continue it; the transcript itself lives in the side panel (☰).
@@ -18,8 +29,18 @@ export interface OrbViewModel {
   /** The chat asks the user something: the question, answered by typing here (or in the side panel). */
   ask: string;
   busy: boolean;
-  /** This tab records the site's requests while the user browses ("Learn this site"). */
+  /** This tab records the site's requests while the user browses (Teach). */
   learning: boolean;
+  /** Distinct APIs the current teaching session mapped. */
+  learnFound?: number;
+  /** `Learned 4 APIs on flipkart.com`, for a few seconds after Done. */
+  learned?: string;
+  /** What Aeon knows about this site, from the registry; absent until read. */
+  xray?: SiteCounts;
+  /** The page has a form worth filling (3 or more visible, enabled fields). */
+  fillForm?: boolean;
+  /** What the pointer was on, or the selection, when the cursor was summoned. */
+  target?: OrbTargetChip;
   chats: { chatId: string; title: string; updatedAt: string }[];
   /** Tabs the first message carries as context; this tab to start with. */
   context: OrbTab[];
@@ -56,6 +77,11 @@ export interface OrbViewActions {
   /** Opens (or closes) the list of open tabs to add as context. */
   pickTabs(): void;
   addContext(tabId: number): void;
+  /** Opens the Manage tab, at a route like `#sites?host=…`. */
+  openManage(route?: string): void;
+  removeTarget(): void;
+  /** Shows the pointed-at element's outline on the page again, while the chip is hovered. */
+  hoverTarget(on: boolean): void;
 }
 
 export function OrbBox({
@@ -79,16 +105,36 @@ function Compose({
   model: OrbViewModel;
   actions: OrbViewActions;
 }): ReactElement {
-  const send = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+  const [empty, setEmpty] = useState(true);
+  const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    const field = event.currentTarget;
+    if (event.key === "Backspace" && !field.value && model.target) {
+      event.preventDefault();
+      actions.removeTarget();
+      return;
+    }
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    const text = event.currentTarget.value.trim();
+    const text = field.value.trim();
     if (text) actions.submit(text);
   };
+  const prefill = (text: string): void => {
+    const field = document.getElementById("prompt") as HTMLTextAreaElement | null;
+    if (!field) return;
+    field.value = text;
+    setEmpty(false);
+    field.focus();
+    field.setSelectionRange(text.length, text.length);
+  };
   // The field has the whole width; everything else is one quiet line under it: the tabs this
-  // message carries (× drops one, + adds another), then learning and the chat switcher.
+  // message carries (× drops one, + adds another), then Teach and the chat switcher.
   return (
     <>
+      <XrayStrip
+        host={model.host}
+        counts={model.xray}
+        onOpen={(host) => actions.openManage("#sites?host=" + encodeURIComponent(host))}
+      />
       {model.ask && <p className="isl-ask">{model.ask}</p>}
       <RunningLine model={model} actions={actions} />
       <textarea
@@ -97,36 +143,58 @@ function Compose({
         placeholder={promptPlaceholder(model)}
         aria-label="Ask Aeon"
         disabled={model.busy}
-        onKeyDown={send}
+        onKeyDown={keyDown}
+        onInput={(event) => setEmpty(!event.currentTarget.value)}
       />
-      <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
-        {model.context.map((tab) => (
-          <ContextChip key={tab.tabId} tab={tab} actions={actions} />
-        ))}
-        <button
-          type="button"
-          className="isl-add"
-          title="Add a tab"
-          aria-label="Add a tab"
-          aria-expanded={model.tabChoices !== null}
-          onClick={actions.pickTabs}
-        >
-          +
-        </button>
-        <span className="isl-notice">{model.notice}</span>
-        <LearnButton model={model} actions={actions} />
-        {model.chatId && (
-          <Button
-            label="Open the transcript in the side panel"
-            onClick={actions.toSidePanel}
-            icon="panel"
-          />
-        )}
-        {model.chatId && <Button label="New chat" onClick={actions.newChat} icon="new" />}
-        <Switcher model={model} actions={actions} icon />
-        {model.tabChoices && <TabChoices model={model} actions={actions} />}
-      </div>
+      {empty && !model.chatId && !model.ask ? (
+        <PowerRow fillForm={model.fillForm === true} onPrefill={prefill} />
+      ) : null}
+      {model.learned ? <p className="isl-learned">{model.learned}</p> : null}
+      <Foot model={model} actions={actions} />
     </>
+  );
+}
+
+function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions }): ReactElement {
+  return (
+    <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
+      {model.target ? (
+        <TargetChip
+          target={model.target}
+          onRemove={actions.removeTarget}
+          onHover={actions.hoverTarget}
+        />
+      ) : null}
+      {model.context.map((tab) => (
+        <ContextChip key={tab.tabId} tab={tab} actions={actions} />
+      ))}
+      <button
+        type="button"
+        className="isl-add"
+        title="Add a tab"
+        aria-label="Add a tab"
+        aria-expanded={model.tabChoices !== null}
+        onClick={actions.pickTabs}
+      >
+        +
+      </button>
+      <span className="isl-notice">{model.notice}</span>
+      <TeachControl
+        learning={model.learning}
+        found={model.learnFound ?? 0}
+        onToggle={actions.toggleLearning}
+      />
+      {model.chatId && (
+        <Button
+          label="Open the transcript in the side panel"
+          onClick={actions.toSidePanel}
+          icon="panel"
+        />
+      )}
+      {model.chatId && <Button label="New chat" onClick={actions.newChat} icon="new" />}
+      <Switcher model={model} actions={actions} icon />
+      {model.tabChoices && <TabChoices model={model} actions={actions} />}
+    </div>
   );
 }
 
@@ -146,19 +214,25 @@ function RunningLine({
 }): ReactElement | null {
   const line = model.line;
   if (!line || line.text === model.ask) return null;
+  // A finished answer short enough to read here shows whole; an error or a long one stays clamped.
+  const inPlace = line.more && !line.title && answerFits(line.text);
   return (
     <>
-      <p className="isl-line">
-        {line.title ? <span className="isl-line-title">{line.title}</span> : null}
-        <span className="isl-line-text" data-clamp={line.more ? "2" : "1"}>
-          {line.text}
-        </span>
-        {line.more ? (
-          <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
-            Side panel
-          </button>
-        ) : null}
-      </p>
+      {inPlace ? (
+        <AnswerInPlace text={line.text} />
+      ) : (
+        <p className="isl-line">
+          {line.title ? <span className="isl-line-title">{line.title}</span> : null}
+          <span className="isl-line-text" data-clamp={line.more ? "2" : "1"}>
+            {line.text}
+          </span>
+          {line.more ? (
+            <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
+              Side panel
+            </button>
+          ) : null}
+        </p>
+      )}
       {line.more && model.footer ? (
         <AnswerLines
           footer={model.footer}
@@ -184,34 +258,6 @@ function ContextChip({ tab, actions }: { tab: OrbTab; actions: OrbViewActions })
         ×
       </button>
     </span>
-  );
-}
-
-function LearnButton({
-  model,
-  actions,
-}: {
-  model: OrbViewModel;
-  actions: OrbViewActions;
-}): ReactElement {
-  return (
-    <button
-      type="button"
-      className="icon isl-learn"
-      aria-pressed={model.learning}
-      aria-label={model.learning ? "Stop learning this site" : "Learn this site"}
-      title={
-        model.learning
-          ? `Aeon is learning ${model.host || "this site"} while you browse this tab. Click to stop.`
-          : "Teach Aeon this site: it learns while you browse this tab (Chrome shows a debugger bar)"
-      }
-      onClick={actions.toggleLearning}
-    >
-      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-        <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        <circle cx="8" cy="8" r="2" fill="currentColor" />
-      </svg>
-    </button>
   );
 }
 
@@ -261,6 +307,7 @@ function Switcher({
       needs={model.needs}
       onSelect={actions.selectChat}
       onOpen={actions.loadChats}
+      onManage={() => actions.openManage()}
       icon={icon}
     />
   );

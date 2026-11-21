@@ -1,6 +1,7 @@
 import type { AnswerOffer, TranscriptRow } from "@aeon/ui";
 import { submitComposerMessage } from "./chat-composer-submit.js";
 import type { UiClient } from "./ui-client-core.js";
+import { localOfferAction } from "./offer-actions.js";
 
 export function latestAnswerText(rows: readonly TranscriptRow[]): string {
   for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -29,6 +30,7 @@ export async function sendAnswerOffer(input: {
       await input.pin(input.answerText);
       return;
     }
+    if ((await localOfferAction(input.offer)).handled) return;
     await sendAnswerText(input, input.offer.followUp);
   } catch (error) {
     input.onError(error instanceof Error ? error.message : "That offer could not be sent.");

@@ -12,6 +12,8 @@ export interface PromptFieldProps {
   onChange(value: string): void;
   onEnter?(): void;
   onFiles?(files: readonly File[]): void;
+  /** Focus on mount (default). Manage opens without grabbing the keyboard. */
+  autoFocus?: boolean;
 }
 
 export function PromptField(props: PromptFieldProps): ReactElement {
@@ -39,7 +41,7 @@ export function PromptField(props: PromptFieldProps): ReactElement {
       <textarea
         id={props.id ?? "prompt"}
         ref={textarea}
-        autoFocus
+        autoFocus={props.autoFocus !== false}
         rows={props.rows ?? 1}
         maxLength={props.maxLength ?? 50000}
         placeholder={props.placeholder}
@@ -53,7 +55,7 @@ export function PromptField(props: PromptFieldProps): ReactElement {
   return (
     <input
       id={props.id}
-      autoFocus
+      autoFocus={props.autoFocus !== false}
       type="text"
       maxLength={props.maxLength}
       placeholder={props.placeholder}

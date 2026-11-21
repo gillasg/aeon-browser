@@ -99,6 +99,11 @@ export class OrbOverlay {
     this.onVisibility();
   }
 
+  /** The layer's host, so point-and-command can look past it. */
+  get element(): HTMLElement {
+    return this.host;
+  }
+
   get bubbleOpen(): boolean {
     return this.open;
   }

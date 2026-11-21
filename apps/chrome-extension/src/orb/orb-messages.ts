@@ -1,4 +1,5 @@
 import type { OrbBox, OrbCursorStep, OrbStatus } from "./orb-run.js";
+import type { SummonInfo } from "./orb-target.js";
 
 // Messages between the orb's three parts:
 // - the service worker (shortcut, nonce),
@@ -18,7 +19,12 @@ export type OrbToContent =
   | { kind: "aeon.orb.panel"; width: number; height: number }
   /** keepRunning: collapse to the orb. false: dismiss the orb unless a run is going. */
   | { kind: "aeon.orb.hide"; keepRunning: boolean }
-  | { kind: "aeon.orb.prefs"; reduceMotion: boolean };
+  | { kind: "aeon.orb.prefs"; reduceMotion: boolean }
+  /** The target chip: dropped (× or Backspace), or hovered (outline the element again). */
+  | { kind: "aeon.orb.target"; action: "drop" | "hover" | "unhover" };
+
+/** orb.html → content script: what the last summon pointed at (asked once the box has loaded). */
+export const ORB_SUMMON_INFO = "aeon.orb.summon-info";
 
 /** Service worker → content script: show the orb here (open: with its box open). */
 export interface OrbToggle {
@@ -47,6 +53,8 @@ export const ORB_ON_KEY = "aeon-orb-on";
 export interface OrbShown {
   kind: "aeon.orb.shown";
   tabId: number;
+  /** The selection or element the pointer was on, and whether the page has a form to fill. */
+  summon?: SummonInfo | undefined;
 }
 
 /** orb.html → service worker: proves it was framed by the content script for this tab. */
@@ -63,6 +71,7 @@ const CONTENT_KINDS = new Set([
   "aeon.orb.panel",
   "aeon.orb.hide",
   "aeon.orb.prefs",
+  "aeon.orb.target",
 ]);
 
 export function isOrbToContent(value: unknown): value is OrbToContent {

@@ -41,7 +41,8 @@ import { readEnvironment } from "./environment.js";
 import { backfillChatOrigins } from "./chat-origin-backfill.js";
 import { migrateAeonSettings } from "./settings-migration.js";
 import { outsideContextAnswer, type OutsideTab } from "./outside-context.js";
-import { migrateAllAbilities } from "@browserkit/site-mapper";
+import { listSites, migrateAllAbilities } from "@browserkit/site-mapper";
+import { siteCounts } from "./site-counts.js";
 import { McpClientManager } from "./mcp-client-manager.js";
 import { McpCodeBridge } from "./mcp-code-bridge.js";
 import { AbilityIdleWorker } from "./ability-idle-worker.js";
@@ -280,9 +281,10 @@ async function readHomeManagementSnapshot(
   service: ChatService,
   store: ReturnType<typeof openChatStore>,
 ): Promise<unknown> {
+  const all = store.listRoutines();
   return {
-    routines: store
-      .listRoutines()
+    sites: siteCounts(await listSites().catch(() => []), all),
+    routines: all
       .filter((routine) => !routine.deletedAt)
       .slice(0, 3)
       .map((routine) => ({

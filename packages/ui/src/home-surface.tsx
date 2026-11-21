@@ -17,7 +17,8 @@ import { HomeDashboard } from "./home-dashboard.js";
 import { HomeCore } from "./home-core.js";
 import type { HomeRunActions, HomeRunPreview } from "./home-live.js";
 import { ActivityPanel } from "./activity-panel.js";
-import { type ActivityEntry, recentActivityCount, useActivityLog } from "./activity-log.js";
+import { type ActivityEntry, useActivityLog } from "./activity-log.js";
+import { hashRoute } from "./manage-route.js";
 import { ModelAccounts } from "./model-accounts.js";
 import { BrowserAccounts } from "./browser-accounts.js";
 import { Segmented } from "./segmented.js";
@@ -113,12 +114,31 @@ export interface NewTabHomeProps {
 
 type SettingsSection = "settings" | "models" | "signin" | "forms" | "blocked" | "advanced";
 
-/** `?view=models` is the Models tab of Settings; every other view is the top bar's. */
+const SECTION_ROUTES = new Set(["models", "signin", "forms", "blocked"]);
+
+/** A route name to a page: `models` is the Models tab of Settings, `watches` the Watches page. */
+function routeTo(route: string | null): { view: HomeView; settingsSection?: SettingsSection } {
+  if (route && SECTION_ROUTES.has(route))
+    return { view: "settings", settingsSection: route as SettingsSection };
+  return viewFromRoute(route === "watches" ? "automations" : route);
+}
+
+/** `#sites?host=…` (how other surfaces open Manage) wins over `?view=`. */
 function homeRoute(): { view: HomeView; settingsSection?: SettingsSection } {
-  const route = new URLSearchParams(globalThis.location?.search ?? "").get("view");
-  if (route === "models" || route === "signin" || route === "blocked")
-    return { view: "settings", settingsSection: route };
-  return viewFromRoute(route);
+  const hash = hashRoute().page;
+  if (hash) return routeTo(hash);
+  return routeTo(new URLSearchParams(globalThis.location?.search ?? "").get("view"));
+}
+
+/** Follows a hash route sent to a Manage tab that is already open. */
+function useHashNavigation(onRoute: (route: ReturnType<typeof homeRoute>) => void): void {
+  useEffect(() => {
+    const follow = (): void => {
+      if (hashRoute().page) onRoute(homeRoute());
+    };
+    addEventListener("hashchange", follow);
+    return () => removeEventListener("hashchange", follow);
+  }, []);
 }
 
 export function NewTabHome(props: NewTabHomeProps): ReactElement {
@@ -133,30 +153,35 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
   useSlashToAsk();
   // The chat list is the Chats page; the controller still owns its search state.
   const shown: HomeView = props.catalogOpen ? "chats" : view;
-  const go = (next: HomeView): void => {
+  // The gear opens Settings' General section; Models, Forms and Blocked pass their own.
+  const go = (next: HomeView, section: SettingsSection = "settings"): void => {
     setView(next);
+    if (next === "settings") setSettingsSection(section);
     if (next === "chats") props.onCatalog();
     else props.onCloseCatalog?.();
     if (next === "home" || next === "automations" || next === "sites" || next === "settings")
       props.onManagementLoad();
-    syncRoute(next, settingsSection);
+    syncRoute(next, section);
   };
+  useHashNavigation((next) => go(next.view, next.settingsSection));
   const palette = usePaletteItems(props, go);
   return (
     <div className="home-shell" data-view={shown}>
       <CommandPalette items={palette} />
-      <HomeTopBar view={shown} activityCount={recentActivityCount(activity)} onView={go} />
+      <HomeTopBar
+        view={shown}
+        section={settingsSection}
+        onView={go}
+        onSection={(section) => {
+          setSettingsSection(section);
+          go("settings", section);
+        }}
+      />
       <main className="home-main" data-screen={screenName(shown)}>
         <span id="home-connection" hidden>
           {props.connectionLabel}
         </span>
-        {props.developmentFixture && (
-          <div className="home-status" role="status">
-            <span className="fixture-badge">
-              <i /> Development fixture
-            </span>
-          </div>
-        )}
+        <FixtureBadge on={props.developmentFixture === true} />
         <HomePage
           view={shown}
           props={props}
@@ -168,18 +193,34 @@ export function NewTabHome(props: NewTabHomeProps): ReactElement {
           }}
           onView={go}
         />
-        {props.error && (
-          <p id="home-error" className="home-error" role="status" aria-live="polite">
-            <span>{props.error}</span>
-            {props.onDismissError && (
-              <button type="button" aria-label="Dismiss error" onClick={props.onDismissError}>
-                ×
-              </button>
-            )}
-          </p>
-        )}
+        <HomeError props={props} />
       </main>
     </div>
+  );
+}
+
+function FixtureBadge({ on }: { on: boolean }): ReactElement | null {
+  if (!on) return null;
+  return (
+    <div className="home-status" role="status">
+      <span className="fixture-badge">
+        <i /> Development fixture
+      </span>
+    </div>
+  );
+}
+
+function HomeError({ props }: { props: NewTabHomeProps }): ReactElement | null {
+  if (!props.error) return null;
+  return (
+    <p id="home-error" className="home-error" role="status" aria-live="polite">
+      <span>{props.error}</span>
+      {props.onDismissError && (
+        <button type="button" aria-label="Dismiss error" onClick={props.onDismissError}>
+          ×
+        </button>
+      )}
+    </p>
   );
 }
 
@@ -227,7 +268,7 @@ function HomeLanding({
         waiting={props.needsChatIds?.size ?? 0}
         connecting={props.connected === false}
       />
-      <HomeStart props={props} />
+      <HomeStart props={{ ...props, onLearn: () => onView("learn") }} />
       <HomeDashboard
         chats={props.chats.filter((chat) => !chat.archived)}
         runningChatIds={props.runningChatIds ?? new Set()}
@@ -558,6 +599,8 @@ function syncRoute(view: HomeView, section: SettingsSection): void {
   if (!location) return;
   const url = new URL(location.href);
   const value = view === "settings" ? section : view;
+  // A hash route is a one-time way in; from here `?view=` keeps the page.
+  if (url.hash && !(view === "sites" && hashRoute().page === "sites")) url.hash = "";
   if (view === "home") url.searchParams.delete("view");
   else url.searchParams.set("view", value);
   globalThis.history?.replaceState(globalThis.history.state, "", url.href);

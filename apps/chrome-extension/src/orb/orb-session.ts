@@ -10,6 +10,8 @@ import {
 import { subscribeSavedChat } from "../chat-subscribe-client.js";
 import type { UiClient } from "../ui-client-core.js";
 import { connectPage, connectionErrorMessage } from "../ui-connection.js";
+import { homeSites, type SiteRows } from "../site-facts.js";
+import type { SummonTarget } from "./orb-target.js";
 
 // The orb's line to the daemon: a catalog connection to start a chat, then a chat connection
 // for that chat's event stream (the same grants the side panel and chat page use).
@@ -42,6 +44,14 @@ export class OrbSession {
     this.modelChoice = this.model();
     this.modelChoice.catch(() => (this.modelChoice = undefined));
   }
+
+  /** Saved APIs and active watches per site, for the X-Ray strip. */
+  sites(): Promise<SiteRows> {
+    return homeSites(this.requireCatalog());
+  }
+
+  /** What the user pointed at rides with the message as structured context, never as text. */
+  target: SummonTarget | undefined;
 
   /** Recent chats, for the orb's switcher. */
   async listChats(): Promise<{ chatId: string; title: string; updatedAt: string }[]> {
@@ -76,7 +86,9 @@ export class OrbSession {
       this.modelChoice ?? this.model(),
       ...tabIds.map((tabId) => this.page(tabId)),
     ]);
-    const pages = captured.filter((page): page is PiBrowserContextRecord => Boolean(page));
+    const pages = captured
+      .filter((page): page is PiBrowserContextRecord => Boolean(page))
+      .map((page) => (page.target.tabId === this.tabId ? withTarget(page, this.target) : page));
     const result = await command(this.requireCatalog(), {
       operation: "chat.create",
       payload: {
@@ -106,7 +118,8 @@ export class OrbSession {
   /** Sends the same prompt again in the same chat. */
   async again(text: string): Promise<void> {
     if (!this.chat || !this.chatId) return this.start(text);
-    const page = await this.page();
+    const captured = await this.page();
+    const page = captured ? withTarget(captured, this.target) : undefined;
     await command(this.chat, {
       operation: "chat.submit",
       payload: {
@@ -195,6 +208,17 @@ export class OrbSession {
     if (!this.catalog) throw new Error("Aeon is not connected.");
     return this.catalog;
   }
+}
+
+/** The selection becomes the record's selected text; an element rides as `element`. */
+export function withTarget(
+  page: PiBrowserContextRecord,
+  target: SummonTarget | undefined,
+): PiBrowserContextRecord {
+  if (!target) return page;
+  if (target.selection)
+    return { ...page, kind: "selection", selectedText: target.title.slice(0, 8000) };
+  return { ...page, element: target.payload };
 }
 
 async function command(

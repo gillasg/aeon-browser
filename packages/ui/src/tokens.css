@@ -569,6 +569,8 @@
   --aeon-island-trail: rgb(99 102 241 / 55%);
   --aeon-island-badge: #4f46e5;
   --aeon-island-dot: #d4d4d8;
+  /* Recording (Teach): record red. Never amber, which means "needs you". */
+  --aeon-island-rec: #ff453a;
   --aeon-fs-xs: 11px;
   --aeon-fs-sm: 12px;
   --aeon-fs-md: 13px;

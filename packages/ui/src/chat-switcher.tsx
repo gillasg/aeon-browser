@@ -28,6 +28,8 @@ export interface ChatSwitcherProps {
   label?: string;
   /** A round icon button (the chat page's corner) instead of a text pill (the orb). */
   icon?: boolean;
+  /** The cursor's way to the Manage tab: the list's last row, "Manage Aeon…". */
+  onManage?: (() => void) | undefined;
 }
 
 export function ChatSwitcher(props: ChatSwitcherProps): ReactElement {
@@ -173,7 +175,24 @@ function SwitcherMenu(
         ))}
         {!list.length && <li className="chat-switcher-empty">No chats match</li>}
       </ul>
+      {props.onManage && <ManageRow onClose={props.onClose} onManage={props.onManage} />}
     </div>
+  );
+}
+
+function ManageRow(props: { onClose(): void; onManage(): void }): ReactElement {
+  return (
+    <button
+      type="button"
+      className="chat-switcher-manage"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => {
+        props.onClose();
+        props.onManage();
+      }}
+    >
+      Manage Aeon…
+    </button>
   );
 }
 

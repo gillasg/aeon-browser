@@ -2,6 +2,7 @@
 // A steer while the run is active is a correction. The opening prompt is not.
 
 import type { PiSessionEvent, PiToolStepEvent } from "@aeon/domain";
+import { deterministicWatchCall, savesBoost } from "./run-effects.js";
 
 export interface SeenStep {
   id: string;
@@ -22,7 +23,7 @@ export interface SeenStep {
 }
 
 export interface SeenEvent {
-  kind: "run-state" | "user" | "steps" | "error" | "tool" | "answer" | "code";
+  kind: "run-state" | "user" | "steps" | "error" | "tool" | "answer" | "code" | "watch";
   state?: string;
   text?: string;
   toolCallId?: string;
@@ -39,6 +40,8 @@ export interface SeenCell {
   toolCallId: string;
   code: string;
   ok: boolean;
+  /** What the cell printed, kept only for a cell that saves a boost (its id is in there). */
+  result?: string;
 }
 
 export interface LiveRun {
@@ -70,6 +73,10 @@ export interface LiveRun {
   answer?: string;
   /** browser_code cells, for quietly learning a finished run as an ability. */
   cells: SeenCell[];
+  /** create_routine calls with a no-model check, until they finish. */
+  watchCalls?: string[];
+  /** A watch with a no-model check was created this run. */
+  deterministicWatch?: boolean;
 }
 
 export interface Absorb {
@@ -118,6 +125,8 @@ function onRunEvent(run: LiveRun, event: SeenEvent): LiveRun {
   if (event.kind === "user") return onUser(run, event.text ?? "");
   if (event.kind === "steps") return onSteps(run, event);
   if (event.kind === "code") return onCode(run, event);
+  if (event.kind === "watch")
+    return { ...run, watchCalls: [...(run.watchCalls ?? []), event.toolCallId ?? ""] };
   if (event.kind === "tool" || event.kind === "error") return onToolEnd(run, event);
   if (event.kind === "answer") return onAnswer(run, event.text ?? "");
   return run;
@@ -130,13 +139,24 @@ function onCode(run: LiveRun, event: SeenEvent): LiveRun {
   };
 }
 
+function settleCell(cell: SeenCell, event: SeenEvent): SeenCell {
+  if (cell.toolCallId !== event.toolCallId) return cell;
+  const ok = event.isError === false;
+  return ok && savesBoost(cell.code)
+    ? { ...cell, ok, result: (event.result ?? "").slice(0, 4000) }
+    : { ...cell, ok };
+}
+
+function settleWatch(run: LiveRun, event: SeenEvent): LiveRun {
+  if (!event.toolCallId || !run.watchCalls?.includes(event.toolCallId)) return run;
+  const watchCalls = run.watchCalls.filter((id) => id !== event.toolCallId);
+  const created = event.kind === "tool" && event.isError === false;
+  return { ...run, watchCalls, ...(created ? { deterministicWatch: true } : {}) };
+}
+
 function onToolEnd(run: LiveRun, event: SeenEvent): LiveRun {
-  const settled = event.toolCallId
-    ? run.cells.map((cell) =>
-        cell.toolCallId === event.toolCallId ? { ...cell, ok: event.isError === false } : cell,
-      )
-    : run.cells;
-  const next = { ...run, cells: settled };
+  const settled = event.toolCallId ? run.cells.map((cell) => settleCell(cell, event)) : run.cells;
+  const next = settleWatch({ ...run, cells: settled }, event);
   if (event.kind === "tool") return onRead(next, event.result ?? "");
   if (OURS.test(event.result ?? "")) return { ...next, ours: true };
   return { ...next, stumbled: true };
@@ -225,7 +245,10 @@ export function seenFrom(event: PiSessionEvent): SeenEvent | undefined {
 }
 
 function codeStart(event: PiSessionEvent): SeenEvent | undefined {
-  if (event.kind !== "tool-start" || event.toolName !== "browser_code") return undefined;
+  if (event.kind !== "tool-start") return undefined;
+  if (deterministicWatchCall(event.toolName, event.arguments))
+    return { kind: "watch", toolCallId: event.toolCallId };
+  if (event.toolName !== "browser_code") return undefined;
   if (typeof event.arguments.code !== "string") return undefined;
   return { kind: "code", code: event.arguments.code, toolCallId: event.toolCallId };
 }

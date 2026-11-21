@@ -58,9 +58,11 @@ export { PiModelCatalogSchema, type PiModelCatalogDto } from "./model-catalog-dt
 export {
   RunCardItemSchema,
   RunCardOfferActionSchema,
+  RunCardReceiptSchema,
   RunCardSchema,
   type RunCard,
   type RunCardItem,
+  type RunCardReceipt,
 } from "./run-card.js";
 export {
   ChatCloseViewRequestSchema,

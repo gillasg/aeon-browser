@@ -17,9 +17,6 @@
       "128": "aeon-icon-128.png"
     }
   },
-  "chrome_url_overrides": {
-    "newtab": "home.html"
-  },
   "side_panel": {
     "default_path": "sidepanel.html"
   },

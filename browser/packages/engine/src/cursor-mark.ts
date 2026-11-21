@@ -75,6 +75,7 @@ export const CURSOR_VARS: Readonly<Record<string, string>> = {
   "--aeon-island-trail": "rgb(99 102 241 / 55%)",
   "--aeon-island-badge": BADGE_FALLBACK,
   "--aeon-island-dot": "#d4d4d8",
+  "--aeon-island-rec": "#ff453a",
   "--aeon-fs-xs": "11px",
   "--aeon-fs-sm": "12px",
   "--aeon-fs-md": "13px",

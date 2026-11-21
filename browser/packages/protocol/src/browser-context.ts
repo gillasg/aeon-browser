@@ -22,6 +22,17 @@ export const PiBrowserContextRecordSchema = z
     selectedText: z.string().max(8000).optional(),
     selectionTruncated: z.boolean().optional(),
     sourceStatus: z.enum(["current", "stale", "lost", "offline"]).optional(),
+    /** The element the user pointed at when they summoned the cursor. Never its HTML. */
+    element: z
+      .object({
+        selector: z.string().max(500).optional(),
+        label: z.string().min(1).max(200),
+        role: z.string().max(40).optional(),
+        tag: z.string().max(40).optional(),
+        text: z.string().max(200).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((record, context) => {

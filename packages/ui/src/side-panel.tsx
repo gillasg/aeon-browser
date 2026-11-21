@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { PickerChevron } from "./picker-chevron.js";
 import { SidebarIcon } from "./sidebar-icons.js";
+import { xrayParts, type SiteCounts } from "./site-xray.js";
 
 export interface SidePanelProps {
   chats: readonly Pick<ChatCatalogItemDto, "chatId" | "title" | "updatedAt">[];
@@ -14,6 +15,12 @@ export interface SidePanelProps {
   onNew(): void;
   onAllChats(): void;
   onOpenFull(): void;
+  /** Opens (or focuses) the Manage tab: models, sites, watches, forms. */
+  onManage(): void;
+  /** What Aeon knows about the active tab's site; nothing renders when every count is 0. */
+  xray?: { host: string; counts: SiteCounts } | undefined;
+  /** Opens Manage at this site. */
+  onXray?(host: string): void;
 }
 
 export function SidePanel(props: SidePanelProps): ReactElement {
@@ -29,6 +36,7 @@ export function SidePanel(props: SidePanelProps): ReactElement {
         header={header}
         trigger={trigger}
       />
+      <PanelXray xray={props.xray} onOpen={props.onXray} />
       <p id="panel-status" role="status" aria-live="polite">
         {props.status}
       </p>
@@ -98,6 +106,7 @@ function PanelHeader({
         </button>
         {props.pickerOpen && <PickerMenu props={props} />}
       </div>
+      <ManageButton onManage={props.onManage} />
       <button
         id="panel-new-chat"
         className="panel-icon-button"
@@ -120,6 +129,70 @@ function PanelHeader({
         <SidebarIcon kind="open" />
       </button>
     </header>
+  );
+}
+
+function ManageButton({ onManage }: { onManage(): void }): ReactElement {
+  return (
+    <button
+      id="panel-manage"
+      className="panel-icon-button"
+      type="button"
+      aria-label="Manage Aeon"
+      title="Manage Aeon: models, sites, watches, forms"
+      onClick={onManage}
+    >
+      <ManageIcon />
+    </button>
+  );
+}
+
+/** Two slider lines with knobs, in the header's 16 px stroke set. */
+function ManageIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M3 5h10M3 11h10" />
+      <circle cx="6" cy="5" r="1.6" className="panel-icon-knob" />
+      <circle cx="10" cy="11" r="1.6" className="panel-icon-knob" />
+    </svg>
+  );
+}
+
+/** `flipkart.com · 4 APIs · 1 boost`, under the header; absent when there is nothing to say. */
+function PanelXray({
+  xray,
+  onOpen,
+}: {
+  xray: SidePanelProps["xray"];
+  onOpen: SidePanelProps["onXray"];
+}): ReactElement | null {
+  const parts = xrayParts(xray?.counts);
+  if (!xray || !parts.length) return null;
+  return (
+    <button
+      type="button"
+      id="panel-xray"
+      className="panel-xray"
+      aria-label={`What Aeon knows about ${xray.host}`}
+      onClick={() => onOpen?.(xray.host)}
+    >
+      <span className="panel-xray-host">{xray.host}</span>
+      {parts.map((part) => (
+        <span key={part.noun} className="panel-xray-count">
+          {" · "}
+          {part.count} {part.noun}
+        </span>
+      ))}
+    </button>
   );
 }
 

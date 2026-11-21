@@ -5,11 +5,22 @@ import {
   isOrbToContent,
   isOrbToggle,
   type OrbShown,
+  type OrbToContent,
   type OrbToggle,
 } from "./orb-messages.js";
 import { startCursorControls } from "./cursor-controls.js";
 import { drawLocalCursor, isCursorLocal, pageChatId } from "./orb-aeon-pages.js";
 import { OrbOverlay } from "./orb-overlay.js";
+import { ORB_SUMMON_INFO } from "./orb-messages.js";
+import {
+  captureSummon,
+  dropTarget,
+  flashTarget,
+  hideOutline,
+  skipHost,
+  trackPointer,
+  type SummonInfo,
+} from "./orb-target.js";
 
 // Loaded on every http(s) page, and by Aeon's own tab pages themselves, but adds nothing until the
 // shortcut is pressed. While the orb is on, every page asks for it on load and when it becomes
@@ -31,6 +42,8 @@ if (!window.__orbLoaded && (!aeonPage || window.parent === window)) {
 function start(): void {
   let overlay: OrbOverlay | undefined;
   let recording = false;
+  let summon: SummonInfo | undefined;
+  if (!aeonPage) trackPointer();
 
   // keepRunning: fold to the orb (Esc, click away, Minimize). Otherwise the orb goes everywhere:
   // the chat moved to the side panel or a tab. A run keeps going there.
@@ -43,10 +56,13 @@ function start(): void {
       followPageChat(message.tabId);
       overlay = new OrbOverlay(message.tabId, message.nonce);
       overlay.setRecording(recording);
+      skipHost(overlay.element);
     }
     if (!message.open) return;
+    // Read before the box opens over the page, so the box is never what the pointer is on.
+    summon = aeonPage ? undefined : captureSummon();
     overlay.showBubble();
-    const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId };
+    const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId, summon };
     void chrome.runtime.sendMessage(shown).catch(() => undefined);
   };
   const restore = () => {
@@ -71,24 +87,40 @@ function start(): void {
   listenForEscape(() => overlay);
   if (aeonPage) listenForLocalCursor();
 
-  chrome.runtime.onMessage.addListener((message: unknown, sender) => {
+  chrome.runtime.onMessage.addListener((message: unknown, sender, reply) => {
     if (sender.id !== chrome.runtime.id) return;
     if (isOrbToggle(message)) return show(message);
-    if ((message as { kind?: unknown } | null)?.kind === ORB_DISMISS) {
+    const kind = (message as { kind?: unknown } | null)?.kind;
+    if (kind === ORB_SUMMON_INFO) return void reply(summon ?? null);
+    if (kind === ORB_DISMISS) {
       overlay?.destroy();
       overlay = undefined;
       return;
     }
     // The engine is recording this tab on video: keep the orb out of the picture.
-    if ((message as { kind?: unknown } | null)?.kind === "browserkit.recording") {
+    if (kind === "browserkit.recording") {
       recording = (message as { recording?: unknown }).recording === true;
       overlay?.setRecording(recording);
       return;
     }
-    if (!overlay || !isOrbToContent(message)) return;
-    if (message.kind === "aeon.orb.hide") close(message.keepRunning);
-    else overlay.apply(message);
+    if (overlay && isOrbToContent(message)) toOverlay(overlay, message, close);
   });
+}
+
+function toOverlay(
+  overlay: OrbOverlay,
+  message: OrbToContent,
+  close: (keepRunning: boolean) => void,
+): void {
+  if (message.kind === "aeon.orb.hide") close(message.keepRunning);
+  else if (message.kind === "aeon.orb.target") onTarget(message.action);
+  else overlay.apply(message);
+}
+
+function onTarget(action: "drop" | "hover" | "unhover"): void {
+  if (action === "drop") dropTarget();
+  else if (action === "hover") flashTarget(0);
+  else hideOutline();
 }
 
 function listenForEscape(current: () => OrbOverlay | undefined): void {

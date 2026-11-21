@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { AnswerFooter, AnswerLine, AnswerOffer } from "./answer-lines.js";
+import type { AnswerFooter, AnswerLine, AnswerOffer, AnswerReceipt } from "./answer-lines.js";
 
 /** The learned line, the speed line and the offers, under an answer. */
 export function AnswerLines({
@@ -38,6 +38,7 @@ function Line({
   onOffer: ((offer: AnswerOffer) => void) | undefined;
   disabled: boolean;
 }): ReactElement {
+  if (line.kind === "receipt") return <ReceiptLine line={line} />;
   if (line.kind !== "offer")
     return (
       <p className="answer-line" data-kind={line.kind}>
@@ -55,6 +56,21 @@ function Line({
       >
         {line.label}
       </button>
+    </p>
+  );
+}
+
+/** The receipt: its first phrase in the answer's colour, the rest muted, numbers tabular. */
+function ReceiptLine({ line }: { line: AnswerReceipt }): ReactElement {
+  return (
+    <p className="answer-line answer-receipt" data-kind="receipt" data-receipt={line.receipt}>
+      <span className="answer-receipt-lead">{line.lead}</span>
+      {line.rest.map((part) => (
+        <span key={part} className="answer-receipt-rest">
+          {" · "}
+          {part}
+        </span>
+      ))}
     </p>
   );
 }

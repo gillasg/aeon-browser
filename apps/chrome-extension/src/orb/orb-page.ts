@@ -33,6 +33,19 @@ import {
 import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
 import { OrbBox, type OrbTab, type OrbViewModel } from "./orb-view.js";
+import { localOfferAction } from "../offer-actions.js";
+import { openManage } from "../manage-tab.js";
+import type { OrbShown } from "./orb-messages.js";
+import {
+  applySummon,
+  askSummon,
+  loadLearning,
+  loadXray,
+  receiptOf,
+  removeTarget,
+  toggleLearning,
+  type SiteUx,
+} from "./orb-site-ux.js";
 
 // orb.html: the cursor's ask box. Framed by the content script. Starts the chat (or sends the
 // next message in it), folds back to the cursor, and keeps following the chat's events to drive the
@@ -76,6 +89,18 @@ const session = new OrbSession(tabId, {
   closed: () => void reconnectSession(),
 });
 let reconnecting = false;
+/** The receipt's short form stays on the minimised pill this long after a run ends. */
+const RECEIPT_PILL_MS = 6000;
+let receiptUntil = 0;
+let receiptPillShown = false;
+const ux: SiteUx = {
+  tabId,
+  model,
+  session,
+  render: () => render(),
+  notice: (text) => notice(text),
+  toContent: (message) => toContent(message),
+};
 
 void boot();
 
@@ -95,7 +120,8 @@ async function boot(): Promise<void> {
   model.host = own?.host ?? "";
   model.context = own ? [own] : [];
   render();
-  void loadLearning();
+  void loadLearning(ux);
+  void askSummon(ux);
   listen();
   sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
@@ -107,6 +133,7 @@ async function boot(): Promise<void> {
   });
   await connectSession();
   void loadChats();
+  void loadXray(ux);
   chrome.storage.session.onChanged.addListener((changes) => {
     const handed = changes[TAB_CHAT]?.newValue;
     if (typeof handed === "string" && handed && handed !== model.chatId)
@@ -132,7 +159,9 @@ async function rememberedChat(): Promise<{ chatId?: string; borrowed: boolean }>
 }
 
 /** Opened again after closing: a chat borrowed from another tab gives way to a fresh one. */
-function reopened(): void {
+function reopened(message: OrbShown): void {
+  applySummon(ux, message.summon);
+  void loadXray(ux);
   focusPrompt();
   if (!borrowed || Date.now() - bootedAt < 1500) return;
   borrowed = false;
@@ -202,7 +231,8 @@ function listen(): void {
   addEventListener("pagehide", () => void setNeeds(tabId, false));
   chrome.runtime.onMessage.addListener(
     (message: { kind?: string; tabId?: number; control?: string }, sender) => {
-      if (message?.kind === "aeon.orb.shown" && message.tabId === tabId) reopened();
+      if (message?.kind === "aeon.orb.shown" && message.tabId === tabId)
+        reopened(message as OrbShown);
       // The cursor's ■ in this tab stops this cursor's chat.
       if (message?.kind === CURSOR_STOP && sender.tab?.id === tabId) void session.stop();
       // The engine says when the user takes this tab over; the swarm rests until it's given back.
@@ -214,7 +244,19 @@ function listen(): void {
   );
 }
 
-function answerOffer(offer: AnswerOffer): void {
+async function answerOffer(offer: AnswerOffer): Promise<void> {
+  try {
+    const url = (await chrome.tabs.get(tabId).catch(() => undefined))?.url;
+    const local = await localOfferAction(offer, url);
+    if (local.handled) {
+      notice(local.notice);
+      void loadXray(ux);
+      return;
+    }
+  } catch (error) {
+    notice(messageOf(error));
+    return;
+  }
   if (offer.action === "pin") {
     const value = (run?.answer ?? "").trim().slice(0, 200);
     if (!value) return;
@@ -255,6 +297,8 @@ async function submit(text: string): Promise<void> {
     visual("error", "Couldn't send: " + messageOf(error));
   } finally {
     model.busy = false;
+    // The target went with this message; the next one starts without it.
+    if (model.target) removeTarget(ux);
     render();
   }
 }
@@ -266,6 +310,8 @@ function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
   for (const entry of entries) onEvent({ kind: "entry-added", entry }, false);
   onEvent({ kind: "run-state", state: runState as "idle" }, false);
   sentActions = run.actions.length;
+  // A replayed run ended earlier: its receipt does not take over the pill now.
+  receiptPillShown = true;
   sync();
 }
 
@@ -322,26 +368,29 @@ function sameBoxLine(current: BoxLine | undefined, next: BoxLine | null): boolea
   return current.text === next.text && current.more === next.more && current.title === next.title;
 }
 
+/** The box's ask, line and footer follow the run. */
+function syncBox(current: OrbRun): void {
+  const ask = current.status === "needs" ? current.label : "";
+  const line = boxLine(current);
+  const same =
+    ask === model.ask && sameBoxLine(model.line, line) && sameFooter(model.footer, current.footer);
+  if (same) return;
+  model.ask = ask;
+  if (line) model.line = line;
+  else delete model.line;
+  if (current.footer) model.footer = current.footer;
+  else delete model.footer;
+  render();
+  if (ask) focusPrompt();
+}
+
 /** Pushes the run to the overlay: the swarm's state, where the agent acts, what needs the user. */
 function sync(): void {
   if (!run) return;
   const state = visualState(run);
-  const ask = run.status === "needs" ? run.label : "";
-  const line = boxLine(run);
-  if (
-    ask !== model.ask ||
-    !sameBoxLine(model.line, line) ||
-    !sameFooter(model.footer, run.footer)
-  ) {
-    model.ask = ask;
-    if (line) model.line = line;
-    else delete model.line;
-    if (run.footer) model.footer = run.footer;
-    else delete model.footer;
-    render();
-    if (ask) focusPrompt();
-  }
-  visual(state, run.label);
+  syncBox(run);
+  if (state === "done" && !receiptPillShown && receiptOf(run.footer)) showReceiptOnPill();
+  visual(state, pillLabel(state, run.label));
   sendNewActions(run);
   if (run.status === "needs" && !userControl)
     toContent({ kind: "aeon.orb.spotlight", box: spotlightBox(run.actions, tabId) ?? null });
@@ -353,6 +402,7 @@ function sync(): void {
 function changed(state: OrbVisualState): void {
   if (state === lastState) return;
   lastState = state;
+  if (state !== "done") receiptPillShown = false;
   void setNeeds(tabId, state === "needs", session.chatId ?? "");
   if (state === "needs") playSound("needs");
   if (state === "done") {
@@ -369,6 +419,23 @@ function sendNewActions(current: OrbRun): void {
   if (steps.length && !userControl) toContent({ kind: "aeon.orb.cursor", steps });
 }
 
+/** For 6 s after a run ends the minimised pill says its receipt (`0.8 s · site API`). */
+function showReceiptOnPill(): void {
+  const short = receiptOf(run?.footer)?.short;
+  if (!short) return;
+  receiptPillShown = true;
+  receiptUntil = Date.now() + RECEIPT_PILL_MS;
+  globalThis.setTimeout(() => {
+    receiptUntil = 0;
+    sync();
+  }, RECEIPT_PILL_MS);
+}
+
+function pillLabel(state: OrbVisualState, label: string): string {
+  const short = receiptOf(run?.footer)?.short;
+  return state === "done" && short && Date.now() < receiptUntil ? short : label;
+}
+
 function visualState(current: OrbRun): OrbVisualState {
   if (userControl) return "paused";
   return current.status === "idle" ? "thinking" : current.status;
@@ -379,23 +446,6 @@ function visual(state: OrbVisualState, label: string): void {
   if (key === lastVisual) return;
   lastVisual = key;
   toContent({ kind: "aeon.orb.visual", state, label });
-}
-
-async function loadLearning(): Promise<void> {
-  const learning = (await chrome.runtime
-    .sendMessage({ kind: "aeon.learn.get", tabId })
-    .catch(() => null)) as { on?: boolean } | null;
-  model.learning = learning?.on === true;
-  render();
-}
-
-async function toggleLearning(): Promise<void> {
-  const reply = (await chrome.runtime
-    .sendMessage({ kind: "aeon.learn.set", tabId, on: !model.learning })
-    .catch(() => null)) as { ok?: boolean; on?: boolean; error?: string } | null;
-  if (reply?.ok) model.learning = reply.on === true;
-  else notice("Couldn't start learning this site" + (reply?.error ? " · " + reply.error : ""));
-  render();
 }
 
 /** Hand-off is manual: the chat moves to the side panel beside this page, and the box collapses. */
@@ -465,7 +515,13 @@ function view(): ReactNode {
       toSidePanel,
       answerOffer: (offer) => void answerOffer(offer),
       answerWrong: () => void submit(WRONG_FOLLOW_UP),
-      toggleLearning: () => void toggleLearning(),
+      toggleLearning: () => void toggleLearning(ux),
+      openManage: (route) => void openManage(route).catch(() => undefined),
+      removeTarget: () => {
+        removeTarget(ux);
+        focusPrompt();
+      },
+      hoverTarget: (on) => toContent({ kind: "aeon.orb.target", action: on ? "hover" : "unhover" }),
       pickTabs: () => void pickTabs(),
       addContext: (id) => void addContext(id),
       removeContext,

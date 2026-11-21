@@ -10,6 +10,8 @@ import { handoffKey, pendingHandoffs, saveChatContext } from "./browser-context-
 import { applyStoredTheme } from "./theme-preferences.js";
 import { observePanelFrameTitle } from "./panel-frame-title.js";
 import { sidePanelSelectionKey as selectionKey } from "./sidebar-selection.js";
+import { manageSitesRoute, openManage } from "./manage-tab.js";
+import { watchPanelXray, type PanelXray } from "./sidepanel-xray.js";
 
 const root = requiredElement("root");
 
@@ -31,6 +33,8 @@ let pickerOpen = false;
 let status = "Loading Chats…";
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 let routingContext = false;
+let xray: PanelXray;
+let xrayWatched = false;
 
 window.addEventListener("message", (event) => {
   if (
@@ -69,6 +73,9 @@ function createView() {
     onNew: () => void selectChat(""),
     onAllChats: () => void openAllChats(),
     onOpenFull: () => void openSelectedChat(),
+    onManage: () => void openManage(),
+    xray,
+    onXray: (host) => void openManage(manageSitesRoute(host)),
   };
   return createElement(SidePanel, props);
 }
@@ -121,6 +128,17 @@ async function start(): Promise<void> {
     client = connection.client;
     reconnect.watch(client);
     client.subscribe(handleDaemonMessage);
+    if (!xrayWatched) {
+      xrayWatched = true;
+      watchPanelXray(
+        windowId,
+        () => client,
+        (next) => {
+          xray = next;
+          render();
+        },
+      );
+    }
     const stored = await chrome.storage.session.get(selectionKey(windowId));
     const savedId = stored[selectionKey(windowId)];
     await refreshChats();

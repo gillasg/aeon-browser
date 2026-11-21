@@ -30,7 +30,7 @@ export class HomeCatalogController {
   hide(): void {
     if (!this.open) return;
     this.open = false;
-    document.title = "Aeon";
+    document.title = "Aeon · Manage";
     this.options.onChange();
   }
 

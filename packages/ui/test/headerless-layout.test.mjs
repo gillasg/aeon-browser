@@ -32,16 +32,17 @@ test("new tab has no sidebar: a top bar, a quiet welcome and the dashboard", () 
   assert.match(html, /class="home-top-nav"/);
   assert.match(html, /placeholder="Ask Aeon to do anything"/);
   assert.doesNotMatch(html, /id="chat-sidebar"|id="pinned-label"|id="projects-label"/);
-  for (const page of ["Chats", "Automations", "Sites"]) assert.match(html, new RegExp(`>${page}<`));
+  for (const page of ["Models", "Sites", "Watches", "Forms", "Blocked", "Learn"])
+    assert.match(html, new RegExp(`>${page}<`));
   assert.match(html, /aria-label="Settings"/);
   // A quiet home: the core and the ask box, with no empty sections under them.
   assert.match(html, /class="home-core" data-mode="idle"/);
   assert.doesNotMatch(html, /Recent|Press Watch/);
-  // First run is one line and three account-free examples, never a tour or a modal.
-  assert.match(html, /Aeon is a browser agent that works in your Chrome/);
-  assert.match(html, /Summarise the page I have open in five bullets/);
-  assert.match(html, /List every link on this page/);
-  assert.match(html, /Tell me when this page changes/);
+  // First run is one line and four general examples, never a tour or a modal.
+  assert.match(html, /Aeon works in your Chrome, with your logins/);
+  assert.match(html, /Turn this site into an API I can call/);
+  assert.match(html, /Fill this form with my details/);
+  assert.match(html, /Hide the parts of this site I never use/);
   assert.doesNotMatch(html, /role="dialog"|tour-actions/);
   delete globalThis.localStorage;
   delete globalThis.location;

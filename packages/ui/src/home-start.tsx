@@ -26,6 +26,8 @@ type HomeStartProps = Pick<
   onRemoveContext?(): void;
   chatId?: string;
   connected?: boolean;
+  /** "What can Aeon do?": the Learn page. */
+  onLearn?(): void;
 };
 
 export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
@@ -55,7 +57,7 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
   );
   return (
     <section className="home-start" aria-label="Ask Aeon">
-      <NewUserWelcome needsModel={needsModel} onExample={tryExample} />
+      <NewUserWelcome needsModel={needsModel} onExample={tryExample} onLearn={props.onLearn} />
       <ProjectChip name={props.projectName} projectId={props.projectId} />
       <PageContextTray
         chatId={props.chatId}
@@ -148,6 +150,8 @@ function HomePrompt({
       <PromptField
         multiline
         id="home-query"
+        // The Manage tab never takes the keyboard on load; the side panel's start page does.
+        autoFocus={inPanel()}
         value={query}
         placeholder="Ask Aeon to do anything"
         ariaLabel="Ask Aeon anything"
@@ -262,4 +266,8 @@ function HomePickers({
       </div>
     </div>
   );
+}
+
+function inPanel(): boolean {
+  return new URLSearchParams(globalThis.location?.search ?? "").get("host") === "panel";
 }

@@ -130,6 +130,14 @@ export type PiSessionEvent =
           | { kind: "notice"; text: string; detail?: string | undefined }
           | { kind: "learned"; abilityId: string; name: string; site: string }
           | {
+              kind: "receipt";
+              receipt: "vault" | "repaired" | "speed" | "boost" | "watch";
+              durationMs?: number | undefined;
+              previousMs?: number | undefined;
+              costUsd?: number | undefined;
+              version?: number | undefined;
+            }
+          | {
               kind: "offer";
               id: string;
               text: string;
