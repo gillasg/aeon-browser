@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- The document does not scroll. #scroller keeps the page, with overflow hidden, like a scroll-jacked layout. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Inner scroller</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+      }
+      #scroller {
+        height: 600px;
+        overflow: hidden;
+      }
+      #content {
+        height: 2400px;
+      }
+    </style>
+  </head>
+  <body data-doc-scroll="600" data-doc-client="600">
+    <div id="scroller" data-scroll-height="2400" data-client-height="600" data-overflow-y="hidden">
+      <div id="content">
+        <p>one</p>
+        <p style="margin-top: 2200px">end</p>
+      </div>
+    </div>
+  </body>
+</html>

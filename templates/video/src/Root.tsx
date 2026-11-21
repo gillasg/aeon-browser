@@ -45,7 +45,12 @@ export function buildProps(
     outro: { text: "That's it", duration: 1000 },
     badge: derived.segments.some((s) => s.speed > 1) ? { t0: 0, t1: 1000, speed: 4 } : undefined,
   };
-  return { edit, base: staticFile("frames/"), cursor: derived.cursor };
+  return {
+    edit,
+    base: staticFile("frames/"),
+    cursor: derived.cursor,
+    ...(events.terminal ? { terminal: events.terminal } : {}),
+  };
 }
 
 const durationInFrames = (props: RenderProps) => {

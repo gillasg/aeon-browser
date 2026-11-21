@@ -238,7 +238,7 @@ function __stealthProbe() {
   try { geolocationShim = !native.test(Function.prototype.toString.call(navigator.geolocation.getCurrentPosition)); } catch {}
   return {webdriver: navigator.webdriver === true, globals, overlays, wrapped, geolocationShim, leaks};
 }
-function __beginCell() { __speedBegin(); __dirty.clear(); __valueOnly.clear(); __hasDelivered=false; __deliveryValue=undefined; }
+function __beginCell() { __speedBegin(); __dirty.clear(); __valueOnly.clear(); __hasDelivered=false; __deliveryValue=undefined; if (typeof __shotPaths !== 'undefined') __shotPaths.length = 0; }
 // A batch's direct value set (a native select) is still a value-only change.
 function __markValueOnly(target) { var key = __key(target); if (!__dirty.has(key)) __valueOnly.set(key, target); __dirty.set(key, target); }
 // Page-side: the text the user selected, unless it sits in a field (the agent's own typing selects
@@ -290,7 +290,11 @@ async function __step(step, readOnly = false) {
   if (step.target) __lastTarget = step.target;
   var action = ['click','hold','fill','press','scroll','navigate','evaluate','cdp','upload','pointer','keys','reconnect'].includes(step.op);
   if(step.op==='frames' && ['click','fill','cdp'].includes(step.action))action=true;
-  if (readOnly) action=false;
+  if (readOnly) {
+    action=false;
+    // Internal CDP (an isolated world, a frame tree) is not a step the agent took.
+    step = {...step, internal: true};
+  }
   var actionKey = step.target && __key(step.target);
   var wasDirty = actionKey && __dirty.has(actionKey);
   if (action) {

@@ -14,10 +14,7 @@ export function rawProps(): RenderProps {
   const events = recording as unknown as RecordingEvents;
   const vp = { width: events.clip.width || 760, height: events.clip.height || 1350 };
   const fps = events.clip.fps || 30;
-  const count = Math.max(
-    1,
-    Math.min(events.clip.frames || 1, Math.round(RAW_MAX_SECONDS * fps)),
-  );
+  const count = Math.max(1, Math.min(events.clip.frames || 1, Math.round(RAW_MAX_SECONDS * fps)));
   const frames: Frame[] = Array.from({ length: count }, (_, i) => ({
     t: (i * 1000) / fps,
     f: `${String(i + 1).padStart(6, "0")}.jpg`,
@@ -25,6 +22,7 @@ export function rawProps(): RenderProps {
   const duration = (count / fps) * 1000;
   return {
     base: staticFile("frames/"),
+    ...(events.terminal ? { terminal: events.terminal } : {}),
     cursor: [], // never draw a second cursor over a real-window recording
     edit: {
       version: 1,

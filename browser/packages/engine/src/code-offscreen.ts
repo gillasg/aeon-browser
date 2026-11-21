@@ -233,7 +233,12 @@ window.addEventListener("message", (event) => {
     stage(message.cellId, "result-sent");
     cells.delete(message.cellId);
     const done = message as Record<string, unknown>;
-    cell.reply({ value: done.value, output: done.output, error: done.error });
+    cell.reply({
+      value: done.value,
+      output: done.output,
+      error: done.error,
+      ...(Array.isArray(done.screenshots) ? { screenshots: done.screenshots } : {}),
+    });
   }
 });
 

@@ -6,7 +6,8 @@ import { timeState, windowLayout } from "./layout";
 import { Scene } from "./Scene";
 import { introMs, outroMs, segmentAt, videoDuration } from "./timeline";
 import { badgeLabel } from "./presets";
-import type { Rect, RenderProps, Style } from "./types";
+import { terminalFrame, terminalLines } from "./terminal";
+import type { Rect, RenderProps, Style, TerminalCast } from "./types";
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const fade = (st: number, t0: number, t1: number, ms = 260) =>
@@ -164,14 +165,15 @@ const SpeedBadge: React.FC<{
   opacity: number;
   width: number;
   height: number;
+  right: number;
   style: Style;
-}> = ({ speed, opacity, width, height, style }) => {
+}> = ({ speed, opacity, width, height, right, style }) => {
   const fs = Math.min(width, height) * 0.024;
   return (
     <div
       style={{
         position: "absolute",
-        right: width * 0.04,
+        right,
         top: height * 0.035,
         opacity,
         display: "flex",
@@ -195,6 +197,53 @@ const SpeedBadge: React.FC<{
   );
 };
 
+/** The terminal cast, drawn beside the tab from events.json only. */
+const TerminalPane: React.FC<{ cast: TerminalCast; st: number; box: Rect }> = ({
+  cast,
+  st,
+  box,
+}) => {
+  const lines = terminalLines(cast, st);
+  const fs = Math.max(13, Math.min(22, box.w * 0.042));
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: box.x,
+        top: box.y,
+        width: box.w,
+        height: box.h,
+        boxSizing: "border-box",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+        background: "#12141a",
+        color: "#e7e7ea",
+        borderRadius: 12,
+        padding: fs * 0.7,
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontSize: fs,
+        lineHeight: 1.35,
+      }}
+    >
+      {lines.map((line, index) => (
+        <div
+          key={index}
+          style={{
+            whiteSpace: "pre",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            color: line.kind === "err" ? "#ff8b8b" : line.kind === "in" ? "#9ad7ff" : "#e7e7ea",
+          }}
+        >
+          {line.text || " "}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 /** The whole picture at output time `ms`. */
 export const VideoAt: React.FC<{
   props: RenderProps;
@@ -204,7 +253,8 @@ export const VideoAt: React.FC<{
 }> = ({ props, ms, width, height }) => {
   const { edit } = props;
   const { intro, vlen, vt, st } = timeState(props, ms);
-  const area: Rect = { x: 0, y: 0, w: width, h: height };
+  const panes = terminalFrame(width, height, Boolean(props.terminal?.events.length));
+  const area: Rect = panes.chrome;
   const L =
     edit.style.frame && edit.style.frame !== "none"
       ? framedLayout(edit, area)
@@ -230,12 +280,16 @@ export const VideoAt: React.FC<{
       <AbsoluteFill style={{ opacity: edit.intro ? clamp01((ms - (intro - 300)) / 700) : 1 }}>
         {scene}
       </AbsoluteFill>
+      {props.terminal && panes.term.w > 0 && (
+        <TerminalPane cast={props.terminal} st={st} box={panes.term} />
+      )}
       {showBadge && (
         <SpeedBadge
           speed={seg!.speed}
           opacity={badgeOp}
-          width={width}
-          height={height}
+          width={panes.chrome.w}
+          height={panes.chrome.h}
+          right={width - (panes.chrome.x + panes.chrome.w) + panes.chrome.w * 0.04}
           style={edit.style}
         />
       )}
