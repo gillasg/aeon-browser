@@ -34,6 +34,16 @@ test("a remembered password is removed from every string agent code gets back, i
   assert.equal(error.message, "value was [removed]");
 });
 
+test("a remembered numeric code never eats a product id in a link path", () => {
+  rememberSecrets(["311738"]);
+  assert.equal(
+    hideSecrets("see https://www.croma.com/sony-ps5/p/311738 now"),
+    "see https://www.croma.com/sony-ps5/p/311738 now",
+  );
+  assert.equal(hideSecrets("your code 311738"), "your code [removed]");
+  assert.equal(hideSecrets("https://x.test/a?code=311738"), "https://x.test/a?code=[removed]");
+});
+
 test("code that runs in the page is what a password page refuses; clicks and reads are not", () => {
   assert.equal(runsPageCode({ op: "evaluate", target, expression: "1" }), true);
   assert.equal(runsPageCode({ op: "waitFor", target, expression: "1", timeoutMs: 100 }), true);

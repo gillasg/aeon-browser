@@ -3,6 +3,7 @@ import { CommandPalette, type PaletteItem } from "./command-palette.js";
 import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
 import { useEffect, useState, type ReactElement, type ReactNode, useMemo } from "react";
+import { usePageTitle } from "./page-title.js";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { HomeCatalog } from "./home-catalog.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
@@ -346,6 +347,7 @@ function SettingsPage({
   section: SettingsSection;
   onSection(section: SettingsSection): void;
 }): ReactElement {
+  usePageTitle(section === "models" ? "Models" : "Settings");
   return (
     <div className="home-settings-layout">
       <SettingsMenu section={section} onSection={onSection} />

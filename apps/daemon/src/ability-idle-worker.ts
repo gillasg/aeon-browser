@@ -47,6 +47,33 @@ export interface IdleWorkerOptions extends Partial<IdleConfig> {
   onNote?: (ability: Ability, note: AbilityCheckNote) => void;
 }
 
+/** The session every idle check runs under: an outside session, never a user's chat. */
+export const IDLE_SESSION = "ability-idle";
+
+/**
+ * The browser_code cell an idle check sends. It always gets its own background window
+ * (`space: "window"`), so a check never opens a tab group in the window the user works in.
+ */
+export interface IdleCodeCell<T> {
+  code: string;
+  timeoutMs: number;
+  ownerTitle: string;
+  space: "window";
+  onCall: T;
+  onProgress: () => undefined;
+}
+
+export function idleCodeCell<T>(code: string, onCall: T): IdleCodeCell<T> {
+  return {
+    code,
+    timeoutMs: 60_000,
+    ownerTitle: "Ability check",
+    space: "window",
+    onCall,
+    onProgress: () => undefined,
+  };
+}
+
 const TICK_MS = 5 * 60 * 1000;
 
 function report(error: unknown): void {

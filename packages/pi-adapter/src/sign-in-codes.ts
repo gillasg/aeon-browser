@@ -11,7 +11,8 @@ export class SignInCodes {
   private readonly codes = new Set<string>();
 
   note(text: string): void {
-    const code = codeIn(text);
+    // Digits in a link's path are ids (a product, an order page), never a code someone was sent.
+    const code = codeIn(withoutUrlPaths(text));
     if (!code || code.length < 4) return;
     this.codes.add(code);
     while (this.codes.size > MAX) this.codes.delete(this.codes.values().next().value as string);
@@ -19,12 +20,38 @@ export class SignInCodes {
 
   mask(text: string): string {
     if (!this.codes.size || !text) return text;
-    let out = text;
-    for (const value of this.codes)
-      for (const form of formsOf(value))
-        if (out.includes(form)) out = out.split(form).join("[removed]");
-    return out;
+    return maskOutsideUrlPaths(text, (part) => {
+      let out = part;
+      for (const value of this.codes)
+        for (const form of formsOf(value))
+          if (out.includes(form)) out = out.split(form).join("[removed]");
+      return out;
+    });
   }
+}
+
+const URL_RE = /https?:\/\/[^\s<>"'`)\]]+/g;
+
+/** Splits off each link's origin and path, which `mask` keeps; query and fragment still get masked. */
+function maskOutsideUrlPaths(text: string, mask: (part: string) => string): string {
+  let out = "";
+  let last = 0;
+  for (const match of text.matchAll(URL_RE)) {
+    const start = match.index ?? 0;
+    const url = match[0];
+    const cut = url.search(/[?#]/);
+    const path = cut < 0 ? url : url.slice(0, cut);
+    out += mask(text.slice(last, start)) + path + (cut < 0 ? "" : mask(url.slice(cut)));
+    last = start + url.length;
+  }
+  return out + mask(text.slice(last));
+}
+
+function withoutUrlPaths(text: string): string {
+  return maskOutsideUrlPaths(text, (part) => part).replace(URL_RE, (url) => {
+    const cut = url.search(/[?#]/);
+    return cut < 0 ? " " : " " + url.slice(cut);
+  });
 }
 
 // A code is a secret for one chat, not for one resource loader: a resource reload rebuilds the

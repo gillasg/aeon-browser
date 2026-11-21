@@ -187,12 +187,16 @@ function Subscriptions({
 }: {
   providers: readonly ModelProvider[];
   onStart: ModelAccountsProps["onStart"];
-}): ReactElement {
-  const oauth = providers.flatMap((provider) =>
-    provider.methods
-      .filter((method) => method.type === "oauth")
-      .map((method) => ({ provider, method })),
-  );
+}): ReactElement | null {
+  // A connected provider already sits in Connected; listing it again here is noise.
+  const oauth = providers
+    .filter((provider) => !provider.connected)
+    .flatMap((provider) =>
+      provider.methods
+        .filter((method) => method.type === "oauth")
+        .map((method) => ({ provider, method })),
+    );
+  if (!oauth.length) return null;
   return (
     <section className="aeon-page-section" aria-labelledby="models-subscriptions">
       <h2 id="models-subscriptions">Sign in with an account</h2>
@@ -202,19 +206,13 @@ function Subscriptions({
             key={provider.id}
             type="button"
             className="model-tile"
-            data-connected={provider.connection?.type === "oauth" && provider.connection.stored}
+            title={method.label}
             onClick={() => onStart(provider, "oauth")}
           >
             <ProviderIcon provider={provider.id} />
             <span className="model-tile-text">
-              <strong>
-                {provider.name} <Badge text={method.subscription ? "Subscription" : undefined} />
-              </strong>
-              <span>
-                {provider.connection?.type === "oauth" && provider.connection.stored
-                  ? "Connected · sign in again"
-                  : method.label}
-              </span>
+              <strong>{provider.name}</strong>
+              <span>{method.label}</span>
             </span>
           </button>
         ))}

@@ -47,7 +47,7 @@ import { listSites, migrateAllAbilities } from "@browserkit/site-mapper";
 import { siteCounts } from "./site-counts.js";
 import { McpClientManager } from "./mcp-client-manager.js";
 import { McpCodeBridge } from "./mcp-code-bridge.js";
-import { AbilityIdleWorker } from "./ability-idle-worker.js";
+import { AbilityIdleWorker, IDLE_SESSION, idleCodeCell } from "./ability-idle-worker.js";
 
 export function createProductionRuntime(dataDirectory: string): {
   service: ChatService;
@@ -460,23 +460,26 @@ function installAbilityIdle(options: {
   return new AbilityIdleWorker({
     activity: () => readDaemonActivity(attention, routines, siteRules, browserControl),
     cell: async (code) => {
-      const chatId = sessionChatId("external", "ability-idle");
+      const chatId = sessionChatId("external", IDLE_SESSION);
       const host = createAeonHostHandler({
         source: "external",
         siteRules: () => siteRules.answer(chatId),
         siteMapper: (request) => siteMapperRequest(chatId, request),
       });
-      const output = await browserControl.execute(chatId, `ability-idle-${randomUUID()}`, {
-        codeCell: {
-          code,
-          timeoutMs: 60_000,
-          ownerTitle: "Ability check",
-          onCall: (request: Record<string, unknown>) =>
-            host(request, { source: "external", scope: chatId }) ??
-            Promise.resolve({ error: "UNSUPPORTED" }),
-          onProgress: () => undefined,
-        },
-      });
+      let output: string;
+      try {
+        output = await browserControl.execute(chatId, `ability-idle-${randomUUID()}`, {
+          codeCell: idleCodeCell(
+            code,
+            (request: Record<string, unknown>) =>
+              host(request, { source: "external", scope: chatId }) ??
+              Promise.resolve({ error: "UNSUPPORTED" }),
+          ),
+        });
+      } finally {
+        // A check keeps no tabs: close whatever it opened, even when it failed.
+        browserControl.tidyChat(chatId);
+      }
       const parsed = JSON.parse(output) as { value?: unknown; error?: string };
       if (parsed.error) throw new Error(parsed.error);
       return parsed.value;

@@ -57,10 +57,32 @@ function formsOf(value: string): string[] {
 export function hideSecrets(text: string): string {
   if (!secrets.size || !text) return text;
   let out = text;
-  for (const value of secrets)
-    for (const form of formsOf(value))
-      if (out.includes(form)) out = out.split(form).join("[removed]");
+  for (const value of secrets) {
+    // A numeric code also appears as an id in link paths (/p/311738); only the query keeps it.
+    const replace = (part: string) => {
+      for (const form of formsOf(value))
+        if (part.includes(form)) part = part.split(form).join("[removed]");
+      return part;
+    };
+    out = /^\d+$/.test(value) ? outsideUrlPaths(out, replace) : replace(out);
+  }
   return out;
+}
+
+const URL_RE = /https?:\/\/[^\s<>"'`)\]]+/g;
+
+function outsideUrlPaths(text: string, mask: (part: string) => string): string {
+  let out = "";
+  let last = 0;
+  for (const match of text.matchAll(URL_RE)) {
+    const start = match.index ?? 0;
+    const url = match[0];
+    const cut = url.search(/[?#]/);
+    out +=
+      mask(text.slice(last, start)) + (cut < 0 ? url : url.slice(0, cut) + mask(url.slice(cut)));
+    last = start + url.length;
+  }
+  return out + mask(text.slice(last));
 }
 
 function scrub(value: unknown, depth: number): unknown {

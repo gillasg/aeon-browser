@@ -82,3 +82,17 @@ test("a streaming answer block is masked, and an unchanged block is reused", () 
   const clean = { type: "text", text: "nothing secret here" };
   assert.equal(maskAnswerBlock(codes, clean), clean, "a clean block is not reallocated");
 });
+
+test("numeric ids in link paths are never taken for codes or removed", () => {
+  const codes = signInCodes("url-ids-chat");
+  codes.note("Sony PS5 https://www.croma.com/sony-ps5/p/311738 in stock");
+  const link = "Buy it: https://www.croma.com/sony-ps5/p/311738 and https://amazon.in/dp/123456";
+  assert.equal(codes.mask(link), link);
+  codes.note("Your verification code is 311738.");
+  assert.equal(codes.mask(link), link, "the same digits in a path stay even once they are a code");
+  assert.equal(codes.mask("The code was 311738."), "The code was [removed].");
+  assert.equal(
+    codes.mask("https://site.test/items/12345678?code=311738&token=abc"),
+    "https://site.test/items/12345678?code=[removed]&token=abc",
+  );
+});

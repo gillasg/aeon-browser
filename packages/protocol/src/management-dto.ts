@@ -271,7 +271,8 @@ export const ManagementAbilitySchema = z
         lastOkAt: z.string().max(60).optional(),
         lastUsedAt: z.string().max(60).optional(),
       })
-      .strict()
+      // Saved stats carry per-way counters (`ways`) and may grow more; drop them instead of failing the page.
+      .strip()
       .optional(),
     /** Ways that changed since their tests last passed. */
     untested: z

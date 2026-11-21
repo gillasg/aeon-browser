@@ -6,6 +6,7 @@ import { SitesPage } from "./management-site-page.js";
 import { ResourcesPanel } from "./management-resources.js";
 import { CapabilitiesPanel } from "./management-capabilities.js";
 import { SettingsPanel } from "./management-settings.js";
+import { usePageTitle } from "./page-title.js";
 
 export type { ManagementSurfaceProps } from "./management-surface-props.js";
 
@@ -17,6 +18,7 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
     capabilities: "MCPs / CLIs",
     settings: "Settings",
   };
+  usePageTitle(titles[props.section]);
   return (
     <section className="management-main" aria-label={titles[props.section]}>
       <header className="management-heading">

@@ -436,11 +436,13 @@
   font-weight: 500;
 }
 .model-tile-text span {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--aeon-faint);
   font-size: var(--aeon-fs-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .model-flow {
   padding: var(--aeon-s-5);

@@ -101,3 +101,28 @@ test("a finished sign-in confirms the default model and offers Start chatting", 
   assert.match(plain, /Done<\/button>/);
   assert.doesNotMatch(plain, /Start chatting/);
 });
+
+test("the sign-in grid skips connected providers and drops the redundant Subscription badge", () => {
+  const xai = {
+    id: "xai",
+    name: "xAI",
+    methods: [{ type: "oauth", label: "Sign in with X", subscription: true }],
+    connected: true,
+    connection: { type: "oauth", stored: true },
+  };
+  const codex = {
+    id: "openai-codex",
+    name: "OpenAI Codex",
+    methods: [{ type: "oauth", label: "ChatGPT Plus or Pro", subscription: true }],
+    connected: false,
+  };
+  const html = renderToStaticMarkup(
+    createElement(ModelAccounts, {
+      ...props(),
+      state: { ...props().state, providers: [xai, codex] },
+    }),
+  );
+  const grid = html.slice(html.indexOf('id="models-subscriptions"'));
+  assert.match(grid, /OpenAI Codex/);
+  assert.doesNotMatch(grid.slice(0, grid.indexOf("</section>")), /xAI|model-badge/);
+});
