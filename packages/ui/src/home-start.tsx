@@ -12,7 +12,7 @@ import type { PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
-import { NewUserWelcome } from "./new-user-welcome.js";
+import { NewUserWelcome, markWelcomeDone } from "./new-user-welcome.js";
 import { PromptField } from "./prompt-field.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
@@ -132,9 +132,15 @@ function HomePrompt({
   onFiles(files: readonly File[]): void;
   contextId?: string | undefined;
 }): ReactElement {
+  // Any sent task, typed or picked, retires the first-run examples.
+  const send = (): void => {
+    if (!query.trim() || !canSubmit) return;
+    markWelcomeDone();
+    onSubmit(query.trim());
+  };
   const submit = (event: FormEvent): void => {
     event.preventDefault();
-    if (query.trim() && canSubmit) onSubmit(query.trim());
+    send();
   };
   return (
     <form id="home-form" className="home-query-form" onSubmit={submit}>
@@ -147,9 +153,7 @@ function HomePrompt({
         ariaLabel="Ask Aeon anything"
         onChange={onQuery}
         onFiles={onFiles}
-        onEnter={() => {
-          if (query.trim() && canSubmit) onSubmit(query.trim());
-        }}
+        onEnter={send}
       />
       <button
         className="home-send-button"

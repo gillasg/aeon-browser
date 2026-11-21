@@ -2,7 +2,8 @@ import { useState, type ReactElement } from "react";
 
 // The whole first-run experience: one line about Aeon and three tasks that need no site account.
 // No tour, no dialog. A click puts the task in the ask box, ready to send (or to send after the
-// one-time model connect below). Settings can bring it back with "Welcome / Show again".
+// one-time model connect below). It goes for good once any task is sent, picked or typed.
+// Settings can bring it back with "Welcome / Show again".
 
 const KEY = "aeonWelcome";
 
@@ -28,11 +29,7 @@ export function NewUserWelcome({
   });
   if (seen) return null;
   const pick = (text: string): void => {
-    try {
-      localStorage.setItem(KEY, "done");
-    } catch {
-      /* Nothing to remember. */
-    }
+    markWelcomeDone();
     setSeen(true);
     onExample(text);
   };
@@ -51,6 +48,15 @@ export function NewUserWelcome({
       </div>
     </section>
   );
+}
+
+/** Called when any task is sent, so a user who types their own never sees the examples again. */
+export function markWelcomeDone(): void {
+  try {
+    localStorage.setItem(KEY, "done");
+  } catch {
+    /* Nothing to remember. */
+  }
 }
 
 export function resetWelcome(): void {
