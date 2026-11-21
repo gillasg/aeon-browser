@@ -238,7 +238,7 @@ function __stealthProbe() {
   try { geolocationShim = !native.test(Function.prototype.toString.call(navigator.geolocation.getCurrentPosition)); } catch {}
   return {webdriver: navigator.webdriver === true, globals, overlays, wrapped, geolocationShim, leaks};
 }
-function __beginCell() { __speedBegin(); __dirty.clear(); __valueOnly.clear(); __hasDelivered=false; __deliveryValue=undefined; if (typeof __shotPaths !== 'undefined') __shotPaths.length = 0; }
+function __beginCell() { __speedBegin(); __dirty.clear(); __valueOnly.clear(); __hasDelivered=false; __deliveryValue=undefined; if (globalThis.__readCounts) globalThis.__readCounts.clear(); if (typeof __shotPaths !== 'undefined') __shotPaths.length = 0; }
 // A batch's direct value set (a native select) is still a value-only change.
 function __markValueOnly(target) { var key = __key(target); if (!__dirty.has(key)) __valueOnly.set(key, target); __dirty.set(key, target); }
 // Page-side: the text the user selected, unless it sits in a field (the agent's own typing selects
@@ -437,6 +437,38 @@ function __lazyPage() {
   }});
 }
 Object.defineProperty(globalThis,'page',{value:__lazyPage(),writable:true,configurable:true});
+function __bindPage(bound) {
+  try { page = bound; } catch (error) { globalThis.page = bound; }
+  globalThis.page = bound;
+  return bound;
+}
+function __useTarget(target) {
+  var resolved = target;
+  if (typeof resolved === 'string' && /^\\d+$/.test(resolved)) resolved = Number(resolved);
+  if (resolved && typeof resolved === 'object') resolved = resolved.target || resolved;
+  if (typeof resolved === 'string' && /^\\d+$/.test(resolved)) resolved = Number(resolved);
+  var now = __targetNow(resolved);
+  return __isTargetKey(now) ? now : resolved;
+}
+async function __useLater(target) {
+  var resolved = await __boundTarget(__useTarget(target));
+  if (!__isTargetKey(resolved)) {
+    var id = target && typeof target === 'object' ? target.id ?? target.tabId : undefined;
+    if (typeof id === 'string' && /^\\d+$/.test(id)) id = Number(id);
+    if (typeof id === 'number') resolved = await __tabTarget(id);
+  }
+  if (!__isTargetKey(resolved)) throw Error('TARGET_LOST: bu.use takes a tab, a tab id or a session label (p1, p2…)');
+  var entry = __tabs.get(__key(resolved));
+  if (!entry && __attachedTarget && __key(resolved) === __key(__attachedTarget))
+    entry = {target: resolved, url:'', title:''};
+  if (!entry) {
+    await browser.tabs();
+    entry = __tabs.get(__key(resolved));
+  }
+  if (!entry) throw Error('TARGET_LOST: tab ' + (resolved.tabId ?? '?') + ' is not open; browser.tabs() lists live tabs, browser.attachTab(tab) attaches one');
+  __lastTarget = resolved;
+  return __bindPage(browser.page(resolved));
+}
 var __progressAt = 0;
 var bu = Object.freeze({
   // Long jobs run in one cell and report as they go: bu.progress(47, 77, 'Removing') shows
@@ -447,18 +479,20 @@ var bu = Object.freeze({
     __progressAt = now;
     __call({progress: {done: Number(done), total: total == null ? undefined : Number(total), label: label == null ? undefined : String(label)}}).catch(() => {});
   },
-  use: target => {
-    if (typeof target === 'number') return __tabTarget(target).then(bu.use);
-    if (typeof target === 'string') {
-      if (!/^p\\d{1,3}$/.test(target)) throw Error('TARGET_LOST: bu.use takes a tab, a tab id or a session label (p1, p2…)');
-      return __labelTarget(target).then(bu.use);
+  // Sync when the tab is already known, so bu.use(tab) binds page before the next line.
+  // A tab that still has to be listed is looked up, and the returned promise is the page.
+  use: (target) => {
+    var resolved = __useTarget(target);
+    if (__isTargetKey(resolved)) {
+      var entry = __tabs.get(__key(resolved));
+      if (!entry && __attachedTarget && __key(resolved) === __key(__attachedTarget))
+        entry = {target: resolved, url:'', title:''};
+      if (entry) {
+        __lastTarget = resolved;
+        return __bindPage(browser.page(resolved));
+      }
     }
-    if (!target || typeof target !== 'object') throw Error('TARGET_LOST: bu.use needs a tab from browser.tabs(), a tab id, or a target');
-    var entry = __tabs.get(__key(target));
-    if (!entry && __attachedTarget && __key(target) === __key(__attachedTarget))
-      entry = {target, url:'', title:''};
-    if (!entry) throw Error('TARGET_LOST: tab ' + (target.tabId ?? target.target?.tabId ?? '?') + ' is not open; browser.tabs() lists live tabs, browser.attachTab(tab) attaches one');
-    __lastTarget = target; globalThis.page = browser.page(target); return globalThis.page;
+    return __useLater(target);
   },
   // The overlay that covers the page: the short name TARGET_BLOCKED gives for page.overlays.dismiss().
   clear: (options = {}) => {

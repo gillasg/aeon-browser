@@ -19,13 +19,16 @@ interface Snapshot {
 export class BrowserInventoryRegistry {
   private readonly clients = new Map<string, Snapshot>();
 
-  applyFull(candidate: unknown): BrowserInventoryFull | undefined {
+  applyFull(candidate: unknown): BrowserInventoryFull | "duplicate" | undefined {
     const parsed = BrowserInventoryFullSchema.safeParse(candidate);
     if (!parsed.success || !validFull(parsed.data)) return undefined;
     const next = parsed.data;
     const current = this.clients.get(next.clientInstanceId);
+    // A second full snapshot of the same run (a reconnect that lost the generation race, or the
+    // same socket sending the snapshot twice) is not a new inventory. Rejecting it used to close
+    // the live socket, so a named browser vanished between parallel pins.
     if (current?.browserRunId === next.browserRunId && current.generation >= next.generation)
-      return undefined;
+      return "duplicate";
     this.clients.set(next.clientInstanceId, {
       browserRunId: next.browserRunId,
       generation: next.generation,

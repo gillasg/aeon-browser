@@ -26,7 +26,12 @@ export {
   type AeonModelRuntimeOptions,
   type LiveModelSource,
 } from "./live-models.js";
-export { siteMapperRequest, sessionChatId } from "./site-browser.js";
+export {
+  browserNamedFor,
+  browserParentChat,
+  siteMapperRequest,
+  sessionChatId,
+} from "./site-browser.js";
 export {
   createAeonHostHandler,
   type SiteRulesAnswer,

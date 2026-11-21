@@ -464,18 +464,31 @@ function __extendPageData(target, base) {
     read: async (options = {}, settings = {}) => {
       if (typeof options === 'string') return readElement(options, settings);
       __noteRead(target);
-      var deadline = Date.now() + Math.max(5000, Number(options.timeMs) || 30000);
+      var readKey = __key(target) + '|' + String((__tabs.get(__key(target)) || {}).url || '');
+      var counts = globalThis.__readCounts || (globalThis.__readCounts = new Map());
+      var times = (counts.get(readKey) || 0) + 1;
+      counts.set(readKey, times);
+      if (times > 4) {
+        var prior = (globalThis.__lastReads && globalThis.__lastReads.get(readKey)) || {markdown: '', text: ''};
+        return {...prior, partial: true, loop: true, notes: [...(prior.notes || []), 'stopped: this page was read ' + times + ' times in one cell without a new navigation']};
+      }
+      var budget = Number(options.timeMs);
+      var deadline = Date.now() + Math.max(500, budget > 0 ? budget : 30000);
+      var timedOut = () => Date.now() > deadline;
       var max = Math.max(2000, Math.min(200000, Number(options.max) || 40000));
-      var expanded = options.expand === false
+      var expanded = options.expand === false || timedOut()
         ? {clicked: [], skipped: []}
         : await inspect(__expandRead, {max: options.maxClicks ?? 10}).catch(() => ({clicked: [], skipped: []}));
-      var waited = await inspect(__waitRead, {maxMs: options.waitMs ?? 5000}).catch(() => ({settled: false, partial: true, note: 'the settle wait failed'}));
+      var waited = timedOut()
+        ? {settled: false, partial: true, note: 'time budget spent'}
+        : await inspect(__waitRead, {maxMs: Math.min(options.waitMs ?? 5000, Math.max(0, deadline - Date.now()))}).catch(() => ({settled: false, partial: true, note: 'the settle wait failed'}));
       var markdown = await inspect(__readMarkdown, {...options, max});
       var data = await base.inspect(
         '(' + __readPageData.toString() + ')(' + __readMetadata.toString() + ', ' + JSON.stringify({...options, summary: options.summary === true}) + ')'
       );
       var list = null, listNote;
       try {
+        if (timedOut()) throw Error('time budget spent');
         list = await __collectList(base, options.list || null, {
           max: Math.min(500, Number(options.maxItems) || 200),
           ...(options.maxScrolls ? {maxScrolls: options.maxScrolls} : {}),
@@ -484,10 +497,10 @@ function __extendPageData(target, base) {
       } catch (error) {
         listNote = 'no repeated list: ' + String(error && error.message || error).slice(0, 200);
       }
-      var scrollers = options.scrollers === false
+      var scrollers = options.scrollers === false || timedOut()
         ? []
         : await __readScrollers(base, {deadline, maxChars: Math.floor(max / 2)}).catch(() => []);
-      var embedded = options.frames === false
+      var embedded = options.frames === false || timedOut()
         ? []
         : await __readEmbedded(base, target, {deadline, maxChars: Math.floor(max / 4)}).catch(() => []);
       // A panel whose text did not grow while scrolling is already in the Markdown.
@@ -546,6 +559,8 @@ function __extendPageData(target, base) {
       // text is the page text (the same string as markdown) so a check can match it.
       // data, list, markdown and the rest stay.
       result.text = String(result.markdown || '');
+      if (timedOut()) { result.partial = true; result.notes.push('time budget spent'); }
+      (globalThis.__lastReads || (globalThis.__lastReads = new Map())).set(readKey, result);
       return result;
     },
     status: async () => {
@@ -618,20 +633,31 @@ async function __pool(items, worker, options = {}) {
     if (until > Date.now()) await __sleep(until - Date.now());
   }
   // The runner's tab is stored on 'tab' as soon as it exists, so a failure never leaks it.
+  function dropTab(tab) {
+    var dead = tab.page;
+    tab.page = undefined;
+    if (dead && dead.close) dead.close().catch(() => {});
+  }
   async function attempt(job, tab) {
     var url = urlOf(job.item);
-    if (url) {
-      await wait(new URL(url).host);
-      if (tab.page) await tab.page.goto(url, {present: false});
-      else tab.page = await browser.openTab(url, {new: true, present: false});
-      var status = await tab.page.status().catch(() => null);
-      if (status === 429 || status === 503) {
-        var host = new URL(url).host;
-        backoff.set(host, Date.now() + Math.min(60000, 2000 * 2 ** job.attempts));
-        throw Object.assign(Error('HTTP ' + status + ' from ' + host), {retryable: true});
-      }
-    } else if (!tab.page) throw Error('Each item needs a url (or be one)');
-    return worker(tab.page, job.item, job.index);
+    try {
+      if (url) {
+        await wait(new URL(url).host);
+        if (tab.page) await tab.page.goto(url, {present: false});
+        else tab.page = await browser.openTab(url, {new: true, present: false});
+        var status = await tab.page.status().catch(() => null);
+        if (status === 429 || status === 503) {
+          var host = new URL(url).host;
+          backoff.set(host, Date.now() + Math.min(60000, 2000 * 2 ** job.attempts));
+          throw Object.assign(Error('HTTP ' + status + ' from ' + host), {retryable: true});
+        }
+      } else if (!tab.page) throw Error('Each item needs a url (or be one)');
+      return await worker(tab.page, job.item, job.index);
+    } catch (error) {
+      var message = String(error && error.message || error);
+      if (/TARGET_LOST|about:blank|TAB_DEAD/.test(message)) dropTab(tab);
+      throw error;
+    }
   }
   async function runner() {
     var tab = {};
@@ -644,6 +670,7 @@ async function __pool(items, worker, options = {}) {
           if (job.attempts++ < retries) { queue.push(job); continue; }
           results[job.index] = {ok: false, item: job.item, error: String(error && error.message || error)};
         }
+        globalThis.__partialValue = results.slice();
         if (options.onProgress) options.onProgress(results.filter(Boolean).length, items.length);
       }
     } finally {

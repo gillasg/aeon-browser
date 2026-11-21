@@ -39,7 +39,10 @@ type Waiter = {
 /** What the runtime needs from a browser connection; anything that can run browser code fits. */
 export interface Bridge {
   /** Runs browser code in a named session (tabs and variables persist per session). */
-  run(code: string, options?: { session?: string; timeoutMs?: number }): Promise<unknown>;
+  run(
+    code: string,
+    options?: { session?: string; timeoutMs?: number; browser?: string },
+  ): Promise<unknown>;
   status(): Promise<{ browsers: number }>;
   close(): void;
 }
@@ -124,7 +127,7 @@ export class BridgeClient implements Bridge {
   /** Runs browser code; throws with the cell's error so callers see what the page said. */
   async run(
     code: string,
-    options: { session?: string; timeoutMs?: number } = {},
+    options: { session?: string; timeoutMs?: number; browser?: string } = {},
   ): Promise<unknown> {
     const reply = (await this.request("run", {
       code,

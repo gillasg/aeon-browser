@@ -1,3 +1,15 @@
+import { toOffscreen } from "./code-offscreen-host.js";
+
+/** A deadline keeps the realm. The sandbox posts whatever the cell had already built. */
+export function interruptCell(chatId: string, cellId: string): void {
+  void toOffscreen({
+    target: "aeon-code-offscreen",
+    kind: "interrupt",
+    chatId,
+    cellId,
+  }).catch(() => undefined);
+}
+
 /** What a finished cell posts back to the host. */
 export type CellOutcome = {
   value?: unknown;

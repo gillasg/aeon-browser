@@ -39,6 +39,51 @@ interface Pending {
 const LINK_GRACE_MS = 60_000;
 /** A browser answers a run at once; silence past this means the connection stalled. */
 const ACK_MS = 10_000;
+/** How long an interrupted cell may take to post the value it already built. */
+const PARTIAL_WAIT_MS = 3_000;
+
+function startedStage(stage: BrowserCodeStage): boolean {
+  return stage === "evaluating" || stage === "result-sent";
+}
+
+function deadlineMessage(stage: BrowserCodeStage, started: boolean): string {
+  if (!started) {
+    return `INTERNAL: the browser never started this code; browser code exceeded its deadline (last stage: ${stage}); that cell stopped and its realm was reset.`;
+  }
+  return `TIMEOUT: browser code exceeded its deadline (last stage: ${stage}); the partial value was not returned`;
+}
+
+/** Arms the cell deadline. A cell that has started is interrupted and given time to return a partial. */
+function deadlineClock(
+  stageOf: () => BrowserCodeStage,
+  cancel: (reset: boolean) => void,
+  finish: (result?: BrowserCodeResult, error?: Error) => void,
+  timeoutMs: number,
+): { waiting: (paused: boolean) => void; clear: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expire = (): void => {
+    const stage = stageOf();
+    if (!startedStage(stage)) {
+      cancel(true);
+      finish(undefined, new Error(deadlineMessage(stage, false)));
+      return;
+    }
+    cancel(false);
+    clearTimeout(timer);
+    timer = setTimeout(
+      () => finish(undefined, new Error(deadlineMessage(stage, true))),
+      PARTIAL_WAIT_MS,
+    );
+  };
+  timer = setTimeout(expire, timeoutMs + 5000);
+  return {
+    waiting: (paused: boolean) => {
+      clearTimeout(timer);
+      timer = paused ? undefined : setTimeout(expire, timeoutMs + 5000);
+    },
+    clear: () => clearTimeout(timer),
+  };
+}
 
 /** Runs browser_code cells inside a connected executor: one round trip per cell, not per step. */
 export class BrowserCodeCells {
@@ -65,31 +110,6 @@ export class BrowserCodeCells {
         if (socket.readyState === WebSocket.OPEN)
           socket.send(JSON.stringify({ kind: "browser.code.cancel", cellId, reset }));
       };
-      const expire = () => {
-        const stage = this.cells.get(cellId)?.stage ?? "sent";
-        // Always drop the realm. An evaluating cell left running keeps its loop, interval or
-        // observer alive in the extension renderer for the rest of the Chrome session.
-        const neverEvaluated =
-          stage === "sent" ||
-          stage === "received" ||
-          stage === "offscreen" ||
-          stage === "realm-ready";
-        cancel(true);
-        finish(
-          undefined,
-          new Error(
-            `${neverEvaluated ? "INTERNAL: the browser never started this code; " : "TIMEOUT: "}browser code exceeded its deadline (last stage: ${stage}); that cell stopped and its realm was reset.`,
-          ),
-        );
-      };
-      let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(
-        expire,
-        input.timeoutMs + 5000,
-      );
-      const waiting = (paused: boolean) => {
-        clearTimeout(timer);
-        timer = paused ? undefined : setTimeout(expire, input.timeoutMs + 5000);
-      };
       const abort = () => {
         cancel(true);
         finish(undefined, new Error("RUN_RESET: browser workflow cancelled; runtime reset"));
@@ -105,7 +125,7 @@ export class BrowserCodeCells {
       const finish = (result?: BrowserCodeResult, error?: Error) => {
         const cell = this.cells.get(cellId);
         if (!this.cells.delete(cellId)) return;
-        clearTimeout(timer);
+        clock.clear();
         if (cell?.closeTimer) clearTimeout(cell.closeTimer);
         signal?.removeEventListener("abort", abort);
         if (cell) cell.socket.off("close", close);
@@ -119,12 +139,18 @@ export class BrowserCodeCells {
           reject(error ?? new Error("INTERNAL: the cell ended without a result"));
         }
       };
+      const clock = deadlineClock(
+        () => this.cells.get(cellId)?.stage ?? "sent",
+        cancel,
+        finish,
+        input.timeoutMs,
+      );
       this.cells.set(cellId, {
         clientInstanceId,
         socket,
         input,
         finish,
-        waiting,
+        waiting: clock.waiting,
         stage: "sent",
         opened: new Map(),
       });

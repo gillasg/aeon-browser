@@ -176,6 +176,8 @@ export class BrowserFetcher implements Fetcher {
   readonly name = "browser" as const;
   private readonly free: string[] = [];
   private readonly waiting: ((session: string) => void)[] = [];
+  /** The profile later closes must use, so a close is not ambiguous when two browsers are open. */
+  private browserName: string | undefined;
 
   constructor(
     workers = 3,
@@ -200,11 +202,13 @@ export class BrowserFetcher implements Fetcher {
   async fetch(url: string, options: ScrapeOptions): Promise<Fetched> {
     await passGate(url);
     const session = await this.acquire();
+    if (options.browser) this.browserName = options.browser;
     try {
       const bridge = await this.bridge();
       const captured = (await bridge.run(pageCode(url, options, outputsFor(options)), {
         session,
         timeoutMs: options.timeoutMs ?? 90_000,
+        ...(options.browser ? { browser: options.browser } : {}),
       })) as Captured;
       const fetched: Fetched = {
         url,
@@ -231,11 +235,12 @@ export class BrowserFetcher implements Fetcher {
   async close(): Promise<void> {
     const bridge = await this.bridge().catch(() => undefined);
     if (!bridge) return;
+    const browser = this.browserName;
     for (const session of [...this.free])
       await bridge
         .run(
           "if (globalThis.__crawlTab) { await globalThis.__crawlTab.close(); globalThis.__crawlTab = undefined; } true",
-          { session },
+          { session, ...(browser ? { browser } : {}) },
         )
         .catch(() => undefined);
   }

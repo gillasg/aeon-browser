@@ -121,6 +121,7 @@ export function installAeonCliHost(host: DaemonHost): void {
   useBrowser(daemonBridge(host));
   configureCliHost({
     runInBrowser: (code, options) => host.runInBrowser(code, options ?? {}),
+    browsers: () => host.browsers(),
     model: async () => host.model(),
   });
 }

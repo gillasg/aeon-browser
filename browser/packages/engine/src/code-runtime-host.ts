@@ -1,7 +1,7 @@
 import { stepTrace, takeActionTiming } from "./native-browser-action-timing.js";
 import { recordStep } from "./evidence/step-record.js";
 import { progressSteps } from "./code-runtime-progress.js";
-import { cellPayload, takeInternal, type CellOutcome } from "./code-runtime-cell.js";
+import { cellPayload, interruptCell, takeInternal, type CellOutcome } from "./code-runtime-cell.js";
 import type { StepEvent } from "@browserkit/protocol";
 import { runEffect, type KernelChecks } from "./kernel.js";
 import { cellEffects } from "./code-runtime-effects.js";
@@ -27,7 +27,7 @@ import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.j
 import { stepFailure } from "./code-step-errors.js";
 import { mayHaveLanded, refusedEffect, sentActionEffect } from "./native-browser-effect.js";
 import { jobs } from "./code-runtime-jobs.js";
-import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
+import { finishJob, cancelJobs, loseJob } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
 import { agentTypedIn, noteAgentText } from "./native-browser-password-lock.js";
 import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
@@ -119,15 +119,15 @@ export function handleBrowserCodeMessage(
   if (cancel.success) {
     const cell = cells.get(cancel.data.cellId);
     const reset = cancel.data.reset === true;
-    if (cell && reset) void resetRealm(cell.run.chatId);
-    if (cell)
+    if (!cell) return true;
+    if (reset) {
+      void resetRealm(cell.run.chatId);
       finish(cell, {
         output: "",
-        error: reset
-          ? "RUN_RESET: browser workflow cancelled; runtime reset"
-          : "RUN_RESET: browser workflow cancelled",
-        reset,
+        error: "RUN_RESET: browser workflow cancelled; runtime reset",
+        reset: true,
       });
+    } else interruptCell(cell.run.chatId, cell.run.cellId);
     return true;
   }
   return false;
@@ -276,8 +276,8 @@ function finalize(cell: Cell, result: CellOutcome): void {
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.target !== "aeon-code-host") return;
   if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL(OFFSCREEN)) return;
-  if (message.kind === "jobDone") {
-    finishJob(message as Record<string, unknown>);
+  if (message.kind === "jobDone" || message.kind === "jobLost") {
+    (message.kind === "jobDone" ? finishJob : loseJob)(message as Record<string, unknown>);
     reply({ ok: true });
     return true;
   }

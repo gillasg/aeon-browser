@@ -343,6 +343,10 @@ export class BrowserControlService {
   executorSockets(): WebSocket[] {
     return [...this.executors.values()];
   }
+  /** The socket a browser is connected on, when it is. */
+  executorSocket(clientInstanceId: string): WebSocket | undefined {
+    return this.executors.get(clientInstanceId);
+  }
   /**
    * Daemon, then extension, then engine. No open executor answers at once as extension-down;
    * the engine must echo the nonce on a later turn.

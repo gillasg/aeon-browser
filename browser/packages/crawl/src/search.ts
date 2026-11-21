@@ -24,6 +24,8 @@ export interface SearchOptions {
   limit?: number;
   engine?: SearchEngine;
   bridge?: () => Promise<Bridge>;
+  /** Chrome profile for a Google search, when more than one browser is connected. */
+  browser?: string;
 }
 
 // Queries whose answer depends on where the user is, what is happening now, or who they are.
@@ -38,7 +40,10 @@ async function googleSearch(query: string, options: SearchOptions): Promise<Sear
   const bridge = await (options.bridge ?? sharedBridge)();
   const results = (await bridge.run(
     `await google.search(${JSON.stringify(query)}, { limit: ${options.limit ?? 10} })`,
-    { session: "browser-crawl-search" },
+    {
+      session: "browser-crawl-search",
+      ...(options.browser ? { browser: options.browser } : {}),
+    },
   )) as SearchResult[];
   return (results ?? []).map((item) => ({
     title: item.title,

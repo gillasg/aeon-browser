@@ -30,7 +30,11 @@ export interface Job extends Cell {
 
 let jobsRestored: Promise<void> | undefined;
 export function restoreJobs(): Promise<void> {
-  jobsRestored ??= chrome.storage.session
+  if (jobsRestored) return jobsRestored;
+  // A failed read must not stick: the next status call reads again, and a save must not write an
+  // empty map over jobs that are still in storage. Only this read may clear the cache, so a newer
+  // reload is not dropped when an older read fails.
+  const reading = chrome.storage.session
     .get(JOB_STORAGE)
     .then((stored) => {
       const saved = stored[JOB_STORAGE];
@@ -71,8 +75,18 @@ export function restoreJobs(): Promise<void> {
         });
       }
     })
-    .catch(() => undefined);
-  return jobsRestored;
+    .catch((error: unknown) => {
+      if (jobsRestored === reading) jobsRestored = undefined;
+      throw error;
+    });
+  jobsRestored = reading;
+  return reading;
+}
+
+/** Reads storage again and merges anything this worker has not seen yet. */
+export function reloadJobs(): Promise<void> {
+  jobsRestored = undefined;
+  return restoreJobs().catch(() => undefined);
 }
 
 export function emptyJob(jobId: string, chatId: string, total: number): Job {
@@ -107,30 +121,49 @@ export function emptyJob(jobId: string, chatId: string, total: number): Job {
   };
 }
 
+function savedResults(job: Job): unknown[] | undefined {
+  if (!job.results) return undefined;
+  try {
+    const text = JSON.stringify(job.results) ?? "";
+    return text.length <= 1_000_000 ? job.results : undefined;
+  } catch {
+    // A result that cannot be stored must not drop the record itself.
+    return undefined;
+  }
+}
+
 let jobsWriting = Promise.resolve();
 export function saveJobs(): Promise<void> {
-  const saved = [...jobs.values()].map((job) => {
-    const text = JSON.stringify(job.results) ?? "";
-    return {
-      jobId: job.run.cellId,
-      chatId: job.run.chatId,
-      status: job.status,
-      total: job.total,
-      startedAt: job.startedAt,
-      ...(job.finishedAt ? { finishedAt: job.finishedAt } : {}),
-      ...(job.results && text.length <= 1_000_000 ? { results: job.results } : {}),
-      ...(job.progress ? { progress: job.progress } : {}),
-      ...(job.items && job.items.length <= 500 ? { items: job.items } : {}),
-      ...(job.fn ? { fn: job.fn } : {}),
-      ...(job.options ? { options: job.options } : {}),
-      ...(job.mode ? { mode: job.mode } : {}),
-      ...(job.error ? { error: job.error } : {}),
-      ...(job.artifact ? { artifact: job.artifact } : {}),
-    };
-  });
   jobsWriting = jobsWriting
     .catch(() => undefined)
-    .then(() => chrome.storage.session.set({ [JOB_STORAGE]: saved }))
+    .then(async () => {
+      // Restore first, so a save during startup cannot replace stored jobs with an empty map.
+      try {
+        await restoreJobs();
+      } catch {
+        return;
+      }
+      const saved = [...jobs.values()].map((job) => {
+        const results = savedResults(job);
+        return {
+          jobId: job.run.cellId,
+          chatId: job.run.chatId,
+          status: job.status,
+          total: job.total,
+          startedAt: job.startedAt,
+          ...(job.finishedAt ? { finishedAt: job.finishedAt } : {}),
+          ...(results ? { results } : {}),
+          ...(job.progress ? { progress: job.progress } : {}),
+          ...(job.items && job.items.length <= 500 ? { items: job.items } : {}),
+          ...(job.fn ? { fn: job.fn } : {}),
+          ...(job.options ? { options: job.options } : {}),
+          ...(job.mode ? { mode: job.mode } : {}),
+          ...(job.error ? { error: job.error } : {}),
+          ...(job.artifact ? { artifact: job.artifact } : {}),
+        };
+      });
+      await chrome.storage.session.set({ [JOB_STORAGE]: saved });
+    })
     .catch(() => undefined);
   return jobsWriting;
 }
