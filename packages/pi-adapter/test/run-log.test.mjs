@@ -128,6 +128,13 @@ test("closing the session while a run-log write is pending writes nothing afterw
   }
 });
 
+test("hostOf preserves host:port for loopback URLs and drops port for web hosts", async () => {
+  const { hostOf } = await import("../dist/run-log.js");
+  assert.equal(hostOf("http://127.0.0.1:3773/settings"), "127.0.0.1:3773");
+  assert.equal(hostOf("http://localhost:8080/api"), "localhost:8080");
+  assert.equal(hostOf("https://shop.example:8443/x"), "shop.example");
+});
+
 async function runFiles(workspace) {
   const names = await readdir(join(workspace, "runs")).catch((error) => {
     if (error?.code === "ENOENT") return [];

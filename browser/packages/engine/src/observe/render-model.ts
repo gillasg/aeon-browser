@@ -69,7 +69,7 @@ export function roleLabel(role: string): string {
   return ROLE_LABEL[role] ?? role;
 }
 
-/** `a|b` is either word. An empty query matches everything. */
+/** `a|b` is either phrase. An empty query matches everything. */
 export function queryParts(query: string): string[] {
   return query
     .toLowerCase()
@@ -78,8 +78,26 @@ export function queryParts(query: string): string[] {
     .filter((part) => part.length > 0);
 }
 
-export function matchesQuery(hay: string, query: string): boolean {
+/** Splits a query on `|` and whitespace into individual words (dropping 1-char noise when longer words exist). */
+export function queryWords(query: string): string[] {
+  const raw = query
+    .toLowerCase()
+    .split(/[\s|]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  const meaningful = raw.filter((word) => word.length > 1);
+  return meaningful.length > 0 ? meaningful : raw;
+}
+
+export function matchesExactQuery(hay: string, query: string): boolean {
   const parts = queryParts(query);
+  if (parts.length === 0) return true;
+  const text = hay.toLowerCase();
+  return parts.some((part) => text.includes(part));
+}
+
+export function matchesQuery(hay: string, query: string): boolean {
+  const parts = queryWords(query);
   if (parts.length === 0) return true;
   const text = hay.toLowerCase();
   return parts.some((part) => text.includes(part));

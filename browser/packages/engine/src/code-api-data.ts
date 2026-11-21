@@ -486,6 +486,23 @@ function __extendPageData(target, base) {
         : await inspect(__waitRead, {maxMs: Math.min(options.waitMs ?? 5000, Math.max(0, deadline - Date.now()))}).catch(() => ({settled: false, partial: true, note: 'the settle wait failed'}));
       var markdown = await inspect(__readMarkdown, {...options, max});
       var pageTitle = await base.inspect(() => document.title);
+      var mdBody = String(markdown.markdown || '')
+        .replace(/^#\\s+.*$/m, '')
+        .replace(/\\s+/g, ' ')
+        .trim();
+      var fallbackNote;
+      if (mdBody.length < 40 && !timedOut()) {
+        var axState = await base.state().catch(() => '');
+        var axText = typeof axState === 'string' ? axState.trim() : '';
+        if (axText.length > Math.max(40, String(markdown.markdown || '').trim().length)) {
+          markdown = {
+            ...markdown,
+            markdown: axText.slice(0, max),
+            chars: Math.min(axText.length, max),
+          };
+          fallbackNote = 'markdown was near empty; fell back to accessibility text';
+        }
+      }
       var throttled = __throttlePage(pageTitle, String(markdown.markdown || ''));
       if (throttled) throw Error(throttled);
       var data = await base.inspect(
@@ -512,6 +529,7 @@ function __extendPageData(target, base) {
       var panels = scrollers.filter((panel) => panel.grew).map(({grew, height, view, ...panel}) => panel);
       var notes = [
         ...(expanded.clicked.length ? ['expanded ' + expanded.clicked.length + ' control(s): ' + expanded.clicked.join(', ')] : []),
+        ...(fallbackNote ? [fallbackNote] : []),
         ...(markdown.notes || []),
         ...((data && data.notes) || []),
         ...(waited.note ? [waited.note] : []),

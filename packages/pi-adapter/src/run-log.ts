@@ -190,11 +190,18 @@ function hostsOf(steps: readonly Record<string, unknown>[]): string[] {
   return [...hosts];
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  const bare = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return bare === "localhost" || bare === "127.0.0.1" || bare === "::1" || bare.startsWith("127.");
+}
+
 export function hostOf(url: unknown): string | undefined {
   if (typeof url !== "string" || !url) return undefined;
   try {
-    const host = new URL(url).hostname;
-    return host || undefined;
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+    if (!hostname) return undefined;
+    return isLoopbackHost(hostname) && parsed.port ? parsed.host : hostname;
   } catch {
     return undefined;
   }

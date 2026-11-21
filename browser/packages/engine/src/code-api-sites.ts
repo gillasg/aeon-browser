@@ -1,9 +1,16 @@
 // Sites in browser code: site skills (helpers saved per site), mapped site APIs, and learning
 // a site's API while the agent works in it. Evaluated in the code sandbox with the other APIs.
 export const browserSitesApi = `
+function __siteHost(url) {
+  var parsed = new URL(String(url));
+  var hostname = parsed.hostname.toLowerCase().replace(/^www\\./, '');
+  var bare = hostname.replace(/^\\[|\\]$/g, '');
+  var loopback = bare === 'localhost' || bare === '127.0.0.1' || bare === '::1' || bare.startsWith('127.');
+  return loopback && parsed.port ? parsed.host.toLowerCase() : hostname;
+}
 var __skillCache = new Map();
 async function __siteSkills(url) {
-  var host; try { host = new URL(url).hostname; } catch { return []; }
+  var host; try { host = __siteHost(url); } catch { return []; }
   var cached = __skillCache.get(host);
   if (cached && Date.now() - cached.at < 60000) return cached.list;
   var answer = await __call({siteSkill:'list', url}).catch(() => []);
@@ -42,7 +49,7 @@ async function __autoLoadSkills(url) {
 var __announcedSites = new Set();
 async function __mappedNote(url) {
   var host = '';
-  try { host = new URL(url).hostname.replace(/^www\\./, ''); } catch { return ''; }
+  try { host = __siteHost(url); } catch { return ''; }
   if (!host || __announcedSites.has(host)) return '';
   __announcedSites.add(host);
   var caps;
@@ -127,7 +134,7 @@ function __siteToolTarget() {
 }
 async function __siteToolHost() {
   var url = String(browser.page(__siteToolTarget()).url);
-  return {url, host: new URL(url).hostname.replace(/^www\./, '')};
+  return {url, host: __siteHost(url)};
 }
 function __siteToolGroup(kind) {
   return new Proxy({}, {
@@ -148,7 +155,7 @@ function __siteToolGroup(kind) {
 // tools, learned notes, site skills and WebMCP tools. Reads sort before writes.
 var __siteCapabilities = async (host) => {
   var url = host ? (/^https?:/.test(host) ? host : 'https://' + host) : (__lastTarget ? String(await browser.page(__lastTarget).url()) : '');
-  var siteName = host || (url ? new URL(url).hostname.replace(/^www\\./, '') : '');
+  var siteName = host ? (__siteHost(/^https?:/.test(host) ? host : 'https://' + host)) : (url ? __siteHost(url) : '');
   if (!siteName) throw Error('SITE_UNKNOWN: pass a site or open a tab first');
   var base = await __call({siteCapabilities: {host: siteName}});
   var webmcp = __lastTarget ? await browser.page(__lastTarget).webmcp.list().catch(() => ({tools: []})) : {tools: []};
@@ -165,11 +172,11 @@ var __siteCapabilities = async (host) => {
 var __siteHostName = async (site) => {
   if (site) {
     var text = String(site);
-    if (/^https?:/.test(text)) return new URL(text).hostname.replace(/^www\\./, '');
+    if (/^https?:/.test(text)) return __siteHost(text);
     return text.replace(/^www\\./, '').split('/')[0];
   }
   if (!__lastTarget) throw Error('SITE_UNKNOWN: pass a site or open a tab first');
-  return new URL(String(await browser.page(__lastTarget).url())).hostname.replace(/^www\\./, '');
+  return __siteHost(String(await browser.page(__lastTarget).url()));
 };
 // Saves an ability for the current site (or spec.site). A script way may be a function; a
 // demonstration's skill ({name, code}) is saved as a page-script ability.
@@ -320,7 +327,7 @@ async function __learnFromCell() {
         if (cause) entry._step = cause.label;
       }
       var url = (__tabs.get(key) && __tabs.get(key).url) || entries[0].request.url;
-      var result = await __call({siteMapper: 'learn-live', site: new URL(String(url)).hostname, har, approved});
+      var result = await __call({siteMapper: 'learn-live', site: __siteHost(url), har, approved});
       for (var op of (result && result.learned) || []) {
         // Only operations this cell's own actions caused (or a write it proved): unrelated
         // page-load requests (a checkout widget, an animation JSON) stay in siteMapper.operations.

@@ -106,7 +106,8 @@ test(
         { stdio: "ignore" },
       );
       await connectExtension(profile, env);
-      const abilities = join(home, "s2a", "sites", "127.0.0.1", "abilities");
+      const siteHost = new URL(siteUrl).host;
+      const abilities = join(home, "s2a", "sites", siteHost.replace(/:/g, "_"), "abilities");
       await mkdir(abilities, { recursive: true });
       await writeFile(
         join(abilities, "find_lamp.json"),
@@ -123,9 +124,10 @@ test(
         const result = await page.overlays.dismiss();
         console.log("CLEARED " + JSON.stringify({result, choice: await page.evaluate(() => window.choice ?? null), left: await page.evaluate(() => document.querySelectorAll('#cookies,#promo').length)}));`);
       // Opening a mapped site names its abilities, so the agent need not click through it.
+      const escapedHost = siteHost.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       assert.match(
         cleared.stdout,
-        /\[site\] 127\.0\.0\.1 is mapped.*find_lamp\(query\)/,
+        new RegExp(`\\[site\\] ${escapedHost} is mapped.*find_lamp\\(query\\)`),
         cleared.stdout,
       );
       const out = JSON.parse(/CLEARED (.*)/.exec(cleared.stdout)?.[1] ?? "null");

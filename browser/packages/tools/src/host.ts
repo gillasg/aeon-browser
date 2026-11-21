@@ -356,13 +356,18 @@ function handleSiteTool(value: unknown): Promise<unknown> {
   );
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  const bare = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return bare === "localhost" || bare === "127.0.0.1" || bare === "::1" || bare.startsWith("127.");
+}
+
 function siteNameFrom(request: { site?: unknown; url?: unknown }): string {
   const value = String(request.site ?? request.url ?? "");
   try {
-    return new URL(value.includes("://") ? value : `https://${value}`).hostname.replace(
-      /^www\./,
-      "",
-    );
+    const parsed = new URL(value.includes("://") ? value : `https://${value}`);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (isLoopbackHost(hostname) && parsed.port) return parsed.host.toLowerCase();
+    return hostname;
   } catch {
     return value.replace(/^https?:\/\//, "").split("/")[0] ?? "";
   }

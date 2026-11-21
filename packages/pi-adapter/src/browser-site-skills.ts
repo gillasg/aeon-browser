@@ -72,7 +72,7 @@ function validSkill(skill: Partial<SiteSkill> | undefined): SiteSkill {
   if (
     !domains.length ||
     domains.length > 16 ||
-    domains.some((d) => !/^(\*\.)?[a-z0-9.-]+$/.test(d))
+    domains.some((d) => !/^(\*\.)?[a-z0-9.-]+(?::\d{1,5})?$/.test(d))
   )
     throw new Error("Skill domains must be host names such as example.com or *.example.com");
   const text = (value: unknown, max: number, label: string) => {
@@ -99,9 +99,17 @@ function validName(name: unknown): string {
   return name;
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  const bare = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return bare === "localhost" || bare === "127.0.0.1" || bare === "::1" || bare.startsWith("127.");
+}
+
 function hostOf(url: string | undefined): string | undefined {
+  if (!url) return undefined;
   try {
-    return url ? new URL(url).hostname.toLowerCase() : undefined;
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return isLoopbackHost(hostname) && parsed.port ? parsed.host.toLowerCase() : hostname;
   } catch {
     return undefined;
   }

@@ -2,6 +2,7 @@ import {
   DROP_ORDER,
   RANK,
   cost,
+  matchesExactQuery,
   matchesQuery,
   noMatchText,
   queryParts,
@@ -137,20 +138,27 @@ function rowLabel(line: Line, lines: readonly Line[]): string {
 
 function applyFocus(lines: Line[], focus: string | undefined): Line[] {
   if (!focus || queryParts(focus).length === 0) return lines;
-  const matched = keepMatches(lines, focus);
-  if (matched.hits > 0) return matched.lines;
+  const exact = keepMatches(lines, focus, true);
+  if (exact.hits > 0) return exact.lines;
+  const words = keepMatches(lines, focus, false);
+  if (words.hits > 0) return words.lines;
   const note = noMatchText(focus, elementCount(lines));
-  return [...matched.lines, noteLine(note, 80)];
+  return [...exact.lines, noteLine(note, 80)];
 }
 
-function keepMatches(lines: Line[], query: string): { lines: Line[]; hits: number } {
+function keepMatches(
+  lines: Line[],
+  query: string,
+  exact: boolean,
+): { lines: Line[]; hits: number } {
   const byKey = new Map(lines.map((line) => [line.key, line]));
   const keep = new Set<string>();
   let hits = 0;
   for (const line of lines) {
     const structural =
       line.section === "header" || line.section === "notice" || line.kind === "note";
-    const hit = !structural && matchesQuery(line.hay, query);
+    const hit =
+      !structural && (exact ? matchesExactQuery(line.hay, query) : matchesQuery(line.hay, query));
     if (!structural && !hit) continue;
     if (hit) hits += 1;
     let current: Line | undefined = line;

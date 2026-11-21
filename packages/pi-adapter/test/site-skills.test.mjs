@@ -46,3 +46,28 @@ test("imported skills are enabled", async (t) => {
     "search",
   );
 });
+
+test("loopback site skills isolate by host:port", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "aeon-skills-loopback-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await importSiteSkills(directory, [
+    { name: "app-a", domains: ["127.0.0.1:4100"], description: "App A", code: "const a = 1;" },
+    { name: "app-b", domains: ["127.0.0.1:4200"], description: "App B", code: "const b = 2;" },
+  ]);
+  const aSkills = await siteSkillCall(directory, {
+    siteSkill: "list",
+    url: "http://127.0.0.1:4100/dashboard",
+  });
+  const bSkills = await siteSkillCall(directory, {
+    siteSkill: "list",
+    url: "http://127.0.0.1:4200/dashboard",
+  });
+  assert.deepEqual(
+    aSkills.map((skill) => skill.name),
+    ["app-a"],
+  );
+  assert.deepEqual(
+    bSkills.map((skill) => skill.name),
+    ["app-b"],
+  );
+});

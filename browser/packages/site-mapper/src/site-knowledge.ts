@@ -122,11 +122,18 @@ function sameHost(site: string, urls: readonly string[]): string[] {
   const want = bareHost(site);
   return urls.filter((url) => {
     try {
-      return bareHost(new URL(url).hostname) === want;
+      const parsed = new URL(url);
+      const key = isLoopback(parsed.hostname) && parsed.port ? parsed.host : parsed.hostname;
+      return bareHost(key) === want;
     } catch {
       return false;
     }
   });
+}
+
+function isLoopback(hostname: string): boolean {
+  const bare = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return bare === "localhost" || bare === "127.0.0.1" || bare === "::1" || bare.startsWith("127.");
 }
 
 function bareHost(host: string): string {

@@ -1495,7 +1495,7 @@ test(
             "repl",
             "--session",
             "learn",
-            `const operations = await siteMapper.operations(new URL(page.url()).hostname);
+            `const operations = await siteMapper.operations(new URL(page.url()).host);
             console.log("OPS " + JSON.stringify(operations.map((operation) => operation.id)));`,
           ],
           { env },
@@ -1612,7 +1612,11 @@ test(
         const result = JSON.parse(/RESULT (.*)/.exec(stdout)[1]);
         // Nothing was mapped by hand: the fixture's APIs were learned while the earlier steps
         // used them (the learned-lines case opens the same fixture as localhost, a fresh site).
-        assert.deepEqual(result.sites.map((site) => site.site).sort(), ["127.0.0.1", "localhost"]);
+        const expectedSites = [
+          new URL(siteUrl).host,
+          new URL(siteUrl.replace("127.0.0.1", "localhost")).host,
+        ].sort();
+        assert.deepEqual(result.sites.map((site) => site.site).sort(), expectedSites);
         for (const site of result.sites) assert.ok(site.operations > 0, JSON.stringify(site));
         assert.match(result.missing, /not mapped/);
       });
