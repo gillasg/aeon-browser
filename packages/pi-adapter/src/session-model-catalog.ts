@@ -32,12 +32,12 @@ export async function readPiModelCatalog(options: ModelCatalogOptions): Promise<
   const selectedDefault =
     models.find(
       (model) =>
-        model.provider === options.preferredInitialModel?.provider &&
-        model.id === options.preferredInitialModel?.id,
+        model.provider === settings.getDefaultProvider() && model.id === settings.getDefaultModel(),
     ) ??
     models.find(
       (model) =>
-        model.provider === settings.getDefaultProvider() && model.id === settings.getDefaultModel(),
+        model.provider === options.preferredInitialModel?.provider &&
+        model.id === options.preferredInitialModel?.id,
     ) ??
     models[0];
   return {

@@ -31,3 +31,8 @@ test("a message that leads with its code keeps that code, whatever follows", () 
   assert.equal(errorCode(new Error(message)), "TARGET_BLOCKED");
   assert.equal(errorCode(new Error("SITE_BLOCKED: the user blocked x.com")), "SITE_BLOCKED");
 });
+
+test("a narrow code is reported as its shared code, not as Chrome refusing", () => {
+  const message = "MODEL_FAILED: 403: An active subscription is required";
+  assert.equal(errorCode(new Error(message)), "NETWORK");
+});

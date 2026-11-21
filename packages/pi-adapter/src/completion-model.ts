@@ -1,8 +1,8 @@
 import { modelUnavailable } from "./model-unavailable.js";
 
-// Which model one-off calls use: an explicitly named one, else Aeon's preferred model, else the
-// person's default, else the first connected model. A choice that is gone is never swapped out
-// silently: the error says which provider to sign in to again.
+// Which model one-off calls use: an explicitly named one, else the person's default, else Aeon's
+// preferred model when it is connected, else the first connected model. A choice the person made
+// that is gone is never swapped out silently: the error says which provider to sign in to again.
 
 export interface CompletionModelChoice {
   model?: string | undefined;
@@ -26,11 +26,10 @@ export function chooseCompletionModel<ModelType extends ModelReference>(
 ): ModelType {
   const explicit = choiceReference(choice.model);
   if (explicit) return requireModel(models, explicit);
-  const preferredModel = preferred ? findModel(models, preferred) : undefined;
-  if (preferredModel) return preferredModel;
   const stored = referenceOf(defaults.getDefaultProvider(), defaults.getDefaultModel());
   if (stored) return requireModel(models, stored);
-  if (preferred) throw modelUnavailable(preferred.provider, preferred.id);
+  const preferredModel = preferred ? findModel(models, preferred) : undefined;
+  if (preferredModel) return preferredModel;
   const first = models[0];
   if (first) return first;
   throw new Error(
