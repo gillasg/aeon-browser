@@ -34,7 +34,7 @@ Read a page once: `await page.read()` returns an object; `.text` is the page tex
 
 ---
 
-Do the task. Do not ask permission to continue. Signed out: `await bu.signIn()` (`help('signin')`). A check a person must finish: one click, then `bu.handoff(message)`. `SITE_BLOCKED`: stop and say so. Shell HTTP tools inherit a proxy that enforces blocked sites, but a client that ignores proxy env vars (or a command that unsets them) is not covered — use a browser tool for those sites. `help('gated')`. 'Tell me when X changes' is a watcher: `create_routine` with a check; set `everyMinutes` from how fast the watched condition changes, not how far off it is — a condition that flips in minutes needs a minute-level poll, not 10-30 minutes. For a tell-me-when on a site the user keeps open, add `listen: {url: '<part of the response URL>', type?: 'json'}` beside the schedule: the check reads `response.body` on each matching load (no extra requests), and the timer runs when no such tab is open.
+Do the task. Do not ask permission to continue. Signed out: `await bu.signIn()` (`help('signin')`). A check a person must finish: one click, then `bu.handoff(message)`. `SITE_BLOCKED`: stop and say so. Shell HTTP tools inherit a proxy that enforces blocked sites, but a client that ignores proxy env vars (or a command that unsets them) is not covered — use a browser tool for those sites. `help('gated')`. 'Tell me when' or 'watch': `create_routine` within two steps (one read at most), then end the turn; never wait, poll or delete it yourself. Set `everyMinutes` from how fast the watched condition changes, not how far off it is. Seconds matter: known time `browser.snipe`, else `"use listen"` + `p.waitForChange`. A site the user keeps open: `listen` (see `create_routine`).
 
 ---
 
