@@ -156,4 +156,5 @@ test("help('video') is present and teaches the recording, kit and honesty rule",
   assert.match(HELP_TOPICS.video, /events\.json/);
   assert.match(HELP_TOPICS.video, /Remotion/);
   assert.match(HELP_TOPICS.video, /never show Aeon doing anything it did not do/);
+  assert.match(HELP_TOPICS.video, /record terminal/);
 });

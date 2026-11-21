@@ -253,6 +253,7 @@ interface CellOutput {
   detail?: string;
   value?: unknown;
   output?: string;
+  screenshots?: string[];
   steps?: Record<string, unknown>[];
   reset?: boolean;
   opened?: { tabId?: number }[];
@@ -316,10 +317,39 @@ async function browserCodeResult(options: {
   return {
     content: await modelContent(body, options.startedAt),
     isError: failed,
+    value: cell.value === undefined ? null : cell.value,
+    screenshots: screenshotPaths(cell),
     details: Object.keys(details).length ? details : undefined,
     // finish_from_js handed the answer over: the run ends after this call.
     ...(delivered ? { terminate: true } : {}),
   };
+}
+
+const IMAGE_PATH = /\.(png|jpe?g|webp|gif)$/i;
+
+/** Absolute image paths this cell saved: the recorded list, plus a returned {saved} or {path}. */
+export function screenshotPaths(cell: { screenshots?: unknown; value?: unknown }): string[] {
+  const found: string[] = [];
+  const push = (value: unknown) => {
+    if (typeof value !== "string" || !IMAGE_PATH.test(value)) return;
+    if (!(value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value))) return;
+    if (!found.includes(value)) found.push(value);
+  };
+  if (Array.isArray(cell.screenshots)) for (const item of cell.screenshots) push(item);
+  collectSaved(cell.value, push, 0);
+  return found;
+}
+
+function collectSaved(value: unknown, push: (value: unknown) => void, depth: number): void {
+  if (depth > 4 || !value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectSaved(item, push, depth + 1);
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  push(record.saved);
+  push(record.path);
+  for (const item of Object.values(record)) collectSaved(item, push, depth + 1);
 }
 
 function isDelivery(value: unknown): boolean {

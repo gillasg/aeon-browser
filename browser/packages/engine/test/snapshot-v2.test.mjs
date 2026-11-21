@@ -22,6 +22,7 @@ function el(role, name, children = [], extra = {}) {
   if (extra.value !== undefined) self.value = { value: extra.value };
   if (extra.properties) self.properties = extra.properties;
   if (extra.frameId) self.frameId = extra.frameId;
+  if (extra.ignored) self.ignored = true;
   const flat = [self];
   for (const subtree of children) {
     const [head, ...rest] = subtree;
@@ -639,6 +640,56 @@ test("fields keep flags, a spaced value, a frame ref, and skip a foreign url", (
   assert.ok(docs && !docs.includes("→"), docs);
   assert.match(view, /\[f1:e\d+\] button "Frame save"/);
   assert.doesNotMatch(view, /\[4242\]/);
+});
+
+test("a named group lists the button it holds, even when that button is ignored", () => {
+  seq = 0;
+  const { view } = render(
+    el("RootWebArea", "Intro", [
+      el("group", "Unleash Your Inner Builder.", [
+        el("heading", "Unleash Your Inner Builder."),
+        el("button", "Start", [], { ignored: true, backend: 65 }),
+      ]),
+    ]),
+  );
+  assert.match(view, /group "Unleash Your Inner Builder\."/);
+  assert.match(view, /\[65\] button "Start"/);
+});
+
+test("a dialog lists an ignored primary button", () => {
+  seq = 0;
+  const { view } = render(
+    el("RootWebArea", "Ask", [
+      el("dialog", "Cookie preferences", [
+        el("button", "Reject all", [], { ignored: true, backend: 70 }),
+      ]),
+    ]),
+  );
+  assert.match(view, /dialog "Cookie preferences"/);
+  assert.match(view, /\[70\] button "Reject all"/);
+});
+
+test("a mirrored frame does not repeat the root's buttons", () => {
+  seq = 0;
+  const root = el("RootWebArea", "Form", [
+    el("main", "", [
+      el("button", "Start", [], { backend: 10 }),
+      el("button", "Open the transcript", [], { backend: 11 }),
+      el("button", "Stop", [], { backend: 12 }),
+    ]),
+  ]);
+  for (const node of root) node.frameId = "root";
+  const copy = el("RootWebArea", "Chrome", [
+    el("button", "Open the transcript", [], { backend: 21 }),
+    el("button", "Stop", [], { backend: 22 }),
+    el("button", "Pay", [], { backend: 23 }),
+  ]);
+  for (const node of copy) node.frameId = "frame-2";
+  const { view } = render([...root, ...copy]);
+  assert.equal(view.split('button "Open the transcript"').length - 1, 1);
+  assert.equal(view.split('button "Stop"').length - 1, 1);
+  assert.match(view, /button "Start"/);
+  assert.match(view, /button "Pay"/);
 });
 
 test("an unnamed single-child container folds, and a dialog does not", () => {

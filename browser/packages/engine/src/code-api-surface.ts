@@ -4,7 +4,10 @@
 // from the steps the engine already has (evaluate, cdp, observe, navigate) so it needs no new
 // extension message; the pieces that do (windows, zoom) call the extension directly.
 
-export const browserSurfaceApi = `
+import { fullPageShotApi } from "./full-page-shot.js";
+
+export const browserSurfaceApi =
+  `
 // ---------- page helpers (serialized into the page) ----------
 function __htmlOf(options) {
   var root = options.selector ? document.querySelector(options.selector) : (options.outer ? document.documentElement : document.body);
@@ -171,6 +174,8 @@ function __iconBoxes(max, selector) {
     };
   });
 }
+// Absolute paths of screenshots this cell saved. The cell result lists them for --json.
+var __shotPaths = [];
 // A screenshot is saved and returned as {saved: absolute path}. Relative names go under screens/.
 // An absolute path is kept when it is inside the session folder or the OS temp directory; anything
 // else is saved as screens/<file name> and the result.note says so. The image stays off the printed
@@ -200,6 +205,7 @@ async function __savedShot(shot, options) {
     var name = asked || ('screens/' + Date.now() + '.' + ext);
     var file = await __saveShot(name, shot.data);
     result.saved = (file && file.path) || name;
+    if (result.saved) __shotPaths.push(result.saved);
     if (file && file.note) { result.note = file.note; console.warn('[warn] ' + file.note); }
   }
   Object.defineProperty(result, 'dataBase64', {value: shot.data, enumerable: options.inline === true || options.save === false});
@@ -213,6 +219,18 @@ function __shotName(path, index) {
   return stem + '-' + index + ext;
 }
 async function __sequenceStep(options, wheel) {
+  if (options.selector) {
+    return page.evaluate(function (arg) {
+      var el = document.querySelector(arg.selector);
+      if (!el) return false;
+      var before = el.scrollTop;
+      el.scrollTop = arg.offset;
+      el.dispatchEvent(new Event('scroll', { bubbles: true }));
+      return new Promise(function (resolve) {
+        requestAnimationFrame(function () { requestAnimationFrame(function () { resolve(el.scrollTop !== before); }); });
+      });
+    }, { selector: options.selector, offset: options.offset });
+  }
   if (options.click) {
     var click = options.click;
     if (typeof click === 'string') return page.locator(click).click();
@@ -397,6 +415,10 @@ function __extendPageSurface(target, base) {
     settle: async (options = {}) => (await __step({op:'settle', target, quietMs: Math.min(Math.max(options.quietMs || 500, 50), 10000), timeoutMs: Math.min(Math.max(options.timeoutMs || 10000, 100), 60000)})).data,    // Screenshot with full-page, annotation, and save choices.
     screenshot: async (options = {}) => {
       if (options.labels) return __labeledScreenshot(target);
+      if (options.fullPage === true && !options.annotate) {
+        var stitched = await __stitchFullPage(page, options);
+        if (stitched) return stitched;
+      }
       var params = { format: options.format || 'png', captureBeyondViewport: options.fullPage === true };
       if (options.annotate) {
         await __step({op:'evaluate', target, expression: '(' + __annotateShim.toString() + ')(' + JSON.stringify(options.annotate === true ? {} : options.annotate) + ')'});
@@ -580,7 +602,7 @@ function __annotateShim() {
   document.documentElement.appendChild(layer);
   return { boxes: index };
 }
-`;
+` + fullPageShotApi();
 
 // The browser-level additions (windows, zoom) use requests the extension answers directly.
 export const browserWindowApi = `

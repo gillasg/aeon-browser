@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { summarize } from "../dist/results.js";
 import { runTasks } from "../dist/run.js";
+import { toolResultJson } from "../dist/tools.js";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 const at = "2026-10-12T10:00:00.000Z";
@@ -127,6 +128,25 @@ test("the CLI says plainly when Aeon is not running", async () => {
   } finally {
     await rm(home, { recursive: true, force: true });
   }
+});
+
+test("tool --json carries the cell value and screenshot paths", async () => {
+  const text = await toolResultJson(
+    { name: "browser_code", session: "cli" },
+    {
+      isError: false,
+      value: { page: 2, saved: "/tmp/form-step-2.png" },
+      screenshots: ["/tmp/form-step-1.png", "/tmp/form-step-2.png"],
+    },
+    [{ type: "text", text: "value: {page:2}" }],
+  );
+  const body = JSON.parse(text);
+  assert.equal(body.tool, "browser_code");
+  assert.equal(body.session, "cli");
+  assert.equal(body.isError, false);
+  assert.equal(body.value.page, 2);
+  assert.deepEqual(body.screenshots, ["/tmp/form-step-1.png", "/tmp/form-step-2.png"]);
+  assert.equal(body.content[0].text, "value: {page:2}");
 });
 
 test("--json prints errors as JSON on stdout, not plain text on stderr", async () => {

@@ -75,7 +75,29 @@ function includedIds(
     include.add(match.nodeId);
     addContainers(match, include, byId, kids, memo);
   }
+  // A named group or dialog is the page's main control host (a Typeform intro, a cookie
+  // dialog). Its button can be ignored or past the shown-node cap; the host still lists it.
+  for (const id of [...include]) addHostedControls(byId.get(id), include, kids);
   return include;
+}
+
+const HOST_ROLES = new Set(["group", "dialog", "alertdialog"]);
+
+function addHostedControls(
+  node: AxNode | undefined,
+  include: Set<string>,
+  kids: Map<string, AxNode[]>,
+): void {
+  if (!node?.nodeId || !HOST_ROLES.has(roleOf(node))) return;
+  const stack = [...(kids.get(node.nodeId) ?? [])];
+  let guard = 0;
+  while (stack.length && guard++ < 400) {
+    const child = stack.pop();
+    if (!child?.nodeId) continue;
+    if (INTERACTIVE_ROLES.has(roleOf(child)) && child.backendDOMNodeId !== undefined)
+      include.add(child.nodeId);
+    stack.push(...(kids.get(child.nodeId) ?? []));
+  }
 }
 
 function addContainers(

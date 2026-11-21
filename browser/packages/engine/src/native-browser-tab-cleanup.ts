@@ -9,6 +9,7 @@
 import { collapseAgentGroups, agentGroupsReady, isAgentGroupId } from "./native-browser-groups.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { followReplacement } from "./native-browser-replaced.js";
 import { spaceWindowIds } from "./native-browser-spaces.js";
 
 type Tracked = {
@@ -206,27 +207,61 @@ export function mineTabIds(chatId: string): number[] {
  */
 export async function closeChatTab(chatId: string, tabId: number): Promise<{ closed: number }> {
   await restore();
-  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-  if (!tab) {
+  const ids = [...new Set([followReplacement(tabId), tabId])];
+  const live: chrome.tabs.Tab[] = [];
+  for (const id of ids) {
+    const tab = await chrome.tabs.get(id).catch(() => undefined);
+    if (tab) live.push(tab);
+  }
+  if (!live.length) {
     forgetAgentTab(tabId);
     throw new Error(`TARGET_LOST: tab ${tabId} is already closed`);
   }
-  await unsplitForClose(tab, tabId);
-  closing.add(tabId);
-  const removed = await chrome.tabs.remove(tabId).then(
-    () => true,
-    () => false,
-  );
-  closing.delete(tabId);
-  if (!removed) throw new Error(`TAB_CLOSE_FAILED: Chrome refused to close tab ${tabId}`);
-  tracked.delete(tabId);
+  let closedId = live[0]?.id ?? tabId;
+  for (const tab of live) {
+    const id = tab.id ?? closedId;
+    await unsplitForClose(tab, id);
+    const gone = await removeVerified(id);
+    if (!gone) throw new Error(`TAB_CLOSE_FAILED: Chrome did not close tab ${id}`);
+    closedId = id;
+  }
   const count = stats.get(chatId) ?? { opened: 0, closed: 0, popups: 0 };
   count.closed += 1;
   stats.set(chatId, count);
   save();
-  const stillOpen = await chrome.tabs.get(tabId).catch(() => undefined);
-  if (stillOpen) throw new Error(`TAB_CLOSE_FAILED: Chrome did not close tab ${tabId}`);
-  return { closed: tabId };
+  return { closed: closedId };
+}
+
+/**
+ * Chrome often ignores tabs.remove while a debugger is attached, and a collapsed tab group can
+ * swallow the close. Detach and leave the group first, then remove, and try once more if the tab
+ * is still there. The close counts only after the tab is gone.
+ */
+async function removeVerified(tabId: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await releaseForClose(tabId);
+    closing.add(tabId);
+    await chrome.tabs.remove(tabId).catch(() => undefined);
+    closing.delete(tabId);
+    tracked.delete(tabId);
+    const still = await chrome.tabs.get(tabId).catch(() => undefined);
+    if (!still) return true;
+  }
+  return false;
+}
+
+async function releaseForClose(tabId: number): Promise<void> {
+  try {
+    const session = await import("./native-browser-session.js");
+    await session.reconnectBrowserSession(tabId);
+  } catch {
+    // The explicit detach below still runs.
+  }
+  await chrome.debugger?.detach?.({ tabId }).catch(() => undefined);
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  const groupId = tab?.groupId;
+  if (typeof groupId === "number" && groupId >= 0)
+    await chrome.tabs.ungroup?.(tabId).catch(() => undefined);
 }
 
 export async function unsplitForClose(

@@ -63,6 +63,49 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+/**
+ * `--json` keeps the text content and adds the cell's return value plus absolute screenshot
+ * paths. Image blocks with no recorded path are saved the same way a plain run saves them.
+ */
+export async function toolResultJson(
+  call: { name: string; session: string },
+  reply: Json,
+  content: Content[],
+): Promise<string> {
+  const recorded = Array.isArray(reply.screenshots)
+    ? reply.screenshots.filter((item): item is string => typeof item === "string")
+    : [];
+  const screenshots = recorded.length ? recorded : await imagePaths(content);
+  return (
+    JSON.stringify(
+      {
+        tool: call.name,
+        session: call.session,
+        isError: reply.isError === true,
+        content,
+        value: "value" in reply ? (reply.value ?? null) : null,
+        screenshots,
+      },
+      null,
+      2,
+    ) + "\n"
+  );
+}
+
+async function imagePaths(content: Content[]): Promise<string[]> {
+  const folder = join(dataDirectory(), "cli-images");
+  const paths: string[] = [];
+  for (const [index, part] of content.entries()) {
+    if (part.type !== "image" || !part.data) continue;
+    await mkdir(folder, { recursive: true });
+    const extension = (part.mimeType ?? "image/png").split("/")[1] ?? "png";
+    const path = join(folder, `${Date.now()}-${index}.${extension}`);
+    await writeFile(path, Buffer.from(part.data, "base64"));
+    paths.push(path);
+  }
+  return paths;
+}
+
 /** Screenshots and other images are saved to files; their paths are printed instead. */
 async function print(content: Content[], options: { plain?: boolean } = {}): Promise<void> {
   const folder = join(dataDirectory(), "cli-images");
@@ -145,9 +188,7 @@ export async function runTool(client: AeonClient, rest: string[]): Promise<numbe
   const content = (reply.content as Content[] | undefined) ?? [];
   const isError = reply.isError === true;
   if (call.asJson) {
-    process.stdout.write(
-      JSON.stringify({ tool: call.name, session: call.session, isError, content }, null, 2) + "\n",
-    );
+    process.stdout.write(await toolResultJson(call, reply, content));
     return isError ? 1 : 0;
   }
   await print(content, { plain: call.plain });

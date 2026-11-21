@@ -37,6 +37,17 @@ export type ClipMeta = {
   tabId?: number;
 };
 
+/** One chunk of a terminal cast. `t` is ms on the clip clock. `in` is the command. */
+export type TerminalEvent = { t: number; kind: "in" | "out" | "err"; text: string };
+
+/** Asciinema-style capture of one command, written as events.json `terminal`. */
+export type TerminalCast = {
+  version: 1;
+  command: string;
+  startedAt: number;
+  events: TerminalEvent[];
+};
+
 export type RecordingEvents = {
   version: 1;
   recorder: "aeon";
@@ -46,9 +57,35 @@ export type RecordingEvents = {
   /** With --tabs there is one clip per recorded tab; the first is also `clip`. */
   clips?: ClipMeta[];
   events: VideoEvent[];
+  /** A terminal session recorded beside the tab. The kit draws it as a pane. */
+  terminal?: TerminalCast;
   /** Set when the action list is incomplete (no trace was reachable at stop time). */
   note?: string;
 };
+
+/**
+ * One clip per tab, in the order each tab first appears. A tab opened mid-run is its own clip
+ * on the same clock as the recording, so an editor can show it beside the first.
+ */
+export function tabClips(
+  events: VideoEvent[],
+  recording: ClipMeta,
+  extraTabIds: number[] = [],
+): ClipMeta[] {
+  const ids: number[] = [];
+  const add = (id: number | undefined) => {
+    if (id === undefined || ids.includes(id)) return;
+    ids.push(id);
+  };
+  for (const event of events) add(event.tabId);
+  for (const id of extraTabIds) add(id);
+  return ids.map((tabId) => ({
+    ...recording,
+    file: `takes/${tabId}.webm`,
+    source: "tabs",
+    tabId,
+  }));
+}
 
 /** Write events.json atomically so a reader never sees a half-written log. */
 export async function writeEvents(

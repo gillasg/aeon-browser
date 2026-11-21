@@ -8,7 +8,7 @@ import {
 import { currentInventoryTabs, refreshInventoryTab } from "./native-inventory-client.js";
 import { browserSessionOwner } from "./native-browser-session.js";
 import { claimAgentTab, groupAgentTab } from "./native-browser-groups.js";
-import { markAgentTabGrouped, trackAgentTab } from "./native-browser-tab-cleanup.js";
+import { closeChatTab, markAgentTabGrouped, trackAgentTab } from "./native-browser-tab-cleanup.js";
 import { noteLabel, noteSpace, spaceWindow } from "./native-browser-spaces.js";
 import { callClass, send as cdpSend } from "./cdp/send.js";
 
@@ -151,10 +151,9 @@ async function newTab(id: string, chatId: string, url: string): Promise<void> {
 
 async function closeTab(id: string, tabId: number, chatId: string): Promise<void> {
   try {
-    void chatId;
     enabled.delete(tabId);
     holdBrowserDebugger(tabId, false);
-    await chrome.tabs.remove(tabId).catch(() => undefined);
+    await closeChatTab(chatId || "cdp", tabId);
     send({ kind: "cdp.tab", id, closed: true });
   } catch (error) {
     send({ kind: "cdp.tab", id, error: String(error instanceof Error ? error.message : error) });

@@ -97,15 +97,21 @@ test(
   },
 );
 
-test("aeon record start --tabs fails clearly instead of leaving an empty folder", async () => {
+test("aeon record start --tabs records the folder and stop finishes it without a display", async () => {
   const home = await mkdtemp(join(tmpdir(), "aeon-record-tabs-"));
   try {
     const folder = join(home, "tabs-recording");
-    const result = await aeon(home, ["record", "start", "--tabs", "--out", folder]);
-    assert.notEqual(result.code, 0, "tabs mode refuses to start");
-    assert.match(result.stderr + result.stdout, /--tabs is unavailable/);
-    assert.match(result.stderr + result.stdout, /no daemon API to collect/);
-    assert.equal(existsSync(folder), false, "no empty folder is left behind");
+    const start = await aeon(home, ["record", "start", "--tabs", "--out", folder]);
+    assert.equal(start.code, 0, start.stderr);
+    assert.match(start.stdout, /Recording tabs/);
+    const initial = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
+    assert.equal(initial.clip.source, "tabs");
+    assert.equal(initial.clip.file, "takes/");
+    const stopped = await aeon(home, ["record", "stop", "--out", folder]);
+    assert.equal(stopped.code, 0, stopped.stderr);
+    const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
+    assert.equal(events.clip.source, "tabs");
+    assert.ok(Array.isArray(events.events));
   } finally {
     await rm(home, { recursive: true, force: true });
   }
