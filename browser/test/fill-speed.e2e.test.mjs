@@ -9,12 +9,13 @@ import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import WebSocket from "ws";
 import { fakeVault, NEW } from "./vault-site.mjs";
+import { chromePort } from "./helpers/chrome-port.mjs";
 
 const chromePath =
   process.env.CHROME_PATH ??
@@ -300,9 +301,7 @@ console.log('VAULT ' + JSON.stringify({before, out: await page.evaluate(() => do
 );
 
 async function connectExtension(profile, env) {
-  const port = await waitFor(async () =>
-    Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]),
-  );
+  const port = await chromePort(profile);
   const worker = await waitFor(async () => {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
     const found = targets.find((item) => item.url.endsWith("/service-worker.js"));
