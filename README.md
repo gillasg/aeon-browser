@@ -1,6 +1,57 @@
 # Aeon
 
-A browser agent that lives in your Chrome.
+**A browser agent that lives in your own Chrome.** It works in the browser you already use, signed in to everything, next to you. It doesn't run in a sandbox, a cloud VM or a headless copy.
+
+Ask in plain words: _"find the cheapest iPhone 16 on Amazon.in"_, _"tell me when this drops under ₹2000"_, _"fill this form from my details"_. Aeon does it in a background tab you can watch or take over.
+
+## What makes it different
+
+- **Any website becomes an API.** Aeon learns the private API a site's own page uses, from your real session, then calls it directly. A task that takes minutes of clicking runs in seconds. When the site changes, the mapping repairs itself. It exports as OpenAPI or MCP.
+- **Signs in without the model seeing your password.** Logins, one-time codes and personal details are filled from your password manager inside the browser. The model is only told that you are signed in.
+- **Watchers that cost nothing until something happens.** "Tell me when it's back in stock" becomes a scheduled check that runs without a model call and wakes the agent only when the condition is met. Snipes act within milliseconds of a sale opening.
+- **Uses the AI subscriptions you already pay for.** It can run on your existing model account, and it can use AI websites through your own logins with no API key.
+- **Your browser, shared.** You and several agents work in one Chrome at once. Each agent keeps to its own tab group, and you can take over any tab at any time.
+- **Abilities that get faster every run.** One sentence or one demonstration becomes a named, tested skill for a site that is safe to repeat.
+- **Change any site by asking.** "Hide Shorts on YouTube" or "add a price-per-kg column" becomes a lasting change to how the site looks and behaves.
+- **Hard to tell from a person.** It passes the common bot detectors (see the numbers below).
+- **Other agents can use it.** Claude Code, Codex or any MCP client can hand Aeon a whole task or drive your browser directly.
+
+## Measured, not claimed
+
+Every release is run against our own eval suite: real tasks on local copies of real sites, graded by checking the final state of the page, not by asking a model whether it went well. Failures are listed, not hidden.
+
+| Suite (Grok 4.7, Nov 2026)                                                               | Result                                                   |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Lane A: 23 everyday tasks (shopping, forms, sign-in, inboxes, watchers)                  | **18/23 (78%)**, at $0.93 in model list price for all 23 |
+| Bot detectors: BrowserScan, CreepJS, Cloudflare, DataDome, HUMAN, Fingerprint, Sannysoft | **6 of 7 decided pass**                                  |
+| First-tool choice across 115 situations (×3)                                             | 43% first call, 49% within 3 steps                       |
+
+All three Lane A failures are timing-critical watcher tasks ("grab tickets the second they open"). That is the next thing we are fixing. Sannysoft fails only on WebGL, because the test machine has no GPU. More detail in [docs/evals.md](docs/evals.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+  you([You]) --> panel
+  agents([Claude Code, Codex, MCP clients]) --> cli
+  subgraph chrome [Your Chrome]
+    panel[Side panel, chat, Home] --- ext[Extension]
+    ext --- engine[Engine: tabs, page map, input, network]
+    engine --- tabs[(Your signed-in tabs)]
+  end
+  subgraph local [This computer, 127.0.0.1 only]
+    daemon[Daemon: chats, agent, tools, routines] --- store[(Local data)]
+    cli[aeon CLI and MCP server]
+  end
+  ext <-- native messaging grant --> daemon
+  cli --> daemon
+  daemon <--> model[Your model account]
+```
+
+- **Extension (in Chrome):** the chat UI and the engine. The engine drives tabs through Chrome's debugger API with a compact page map, real input events, iframes, network capture and replay.
+- **Daemon (on your machine):** runs each chat's agent loop and the tools (`browser_code`, `crawl`, `site_mapper`, routines), and keeps everything in local storage. It listens on localhost only, and only your extension can connect (see _Local connections_ below).
+- **The agent writes code, not clicks.** It works by writing short scripts against a Playwright-style API inside a sandbox, so a whole form or a 50-row table is one step, not 50.
+- **Routines and watchers** run on the daemon's schedule as plain code, and call the model only when there is something to act on.
 
 ## Install
 
