@@ -22,4 +22,8 @@ test("tell me when sets a watcher whose interval fits how fast the condition cha
   assert.match(guidance, /Tell me when/);
   assert.match(guidance, /how fast the watched condition changes/);
   assert.match(guidance, /everyMinutes/);
+  // Lane A and path-choice: agents waited in the chat or deleted the watcher to report the event.
+  assert.match(guidance, /create_routine` within two steps/);
+  assert.match(guidance, /never wait, poll or delete it yourself/);
+  assert.match(guidance, /browser\.snipe/);
 });
