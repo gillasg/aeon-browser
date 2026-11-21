@@ -12,6 +12,7 @@ import {
   BrowserCodeRunSchema,
   BrowserCodeStageSchema,
   BrowserStepSchema,
+  handoffMeta,
   type BrowserCodeRun,
   type BrowserCodeStage,
   type BrowserStep,
@@ -57,7 +58,7 @@ import {
   releaseTabs,
   type SiteRules,
 } from "./native-browser-site-rules.js";
-import { handOffToUser, takeTypedAnswer } from "./native-browser-handoff.js";
+import { answeredHandoff, handOffToUser } from "./native-browser-handoff.js";
 import { engineDebug } from "./native-debug-log.js";
 import { presentBrowserTask, presentsBrowserTask } from "./native-browser-layout.js";
 import { engineConfig } from "./engine-config.js";
@@ -568,6 +569,7 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
     cancel?: unknown;
     spotlight?: { x: number; y: number; width: number; height: number };
   };
+  const meta = handoffMeta(request);
   const target = authorizedTarget(cell, (request as { target?: unknown }).target);
   const pending = startedHandoffs.get(target.tabId);
   if (cancel === true) {
@@ -581,7 +583,13 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
   const text = String(message ?? "").slice(0, 500) || "Please take over, then click Done.";
   const entry: Record<string, unknown> = {
     index: cell.steps.length,
-    action: { op: "handoff", message: text, target, ...(start === true ? { start: true } : {}) },
+    action: {
+      op: "handoff",
+      message: text,
+      target,
+      ...(start === true ? { start: true } : {}),
+      ...meta,
+    },
     disposition: "running",
   };
   cell.steps.push(entry);
@@ -593,6 +601,7 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
       text,
       () => startedHandoffs.get(target.tabId)?.token === token,
       box,
+      meta,
     );
     startedHandoffs.set(target.tabId, { token, run, cellId: cell.run.cellId });
     setTimeout(() => {
@@ -607,25 +616,16 @@ async function handoff(cell: Cell, request: object): Promise<unknown> {
   }
   setWaiting(cell, true);
   try {
-    const outcome = await handOffToUser(target.tabId, text, () => !cell.done, box);
+    const outcome = await handOffToUser(target.tabId, text, () => !cell.done, box, meta);
     Object.assign(entry, { disposition: outcome === "done" ? "completed" : "failed" });
     if (outcome === "done") await saveUserLogin(cell, target);
-    return answered(target.tabId, outcome);
+    return answeredHandoff(target.tabId, outcome);
   } catch (error) {
     Object.assign(entry, { disposition: "failed", code: describe(error) });
     throw error;
   } finally {
     setWaiting(cell, false);
   }
-}
-
-/** A hand-off the user answered by typing into the cursor returns that text. */
-function answered(
-  tabId: number,
-  outcome: "done" | "cancelled",
-): "done" | "cancelled" | { answer: string } {
-  const answer = outcome === "done" ? takeTypedAnswer(tabId) : undefined;
-  return answer !== undefined ? { answer } : outcome;
 }
 
 async function waitForStarted(
@@ -637,7 +637,7 @@ async function waitForStarted(
   try {
     const outcome = await run;
     if (outcome === "done") await saveUserLogin(cell, { tabId });
-    return answered(tabId, outcome);
+    return answeredHandoff(tabId, outcome);
   } finally {
     setWaiting(cell, false);
     if (startedHandoffs.get(tabId)?.run === run) startedHandoffs.delete(tabId);

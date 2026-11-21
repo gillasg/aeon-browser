@@ -34,7 +34,9 @@ function bodyProperties(operation: Operation): Record<string, JsonSchema> {
   const properties = (operation.requestBody?.schema.properties ?? {}) as Record<string, JsonSchema>;
   if (operation.kind === "graphql")
     return { variables: properties.variables ?? { type: "object" } };
-  return properties;
+  // A body field that was the same in every recording is filled in on replay, not asked for.
+  const constants = operation.requestBody?.constants ?? {};
+  return Object.fromEntries(Object.entries(properties).filter(([name]) => !(name in constants)));
 }
 
 export function operationInputSchema(operation: Operation): Json {

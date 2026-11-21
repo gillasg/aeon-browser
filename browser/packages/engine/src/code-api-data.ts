@@ -165,7 +165,7 @@ function __readMetadata() {
   });
   var link = (rel) => document.querySelector('link[rel="' + rel + '"]')?.href;
   return {
-    url: location.href, title: document.title, lang: document.documentElement.lang || undefined,
+    url: location.href, title: document.title, lang: (document.documentElement && document.documentElement.lang) || undefined,
     description: meta.description, canonical: link('canonical'), icon: link('icon') || link('shortcut icon'),
     alternates: [...document.querySelectorAll('link[rel="alternate"][hreflang]')].map((tag) => ({lang: tag.hreflang, url: tag.href})),
     meta,
@@ -371,6 +371,7 @@ function __expandRead(options) {
   var allowed = /^(show more|show replies|show \\d+ more|show more replies|read more|view more|see more|load more|more replies)$/i;
   var danger = /\\b(post|reply|follow|like|buy|order|purchase|subscribe|send|share|delete|block|report|retweet|repost|message|pay)\\b/i;
   var clicked = [], skipped = [];
+  if (!root) return {clicked, skipped};
   var max = Math.max(0, Math.min(10, Number(options.max) || 10));
   for (var button of root.querySelectorAll('button, [role="button"], a[role="button"]')) {
     if (clicked.length >= max || button.disabled) break;

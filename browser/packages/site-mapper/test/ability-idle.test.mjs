@@ -160,6 +160,10 @@ test("a drifted ability is re-learned, saved as a new version, and the old one i
     assert.match(stored.ways[0].code, /return 2/);
     assert.equal((await listAbilityVersions("shop.example", "orders")).length, 1);
     assert.equal(result.note.ok, true);
+    assert.equal(result.healed.fromVersion, 1);
+    assert.equal(result.healed.toVersion, 2);
+    assert.match(result.healed.reason, /items list is gone/);
+    assert.equal(stored.version, 2);
   });
 });
 

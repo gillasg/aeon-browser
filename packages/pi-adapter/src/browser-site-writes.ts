@@ -2,6 +2,11 @@
 // per operation so the step can say what it changed: the Activity log lists them, with the
 // items, and the orb shows them on the result.
 
+import type { Rewind } from "@aeon/protocol";
+
+/** Says how a write can be taken back, when the site's opposite action is known. */
+export type RewindLookup = (site: string, operation: string) => Promise<Rewind | undefined>;
+
 export interface SiteWrite {
   site: string;
   operation: string;
@@ -11,6 +16,8 @@ export interface SiteWrite {
   items: string[];
   /** The values each item was written with, so Activity can reverse them. */
   params: Record<string, unknown>[];
+  /** How to take the write back; absent when it cannot be (nothing learned, or irreversible). */
+  rewind?: Rewind;
 }
 
 const MAX_ITEMS = 200;
@@ -19,6 +26,8 @@ export class SiteWrites {
   private readonly writes = new Map<string, SiteWrite>();
   /** The cell called a mapped site API at all (read or write). */
   usedApi = false;
+
+  constructor(private readonly rewindOf?: RewindLookup) {}
 
   track(request: unknown, sent: Promise<unknown>): Promise<unknown> {
     const call = request as {
@@ -41,10 +50,14 @@ export class SiteWrites {
     };
     this.writes.set(key, write);
     return sent.then(
-      (value) => {
+      async (value) => {
         write.done += 1;
         if (write.items.length < MAX_ITEMS) write.items.push(itemLabel(call.params));
         if (write.params.length < MAX_ITEMS) write.params.push(itemParams(call.params));
+        if (!write.rewind && this.rewindOf) {
+          const rewind = await this.rewindOf(write.site, write.operation).catch(() => undefined);
+          if (rewind) write.rewind = rewind;
+        }
         return value;
       },
       (error: unknown) => {

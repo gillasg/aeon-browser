@@ -128,6 +128,14 @@ export class BrowserControlService {
     const connected = [...this.executors.keys()];
     return connected.length === 1 ? connected[0] : undefined;
   }
+  /**
+   * The browser this chat's own browser code would run in right now: its pin, else the browser
+   * its attached tabs are in. A worker chat started by this one (site_mapper, crawl) copies it,
+   * so it never meets AMBIGUOUS_BROWSER where its parent did not.
+   */
+  codeBrowserOf(chatId: string): string | undefined {
+    return this.pickCodeClient(chatId).clientInstanceId;
+  }
   /** Browser ids a chat may use, of those given: only its pinned one when it has one. */
   private allowedFor(chatId: string, ids: string[]): string[] {
     const pin = this.pins.get(chatId);

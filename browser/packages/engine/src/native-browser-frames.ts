@@ -1,4 +1,5 @@
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
+import { withContextRetry } from "./cdp/context-retry.js";
 import { send } from "./cdp/send.js";
 import { BrowserActionError } from "./native-browser-common.js";
 import type { AxNode } from "./native-browser-common.js";
@@ -120,22 +121,26 @@ export async function evaluateFrame(
   frameId: string,
   expression: string,
 ): Promise<unknown> {
-  const contextId = await frameContext(debuggee, frameId);
-  const result = (await send(
-    debuggee,
-    "Runtime.evaluate",
-    {
-      expression,
-      contextId,
-      returnByValue: true,
-      awaitPromise: true,
-      timeout: 8000,
-    },
-    { label: "evaluateFrame", ms: 8_000 },
-  )) as {
-    result?: { value?: unknown };
-    exceptionDetails?: { text: string; exception?: { description: string } };
-  };
+  // The context is made fresh for each call, and a frame that reloads between the two CDP
+  // calls drops it: make another and run again. A script that throws comes back as a result.
+  const result = await withContextRetry(async () => {
+    const contextId = await frameContext(debuggee, frameId);
+    return (await send(
+      debuggee,
+      "Runtime.evaluate",
+      {
+        expression,
+        contextId,
+        returnByValue: true,
+        awaitPromise: true,
+        timeout: 8000,
+      },
+      { label: "evaluateFrame", ms: 8_000 },
+    )) as {
+      result?: { value?: unknown };
+      exceptionDetails?: { text: string; exception?: { description: string } };
+    };
+  });
   if (result.exceptionDetails)
     throw new BrowserActionError(
       "CHROME_ERROR",
@@ -196,6 +201,31 @@ throw Error(all.length?'Several file inputs on the page: pass a selector for the
 })()`;
 }
 
+async function findFileInput(
+  debuggee: chrome.debugger.Debuggee,
+  selector: string,
+  frameId?: string,
+): Promise<{
+  result?: { objectId?: string };
+  exceptionDetails?: { exception?: { description?: string } };
+}> {
+  return withContextRetry(
+    async () =>
+      (await send(
+        debuggee,
+        "Runtime.evaluate",
+        {
+          expression: fileInputExpression(selector),
+          ...(frameId ? { contextId: await frameContext(debuggee, frameId) } : {}),
+        },
+        { label: "uploadFiles", ms: 5_000 },
+      )) as {
+        result?: { objectId?: string };
+        exceptionDetails?: { exception?: { description?: string } };
+      },
+  );
+}
+
 export async function uploadFiles(
   debuggee: chrome.debugger.Debuggee,
   request: Upload,
@@ -205,18 +235,7 @@ export async function uploadFiles(
   if (!backendNodeId) {
     if (!step.selector)
       throw new Error("Choose an observed file input or file chooser backendNodeId");
-    const result = (await send(
-      debuggee,
-      "Runtime.evaluate",
-      {
-        expression: fileInputExpression(step.selector),
-        ...(step.frameId ? { contextId: await frameContext(debuggee, step.frameId) } : {}),
-      },
-      { label: "uploadFiles", ms: 5_000 },
-    )) as {
-      result?: { objectId?: string };
-      exceptionDetails?: { exception?: { description?: string } };
-    };
+    const result = await findFileInput(debuggee, step.selector, step.frameId);
     const objectId = result.result?.objectId;
     if (!objectId || result.exceptionDetails)
       throw new Error(
@@ -430,4 +449,37 @@ async function frameOwner(
     if (box?.model) return { source, backendNodeId: owner.backendNodeId, model: box.model };
   }
   return undefined;
+}
+
+export async function resolveFrameObject(
+  debuggee: chrome.debugger.Debuggee,
+  frameId: string,
+  selector: string | number,
+): Promise<string> {
+  // A frame that reloads between making its context and using it drops the context: make
+  // another and resolve again. "Expected exactly one element" and the like still fail at once.
+  return withContextRetry(async () => {
+    const contextId = await frameContext(debuggee, frameId);
+    if (typeof selector === "number") {
+      const node = (await send(
+        debuggee,
+        "DOM.resolveNode",
+        { backendNodeId: selector, executionContextId: contextId },
+        { label: "resolveFrameObject" },
+      )) as { object: { objectId: string } };
+      return node.object.objectId;
+    }
+    const result = (await send(
+      debuggee,
+      "Runtime.evaluate",
+      {
+        contextId,
+        expression: `(()=>{const roots=[document],items=[];while(roots.length){const root=roots.pop();items.push(...root.querySelectorAll(${JSON.stringify(selector)}));for(const el of root.querySelectorAll('*'))if(el.shadowRoot)roots.push(el.shadowRoot);}if(items.length!==1)throw Error('Expected exactly one element');return items[0]})()`,
+      },
+      { label: "resolveFrameObject", ms: 5_000 },
+    )) as { result?: { objectId?: string }; exceptionDetails?: unknown };
+    const objectId = result.result?.objectId;
+    if (!objectId || result.exceptionDetails) throw new Error("TARGET_NOT_FOUND");
+    return objectId;
+  });
 }

@@ -2,6 +2,7 @@
 // cosmetic: every update is sent without awaiting, never fails or delays an action, ignores
 // pointer input and stays out of the accessibility tree. Animation runs inside the page, so the
 // agent moves on while the cursor is still gliding.
+import type { HandoffMeta } from "@browserkit/protocol";
 import { send } from "./cdp/send.js";
 import { cursorExpression } from "./cursor-page.js";
 import { BADGE_FALLBACK, NEEDS_BADGE, NEUTRAL_GLOW } from "./cursor-mark.js";
@@ -51,6 +52,10 @@ export interface CursorUpdate {
   start?: { x: number; y: number };
   /** The agent waits for the user: amber cursor and spotlight, no glow, the message as caption. */
   needs?: string | null;
+  /** Why the agent waits: a sign-in or check in the way, or a cliff edge (a commitment to approve). */
+  needsKind?: string | null;
+  /** The commitment a cliff-edge hand-off waits for, in words ("Pay $42.10"). */
+  needsAction?: string | null;
   /** The tab is being recorded with the cursor: show only the cursor, nothing else of ours. */
   clean?: boolean;
   /** Summoned cursor: remember this point. Ignored while the agent is already driving it. */
@@ -128,6 +133,7 @@ export function showAgentNeeds(
   tabId: number,
   message: string | null,
   spotlight?: { x: number; y: number; width: number; height: number },
+  meta: HandoffMeta = {},
 ): void {
   const point = spotlight
     ? {
@@ -140,6 +146,8 @@ export function showAgentNeeds(
     { tabId },
     {
       needs: message,
+      needsKind: message !== null ? (meta.kind ?? null) : null,
+      needsAction: message !== null ? (meta.actionLabel ?? null) : null,
       ...(message !== null ? { glow: false } : { glow: true, hideSpotlight: true }),
       ...(spotlight && message !== null ? { spotlight, ...point } : {}),
     },

@@ -107,7 +107,7 @@ async function __challenges(target) {
 async function __handoffUntilClear(message, target, options) {
   var started = Date.now(), limit = Math.min(Number(options.timeoutMs) || 600000, 1800000);
   var present = (await __challenges(target).catch(() => [])).length > 0;
-  var handle = await bu.handoff(message, {target, selector: options.selector, start: true});
+  var handle = await bu.handoff(message, {target, selector: options.selector, start: true, kind: options.kind || 'captcha'});
   var outcome = null;
   var waiting = handle.wait().then(() => { outcome = outcome || 'done'; }, () => { outcome = outcome || 'cancelled'; });
   while (!outcome && Date.now() - started < limit) {

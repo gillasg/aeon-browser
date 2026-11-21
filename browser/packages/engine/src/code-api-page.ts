@@ -212,28 +212,35 @@ function __waitCondition(target, expression, timeout) {
 // variables, and they still see the page's DOM and events. One context per tab, remade after a
 // navigation drops it.
 var __worlds = new Map();
+// A frame that navigates between making the world and running in it drops the context ("Cannot
+// find context with specified id"): make another and run again, twice at most, after a short
+// pause. An exception thrown by the helper itself is the answer, not a reason to retry.
+var __CONTEXT_GONE = /Cannot find context with specified id|Execution context was destroyed|Cannot find default execution context|Inspected target navigated or closed|NO_FRAME|NO_CONTEXT/i;
 async function __isolatedEval(target, expression) {
   var key = __key(target);
   for (var attempt = 0; ; attempt++) {
-    var contextId = __worlds.get(key);
-    if (!contextId) {
-      var tree = (await __step({op:'cdp', target, method:'Page.getFrameTree', params:{}}, true)).data.value;
-      var frame = tree && tree.frameTree && tree.frameTree.frame;
-      if (!frame || !frame.id) throw Error('NO_FRAME');
-      var made = (await __step({op:'cdp', target, method:'Page.createIsolatedWorld', params:{frameId: frame.id, worldName: 'browserkit-helper'}}, true)).data.value;
-      contextId = made && made.executionContextId;
-      if (!contextId) throw Error('NO_CONTEXT');
-      __worlds.set(key, contextId);
-    }
+    var reply;
     try {
-      var reply = (await __step({op:'cdp', target, method:'Runtime.evaluate', params:{expression, contextId, returnByValue:true, awaitPromise:true}}, true)).data.value;
-      if (reply && reply.exceptionDetails)
-        throw Error(reply.exceptionDetails.exception && reply.exceptionDetails.exception.description || reply.exceptionDetails.text || 'HELPER_FAILED');
-      return reply && reply.result ? reply.result.value : undefined;
+      var contextId = __worlds.get(key);
+      if (!contextId) {
+        var tree = (await __step({op:'cdp', target, method:'Page.getFrameTree', params:{}}, true)).data.value;
+        var frame = tree && tree.frameTree && tree.frameTree.frame;
+        if (!frame || !frame.id) throw Error('NO_FRAME');
+        var made = (await __step({op:'cdp', target, method:'Page.createIsolatedWorld', params:{frameId: frame.id, worldName: 'browserkit-helper'}}, true)).data.value;
+        contextId = made && made.executionContextId;
+        if (!contextId) throw Error('NO_CONTEXT');
+        __worlds.set(key, contextId);
+      }
+      reply = (await __step({op:'cdp', target, method:'Runtime.evaluate', params:{expression, contextId, returnByValue:true, awaitPromise:true}}, true)).data.value;
     } catch (error) {
       __worlds.delete(key);
-      if (attempt >= 1 || !/context|Cannot find/i.test(String(error && error.message || error))) throw error;
+      if (attempt >= 2 || !__CONTEXT_GONE.test(String(error && error.message || error))) throw error;
+      await __sleep(60 * (attempt + 1));
+      continue;
     }
+    if (reply && reply.exceptionDetails)
+      throw Error(reply.exceptionDetails.exception && reply.exceptionDetails.exception.description || reply.exceptionDetails.text || 'HELPER_FAILED');
+    return reply && reply.result ? reply.result.value : undefined;
   }
 }
 // What the page itself can check about being driven. Never patches anything: it only reads.
@@ -551,13 +558,19 @@ var bu = Object.freeze({
   },
   // {selector} points the amber cursor at the element; {start: true} registers the hand-off and
   // returns at once ({wait, cancel}), for a click that opens a prompt the page then blocks on.
+  // {kind: 'cliff-edge', actionLabel} stops at a commitment (pay, send, submit, delete): the cursor
+  // says so and the button names it. {kind: 'auth' | 'captcha'} says what is in the way. Without
+  // kind it is the plain hand-off it always was.
   handoff: async (message, options = {}) => {
     var target = options.target || __lastTarget;
     if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');
+    if (options.kind !== undefined && !['auth', 'captcha', 'cliff-edge'].includes(options.kind))
+      throw Error('INVALID_INPUT: bu.handoff kind must be one of auth, captcha, cliff-edge, not ' + JSON.stringify(options.kind));
+    var meta = {...(options.kind ? {kind: options.kind} : {}), ...(options.actionLabel ? {actionLabel: String(options.actionLabel).slice(0, 40)} : {})};
     if (options.wait === true) return __handoffUntilClear(message, target, options);
     __handedOff = true;
     var spotlight = options.selector ? await browser.page(target).locator(options.selector).boundingBox().catch(() => null) : null;
-    var request = {message: String(message ?? '').slice(0, 500), target, ...(spotlight ? {spotlight} : {})};
+    var request = {message: String(message ?? '').slice(0, 500), target, ...meta, ...(spotlight ? {spotlight} : {})};
     if (options.start) {
       await __call({handoff: {...request, start: true}});
       return Object.freeze({wait: () => bu.handoff(message, {target}), cancel: () => __call({handoff: {target, cancel: true}})});

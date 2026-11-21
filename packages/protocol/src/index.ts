@@ -93,3 +93,5 @@ export {
   type CompanionRequest,
   type CompanionResult,
 } from "./companion.js";
+
+export * from "./rewind.js";

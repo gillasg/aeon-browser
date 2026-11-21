@@ -1,5 +1,5 @@
 import { documentShape } from "./html.js";
-import type { Classified } from "../filter.js";
+import { isTelemetry, type Classified } from "../filter.js";
 import type { Exchange, Operation, Param } from "../types.js";
 import {
   ACTION_FIELDS,
@@ -11,6 +11,7 @@ import {
   type GraphqlCall,
   type ParsedBody,
 } from "./bodies.js";
+import { bodyConstants } from "./body-constants.js";
 import { inferSchema, shapeKey, similarity } from "./schema.js";
 import { camel, singular, templatePaths, type SegmentKind } from "./templates.js";
 
@@ -76,8 +77,12 @@ function discriminator(member: Member): {
 }
 
 export function groupExchanges(kept: Classified[], templates: string[] = []): Grouped {
+  // Beacons that got past the filter (a live capture, a hand-built list) never become operations.
   const api = kept.filter(
-    (item) => item.category === "api" || item.category === "auth" || item.category === "document",
+    (item) =>
+      (item.category === "api" && !isTelemetry(item.exchange, new URL(item.exchange.url))) ||
+      item.category === "auth" ||
+      item.category === "document",
   );
   const templated = templatePaths(
     api.map(({ exchange, category }) => ({
@@ -298,6 +303,8 @@ function requestBody(group: Group): Operation["requestBody"] {
     schema: values.length ? inferSchema(values) : {},
   };
   if (first.form) body.form = true;
+  const constants = bodyConstants(values);
+  if (constants) body.constants = constants;
   return body;
 }
 

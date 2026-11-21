@@ -6,6 +6,7 @@ import type { Params } from "./runtime/request.js";
 import { siteMapper } from "./runtime/site-mapper.js";
 import { watch } from "./watch.js";
 import { learnLive, undoLive, writeLive } from "./live.js";
+import { rewindForOperation } from "./rewind.js";
 
 // Requests from browser code (the `siteMapper` global in browserkit's runtime): a
 // browser cell, or a watcher's check, can list mapped sites, call or watch their operations, run
@@ -22,6 +23,7 @@ export interface SiteMapperRequest {
     | "learn-live"
     | "write"
     | "undo"
+    | "rewind"
     | "code"
     | "export"
     | "pace";
@@ -87,6 +89,8 @@ const HANDLERS: Record<Exclude<SiteMapperRequest["siteMapper"], "sites" | "code"
     writeLive(site, required(request.operation, "operation"), request.params ?? {}),
   undo: (site, request) =>
     undoLive(site, required(request.operation, "operation"), request.params ?? {}),
+  rewind: async (site, request) =>
+    (await rewindForOperation(site, required(request.operation, "operation"))) ?? null,
   call: async (site, request) =>
     (await siteMapper(site)).call(required(request.operation, "operation"), request.params ?? {}),
   export: async (site, request) => exportRows(site, request),

@@ -10,6 +10,7 @@ export * from "./site-scripts.js";
 export * from "./native-bootstrap.js";
 export * from "./errors.js";
 export * from "./step-event.js";
+export * from "./handoff.js";
 export {
   connectionAddress,
   literalLoopback,

@@ -16,7 +16,7 @@ export {
   encodeTnetstring,
 } from "./load/index.js";
 export { filterExchanges, learnNoise, type FilterOptions } from "./filter.js";
-export { inputParams, documentedParams, isDerived } from "./params.js";
+export { inputParams, documentedParams, isDerived, bodyInputs, operationInputs } from "./params.js";
 export { inferSchema } from "./infer/schema.js";
 export { templatePaths } from "./infer/templates.js";
 export { builtinAbilities, builtinSites } from "./builtin-abilities.js";
@@ -40,7 +40,9 @@ export {
 } from "./site-capabilities.js";
 export {
   ABILITY_HISTORY_LIMIT,
+  abilityVersionNumber,
   countAbilityVersions,
+  versionLabel,
   listAbilityVersions,
   readAbilityVersion,
   saveAbilityVersion,
@@ -311,7 +313,20 @@ export {
 } from "./route-promote.js";
 export { reportWrong, type WrongReport } from "./route-wrong.js";
 export { actRoute, dropActRoute, readActRoute, saveActRoute, type ActStep } from "./act-route.js";
-export { queueHeal } from "./ability-heal.js";
+export {
+  healLine,
+  lastHeal,
+  markHealPending,
+  pendingHeal,
+  queueHeal,
+  readHealState,
+  settleHeal,
+  takeHealReceipt,
+  type HealReceipt,
+  type HealState,
+  type PendingHeal,
+} from "./ability-heal.js";
+export { versionedSave, type VersionedSave } from "./ability-heal-receipt.js";
 export {
   autoSaveAbility,
   autoSaveBlocker,
@@ -349,3 +364,11 @@ export type {
   TargetWithFallbacks,
 } from "./route-types.js";
 export * from "./runtime/index.js";
+export {
+  navigateBackRewind,
+  rewindForAbility,
+  rewindForOperation,
+  undoLabel,
+  type Rewind,
+} from "./rewind.js";
+export { elapsedLabel, mcpCommandForSite, runReceipt, type RunReceipt } from "./run-receipt.js";

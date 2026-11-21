@@ -73,7 +73,7 @@ export const EFFECTS = [
   },
   {
     name: "user.handoff",
-    call: "bu.handoff(message, {selector?, wait?, start?})",
+    call: "bu.handoff(message, {selector?, wait?, start?, kind?, actionLabel?})",
     does: "asks the user to do a step in the tab and waits for it",
     needs: ["tab"],
     errors: ["TIMEOUT"],

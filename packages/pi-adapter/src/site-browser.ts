@@ -8,7 +8,7 @@ import {
   type Bridge,
 } from "@browserkit/tools/site-to-api";
 import type { BrowserToolRunner } from "./browser-tool.js";
-import { clampTimeoutMs } from "@aeon/protocol";
+import { clampTimeoutMs, RewindSchema, type Rewind } from "@aeon/protocol";
 import { cellTimeoutMs } from "./run-budget.js";
 
 // site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they
@@ -103,4 +103,15 @@ export function inChat<T>(chatId: string, work: () => Promise<T>): Promise<T> {
 export function siteMapperRequest(chatId: string, request: unknown): Promise<unknown> | undefined {
   if (!isSiteMapperRequest(request)) return undefined;
   return inChat(chatId, () => handleSiteMapperRequest(request));
+}
+
+/** How a write through a site's API can be taken back, or undefined when it cannot be. */
+export async function siteRewind(
+  chatId: string,
+  site: string,
+  operation: string,
+): Promise<Rewind | undefined> {
+  const found = await siteMapperRequest(chatId, { siteMapper: "rewind", site, operation });
+  const parsed = RewindSchema.safeParse(found);
+  return parsed.success ? parsed.data : undefined;
 }

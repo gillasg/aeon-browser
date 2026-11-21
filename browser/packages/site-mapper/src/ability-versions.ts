@@ -139,3 +139,18 @@ async function pruneVersions(folder: string): Promise<void> {
   for (const file of files.slice(0, Math.max(0, files.length - ABILITY_HISTORY_LIMIT)))
     await unlink(join(folder, file)).catch(() => undefined);
 }
+
+/** `v1`, `v2`: versions count from 1, the first save being v1. */
+export function versionLabel(version: number): string {
+  return `v${version}`;
+}
+
+/**
+ * The number of the ability's current content, from 1. Saves stamp it; an ability saved before
+ * that is numbered by its archive (every earlier save is one version), which is exact until the
+ * history cap starts dropping the oldest.
+ */
+export async function abilityVersionNumber(ability: Ability): Promise<number> {
+  if (typeof ability.version === "number" && ability.version >= 1) return ability.version;
+  return (await countAbilityVersions(ability.site, ability.name)).count + 1;
+}

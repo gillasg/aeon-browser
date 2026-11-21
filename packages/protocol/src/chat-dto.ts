@@ -4,6 +4,7 @@ import {
   StepEffectSchema,
   StepEventSchema,
 } from "@browserkit/protocol";
+import { RewindSchema } from "./rewind.js";
 import { RunCardSchema } from "./run-card.js";
 import { ChatCatalogItemSchema, ChatIdSchema, ChatSummarySchema } from "./chat-catalog-dto.js";
 export {
@@ -338,6 +339,8 @@ export const PiSessionEventSchema = z.discriminatedUnion("kind", [
               failed: z.number().int().nonnegative(),
               items: z.array(z.string().max(80)).max(200),
               params: z.array(z.record(z.string(), z.unknown())).max(200).optional(),
+              /** How to take the write back, when the site's opposite action is known. */
+              rewind: RewindSchema.optional(),
             })
             .strict(),
         )

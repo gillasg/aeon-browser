@@ -1,3 +1,4 @@
+import type { HandoffMeta } from "@browserkit/protocol";
 import { engineConfig } from "./engine-config.js";
 import { engineDebug } from "./native-debug-log.js";
 import { withLock } from "./native-browser-scheduler.js";
@@ -41,10 +42,19 @@ onEngineInstall(() => {
 // What the user typed into the cursor's ask instead of acting in the tab, kept for the hand-off's
 // caller (bu.handoff returns it) until it is taken.
 const typed = new Map<number, string>();
-export function takeTypedAnswer(tabId: number): string | undefined {
+function takeTypedAnswer(tabId: number): string | undefined {
   const answer = typed.get(tabId);
   typed.delete(tabId);
   return answer;
+}
+
+/** A hand-off the user answered by typing into the cursor returns that text. */
+export function answeredHandoff(
+  tabId: number,
+  outcome: "done" | "cancelled",
+): "done" | "cancelled" | { answer: string } {
+  const answer = outcome === "done" ? takeTypedAnswer(tabId) : undefined;
+  return answer !== undefined ? { answer } : outcome;
 }
 
 /** Whether the user can see the tab now: active in a focused window, and not being recorded. */
@@ -60,6 +70,7 @@ function followNavigation(
   tabId: number,
   message: string,
   spotlight?: { x: number; y: number; width: number; height: number },
+  meta: HandoffMeta = {},
 ): (details: { tabId: number; frameId: number }) => void {
   const point = spotlight
     ? {
@@ -69,8 +80,8 @@ function followNavigation(
     : undefined;
   return (details) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
-    showAgentNeeds(tabId, message, spotlight);
-    void showHandoffAsk(tabId, point);
+    showAgentNeeds(tabId, message, spotlight, meta);
+    void showHandoffAsk(tabId, point, meta);
   };
 }
 
@@ -79,6 +90,7 @@ export async function handOffToUser(
   message: string,
   active: () => boolean,
   spotlight?: { x: number; y: number; width: number; height: number },
+  meta: HandoffMeta = {},
 ): Promise<"done" | "cancelled"> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!tab) throw new Error("TARGET_LOST");
@@ -96,7 +108,7 @@ export async function handOffToUser(
       .create(notification, {
         type: "basic",
         iconUrl: chrome.runtime.getURL(engineConfig.notificationIcon),
-        title: "The agent needs you",
+        title: meta.kind === "cliff-edge" ? "Your go-ahead is needed" : "The agent needs you",
         message,
         requireInteraction: true,
       })
@@ -106,8 +118,8 @@ export async function handOffToUser(
   typed.delete(tabId);
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
-  showAgentNeeds(tabId, message, spotlight);
-  const follow = followNavigation(tabId, message, spotlight);
+  showAgentNeeds(tabId, message, spotlight, meta);
+  const follow = followNavigation(tabId, message, spotlight, meta);
   chrome.webNavigation.onCommitted.addListener(follow);
   void showHandoffAsk(
     tabId,
@@ -117,6 +129,7 @@ export async function handOffToUser(
           y: Math.round(spotlight.y + spotlight.height / 2),
         }
       : undefined,
+    meta,
   );
   engineDebug("handoff", "shown", { tab: tabId });
   const startedAt = Date.now();

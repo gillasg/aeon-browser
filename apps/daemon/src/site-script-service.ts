@@ -9,6 +9,7 @@ import {
 } from "@aeon/protocol";
 import type { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
+import { siteScriptRewind } from "./site-script-rewind.js";
 
 export class SiteScriptService {
   private readonly store: SqliteSiteScriptStore;
@@ -197,7 +198,14 @@ export class SiteScriptService {
       ? await this.apply(callId, next, command.target, "install", signal)
       : await this.remove(callId, next, command.target, signal);
     this.browser.resyncScripts(next.clientInstanceId);
-    return { scriptId: next.scriptId, revision: next.revision, enabled: next.enabled, runtime };
+    const rewind = siteScriptRewind(next, command.action);
+    return {
+      scriptId: next.scriptId,
+      revision: next.revision,
+      enabled: next.enabled,
+      runtime,
+      ...(rewind ? { rewind } : {}),
+    };
   }
   private revise(
     script: SiteScriptRecord,

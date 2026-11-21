@@ -7,7 +7,10 @@ import { withResultAsserts, type AbilityAssert } from "./ability-assert.js";
 import { defaultHost } from "./ability-attempt.js";
 import { testedAbility, withTested, type AbilityTested } from "./ability-digest.js";
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
-import { versionChangedAbility } from "./ability-versions.js";
+import { takeHealReceipt, type HealReceipt } from "./ability-heal.js";
+import { versionedSave } from "./ability-heal-receipt.js";
+import { rewindForAbility, type Rewind } from "./rewind.js";
+import { runReceipt } from "./run-receipt.js";
 import { executeRead, executeWrite, type RunRecorder } from "./ability-run.js";
 import { abilityWrites, kindFromWrites, type AbilityWrite } from "./ability-effects.js";
 import { inferAbilityInputs, type AbilityDemonstration } from "./ability-infer.js";
@@ -219,6 +222,8 @@ export interface Ability {
   scrubbed?: AbilityScrubbed[];
   /** What the ways change, as an inventory. Never a permission gate. */
   writes?: AbilityWrite[];
+  /** Counted from 1: the first save is v1, each save that changes the content is the next. */
+  version?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -238,6 +243,18 @@ export interface AbilityRunResult {
   /** A second way disagreed; the ability is marked stale. */
   stale?: boolean;
   staleWhy?: string;
+  /** A repair since the last run: which version replaced which. Returned once. */
+  healed?: HealReceipt;
+  /** Writes: how to take the change back, when the site's opposite action is known. */
+  rewind?: Rewind;
+  /** Served by a compiled way (the site's API): no page, no model. */
+  compiled?: boolean;
+  /** How long the run took. */
+  elapsedMs?: number;
+  /** `aeon mcp <site>`: the one line that serves this site's tools to another agent. */
+  mcpCommand?: string;
+  /** `0.4s · no model · API` */
+  receipt?: string;
 }
 
 export interface AbilityRunOptions {
@@ -353,6 +370,8 @@ export async function saveAbility(
   tests?: AbilityTestReport;
   inferred?: { inputs: string[]; references: string[] };
   scrubbed?: ScrubMark[];
+  /** This save repaired a drifted ability: which version replaced which. */
+  healed?: HealReceipt;
 }> {
   const {
     ability: prepared,
@@ -381,14 +400,15 @@ export async function saveAbility(
   const testedNow = withTested(drafted, existing, tests?.ways);
   const next = { ...testedNow, updatedAt: new Date().toISOString() };
   const inferred = inferredOf(prepared);
-  await versionChangedAbility(existing, next);
-  await writeAtomic(path, JSON.stringify(next, null, 2) + "\n");
+  const { ability: saved, healed } = await versionedSave(site, existing, next);
+  await writeAtomic(path, JSON.stringify(saved, null, 2) + "\n");
   const warnings =
-    options.check === false ? [] : [...contractWarnings(next), ...scrubWarnings(scrub.marks)];
+    options.check === false ? [] : [...contractWarnings(saved), ...scrubWarnings(scrub.marks)];
   return {
-    ability: next,
+    ability: saved,
     path,
     warnings,
+    ...(healed ? { healed } : {}),
     ...(tests ? { tests } : {}),
     ...(inferred ? { inferred } : {}),
     ...(scrub.marks.length ? { scrubbed: scrub.marks } : {}),
@@ -587,12 +607,35 @@ export async function runAbility(
   if (!ability) throw new Error(`ABILITY_UNKNOWN: ${siteName(site)} has no ability ${name}`);
   const unknown = unknownInputMessage(ability, inputs);
   if (unknown) throw new Error(unknown);
+  const started = Date.now();
   const host = options.host ?? defaultHost(site);
   const blocked = await preconditionError(ability, host);
   if (blocked) throw new Error(blocked);
   const record: RunRecorder = (ok, notes, differ) => recordAbilityRun(ability, ok, notes, differ);
-  if (ability.kind === "write") return executeWrite(ability, inputs, host, options, record);
-  return executeRead(ability, inputs, host, options, record);
+  const run =
+    ability.kind === "write"
+      ? await executeWrite(ability, inputs, host, options, record)
+      : await executeRead(ability, inputs, host, options, record);
+  return { ...run, ...(await runExtras(ability, inputs, run, Date.now() - started)) };
+}
+
+/** What a finished run adds: the receipt, a repair since the last run, and how to undo a write. */
+async function runExtras(
+  ability: Ability,
+  inputs: Record<string, unknown>,
+  run: AbilityRunResult,
+  elapsedMs: number,
+): Promise<Partial<AbilityRunResult>> {
+  const healed = await takeHealReceipt(ability.site, ability.name).catch(() => undefined);
+  const applied = ability.kind === "write" && run.write?.write_status === "applied";
+  const rewind = applied
+    ? await rewindForAbility(ability, inputs).catch(() => undefined)
+    : undefined;
+  return {
+    ...runReceipt(ability.site, run.via, elapsedMs),
+    ...(healed ? { healed } : {}),
+    ...(rewind ? { rewind } : {}),
+  };
 }
 
 /** Runs an ability's stored test cases and reports failures and constant output. */

@@ -1,6 +1,7 @@
 import { noteDeviceEmulation, withFocusEmulation } from "./native-browser-session.js";
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
+import { withContextRetry } from "./cdp/context-retry.js";
 import { callClass, send } from "./cdp/send.js";
 import { isKernelErrorCode } from "./kernel-errors.js";
 import { refusedCdp } from "./native-browser-guards.js";
@@ -222,6 +223,16 @@ async function quietContext(debuggee: chrome.debugger.Debuggee): Promise<number 
 }
 
 async function probe(debuggee: chrome.debugger.Debuggee): Promise<PageProbe | undefined> {
+  // The settle probe lives in a cached isolated world that a navigation drops. Forget it and
+  // make another, a couple of times, before the settle loop sees a failure.
+  return withContextRetry(() => probeOnce(debuggee), {
+    invalidate: () => {
+      if (debuggee.tabId !== undefined) forgetQuietWorld(debuggee.tabId);
+    },
+  });
+}
+
+async function probeOnce(debuggee: chrome.debugger.Debuggee): Promise<PageProbe | undefined> {
   const contextId = await quietContext(debuggee);
   const result = (await send(
     debuggee,

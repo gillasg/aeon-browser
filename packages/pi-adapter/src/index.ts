@@ -27,6 +27,8 @@ export {
   type LiveModelSource,
 } from "./live-models.js";
 export {
+  aeonBridge,
+  inChat,
   browserNamedFor,
   browserParentChat,
   siteMapperRequest,

@@ -59,7 +59,7 @@ import {
   pageOutcome,
   pageStillChanging,
 } from "./native-browser-navigation.js";
-import { frameContext, rootFramePoint } from "./native-browser-frames.js";
+import { resolveFrameObject, rootFramePoint } from "./native-browser-frames.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { scrollWithFeedback } from "./native-browser-scroll.js";
 import { hiddenTargetError } from "./native-browser-reveal.js";
@@ -560,35 +560,6 @@ async function frameOffset(
     { label: "frameOffset" },
   )) as { model: { content: number[] } };
   return { x: box.model.content[0] ?? 0, y: box.model.content[1] ?? 0 };
-}
-
-async function resolveFrameObject(
-  debuggee: chrome.debugger.Debuggee,
-  frameId: string,
-  selector: string | number,
-): Promise<string> {
-  const contextId = await frameContext(debuggee, frameId);
-  if (typeof selector === "number") {
-    const node = (await send(
-      debuggee,
-      "DOM.resolveNode",
-      { backendNodeId: selector, executionContextId: contextId },
-      { label: "resolveFrameObject" },
-    )) as { object: { objectId: string } };
-    return node.object.objectId;
-  }
-  const result = (await send(
-    debuggee,
-    "Runtime.evaluate",
-    {
-      contextId,
-      expression: `(()=>{const roots=[document],items=[];while(roots.length){const root=roots.pop();items.push(...root.querySelectorAll(${JSON.stringify(selector)}));for(const el of root.querySelectorAll('*'))if(el.shadowRoot)roots.push(el.shadowRoot);}if(items.length!==1)throw Error('Expected exactly one element');return items[0]})()`,
-    },
-    { label: "resolveFrameObject", ms: 5_000 },
-  )) as { result?: { objectId?: string }; exceptionDetails?: unknown };
-  const objectId = result.result?.objectId;
-  if (!objectId || result.exceptionDetails) throw new Error("TARGET_NOT_FOUND");
-  return objectId;
 }
 
 function caused(receipt: ReturnType<typeof takeReceipt>): boolean {

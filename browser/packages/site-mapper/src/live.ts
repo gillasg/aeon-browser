@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { operationEffect } from "./effect.js";
 import { filterExchanges } from "./filter.js";
 import { parseCapture } from "./load/index.js";
 import { learnedNoise, loadModel, saveFlow, siteDir, siteName, writeAtomic } from "./registry.js";
@@ -256,6 +257,24 @@ export async function undoLive(
   if (response.status >= 400 || response.status === 0)
     throw await undoFailure(name, state, operationId, reverseId, response);
   return response.json ?? response.text ?? { ok: true, status: response.status };
+}
+
+/**
+ * The operation that reverses a proven routine write, or undefined when there is none (it never
+ * went through the API, no opposite was learned, or the opposite is not routine). Never throws:
+ * it answers "can this be taken back?" for a receipt.
+ */
+export async function reverseOperation(
+  site: string,
+  operationId: string,
+): Promise<{ reverseId: string; irreversible: boolean } | undefined> {
+  try {
+    const { model, reverseId } = await undoTarget(site, operationId);
+    const forward = model.operations.find((item) => item.id === operationId);
+    return { reverseId, irreversible: !!forward && operationEffect(forward) === "irreversible" };
+  } catch {
+    return undefined;
+  }
 }
 
 /** The forward write, the state that proves it, and the opposite operation to send. */

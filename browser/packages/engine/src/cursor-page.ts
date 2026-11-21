@@ -220,6 +220,16 @@ const PAGE_BODY = `
     if (update.needs) { s.cursor.style.opacity = "1"; s.cursorShown = true; }
     else { s.spotlight.classList.remove("on"); s.pill.classList.remove("on"); }
   }
+  // What the wait is for, as data on the wrapper: a cliff edge (a commitment to approve) is not a
+  // bot check, and the styling of each is the host page's to choose.
+  if (update.needsKind !== undefined) {
+    if (update.needsKind) s.wrap.setAttribute("data-needs-kind", String(update.needsKind));
+    else s.wrap.removeAttribute("data-needs-kind");
+  }
+  if (update.needsAction !== undefined) {
+    if (update.needsAction) s.wrap.setAttribute("data-needs-action", String(update.needsAction).slice(0, 40));
+    else s.wrap.removeAttribute("data-needs-action");
+  }
   s.cursor.classList.remove("idle");
   clearTimeout(s.idle);
   s.idle = setTimeout(function () { s.cursor.classList.add("idle"); }, 2200);
@@ -331,6 +341,8 @@ const PAGE_BODY = `
     state.agent = false;
     state.summoned = false;
     state.wrap.classList.remove("needs");
+    state.wrap.removeAttribute("data-needs-kind");
+    state.wrap.removeAttribute("data-needs-action");
     state.wrap.classList.remove("clean");
     state.glow.classList.remove("on");
     state.pill.classList.remove("on");

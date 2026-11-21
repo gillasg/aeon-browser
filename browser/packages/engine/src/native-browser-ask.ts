@@ -2,6 +2,7 @@
 // page scripts cannot enumerate the field, read what the user types, or answer for them. The
 // main-world painter still draws the amber cursor and its message; this host collects Done,
 // Cancel and the typed answer and sends them to the extension worker over runtime messaging.
+import type { HandoffMeta } from "@browserkit/protocol";
 import { CURSOR_TOKEN_CSS } from "./cursor-mark.js";
 
 export const HANDOFF_ASK_ID = "aeon-agent-ask";
@@ -24,19 +25,29 @@ interface AskDetail {
   style: string;
   tabId: number;
   point?: { x: number; y: number };
+  /** Names the confirm button after the commitment ("Pay $42.10") instead of "Done". */
+  confirm?: string;
 }
 
 /** Adds the ask to the tab. A closed shadow root keeps the input out of the page's DOM queries. */
 export async function showHandoffAsk(
   tabId: number,
   point?: { x: number; y: number },
+  meta: HandoffMeta = {},
 ): Promise<void> {
   await chrome.scripting
     .executeScript({
       target: { tabId },
       world: "ISOLATED",
       func: showAsk,
-      args: [{ style: CURSOR_TOKEN_CSS + ASK_CSS, tabId, ...(point ? { point } : {}) }],
+      args: [
+        {
+          style: CURSOR_TOKEN_CSS + ASK_CSS,
+          tabId,
+          ...(point ? { point } : {}),
+          ...(meta.kind === "cliff-edge" && meta.actionLabel ? { confirm: meta.actionLabel } : {}),
+        },
+      ],
     })
     .catch(() => undefined);
 }
@@ -118,7 +129,7 @@ function showAsk(detail: AskDetail): void {
   row.className = "ask";
   row.append(
     field,
-    makeButton("done", "Done", finish),
+    makeButton("done", detail.confirm ?? "Done", finish),
     makeButton("cancel", "✕", () => send("cancelled")),
   );
   root.append(makeStyle(), row);

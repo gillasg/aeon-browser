@@ -10,6 +10,7 @@ export {
   siteMapper,
   SiteClient,
   HttpError,
+  BadRequest,
   SignedOut,
   Challenged,
   errorKind,

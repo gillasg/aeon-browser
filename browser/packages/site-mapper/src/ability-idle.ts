@@ -7,6 +7,8 @@
 
 import type { Ability } from "./abilities.js";
 import { saveAbility } from "./abilities.js";
+import { markHealPending, type HealReceipt } from "./ability-heal.js";
+import { wayId } from "./ability-stats.js";
 import { siteName } from "./registry.js";
 
 /** What a failed check means. Only drift is safe to repair in the background. */
@@ -208,6 +210,8 @@ export interface IdleRepairResult {
   ability: Ability;
   status: "ok" | "repaired" | "not-drift" | "unrepaired";
   note?: AbilityCheckNote;
+  /** A repair: which version replaced which, for the one-line receipt. */
+  healed?: HealReceipt;
 }
 
 /**
@@ -238,28 +242,14 @@ export async function repairAbilityWhileIdle(
     const note = failedCheckNote(reason, detail, at);
     return { ability: withCheckNote(ability, note), status: "not-drift", note };
   }
-  let fresh: Ability | undefined;
-  try {
-    fresh = await deps.relearn(ability);
-  } catch {
-    fresh = undefined;
-  }
-  if (fresh?.ways.length) {
-    const saved = await saveAbility(
-      {
-        ...fresh,
-        name: ability.name,
-        site: ability.site,
-        stats: ability.stats,
-        createdAt: ability.createdAt,
-      },
-      { replace: true },
-    );
+  const saved = await relearnAndSave(ability, detail, deps);
+  if (saved) {
     const note: AbilityCheckNote = { at, ok: true, reason: "drift", detail: "re-learned" };
     return {
       ability: withCheckNote(saved.ability, note),
       status: "repaired",
       note,
+      ...(saved.healed ? { healed: saved.healed } : {}),
     };
   }
   const note: AbilityCheckNote = {
@@ -270,4 +260,33 @@ export async function repairAbilityWhileIdle(
     repairFailed: true,
   };
   return { ability: withCheckNote(ability, note), status: "unrepaired", note };
+}
+
+/** Re-learns a drifted ability and saves it as the next version; undefined when nothing came back. */
+async function relearnAndSave(
+  ability: Ability,
+  detail: string,
+  deps: IdleRepairDeps,
+): Promise<Awaited<ReturnType<typeof saveAbility>> | undefined> {
+  let fresh: Ability | undefined;
+  try {
+    fresh = await deps.relearn(ability);
+  } catch {
+    fresh = undefined;
+  }
+  if (!fresh?.ways.length) return undefined;
+  const first = ability.ways[0];
+  // A check that failed outside a run has not queued a heal; the save below is its repair.
+  if (first)
+    await markHealPending(ability.site, ability.name, wayId(first), detail).catch(() => undefined);
+  return saveAbility(
+    {
+      ...fresh,
+      name: ability.name,
+      site: ability.site,
+      stats: ability.stats,
+      createdAt: ability.createdAt,
+    },
+    { replace: true },
+  );
 }

@@ -16,7 +16,7 @@ import {
   type PiSessionReference,
   type PiToolStepEvent,
 } from "@aeon/domain";
-import { StepEventSchema, type StepEvent } from "@aeon/protocol";
+import { RewindSchema, StepEventSchema, type Rewind, type StepEvent } from "@aeon/protocol";
 import { resultText, safeJsonObject } from "./pi-content-projection.js";
 import { submitToPi, createSessionControls } from "./session-controls.js";
 import { createPiThreadDelivery } from "./pi-thread-delivery.js";
@@ -470,6 +470,7 @@ function toolWrites(value: unknown): ToolWrite[] | undefined {
     ...(Array.isArray(write.params)
       ? { params: write.params.slice(0, 200).map(toolWriteParams) }
       : {}),
+    ...(RewindSchema.safeParse(write.rewind).success ? { rewind: write.rewind as Rewind } : {}),
   }));
 }
 
@@ -492,4 +493,5 @@ interface ToolWrite {
   failed: number;
   items: string[];
   params?: Record<string, unknown>[];
+  rewind?: unknown;
 }

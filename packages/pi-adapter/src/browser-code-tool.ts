@@ -28,7 +28,7 @@ import {
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
-import { siteMapperRequest } from "./site-browser.js";
+import { siteMapperRequest, siteRewind } from "./site-browser.js";
 import { tallyCell, writeRunLog } from "./run-log.js";
 import { cellBehaviour, noteBrowserCell } from "./batch-nudge.js";
 import { formatCell } from "./cell-grammar.js";
@@ -175,7 +175,7 @@ export function createBrowserCodeTool(
       const startedAt = Date.now();
       let steps: Record<string, unknown>[] = [];
       let progress: ToolProgress | undefined;
-      const writes = new SiteWrites();
+      const writes = new SiteWrites((site, operation) => siteRewind(chatId, site, operation));
       const files: string[] = [];
       const envelope = () => ({
         operationId,

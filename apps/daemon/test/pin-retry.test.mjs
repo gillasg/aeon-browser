@@ -16,6 +16,10 @@ function browser(list) {
     browserOf(chatId) {
       return pins.get(chatId);
     },
+    // A chat with no attached tabs has no browser of its own beyond its pin.
+    codeBrowserOf() {
+      return undefined;
+    },
   };
 }
 

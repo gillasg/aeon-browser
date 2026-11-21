@@ -144,7 +144,13 @@ export interface Operation {
   };
   graphql?: { query?: string; hash?: string; operationName?: string; variablesPath: string };
   params: Param[];
-  requestBody?: { mime: string; schema: JsonSchema; form?: boolean };
+  requestBody?: {
+    mime: string;
+    schema: JsonSchema;
+    form?: boolean;
+    /** Top-level fields that had the same value in every recorded body; replay fills them in. */
+    constants?: Record<string, string | number | boolean>;
+  };
   responses: Record<string, { mime: string; schema?: JsonSchema }>;
   role: "read" | "action" | "auth";
   /** Set only when an override names it. Otherwise callers infer it from the method and text. */

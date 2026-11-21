@@ -130,7 +130,27 @@ const BOT_DEFENSE = [
 ];
 
 const NOISE_PATHS =
-  /\/(collect|beacon|track(ing)?|events?|analytics|telemetry|metrics|rum|pixel|ping|heartbeat|keep-?alive|log(s|ging)?|csp-report|report-uri|sockjs-node|__webpack_hmr|hot-update[^/]*|stats|impression|clicks?)(\/|$|\?|\.)/i;
+  /\/(collect|beacons?|send-?beacon|track(ing)?|events?|log[-_]?events?|analytics|telemetry|metrics?|rum|pixel|ping|heartbeat|keep-?alive|log(s|ging|ger)?|gen_204|csi|csp-report|report-uri|sockjs-node|__webpack_hmr|hot-update[^/]*|stats|impressions?|clicks?)(\/|$|\?|\.)/i;
+
+// What a beacon says back: a bare acknowledgement, never data a caller could use.
+const ACK_KEYS = new Set([
+  "ok",
+  "success",
+  "status",
+  "result",
+  "message",
+  "msg",
+  "code",
+  "received",
+  "accepted",
+  "queued",
+  "error",
+  "errors",
+]);
+
+// What an event batch sends: fields only analytics code puts in a body.
+const EVENT_BODY =
+  /"(events?|event_type|eventName|event_name|ts|timestamp|sid|session_id|batch|anonymousId|distinct_id|client_id)"/;
 
 const STATIC_FILE =
   /\.(js|mjs|css|map|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|m4a|pdf|zip|wasm)(\?|$)/i;
@@ -241,14 +261,53 @@ function staticReason(exchange: Exchange, url: URL): string | undefined {
   if (STATIC_FILE.test(url.pathname) || STATIC_PATHS.test(url.pathname)) return "static file";
   const stream =
     type === "eventsource" || type === "websocket" || !!exchange.frames || !!exchange.messages;
-  if (!stream && NOISE_PATHS.test(url.pathname) && !isUsefulResponse(exchange)) return "telemetry";
+  if (!stream && isTelemetry(exchange, url)) return "telemetry";
   return undefined;
+}
+
+/** A body that only acknowledges ({"ok": true}, {"status": "accepted"}, [], {}). */
+function isAckBody(body: string): boolean {
+  if (body.length <= 2) return true;
+  try {
+    const value = JSON.parse(body) as unknown;
+    if (Array.isArray(value)) return value.length === 0;
+    if (!value || typeof value !== "object") return true;
+    const keys = Object.keys(value);
+    return keys.every((key) => ACK_KEYS.has(key.toLowerCase()));
+  } catch {
+    return false;
+  }
+}
+
+function sentByBeacon(exchange: Exchange): boolean {
+  return !!exchange.initiator?.stack?.some((frame) => /sendBeacon/i.test(frame.functionName));
+}
+
+/** A write with nothing to say back: no body, a 204, or a bare acknowledgement. */
+function answersNothing(exchange: Exchange): boolean {
+  if (exchange.status === 204) return true;
+  return isAckBody(exchange.responseBody?.trim() ?? "");
+}
+
+/**
+ * First-party metrics and beacons: sendBeacon calls, event batches with nothing to answer,
+ * and the usual /collect, /telemetry, /track paths. A real endpoint that happens to live at
+ * an /events path answers with data and is kept; a fire-and-forget write is not an operation
+ * anyone can call for its result.
+ */
+export function isTelemetry(exchange: Exchange, url: URL): boolean {
+  if (sentByBeacon(exchange)) return true;
+  const writes = exchange.method !== "GET" && exchange.method !== "HEAD";
+  const onNoisePath = NOISE_PATHS.test(url.pathname);
+  if (writes && answersNothing(exchange))
+    return onNoisePath || EVENT_BODY.test(exchange.requestBody ?? "");
+  return onNoisePath && !isUsefulResponse(exchange);
 }
 
 /** Beacons answer with nothing; a real endpoint at a /events path answers with data. */
 function isUsefulResponse(exchange: Exchange): boolean {
   const body = exchange.responseBody?.trim() ?? "";
-  return exchange.status !== 204 && body.length > 20 && isJsonLike(exchange);
+  return exchange.status !== 204 && body.length > 20 && isJsonLike(exchange) && !isAckBody(body);
 }
 
 export function originMatches(url: URL, origin: string): boolean {

@@ -9,10 +9,11 @@ import {
   type AbilityPrecondition,
 } from "./abilities.js";
 import { untestedWays } from "./ability-digest.js";
+import { readHealState, type HealReceipt, type HealState } from "./ability-heal.js";
 import type { AbilityWrite } from "./ability-effects.js";
 import { wayId } from "./ability-stats.js";
 import { capabilityIndex } from "./infer/capabilities.js";
-import { inputParams } from "./params.js";
+import { operationInputs } from "./params.js";
 import { loadModel, siteName } from "./registry.js";
 
 export interface SiteAbilitySummary {
@@ -37,6 +38,10 @@ export interface SiteAbilitySummary {
   /** Read ability a write uses to confirm itself. */
   postcondition?: string;
   stats?: Ability["stats"];
+  /** Counted from 1; each save that changes the ability is the next version. */
+  version?: number;
+  /** The last repair of a drifted way: `Repaired <name> (v1 → v2)`. */
+  healed?: HealReceipt;
 }
 
 export interface SiteOperationSummary {
@@ -63,17 +68,18 @@ export interface SiteCapabilities {
 /** The merged inventory for a site. Missing stores simply contribute nothing. */
 export async function siteCapabilities(site: string): Promise<SiteCapabilities> {
   const host = siteName(site);
-  const [abilities, notes, model] = await Promise.all([
+  const [abilities, notes, model, heals] = await Promise.all([
     listAbilities(host).catch(() => []),
     readSiteNotes(host).catch(() => ""),
     loadModel(host).catch(() => undefined),
+    readHealState(host),
   ]);
   const operations = model?.operations ?? [];
   const index = capabilityIndex(operations);
   const roles = new Map<string, string[]>();
   for (const [capability, ids] of Object.entries(index))
     for (const id of ids ?? []) roles.set(id, [...(roles.get(id) ?? []), capability]);
-  const summaries = abilities.map(summarize).sort(lookupsFirst);
+  const summaries = abilities.map((item) => summarize(item, heals)).sort(lookupsFirst);
   return {
     site: host,
     ...grouped(summaries),
@@ -84,7 +90,7 @@ export async function siteCapabilities(site: string): Promise<SiteCapabilities> 
         title: operation.summary ?? operation.id,
         does: effect === "read" ? ("read" as const) : ("write" as const),
         effect,
-        inputs: inputParams(operation).map((param) => param.name),
+        inputs: operationInputs(operation),
         ...(roles.get(operation.id)?.length ? { capabilities: roles.get(operation.id) } : {}),
       };
     }),
@@ -92,7 +98,7 @@ export async function siteCapabilities(site: string): Promise<SiteCapabilities> 
   };
 }
 
-function summarize(ability: Ability): SiteAbilitySummary {
+function summarize(ability: Ability, heals: HealState): SiteAbilitySummary {
   const post = ability.postcondition?.ability ?? ability.options.readBack?.ability;
   const effect = abilityEffect(ability);
   const kind = readOrWrite(effect);
@@ -111,7 +117,20 @@ function summarize(ability: Ability): SiteAbilitySummary {
     ...writesField(ability),
     ...(ability.preconditions ? { preconditions: ability.preconditions } : {}),
     ...(post ? { postcondition: post } : {}),
+    ...versionFields(ability, heals),
     stats: ability.stats,
+  };
+}
+
+/** The version number, and the last repair of a drifted way when there was one. */
+function versionFields(
+  ability: Ability,
+  heals: HealState,
+): Pick<SiteAbilitySummary, "version" | "healed"> {
+  const healed = heals[ability.name]?.last;
+  return {
+    ...(ability.version ? { version: ability.version } : {}),
+    ...(healed ? { healed } : {}),
   };
 }
 

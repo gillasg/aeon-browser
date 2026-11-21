@@ -5,7 +5,9 @@ import type { Challenge } from "../challenge.js";
 import { BrowserNotConnected } from "./bridge.js";
 import { isRateLimited } from "./limits.js";
 import { withNotes } from "./outcome.js";
-import { MissingParams, type RuntimeResponse } from "./request.js";
+import type { Operation } from "../types.js";
+import { badRequestDetail, invalidInputNames } from "./bad-request.js";
+import { MissingParams, type Params, type RuntimeResponse } from "./request.js";
 
 export class HttpError extends Error {
   constructor(
@@ -45,11 +47,38 @@ export class Challenged extends HttpError {
   }
 }
 
+/**
+ * The site refused the inputs (400, or 422): its own words, the inputs it flagged, what the
+ * operation declares and what was passed. A bad input is the caller's to fix, so it is an input
+ * error, never a "broken site".
+ */
+export class BadRequest extends HttpError {
+  readonly invalid: string[];
+  constructor(
+    operationId: string,
+    response: RuntimeResponse,
+    operation?: Operation,
+    params: Params = {},
+  ) {
+    super(operationId, response);
+    this.name = "BadRequest";
+    this.invalid = invalidInputNames(response);
+    this.message = `${this.message} ${badRequestDetail(operation, params, response)}`;
+  }
+}
+
 /** The call's value, or the error its status actually is. A rate limit is not data. */
-export function finishRead(id: string, response: RuntimeResponse, wall?: Challenge): unknown {
+export function finishRead(
+  id: string,
+  response: RuntimeResponse,
+  wall?: Challenge,
+  call?: { operation?: Operation; params?: Params },
+): unknown {
   if (wall) throw new Challenged(id, response, wall);
   if (isRateLimited(response)) throw rateLimited(id, response);
   if (response.status === 401 || response.status === 403) throw new SignedOut(id, response);
+  if (response.status === 400 || response.status === 422)
+    throw new BadRequest(id, response, call?.operation, call?.params);
   if (response.status >= 400 || response.status === 0) throw new HttpError(id, response);
   return withNotes(response);
 }
@@ -77,7 +106,7 @@ export function errorKind(error: unknown): ErrorKind {
   if (cause instanceof Error) return errorKind(cause);
   if (error instanceof Challenged) return "challenged";
   if (error instanceof SignedOut) return "signed-out";
-  if (error instanceof MissingParams) return "missing-input";
+  if (error instanceof MissingParams || error instanceof BadRequest) return "missing-input";
   if (error instanceof BrowserNotConnected) return "browser-offline";
   if (error instanceof HttpError) return "broken";
   return "failed";

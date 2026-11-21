@@ -49,32 +49,71 @@ export function docsTargets(model: SiteModel): { docs: string[]; graphql: string
   };
 }
 
-/** Page code that fetches the candidates and returns what answered. */
-export function docsExpression(targets: { docs: string[]; graphql: string[] }): string {
+/** What one fetch may take, how many run at once, and how long the whole probe may last. */
+export const DOCS_FETCH_MS = 2500;
+export const DOCS_CONCURRENCY = 4;
+export const DOCS_TOTAL_MS = 8000;
+
+/**
+ * Page code that fetches the candidates and returns what answered. Most sites answer none of the
+ * doc paths, and a host that hangs instead of refusing must not stall mapping: every fetch has
+ * its own timeout, a few run at once, and the probe as a whole gives up after a fixed budget
+ * and returns what it has.
+ */
+export function docsExpression(
+  targets: { docs: string[]; graphql: string[] },
+  limits: { fetchMs?: number; totalMs?: number; concurrency?: number } = {},
+): string {
+  const fetchMs = limits.fetchMs ?? DOCS_FETCH_MS;
+  const totalMs = limits.totalMs ?? DOCS_TOTAL_MS;
+  const concurrency = limits.concurrency ?? DOCS_CONCURRENCY;
   return `(async () => {
   const t = ${JSON.stringify(targets)};
+  const started = Date.now();
+  const left = () => ${totalMs} - (Date.now() - started);
+  const signalFor = (ms) => {
+    if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) return { signal: AbortSignal.timeout(ms) };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return { signal: controller.signal, done: () => clearTimeout(timer) };
+  };
   const json = async (url, init) => {
+    const budget = Math.min(${fetchMs}, left());
+    if (budget <= 0) return undefined;
+    const limit = signalFor(budget);
     try {
-      const response = await fetch(url, { credentials: 'include', ...init });
+      const response = await fetch(url, { credentials: 'include', ...init, signal: limit.signal });
       if (!response.ok) return undefined;
       return await response.json();
-    } catch { return undefined; }
+    } catch { return undefined; } finally { if (limit.done) limit.done(); }
   };
-  const openapi = [];
-  for (const url of t.docs) {
-    const doc = await json(url);
-    if (doc && (doc.openapi || doc.swagger) && doc.paths) openapi.push({ url, title: doc.info?.title, document: doc });
-  }
-  const graphql = [];
-  for (const url of t.graphql) {
-    const body = await json(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query: ${JSON.stringify(INTROSPECTION)} }),
-    });
-    if (body?.data?.__schema) graphql.push({ url, schema: body.data.__schema });
-  }
-  return { openapi, graphql };
+  const results = new Map();
+  const jobs = [
+    ...t.docs.map((url, index) => ({ index, run: async () => {
+      const doc = await json(url);
+      if (doc && (doc.openapi || doc.swagger) && doc.paths) results.set(index, { kind: 'openapi', value: { url, title: doc.info?.title, document: doc } });
+    } })),
+    ...t.graphql.map((url, index) => ({ index: t.docs.length + index, run: async () => {
+      const body = await json(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: ${JSON.stringify(INTROSPECTION)} }),
+      });
+      if (body?.data?.__schema) results.set(t.docs.length + index, { kind: 'graphql', value: { url, schema: body.data.__schema } });
+    } })),
+  ];
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length && left() > 0) await jobs[next++].run();
+  };
+  const pool = Promise.all(Array.from({ length: Math.min(${concurrency}, jobs.length) }, worker));
+  // A fetch that ignores its abort cannot hold the probe past the budget.
+  await Promise.race([pool, new Promise((done) => setTimeout(done, ${totalMs}))]);
+  const found = [...results.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1]);
+  return {
+    openapi: found.filter((item) => item.kind === 'openapi').map((item) => item.value),
+    graphql: found.filter((item) => item.kind === 'graphql').map((item) => item.value),
+  };
 })()`;
 }
 

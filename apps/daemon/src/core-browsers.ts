@@ -130,7 +130,10 @@ export function handleBrowsers(
 const PIN_WAIT_MS = 2500;
 const PIN_POLL_MS = 100;
 
-/** A worker chat uses the named profile, or copies the chat that started it. */
+/**
+ * A worker chat uses the named profile, or copies the browser of the chat that started it: that
+ * chat's pin, the browser its tabs are in, or the only one connected.
+ */
 export async function pinInherited(
   browser: BrowserControlService,
   directory: string,
@@ -143,7 +146,7 @@ export async function pinInherited(
     return;
   }
   if (!parent || parent === chatId) return;
-  const id = browser.browserOf(parent);
+  const id = browser.codeBrowserOf(parent) ?? browser.browserOf(parent);
   if (id && browser.browserOf(chatId) !== id) browser.pinChat(chatId, id);
 }
 

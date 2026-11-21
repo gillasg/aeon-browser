@@ -205,14 +205,15 @@ function createRoutineTools(
         "cheapest form yourself and never ask them to choose: a check whenever a site's learned API or a " +
         "page read can tell whether there is something to report (no model call until it passes), " +
         "otherwise just the instruction, which runs the agent on schedule. " +
-        "For a check, add check: browser_code that runs on each slot without a model call " +
+        "Watcher shape: {title, instruction, schedule: {kind: 'interval', everyMinutes: 5}, check: \"...\"}. " +
+        "The check is browser_code that runs on each slot with no model call; its last expression decides: " +
+        "truthy wakes you with the instruction and that value, false does nothing and costs nothing " +
         "(e.g. const p = await browser.openTab(url); const price = await p.evaluate(() => ...); " +
-        "await p.close(); price < 400 ? {price} : false). You are woken with the instruction only " +
-        "when its last expression is truthy, and receive that value. Watchers may run every minute. " +
-        "'Tell me when' is that watcher now, not a wait in the cell. " +
-        "For 'tell me when', set everyMinutes from how fast the watched condition changes, not from how far off it is: " +
+        "await p.close(); price < 400 ? {price} : false). The schedule is the polling: never loop, sleep or wait inside a check, " +
+        "and never wait for the condition yourself; 'tell me when' is this watcher, created now, then end the turn. " +
+        "Set everyMinutes from how fast the watched condition changes, not from how far off it is (watchers may run every minute): " +
         "a condition that can flip in minutes needs a minute-level poll, not 10-30 minutes; keep long intervals for steady things and one-time moments. " +
-        "Use them as event triggers: new items from a mapped API " +
+        "Event triggers: new items from a mapped API " +
         "(const r = await siteMapper.watch('shop.com', 'searchListings', {q: 'lamp'}); r.new.length ? r.new : false), " +
         "a new message or email (siteMapper.watch on the inbox's API, or count unread on the page), " +
         "new rows on a page (const r = browser.changes('lamps', (await p.list()).items); r.new.length ? r.new : false; " +
@@ -226,9 +227,12 @@ function createRoutineTools(
         "\"use listen\"; const p = await browser.openTab(url); await p.waitForChange('.inbox', {timeoutMs: 55000}) " +
         "(also p.waitForResponse('/api/messages'), p.waitForMessage(/new_message/) for WebSockets). " +
         "Schedules: {kind: 'interval', everyMinutes}, {kind: 'calendar', daysOfWeek, localTime} or {kind: 'once', atUtc} for one run at an exact time. " +
-        "A watcher waits for a condition (its check) or for a moment: to act at an exact moment (a drop, a ticket or booking release, a slot opening) " +
-        "under 55 minutes away call browser.snipe now; later, create a watcher with schedule {kind: 'once', atUtc: 3 minutes before} " +
-        "whose check is return await browser.snipe({at, url, prepare, fire, done, wait: true}): it fires with no model call and its result wakes you (help('snipe')). " +
+        "An exact moment (a drop, a ticket or booking release, a slot opening) under 55 minutes away: call browser.snipe in browser_code now. " +
+        "Later: a watcher with schedule {kind: 'once', atUtc: '<3 minutes before>'} whose check is exactly " +
+        "return await browser.snipe({at: '2026-12-01T09:00:00Z', url: 'https://shop.example/drop', prepare: async (page) => { await page.getByLabel('Seats').fill('2'); }, " +
+        "fire: async (page) => { await page.getByRole('button', {name: 'Book'}).click(); return 'clicked'; }, " +
+        "done: async (page, result) => result === 'clicked', wait: true}). " +
+        "It fires with no model call and its result wakes you; the options are exactly at, url, prepare, fire, done, wait (help('snipe')). " +
         "webhook {url, secret?} POSTs {routineId, title, value, firedAt} when the check passes (HMAC-SHA256 in X-Aeon-Signature when secret is set). webhookOnly delivers that and does not wake you. effect is read, write or irreversible (inferred when omitted).",
       routineCreate,
     ),

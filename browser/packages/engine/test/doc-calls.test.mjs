@@ -1144,3 +1144,24 @@ test("a nested target is bound too, so no request carries a raw tab id or label"
     assert.deepEqual(call.target, KEY, `${form} sent ${JSON.stringify(call.target)}`);
   }
 });
+
+test("bu.handoff passes a kind and an action label to the host, and a plain call sends neither", async () => {
+  const source = await sandboxSource();
+  const sent = async (form) => {
+    const box = await realm(source);
+    const result = await box.cell(form);
+    return { result, call: box.requests.find((request) => request.handoff)?.handoff };
+  };
+  const cliff = await sent(
+    `return await bu.handoff('Pay $42.10 to Acme?', {target: ${TAB_ID}, kind: 'cliff-edge', actionLabel: 'Pay $42.10'})`,
+  );
+  assert.equal(cliff.result.error, undefined, cliff.result.error?.message);
+  assert.equal(cliff.call.kind, "cliff-edge");
+  assert.equal(cliff.call.actionLabel, "Pay $42.10");
+  const plain = await sent(`return await bu.handoff('Please sign in', {target: ${TAB_ID}})`);
+  assert.equal("kind" in plain.call, false);
+  assert.equal("actionLabel" in plain.call, false);
+  const wrong = await sent(`return await bu.handoff('x', {target: ${TAB_ID}, kind: 'payment'})`);
+  assert.match(String(wrong.result.error?.message), /INVALID_INPUT.*auth, captcha, cliff-edge/);
+  assert.equal(wrong.call, undefined, "a wrong kind never reaches the host");
+});

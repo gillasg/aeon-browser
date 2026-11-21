@@ -26,3 +26,17 @@ export function inputParams(operation: Operation): Param[] {
 export function documentedParams(operation: Operation): Param[] {
   return operation.params.filter((param) => !isDerived(param));
 }
+
+/** The request body's top-level fields a caller supplies: those that varied, not recorded constants. */
+export function bodyInputs(operation: Operation): string[] {
+  const properties = (operation.requestBody?.schema.properties ?? {}) as Record<string, unknown>;
+  const constants = operation.requestBody?.constants ?? {};
+  return Object.keys(properties).filter((name) => !(name in constants));
+}
+
+/** Everything a caller supplies for an operation: its parameters, then its varying body fields. */
+export function operationInputs(operation: Operation): string[] {
+  return [
+    ...new Set([...inputParams(operation).map((param) => param.name), ...bodyInputs(operation)]),
+  ];
+}

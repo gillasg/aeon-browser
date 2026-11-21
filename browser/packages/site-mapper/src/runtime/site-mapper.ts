@@ -33,6 +33,7 @@ import { paginate, type PaginateOptions } from "./paginate.js";
 import { applyPaceNotes, exportPaced, notePaceLimit, takePace } from "../pace.js";
 import { readSiteFacts } from "../site-notes.js";
 export {
+  BadRequest,
   Challenged,
   HttpError,
   SignedOut,
@@ -564,7 +565,7 @@ export class SiteClient {
     if (options?.pace !== false) await takePace(this.site);
     const response = await this.request(id, params);
     const wall = paceOnChallenge(this.site, response);
-    return finishRead(id, response, wall);
+    return finishRead(id, response, wall, { operation: this.operation(id), params });
   }
 
   /** The site's saved multi-step actions (overrides.actions). */

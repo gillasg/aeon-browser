@@ -1,5 +1,6 @@
 // Visible text and non-semantic clickables share one evaluate. Clickables are capped and
 // timed so a huge page cannot stall the snapshot; the accessibility tree still comes back.
+import { isContextGone, withContextRetry } from "../cdp/context-retry.js";
 import { send } from "../cdp/send.js";
 import {
   CLICKABLE_CAP,
@@ -16,8 +17,12 @@ export function emptyScan(): PageScan {
 }
 
 export async function readPageScan(debuggee: chrome.debugger.Debuggee): Promise<PageScan> {
-  const contextId = await observeContext(debuggee);
-  const isolated = contextId === undefined ? undefined : await evaluateScan(debuggee, contextId);
+  // A page that navigates between making the scan's world and running in it drops the world:
+  // make another (twice at most), then fall back to the page's own world.
+  const isolated = await withContextRetry(async () => {
+    const contextId = await observeContext(debuggee);
+    return contextId === undefined ? undefined : await evaluateScan(debuggee, contextId, true);
+  }).catch(() => undefined);
   if (isolated) return isolated;
   return (await evaluateScan(debuggee)) ?? emptyScan();
 }
@@ -65,6 +70,7 @@ async function observeContext(debuggee: chrome.debugger.Debuggee): Promise<numbe
 async function evaluateScan(
   debuggee: chrome.debugger.Debuggee,
   contextId?: number,
+  retryable = false,
 ): Promise<PageScan | undefined> {
   const result = (await send(
     debuggee,
@@ -75,7 +81,11 @@ async function evaluateScan(
       ...(contextId !== undefined ? { contextId } : {}),
     },
     { label: "evaluateScan", ms: 5_000 },
-  ).catch(() => undefined)) as { result?: { value?: unknown } } | undefined;
+  ).catch((error: unknown) => {
+    // The caller makes a new world and tries again; any other failure is just an empty scan.
+    if (retryable && isContextGone(error)) throw error;
+    return undefined;
+  })) as { result?: { value?: unknown } } | undefined;
   return result ? asScan(result.result?.value) : undefined;
 }
 

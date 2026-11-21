@@ -5,7 +5,7 @@ import { coverage } from "./coverage.js";
 import { formatDiff, diffModels } from "./diff.js";
 import { checkHealth, repair } from "./health.js";
 import { runMcpServer } from "./mcp.js";
-import { inputParams } from "./params.js";
+import { operationInputs } from "./params.js";
 import { STAGES, type Stage } from "./pipeline.js";
 import { PassiveRecorder, RecordingSession } from "./record.js";
 import {
@@ -356,7 +356,7 @@ async function build(args: Args, site: string): Promise<void> {
 async function listOperations(site: string): Promise<void> {
   const model = await mappedModel(site);
   for (const op of model.operations) {
-    const inputs = inputParams(op).map((p) => p.name);
+    const inputs = operationInputs(op);
     const caps = op.capabilities?.length ? `\t[${op.capabilities.join(", ")}]` : "";
     const lives = op.volatile?.length ? `\tvolatile: ${op.volatile.join(", ")}` : "";
     out(`${op.id}\t${op.method} ${op.path}\t${inputs.join(", ")}${caps}${lives}`);

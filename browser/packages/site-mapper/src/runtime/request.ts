@@ -1,5 +1,6 @@
 import { randomUUID, randomBytes } from "node:crypto";
 import { parseJson } from "../infer/schema.js";
+import { declaredInputs, plainInputName } from "./bad-request.js";
 import type { Dependency, Operation, Param } from "../types.js";
 
 // Builds a concrete request from an operation and the caller's parameters. The last recorded
@@ -42,9 +43,16 @@ export class MissingParams extends Error {
     operation: Operation,
     public readonly missing: string[],
   ) {
-    super(`${operation.id} needs: ${missing.join(", ")}`);
+    super(missingMessage(operation, missing));
     this.name = "MissingParams";
   }
+}
+
+/** Which inputs are missing, the ones the operation declares, and how to pass them. */
+function missingMessage(operation: Operation, missing: string[]): string {
+  const names = missing.map(plainInputName);
+  const declared = declaredInputs(operation).join(", ") || "none";
+  return `${operation.id} needs: ${missing.join(", ")}. Declared inputs: ${declared}. Next: pass ${names.join(", ")} as call("${operation.id}", { ${names.map((name) => `${name}: …`).join(", ")} }).`;
 }
 
 function setPointer(target: unknown, pointer: string, value: unknown): unknown {
@@ -112,7 +120,9 @@ function rpcBody(operation: Operation, params: Params, consumed: Set<string>): u
 
 function jsonBody(operation: Operation, params: Params, consumed: Set<string>): unknown {
   // Other bodies start empty: every field must be passed, never replayed from the recording.
-  let body: unknown = {};
+  // The exception is a field that had the same value in every recorded body: the caller never
+  // needed to say it, so it is filled in, and anything the caller passes still wins.
+  let body: unknown = { ...operation.requestBody?.constants };
   if (params.body !== undefined) {
     consumed.add("body");
     body = isRecord(body) && isRecord(params.body) ? { ...body, ...params.body } : params.body;
