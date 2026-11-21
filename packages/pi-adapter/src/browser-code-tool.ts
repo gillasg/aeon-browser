@@ -17,7 +17,12 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { browserContent, modelImageBlocks, type BrowserToolRunner } from "./browser-tool.js";
 import { createSiteScriptTool } from "./site-script-tool.js";
 import { createBrowserContextTool } from "./browser-context-tool.js";
-import { isWorkspaceRequest, workspaceCall, validateUploadFiles } from "./browser-workspace.js";
+import {
+  isWorkspaceRequest,
+  noteWorkspaceStep,
+  workspaceCall,
+  validateUploadFiles,
+} from "./browser-workspace.js";
 import { isSiteSkillRequest, siteSkillCall } from "./browser-site-skills.js";
 import { SiteWrites } from "./browser-site-writes.js";
 import { isSavedReadRequest, putSavedRead } from "./saved-reads.js";
@@ -532,7 +537,7 @@ async function serveCall(
   if (isWorkspaceRequest(request)) {
     if (!workspace) throw new Error("Chat workspace is unavailable");
     const result = await workspaceCall(workspace, request);
-    steps.push({ action: request.workspace, result, workspace: true });
+    noteWorkspaceStep(steps, request, result);
     return result;
   }
   const upload = request as { validateUpload?: unknown };

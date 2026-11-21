@@ -171,23 +171,79 @@ function __iconBoxes(max, selector) {
     };
   });
 }
-// A screenshot is saved in the workspace and returned as {saved: absolute path}. The image itself
-// stays off the printed result (megabytes of base64) unless {inline: true} or {save: false}, but
-// code can still read .dataBase64. {path} names the file; it is always written inside the workspace.
+// A screenshot is saved and returned as {saved: absolute path}. Relative names go under screens/.
+// An absolute path is kept when it is inside the session folder or the OS temp directory; anything
+// else is saved as screens/<file name> and the result.note says so. The image stays off the printed
+// result unless {inline: true} or {save: false}, but code can still read .dataBase64.
+// 1000000 is a multiple of 4, so each base64 piece decodes on its own.
+async function __saveShot(name, base64) {
+  var size = 1000000, at = 0, result;
+  do {
+    var end = Math.min(base64.length, at + size);
+    result = await __call({
+      workspace: at ? 'screenshot-append' : 'screenshot',
+      name: name,
+      value: base64.slice(at, end),
+      base64: true,
+    });
+    at = end;
+  } while (at < base64.length);
+  return result;
+}
 async function __savedShot(shot, options) {
   if (!shot.data) throw new Error('SCREENSHOT_CAPTURE_FAILED');
   var mimeType = shot.mimeType || 'image/png';
   var result = {mimeType};
   if (options.save !== false) {
     var asked = String(options.path || options.name || '').replace(/\\\\/g, '/');
-    var outside = /^([a-z]:)?\\//i.test(asked) || asked.startsWith('../');
-    var name = !asked ? 'screens/' + Date.now() + '.' + (mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1]) : outside ? 'screens/' + asked.split('/').pop() : asked;
-    var file = await artifact(name, __bytesFromBase64(shot.data));
+    var ext = mimeType === 'image/jpeg' ? 'jpg' : (mimeType.split('/')[1] || 'png');
+    var name = asked || ('screens/' + Date.now() + '.' + ext);
+    var file = await __saveShot(name, shot.data);
     result.saved = (file && file.path) || name;
-    if (outside) result.note = 'browser code writes only inside its workspace, so ' + asked + ' was saved there instead';
+    if (file && file.note) { result.note = file.note; console.warn('[warn] ' + file.note); }
   }
   Object.defineProperty(result, 'dataBase64', {value: shot.data, enumerable: options.inline === true || options.save === false});
   return result;
+}
+function __shotName(path, index) {
+  var raw = String(path || 'sequence');
+  var match = /^(.*?)(\\.[A-Za-z0-9]+)$/.exec(raw);
+  var stem = match ? match[1] : raw;
+  var ext = match ? match[2] : '.png';
+  return stem + '-' + index + ext;
+}
+async function __sequenceStep(options, wheel) {
+  if (options.click) {
+    var click = options.click;
+    if (typeof click === 'string') return page.locator(click).click();
+    if (click && typeof click.x === 'number' && typeof click.y === 'number') return page.clickAt(click.x, click.y);
+    throw new Error('INVALID_INPUT: click is a CSS selector or {x, y}');
+  }
+  var size = await page.evaluate(function () { return { width: innerWidth, height: innerHeight }; });
+  var x = Math.max(0, Math.round((Number(size && size.width) || 0) / 2));
+  var y = Math.max(0, Math.round((Number(size && size.height) || 0) / 2));
+  return page.cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: x, y: y, deltaX: 0, deltaY: wheel });
+}
+async function __captureSequence(options) {
+  options = options || {};
+  var count = Math.min(30, Math.max(1, Math.round(Number(options.steps) || 10)));
+  var wheel = Number(options.wheel);
+  if (!Number.isFinite(wheel)) wheel = 800;
+  var askedWait = options.waitMs === undefined ? 1500 : options.waitMs;
+  var waitMs = Math.min(60000, Math.max(0, Number(askedWait) || 0));
+  var stop = options.stopWhenUnchanged !== false;
+  var saved = [], previous = '';
+  for (var index = 0; index < count; index++) {
+    await __sequenceStep(options, wheel);
+    if (waitMs) await sleep(waitMs);
+    var shot = await page.screenshot({ path: __shotName(options.path || options.name, index) });
+    var file = shot && (shot.saved || shot.path);
+    if (file) saved.push(String(file));
+    var data = (shot && shot.dataBase64) || '';
+    if (stop && previous && data && data === previous) break;
+    previous = data;
+  }
+  return saved;
 }
 function __bytesFromBase64(base64) {
   var binary = atob(base64);
@@ -350,6 +406,8 @@ function __extendPageSurface(target, base) {
         : await __step({op:'observe', target, kind:'screenshot'}).then((result) => { var shot = (result && result.data) || result || {}; return {data: shot.dataBase64, mimeType: shot.mimeType}; });
       return __savedShot(shot, options);
     },
+    // Wheel or click, then a screenshot, for pages whose content moves without growing the document.
+    captureSequence: (options) => __captureSequence(options),
     // Emulation: network conditions, CPU throttle, viewport and touch.
     emulateNetwork: async (options = {}) => page.cdp('Network.emulateNetworkConditions', {
       offline: options.offline === true,

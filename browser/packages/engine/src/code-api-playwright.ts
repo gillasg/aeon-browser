@@ -335,6 +335,25 @@ async function __waitUntil(check, timeout, pending) {
   while (Date.now() < deadline) { if (await check()) return; await new Promise((done) => setTimeout(done, 250)); }
   throw new Error(pending ? 'TIMEOUT: element did not become ' + pending : 'TIMEOUT: element did not appear');
 }
+// waitForLoad is the common guess for "the DOM is usable". Pages that never reach
+// readyState complete (analytics, ads) must not fail the cell once the DOM is interactive.
+// waitForLoadState stays strict: Playwright's 'load' still rejects on timeout.
+async function __waitForLoad(base, options) {
+  options = options || {};
+  var timeoutMs = options.timeout ?? options.timeoutMs ?? 8000;
+  try {
+    return await base.waitFor(function () { return document.readyState === 'complete'; }, {timeoutMs: timeoutMs});
+  } catch (error) {
+    var state = '';
+    try { state = await base.evaluate(function () { return document.readyState; }); }
+    catch (ignored) { throw error; }
+    if (state === 'interactive' && /TIMEOUT/.test(String(error && error.message || error))) {
+      console.warn('[warn] load still pending after ' + Math.max(1, Math.round(Number(timeoutMs) / 1000)) + ' s; DOM ready');
+      return {readyState: 'interactive'};
+    }
+    throw error;
+  }
+}
 function __extendPage(target, base) {
   var css = (selector) => base.locator(selector);
   var keys = base.keyboard;
@@ -393,8 +412,9 @@ function __extendPage(target, base) {
     dblclick: (selector, options) => css(selector).first().dblclick(options),
     type: (selector, value) => css(selector).first().fill(value),
     waitForLoadState: (state, options = {}) => base.waitFor(state === 'domcontentloaded' ? () => document.readyState !== 'loading' : () => document.readyState === 'complete', {timeoutMs: options.timeout ?? 8000}),
-    // A common guess from other tools; same as waitForLoadState('load').
-    waitForLoad: (options = {}) => base.waitFor(() => document.readyState === 'complete', {timeoutMs: options.timeout ?? options.timeoutMs ?? 8000}),
+    // A common guess from other tools. Unlike waitForLoadState('load'), a timeout is not a
+    // failure when the DOM is already interactive.
+    waitForLoad: (options) => __waitForLoad(base, options),
     waitForURL: (pattern, options = {}) => __waitUntil(async () => {
       var url = await base.evaluate(() => location.href);
       return pattern instanceof RegExp ? pattern.test(url) : String(url).includes(String(pattern).replace(/\\*\\*/g, ''));

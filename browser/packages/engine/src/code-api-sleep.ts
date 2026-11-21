@@ -5,10 +5,16 @@
 // action on a tab, now fires once that tab is quiet (no DOM changes and no requests in flight for
 // 500 ms, the engine's settle step) or at its full time, whichever is first, and never before
 // 300 ms. The cell is told how much waiting was saved. `page.waitForTimeout(ms)` keeps the exact
-// wait, for pacing on purpose.
+// wait, for pacing on purpose. `sleep(ms)` does too: models write it constantly, and one call
+// waits at most 60s.
 
 export const browserSleepApi = `
 var __realSetTimeout = setTimeout, __realClearTimeout = clearTimeout;
+// The wait models write. Full duration, like page.waitForTimeout, at most 60s per call.
+function sleep(ms) {
+  var delay = Math.min(60000, Math.max(0, Number(ms) || 0));
+  return new Promise(function (done) { __realSetTimeout(done, delay); });
+}
 var __acted = {at: 0, target: null}, __sleepSaved = 0, __sleepCut = 0, __cancelledTimers = new Set();
 function __noteActed(target) { if (target) { __acted.at = Date.now(); __acted.target = target; } }
 // Only timers set directly by the cell's code: the cell is evaluated as aeon-cell.js.

@@ -59,7 +59,7 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
 - `page` is Playwright-style (`goto`, `locator`, `getByRole`, `getByText`, `getByLabel`, `$$eval`,
   `keyboard.press`, `waitForSelector`). There is no `page.playwright`. `help('playwright')`.
 - After a cell with actions the new page state prints automatically; never add blind sleeps (one right
-  after an action ends when the page settles; `page.waitForTimeout(ms)` paces on purpose). A missing
+  after an action ends when the page settles; `await sleep(ms)` waits at most 60s, `page.waitForTimeout(ms)` paces on purpose). A missing
   control is retried while the page is still changing and is `TARGET_NOT_FOUND` once the page has been
   quiet, so do not sleep for it to appear. A site
   that says "too many attempts" or "try again later", or answers 429, is rate-limiting: stop that
