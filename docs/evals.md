@@ -46,6 +46,14 @@ All three real failures come from one cause. For timing-critical watches, the ag
 
 **43% right on the first call, 49% within 3 steps.** On DeepSeek V4.1 Flash the same suite scores 35% and 39%. The weakest area is watchers (0 of 14 on both models): the agent reads the page before creating the routine. That's the same gap Lane A shows.
 
+## Hill-climb log
+
+Each change to Aeon's guidance or tools is measured against the suite before it is kept.
+
+| Date | Change | Measured on | Before | After | Kept? |
+| --- | --- | --- | --- | --- | --- |
+| 21 Nov 2026 | Watchers: create the routine within two steps and end the turn; set the interval from how fast the condition changes | First-tool choice, 14 watcher situations ×3, Grok 4.7 | 0/14 within 3 steps | 5/14 within 3 steps (still 0/14 on the first call) | Yes; first-call gap still open |
+
 ## Earlier runs (DeepSeek V4.1 Flash, thinking high)
 
 | Date | Lane A | First-tool choice |
