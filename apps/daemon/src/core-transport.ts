@@ -193,8 +193,15 @@ function handleOpenChat(
     );
     return true;
   }
-  const browsers = known ? browser.openChatTab(chatId, active) : 0;
-  socket.send(JSON.stringify({ kind: "core.chat.opened", chatId, browsers }));
+  if (known) {
+    void browser
+      .openChatAndWait(chatId, active)
+      .then((opened) =>
+        socket.send(JSON.stringify({ kind: "core.chat.opened", chatId, ...opened })),
+      );
+    return true;
+  }
+  socket.send(JSON.stringify({ kind: "core.chat.opened", chatId, browsers: 0 }));
   return true;
 }
 

@@ -36,7 +36,7 @@ import {
   screenshotPoint,
   observeSemantic,
 } from "./native-browser-observation.js";
-import { type AxRef, BrowserActionError, safePage } from "./native-browser-common.js";
+import { type AxRef, BrowserActionError, drivablePage } from "./native-browser-common.js";
 import {
   elementQuery,
   expectedValue,
@@ -647,7 +647,7 @@ export async function performAction(
     const current = await refreshInventoryTab(tabId);
     if (!current) throw new Error("TARGET_LOST");
     const liveTab = await chrome.tabs.get(tabId).catch(() => undefined);
-    if (!liveTab?.url || !safePage(liveTab.url)) throw new Error("TARGET_LOST");
+    if (!liveTab?.url || !drivablePage(liveTab.url)) throw new Error("TARGET_LOST");
     const observation =
       scroll || (request.step.op !== "scroll" && request.step.observe === false)
         ? undefined

@@ -100,21 +100,27 @@ export async function scopedBackendIds(
 ): Promise<Set<number>> {
   const ids = await queryNodes(debuggee, { by: "css", value: selector });
   if (ids.length !== 1) throw new Error(ids.length ? "AMBIGUOUS_TARGET" : "TARGET_NOT_FOUND");
-  interface DomNode {
-    backendNodeId?: number;
-    children?: DomNode[];
-    shadowRoots?: DomNode[];
-    contentDocument?: DomNode;
-  }
+  return subtreeBackendIds(debuggee, { backendNodeId: ids[0] as number }, "scopedBackendIds");
+}
+
+interface DomNode {
+  backendNodeId?: number;
+  children?: DomNode[];
+  shadowRoots?: DomNode[];
+  contentDocument?: DomNode;
+}
+
+/** Backend node ids of a node and everything under it, shadow roots (closed ones too) included. */
+export async function subtreeBackendIds(
+  debuggee: chrome.debugger.Debuggee,
+  target: { backendNodeId: number } | { objectId: string },
+  label = "subtreeBackendIds",
+): Promise<Set<number>> {
   const result = (await send(
     debuggee,
     "DOM.describeNode",
-    {
-      backendNodeId: ids[0],
-      depth: -1,
-      pierce: true,
-    },
-    { label: "scopedBackendIds" },
+    { ...target, depth: -1, pierce: true },
+    { label },
   )) as { node?: DomNode };
   const selected = new Set<number>();
   const pending: DomNode[] = result.node ? [result.node] : [];

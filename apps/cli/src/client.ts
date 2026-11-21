@@ -331,8 +331,15 @@ export class AeonClient {
     });
   }
 
-  /** Shows a chat as a tab in the connected Chrome; resolves with how many browsers were asked. */
-  openChat(chatId: string, active = false, timeoutMs = 30_000): Promise<number> {
+  /**
+   * Shows a chat as a tab in the connected Chrome; resolves with how many browsers were asked and,
+   * when Chrome gave it, the chat tab's id.
+   */
+  openChat(
+    chatId: string,
+    active = false,
+    timeoutMs = 30_000,
+  ): Promise<{ browsers: number; tabId?: number }> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.openWaiters.delete(chatId);
@@ -340,7 +347,10 @@ export class AeonClient {
       }, timeoutMs);
       this.openWaiters.set(chatId, (reply) => {
         clearTimeout(timer);
-        resolve(Number(reply.browsers));
+        resolve({
+          browsers: Number(reply.browsers),
+          ...(reply.tabId !== undefined ? { tabId: Number(reply.tabId) } : {}),
+        });
       });
       this.socket.send(JSON.stringify({ kind: "core.chat.open", chatId, active }));
     });

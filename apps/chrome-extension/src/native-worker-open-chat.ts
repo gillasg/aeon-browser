@@ -25,13 +25,30 @@ export function handleOpenChatMessage(candidate: unknown, socket: WebSocket): bo
     );
     return true;
   }
-  void openChat(chatId, active).catch(() => undefined);
+  // The chat's tab id goes back, so `aeon open` can print it.
+  void openChat(chatId, active).then(
+    (tabId) => replyOpened(socket, chatId, tabId),
+    () => replyOpened(socket, chatId, undefined),
+  );
   return true;
 }
 
 function reply(socket: WebSocket, body: Record<string, unknown>): void {
   if (socket.readyState === WebSocket.OPEN)
     socket.send(JSON.stringify({ kind: "native.chat.typed", ...body }));
+}
+
+/** The answer to native.chat.open: the chat's tab id, when Chrome gave one (the daemon reads it). */
+export function chatOpenedMessage(
+  chatId: string,
+  tabId: number | undefined,
+): Record<string, unknown> {
+  return { kind: "native.chat.opened", chatId, ...(tabId !== undefined ? { tabId } : {}) };
+}
+
+function replyOpened(socket: WebSocket, chatId: string, tabId: number | undefined): void {
+  if (socket.readyState === WebSocket.OPEN)
+    socket.send(JSON.stringify(chatOpenedMessage(chatId, tabId)));
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

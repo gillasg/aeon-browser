@@ -54,6 +54,8 @@ export function handleBrowserDnsMessage(candidate: unknown): boolean {
  * while the policy is on, because the preflight cannot prove it public.
  */
 export async function assertBrowserNetwork(url: string): Promise<void> {
+  // Aeon's own pages and about:blank make no network request of their own: there is no host to check.
+  if (!/^https?:/i.test(url)) return;
   if (!(await engineConfig.privateNetwork())) return;
   const ports = await engineConfig.privateNetworkPorts();
   const decision = preflightHost(url, ports);

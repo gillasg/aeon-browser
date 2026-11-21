@@ -2,6 +2,7 @@ import { z } from "zod";
 import { BrowserTargetKeySchema } from "./browser-inventory.js";
 import { SiteScriptDefinitionSchema } from "./site-scripts.js";
 import { SemanticTargetSchema } from "./browser-elements.js";
+import { OpenUrlSchema } from "./browser-url.js";
 const target = BrowserTargetKeySchema;
 export const browserExtraSteps = [
   z
@@ -74,11 +75,7 @@ export const browserExtraSteps = [
     .object({
       op: z.literal("navigate"),
       target,
-      url: z
-        .string()
-        .url()
-        .max(8192)
-        .refine((value) => ["http:", "https:"].includes(new URL(value).protocol)),
+      url: OpenUrlSchema,
       /** false for parallel reads: navigate without changing the Split View pair. */
       present: z.boolean().optional(),
       /** The Referer this navigation sends (some players gate on it). */

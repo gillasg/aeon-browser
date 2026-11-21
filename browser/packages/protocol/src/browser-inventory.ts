@@ -38,6 +38,8 @@ export const BrowserTabSchema = z
     control: z.enum(["agent", "user"]).optional(),
     /** True when another chat is driving this tab; browser.activeTab() skips it. */
     heldByOther: z.boolean().optional(),
+    /** One of Aeon's own pages (home, chat, side panel): listed and drivable, marked as Aeon UI. */
+    aeonUi: z.boolean().optional(),
     /** Stable session label (p1, p2…), accepted anywhere a tab id is. */
     label: z
       .string()

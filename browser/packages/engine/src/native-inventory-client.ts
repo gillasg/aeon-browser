@@ -9,6 +9,7 @@ import {
   type BrowserInventoryDeltaMessage,
 } from "@browserkit/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
+import { aeonUiPage } from "./native-browser-common.js";
 
 export type TabIdentity = { tabIncarnation: string; documentEpoch: number };
 
@@ -42,6 +43,8 @@ export function toInventoryTab(
     pinned: tab.pinned,
     groupId: tab.groupId ?? -1,
     documentEpoch: state.documentEpoch,
+    // The daemon lists and gates Aeon's own pages by this mark: only the engine knows its own id.
+    ...(aeonUiPage(tab.url ?? "") ? { aeonUi: true } : {}),
   });
 }
 

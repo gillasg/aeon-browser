@@ -50,7 +50,7 @@ export function attachNativeExecutor(
     if (handleExecutorHeartbeat(candidate, socket, executor)) return;
     if (handleInventory(socket, candidate, executor, inventories, state, browserControl)) return;
     if (browserControl.handleExecutorResult(candidate, socket)) return;
-    if (browserControl.handleChatTyped(candidate)) return;
+    if (handleChatReply(candidate, browserControl)) return;
     if (handleAgentSettingsReply(candidate)) return;
     if (handleBlockedSitesReply(candidate)) return;
     if (handleCompanionMessage(socket, candidate, { service, browserControl })) return;
@@ -60,6 +60,11 @@ export function attachNativeExecutor(
     if (!request.success) return socket.close(1008, "Unsupported executor message");
     void issuePageGrant(socket, request.data, executor, service, endpoint, grants);
   });
+}
+
+/** The extension's answers to a chat it was asked to show or type into: the tab id, or the typed result. */
+function handleChatReply(candidate: unknown, browserControl: BrowserControlService): boolean {
+  return browserControl.handleChatTyped(candidate) || browserControl.handleChatOpened(candidate);
 }
 
 function handleExecutorHeartbeat(

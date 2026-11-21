@@ -11,7 +11,7 @@ import {
 } from "./native-inventory-client.js";
 import { browserSessionHolder } from "./native-browser-session.js";
 import { ensureAgentTabsRestored, mineTabIds } from "./native-browser-tab-cleanup.js";
-import { safePage, sameTarget } from "./native-browser-common.js";
+import { drivablePage, sameTarget } from "./native-browser-common.js";
 import { controlOf } from "./native-browser-control.js";
 import { ensureSpacesRestored, labelOf } from "./native-browser-spaces.js";
 
@@ -25,7 +25,7 @@ export async function listTabs(request: BrowserExecutorRequest): Promise<Browser
   await refreshActiveTabs();
   const mine = new Set(mineTabIds(request.chatId));
   const tabs = currentInventoryTabs()
-    .filter((tab) => safePage(tab.url))
+    .filter((tab) => drivablePage(tab.url))
     .filter((tab) => !step?.mine || mine.has(tab.target.tabId));
   const filtered = query
     ? tabs.filter((tab) => `${tab.title} ${tab.url}`.toLowerCase().includes(query.toLowerCase()))
@@ -71,14 +71,14 @@ async function refreshActiveTabs(): Promise<void> {
 // target is listed; it is borrowed, not owned, so it is not grouped or bound to the session.
 export function attachTab(target: BrowserTargetKey): BrowserExecutorResult {
   const tab = currentInventoryTabs().find((known) => sameTarget(known.target, target));
-  if (!tab || !safePage(tab.url)) throw new Error("TARGET_LOST");
+  if (!tab || !drivablePage(tab.url)) throw new Error("TARGET_LOST");
   return BrowserExecutorResultSchema.parse({ kind: "tab", tab });
 }
 
-/** Whether the tab still exists on an http(s) page. */
+/** Whether the tab still exists on a page the agent can drive. */
 export async function isLivePage(tabId: number): Promise<boolean> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-  return Boolean(tab?.url && safePage(tab.url));
+  return Boolean(tab?.url && drivablePage(tab.url));
 }
 
 /** A readable host for a tab caption. */

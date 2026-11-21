@@ -22,7 +22,7 @@ import {
 import { ownerTitle } from "./native-browser-owner.js";
 import { enableQuietTab } from "./native-browser-quiet.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
-import { BrowserActionError, safePage, sameIdentity } from "./native-browser-common.js";
+import { BrowserActionError, assertOpenable, sameIdentity } from "./native-browser-common.js";
 import { navigateReady } from "./native-browser-navigation.js";
 import { noteAgentNavigation, setAgentOpenedTab } from "./evidence/dialogs.js";
 import { captureFromTabStart } from "./native-browser-network.js";
@@ -139,11 +139,8 @@ function validOpenTab(
   request: BrowserExecutorRequest,
   identity: BrowserIdentity,
 ): Extract<BrowserStep, { op: "openTab" }> {
-  if (
-    request.step.op !== "openTab" ||
-    request.step.clientInstanceId !== identity.clientInstanceId ||
-    !safePage(request.step.url)
-  )
+  if (request.step.op !== "openTab" || request.step.clientInstanceId !== identity.clientInstanceId)
     throw new Error("INVALID_TARGET");
+  assertOpenable(request.step.url);
   return request.step;
 }

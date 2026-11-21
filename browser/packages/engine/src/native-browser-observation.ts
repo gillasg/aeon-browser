@@ -20,6 +20,7 @@ import {
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { getAxTree, withDebugger } from "./native-browser-debugger.js";
 import { onNode, scopedBackendIds } from "./native-browser-dom.js";
+import { overlayBackendIds } from "./native-browser-overlay.js";
 import { controlHint, hintTargets } from "./observe/hints.js";
 import { emptyScan, readPageScan, resolveClickables } from "./observe/scan.js";
 import { matchesQuery } from "./observe/render-model.js";
@@ -437,10 +438,13 @@ async function collectPage(
   await revalidateTarget(request, tabId);
   await settleBrowserPage(debuggee, 3000, 0);
   await revalidateTarget(request, tabId);
-  const [ax, scan] = await Promise.all([
+  const [all, scan, overlay] = await Promise.all([
     getAxTree(debuggee),
     readPageScan(debuggee).catch(() => emptyScan()),
+    overlayBackendIds(debuggee),
   ]);
+  // Aeon's own overlay is not the page: its nodes are left out of the state the agent reads.
+  const ax = all.filter((node) => !overlay.has(node.backendDOMNodeId ?? -1));
   const clickables =
     ax.length > CLICKABLE_NODE_LIMIT
       ? []

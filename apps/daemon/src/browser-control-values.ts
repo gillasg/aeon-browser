@@ -12,7 +12,7 @@ export function listBrowserTabs(
   const tabs = [...executors.keys()].flatMap((clientId) => inventories?.get(clientId)?.tabs ?? []);
   const visible = tabs.filter(
     (tab) =>
-      safeUrl(tab.url) &&
+      drivableTab(tab) &&
       (!step.query || `${tab.title} ${tab.url}`.toLowerCase().includes(step.query.toLowerCase())),
   );
   return { result: { kind: "tabs", tabs: visible.slice(0, 256) } };
@@ -23,6 +23,10 @@ export function safeUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+/** A tab the agent may use: a web page or one of Aeon's own pages (the engine marks them). */
+export function drivableTab(tab: { url: string; aeonUi?: boolean | undefined }): boolean {
+  return tab.aeonUi === true || safeUrl(tab.url);
 }
 export function normalizedUrl(value: string): string {
   return new URL(value).href;

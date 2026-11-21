@@ -5,7 +5,7 @@
 // was started by the agent in a tab the agent opened. page.dialog.expect sets the next answer.
 import type { BrowserExecutorResult, BrowserStep } from "@browserkit/protocol";
 import { refreshInventoryTab } from "../native-inventory-client.js";
-import { safePage, sameTarget } from "../native-browser-common.js";
+import { drivablePage, sameTarget } from "../native-browser-common.js";
 import { notePageConsole } from "../native-browser-events.js";
 import { noteReceiptDialog } from "../native-browser-receipts.js";
 import { send } from "../cdp/send.js";
@@ -133,7 +133,7 @@ export async function dialogExpectResult(
 ): Promise<BrowserExecutorResult> {
   expectNextDialog(step.target.tabId, step.expect);
   const tab = await refreshInventoryTab(step.target.tabId);
-  if (!tab || !sameTarget(tab.target, step.target) || !safePage(tab.url))
+  if (!tab || !sameTarget(tab.target, step.target) || !drivablePage(tab.url))
     throw new Error("TARGET_LOST");
   return {
     kind: "page",

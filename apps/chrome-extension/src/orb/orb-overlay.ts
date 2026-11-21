@@ -201,6 +201,8 @@ export class OrbOverlay {
     // An extension reload leaves the old script's cursor on the page with nothing driving it.
     for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
     this.host.setAttribute("data-aeon-orb", "");
+    // The engine leaves every data-aeon-overlay subtree out of the page state the agent reads.
+    this.host.setAttribute("data-aeon-overlay", "");
     document.documentElement.append(this.host);
   }
 

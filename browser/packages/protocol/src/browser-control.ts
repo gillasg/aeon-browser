@@ -2,12 +2,7 @@ import { z } from "zod";
 import { browserExtraSteps } from "./browser-extra-steps.js";
 import { browserCapabilitySteps, pointerGesture } from "./browser-capability-steps.js";
 import { BrowserTabSchema, BrowserTargetKeySchema } from "./browser-inventory.js";
-
-const HttpUrlSchema = z
-  .string()
-  .url()
-  .max(8192)
-  .refine((value) => ["http:", "https:"].includes(new URL(value).protocol));
+import { OpenUrlSchema } from "./browser-url.js";
 
 export { BrowserElementTargetSchema, type BrowserElementTarget } from "./browser-elements.js";
 import { BrowserElementTargetSchema, SemanticTargetSchema } from "./browser-elements.js";
@@ -27,7 +22,7 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
     .object({
       op: z.literal("openTab"),
       clientInstanceId: z.string().uuid(),
-      url: HttpUrlSchema,
+      url: OpenUrlSchema,
       foreground: z.boolean().default(false),
       /** Park popups and mute media while the agent uses this tab. */
       quiet: z.boolean().optional(),

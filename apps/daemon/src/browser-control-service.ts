@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import {
   BrowserExecutorRequestSchema,
+  NativeChatOpenedSchema,
   NativeChatTypedSchema,
   BrowserPopupSchema,
   BrowserOperationResultSchema,
@@ -20,6 +21,7 @@ import { CdpService } from "./cdp-service.js";
 import { HealthPings, type HealthReport } from "./health-ping.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import {
+  drivableTab,
   listBrowserTabs,
   safeUrl,
   normalizedUrl,
@@ -80,7 +82,7 @@ export class BrowserControlService {
     if (!this.getAssociation(chatId, target))
       throw new Error("Attach the exact browser target first.");
     const tab = this.inventories?.findTarget(target);
-    if (!tab || !safeUrl(tab.url)) throw new Error("TARGET_LOST");
+    if (!tab || !drivableTab(tab)) throw new Error("TARGET_LOST");
     return tab.url;
   }
   useInventories(inventories: BrowserInventoryRegistry): void {
@@ -142,7 +144,7 @@ export class BrowserControlService {
     if (!this.inventories) return "offline";
     if (!this.connected(target.clientInstanceId)) return "offline";
     const tab = this.inventories.findTarget(target);
-    if (!tab || !safeUrl(tab.url)) return "lost";
+    if (!tab || !drivableTab(tab)) return "lost";
     if (!safeUrl(capturedUrl) || normalizedUrl(tab.url) !== normalizedUrl(capturedUrl))
       return "stale";
     this.setAssociation(chatId, target, "borrowed", "user-context");
@@ -431,6 +433,33 @@ export class BrowserControlService {
       socket.send(JSON.stringify({ kind: "native.chat.open", chatId, active }));
     return sockets.length;
   }
+  private opening = new Map<string, (tabId: number | undefined) => void>();
+  /**
+   * aeon open: asks the chat's browsers to show its tab, and waits briefly for the tab id the first
+   * one answers with. A browser that never answers still counts, just without an id.
+   */
+  openChatAndWait(chatId: string, active = false): Promise<{ browsers: number; tabId?: number }> {
+    const sockets = this.socketsFor(chatId);
+    if (!sockets.length) return Promise.resolve({ browsers: 0 });
+    return new Promise((resolve) => {
+      const finish = (tabId?: number) => {
+        clearTimeout(timer);
+        this.opening.delete(chatId);
+        resolve({ browsers: sockets.length, ...(tabId !== undefined ? { tabId } : {}) });
+      };
+      const timer = setTimeout(() => finish(), 5_000);
+      this.opening.set(chatId, finish);
+      for (const socket of sockets)
+        socket.send(JSON.stringify({ kind: "native.chat.open", chatId, active }));
+    });
+  }
+  /** The extension's native.chat.opened answer to openChatAndWait: the chat's tab id. */
+  handleChatOpened(candidate: unknown): boolean {
+    const message = NativeChatOpenedSchema.safeParse(candidate);
+    if (!message.success) return false;
+    this.opening.get(message.data.chatId)?.(message.data.tabId);
+    return true;
+  }
   private release(chatId: string, reset = false, tidy = false): void {
     for (const pending of this.pending.values())
       if (pending.chatId === chatId) pending.finish(undefined, "RUN_RESET");
@@ -483,7 +512,7 @@ export class BrowserControlService {
   ): { result?: BrowserExecutorResult; code?: string; detail?: string } {
     const tab = this.inventories?.findTarget(step.target);
     if (!this.connected(step.target.clientInstanceId)) return { code: "BROWSER_OFFLINE" };
-    if (!tab || !safeUrl(tab.url)) return { code: "TARGET_LOST" };
+    if (!tab || !drivableTab(tab)) return { code: "TARGET_LOST" };
     this.setAssociation(chatId, step.target, "borrowed", "user-picker");
     return { result: { kind: "tab", tab } };
   }
@@ -513,7 +542,7 @@ export class BrowserControlService {
     const outdated = this.outdatedRuntime(step);
     if (outdated) return outdated;
     const tab = this.inventories?.findTarget(step.target);
-    if (!tab || !safeUrl(tab.url)) return { code: "TARGET_LOST" };
+    if (!tab || !drivableTab(tab)) return { code: "TARGET_LOST" };
     // Any open tab is the agent's to use: the first step in one borrows it, as attachTab did.
     if (!this.getAssociation(chatId, step.target))
       this.setAssociation(chatId, step.target, "borrowed", "user-picker");

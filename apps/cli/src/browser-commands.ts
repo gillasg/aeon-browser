@@ -12,7 +12,7 @@ import { repl } from "./repl.js";
 // The browser itself, as Aeon sees it: the daemon and the user's Chrome. These replace the
 // bridge-only commands (status, tabs, repl, journal, serve) browserkit's own command line has.
 
-const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url }))`;
+const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url, aeonUi: tab.aeonUi === true }))`;
 
 async function status(host: DaemonHost, args: Args): Promise<number> {
   const client = await host.connect();
@@ -34,12 +34,19 @@ async function tabs(host: DaemonHost, args: Args): Promise<number> {
     target?: { tabId?: number };
     title?: string;
     url?: string;
+    aeonUi?: boolean;
   }[];
   if (has(args, "json")) {
     printJson(list);
     return 0;
   }
-  printRows(list.map((tab) => [tab.target?.tabId, tab.title, tab.url]));
+  printRows(
+    list.map((tab) => [
+      tab.target?.tabId,
+      tab.aeonUi ? `${tab.title ?? ""} (Aeon UI)` : tab.title,
+      tab.url,
+    ]),
+  );
   return 0;
 }
 

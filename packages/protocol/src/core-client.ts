@@ -94,6 +94,8 @@ export const CoreOpenChatReplySchema = z
     kind: z.literal("core.chat.opened"),
     chatId: z.string().uuid(),
     browsers: z.number().int().nonnegative(),
+    /** The chat's tab in the browser that showed it, when Chrome gave one (aeon open prints it). */
+    tabId: z.number().int().nonnegative().optional(),
     /** typed: whether the prompt was typed into the chat's composer, and why not. */
     typed: z.boolean().optional(),
     recording: z.boolean().optional(),
@@ -124,6 +126,14 @@ export const NativeOpenChatSchema = z
     chatId: z.string().uuid(),
     active: z.boolean(),
     typed: z.string().min(1).max(8000).optional(),
+  })
+  .strict();
+/** The extension shows a chat's tab (native.chat.open); its tab id, when Chrome gave one. */
+export const NativeChatOpenedSchema = z
+  .object({
+    kind: z.literal("native.chat.opened"),
+    chatId: z.string().uuid(),
+    tabId: z.number().int().nonnegative().optional(),
   })
   .strict();
 /** The extension typed a prompt into a chat's composer (native.chat.open with typed). */

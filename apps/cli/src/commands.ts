@@ -565,9 +565,13 @@ function chatToolCommands(host: DaemonHost): Command[] {
         const client = await host.connect();
         const chatId = args.positional[0];
         if (!chatId) throw new Error("Usage: aeon open <chatId>");
-        const browsers = await client.openChat(chatId, true);
-        process.stdout.write(browsers ? "Opened.\n" : "No connected Chrome has Aeon loaded.\n");
-        return browsers ? 0 : 1;
+        const { browsers, tabId } = await client.openChat(chatId, true);
+        if (!browsers) {
+          process.stdout.write("No connected Chrome has Aeon loaded.\n");
+          return 1;
+        }
+        process.stdout.write(tabId === undefined ? "Opened.\n" : `Opened tab ${tabId}.\n`);
+        return 0;
       },
     },
     {

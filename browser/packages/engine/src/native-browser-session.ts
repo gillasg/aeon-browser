@@ -413,6 +413,15 @@ export function noteDeviceEmulation(tabId: number, method: string, params: unkno
   if (method === "Emulation.setDeviceMetricsOverride") emulated.set(tabId, params);
   else if (method === "Emulation.clearDeviceMetricsOverride") emulated.delete(tabId);
 }
+/** A debugger detach clears the size Chrome holds for the session: a re-attach puts back the agent's. */
+export async function reapplyDeviceEmulation(tabId: number): Promise<void> {
+  const params = emulated.get(tabId);
+  if (params === undefined) return;
+  await send({ tabId }, "Emulation.setDeviceMetricsOverride", params as object, {
+    label: "reapplyViewport",
+  }).catch(() => undefined);
+}
+onBrowserDebuggerAttached(reapplyDeviceEmulation);
 onEngineInstall(() => {
   chrome.tabs.onActivated?.addListener(({ tabId }) => void restoreBrowserViewport(tabId));
 });

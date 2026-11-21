@@ -45,6 +45,7 @@ function __compactTab(tab) {
   if (typeof tab.mine === 'boolean') entry.mine = tab.mine;
   if (typeof tab.label === 'string') entry.label = tab.label;
   if (typeof tab.control === 'string') entry.control = tab.control;
+  if (tab.aeonUi === true) entry.aeonUi = true;
   for (var [key, value] of Object.entries({...tab, tabId: tab.target.tabId}))
     if (!(key in entry)) Object.defineProperty(entry, key, {value, enumerable: false});
   return entry;

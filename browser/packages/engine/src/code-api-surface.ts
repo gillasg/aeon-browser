@@ -448,6 +448,15 @@ function __extendPageSurface(target, base) {
       if (options.touch !== undefined) await page.cdp('Emulation.setTouchEmulationEnabled', { enabled: options.touch === true });
       return { viewport: { width: options.width || 1280, height: options.height || 800, mobile: options.mobile === true } };
     },
+    // The tab's viewport in CSS pixels (420x860 for a phone), until the tab closes; kept across re-attaches.
+    setViewportSize: async (size = {}) => {
+      var width = Math.round(Number(size.width)), height = Math.round(Number(size.height));
+      if (!(width > 0) || !(height > 0)) throw Error('INVALID_INPUT: setViewportSize needs {width, height} in CSS pixels');
+      width = Math.min(Math.max(width, 200), 7680);
+      height = Math.min(Math.max(height, 200), 4320);
+      await page.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 0, mobile: false });
+      return { viewport: { width, height } };
+    },
     touch: (enabled = true) => page.cdp('Emulation.setTouchEmulationEnabled', { enabled: enabled !== false }),
     // Stop matching requests before they are sent, or let them through again.
     abort: async (patterns) => page.cdp('Network.setBlockedURLs', { urls: [].concat(patterns).map(String) }),

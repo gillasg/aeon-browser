@@ -4,6 +4,7 @@ import { respondFailure, sendFailure } from "./native-browser-result.js";
 import { callClass, send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
+import { inventoryMatchesRequest, isTargetStep } from "./native-browser-target-step.js";
 import {
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
@@ -74,7 +75,8 @@ import {
   type AxNode,
   sameTarget,
   BrowserActionError,
-  safePage,
+  assertOpenable,
+  drivablePage,
   browserErrorDetail,
   errorCode,
   sameIdentity,
@@ -289,6 +291,7 @@ export async function performExtra(
       if (step.op === "press")
         return pressElement(debuggee, request, () => revalidate(request, tabId));
       if (step.op === "navigate") {
+        assertOpenable(step.url);
         await assertBrowserNetwork(step.url);
         if (await engineConfig.privateNetwork())
           await guardPrivateTab(tabId, await engineConfig.privateNetworkPorts());
@@ -315,7 +318,7 @@ export async function performExtra(
     });
   const tab = await refreshInventoryTab(tabId);
   assertRequestActive(request);
-  if (!tab || !sameTarget(tab.target, request.step.target) || !safePage(tab.url))
+  if (!tab || !sameTarget(tab.target, request.step.target) || !drivablePage(tab.url))
     throw new Error("TARGET_LOST");
   const encoded = JSON.stringify(data);
   // A CDP call is an explicit request for exactly what it returns: screenshots, PDFs and page
@@ -626,24 +629,10 @@ async function assertTarget(request: BrowserExecutorRequest): Promise<chrome.tab
   const known = currentInventoryTabs().find((tab) => sameTarget(tab.target, target));
   if (!inventoryMatchesRequest(known, request)) throw new Error("TARGET_LOST");
   const live = await chrome.tabs.get(target.tabId).catch(() => undefined);
-  if (!live?.url || !safePage(live.url)) throw new Error("TARGET_LOST");
+  if (!live?.url || !drivablePage(live.url)) throw new Error("TARGET_LOST");
   const refreshed = await refreshInventoryTab(target.tabId);
   if (!inventoryMatchesRequest(refreshed, request)) throw new Error("TARGET_LOST");
   return live;
-}
-function inventoryMatchesRequest(
-  tab: ReturnType<typeof currentInventoryTabs>[number] | undefined,
-  request: BrowserExecutorRequest,
-): boolean {
-  return Boolean(
-    tab &&
-    isTargetStep(request.step) &&
-    sameTarget(tab.target, request.step.target) &&
-    (request.step.op === "event" ||
-      request.step.op === "downloads" ||
-      tab.documentEpoch === request.expectedDocumentEpoch) &&
-    safePage(tab.url),
-  );
 }
 async function revalidateTarget(request: BrowserExecutorRequest, tabId: number): Promise<void> {
   if (isWriteStep(request.step)) assertClaimActive(request);
@@ -680,10 +669,6 @@ function enqueueTarget(
   };
   void current.then(cleanup, cleanup);
   return current;
-}
-type TargetStep = Exclude<BrowserStep, { op: "listTabs" | "openTab" | "attachTab" }>;
-function isTargetStep(step: BrowserStep): step is TargetStep {
-  return !["listTabs", "openTab", "attachTab"].includes(step.op);
 }
 function isPageAction(
   step: BrowserStep,
