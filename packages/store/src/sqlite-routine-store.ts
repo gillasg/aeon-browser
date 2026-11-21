@@ -22,8 +22,8 @@ export class SqliteRoutineStore {
       .prepare(
         `INSERT INTO routines
          (routine_id, chat_id, title, instruction, check_code, check_shell, sites_json, listen_json, schedule_json, next_due_at,
-          required_browser_instance_id, enabled, revision, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          required_browser_instance_id, webhook_json, webhook_only, effect, enabled, revision, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.routineId,
@@ -37,6 +37,9 @@ export class SqliteRoutineStore {
         JSON.stringify(record.schedule),
         record.nextDueAt,
         record.requiredBrowserInstanceId ?? null,
+        record.webhook ? JSON.stringify(record.webhook) : null,
+        record.webhookOnly ? 1 : 0,
+        record.effect ?? "write",
         record.enabled ? 1 : 0,
         record.revision,
         record.createdAt,
@@ -92,6 +95,9 @@ export class SqliteRoutineStore {
       | "schedule"
       | "nextDueAt"
       | "requiredBrowserInstanceId"
+      | "webhook"
+      | "webhookOnly"
+      | "effect"
       | "enabled"
     >,
     updatedAt: string,
@@ -99,7 +105,7 @@ export class SqliteRoutineStore {
     const result = this.database
       .prepare(
         `UPDATE routines SET title = ?, instruction = ?, check_code = ?, check_shell = ?, sites_json = ?, listen_json = ?, schedule_json = ?, next_due_at = ?,
-         required_browser_instance_id = ?, enabled = ?, revision = revision + 1, updated_at = ?
+         required_browser_instance_id = ?, webhook_json = ?, webhook_only = ?, effect = ?, enabled = ?, revision = revision + 1, updated_at = ?
          WHERE routine_id = ? AND revision = ? AND deleted_at IS NULL`,
       )
       .run(
@@ -112,6 +118,9 @@ export class SqliteRoutineStore {
         JSON.stringify(patch.schedule),
         patch.nextDueAt,
         patch.requiredBrowserInstanceId ?? null,
+        patch.webhook ? JSON.stringify(patch.webhook) : null,
+        patch.webhookOnly ? 1 : 0,
+        patch.effect ?? "write",
         patch.enabled ? 1 : 0,
         updatedAt,
         routineId,
@@ -262,10 +271,12 @@ export class SqliteRoutineStore {
     if (!current) throw new Error("Routine run does not exist.");
     const state =
       patch.state && mayAdvance(current.state, patch.state) ? patch.state : current.state;
+    const delivery =
+      patch.webhookDelivery === undefined ? current.webhookDelivery : patch.webhookDelivery;
     this.database
       .prepare(
         `UPDATE routine_runs SET state = ?, pi_entry_id = ?, accepted_turn_id = ?,
-         completed_at = ?, last_error = ?, updated_at = ? WHERE run_id = ?`,
+         completed_at = ?, last_error = ?, webhook_delivery_json = ?, updated_at = ? WHERE run_id = ?`,
       )
       .run(
         state,
@@ -273,6 +284,7 @@ export class SqliteRoutineStore {
         patch.acceptedTurnId === undefined ? current.acceptedTurnId : patch.acceptedTurnId,
         patch.completedAt === undefined ? current.completedAt : patch.completedAt,
         patch.lastError === undefined ? current.lastError : patch.lastError,
+        delivery ? JSON.stringify(delivery) : null,
         updatedAt,
         runId,
       );

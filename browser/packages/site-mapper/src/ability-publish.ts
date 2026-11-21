@@ -8,12 +8,13 @@ import { unusedInputs } from "./ability-contract.js";
 import { createRedactor, SECRET_KEYS } from "./redact.js";
 import type { Ability } from "./abilities.js";
 import type { AbilityWrite } from "./ability-effects.js";
+import { abilityEffect, type CallEffect } from "./effect.js";
 
 export interface PublicAbility {
   name: string;
   site: string;
   description?: string;
-  effect: "read" | "write";
+  effect: CallEffect;
   inputs: Record<string, unknown>;
   outputs?: Record<string, unknown>;
   preconditions?: unknown;
@@ -40,7 +41,7 @@ export function publicAbility(ability: Ability): PublicAbility {
     name: ability.name,
     site: ability.site,
     ...(ability.description ? { description: ability.description } : {}),
-    effect: ability.kind,
+    effect: abilityEffect(ability),
     inputs: ability.inputs,
     ...(ability.outputs ? { outputs: ability.outputs } : {}),
     ...(ability.preconditions ? { preconditions: ability.preconditions } : {}),

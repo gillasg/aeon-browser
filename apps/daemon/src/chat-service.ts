@@ -61,6 +61,7 @@ export class ChatService {
   private readonly threadSupport: ChatThreadSupport;
   private readonly metadata: ChatMetadataService;
   private externalContextReader: (() => Promise<unknown>) | undefined;
+  private browserResolver: ((name: string, chatId: ChatId) => Promise<string>) | undefined;
   private stoppedListener: ((chatId: ChatId) => void) | undefined;
   private readonly commandGate = new ChatCommandGate();
   private readonly eventHub = new ChatEventHub();
@@ -211,6 +212,12 @@ export class ChatService {
   setExternalContextReader(reader: (() => Promise<unknown>) | undefined): void {
     this.externalContextReader = reader;
   }
+  /** Resolves `aeon automation create --browser <name>` to a connected profile. */
+  setBrowserResolver(
+    resolver: ((name: string, chatId: ChatId) => Promise<string>) | undefined,
+  ): void {
+    this.browserResolver = resolver;
+  }
   /** A stop (from the panel, CLI or MCP) tidies the tabs its run no longer needs. */
   setStoppedListener(listener: (chatId: ChatId) => void): void {
     this.stoppedListener = listener;
@@ -241,6 +248,10 @@ export class ChatService {
         getChat: (chatId) => this.store.getChat(chatId),
         session,
         args,
+        resolveBrowser: (name, chatId) =>
+          this.browserResolver
+            ? this.browserResolver(name, chatId)
+            : Promise.reject(new Error("This daemon cannot pin a browser by name.")),
       }).then((value) => ({
         content: [{ type: "text", text: JSON.stringify(value, null, 1) }],
         isError: false,

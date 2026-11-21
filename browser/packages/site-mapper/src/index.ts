@@ -197,7 +197,16 @@ export { checkHealth, repair, readHealth, type HealthReport, type HealthResult }
 export { detectChallenge, type Challenge } from "./challenge.js";
 export { coverage, type Suggestion } from "./coverage.js";
 export { serve, type Server, type ServeOptions } from "./serve.js";
-export { runMcpServer, siteTools } from "./mcp.js";
+export { runMcpServer, siteTools, operationInputSchema } from "./mcp.js";
+export { catalogToolsForSite, searchCatalog, type CatalogTool } from "./catalog.js";
+export {
+  abilityEffect,
+  effectAnnotations,
+  inferEffect,
+  isCallEffect,
+  operationEffect,
+  type CallEffect,
+} from "./effect.js";
 export { performFlow, editApi, nameOperations, type ModelLike } from "./agent.js";
 export { explore, EXPLORE_BRIEF, type ExploreOptions, type ExploreResult } from "./explore.js";
 export { watch, type WatchOptions, type WatchResult } from "./watch.js";

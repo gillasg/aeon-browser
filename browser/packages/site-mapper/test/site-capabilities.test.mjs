@@ -75,6 +75,9 @@ test("capabilities merge abilities, operations and notes", async () => {
       ["searchProducts", "createOrder"],
     );
     assert.deepEqual(answer.operations[0].capabilities, ["search"]);
+    assert.equal(answer.operations[0].effect, "read");
+    assert.equal(answer.operations[1].effect, "write");
+    assert.equal(answer.abilities[0].effect, "read");
     assert.match(answer.notes, /gate needs Accept/);
   } finally {
     if (old === undefined) delete process.env.SITE_TO_API_HOME;

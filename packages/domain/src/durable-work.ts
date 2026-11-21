@@ -1,4 +1,18 @@
 import type { ChatId } from "./chat.js";
+import type { CallEffect } from "./effect.js";
+
+/** Where a passing check is delivered. The secret signs the body; it is never required. */
+export interface RoutineWebhook {
+  url: string;
+  secret?: string;
+}
+
+/** What the last webhook attempt did, stored on the run. */
+export interface WebhookDelivery {
+  status: "delivered" | "failed";
+  attempts: number;
+  error?: string;
+}
 
 export type RoutineSchedule =
   | { kind: "interval"; everyMinutes: number; anchorUtc: string; timeZone: string }
@@ -49,6 +63,12 @@ export interface RoutineRecord {
   schedule: RoutineSchedule;
   nextDueAt: string | null;
   requiredBrowserInstanceId: string | null;
+  /** POST this when the check passes. Null means the routine only wakes Aeon. */
+  webhook: RoutineWebhook | null;
+  /** The check still runs; a pass does not start the agent. */
+  webhookOnly: boolean;
+  /** What calling this routine can do. Inferred when omitted, overridable. */
+  effect: CallEffect;
   enabled: boolean;
   deletedAt: string | null;
   revision: number;
@@ -69,6 +89,8 @@ export interface RoutineRunRecord {
   updatedAt: string;
   completedAt: string | null;
   lastError: string | null;
+  /** Set when this run tried to deliver a webhook. */
+  webhookDelivery: WebhookDelivery | null;
 }
 
 export interface RoutineRunPatch {
@@ -77,6 +99,7 @@ export interface RoutineRunPatch {
   acceptedTurnId?: string | null;
   completedAt?: string | null;
   lastError?: string | null;
+  webhookDelivery?: WebhookDelivery | null;
 }
 
 export interface ClaimRoutineSlotsInput {
@@ -209,6 +232,9 @@ export interface AeonProductStore {
       | "schedule"
       | "nextDueAt"
       | "requiredBrowserInstanceId"
+      | "webhook"
+      | "webhookOnly"
+      | "effect"
       | "enabled"
     >,
     updatedAt: string,

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const STORE_SCHEMA_VERSION = 13;
+export const STORE_SCHEMA_VERSION = 14;
 
 export function migrate(database: Database.Database): void {
   database.exec(`
@@ -34,7 +34,19 @@ const MIGRATIONS: readonly [number, (database: Database.Database) => void][] = [
   [11, migrateChatOrigin],
   [12, migrateRoutineShellCheck],
   [13, migrateRoutineListen],
+  [14, migrateRoutineWebhook],
 ];
+
+function migrateRoutineWebhook(database: Database.Database): void {
+  database.transaction(() => {
+    // A passing check can POST a webhook, with or without waking the agent.
+    database.exec("ALTER TABLE routines ADD COLUMN webhook_json TEXT;");
+    database.exec("ALTER TABLE routines ADD COLUMN webhook_only INTEGER NOT NULL DEFAULT 0;");
+    database.exec("ALTER TABLE routines ADD COLUMN effect TEXT NOT NULL DEFAULT 'write';");
+    database.exec("ALTER TABLE routine_runs ADD COLUMN webhook_delivery_json TEXT;");
+    markVersion(database, 14);
+  })();
+}
 
 function migrateRoutineListen(database: Database.Database): void {
   database.transaction(() => {

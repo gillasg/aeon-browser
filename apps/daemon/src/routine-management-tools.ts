@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { ChatId, AeonProductStore, RoutineRecord } from "@aeon/domain";
+import {
+  inferRoutineEffect,
+  optionalBoolean,
+  parseEffect,
+  parseWebhook,
+} from "./routine-fields.js";
 import { optionalListen } from "./routine-listen.js";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 import type { RoutineScheduler } from "./routine-scheduler.js";
@@ -48,9 +54,13 @@ export class RoutineManagementTools {
 
   private create(args: Record<string, unknown>, chatId: ChatId): RoutineRecord {
     const now = new Date();
+    const title = requiredString(args.title, "title");
+    const instruction = requiredString(args.instruction, "instruction");
     const check = optionalCheck(args.check, null);
     const checkShell = optionalShellCheck(args.checkShell, null);
     const listen = optionalListen(args.listen);
+    const webhook = parseWebhook(args.webhook, args.webhookSecret, null);
+    const webhookOnly = optionalBoolean(args.webhookOnly, "webhookOnly", false);
     const schedule = parseRoutineSchedule(
       args.schedule,
       now,
@@ -60,8 +70,8 @@ export class RoutineManagementTools {
     const saved = this.store.createRoutine({
       routineId: randomUUID(),
       chatId,
-      title: requiredString(args.title, "title"),
-      instruction: requiredString(args.instruction, "instruction"),
+      title,
+      instruction,
       check,
       checkShell,
       sites: optionalSites(args.sites, []),
@@ -74,6 +84,15 @@ export class RoutineManagementTools {
         optionalNullableUuid(args.requiredBrowserInstanceId, "requiredBrowserInstanceId") ??
         this.routines.browserForChat(chatId) ??
         null,
+      webhook,
+      webhookOnly,
+      effect: inferRoutineEffect({
+        title,
+        instruction,
+        check,
+        webhookOnly,
+        override: parseEffect(args.effect),
+      }),
       enabled: true,
       deletedAt: null,
       revision: 1,
@@ -94,6 +113,9 @@ export class RoutineManagementTools {
     const check = optionalCheck(args.check, current.check);
     const checkShell = optionalShellCheck(args.checkShell, current.checkShell);
     const listen = optionalListen(args.listen, current.listen ?? null);
+    const webhook = parseWebhook(args.webhook, args.webhookSecret, current.webhook);
+    const webhookOnly = optionalBoolean(args.webhookOnly, "webhookOnly", current.webhookOnly);
+    const effect = parseEffect(args.effect) ?? current.effect;
     const schedule = parseRoutineSchedule(
       args.schedule,
       new Date(),
@@ -116,6 +138,9 @@ export class RoutineManagementTools {
           "requiredBrowserInstanceId",
           current.requiredBrowserInstanceId,
         ),
+        webhook,
+        webhookOnly,
+        effect,
         enabled,
         nextDueAt: enabled ? nextRoutineOccurrence(schedule, new Date()) : null,
       },

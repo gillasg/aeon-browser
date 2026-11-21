@@ -31,6 +31,18 @@ const routineListen = Type.Object(
   },
   { additionalProperties: false },
 );
+const routineWebhook = Type.Object(
+  {
+    url: Type.String({ minLength: 1, maxLength: 2000 }),
+    secret: Type.Optional(Type.String({ maxLength: 200 })),
+  },
+  { additionalProperties: false },
+);
+const routineEffect = Type.Union([
+  Type.Literal("read"),
+  Type.Literal("write"),
+  Type.Literal("irreversible"),
+]);
 const routineCreate = Type.Object(
   {
     title: Type.String({ minLength: 1, maxLength: 120 }),
@@ -42,6 +54,12 @@ const routineCreate = Type.Object(
     ),
     schedule: record,
     requiredBrowserInstanceId: Type.Optional(Type.String({ format: "uuid" })),
+    webhook: Type.Optional(
+      Type.Union([Type.String({ minLength: 1, maxLength: 2000 }), routineWebhook]),
+    ),
+    webhookSecret: Type.Optional(Type.String({ maxLength: 200 })),
+    webhookOnly: Type.Optional(Type.Boolean()),
+    effect: Type.Optional(routineEffect),
   },
   { additionalProperties: false },
 );
@@ -62,6 +80,12 @@ const routineUpdate = Type.Object(
     requiredBrowserInstanceId: Type.Optional(
       Type.Union([Type.String({ format: "uuid" }), Type.Null()]),
     ),
+    webhook: Type.Optional(
+      Type.Union([Type.String({ minLength: 1, maxLength: 2000 }), routineWebhook, Type.Null()]),
+    ),
+    webhookSecret: Type.Optional(Type.String({ maxLength: 200 })),
+    webhookOnly: Type.Optional(Type.Boolean()),
+    effect: Type.Optional(routineEffect),
   },
   { additionalProperties: false },
 );
@@ -204,7 +228,8 @@ function createRoutineTools(
         "Schedules: {kind: 'interval', everyMinutes}, {kind: 'calendar', daysOfWeek, localTime} or {kind: 'once', atUtc} for one run at an exact time. " +
         "A watcher waits for a condition (its check) or for a moment: to act at an exact moment (a drop, a ticket or booking release, a slot opening) " +
         "under 55 minutes away call browser.snipe now; later, create a watcher with schedule {kind: 'once', atUtc: 3 minutes before} " +
-        "whose check is return await browser.snipe({at, url, prepare, fire, done, wait: true}): it fires with no model call and its result wakes you (help('snipe')).",
+        "whose check is return await browser.snipe({at, url, prepare, fire, done, wait: true}): it fires with no model call and its result wakes you (help('snipe')). " +
+        "webhook {url, secret?} POSTs {routineId, title, value, firedAt} when the check passes (HMAC-SHA256 in X-Aeon-Signature when secret is set). webhookOnly delivers that and does not wake you. effect is read, write or irreversible (inferred when omitted).",
       routineCreate,
     ),
     tool(
@@ -218,7 +243,7 @@ function createRoutineTools(
       chatId,
       host,
       "update_routine",
-      "Update or disable one of this Chat's routines.",
+      "Update or disable one of this Chat's routines. Omit webhook, webhookOnly and effect to keep them; webhook null removes it.",
       routineUpdate,
     ),
     tool(chatId, host, "list_routines", "List this Chat's routines and recent run history.", empty),

@@ -54,6 +54,7 @@ const BOOLEAN = new Set([
   "unreviewed",
   "values",
   "verbose",
+  "webhook-only",
   "window",
 ]);
 

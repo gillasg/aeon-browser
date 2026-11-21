@@ -1,4 +1,5 @@
 import { code } from "./code.js";
+import { operationEffect } from "./effect.js";
 import { formatPace, paceExpectedMs, setBatchRate } from "./pace.js";
 import { listSites, loadModel, siteName } from "./registry.js";
 import type { Params } from "./runtime/request.js";
@@ -59,6 +60,7 @@ async function operations(site: string): Promise<unknown> {
     what: op.summary,
     method: op.method,
     path: op.path,
+    effect: operationEffect(op),
     ...(op.role === "action" ? { writes: true } : {}),
     ...(op.steps?.[0] ? { sentBy: op.steps[0] } : {}),
     params: op.params.filter((p) => !p.constant && !p.generated).map((p) => p.name),

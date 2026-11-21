@@ -283,6 +283,15 @@ function routineCreateFields(args: Args): Record<string, unknown> {
       .filter(Boolean);
   const chat = flag(args, "chat");
   if (chat) fields.chatId = chat;
+  const webhook = flag(args, "webhook");
+  if (webhook) fields.webhook = webhook;
+  const webhookSecret = flag(args, "webhook-secret");
+  if (webhookSecret) fields.webhookSecret = webhookSecret;
+  if (has(args, "webhook-only")) fields.webhookOnly = true;
+  const browser = flag(args, "browser");
+  if (browser) fields.browser = browser;
+  const effect = flag(args, "effect");
+  if (effect) fields.effect = effect;
   return fields;
 }
 
@@ -387,10 +396,13 @@ function automationCommand(host: DaemonHost, name: string): Command {
     group: "Aeon",
     summary: "create, list, pause or delete automations (routines)",
     help: `Usage: aeon automation create "<instruction>" [--schedule "every 15 minutes"] [--title t]
-         [--check "<browser code>"] [--sites a.com,b.com] [--chat <chatId>]
+         [--check "<browser code>"] [--sites a.com,b.com] [--chat <chatId>] [--browser <name>]
+         [--webhook <url> [--webhook-secret <secret>] [--webhook-only]] [--effect read|write|irreversible]
        aeon automation list [--json] | pause <routineId> | delete <routineId>
 
-Creates the automation in a new chat (or --chat, one this CLI created). Alerts go to Aeon only.
+Creates the automation in a new chat (or --chat, one this CLI created). --browser pins a connected
+Chrome profile. --webhook POSTs {routineId, title, value, firedAt} when the check passes
+(X-Aeon-Signature when a secret is set). --webhook-only does not wake the agent.
 \`aeon routine\` is the same command.`,
     run: (args) => routineCommand(host, args),
   };

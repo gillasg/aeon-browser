@@ -77,6 +77,33 @@ test("an outside agent creates, lists, pauses and deletes only its own routines"
   );
   assert.equal(store.getRoutine(created.routineId)?.deletedAt !== null, true);
 
+  const pinned = await runExternalRoutine({
+    ...options("cli", {
+      action: "create",
+      title: "Submit the form",
+      instruction: "Submit it.",
+      schedule: "every 15 minutes",
+      check: "return { ok: true }",
+      webhook: "https://example.com/hooks/aeon",
+      webhookSecret: "top-secret",
+      webhookOnly: true,
+      browser: "Work",
+    }),
+    resolveBrowser: async (name, chatId) => {
+      assert.equal(name, "Work");
+      assert.ok(chatId);
+      return "22222222-2222-4222-8222-222222222222";
+    },
+  });
+  assert.equal(pinned.webhook, "https://example.com/hooks/aeon");
+  assert.equal(pinned.webhookOnly, true);
+  assert.equal(pinned.effect, "irreversible");
+  assert.equal(pinned.requiredBrowserInstanceId, "22222222-2222-4222-8222-222222222222");
+  assert.equal(JSON.stringify(pinned).includes("top-secret"), false);
+  const stored = store.getRoutine(pinned.routineId);
+  assert.equal(stored.webhook.secret, "top-secret");
+  assert.equal(stored.webhookOnly, true);
+
   // A routine in a chat the user made is the user's: an outside agent cannot manage it.
   const userChat = await chats.createDraft("User chat", undefined, "user");
   const now = new Date();

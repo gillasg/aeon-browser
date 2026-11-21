@@ -17,7 +17,7 @@ test("schema 3 fork intents migrate without losing rows and allow terminal failu
 
   migrate(database);
 
-  assert.equal(STORE_SCHEMA_VERSION, 13);
+  assert.equal(STORE_SCHEMA_VERSION, 14);
   assert.equal(
     database.prepare("SELECT MAX(version) AS version FROM schema_migrations").get().version,
     STORE_SCHEMA_VERSION,
@@ -36,6 +36,18 @@ test("schema 3 fork intents migrate without losing rows and allow terminal failu
     "failed",
   );
   assert.deepEqual(database.pragma("foreign_key_check"), []);
+  const routineColumns = database
+    .prepare("PRAGMA table_info(routines)")
+    .all()
+    .map((column) => column.name);
+  assert.ok(routineColumns.includes("webhook_json"));
+  assert.ok(routineColumns.includes("webhook_only"));
+  assert.ok(routineColumns.includes("effect"));
+  const runColumns = database
+    .prepare("PRAGMA table_info(routine_runs)")
+    .all()
+    .map((column) => column.name);
+  assert.ok(runColumns.includes("webhook_delivery_json"));
 });
 
 function createSchemaThreeForkTables(database) {

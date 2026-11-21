@@ -16,6 +16,7 @@ import { detectPagination } from "./infer/pagination.js";
 import { detectSigning, markSignedParams } from "./infer/signing.js";
 import { traceDependencies, type StorageSnapshot } from "./infer/trace.js";
 import { detectCapabilities } from "./infer/capabilities.js";
+import { isCallEffect } from "./effect.js";
 import { volatileFields } from "./infer/volatile.js";
 import type { Exchange, Operation, Overrides, SiteModel } from "./types.js";
 
@@ -93,6 +94,8 @@ function annotate(operation: Operation, members: Member[], overrides: Overrides)
   markSignedParams(operation);
   const capabilities = overrides.capabilities?.[operation.id] ?? detectCapabilities(operation);
   if (capabilities.length) operation.capabilities = capabilities;
+  const effect = overrides.effects?.[operation.id];
+  if (isCallEffect(effect)) operation.effect = effect;
   const volatile = volatileFields(operation.samples);
   if (volatile.length) operation.volatile = volatile.map((field) => field.pointer);
 }

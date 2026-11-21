@@ -114,6 +114,7 @@ test("the MCP server lists its tools without a running Aeon", async () => {
       "aeon_search",
       "aeon_context",
       "aeon_routine",
+      "catalog_search",
       "browser_action",
     ],
   );
@@ -262,7 +263,11 @@ function mcp(messages) {
     // An empty data folder, so an Aeon running on this machine does not add its tools.
     const child = spawn(process.execPath, [cli, "mcp"], {
       stdio: ["pipe", "pipe", "inherit"],
-      env: { ...process.env, AEON_DATA_DIR: join(tmpdir(), "aeon-cli-mcp-" + process.pid) },
+      env: {
+        ...process.env,
+        AEON_DATA_DIR: join(tmpdir(), "aeon-cli-mcp-" + process.pid),
+        SITE_TO_API_HOME: join(tmpdir(), "aeon-cli-mcp-sites-" + process.pid),
+      },
     });
     let buffer = "";
     const replies = [];

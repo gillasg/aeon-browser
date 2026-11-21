@@ -192,6 +192,8 @@ export interface Ability {
   site: string;
   description?: string;
   kind: AbilityKind;
+  /** read, write or irreversible. Wins over the guess from the name and description. */
+  effect?: "read" | "write" | "irreversible";
   inputs: Record<string, unknown>;
   /** JSON Schema of the result (its properties are the fields callers may rely on). */
   outputs?: Record<string, unknown>;

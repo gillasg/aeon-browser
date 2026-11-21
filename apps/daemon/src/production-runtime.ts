@@ -24,7 +24,7 @@ import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
 import { type ActivityCounts } from "./daemon-activity.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
-import { chatBrowserName, pinInherited } from "./core-browsers.js";
+import { chatBrowserName, pin, pinInherited } from "./core-browsers.js";
 import {
   abilityCards,
   lastActionNote,
@@ -82,11 +82,7 @@ export function createProductionRuntime(dataDirectory: string): {
   warmModels(pi);
   const siteRules = new BrowserSiteRules();
   const service = new ChatService({ dataDirectory: dataRoot, store, pi, siteRules });
-  service.setStoppedListener((chatId) => browserControl.tidyChat(chatId));
-  bindChatLabels(browserControl, store);
-  service.setExternalContextReader(() =>
-    outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
-  );
+  bindChatService(service, browserControl, store, dataRoot);
   pi.setSiteRulesHost((chatId) => siteRules.answer(chatId));
   pi.setBrowserNameHost((chatId) => chatBrowserName(dataRoot, browserControl, chatId));
   const stopPreparing = installChatPreparation(service);
@@ -148,6 +144,34 @@ export function createProductionRuntime(dataDirectory: string): {
       closeRuntimeStores(service, store);
     },
   };
+}
+
+function bindChatService(
+  service: ChatService,
+  browserControl: BrowserControlService,
+  store: ReturnType<typeof openChatStore>,
+  dataRoot: string,
+): void {
+  service.setStoppedListener((chatId) => browserControl.tidyChat(chatId));
+  bindChatLabels(browserControl, store);
+  service.setExternalContextReader(() =>
+    outsideContextAnswer(dataRoot, () => readOpenTabs(browserControl)),
+  );
+  service.setBrowserResolver((name, chatId) =>
+    resolveNamedBrowser(browserControl, dataRoot, name, chatId),
+  );
+}
+
+async function resolveNamedBrowser(
+  browser: BrowserControlService,
+  directory: string,
+  name: string,
+  chatId: string,
+): Promise<string> {
+  await pin(browser, directory, chatId, name);
+  const id = browser.browserOf(chatId);
+  if (!id) throw new Error(`No connected browser is named ${name}.`);
+  return id;
 }
 
 function bindChatLabels(

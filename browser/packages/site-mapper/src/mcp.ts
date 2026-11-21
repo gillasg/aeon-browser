@@ -9,6 +9,7 @@ import type { ChannelOptions } from "./runtime/channels.js";
 import { isDerived } from "./params.js";
 import { listAbilities, runAbility, type Ability } from "./abilities.js";
 import { contentDigest } from "./ability-digest.js";
+import { abilityEffect, effectAnnotations, inferEffect, operationEffect } from "./effect.js";
 import type { JsonSchema, Operation, PageEndpoint, Param, SiteModel } from "./types.js";
 
 // A stdio MCP server. With a site: one tool per operation and page endpoint, with typed inputs.
@@ -34,6 +35,10 @@ function bodyProperties(operation: Operation): Record<string, JsonSchema> {
   if (operation.kind === "graphql")
     return { variables: properties.variables ?? { type: "object" } };
   return properties;
+}
+
+export function operationInputSchema(operation: Operation): Json {
+  return inputSchema(operation);
 }
 
 function inputSchema(operation: Operation): Json {
@@ -89,10 +94,7 @@ function abilityTools(abilities: readonly Ability[], site: string, used: Set<str
         name,
         description: abilityDescription(ability, site),
         inputSchema: { type: "object", ...(ability.inputs as Json) },
-        annotations: {
-          readOnlyHint: ability.kind === "read",
-          destructiveHint: Boolean(ability.writes?.some((write) => write.kind === "explicit")),
-        },
+        annotations: effectAnnotations(abilityEffect(ability)),
       },
     ];
   });
@@ -107,7 +109,7 @@ export function siteTools(
     name: toolName(op.id),
     description: `${op.summary ?? op.description ?? op.id}: ${op.method} ${op.path} on ${model.site} (${op.role}, ${op.bucket} confidence${op.capabilities?.length ? `, ${op.capabilities.join("/")}` : ""}).`,
     inputSchema: inputSchema(op),
-    annotations: { readOnlyHint: op.role === "read", destructiveHint: op.method === "DELETE" },
+    annotations: effectAnnotations(operationEffect(op)),
   }));
   const pages = model.pages.map((page: PageEndpoint) => ({
     name: toolName(page.id),
@@ -117,13 +119,20 @@ export function siteTools(
       properties: Object.fromEntries(page.params.map((p) => [p.name, { type: "string" }])),
       required: page.params.map((p) => p.name),
     },
-    annotations: { readOnlyHint: true },
+    annotations: effectAnnotations("read"),
   }));
-  const actions = Object.entries(saved).map(([name, action]) => ({
-    name: toolName(name),
-    description: `${action.description ?? name}: runs ${action.steps.map((step) => step.operation).join(" → ")} on ${model.site}.`,
-    inputSchema: { type: "object", properties: {}, additionalProperties: true },
-  }));
+  const actions = Object.entries(saved).map(([name, action]) => {
+    const effect = inferEffect({
+      text: `${name} ${action.description ?? ""} ${action.steps.map((step) => step.operation).join(" ")}`,
+      fallback: "write",
+    });
+    return {
+      name: toolName(name),
+      description: `${action.description ?? name}: runs ${action.steps.map((step) => step.operation).join(" → ")} on ${model.site} (${effect}).`,
+      inputSchema: { type: "object", properties: {}, additionalProperties: true },
+      annotations: effectAnnotations(effect),
+    };
+  });
   const tools = [...ops, ...pages, ...actions];
   const used = new Set(tools.map((tool) => String(tool.name)));
   return [...tools, ...abilityTools(abilities, model.site, used)];

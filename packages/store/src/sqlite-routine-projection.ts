@@ -1,5 +1,12 @@
-import { asChatId } from "@aeon/domain";
-import type { RoutineListen, RoutineRecord, RoutineRunRecord } from "@aeon/domain";
+import { asChatId, isCallEffect } from "@aeon/domain";
+import type {
+  CallEffect,
+  RoutineListen,
+  RoutineRecord,
+  RoutineRunRecord,
+  RoutineWebhook,
+  WebhookDelivery,
+} from "@aeon/domain";
 
 export interface RoutineRow {
   routine_id: string;
@@ -13,6 +20,9 @@ export interface RoutineRow {
   schedule_json: string;
   next_due_at: string | null;
   required_browser_instance_id: string | null;
+  webhook_json: string | null;
+  webhook_only: number | null;
+  effect: string | null;
   enabled: number;
   deleted_at: string | null;
   revision: number;
@@ -33,6 +43,7 @@ export interface RoutineRunRow {
   updated_at: string;
   completed_at: string | null;
   last_error: string | null;
+  webhook_delivery_json: string | null;
 }
 
 export function toRoutine(row: RoutineRow): RoutineRecord {
@@ -48,6 +59,9 @@ export function toRoutine(row: RoutineRow): RoutineRecord {
     schedule: JSON.parse(row.schedule_json) as RoutineRecord["schedule"],
     nextDueAt: row.next_due_at,
     requiredBrowserInstanceId: row.required_browser_instance_id,
+    webhook: webhookOf(row.webhook_json),
+    webhookOnly: row.webhook_only === 1,
+    effect: effectOf(row.effect),
     enabled: row.enabled === 1,
     deletedAt: row.deleted_at,
     revision: row.revision,
@@ -70,7 +84,42 @@ export function toRoutineRun(row: RoutineRunRow): RoutineRunRecord {
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
     lastError: row.last_error,
+    webhookDelivery: deliveryOf(row.webhook_delivery_json),
   };
+}
+
+function effectOf(value: string | null): CallEffect {
+  return isCallEffect(value) ? value : "write";
+}
+
+function webhookOf(value: string | null): RoutineWebhook | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed.url !== "string" || !parsed.url) return null;
+    return {
+      url: parsed.url,
+      ...(typeof parsed.secret === "string" && parsed.secret ? { secret: parsed.secret } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function deliveryOf(value: string | null): WebhookDelivery | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (parsed?.status !== "delivered" && parsed?.status !== "failed") return null;
+    const attempts = Number(parsed.attempts);
+    return {
+      status: parsed.status,
+      attempts: Number.isFinite(attempts) ? attempts : 0,
+      ...(typeof parsed.error === "string" && parsed.error ? { error: parsed.error } : {}),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** The optional live-watch filter; a database from before it has null. */

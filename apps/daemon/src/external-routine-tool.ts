@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { AeonProductStore, ChatId, RoutineRecord } from "@aeon/domain";
 import { exploreForRoutine } from "@aeon/pi-adapter";
+import {
+  inferRoutineEffect,
+  optionalBoolean,
+  parseEffect,
+  parseWebhook,
+} from "./routine-fields.js";
 import { optionalListen } from "./routine-listen.js";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 
@@ -47,6 +53,27 @@ export const EXTERNAL_ROUTINE_TOOL = {
         maxItems: 10,
         description: "Only these sites during the routine's own run.",
       },
+      webhook: {
+        type: "string",
+        maxLength: 2000,
+        description:
+          "POST {routineId, title, value, firedAt} here when the check passes. Needs a check.",
+      },
+      webhookSecret: {
+        type: "string",
+        maxLength: 200,
+        description: "Signs the body as HMAC-SHA256 in X-Aeon-Signature.",
+      },
+      webhookOnly: {
+        type: "boolean",
+        description: "Deliver the webhook and do not start the agent.",
+      },
+      browser: {
+        type: "string",
+        maxLength: 80,
+        description: "Connected Chrome profile name. The check and the run stay on that browser.",
+      },
+      effect: { type: "string", enum: ["read", "write", "irreversible"] },
     },
     required: ["action"],
     additionalProperties: false,
@@ -65,6 +92,8 @@ export interface ExternalRoutineOptions {
   /** The tool call's session: "mcp" or "cli". */
   session: string;
   args: Record<string, unknown>;
+  /** Pins `browser` (a connected profile name) onto the routine's chat and returns its id. */
+  resolveBrowser?: (name: string, chatId: ChatId) => Promise<string>;
 }
 
 export async function runExternalRoutine(options: ExternalRoutineOptions): Promise<unknown> {
@@ -91,6 +120,12 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
   );
   const sites = sitesOf(options.args.sites);
   const chatId = await chatFor(options, origin);
+  const browserName = optionalString(options.args.browser).trim();
+  const requiredBrowserInstanceId = browserName
+    ? await browserFor(options, browserName, chatId)
+    : null;
+  const webhook = parseWebhook(options.args.webhook, options.args.webhookSecret, null);
+  const webhookOnly = optionalBoolean(options.args.webhookOnly, "webhookOnly", false);
   const timestamp = now.toISOString();
   const saved = options.store.createRoutine({
     routineId: randomUUID(),
@@ -103,7 +138,16 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
     listen,
     schedule,
     nextDueAt: nextRoutineOccurrence(schedule, now),
-    requiredBrowserInstanceId: null,
+    requiredBrowserInstanceId,
+    webhook,
+    webhookOnly,
+    effect: inferRoutineEffect({
+      title,
+      instruction,
+      check,
+      webhookOnly,
+      override: parseEffect(options.args.effect),
+    }),
     enabled: true,
     deletedAt: null,
     revision: 1,
@@ -156,6 +200,9 @@ function pause(options: ExternalRoutineOptions, origin: Origin): unknown {
         listen: routine.listen ?? null,
         schedule: routine.schedule,
         requiredBrowserInstanceId: routine.requiredBrowserInstanceId ?? null,
+        webhook: routine.webhook ?? null,
+        webhookOnly: routine.webhookOnly === true,
+        effect: routine.effect ?? "write",
         enabled: false,
         nextDueAt: null,
       },
@@ -193,8 +240,23 @@ function project(routine: RoutineRecord): Record<string, unknown> {
     sites: routine.sites ?? [],
     check: Boolean(routine.check),
     ...(routine.listen ? { listen: routine.listen } : {}),
+    ...(routine.webhook ? { webhook: routine.webhook.url } : {}),
+    ...(routine.webhookOnly ? { webhookOnly: true } : {}),
+    effect: routine.effect,
+    ...(routine.requiredBrowserInstanceId
+      ? { requiredBrowserInstanceId: routine.requiredBrowserInstanceId }
+      : {}),
     createdAt: routine.createdAt,
   };
+}
+
+async function browserFor(
+  options: ExternalRoutineOptions,
+  name: string,
+  chatId: ChatId,
+): Promise<string> {
+  if (!options.resolveBrowser) throw new Error("This daemon cannot pin a browser by name.");
+  return options.resolveBrowser(name, chatId);
 }
 
 function sitesOf(value: unknown): string[] {

@@ -1,6 +1,7 @@
 // One answer for what can be done on a site: its abilities, the mapped operations they can use,
 // and the site's notes. WebMCP tools are added by the browser runtime, which can see the page.
 
+import { abilityEffect, operationEffect, type CallEffect } from "./effect.js";
 import {
   listAbilities,
   readSiteNotes,
@@ -18,6 +19,7 @@ export interface SiteAbilitySummary {
   name: string;
   title: string;
   does: "read" | "write";
+  effect: CallEffect;
   /** Lookups are reads, changes are writes. Same abilities, shown apart. */
   group: "lookup" | "change";
   inputs: string[];
@@ -41,6 +43,7 @@ export interface SiteOperationSummary {
   name: string;
   title: string;
   does: "read" | "write";
+  effect: CallEffect;
   inputs: string[];
   capabilities?: string[];
 }
@@ -74,24 +77,31 @@ export async function siteCapabilities(site: string): Promise<SiteCapabilities> 
   return {
     site: host,
     ...grouped(summaries),
-    operations: operations.map((operation) => ({
-      name: operation.id,
-      title: operation.summary ?? operation.id,
-      does: operation.role === "read" ? "read" : "write",
-      inputs: inputParams(operation).map((param) => param.name),
-      ...(roles.get(operation.id)?.length ? { capabilities: roles.get(operation.id) } : {}),
-    })),
+    operations: operations.map((operation) => {
+      const effect = operationEffect(operation);
+      return {
+        name: operation.id,
+        title: operation.summary ?? operation.id,
+        does: effect === "read" ? ("read" as const) : ("write" as const),
+        effect,
+        inputs: inputParams(operation).map((param) => param.name),
+        ...(roles.get(operation.id)?.length ? { capabilities: roles.get(operation.id) } : {}),
+      };
+    }),
     notes,
   };
 }
 
 function summarize(ability: Ability): SiteAbilitySummary {
   const post = ability.postcondition?.ability ?? ability.options.readBack?.ability;
+  const effect = abilityEffect(ability);
+  const kind = readOrWrite(effect);
   return {
     name: ability.name,
     title: ability.description ?? ability.name,
-    does: ability.kind,
-    group: ability.kind === "write" ? "change" : "lookup",
+    does: kind.does,
+    effect,
+    group: kind.group,
     inputs: Object.keys((ability.inputs.properties ?? {}) as Record<string, unknown>),
     ways: ability.ways.map((way) => way.kind),
     ...(ability.ways.some((way) => way.partial) ? { partial: true } : {}),
@@ -124,6 +134,13 @@ function unverifiedField(ability: Ability): { unverified?: { via: string; why?: 
   return ways.length ? { unverified: ways } : {};
 }
 
+function readOrWrite(effect: CallEffect): {
+  does: "read" | "write";
+  group: "lookup" | "change";
+} {
+  return effect === "read" ? { does: "read", group: "lookup" } : { does: "write", group: "change" };
+}
+
 function lookupsFirst(left: SiteAbilitySummary, right: SiteAbilitySummary): number {
   if (left.does !== right.does) return left.does === "read" ? -1 : 1;
   return left.name.localeCompare(right.name);
@@ -150,6 +167,7 @@ export function withWebMcp(
       name: tool.name,
       title: tool.description ?? tool.name,
       does: "read" as const,
+      effect: "read" as const,
       group: "lookup" as const,
       inputs: [],
       ways: ["webmcp"],

@@ -147,6 +147,8 @@ export interface Operation {
   requestBody?: { mime: string; schema: JsonSchema; form?: boolean };
   responses: Record<string, { mime: string; schema?: JsonSchema }>;
   role: "read" | "action" | "auth";
+  /** Set only when an override names it. Otherwise callers infer it from the method and text. */
+  effect?: "read" | "write" | "irreversible";
   security: string[];
   pagination?: Pagination;
   dependencies: Dependency[];
@@ -254,6 +256,8 @@ export interface Overrides {
   names?: Record<string, string>;
   /** Say what an operation is for, when the guess is wrong: search, list, detail, price, availability. */
   capabilities?: Record<string, Capability[]>;
+  /** read, write or irreversible. Wins over the guess from the method and the text. */
+  effects?: Record<string, "read" | "write" | "irreversible">;
   descriptions?: Record<string, string>;
   /** URL regexes to drop as noise. */
   noise?: string[];

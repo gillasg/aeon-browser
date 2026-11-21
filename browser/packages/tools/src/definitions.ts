@@ -16,6 +16,7 @@ import {
   rebuild,
   runSiteToolAction,
   siteMapper,
+  operationEffect,
   siteName,
   SITE_TOOL_ACTIONS,
   watch,
@@ -602,6 +603,7 @@ function describeOperation(op: SiteOperation): Record<string, unknown> {
     method: op.method,
     path: op.path,
     role: op.role,
+    effect: operationEffect(op),
     params: op.params
       .filter((param) => !param.constant && !param.generated)
       .map((param) => `${param.name}${param.required ? "" : "?"}`),

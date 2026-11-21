@@ -7,6 +7,7 @@ import type {
   RoutineRecord,
   RoutineRunRecord,
   RoutineRunState,
+  WebhookDelivery,
 } from "@aeon/domain";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
@@ -15,6 +16,7 @@ import { createAeonHostHandler, siteMapperRequest } from "@aeon/pi-adapter";
 import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
 import { isLive, liveCheckCode } from "./routine-listen.js";
 import { countBusyRoutines } from "./daemon-activity.js";
+import { deliverRoutineWebhook } from "./routine-webhook.js";
 
 const TICK_MS = 10_000;
 const MAX_RUNS_PER_TICK = 32;
@@ -60,6 +62,8 @@ export class RoutineScheduler {
   onCheck:
     | ((routine: RoutineRecord, check: { met: boolean; value?: unknown; error?: string }) => void)
     | undefined;
+  /** Webhook POST for a passing check. Tests replace it. */
+  webhookDeliver = deliverRoutineWebhook;
 
   async start(): Promise<void> {
     if (this.started) return;
@@ -225,24 +229,60 @@ export class RoutineScheduler {
     run: RoutineRunRecord,
   ): Promise<string | undefined> {
     if (!routine.check) return routine.instruction;
-    // A live routine fires from a response with the value it heard; with no matching tab open its
-    // listener stays idle and the normal timer check runs against the same realm (and the same
-    // "new since last time" state), so dedupe is identical to a timer routine's.
+    const check = await this.watcherCheck(routine, run);
+    this.onCheck?.(routine, check);
+    if (!check.met) {
+      this.recordUnmetCheck(run, check.error);
+      return undefined;
+    }
+    return this.passedCheckInstruction(routine, run, check.value);
+  }
+
+  /**
+   * A live routine fires from a response with the value it heard. With no matching tab open its
+   * listener stays idle and the normal timer check runs against the same realm (and the same
+   * "new since last time" state), so dedupe is identical to a timer routine's.
+   */
+  private async watcherCheck(
+    routine: RoutineRecord,
+    run: RoutineRunRecord,
+  ): Promise<{ met: boolean; value?: unknown; error?: string }> {
     const live = isListening(routine) || isLive(routine);
     const heard = live ? this.takeHeard(routine.routineId) : { met: false };
-    const check =
-      heard.met || isListening(routine) ? heard : await this.runCheck(routine, run.runId);
-    this.onCheck?.(routine, check);
-    if (check.met) {
-      this.onAlert?.(routine.chatId, routine.title, describeCheck(check.value));
-      return `${routine.instruction}
+    if (heard.met || isListening(routine)) return heard;
+    return this.runCheck(routine, run.runId);
+  }
 
-This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`;
-    }
+  private recordUnmetCheck(run: RoutineRunRecord, error: string | undefined): void {
     const completedAt = new Date().toISOString();
-    if (check.error) this.update(run.runId, "failed", { completedAt, lastError: check.error });
+    if (error) this.update(run.runId, "failed", { completedAt, lastError: error });
     else this.update(run.runId, "skipped", { completedAt });
-    return undefined;
+  }
+
+  private async passedCheckInstruction(
+    routine: RoutineRecord,
+    run: RoutineRunRecord,
+    value: unknown,
+  ): Promise<string | undefined> {
+    this.onAlert?.(routine.chatId, routine.title, describeCheck(value));
+    const delivery = routine.webhook ? await this.webhookDeliver(routine, value) : undefined;
+    if (routine.webhookOnly) {
+      this.completeWebhookOnly(run.runId, delivery);
+      return undefined;
+    }
+    if (delivery) this.update(run.runId, "due", { webhookDelivery: delivery });
+    return `${routine.instruction}
+
+This routine's check passed with: ${JSON.stringify(value).slice(0, 4000)}`;
+  }
+
+  private completeWebhookOnly(runId: string, delivery: WebhookDelivery | undefined): void {
+    const failed = delivery?.status === "failed";
+    this.update(runId, failed ? "failed" : "completed", {
+      completedAt: new Date().toISOString(),
+      ...(failed && delivery?.error ? { lastError: delivery.error } : {}),
+      ...(delivery ? { webhookDelivery: delivery } : {}),
+    });
   }
 
   /**
@@ -401,6 +441,7 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
       acceptedTurnId?: string;
       completedAt?: string;
       lastError?: string;
+      webhookDelivery?: WebhookDelivery | null;
     } = {},
   ): void {
     this.store.updateRoutineRun(runId, { state, ...fields }, new Date().toISOString());

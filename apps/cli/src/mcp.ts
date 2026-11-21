@@ -22,6 +22,13 @@ import {
 } from "@aeon/protocol";
 import { modelAuthPath, modelSignedIn } from "./doctor-io.js";
 import { SamplingBridge, readUseClientModel, setSamplingBridge } from "./mcp-sampling.js";
+import {
+  callCatalog,
+  catalogFingerprint,
+  catalogMcpTool,
+  loadCatalog,
+  type CatalogTool,
+} from "./catalog.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -198,10 +205,27 @@ const tools = [
         },
         check: { type: "string", maxLength: 20000 },
         sites: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 10 },
+        webhook: { type: "string", maxLength: 2000 },
+        webhookSecret: { type: "string", maxLength: 200 },
+        webhookOnly: { type: "boolean" },
+        browser: { type: "string", maxLength: 80 },
+        effect: { type: "string", enum: ["read", "write", "irreversible"] },
       },
       required: ["action"],
       additionalProperties: false,
     },
+  },
+  {
+    name: "catalog_search",
+    description:
+      "Find mapped site operations and saved abilities by text. Each match is a tool this server also lists.",
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", minLength: 1, maxLength: 200 } },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false },
   },
   {
     name: "browser_action",
@@ -364,6 +388,8 @@ export async function runMcpServer(site?: string): Promise<void> {
   // One mapped site as its own MCP server: one tool per operation, called with the user's logins.
   if (site) return runSiteMcpServer(siteName(site));
   let client: AeonClient | undefined;
+  catalogState = { tools: [], fingerprint: "", primed: false };
+  const stopCatalog = watchCatalog();
   const deps: McpDeps = {
     aeon: async () => (client ??= await AeonClient.connect()),
     runs: new Map<string, Run>(),
@@ -380,6 +406,7 @@ export async function runMcpServer(site?: string): Promise<void> {
   setSamplingBridge(sampler);
   const lines = createInterface({ input: process.stdin });
   for await (const line of lines) await processMcpLine(line, deps, sampler);
+  stopCatalog();
   for (const controller of deps.pending.values()) controller.abort();
   sampler.close();
   setSamplingBridge(undefined);
@@ -417,7 +444,7 @@ function initializeResult(params: Json): Json {
   const version = MCP_PROTOCOLS.find((candidate) => candidate === asked) ?? MCP_PROTOCOLS[0];
   return {
     protocolVersion: version,
-    capabilities: { tools: { listChanged: false } },
+    capabilities: { tools: { listChanged: true } },
     serverInfo: { name: "aeon", version: "0.1.0" },
   };
 }
@@ -433,6 +460,13 @@ async function callToolResult(
   session: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<unknown> {
+  if (params.name === "catalog_search" || params.name.startsWith("site__")) {
+    try {
+      return text(await callCatalog(params.name, params.arguments ?? {}, catalogState.tools));
+    } catch (error) {
+      return { ...text(error instanceof Error ? error.message : String(error)), isError: true };
+    }
+  }
   if (CHAT_TOOLS.has(params.name))
     return callChatTool(await aeon(), params.name, params.arguments, session, signal);
   try {
@@ -453,8 +487,13 @@ async function handle(
   const method = String(message.method ?? "");
   if (method === "initialize") return initializeResult(mcpParams(message));
   if (method === "server/discover") return mcpDiscoverResult({ name: "aeon", version: "0.1.0" });
-  if (method === "tools/list")
-    return mcpListResult({ tools: [...tools, ...(await chatTools(aeon))] }, modern);
+  if (method === "tools/list") {
+    const listed = await refreshCatalog(false);
+    return mcpListResult(
+      { tools: [...tools, ...listed.map(catalogMcpTool), ...(await chatTools(aeon))] },
+      modern,
+    );
+  }
   if (method === "resources/list" || method === "prompts/list") return listResult(method, modern);
   if (method === "ping") return mcpResult({}, modern);
   if (method !== "tools/call") throw new Error("Method not found");
@@ -604,6 +643,33 @@ function startRun(client: AeonClient, args: Json, runs: Map<string, Run>): { run
     (error: unknown) => (run.error = error instanceof Error ? error.message : String(error)),
   );
   return { runId };
+}
+
+interface CatalogState {
+  tools: CatalogTool[];
+  fingerprint: string;
+  primed: boolean;
+}
+
+let catalogState: CatalogState = { tools: [], fingerprint: "", primed: false };
+
+function watchCatalog(): () => void {
+  const ms = Number(process.env.AEON_CATALOG_POLL_MS ?? 5000);
+  const interval = Number.isFinite(ms) && ms >= 50 ? ms : 5000;
+  const timer = setInterval(() => void refreshCatalog(true).catch(() => undefined), interval);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
+async function refreshCatalog(notify: boolean): Promise<CatalogTool[]> {
+  const next = await loadCatalog();
+  const fingerprint = catalogFingerprint(next);
+  if (notify && catalogState.primed && fingerprint !== catalogState.fingerprint)
+    process.stdout.write(
+      `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" })}\n`,
+    );
+  catalogState = { tools: next, fingerprint, primed: true };
+  return next;
 }
 
 function text(value: unknown) {
