@@ -7,6 +7,7 @@ import {
   BrowserInventoryDeltaMessageSchema,
   BrowserInventoryFullSchema,
   BrowserInventoryReplySchema,
+  type BrowserInventoryFull,
   PageGrantIssueRequestSchema,
   PageGrantIssueResponseSchema,
   SUPPORTED_PROTOCOL_VERSION,
@@ -112,6 +113,15 @@ function handleInventory(
   return applyInventoryDelta(socket, delta.data, executor, inventories, state);
 }
 
+/** What a full inventory does to the socket. A duplicate of the same run is acknowledged, not closed. */
+export function fullInventoryAction(
+  sameIdentity: boolean,
+  applied: BrowserInventoryFull | "duplicate" | undefined,
+): "reject" | "duplicate" | "apply" {
+  if (!sameIdentity || applied === undefined) return "reject";
+  return applied === "duplicate" ? "duplicate" : "apply";
+}
+
 function applyFullInventory(
   socket: WebSocket,
   inventory: ReturnType<typeof BrowserInventoryFullSchema.parse>,
@@ -120,21 +130,26 @@ function applyFullInventory(
   state: { inventoryReady: boolean },
   browserControl: BrowserControlService,
 ): true {
-  const accepted =
+  const sameIdentity =
     inventory.clientInstanceId === executor.clientInstanceId &&
-    inventory.browserRunId === executor.browserRunId &&
-    inventories.applyFull(inventory);
-  if (!accepted) socket.close(1008, "Invalid or stale browser inventory");
+    inventory.browserRunId === executor.browserRunId;
+  const applied = sameIdentity ? inventories.applyFull(inventory) : undefined;
+  const action = fullInventoryAction(sameIdentity, applied);
+  if (action === "reject") socket.close(1008, "Invalid or stale browser inventory");
   else {
     state.inventoryReady = true;
-    browserControl.connectExecutor(
-      executor.clientInstanceId,
-      socket,
-      inventory.capabilities?.includes("site-scripts"),
-      inventory.capabilities?.includes("browser-actions-v2"),
-      inventory.capabilities?.includes("browser-runtime-v4"),
-      inventory.capabilities?.includes("browser-code-v1"),
-    );
+    // A duplicate from this socket is the browser we already have. A duplicate from an older
+    // socket must not replace the live one. A newer snapshot always connects.
+    const current = browserControl.executorSocket(executor.clientInstanceId);
+    if (action === "apply" || !current)
+      browserControl.connectExecutor(
+        executor.clientInstanceId,
+        socket,
+        inventory.capabilities?.includes("site-scripts"),
+        inventory.capabilities?.includes("browser-actions-v2"),
+        inventory.capabilities?.includes("browser-runtime-v4"),
+        inventory.capabilities?.includes("browser-code-v1"),
+      );
     socket.send(
       JSON.stringify(
         BrowserInventoryReplySchema.parse({

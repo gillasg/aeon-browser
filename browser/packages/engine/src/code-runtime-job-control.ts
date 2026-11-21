@@ -10,25 +10,32 @@ import { judgeOutcome, registrableDomain, summarizeOutcomes, type Outcome } from
 import {
   jobs,
   jobTimers,
+  reloadJobs,
   restoreJobs,
   saveJobs,
   MAX_JOB_ITEM_CHARS,
   type Job,
 } from "./code-runtime-jobs.js";
+import { DROPPED_JOB_REASON, jobIdOf, missingJob } from "./code-job-record.js";
 import { agentTabSummary, reapChatPopups } from "./native-browser-tab-cleanup.js";
 
 export async function jobCall(cell: Cell, request: Record<string, unknown>): Promise<unknown> {
   const action = String(request.action ?? "status");
   if (action === "start") return startJob(cell, request);
-  await restoreJobs();
+  await restoreJobs().catch(() => undefined);
   if (action === "list")
     return {
       jobs: [...jobs.values()]
         .filter((job) => job.run.chatId === cell.run.chatId)
         .map((job) => jobState(job)),
     };
-  const job = jobs.get(String(request.id ?? ""));
-  if (!job) throw new Error("TARGET_LOST: no browser job " + String(request.id ?? ""));
+  const id = jobIdOf(request);
+  let job = jobs.get(id);
+  if (!job) {
+    await reloadJobs();
+    job = jobs.get(id);
+  }
+  if (!job) return missingJob(id);
   if (action === "item") {
     storeJobItem(job, request);
     return { ok: true };
@@ -290,6 +297,19 @@ async function startJob(cell: Cell, request: Record<string, unknown>): Promise<u
   }
   watchJob(job);
   return { jobId, status: "running", total: items.length, mode: job.mode };
+}
+
+/** The offscreen document dropped a job realm before it finished. The record stays, and says why. */
+export function loseJob(message: Record<string, unknown>): void {
+  const job = jobs.get(String(message.jobId ?? ""));
+  if (!job || job.status !== "running") return;
+  job.status = "lost";
+  job.done = true;
+  job.finishedAt = Date.now();
+  job.error =
+    typeof message.error === "string" && message.error ? message.error : DROPPED_JOB_REASON;
+  clearJobTimer(job);
+  void saveJobs();
 }
 
 export function finishJob(message: Record<string, unknown>): void {

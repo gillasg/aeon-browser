@@ -15,7 +15,7 @@ import {
 import { fileKind, fileToMarkdown } from "./content/files.js";
 import { extractCss } from "./extract/css.js";
 import { extractJson, summarize, type ModelLike } from "./extract/model.js";
-import { AutoFetcher } from "./fetch/auto.js";
+import { AutoFetcher, emptyShell } from "./fetch/auto.js";
 import type { Fetched, Validators } from "./fetch/types.js";
 import { fitMarkdown, pageScore } from "./relevance.js";
 import type { Format, PageResult, ScrapeOptions } from "./types.js";
@@ -113,8 +113,22 @@ function fromHtml(
     const value = HTML_FORMATS[format]?.(parts);
     if (value !== undefined) out[format] = value;
   }
+  // The file keeps the whole page. fitMarkdown, when asked for, is only the reply's slice.
+  result.markdown = markdown;
   result.contentHash = hash(markdown);
   if (options.query) result.score = pageScore(markdown, options.query);
+}
+
+/** Static HTML that extracted to nothing, with scripts: render it instead of returning the shell. */
+export function shouldRenderShell(
+  markdown: string | undefined,
+  html: string,
+  fetchedBy: string,
+  render: string | undefined,
+): boolean {
+  if (render === "static" || fetchedBy !== "static") return false;
+  if ((markdown ?? "").trim()) return false;
+  return emptyShell(html) || /<script\b/i.test(html);
 }
 
 async function fromFile(
@@ -200,7 +214,12 @@ export async function scrape(
   };
   try {
     const fetched = await ctx.fetcher.fetch(url, options, validators);
-    return await buildResult(fetched, options, 0, ctx);
+    const result = await buildResult(fetched, options, 0, ctx);
+    const html = fetched.html ?? fetched.body.toString("utf8");
+    if (!shouldRenderShell(result.markdown, html, fetched.fetchedBy, options.render)) return result;
+    await ctx.fetcher.noteBrowser(url);
+    const again = await ctx.fetcher.browser.fetch(url, options);
+    return await buildResult(again, options, 0, ctx);
   } finally {
     if (!context?.fetcher) await ctx.fetcher.close();
   }

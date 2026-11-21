@@ -16,6 +16,8 @@ import { cellTimeoutMs } from "./run-budget.js";
 // agent's own browser_code cells.
 
 const chats = new AsyncLocalStorage<{ chatId: string }>();
+/** A crawl worker chat that must run in a named browser, set for the duration of bridge.run. */
+const namedBrowser = new Map<string, string>();
 const BACKGROUND = "aeon-background";
 const MIN_TIMEOUT_MS = 1_000;
 const MAX_TIMEOUT_MS = 600_000;
@@ -41,15 +43,25 @@ interface CellOutput {
   value?: unknown;
 }
 
+/** The chat whose browser pin a nested crawl call should copy. */
+export function browserParentChat(): string | undefined {
+  return chats.getStore()?.chatId;
+}
+
+/** The profile a worker chat was asked to use, while its cell is in flight. */
+export function browserNamedFor(chatId: string): string | undefined {
+  return namedBrowser.get(chatId);
+}
+
 export function aeonBridge(run: BrowserToolRunner): Bridge {
   return {
     async run(code, options = {}) {
       const chatId = chats.getStore()?.chatId ?? BACKGROUND;
       const timeoutMs = boundedCellTimeout(chatId, options.timeoutMs);
-      const output = await run(
-        sessionChatId(chatId, options.session ?? "default"),
-        `site-${randomUUID()}`,
-        {
+      const child = sessionChatId(chatId, options.session ?? "default");
+      if (options.browser) namedBrowser.set(child, options.browser);
+      try {
+        const output = await run(child, `site-${randomUUID()}`, {
           codeCell: {
             code,
             timeoutMs,
@@ -61,13 +73,15 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
             onCall: () => Promise.resolve({ error: "UNSUPPORTED" }),
             onProgress: () => undefined,
           },
-        },
-      );
-      const cell = JSON.parse(output) as CellOutput;
-      if (cell.error === "BROWSER_OFFLINE")
-        throw new BrowserNotConnected("Aeon's browser is not connected.");
-      if (cell.error) throw new Error(cell.detail ? `${cell.error}: ${cell.detail}` : cell.error);
-      return cell.value;
+        });
+        const cell = JSON.parse(output) as CellOutput;
+        if (cell.error === "BROWSER_OFFLINE")
+          throw new BrowserNotConnected("Aeon's browser is not connected.");
+        if (cell.error) throw new Error(cell.detail ? `${cell.error}: ${cell.detail}` : cell.error);
+        return cell.value;
+      } finally {
+        namedBrowser.delete(child);
+      }
     },
     status: () => Promise.resolve({ browsers: 1 }),
     close: () => undefined,

@@ -102,6 +102,8 @@ export type CrawlToolInput = {
   readiness?: boolean;
   /** For search: auto (default), web (keyless providers) or google (the user's browser). */
   engine?: "auto" | "web" | "google";
+  /** Chrome profile to render in when more than one is connected (a name from `aeon browsers`). */
+  browser?: string;
   api?: { site: string; operation: string; params?: Record<string, unknown>; maxItems?: number };
 };
 
@@ -166,6 +168,11 @@ const crawlParameters: JsonObjectSchema = {
       description:
         "For search: auto picks Google in the user's browser for local, live and personal queries (near me, prices, scores, today, my ...) and fast keyless web search for the rest; web or google forces one.",
     },
+    browser: {
+      type: "string",
+      maxLength: 80,
+      description: "Chrome profile name (aeon browsers) to render pages in.",
+    },
     readiness: {
       type: "boolean",
       description:
@@ -192,7 +199,7 @@ export const crawlTool: AgentToolDefinition<CrawlToolInput> = {
   description:
     "Read web pages as Markdown and data: scrape a URL, crawl a site or section, map a site's URLs, check which of many sites load, or search the web (keyless search providers, or Google in the user's browser for local, live and personal queries). Uses plain HTTP first and the user's browser (with their logins) when needed.",
   actions: [
-    { name: "scrape", params: ["url", "query", "formats", "render"] },
+    { name: "scrape", params: ["url", "query", "formats", "render", "browser"] },
     {
       name: "crawl",
       params: [
@@ -204,6 +211,7 @@ export const crawlTool: AgentToolDefinition<CrawlToolInput> = {
         "exclude",
         "formats",
         "render",
+        "browser",
         "api",
       ],
     },
@@ -220,6 +228,7 @@ async function runCrawl(input: CrawlToolInput, context: AgentToolContext): Promi
   const formats =
     input.formats ?? (input.query ? ["fitMarkdown", "metadata"] : ["markdown", "metadata"]);
   const render = input.render ?? "auto";
+  const browser = input.browser ? { browser: input.browser } : {};
   if (input.action === "check") {
     const urls = [...(input.urls ?? []), ...(await urlsFromFile(input.file, context.workspace))];
     if (!urls.length) throw new Error("Give urls (hosts or URLs) or a workspace file listing them");
@@ -235,18 +244,21 @@ async function runCrawl(input: CrawlToolInput, context: AgentToolContext): Promi
       columns: input.columns ?? { name: "name" },
       ...(input.criteria ? { criteria: input.criteria } : {}),
       perQuery: input.limit ?? 10,
+      ...browser,
       ...(context.model ? { model: (await context.model()) as never } : {}),
     });
   if (input.action === "search")
     return search(require(input.query, "query"), {
       limit: input.limit ?? 10,
       ...(input.engine ? { engine: input.engine } : {}),
+      ...browser,
     });
   const url = require(input.url, "url");
   if (input.action === "scrape")
     return scrape(url, {
       formats,
       render,
+      ...browser,
       ...(input.query ? { query: input.query } : {}),
     });
   if (input.action === "map")
@@ -264,6 +276,7 @@ async function runCrawl(input: CrawlToolInput, context: AgentToolContext): Promi
     ...(input.exclude ? { exclude: input.exclude } : {}),
     ...(input.query ? { query: input.query, strategy: "best" as const } : {}),
     ...(input.api ? { api: input.api } : {}),
+    ...browser,
   });
 }
 

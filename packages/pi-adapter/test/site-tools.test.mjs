@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -123,7 +123,12 @@ test("crawl scrapes a page and crawls a site into the workspace", async (t) => {
   const page = JSON.parse(
     text(await tool.execute("1", { action: "scrape", url: `${origin}/`, render: "static" })),
   );
-  assert.match(page.markdown, /# Heading \//);
+  assert.match(page.preview, /# Heading \//);
+  const saved = await readdir(join(workspace, page.savedIn));
+  const markdownName = saved.find((file) => file.endsWith(".md"));
+  assert.ok(markdownName, saved.join(","));
+  const markdown = await readFile(join(workspace, page.savedIn, markdownName), "utf8");
+  assert.equal(markdown.split("Some real text for the page.").length - 1, 20);
   const crawled = JSON.parse(
     text(
       await tool.execute("2", { action: "crawl", url: `${origin}/`, limit: 5, render: "static" }),

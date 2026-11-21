@@ -42,7 +42,7 @@ test("a browser code deadline resets the realm when the cell never started", asy
   assert.equal(cancel.reset, true);
 });
 
-test("a deadline names the last stage and resets a realm that was evaluating", async () => {
+test("a deadline names the last stage and keeps a realm that was evaluating", async () => {
   mock.timers.enable({ apis: ["setTimeout"] });
   try {
     const messages = [];
@@ -65,9 +65,10 @@ test("a deadline names the last stage and resets a realm that was evaluating", a
       connection,
     );
     mock.timers.tick(6001);
-    await assert.rejects(run, /last stage: evaluating.*realm was reset/);
     const cancel = messages.find((message) => message.kind === "browser.code.cancel");
-    assert.equal(cancel.reset, true);
+    assert.equal(cancel.reset, false);
+    mock.timers.tick(3000);
+    await assert.rejects(run, /last stage: evaluating.*partial value was not returned/);
   } finally {
     mock.timers.reset();
   }
@@ -110,6 +111,7 @@ test("a cell that times out still hands the tabs it opened to its chat", async (
       connection,
     );
     mock.timers.tick(6001);
+    mock.timers.tick(3000);
     await assert.rejects(run, /TIMEOUT/);
     assert.deepEqual(adopted, [{ chatId, target }]);
   } finally {

@@ -11,6 +11,7 @@ import {
 } from "@aeon/protocol";
 import { BrowserInventoryRegistry } from "../dist/browser-inventory-registry.js";
 import { GrantAuthority } from "../dist/grant-authority.js";
+import { fullInventoryAction } from "../dist/native-executor-messages.js";
 import { authorizeNativeUiScope } from "../dist/native-ui-authz.js";
 
 const origin = "chrome-extension://npcdopokfkpfmepknhoecppgdgmkmihh";
@@ -187,6 +188,21 @@ test("New Tab Ask reads Pi models on the catalog grant, then hands prompt to exa
   assert.equal(authorizeNativeUiScope(catalog, submit), false);
   assert.equal(authorizeNativeUiScope(exactChat, submit), true);
   assert.equal(authorizeNativeUiScope(differentChat, submit), false);
+});
+
+test("a duplicate inventory is acknowledged and is not a reason to close the socket", () => {
+  assert.equal(fullInventoryAction(true, "duplicate"), "duplicate");
+  assert.equal(fullInventoryAction(true, undefined), "reject");
+  assert.equal(fullInventoryAction(false, "duplicate"), "reject");
+  assert.equal(fullInventoryAction(true, { kind: "browser.inventory.full" }), "apply");
+});
+
+test("a repeated full inventory is a duplicate and does not replace the snapshot", () => {
+  const { registry, full } = inventoryFixture();
+  assert.equal(registry.applyFull(full).generation, 1);
+  assert.equal(registry.applyFull(full), "duplicate");
+  assert.equal(registry.get(clientInstanceId).generation, 1);
+  assert.equal(registry.applyFull({ ...full, generation: 2 }).generation, 2);
 });
 
 test("inventory generations replace atomically and deltas preserve navigation identity", () => {

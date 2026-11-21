@@ -50,6 +50,11 @@ function render(args: Args): "auto" | "static" | "browser" {
   return value === "static" || value === "browser" ? value : "auto";
 }
 
+function namedBrowser(args: Args): { browser?: string } {
+  const browser = flag(args, "browser");
+  return browser ? { browser } : {};
+}
+
 function formats(args: Args): Format[] {
   const chosen = list(args, "formats");
   return chosen.length ? (chosen as Format[]) : DEFAULT_FORMATS;
@@ -73,6 +78,7 @@ function crawlOptions(args: Args): CrawlToolInput {
     ...(exclude.length ? { exclude } : {}),
     ...(query ? { query } : {}),
     ...(api ? { api: { site: api.split(":")[0] ?? "", operation: api.split(":")[1] ?? "" } } : {}),
+    ...namedBrowser(args),
   };
 }
 
@@ -86,6 +92,7 @@ async function runScrape(target: string, args: Args): Promise<number> {
         formats: formats(args),
         render: render(args),
         ...(query ? { query } : {}),
+        ...namedBrowser(args),
       },
       {},
     ),
@@ -118,6 +125,7 @@ async function runSearch(target: string, args: Args): Promise<number> {
       ...(flag(args, "engine")
         ? { engine: flag(args, "engine") as "auto" | "web" | "google" }
         : {}),
+      ...namedBrowser(args),
     },
     {},
   )) as { url: string; title?: string; snippet?: string }[];
@@ -134,17 +142,27 @@ async function runFind(target: string, args: Args): Promise<number> {
   }
   const criteria = flag(args, "criteria");
   const model = await cliModel();
-  const rows = (await crawlTool.run(
+  const report = (await crawlTool.run(
     {
       action: "find",
       query: target,
       columns: Object.keys(columns).length ? columns : { name: "name" },
       ...(criteria ? { criteria } : {}),
+      ...namedBrowser(args),
     },
     model ? { model: async () => model } : {},
-  )) as { url: string; values: Record<string, unknown> }[];
-  if (has(args, "json")) printJson(rows);
-  else printRows(rows.map((row) => [row.url, ...Object.values(row.values).map(String)]));
+  )) as {
+    rows: { url: string; values: Record<string, unknown> }[];
+    why?: string;
+    opened: string[];
+    rejected: { url: string; reason: string }[];
+  };
+  if (has(args, "json")) printJson(report);
+  else {
+    if (report.why) out(report.why);
+    for (const page of report.rejected) out(`${page.reason}  ${page.url}`);
+    printRows(report.rows.map((row) => [row.url, ...Object.values(row.values).map(String)]));
+  }
   return 0;
 }
 
@@ -344,6 +362,7 @@ export const crawlCommand: Command = {
   --exclude <patterns>   never these
   --formats <list>       markdown (default), fitMarkdown, text, links, metadata, tables, pageData
   --render <mode>        auto (default), static, browser
+  --browser <name>       Chrome profile to render in (see aeon browsers)
   --query <text>         rank pages and keep the relevant parts
   --site                 start from the site's root instead of this page
   --api <site>:<op>      read a mapped site's operation instead of pages

@@ -127,20 +127,51 @@ export function handleBrowsers(
   return true;
 }
 
+const PIN_WAIT_MS = 2500;
+const PIN_POLL_MS = 100;
+
+/** A worker chat uses the named profile, or copies the chat that started it. */
+export async function pinInherited(
+  browser: BrowserControlService,
+  directory: string,
+  chatId: string,
+  parent: string | undefined,
+  named: string | undefined,
+): Promise<void> {
+  if (named) {
+    await pin(browser, directory, chatId, named);
+    return;
+  }
+  if (!parent || parent === chatId) return;
+  const id = browser.browserOf(parent);
+  if (id && browser.browserOf(chatId) !== id) browser.pinChat(chatId, id);
+}
+
 export async function pin(
   browser: BrowserControlService,
   directory: string,
   chatId: string,
   name: string,
 ): Promise<void> {
-  const browsers = summarize(browser, await readBrowserNames(directory));
-  const found = browsers.find((item) => item.name === name);
-  if (!found) {
-    const known = browsers.map((item) => item.name).filter(Boolean);
-    const hint = known.length ? ` Connected: ${known.join(", ")}.` : "";
-    throw new Error(`No connected browser is named ${name}.${hint} See aeon browsers.`);
+  const deadline = Date.now() + PIN_WAIT_MS;
+  for (;;) {
+    const names = await readBrowserNames(directory);
+    const browsers = summarize(browser, names);
+    const found = findBrowser(browsers, name);
+    if (found) {
+      browser.pinChat(chatId, found.clientInstanceId);
+      return;
+    }
+    // The name is in the file but its socket is in a reconnect gap. Wait, instead of failing the
+    // calls that land in that gap while the others in the same batch still run.
+    const named = Object.values(names).includes(name);
+    if (!named || Date.now() >= deadline) {
+      const known = browsers.map((item) => item.name).filter(Boolean);
+      const hint = known.length ? ` Connected: ${known.join(", ")}.` : "";
+      throw new Error(`No connected browser is named ${name}.${hint} See aeon browsers.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, PIN_POLL_MS));
   }
-  browser.pinChat(chatId, found.clientInstanceId);
 }
 
 export function handleChatPin(

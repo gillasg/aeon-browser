@@ -26,7 +26,7 @@ import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.j
 import { stepFailure } from "./code-step-errors.js";
 import { mayHaveLanded, refusedEffect, sentActionEffect } from "./native-browser-effect.js";
 import { jobs } from "./code-runtime-jobs.js";
-import { finishJob, cancelJobs } from "./code-runtime-job-control.js";
+import { finishJob, cancelJobs, loseJob } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
 import { agentTypedIn, noteAgentText } from "./native-browser-password-lock.js";
 import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
@@ -118,15 +118,23 @@ export function handleBrowserCodeMessage(
   if (cancel.success) {
     const cell = cells.get(cancel.data.cellId);
     const reset = cancel.data.reset === true;
-    if (cell && reset) void resetRealm(cell.run.chatId);
-    if (cell)
+    if (cell && reset) {
+      void resetRealm(cell.run.chatId);
       finish(cell, {
         output: "",
-        error: reset
-          ? "RUN_RESET: browser workflow cancelled; runtime reset"
-          : "RUN_RESET: browser workflow cancelled",
-        reset,
+        error: "RUN_RESET: browser workflow cancelled; runtime reset",
+        reset: true,
       });
+    } else if (cell) {
+      // A deadline interrupts the cell and keeps the realm. The sandbox posts the partial value;
+      // startCell finishes from that, instead of wiping what the cell already built.
+      void toOffscreen({
+        target: "aeon-code-offscreen",
+        kind: "interrupt",
+        chatId: cell.run.chatId,
+        cellId: cell.run.cellId,
+      }).catch(() => undefined);
+    }
     return true;
   }
   return false;
@@ -283,6 +291,11 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL(OFFSCREEN)) return;
   if (message.kind === "jobDone") {
     finishJob(message as Record<string, unknown>);
+    reply({ ok: true });
+    return true;
+  }
+  if (message.kind === "jobLost") {
+    loseJob(message as Record<string, unknown>);
     reply({ ok: true });
     return true;
   }

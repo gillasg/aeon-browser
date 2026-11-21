@@ -7,7 +7,12 @@ import type { ModelLike } from "@browserkit/tools/site-to-api";
 
 export interface CliHost {
   /** Runs browser code in a named session; the last expression is returned. */
-  runInBrowser(code: string, options?: { session?: string; timeoutMs?: number }): Promise<unknown>;
+  runInBrowser(
+    code: string,
+    options?: { session?: string; timeoutMs?: number; browser?: string },
+  ): Promise<unknown>;
+  /** Connected browsers, when the host can see more than one. */
+  browsers?(): Promise<unknown>;
   /** The model the AI commands use (describe, edit, name, find, explore), when the host has one. */
   model?(): Promise<ModelLike | undefined>;
 }
