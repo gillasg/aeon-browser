@@ -24,8 +24,11 @@ import {
   eventsFromTrace,
   tabClips,
   writeEvents,
+  type ClipMeta,
   type RecordingEvents,
+  type TerminalCast,
   type Trace,
+  type VideoEvent,
 } from "./record-events.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
 
@@ -145,7 +148,8 @@ async function recordedTabIds(host: DaemonHost, chatId: string | undefined): Pro
 }
 
 /** Pull the chat's trace through the daemon, best effort; a recording must never hang on it. */
-async function traceOf(host: DaemonHost, chatId: string): Promise<Trace | undefined> {
+async function traceOf(host: DaemonHost, chatId: string | undefined): Promise<Trace | undefined> {
+  if (!chatId) return undefined;
   try {
     const { inspect } = await import("./run.js");
     const result = await inspect(await host.connect(), chatId);
@@ -155,17 +159,33 @@ async function traceOf(host: DaemonHost, chatId: string): Promise<Trace | undefi
   }
 }
 
-async function stop(host: DaemonHost, args: Args): Promise<number> {
-  const out = typeof args.flags?.out === "string" ? args.flags.out : undefined;
-  const folder = out ? defaultFolder(out) : remembered();
-  const before = loadState(folder);
-  const opts: RecordOptions = { source: before.source, ffmpeg: before.ffmpeg, log };
-  const state = await stopCapture(folder, opts);
-  // The chat usually starts after the recording, so stop can name it too.
-  if (typeof args.flags?.chat === "string") state.chatId = args.flags.chat;
-  const size = frameSize(folder, ffprobeBinary(opts));
-  const durationMs = state.frames > 1 ? Math.round(((state.frames - 1) / state.fps) * 1000) : 0;
-  const clip = {
+function flagString(args: Args, name: string): string | undefined {
+  const value = args.flags[name];
+  return typeof value === "string" ? value : undefined;
+}
+
+function stopFolder(args: Args): string {
+  const out = flagString(args, "out");
+  return out ? defaultFolder(out) : remembered();
+}
+
+/** The chat usually starts after the recording, so stop can name it too. */
+function nameStopChat(state: RecordState, args: Args): void {
+  const chat = flagString(args, "chat");
+  if (chat) state.chatId = chat;
+}
+
+function clipDuration(frames: number, fps: number): number {
+  if (frames <= 1) return 0;
+  return Math.round(((frames - 1) / fps) * 1000);
+}
+
+function baseClip(
+  state: RecordState,
+  size: { width: number; height: number },
+  durationMs: number,
+): ClipMeta {
+  return {
     file: state.source === "tabs" ? "takes/" : "clip.mp4",
     source: state.source,
     ...size,
@@ -174,33 +194,67 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
     durationMs,
     frames: state.frames,
   };
-  const trace = state.chatId ? await traceOf(host, state.chatId) : undefined;
-  const events = trace ? eventsFromTrace(trace, state.startedAt) : [];
-  const clips =
-    state.source === "tabs" ? tabClips(events, clip, await recordedTabIds(host, state.chatId)) : [];
-  if (state.source === "tabs" && state.recordAgentTabsWas === false) {
-    try {
-      await (await host.connect()).settings({ recordAgentTabs: false }, 3_000);
-    } catch {
-      // The setting stays on if Chrome is gone; the user can turn it off.
-    }
+}
+
+async function clipsForStop(
+  host: DaemonHost,
+  state: RecordState,
+  events: VideoEvent[],
+  clip: ClipMeta,
+): Promise<ClipMeta[]> {
+  if (state.source !== "tabs") return [];
+  return tabClips(events, clip, await recordedTabIds(host, state.chatId));
+}
+
+/** Put recordAgentTabs back when this recording was the one that turned it on. */
+async function releaseTabTakes(host: DaemonHost, state: RecordState): Promise<void> {
+  if (state.source !== "tabs" || state.recordAgentTabsWas !== false) return;
+  try {
+    const client = await host.connect();
+    await client.settings({ recordAgentTabs: false }, 3_000);
+  } catch {
+    // The setting stays on if Chrome is gone; the user can turn it off.
   }
-  const terminal = keptTerminal(folder);
-  const result: RecordingEvents = {
+}
+
+const MISSING_TRACE =
+  "No chat trace was attached at start (use --chat <id> to log Aeon's actions); the clip metadata and frames are still recorded.";
+
+function stopRecording(
+  clip: ClipMeta,
+  clips: ClipMeta[],
+  events: VideoEvent[],
+  terminal: TerminalCast | undefined,
+  traced: boolean,
+): RecordingEvents {
+  return {
     version: 1,
     recorder: "aeon",
     clock: "clip",
     clip: clips[0] ?? clip,
-    ...(clips.length ? { clips } : {}),
+    ...(clips.length > 0 ? { clips } : {}),
     events,
     ...(terminal ? { terminal } : {}),
-    ...(trace
-      ? {}
-      : {
-          note: "No chat trace was attached at start (use --chat <id> to log Aeon's actions); the clip metadata and frames are still recorded.",
-        }),
+    ...(traced ? {} : { note: MISSING_TRACE }),
   };
-  await writeEvents(folder, result);
+}
+
+async function stop(host: DaemonHost, args: Args): Promise<number> {
+  const folder = stopFolder(args);
+  const before = loadState(folder);
+  const opts: RecordOptions = { source: before.source, ffmpeg: before.ffmpeg, log };
+  const state = await stopCapture(folder, opts);
+  nameStopChat(state, args);
+  const size = frameSize(folder, ffprobeBinary(opts));
+  const clip = baseClip(state, size, clipDuration(state.frames, state.fps));
+  const trace = await traceOf(host, state.chatId);
+  const events = trace ? eventsFromTrace(trace, state.startedAt) : [];
+  const clips = await clipsForStop(host, state, events, clip);
+  await releaseTabTakes(host, state);
+  await writeEvents(
+    folder,
+    stopRecording(clip, clips, events, keptTerminal(folder), trace !== undefined),
+  );
   log(`Stopped. ${state.frames} frames, ${events.length} action(s). Folder: ${folder}`);
   return 0;
 }
