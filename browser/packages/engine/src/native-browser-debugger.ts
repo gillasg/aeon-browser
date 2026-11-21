@@ -9,6 +9,7 @@ import {
   type AxRef,
 } from "./native-browser-common.js";
 import type { BrowserElementTarget, BrowserTargetKey } from "@browserkit/protocol";
+import { collectAttributeHits, missMessage, type AttributeHit } from "./attribute-hint.js";
 import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom.js";
 import { ambiguousError, hiddenError, notFoundError } from "./native-browser-candidates.js";
 import { collectFrameAx } from "./native-browser-frames.js";
@@ -249,7 +250,7 @@ async function resolveQueryFast(
   const id = visible[0];
   if (id === undefined && ids[0] !== undefined)
     throw await hiddenQuery(debuggee, [], ids[0], query.value);
-  if (id === undefined) throw notFoundError([], "", query.value);
+  if (id === undefined) throw await missedQuery(debuggee, query);
   const ref = await describeBackend(
     debuggee,
     { kind: "backend", backendNodeId: id, documentEpoch: documentEpoch ?? 0 },
@@ -257,6 +258,44 @@ async function resolveQueryFast(
   );
   if (!ref) throw new Error("STALE_REF");
   return ref;
+}
+
+async function missedQuery(
+  debuggee: chrome.debugger.Debuggee,
+  query: Extract<BrowserElementTarget, { kind: "query" }>,
+): Promise<BrowserActionError> {
+  const hits = await send<{ result?: { value?: unknown } }>(
+    debuggee,
+    "Runtime.evaluate",
+    {
+      expression: `(${collectAttributeHits.toString()})()`,
+      returnByValue: true,
+    },
+    { label: "attributeHint", ms: 5_000 },
+  )
+    .then((result) => attributeHits(result.result?.value))
+    .catch(() => []);
+  return new BrowserActionError("TARGET_NOT_FOUND", missMessage(query, hits), {
+    target: { name: query.value },
+  });
+}
+
+function attributeHits(value: unknown): AttributeHit[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const hit = item as AttributeHit;
+    if (typeof hit.tag !== "string") return [];
+    return [
+      {
+        tag: hit.tag,
+        role: typeof hit.role === "string" ? hit.role : "",
+        placeholder: typeof hit.placeholder === "string" ? hit.placeholder : "",
+        label: typeof hit.label === "string" ? hit.label : "",
+        text: typeof hit.text === "string" ? hit.text : "",
+      },
+    ];
+  });
 }
 
 function ambiguousQuery(nodes: AxNode[], ids: number[], value: string): Error {

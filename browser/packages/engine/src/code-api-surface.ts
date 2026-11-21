@@ -171,6 +171,8 @@ function __iconBoxes(max, selector) {
     };
   });
 }
+// Absolute paths of screenshots this cell saved. The cell result lists them for --json.
+var __shotPaths = [];
 // A screenshot is saved and returned as {saved: absolute path}. Relative names go under screens/.
 // An absolute path is kept when it is inside the session folder or the OS temp directory; anything
 // else is saved as screens/<file name> and the result.note says so. The image stays off the printed
@@ -200,6 +202,7 @@ async function __savedShot(shot, options) {
     var name = asked || ('screens/' + Date.now() + '.' + ext);
     var file = await __saveShot(name, shot.data);
     result.saved = (file && file.path) || name;
+    if (result.saved) __shotPaths.push(result.saved);
     if (file && file.note) { result.note = file.note; console.warn('[warn] ' + file.note); }
   }
   Object.defineProperty(result, 'dataBase64', {value: shot.data, enumerable: options.inline === true || options.save === false});

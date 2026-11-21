@@ -324,12 +324,36 @@ export function createSemanticNodes(
           }),
     });
   }
-  truncateToBudget(compact, options.maxBytes);
-  return { refs, nodes: compact, truncated: candidates.length > compact.length };
+  const listed = dropMirroredControls(compact);
+  for (const [ref, ax] of refs)
+    if (!listed.some((node) => node.backendNodeId === ax.backendNodeId)) refs.delete(ref);
+  truncateToBudget(listed, options.maxBytes);
+  return { refs, nodes: listed, truncated: candidates.length > listed.length };
 
   function depthOfNode(node: AxNode): number {
     return node.nodeId ? (depths.get(node.nodeId) ?? 0) : 0;
   }
+}
+
+const MIRRORED_ROLES = new Set(["button", "link"]);
+
+/**
+ * A same-page iframe often repeats the root document's chrome ("Open the transcript", "Stop").
+ * Drop a non-root button or link when the root already has that role and name. A control that
+ * exists only in the frame stays.
+ */
+function dropMirroredControls(nodes: BrowserSemanticNode[]): BrowserSemanticNode[] {
+  const key = (node: BrowserSemanticNode) => `${node.role.toLowerCase()}|${node.name}`;
+  const rootKeys = new Set(
+    nodes.flatMap((node) =>
+      node.frame || !MIRRORED_ROLES.has(node.role.toLowerCase()) ? [] : [key(node)],
+    ),
+  );
+  if (!rootKeys.size) return nodes;
+  return nodes.filter(
+    (node) =>
+      !node.frame || !MIRRORED_ROLES.has(node.role.toLowerCase()) || !rootKeys.has(key(node)),
+  );
 }
 
 /** Drops nodes from the end until the observation fits a byte budget (never below ten). */

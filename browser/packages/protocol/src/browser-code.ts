@@ -83,6 +83,8 @@ export const BrowserCodeResultSchema = z
       .array(z.object({ tabId: z.number().int(), url: z.string().max(8192) }).strict())
       .max(64)
       .optional(),
+    /** Absolute paths of screenshots this cell saved. */
+    screenshots: z.array(z.string().max(2000)).max(32).optional(),
     /** Tabs this run opened/closed, the ones still open, all tabs, and parked popups. */
     tabStats: z
       .object({
