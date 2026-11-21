@@ -221,7 +221,7 @@ async function toAbilityCard(site: string, ability: ListedAbility): Promise<Abil
     ways: ability.ways.map((way) => way.kind),
     ...(sources.length ? { sources } : {}),
     inputs: abilityInputs(ability.inputs),
-    stats: ability.stats,
+    ...(ability.stats ? { stats: listStats(ability.stats) } : {}),
     ...(untested.length ? { untested } : {}),
     ...(versions.count
       ? {
@@ -336,4 +336,15 @@ export function noteProviderTest(id: string, text: string): void {
   providerState = providerState.map((card) =>
     card.id === id ? { ...card, lastTest: text.slice(0, 500) } : card,
   );
+}
+
+/** The list's stats fields only: stored stats also keep per-way counts the strict DTO rejects. */
+function listStats(stats: NonNullable<AbilityCard["stats"]>): NonNullable<AbilityCard["stats"]> {
+  const { runs, failures, lastOkAt, lastUsedAt } = stats;
+  return {
+    runs,
+    failures,
+    ...(lastOkAt ? { lastOkAt } : {}),
+    ...(lastUsedAt ? { lastUsedAt } : {}),
+  };
 }

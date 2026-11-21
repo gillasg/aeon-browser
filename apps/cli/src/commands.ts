@@ -742,7 +742,10 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
   const commands = BROWSERKIT_COMMANDS.filter((command) => !taken.has(command.name)).map(
     (command) => overrides.get(command.name) ?? command,
   );
-  return [...own, ...commands];
+  // An override browserkit has no command for (login) is Aeon's own; keep it rather than drop it.
+  const known = new Set([...taken, ...BROWSERKIT_COMMANDS.map((command) => command.name)]);
+  const extra = [...overrides.values()].filter((command) => !known.has(command.name));
+  return [...own, ...extra, ...commands];
 }
 
 /** aeon update: wait until nothing is running, then pull and run the one-command setup again. */
