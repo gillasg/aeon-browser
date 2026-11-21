@@ -23,11 +23,12 @@ export function terminalLines(cast: TerminalCast, t: number, max = 16): TermLine
         lines.push({ kind: "in", text: (i === 0 ? "$ " : "") + (parts[i] ?? "") });
       continue;
     }
+    const ended = event.text.endsWith("\n");
     const parts = event.text.split("\n");
-    if (event.text.endsWith("\n")) parts.pop();
+    if (ended) parts.pop();
     for (let i = 0; i < parts.length; i++) {
       const piece = parts[i] ?? "";
-      const newline = i < parts.length - 1;
+      const newline = ended || i < parts.length - 1;
       open = open
         ? { kind: open.kind, text: open.text + piece }
         : { kind: event.kind, text: piece };
