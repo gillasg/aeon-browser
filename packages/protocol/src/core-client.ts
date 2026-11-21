@@ -260,7 +260,7 @@ export const NativeBlockedSitesReplySchema = z
 
 /**
  * Aeon's agent settings, read or changed from outside the settings page (the Aeon CLI). Screen
- * recorders (Aperture) switch these on for a recording and restore them after; keep the names.
+ * recorders (Aeon Recorder) switch these on for a recording and restore them after; keep the names.
  */
 export const AgentSettingsSchema = z
   .object({

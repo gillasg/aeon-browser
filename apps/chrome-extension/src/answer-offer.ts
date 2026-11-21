@@ -22,7 +22,9 @@ export async function sendAnswerOffer(input: {
   offer: AnswerOffer;
   wasRunning: boolean;
   answerText: string;
+  url?: string;
   onError(message: string): void;
+  onNotice?(message: string): void;
   pin(text: string): Promise<void>;
 }): Promise<void> {
   try {
@@ -30,7 +32,11 @@ export async function sendAnswerOffer(input: {
       await input.pin(input.answerText);
       return;
     }
-    if ((await localOfferAction(input.offer)).handled) return;
+    const local = await localOfferAction(input.offer, input.url);
+    if (local.handled) {
+      input.onNotice?.(local.notice);
+      return;
+    }
     await sendAnswerText(input, input.offer.followUp);
   } catch (error) {
     input.onError(error instanceof Error ? error.message : "That offer could not be sent.");
@@ -60,4 +66,15 @@ export async function sendAnswerText(
     typedByUser: true,
     onError: input.onError,
   });
+}
+
+/** The management input that marks a page's answer as wrong, or none off a web page. */
+export function reportWrongInput(url: string | undefined): { site: string; quirk: string } | null {
+  if (!url || !/^https?:/.test(url)) return null;
+  try {
+    const site = new URL(url).hostname.replace(/^www\./, "");
+    return site ? { site, quirk: "The user marked this answer as wrong." } : null;
+  } catch {
+    return null;
+  }
 }

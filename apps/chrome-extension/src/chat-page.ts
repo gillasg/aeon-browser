@@ -28,7 +28,12 @@ import {
   WRONG_FOLLOW_UP,
   type AnswerOffer,
 } from "@aeon/ui";
-import { latestAnswerText, sendAnswerOffer, sendAnswerText } from "./answer-offer.js";
+import {
+  latestAnswerText,
+  reportWrongInput,
+  sendAnswerOffer,
+  sendAnswerText,
+} from "./answer-offer.js";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
 import { submitInitialPrompt } from "./chat-initial-submit.js";
@@ -236,20 +241,32 @@ function createView() {
   });
 }
 
-function offerAnswer(offer: AnswerOffer): void {
-  void sendAnswerOffer({
+async function activeTabUrl(): Promise<string | undefined> {
+  const [tab] = await chrome.tabs
+    .query({ active: true, lastFocusedWindow: true })
+    .catch(() => [] as chrome.tabs.Tab[]);
+  return tab?.url;
+}
+
+async function offerAnswer(offer: AnswerOffer): Promise<void> {
+  const url = await activeTabUrl();
+  await sendAnswerOffer({
     client,
     chatId,
     offer,
     wasRunning: runState === "running-unconfirmed",
     answerText: latestAnswerText(transcript.rows),
+    ...(url ? { url } : {}),
     onError: showError,
+    onNotice: showError,
     pin: pinAnswer,
   });
 }
 
-function wrongAnswer(): void {
+async function wrongAnswer(): Promise<void> {
   if (!client) return;
+  const input = reportWrongInput(await activeTabUrl());
+  if (input) void managementAction("report_wrong", input).catch(() => undefined);
   void sendAnswerText(
     {
       client,
@@ -265,6 +282,14 @@ function wrongAnswer(): void {
 async function pinAnswer(text: string): Promise<void> {
   const value = text.trim().slice(0, 200);
   if (!value) return;
+  await managementAction("pin_result", { title: pinTitle(title), value });
+}
+
+/** One management action through this chat's grant; throws when Aeon refuses it. */
+async function managementAction(
+  action: "pin_result" | "report_wrong",
+  input: Record<string, unknown>,
+): Promise<void> {
   if (!client) throw new Error("Aeon is not connected.");
   const requestId = crypto.randomUUID();
   const after = client.send(
@@ -272,11 +297,7 @@ async function pinAnswer(text: string): Promise<void> {
       kind: "command",
       requestId,
       operation: "management.action",
-      payload: {
-        chatId,
-        action: "pin_result",
-        input: { title: pinTitle(title), value },
-      },
+      payload: { chatId, action, input },
     }),
   );
   const response = await client.waitFor(

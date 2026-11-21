@@ -116,7 +116,9 @@ function Compose({
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     const text = field.value.trim();
-    if (text) actions.submit(text);
+    if (!text) return;
+    setEmpty(true);
+    actions.submit(text);
   };
   const prefill = (text: string): void => {
     const field = document.getElementById("prompt") as HTMLTextAreaElement | null;

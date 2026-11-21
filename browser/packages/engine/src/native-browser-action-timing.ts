@@ -3,7 +3,7 @@ import { send } from "./cdp/send.js";
 // When and where each action's input reached the page, for the step trace: the moment the event
 // was sent, the click point and the element's box (viewport CSS pixels of the top-level page,
 // measured after scrolling it into view), and scroll positions before and after.
-// Screen recorders (Aperture) read these from the trace to zoom on each action; keep the shape.
+// Screen recorders (Aeon Recorder) read these from the trace to zoom on each action; keep the shape.
 export interface ActionTiming {
   tAct?: number;
   point?: { x: number; y: number };

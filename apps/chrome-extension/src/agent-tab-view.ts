@@ -2,10 +2,10 @@
 // the worker cannot read that, so extension pages mirror it into chrome.storage.local.
 export const AGENT_TAB_VIEW_KEY = "aeonAgentTabView";
 export type AgentTabView = "auto" | "split" | "thumbnails";
-// On/off agent settings, off by default. Screen recorders (Aperture) rely on them; keep them.
+// On/off agent settings, off by default. Screen recorders (Aeon Recorder) rely on them; keep them.
 export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
 export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
-// Record every tab a chat drives, for screen recorders (Aperture) that build takes; keep it.
+// Record every tab a chat drives, for screen recorders (Aeon Recorder) that build takes; keep it.
 export const RECORD_AGENT_TABS_KEY = "aeonRecordAgentTabs";
 /** Same key the engine reads. Off until Settings or `aeon settings` stores true. */
 export const HUMAN_LIKE_INPUT_KEY = "aeonHumanLikeInput";

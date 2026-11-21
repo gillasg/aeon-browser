@@ -297,7 +297,7 @@ function PanelEmpty(): ReactElement {
   return (
     <section id="panel-empty" className="panel-empty">
       <div className="empty-mark" aria-hidden="true">
-        p
+        a
       </div>
       <h1>Choose a Chat</h1>
       <p>Select a Chat above or start a new one. This Chat stays selected while you switch tabs.</p>

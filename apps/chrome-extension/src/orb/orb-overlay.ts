@@ -36,13 +36,35 @@ interface Point {
 // no id, class or attribute for it. Cache the latest values here in the isolated world.
 let cursorPoint: Point | undefined;
 let cursorPresent = false;
+/** Overlays whose paused loop should run again when the cursor moves or comes and goes. */
+const sleepers = new Set<() => void>();
 window.addEventListener(CURSOR_STATE_EVENT, (event) => {
   const detail = (event as CustomEvent<{ present?: boolean; point?: Point }>).detail;
   if (!detail) return;
   cursorPresent = detail.present !== false;
   if (detail.point && Number.isFinite(detail.point.x) && Number.isFinite(detail.point.y))
     cursorPoint = detail.point;
+  for (const wake of sleepers) wake();
 });
+
+/** Nothing left to animate: the loop can pause until something changes. */
+export function overlaySettled(input: {
+  acting: boolean;
+  dragging: boolean;
+  releasePending: boolean;
+  cursorPresent: boolean;
+  point: Point;
+  target: Point;
+}): boolean {
+  return (
+    !input.acting &&
+    !input.dragging &&
+    !input.releasePending &&
+    input.cursorPresent &&
+    Math.abs(input.target.x - input.point.x) < 0.25 &&
+    Math.abs(input.target.y - input.point.y) < 0.25
+  );
+}
 
 export class OrbOverlay {
   private readonly host = document.createElement("div");
@@ -91,7 +113,9 @@ export class OrbOverlay {
       this.point = { ...this.home() };
       this.target = this.home();
       this.placed = true;
+      this.wake();
     });
+    sleepers.add(this.wake);
     this.stopWatching = watchOrbPosition((position) => this.moveHome(position));
     addEventListener("resize", this.resize);
     addEventListener("pointerdown", this.clickAway, { capture: true });
@@ -119,6 +143,7 @@ export class OrbOverlay {
     this.frame.classList.remove("off");
     requestAnimationFrame(() => this.frame.classList.add("on"));
     if (focus) this.frame.focus();
+    this.wake();
   }
 
   hideBubble(): void {
@@ -128,9 +153,11 @@ export class OrbOverlay {
     this.later(() => {
       if (!this.open) this.frame.classList.add("off");
     }, 450);
+    this.wake();
   }
 
   apply(message: OrbToContent): void {
+    this.wake();
     if (message.kind === "aeon.orb.visual") this.setVisual(message.state, message.label);
     else if (message.kind === "aeon.orb.cursor") this.streamTo(message.steps);
     else if (message.kind === "aeon.orb.spotlight") this.spotlight(message.box);
@@ -146,6 +173,7 @@ export class OrbOverlay {
   setRecording(on: boolean): void {
     this.host.style.display = on ? "none" : "";
     if (!on) this.ensureCursor();
+    this.wake();
   }
 
   private updatePill(): void {
@@ -165,7 +193,9 @@ export class OrbOverlay {
   }
 
   destroy(): void {
+    sleepers.delete(this.wake);
     cancelAnimationFrame(this.raf);
+    this.raf = 0;
     for (const timer of this.timers) clearTimeout(timer);
     clearTimeout(this.fadeTimer);
     removeEventListener("resize", this.resize);
@@ -297,6 +327,7 @@ export class OrbOverlay {
   private moveHome(position: OrbPosition): void {
     this.position = position;
     if (!this.spot.classList.contains("on") && !this.acting) this.target = this.home();
+    this.wake();
   }
 
   private readonly dragStart = (event: PointerEvent): void => {
@@ -306,6 +337,7 @@ export class OrbOverlay {
     this.drag = { start: { x: event.clientX, y: event.clientY }, moved: false };
     this.hit.addEventListener("pointermove", this.dragMove);
     this.hit.addEventListener("pointerup", this.dragEnd, { once: true });
+    this.wake();
   };
 
   private readonly dragMove = (event: PointerEvent): void => {
@@ -315,12 +347,14 @@ export class OrbOverlay {
     if (far > DRAG_SLOP) drag.moved = true;
     if (!drag.moved) return;
     this.target = this.point = this.clampPoint({ x: event.clientX, y: event.clientY });
+    this.wake();
   };
 
   private readonly dragEnd = (): void => {
     this.hit.removeEventListener("pointermove", this.dragMove);
     const moved = this.drag?.moved === true;
     this.drag = undefined;
+    this.wake();
     if (!moved) {
       if (this.open) this.hideBubble();
       else this.showBubble();
@@ -344,10 +378,16 @@ export class OrbOverlay {
     if (document.hidden) {
       if (this.raf) cancelAnimationFrame(this.raf);
       this.raf = 0;
-    } else if (!this.raf) {
+    } else {
       this.frameLast = 0;
-      this.raf = requestAnimationFrame(this.tick);
+      this.wake();
     }
+  };
+
+  /** Runs the loop again after it paused on a settled cursor; a no-op while it is running. */
+  private readonly wake = (): void => {
+    if (this.raf || document.hidden) return;
+    this.raf = requestAnimationFrame(this.tick);
   };
 
   private readonly tick = (time: number): void => {
@@ -363,9 +403,21 @@ export class OrbOverlay {
         this.writeSummon(this.drag?.moved === true, this.releasePending);
       this.releasePending = false;
       this.placeChrome(this.glyphPoint());
+      if (this.settled()) return;
     }
     this.raf = requestAnimationFrame(this.tick);
   };
+
+  private settled(): boolean {
+    return overlaySettled({
+      acting: this.acting,
+      dragging: this.drag !== undefined,
+      releasePending: this.releasePending,
+      cursorPresent,
+      point: this.point,
+      target: this.target,
+    });
+  }
 
   /** The box opens beside the cursor's tip, where the pill would be, on the side with room. */
   private placeFrame(at: Point): void {
@@ -442,6 +494,7 @@ export class OrbOverlay {
 
   private readonly resize = (): void => {
     this.target = this.spot.classList.contains("on") ? this.clampPoint(this.target) : this.home();
+    this.wake();
   };
 
   private later(run: () => void, ms: number): void {

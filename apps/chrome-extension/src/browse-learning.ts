@@ -40,13 +40,21 @@ export function installBrowseLearning(): void {
     return true;
   });
   chrome.tabs.onUpdated.addListener((tabId, change) => {
-    if (change.status === "complete" && timers.has(tabId)) void flush(tabId);
+    if (change.status === "complete") void whileTeaching(tabId, () => flush(tabId));
   });
   chrome.tabs.onRemoved.addListener((tabId) => void stop(tabId));
   // The user closed Chrome's debugger bar: learning on that tab ends with it.
   chrome.debugger.onDetach.addListener((source) => {
-    if (source.tabId !== undefined && timers.has(source.tabId)) void stop(source.tabId);
+    const tabId = source.tabId;
+    if (tabId !== undefined) void whileTeaching(tabId, () => stop(tabId));
   });
+}
+
+/** Runs `then` when the tab is teaching: the in-memory timer, or (after Chrome slept this worker
+ * and cleared it) the session record that outlives it. */
+export async function whileTeaching(tabId: number, then: () => Promise<unknown>): Promise<void> {
+  if (!timers.has(tabId) && !(await teaching(tabId))) return;
+  await then();
 }
 
 async function teaching(tabId: number): Promise<Teaching | undefined> {
@@ -103,9 +111,9 @@ async function start(tabId: number): Promise<void> {
 async function stop(tabId: number): Promise<{ found: number; site: string }> {
   const state = await teaching(tabId);
   const timer = timers.get(tabId);
-  if (timer !== undefined) {
-    globalThis.clearInterval(timer);
-    timers.delete(tabId);
+  if (timer !== undefined) globalThis.clearInterval(timer);
+  timers.delete(tabId);
+  if (timer !== undefined || state !== undefined) {
     await flush(tabId);
     await learnUserTab(tabId, false).catch(() => undefined);
   }

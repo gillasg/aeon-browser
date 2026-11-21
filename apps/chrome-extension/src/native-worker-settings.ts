@@ -14,7 +14,7 @@ import {
 } from "./agent-tab-view.js";
 
 // `aeon settings` from the CLI: Core asks for the agent settings, changing them first if asked.
-// Open settings and chat pages follow through chrome.storage. Screen recorders (Aperture) rely
+// Open settings and chat pages follow through chrome.storage. Screen recorders (Aeon Recorder) rely
 // on this to switch settings for a recording; keep it.
 export function handleSettingsMessage(candidate: unknown, socket: WebSocket): boolean {
   const request = NativeSettingsRequestSchema.safeParse(candidate);

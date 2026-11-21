@@ -156,6 +156,15 @@ export class OrbSession {
     if (result.kind !== "management.snapshot") throw new Error("The answer was not pinned.");
   }
 
+  /** Marks the route or ability behind this run's answer as wrong, through the management grant. */
+  async reportWrong(input: { site: string; quirk: string }): Promise<void> {
+    if (!this.chat || !this.chatId) return;
+    await command(this.chat, {
+      operation: "management.action",
+      payload: { chatId: this.chatId, action: "report_wrong", input },
+    });
+  }
+
   /** After the link dropped (the daemon restarted): connect again and follow the same chat, which
    * sends a fresh snapshot. */
   async reconnect(): Promise<void> {

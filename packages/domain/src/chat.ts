@@ -227,7 +227,7 @@ export interface PiMessageProjection {
 
 /**
  * One browser action inside a tool call: what ran, in which tab, when its input reached the page
- * and where (viewport CSS pixels). Screen recorders (Aperture) read these through `aeon trace`;
+ * and where (viewport CSS pixels). Screen recorders (Aeon Recorder) read these through `aeon trace`;
  * keep the shape.
  */
 export interface BrowserTraceAction {

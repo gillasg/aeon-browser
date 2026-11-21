@@ -71,6 +71,10 @@ export function tabClips(
   events: VideoEvent[],
   recording: ClipMeta,
   extraTabIds: number[] = [],
+  takes: ReadonlyMap<
+    number,
+    Pick<ClipMeta, "file" | "width" | "height" | "startedAt" | "durationMs" | "frames">
+  > = new Map(),
 ): ClipMeta[] {
   const ids: number[] = [];
   const add = (id: number | undefined) => {
@@ -79,12 +83,20 @@ export function tabClips(
   };
   for (const event of events) add(event.tabId);
   for (const id of extraTabIds) add(id);
-  return ids.map((tabId) => ({
-    ...recording,
-    file: `takes/${tabId}.webm`,
-    source: "tabs",
-    tabId,
-  }));
+  for (const id of takes.keys()) add(id);
+  return ids.map((tabId) => {
+    const take = takes.get(tabId);
+    // A take copied into the folder carries its own size, start and length; without one (Chrome
+    // was gone, or the tab recorded nothing) the clip keeps the recording's clock.
+    if (!take) return { ...recording, file: `takes/${tabId}.webm`, source: "tabs", tabId };
+    return {
+      ...recording,
+      ...take,
+      startedAt: take.startedAt || recording.startedAt,
+      source: "tabs",
+      tabId,
+    };
+  });
 }
 
 /** Write events.json atomically so a reader never sees a half-written log. */

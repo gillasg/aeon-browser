@@ -37,7 +37,7 @@ interface Snapshot {
 
 /**
  * A timed browser action inside a step (epoch ms; box and point in viewport CSS pixels).
- * Screen recorders (Aperture) read these through `aeon trace --json`; keep the shape.
+ * Screen recorders (Aeon Recorder) read these through `aeon trace --json`; keep the shape.
  */
 export interface TraceAction {
   kind: string;
@@ -86,7 +86,7 @@ export interface ChatResult {
   /** Tokens and estimated cost over the chat's model turns (eval harnesses report these). */
   usage?: UsageTotals;
   /** When the latest prompt was submitted and when the chat finished it (ISO; finishedAt only
-   * once finished). Screen recorders (Aperture) frame recordings with these; keep them. */
+   * once finished). Screen recorders (Aeon Recorder) frame recordings with these; keep them. */
   promptAt: string | null;
   finishedAt: string | null;
   trace: TraceStep[];

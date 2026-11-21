@@ -11,7 +11,7 @@ import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import type { RoutineDraftSeed } from "./routine-draft-route.js";
 
 type Routine = ManagementSnapshotDto["routines"][number];
-type ScheduleKind = "interval" | "calendar";
+type ScheduleKind = "interval" | "calendar" | "once";
 interface RoutineDraft {
   title: string;
   setTitle: Dispatch<SetStateAction<string>>;
@@ -22,6 +22,8 @@ interface RoutineDraft {
   sites: string;
   setSites: Dispatch<SetStateAction<string>>;
   kind: ScheduleKind;
+  /** A one-time routine's moment (UTC), kept as it was: the editor does not reschedule a snipe. */
+  atUtc: string;
   setKind: Dispatch<SetStateAction<ScheduleKind>>;
   everyMinutes: string;
   setEveryMinutes: Dispatch<SetStateAction<string>>;
@@ -111,6 +113,7 @@ function useRoutineDraft(
     sites,
     setSites,
     kind,
+    atUtc: routine?.schedule.kind === "once" ? routine.schedule.atUtc : "",
     setKind,
     everyMinutes,
     setEveryMinutes,
@@ -147,10 +150,10 @@ function initialChatId(props: ManagementSurfaceProps, routine?: Routine): string
   return routine?.chatId ?? props.snapshot?.chats[0]?.chatId ?? "";
 }
 
-function initialScheduleKind(routine?: Routine): ScheduleKind {
-  // A one-time routine (a snipe) is made by the agent; the editor offers the repeating kinds.
+export function initialScheduleKind(routine?: Pick<Routine, "schedule">): ScheduleKind {
+  // A one-time routine (a snipe) is made by the agent; editing it keeps it one-time.
   const kind = routine?.schedule.kind;
-  return kind === "calendar" ? "calendar" : "interval";
+  return kind === "calendar" || kind === "once" ? kind : "interval";
 }
 
 function initialIntervalMinutes(schedule?: Routine["schedule"]): string {
@@ -233,16 +236,29 @@ function RoutineScheduleFields({ draft }: { draft: RoutineDraft }): ReactElement
           value={draft.kind}
           onChange={(event) => draft.setKind(event.target.value as ScheduleKind)}
         >
+          {draft.atUtc ? <option value="once">Once</option> : null}
           <option value="interval">Every N minutes</option>
           <option value="calendar">Selected weekdays</option>
         </select>
       </label>
-      {draft.kind === "interval" ? (
-        <IntervalFields draft={draft} />
-      ) : (
-        <CalendarFields draft={draft} />
-      )}
+      <ScheduleKindFields draft={draft} />
     </>
+  );
+}
+
+function ScheduleKindFields({ draft }: { draft: RoutineDraft }): ReactElement {
+  if (draft.kind === "once") return <OnceField atUtc={draft.atUtc} />;
+  if (draft.kind === "interval") return <IntervalFields draft={draft} />;
+  return <CalendarFields draft={draft} />;
+}
+
+function OnceField({ atUtc }: { atUtc: string }): ReactElement {
+  const at = new Date(atUtc);
+  const label = Number.isNaN(at.getTime()) ? atUtc : at.toLocaleString();
+  return (
+    <p className="routine-once">
+      Runs once at <time dateTime={atUtc}>{label}</time>
+    </p>
   );
 }
 
@@ -312,8 +328,15 @@ function RoutineTargetFields({ draft }: { draft: RoutineDraft }): ReactElement {
   );
 }
 
-function makeSchedule(draft: RoutineDraft): Routine["schedule"] {
-  if (draft.kind === "interval")
+export function makeSchedule(
+  draft: Pick<
+    RoutineDraft,
+    "kind" | "atUtc" | "everyMinutes" | "daysOfWeek" | "localTime" | "timeZone"
+  >,
+): Routine["schedule"] {
+  if (draft.kind === "once" && draft.atUtc)
+    return { kind: "once", atUtc: draft.atUtc, timeZone: draft.timeZone };
+  if (draft.kind === "interval" || draft.kind === "once")
     return {
       kind: "interval",
       everyMinutes: Number(draft.everyMinutes),

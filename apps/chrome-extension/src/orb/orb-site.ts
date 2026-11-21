@@ -59,6 +59,7 @@ export function installSiteAnswers(): void {
     const extensionPage =
       request.kind === "aeon.site.operations" || request.kind === "aeon.site.undo";
     const tabUrl = sender.tab?.url;
+    if (extensionPage && !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
     if (!extensionPage && (!tabUrl || pageKey(tabUrl) !== pageKey(request.url))) return;
     void answer(request).then(sendResponse, () => sendResponse(null));
     return true;

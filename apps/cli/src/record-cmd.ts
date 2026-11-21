@@ -30,6 +30,7 @@ import {
   type Trace,
   type VideoEvent,
 } from "./record-events.js";
+import { saveTabTakes, type SavedTake } from "./record-takes.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
 
 const log = (line: string) => process.stdout.write(line + "\n");
@@ -203,7 +204,23 @@ async function clipsForStop(
   clip: ClipMeta,
 ): Promise<ClipMeta[]> {
   if (state.source !== "tabs") return [];
-  return tabClips(events, clip, await recordedTabIds(host, state.chatId));
+  const recorded = await recordedTabIds(host, state.chatId);
+  const tabIds = [
+    ...new Set([
+      ...events.flatMap((event) => (event.tabId === undefined ? [] : [event.tabId])),
+      ...recorded,
+    ]),
+  ];
+  const takes = await saveTabTakes(
+    (code) => host.runInBrowser(code, { session: "aeon-record", timeoutMs: 60_000 }),
+    state.folder,
+    tabIds,
+  ).catch(() => new Map<number, SavedTake>());
+  if (tabIds.length && !takes.size)
+    log(
+      "No tab takes could be copied (is Chrome open with Aeon?); clips keep the recording's clock.",
+    );
+  return tabClips(events, clip, recorded, takes);
 }
 
 /** Put recordAgentTabs back when this recording was the one that turned it on. */

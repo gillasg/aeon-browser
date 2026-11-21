@@ -2,7 +2,7 @@ import type { AeonClient } from "./client.js";
 import { readUseClientModel, writeUseClientModel } from "./mcp-sampling.js";
 
 // `aeon settings`: read or change Aeon's agent settings in the connected Chrome. Screen recorders
-// (Aperture) switch these on for a recording and restore them after; keep the names.
+// (Aeon Recorder) switch these on for a recording and restore them after; keep the names.
 const FLAGS = ["agentInFront", "hideAgentCursor", "recordAgentTabs", "humanLikeInput"];
 const VIEWS = ["auto", "split", "thumbnails"];
 // mcpUseClientModel is Aeon's own setting, stored next to its data (no Chrome needed).

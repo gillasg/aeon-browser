@@ -59,7 +59,7 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
       />
       <SwitchRow
         label="Reduce motion"
-        detail="The swarm holds still and nothing slides."
+        detail="Animations hold still and nothing slides."
         checked={reduceMotion}
         onChange={setReduceMotion}
       />
@@ -107,7 +107,7 @@ function ChatSettings(props: ManagementSurfaceProps): ReactElement {
 
 function AgentTabSettings(): ReactElement {
   const [tabView, setTabView] = useAgentTabView();
-  // Both switches are relied on by screen recorders (Aperture); keep them.
+  // Both switches are relied on by screen recorders (Aeon Recorder); keep them.
   const [inFront, setInFront] = useAgentFlag(agentInFrontKey);
   const [hideCursor, setHideCursor] = useAgentFlag(hideAgentCursorKey);
   const [humanLike, setHumanLike] = useAgentFlag(humanLikeInputKey);

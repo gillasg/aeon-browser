@@ -34,6 +34,7 @@ import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
 import { OrbBox, type OrbTab, type OrbViewModel } from "./orb-view.js";
 import { localOfferAction } from "../offer-actions.js";
+import { reportWrongInput } from "../answer-offer.js";
 import { openManage } from "../manage-tab.js";
 import type { OrbShown } from "./orb-messages.js";
 import {
@@ -264,6 +265,14 @@ async function answerOffer(offer: AnswerOffer): Promise<void> {
     return;
   }
   if (offer.followUp.trim()) void submit(offer.followUp);
+}
+
+/** "Wrong": Aeon marks the route as wrong (best effort) and is asked to try again. */
+async function answerWrong(): Promise<void> {
+  const url = (await chrome.tabs.get(tabId).catch(() => undefined))?.url;
+  const input = reportWrongInput(url);
+  if (input) void session.reportWrong(input).catch(() => undefined);
+  await submit(WRONG_FOLLOW_UP);
 }
 
 // Sent, the box folds back to the cursor, whose pill carries the run. A chat this cursor already
@@ -514,7 +523,7 @@ function view(): ReactNode {
       loadChats: () => void loadChats(),
       toSidePanel,
       answerOffer: (offer) => void answerOffer(offer),
-      answerWrong: () => void submit(WRONG_FOLLOW_UP),
+      answerWrong: () => void answerWrong(),
       toggleLearning: () => void toggleLearning(ux),
       openManage: (route) => void openManage(route).catch(() => undefined),
       removeTarget: () => {
@@ -551,7 +560,9 @@ function toContent(message: OrbToContent): void {
 
 function clearPrompt(): void {
   const prompt = document.getElementById("prompt") as HTMLTextAreaElement | null;
-  if (prompt) prompt.value = "";
+  if (!prompt) return;
+  prompt.value = "";
+  prompt.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 function focusPrompt(): void {

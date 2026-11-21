@@ -36,40 +36,66 @@ interface SiteEntry {
   routines: Routine[];
 }
 
+/** One spelling per site: `WWW.Example.com ` and `example.com` are the same page. */
+export function siteHost(host: string): string {
+  return host
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, "");
+}
+
 /** Every site worth a page: mapped, blocked, or used by a routine. Sorted by name. */
 export function siteEntries(
   sites: readonly Site[],
   blocked: readonly string[],
   routines: readonly Routine[],
 ): SiteEntry[] {
-  const hosts = new Set<string>([
-    ...sites.map((site) => site.site),
-    ...blocked,
-    ...routines.flatMap((routine) => routine.sites),
-  ]);
+  const hosts = new Set<string>(
+    [...sites.map((site) => site.site), ...blocked, ...routines.flatMap((routine) => routine.sites)]
+      .map(siteHost)
+      .filter(Boolean),
+  );
   return [...hosts].sort().map((host) => ({
     host,
-    mapped: sites.find((site) => site.site === host),
-    blocked: blocked.includes(host),
-    routines: routines.filter((routine) => routine.sites.includes(host)),
+    mapped: sites.find((site) => siteHost(site.site) === host),
+    blocked: blocked.some((item) => siteHost(item) === host),
+    routines: routines.filter((routine) => routine.sites.some((item) => siteHost(item) === host)),
   }));
+}
+
+/** The page for a selected host; a deep link to a site with nothing yet (only a boost, or not
+ * mapped) still gets its page instead of falling back to the list. */
+export function selectedSiteEntry(
+  entries: readonly SiteEntry[],
+  selected: string,
+): SiteEntry | undefined {
+  const host = siteHost(selected);
+  if (!host) return undefined;
+  return (
+    entries.find((item) => item.host === host) ?? {
+      host,
+      mapped: undefined,
+      blocked: false,
+      routines: [],
+    }
+  );
 }
 
 export function SitesPage(props: ManagementSurfaceProps): ReactElement {
   const entries = entriesOf(props);
-  const [selected, setSelected] = useState(() => hashRoute().host);
+  const [selected, setSelected] = useState(() => siteHost(hashRoute().host));
   const [query, setQuery] = useState("");
   // The cursor's X-Ray line opens Manage at `#sites?host=…`, also into a Manage tab already open.
   useEffect(() => {
     const follow = (): void => {
-      const host = hashRoute().host;
+      const host = siteHost(hashRoute().host);
       if (host) setSelected(host);
     };
     addEventListener("hashchange", follow);
     return () => removeEventListener("hashchange", follow);
   }, []);
   const chatId = props.selectedChatId || props.snapshot?.chats[0]?.chatId || "";
-  const entry = entries.find((item) => item.host === selected);
+  const entry = selectedSiteEntry(entries, selected);
   return (
     <div className="management-sites site-pages">
       <ActionNote note={props.snapshot?.lastAction} />

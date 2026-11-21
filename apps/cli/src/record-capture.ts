@@ -1,4 +1,4 @@
-// Real-window / screen capture for `aeon record`. Ported from Aperture's recorder: ffmpeg x11grab
+// Real-window / screen capture for `aeon record`. Ported from the Aeon Recorder: ffmpeg x11grab
 // on Linux (the real X cursor is in frame), avfoundation on macOS, gdigrab on Windows. Frames are
 // written as constant-rate JPEGs so a stop never loses a half-finalised container; a clip.mp4 is
 // encoded from them at stop. --tabs uses Aeon's own hidden tab takes instead of the screen.
@@ -33,6 +33,8 @@ export type RecordState = {
   tabSession?: string;
   /** Chat whose trace supplies events.json at stop. */
   chatId?: string;
+  /** The ffmpeg input chosen at start (gdigrab `title=…`/`desktop`, avfoundation `N:none`). */
+  input?: string;
   /** The recordAgentTabs value before --tabs turned it on, so stop can put it back. */
   recordAgentTabsWas?: boolean;
 };
@@ -102,7 +104,7 @@ export function windowGeometry(
   return { x: x || 0, y: y || 0, w: Math.max(2, w - (w % 2)), h: Math.max(2, h - (h % 2)) };
 }
 
-/** Find the frontmost Chrome window by X11 class (or APERTURE_CHROME_CLASS-style override). */
+/** Find the frontmost Chrome window by X11 class (or AEON_CHROME_CLASS override). */
 export function findChromeWindow(testMode = false): string {
   const klass = process.env.AEON_CHROME_CLASS ?? "[Gg]oogle-[Cc]hrome|[Cc]hromium";
   const ids = tool("xdotool", ["search", "--onlyvisible", "--class", klass], testMode)
@@ -132,13 +134,92 @@ export function screenSize(testMode = false): { w: number; h: number } {
   return w && h ? { w: w - (w % 2), h: h - (h % 2) } : { w: 1920, h: 1080 };
 }
 
-/** ffmpeg arguments for the source. Windows/macOS builders are included for parity with Aperture. */
-export function captureArgs(state: RecordState, folder: string): string[] {
+/**
+ * gdigrab's input: `desktop` for the screen, `title=<exact window title>` for a window. Chrome's
+ * title is "<page> - Google Chrome", so it is looked up at start (AEON_CHROME_TITLE overrides);
+ * without a match the whole desktop is recorded and the caller says so.
+ */
+export function gdigrabInput(source: Source, chromeTitle: string | undefined): string {
+  if (source === "screen") return "desktop";
+  const title = chromeTitle?.trim();
+  return title ? `title=${title}` : "desktop";
+}
+
+/** The visible Chrome window's title on Windows, or undefined when none is found. */
+export function windowsChromeTitle(
+  env: NodeJS.ProcessEnv = process.env,
+  testMode = false,
+): string | undefined {
+  if (env.AEON_CHROME_TITLE?.trim()) return env.AEON_CHROME_TITLE.trim();
+  if (testMode) return undefined;
+  try {
+    const out = execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        "Get-Process chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | Select-Object -First 1 -ExpandProperty MainWindowTitle",
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5_000 },
+    );
+    return out.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The avfoundation screen device index from `ffmpeg -f avfoundation -list_devices true -i ""`
+ * (its stderr lists video devices such as "[1] Capture screen 0"). Cameras come first, so the
+ * screen is rarely index 0.
+ */
+export function avfoundationScreenIndex(listing: string): string | undefined {
+  return /\[(\d+)\]\s+Capture screen \d+/.exec(listing)?.[1];
+}
+
+/** avfoundation's input: AEON_MAC_SCREEN_DEVICE, else the first screen ffmpeg lists. It records a
+ * whole screen; a single window cannot be selected, so `window` records the screen Chrome is on. */
+export function macScreenDevice(
+  ffmpeg: string,
+  env: NodeJS.ProcessEnv = process.env,
+  testMode = false,
+): string {
+  const override = env.AEON_MAC_SCREEN_DEVICE?.trim();
+  if (override) return override.includes(":") ? override : `${override}:none`;
+  if (testMode) return "1:none";
+  let listing = "";
+  try {
+    execFileSync(
+      ffmpeg,
+      ["-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 5_000,
+      },
+    );
+  } catch (error) {
+    // ffmpeg exits non-zero after listing (the empty input is not a device); the list is stderr.
+    listing = String((error as { stderr?: unknown }).stderr ?? "");
+  }
+  const index = avfoundationScreenIndex(listing);
+  if (!index)
+    throw new Error(
+      "No screen capture device found. Allow Screen Recording for your terminal in System Settings, or set AEON_MAC_SCREEN_DEVICE.",
+    );
+  return `${index}:none`;
+}
+
+/** ffmpeg arguments for the source: gdigrab on Windows, avfoundation on macOS, x11grab on Linux. */
+export function captureArgs(
+  state: RecordState,
+  folder: string,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
   const out = join(folder, "frames", "%06d.jpg");
   const fps = String(state.fps);
-  if (isWindows) {
-    const select =
-      state.source === "screen" ? "desktop" : "window_exe=chrome.exe:window_title='Google Chrome'";
+  if (platform === "win32") {
+    const select = state.input ?? gdigrabInput(state.source, undefined);
     return [
       "-v",
       "error",
@@ -160,8 +241,8 @@ export function captureArgs(state: RecordState, folder: string): string[] {
       out,
     ];
   }
-  if (isMac) {
-    const device = state.source === "screen" ? "1:none" : "1:none";
+  if (platform === "darwin") {
+    const device = state.input ?? "1:none";
     return [
       "-v",
       "error",
@@ -247,6 +328,25 @@ function sourceGeometry(opts: RecordOptions, testMode: boolean): RecordState["ge
   return undefined;
 }
 
+/** The platform's ffmpeg input, with an honest line when it records more than was asked for. */
+function captureInput(opts: RecordOptions, ffmpeg: string, testMode: boolean): string | undefined {
+  if (isWindows) {
+    const input = gdigrabInput(opts.source, windowsChromeTitle(process.env, testMode));
+    if (opts.source === "window" && input === "desktop")
+      opts.log?.(
+        "No Chrome window title found; recording the whole desktop. Set AEON_CHROME_TITLE to the exact window title to record only Chrome.",
+      );
+    return input;
+  }
+  if (isMac) {
+    const device = macScreenDevice(ffmpeg, process.env, testMode);
+    if (opts.source === "window")
+      opts.log?.("macOS capture records the whole screen; keep Chrome in front.");
+    return device;
+  }
+  return undefined;
+}
+
 function countFrames(folder: string): number {
   return readdirSync(join(folder, "frames")).filter((f) => f.endsWith(".jpg")).length;
 }
@@ -284,6 +384,7 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
   const geometry = sourceGeometry(opts, testMode);
   mkdirSync(join(folder, "frames"), { recursive: true });
   const ffmpeg = ffmpegBinary(opts);
+  const input = captureInput(opts, ffmpeg, testMode);
   const state: RecordState = {
     version: 1,
     source: opts.source,
@@ -293,6 +394,7 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
     ffmpeg,
     ...(d ? { display: d } : {}),
     ...(geometry ? { geometry } : {}),
+    ...(input ? { input } : {}),
     frames: 0,
   };
   const child = spawn(ffmpeg, captureArgs(state, folder), {

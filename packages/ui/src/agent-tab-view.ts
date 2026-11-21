@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 export type AgentTabView = "auto" | "split" | "thumbnails";
 export const agentTabViewKey = "aeonAgentTabView";
 // On/off agent settings, mirrored the same way. Both are off by default. Screen recorders
-// (Aperture) rely on them (the agent's work in the visible tab, no second cursor); keep them.
+// (Aeon Recorder) rely on them (the agent's work in the visible tab, no second cursor); keep them.
 export const agentInFrontKey = "aeonAgentInFront";
 export const hideAgentCursorKey = "aeonHideAgentCursor";
 /** Curved pointer and real keystrokes. Off by default; speed wins until the user turns it on. */
