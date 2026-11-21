@@ -10,6 +10,7 @@ import { createExtractTool } from "./extract-tool.js";
 import { fastToolModel, siteToolModel, type CompletionOptions } from "./text-completion.js";
 import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { inChat, sessionChatId } from "./site-browser.js";
+import { fullOutput } from "./site-tool-output.js";
 
 // Tools for agents outside Aeon, through the Aeon MCP server: the same browser_code, crawl and
 // site_mapper a chat gets, so another agent can do in Aeon everything browserkit
@@ -112,7 +113,10 @@ export async function runExternalTool(
   const tools = toolsFor(options, run, session);
   const tool = name === "browser_tabs" ? tools.browser_code : tools[name];
   if (!tool) throw new Error(`Unknown tool ${name}`);
-  const input = name === "browser_tabs" ? { code: TABS_CODE } : args;
+  const full = args.__aeonFull === true;
+  const clean = { ...args };
+  delete clean.__aeonFull;
+  const input = name === "browser_tabs" ? { code: TABS_CODE } : clean;
   const workspace = resolve(
     options.sessionDirectory,
     "..",
@@ -120,8 +124,10 @@ export async function runExternalTool(
     session.replace(/[^\w.-]+/g, "-"),
   );
   await mkdir(workspace, { recursive: true });
+  const execute = () =>
+    tool.execute(randomUUID(), input as never, undefined, undefined, undefined as never);
   const result = await inChat(sessionChatId("external", session), () =>
-    tool.execute(randomUUID(), input as never, undefined, undefined, undefined as never),
+    full ? fullOutput(execute) : execute(),
   );
   const outcome = result as unknown as {
     content: Content[];

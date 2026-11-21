@@ -84,20 +84,16 @@ export function sweepRealms(now = Date.now()): void {
     // busy; otherwise one abandoned job pins its realm for the life of the document.
     if (job.busy && (now - job.startedAt >= CELL_MAX_MS || now - job.usedAt >= REALM_IDLE_MS))
       job.busy = false;
-    if (!job.busy && now - job.usedAt >= REALM_IDLE_MS) {
-      job.frame.remove();
-      jobRealms.delete(jobId);
-    }
+    if (!job.busy && now - job.usedAt >= REALM_IDLE_MS)
+      forgetJob(jobId, job, "the worker dropped this job before it finished; start it again");
   }
   const jobExcess = jobRealms.size - MAX_JOB_REALMS;
   if (jobExcess > 0) {
     const lruJobs = [...jobRealms]
       .filter(([, job]) => !job.busy)
       .sort((a, b) => a[1].usedAt - b[1].usedAt);
-    for (const [jobId, job] of lruJobs.slice(0, jobExcess)) {
-      job.frame.remove();
-      jobRealms.delete(jobId);
-    }
+    for (const [jobId, job] of lruJobs.slice(0, jobExcess))
+      forgetJob(jobId, job, "the worker dropped this job before it finished; start it again");
   }
   for (const [chatId, existing] of realms) {
     if (hasCell(chatId)) {
@@ -152,16 +148,31 @@ function stage(cellId: string, value: string): void {
     .catch(() => undefined);
 }
 
+const DROPPED_JOB = "the worker dropped this job before it finished; start it again";
+
+/** Removes a job realm and tells the service worker, so status is "lost" with a reason. */
+function forgetJob(jobId: string, job: JobRealm, reason: string): void {
+  job.frame.contentWindow?.postMessage({ kind: "stop" }, "*");
+  job.frame.remove();
+  jobRealms.delete(jobId);
+  void chrome.runtime
+    .sendMessage({
+      target: "aeon-code-host",
+      kind: "jobLost",
+      jobId,
+      chatId: job.chatId,
+      error: reason,
+    })
+    .catch(() => undefined);
+}
+
 function drop(chatId: string): void {
   const frame = realms.get(chatId)?.frame;
   frame?.contentWindow?.postMessage({ kind: "stop" }, "*");
   frame?.remove();
   realms.delete(chatId);
   for (const [jobId, job] of jobRealms)
-    if (job.chatId === chatId) {
-      job.frame.remove();
-      jobRealms.delete(jobId);
-    }
+    if (job.chatId === chatId) forgetJob(jobId, job, DROPPED_JOB);
   for (const [cellId, cell] of cells)
     if (cell.chatId === chatId) {
       cells.delete(cellId);
@@ -293,6 +304,14 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   }
   if (message.kind === "reset") {
     drop(message.chatId);
+    reply(true);
+    return;
+  }
+  if (message.kind === "interrupt") {
+    // Stop the cell and keep the realm, so a deadline can return the value built so far.
+    realms
+      .get(message.chatId)
+      ?.frame.contentWindow?.postMessage({ kind: "stop", keep: true, cellId: message.cellId }, "*");
     reply(true);
     return;
   }

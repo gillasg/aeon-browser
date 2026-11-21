@@ -7,6 +7,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat-service.js";
 import {
+  browserNamedFor,
+  browserParentChat,
   PiSdkSessionAdapter,
   resolvePiAgentDirectory,
   sessionChatId,
@@ -22,7 +24,7 @@ import { RoutineScheduler } from "./routine-scheduler.js";
 import { BrowserSiteRules } from "./browser-site-rules.js";
 import { type ActivityCounts } from "./daemon-activity.js";
 import { readPasswordManagerStatus } from "./password-manager-status.js";
-import { chatBrowserName } from "./core-browsers.js";
+import { chatBrowserName, pinInherited } from "./core-browsers.js";
 import {
   abilityCards,
   lastActionNote,
@@ -382,7 +384,14 @@ function createPiAdapter(
         "opencode-go",
       id: readEnvironment("INITIAL_MODEL_ID") || "deepseek-v4.1-flash",
     },
-    browserTool: browserControl.execute.bind(browserControl),
+    browserTool: (chatId, toolCallId, input, signal) =>
+      pinInherited(
+        browserControl,
+        dataRoot,
+        chatId,
+        browserParentChat(),
+        browserNamedFor(chatId),
+      ).then(() => browserControl.execute(chatId, toolCallId, input, signal)),
   });
   return pi;
 }

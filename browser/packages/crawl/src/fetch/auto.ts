@@ -23,6 +23,21 @@ const BROWSER_ONLY: (keyof ScrapeOptions)[] = [
 
 const BROWSER_FORMATS = ["screenshot", "pdf", "mhtml"];
 
+function visibleText(html: string): string {
+  return html
+    .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** An app root with scripts and little on-screen text: the HTML is a shell, not the page. */
+export function emptyShell(html: string): boolean {
+  if (!/<script\b/i.test(html)) return false;
+  if (!/id=["'](?:__next|___gatsby|root|app)["']/i.test(html)) return false;
+  return visibleText(html).length < 800;
+}
+
 /** Why a plain HTTP answer is not good enough, or undefined when it is. */
 export function needsBrowser(fetched: Fetched): string | undefined {
   if ([401, 403, 407, 503].includes(fetched.status)) return `HTTP ${fetched.status}`;
@@ -30,16 +45,12 @@ export function needsBrowser(fetched: Fetched): string | undefined {
   const html = fetched.body.toString("utf8");
   const vendor = botCheck(fetched.headers, html);
   if (vendor) return "bot check";
-  const text = html
-    .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const text = visibleText(html);
   const scripts = (html.match(/<script\b/gi) ?? []).length;
   if (text.length < 200 && scripts > 0) return "rendered by JavaScript";
   if (/<noscript>[^<]*(enable|requires?) javascript/i.test(html) && text.length < 1500)
     return "needs JavaScript";
-  if (/<div id="(root|app|__next|___gatsby)"><\/div>/i.test(html)) return "empty app shell";
+  if (emptyShell(html)) return "empty app shell";
   return undefined;
 }
 
@@ -81,6 +92,11 @@ export class AutoFetcher {
     } catch {
       // No history yet, or unreadable: start with none and learn again.
     }
+  }
+
+  /** Remember that this host needs the browser, including a shell found after extraction. */
+  noteBrowser(url: string): Promise<void> {
+    return this.markBrowserHost(new URL(url).host);
   }
 
   private markBrowserHost(host: string): Promise<void> {

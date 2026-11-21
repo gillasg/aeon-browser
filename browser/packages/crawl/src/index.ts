@@ -1,6 +1,12 @@
 // browser-crawl: crawl anything, including behind logins.
 export * from "./types.js";
-export { scrape, buildResult, DEFAULT_FORMATS, type ScrapeContext } from "./scrape.js";
+export {
+  scrape,
+  buildResult,
+  shouldRenderShell,
+  DEFAULT_FORMATS,
+  type ScrapeContext,
+} from "./scrape.js";
 export { Crawl, crawl, type CrawlHooks, type CrawlDeps } from "./crawler.js";
 export { mapSite, type MapOptions, type MappedUrl } from "./map.js";
 export {
@@ -11,12 +17,18 @@ export {
   type SearchResult,
 } from "./search.js";
 export { searchWeb, WEB_PROVIDERS, type WebProvider, type WebResult } from "./web-search.js";
-export { findList, type FindOptions, type FoundRow } from "./find.js";
+export {
+  findList,
+  rejectReason,
+  type FindOptions,
+  type FindReport,
+  type FoundRow,
+} from "./find.js";
 export { syncSite, type SyncReport } from "./sync.js";
 export { startServer, type CrawlServer, type ServerOptions } from "./server.js";
 export { runMcpServer } from "./mcp.js";
 export { writeOutput, writeDataset, toCsv, toJsonl, toMarkdownBundle } from "./output.js";
-export { AutoFetcher, needsBrowser, type AutoOptions } from "./fetch/auto.js";
+export { AutoFetcher, emptyShell, needsBrowser, type AutoOptions } from "./fetch/auto.js";
 export { botCheck, isNetworkRefusal, isDnsFailure } from "./challenge.js";
 export {
   checkSites,

@@ -43,6 +43,19 @@ function preview(page: PageResult, chars = 600): Record<string, unknown> {
   };
 }
 
+/** The file is the whole page. The reply is the relevance slice, with the path. */
+async function savePage(page: PageResult, workspace: string | undefined): Promise<ToolText> {
+  const reply: Record<string, unknown> = {
+    ...preview(page),
+    ...(page.score !== undefined ? { score: page.score } : {}),
+  };
+  if (!workspace) return textResult(reply);
+  const folder = join("crawls", new Date().toISOString().replace(/[:.]/g, "-"));
+  await mkdir(join(workspace, folder), { recursive: true });
+  await writeOutput([page], join(workspace, folder));
+  return textResult({ ...reply, savedIn: folder.replace(/\\/g, "/") });
+}
+
 async function saveCrawl(pages: PageResult[], workspace: string | undefined): Promise<ToolText> {
   let saved: string | undefined;
   if (workspace && pages.length) {
@@ -71,8 +84,7 @@ async function runAction(
   if (input.action === "check") return runCheck(input, workspace);
   const value = await crawlTool.run(input, { ...(model ? { model } : {}) });
   if (input.action === "crawl") return saveCrawl(value as PageResult[], workspace);
-  if (input.action === "scrape")
-    return boundedResult(value, workspace, "crawls", new URL((value as PageResult).url).hostname);
+  if (input.action === "scrape") return savePage(value as PageResult, workspace);
   if (input.action === "map") return boundedResult(value, workspace, "crawls", "map");
   if (input.action === "find") return boundedResult(value, workspace, "crawls", "find");
   return textResult(value);

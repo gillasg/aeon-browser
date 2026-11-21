@@ -261,12 +261,13 @@ const COMMANDS: Record<string, (positional: string[], flags: Flags) => Promise<v
           return [name.trim(), (what ?? name).trim()];
         }),
     );
-    const rows = await findList(positional.slice(1).join(" "), {
+    const report = await findList(positional.slice(1).join(" "), {
       columns,
       ...(typeof flags.criteria === "string" ? { criteria: flags.criteria } : {}),
       ...(typeof flags.also === "string" ? { queries: flags.also.split("|") } : {}),
+      ...(typeof flags.browser === "string" ? { browser: flags.browser } : {}),
     });
-    out(JSON.stringify(rows, null, 2));
+    out(JSON.stringify(report, null, 2));
   },
   schema: async (positional) => {
     const [, url, description] = positional;

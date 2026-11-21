@@ -1,11 +1,12 @@
 // Job and media helpers are separate pieces of the browser_code API string; all of them are
 // evaluated together, so the objects below can call them by name at use time.
 export const browserMediaApi = `
+var __jobId = (id) => id && typeof id === 'object' ? String(id.jobId || id.id || '') : String(id ?? '');
 var __job = (items, fn, options = {}) => __call({job:{action:'start', items,
   fn: typeof fn === 'function' ? fn.toString() : String(fn), options}});
-__job.status = (id) => __call({job:{action:'status', id:String(id)}});
-__job.cancel = (id) => __call({job:{action:'cancel', id:String(id)}});
-__job.resume = (id) => __call({job:{action:'resume', id:String(id)}});
+__job.status = (id) => __call({job:{action:'status', id:__jobId(id)}});
+__job.cancel = (id) => __call({job:{action:'cancel', id:__jobId(id)}});
+__job.resume = (id) => __call({job:{action:'resume', id:__jobId(id)}});
 __job.list = () => __call({job:{action:'list'}});
 // Bulk "open, get past the gate, wait, capture, read, close". A mode of the durable job runtime:
 // {jobId, total} at once, or the finished {results, summary} when pilot/wait asks it to block.

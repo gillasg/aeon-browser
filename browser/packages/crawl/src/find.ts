@@ -18,11 +18,39 @@ export interface FindOptions {
   /** Search results to read per query (default 10). */
   perQuery?: number;
   model?: ModelLike;
+  /** Chrome profile the page reads use. */
+  browser?: string;
+  /** Replaces web search in tests. */
+  search?: FindSearch;
 }
 
 export interface FoundRow {
   url: string;
   values: Record<string, unknown>;
+}
+
+export interface RejectedPage {
+  url: string;
+  reason: string;
+}
+
+/** Rows, plus why a search that matched nothing opened the pages it did. */
+export interface FindReport {
+  rows: FoundRow[];
+  opened: string[];
+  rejected: RejectedPage[];
+  why?: string;
+}
+
+export interface FindSearch {
+  (
+    query: string,
+    options: {
+      limit?: number;
+      formats?: ("markdown" | "fitMarkdown" | "metadata")[];
+      browser?: string;
+    },
+  ): Promise<{ url: string; page?: { fitMarkdown?: string; markdown?: string } }[]>;
 }
 
 const ROW_SCHEMA = (columns: Record<string, string>) => ({
@@ -77,24 +105,74 @@ function readResult(
   return markdown ? readPage(markdown, query, options) : Promise.resolve(undefined);
 }
 
-function addRows(rows: Map<string, FoundRow>, url: string, found: Found): void {
-  if (!found?.matches) return;
+function addRows(rows: Map<string, FoundRow>, url: string, found: Found): number {
+  if (!found?.matches) return 0;
+  let added = 0;
   for (const values of found.rows ?? []) {
     const key = rowKey(values);
-    if (!rows.has(key)) rows.set(key, { url, values });
+    if (!rows.has(key)) {
+      rows.set(key, { url, values });
+      added += 1;
+    }
   }
+  return added;
+}
+
+type ListedPage = { url: string; page?: { fitMarkdown?: string; markdown?: string } };
+
+async function considerPage(
+  rows: Map<string, FoundRow>,
+  opened: string[],
+  rejected: RejectedPage[],
+  result: ListedPage,
+  query: string,
+  options: FindOptions,
+): Promise<void> {
+  opened.push(result.url);
+  const markdown = result.page?.fitMarkdown ?? result.page?.markdown;
+  const found = markdown?.trim() ? await readResult(result, query, options) : undefined;
+  const added = addRows(rows, result.url, found);
+  const reason = rejectReason(markdown, found, added);
+  if (reason) rejected.push({ url: result.url, reason });
+}
+
+function findReport(
+  rows: Map<string, FoundRow>,
+  opened: string[],
+  rejected: RejectedPage[],
+): FindReport {
+  const kept = [...rows.values()];
+  const why = opened.length ? "no page matched the criteria" : "no pages opened";
+  return { rows: kept, opened, rejected, ...(kept.length ? {} : { why }) };
+}
+
+/** Why one opened page did not become a row. */
+export function rejectReason(
+  markdown: string | undefined,
+  found: Found,
+  added: number,
+): string | undefined {
+  if (!markdown?.trim()) return markdown === undefined ? "could not read the page" : "no page text";
+  if (!found) return "could not read the page";
+  if (!found.matches) return "did not match the criteria";
+  if (!added) return "matched but added no new row";
+  return undefined;
 }
 
 /** Searches, checks each result against the criteria, and fills in the columns. */
-export async function findList(query: string, options: FindOptions): Promise<FoundRow[]> {
+export async function findList(query: string, options: FindOptions): Promise<FindReport> {
   const rows = new Map<string, FoundRow>();
-  for (const search of [query, ...(options.queries ?? [])]) {
-    const results = await searchAndScrape(search, {
+  const opened: string[] = [];
+  const rejected: RejectedPage[] = [];
+  const search = options.search ?? searchAndScrape;
+  for (const term of [query, ...(options.queries ?? [])]) {
+    const results = await search(term, {
       limit: options.perQuery ?? 10,
       formats: ["markdown"],
+      ...(options.browser ? { browser: options.browser } : {}),
     });
     for (const result of results)
-      addRows(rows, result.url, await readResult(result, query, options));
+      await considerPage(rows, opened, rejected, result, query, options);
   }
-  return [...rows.values()];
+  return findReport(rows, opened, rejected);
 }

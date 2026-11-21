@@ -43,6 +43,7 @@ let queue: Promise<void> = Promise.resolve();
 let output = "";
 let asynchronousError: string | undefined;
 let stopped = false;
+let keep = false;
 
 /** A promise that outlives `ms` fails; the cell still posts its result. */
 function bounded<T>(work: T | Promise<T>, ms: number): Promise<T> {
@@ -111,12 +112,15 @@ scope.__encodeBytes = (data: unknown) => {
 };
 // Skills are evaluated with the same REPL rules as cells, so `const helper = ...` persists.
 scope.__repl = toReplScript;
-scope.__call = (request: unknown) =>
-  new Promise((resolve, reject) => {
+scope.__call = (request: unknown) => {
+  if (stopped)
+    return Promise.reject(new Error(keep ? "TIMEOUT: browser cell did not finish" : "RUN_RESET"));
+  return new Promise((resolve, reject) => {
     const callId = String(++sequence);
     pending.set(callId, { resolve, reject });
     parent.postMessage({ kind: "call", cellId, callId, request }, "*");
   });
+};
 evaluate(
   [
     browserWindowApi,
@@ -161,10 +165,12 @@ window.addEventListener("message", (event) => {
     if (typeof message.error === "string") waiter?.reject(new Error(message.error));
     else waiter?.resolve(message.value);
   } else if (message.kind === "stop") {
-    // The host is dropping this frame because the cell's deadline passed. Reject what it is
-    // waiting on so an async cell unwinds; a sync loop still dies when the frame is removed.
+    // reset drops the frame. keep stops the cell and leaves the realm, so the partial value can
+    // be posted and the next cell in this chat still sees its variables.
     stopped = true;
-    for (const waiter of pending.values()) waiter.reject(new Error("RUN_RESET"));
+    keep = message.keep === true;
+    const reason = keep ? "TIMEOUT: browser cell did not finish" : "RUN_RESET";
+    for (const waiter of pending.values()) waiter.reject(new Error(reason));
     pending.clear();
   } else if (message.kind === "cell") {
     // One cell at a time, and only while this frame is alive. A deadline stops the frame, so a
@@ -200,8 +206,11 @@ async function run(message: Record<string, unknown>): Promise<void> {
       String(message.code),
     );
   }
-  // The frame is being removed. Do not observe or post a result the next cell could take.
-  if (stopped) return;
+  // A deadline keeps the realm and returns what the cell had built. A reset posts nothing.
+  if (stopped) {
+    if (keep) postPartial();
+    return;
+  }
   // Calls the cell started but did not await still finish before the final observation.
   for (let waited = 0; pending.size && !stopped && waited < 10_000; waited += 5)
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -239,6 +248,44 @@ async function run(message: Record<string, unknown>): Promise<void> {
     },
     "*",
   );
+}
+
+/** The value a timed-out cell had built: the pool's partial, else the largest array it left. */
+function readPartial(): unknown {
+  try {
+    const marked = evaluate("globalThis.__partialValue");
+    if (marked !== undefined) return marked;
+  } catch {
+    // No partial was published.
+  }
+  try {
+    return evaluate(`(() => {
+      let best, count = -1;
+      for (const key of Object.getOwnPropertyNames(globalThis)) {
+        if (key.startsWith("__")) continue;
+        const value = globalThis[key];
+        if (Array.isArray(value) && value.length > count) { best = value; count = value.length; }
+      }
+      return best;
+    })()`);
+  } catch {
+    return undefined;
+  }
+}
+
+function postPartial(): void {
+  parent.postMessage(
+    {
+      kind: "done",
+      cellId,
+      value: portable(readPartial()),
+      output,
+      error: "TIMEOUT: browser cell did not finish; partial value returned",
+    },
+    "*",
+  );
+  stopped = false;
+  keep = false;
 }
 
 /** Adds a one-line "Tip:" to the output when the cell took the long way to something. */

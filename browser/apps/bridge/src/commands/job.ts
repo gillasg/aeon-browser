@@ -1,6 +1,13 @@
 import { BridgeClient } from "../client.js";
-import { cliHost } from "../host.js";
+import { cliHost, type CliHost } from "../host.js";
 import { flag, has, type Args } from "../args.js";
+import {
+  ambiguousBrowser,
+  browserNames,
+  mergeJobLists,
+  preferJob,
+  type JobView,
+} from "../job-list.js";
 import { out, printJson } from "../output.js";
 import type { Command } from "../usage.js";
 
@@ -9,9 +16,20 @@ import type { Command } from "../usage.js";
 
 const SESSION = "browserkit-cli";
 
-async function runInBrowser(code: string): Promise<unknown> {
+async function runInBrowser(code: string, browser?: string): Promise<unknown> {
   const host = cliHost();
-  if (host) return host.runInBrowser(code, { session: SESSION });
+  const session = browser ? `${SESSION}-${browser}` : SESSION;
+  if (host) {
+    try {
+      return await host.runInBrowser(code, {
+        session,
+        ...(browser ? { browser } : {}),
+      });
+    } catch (error) {
+      if (browser || !host.browsers || !ambiguousBrowser(error)) throw error;
+      return acrossBrowsers(host, code);
+    }
+  }
   const bridge = await BridgeClient.connect();
   try {
     const reply = await bridge.request("run", { code, session: SESSION });
@@ -22,16 +40,35 @@ async function runInBrowser(code: string): Promise<unknown> {
   }
 }
 
-interface JobView {
-  jobId?: string;
-  status?: string;
-  state?: string;
-  mode?: string;
-  done?: number;
-  total?: number;
-  summary?: { counts?: Record<string, number>; warning?: string };
-  error?: string;
-  note?: string;
+/** One session per browser, so the pins do not replace each other. */
+async function acrossBrowsers(host: CliHost, code: string): Promise<unknown> {
+  const names = browserNames(await host.browsers!());
+  if (!names.length)
+    throw new Error(
+      "Several browsers are connected. Pick one with --browser <name> (see aeon browsers).",
+    );
+  const listing = code.includes("browser.job.list()");
+  const values: unknown[] = [];
+  let firstError: unknown;
+  for (const name of names) {
+    try {
+      values.push(await host.runInBrowser(code, { session: `${SESSION}-${name}`, browser: name }));
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (!values.length) throw firstError ?? new Error("No connected browser answered.");
+  if (!listing) return preferJob(values.filter(isJob)) ?? values[0];
+  const groups = values.map((value) => (isList(value) ? value.jobs : []));
+  return { jobs: mergeJobLists(groups) };
+}
+
+function isJob(value: unknown): value is JobView {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isList(value: unknown): value is { jobs: JobView[] } {
+  return isJob(value) && Array.isArray((value as { jobs?: unknown }).jobs);
 }
 
 function line(job: JobView): string {
@@ -49,11 +86,12 @@ async function job(args: Args): Promise<number> {
       "Usage: browserkit job list | status <id> | result <id> | cancel <id> | resume <id> [--json]",
     );
   if (action !== "list" && !id) throw new Error(`Usage: browserkit job ${action} <id> [--json]`);
+  const browser = flag(args, "browser");
   const code =
     action === "list"
       ? "await browser.job.list()"
       : `await browser.job.${action}(${JSON.stringify(id)})`;
-  const value = (await runInBrowser(code)) as JobView | { jobs?: JobView[] };
+  const value = (await runInBrowser(code, browser)) as JobView | { jobs?: JobView[] };
   if (has(args, "json")) {
     printJson(value);
     return 0;
@@ -73,7 +111,7 @@ export const jobCommand: Command = {
   name: "job",
   group: "Browser",
   summary: "list, inspect, cancel or resume durable browser jobs",
-  help: `Usage: browserkit job list | status <id> | result <id> | cancel <id> | resume <id> [--json]
+  help: `Usage: browserkit job list | status <id> | result <id> | cancel <id> | resume <id> [--browser name] [--json]
 
 A browser.job (and a sweep) is a record that survives the cell that started it: every finished
 item is stored as it lands, a lost realm reports state "lost" instead of an empty result, resume
