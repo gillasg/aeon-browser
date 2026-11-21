@@ -89,6 +89,18 @@ export class BrowserControlService {
   pinChat(chatId: string, clientInstanceId: string): void {
     this.pins.set(chatId, clientInstanceId);
   }
+  /**
+   * The one browser a chat works in: its pin, else the only connected browser its tabs are in.
+   * Routines created in the chat inherit it, so their checks never hit AMBIGUOUS_BROWSER.
+   */
+  browserForChat(chatId: string): string | undefined {
+    const pinned = this.pins.get(chatId);
+    if (pinned) return pinned;
+    const used = new Set(
+      [...(this.associations.get(chatId)?.values() ?? [])].map((a) => a.target.clientInstanceId),
+    );
+    return used.size === 1 ? [...used][0] : undefined;
+  }
   /** Pins a chat to the browser it was typed in, unless it already has one (aeon run --browser). */
   claimChat(chatId: string, clientInstanceId: string): void {
     if (!this.pins.has(chatId)) this.pins.set(chatId, clientInstanceId);

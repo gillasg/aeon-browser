@@ -35,6 +35,8 @@ async function runWatcher(checkResult, options = {}) {
   const checks = [];
   const browser = {
     isInstanceAvailable: () => true,
+    browserForChat: () => undefined,
+    pinChat: () => undefined,
     execute: async (chatId, toolCallId, raw) => {
       checks.push({ chatId, toolCallId, code: raw.codeCell.code });
       return JSON.stringify(checkResult);

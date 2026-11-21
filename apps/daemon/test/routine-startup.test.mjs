@@ -32,6 +32,8 @@ test(
     });
     const browser = {
       isInstanceAvailable: () => true,
+      browserForChat: () => undefined,
+      pinChat: () => undefined,
       execute: () => {
         startedChecks += 1;
         return gate.then(() => {

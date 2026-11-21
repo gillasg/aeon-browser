@@ -23,6 +23,8 @@ export interface ListenerHost {
     routine: RoutineRecord,
   ): Promise<{ met: boolean; value?: unknown; error?: string; idle?: boolean }>;
   heard(routine: RoutineRecord, value: unknown): void;
+  /** A listening check that threw: shown on the routine, so it never fails silently. */
+  failed?(routine: RoutineRecord, error: string): void;
 }
 
 export class RoutineListeners {
@@ -77,8 +79,10 @@ export class RoutineListeners {
         error: error instanceof Error ? error.message : String(error),
       }));
       if (result.met) this.host.heard(routine, (result as { value?: unknown }).value);
-      else if (result.error) await pause(ERROR_BACKOFF_MS);
-      else if (result.idle)
+      else if (result.error) {
+        this.host.failed?.(routine, result.error);
+        await pause(ERROR_BACKOFF_MS);
+      } else if (result.idle)
         await pause(POLL_MS); // no matching tab / response yet: let the timer run
       else await pause(250);
     }

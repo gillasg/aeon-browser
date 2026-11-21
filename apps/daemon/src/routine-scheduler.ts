@@ -36,6 +36,7 @@ export class RoutineScheduler {
       isLive(routine)
         ? this.runLiveCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS)
         : this.runCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS),
+    failed: (routine, error) => this.onCheck?.(routine, { met: false, error }),
     heard: (routine, value) => {
       this.heard.set(routine.routineId, value);
       this.runNow(routine.routineId);
@@ -47,6 +48,11 @@ export class RoutineScheduler {
     private readonly chats: ChatService,
     private readonly browser: BrowserControlService,
   ) {}
+
+  /** The browser a routine created in this chat runs its checks in (see BrowserControlService). */
+  browserForChat(chatId: string): string | undefined {
+    return this.browser.browserForChat(chatId);
+  }
 
   /** Told when a watcher's check passes, before its agent run (a notification, at once). */
   onAlert: ((chatId: string, title: string, message: string) => void) | undefined;
@@ -292,6 +298,9 @@ This routine's check passed with: ${JSON.stringify(check.value).slice(0, 4000)}`
       siteRules: () => ({ blocked: [], only: routine.sites ?? [], allow: [] }),
       siteMapper: (request) => siteMapperRequest(checkRealm(routine.routineId), request),
     });
+    const browser =
+      routine.requiredBrowserInstanceId ?? this.browser.browserForChat(routine.chatId);
+    if (browser) this.browser.pinChat(checkRealm(routine.routineId), browser);
     const raw = await this.browser.execute(checkRealm(routine.routineId), `routine-check:${id}`, {
       codeCell: {
         code,
