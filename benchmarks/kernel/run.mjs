@@ -183,7 +183,9 @@ async function main() {
       );
     }
   } finally {
+    // Chrome keeps its connections to this server open, so close them too or the bench never exits.
     server.close();
+    server.closeAllConnections();
   }
   const dir = path.join(here, "results");
   fs.mkdirSync(dir, { recursive: true });

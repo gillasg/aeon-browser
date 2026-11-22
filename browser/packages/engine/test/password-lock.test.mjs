@@ -8,6 +8,7 @@ import {
 } from "../dist/native-browser-secrets.js";
 import {
   documentReplaced,
+  showsErrorPage,
   guardPageCode,
   prepareSignIn,
   runsPageCode,
@@ -127,4 +128,32 @@ test("a page replaced mid-check is told apart from one that could not be checked
   assert.equal(documentReplaced("Frame with ID 0 was removed."), true);
   assert.equal(documentReplaced("no top frame"), true);
   assert.equal(documentReplaced("Cannot access contents of the page"), false);
+});
+
+test("a tab showing Chrome's error page is a failed load, not a password page", () => {
+  assert.equal(showsErrorPage("Frame with ID 0 is showing error page"), true);
+  assert.equal(
+    showsErrorPage('Cannot access contents of url "chrome-error://chromewebdata/"'),
+    true,
+  );
+  assert.equal(showsErrorPage("Frame with ID 0 was removed."), false);
+  assert.equal(documentReplaced("Frame with ID 0 is showing error page"), false);
+});
+
+test("code in a tab showing Chrome's error page fails as NETWORK, not PASSWORD_PAGE", async () => {
+  globalThis.chrome = {
+    storage: { session: { get: async () => ({}), set: async () => undefined } },
+    scripting: {
+      executeScript: async () => {
+        throw new Error("Frame with ID 0 is showing error page");
+      },
+    },
+    webNavigation: {
+      getAllFrames: async () => [{ frameId: 0, url: "chrome-error://chromewebdata/" }],
+    },
+  };
+  await assert.rejects(
+    guardPageCode({ op: "evaluate", target, expression: "document.title" }),
+    (error) => /^NETWORK:/.test(error.message) && !/PASSWORD_PAGE/.test(error.message),
+  );
 });

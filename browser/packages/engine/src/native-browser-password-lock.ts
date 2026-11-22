@@ -251,6 +251,11 @@ export function documentReplaced(message: string): boolean {
   );
 }
 
+/** Chrome's answer when the tab shows its own error page (the load failed: DNS, proxy, offline). */
+export function showsErrorPage(message: string): boolean {
+  return /showing error page|chrome-error:\/\//i.test(message);
+}
+
 /**
  * The probe, once more after a moment when the page was being replaced. A page Aeon still
  * cannot check runs no code either way; only the reason differs.
@@ -277,6 +282,11 @@ async function checkedProbe(tabId: number): Promise<ProbeState> {
           continue;
         }
         throw unansweredPage();
+      }
+      if (showsErrorPage(message)) {
+        throw new Error(
+          `NETWORK: the page did not load (the tab shows Chrome's error page), so no code ran in it; check the URL or connection and navigate again (${message})`,
+        );
       }
       const replaced = documentReplaced(message);
       if (replaced && attempt === 0) {

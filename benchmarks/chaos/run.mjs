@@ -177,6 +177,7 @@ async function main() {
     if (values["kill-daemon"]) results.daemon = await killDaemon(browser);
   } finally {
     server.close();
+    server.closeAllConnections();
   }
   const verdict = judge(results);
   fs.mkdirSync(out, { recursive: true });
