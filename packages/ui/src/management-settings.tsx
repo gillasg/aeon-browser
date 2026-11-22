@@ -29,10 +29,6 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
         {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
         {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
       />
-      <PiSettings
-        {...(props.piExtensions !== undefined ? { piExtensions: props.piExtensions } : {})}
-        {...(props.onPiExtensions ? { onPiExtensions: props.onPiExtensions } : {})}
-      />
       <HelperSettings connectionLabel={props.connectionLabel} />
     </div>
   );
@@ -164,21 +160,6 @@ function OutsideAgentsSettings(props: {
         label="Let other agents see my open tabs"
         checked={props.outsideContext === true}
         onChange={(enabled) => props.onOutsideContext?.(enabled)}
-      />
-    </SettingsGroup>
-  );
-}
-
-function PiSettings(props: { piExtensions?: boolean; onPiExtensions?(enabled: boolean): void }) {
-  return (
-    <SettingsGroup
-      title="Pi"
-      footer="New chats also load the extensions, packages and skills in ~/.pi/agent. Off keeps startup fast."
-    >
-      <SwitchRow
-        label="Load my Pi extensions"
-        checked={props.piExtensions === true}
-        onChange={(enabled) => props.onPiExtensions?.(enabled)}
       />
     </SettingsGroup>
   );

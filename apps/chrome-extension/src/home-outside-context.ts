@@ -4,7 +4,7 @@ import type { UiClient } from "./ui-client-core.js";
 // On/off settings owned by the daemon ("Let outside agents see my open tabs", "Load my Pi
 // extensions"). The home page reads and changes them; nothing else in the extension needs them.
 
-type SwitchOperation = "settings.outside-context" | "settings.pi-extensions";
+type SwitchOperation = "settings.outside-context";
 
 export class HomeOutsideContext {
   enabled = false;

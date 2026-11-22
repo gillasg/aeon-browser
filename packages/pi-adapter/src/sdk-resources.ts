@@ -35,8 +35,6 @@ export function createPiResourceLoader(input: {
   onMcpStatusChange?: (servers: readonly McpServerStatus[]) => void;
   additionalFactories?: readonly InlineExtension[];
   browserGuidance?: boolean;
-  /** Load the user's own Pi extensions, packages, skills and prompts (Settings, off by default). */
-  personal?: boolean;
 }): ResourceLoader {
   const onMcpStatusChange = input.onMcpStatusChange;
   const existingStatusListener = input.mcpOptions?.onStatusChange;
@@ -76,10 +74,10 @@ export function createPiResourceLoader(input: {
   return new DefaultResourceLoader({
     cwd: input.workingDirectory,
     agentDir: input.agentDirectory,
-    settingsManager: input.personal
-      ? input.settingsManager
-      : withoutPackages(input.settingsManager),
-    ...(input.personal ? {} : personalOff(extensionFactories)),
+    // Aeon owns its whole tool surface: the user's own Pi extensions, packages, skills and
+    // prompts (~/.pi/agent) never load. Pi's core tools and Aeon's built-in extensions do.
+    settingsManager: withoutPackages(input.settingsManager),
+    ...builtinOnly(extensionFactories),
     appendSystemPromptOverride: (base) =>
       input.browserGuidance ? [...base, browserRuntimePrimer] : base,
     // The `aeon` skill teaches other agents to reach Aeon from a shell; Aeon's own agent already
@@ -90,7 +88,7 @@ export function createPiResourceLoader(input: {
 }
 
 /** Only Aeon's own extensions: the built-in ones still load by name, the user's do not. */
-function personalOff(factories: readonly InlineExtension[]) {
+function builtinOnly(factories: readonly InlineExtension[]) {
   const builtin = factories
     .filter((factory) => typeof factory !== "function" && factory.builtin === true)
     .map((factory) => `builtin:${(factory as { name: string }).name}`);

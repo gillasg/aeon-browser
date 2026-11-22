@@ -14,7 +14,7 @@ async function skill(root, name) {
   );
 }
 
-test("Aeon's own agent never sees the skill written for agents outside Aeon", async () => {
+test("Aeon's own agent never sees outside-agent or personal Pi skills and extensions", async () => {
   assert.deepEqual(
     withoutOutsideAgentSkills([{ name: "aeon" }, { name: "pdf" }]).map((item) => item.name),
     ["pdf"],
@@ -26,24 +26,21 @@ test("Aeon's own agent never sees the skill written for agents outside Aeon", as
     await skill(join(agent, "skills"), "aeon");
     await skill(join(agent, "skills"), "notes");
     await mkdir(cwd, { recursive: true });
+    await mkdir(join(agent, "extensions"), { recursive: true });
+    await writeFile(
+      join(agent, "extensions", "personal.ts"),
+      'export default (pi) => pi.registerTool({ name: "personal_tool" });\n',
+    );
+    // Aeon owns its tool surface: the user's own Pi skills and extensions never load.
     const loader = createPiResourceLoader({
       workingDirectory: cwd,
       agentDirectory: agent,
       settingsManager: SettingsManager.create(cwd, agent),
-      personal: true,
     });
     await loader.reload();
-    const names = loader.getSkills().skills.map((item) => item.name);
-    assert.ok(names.includes("notes"), `other skills still load (got ${names.join(", ")})`);
-    assert.ok(!names.includes("aeon"));
-    // Off (the default): none of the user's own skills load at all.
-    const plain = createPiResourceLoader({
-      workingDirectory: cwd,
-      agentDirectory: agent,
-      settingsManager: SettingsManager.create(cwd, agent),
-    });
-    await plain.reload();
-    assert.deepEqual(plain.getSkills().skills, []);
+    assert.deepEqual(loader.getSkills().skills, []);
+    const paths = loader.getExtensions().extensions.map((item) => item.path);
+    assert.ok(!paths.some((path) => path.includes("personal.ts")), paths.join(", "));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

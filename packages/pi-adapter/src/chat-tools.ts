@@ -11,6 +11,7 @@ import { createCrawlTool } from "./crawl-tool.js";
 import { createExtractTool } from "./extract-tool.js";
 import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { fastToolModel, siteToolModel, type CompletionOptions } from "./text-completion.js";
+import { createWebsearchTool } from "./websearch-tool.js";
 import { createThreadTools, type ThreadToolHost } from "./thread-tools.js";
 
 export interface ChatToolInput {
@@ -49,6 +50,7 @@ export function createChatTools(input: ChatToolInput): ReturnType<typeof defineT
     createSiteMapperTool(input.chatId, input.workingDirectory, siteToolModel(input.completion)),
     createCrawlTool(input.chatId, input.workingDirectory, siteToolModel(input.completion)),
     createExtractTool(input.completion, input.workingDirectory),
+    createWebsearchTool(input.workingDirectory),
     createAskUserTool(input.chatId),
   ];
 }

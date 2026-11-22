@@ -27,8 +27,6 @@ export interface ManagementSurfaceProps {
   privacy?: PrivacySettingsProps | undefined;
   onOutsideContext?(enabled: boolean): void;
   /** Settings → Other agents: new chats load the user's own Pi extensions (off by default). */
-  piExtensions?: boolean;
-  onPiExtensions?(enabled: boolean): void;
   /** Goes home with this example in the ask box (an empty page's one action). */
   onSuggest?(example: string): void;
 }

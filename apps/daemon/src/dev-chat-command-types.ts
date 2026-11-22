@@ -36,8 +36,7 @@ export type ReadCommandRequest = Extract<
       | "chat.stop"
       | "settings.blocked-sites"
       | "settings.form-profile"
-      | "settings.outside-context"
-      | "settings.pi-extensions";
+      | "settings.outside-context";
   }
 >;
 export type NonSubmitCommand = Exclude<
