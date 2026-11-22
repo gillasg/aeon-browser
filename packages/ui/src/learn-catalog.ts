@@ -218,4 +218,16 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
     body: "aeon run starts a chat from any shell; coding agents use it too.",
     example: "Find my last Uber receipt",
   },
+  {
+    topic: "shortcuts",
+    title: "Use Aeon from other agents",
+    body: "aeon mcp gives Claude Code, Codex or any MCP client Aeon's own browser tools, or a whole task.",
+    example: "Show me how to add Aeon to my coding agent as an MCP server",
+  },
+  {
+    topic: "shortcuts",
+    title: "Open files and diffs it wrote",
+    body: "Click a file or diff in chat: it opens in one Viewer tab, with preview, line jump and recent files.",
+    example: "Write a CSV of my last 10 Amazon orders, then link it so I can open it",
+  },
 ];

@@ -69,6 +69,11 @@ test("a deadline names the last stage and keeps a realm that was evaluating", as
     assert.equal(cancel.reset, false);
     mock.timers.tick(3000);
     await assert.rejects(run, /last stage: evaluating.*partial value was not returned/);
+    // A started cell that never posts its partial is stuck: its realm is reset at once, so the
+    // session's next cell does not queue behind it.
+    const resets = messages.filter((m) => m.kind === "browser.code.cancel" && m.reset === true);
+    assert.equal(resets.length, 1);
+    assert.equal(resets[0].cellId, cellId);
   } finally {
     mock.timers.reset();
   }

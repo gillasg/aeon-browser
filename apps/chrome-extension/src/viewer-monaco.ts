@@ -32,7 +32,17 @@ export function createCodeView(
         });
   const base = original === undefined ? undefined : monaco.editor.createModel(original, language);
   if (base && "getModifiedEditor" in editor) editor.setModel({ original: base, modified: model });
-  else if ("revealLineInCenter" in editor) editor.revealLineInCenter(line);
+  else if ("revealLineInCenter" in editor) {
+    editor.revealLineInCenter(line);
+    // Jump-to-line: the linked line stays marked so it is easy to find again.
+    if (line > 1)
+      editor.createDecorationsCollection([
+        {
+          range: new monaco.Range(line, 1, line, 1),
+          options: { isWholeLine: true, className: "viewer-line-target" },
+        },
+      ]);
+  }
   const theme = () =>
     monaco.editor.setTheme(
       getComputedStyle(document.documentElement).colorScheme === "light" ||

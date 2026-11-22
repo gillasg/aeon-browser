@@ -1,19 +1,13 @@
-# Aeon test bench
+# Benchmarks
 
-Runs the same task list (`tasks.json`) two ways and writes a table of pass/fail, steps and time:
+Model-free benches for Aeon's browser layer and install. Each writes its results under `results/`.
 
-- **scripted**: a `browser_code` solution through `aeon tool browser_code`.
-- **agent**: Aeon's own agent through `aeon run`.
+| Bench       | What it measures                                                         | Run                               |
+| ----------- | ------------------------------------------------------------------------ | --------------------------------- |
+| `kernel`    | speed and steadiness of eight everyday browser jobs through `aeon repl`  | `node benchmarks/kernel/run.mjs`  |
+| `chaos`     | concurrent sessions, tab leaks and hung-cell timeouts in your Chrome     | `node benchmarks/chaos/run.mjs`   |
+| `stealth`   | what bot detectors see when Aeon drives your Chrome                      | `node benchmarks/stealth/run.mjs` |
+| `installed` | the installed native host through sleep/resume, dropped links and update | `pnpm bench:installed`            |
 
-```sh
-pnpm bench                 # dry run: fixtures, no browser
-pnpm bench:live            # real run against the local fixture pages
-node benchmarks/run.mjs --dry-run --out results/run.json
-node benchmarks/run.mjs --only deals-price,apply-form --allow-browser
-```
-
-The real run starts a local fixture server on `127.0.0.1` and drives the user's Chrome, so it
-refuses to start without `--allow-browser`. The three example tasks cover reading a table, reading
-a virtualized list and filling a form. `tasks.json` fields: `id`, `task` (the `{{base}}`
-placeholder becomes the fixture origin), `startUrl`, `script` (the browser_code solution), `expected`
-(facts that must appear), and `fixture` (the dry-run answers for both ways).
+`kernel`, `chaos` and `stealth` drive the real Chrome. Their offline pieces are unit-tested by
+`benchmarks/*.test.mjs` as part of `pnpm test`.

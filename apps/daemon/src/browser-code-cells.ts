@@ -53,7 +53,7 @@ function deadlineMessage(stage: BrowserCodeStage, started: boolean): string {
   if (!started) {
     return `INTERNAL: the browser never started this code; browser code exceeded its deadline (last stage: ${stage}); that cell stopped and its realm was reset.`;
   }
-  return `TIMEOUT: browser code exceeded its deadline (last stage: ${stage}); the partial value was not returned`;
+  return `TIMEOUT: browser code exceeded its deadline (last stage: ${stage}); the partial value was not returned and the stuck realm was reset, so this session's variables are gone`;
 }
 
 /** Arms the cell deadline. A cell that has started is interrupted and given time to return a partial. */
@@ -73,10 +73,13 @@ function deadlineClock(
     }
     cancel(false);
     clearTimeout(timer);
-    timer = setTimeout(
-      () => finish(undefined, new Error(deadlineMessage(stage, true))),
-      PARTIAL_WAIT_MS,
-    );
+    // No partial in time: the cell is stuck on a promise that never settles. Reset its realm now,
+    // or the next cell in this session (session.close included) queues behind it until the
+    // browser's own deadline resets it, ~10 s later.
+    timer = setTimeout(() => {
+      cancel(true);
+      finish(undefined, new Error(deadlineMessage(stage, true)));
+    }, PARTIAL_WAIT_MS);
   };
   timer = setTimeout(expire, timeoutMs + 5000);
   return {

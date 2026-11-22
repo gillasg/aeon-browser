@@ -6,7 +6,18 @@ import { z } from "zod";
 import { connectPage, connectionErrorMessage } from "./ui-connection.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import { createCodeView, languageForPath } from "./viewer-monaco.js";
-import { installFileViewerLinks } from "./file-viewer-launch.js";
+import { installFileViewerLinks, rememberRecent } from "./file-viewer-launch.js";
+import {
+  fileName,
+  parseDelimited,
+  parseViewerHref,
+  previewKind,
+  readRecent,
+  RECENT_KEY,
+  viewerHref,
+  type PreviewKind,
+  type RecentFile,
+} from "./viewer-files.js";
 
 interface FileData {
   path: string;
@@ -22,11 +33,14 @@ if (!root) throw new Error("Viewer root is missing.");
 void applyStoredTheme();
 let displayedPath = "";
 installFileViewerLinks(chatId, () => displayedPath);
+// A deep link opened directly (not through a chat click) still joins the recent strip.
+const opened = parseViewerHref(location.href);
+if (opened) void rememberRecent(opened).catch(() => undefined);
 const update = mountAeonUi(root, createElement(Viewer, { data: null, error: "" }));
 void load()
   .then((data) => {
     displayedPath = data.path;
-    document.title = data.path.split(/[\\/]/).pop() + " · Aeon";
+    document.title = fileName(data.path) + " · Aeon";
     update(createElement(Viewer, { data, error: "" }));
   })
   .catch((error: unknown) =>
@@ -96,50 +110,142 @@ async function load(): Promise<FileData> {
   }
 }
 
+type Mode = "preview" | "source" | "diff";
 function Viewer({ data, error }: { data: FileData | null; error: string }): ReactElement {
-  const [mode, setMode] = useState<"preview" | "source" | "diff">(
-    params.has("diff") ? "diff" : "preview",
-  );
+  const kind: PreviewKind = data ? previewKind(data.path, data.language) : "none";
+  const [mode, setMode] = useState<Mode>(params.has("diff") ? "diff" : "preview");
+  const shown: Mode = mode === "preview" && kind === "none" ? "source" : mode;
   if (!data)
     return (
       <main className="file-viewer">
+        <RecentStrip current="" />
         <p className="viewer-status" role="status">
           {error || "Opening local file…"}
         </p>
       </main>
     );
-  const markdown = data.language === "markdown";
   return (
     <main className="file-viewer">
+      <RecentStrip current={data.path} />
       <ViewerControls
-        mode={mode}
+        mode={shown}
         onMode={setMode}
-        markdown={markdown}
+        preview={kind !== "none"}
         hasDiff={data.original !== undefined}
+        path={data.path}
+        chatId={chatId}
       />
       <footer className="viewer-path" title={data.path}>
         {data.path}
       </footer>
       <section className="viewer-body">
-        {markdown && mode === "preview" ? (
-          <div className="viewer-preview">
-            <ChatMarkdown text={data.content} />
-          </div>
+        {shown === "preview" ? (
+          <Preview data={data} kind={kind} />
         ) : (
           <>
-            {mode === "diff" && (
+            {shown === "diff" && (
               <div className="viewer-diff-heading">
-                <span>{data.path.split(/[\\/]/).pop()}</span>
+                <span>{fileName(data.path)}</span>
                 {data.label && <small>{data.label} · excerpt</small>}
               </div>
             )}
-            <CodeView data={data} diff={mode === "diff"} />
+            <CodeView data={data} diff={shown === "diff"} />
           </>
         )}
       </section>
     </main>
   );
 }
+
+function Preview({ data, kind }: { data: FileData; kind: PreviewKind }): ReactElement {
+  if (kind === "markdown")
+    return (
+      <div className="viewer-preview">
+        <ChatMarkdown text={data.content} />
+      </div>
+    );
+  if (kind === "csv") {
+    const [head = [], ...rows] = parseDelimited(
+      data.content,
+      /\.tsv$/i.test(data.path) ? "\t" : ",",
+    );
+    return (
+      <div className="viewer-preview">
+        <table>
+          <thead>
+            <tr>
+              {head.map((cell, index) => (
+                <th key={index}>{cell}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 2000).map((row, index) => (
+              <tr key={index}>
+                {row.map((cell, column) => (
+                  <td key={column}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length > 2000 && <p className="viewer-note">First 2000 of {rows.length} rows.</p>}
+      </div>
+    );
+  }
+  // HTML and SVG render in a sandboxed frame with scripts off: a preview, never a live page.
+  return (
+    <iframe
+      className="viewer-frame"
+      title={fileName(data.path)}
+      sandbox=""
+      srcDoc={
+        kind === "image"
+          ? `<body style="margin:0;display:grid;place-items:center;min-height:100vh">${data.content}</body>`
+          : data.content
+      }
+    />
+  );
+}
+
+/** Files opened this browser session, newest first. One click switches the file in this tab. */
+function RecentStrip({ current }: { current: string }): ReactElement | null {
+  const [recent, setRecent] = useState<RecentFile[]>([]);
+  useEffect(() => {
+    const read = () =>
+      void chrome.storage.session
+        .get(RECENT_KEY)
+        .then((values) => setRecent(readRecent(values[RECENT_KEY])))
+        .catch(() => undefined);
+    read();
+    const changed = (changes: Record<string, unknown>, area: string) => {
+      if (area === "session" && RECENT_KEY in changes) read();
+    };
+    chrome.storage.onChanged.addListener(changed);
+    return () => chrome.storage.onChanged.removeListener(changed);
+  }, []);
+  if (recent.length < 2) return null;
+  const base = chrome.runtime.getURL("viewer.html");
+  return (
+    <nav className="viewer-recent" aria-label="Recent files">
+      {recent.map((item) => {
+        const active = item.path === current && item.chatId === chatId;
+        return (
+          <a
+            key={item.chatId + item.path + (item.diff ?? "")}
+            href={viewerHref(base, item)}
+            aria-current={active ? "page" : undefined}
+            title={item.path}
+          >
+            {fileName(item.path)}
+            {item.diff ? <small> diff</small> : null}
+          </a>
+        );
+      })}
+    </nav>
+  );
+}
+
 function CodeView({ data, diff }: { data: FileData; diff: boolean }): ReactElement {
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {

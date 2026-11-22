@@ -160,3 +160,38 @@ body,
   margin-left: auto;
   font-size: 11px;
 }
+.viewer-line-target {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.viewer-recent {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 62px 8px 16px;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.viewer-recent a {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.viewer-recent a:hover,
+.viewer-recent a[aria-current="page"] {
+  background: var(--surface);
+  color: var(--text);
+}
+.viewer-recent small {
+  opacity: 0.7;
+}
+.viewer-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}

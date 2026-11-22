@@ -130,19 +130,27 @@ async function armTabTakes(host: DaemonHost, state: RecordState): Promise<void> 
   }
 }
 
-/** Tab ids the engine recorded for this chat, when the daemon is up. */
-async function recordedTabIds(host: DaemonHost, chatId: string | undefined): Promise<number[]> {
-  if (!chatId) return [];
+/**
+ * Tab ids the engine recorded during this recording. With --chat, the chat's takes; without one,
+ * every take that started after the recording did (a --tabs run without --chat used to list none,
+ * so stop never collected a take).
+ */
+export async function recordedTabIds(
+  run: (code: string) => Promise<unknown>,
+  chatId: string | undefined,
+  startedAt: number,
+): Promise<number[]> {
   try {
-    const listed = (await host.runInBrowser(
-      `return await browser.takes(${JSON.stringify(chatId)})`,
-      {
-        session: "aeon-record",
-        timeoutMs: 8_000,
-      },
-    )) as { tabId?: unknown }[] | undefined;
+    const listed = (await run(
+      `return await browser.takes(${chatId ? JSON.stringify(chatId) : ""})`,
+    )) as { tabId?: unknown; startedAt?: unknown }[] | undefined;
     if (!Array.isArray(listed)) return [];
-    return listed.flatMap((take) => (typeof take?.tabId === "number" ? [take.tabId] : []));
+    return listed.flatMap((take) =>
+      typeof take?.tabId !== "number" ||
+      (!chatId && typeof take.startedAt === "number" && take.startedAt < startedAt)
+        ? []
+        : [take.tabId],
+    );
   } catch {
     return [];
   }
@@ -204,7 +212,11 @@ async function clipsForStop(
   clip: ClipMeta,
 ): Promise<ClipMeta[]> {
   if (state.source !== "tabs") return [];
-  const recorded = await recordedTabIds(host, state.chatId);
+  const recorded = await recordedTabIds(
+    (code) => host.runInBrowser(code, { session: "aeon-record", timeoutMs: 8_000 }),
+    state.chatId,
+    state.startedAt,
+  );
   const tabIds = [
     ...new Set([
       ...events.flatMap((event) => (event.tabId === undefined ? [] : [event.tabId])),

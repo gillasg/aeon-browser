@@ -1,4 +1,12 @@
 import { z } from "zod";
+import {
+  pickViewerTab,
+  pushRecent,
+  readRecent,
+  RECENT_KEY,
+  viewerHref,
+  type ViewerTarget,
+} from "./viewer-files.js";
 const Detail = z
   .object({
     path: z.string().min(1).max(4096),
@@ -23,19 +31,33 @@ export function installFileViewerLinks(chatId: string, currentPath?: () => strin
   });
 }
 async function launch(chatId: string, detail: z.infer<typeof Detail>): Promise<void> {
-  const url = new URL(chrome.runtime.getURL("viewer.html"));
-  url.searchParams.set("chatId", chatId);
-  url.searchParams.set("path", detail.path);
-  if (detail.line) url.searchParams.set("line", String(detail.line));
+  let diff: string | undefined;
   if (detail.original !== undefined && detail.modified !== undefined) {
-    const id = crypto.randomUUID();
-    await chrome.storage.session.set({ ["aeon-viewer-" + id]: { ...detail, chatId } });
-    url.searchParams.set("diff", id);
+    diff = crypto.randomUUID();
+    await chrome.storage.session.set({ ["aeon-viewer-" + diff]: { ...detail, chatId } });
   }
-  const existing = await chrome.tabs.query({});
-  const tab = existing.find((candidate) => candidate.url === url.href);
+  const target = {
+    chatId,
+    path: detail.path,
+    ...(detail.line ? { line: detail.line } : {}),
+    ...(diff ? { diff } : {}),
+  };
+  await rememberRecent(target);
+  const base = chrome.runtime.getURL("viewer.html");
+  const href = viewerHref(base, target);
+  const current = await chrome.windows.getCurrent().catch(() => undefined);
+  // One Viewer tab: a click opens the file in it rather than in a new tab per file.
+  const tab = pickViewerTab(await chrome.tabs.query({}), base, current?.id);
   if (tab?.id !== undefined) {
-    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.tabs.update(tab.id, { url: href, active: true });
     if (tab.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
-  } else await chrome.tabs.create({ url: url.href });
+  } else await chrome.tabs.create({ url: href });
+}
+
+/** Adds a file to the Viewer's recent strip (session storage, so it clears with the browser). */
+export async function rememberRecent(target: ViewerTarget): Promise<void> {
+  const stored = await chrome.storage.session.get(RECENT_KEY);
+  await chrome.storage.session.set({
+    [RECENT_KEY]: pushRecent(readRecent(stored[RECENT_KEY]), target, Date.now()),
+  });
 }
