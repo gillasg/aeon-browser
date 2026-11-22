@@ -246,15 +246,20 @@ async function releaseTabTakes(host: DaemonHost, state: RecordState): Promise<vo
   }
 }
 
-const MISSING_TRACE =
-  "No chat trace was attached at start (use --chat <id> to log Aeon's actions); the clip metadata and frames are still recorded.";
+/** Why events[] is empty, or undefined when the chat's trace was attached. */
+export function traceNote(chatId: string | undefined, traced: boolean): string | undefined {
+  if (traced) return undefined;
+  if (chatId)
+    return `The trace of chat ${chatId} could not be read (is it a chat id from \`aeon run\` or \`aeon chats\`?); the clip metadata and frames are still recorded.`;
+  return "No chat was named (use --chat <id> at start or stop to log Aeon's actions); the clip metadata and frames are still recorded.";
+}
 
 function stopRecording(
   clip: ClipMeta,
   clips: ClipMeta[],
   events: VideoEvent[],
   terminal: TerminalCast | undefined,
-  traced: boolean,
+  note: string | undefined,
 ): RecordingEvents {
   return {
     version: 1,
@@ -264,7 +269,7 @@ function stopRecording(
     ...(clips.length > 0 ? { clips } : {}),
     events,
     ...(terminal ? { terminal } : {}),
-    ...(traced ? {} : { note: MISSING_TRACE }),
+    ...(note ? { note } : {}),
   };
 }
 
@@ -282,7 +287,13 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   await releaseTabTakes(host, state);
   await writeEvents(
     folder,
-    stopRecording(clip, clips, events, keptTerminal(folder), trace !== undefined),
+    stopRecording(
+      clip,
+      clips,
+      events,
+      keptTerminal(folder),
+      traceNote(state.chatId, trace !== undefined),
+    ),
   );
   log(`Stopped. ${state.frames} frames, ${events.length} action(s). Folder: ${folder}`);
   return 0;

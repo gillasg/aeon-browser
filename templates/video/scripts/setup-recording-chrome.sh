@@ -57,8 +57,9 @@ if ext_id not in settings:
     }
     d["extensions"].setdefault("ui", {})["developer_mode"] = True
     d.setdefault("browser", {})["has_seen_welcome_page"] = True
-    d.setdefault("profile", {}).update(exit_type="Normal", exited_cleanly=True)
-    with open(pref, "w") as f: json.dump(d, f, separators=(",", ":"))
+# A killed Chrome leaves exit_type "Crashed", and the next start films a "Restore pages?" bubble.
+d.setdefault("profile", {}).update(exit_type="Normal", exited_cleanly=True)
+with open(pref, "w") as f: json.dump(d, f, separators=(",", ":"))
 PY
 
 if [ ! -S "/tmp/.X11-unix/X${NUM}" ]; then
