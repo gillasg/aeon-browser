@@ -1,5 +1,5 @@
 import { performFlow, requireModel, type ModelLike } from "./agent.js";
-import { siteName } from "./registry.js";
+import { siteName, siteStartUrl } from "./registry.js";
 import type { Bridge } from "./runtime/bridge.js";
 import { rebuild } from "./workflow.js";
 
@@ -60,8 +60,8 @@ async function exploreOne(
   options: ExploreOptions & { quiet: boolean },
 ): Promise<ExploreResult> {
   const name = siteName(site);
-  // A full URL starts there; a bare name starts at its home page.
-  const startUrl = /^https?:\/\//i.test(site) ? site : undefined;
+  // A full URL starts there; a bare name starts where the site was seen before, or its home page.
+  const startUrl = await siteStartUrl(site);
   try {
     const flow = await performFlow(
       name,
@@ -70,7 +70,7 @@ async function exploreOne(
         model,
         maxSteps: options.maxSteps ?? 25,
         session: `site-to-api-explore-${name}`,
-        ...(startUrl ? { startUrl } : {}),
+        startUrl,
         foreground: options.foreground === true,
         quiet: options.quiet,
         ads: options.quiet,

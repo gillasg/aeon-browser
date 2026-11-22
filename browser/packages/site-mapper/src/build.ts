@@ -9,7 +9,7 @@ import { saveAbility, testAbility, type Ability } from "./abilities.js";
 import type { AbilityTestReport } from "./ability-contract.js";
 import { modelSummary, performFlow, requireModel, type ModelLike } from "./agent.js";
 import { failureKind } from "./explore.js";
-import { siteName } from "./registry.js";
+import { siteName, siteStartUrl } from "./registry.js";
 import type { Bridge } from "./runtime/bridge.js";
 import { rebuild } from "./workflow.js";
 
@@ -164,15 +164,15 @@ function blockedKind(message: string): BlockedReason {
   return "site_broken";
 }
 
-function flowOptions(site: string, name: string, model: ModelLike, options: BuildOptions) {
-  const startUrl = /^https?:\/\//i.test(site) ? site : undefined;
+async function flowOptions(site: string, name: string, model: ModelLike, options: BuildOptions) {
+  const startUrl = await siteStartUrl(site);
   return {
     model,
     maxSteps: options.maxSteps ?? 30,
     session: `site-to-api-build-${name}`,
     foreground: options.foreground === true,
     quiet: true,
-    ...(startUrl ? { startUrl } : {}),
+    startUrl,
     ...(options.kind === "write" ? { dryRun: true } : {}),
     ...(options.bridge ? { bridge: options.bridge } : {}),
   };
@@ -189,7 +189,11 @@ export async function buildAbility(
   const kind = options.kind ?? "read";
   let flow;
   try {
-    flow = await performFlow(name, taskBrief(task, kind), flowOptions(site, name, model, options));
+    flow = await performFlow(
+      name,
+      taskBrief(task, kind),
+      await flowOptions(site, name, model, options),
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { site: name, blocked: { reason: blockedKind(message), why: message } };

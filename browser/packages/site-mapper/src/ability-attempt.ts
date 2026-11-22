@@ -14,7 +14,7 @@ import type {
   AbilityWayScript,
   AbilityWaySteps,
 } from "./abilities.js";
-import { siteName } from "./registry.js";
+import { siteHome, siteName } from "./registry.js";
 
 export async function attemptWay(
   ability: Ability,
@@ -267,7 +267,7 @@ function onSite(site: string, code: string): string {
   return `async (page, bu, inputs) => {
   let tab = page;
   try { if (!tab || !new URL(await tab.url()).hostname.endsWith(${JSON.stringify(host)})) tab = undefined; } catch { tab = undefined; }
-  tab ??= await browser.openTab(${JSON.stringify(`https://${host}/`)}, { active: false });
+  tab ??= await browser.openTab(${JSON.stringify(siteHome(host))}, { active: false });
   return await (${code})(tab, bu, inputs);
 }`;
 }

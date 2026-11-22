@@ -91,7 +91,8 @@ export function clean(
 function readability(doc: Doc): string | undefined {
   try {
     const article = new Readability(doc.cloneNode(true) as never, { charThreshold: 200 }).parse();
-    if (!article?.content || (article.textContent ?? "").trim().length <= 200) return undefined;
+    const kept = (article?.textContent ?? "").trim().length;
+    if (!article?.content || kept <= 200 || pickedOneCard(doc, kept)) return undefined;
     // Readability lifts the page's heading into its title; keep it as the first heading.
     const heading = doc.querySelector("h1")?.textContent?.trim();
     if (!heading || article.content.includes(heading)) return article.content;
@@ -101,13 +102,28 @@ function readability(doc: Doc): string | undefined {
   }
 }
 
+/**
+ * On a page of repeated cards Readability can pick one card as "the article"; most of the page's
+ * text missing means it did.
+ */
+function pickedOneCard(doc: Doc, kept: number): boolean {
+  if (doc.querySelectorAll("article").length < 2) return false;
+  return kept < (doc.querySelector("body")?.textContent ?? "").trim().length / 2;
+}
+
 /** Main content: Readability first, then the page without its navigation and footer. */
 export function mainHtml(doc: Doc): string {
   const article = readability(doc);
   if (article) return article;
   const copy = doc.cloneNode(true) as Doc;
   for (const el of copy.querySelectorAll(BOILERPLATE) as unknown as El[]) el.remove();
-  const main = copy.querySelector("main, article, [role=main]") ?? copy.querySelector("body");
+  // One <article> is the page's content; several are cards in a list, and keeping the first
+  // would drop the rest of the list.
+  const articles = copy.querySelectorAll("article") as unknown as El[];
+  const main =
+    copy.querySelector("main, [role=main]") ??
+    (articles.length === 1 ? articles[0] : null) ??
+    copy.querySelector("body");
   return main?.innerHTML ?? "";
 }
 

@@ -19,6 +19,49 @@ export interface ProfileFillResult {
   missing: { label: string; field: string }[];
   /** Fields with no profile match (left alone). */
   other: string[];
+  /** FOREIGN_FORM: a sign-in form that sends to another site; nothing was filled. */
+  reason?: "FOREIGN_FORM";
+  /** The host that form sends to. */
+  detail?: string;
+}
+
+/** `shop.example.co.uk` and `www.shop.example.co.uk` are one site; ports and paths do not count. */
+export function siteOf(host: string): string {
+  const parts = host
+    .toLowerCase()
+    .replace(/^www[.]/, "")
+    .split(".");
+  const n =
+    parts.length >= 3 &&
+    parts[parts.length - 1]!.length === 2 &&
+    /^(co|com|org|net|ac|gov|edu)$/.test(parts[parts.length - 2]!)
+      ? 3
+      : 2;
+  return parts.slice(-n).join(".");
+}
+
+/**
+ * The host a sign-in form sends its login to, when that is another site than the page: filling
+ * the user's details there hands them to whoever runs it. Same rule as bu.signIn.
+ */
+export function foreignLoginHost(pageUrl: string, action: string | null): string | null {
+  try {
+    const page = new URL(pageUrl);
+    const target = new URL(action || pageUrl, pageUrl);
+    if (!/^https?:$/.test(target.protocol)) return null;
+    return siteOf(target.hostname) === siteOf(page.hostname) ? null : target.hostname;
+  } catch {
+    return null;
+  }
+}
+
+// Runs in the page: the action of a form that takes a password, if there is one.
+function loginForm(): { page: string; action: string | null } | null {
+  const password = [...document.querySelectorAll("input[type=password]")].find(
+    (el) => (el as HTMLInputElement).form,
+  ) as HTMLInputElement | undefined;
+  if (!password?.form) return null;
+  return { page: location.href, action: password.form.getAttribute("action") };
 }
 
 const AUTOCOMPLETE: Record<string, string> = {
@@ -153,6 +196,10 @@ export async function fillProfileOnPage(
   options: { fields?: unknown },
   ask: Ask,
 ): Promise<ProfileFillResult> {
+  const login = await inPage(tabId, loginForm, []);
+  const foreign = login ? foreignLoginHost(login.page, login.action) : null;
+  if (foreign)
+    return { filled: [], missing: [], other: [], reason: "FOREIGN_FORM", detail: foreign };
   const only = Array.isArray(options.fields) ? options.fields.map(String) : undefined;
   const saved = ((await ask({ profile: "fields" })) as { fields?: string[] }).fields ?? [];
   const fields = (await inPage(tabId, scanPage, [])) ?? [];

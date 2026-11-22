@@ -3,7 +3,7 @@ import { type Challenge, observeExchange } from "../challenge.js";
 import { breakingChanges, responseChanges } from "../diff.js";
 import { extractEmbedded, metaTags } from "../infer/html.js";
 import { getPointer } from "../infer/schema.js";
-import { loadModel, readOverrides, readSession, siteName } from "../registry.js";
+import { loadModel, readOverrides, readSession, siteHome, siteName } from "../registry.js";
 import {
   readTransportPreferences,
   recordTransportPreference,
@@ -116,7 +116,7 @@ export class SiteClient {
     const page = operation.pageUrls?.[0];
     if (page) return new URL(page).origin + "/";
     const main = this.model.origins.find((origin) => originMatches(new URL(origin), this.site));
-    return (main ?? `https://${this.site}`) + "/";
+    return main ? main + "/" : siteHome(this.site);
   }
 
   private schemes(operation: Operation): SecurityScheme[] {
@@ -593,7 +593,7 @@ export class SiteClient {
     const transport = this.page as Partial<PageTransport>;
     if (!transport.inPage) throw new Error("Channels need the browser");
     const inPage = transport.inPage.bind(transport);
-    const host = this.model.operations[0] ?? { origin: `https://${this.site}` };
+    const host = this.model.operations[0] ?? { origin: siteHome(this.site).replace(/\/$/, "") };
     const home = this.home(host);
     const key = `${id}-${Date.now()}`;
     await inPage(home, channelStartExpression(channel, key, options));
@@ -609,7 +609,7 @@ export class SiteClient {
   async docs(): Promise<SiteDocs> {
     const transport = this.page as Partial<PageTransport>;
     if (!transport.inPage) throw new Error("Reading a site's API documents needs the browser");
-    const host = this.model.operations[0] ?? { origin: `https://${this.site}` };
+    const host = this.model.operations[0] ?? { origin: siteHome(this.site).replace(/\/$/, "") };
     return (await transport.inPage.call(
       transport,
       this.home(host),

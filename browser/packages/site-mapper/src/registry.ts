@@ -27,6 +27,44 @@ export function siteName(input: string): string {
   return host.toLowerCase().replace(/^www\./, "");
 }
 
+/**
+ * The home page for a bare site name. Local and private-network hosts rarely serve TLS, so they
+ * start on http; everything else on https. A name given with a scheme keeps it.
+ */
+export function siteHome(input: string): string {
+  const trimmed = input.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const host = (trimmed.split("/")[0] ?? trimmed).toLowerCase();
+  return `${plainHttpHost(host) ? "http" : "https"}://${host}/`;
+}
+
+/** Where to start on a site: an origin it was seen on before, else its home page. */
+export async function siteStartUrl(input: string): Promise<string> {
+  if (/^https?:\/\//i.test(input.trim())) return input.trim();
+  const name = siteName(input);
+  const origins = (await loadModel(name).catch(() => undefined))?.origins ?? [];
+  const seen = origins.find((origin) => {
+    try {
+      const url = new URL(origin);
+      return url.host === name || url.hostname === name || url.hostname === `www.${name}`;
+    } catch {
+      return false;
+    }
+  });
+  return seen ? seen.replace(/\/?$/, "/") : siteHome(input);
+}
+
+function plainHttpHost(host: string): boolean {
+  const hostname = host.replace(/^\[([^\]]+)\](?::\d+)?$/, "$1").replace(/:\d+$/, "");
+  if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local"))
+    return true;
+  if (hostname === "::1") return true;
+  const ip = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(hostname);
+  if (!ip) return false;
+  const [a, b] = [Number(ip[1]), Number(ip[2])];
+  return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+
 export function siteDir(site: string): string {
   return join(registryRoot(), "sites", siteName(site).replace(/:/g, "_"));
 }

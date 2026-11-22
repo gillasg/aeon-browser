@@ -1,5 +1,5 @@
 import { RecordingSession } from "./record.js";
-import { readOverrides, siteName, writeOverrides } from "./registry.js";
+import { readOverrides, siteHome, siteName, writeOverrides } from "./registry.js";
 import type { Bridge } from "./runtime/bridge.js";
 import type { Overrides, SiteModel } from "./types.js";
 import { loadFlows, rebuild, saveRecording } from "./workflow.js";
@@ -187,7 +187,7 @@ export async function performFlow(
 
 function startFlow(name: string, options: FlowOptions): Promise<RecordingSession> {
   return RecordingSession.start({
-    url: options.startUrl ?? `https://${name}/`,
+    url: options.startUrl ?? siteHome(name),
     ...(options.bridge ? { bridge: options.bridge } : {}),
     ...(options.session ? { session: options.session } : {}),
     ...(options.foreground === false ? { foreground: false } : {}),

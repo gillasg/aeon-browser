@@ -28,3 +28,23 @@ test("form fields map to profile fields by hint, label and saved names", () => {
   assert.equal(profileFieldFor(field("Passport city"), ["passportCity"]), "passportCity");
   assert.equal(profileFieldFor(field("Favourite colour"), []), undefined);
 });
+
+test("a sign-in form that sends to another site is refused by fillProfile's host check", async () => {
+  const { foreignLoginHost, siteOf } = await import("../dist/native-browser-profile.js");
+  assert.equal(
+    foreignLoginHost("http://127.0.0.1:8080/login", "http://localhost:8080/collect"),
+    "localhost",
+  );
+  assert.equal(
+    foreignLoginHost("https://shop.example/login", "https://evil.test/steal"),
+    "evil.test",
+  );
+  assert.equal(
+    foreignLoginHost("https://www.shop.example/login", "https://auth.shop.example/s"),
+    null,
+  );
+  assert.equal(foreignLoginHost("https://shop.example/login", "/session"), null);
+  assert.equal(foreignLoginHost("https://shop.example/login", null), null);
+  assert.equal(foreignLoginHost("https://shop.example/login", "javascript:void 0"), null);
+  assert.equal(siteOf("www.shop.example.co.uk"), "example.co.uk");
+});

@@ -58,7 +58,10 @@ export class RoutineManagementTools {
     }
   }
 
-  private create(args: Record<string, unknown>, chatId: ChatId): RoutineRecord {
+  private create(
+    args: Record<string, unknown>,
+    chatId: ChatId,
+  ): RoutineRecord & { warning?: string } {
     const now = new Date();
     const title = requiredString(args.title, "title");
     const instruction = requiredString(args.instruction, "instruction");
@@ -110,10 +113,13 @@ export class RoutineManagementTools {
     exploreForRoutine(
       [saved.title, saved.instruction, JSON.stringify(saved.check ?? "")].join(" "),
     );
-    return this.store.getRoutine(saved.routineId) ?? saved;
+    return withWarning(this.store.getRoutine(saved.routineId) ?? saved);
   }
 
-  private update(args: Record<string, unknown>, chatId: ChatId): RoutineRecord {
+  private update(
+    args: Record<string, unknown>,
+    chatId: ChatId,
+  ): RoutineRecord & { warning?: string } {
     const id = requiredString(args.routineId, "routineId");
     const current = this.requireOwned(id, chatId);
     const check = optionalCheck(args.check, current.check);
@@ -154,7 +160,7 @@ export class RoutineManagementTools {
     );
     if (current.chatId !== updated.chatId)
       throw new Error("Routine ownership changed unexpectedly.");
-    return updated;
+    return withWarning(updated);
   }
 
   private run(args: Record<string, unknown>, chatId: ChatId): unknown {
@@ -207,7 +213,36 @@ function optionalCheck(value: unknown, fallback: string | null): string | null {
   if (value === null) return null;
   if (typeof value !== "string" || !value.trim() || value.length > 8000)
     throw new Error("check must be browser code of at most 8000 characters, or null.");
-  return value;
+  return withListenDirective(value);
+}
+
+/**
+ * The listen directive is a string statement, like "use strict". Written bare (`use listen;`) it
+ * is a syntax error that fails every run, so the watcher never fires; quote it.
+ */
+export function withListenDirective(check: string): string {
+  return check.replace(/^(\s*)use listen\b\s*;?/, '$1"use listen";');
+}
+
+/**
+ * A one-time check runs once: if the moment is a little early or late it returns false and the
+ * watcher never fires. Said back to the agent so it can switch to a poll or browser.snipe.
+ */
+export function onceCheckWarning(
+  routine: Pick<RoutineRecord, "check" | "schedule">,
+): string | null {
+  if (routine.schedule.kind !== "once" || !routine.check) return null;
+  if (/\bbrowser\.snipe\s*\(/.test(routine.check)) return null;
+  return (
+    "This check runs one time only: if the page is not ready at that instant it returns false " +
+    "and the watcher never fires. For 'tell me when it opens/changes', use schedule " +
+    "{kind: 'interval', everyMinutes: 1} (or listen) starting now, or browser.snipe for an exact moment."
+  );
+}
+
+function withWarning(routine: RoutineRecord): RoutineRecord & { warning?: string } {
+  const warning = onceCheckWarning(routine);
+  return warning ? { ...routine, warning } : routine;
 }
 
 /** Omitted keeps the current list (editors that do not know about sites); an array replaces it. */

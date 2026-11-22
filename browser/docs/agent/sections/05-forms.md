@@ -16,8 +16,13 @@ select or check. `page.controls.inspect()` gives every field's state; `page.batc
 any steps in one call (`help("forms")`). Fields about the
 user: `await bu.fillProfile()` fills them from their form profile without you seeing the values;
 for each field it reports `missing`, ask the user, then offer to keep the answer and on yes
-`bu.profile.save({field: value})` (`help("profile")`). A code sent by email or text:
-`await bu.fillCode()`. `TARGET_BLOCKED` names what
+`bu.profile.save({field: value})` (`help("profile")`). Signing in "with my saved details" is
+`bu.signIn()`, not `fillProfile`. Either returns `reason: "FOREIGN_FORM"` when the login form sends
+to another site: nothing was filled; tell the user you will not sign in there and end the turn. A
+code sent by email or text: `await bu.fillCode()`; when the user named an inbox page or one is
+open, read the code or link there yourself in its own tab (`{newTab: true}`), re-reading until the
+mail arrives. Ask only for what no page or profile holds, as your final answer (what is done, what
+is missing), not by waiting in `bu.handoff` or `ask_user`. `TARGET_BLOCKED` names what
 covers the control: act inside that dialog or close it. If something seems missing, scroll, search
 the page or try another URL before concluding it is not there. Never repeat a failing action more
 than twice; change strategy.
