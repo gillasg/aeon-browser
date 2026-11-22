@@ -47,4 +47,16 @@ test("a sign-in form that sends to another site is refused by fillProfile's host
   assert.equal(foreignLoginHost("https://shop.example/login", null), null);
   assert.equal(foreignLoginHost("https://shop.example/login", "javascript:void 0"), null);
   assert.equal(siteOf("www.shop.example.co.uk"), "example.co.uk");
+  // Two IP addresses that share their last two octets are still two sites.
+  assert.equal(foreignLoginHost("http://192.168.0.1/login", "http://10.0.0.1/collect"), "10.0.0.1");
+  assert.equal(foreignLoginHost("http://127.0.0.1:8080/login", "http://127.0.0.1:9090/s"), null);
+  assert.equal(siteOf("localhost"), "localhost");
+});
+
+test("every element action refuses a sign-in form that posts to another site", async () => {
+  const source = await import("node:fs").then((fs) =>
+    fs.readFileSync(new URL("../src/native-browser-input.ts", import.meta.url), "utf8"),
+  );
+  assert.match(source, /refuseForeignLoginForm\(frame, node\.backendNodeId\)/);
+  assert.match(source, /"FOREIGN_FORM"/);
 });

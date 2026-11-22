@@ -213,7 +213,8 @@
         },
         "site": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "For ability, optional: the name is looked up on every site."
         },
         "sites": {
           "type": "array",

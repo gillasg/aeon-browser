@@ -18,6 +18,7 @@ import { idleWaitGuard } from "./idle-wait-guard.js";
 import { browserAbilitySearch } from "./browser-ability-search.js";
 import { signInCodeGuard } from "./sign-in-code-guard.js";
 import { leakedToolCallGuard } from "./leaked-tool-call-guard.js";
+import { emptyToolInputGuard } from "./empty-tool-input-guard.js";
 
 /** Skills written for agents outside Aeon (they drive Aeon from a shell). */
 const OUTSIDE_AGENT_SKILLS = new Set(["aeon"]);
@@ -68,6 +69,7 @@ export function createPiResourceLoader(input: {
     browserProfileGuard(),
     signInCodeGuard(),
     leakedToolCallGuard(),
+    emptyToolInputGuard(),
     idleWaitGuard(),
     ...(input.additionalFactories ?? []),
   ];

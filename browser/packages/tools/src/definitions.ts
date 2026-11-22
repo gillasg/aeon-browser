@@ -11,6 +11,7 @@ import {
   explore,
   importCaptures,
   isSiteToolAction,
+  listAbilities,
   listSites,
   loadModel,
   rebuild,
@@ -373,7 +374,11 @@ const siteMapperParameters: JsonObjectSchema = {
     },
     repair: { type: "boolean", description: "For heal: re-record failing operations." },
     actions: { type: "boolean", description: "For explore: also map actions in dry run." },
-    site: { type: "string", maxLength: 200 },
+    site: {
+      type: "string",
+      maxLength: 200,
+      description: "For ability, optional: the name is looked up on every site.",
+    },
     sites: {
       type: "array",
       items: { type: "string", maxLength: 500 },
@@ -515,6 +520,18 @@ async function runSiteMapper(
   }
   if (input.action === "learn" || input.action === "import")
     return learnCaptures(input, context.workspace);
+  if ((input.action as string) === "ability" && !input.site) {
+    // Without a site: find the ability by name on every site, or list them all.
+    const found = await findAbilities(input.name);
+    if (input.name && found.length === 1)
+      return runSiteMapper({ ...input, site: found[0]!.site, name: found[0]!.name }, context);
+    return found.length || !input.name
+      ? { abilities: found, next: "call again with site and name" }
+      : {
+          abilities: [],
+          note: `no saved ability is called ${input.name}; site_mapper sites lists the sites`,
+        };
+  }
   const site = normalizeSite(input);
   if (input.action === "operations") return describeOperations(site);
   if (input.action === "call") {
@@ -610,6 +627,26 @@ function describeOperation(op: SiteOperation): Record<string, unknown> {
     ...(body ? { bodyFields: body } : {}),
     ...(op.pagination ? { paginated: true } : {}),
   };
+}
+
+/** Saved abilities across every mapped site, matched by name (case and separators ignored). */
+async function findAbilities(
+  name: string | undefined,
+): Promise<{ site: string; name: string; what?: string }[]> {
+  const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const wanted = name ? squash(name) : "";
+  const sites = await listSites();
+  const lists = await Promise.all(
+    sites.map(async ({ site }) =>
+      (await listAbilities(site).catch(() => [])).map((ability) => ({
+        site,
+        name: ability.name,
+        ...(ability.description ? { what: ability.description } : {}),
+      })),
+    ),
+  );
+  const all = lists.flat().filter((item) => !wanted || squash(item.name) === wanted);
+  return wanted ? all : all.slice(0, 50);
 }
 
 function normalizeSite(input: SiteMapperToolInput): string {

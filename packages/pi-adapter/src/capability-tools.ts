@@ -218,7 +218,8 @@ function createRoutineTools(
         "a new message or email (siteMapper.watch on the inbox's API, or count unread on the page), " +
         "new rows on a page (const r = browser.changes('lamps', (await p.list()).items); r.new.length ? r.new : false; " +
         "browser.changes returns {new, changed, gone} against its last run, keyed by id, url or href). " +
-        "Check variables persist between runs. " +
+        "Check variables persist between runs (declare them: let seen = false). " +
+        "A tell-me-when-it-opens check tests that today's text ('opens at', 'sold out', the old price) is gone, not for wording you guess. " +
         "For a tell-me-when on a site the user keeps open, set listen: {url: '<part of the response URL>', type?: 'json'} beside the schedule: the check gets `response` (its `body` is that response, parsed when JSON) on each matching load, with no extra requests; the timer runs when no such tab is open. " +
         "When the user wants it kept to particular sites ('only example.com'), pass sites: ['example.com']: " +
         "its own runs then use those sites and no others. " +

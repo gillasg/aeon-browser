@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { onceCheckWarning, withListenDirective } from "../dist/routine-management-tools.js";
+import {
+  onceCheckWarning,
+  undeclaredAssignments,
+  withListenDirective,
+} from "../dist/routine-management-tools.js";
 import { isListening } from "../dist/routine-listeners.js";
 
 test("a bare use listen line becomes the quoted directive, so the check listens instead of failing", () => {
@@ -24,4 +28,24 @@ test("a once schedule with a plain check is flagged; snipe and polling are not",
   );
   assert.equal(onceCheckWarning({ check: "x ? {x} : false", schedule: interval }), null);
   assert.equal(onceCheckWarning({ check: null, schedule: once }), null);
+});
+
+test("a check that assigns a name it never declares is caught before it fails every run", () => {
+  const broken =
+    "const r = await p.read();\nconst m = r.text.match(/x\\s*([\\d,]+)/);\n" +
+    "if (m && !notified) {\n  notified = true;\n  return {m};\n}\nreturn false;";
+  assert.deepEqual(undeclaredAssignments(broken), ["notified"]);
+  assert.deepEqual(undeclaredAssignments("let seen = 0; seen++; seen += 1; seen"), []);
+  assert.deepEqual(undeclaredAssignments("var a; a = 1; let {b, c} = o; b = 2; a"), []);
+  assert.deepEqual(undeclaredAssignments("const f = (x, y = 1) => { x = 2; return x; }; f(1)"), []);
+  assert.deepEqual(undeclaredAssignments("for (const item of xs) { item.ok = true; } xs"), []);
+  assert.deepEqual(
+    undeclaredAssignments("async function f(a) { a = 1; } try {} catch (e) { e = 0; }"),
+    [],
+  );
+  assert.deepEqual(undeclaredAssignments("const o = {a: 1}; o.a = 2; o['b'] = 3; o"), []);
+  assert.deepEqual(undeclaredAssignments("x === 1 ? 'a = b' : `c = ${d}` // e = f"), []);
+  assert.deepEqual(undeclaredAssignments("globalThis.seen = true; count = (count ?? 0) + 1"), [
+    "count",
+  ]);
 });

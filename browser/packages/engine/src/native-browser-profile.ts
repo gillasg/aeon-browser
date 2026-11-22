@@ -27,6 +27,9 @@ export interface ProfileFillResult {
 
 /** `shop.example.co.uk` and `www.shop.example.co.uk` are one site; ports and paths do not count. */
 export function siteOf(host: string): string {
+  // An IP address or a single-label host (localhost) is its own site.
+  const bare = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (/^[0-9.]+$/.test(bare) || bare.includes(":") || !bare.includes(".")) return bare;
   const parts = host
     .toLowerCase()
     .replace(/^www[.]/, "")
@@ -53,6 +56,22 @@ export function foreignLoginHost(pageUrl: string, action: string | null): string
   } catch {
     return null;
   }
+}
+
+// Runs on a target element: the page and action of the password form it sits in, if any.
+export function loginFormOfNode(this: Element): { page: string; action: string | null } | null {
+  const form =
+    (this as HTMLInputElement).form ?? (this.closest ? this.closest("form") : null) ?? null;
+  if (!form || !form.querySelector("input[type=password]")) return null;
+  const submitter = this as HTMLButtonElement;
+  return {
+    page: location.href,
+    action: submitter.getAttribute?.("formaction") || form.getAttribute("action"),
+  };
+}
+
+export function foreignLoginMessage(host: string): string {
+  return `this sign-in form sends what it holds to ${host}, another site; nothing was typed or sent. Tell the user and do not retry.`;
 }
 
 // Runs in the page: the action of a form that takes a password, if there is one.

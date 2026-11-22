@@ -1,4 +1,5 @@
 import { stepTrace, takeActionTiming } from "./native-browser-action-timing.js";
+import { settleWithin } from "./settle-within.js";
 import { recordStep } from "./evidence/step-record.js";
 import { progressSteps } from "./code-runtime-progress.js";
 import { cellPayload, interruptCell, takeInternal, type CellOutcome } from "./code-runtime-cell.js";
@@ -476,14 +477,17 @@ async function vaultAfterSubmit(
     callCore(cell, request),
   ).catch(() => undefined);
   engineDebug("vault", "after-submit-outcome", { tab: target.tabId, outcome });
-  // Every outcome is said on the click itself, so the model never has to check a save.
   if (outcome === "saved") return addNote(result, VAULT_SAVED);
   if (outcome === "failed") return addNote(result, await askToUnlock(cell, target));
-  // Nothing saved (no answer, skipped or a person's own password): nothing to say.
   if (outcome !== "unsaved") return;
-  const asked = await handoff(cell, { target, message: SAVE_IN_CHROME }).catch(() => "failed");
+  // Wait at most 20s for Chrome's save prompt so an away user does not hold the run until timeout.
+  await handoff(cell, { target, message: SAVE_IN_CHROME, start: true }).catch(() => undefined);
+  const run = startedHandoffs.get(target.tabId)?.run;
+  const asked = run ? await settleWithin(run, SAVE_PROMPT_WAIT_MS) : "failed";
+  if (asked !== "done") startedHandoffs.delete(target.tabId);
   addNote(result, asked === "done" ? UNSAVED_LOGIN_SAVED : UNSAVED_LOGIN_NOTE);
 }
+const SAVE_PROMPT_WAIT_MS = 20_000;
 
 function addNote(result: unknown, note: string): void {
   const action = result as { kind?: string; note?: string };

@@ -15,6 +15,11 @@ import { withFocusEmulation } from "./native-browser-session.js";
 import { humanType, paceKey } from "./native-browser-human-input.js";
 import { pasteNode } from "./native-browser-paste.js";
 import {
+  foreignLoginHost,
+  foreignLoginMessage,
+  loginFormOfNode,
+} from "./native-browser-profile.js";
+import {
   type BrowserExecutorRequest,
   type BrowserElementTarget,
   type BrowserStep,
@@ -726,6 +731,8 @@ async function dispatchAction(
     () => revalidateTarget(request, request.step.target.tabId),
     request.step.op === "fill",
   );
+  if (request.step.op === "click" || request.step.op === "fill" || request.step.op === "paste")
+    await refuseForeignLoginForm(frame, node.backendNodeId);
   const measured = await measureBox(frame, node.backendNodeId);
   noteActionTiming(debuggee.tabId, {
     box: measured
@@ -758,6 +765,19 @@ async function dispatchAction(
     };
   } else await scrollAt(debuggee, top.x, top.y, request.step.direction, request.step.amount);
   return measured ? { box: measured } : undefined;
+}
+
+async function refuseForeignLoginForm(
+  frame: chrome.debugger.Debuggee,
+  backendNodeId: number,
+): Promise<void> {
+  const form = await onNode<{ page: string; action: string | null } | null>(
+    frame,
+    backendNodeId,
+    loginFormOfNode,
+  ).catch(() => null);
+  const host = form ? foreignLoginHost(form.page, form.action) : null;
+  if (host) throw new BrowserActionError("FOREIGN_FORM", foreignLoginMessage(host));
 }
 
 async function scrollViewport(

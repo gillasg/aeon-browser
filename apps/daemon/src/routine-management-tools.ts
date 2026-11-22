@@ -213,7 +213,50 @@ function optionalCheck(value: unknown, fallback: string | null): string | null {
   if (value === null) return null;
   if (typeof value !== "string" || !value.trim() || value.length > 8000)
     throw new Error("check must be browser code of at most 8000 characters, or null.");
+  const undeclared = undeclaredAssignments(value);
+  if (undeclared.length)
+    throw new Error(
+      `check assigns ${undeclared.map((name) => `\`${name}\``).join(", ")} without declaring it, ` +
+        "so every run fails with a ReferenceError and the watcher never fires. Declare it " +
+        `(\`let ${undeclared[0]} = false;\`; check variables persist between runs) or drop it.`,
+    );
   return withListenDirective(value);
+}
+
+const DECLARED_KEYWORDS = /\b(?:let|const|var)\s+([^=;]+?)(?:=(?!=)|;|\bof\b|\bin\b|$)/gm;
+const NAMED = /\b(?:function\*?|class)\s+([A-Za-z_$][\w$]*)/g;
+// Arrow, function and catch parameters; `if (...) {` is not a parameter list.
+const PARAMS =
+  /\(([^()]*)\)\s*=>|\b(?:function\*?\s*[\w$]*|catch)\s*\(([^()]*)\)|([A-Za-z_$][\w$]*)\s*=>/g;
+const ASSIGNED =
+  /(?<![\w$.\]])\s*([A-Za-z_$][\w$]*)\s*(?:\+\+|--|(?:[-+*/%|&^]|\*\*|\?\?|\|\||&&)?=(?![=>]))/g;
+const IDENT = /[A-Za-z_$][\w$]*/g;
+
+/**
+ * Names a check assigns (`seen = true`, `count++`) but never declares with let, const, var, a
+ * function or a parameter. Reading such a name throws a ReferenceError before the first
+ * assignment, so the check fails on every run and its watcher never fires.
+ */
+export function undeclaredAssignments(code: string): string[] {
+  // Comments, strings and template text are not code.
+  const plain = code
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:\\])\/\/.*$/gm, "$1")
+    .replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
+  const declared = new Set<string>();
+  const add = (text: string | undefined) => {
+    for (const name of text?.match(IDENT) ?? []) declared.add(name);
+  };
+  for (const match of plain.matchAll(DECLARED_KEYWORDS)) add(match[1]);
+  for (const match of plain.matchAll(NAMED)) add(match[1]);
+  for (const match of plain.matchAll(PARAMS)) add(match[1] ?? match[2] ?? match[3]);
+  const found = new Set<string>();
+  for (const match of plain.matchAll(ASSIGNED)) {
+    const name = match[1] ?? "";
+    if (name && !declared.has(name) && !/^(?:globalThis|window|self|location)$/.test(name))
+      found.add(name);
+  }
+  return [...found];
 }
 
 /**
