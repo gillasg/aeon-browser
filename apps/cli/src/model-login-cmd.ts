@@ -69,7 +69,7 @@ async function modelsPageUrl(): Promise<string> {
 const WAIT_MS = 10 * 60_000;
 const POLL_MS = 3_000;
 
-async function login(host: DaemonHost, args: Args): Promise<number> {
+export async function login(host: DaemonHost, args: Args): Promise<number> {
   const action = args.positional[0];
   const before = await modelLoginStatus();
   if (action === "status") {

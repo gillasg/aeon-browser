@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { activeProvider } from "@browserkit/credentials";
 import { listSites, registryRoot, bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 import { has, type Args } from "browserkit/dist/args.js";
@@ -11,7 +11,9 @@ import { waitForBrowser } from "./browser-wait.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
-import { modelLoginStatus } from "./model-login-cmd.js";
+import { applyChromeFlags, defaultFlagEnv, undoChromeFlags, type FlagEnv } from "./chrome-flags.js";
+import { login, modelLoginStatus } from "./model-login-cmd.js";
+import { setupPrompts, terminalAsk } from "./setup-prompts.js";
 
 // `aeon setup` installs the shim and the skill, then guides the user through the only manual step:
 // loading the unpacked extension in Chrome. The script opens chrome://extensions, copies the folder
@@ -28,11 +30,14 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-async function setup(args: Args): Promise<number> {
+async function setup(host: DaemonHost, args: Args): Promise<number> {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const say = (line: string) => process.stdout.write(line + "\n");
+  const flagEnv = defaultFlagEnv(dataDirectory());
+  if (has(args, "undo-flags") || has(args, "quiet-bar")) return flagsOnly(args, flagEnv);
   const script = join(root, "scripts", "setup.mjs");
   if (!existsSync(script)) {
-    process.stdout.write(`Aeon setup script not found at ${script}.\n`);
+    say(`Aeon setup script not found at ${script}.`);
     return 1;
   }
   const flags = [
@@ -44,16 +49,64 @@ async function setup(args: Args): Promise<number> {
     const code = await install();
     if (code !== 0) return code;
     if (has(args, "no-register"))
-      process.stdout.write("The native host is registered by Aeon's installer; nothing to skip.\n");
+      say("The native host is registered by Aeon's installer; nothing to skip.");
   }
   execFileSync(process.execPath, [script, ...flags], { cwd: root, stdio: "inherit" });
-  // Chats need a model; say how to connect one instead of letting the first chat fail.
-  const models = await modelLoginStatus().catch(() => undefined);
-  if (models && !models.connected.length)
-    process.stdout.write(
-      "Next: connect an AI model with `aeon login` (or Settings → Models in Aeon).\n",
-    );
+  await finishSetup(host, args, root, flagEnv);
   return 0;
+}
+
+function flagsOnly(args: Args, flagEnv: FlagEnv): number {
+  const result = has(args, "undo-flags") ? undoChromeFlags(flagEnv) : applyChromeFlags(flagEnv);
+  process.stdout.write(`${result.done ? "Done" : "Skipped"}: ${result.detail}.\n`);
+  return result.done ? 0 : 1;
+}
+
+async function finishSetup(
+  host: DaemonHost,
+  args: Args,
+  root: string,
+  flagEnv: FlagEnv,
+): Promise<void> {
+  const say = (line: string) => process.stdout.write(line + "\n");
+  const interactive = !has(args, "yes") && process.stdin.isTTY === true && !process.env.CI;
+  const bridge = join(root, "browser", "apps", "bridge", "dist");
+  const connectedModels = async () => (await modelLoginStatus()).connected.length;
+  await setupPrompts({
+    interactive,
+    ask: terminalAsk(),
+    say,
+    applyFlags: () => applyChromeFlags(flagEnv),
+    detectAgents: async () => {
+      const table = (await import(pathToFileURL(join(bridge, "agent-table.js")).href)) as {
+        agentTargets: () => { id: string }[];
+      };
+      return table.agentTargets().map((target) => target.id);
+    },
+    connectAgents: async () => {
+      const { connectAgents } = (await import(
+        pathToFileURL(join(bridge, "connect-agents.js")).href
+      )) as {
+        connectAgents: (server: {
+          name: string;
+          command: string;
+          args: string[];
+        }) => Promise<{ agent: string; done: boolean; detail: string }[]>;
+      };
+      const cli = join(root, "apps", "cli", "dist", "cli.js");
+      for (const row of await connectAgents({
+        name: "aeon",
+        command: process.execPath,
+        args: [cli, "mcp"],
+      }))
+        say(`   ${row.done ? "Connected" : "Could not connect"} ${row.agent} (${row.detail})`);
+    },
+    connectedModels,
+    login: () => login(host, { positional: [], flags: {} }),
+  });
+  // Chats need a model; say how to connect one instead of letting the first chat fail.
+  if (!interactive && (await connectedModels().catch(() => undefined)) === 0)
+    say("Next: connect an AI model with `aeon login` (or Settings → Models in Aeon).");
 }
 
 async function doctor(host: DaemonHost): Promise<number> {
@@ -168,13 +221,16 @@ export function setupCommands(host: DaemonHost): Command[] {
       name: "setup",
       group: "Browser",
       summary: "finish setup by loading the Aeon extension in Chrome",
-      help: `Usage: aeon setup [--no-register] [--again] [--yes] [--no-wait]
+      help: `Usage: aeon setup [--no-register] [--again] [--yes] [--no-wait] [--quiet-bar] [--undo-flags]
 
 Installs the aeon command and the Aeon skill, opens chrome://extensions, puts the extension
 folder on your clipboard, prints the three clicks and waits until Aeon connects. No Chrome
 flags are needed. --again repeats any missing install step (native host, service, extension).
---no-wait prints the clicks without waiting; --yes is the short, non-interactive wait for CI.`,
-      run: setup,
+--no-wait prints the clicks without waiting; --yes is the short, non-interactive wait for CI.
+On a terminal it then offers three opt-ins: Chrome launch flags, coding-agent MCP, model sign-in.
+--quiet-bar adds the optional Chrome flags to your Chrome launcher (Linux .desktop, Windows
+shortcuts, macOS "Aeon Chrome" app); --undo-flags removes them again.`,
+      run: (args) => setup(host, args),
     },
     {
       name: "doctor",
