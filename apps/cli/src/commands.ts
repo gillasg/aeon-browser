@@ -519,13 +519,14 @@ with what it has.`,
     {
       name: "video",
       group: "Aeon",
-      summary: "copy the Remotion starter kit for rendering a recording",
+      summary: "copy the Director's Studio Remotion kit for rendering a recording",
       help: `Usage: aeon video kit <dir>
 
-Copies the plain Remotion starter kit into <dir>: a Chrome frame (horizontal or
-vertical tabs, light or dark), scenes, a drawn cursor and zoom-from-events logic,
-a speed badge, captions, title and end cards, and a README with a full example
-that reads events.json from \`aeon record\`. Aeon does not render; Remotion does.`,
+Copies the Director's Studio Remotion kit into <dir>: DirectorCut (1920x1080),
+DirectorSquare (1080x1080) and RecordingRaw compositions; Stage, Camera, Pair,
+Hold, TimeCut, EditorialBeat and End primitives driven by events.json from
+\`aeon record\`; a synthesized score; and a taste linter that runs before every
+render. Aeon records; Remotion renders. See the kit's README.`,
       run: (args) => videoCommand(args),
     },
   ];

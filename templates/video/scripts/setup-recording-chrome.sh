@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # One-time, idempotent setup for the SEPARATE recording Chrome. Never touches aeon-chrome or
 # aeon-daemon: eval keeps running on its own CFT browser/profile/display.
+# Default capture: a 1280x720 logical window at DPR 3, so frames are a 3840x2160 master that
+# delivers a sharp 1920x1080 cut with up to a 2x optical push-in. Set AEON_RECORDING_DPR=2 for a
+# 2560x1440 master on smaller machines. Export the same AEON_RECORDING_DPR for `aeon record` so
+# events.json carries dpr and the logical size.
 set -euo pipefail
 
 DISPLAY_NUM="${AEON_RECORDING_DISPLAY:-:120}"
@@ -11,8 +15,13 @@ EXT_DIR="${AEON_EXTENSION_DIR:-$(cd "$KIT_DIR/../.." 2>/dev/null && pwd)/apps/ch
 PROXY="${AEON_RECORDING_PROXY:-}"
 EXT_ID="npcdopokfkpfmepknhoecppgdgmkmihh"
 BROWSER="${AEON_RECORDING_BROWSER:-recording}"
-SCREEN="${AEON_RECORDING_SCREEN:-1000x1500}"
-WINDOW="${AEON_RECORDING_SIZE:-760x1350}"
+DPR="${AEON_RECORDING_DPR:-3}"
+WINDOW="${AEON_RECORDING_SIZE:-1280x720}" # logical (CSS) px
+LOGICAL_W="${WINDOW%x*}"
+LOGICAL_H="${WINDOW#*x}"
+PHYS_W=$((LOGICAL_W * DPR))
+PHYS_H=$((LOGICAL_H * DPR))
+SCREEN="${PHYS_W}x${PHYS_H}"
 NUM="${DISPLAY_NUM#:}"
 
 mkdir -p "$PROFILE/Default" "$PROFILE/NativeMessagingHosts"
@@ -66,6 +75,13 @@ if [ ! -S "/tmp/.X11-unix/X${NUM}" ]; then
   rm -f "/tmp/.X11-unix/X${NUM}"
   setsid nohup Xvfb "$DISPLAY_NUM" -screen 0 "$SCREEN"x24 -nolisten tcp \
     >/tmp/aeon-recording-xvfb.log 2>&1 </dev/null &
+  for _ in $(seq 1 20); do [ -S "/tmp/.X11-unix/X${NUM}" ] && break; sleep 0.25; done
+fi
+# The screen must be exactly the window: larger films black padding, smaller cuts the window off.
+GEOMETRY="$(DISPLAY="$DISPLAY_NUM" xdotool getdisplaygeometry 2>/dev/null | tr ' ' 'x' || true)"
+if [ -n "$GEOMETRY" ] && [ "$GEOMETRY" != "$SCREEN" ]; then
+  echo "Display $DISPLAY_NUM is $GEOMETRY, not $SCREEN. Stop its Xvfb and the recording Chrome, then rerun." >&2
+  exit 1
 fi
 
 if ! pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1; then
@@ -75,10 +91,20 @@ if ! pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1; then
   DISPLAY="$DISPLAY_NUM" setsid nohup "${AEON_RECORDING_CHROME:-google-chrome}" \
     --user-data-dir="$PROFILE" \
     --no-first-run --no-default-browser-check --disable-gpu --silent-debugger-extension-api \
+    --force-device-scale-factor="$DPR" \
     "${NET_ARGS[@]}" \
-    --window-size="${WINDOW/x/,}" --window-position=0,0 about:blank \
+    --window-size="$LOGICAL_W,$LOGICAL_H" --window-position=0,0 about:blank \
     >/tmp/aeon-recording-chrome.log 2>&1 </dev/null &
 fi
+
+# Chrome rounds --window-size at high DPR and leaves a 1 px black edge: pin the exact physical size.
+WID=""
+for _ in $(seq 1 40); do
+  WID="$(DISPLAY="$DISPLAY_NUM" xdotool search --onlyvisible --class google-chrome 2>/dev/null | tail -1 || true)"
+  [ -z "$WID" ] || break
+  sleep 0.25
+done
+[ -z "$WID" ] || DISPLAY="$DISPLAY_NUM" xdotool windowmove "$WID" 0 0 windowsize "$WID" "$PHYS_W" "$PHYS_H"
 
 # Wait for this profile to register with the daemon; name it so `aeon run --browser` is explicit.
 for _ in $(seq 1 40); do
@@ -120,4 +146,30 @@ aeon tool --browser "$BROWSER" browser_code \
   '{"code":"await browser.settings({agentInFront:true, cursor:\"shown\"}); return true;"}' \
   >/dev/null 2>&1 || true
 
-echo "Recording Chrome ready: browser=$BROWSER display=$DISPLAY_NUM profile=$PROFILE"
+# Clean-frame check: a bar under the toolbar ("controlled by automated software", "Restore pages?")
+# steals viewport height; the wrong DPR means a soft master. Refuse to film either.
+FRAME="$(aeon tool --browser "$BROWSER" browser_code \
+  '{"code":"return {dpr: devicePixelRatio, bars: outerHeight - innerHeight, w: innerWidth};"}' 2>/dev/null || true)"
+python3 - "$FRAME" "$DPR" "$LOGICAL_W" <<'PY' || exit 1
+import json, re, sys
+raw, dpr, width = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
+m = re.search(r'\{[^{}]*"dpr"[^{}]*\}', raw.replace('\\"', '"'))
+if not m:
+    print("Clean-frame check skipped (the page could not be read).", file=sys.stderr)
+    sys.exit(0)
+f = json.loads(m.group(0))
+problems = []
+if abs(f["dpr"] - dpr) > 0.01:
+    problems.append(f"devicePixelRatio is {f['dpr']}, expected {dpr:g}")
+# Tab strip + toolbar is ~87 CSS px; any infobar adds 40 or more.
+if f["bars"] > 110:
+    problems.append(f"{f['bars']} px of browser UI above the page: an infobar is showing")
+if f["w"] != width:
+    problems.append(f"viewport is {f['w']} px wide, expected {width}")
+if problems:
+    print("Not a clean frame: " + "; ".join(problems), file=sys.stderr)
+    sys.exit(1)
+PY
+
+echo "Recording Chrome ready: browser=$BROWSER display=$DISPLAY_NUM profile=$PROFILE capture=$SCREEN (DPR $DPR)"
+echo "Record with: AEON_RECORDING_DPR=$DPR aeon record start --window chrome"

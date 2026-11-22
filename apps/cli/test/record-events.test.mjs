@@ -4,7 +4,13 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { eventsFromTrace, tabClips, writeEvents } from "../dist/record-events.js";
+import {
+  clipScale,
+  eventsFromTrace,
+  soundCuesFromEvents,
+  tabClips,
+  writeEvents,
+} from "../dist/record-events.js";
 
 test("writeEvents writes an atomic, readable events.json", async () => {
   const folder = await mkdtemp(join(tmpdir(), "aeon-events-"));
@@ -133,4 +139,51 @@ test("a second tab opened mid-run is its own clip", () => {
   assert.equal(clips[1].source, "tabs");
   assert.ok(events.some((event) => event.tabId === 8 && event.kind === "navigate"));
   assert.ok(events.some((event) => event.tabId === 8 && event.kind === "click"));
+});
+
+test("eventsFromTrace keeps element bounds in page and calibrated window space", () => {
+  const trace = {
+    trace: [
+      {
+        actions: [
+          { kind: "click", tStart: 1500, box: { x: 40, y: 60, width: 20, height: 10 } },
+          { kind: "fill", tStart: 1600, point: { x: 5, y: 6 }, text: "a" },
+        ],
+      },
+    ],
+  };
+  const plain = eventsFromTrace(trace, 1000);
+  assert.deepEqual(plain[0].box, { x: 40, y: 60, width: 20, height: 10 });
+  assert.equal(plain[0].windowBox, undefined);
+  assert.equal(plain[1].box, undefined);
+  const calibrated = eventsFromTrace(trace, 1000, { windowOffset: { x: 0, y: 100 }, scale: 3 });
+  assert.deepEqual(calibrated[0].windowBox, { x: 120, y: 280, width: 60, height: 30 });
+  assert.deepEqual(calibrated[0].window, { x: 150, y: 295 });
+});
+
+test("clipScale records dpr and logical size only when known", () => {
+  assert.deepEqual(clipScale({ width: 3840, height: 2160 }, 3), {
+    dpr: 3,
+    logicalWidth: 1280,
+    logicalHeight: 720,
+  });
+  assert.deepEqual(clipScale({ width: 3840, height: 2160 }, undefined), {});
+  assert.deepEqual(clipScale({ width: 0, height: 0 }, 2), {});
+});
+
+test("soundCuesFromEvents scores keys while typing and a trigger on click and Enter", () => {
+  const cues = soundCuesFromEvents([
+    { id: "e1", kind: "type", t: 100, at: 0, text: "abc" },
+    { id: "e2", kind: "press", t: 400, at: 0, text: "Enter" },
+    { id: "e3", kind: "press", t: 500, at: 0, text: "Tab" },
+    { id: "e4", kind: "click", t: 600, at: 0 },
+    { id: "e5", kind: "navigate", t: 700, at: 0, text: "https://example.com" },
+  ]);
+  assert.deepEqual(cues, [
+    { t: 100, kind: "key" },
+    { t: 155, kind: "key" },
+    { t: 210, kind: "key" },
+    { t: 400, kind: "trigger" },
+    { t: 600, kind: "trigger" },
+  ]);
 });

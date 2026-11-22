@@ -1,10 +1,19 @@
-// The kit's data model. `RecordingEvents` is exactly what `aeon record` writes to events.json;
-// the other types are an editor's decisions, derived from it by edit-from-events.ts.
+// The kit's data model. `RecordingEvents` is exactly what `aeon record` writes to events.json
+// (see EVENTS.md). `DirectorEdit` is an editor's decisions on top of it, built by edit.ts.
+// Every time below is milliseconds on the clip clock unless a name says `video`.
 
 export type Point = { x: number; y: number };
-export type Box = { x: number; y: number; w: number; h: number };
+/** events.json bounds: CSS px on `box`, captured-window px on `windowBox`. */
+export type Box = { x: number; y: number; width: number; height: number };
+/** The kit's rectangles, always in source-frame px unless noted. */
 export type Rect = { x: number; y: number; w: number; h: number };
-export type Frame = { t: number; f: string; sy?: number };
+export type Frame = { t: number; f: string };
+
+export type Beat =
+  "prompt" | "teach" | "compile" | "receipt" | "result" | "terminal" | "watch" | "boost";
+export type SoundCueKind = "start" | "needs-you" | "done" | "key" | "trigger";
+export type SoundCue = { t: number; kind: SoundCueKind };
+
 export type VideoEventKind = "click" | "type" | "press" | "scroll" | "navigate" | "tab-switch";
 export type VideoEvent = {
   id: string;
@@ -16,6 +25,9 @@ export type VideoEvent = {
   window?: Point;
   text?: string;
   scroll?: Point;
+  box?: Box;
+  windowBox?: Box;
+  beat?: Beat;
 };
 export type ClipMeta = {
   file: string;
@@ -27,17 +39,18 @@ export type ClipMeta = {
   durationMs: number;
   frames: number;
   tabId?: number;
+  dpr?: number;
+  logicalWidth?: number;
+  logicalHeight?: number;
 };
 /** One chunk of a terminal cast. `t` is ms on the clip clock. `in` is the command. */
 export type TerminalEvent = { t: number; kind: "in" | "out" | "err"; text: string };
-/** Asciinema-style capture written by `aeon record terminal` as events.json `terminal`. */
 export type TerminalCast = {
   version: 1;
   command: string;
   startedAt: number;
   events: TerminalEvent[];
 };
-/** The on-disk log. Import it from src/recording.json (copied from the recording folder). */
 export type RecordingEvents = {
   version: 1;
   recorder: "aeon";
@@ -46,66 +59,92 @@ export type RecordingEvents = {
   clips?: ClipMeta[];
   events: VideoEvent[];
   terminal?: TerminalCast;
+  soundCues?: SoundCue[];
   note?: string;
 };
 
-export type Theme = "light" | "dark";
-export type FrameKind = "none" | "horizontal" | "vertical";
-export type Output = { width: number; height: number; fps: number; preset: string };
-export type Background =
-  | { type: "gradient"; colors: string[]; angle?: number }
-  | { type: "color"; color: string }
-  | { type: "image"; src: string; blur?: number };
+// ---- Director's decisions ----------------------------------------------------------------------
 
-export type Style = {
-  theme: Theme;
-  frame: FrameKind;
-  background: Background;
-  padding: number;
-  radius: number;
-  accent: string;
-  font: string;
-  captionFont: number;
-  codeWallpaper?: string;
-  cursorColor: string;
+export type Surface = "obsidian" | "stone";
+export type Framing = "stage" | "inside" | "focus";
+
+/** One camera beat. `focus` pushes into `focusRect` (source px); `scale` overrides the fit. */
+export type CameraCue = {
+  tStart: number;
+  tEnd: number;
+  framing: Framing;
+  focusRect?: Rect;
+  scale?: number;
+  easeMs?: number;
 };
+/** Protected stillness: no camera move, cut or speed change may start inside it. */
+export type HoldRegion = { tStart: number; tEnd: number };
+/** A kept stretch of the clip. Gaps between segments are cuts. `speed !== 1` needs a `label`. */
+export type Segment = { s0: number; s1: number; speed: number; label?: string };
+export type Placement = "top-left" | "bottom-left" | "bottom-right";
+export type EditorialLine = { tStart: number; tEnd: number; text: string; placement?: Placement };
+/** A real time-compression cut at clip time `t`; clocks come from the recording, never typed in. */
+export type TimeCut = { t: number; beforeDetail?: string; afterDetail?: string };
+/** A beat-bearing element and where it sits in the source frame at `t`. */
+export type BeatMark = { t: number; beat: Beat; box?: Rect };
+export type PairSpec = {
+  /** Clip time the browser glides left and the terminal emerges. */
+  pairAtMs: number;
+  /** Source-px y of the page value to line up with (an events.json `box.y`, scaled). */
+  alignPageY?: number;
+  /** Index of the terminal line that should sit on that scanline. */
+  alignTerminalLine?: number;
+};
+export type EndSpec = { command: string; repo: string; durationMs: number };
 
-export type Segment = { s0: number; s1: number; speed: number; kind: "action" | "hold" | "slack" };
-export type Zoom = { t0: number; t1: number; box: Box; scale: number };
-export type Overlay =
-  | { type: "caption"; t0: number; t1: number; text: string }
-  | { type: "keys"; t0: number; t1: number; text: string };
-export type Card = { text: string; subtitle?: string; duration: number };
-
-/** One clip's timeline: source frames and the edit decisions on top of them. */
-export type Edit = {
+export type DirectorEdit = {
   version: 1;
+  output: { width: number; height: number; fps: number };
   source: {
-    viewport: { width: number; height: number };
-    fps: number;
-    duration: number;
-    mobile: boolean;
-    url?: string;
+    width: number;
+    height: number;
+    dpr?: number;
+    startedAt: number;
+    durationMs: number;
+    frames: Frame[];
   };
-  output: Output;
-  style: Style;
-  frames: Frame[];
+  surface: Surface;
+  focusDim: number;
+  cues: CameraCue[];
+  holds: HoldRegion[];
   segments: Segment[];
-  zooms: Zoom[];
-  overlays: Overlay[];
-  intro?: Card;
-  outro?: Card;
-  badge?: { t0: number; t1: number; speed: number };
-  /** A second clip (e.g. the chat), shown beside the first in a split frame. */
-  side?: { frames: Frame[]; viewport: { width: number; height: number }; title?: string };
+  editorial: EditorialLine[];
+  timeCuts: TimeCut[];
+  beats: BeatMark[];
+  compile: { tStart: number; tEnd: number }[];
+  pair?: PairSpec;
+  end?: EndSpec;
+  terminal?: TerminalCast;
+  /** Declared visual effects. The linter refuses blur, tilt, glow and overshoot. */
+  effects: string[];
+  /** Full-screen title or stat cards. Always refused by the linter; kept so it can say so. */
+  slides: { text: string; durationMs: number }[];
+  audioSrc?: string;
+  lint?: "on" | "off";
 };
 
-/** Props every composition receives. `frames` come from staticFile()'d public/frames/. */
-export type RenderProps = {
-  edit: Edit;
-  base: string;
-  /** The drawn cursor and zoom path, derived only from events.json. */
-  cursor: { t: number; x: number; y: number }[];
-  /** Present when the recording folder has a terminal cast. Drawn beside the tab. */
-  terminal?: TerminalCast;
-};
+/** director.json: what an author writes. Everything is optional; events.json fills the rest. */
+export type DirectorScript = Partial<
+  Pick<
+    DirectorEdit,
+    | "surface"
+    | "focusDim"
+    | "cues"
+    | "holds"
+    | "segments"
+    | "editorial"
+    | "timeCuts"
+    | "beats"
+    | "compile"
+    | "pair"
+    | "end"
+    | "effects"
+    | "slides"
+    | "audioSrc"
+  >
+> & { holdMs?: number };

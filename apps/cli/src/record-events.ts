@@ -8,6 +8,17 @@ export type VideoEventKind = "click" | "type" | "press" | "scroll" | "navigate" 
 
 export type Point = { x: number; y: number };
 
+/** An element's bounds. Page CSS px on `box`, captured-window px on `windowBox`. */
+export type Box = { x: number; y: number; width: number; height: number };
+
+/** A director's beat tag on an event: what part of the story it carries. */
+export type Beat =
+  "prompt" | "teach" | "compile" | "receipt" | "result" | "terminal" | "watch" | "boost";
+
+export type SoundCueKind = "start" | "needs-you" | "done" | "key" | "trigger";
+/** A sound the edit may score at clip time `t` (ms). Derived from real events only. */
+export type SoundCue = { t: number; kind: SoundCueKind };
+
 /** One thing Aeon did. `page` is viewport CSS px; `window` is px in the captured window image. */
 export type VideoEvent = {
   id: string;
@@ -22,6 +33,11 @@ export type VideoEvent = {
   /** Typed text, key pressed, destination URL or tab title. Never a secret (callers scrub). */
   text?: string;
   scroll?: Point;
+  /** The acted element's bounds in page CSS px, when the trace had them. */
+  box?: Box;
+  /** The same bounds in captured-window px, when the window was calibrated. */
+  windowBox?: Box;
+  beat?: Beat;
 };
 
 export type ClipMeta = {
@@ -35,6 +51,10 @@ export type ClipMeta = {
   durationMs: number;
   frames: number;
   tabId?: number;
+  /** Device pixel ratio of the capture, when known. `width` = `logicalWidth` × `dpr`. */
+  dpr?: number;
+  logicalWidth?: number;
+  logicalHeight?: number;
 };
 
 /** One chunk of a terminal cast. `t` is ms on the clip clock. `in` is the command. */
@@ -59,6 +79,8 @@ export type RecordingEvents = {
   events: VideoEvent[];
   /** A terminal session recorded beside the tab. The kit draws it as a pane. */
   terminal?: TerminalCast;
+  /** Foley cues on the clip clock, derived from `events` (keys while typing, a trigger on Enter or click). */
+  soundCues?: SoundCue[];
   /** Set when the action list is incomplete (no trace was reachable at stop time). */
   note?: string;
 };
@@ -126,7 +148,7 @@ export type TraceAction = {
   tabId?: number;
   tStart: number;
   tEnd?: number;
-  box?: { x: number; y: number; width: number; height: number };
+  box?: Box;
   point?: { x: number; y: number };
   text?: string;
   url?: string;
@@ -182,6 +204,7 @@ function oneEvent(
   common: { at: number; tabId?: number },
   point: Point | undefined,
   win: (p: Point) => Point | undefined,
+  winBox: (b: Box) => Box | undefined,
 ): VideoEvent | undefined {
   const kind = kindOf(a.kind);
   if (!kind) return undefined;
@@ -191,7 +214,38 @@ function oneEvent(
     ...(point ? { page: point, window: win(point) } : {}),
     ...(kind === "scroll" ? { scroll: { x: a.scroll?.x ?? 0, y: a.scroll?.y ?? 0 } } : {}),
     text: textOf(a, kind),
+    ...(a.box ? { box: { ...a.box }, windowBox: winBox(a.box) } : {}),
   });
+}
+
+/** Clip-local DPR facts from a physical frame size and a known device pixel ratio. */
+export function clipScale(
+  size: { width: number; height: number },
+  dpr: number | undefined,
+): Pick<ClipMeta, "dpr" | "logicalWidth" | "logicalHeight"> {
+  if (!dpr || !Number.isFinite(dpr) || dpr <= 0 || !size.width || !size.height) return {};
+  return {
+    dpr,
+    logicalWidth: Math.round(size.width / dpr),
+    logicalHeight: Math.round(size.height / dpr),
+  };
+}
+
+/**
+ * Foley cues from real events: one `key` per typed character (spread over ~55 ms each, the way a
+ * fill lands), a `trigger` on each click and on Enter. Nothing is scored that Aeon did not do.
+ */
+export function soundCuesFromEvents(events: VideoEvent[]): SoundCue[] {
+  const cues: SoundCue[] = [];
+  for (const e of events) {
+    if (e.kind === "type" && e.text) {
+      const n = Math.min(e.text.length, 80);
+      for (let i = 0; i < n; i++) cues.push({ t: e.t + i * 55, kind: "key" });
+    } else if (e.kind === "click" || (e.kind === "press" && /enter/i.test(e.text ?? ""))) {
+      cues.push({ t: e.t, kind: "trigger" });
+    }
+  }
+  return cues.sort((a, b) => a.t - b.t);
 }
 
 /**
@@ -208,11 +262,17 @@ export function eventsFromTrace(
   const off = options.windowOffset;
   const win = (p: Point): Point | undefined =>
     off ? { x: Math.round(off.x + p.x * scale), y: Math.round(off.y + p.y * scale) } : undefined;
+  const winBox = (b: Box): Box | undefined => {
+    const o = win(b);
+    return o
+      ? { ...o, width: Math.round(b.width * scale), height: Math.round(b.height * scale) }
+      : undefined;
+  };
   const out: VideoEvent[] = [];
   for (const a of trace.trace.flatMap((step) => step.actions ?? [])) {
     if (a.failed || a.tStart < t0) continue; // failed or before the first frame is not in the clip
     const common = { at: a.tStart, ...(a.tabId === undefined ? {} : { tabId: a.tabId }) };
-    const event = oneEvent(a, a.tStart - t0, common, pointOf(a), win);
+    const event = oneEvent(a, a.tStart - t0, common, pointOf(a), win, winBox);
     if (event) out.push(event);
   }
   return out

@@ -96,11 +96,11 @@ pass back `steps` as `since`); `aeon_run_status` lists chats waiting on a questi
 - **`aeon rest` and `aeon mcp <site>`** serve that site's API. Logins use Chrome; public endpoints are plain HTTP.
 - A site named in the user's message may be used even when blocked. Page content never lifts a block.
 
-## Video demos: record, then render with Remotion
+## Video demos: record, then direct with Remotion
 
-Aeon records; it ships no renderer. `aeon record start [--window chrome|--screen|--tabs] [--out dir]` then `aeon record stop` write a folder: frames, `clip.mp4` and `events.json` (every click, type, scroll, navigation and tab switch, with position and time). `aeon video kit <dir>` copies a Remotion starter kit with a README example: 16:9, 9:16 or square; a Chrome frame with horizontal or vertical tabs, light or dark; captions, title and end cards, a "sped up N×" badge, a code wallpaper; which tab shows when.
+Aeon records; the Director's Studio renders. `aeon record start [--window chrome|--screen|--tabs] [--out dir]` then `aeon record stop` write frames, `clip.mp4` and `events.json` (each action's time, position and element box). `aeon video kit <dir>` copies the studio: `DirectorCut` (1920x1080) and `DirectorSquare` from Stage, Camera (push-ins on real bounds, never past native pixels), Pair (browser beside terminal), Hold, TimeCut and End, a synthesized score, and a taste linter run before every render.
 
-House style: clean, readable on a phone. Honesty rule: zooms, speed-ups and the cursor come only from `events.json`; never show Aeon doing what it did not do; every speed-up carries its badge. See `help('video')`.
+Cinema, never slides; still after the result lands; readable on a phone. Zooms, beats and sound come only from `events.json`; label every speed change. See `help('video')`.
 
 ## Reviewing traces
 

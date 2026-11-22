@@ -21,7 +21,9 @@ import {
   type Source,
 } from "./record-capture.js";
 import {
+  clipScale,
   eventsFromTrace,
+  soundCuesFromEvents,
   tabClips,
   writeEvents,
   type ClipMeta,
@@ -202,6 +204,7 @@ function baseClip(
     startedAt: state.startedAt,
     durationMs,
     frames: state.frames,
+    ...clipScale(size, Number(process.env.AEON_RECORDING_DPR) || undefined),
   };
 }
 
@@ -269,6 +272,7 @@ function stopRecording(
     ...(clips.length > 0 ? { clips } : {}),
     events,
     ...(terminal ? { terminal } : {}),
+    ...(events.length ? { soundCues: soundCuesFromEvents(events) } : {}),
     ...(note ? { note } : {}),
   };
 }

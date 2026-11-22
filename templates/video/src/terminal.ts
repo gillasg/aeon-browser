@@ -1,6 +1,6 @@
 // Lines of a terminal cast at a clip time. The kit draws these beside the tab. Same shape as
 // events.json `terminal` (see EVENTS.md).
-import type { Rect, TerminalCast } from "./types";
+import type { Rect, TerminalCast } from "./types.ts";
 
 export type TermLine = { kind: "in" | "out" | "err"; text: string };
 

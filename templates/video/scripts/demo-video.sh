@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# One command: record the dedicated recording-Chrome window, run an Aeon task in that browser,
-# stop the take, and render a phone-sized H.264 MP4 from the real frames + events.json.
-# Usage: scripts/demo-video.sh "<task>" [--out file.mp4] [--fps 15] [--max-seconds 30]
+# One command: record the dedicated recording-Chrome window (1280x720 at DPR 3), run an Aeon task
+# in that browser, stop the take, lint the edit, score it, and render the 1920x1080 DirectorCut.
+# Usage: scripts/demo-video.sh "<task>" [--out file.mp4] [--fps 30] [--max-seconds 30] [--director director.json]
 set -euo pipefail
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BROWSER="${AEON_RECORDING_BROWSER:-recording}"
 DISPLAY_NUM="${AEON_RECORDING_DISPLAY:-:120}"
 MAX_SECONDS="${AEON_VIDEO_MAX_SECONDS:-30}"
+export AEON_RECORDING_DPR="${AEON_RECORDING_DPR:-3}"
+DIRECTOR=""
 
 usage() { sed -n '2,3p' "$0" | sed 's/^# //'; exit 1; }
 TASK=""
@@ -16,13 +18,14 @@ while [ $# -gt 0 ]; do
     --out) OUT="${2:-}"; [ -n "$OUT" ] || usage; shift 2 ;;
     --fps) FPS="${2:-}"; [ -n "$FPS" ] || usage; shift 2 ;;
     --max-seconds) MAX_SECONDS="${2:-}"; [ -n "$MAX_SECONDS" ] || usage; shift 2 ;;
+    --director) DIRECTOR="${2:-}"; [ -f "$DIRECTOR" ] || usage; shift 2 ;;
     -h|--help) usage ;;
     *) [ -z "$TASK" ] || usage; TASK="$1"; shift ;;
   esac
 done
 [ -n "$TASK" ] || usage
 OUT="${OUT:-$KIT_DIR/out/demo.mp4}"
-FPS="${FPS:-15}"
+FPS="${FPS:-30}"
 mkdir -p "$(dirname "$OUT")" "$KIT_DIR/out"
 
 "$KIT_DIR/scripts/setup-recording-chrome.sh"
@@ -69,9 +72,15 @@ LIMIT=$(( MAX_SECONDS * FPS ))
 mapfile -t FRAMES < <(find "$WORK/recording/frames" -maxdepth 1 -name '*.jpg' -print | sort)
 for frame in "${FRAMES[@]:0:$LIMIT}"; do cp "$frame" "$KIT_DIR/public/frames/"; done
 cp "$WORK/recording/events.json" "$KIT_DIR/src/recording.json"
+# The camera comes from events.json alone unless a director script is given.
+if [ -n "$DIRECTOR" ]; then
+  cp "$DIRECTOR" "$KIT_DIR/src/director.json"
+else
+  printf '{ "surface": "obsidian", "audioSrc": "audio/score.wav" }\n' >"$KIT_DIR/src/director.json"
+fi
 
 cd "$KIT_DIR"
-npx remotion render src/Root.tsx RecordingVertical "$OUT" \
-  --codec=h264 --concurrency=2 --log=error
+# Lints (refuses slop), synthesizes the score, renders H.264, and writes $OUT.json.
+node scripts/render.mjs DirectorCut --out "$OUT"
 
 echo "$OUT"

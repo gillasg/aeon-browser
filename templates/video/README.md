@@ -1,138 +1,118 @@
-# Aeon video starter kit (Remotion)
+# Aeon Director's Studio
 
-Aeon records; it does not render. This kit is plain Remotion files you install and render yourself.
-It reads `events.json` from `aeon record` and draws only what really happened: zooms, speed-ups and
-the cursor all come from the log (see `EVENTS.md`). It has a Chrome frame (horizontal or vertical
-tabs, light or dark), captions, a title card, a "sped up N×" badge, an end card, and a code-wallpaper
-background option.
+A Remotion kit that turns a real `aeon record` take into a film: real Chrome, staged, lit, framed,
+paced and scored. It never fakes a pixel or a millisecond. Everything comes from the recording's
+`events.json` (see [EVENTS.md](EVENTS.md)) plus an optional `director.json` with your cues.
 
-## Quick start
+Get it with `aeon video kit <dir>`. It is not part of Aeon's build.
 
-```bash
-npm install
-# put a recording's frames in public/frames/ and its events.json next to src/recording.json:
-cp /path/to/recording/frames/*.jpg public/frames/
-cp /path/to/recording/events.json src/recording.json
-npm run render             # out/video.mp4 (16:9)
-npm run render:vertical    # out/video-vertical.mp4 (9:16, vertical tabs)
-npm run still              # one frame, to check it before rendering
+## Compositions
+
+| id               | size      | what it is                                                       |
+| ---------------- | --------- | ---------------------------------------------------------------- |
+| `DirectorCut`    | 1920×1080 | The flagship cut, 30 fps: Stage, Camera, Pair, Holds, End, score |
+| `DirectorSquare` | 1080×1080 | The same edit framed for a phone feed, from the same master      |
+| `RecordingRaw`   | 1920×1080 | The unedited proof: real frames, full-bleed, nothing added       |
+
+`aeon record` itself stays raw. The studio is a separate step.
+
+## Shoot
+
+```sh
+scripts/setup-recording-chrome.sh             # 1280x720 logical at DPR 3 -> 3840x2160 master
+scripts/demo-video.sh "find the price of ..."  # record, lint, score, render out/demo.mp4
 ```
 
-The kit ships a tiny fixture (one solid-colour frame, two events), so `npm run still` works before
-you copy anything in.
+The recording Chrome runs on its own Xvfb display, sized to exactly `1280·DPR × 720·DPR`, so
+there is no black padding and no cutoff. It launches without `--enable-automation`, resets the
+profile's crash state on every run, and refuses to film when an infobar shows or the DPR is wrong.
+`AEON_RECORDING_DPR=2` gives a 2560×1440 master on smaller machines.
 
-### Prove the kit renders (the exact command used to verify this kit)
+## Edit
 
-```bash
+```sh
 npm install
-# the fixture's clip declares 60 frames; make the frame files for the proof:
-for i in $(seq -w 1 60); do cp public/frames/000001.jpg "public/frames/0000$i.jpg"; done
-npx remotion still src/Root.tsx Video out/frame16x9.png --frame=30          # 16:9
-npx remotion still src/Root.tsx VideoVertical out/frame9x16.png --frame=30  # 9:16, vertical tabs
-npx remotion render src/Root.tsx Video out/short.mp4 --frames=0-59 --codec=h264  # a 2-second clip
+cp <recording>/events.json src/recording.json
+cp <recording>/frames/*.jpg public/frames/
+npm run lint:edit     # the taste linter, both cuts
+npm run audio         # public/audio/score.wav from events.json + director.json
+npm run still         # out/still.png
+npm run render        # lint -> score -> out/DirectorCut.mp4 (+ .json metadata)
+npm run render:square
+npm run render:raw
 ```
 
-This ran once in a temp dir (Remotion 4.0.x, headless shell downloaded on first render): both stills
-and the clip rendered, with the Chrome frame, the drawn cursor and the caption visible.
+`node scripts/render.mjs DirectorCut --no-lint` renders anyway and stamps `"lint": "off"` in the
+metadata file beside the video.
 
-## One full example: two clips, a caption, a title card, 16:9 and 9:16
+## The grammar
 
-Two clips: the page Aeon drove (`events.json` clip) and the chat beside it (a second take). The
-caption and title card are in the edit; the speed badge is derived from gaps in the log.
+- **Stage** (`Stage.tsx`). The window rests on an architectural surface: `obsidian` (`#0B0C0F`,
+  soft overhead light) by default, `stone` (`#ECEAE4`) for dark pages. It gets a grounded
+  multi-layer shadow and a 1 px rim. `focusDim` (0 to 0.38) darkens the edges during a push-in.
+  It never blurs.
+- **Camera** (`camera.ts`, `Camera.tsx`). Every move uses one curve, `cubic-bezier(0.16, 1, 0.3, 1)`,
+  over 480–620 ms, with no overshoot. `fromEvents()` pushes in on the real element bounds of each
+  click, type and key press, arrives as the action happens, and breathes out after. Or write cues
+  yourself: `{ tStart, tEnd, framing: "stage" | "inside" | "focus", focusRect?, scale?, easeMs? }`.
+  **Native-pixel invariant:** a source pixel is never drawn larger than a delivery pixel. A 3×
+  master allows up to 2× into 1080p.
+- **Pair** (`Pair.tsx`, `pair.ts`). At `pairAtMs` the browser glides to 58% and the real terminal
+  (`#141518` / `#E6E8EC`, monospace) emerges at 42%. Set `alignPageY` (source px, from the element's
+  box) and `alignTerminalLine`, and the returned line sits on the same scanline as the value on the
+  page. No arrows, no highlight boxes.
+- **Hold** (`hold.ts`, `Hold.tsx`). After every `receipt` or `result` beat, 1.5–2.0 s of stillness.
+  The camera locks, nothing cuts, and the score is silent after the chord.
+- **TimeCut** (`TimeCut.tsx`). A real time compression shows the wall clock on both sides, read
+  from the recording (`19:02:11 · checked 12` → `21:47:03 · checked 418`).
+- **EditorialBeat** (`EditorialBeat.tsx`). At most five words, quiet, in negative space. Never a slide.
+- **End** (`End.tsx`). The command an engineer copies and the repo, on `#0B0C0F`. No slogan.
+- **Score** (`sound.ts`, `scripts/generate-audio.mjs`). A deterministic 48 kHz 16-bit stereo WAV,
+  synthesized offline:
+  - hushed 18 ms keys on typing
+  - a 25 ms dry trigger on click or Enter
+  - a −28 dB D2 + fifth hum during `compile`, which drops to silence on Enter
+  - a D5 + A5 arrival chord (6 ms attack, 240 ms decay) on the receipt, then silence through the Hold
 
-```ts
-// src/edit.ts — import this from Root.tsx instead of the default buildProps() when you want a
-// hand-directed two-clip video. The API is the kit's own; nothing is compiled into Aeon.
-import events from "./recording.json";
-import { emptyEdit, OUTPUTS, style } from "./presets";
-import { fromEvents } from "./zooms-from-events";
-import { staticFile } from "remotion";
-import type { RenderProps } from "./types";
+## director.json
 
-export function twoClipEdit(portrait: boolean): RenderProps {
-  const vp = { width: events.clip.width, height: events.clip.height };
-  const derived = fromEvents(events as any, vp); // zooms + cursor + segments
-  const frames = Array.from({ length: events.clip.frames }, (_, i) => ({
-    t: (i * 1000) / events.clip.fps,
-    f: `${String(i + 1).padStart(6, "0")}.jpg`,
-  }));
-  return {
-    base: staticFile("frames/"),
-    cursor: derived.cursor, // only from events.json
-    edit: {
-      ...emptyEdit(portrait ? OUTPUTS["9x16"]! : OUTPUTS["16x9"]!, vp, events.clip.fps),
-      frames,
-      source: {
-        viewport: vp,
-        fps: events.clip.fps,
-        duration: events.clip.durationMs,
-        mobile: false,
-        url: "https://example.com",
-      },
-      // horizontal tabs on 16:9, vertical tabs on 9:16; switch theme: 'light' or 'dark'
-      style: style({ frame: portrait ? "vertical" : "horizontal", theme: "dark" }),
-      zooms: derived.zooms,
-      segments: derived.segments,
-      overlays: [{ type: "caption", t0: 800, t1: 2600, text: "Find the answer" }],
-      intro: { text: "One task, start to finish", subtitle: "Recorded with Aeon", duration: 1200 },
-      outro: { text: "Done", duration: 1000 },
-      // a second clip beside the page (chat, or a second tab):
-      side: {
-        frames: frames.map((f) => ({ ...f, f: `chat-${f.f}` })),
-        viewport: vp,
-        title: "Aeon",
-      },
-    },
-  };
+```json
+{
+  "surface": "obsidian",
+  "focusDim": 0.22,
+  "compile": [{ "tStart": 1450, "tEnd": 2400 }],
+  "pair": { "pairAtMs": 2450, "alignPageY": 1401, "alignTerminalLine": 3 },
+  "editorial": [{ "tStart": 4900, "tEnd": 5900, "text": "Any site. An API." }],
+  "segments": [{ "s0": 0, "s1": 6000, "speed": 1 }],
+  "timeCuts": [],
+  "end": { "command": "aeon mcp shop.example", "repo": "github.com/gillasg/aeon-browser", "durationMs": 2400 },
+  "audioSrc": "audio/score.wav"
 }
 ```
 
-Register it as your composition in `src/Root.tsx` (`<Composition id="TwoClip" component={Video}
-defaultProps={twoClipEdit(false)} … />`) and render:
+All times are ms on the clip clock. `segments` keep stretches of the clip, and the gaps between
+them are cuts. A segment with `speed` other than 1 needs a visible `label` (`"4×"`). Optional
+fields: `cues` (otherwise derived from events), `holds` (otherwise one after every receipt or
+result beat), `beats` (`{ t, beat, box }` when the log does not tag them), and `holdMs`.
 
-```bash
-npx remotion render src/Root.tsx TwoClip out/two-clip.mp4
-npx remotion render src/Root.tsx TwoClip out/two-clip-vertical.mp4 --props='{"portrait":true}'
-```
+## Taste linter
 
-**Options you can render:** 16:9 (`1920×1080`), 9:16 (`1080×1920`) and square (`1080×1080`);
-a Chrome frame with horizontal or vertical tabs, light or dark; captions; a title card; a
-"sped up N×" badge (only where the log has a compressed gap); an end card; a code-wallpaper
-background (put a code screenshot in `public/` and set `style.codeWallpaper`). Which tab shows
-when is an edit decision in `side`/`frames`, not a re-recording.
+`npm run lint:edit` runs before every render. It fails on:
 
-**House style:** clean and readable on a phone. Keep text big, cap lines short, and let the picture
-breathe; zoom to what Aeon actually clicked or typed. Real-window recordings should fill the frame
-edge to edge and show the real pointer — do not draw a second cursor over them.
+- upscaling past native pixels, or a source smaller than the output
+- a beat element under 9 px tall on a 390 px phone (push in instead)
+- any camera move, cut, time cut or Pair reveal inside a Hold
+- a speed change with no label
+- an editorial line over five words, or hype copy
+- full-screen title or stat slides
+- `blur`, `tilt`, `glow`, `overshoot`
+- eases outside 480–620 ms
 
-**Honesty rule:** zooms, speed-ups and the cursor come only from `events.json`. Never show Aeon
-doing anything it did not do. A log with no events produces no zooms, no speed badge and no cursor.
-A `terminal` cast in that log is drawn as a pane beside the tab: the command and the output it
-actually printed, at the times they arrived.
+It allows lighting, focus dimming, motivated glides, quiet editorial lines and full sound.
 
-## One-command demo video (recording Chrome, separate from eval)
+## Rules
 
-The VPS has a second, branded Chrome on its own Xvfb display and profile, connected to the same
-daemon as browser `recording`; eval and its services are never touched. The profile loads Aeon
-unpacked via Developer mode Preferences (branded Chrome ignores `--load-extension`) and holds the
-native host manifest plus `agentInFront`/cursor settings for filming. Setup is idempotent.
-From this kit: `npm install` once, then
-`scripts/demo-video.sh "<task>" [--out out/demo.mp4] [--fps 15] [--max-seconds 30]`.
-Set `AEON_RECORDING_PROXY` (e.g. a socks5 URL) to film through another network exit.
-It starts `aeon record start --window chrome`, runs `aeon run --browser recording "<task>"`, stops
-with `--chat <id>` (real actions in `events.json`), copies frames + log in, and renders
-`RecordingVertical`: 720×1280, ≤30 s, H.264, real frames edge to edge, Aeon's own cursor only — no drawn
-cursor, zooms, captions, speed-ups or title cards. Prints the output path. One render at a time.
-
-## Files
-
-| File                                                | What it is                                                             |
-| --------------------------------------------------- | ---------------------------------------------------------------------- |
-| `src/ChromeFrame.tsx`                               | drawn Chrome window, horizontal/vertical tabs, light/dark, split panes |
-| `src/Scene.tsx`                                     | real frames, camera zoom, drawn Aeon cursor and click press            |
-| `src/Video.tsx`                                     | background, title card, captions, speed badge, end card, terminal pane |
-| `src/terminal.ts`                                   | lines of an events.json `terminal` cast at a clip time                 |
-| `src/zooms-from-events.ts`                          | cursor path, zooms and speed segments derived from `events.json`       |
-| `src/layout.ts`, `src/camera.ts`, `src/timeline.ts` | framing, spring camera, source↔video time                              |
-| `src/Root.tsx`, `src/index.ts`                      | the three compositions (16:9, 9:16, square)                            |
-| `EVENTS.md`                                         | the `events.json` format                                               |
+Zooms, beats and sound cues come only from what Aeon did, as recorded in `events.json`. Never show
+Aeon doing something it did not do, and never speed up a run without saying so on screen. The
+fixture in `src/recording.json` is one synthetic 3840×2160 frame so the kit renders out of the box.
+Replace it with your take.

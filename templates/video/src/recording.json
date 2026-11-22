@@ -5,33 +5,83 @@
   "clip": {
     "file": "clip.mp4",
     "source": "window",
-    "width": 1280,
-    "height": 800,
+    "width": 3840,
+    "height": 2160,
     "fps": 30,
-    "startedAt": 0,
-    "durationMs": 2000,
-    "frames": 60
+    "startedAt": 1763823720000,
+    "durationMs": 6000,
+    "frames": 1,
+    "dpr": 3,
+    "logicalWidth": 1280,
+    "logicalHeight": 720
   },
   "events": [
     {
       "id": "e1",
-      "kind": "click",
-      "t": 800,
-      "at": 800,
+      "kind": "type",
+      "t": 600,
+      "at": 1763823720600,
       "tabId": 1,
-      "page": { "x": 420, "y": 300 },
-      "window": { "x": 470, "y": 360 },
-      "text": "Get started"
+      "page": { "x": 640, "y": 194 },
+      "window": { "x": 1920, "y": 843 },
+      "box": { "x": 340, "y": 170, "width": 600, "height": 48 },
+      "windowBox": { "x": 1020, "y": 771, "width": 1800, "height": 144 },
+      "text": "sony wh-1000xm5",
+      "beat": "prompt"
     },
     {
       "id": "e2",
-      "kind": "type",
-      "t": 1300,
-      "at": 1300,
+      "kind": "press",
+      "t": 2400,
+      "at": 1763823722400,
       "tabId": 1,
-      "page": { "x": 640, "y": 460 },
-      "text": "hello"
+      "text": "Enter"
+    },
+    {
+      "id": "e3",
+      "kind": "click",
+      "t": 2900,
+      "at": 1763823722900,
+      "tabId": 1,
+      "page": { "x": 640, "y": 380 },
+      "window": { "x": 1920, "y": 1401 },
+      "box": { "x": 340, "y": 350, "width": 600, "height": 60 },
+      "windowBox": { "x": 1020, "y": 1311, "width": 1800, "height": 180 },
+      "text": "Sony WH-1000XM5",
+      "beat": "receipt"
     }
   ],
-  "note": "Tiny fixture. Replace this file with your recording's events.json and put its frames in public/frames/."
+  "terminal": {
+    "version": 1,
+    "command": "aeon mcp shop.example",
+    "startedAt": 1763823722450,
+    "events": [
+      { "t": 2450, "kind": "in", "text": "aeon tool search_price '{\"q\":\"wh-1000xm5\"}'" },
+      {
+        "t": 2900,
+        "kind": "out",
+        "text": "{\n  \"name\": \"Sony WH-1000XM5\",\n  \"price\": 26990,\n  \"currency\": \"INR\"\n}\n"
+      },
+      { "t": 2920, "kind": "out", "text": "0.4 s · site API · no model · $0.00\n" }
+    ]
+  },
+  "soundCues": [
+    { "t": 600, "kind": "key" },
+    { "t": 655, "kind": "key" },
+    { "t": 710, "kind": "key" },
+    { "t": 765, "kind": "key" },
+    { "t": 820, "kind": "key" },
+    { "t": 875, "kind": "key" },
+    { "t": 930, "kind": "key" },
+    { "t": 985, "kind": "key" },
+    { "t": 1040, "kind": "key" },
+    { "t": 1095, "kind": "key" },
+    { "t": 1150, "kind": "key" },
+    { "t": 1205, "kind": "key" },
+    { "t": 1260, "kind": "key" },
+    { "t": 1315, "kind": "key" },
+    { "t": 1370, "kind": "key" },
+    { "t": 2400, "kind": "trigger" }
+  ],
+  "note": "Fixture: one synthetic 3840x2160 frame (DPR 3). Replace with your recording's events.json and put its frames in public/frames/."
 }

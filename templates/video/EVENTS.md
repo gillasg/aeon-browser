@@ -15,12 +15,15 @@ window image, when the window was calibrated).
   "clip": {
     "file": "clip.mp4",
     "source": "window",
-    "width": 1280,
-    "height": 800,
+    "width": 3840,
+    "height": 2160,
     "fps": 30,
     "startedAt": 1731000000000,
     "durationMs": 12400,
-    "frames": 372
+    "frames": 372,
+    "dpr": 3,
+    "logicalWidth": 1280,
+    "logicalHeight": 720
   },
   "clips": [{ "...": "one entry per tab with --tabs; the first is also `clip`" }],
   "events": [
@@ -31,7 +34,9 @@ window image, when the window was calibrated).
       "at": 1731000000820,
       "tabId": 4,
       "page": { "x": 412, "y": 308 },
-      "window": { "x": 462, "y": 368 },
+      "window": { "x": 1236, "y": 1185 },
+      "box": { "x": 352, "y": 290, "width": 120, "height": 36 },
+      "windowBox": { "x": 1056, "y": 1131, "width": 360, "height": 108 },
       "text": "Get started"
     },
     {
@@ -41,8 +46,14 @@ window image, when the window was calibrated).
       "at": 1731000001310,
       "tabId": 4,
       "page": { "x": 640, "y": 460 },
-      "text": "hello"
+      "text": "hello",
+      "beat": "prompt"
     }
+  ],
+  "soundCues": [
+    { "t": 820, "kind": "trigger" },
+    { "t": 1310, "kind": "key" },
+    { "t": 1365, "kind": "key" }
   ],
   "terminal": {
     "version": 1,
@@ -59,9 +70,11 @@ window image, when the window was calibrated).
 
 ## Fields
 
-- `clip`: size (`width`×`height` in px), `fps`, `startedAt` (epoch ms of frame t=0), `durationMs`,
+- `clip`: size (`width`×`height` in captured px), `fps`, `startedAt` (epoch ms of frame t=0), `durationMs`,
   `frames`, and `file` (`clip.mp4`, or `takes/` with `--tabs`). `source` is `window`, `screen` or
-  `tabs`. With `--tabs`, `clips[]` lists one entry per recorded tab (`tabId` on each).
+  `tabs`. With `--tabs`, `clips[]` lists one entry per recorded tab (`tabId` on each). When the
+  capture DPR is known (`AEON_RECORDING_DPR`, set by `setup-recording-chrome.sh`), `dpr`,
+  `logicalWidth` and `logicalHeight` are present: `width = logicalWidth × dpr`.
 - `events[]`: each thing Aeon did:
   - `kind`: `click`, `type`, `press`, `scroll`, `navigate`, `tab-switch`.
   - `t`: ms from clip t=0; `at`: epoch ms of the same moment.
@@ -71,6 +84,13 @@ window image, when the window was calibrated).
   - `text`: what was typed, the key pressed, the destination URL or the tab title. Secrets are not
     included.
   - `scroll`: scroll delta when it is known.
+  - `box`: the acted element's bounds in page CSS px (`{x, y, width, height}`), when the trace had
+    them; `windowBox`: the same bounds in captured-window px, when the window was calibrated. The
+    studio's camera pushes in on these.
+  - `beat` (optional): what the event carries in the story, one of `prompt`, `teach`, `compile`,
+    `receipt`, `result`, `terminal`, `watch`, `boost`. A `receipt` or `result` opens a Hold.
+- `soundCues` (optional): `{t, kind}` with `kind` `key`, `trigger`, `start`, `needs-you` or `done`,
+  derived from real events: one `key` per typed character, a `trigger` on each click and on Enter.
 - `note`: present when the action list is incomplete (e.g. no trace was attached at start). The clip
   metadata and frames are still valid.
 - `terminal`: optional asciinema-style cast from `aeon record terminal --out dir --run "<command>"`.
@@ -82,7 +102,7 @@ window image, when the window was calibrated).
 
 - Zooms, speed-ups and the drawn cursor are derived **only** from `events[]`. Do not invent an
   action, a location or a speed-up that is not in the log.
-- A speed-up must carry a visible "sped up N×" badge. Never compress an action Aeon actually took
+- A speed-up must carry a visible label (`4×`). Never compress an action Aeon actually took
   time over without saying so.
 - On a real-window recording the real pointer is already in the frames: draw no second cursor.
 - Which tab shows when is an edit decision (a timeline over `clips[]`), never a re-recording.
