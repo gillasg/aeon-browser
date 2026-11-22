@@ -319,13 +319,28 @@ function domQuietProbe() {
     );
   }
   function ownOverlay(record: MutationRecord) {
-    return !!(record.target as Element).closest?.(OVERLAY);
+    return !!(record.target as Element).closest?.(OVERLAY) || stealthHost(record.target);
   }
   function overlayNode(record: MutationRecord) {
     for (const node of [...record.addedNodes, ...record.removedNodes]) {
+      if (stealthHost(node)) return true;
       if (node instanceof Element && (node.matches(OVERLAY) || node.closest(OVERLAY))) return true;
     }
     return false;
+  }
+  // The cursor and its controls mount unmarked hosts (a page must not find them): an empty div
+  // whose only attribute is a full-viewport, click-through, topmost style. Its content lives in a
+  // closed shadow root, so to this world it has no children and no shadowRoot.
+  function stealthHost(node: Node) {
+    if (!(node instanceof HTMLDivElement)) return false;
+    if (node.attributes.length !== 1 || node.childNodes.length || node.shadowRoot) return false;
+    const style = node.style;
+    return (
+      style.position === "fixed" &&
+      style.zIndex === "2147483647" &&
+      style.pointerEvents === "none" &&
+      ["top", "right", "bottom", "left"].every((side) => style.getPropertyValue(side) === "0px")
+    );
   }
   function unchangedAttribute(record: MutationRecord) {
     return (
