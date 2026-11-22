@@ -51,6 +51,8 @@ A bot wall (Cloudflare, DataDome and the like) logs a `[warn] challenge:` line w
 Try its checkbox once (`page.clickAt` on it). A press-and-hold check gets one try with
 `page.hold(target, {ms})` or `page.holdAt(x, y, {ms})`; if the check is still there,
 `await bu.handoff("Please finish the check", {wait: true})` returns once the page is clear. Never
-try more than once. To reuse the signed-in session from a script, `browserkit session export
+try more than once. "Just a moment" / "Checking your browser" pages clear by themselves: wait,
+never click or reload. `page.widgetShot({selector?})` crops one widget (default: the visible check
+frame) to look at it. To reuse the signed-in session from a script, `browserkit session export
 <site>` or `browserkit cookies export <site>` saves the cookies, mapped site or not.
 `help('gated')`.

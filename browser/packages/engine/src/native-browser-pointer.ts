@@ -2,7 +2,7 @@ import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { send } from "./cdp/send.js";
 import { showAgentCursor } from "./native-browser-cursor.js";
 import { pointerButtonBits, pointerPress } from "./native-browser-debugger.js";
-import { humanMouse } from "./native-browser-human-input.js";
+import { dragPath, humanMouse } from "./native-browser-human-input.js";
 import { withFocusEmulation } from "./native-browser-session.js";
 
 type PointerStep = Extract<BrowserExecutorRequest["step"], { op: "pointer" }>;
@@ -93,13 +93,10 @@ async function dragPointer(
     ...held,
   });
   try {
-    for (let i = 1; i <= 12; i++)
-      await mouse(
-        "mouseMoved",
-        step.x + ((step.toX - step.x) * i) / 12,
-        step.y + ((step.toY - step.y) * i) / 12,
-        { button: "left", buttons: 1, ...held },
-      );
+    // A curved, slightly jittered path: a straight evenly spaced line is a synthetic tell, and
+    // drop targets that track pointermove need intermediate points to register a hover.
+    for (const point of dragPath({ x: step.x, y: step.y }, { x: step.toX, y: step.toY }))
+      await mouse("mouseMoved", point.x, point.y, { button: "left", buttons: 1, ...held });
   } finally {
     await mouse("mouseReleased", step.toX, step.toY, {
       button: "left",

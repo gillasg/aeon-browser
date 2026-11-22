@@ -23,6 +23,32 @@ export interface ReadinessSnapshot {
   links?: number;
   rows?: number;
   forms?: number;
+  /** An input with autocomplete=one-time-code or a short numeric code field. */
+  hasOneTimeCode?: boolean;
+  /** A meta refresh tag, the classic passive redirect gate. */
+  metaRefresh?: boolean;
+  /** A visible captcha widget frame or response field (reCAPTCHA, hCaptcha, Turnstile, Arkose). */
+  captchaWidget?: boolean;
+}
+
+/**
+ * What stands between the agent and the page. `interactive: false` clears by itself (a JS check or
+ * a redirect gate): wait it out, never click or reload. `interactive: true` needs the person.
+ */
+export type GateKind =
+  "interstitial" | "captcha" | "verification" | "login" | "two-factor" | "blocked";
+
+export interface Gate {
+  kind: GateKind;
+  interactive: boolean;
+}
+
+/** A clean pause for the user: where, why, and what to tell them. Resume once the gate is gone. */
+export interface HumanHandoff {
+  url?: string;
+  reason: GateKind;
+  guidance: string;
+  resume: "when-cleared";
 }
 
 export interface Readiness {
@@ -33,13 +59,49 @@ export interface Readiness {
   httpStatus?: number | null;
   textLength: number;
   at: string;
+  gate?: Gate;
 }
 
-const CHALLENGE = [
+// Passive checks: a JavaScript challenge or redirect that clears on its own within seconds.
+const PASSIVE = [
   "just a moment",
-  "attention required",
   "checking your browser",
+  "checking if the site connection is secure",
+  "verifying your browser",
+  "please wait while we verify",
+  "redirecting",
+  "one moment, please",
+];
+
+// Interactive verification: a person has to act. Checked before the passive list.
+const INTERACTIVE = [
   "verify you are human",
+  "are you a robot",
+  "i'm not a robot",
+  "press and hold",
+  "press & hold",
+  "complete the security check",
+  "select all images",
+  "solve this puzzle",
+  "captcha",
+];
+
+const BLOCKED = ["access denied", "you have been blocked", "request blocked", "403 forbidden"];
+
+const TWO_FACTOR = [
+  "two-step verification",
+  "2-step verification",
+  "two-factor",
+  "2fa",
+  "verification code",
+  "enter the code",
+  "authenticator app",
+  "security code",
+  "one-time code",
+];
+
+const CHALLENGE = [
+  "attention required",
   "are you a robot",
   "unusual traffic",
   "enable javascript and cookies to continue",
@@ -116,22 +178,54 @@ export function classifyReadiness(snapshot: ReadinessSnapshot): Readiness {
     at: new Date().toISOString(),
   });
 
+  const gated = (state: ReadinessState, kind: GateKind, interactive: boolean): Readiness => ({
+    ...finish(state),
+    gate: { kind, interactive },
+  });
+
+  const interactive = includesAny(text, INTERACTIVE);
+  if (snapshot.captchaWidget === true || interactive.length) {
+    if (snapshot.captchaWidget === true) evidence.push("captcha widget on the page");
+    if (interactive.length)
+      evidence.push(`challenge wording (verification): ${interactive.slice(0, 3).join(", ")}`);
+    return gated("challenge", snapshot.captchaWidget === true ? "captcha" : "verification", true);
+  }
+  const blocked = includesAny(text, BLOCKED);
+  if (blocked.length && textLength < 2500) {
+    evidence.push(`challenge wording (blocked): ${blocked[0]}`);
+    return gated("challenge", "blocked", true);
+  }
+  const passive = includesAny(text, PASSIVE);
+  if ((passive.length || snapshot.metaRefresh === true) && textLength < 2500) {
+    if (passive.length)
+      evidence.push(`challenge wording (passive): ${passive.slice(0, 3).join(", ")}`);
+    if (snapshot.metaRefresh === true) evidence.push("meta refresh redirect");
+    return gated("challenge", "interstitial", false);
+  }
   const challenge = includesAny(text, CHALLENGE);
   if (challenge.length) {
     evidence.push(`challenge wording: ${challenge.slice(0, 3).join(", ")}`);
-    return finish("challenge");
+    const throttled = challenge.some((word) => /rate limit|too many/.test(word));
+    return gated("challenge", throttled ? "blocked" : "verification", true);
+  }
+
+  const twoFactor = includesAny(`${title}\n${heading}`.toLowerCase(), TWO_FACTOR);
+  if (snapshot.hasOneTimeCode === true || (twoFactor.length && (snapshot.forms ?? 0) > 0)) {
+    if (snapshot.hasOneTimeCode === true) evidence.push("one-time code field");
+    if (twoFactor.length) evidence.push(`two-factor wording: ${twoFactor[0]}`);
+    return gated("login", "two-factor", true);
   }
 
   if (snapshot.hasPassword === true) {
     evidence.push("password field on the page");
-    return finish("login");
+    return gated("login", "login", true);
   }
   const login = includesAny(`${heading}\n${title}`.toLowerCase(), LOGIN);
   const walled = textLength < 1500 && (snapshot.forms ?? 0) > 0 && (snapshot.links ?? 0) < 40;
   if (login.length && (walled || (snapshot.hasEmail === true && snapshot.hasSignInLink === true))) {
     evidence.push(`sign-in wording: ${login[0]}`);
     if (walled) evidence.push("little content outside the form");
-    return finish("login");
+    return gated("login", "login", true);
   }
 
   const stillLoading =
@@ -181,6 +275,69 @@ export function classifyReadiness(snapshot: ReadinessSnapshot): Readiness {
   return finish("ready");
 }
 
+const GUIDANCE: Record<GateKind, string> = {
+  interstitial: "A browser check that clears by itself: wait, do not click or reload.",
+  captcha: "A check for people: ask the user to pass it in the tab, then continue.",
+  verification: "The site wants a person to verify: ask the user to finish it in the tab.",
+  login: "Signed out: sign in with the password manager, or ask the user to sign in.",
+  "two-factor": "The site wants a code: ask the user to enter it in the tab.",
+  blocked: "The site refused this request: retrying will not help; use another route.",
+};
+
+/** The structured pause for an interactive gate, or undefined when nothing needs the person. */
+export function humanHandoff(readiness: Readiness): HumanHandoff | undefined {
+  const gate = readiness.gate;
+  if (!gate?.interactive) return undefined;
+  return {
+    ...(readiness.url ? { url: readiness.url } : {}),
+    reason: gate.kind,
+    guidance: GUIDANCE[gate.kind],
+    resume: "when-cleared",
+  };
+}
+
+export interface WaitOutOptions {
+  timeoutMs?: number;
+  intervalMs?: number;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+export interface WaitOutResult {
+  outcome: "cleared" | "interactive" | "timeout";
+  readiness: Readiness;
+  polls: number;
+  waitedMs: number;
+  handoff?: HumanHandoff;
+}
+
+/**
+ * Waits out a passive interstitial by polling, never clicking or reloading. Stops at once when the
+ * page turns into an interactive gate (hand it to the user) and after `timeoutMs` (default 15 s).
+ */
+export async function waitOutInterstitial(
+  probe: () => Promise<ReadinessSnapshot>,
+  options: WaitOutOptions = {},
+): Promise<WaitOutResult> {
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((ms: number) => new Promise((done) => setTimeout(done, ms)));
+  const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 15_000, 0), 60_000);
+  const intervalMs = Math.max(options.intervalMs ?? 750, 100);
+  const started = now();
+  let polls = 0;
+  for (;;) {
+    const readiness = classifyReadiness(await probe());
+    polls += 1;
+    const waitedMs = now() - started;
+    const handoff = humanHandoff(readiness);
+    if (handoff) return { outcome: "interactive", readiness, polls, waitedMs, handoff };
+    if (readiness.gate?.kind !== "interstitial" && readiness.state !== "loading")
+      return { outcome: "cleared", readiness, polls, waitedMs };
+    if (waitedMs >= timeoutMs) return { outcome: "timeout", readiness, polls, waitedMs };
+    await sleep(Math.min(intervalMs, timeoutMs - waitedMs));
+  }
+}
+
 /**
  * The page half: one expression that gathers the snapshot without touching the page's own state.
  * Kept as a string because it runs through the page's debugger, not in the extension.
@@ -208,6 +365,9 @@ export const readinessSnapshotExpression = `(() => {
     main: !!document.querySelector("main, [role=main], article, #content, .content"),
     links: document.links ? document.links.length : 0,
     rows: document.querySelectorAll("li, article, [role=listitem], tr").length,
-    forms: document.forms ? document.forms.length : 0
+    forms: document.forms ? document.forms.length : 0,
+    hasOneTimeCode: !!document.querySelector("input[autocomplete=one-time-code], input[inputmode=numeric][maxlength='6'], input[name*=otp i]"),
+    metaRefresh: !!document.querySelector("meta[http-equiv=refresh i]"),
+    captchaWidget: [...document.querySelectorAll("iframe")].some((f) => /recaptcha\\/(api2|enterprise)|hcaptcha\\.com|challenges\\.cloudflare\\.com|arkoselabs|funcaptcha|captcha-delivery\\.com/.test(f.src || "") && !/size=invisible/.test(f.src || "")) || !!document.querySelector("#px-captcha")
   };
 })()`;

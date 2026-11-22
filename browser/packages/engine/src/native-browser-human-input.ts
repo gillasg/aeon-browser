@@ -87,6 +87,31 @@ export function trajectory(from: Point, to: Point): { point: Point; delay: numbe
   }));
 }
 
+/**
+ * Intermediate points for a drag from `from` to `to`: a gentle bow with sub-pixel jitter that
+ * fades out on arrival, always at least 8 points and ending exactly on the target.
+ */
+export function dragPath(from: Point, to: Point): Point[] {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  const steps = Math.max(8, Math.min(40, Math.round(distance / 12)));
+  const normal = distance > 0 ? { x: -dy / distance, y: dx / distance } : { x: 0, y: 0 };
+  const bow = (unit() < 0.5 ? -1 : 1) * random(0.02, 0.08) * distance;
+  const points: Point[] = [];
+  for (let i = 1; i <= steps; i++) {
+    const s = minimumJerk(i / steps);
+    const arc = 4 * s * (1 - s) * bow;
+    const tremor = i === steps ? 0 : (1 - s) * 0.8;
+    points.push({
+      x: Math.round((from.x + dx * s + normal.x * arc + noise(tremor)) * 10) / 10,
+      y: Math.round((from.y + dy * s + normal.y * arc + noise(tremor)) * 10) / 10,
+    });
+  }
+  points[points.length - 1] = { x: to.x, y: to.y };
+  return points;
+}
+
 type TabState = {
   pointer?: Point;
   aim?: Point & { dx: number; dy: number };

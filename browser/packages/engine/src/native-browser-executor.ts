@@ -1,3 +1,4 @@
+import { noteChallengeSeen } from "./native-browser-human-input.js";
 import { noteActionTiming } from "./native-browser-action-timing.js";
 import { closedByAction } from "./native-browser-closed-tab.js";
 import { respondFailure, sendFailure } from "./native-browser-result.js";
@@ -95,6 +96,7 @@ import { captureFromTabStart } from "./native-browser-network.js";
 import { executeCookies, type CookieStep } from "./native-browser-cookies.js";
 import {
   classifyReadiness,
+  humanHandoff,
   readinessSnapshotExpression,
   type ReadinessSnapshot,
 } from "./readiness.js";
@@ -270,10 +272,15 @@ export async function performExtra(
           pending: settle.pending,
         };
       }
-      if (step.op === "readiness")
-        return classifyReadiness(
+      if (step.op === "readiness") {
+        const readiness = classifyReadiness(
           ((await evaluate(debuggee, readinessSnapshotExpression)) ?? {}) as ReadinessSnapshot,
         );
+        // A gate switches this tab to human-paced input; an interactive one carries the pause.
+        if (readiness.gate) noteChallengeSeen(tabId);
+        const handoff = humanHandoff(readiness);
+        return handoff ? { ...readiness, handoff } : readiness;
+      }
       if (step.op === "evaluate" || step.op === "cdp" || step.op === "waitFor") {
         if (
           step.op === "cdp" &&

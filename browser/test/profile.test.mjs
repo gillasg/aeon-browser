@@ -11,3 +11,23 @@ test("the managed profile is separate, fresh and extension-free", () => {
   assert.ok(args.includes("--no-first-run"));
   assert.equal(args.at(-1), "https://example.com");
 });
+
+test("the managed profile launches with no automation tells", () => {
+  const args = profileArgs(profileDirectory(), "https://example.com");
+  // Each of these makes navigator.webdriver true, shows the automation infobar, exposes a debug
+  // port, or changes rendering in a way bot checks score.
+  const tells = [
+    /^--enable-automation/,
+    /^--remote-debugging-(port|pipe)/,
+    /^--headless/,
+    /^--disable-blink-features/,
+    /^--user-agent=/,
+    /^--lang=/,
+    /^--window-size=/,
+    /^--test-type/,
+    /^--no-sandbox/,
+  ];
+  for (const arg of args)
+    for (const tell of tells)
+      assert.ok(!tell.test(arg), `launch flag ${arg} is an automation tell`);
+});

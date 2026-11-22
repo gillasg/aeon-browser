@@ -566,6 +566,34 @@ function __extendPageSurface(target, base) {
         indexedDB: databases, caches, serviceWorkers: workers,
       };
     }, options),
+    // A cropped screenshot of one widget, to look at a verification widget or embedded frame
+    // closely before handing it to the user. Finds the selector (default: a visible captcha or
+    // challenge frame) through open shadow roots; the box is in top-level viewport pixels.
+    widgetShot: async (options = {}) => {
+      var find = function (selector) {
+        var pattern = /recaptcha|hcaptcha|challenges\.cloudflare|arkoselabs|funcaptcha|captcha-delivery/;
+        var roots = [document];
+        while (roots.length) {
+          var root = roots.shift();
+          for (var el of root.querySelectorAll(selector || 'iframe,#px-captcha')) {
+            var r = el.getBoundingClientRect();
+            if (r.width < 8 || r.height < 8) continue;
+            if (!selector && el.tagName === 'IFRAME' && !pattern.test(el.src || '')) continue;
+            return {x: r.x, y: r.y, width: r.width, height: r.height, frame: el.tagName === 'IFRAME' ? String(el.src || '').slice(0, 200) : null};
+          }
+          for (var host of root.querySelectorAll('*')) if (host.shadowRoot) roots.push(host.shadowRoot);
+        }
+        return null;
+      };
+      var box = (await __step({op:'evaluate', target, expression: '(' + find.toString() + ')(' + JSON.stringify(options.selector || '') + ')'})).data.value;
+      if (!box) return {found: false};
+      var pad = Math.max(0, Math.min(64, options.padding ?? 8));
+      var clip = {x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + pad * 2, height: box.height + pad * 2, scale: 1};
+      var shot = await page.cdp('Page.captureScreenshot', {format: 'png', clip});
+      var name = options.path || 'widgets/widget-' + Date.now() + '.png';
+      await artifact(name, __bytesFromBase64(shot.data));
+      return {found: true, saved: name, box: {x: box.x, y: box.y, width: box.width, height: box.height}, frame: box.frame};
+    },
     // Small screenshots of icon-only controls, not the whole page.
     iconTiles: async (options = {}) => {
       var boxes = (await __step({op:'evaluate', target, expression: '(' + __iconBoxes.toString() + ')(' + JSON.stringify(options.max || 30) + ',' + JSON.stringify(options.selector || '') + ')'})).data.value || [];
