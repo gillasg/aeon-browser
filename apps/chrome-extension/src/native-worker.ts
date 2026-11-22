@@ -80,7 +80,7 @@ import {
   openNativeChat,
   takeNativeInitialSubmit,
 } from "./native-worker-tabs.js";
-import { extensionBuild, loadExtensionBuild } from "./extension-build.js";
+import { extensionBuild } from "./extension-build.js";
 import { reportLink } from "./link-state.js";
 
 const NATIVE_HOST = "com.aeon.native_host";
@@ -102,7 +102,6 @@ let connecting: Promise<ExecutorConnection> | undefined;
 let linkDownTimer: number | undefined;
 /** Parts of the worker that failed to start; pages that can't connect report them. */
 const startupFailures: string[] = [];
-void loadExtensionBuild();
 
 configureEngine({
   controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,

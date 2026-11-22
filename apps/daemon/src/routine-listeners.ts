@@ -16,6 +16,24 @@ const ERROR_BACKOFF_MS = 30_000;
 export const isListening = (routine: Pick<RoutineRecord, "check">): boolean =>
   Boolean(routine.check && LISTEN_DIRECTIVE.test(routine.check));
 
+type CheckResult = { met: boolean; value?: unknown; error?: string; idle?: boolean };
+
+/**
+ * One listener pass. A live routine waits on an open tab; when none matches it is idle, and a
+ * check that also says "use listen" then runs on its own (it opens its page and waits there).
+ * The timer skips every "use listen" routine, so without this a live listening check whose tab
+ * was closed never ran again and its watcher never fired.
+ */
+export async function listenerPass(
+  routine: Pick<RoutineRecord, "check" | "listen">,
+  live: () => Promise<CheckResult>,
+  plain: () => Promise<CheckResult>,
+): Promise<CheckResult> {
+  if (!isLive(routine)) return plain();
+  const heard = await live();
+  return heard.idle && isListening(routine) ? plain() : heard;
+}
+
 export interface ListenerHost {
   routines(): readonly RoutineRecord[];
   available(routine: RoutineRecord): boolean;

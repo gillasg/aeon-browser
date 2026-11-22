@@ -25,7 +25,7 @@ const GUIDELINES = [
   "In browser_code, `[api]` reads are siteMapper.call and `[saved]` abilities site.run. Writes: do one in the page; once it worked, siteMapper.write repeats it and siteMapper.batch runs it over many items (paced, stops at the first error; continue what is left in the page). Paying, ordering, sending, posting, deleting and account changes always stay in the page.",
   "watch: like call, but returns only items new or changed since the last watch of the same operation and params; the first returns first: true. Pair it with a routine to check on a schedule. key names the field that identifies an item when the default (id, url, ...) is wrong.",
   "explore maps sites you have not used yet (sites: ['a.com']) in background tabs, looking only. The system runs it when a routine or watcher needs a site with no read that fits; use it yourself only when a task needs a part of a site that no page you can reach shows. It is heavy (an agent with its own tabs per site): explore one site at a time, and for sites built on the same code explore one, then call its learned API on the rest. Many pages or sites: browser.job (or crawl for plain reads), never one long cell.",
-  "import adds capture files from outside the browser (HAR, mitmproxy flows from phone or desktop apps) to a site's API.",
+  "import adds capture files from outside the browser (HAR, mitmproxy flows from phone or desktop apps) to a site's API, or installs a saved site pack (its .zip or extracted folder, in the workspace; the pack names its site) with its abilities.",
   ...SITE_TOOL_HELP,
   "Long results are saved in the workspace and previewed; load the file in browser_code or read it with other tools if you need all of it.",
 ];

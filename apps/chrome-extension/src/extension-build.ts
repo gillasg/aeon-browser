@@ -1,18 +1,13 @@
 // The build the running extension was loaded from. The daemon sends its own installed build in
 // every heartbeat acknowledgement; when they differ, the extension reloads itself so a rebuilt
 // engine never sits behind a stale service worker.
+//
+// The build is compiled into the bundle, not read from build-info.json at run time: Chrome can
+// keep running a cached service worker after the folder was rebuilt, and that worker would read
+// the new file, match the daemon and never reload.
 
-let build: string | undefined;
-let loading: Promise<string | undefined> | undefined;
+const embedded = typeof __AEON_BUILD_INFO__ === "string" ? __AEON_BUILD_INFO__.trim() : undefined;
 
 export function extensionBuild(): string | undefined {
-  return build;
-}
-
-export function loadExtensionBuild(): Promise<string | undefined> {
-  loading ??= fetch(chrome.runtime.getURL("build-info.json"))
-    .then((response) => (response.ok ? response.text() : undefined))
-    .then((text) => (build = text?.trim() || undefined))
-    .catch(() => undefined);
-  return loading;
+  return embedded || undefined;
 }

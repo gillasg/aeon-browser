@@ -159,6 +159,16 @@ function contains(value: unknown, wanted: unknown): boolean {
 }
 
 /** Runs the stored cases; a read whose different inputs give one identical answer is constant. */
+/**
+ * Inputs that differ only by case or surrounding space ("oak lamp" and "Oak lamp ") ask the same
+ * question: their equal answers do not show that the result ignores its inputs.
+ */
+function inputKey(inputs: Record<string, unknown>): string {
+  return JSON.stringify(inputs, (_key, value: unknown) =>
+    typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : value,
+  );
+}
+
 export async function testAbilityCases(
   ability: Ability,
   run: (inputs: Record<string, unknown>) => Promise<unknown>,
@@ -171,7 +181,7 @@ export async function testAbilityCases(
       const missing = Object.entries(test.expect ?? {})
         .filter(([, wanted]) => !contains(value, wanted))
         .map(([field]) => field);
-      answers.set(JSON.stringify(test.inputs), JSON.stringify(value));
+      answers.set(inputKey(test.inputs), JSON.stringify(value));
       cases.push({
         inputs: test.inputs,
         ok: !missing.length,

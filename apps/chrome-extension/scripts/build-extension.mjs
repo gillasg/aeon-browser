@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
@@ -38,6 +39,7 @@ export async function buildExtension() {
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   const cursorPage = await import(pathToFileURL(engine("cursor-page")).href);
+  const buildInfo = buildInfoText();
   const shared = {
     bundle: true,
     platform: "browser",
@@ -45,7 +47,7 @@ export async function buildExtension() {
     jsx: "automatic",
     target: "chrome116",
     loader: { ".ttf": "file" },
-    define: { __AEON_NATIVE_TRANSPORT__: "true" },
+    define: { __AEON_NATIVE_TRANSPORT__: "true", __AEON_BUILD_INFO__: JSON.stringify(buildInfo) },
     plugins: [cursorPaintPlugin(cursorPage)],
   };
   const entries = [
@@ -62,16 +64,14 @@ export async function buildExtension() {
 
   await buildViewerWorker(shared, output);
   await Promise.all(
-    STATIC_FILES.map((file) =>
-      copyFile(
-        join(appRoot, file),
-        join(output, file.startsWith("manifest.") ? "manifest.json" : file),
-      ),
+    STATIC_FILES.filter((file) => !file.startsWith("manifest.")).map((file) =>
+      copyFile(join(appRoot, file), join(output, file)),
     ),
   );
+  await writeManifest(output);
   await copyFile(join(appRoot, "../../packages/ui/src/tokens.css"), join(output, "ui-tokens.css"));
   await writeCursorPage(output);
-  await writeBuildInfo(output);
+  await writeFile(join(output, "build-info.json"), buildInfo);
   process.stdout.write(`Built native extension at ${output}\n`);
 }
 
@@ -136,8 +136,9 @@ async function buildEntries(shared, output, entries) {
   );
 }
 
-// Which revision of Aeon this build used.
-async function writeBuildInfo(output) {
+// Which revision of Aeon this build used, plus a stamp unique to this build: two builds of one
+// revision (a dirty tree, a rebuilt dependency) must still differ, or a stale worker matches.
+function buildInfoText() {
   let revision = null;
   try {
     revision = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -147,8 +148,20 @@ async function writeBuildInfo(output) {
   } catch {
     // Not a git checkout.
   }
-  await writeFile(
-    join(output, "build-info.json"),
-    JSON.stringify({ aeon: revision }, null, 2) + "\n",
-  );
+  return JSON.stringify({ aeon: revision, build: randomUUID() }, null, 2) + "\n";
+}
+
+// Chrome keeps an extension's registered service worker across restarts while the manifest
+// version is unchanged, so a rebuilt folder kept running the old worker. Every build gets its own
+// version (0.1.<day>.<half-minute of the day>, rising); version_name keeps the readable one.
+export function buildVersion(now = Date.now()) {
+  const seconds = Math.floor(now / 1000);
+  return `0.1.${Math.floor(seconds / 86_400) % 65_536}.${Math.floor((seconds % 86_400) / 2)}`;
+}
+
+async function writeManifest(output) {
+  const manifest = JSON.parse(await readFile(join(appRoot, "manifest.native.json"), "utf8"));
+  manifest.version_name ??= manifest.version;
+  manifest.version = buildVersion();
+  await writeFile(join(output, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 }

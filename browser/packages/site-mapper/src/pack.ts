@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import type { Ability } from "./abilities.js";
 import { abilitySlug } from "./ability-files.js";
@@ -161,8 +161,9 @@ export async function exportSitePack(options: {
   };
 }
 
+/** Reads a pack zip, or the folder a pack zip was extracted into. */
 export async function readSitePack(file: string): Promise<SitePack> {
-  const entries = await readZip(file);
+  const entries = (await isFolder(file)) ? await readFolder(file) : await readZip(file);
   const paths = Object.keys(entries);
   for (const path of paths) safePath(path);
   const manifest = readManifest(entries);
@@ -176,6 +177,30 @@ export async function readSitePack(file: string): Promise<SitePack> {
       return typeof item.name === "string";
     }),
   };
+}
+
+async function isFolder(path: string): Promise<boolean> {
+  return (await stat(path).catch(() => undefined))?.isDirectory() ?? false;
+}
+
+async function readFolder(root: string): Promise<Record<string, Uint8Array>> {
+  const entries: Record<string, Uint8Array> = {};
+  for (const item of await readdir(root, { recursive: true, withFileTypes: true })) {
+    if (!item.isFile()) continue;
+    const full = join(item.parentPath, item.name);
+    entries[relative(root, full).split(sep).join("/")] = new Uint8Array(await readFile(full));
+  }
+  return entries;
+}
+
+/** True when path is a site pack (a zip or extracted folder holding a pack.json). */
+export async function isSitePack(path: string): Promise<boolean> {
+  if (await isFolder(path)) return existsSync(join(path, "pack.json"));
+  try {
+    return Boolean(unzipSync(new Uint8Array(await readFile(path)))["pack.json"]);
+  } catch {
+    return false;
+  }
 }
 
 async function readZip(file: string): Promise<Record<string, Uint8Array>> {

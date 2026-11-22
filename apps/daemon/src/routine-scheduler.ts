@@ -13,7 +13,12 @@ import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
 import { createAeonHostHandler, siteMapperRequest } from "@aeon/pi-adapter";
-import { isListening, LISTEN_TIMEOUT_MS, RoutineListeners } from "./routine-listeners.js";
+import {
+  isListening,
+  listenerPass,
+  LISTEN_TIMEOUT_MS,
+  RoutineListeners,
+} from "./routine-listeners.js";
 import { isLive, liveCheckCode } from "./routine-listen.js";
 import { countBusyRoutines } from "./daemon-activity.js";
 import { deliverRoutineWebhook } from "./routine-webhook.js";
@@ -35,9 +40,11 @@ export class RoutineScheduler {
       !routine.requiredBrowserInstanceId ||
       this.browser.isInstanceAvailable(routine.requiredBrowserInstanceId),
     check: (routine) =>
-      isLive(routine)
-        ? this.runLiveCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS)
-        : this.runCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS),
+      listenerPass(
+        routine,
+        () => this.runLiveCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS),
+        () => this.runCheck(routine, `listen:${randomUUID()}`, LISTEN_TIMEOUT_MS),
+      ),
     failed: (routine, error) => this.onCheck?.(routine, { met: false, error }),
     heard: (routine, value) => {
       this.heard.set(routine.routineId, value);

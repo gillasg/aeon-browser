@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  "@earendil-works/pi-ai@1.6.0": aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb
   "@earendil-works/pi-coding-agent@1.6.0": fbfbfdf267217354a76d68c0624457d316bb8b6c166f2eec44206cc5c5c6bc52
 
 importers:
@@ -134,7 +135,7 @@ importers:
         version: link:../../browser/packages/tools
       "@earendil-works/pi-ai":
         specifier: 1.6.0
-        version: 1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
+        version: 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
       "@modelcontextprotocol/client":
         specifier: 2.2.0
         version: 2.2.0
@@ -476,7 +477,7 @@ importers:
         version: link:../../browser/packages/tools
       "@earendil-works/pi-ai":
         specifier: 1.6.0
-        version: 1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
+        version: 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
       "@earendil-works/pi-coding-agent":
         specifier: 1.6.0
         version: 1.6.0(patch_hash=fbfbfdf267217354a76d68c0624457d316bb8b6c166f2eec44206cc5c5c6bc52)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.5)
@@ -5032,7 +5033,7 @@ snapshots:
 
   "@earendil-works/pi-agent-core@1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)":
     dependencies:
-      "@earendil-works/pi-ai": 1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
+      "@earendil-works/pi-ai": 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
       "@earendil-works/pi-schema": 1.6.0
     transitivePeerDependencies:
       - "@aws-sdk/credential-provider-node"
@@ -5048,7 +5049,7 @@ snapshots:
       - ws
       - zod
 
-  "@earendil-works/pi-ai@1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)":
+  "@earendil-works/pi-ai@1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)":
     dependencies:
       "@anthropic-ai/sdk": 0.129.0(zod@4.6.5)
       "@aws-sdk/client-bedrock-runtime": 3.1127.0
@@ -5081,7 +5082,7 @@ snapshots:
   "@earendil-works/pi-coding-agent@1.6.0(patch_hash=fbfbfdf267217354a76d68c0624457d316bb8b6c166f2eec44206cc5c5c6bc52)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.5)":
     dependencies:
       "@earendil-works/pi-agent-core": 1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
-      "@earendil-works/pi-ai": 1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
+      "@earendil-works/pi-ai": 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
       "@earendil-works/pi-codemode": 1.6.0
       "@earendil-works/pi-mcp": 1.6.0
       "@earendil-works/pi-tui": 1.6.0

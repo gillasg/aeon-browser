@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { assertSiteAllowed } from "./web-gate.js";
+import { importSitePacks, sitePackPaths } from "./site-pack-import.js";
 import { classifyError, describeError, isErrorCode, type ErrorCode } from "@browserkit/protocol";
 import { resolve } from "node:path";
 import { checkSites, crawl, findList, mapSite, scrape, search, type Format } from "browser-crawl";
@@ -490,12 +491,15 @@ async function runSiteMapper(
   // Every action that reaches a site checks it against the user's blocked sites first.
   for (const named of [input.site, input.url, ...(input.sites ?? [])])
     await assertSiteAllowed(named);
-  if (input.action === "code")
+  if (input.action === "code") {
+    if (!input.url?.trim() && !input.site?.trim())
+      throw new Error("INVALID_INPUT: code needs url or site: the page whose code to read");
     return readSiteCode(input.url ?? input.site ?? "", {
       ...(input.grep ? { grep: input.grep } : {}),
       ...(input.maxFiles ? { maxFiles: input.maxFiles } : {}),
       ...(input.maxBytes ? { maxBytes: input.maxBytes } : {}),
     });
+  }
   if (input.action === "build") {
     if (!input.site || !input.goal)
       throw new Error("Give site and goal: the task the new ability should do");
@@ -560,6 +564,8 @@ async function runSiteMapper(
 }
 
 async function learnCaptures(input: SiteMapperToolInput, workspace?: string): Promise<unknown> {
+  const packs = workspace ? await sitePackPaths(input.files ?? [], workspace) : [];
+  if (packs.length) return importSitePacks(packs);
   const site = normalizeSite(input);
   if (!workspace) throw new Error("This tool needs a workspace for capture files");
   if (!input.files?.length)

@@ -196,6 +196,7 @@ export { createRedactor } from "./redact.js";
 export {
   exportSitePack,
   installSitePack,
+  isSitePack,
   readSitePack,
   skillsForSite,
   PACK_FORMAT,

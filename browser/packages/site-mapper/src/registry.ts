@@ -43,7 +43,7 @@ export async function siteStartUrl(input: string): Promise<string> {
   if (/^https?:\/\//i.test(input.trim())) return input.trim();
   const name = siteName(input);
   const origins = (await loadModel(name).catch(() => undefined))?.origins ?? [];
-  const seen = origins.find((origin) => {
+  const seen = [...origins, ...(await abilityOrigins(name))].find((origin) => {
     try {
       const url = new URL(origin);
       return url.host === name || url.hostname === name || url.hostname === `www.${name}`;
@@ -52,6 +52,23 @@ export async function siteStartUrl(input: string): Promise<string> {
     }
   });
   return seen ? seen.replace(/\/?$/, "/") : siteHome(input);
+}
+
+/**
+ * Origins the site's saved abilities call, most used first. A site whose model never recorded an
+ * origin (a hand-made ability, an imported pack) still names its port and scheme in its code; the
+ * bare name would start on another port, where nothing is listening.
+ */
+async function abilityOrigins(name: string): Promise<string[]> {
+  const folder = join(siteDir(name), "abilities");
+  const files = await readdir(folder).catch(() => [] as string[]);
+  const counts = new Map<string, number>();
+  for (const file of files.filter((entry) => entry.endsWith(".json"))) {
+    const text = await readFile(join(folder, file), "utf8").catch(() => "");
+    for (const match of text.matchAll(/https?:\/\/[a-z0-9.[\]:-]+/gi))
+      counts.set(match[0].toLowerCase(), (counts.get(match[0].toLowerCase()) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]).map(([origin]) => origin);
 }
 
 function plainHttpHost(host: string): boolean {

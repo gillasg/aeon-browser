@@ -32,3 +32,24 @@ test("a bare site starts on the origin it was mapped from", async (t) => {
   assert.equal(await siteStartUrl("unmapped.example"), "https://unmapped.example/");
   assert.equal(await siteStartUrl("https://given.example/start"), "https://given.example/start");
 });
+
+test("a bare site with no recorded origin starts where its saved abilities call", async (t) => {
+  const previous = process.env.SITE_TO_API_HOME;
+  process.env.SITE_TO_API_HOME = await mkdtemp(join(tmpdir(), "site-home-"));
+  t.after(() => {
+    if (previous === undefined) delete process.env.SITE_TO_API_HOME;
+    else process.env.SITE_TO_API_HOME = previous;
+  });
+  const site = "127.0.0.1";
+  await mkdir(join(siteDir(site), "abilities"), { recursive: true });
+  await writeFile(
+    join(siteDir(site), "model.json"),
+    JSON.stringify({ site, origins: [], operations: [] }),
+  );
+  const code = 'const r = await browser.fetch("http://127.0.0.1:8790/h11/books"); return r;';
+  await writeFile(
+    join(siteDir(site), "abilities", "books.json"),
+    JSON.stringify({ site, name: "books", ways: [{ kind: "script", code }] }),
+  );
+  assert.equal(await siteStartUrl(site), "http://127.0.0.1:8790/");
+});

@@ -1,3 +1,4 @@
+import { siteStartUrl } from "./registry.js";
 import { sharedBridge } from "./runtime/bridge.js";
 
 // How a site works: one read of its HTML, JS chunks, route manifests, source maps, robots and
@@ -44,7 +45,8 @@ const MAX_MATCHES = 120;
 const DEFAULT_TIMEOUT = 15_000;
 
 export async function code(input: string, options: SiteCodeOptions = {}): Promise<SiteCodeResult> {
-  const url = pageUrl(input);
+  // A bare site starts where it was used (its mapped origin or its abilities' port), not https.
+  const url = pageUrl(/^https?:\/\//i.test(input.trim()) ? input : await siteStartUrl(input));
   const origin = new URL(url).origin;
   const maxFiles = Math.max(1, Math.min(200, options.maxFiles ?? DEFAULT_MAX_FILES));
   const maxBytes = Math.max(10_000, Math.min(8_000_000, options.maxBytes ?? DEFAULT_MAX_BYTES));

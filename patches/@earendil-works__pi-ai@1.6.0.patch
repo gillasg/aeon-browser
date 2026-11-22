@@ -1,0 +1,43 @@
+diff --git a/dist/api/openai-responses-shared.d.ts b/dist/api/openai-responses-shared.d.ts
+index cec9bde67ccda949f13d8ef8576ca8cdcb2df554..5b52b5fb26110654a03ae0ef21ddf61b7e7712f1 100644
+--- a/dist/api/openai-responses-shared.d.ts
++++ b/dist/api/openai-responses-shared.d.ts
+@@ -51,4 +51,5 @@ export declare function getResponsesToolSupport(options: {
+ export declare function convertResponsesMessages<TApi extends Api>(model: Model<TApi>, context: TranscriptContext, allowedToolCallProviders: ReadonlySet<string>, options?: ConvertResponsesMessagesOptions): ResponseInput;
+ export declare function convertResponsesTools(tools: readonly Tool[], options?: ConvertResponsesToolsOptions): OpenAITool[];
+ export declare function processResponsesStream<TApi extends Api>(openaiStream: AsyncIterable<ResponseStreamEvent>, output: AssistantMessage, stream: AssistantMessageEventStream, model: Model<TApi>, options?: OpenAIResponsesStreamOptions): Promise<void>;
++export declare function recoverGrammarFunctionCall(block: { name: string; arguments?: unknown; argumentsError?: string }, rawArguments: unknown, grammarToolInputProperties?: Map<string, string>): void;
+ //# sourceMappingURL=openai-responses-shared.d.ts.map
+\ No newline at end of file
+diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
+index b7016e398acac3560ce58cc6cbb46e2cdfcae2a6..aac4b1f2cb9a7757828d99580eb52dc87c11616b 100644
+--- a/dist/api/openai-responses-shared.js
++++ b/dist/api/openai-responses-shared.js
+@@ -655,6 +655,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+                 if (item.arguments)
+                     slot.input.arguments.replace(item.arguments);
+                 Object.assign(slot.block, slot.input.arguments.finish());
++                recoverGrammarFunctionCall(slot.block, item.arguments, options?.grammarToolInputProperties);
+                 if (item.namespace !== undefined)
+                     slot.block.namespace = item.namespace;
+                 unfinishedToolCalls.delete(slot.block);
+@@ -794,3 +795,19 @@ function mapStopReason(status, incompleteReason) {
+     }
+ }
+ //# sourceMappingURL=openai-responses-shared.js.map
++// A model sometimes calls a grammar tool (one string input, sent as custom_tool_call) as a JSON
++// function_call whose arguments are the raw input text. That text is not JSON, so the call kept
++// `{}` and every later replay threw "requires argument ... to be a string", failing the run.
++// Keep the raw text as the tool's input: the call runs with what the model wrote.
++export function recoverGrammarFunctionCall(block, rawArguments, grammarToolInputProperties) {
++    const property = grammarToolInputProperties?.get(block.name);
++    if (property === undefined)
++        return;
++    const args = block.arguments && typeof block.arguments === "object" ? block.arguments : {};
++    if (typeof args[property] === "string")
++        return;
++    const received = /\n\nReceived arguments:\n([\s\S]*)$/.exec(block.argumentsError ?? "")?.[1];
++    const raw = typeof rawArguments === "string" && rawArguments ? rawArguments : received ?? "";
++    block.arguments = { ...args, [property]: raw };
++    delete block.argumentsError;
++}

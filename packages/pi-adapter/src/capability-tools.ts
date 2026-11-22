@@ -230,7 +230,7 @@ function createRoutineTools(
         "Schedules: {kind: 'interval', everyMinutes}, {kind: 'calendar', daysOfWeek, localTime} or {kind: 'once', atUtc} for one run at an exact time. " +
         "A once schedule runs its check one time: a page a second early returns false and nothing fires, so a 'tell me when it opens' watcher polls every minute (or listens) from now instead. " +
         "The instruction is what you are woken with when the check passes, so write it as that moment's job ('The lamp is now under 2000: tell the user the price from the check value and the link'), not as the user's original request. " +
-        "An exact moment (a drop, a ticket or booking release, a slot opening) under 55 minutes away: call browser.snipe in browser_code now. " +
+        "Acting at an exact moment (buying at a drop, booking at a release) under 55 minutes away: call browser.snipe in browser_code now, without wait (it runs in the background). Only telling the user when it comes is a watcher like the one above. " +
         "Later: a watcher with schedule {kind: 'once', atUtc: '<3 minutes before>'} whose check is exactly " +
         "return await browser.snipe({at: '2026-12-01T09:00:00Z', url: 'https://shop.example/drop', prepare: async (page) => { await page.getByLabel('Seats').fill('2'); }, " +
         "fire: async (page) => { await page.getByRole('button', {name: 'Book'}).click(); return 'clicked'; }, " +

@@ -20,4 +20,5 @@ minimumReleaseAgeExclude:
   - "@modelcontextprotocol/client@2.2.0"
   - "@modelcontextprotocol/core@2.2.0"
 patchedDependencies:
+  "@earendil-works/pi-ai@1.6.0": patches/@earendil-works__pi-ai@1.6.0.patch
   "@earendil-works/pi-coding-agent@1.6.0": patches/@earendil-works__pi-coding-agent@1.6.0.patch
