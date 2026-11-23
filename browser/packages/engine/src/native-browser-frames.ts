@@ -186,7 +186,7 @@ type Upload = BrowserExecutorRequest & {
  * The file input for a selector: the input itself, or (for an upload button or drop zone, whose
  * real input is usually hidden) the input inside it, in its form, or the page's only one.
  */
-function fileInputExpression(selector: string): string {
+export function fileInputExpression(selector: string): string {
   return `(()=>{
 const deep=(sel)=>{const roots=[document],found=[];while(roots.length){const root=roots.pop();found.push(...root.querySelectorAll(sel));for(const el of root.querySelectorAll('*'))if(el.shadowRoot)roots.push(el.shadowRoot);}return found;};
 const isFile=(el)=>el instanceof HTMLInputElement&&el.type==='file'&&!el.disabled;
@@ -194,7 +194,8 @@ const matches=deep(${JSON.stringify(selector)});
 if(!matches.length)throw Error('Nothing matches '+${JSON.stringify(selector)});
 const direct=matches.find(isFile);if(direct)return direct;
 const el=matches[0];
-const inside=[...el.querySelectorAll('input[type=file]')].find(isFile);if(inside)return inside;
+const inside=[el,el.shadowRoot].filter(Boolean).flatMap((root)=>[...root.querySelectorAll('input[type=file]')]).find(isFile);if(inside)return inside;
+const label=el.closest('label');const forId=label&&label.htmlFor&&el.getRootNode().getElementById?.(label.htmlFor);if(isFile(forId))return forId;const wrapped=label&&[...label.querySelectorAll('input[type=file]')].find(isFile);if(wrapped)return wrapped;
 const form=el.closest('form');const inForm=form&&[...form.querySelectorAll('input[type=file]')].find(isFile);if(inForm)return inForm;
 const all=deep('input[type=file]').filter(isFile);if(all.length===1)return all[0];
 throw Error(all.length?'Several file inputs on the page: pass a selector for the right one':'No file input on the page for that element');
@@ -261,8 +262,8 @@ export async function uploadFiles(
     backendNodeId,
     fileInputState,
   );
-  if (state.type !== "file" || state.disabled || (!state.multiple && step.files.length > 1))
-    throw new Error("INVALID_TARGET");
+  const problem = fileInputProblem(state, step.files.length);
+  if (problem) throw new Error("INVALID_TARGET: " + problem);
   await send(
     debuggee,
     "DOM.setFileInputFiles",
@@ -271,6 +272,19 @@ export async function uploadFiles(
   );
   const files = await onNode(debuggee, backendNodeId, chosenFiles);
   return { files, selected: true };
+}
+
+/** Why a node cannot take these files, or undefined when it can. */
+export function fileInputProblem(
+  state: { type: string; multiple: boolean; disabled: boolean },
+  count: number,
+): string | undefined {
+  if (state.type !== "file")
+    return `the element is <input type=${state.type || "?"}>, not a file input`;
+  if (state.disabled) return "the file input is disabled";
+  if (count === 0) return "no files given";
+  if (!state.multiple && count > 1) return `the file input takes one file, ${count} given`;
+  return undefined;
 }
 
 function fileInputState(this: HTMLInputElement) {

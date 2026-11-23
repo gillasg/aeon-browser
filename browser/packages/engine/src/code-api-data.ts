@@ -669,7 +669,11 @@ async function __pool(items, worker, options = {}) {
       if (url) {
         await wait(new URL(url).host);
         if (tab.page) await tab.page.goto(url, {present: false});
-        else tab.page = await browser.openTab(url, {new: true, present: false});
+        else if (options.turbo) {
+          tab.page = await browser.openTab('about:blank', {new: true, present: false});
+          await tab.page.turbo(options.turbo === true ? {} : options.turbo);
+          await tab.page.goto(url, {present: false});
+        } else tab.page = await browser.openTab(url, {new: true, present: false});
         var status = await tab.page.status().catch(() => null);
         if (status === 429 || status === 503) {
           var host = new URL(url).host;
