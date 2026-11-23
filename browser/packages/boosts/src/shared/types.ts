@@ -102,6 +102,34 @@ export interface HtmlPart {
   html: string;
 }
 
+/**
+ * A declarative network rewrite on the boost's sites, applied by a host that drives DevTools
+ * Fetch (Aeon's engine): block, edit JSON fields, response headers or HTML. Pure data, no code.
+ */
+export interface WireRule {
+  match: string;
+  method?: string;
+  action: "block" | "json" | "headers" | "html";
+  json?: Record<string, unknown>[];
+  headers?: HeaderChange[];
+  html?: Record<string, unknown>[];
+}
+
+/** A small interactive widget in its own closed Shadow DOM, anchored to an element or a corner. */
+export interface Widget {
+  kind: "pill" | "badge" | "note";
+  text: string;
+  /** Anchor element; leave out to use a page corner. */
+  selector?: string;
+  position?: "before" | "after" | "prepend" | "append";
+  corner?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  /** A badge shows how many elements match this, kept live. */
+  count?: string;
+  /** What clicking a pill does. */
+  action?:
+    { do: "click"; selector: string } | { do: "copy"; text: string } | { do: "open"; url: string };
+}
+
 /** Parsed userscript or userstyle header. */
 export interface ScriptMeta {
   name: string;
@@ -180,6 +208,8 @@ export interface Boost {
   actions?: Action[];
   network?: NetworkRule[];
   html?: HtmlPart[];
+  wire?: WireRule[];
+  widgets?: Widget[];
   js?: string;
   /** "page" runs with the page's own globals; "isolated" keeps them apart. */
   jsWorld?: "page" | "isolated";

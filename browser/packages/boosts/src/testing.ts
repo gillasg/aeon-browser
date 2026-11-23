@@ -9,3 +9,4 @@ export * from "./shared/bundle.js";
 export * from "./shared/ai.js";
 export * from "./shared/health.js";
 export { mayConnect } from "./background/xhr.js";
+export { Widgets, WIDGET_ATTRIBUTE } from "./content/widgets.js";

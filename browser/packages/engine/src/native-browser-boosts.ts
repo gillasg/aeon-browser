@@ -1,4 +1,5 @@
 import { startBoostEngine, type BoostEngine, type BoostEngineOptions } from "site-boosts/embed";
+import { installWire, syncAllWireTabs } from "./native-browser-wire-tabs.js";
 
 // Boosts from Site Boosts' engine, built into this extension: saved page changes (styles, hidden
 // elements, actions, network rules, scripts) that apply in every tab and survive restarts.
@@ -12,6 +13,8 @@ export function installBoosts(
   options: Omit<BoostEngineOptions, "contentScript"> = {},
 ): void {
   engine ??= startBoostEngine({ contentScript, ...options });
+  const started = engine;
+  installWire((url) => started.wireFor(url));
 }
 
 type Request = Record<string, unknown>;
@@ -21,6 +24,14 @@ export function isBoostsRequest(value: Request | null): boolean {
 }
 
 export async function boostsCall(value: Request): Promise<unknown> {
+  const result = await boostsCallOnce(value);
+  // Wire rules follow every change at once, so an undo stops the interception too.
+  if (value.boosts !== "list" && value.boosts !== "get")
+    await syncAllWireTabs().catch(() => undefined);
+  return result;
+}
+
+async function boostsCallOnce(value: Request): Promise<unknown> {
   if (!engine) throw new Error("UNSUPPORTED: boosts are not built into this extension");
   const id = String(value.id ?? "");
   if (value.boosts === "list")
@@ -33,6 +44,11 @@ export async function boostsCall(value: Request): Promise<unknown> {
   if (value.boosts === "remove") {
     await engine.remove(id);
     return { removed: id };
+  }
+  if (value.boosts === "undo") {
+    // One call takes a boost off every page: widgets unmount, styles go, wire rules stop.
+    await engine.setEnabled(id, false);
+    return { id, enabled: false, undone: true };
   }
   if (value.boosts === "enable") {
     await engine.setEnabled(id, value.enabled !== false);

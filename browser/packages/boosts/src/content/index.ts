@@ -26,7 +26,13 @@ let healthTimer: ReturnType<typeof setTimeout> | undefined;
 
 const hasPagePart = (b: Boost): boolean =>
   Boolean(
-    b.css || b.sections?.length || b.zaps?.length || b.look || b.actions?.length || b.html?.length,
+    b.css ||
+    b.sections?.length ||
+    b.zaps?.length ||
+    b.look ||
+    b.actions?.length ||
+    b.html?.length ||
+    b.widgets?.length,
   );
 
 function apply(): void {

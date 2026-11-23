@@ -89,6 +89,8 @@ function parts(
   | "actions"
   | "network"
   | "html"
+  | "wire"
+  | "widgets"
   | "js"
   | "jsWorld"
   | "runAt"
@@ -107,6 +109,8 @@ function parts(
     actions: asArray(raw.actions),
     network: asArray(raw.network),
     html: asArray(raw.html),
+    wire: asArray(raw.wire),
+    widgets: asArray(raw.widgets),
     js: asString(raw.js),
     jsWorld: raw.jsWorld === "isolated" ? "isolated" : raw.js ? "page" : undefined,
     runAt: asString(raw.runAt) as Boost["runAt"],

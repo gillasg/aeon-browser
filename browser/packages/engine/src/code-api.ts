@@ -420,6 +420,7 @@ var browser = Object.freeze({
     save: async (boost) => { var saved = await __call({boosts:"save", boost}); if (saved && saved.warning) console.log(saved.warning); return saved; },
     remove: (id) => __call({boosts:"remove", id}),
     enable: (id, enabled = true) => __call({boosts:"enable", id, enabled}),
+    undo: (id) => __call({boosts:"undo", id}),
   }),
   // The active tab, open tabs, recent and most used sites, and history/bookmark matches for a request.
   context: (request = "", options = {}) => __context(request, options),

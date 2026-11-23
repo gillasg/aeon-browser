@@ -35,6 +35,8 @@ export interface BoostEngine {
   save(input: Record<string, unknown>): Promise<BoostSummary>;
   remove(id: string): Promise<void>;
   setEnabled(id: string, enabled: boolean): Promise<void>;
+  /** The wire rules of the boosts active on this URL, as saved. */
+  wireFor(url: string): Promise<unknown[]>;
 }
 
 export declare function startBoostEngine(options: BoostEngineOptions): BoostEngine;

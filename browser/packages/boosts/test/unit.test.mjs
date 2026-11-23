@@ -432,3 +432,35 @@ test("the scripted model answers a CORS preflight", async () => {
     await site.close();
   }
 });
+
+test("widgets mount in a closed shadow root, follow re-renders and unmount without residue", async () => {
+  const { parseHTML } = await import("linkedom");
+  const { Widgets, WIDGET_ATTRIBUTE } = await import("../build-test/lib.mjs");
+  const { document } = parseHTML(
+    "<html><body><h1 class=t>A</h1><li class=r></li><li class=r></li></body></html>",
+  );
+  const before = document.body.innerHTML;
+  const widgets = new Widgets(document, "b1", [
+    { kind: "pill", text: "Copy <b>x</b>", selector: ".t", action: { do: "copy", text: "x" } },
+    { kind: "badge", text: "Rows", count: ".r", corner: "top-right" },
+  ]);
+  widgets.update();
+  assert.equal(widgets.count(), 2);
+  assert.equal(document.querySelectorAll(`[${WIDGET_ATTRIBUTE}="b1"]`).length, 2);
+  assert.equal(
+    document.querySelector(".t").nextElementSibling.getAttribute(WIDGET_ATTRIBUTE),
+    "b1",
+  );
+  assert.doesNotMatch(document.body.innerHTML, /<b>x<\/b>/, "text never becomes markup");
+  widgets.update();
+  assert.equal(widgets.count(), 2, "updating again mounts nothing twice");
+  const h1 = document.createElement("h1");
+  h1.className = "t";
+  document.body.append(h1);
+  widgets.update();
+  assert.equal(widgets.count(), 3, "a re-rendered anchor gets its widget back");
+  widgets.unmount();
+  assert.equal(widgets.count(), 0);
+  h1.remove();
+  assert.equal(document.body.innerHTML, before, "unmount leaves zero DOM residue");
+});

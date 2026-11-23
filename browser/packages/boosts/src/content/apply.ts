@@ -2,6 +2,7 @@ import { boostCss, cssSelectors } from "../shared/css.js";
 import type { Boost, HealthReport, HtmlPart, Target } from "../shared/types.js";
 import { ActionRunner } from "./actions.js";
 import { findTargets, safeQueryAll, sampleOf } from "./target.js";
+import { Widgets } from "./widgets.js";
 
 // Applies boosts to the page: styles, zaps (including text-matched ones), added HTML and actions,
 // kept up to date as the page changes, with a health report of what matched.
@@ -37,7 +38,8 @@ function textActionCounts(boost: Boost, ran: number): HealthReport["selectors"] 
 function boostSelectors(boost: Boost): string[] {
   const selectors = new Set(cssSelectors(boost.css ?? ""));
   for (const zap of boost.zaps ?? []) selectors.add(zap.selector);
-  for (const part of boost.html ?? []) selectors.add(part.selector);
+  for (const part of [...(boost.html ?? []), ...(boost.widgets ?? [])])
+    if (part.selector) selectors.add(part.selector);
   for (const action of boost.actions ?? [])
     if ("selector" in action && action.selector) selectors.add(action.selector);
   return [...selectors];
@@ -47,6 +49,7 @@ class Applied {
   private style?: HTMLStyleElement;
   private insertedCss?: string;
   private runner?: ActionRunner;
+  private widgets?: Widgets;
   private hidden = new Set<HTMLElement>();
   private added = new Set<Element>();
   private errors: string[] = [];
@@ -60,6 +63,8 @@ class Applied {
     const css = boostCss(this.boost, location.href);
     if (css) this.addStyle(css);
     if (this.boost.actions?.length) this.runner = new ActionRunner(this.boost.actions);
+    if (this.boost.widgets?.length)
+      this.widgets = new Widgets(document, this.boost.id, this.boost.widgets);
     this.update();
   }
 
@@ -85,6 +90,7 @@ class Applied {
       if (zap.contains) this.hideContaining(zap.selector, zap.contains.toLowerCase());
     for (const part of this.boost.html ?? []) this.insertHtml(part);
     this.runner?.scan();
+    this.widgets?.update();
   }
 
   private hideContaining(selector: string, wanted: string): void {
@@ -112,6 +118,7 @@ class Applied {
   }
 
   stop(): void {
+    this.widgets?.unmount();
     this.style?.remove();
     if (this.insertedCss)
       void this.send("css.remove", { css: this.insertedCss }).catch(() => undefined);

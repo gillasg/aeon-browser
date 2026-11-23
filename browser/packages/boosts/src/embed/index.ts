@@ -24,7 +24,7 @@ import {
 
 export const MESSAGE_PREFIX = "boosts.";
 const CONTENT_SCRIPT_ID = "sb-content";
-const PAGE_PARTS = ["css", "sections", "zaps", "look", "actions", "html"] as const;
+const PAGE_PARTS = ["css", "sections", "zaps", "look", "actions", "html", "widgets"] as const;
 
 export interface BoostEngineOptions {
   /** The content script the host built with site-boosts/embed-build (writeContent). */
@@ -56,10 +56,12 @@ export interface BoostEngine {
   save(input: Record<string, unknown>): Promise<BoostSummary>;
   remove(id: string): Promise<void>;
   setEnabled(id: string, enabled: boolean): Promise<void>;
+  /** The wire rules of the boosts active on this URL, as saved. */
+  wireFor(url: string): Promise<unknown[]>;
 }
 
 const partsOf = (boost: Boost): string[] =>
-  [...PAGE_PARTS, "js", "network"].filter((part) => {
+  [...PAGE_PARTS, "js", "network", "wire"].filter((part) => {
     const value = (boost as unknown as Record<string, unknown>)[part];
     return Array.isArray(value) ? value.length > 0 : Boolean(value);
   });
@@ -187,6 +189,11 @@ export function startBoostEngine(options: BoostEngineOptions): BoostEngine {
     async remove(id) {
       await deleteBoost(id);
       await changed();
+    },
+    async wireFor(url) {
+      const plan = await planFor(url);
+      if (plan.siteDisabled || plan.paused) return [];
+      return plan.boosts.filter((b) => plan.active.includes(b.id)).flatMap((b) => b.wire ?? []);
     },
     async setEnabled(id, enabled) {
       if (!(await patchBoost(id, { enabled }))) throw new Error(`No boost ${id}`);
