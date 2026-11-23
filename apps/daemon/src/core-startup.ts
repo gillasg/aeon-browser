@@ -11,6 +11,7 @@ import {
 } from "@aeon/location";
 import { createProductionRuntime } from "./production-runtime.js";
 import { startCoreTransport } from "./core-transport.js";
+import { startSessionKeepalive, type SessionKeepalive } from "./session-keepalive.js";
 
 export async function acquireCoreLock(directory: string): Promise<() => Promise<void>> {
   const fix = "Set AEON_DATA_DIR to a directory you own with mode 700.";
@@ -82,6 +83,7 @@ export async function startStandaloneCore(): Promise<void> {
   const unlock = await acquireCoreLock(directory);
   let runtime: ReturnType<typeof createProductionRuntime> | undefined;
   let core: Awaited<ReturnType<typeof startCoreTransport>> | undefined;
+  let keepalive: SessionKeepalive | undefined;
   try {
     runtime = createProductionRuntime(directory);
     await runtime.ready;
@@ -101,12 +103,14 @@ export async function startStandaloneCore(): Promise<void> {
       );
     process.stdout.write("Core ready. Native clients can discover it in the data directory.\n");
     runtime.warm();
+    keepalive = await startSessionKeepalive(directory);
     await new Promise<void>((resolveStop) => {
       process.once("SIGINT", resolveStop);
       process.once("SIGTERM", resolveStop);
     });
   } finally {
     try {
+      keepalive?.stop();
       await core?.close();
       await runtime?.close();
     } finally {

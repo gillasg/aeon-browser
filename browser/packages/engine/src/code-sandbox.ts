@@ -22,6 +22,7 @@ import { browserRecordingApi } from "./code-api-recording.js";
 import { browserSitesApi } from "./code-api-sites.js";
 import { browserContextApi } from "./code-api-context.js";
 import { browserSnipeApi } from "./code-api-snipe.js";
+import { browserTimingApi } from "./code-api-timing.js";
 import { browserTablesApi } from "./code-api-tables.js";
 import { browserHelpApi } from "./code-api-help.js";
 import { browserControlsApi } from "./code-api-controls.js";
@@ -127,6 +128,7 @@ evaluate(
     browserWindowApi,
     browserSurfaceApi,
     browserMediaApi,
+    browserTimingApi,
     browserCodeApi,
     browserSitesApi,
     browserContextApi,

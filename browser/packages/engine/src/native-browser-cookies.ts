@@ -3,6 +3,7 @@
 // never carries a session token. Everything stays on this machine; nothing is sent anywhere.
 
 import type { BrowserStep } from "@browserkit/protocol";
+import { chromeAccountJars, type AccountAction } from "./native-browser-accounts.js";
 
 export type CookieStep = Extract<BrowserStep, { op: "cookies" }>;
 
@@ -42,6 +43,8 @@ export async function executeCookies(step: CookieStep): Promise<unknown> {
       return removeCookies(step);
     case "clear":
       return clearCookies(step);
+    default:
+      return accountStep(step);
   }
 }
 
@@ -150,4 +153,12 @@ function filterOf(step: CookieStep): { url?: string; domain?: string; name?: str
     ...(step.domain ? { domain: step.domain } : {}),
     ...(step.name ? { name: step.name } : {}),
   };
+}
+
+/** Named account jars for one site: accountSave, accountSwitch, accountList, accountCurrent, accountRemove. */
+function accountStep(step: CookieStep): Promise<unknown> {
+  const site = step.url ?? step.domain;
+  if (!site) throw new Error("ACCOUNTS_ORIGIN: give the site's url");
+  const action = step.action.replace(/^account/, "").toLowerCase() as AccountAction;
+  return chromeAccountJars().run(action, site, step.account);
 }

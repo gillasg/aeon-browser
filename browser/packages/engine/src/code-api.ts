@@ -395,7 +395,12 @@ var browser = Object.freeze({
       : {tabGroups:'get'});
     return result.enabled === true;
   },
-  pool: (items, worker, options = {}) => __pool(items, worker, options),
+  pool: Object.assign((items, worker, options = {}) => __pool(items, worker, options), {map: (items, worker, options) => __poolMap(items, worker, options)}),
+  // Server clock and exact timing: browser.clock(url) -> {serverOffsetMs, rttMs}; browser.scheduleAt(ms, fn, {offsetMs, leadMs, signal}).
+  clock: (url, options) => __clockSync(String(url), options),
+  scheduleAt: (at, fn, options) => __timing.scheduleAt(typeof at === 'number' ? at : Date.parse(at), fn, options),
+  // Named cookie jars per site: browser.accounts.save(site, name) / switch / list / current / remove. Metadata only.
+  accounts: __accounts,
   // Close every tab this chat/session opened (page.keep tabs stay), returning {closed, remaining}.
   reset: () => __call({tabs:'reset'}),
   // Many pages past the cell deadline: start a job, then check it in a later cell.
