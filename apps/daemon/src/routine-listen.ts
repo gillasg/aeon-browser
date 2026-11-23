@@ -111,6 +111,29 @@ export function tabMatchesListen(tabUrl: string, listen: RoutineListen, sites: s
   return matchesListenUrl(tabUrl, listen);
 }
 
+const STREAM_TYPES = new Set(["ws", "sse", "webrtc", "stream"]);
+const PUSH_TYPES = new Set(["push", "notification", "badge", "title", "notifications"]);
+
+/**
+ * The wait a live check makes. A stream type (ws, sse, webrtc, stream) waits on page.streams for
+ * the next frame from a matching URL; a push type (push, notification, badge, title) waits on
+ * page.notifications. Both are woken by the engine's CDP events, never by polling. Anything else
+ * waits for the next matching finished response.
+ */
+export function liveWaitCode(listen: RoutineListen): string {
+  const url = JSON.stringify(listen.url);
+  const type = listen.type ?? "";
+  if (STREAM_TYPES.has(type)) {
+    const kind = type === "stream" ? "" : `kind: ${JSON.stringify(type)}, `;
+    return `__aeonLivePage.streams.waitFor({url: ${url}, ${kind}direction: "received"}, 55000)`;
+  }
+  if (PUSH_TYPES.has(type)) {
+    const kind = type === "notifications" ? "" : `, kind: ${JSON.stringify(type)}`;
+    return `__aeonLivePage.notifications.waitFor({${kind.slice(2)}}, 55000)`;
+  }
+  return `__aeonLivePage.waitForResponse(${url}, {${type ? `type: ${JSON.stringify(type)}, ` : ""}timeoutMs: 55000})`;
+}
+
 /**
  * The browser code run for one live check. It attaches to an existing tab (never opens one), waits
  * for the next matching response, and evaluates the routine's own check with `response` in scope.
@@ -128,7 +151,7 @@ export function liveCheckCode(check: string, listen: RoutineListen, sites: strin
 var __aeonLiveTab = __aeonLiveTabs.find(function(t){ var u = String(t.url || ''); ${tabTest} });
 if (!__aeonLiveTab) return {__liveIdle: true};
 var __aeonLivePage = await browser.tab(__aeonLiveTab.id ?? __aeonLiveTab.tabId ?? __aeonLiveTab);
-var __aeonLiveFound = await __aeonLivePage.waitForResponse(${JSON.stringify(listen.url)}, {${listen.type ? `type: ${JSON.stringify(listen.type)}, ` : ""}timeoutMs: 55000});
+var __aeonLiveFound = await ${liveWaitCode(listen)};
 if (!__aeonLiveFound) return {__liveIdle: true};
 var response = __aeonLiveFound;
 ${check}`;

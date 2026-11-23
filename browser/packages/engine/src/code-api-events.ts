@@ -38,13 +38,39 @@ function __mediaRecorder(arg) {
   });
 }
 
+// page.streams and page.notifications: lazy taps (nothing is enabled until start or waitFor).
+// A filter is {url, regex, kind, direction, match, field, equals}; a function filter is tested
+// here against each new item, the wait itself stays event-driven in the engine.
+function __realtimeApi(target, key) {
+  var call = (action, options = {}) => __call({[key]: action, target, ...options});
+  var shape = (filter) => typeof filter === 'string' ? {url: filter} : filter instanceof RegExp ? {url: filter.source, regex: true} : filter || {};
+  var waitFor = async (filter = {}, timeoutMs = 30000) => {
+    if (typeof filter !== 'function') return call('waitFor', {...shape(filter), timeoutMs});
+    var deadline = Date.now() + Math.min(timeoutMs, 55000), since;
+    while (Date.now() < deadline) {
+      var item = await call('waitFor', {timeoutMs: deadline - Date.now(), ...(since === undefined ? {} : {since})});
+      if (!item) return null;
+      since = item.seq;
+      if (filter(item)) return item;
+    }
+    return null;
+  };
+  return {start: (options = {}) => call('start', options), stop: () => call('stop'), state: () => call('state'),
+    list: async (filter = {}) => typeof filter === 'function' ? (await call('list')).filter(filter) : call('list', shape(filter)), waitFor};
+}
+
 function __extendPageEvents(target, base) {
   // A condition runs as its own expression (no eval, so page security policies do not block it).
   var probe = async (arg) => arg.condition ? {value: await base.inspect('(' + arg.condition + ')()')} : base.inspect('(' + __changeProbe.toString() + ')(' + JSON.stringify(arg) + ')');
   // Records only when nothing records yet, so an existing recording keeps its options (dry run, types).
   var recording = async () => { try { await __call({network: 'list', target, match: ''}); } catch { await __call({network: 'start', target}); } };
   var deadlineOf = (options) => Date.now() + Math.min(options.timeoutMs ?? 50000, 55000);
+  var streams = __realtimeApi(target, 'streams'), notifications = __realtimeApi(target, 'notifications');
   return Object.assign(base, {
+    // WebSocket / SSE / opt-in WebRTC ({webrtc: true}) frames; describe() infers each stream's shape.
+    streams: Object.freeze({...streams, describe: () => __call({streams: 'describe', target}), clear: () => __call({streams: 'clear', target})}),
+    // Push messages, notifications, app badge and "(3)" title unread counts; badge() is the latest.
+    notifications: Object.freeze({...notifications, badge: () => __call({notifications: 'badge', target})}),
     // Every matching DevTools event (e.g. 'Network.webSocketFrameReceived') goes to handler(params, at)
     // until stop(); enable the domain's feature with page.cdp first if it needs one.
     onCdp: (event, handler, options = {}) => __cdpStream(target, event, handler, options),

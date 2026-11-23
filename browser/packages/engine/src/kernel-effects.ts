@@ -114,6 +114,20 @@ export const EFFECTS = [
     errors: ["TIMEOUT", "INVALID_INPUT", "REPLAY_ORIGIN"],
   },
   {
+    name: "page.streams",
+    call: "page.streams.start/stop/list/waitFor/describe",
+    does: "the tab's WebSocket, server-sent event and data channel messages, scrubbed",
+    needs: ["tab"],
+    errors: ["UNSUPPORTED", "INVALID_INPUT"],
+  },
+  {
+    name: "page.notifications",
+    call: "page.notifications.start/stop/list/waitFor/badge",
+    does: "the tab's push messages, notifications, app badge and unread count, scrubbed",
+    needs: ["tab"],
+    errors: ["UNSUPPORTED", "INVALID_INPUT"],
+  },
+  {
     name: "net.rules",
     call: "page.rules.block/headers/mock/clear",
     does: "per-tab network rules",

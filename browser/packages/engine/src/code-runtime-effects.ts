@@ -14,6 +14,8 @@ import { sessionHeadersFor } from "./native-browser-session-headers.js";
 import { resetChatTabs, reapChatPopups } from "./native-browser-tab-cleanup.js";
 import { disableQuietTab, enableQuietTab } from "./native-browser-quiet.js";
 import { networkCall } from "./native-browser-network.js";
+import { streamsCall } from "./native-browser-streams.js";
+import { pushCall } from "./native-browser-push.js";
 import { pageGuard } from "./page-guard.js";
 import { mediaCall, type MediaRequest } from "./native-browser-media.js";
 import { isLibraryRequest, libraryCall } from "./native-browser-library.js";
@@ -195,6 +197,18 @@ function tabEffects(host: EffectHost): Effect<Cell>[] {
       match: named("network"),
       tab: target,
       run: (_, value, tabId = 0) => networkCall(tabId, value.network as string, value),
+    },
+    {
+      name: "page.streams",
+      match: named("streams"),
+      tab: target,
+      run: (_, value, tabId = 0) => streamsCall(tabId, value.streams as string, value),
+    },
+    {
+      name: "page.notifications",
+      match: named("notifications"),
+      tab: target,
+      run: (_, value, tabId = 0) => pushCall(tabId, value.notifications as string, value),
     },
     {
       name: "net.rules",
