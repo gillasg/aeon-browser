@@ -27,11 +27,13 @@ import {
   tabClips,
   writeEvents,
   type ClipMeta,
+  type Mark,
   type RecordingEvents,
   type TerminalCast,
   type Trace,
   type VideoEvent,
 } from "./record-events.js";
+import { mark, readMarks, run, wait, withMarkCues, type RecordSteps } from "./record-script.js";
 import { saveTabTakes, type SavedTake } from "./record-takes.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
 
@@ -62,6 +64,10 @@ function sourceOf(args: Args): Source {
   return "window";
 }
 
+function mouseOption(args: Args): { noMouse?: true } {
+  return args.flags["no-mouse"] === true ? { noMouse: true } : {};
+}
+
 function optionsOf(args: Args): RecordOptions {
   const out = typeof args.flags?.out === "string" ? args.flags.out : undefined;
   const ffmpeg = typeof args.flags?.ffmpeg === "string" ? args.flags.ffmpeg : undefined;
@@ -72,6 +78,7 @@ function optionsOf(args: Args): RecordOptions {
     ...(out ? { out } : {}),
     ...(ffmpeg ? { ffmpeg } : {}),
     ...(ffprobe ? { ffprobe } : {}),
+    ...mouseOption(args),
     log,
   };
 }
@@ -82,6 +89,10 @@ async function start(host: DaemonHost, args: Args): Promise<number> {
   mkdirSync(folder, { recursive: true });
   remember(folder, opts.out);
   const state = await startCapture(folder, opts);
+  if (host.browser) {
+    state.browser = host.browser;
+    saveState(folder, state);
+  }
   if (opts.source === "tabs") await armTabTakes(host, state);
   const chatId = typeof args.flags?.chat === "string" ? args.flags.chat : undefined;
   if (chatId) {
@@ -257,13 +268,15 @@ export function traceNote(chatId: string | undefined, traced: boolean): string |
   return "No chat was named (use --chat <id> at start or stop to log Aeon's actions); the clip metadata and frames are still recorded.";
 }
 
-function stopRecording(
+export function stopRecording(
   clip: ClipMeta,
   clips: ClipMeta[],
   events: VideoEvent[],
   terminal: TerminalCast | undefined,
   note: string | undefined,
+  marks: Mark[] = [],
 ): RecordingEvents {
+  const cues = withMarkCues(events.length ? soundCuesFromEvents(events) : [], marks);
   return {
     version: 1,
     recorder: "aeon",
@@ -272,7 +285,8 @@ function stopRecording(
     ...(clips.length > 0 ? { clips } : {}),
     events,
     ...(terminal ? { terminal } : {}),
-    ...(events.length ? { soundCues: soundCuesFromEvents(events) } : {}),
+    ...(marks.length ? { marks } : {}),
+    ...(cues.length ? { soundCues: cues } : {}),
     ...(note ? { note } : {}),
   };
 }
@@ -280,6 +294,7 @@ function stopRecording(
 async function stop(host: DaemonHost, args: Args): Promise<number> {
   const folder = stopFolder(args);
   const before = loadState(folder);
+  if (!host.browser && before.browser) host.pinBrowser(before.browser);
   const opts: RecordOptions = { source: before.source, ffmpeg: before.ffmpeg, log };
   const state = await stopCapture(folder, opts);
   nameStopChat(state, args);
@@ -297,6 +312,7 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
       events,
       keptTerminal(folder),
       traceNote(state.chatId, trace !== undefined),
+      readMarks(folder),
     ),
   );
   log(`Stopped. ${state.frames} frames, ${events.length} action(s). Folder: ${folder}`);
@@ -323,12 +339,21 @@ async function terminal(_host: DaemonHost, args: Args): Promise<number> {
 
 /** `aeon record`: start/stop are ours; gif/video/trace stay the browserkit command's. */
 export function recordCommand(original: Command | undefined, host: DaemonHost): Command {
+  const steps: RecordSteps = {
+    start: (args) => start(host, args),
+    stop: (args) => stop(host, args),
+    folder: stopFolder,
+    log,
+  };
   return {
     name: "record",
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
-    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>]
+    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>]
        aeon record stop [--out <dir>] [--chat <id>]
+       aeon record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
+       aeon record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
+       aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>]
        aeon record terminal --out <dir> --run "<command>"
        aeon record gif|video|trace …   (the original screen recordings)
 
@@ -337,14 +362,24 @@ Windows) into a folder with frames, clip.mp4 and events.json. --tabs records eve
 the chat drives, including one opened mid-run, and stop writes one clip per tab.
 terminal records a command and its output into that folder's events.json; the video
 kit draws it beside the tab. Run it after start and before stop.
+--no-mouse keeps the OS pointer out of the frames (only Aeon's cursor is on camera). mark names a
+beat on the clip clock; --selector also records the element's box (page CSS px) and windowBox
+(clip px), read without any automation glow; stop merges marks (and their --cue sounds) into
+events.json. wait blocks on a real condition, never a sleep: an element, a URL, a loaded page, or
+a chat that has truly finished. run does it all for one prompt: optionally opens --url, starts,
+runs the prompt, waits for the chat to finish, holds --tail seconds, stops, attaches the trace.
+--browser picks one connected Chrome profile; mark, wait and stop follow the one start used.
 The folder is a recording, not a video: render it with Remotion (see \`aeon video kit\`).`,
     run: async (args: Args) => {
       const action = args.positional[0];
       if (action === "start") return start(host, args);
       if (action === "stop") return stop(host, args);
       if (action === "terminal") return terminal(host, args);
+      if (action === "mark") return mark(host, steps, args);
+      if (action === "wait") return wait(host, steps, args);
+      if (action === "run") return run(host, steps, args);
       if (original) return original.run({ ...args, positional: args.positional.slice(1) });
-      throw new Error("Usage: aeon record start|stop|gif|video|trace");
+      throw new Error("Usage: aeon record start|stop|mark|wait|run|terminal|gif|video|trace");
     },
   };
 }

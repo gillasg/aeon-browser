@@ -14,6 +14,8 @@ const base = {
 test("speed lines name the path and the previous run", () => {
   assert.equal(speedText(400, "saved ability"), "0.4 s · saved ability");
   assert.equal(speedText(38000, "first time"), "38 s · first time");
+  // A first run never compares with an earlier time: "(was 8.0 s)" there was nonsense.
+  assert.equal(speedText(9400, "first time", 8000), "9.4 s · first time");
   assert.equal(speedText(1100, "from memory", 38000), "1.1 s · from memory (was 38 s)");
   assert.equal(
     speedText(1100, "with a saved draft", 38000),

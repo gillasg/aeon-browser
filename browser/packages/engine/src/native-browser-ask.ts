@@ -60,7 +60,7 @@ export async function hideHandoffAsk(tabId: number): Promise<void> {
 }
 
 /** Runs in the tab's isolated world. Helpers are nested so the serialised function is whole. */
-function showAsk(detail: AskDetail): void {
+export function showAsk(detail: AskDetail): void {
   const id = "aeon-agent-ask";
   const old = document.getElementById(id);
   if (old) old.remove();
@@ -108,12 +108,24 @@ function showAsk(detail: AskDetail): void {
   host.addEventListener("aeon-ask-remove", () =>
     window.removeEventListener("cursor-overlay-state", onState),
   );
+  // Beside the cursor, flipped to its left or above it when there is no room, and always whole
+  // inside the viewport with a 12px margin (a wing near an edge used to push the card off-screen).
   function place(): void {
+    const margin = 12;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const box = row.getBoundingClientRect();
+    const w = box.width || 340;
+    const h = box.height || 40;
     const point: { x?: unknown; y?: unknown } = cursorPoint ?? {};
-    const x = typeof point.x === "number" ? point.x + 14 : window.innerWidth / 2 - 160;
-    const y = typeof point.y === "number" ? point.y + 44 : window.innerHeight - 120;
-    host.style.left = Math.max(8, Math.min(window.innerWidth - 328, x)) + "px";
-    host.style.top = Math.max(8, Math.min(window.innerHeight - 52, y)) + "px";
+    let x = (width - w) / 2;
+    let y = height - h - 80;
+    if (typeof point.x === "number" && typeof point.y === "number") {
+      x = point.x + 14 + w > width - margin ? point.x - 14 - w : point.x + 14;
+      y = point.y + 44 + h > height - margin ? point.y - 20 - h : point.y + 44;
+    }
+    host.style.left = Math.max(margin, Math.min(width - w - margin, x)) + "px";
+    host.style.top = Math.max(margin, Math.min(height - h - margin, y)) + "px";
   }
   const field = document.createElement("input");
   field.type = "text";
@@ -133,8 +145,8 @@ function showAsk(detail: AskDetail): void {
     makeButton("cancel", "✕", () => send("cancelled")),
   );
   root.append(makeStyle(), row);
-  place();
   (document.documentElement || document.body).append(host);
+  place();
 }
 
 /** Runs in the tab's isolated world: drops the ask without touching anything else. */

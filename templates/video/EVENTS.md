@@ -89,8 +89,15 @@ window image, when the window was calibrated).
     studio's camera pushes in on these.
   - `beat` (optional): what the event carries in the story, one of `prompt`, `teach`, `compile`,
     `receipt`, `result`, `terminal`, `watch`, `boost`. A `receipt` or `result` opens a Hold.
-- `soundCues` (optional): `{t, kind}` with `kind` `key`, `trigger`, `start`, `needs-you` or `done`,
-  derived from real events: one `key` per typed character, a `trigger` on each click and on Enter.
+- `soundCues` (optional): `{t, kind}` with `kind` `key`, `trigger`, `start`, `needs-you`, `done`,
+  `arrive` or `shutter`, derived from real events: one `key` per typed character, a `trigger` on
+  each click and on Enter, plus the `--cue` of each mark.
+- `marks` (optional): beats a script named with `aeon record mark <name>`, as
+  `{name, t, label?, box?, windowBox?, cue?}`. `t` is on the clip clock. `--selector` records the
+  element's `box` (page CSS px) and `windowBox` (clip px: toolbar offset added, scaled by DPR);
+  `--box x,y,w,h` gives a `windowBox` directly. `aeon record wait --for selector|url|idle|chat`
+  blocks on the real condition between marks, and `aeon record run "<prompt>"` records one prompt
+  start to finish in one command.
 - `note`: present when the action list is incomplete (e.g. no trace was attached at start). The clip
   metadata and frames are still valid.
 - `terminal`: optional asciinema-style cast from `aeon record terminal --out dir --run "<command>"`.

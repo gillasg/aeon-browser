@@ -55,6 +55,11 @@ async function main(argv: string[]): Promise<number> {
     out(commandHelp(command, "aeon"));
     return 0;
   }
+  // `--browser <name>` works on every command that reaches Chrome (boosts, map, cookies, record
+  // and browserkit's own), not only the ones that read it: with two Chromes connected, a command
+  // without it used to fail as ambiguous or land in the wrong profile.
+  const browser = args.flags.browser;
+  if (typeof browser === "string") host.pinBrowser(browser);
   return command.run({ ...args, positional: rest });
 }
 

@@ -18,3 +18,41 @@ test("a browser line shows its short id, name, tabs and sites", () => {
   });
   assert.match(line, /^7c2f4b1e {2}eval\s+3 tabs {2}github\.com, news\.ycombinator\.com$/);
 });
+
+test("--browser pins every cell a command runs (boosts, map, cookies, record) to that profile", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "aeon-pin-"));
+  const was = process.env.AEON_DATA_DIR;
+  process.env.AEON_DATA_DIR = dir;
+  try {
+    const { DaemonHost } = await import("../dist/host.js");
+    const sent = [];
+    const host = new DaemonHost();
+    host.connect = async () => ({
+      browserRun: async (request) => (sent.push(request), { value: 1 }),
+    });
+    await host.runInBrowser("1");
+    host.pinBrowser("recording");
+    await host.runInBrowser("2", { session: "browserkit-cli" });
+    await host.runInBrowser("3", { browser: "eval" });
+    assert.equal(sent[0].browser, undefined);
+    assert.equal(sent[1].browser, "recording");
+    assert.equal(sent[2].browser, "eval");
+    assert.equal(host.browser, "recording");
+  } finally {
+    if (was === undefined) delete process.env.AEON_DATA_DIR;
+    else process.env.AEON_DATA_DIR = was;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("boosts, map, cookies and record document --browser", () => {
+  const commands = aeonCommands({});
+  for (const name of ["boosts", "map", "cookies", "record"]) {
+    const command = commands.find((item) => item.name === name);
+    assert.ok(command, name);
+    assert.match(command.help, /--browser/, name);
+  }
+});

@@ -44,7 +44,18 @@ function followLearning(ux: SiteUx): void {
   if (!ux.model.learning) return;
   poll = window.setInterval(() => {
     void learnMessage({ kind: "aeon.learn.get", tabId: ux.tabId }).then((reply) => {
-      if (!reply?.on) return clearInterval(poll);
+      if (!reply) return clearInterval(poll);
+      if (!reply.on) {
+        // Learning ended outside the orb (Chrome's debugger bar was closed): still say what
+        // was learned, as Stop does.
+        clearInterval(poll);
+        ux.model.learning = false;
+        ux.model.learnFound = 0;
+        if ((reply.found ?? 0) > 0)
+          showLearned(ux, learnedLine(reply.found ?? 0, reply.site || ux.model.host));
+        ux.render();
+        return;
+      }
       if (reply.found === ux.model.learnFound) return;
       ux.model.learnFound = reply.found ?? 0;
       ux.render();
@@ -71,7 +82,8 @@ export async function toggleLearning(ux: SiteUx): Promise<void> {
   ux.model.learning = reply.on === true;
   ux.model.learnFound = 0;
   followLearning(ux);
-  if (!on && (reply.found ?? 0) > 0) showLearned(ux, learnedLine(reply.found ?? 0, ux.model.host));
+  if (!on && (reply.found ?? 0) > 0)
+    showLearned(ux, learnedLine(reply.found ?? 0, reply.site || ux.model.host));
   ux.render();
   if (!on) void loadXray(ux);
 }

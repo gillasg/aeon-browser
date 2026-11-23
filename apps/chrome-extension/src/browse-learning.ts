@@ -7,11 +7,18 @@ import { askCore } from "./companion-requests.js";
 // for every tab: one switch, one tab, until it is turned off or the tab closes.
 
 const KEY = (tabId: number) => `aeon-learn:${tabId}`;
+/** The last session's result, so an orb that only sees learning end (the user closed Chrome's
+ * debugger bar) can still say what was learned. */
+const DONE_KEY = (tabId: number) => `aeon-learned:${tabId}`;
 
-/** What a teaching tab started from, so the count is the APIs this session added. */
+/**
+ * What a teaching tab started from, per site it visited, so the count is the APIs this session
+ * added. Teaching often starts on one page and browses to the site that matters; a baseline taken
+ * only for the first host used to count nothing there.
+ */
 interface Teaching {
   site: string;
-  baseline: string[];
+  baselines: Record<string, string[]>;
   found: number;
 }
 const EVERY_MS = 20_000;
@@ -60,17 +67,27 @@ export async function whileTeaching(tabId: number, then: () => Promise<unknown>)
 async function teaching(tabId: number): Promise<Teaching | undefined> {
   const value = (await chrome.storage.session.get(KEY(tabId)))[KEY(tabId)] as unknown;
   if (!value) return undefined;
-  const item = value as Partial<Teaching>;
-  return {
-    site: typeof item.site === "string" ? item.site : "",
-    baseline: Array.isArray(item.baseline) ? item.baseline.map(String) : [],
-    found: Number(item.found) || 0,
-  };
+  const item = value as Partial<Teaching> & { baseline?: unknown };
+  const site = typeof item.site === "string" ? item.site : "";
+  const baselines: Record<string, string[]> = {};
+  if (item.baselines && typeof item.baselines === "object")
+    for (const [host, ids] of Object.entries(item.baselines))
+      if (Array.isArray(ids)) baselines[host] = ids.map(String);
+  if (site && !baselines[site] && Array.isArray(item.baseline))
+    baselines[site] = item.baseline.map(String);
+  return { site, baselines, found: Number(item.found) || 0 };
 }
 
 async function isLearning(tabId: number): Promise<{ on: boolean; found: number; site: string }> {
   const state = await teaching(tabId);
-  return { on: Boolean(state), found: state?.found ?? 0, site: state?.site ?? "" };
+  if (state) return { on: true, found: state.found, site: state.site };
+  const done = (await chrome.storage.session.get(DONE_KEY(tabId)))[DONE_KEY(tabId)] as
+    { found?: unknown; site?: unknown } | undefined;
+  return {
+    on: false,
+    found: Number(done?.found) || 0,
+    site: typeof done?.site === "string" ? done.site : "",
+  };
 }
 
 /** The ids of the operations a site has mapped, or none when it is not mapped yet. */
@@ -99,7 +116,12 @@ async function tabSite(tabId: number): Promise<string> {
 async function start(tabId: number): Promise<void> {
   await learnUserTab(tabId, true);
   const site = await tabSite(tabId);
-  const state: Teaching = { site, baseline: await operationIds(site), found: 0 };
+  const state: Teaching = {
+    site,
+    baselines: site ? { [site]: await operationIds(site) } : {},
+    found: 0,
+  };
+  await chrome.storage.session.remove(DONE_KEY(tabId));
   await chrome.storage.session.set({ [KEY(tabId)]: state });
   if (!timers.has(tabId))
     timers.set(
@@ -117,16 +139,32 @@ async function stop(tabId: number): Promise<{ found: number; site: string }> {
     await flush(tabId);
     await learnUserTab(tabId, false).catch(() => undefined);
   }
-  const found = state ? await countFound(tabId, state) : 0;
+  // Re-read: the flush above may have moved the session to the site the user browsed to.
+  const latest = (await teaching(tabId)) ?? state;
+  const found = latest ? await countFound(tabId, latest) : 0;
+  const site = latest?.site ?? "";
   await chrome.storage.session.remove(KEY(tabId));
-  return { found, site: state?.site ?? "" };
+  if (latest) await chrome.storage.session.set({ [DONE_KEY(tabId)]: { found, site } });
+  return { found, site };
 }
 
 async function countFound(tabId: number, state: Teaching): Promise<number> {
-  const found = newOperationCount(state.baseline, await operationIds(state.site));
+  let found = 0;
+  for (const [host, baseline] of Object.entries(state.baselines))
+    found += newOperationCount(baseline, await operationIds(host));
   if (timers.has(tabId) || (await teaching(tabId)))
     await chrome.storage.session.set({ [KEY(tabId)]: { ...state, found } });
   return found;
+}
+
+/** The first flush on a new host takes its baseline before anything is learned there. */
+async function onSite(tabId: number, host: string): Promise<void> {
+  const state = await teaching(tabId);
+  if (!state || (state.site === host && state.baselines[host])) return;
+  const baselines = state.baselines[host]
+    ? state.baselines
+    : { ...state.baselines, [host]: await operationIds(host) };
+  await chrome.storage.session.set({ [KEY(tabId)]: { ...state, site: host, baselines } });
 }
 
 /** Hands what the tab recorded to core, which builds it into the site's API. */
@@ -136,7 +174,9 @@ async function flush(tabId: number): Promise<void> {
     if (!har.log?.entries?.length) return;
     const tab = await chrome.tabs.get(tabId);
     if (!tab.url || !/^https?:/.test(tab.url)) return;
-    await askCore("site", { action: "learn", site: new URL(tab.url).hostname, har });
+    const host = new URL(tab.url).hostname;
+    await onSite(tabId, host);
+    await askCore("site", { action: "learn", site: host, har });
     const state = await teaching(tabId);
     if (state) await countFound(tabId, state);
   } catch {

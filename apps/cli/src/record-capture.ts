@@ -16,6 +16,8 @@ export type RecordOptions = {
   ffprobe?: string;
   /** Skip X11 checks (used by tests with a fake ffmpeg). */
   testMode?: boolean;
+  /** Leave the OS pointer out of the frames, so only Aeon's own cursor is on camera. */
+  noMouse?: boolean;
   log?: (line: string) => void;
 };
 export type RecordState = {
@@ -37,6 +39,10 @@ export type RecordState = {
   input?: string;
   /** The recordAgentTabs value before --tabs turned it on, so stop can put it back. */
   recordAgentTabsWas?: boolean;
+  /** --no-mouse: the OS pointer is not drawn into the frames. */
+  noMouse?: boolean;
+  /** --browser at start: the Chrome profile later mark/wait/stop calls read from. */
+  browser?: string;
 };
 
 export const isWindows = process.platform === "win32";
@@ -210,6 +216,12 @@ export function macScreenDevice(
   return `${index}:none`;
 }
 
+/**
+ * Frames are 4:2:0 JPEGs: the clip is 4:2:0 anyway, and full-chroma 4K frames took twice as long
+ * to encode at stop and four times the disk.
+ */
+export const FRAME_FORMAT = ["-pix_fmt", "yuvj420p", "-q:v", "2"];
+
 /** ffmpeg arguments for the source: gdigrab on Windows, avfoundation on macOS, x11grab on Linux. */
 export function captureArgs(
   state: RecordState,
@@ -218,6 +230,7 @@ export function captureArgs(
 ): string[] {
   const out = join(folder, "frames", "%06d.jpg");
   const fps = String(state.fps);
+  const pointer = state.noMouse ? "0" : "1";
   if (platform === "win32") {
     const select = state.input ?? gdigrabInput(state.source, undefined);
     return [
@@ -229,15 +242,14 @@ export function captureArgs(
       "-framerate",
       fps,
       "-draw_mouse",
-      "1",
+      pointer,
       "-i",
       select,
       "-fps_mode",
       "cfr",
       "-r",
       fps,
-      "-q:v",
-      "2",
+      ...FRAME_FORMAT,
       out,
     ];
   }
@@ -252,15 +264,14 @@ export function captureArgs(
       "-framerate",
       fps,
       "-capture_cursor",
-      "1",
+      pointer,
       "-i",
       device,
       "-fps_mode",
       "cfr",
       "-r",
       fps,
-      "-q:v",
-      "2",
+      ...FRAME_FORMAT,
       out,
     ];
   }
@@ -274,7 +285,7 @@ export function captureArgs(
     "-f",
     "x11grab",
     "-draw_mouse",
-    "1",
+    pointer,
     "-framerate",
     fps,
     "-video_size",
@@ -285,8 +296,7 @@ export function captureArgs(
     "cfr",
     "-r",
     fps,
-    "-q:v",
-    "2",
+    ...FRAME_FORMAT,
     out,
   ];
 }
@@ -368,6 +378,10 @@ async function waitForFrames(
   }
 }
 
+function pointerOption(opts: RecordOptions): { noMouse?: true } {
+  return opts.noMouse ? { noMouse: true } : {};
+}
+
 /** Start capturing into `folder`. Resolves once frames are flowing (or the fake ffmpeg is up). */
 export async function startCapture(folder: string, opts: RecordOptions): Promise<RecordState> {
   if (opts.source === "tabs") {
@@ -395,6 +409,7 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
     ...(d ? { display: d } : {}),
     ...(geometry ? { geometry } : {}),
     ...(input ? { input } : {}),
+    ...pointerOption(opts),
     frames: 0,
   };
   const child = spawn(ffmpeg, captureArgs(state, folder), {
@@ -413,6 +428,9 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
   saveState(folder, state);
   return state;
 }
+
+/** Fast and still crisp: a 4K take encodes in seconds, not the minutes a slower preset took. */
+export const ENCODE_QUALITY = ["-preset", "veryfast", "-crf", "16"];
 
 /** Ask ffmpeg to finish (q via SIGINT, then TERM, then KILL) and encode clip.mp4 from the frames. */
 export async function stopCapture(
@@ -463,8 +481,7 @@ export async function stopCapture(
     join(folder, "frames", "%06d.jpg"),
     "-c:v",
     "libx264",
-    "-preset",
-    "veryfast",
+    ...ENCODE_QUALITY,
     "-pix_fmt",
     "yuv420p",
     "-r",

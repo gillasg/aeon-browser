@@ -85,7 +85,11 @@ metadata file beside the video.
   "editorial": [{ "tStart": 4900, "tEnd": 5900, "text": "Any site. An API." }],
   "segments": [{ "s0": 0, "s1": 6000, "speed": 1 }],
   "timeCuts": [],
-  "end": { "command": "aeon mcp shop.example", "repo": "github.com/gillasg/aeon-browser", "durationMs": 2400 },
+  "end": {
+    "command": "aeon mcp shop.example",
+    "repo": "github.com/gillasg/aeon-browser",
+    "durationMs": 2400
+  },
   "audioSrc": "audio/score.wav"
 }
 ```

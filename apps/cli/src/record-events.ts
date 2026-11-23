@@ -15,7 +15,8 @@ export type Box = { x: number; y: number; width: number; height: number };
 export type Beat =
   "prompt" | "teach" | "compile" | "receipt" | "result" | "terminal" | "watch" | "boost";
 
-export type SoundCueKind = "start" | "needs-you" | "done" | "key" | "trigger";
+export type SoundCueKind =
+  "start" | "needs-you" | "done" | "key" | "trigger" | "arrive" | "shutter";
 /** A sound the edit may score at clip time `t` (ms). Derived from real events only. */
 export type SoundCue = { t: number; kind: SoundCueKind };
 
@@ -57,6 +58,16 @@ export type ClipMeta = {
   logicalHeight?: number;
 };
 
+/** A beat the script named (`aeon record mark`): `box` is page CSS px, `windowBox` clip px. */
+export type Mark = {
+  name: string;
+  t: number;
+  label?: string;
+  box?: Box;
+  windowBox?: Box;
+  cue?: Extract<SoundCueKind, "key" | "trigger" | "arrive" | "shutter">;
+};
+
 /** One chunk of a terminal cast. `t` is ms on the clip clock. `in` is the command. */
 export type TerminalEvent = { t: number; kind: "in" | "out" | "err"; text: string };
 
@@ -79,6 +90,8 @@ export type RecordingEvents = {
   events: VideoEvent[];
   /** A terminal session recorded beside the tab. The kit draws it as a pane. */
   terminal?: TerminalCast;
+  /** Beats named with `aeon record mark` while recording, on the clip clock. */
+  marks?: Mark[];
   /** Foley cues on the clip clock, derived from `events` (keys while typing, a trigger on Enter or click). */
   soundCues?: SoundCue[];
   /** Set when the action list is incomplete (no trace was reachable at stop time). */

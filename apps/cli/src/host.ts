@@ -21,6 +21,17 @@ export class DaemonHost {
   private client: AeonClient | undefined;
   private connecting: Promise<AeonClient> | undefined;
   private browserUsed = false;
+  /** `--browser <name>` on any command: every cell it runs goes to that Chrome profile. */
+  private pinnedBrowser: string | undefined;
+
+  /** Sends cells without their own `browser` to the named profile (a name from aeon browsers). */
+  pinBrowser(name: string | undefined): void {
+    this.pinnedBrowser = name || undefined;
+  }
+
+  get browser(): string | undefined {
+    return this.pinnedBrowser;
+  }
 
   connect(): Promise<AeonClient> {
     if (this.client) return Promise.resolve(this.client);
@@ -54,7 +65,11 @@ export class DaemonHost {
     // to reach the daemon for it. Only the crawler's own cleanup code looks like this.
     if (!this.browserUsed && code.startsWith("if (globalThis.__crawlTab)")) return { value: true };
     this.browserUsed = true;
-    const result = await runCellOn(await this.connect(), code, options);
+    const browser = options.browser ?? this.pinnedBrowser;
+    const result = await runCellOn(await this.connect(), code, {
+      ...options,
+      ...(browser ? { browser } : {}),
+    });
     if (result.error) throw Object.assign(browserError(result), { output: result.output });
     return result;
   }

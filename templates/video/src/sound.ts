@@ -31,7 +31,7 @@ export function scoreFor(
         ? "key"
         : c.kind === "done"
           ? "chord"
-          : c.kind === "needs-you"
+          : c.kind === "needs-you" || c.kind === "arrive"
             ? "note"
             : "trigger";
     hits.push({ t: v, kind });

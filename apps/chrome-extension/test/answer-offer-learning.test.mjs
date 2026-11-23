@@ -9,8 +9,9 @@ const stubs = {
   "@browserkit/engine/native-browser-network":
     "export const calls = globalThis.__learnCalls = [];" +
     "export async function learnUserTab(tabId, on) { calls.push(['learn', tabId, on]); }" +
-    "export async function networkCall(tabId, op) { calls.push(['network', tabId, op]); return { log: { entries: [] } }; }",
-  "./companion-requests.js": "export async function askCore() { return []; }",
+    "export async function networkCall(tabId, op) { calls.push(['network', tabId, op]); return { log: { entries: globalThis.__harEntries ?? [] } }; }",
+  "./companion-requests.js":
+    "export async function askCore(kind, data) { return globalThis.__askCore ? globalThis.__askCore(kind, data) : []; }",
   "./chat-composer-submit.js": "export async function submitComposerMessage() {}",
 };
 
@@ -61,7 +62,7 @@ function fakeChrome() {
     tabs: {
       onUpdated: event("updated"),
       onRemoved: event("removed"),
-      get: async (tabId) => ({ id: tabId, url: "https://example.com/" }),
+      get: async (tabId) => ({ id: tabId, url: fakeChrome.url ?? "https://example.com/" }),
     },
     debugger: { onDetach: event("detach") },
     storage: {
@@ -124,4 +125,39 @@ test("an answer offer handled here passes the page url and shows its notice", as
   });
   assert.equal(reportWrongInput("chrome://newtab"), null);
   assert.equal(reportWrongInput(undefined), null);
+});
+
+test("Teach counts the APIs learned on the site browsed to, and keeps the result after a detach", async () => {
+  const { store, listeners } = fakeChrome();
+  const learning = await load("../src/browse-learning.ts");
+  learning.installBrowseLearning();
+  // example.com had 7 operations; browsing there while teaching makes it 8.
+  const ops = { "example.com": ["a", "b", "c", "d", "e", "f", "g"] };
+  globalThis.__harEntries = [{}];
+  globalThis.__askCore = (_kind, data) => {
+    if (data.action === "learn") ops[data.site] = [...(ops[data.site] ?? []), "h"];
+    return (ops[data.site] ?? []).map((id) => ({ id }));
+  };
+  const ask = (message) =>
+    new Promise((resolve) => listeners.message(message, { id: "ext" }, resolve));
+  try {
+    // Teach starts on a page of another host, then the user browses to example.com.
+    fakeChrome.url = "https://start.test/";
+    await ask({ kind: "aeon.learn.set", tabId: 9, on: true });
+    fakeChrome.url = "https://example.com/orders";
+    const stopped = await ask({ kind: "aeon.learn.set", tabId: 9, on: false });
+    assert.equal(stopped.found, 1);
+    assert.equal(stopped.site, "example.com");
+    // An orb that only sees learning end still reads what was learned.
+    assert.deepEqual(await ask({ kind: "aeon.learn.get", tabId: 9 }), {
+      on: false,
+      found: 1,
+      site: "example.com",
+    });
+    assert.equal(store.has("aeon-learn:9"), false);
+  } finally {
+    delete globalThis.__harEntries;
+    delete globalThis.__askCore;
+    delete fakeChrome.url;
+  }
 });

@@ -737,6 +737,10 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
   // Aeon owns `record start|stop`; the original gif/video/trace commands stay available.
   const originalRecord = BROWSERKIT_COMMANDS.find((command) => command.name === "record");
   overrides.set("record", recordCommand(originalRecord, host));
+  // Their cells run through the host, so `--browser <name>` (pinned in cli-main) reaches them too.
+  for (const command of BROWSERKIT_COMMANDS.filter((item) => SCOPED.has(item.name)))
+    if (!overrides.has(command.name))
+      overrides.set(command.name, { ...command, help: `${command.help}\n\n${BROWSER_NOTE}` });
   const own = [...aeonOnlyCommands(host), ...browsersCommands(host)];
   // A command Aeon defines itself (pack) replaces browserkit's; help lists each name once.
   const taken = new Set(own.map((command) => command.name));
@@ -748,6 +752,10 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
   const extra = [...overrides.values()].filter((command) => !known.has(command.name));
   return [...own, ...extra, ...commands];
 }
+
+const SCOPED = new Set(["boosts", "map", "cookies"]);
+const BROWSER_NOTE =
+  "--browser <name> runs it in one connected Chrome profile (a name from aeon browsers).";
 
 /** aeon update: wait until nothing is running, then pull and run the one-command setup again. */
 function updateAeon(): Promise<number> {

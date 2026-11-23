@@ -64,10 +64,14 @@ export function formatDuration(ms: number): string {
   return `${text} s`;
 }
 
-/** `0.4 s · saved ability`, `38 s · first time`, `1.1 s · from memory (was 38 s)`. */
+/**
+ * `0.4 s · saved ability`, `38 s · first time`, `1.1 s · from memory (was 38 s)`. A first run has
+ * nothing to compare with, so it never says "was", whatever an earlier unrelated run measured.
+ */
 export function speedText(ms: number, path: SpeedPath, previousMs?: number): string {
   const base = `${formatDuration(ms)} · ${path}`;
-  return previousMs === undefined ? base : `${base} (was ${formatDuration(previousMs)})`;
+  if (previousMs === undefined || path === "first time") return base;
+  return `${base} (was ${formatDuration(previousMs)})`;
 }
 
 export function buildRunCard(facts: RunFacts): RunCard | undefined {

@@ -29,6 +29,7 @@ const BOOLEAN = new Set([
   "no-register",
   "no-agents",
   "no-wait",
+  "no-mouse",
   "pick",
   "uninstall-agents",
   "off",

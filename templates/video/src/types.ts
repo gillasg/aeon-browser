@@ -11,7 +11,8 @@ export type Frame = { t: number; f: string };
 
 export type Beat =
   "prompt" | "teach" | "compile" | "receipt" | "result" | "terminal" | "watch" | "boost";
-export type SoundCueKind = "start" | "needs-you" | "done" | "key" | "trigger";
+export type SoundCueKind =
+  "start" | "needs-you" | "done" | "key" | "trigger" | "arrive" | "shutter";
 export type SoundCue = { t: number; kind: SoundCueKind };
 
 export type VideoEventKind = "click" | "type" | "press" | "scroll" | "navigate" | "tab-switch";
