@@ -29,6 +29,13 @@ import {
   loadCatalog,
   type CatalogTool,
 } from "./catalog.js";
+import {
+  createExtensions,
+  extensionCapabilities,
+  handleExtension,
+  taskAugmentedCall,
+  type McpExtensions,
+} from "./mcp-extensions.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -404,9 +411,18 @@ export async function runMcpServer(site?: string): Promise<void> {
     (await readUseClientModel()) || !(await modelSignedIn(modelAuthPath())),
   );
   setSamplingBridge(sampler);
+  extensions = createExtensions(
+    (method, params) =>
+      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`),
+    (name, args, signal) =>
+      callToolResult({ name, arguments: args }, deps.aeon, deps.runs, undefined, signal),
+    () => catalogState.tools,
+  );
   const lines = createInterface({ input: process.stdin });
   for await (const line of lines) await processMcpLine(line, deps, sampler);
   stopCatalog();
+  extensions?.close();
+  extensions = undefined;
   for (const controller of deps.pending.values()) controller.abort();
   sampler.close();
   setSamplingBridge(undefined);
@@ -435,7 +451,8 @@ async function processMcpLine(line: string, deps: McpDeps, sampler: SamplingBrid
   sampler.learnCapabilities(params);
   const modern = deps.conn.modern;
   const session = mcpSessionFromMeta(params);
-  if (method === "tools/call") void answerCall(message, message.id, deps, modern, session);
+  if (method === "tools/call" || method === "tasks/result")
+    void answerCall(message, message.id, deps, modern, session);
   else await answerRequest(message, message.id, deps, modern, session);
 }
 
@@ -444,7 +461,7 @@ function initializeResult(params: Json): Json {
   const version = MCP_PROTOCOLS.find((candidate) => candidate === asked) ?? MCP_PROTOCOLS[0];
   return {
     protocolVersion: version,
-    capabilities: { tools: { listChanged: true } },
+    capabilities: { tools: { listChanged: true }, ...extensionCapabilities() },
     serverInfo: { name: "aeon", version: "0.1.0" },
   };
 }
@@ -496,6 +513,8 @@ async function handle(
   }
   if (method === "resources/list" || method === "prompts/list") return listResult(method, modern);
   if (method === "ping") return mcpResult({}, modern);
+  const extended = extensionRequest(method, mcpParams(message));
+  if (extended) return extended;
   if (method !== "tools/call") throw new Error("Method not found");
   return callToolResult(
     message.params as { name: string; arguments?: Json },
@@ -504,6 +523,13 @@ async function handle(
     session,
     signal,
   );
+}
+
+/** events/*, tasks/*, or a tools/call that asked to run as a task. */
+function extensionRequest(method: string, params: Json): Promise<Json> | undefined {
+  if (!extensions) return undefined;
+  if (method === "tools/call") return taskAugmentedCall(extensions, params);
+  return handleExtension(extensions, method, params);
 }
 
 async function callTool(
@@ -651,6 +677,7 @@ interface CatalogState {
   primed: boolean;
 }
 
+let extensions: McpExtensions | undefined;
 let catalogState: CatalogState = { tools: [], fingerprint: "", primed: false };
 
 function watchCatalog(): () => void {

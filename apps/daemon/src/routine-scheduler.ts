@@ -69,6 +69,8 @@ export class RoutineScheduler {
   onCheck:
     | ((routine: RoutineRecord, check: { met: boolean; value?: unknown; error?: string }) => void)
     | undefined;
+  /** A passed check, for MCP event subscribers. */
+  onFired: ((routine: RoutineRecord, value: unknown) => void) | undefined;
   /** Webhook POST for a passing check. Tests replace it. */
   webhookDeliver = deliverRoutineWebhook;
 
@@ -271,6 +273,7 @@ export class RoutineScheduler {
     value: unknown,
   ): Promise<string | undefined> {
     this.onAlert?.(routine.chatId, routine.title, describeCheck(value));
+    this.onFired?.(routine, value);
     const delivery = routine.webhook ? await this.webhookDeliver(routine, value) : undefined;
     if (routine.webhookOnly) {
       this.completeWebhookOnly(run.runId, delivery);

@@ -27,9 +27,24 @@ export async function loadCatalog(): Promise<CatalogTool[]> {
 }
 
 export function catalogFingerprint(
-  tools: readonly { name: string; description: string }[],
+  tools: readonly {
+    name: string;
+    description: string;
+    inputSchema?: unknown;
+    annotations?: unknown;
+  }[],
 ): string {
-  return tools.map((tool) => `${tool.name}\n${tool.description}`).join("\n");
+  // Schema and annotations count too: a re-saved ability with new inputs is a changed tool.
+  return tools
+    .map((tool) =>
+      [
+        tool.name,
+        tool.description,
+        JSON.stringify(tool.inputSchema ?? null),
+        JSON.stringify(tool.annotations ?? null),
+      ].join("\n"),
+    )
+    .join("\n");
 }
 
 export function catalogMcpTool(tool: CatalogTool): Record<string, unknown> {

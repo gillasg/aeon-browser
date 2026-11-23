@@ -1,3 +1,4 @@
+import { recordRoutineEvent } from "./routine-events.js";
 import { randomUUID } from "node:crypto";
 import { configureSiteRequests } from "./site-requests.js";
 import { PinnedResults } from "./pinned-results.js";
@@ -96,6 +97,8 @@ export function createProductionRuntime(dataDirectory: string): {
   const routines = new RoutineScheduler(store, service, browserControl);
   routines.onAlert = (chatId, title, message) => attention.alert(chatId, title, message);
   routines.onCheck = (routine, check) => void pins.recordCheck(routine, check);
+  routines.onFired = (routine, value) =>
+    void recordRoutineEvent(dataRoot, routine, value).catch(() => undefined);
   const capabilityTools = new CapabilityToolService(
     registry,
     mcpMigration,

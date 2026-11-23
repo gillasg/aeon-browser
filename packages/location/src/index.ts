@@ -39,3 +39,4 @@ export function aeonDataDirectory(options: AeonLocationOptions = {}): string {
 function expandHome(path: string, home: string): string {
   return path.replace(/^~(?=$|[\\/])/, home);
 }
+export * from "./event-log.js";

@@ -95,3 +95,4 @@ export {
 } from "./companion.js";
 
 export * from "./rewind.js";
+export * from "./secret-scrub.js";
