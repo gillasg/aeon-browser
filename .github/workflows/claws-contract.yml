@@ -1,0 +1,40 @@
+# The Claw & Primitive contract suite: deterministic, zero-LLM, loopback-only. It runs the
+# browser build output with Node alone (no Chrome, no model calls), on every OS Aeon ships to.
+# It is a separate lane: the CI workflow's jobs are unchanged.
+name: Claws contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: claws-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  claws-contract:
+    name: claws contract (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build the browser packages the suite loads
+        run: pnpm exec tsc -b packages/domain packages/location --pretty false && pnpm build:browser
+      - name: Claw & Primitive contract
+        run: pnpm test:claws
