@@ -2,7 +2,6 @@ import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import type { NewTabHomeProps } from "./home-surface.js";
 import { SidebarIcon } from "./sidebar-icons.js";
-import { ago } from "./home-live.js";
 
 // All chats: one grouped list in the order the Ctrl+K switcher uses (needs you, running, recent).
 // Each row is a dot, the title and one line of state or time; actions show on hover and focus.
@@ -147,7 +146,6 @@ function CatalogRow({
   return (
     <li className="catalog-result" data-state={state} data-open={String(open)}>
       <button className="catalog-result-main" type="button" onClick={() => onOpen(chat.chatId)}>
-        <span className="aeon-dot" data-state={state} aria-hidden="true" />
         <span className="catalog-result-text">
           <span className="catalog-result-title">{chat.title}</span>
           {chat.matchExcerpt && <span className="catalog-result-preview">{chat.matchExcerpt}</span>}
@@ -193,4 +191,13 @@ function RowAction({
       <SidebarIcon kind={icon} />
     </button>
   );
+}
+
+/** "3m", "2h", "4d": how long ago a chat last changed. */
+function ago(at: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(at)) / 60_000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)}h`;
+  return `${Math.round(minutes / 1440)}d`;
 }

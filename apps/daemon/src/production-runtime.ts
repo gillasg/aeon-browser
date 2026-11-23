@@ -341,6 +341,7 @@ function managementRoutines(
       ...(routine.check?.includes("browser.snipe(") ? { kind: "snipe" as const } : {}),
       ...(routine.checkShell ? { checkShell: routine.checkShell } : {}),
       ...(routine.listen ? { listen: routine.listen } : {}),
+      ...(routine.webhook?.url ? { webhook: { url: routine.webhook.url } } : {}),
       sites: routine.sites,
       nextDueAt: routine.nextDueAt,
       requiredBrowserInstanceId: routine.requiredBrowserInstanceId,

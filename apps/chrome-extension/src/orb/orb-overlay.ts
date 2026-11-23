@@ -7,7 +7,8 @@ import {
 } from "./orb-messages.js";
 import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "@browserkit/engine/cursor-bus";
 import type { OrbBox, OrbCursorStep } from "./orb-run.js";
-import { OVERLAY_STYLE, spotlightGradient } from "./orb-overlay-style.js";
+import type { OrbLayout } from "./orb-messages.js";
+import { OVERLAY_STYLE } from "./orb-overlay-style.js";
 import {
   loadOrbPosition,
   saveOrbPosition,
@@ -18,11 +19,20 @@ import {
 // The cursor's pill, hit target and ask box. The glyph is the shared page cursor (one shape for
 // the summon and for the agent's steps). This layer remembers where it was left, drags it, and
 // steps out of the way while the agent drives that same glyph. The pill says what it is doing,
-// with ☰ (the transcript, in the side panel) and ■ (stop). Needs you: the pill turns amber.
+// with ☰ (the transcript, in the side panel) and ■ (stop). Nothing here ever dims or blurs the page.
 // Done or couldn't finish: one line, which fades after a few seconds unless hovered. A recording
 // hides this layer; the engine decides whether the glyph itself stays.
 
-const DEFAULT_PANEL = { width: 360, height: 96 };
+const DEFAULT_PANEL = { width: 400, height: 96 };
+/** Pointer summon: 400px to compose, 440px for an answer. Keyboard summon: 480px, centred. */
+export const BOX_WIDTH = { compose: 400, answer: 440, keyboard: 480, teach: 340 } as const;
+/** The box keeps this far inside the viewport, and opens this far from the pointer: close enough
+ * that the stemless arrow and its box read as one companion. */
+const EDGE = 16;
+const POINTER_GAP = 6;
+/** Transparent room orb.html keeps around the box (`#root` padding), so its rounded corners and
+ * shadow never clip at the frame's edge. The frame is this much larger on every side. */
+export const FRAME_PAD = 12;
 const DRAG_SLOP = 4;
 const HIT_SIZE = 32;
 const RESULT_MS = 6000;
@@ -68,7 +78,6 @@ export function overlaySettled(input: {
 
 export class OrbOverlay {
   private readonly host = document.createElement("div");
-  private readonly spot = document.createElement("div");
   private readonly hit = document.createElement("button");
   private readonly frame = document.createElement("iframe");
   private readonly pill = document.createElement("div");
@@ -82,6 +91,11 @@ export class OrbOverlay {
   private target: Point;
   private panel = DEFAULT_PANEL;
   private open = false;
+  /** How the box was summoned and what it shows now: decides its width and where it sits. */
+  private keyboard = false;
+  private layout: OrbLayout = "compose";
+  /** The run points at what needs the user: the cursor waits beside it (no dim, no blur). */
+  private pointing = false;
   private acting = false;
   private hovered = false;
   private fadeTimer = 0;
@@ -137,12 +151,19 @@ export class OrbOverlay {
     return ["thinking", "working", "needs", "paused"].includes(this.state);
   }
 
-  showBubble(focus = true): void {
+  showBubble(focus = true, keyboard?: boolean): void {
+    if (keyboard !== undefined) this.keyboard = keyboard;
     this.open = true;
     this.updatePill();
     this.frame.classList.remove("off");
     requestAnimationFrame(() => this.frame.classList.add("on"));
-    if (focus) this.frame.focus();
+    if (focus) {
+      // Twice: now, and once the frame is painted, so typing lands in the field, not the page.
+      this.frame.focus();
+      requestAnimationFrame(() => {
+        if (this.open) this.frame.focus();
+      });
+    }
     this.wake();
   }
 
@@ -161,12 +182,14 @@ export class OrbOverlay {
     if (message.kind === "aeon.orb.visual") this.setVisual(message.state, message.label);
     else if (message.kind === "aeon.orb.cursor") this.streamTo(message.steps);
     else if (message.kind === "aeon.orb.spotlight") this.spotlight(message.box);
-    else if (message.kind === "aeon.orb.panel")
+    else if (message.kind === "aeon.orb.panel") {
+      this.layout = message.layout ?? "compose";
       this.panel = {
-        width: clampSize(message.width, 260, 440),
-        height: clampSize(message.height, 44, innerHeight - 16),
+        width: boxWidth(this.layout, this.keyboard),
+        // The reported height includes the frame's padding; the panel is the box itself.
+        height: clampSize(message.height - FRAME_PAD * 2, 32, innerHeight - EDGE * 2),
       };
-    else if (message.kind === "aeon.orb.prefs") this.setReducedMotion(message.reduceMotion);
+    } else if (message.kind === "aeon.orb.prefs") this.setReducedMotion(message.reduceMotion);
   }
 
   /** A recording hides the pill and the box. The shared glyph follows the engine's own rule. */
@@ -178,12 +201,24 @@ export class OrbOverlay {
 
   private updatePill(): void {
     const show = !this.open && this.state !== "listening" && this.label !== "" && !this.acting;
+    if (!show) this.releasePillLayout();
     this.pill.hidden = !show;
     this.pill.dataset.state = this.state;
     this.pillLabel.textContent = this.label;
     this.pillLabel.title = this.label;
     // One layout read when the label changes, instead of one on every animation frame.
     this.pillWidth = this.pill.hidden ? 0 : this.pill.offsetWidth;
+  }
+
+  private holdPillLayout(): void {
+    const width = this.pillLabel.offsetWidth;
+    if (width > 0) this.pillLabel.style.minWidth = `${width}px`;
+    this.pill.classList.add("hold-layout");
+  }
+
+  private releasePillLayout(): void {
+    this.pillLabel.style.minWidth = "";
+    this.pill.classList.remove("hold-layout");
   }
 
   /** The setting in Aeon adds to the system's reduce-motion; it never turns that off. */
@@ -217,7 +252,6 @@ export class OrbOverlay {
     style.textContent = OVERLAY_STYLE;
     const layer = document.createElement("div");
     layer.className = "layer";
-    this.spot.className = "spot";
     this.hit.className = "hit";
     this.hit.type = "button";
     this.hit.title = "Aeon · click to ask, drag to move";
@@ -231,7 +265,7 @@ export class OrbOverlay {
     this.frame.className = "off";
     this.frame.setAttribute("allowtransparency", "true");
     this.buildPill();
-    layer.append(this.spot, this.hit, this.pill, this.frame);
+    layer.append(this.hit, this.pill, this.frame);
     shadow.append(style, layer);
     // An extension reload leaves the old script's cursor on the page with nothing driving it.
     for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
@@ -249,7 +283,7 @@ export class OrbOverlay {
     spin.className = "spin";
     this.pillLabel.className = "label";
     this.pillLabel.type = "button";
-    this.pillLabel.addEventListener("click", () => this.showBubble());
+    this.pillLabel.addEventListener("click", () => this.showBubble(true, false));
     const transcript = iconButton("☰", "Open the transcript in the side panel", () =>
       send(CURSOR_TRANSCRIPT),
     );
@@ -262,11 +296,21 @@ export class OrbOverlay {
     });
     this.pill.addEventListener("mouseleave", () => {
       this.hovered = false;
+      this.releasePillLayout();
+      this.pillWidth = this.pill.hidden ? 0 : this.pill.offsetWidth;
       this.scheduleFade();
     });
   }
 
+  private syncPillLayoutHold(next: OrbVisualState): void {
+    const settled = next === "done" || next === "error";
+    const wasRunning = this.state === "thinking" || this.state === "working";
+    if (this.hovered && !this.pill.hidden && wasRunning && settled) this.holdPillLayout();
+    else if (next === "thinking" || next === "working") this.releasePillLayout();
+  }
+
   private setVisual(state: OrbVisualState, label: string): void {
+    this.syncPillLayoutHold(state);
     this.state = state;
     this.label = state === "listening" ? "" : label;
     if (state !== "working") this.showCursor();
@@ -304,17 +348,17 @@ export class OrbOverlay {
     }
     this.releasePending = this.acting;
     this.acting = false;
-    if (!this.spot.classList.contains("on")) this.target = this.home();
+    if (!this.pointing) this.target = this.home();
   }
 
+  /** The cursor waits beside what needs the user. The page itself is never dimmed or blurred. */
   private spotlight(box: OrbBox | null): void {
     if (!box) {
-      this.spot.classList.remove("on");
+      this.pointing = false;
       this.target = this.home();
       return;
     }
-    this.spot.style.background = spotlightGradient(box);
-    this.spot.classList.add("on");
+    this.pointing = true;
     this.showCursor();
     // The cursor waits beside what needs the user.
     this.target = this.clampPoint({ x: box.x - 26, y: box.y + box.height / 2 });
@@ -326,7 +370,7 @@ export class OrbOverlay {
 
   private moveHome(position: OrbPosition): void {
     this.position = position;
-    if (!this.spot.classList.contains("on") && !this.acting) this.target = this.home();
+    if (!this.pointing && !this.acting) this.target = this.home();
     this.wake();
   }
 
@@ -357,7 +401,8 @@ export class OrbOverlay {
     this.wake();
     if (!moved) {
       if (this.open) this.hideBubble();
-      else this.showBubble();
+      // A click on the cursor is a pointer summon: open beside it, even after a keyboard one.
+      else this.showBubble(true, false);
       return;
     }
     this.position = {
@@ -369,7 +414,7 @@ export class OrbOverlay {
 
   /** A click anywhere on the page (not in the box or on the cursor) collapses the box. */
   private readonly clickAway = (event: PointerEvent): void => {
-    if (!this.open || event.composedPath().includes(this.host)) return;
+    if (!this.open || this.layout === "teach" || event.composedPath().includes(this.host)) return;
     this.hideBubble();
   };
 
@@ -419,24 +464,32 @@ export class OrbOverlay {
     });
   }
 
-  /** The box opens beside the cursor's tip, where the pill would be, on the side with room. */
+  /** Beside the pointer, keyboard-centred, or Teach's bottom-centre pill: see `framePlace`. */
   private placeFrame(at: Point): void {
     if (!this.open) return; // the closed box is visibility:hidden; don't lay it out every frame
-    const { width, height } = this.panel;
-    let left = at.x + 24;
-    if (left + width > innerWidth - 8) left = at.x - 8 - width;
-    const top = clampSize(at.y + 16, 8, innerHeight - height - 8);
-    if (width !== this.frameW) {
-      this.frame.style.width = width + "px";
-      this.frameW = width;
+    // Width follows the current summon (a pointer summon after a keyboard one is narrower again).
+    const width = boxWidth(this.layout, this.keyboard);
+    const { height } = this.panel;
+    const place = framePlace({
+      at,
+      width,
+      height,
+      viewport: { width: innerWidth, height: innerHeight },
+      mode: this.layout === "teach" ? "teach" : this.keyboard ? "keyboard" : "pointer",
+    });
+    const frameW = width + FRAME_PAD * 2;
+    const frameH = height + FRAME_PAD * 2;
+    if (frameW !== this.frameW) {
+      this.frame.style.width = frameW + "px";
+      this.frameW = frameW;
     }
-    if (height !== this.frameH) {
-      this.frame.style.height = height + "px";
-      this.frameH = height;
+    if (frameH !== this.frameH) {
+      this.frame.style.height = frameH + "px";
+      this.frameH = frameH;
     }
-    this.frame.style.left = clampSize(left, 8, innerWidth - width - 8) + "px";
-    this.frame.style.top = top + "px";
-    this.frame.style.transformOrigin = left > at.x ? "0 0" : "100% 0";
+    this.frame.style.left = place.left - FRAME_PAD + "px";
+    this.frame.style.top = place.top - FRAME_PAD + "px";
+    this.frame.style.transformOrigin = place.origin;
   }
 
   private placeChrome(at: Point): void {
@@ -493,7 +546,7 @@ export class OrbOverlay {
   }
 
   private readonly resize = (): void => {
-    this.target = this.spot.classList.contains("on") ? this.clampPoint(this.target) : this.home();
+    this.target = this.pointing ? this.clampPoint(this.target) : this.home();
     this.wake();
   };
 
@@ -523,6 +576,50 @@ function iconButton(text: string, label: string, onClick: () => void): HTMLButto
 /** Runs in the click itself, so the side panel opens with the user's gesture. */
 function send(kind: string): void {
   if (chrome.runtime?.id) void chrome.runtime.sendMessage({ kind }).catch(() => undefined);
+}
+
+export function boxWidth(layout: OrbLayout, keyboard: boolean): number {
+  if (layout === "teach") return BOX_WIDTH.teach;
+  if (keyboard) return BOX_WIDTH.keyboard;
+  return layout === "answer" ? BOX_WIDTH.answer : BOX_WIDTH.compose;
+}
+
+/**
+ * Where the box sits. Pointer: 6px beside the pointer, flipped left or up when it would overflow.
+ * Keyboard: centred horizontally in the upper third (top at 22vh), no pointer offset. Teach: a
+ * pill at the bottom centre, clear of the page's middle. Always whole, 16px inside the viewport.
+ */
+export function framePlace(input: {
+  at: Point;
+  width: number;
+  height: number;
+  viewport: { width: number; height: number };
+  mode: "pointer" | "keyboard" | "teach";
+}): { left: number; top: number; origin: string } {
+  const { at, width, height, viewport, mode } = input;
+  const maxLeft = Math.max(EDGE, viewport.width - width - EDGE);
+  const maxTop = Math.max(EDGE, viewport.height - height - EDGE);
+  if (mode === "keyboard")
+    return {
+      left: clampSize((viewport.width - width) / 2, EDGE, maxLeft),
+      top: clampSize(Math.round(viewport.height * 0.22), EDGE, maxTop),
+      origin: "50% 0",
+    };
+  if (mode === "teach")
+    return {
+      left: clampSize((viewport.width - width) / 2, EDGE, maxLeft),
+      top: clampSize(viewport.height - height - 24, EDGE, maxTop),
+      origin: "50% 100%",
+    };
+  const right = at.x + POINTER_GAP + width <= viewport.width - EDGE;
+  const below = at.y + POINTER_GAP + height <= viewport.height - EDGE;
+  const left = right ? at.x + POINTER_GAP : at.x - POINTER_GAP - width;
+  const top = below ? at.y + POINTER_GAP : at.y - POINTER_GAP - height;
+  return {
+    left: clampSize(left, EDGE, maxLeft),
+    top: clampSize(top, EDGE, maxTop),
+    origin: `${right ? "0" : "100%"} ${below ? "0" : "100%"}`,
+  };
 }
 
 function clampSize(value: number, min: number, max: number): number {

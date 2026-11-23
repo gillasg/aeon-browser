@@ -6,8 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import test from "node:test";
 
-const wing =
-  "M 1.2 1.2 L 23.2 9.2 L 17.2 7.3 L 18.7 10.5 L 13.9 8.8 L 15.1 12 L 11.3 9.7 L 14.2 13 L 10.9 12.3 L 13.4 16.8 L 10 15.9 L 12.9 21.5 Z";
+const wing = "M 1.2 1.2 L 1.2 17.4 L 5.6 13.2 L 12.6 13.2 Z";
 
 async function load(entry) {
   const directory = await mkdtemp(join(tmpdir(), "aeon-mark-"));
@@ -25,18 +24,18 @@ async function load(entry) {
 }
 
 function svg(scale) {
-  const width = 22 * scale;
+  const width = 15 * scale;
   const height = 20 * scale;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 25 23"><path d="${wing}" fill="#9fd4ff" stroke="#142033"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 14 19"><path d="${wing}" fill="#9fd4ff" stroke="#142033"/></svg>`;
 }
 
-test("the flying wing is the same path at 1x and 2x", async () => {
+test("the stemless pointer is the same path at 1x and 2x", async () => {
   const mark = await load("../../../browser/packages/engine/src/cursor-mark.ts");
   assert.equal(mark.CURSOR_PATH, wing);
-  assert.equal(mark.CURSOR_WIDTH, 22);
+  assert.equal(mark.CURSOR_WIDTH, 15);
   assert.equal(mark.CURSOR_HEIGHT, 20);
-  assert.match(svg(1), /width="22" height="20"/);
-  assert.match(svg(2), /width="44" height="40"/);
+  assert.match(svg(1), /width="15" height="20"/);
+  assert.match(svg(2), /width="30" height="40"/);
   assert.ok(svg(1).includes(mark.CURSOR_PATH));
   assert.ok(svg(2).includes(mark.CURSOR_PATH));
 });

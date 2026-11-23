@@ -113,6 +113,11 @@ async function tabSite(tabId: number): Promise<string> {
   return tab?.url && /^https?:/.test(tab.url) ? new URL(tab.url).hostname : "";
 }
 
+/** Starts Teach on a tab from the worker itself (Manage → Sites → Teach Aeon). */
+export function startTeaching(tabId: number): Promise<void> {
+  return start(tabId);
+}
+
 async function start(tabId: number): Promise<void> {
   await learnUserTab(tabId, true);
   const site = await tabSite(tabId);

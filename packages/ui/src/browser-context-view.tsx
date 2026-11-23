@@ -21,7 +21,7 @@ export function BrowserContextChip({
         className="browser-context-page-label"
         title={`${record.title ?? record.url}\n${record.url}${record.selectedText ? "\nSelected text attached" : ""}`}
       >
-        {record.title || new URL(record.url).hostname}
+        {chipLabel(record)}
       </span>
       {onRemove && (
         <button
@@ -108,4 +108,11 @@ function ContextDetails({ record }: { record: PiBrowserContextRecord }): ReactEl
       )}
     </div>
   );
+}
+
+/** `@ steam.com · Elden Ring`: the site, then the page, left-aligned in the composer. */
+function chipLabel(record: PiBrowserContextRecord): string {
+  const host = new URL(record.url).hostname.replace(/^www\./, "");
+  const title = record.title?.trim();
+  return title && title !== host ? `@ ${host} · ${title}` : `@ ${host}`;
 }

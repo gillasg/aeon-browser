@@ -17,6 +17,8 @@ async function view() {
       'import { createElement } from "react";',
       "export function ChatSwitcher() { return null; }",
       "export function xrayParts() { return []; }",
+      'export const piSlashCommandsKey = "aeonPiSlashCommands";',
+      "export function useAgentFlag() { return [false, () => {}]; }",
       "export function AnswerLines(props) {",
       "  if (!props.footer) return null;",
       '  const text = props.footer.lines.map((line) => line.text || line.label).join(" ");',
@@ -66,49 +68,67 @@ const actions = {
   answerOffer() {},
   answerWrong() {},
   toggleLearning() {},
+  retry() {},
+  promote() {},
+  copyAnswer() {},
+  dismissHint() {},
   removeContext() {},
   pickTabs() {},
   addContext() {},
 };
 
-test("a running line sits above the field without a side-panel link", async () => {
+test("a running step is one breathing pill above the field, with no panel link", async () => {
   const orb = await view();
   const html = renderToStaticMarkup(
     createElement(orb.OrbBox, {
-      model: { ...model, line: { text: "Reading your orders · 23 found", more: false } },
+      model: {
+        ...model,
+        startedAt: Date.now() - 4000,
+        line: { text: "Reading your orders · 23 found", more: false },
+      },
       actions,
     }),
   );
-  assert.match(html, /isl-line/);
+  assert.match(html, /data-state="working"/);
+  assert.match(html, /isl-working ink-wet/);
   assert.match(html, /Reading your orders/);
-  assert.match(html, /data-clamp="1"/);
+  assert.match(html, /· 4s/);
   assert.doesNotMatch(html, /isl-line-more/);
   assert.match(html, /<textarea/);
 });
 
-test("a finished line clamps to two lines and links to the side panel", async () => {
+test("an error is a neutral card with its whole cause, Retry and Open in panel", async () => {
   const orb = await view();
+  const cause = "Steam asked for a sign-in before it would show the editions list.";
   const html = renderToStaticMarkup(
     createElement(orb.OrbBox, {
-      model: { ...model, line: { title: "Aeon broke", text: "No model", more: true } },
+      model: { ...model, line: { title: "Couldn't finish", text: cause, more: true } },
       actions,
     }),
   );
-  assert.match(html, /Aeon broke/);
-  assert.match(html, /No model/);
-  assert.match(html, /data-clamp="2"/);
-  assert.match(html, /isl-line-more/);
-  assert.match(html, /Side panel/);
+  assert.match(html, /data-state="error"/);
+  assert.match(html, /isl-error/);
+  assert.match(html, new RegExp(cause));
+  assert.match(html, />Retry</);
+  assert.match(html, />Open in panel</);
+  assert.doesNotMatch(html, /data-clamp/);
 });
 
 const footer = {
   lines: [
-    { kind: "notice", text: "1.1 s · from memory (was 38 s)" },
+    {
+      kind: "receipt",
+      receipt: "speed",
+      lead: "0.4 s via skill",
+      rest: ["no model"],
+      text: "0.4 s via skill · no model",
+      short: "0.4 s · via skill",
+    },
     { kind: "learned", text: "Learned: orders" },
   ],
 };
 
-test("finished answers show the lines underneath, and a running step does not", async () => {
+test("a finished answer dries into one receipt line; a running step has none", async () => {
   const orb = await view();
   const done = renderToStaticMarkup(
     createElement(orb.OrbBox, {
@@ -116,14 +136,56 @@ test("finished answers show the lines underneath, and a running step does not", 
       actions,
     }),
   );
-  assert.match(done, /answer-lines/);
-  assert.match(done, /Learned: orders/);
-  assert.match(done, /1\.1 s · from memory/);
+  assert.match(done, /data-state="answer"/);
+  assert.match(done, /isl-answer/);
+  assert.match(done, /class="isl-receipt-text">0\.4s · via skill</);
+  assert.doesNotMatch(done, /no model/);
+  const timed = renderToStaticMarkup(
+    createElement(orb.OrbBox, {
+      model: {
+        ...model,
+        durationMs: 1200,
+        line: { text: "Twenty three orders.", more: true },
+        footer: { lines: [] },
+      },
+      actions,
+    }),
+  );
+  assert.match(timed, /class="isl-receipt-text">1\.2s</);
   const running = renderToStaticMarkup(
     createElement(orb.OrbBox, {
       model: { ...model, line: { text: "Reading your orders · 23 found", more: false }, footer },
       actions,
     }),
   );
-  assert.doesNotMatch(running, /answer-lines/);
+  assert.doesNotMatch(running, /isl-receipt/);
+});
+
+test("Compose never shows the X-Ray strip or the power row", async () => {
+  const orb = await view();
+  const html = renderToStaticMarkup(
+    createElement(orb.OrbBox, {
+      model: {
+        ...model,
+        chatId: undefined,
+        xray: { apis: 4, boosts: 1, watches: 1 },
+        fillForm: true,
+        context: [{ tabId: 1, title: "Shop", host: "shop.com" }],
+      },
+      actions,
+    }),
+  );
+  assert.doesNotMatch(html, /isl-xray|isl-power|Boost this site/);
+  assert.doesNotMatch(html, /Fill this form|isl-whisper|Type \//);
+  assert.match(html, /isl-context/);
+});
+
+test("Teach folds the box to its pill", async () => {
+  const orb = await view();
+  const html = renderToStaticMarkup(
+    createElement(orb.OrbBox, { model: { ...model, learning: true, learnFound: 3 }, actions }),
+  );
+  assert.match(html, /data-state="teach"/);
+  assert.match(html, /Teaching · 3 steps/);
+  assert.doesNotMatch(html, /<textarea/);
 });

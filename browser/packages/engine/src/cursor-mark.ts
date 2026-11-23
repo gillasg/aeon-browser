@@ -1,17 +1,20 @@
 // The one cursor mark, and the colours the page shadow paints with. Pages do not load
 // tokens.css, so this module inlines the same values. They stay dark on every site.
 
-export const CURSOR_PATH =
-  "M 1.2 1.2 L 23.2 9.2 L 17.2 7.3 L 18.7 10.5 L 13.9 8.8 L 15.1 12 L 11.3 9.7 L 14.2 13 L 10.9 12.3 L 13.4 16.8 L 10 15.9 L 12.9 21.5 Z";
+/**
+ * A clean stemless pointer: the classic vertical-left OS arrow head without its tail. Bone fill,
+ * a black outline, so it reads on light and dark pages. Its nose is at (1.2, 1.2).
+ */
+export const CURSOR_PATH = "M 1.2 1.2 L 1.2 17.4 L 5.6 13.2 L 12.6 13.2 Z";
 
-export const CURSOR_VIEWBOX = "0 0 25 23";
-export const CURSOR_WIDTH = 22;
+export const CURSOR_VIEWBOX = "0 0 14 19";
+export const CURSOR_WIDTH = 15;
 export const CURSOR_HEIGHT = 20;
 export const IBEAM_PATH = "M2 1.5h8M2 20.5h8M6 1.5v19";
 
 /** Neutral edge glow. Also the badge colour when the product has no colour of its own. */
-export const NEUTRAL_GLOW = "#8b93a7";
-export const NEEDS_BADGE = "#e08a00";
+export const NEUTRAL_GLOW = "#ecebe8";
+export const NEEDS_BADGE = "#c9a46a";
 export const BADGE_FALLBACK = "#4f46e5";
 
 export const CURSOR_MARK = {
@@ -28,18 +31,18 @@ export const CURSOR_MARK = {
 
 /** Island and cursor custom properties. Values match the block at the end of tokens.css. */
 export const CURSOR_VARS: Readonly<Record<string, string>> = {
-  "--aeon-cursor": "#9fd4ff",
-  "--aeon-cursor-stroke": "#142033",
-  "--aeon-cursor-shadow": "rgb(0 0 0 / 35%)",
-  "--aeon-island-bg": "rgb(17 24 39 / 92%)",
-  "--aeon-island-bg-solid": "rgb(17 24 39 / 97%)",
-  "--aeon-island-surface": "#1c1b25",
-  "--aeon-island-ink": "#ffffff",
-  "--aeon-island-text": "#eeeef4",
-  "--aeon-island-raise": "#e4e2ee",
-  "--aeon-island-chip": "#cfcbdc",
-  "--aeon-island-muted": "#8f8b9e",
-  "--aeon-island-faint": "#6f6b80",
+  "--aeon-cursor": "#ecebe8",
+  "--aeon-cursor-stroke": "#000000",
+  "--aeon-cursor-shadow": "rgb(236 235 232 / 20%)",
+  "--aeon-island-bg": "#16161aeb",
+  "--aeon-island-bg-solid": "#16161aeb",
+  "--aeon-island-surface": "#1e1e23",
+  "--aeon-island-ink": "#ecebe8",
+  "--aeon-island-text": "#ecebe8",
+  "--aeon-island-raise": "#ecebe8",
+  "--aeon-island-chip": "#ecebe8a3",
+  "--aeon-island-muted": "#ecebe8a3",
+  "--aeon-island-faint": "#ecebe866",
   "--aeon-island-line": "rgb(255 255 255 / 8%)",
   "--aeon-island-line-strong": "rgb(255 255 255 / 12%)",
   "--aeon-island-wash": "rgb(255 255 255 / 8%)",
@@ -50,32 +53,35 @@ export const CURSOR_VARS: Readonly<Record<string, string>> = {
   "--aeon-island-spin": "rgb(255 255 255 / 30%)",
   "--aeon-island-field": "rgb(255 255 255 / 22%)",
   "--aeon-island-ink-soft": "rgb(255 255 255 / 85%)",
-  "--aeon-island-focus": "rgb(255 255 255 / 80%)",
-  "--aeon-island-ripple-fill": "rgb(255 255 255 / 35%)",
-  "--aeon-island-needs": NEEDS_BADGE,
-  "--aeon-island-needs-soft": "#e5b567",
-  "--aeon-island-needs-hot": "#ffb347",
-  "--aeon-island-needs-ink": "#7a4a00",
-  "--aeon-island-needs-line": "rgb(224 138 0 / 95%)",
-  "--aeon-island-done": "#2f3b2d",
-  "--aeon-island-error": "#5a2f2c",
+  "--aeon-island-focus": "rgb(236 235 232 / 60%)",
+  "--aeon-island-ripple-fill": "rgb(236 235 232 / 16%)",
+  "--aeon-island-needs": "#16161aeb",
+  "--aeon-island-needs-soft": "#c9a46a",
+  "--aeon-island-needs-hot": "#ecebe8",
+  "--aeon-island-needs-ink": "#ecebe8",
+  "--aeon-island-needs-line": "rgb(201 164 106 / 70%)",
+  "--aeon-island-done": "#16161aeb",
+  "--aeon-island-error": "#16161aeb",
   "--aeon-island-shadow": "rgb(0 0 0 / 25%)",
   "--aeon-island-shadow-deep": "rgb(0 0 0 / 60%)",
-  "--aeon-island-scrim": "rgb(10 8 20 / 55%)",
-  "--aeon-island-glow": NEUTRAL_GLOW,
-  "--aeon-island-glow-line": "rgb(139 147 167 / 85%)",
-  "--aeon-island-glow-mid": "rgb(139 147 167 / 50%)",
-  "--aeon-island-glow-soft": "rgb(139 147 167 / 22%)",
-  "--aeon-island-spot": "rgb(15 23 42 / 55%)",
-  "--aeon-island-callout": "#111827",
+  "--aeon-island-scrim": "transparent",
+  "--aeon-island-glow": "#ecebe8",
+  "--aeon-island-glow-line": "rgb(236 235 232 / 40%)",
+  "--aeon-island-glow-mid": "rgb(236 235 232 / 14%)",
+  "--aeon-island-glow-soft": "rgb(236 235 232 / 6%)",
+  "--aeon-island-spot": "transparent",
+  "--aeon-island-callout": "#16161aeb",
   "--aeon-island-callout-shadow": "rgb(0 0 0 / 30%)",
-  "--aeon-island-ripple": "rgb(17 24 39 / 55%)",
-  "--aeon-island-keys": "rgb(17 24 39 / 90%)",
-  "--aeon-island-ring": "rgb(99 102 241 / 90%)",
-  "--aeon-island-trail": "rgb(99 102 241 / 55%)",
+  "--aeon-island-ripple": "rgb(236 235 232 / 40%)",
+  "--aeon-island-keys": "#16161aeb",
+  "--aeon-island-ring": "rgb(236 235 232 / 55%)",
+  "--aeon-island-trail": "rgb(236 235 232 / 30%)",
   "--aeon-island-badge": BADGE_FALLBACK,
-  "--aeon-island-dot": "#d4d4d8",
-  "--aeon-island-rec": "#ff453a",
+  "--aeon-island-dot": "#ecebe8a3",
+  "--aeon-island-rec": "#ecebe8a3",
+  "--aeon-island-edge": "inset 0 0 0 1px #ffffff1f, 0 0 0 1px #0000004d",
+  "--aeon-island-elev":
+    "inset 0 0 0 1px #ffffff1f, 0 0 0 1px #0000004d, 0 8px 28px #00000040, 0 1px 3px #00000033",
   "--aeon-fs-xs": "11px",
   "--aeon-fs-sm": "12px",
   "--aeon-fs-md": "13px",

@@ -71,3 +71,25 @@ function findPayloadText(item: Record<string, unknown>): string | undefined {
     if (typeof item[key] === "string") return boundedText(item[key] as string);
   return undefined;
 }
+
+/**
+ * The one recovery that matches why something failed. Sign-in is offered only when the cause is
+ * really the account (an expired login, a bad key); a rate limit, a timeout or a dropped
+ * connection is never fixed by signing in again, so those get Retry.
+ */
+export function recoveryFor(cause: string): "sign-in" | "retry" {
+  const text = cause.toLowerCase();
+  if (
+    /429|rate.?limit|quota|too many|timed? ?out|timeout|etimedout|econn|network|overloaded|50[234]/.test(
+      text,
+    )
+  )
+    return "retry";
+  if (
+    /401|403|unauthori[sz]ed|forbidden|sign.?in|log.?in|expired|api.?key|credential|oauth|token/.test(
+      text,
+    )
+  )
+    return "sign-in";
+  return "retry";
+}

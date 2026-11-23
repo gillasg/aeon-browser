@@ -11,6 +11,8 @@ import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js"
 import { PiContextUsageRing } from "./pi-context-usage.js";
 import { QuietWait } from "./pending-work.js";
 import { AnnotationChips, useAnnotations } from "./transcript-annotations.js";
+import { developerModeKey, piSlashCommandsKey, useAgentFlag } from "./agent-tab-view.js";
+import { recoveryFor } from "./tool-outcome.js";
 
 export interface ComposerPanelsProps {
   connected?: boolean;
@@ -68,18 +70,26 @@ function ModelLoading({ connecting }: { connecting: boolean }): ReactElement {
 }
 
 function WorkingPanels({ props }: { props: ComposerPanelsProps }): ReactElement {
+  // For builders: the context ring (Advanced → Developer mode) and Pi's tools and / commands
+  // (Settings → Developer options).
+  const [developer] = useAgentFlag(developerModeKey);
+  const [slash] = useAgentFlag(piSlashCommandsKey);
   return (
     <>
       <ComposerModelControls props={props} />
       {props.modelLogin?.error && <SignInError message={props.modelLogin.error} />}
-      <PiContextUsageRing usage={props.contextUsage ?? null} />
-      <PiToolsButton {...props} />
+      {developer && <PiContextUsageRing usage={props.contextUsage ?? null} />}
+      {slash && <PiToolsButton {...props} />}
     </>
   );
 }
 
-/** A Chat whose Pi session could not start: say why, and reopen the same sign-in page. */
+/**
+ * A Chat whose Pi session could not start: the cause in full, and one recovery matched to it.
+ * Sign in only when the account is the cause; anything else starts the session again.
+ */
 function StartError({ props }: { props: ComposerPanelsProps }): ReactElement {
+  const signIn = recoveryFor(props.controlsError ?? "") === "sign-in" && props.onManageModels;
   return (
     <div className="connect-model" role="region" aria-label="This Chat cannot start">
       <div className="connect-model-body">
@@ -91,9 +101,17 @@ function StartError({ props }: { props: ComposerPanelsProps }): ReactElement {
           </p>
         )}
       </div>
-      {props.onManageModels && (
+      {signIn ? (
         <button type="button" className="connect-model-button" onClick={props.onManageModels}>
           Sign in again
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="connect-model-button"
+          onClick={() => globalThis.location?.reload()}
+        >
+          Retry
         </button>
       )}
     </div>

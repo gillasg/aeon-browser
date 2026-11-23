@@ -1,4 +1,5 @@
 import { installLinkBanner } from "./link-banner.js";
+import { teachSite } from "./teach-site.js";
 import { mirrorAgentTabView } from "./agent-tab-view.js";
 import { savePanelContext } from "./panel-prompt-handoff.js";
 import { startHomePrompt } from "./home-first-submit.js";
@@ -13,17 +14,14 @@ import {
   type PiModelCatalogDto,
   PiModelCatalogSchema,
   PiAttachmentSchema,
-  type PiAttachmentDto,
 } from "@aeon/protocol";
 import {
   mountAeonUi,
   NewTabHome,
+  seedHomeQuery,
   type ComposerModel,
   type ComposerAttachment,
-  type HomeRunPreview,
 } from "@aeon/ui";
-import { followHomePreviews } from "./home-previews.js";
-import { followHomeRunActions } from "./home-run-actions.js";
 import { followPrivacy } from "./home-privacy.js";
 import { markActivityUndone, type ActivityEntry } from "@aeon/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
@@ -32,7 +30,8 @@ import { ModelSignIn } from "./model-sign-in.js";
 import { HomeModelAccounts } from "./home-model-accounts.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import type { UiClient } from "./ui-client-core.js";
-import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
+import { connectPage, connectionErrorMessage } from "./ui-connection.js";
+import { sidePanelSelectionKey } from "./sidebar-selection.js";
 import { HomeCatalogController } from "./home-catalog-controller.js";
 import { HomeBlockedSites } from "./home-blocked-sites.js";
 import { HomeFormProfile } from "./home-form-profile.js";
@@ -41,23 +40,19 @@ import { HomeManagementController } from "./home-management-controller.js";
 import { createManagementClient } from "./management-client.js";
 
 const root = requiredElement("root");
-if (new URL(location.href).searchParams.get("host") === "panel")
-  document.body.dataset.host = "panel";
+const inPanel = new URL(location.href).searchParams.get("host") === "panel";
+if (inPanel) document.body.dataset.host = "panel";
+const PANEL_SEED_KEY = "aeonPanelSeed";
 void applyStoredTheme();
 let client: UiClient | undefined;
 const privacy = followPrivacy(() => render());
-const runActions = followHomeRunActions({
-  client: () => client,
-  onChange: () => render(),
-});
 let chats: ChatCatalogItemDto[] = [];
 let modelCatalog: PiModelCatalogDto | null = null;
 let connectionLabel = "Starting";
 let errorMessage = "";
-let openChatIds: ReadonlySet<string> = new Set();
 let runningChatIds: ReadonlySet<string> = new Set();
 let needsChatIds: ReadonlySet<string> = new Set();
-let previews: ReadonlyMap<string, HomeRunPreview> = new Map();
+let openChatIds: ReadonlySet<string> = new Set();
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 const modelSignIn = new ModelSignIn(
   async () => {
@@ -128,8 +123,6 @@ function createView() {
     chats,
     runningChatIds,
     needsChatIds,
-    previews,
-    runActions: runActions(),
     modelCatalog,
     modelLogin: modelSignIn.state,
     onConnectModel: () => void modelSignIn.open(),
@@ -150,8 +143,10 @@ function createView() {
       attachments?: readonly ComposerAttachment[],
     ) => void askAeon(query, model, thinkingLevel, attachments),
     onReadAttachments: (files: readonly File[]) => Promise.all(files.map(readComposerAttachment)),
-    onNewChat: () => openNewChat(),
+    onNewChat: () => (inPanel ? openNewChat() : void showInPanel("")),
     onOpenChat: (chatId: string) => void openChat(chatId),
+    onSuggest: (example: string) => void showInPanel("", example),
+    onTeachSite: (host: string) => void teachSite(host),
     onUndoActivity: (entry: ActivityEntry) => void undoActivity(entry),
     onCatalog: () => catalog.show(),
     onCloseCatalog: () => catalog.hide(),
@@ -184,11 +179,7 @@ if (new URL(location.href).searchParams.get("embedded") === "1")
   document.body.dataset.embedded = "true";
 render();
 void restoreModelCatalog();
-void watchRunningChats();
-followHomePreviews((next) => {
-  previews = next;
-  render();
-});
+if (!inPanel) void watchRunningChats();
 const reconnect = new PageReconnect(start, (message) => {
   connectionLabel = "Reconnecting";
   showError(message);
@@ -214,7 +205,6 @@ async function start(): Promise<void> {
     management.readPreferences(),
     refreshHome(),
     loadModelCatalog(),
-    management.loadForHome(),
     blockedSites.load(),
     formProfile.load(),
     outsideContext.load(),
@@ -249,7 +239,7 @@ async function askAeon(
       attachments: files,
     });
     saveInitialDisplay(chatId, { text, model, thinkingLevel });
-    if (document.body.dataset.host === "panel") await savePanelContext(chatId);
+    if (inPanel) await savePanelContext(chatId);
     await openChatInCurrentTab(chatId);
   } catch (error) {
     showError(toMessage(error));
@@ -263,39 +253,48 @@ async function openChat(chatId: string): Promise<void> {
     showError(toMessage(error));
   }
 }
-async function openChatInCurrentTab(
-  chatId: string,
-  initialSubmit?: {
-    requestId: string;
-    text: string;
-    model: { provider: string; id: string };
-    thinkingLevel: string;
-    attachments?: PiAttachmentDto[];
-  },
-): Promise<void> {
-  if (new URL(location.href).searchParams.get("host") === "panel") {
-    window.parent.postMessage({ kind: "aeon.select-chat", chatId }, location.origin);
 
+/** The panel's idle canvas swaps itself for the chat; Manage shows the chat in the side panel. */
+async function openChatInCurrentTab(chatId: string): Promise<void> {
+  if (inPanel) {
+    window.parent.postMessage({ kind: "aeon.select-chat", chatId }, location.origin);
     return;
   }
-  await requestOpenChat(chatId, true, initialSubmit);
+  await showInPanel(chatId);
 }
-async function requestOpenChat(
-  chatId: string,
-  reuseCurrentTab: boolean,
-  initialSubmit?: {
-    requestId: string;
-    text: string;
-    model: { provider: string; id: string };
-    thinkingLevel: string;
-    attachments?: PiAttachmentDto[];
-  },
-): Promise<void> {
-  await openExtensionChat(chatId, {
-    ...(reuseCurrentTab ? { reuseCurrentTab: true } : {}),
-    ...(initialSubmit ? { initialSubmit } : {}),
+
+// Manage has no chat of its own: chats, new chats and "Try it" examples open in the side panel.
+// sidePanel.open needs the click's user gesture, so it goes first, before anything awaits.
+let windowId: number | undefined;
+void chrome.windows.getCurrent().then(
+  (current) => (windowId = current.id),
+  () => undefined,
+);
+async function showInPanel(chatId: string, seed?: string): Promise<void> {
+  if (windowId === undefined) return;
+  const opened = chrome.sidePanel.open({ windowId });
+  await chrome.storage.session.set({
+    [sidePanelSelectionKey(windowId)]: chatId,
+    ...(seed ? { [PANEL_SEED_KEY]: seed } : {}),
+  });
+  await opened;
+}
+
+/** In the panel, an example Manage sent lands in the ask box, ready to send. */
+function followPanelSeed(): void {
+  const take = async (): Promise<void> => {
+    const stored = await chrome.storage.session.get(PANEL_SEED_KEY);
+    const text = stored[PANEL_SEED_KEY];
+    if (typeof text !== "string" || !text) return;
+    await chrome.storage.session.remove(PANEL_SEED_KEY);
+    seedHomeQuery(text);
+  };
+  void take().catch(() => undefined);
+  chrome.storage.session.onChanged.addListener((changes) => {
+    if (changes[PANEL_SEED_KEY]?.newValue) void take().catch(() => undefined);
   });
 }
+if (inPanel) followPanelSeed();
 
 async function loadModelCatalog(): Promise<void> {
   const activeClient = client;

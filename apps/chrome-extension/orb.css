@@ -8,42 +8,105 @@
 /* The cursor's ask box, opened beside the cursor. Always dark, whatever the page or theme,
    because it sits on other people's sites, in the cursor pill's colour. It is only ever a compose
    field: the transcript lives in the side panel. */
+/* The cursor's ask box, opened beside the pointer (or centred from the keyboard). Always Dynamic
+   Ink obsidian glass, whatever the page or theme, because it sits on other people's sites. The
+   dual hairline (a light inset, a dark outer) keeps it legible on white and on black pages. It
+   never dims or blurs the page. The only colour it ever shows is a hand-off's ochre, elsewhere. */
+/* ui-tokens.css sets `color-scheme: dark` on :root. A framed document whose colour scheme differs
+   from the page's (a light page like Wikipedia) gets an opaque canvas from Chromium, which shows as
+   a black square behind the rounded box. The frame always keeps the page's scheme, and its own
+   canvas stays transparent: the box paints its own glass. */
+:root,
+html {
+  color-scheme: normal !important;
+}
 html,
 body {
   margin: 0;
-  background: transparent;
+  background: transparent !important;
   overflow: hidden;
 }
 
+/* Breathing room inside the frame so the rounded corners and the outer shadow never clip. */
 #root {
-  display: inline-block;
+  display: block;
+  padding: var(--orb-frame-pad, 12px);
 }
 
 .island {
-  --needs: var(--aeon-island-needs-soft);
   --muted: var(--aeon-island-muted);
+  --faint: var(--aeon-island-faint);
   box-sizing: border-box;
-  width: 360px;
-  max-width: 360px;
-  padding: 10px 12px;
-  border-radius: var(--aeon-r-14);
-  border: 1px solid var(--aeon-island-line);
-  background: var(--aeon-island-bg-solid);
+  width: 100%;
+  padding: 10px 12px 8px;
+  border-radius: var(--aeon-r-12);
+  background: var(--aeon-island-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  /* The shared elevation's 28px blur overflows the frame's 12px pad and clips into a hard grey
+     rectangle on light pages; this one stays inside the pad. */
+  box-shadow:
+    var(--aeon-island-edge),
+    0 4px 10px -2px var(--aeon-island-shadow),
+    0 1px 3px var(--aeon-island-shadow);
   color: var(--aeon-island-text);
   position: relative;
   overflow: hidden;
   font:
-    var(--aeon-fs-md)/1.45 Geist,
-    system-ui,
+    400 var(--aeon-fs-md) / 1.5 Geist,
     -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
     "Segoe UI",
     sans-serif;
 }
 
+/* Morph: the box eases between compose, working, answer and Teach (the frame itself fades and
+   scales in and out from its pointer corner). */
+.island {
+  transition:
+    border-radius var(--aeon-dur, 200ms) var(--aeon-ease, ease-out),
+    padding var(--aeon-dur, 200ms) var(--aeon-ease, ease-out),
+    box-shadow var(--aeon-dur, 200ms) var(--aeon-ease, ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .island {
+    transition: none;
+  }
+}
+
+.island[data-state="teach"] {
+  padding: 4px 4px 4px 14px;
+  border-radius: var(--aeon-r-full);
+}
+
+kbd {
+  font: inherit;
+  font-size: var(--aeon-fs-xs);
+  color: var(--faint);
+}
+
+/* One input row: the @ site chip, left-aligned, then the field. */
+.isl-input {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.isl-context {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 55%;
+  padding-top: 3px;
+}
+
 textarea {
   display: block;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
-  width: 100%;
   min-height: 22px;
   resize: none;
   border: 0;
@@ -60,26 +123,24 @@ textarea {
   overflow-y: auto;
 }
 
-.isl-ask {
-  margin: 0 0 6px;
-  padding: 6px 10px;
-  border-radius: var(--aeon-r-md);
-  background: var(--aeon-island-needs);
-  color: var(--aeon-island-ink);
-  font-size: var(--aeon-fs-md);
-  line-height: 1.4;
+textarea::placeholder {
+  color: var(--faint);
 }
 
-textarea::placeholder {
-  color: var(--aeon-island-faint);
+.isl-ask {
+  margin: 0 0 6px;
+  color: var(--aeon-island-ink);
+  font-size: var(--aeon-fs-md);
+  line-height: 1.45;
 }
 
 .isl-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 2px;
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: var(--aeon-fs-sm);
   color: var(--muted);
 }
@@ -94,18 +155,7 @@ textarea::placeholder {
 }
 
 .isl-foot[data-warn="true"] .isl-notice {
-  color: var(--needs);
-}
-
-.isl-chip {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border-radius: var(--aeon-r-full);
-  padding: 1px 8px;
-  background: var(--aeon-island-wash);
-  color: var(--aeon-island-chip);
+  color: var(--aeon-island-ink);
 }
 
 button {
@@ -113,8 +163,8 @@ button {
   font-size: var(--aeon-fs-sm);
   cursor: pointer;
   border-radius: var(--aeon-r-full);
-  padding: 5px 12px;
-  border: 1px solid var(--aeon-island-line-strong);
+  padding: 4px 10px;
+  border: 0;
   background: transparent;
   color: var(--aeon-island-raise);
 }
@@ -124,8 +174,13 @@ button:hover {
 }
 
 button:focus-visible {
-  outline: 2px solid var(--aeon-island-focus);
+  outline: 1px solid var(--aeon-island-focus);
   outline-offset: 1px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 button.icon,
@@ -133,8 +188,8 @@ button.icon,
   flex: none;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   border-radius: var(--aeon-r-8);
@@ -151,8 +206,6 @@ button.icon:hover,
   width: 16px;
   height: 16px;
 }
-
-/* The message just sent, shown at once while the chat is created and framed. */
 
 /* The chat switcher in the orb: a text pill whose list opens in place below its row (the box
    clips anything floating), and the box grows to fit it. */
@@ -194,7 +247,7 @@ button.icon:hover,
   border: 1px solid var(--aeon-island-wash-10);
   border-radius: var(--aeon-r-12);
   background: var(--aeon-island-surface);
-  box-shadow: var(--aeon-drop-switcher);
+  box-shadow: var(--aeon-island-elev);
   overflow: hidden;
 }
 .chat-switcher-menu input {
@@ -207,7 +260,13 @@ button.icon:hover,
   font: inherit;
   font-size: var(--aeon-fs-sm);
 }
+.chat-switcher-menu input,
+.chat-switcher-manage {
+  flex: none;
+}
 .chat-switcher-menu ul {
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0;
   padding: 0 4px 4px;
   overflow-y: auto;
@@ -251,12 +310,6 @@ button.icon:hover,
 }
 
 /* The tabs the first message carries: a chip per tab with ×, + lists other open tabs. */
-.isl-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 3px 1px 8px;
-}
 .isl-chip-label {
   min-width: 0;
   overflow: hidden;
@@ -329,203 +382,152 @@ button.icon:hover,
   color: var(--muted);
 }
 
-.isl-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0 0 6px;
-  color: var(--aeon-island-text);
-  font-size: var(--aeon-fs-sm);
-}
-.isl-line-title {
-  font-weight: 600;
-  color: var(--aeon-island-ink);
-}
-.isl-line-text {
-  min-width: 0;
-  overflow: hidden;
-}
-.isl-line-text[data-clamp="1"] {
-  display: block;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.isl-line-text[data-clamp="2"] {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-.isl-line-more {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--aeon-island-needs-hot);
-  font-size: var(--aeon-fs-xs);
-}
-.answer-lines {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--aeon-s-1);
-  margin: 0 0 var(--aeon-s-2);
-}
-.answer-line {
-  margin: 0;
-  color: var(--aeon-island-muted);
-  font-size: var(--aeon-fs-sm);
-  line-height: 1.4;
-}
-.answer-line[data-kind="learned"] {
-  color: var(--aeon-island-text);
-}
-.answer-line[data-kind="offer"] {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--aeon-s-2);
-  align-items: baseline;
-}
-.answer-offer {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--aeon-island-needs-hot);
-  font: inherit;
-  font-size: var(--aeon-fs-sm);
-  cursor: pointer;
-}
-.answer-offer:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-/* What Aeon knows about this site: the island's first row. Words in muted and numbers in text,
-   because faint is under 4.5:1 on the island at 11 px. */
-.isl-xray {
-  display: block;
-  max-width: 100%;
-  height: 16px;
-  margin: 0 0 6px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--aeon-island-muted);
-  font-size: var(--aeon-fs-xs);
-  font-variant-numeric: tabular-nums;
-  line-height: 16px;
-  letter-spacing: 0;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.isl-xray:hover {
-  background: transparent;
-  text-decoration: underline;
-}
-.isl-xray-num {
-  color: var(--aeon-island-text);
-}
-.isl-xray-sep,
-.isl-power-sep {
-  color: var(--aeon-island-faint);
-}
-
-/* Prompt starters under an empty prompt: plain text, no pills. */
-.isl-power {
-  margin: 6px 0 0;
-  color: var(--aeon-island-muted);
-  font-size: var(--aeon-fs-sm);
-  line-height: 1.4;
-}
-.isl-power button {
-  padding: 0;
-  border: 0;
-  border-radius: var(--aeon-r-full);
-  background: transparent;
-  color: var(--aeon-island-muted);
-  font-size: var(--aeon-fs-sm);
-}
-.isl-power button:hover {
-  background: transparent;
-  color: var(--aeon-island-text);
-}
-.isl-power button:focus-visible {
-  outline: 2px solid var(--aeon-island-focus);
-}
-
-/* Teach: a text button; while recording, a pill with a record-red dot and its own Stop/Done. */
-.isl-teach {
-  flex: none;
+.isl-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border: 0;
+  gap: 2px;
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 1px 3px 1px 8px;
   border-radius: var(--aeon-r-full);
-  background: transparent;
-  color: var(--aeon-island-muted);
+  background: var(--aeon-island-wash-5);
+  box-shadow: inset 0 0 0 1px var(--aeon-island-line);
+  color: var(--aeon-island-chip);
+  font-size: var(--aeon-fs-sm);
+}
+.isl-chip-at {
+  color: var(--faint);
+}
+
+/* The / palette: three verbs and the fixed ⌘↵ footer. */
+.isl-palette {
+  margin: 6px 0 0;
+  padding: 4px;
+  border-radius: var(--aeon-r-8);
+  background: var(--aeon-island-wash-5);
+  box-shadow: inset 0 0 0 1px var(--aeon-island-line);
+}
+.isl-palette ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.isl-palette li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: var(--aeon-r-7);
+  cursor: pointer;
+}
+.isl-palette li[aria-selected="true"] {
+  background: var(--aeon-island-wash);
+}
+.isl-palette-verb {
+  color: var(--aeon-island-ink);
+  font-weight: 500;
+}
+.isl-palette-hint {
+  color: var(--muted);
+  font-size: var(--aeon-fs-sm);
+}
+.isl-palette-foot {
+  margin: 2px 0 0;
+  padding: 4px 8px 2px;
+  border-top: 1px solid var(--aeon-island-line);
+  color: var(--faint);
+  font-size: var(--aeon-fs-xs);
+}
+
+/* Wet: a breathing hairline around one compact line. */
+.ink-wet {
+  box-shadow: inset 0 0 0 1px var(--aeon-island-line);
+  animation: ink-breathe 2.4s ease-in-out infinite alternate;
+}
+@keyframes ink-breathe {
+  from {
+    box-shadow: inset 0 0 0 1px var(--aeon-island-wash);
+  }
+  to {
+    box-shadow: inset 0 0 0 1px var(--aeon-island-wash-24);
+  }
+}
+.isl-working {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 5px 10px;
+  border-radius: var(--aeon-r-full);
+  color: var(--aeon-island-text);
+  font-size: var(--aeon-fs-sm);
+  white-space: nowrap;
+}
+.isl-working-glyph {
+  color: var(--muted);
+}
+.isl-working-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.isl-working-time {
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.isl-keys {
+  flex: none;
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+/* Teach: a bottom-centre pill. The page under it stays fully usable. */
+.isl-teach-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: -4px -4px -4px -14px;
+  padding: 4px 4px 4px 14px;
+  border-radius: var(--aeon-r-full);
   font-size: var(--aeon-fs-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-button.isl-teach:hover {
-  background: var(--aeon-island-wash-10);
-}
-.isl-teach[data-on="true"] {
-  background: var(--aeon-island-wash-10);
-  color: var(--aeon-island-muted);
-}
-.isl-rec {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--aeon-r-half);
-  background: var(--aeon-island-rec);
-  animation: isl-rec-pulse 1.6s ease-in-out infinite;
-}
-@keyframes isl-rec-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-.isl-teach-stop {
-  padding: 0;
-  border: 0;
-  background: transparent;
+.isl-teach-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--aeon-island-text);
-  font-size: var(--aeon-fs-sm);
 }
-.isl-teach-stop:hover {
-  background: transparent;
-  text-decoration: underline;
+.isl-teach-done {
+  color: var(--aeon-island-ink);
+  font-weight: 500;
 }
 .isl-learned {
   margin: 6px 0 0;
-  color: var(--aeon-island-text);
+  color: var(--muted);
   font-size: var(--aeon-fs-sm);
   font-variant-numeric: tabular-nums;
 }
 
-/* The pointed-at element: the tab chip's shape, told apart by an inset line, before the tab. */
+/* The pointed-at element: the tab chip's shape, told apart by a brighter hairline. */
 .isl-chip.isl-target {
-  max-width: 160px;
-  box-shadow: inset 0 0 0 1px var(--aeon-island-glow-line);
+  box-shadow: inset 0 0 0 1px var(--aeon-island-wash-24);
 }
 
-/* A short answer, whole, in place. It grows downward and never scrolls inside. */
+/* Dry: a short answer, whole, in place, then one receipt line. Never scrolls inside. */
 .isl-answer {
-  max-height: 220px;
+  max-height: 280px;
   margin: 0 0 6px;
   overflow: hidden;
   color: var(--aeon-island-text);
   font-size: var(--aeon-fs-md);
-  line-height: 1.45;
+  line-height: 1.5;
   animation: isl-grow var(--aeon-dur) var(--aeon-ease);
 }
 @keyframes isl-grow {
@@ -533,13 +535,35 @@ button.isl-teach:hover {
     max-height: 40px;
   }
   to {
-    max-height: 220px;
+    max-height: 280px;
   }
 }
 .isl-answer p {
   margin: 0;
 }
+.isl-answer > * + * {
+  margin-top: 4px;
+}
+.isl-answer ul,
+.isl-answer ol {
+  margin: 0;
+  padding-left: 18px;
+}
+.isl-answer li + li {
+  margin-top: 2px;
+}
+.isl-answer li::marker {
+  color: var(--muted);
+}
+.isl-answer[data-clamp] {
+  max-height: calc(8 * 1.5em);
+  animation: none;
+}
 .isl-answer a {
+  color: var(--aeon-island-ink);
+}
+.isl-answer strong {
+  font-weight: 500;
   color: var(--aeon-island-ink);
 }
 .isl-answer code {
@@ -561,24 +585,91 @@ button.isl-teach:hover {
   text-align: left;
 }
 .isl-table th {
-  color: var(--aeon-island-muted);
+  color: var(--muted);
   font-weight: 500;
 }
 .isl-table td[data-numeric="true"] {
   text-align: right;
 }
 
-/* The proof receipt under the answer, 4 px above the offers. */
-.answer-receipt {
-  margin-bottom: 4px;
-  font-variant-numeric: tabular-nums;
-}
-.answer-receipt-lead {
+.isl-line {
+  margin: 0 0 6px;
   color: var(--aeon-island-text);
+}
+.isl-line-more {
+  margin-top: 4px;
+  padding: 0;
+  color: var(--muted);
+  font-size: var(--aeon-fs-xs);
+}
+.isl-line-more:hover {
+  background: transparent;
+  color: var(--aeon-island-ink);
+}
+
+/* One receipt line: never wraps; its icons show on hover or focus. */
+.isl-receipt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: var(--aeon-fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.isl-receipt-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.isl-receipt-icons {
+  flex: none;
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--aeon-dur) var(--aeon-ease);
+}
+.island:hover .isl-receipt-icons,
+.isl-receipt-icons:focus-within {
+  opacity: 1;
+}
+
+/* Error: a neutral card, the whole cause wrapping in full, Retry and Open in panel. */
+.isl-error {
+  margin: 0 0 8px;
+}
+.isl-error-title {
+  margin: 0;
+  color: var(--aeon-island-ink);
+  font-weight: 500;
+}
+.isl-error-text {
+  margin: 2px 0 0;
+  color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.isl-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.isl-error-retry {
+  box-shadow: inset 0 0 0 1px var(--aeon-island-wash-24);
+  color: var(--aeon-island-ink);
+}
+.isl-quiet {
+  color: var(--muted);
 }
 
 /* The switcher's last row: the way to the Manage tab. */
 .chat-switcher-manage {
+  display: flex;
+  justify-content: space-between;
   margin: 0 4px 4px;
   padding: 6px 8px;
   border: 0;
@@ -590,12 +681,115 @@ button.isl-teach:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .isl-rec,
+  .ink-wet,
   .isl-answer {
     animation: none;
   }
+  .ink-wet {
+    box-shadow: inset 0 0 0 1px var(--aeon-island-wash-24);
+  }
 }
-:root[data-reduced-motion] .isl-rec,
+:root[data-reduced-motion] .ink-wet,
 :root[data-reduced-motion] .isl-answer {
   animation: none;
+}
+:root[data-reduced-motion] .ink-wet {
+  box-shadow: inset 0 0 0 1px var(--aeon-island-wash-24);
+}
+
+/* Work in another tab: its live tile sits in the box's top-right corner, the size of a send
+   button. A click morphs it to the box's full width with the title and Jump to tab; it melts
+   away when that work ends. Work on this tab (the one in front) shows none. */
+.aeon-browser-previews {
+  position: fixed;
+  top: calc(var(--orb-frame-pad, 12px) + 6px);
+  right: calc(var(--orb-frame-pad, 12px) + 8px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.aeon-browser-previews.expanded {
+  left: calc(var(--orb-frame-pad, 12px) + 8px);
+}
+.aeon-browser-preview {
+  display: flex;
+  flex-direction: column;
+  width: 48px;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--aeon-r-8);
+  background: var(--aeon-island-surface);
+  box-shadow: var(--aeon-island-edge);
+  color: var(--aeon-island-muted);
+  font-size: var(--aeon-fs-sm);
+  animation: isl-preview-in 200ms ease-out;
+  transition:
+    width 320ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-radius 320ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+.aeon-browser-preview.expanded {
+  width: 100%;
+  border-radius: var(--aeon-r-12);
+}
+.aeon-browser-preview.leaving {
+  opacity: 0;
+  transform: scale(0.92);
+}
+@keyframes isl-preview-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.aeon-preview-thumb {
+  display: block;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+}
+.aeon-browser-preview img {
+  display: block;
+  width: 100%;
+  height: 28px;
+  object-fit: cover;
+  object-position: top;
+  transition: height 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.aeon-browser-preview.expanded img {
+  height: auto;
+  aspect-ratio: 16 / 10;
+}
+.aeon-preview-meta {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.aeon-browser-preview.expanded .aeon-preview-meta {
+  display: flex;
+}
+.aeon-preview-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aeon-preview-jump {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--aeon-r-full);
+  box-shadow: inset 0 0 0 1px var(--aeon-island-line);
+  color: var(--aeon-island-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .aeon-browser-preview,
+  .aeon-browser-preview img {
+    animation: none;
+    transition: none;
+  }
 }

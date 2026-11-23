@@ -80,6 +80,8 @@ const ManagementRoutineSchema = z
       })
       .nullable()
       .optional(),
+    /** Outbound webhook it posts results to (the signing secret never leaves the daemon). */
+    webhook: z.object({ url: z.string().min(1).max(2000) }).optional(),
     /** Sites this routine may use; empty means it is not restricted. */
     sites: z.array(z.string().min(1).max(200)).max(50),
     nextDueAt: z.string().datetime().nullable(),

@@ -8,7 +8,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { promisify } from "node:util";
-import { captureArgs, ENCODE_QUALITY, FRAME_FORMAT } from "../dist/record-capture.js";
+import {
+  captureArgs,
+  ENCODE_OUTPUT,
+  ENCODE_QUALITY,
+  FRAME_FORMAT,
+} from "../dist/record-capture.js";
 import {
   chatFinished,
   markOf,
@@ -70,7 +75,8 @@ test("--no-mouse keeps the OS pointer out of every platform's capture", () => {
 });
 
 test("the clip encodes with the fast preset at crf 16 from 4:2:0 frames", () => {
-  assert.deepEqual(ENCODE_QUALITY, ["-preset", "veryfast", "-crf", "16"]);
+  assert.deepEqual(ENCODE_QUALITY, ["-preset", "superfast", "-crf", "18", "-threads", "0"]);
+  assert.deepEqual(ENCODE_OUTPUT, ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]);
   assert.deepEqual(FRAME_FORMAT, ["-pix_fmt", "yuvj420p", "-q:v", "2"]);
   const state = {
     version: 1,

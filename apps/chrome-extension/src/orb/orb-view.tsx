@@ -1,7 +1,8 @@
-import { useState, type KeyboardEvent, type ReactElement } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactElement } from "react";
 import {
-  AnswerLines,
   ChatSwitcher,
+  piSlashCommandsKey,
+  useAgentFlag,
   type AnswerFooter,
   type AnswerOffer,
   type BoxLine,
@@ -9,17 +10,27 @@ import {
 } from "@aeon/ui";
 import { AnswerInPlace, answerFits } from "./orb-answer.js";
 import {
-  PowerRow,
+  ErrorCard,
+  Palette,
+  ReceiptRow,
   TargetChip,
-  TeachControl,
-  XrayStrip,
+  TeachPill,
+  WorkingPill,
+  durationLabel,
+  elapsedLabel,
+  paletteMatches,
+  verbPrefill,
   type OrbTargetChip,
+  type PaletteVerb,
 } from "./orb-view-parts.js";
 
 export type { OrbTargetChip } from "./orb-view-parts.js";
 
 // The cursor's ask box: always a compose field. The first message starts a chat with this tab as
-// context, later ones continue it; the transcript itself lives in the side panel (☰).
+// context, later ones continue it; the transcript itself lives in the side panel (☰). One input
+// row, no whispers or starter chips; `/` verbs only with Developer options on. Working is one breathing pill,
+// an answer dries into clean text and one receipt line. Nothing promotes to the panel by itself:
+// only ⌘↵, Open in panel or the toolbar does.
 
 export interface OrbViewModel {
   host: string;
@@ -35,8 +46,14 @@ export interface OrbViewModel {
   learnFound?: number;
   /** `Learned 4 APIs on flipkart.com`, for a few seconds after Done. */
   learned?: string;
-  /** What Aeon knows about this site, from the registry; absent until read. */
+  /** What Aeon knows about this site, from the registry; absent until read. Not shown in the box. */
   xray?: SiteCounts;
+  /** The first few summons with no page signal show `Type / for Teach, Watch, Fill`. */
+  hint?: boolean;
+  /** When the current run started here, for the working pill's `· 4s`. */
+  startedAt?: number;
+  /** How long the finished run took, for the receipt's one duration. */
+  durationMs?: number;
   /** The page has a form worth filling (3 or more visible, enabled fields). */
   fillForm?: boolean;
   /** What the pointer was on, or the selection, when the cursor was summoned. */
@@ -72,6 +89,12 @@ export interface OrbViewActions {
   toSidePanel(): void;
   answerOffer(offer: AnswerOffer): void;
   answerWrong(): void;
+  /** Send the last message again (the receipt's Retry, the error card's Retry). */
+  retry(): void;
+  /** ⌘↵: open the side panel on this chat, sending the draft there first when there is one. */
+  promote(text?: string): void;
+  copyAnswer(): void;
+  dismissHint(): void;
   toggleLearning(): void;
   removeContext(tabId: number): void;
   /** Opens (or closes) the list of open tabs to add as context. */
@@ -91,11 +114,105 @@ export function OrbBox({
   model: OrbViewModel;
   actions: OrbViewActions;
 }): ReactElement {
+  if (model.learning)
+    return (
+      <div className="island" data-state="teach">
+        <TeachPill found={model.learnFound ?? 0} onDone={actions.toggleLearning} />
+      </div>
+    );
   return (
-    <div className="island" data-state="compose">
+    <div className="island" data-state={islandState(model)}>
       <Compose model={model} actions={actions} />
     </div>
   );
+}
+
+/** compose · working · answer · error: what the box is showing, for its width and its hairline. */
+export function islandState(model: OrbViewModel): "compose" | "working" | "answer" | "error" {
+  const line = model.line;
+  if (!line || line.text === model.ask) return "compose";
+  if (line.title) return "error";
+  return line.more ? "answer" : "working";
+}
+
+interface PromptKeys {
+  draft: string;
+  selected: number;
+  matches: PaletteVerb[];
+  setDraft(text: string): void;
+  setSelected(index: number): void;
+  prefill(text: string): void;
+  pick(verb: PaletteVerb["verb"]): void;
+  keyDown(event: KeyboardEvent<HTMLTextAreaElement>): void;
+}
+
+/** The field's draft, the `/` palette's choice, and what each key does. */
+function usePromptKeys(model: OrbViewModel, actions: OrbViewActions): PromptKeys {
+  const [draft, setDraft] = useState("");
+  const [selected, setSelected] = useState(0);
+  // The `/` verbs are for builders: Settings → Developer options.
+  const [slash] = useAgentFlag(piSlashCommandsKey);
+  const matches = slash ? paletteMatches(draft) : [];
+  const prefill = (text: string): void => {
+    const node = document.getElementById("prompt") as HTMLTextAreaElement | null;
+    if (!node) return;
+    node.value = text;
+    setDraft(text);
+    node.focus();
+    node.setSelectionRange(text.length, text.length);
+  };
+  const pick = (verb: PaletteVerb["verb"]): void => {
+    setSelected(0);
+    prefill(verb === "teach" ? "" : verbPrefill(verb));
+    if (verb === "teach") actions.toggleLearning();
+  };
+  const keys = { draft, selected, matches, setDraft, setSelected, prefill, pick };
+  return { ...keys, keyDown: (event) => promptKey(event, keys, model, actions) };
+}
+
+function promptKey(
+  event: KeyboardEvent<HTMLTextAreaElement>,
+  keys: Omit<PromptKeys, "keyDown">,
+  model: OrbViewModel,
+  actions: OrbViewActions,
+): void {
+  const node = event.currentTarget;
+  if (event.key === "Backspace" && !node.value && model.target) {
+    event.preventDefault();
+    return actions.removeTarget();
+  }
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") return paletteArrow(event, keys);
+  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+  event.preventDefault();
+  enter(node.value.trim(), event.metaKey || event.ctrlKey, keys, actions);
+}
+
+function paletteArrow(
+  event: KeyboardEvent<HTMLTextAreaElement>,
+  keys: Omit<PromptKeys, "keyDown">,
+): void {
+  const count = keys.matches.length;
+  if (!count) return;
+  event.preventDefault();
+  keys.setSelected((keys.selected + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
+}
+
+/** ⌘↵ promotes to the panel; ↵ picks the highlighted verb, else sends. */
+function enter(
+  text: string,
+  promote: boolean,
+  keys: Omit<PromptKeys, "keyDown">,
+  actions: OrbViewActions,
+): void {
+  const verb = keys.matches[Math.min(keys.selected, keys.matches.length - 1)];
+  if (promote) {
+    keys.setDraft("");
+    return actions.promote(text || undefined);
+  }
+  if (verb) return keys.pick(verb.verb);
+  if (!text) return;
+  keys.setDraft("");
+  actions.submit(text);
 }
 
 function Compose({
@@ -105,61 +222,53 @@ function Compose({
   model: OrbViewModel;
   actions: OrbViewActions;
 }): ReactElement {
-  const [empty, setEmpty] = useState(true);
-  const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    const field = event.currentTarget;
-    if (event.key === "Backspace" && !field.value && model.target) {
-      event.preventDefault();
-      actions.removeTarget();
-      return;
-    }
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    const text = field.value.trim();
-    if (!text) return;
-    setEmpty(true);
-    actions.submit(text);
-  };
-  const prefill = (text: string): void => {
-    const field = document.getElementById("prompt") as HTMLTextAreaElement | null;
-    if (!field) return;
-    field.value = text;
-    setEmpty(false);
-    field.focus();
-    field.setSelectionRange(text.length, text.length);
-  };
-  // The field has the whole width; everything else is one quiet line under it: the tabs this
-  // message carries (× drops one, + adds another), then Teach and the chat switcher.
+  const keys = usePromptKeys(model, actions);
+  // The box opens with the caret in the field, so typing goes here and never scrolls the page.
+  useEffect(() => {
+    (document.getElementById("prompt") as HTMLTextAreaElement | null)?.focus();
+  }, []);
   return (
     <>
-      <XrayStrip
-        host={model.host}
-        counts={model.xray}
-        onOpen={(host) => actions.openManage("#sites?host=" + encodeURIComponent(host))}
-      />
       {model.ask && <p className="isl-ask">{model.ask}</p>}
       <RunningLine model={model} actions={actions} />
-      <textarea
-        id="prompt"
-        rows={1}
-        placeholder={promptPlaceholder(model)}
-        aria-label="Ask Aeon"
-        disabled={model.busy}
-        onKeyDown={keyDown}
-        onInput={(event) => setEmpty(!event.currentTarget.value)}
-      />
-      {empty && !model.chatId && !model.ask ? (
-        <PowerRow fillForm={model.fillForm === true} onPrefill={prefill} />
-      ) : null}
+      <div className="isl-input">
+        <ContextLead model={model} actions={actions} />
+        <textarea
+          id="prompt"
+          rows={1}
+          placeholder={promptPlaceholder(model)}
+          aria-label="Ask Aeon"
+          disabled={model.busy}
+          onKeyDown={keys.keyDown}
+          onInput={(event) => {
+            keys.setDraft(event.currentTarget.value);
+            keys.setSelected(0);
+          }}
+        />
+      </div>
+      {keys.matches.length > 0 && (
+        <Palette draft={keys.draft} selected={keys.selected} onPick={keys.pick} />
+      )}
       {model.learned ? <p className="isl-learned">{model.learned}</p> : null}
       <Foot model={model} actions={actions} />
     </>
   );
 }
 
-function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions }): ReactElement {
+/** The `@ site` context chip, left-aligned inside the bar, then the pointed-at element. */
+function ContextLead({
+  model,
+  actions,
+}: {
+  model: OrbViewModel;
+  actions: OrbViewActions;
+}): ReactElement | null {
+  if (!model.target && !model.context.length) return null;
   return (
-    <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
+    <div className="isl-context">
+      {model.context.map((tab) => (
+        <ContextChip key={tab.tabId} tab={tab} actions={actions} />
+      ))}
       {model.target ? (
         <TargetChip
           target={model.target}
@@ -167,9 +276,13 @@ function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions
           onHover={actions.hoverTarget}
         />
       ) : null}
-      {model.context.map((tab) => (
-        <ContextChip key={tab.tabId} tab={tab} actions={actions} />
-      ))}
+    </div>
+  );
+}
+
+function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions }): ReactElement {
+  return (
+    <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
       <button
         type="button"
         className="isl-add"
@@ -181,18 +294,7 @@ function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions
         +
       </button>
       <span className="isl-notice">{model.notice}</span>
-      <TeachControl
-        learning={model.learning}
-        found={model.learnFound ?? 0}
-        onToggle={actions.toggleLearning}
-      />
-      {model.chatId && (
-        <Button
-          label="Open the transcript in the side panel"
-          onClick={actions.toSidePanel}
-          icon="panel"
-        />
-      )}
+      {model.chatId && <Button label="Open in panel" onClick={actions.toSidePanel} icon="panel" />}
       {model.chatId && <Button label="New chat" onClick={actions.newChat} icon="new" />}
       <Switcher model={model} actions={actions} icon />
       {model.tabChoices && <TabChoices model={model} actions={actions} />}
@@ -202,9 +304,20 @@ function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions
 
 function promptPlaceholder(model: OrbViewModel): string {
   if (model.ask) return "Type the answer here…";
-  if (model.chatId) return "Reply to Aeon…";
+  if (model.chatId) return "Reply…";
   // Aeon's own pages are never page context.
-  return model.context.length ? "Ask Aeon about this page…" : "Ask Aeon anything…";
+  return model.context.length ? "Ask about this page…" : "Ask Aeon anything…";
+}
+
+/** Ticks once a second while the working pill shows. */
+function useElapsed(startedAt: number | undefined, on: boolean): string | undefined {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on || startedAt === undefined) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [on, startedAt]);
+  return on && startedAt !== undefined ? elapsedLabel(now - startedAt) : undefined;
 }
 
 function RunningLine({
@@ -214,43 +327,71 @@ function RunningLine({
   model: OrbViewModel;
   actions: OrbViewActions;
 }): ReactElement | null {
+  const state = islandState(model);
+  const elapsed = useElapsed(model.startedAt, state === "working");
   const line = model.line;
-  if (!line || line.text === model.ask) return null;
-  // A finished answer short enough to read here shows whole; an error or a long one stays clamped.
-  const inPlace = line.more && !line.title && answerFits(line.text);
+  if (!line || state === "compose") return null;
+  if (state === "working") return <WorkingPill text={line.text} elapsed={elapsed} />;
+  if (state === "error")
+    return (
+      <ErrorCard
+        title={line.title ?? "Couldn't finish"}
+        text={line.text}
+        onRetry={model.busy ? undefined : actions.retry}
+        onPanel={model.chatId ? actions.toSidePanel : undefined}
+      />
+    );
+  // A finished answer short enough to read here shows whole; a long one stays clamped and
+  // waits for ⌘↵. It never moves to the panel on its own.
+  const inPlace = answerFits(line.text);
   return (
     <>
       {inPlace ? (
         <AnswerInPlace text={line.text} />
       ) : (
-        <p className="isl-line">
-          {line.title ? <span className="isl-line-title">{line.title}</span> : null}
-          <span className="isl-line-text" data-clamp={line.more ? "2" : "1"}>
-            {line.text}
-          </span>
-          {line.more ? (
-            <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
-              Side panel
-            </button>
-          ) : null}
-        </p>
+        <div className="isl-line">
+          <AnswerInPlace text={line.text} clamp />
+          <button type="button" className="isl-line-more" onClick={actions.toSidePanel}>
+            <kbd>⌘↵</kbd> Continue in panel
+          </button>
+        </div>
       )}
-      {line.more && model.footer ? (
-        <AnswerLines
-          footer={model.footer}
-          disabled={model.busy}
-          onOffer={actions.answerOffer}
-          onWrong={actions.answerWrong}
-        />
-      ) : null}
+      <ReceiptRow
+        receipt={receiptText(model)}
+        disabled={model.busy}
+        onCopy={actions.copyAnswer}
+        onWrong={model.footer?.wrong ? actions.answerWrong : undefined}
+        onRetry={actions.retry}
+      />
     </>
   );
+}
+
+/** `0.4s · via skill`, or just `0.4s`: one duration, never two. */
+export function receiptText(model: Pick<OrbViewModel, "footer" | "durationMs">): string {
+  const parts: string[] = [];
+  if (model.durationMs !== undefined) parts.push(durationLabel(model.durationMs));
+  for (const line of model.footer?.lines ?? []) {
+    if (line.kind !== "receipt") continue;
+    const via = /\bvia\b.*$/.exec(line.lead)?.[0];
+    if (line.receipt === "speed" && via) {
+      if (!parts.length) parts.push(line.lead.replace(/\s*via\b.*$/, "").replace(" s", "s"));
+      parts.push(via);
+    } else parts.push(line.lead);
+    break;
+  }
+  return parts.join(" · ");
 }
 
 function ContextChip({ tab, actions }: { tab: OrbTab; actions: OrbViewActions }): ReactElement {
   return (
     <span className="isl-chip" title={tab.title}>
-      <span className="isl-chip-label">{tab.host || tab.title || "Tab"}</span>
+      <span className="isl-chip-label">
+        <span className="isl-chip-at" aria-hidden="true">
+          @{" "}
+        </span>
+        {tab.host || tab.title || "Tab"}
+      </span>
       <button
         type="button"
         className="isl-chip-x"

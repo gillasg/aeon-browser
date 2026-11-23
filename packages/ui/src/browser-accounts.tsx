@@ -18,6 +18,7 @@ export function BrowserAccounts({
   onAction(chatId: string, action: ManagementActionName, input: Record<string, unknown>): void;
 }): ReactElement {
   const providers = snapshot?.providers ?? [];
+  const check = () => onAction(chatId, "check_providers", {});
   return (
     <section className="browser-accounts" aria-label="Browser accounts">
       <header className="browser-accounts-heading">
@@ -28,7 +29,7 @@ export function BrowserAccounts({
             there; nothing is signed in from this page.
           </p>
         </div>
-        <button type="button" onClick={() => onAction(chatId, "check_providers", {})}>
+        <button type="button" className="aeon-button" onClick={check}>
           Check accounts
         </button>
       </header>

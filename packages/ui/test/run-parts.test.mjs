@@ -5,8 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ApprovalCard, ResultCard, StepTimeline } from "../dist/run-cards.js";
 import { describeWrites, recentActivityCount } from "../dist/activity-log.js";
 import { pauseReason, watcherLine } from "../dist/management-routines.js";
-import { HomeDashboard } from "../dist/home-dashboard.js";
-import { viewFromRoute } from "../dist/home-top-bar.js";
+import { viewFromRoute } from "../dist/manage-nav.js";
 
 test("the step timeline shows each step's path and time", () => {
   const html = renderToStaticMarkup(
@@ -78,36 +77,12 @@ test("a paused watcher says why when its last checks failed", () => {
   assert.match(watcherLine(routine(true, [run("completed")])), /^Next not scheduled · Last check /);
 });
 
-test("home lists running chats first and routes old links to the new pages", () => {
-  const chats = [
-    { chatId: "1", title: "Flights", archived: false },
-    { chatId: "2", title: "Groceries", archived: false },
-  ];
-  const html = renderToStaticMarkup(
-    createElement(HomeDashboard, {
-      chats,
-      runningChatIds: new Set(["1"]),
-      routines: [
-        {
-          routineId: "r",
-          chatId: "2",
-          chatTitle: "Groceries",
-          title: "Watch: eggs",
-          nextDueAt: null,
-          enabled: false,
-        },
-      ],
-      onOpenChat() {},
-      onChats() {},
-      onWatchers() {},
-    }),
-  );
-  assert.match(html, /Running ·.*Flights.*Watch: eggs.*Paused.*Groceries/s);
-  assert.deepEqual(viewFromRoute("routines"), { view: "automations" });
-  assert.deepEqual(viewFromRoute("sessions"), { view: "sites" });
-  assert.deepEqual(viewFromRoute("capabilities"), {
-    view: "settings",
-    settingsSection: "advanced",
-  });
-  assert.deepEqual(viewFromRoute(null), { view: "home" });
+test("old Manage links land on the new pages", () => {
+  assert.equal(viewFromRoute("routines"), "automations");
+  assert.equal(viewFromRoute("sessions"), "sites");
+  assert.equal(viewFromRoute("blocked"), "sites");
+  assert.equal(viewFromRoute("forms"), "details");
+  assert.equal(viewFromRoute("models"), "settings");
+  assert.equal(viewFromRoute("capabilities"), "advanced");
+  assert.equal(viewFromRoute(null), "sites");
 });

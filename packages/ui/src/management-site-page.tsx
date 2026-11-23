@@ -4,29 +4,26 @@ import { EmptyState } from "./empty-state.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { SiteFacts } from "./ability-source.js";
-import { AbilitiesPanel, ActionNote } from "./management-automations.js";
-import {
-  ImportPath,
-  SiteActions,
-  SiteAbilities,
-  SiteRunForm,
-  formatWhen,
-} from "./management-sites.js";
+import { ActionNote } from "./management-automations.js";
+import { BlockedSitesSettings } from "./blocked-sites-settings.js";
+import { Segmented } from "./segmented.js";
+import { SiteActions, SiteAbilities, SiteRunForm, formatWhen } from "./management-sites.js";
 import { SessionActions } from "./management-sessions.js";
 
 // Sites: one page per site Aeon knows (mapped, signed in, watched, or with a rule). Each has four
-// tabs: what Aeon can do there, the account it uses, what is watching it, and the user's rules.
-// Absorbs the old Sites, Site sessions and Blocked sites pages.
+// tabs: its Site APIs (calls with no page), its Replays (recorded steps and scripts), its Boosts,
+// and the account it uses with the user's rules, plus Teach Aeon. Absorbs the old Skills, Site
+// sessions and Blocked sites pages.
 
 type Site = NonNullable<ManagementSnapshotDto["sites"]>[number];
 type Routine = ManagementSnapshotDto["routines"][number];
-type Tab = "can" | "account" | "watching" | "rules";
+type Tab = "apis" | "replays" | "boosts" | "account";
 
 const TABS: ReadonlyArray<[Tab, string]> = [
-  ["can", "Can do"],
-  ["account", "Account"],
-  ["watching", "Watching"],
-  ["rules", "Rules"],
+  ["apis", "Site APIs"],
+  ["replays", "Replays"],
+  ["boosts", "Boosts"],
+  ["account", "Account / Rules"],
 ];
 
 interface SiteEntry {
@@ -84,7 +81,6 @@ export function selectedSiteEntry(
 export function SitesPage(props: ManagementSurfaceProps): ReactElement {
   const entries = entriesOf(props);
   const [selected, setSelected] = useState(() => siteHost(hashRoute().host));
-  const [query, setQuery] = useState("");
   // The cursor's X-Ray line opens Manage at `#sites?host=…`, also into a Manage tab already open.
   useEffect(() => {
     const follow = (): void => {
@@ -102,21 +98,56 @@ export function SitesPage(props: ManagementSurfaceProps): ReactElement {
       {entry ? (
         <SiteDetail entry={entry} props={props} chatId={chatId} onBack={() => setSelected("")} />
       ) : (
-        <>
-          {entries.length > 0 && <SiteSearch query={query} onQuery={setQuery} />}
-          <SiteList
-            entries={matching(entries, query)}
-            searching={query.trim() !== ""}
-            onSelect={setSelected}
-            onSuggest={props.onSuggest}
-          />
-          <AbilitiesPanel {...props} />
-          <div className="management-footnote">
-            <ImportPath chatId={chatId} onAction={props.onAction} />
-          </div>
-        </>
+        <SiteIndex entries={entries} props={props} onSelect={setSelected} />
       )}
     </div>
+  );
+}
+
+/** Every site, searchable, with a Blocked filter in place of a page of its own. */
+function SiteIndex({
+  entries,
+  props,
+  onSelect,
+}: {
+  entries: SiteEntry[];
+  props: ManagementSurfaceProps;
+  onSelect(host: string): void;
+}): ReactElement {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "blocked">(() =>
+    hashRoute().page === "blocked" ? "blocked" : "all",
+  );
+  return (
+    <>
+      <div className="site-list-tools">
+        {entries.length > 0 && <SiteSearch query={query} onQuery={setQuery} />}
+        <Segmented<"all" | "blocked">
+          label="Which sites"
+          value={filter}
+          options={[
+            ["all", "All"],
+            ["blocked", "Blocked"],
+          ]}
+          onChange={setFilter}
+        />
+      </div>
+      {filter === "blocked" ? (
+        <BlockedSitesSettings
+          {...(props.blockedSites ? { sites: props.blockedSites } : {})}
+          {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
+          {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
+        />
+      ) : (
+        <SiteList
+          entries={matching(entries, query)}
+          repairs={props.snapshot?.abilities ?? []}
+          searching={query.trim() !== ""}
+          onSelect={onSelect}
+          onSuggest={props.onSuggest}
+        />
+      )}
+    </>
   );
 }
 
@@ -146,13 +177,18 @@ function matching(entries: SiteEntry[], query: string): SiteEntry[] {
   return text ? entries.filter((entry) => entry.host.includes(text)) : entries;
 }
 
+type Ability = NonNullable<ManagementSnapshotDto["abilities"]>[number];
+
 function SiteList({
   entries,
+  repairs,
   searching,
   onSelect,
   onSuggest,
 }: {
   entries: SiteEntry[];
+  /** Every saved skill; a row says how many of its site's need repair. */
+  repairs: readonly Ability[];
   searching: boolean;
   onSelect(host: string): void;
   onSuggest: ((example: string) => void) | undefined;
@@ -163,7 +199,7 @@ function SiteList({
     return (
       <EmptyState
         text="Aeon learns a site as it works there, and gets faster each time."
-        action="Learn a site"
+        action="Teach Aeon a site"
         {...(onSuggest ? { onAction: () => onSuggest("Learn how to search on ") } : {})}
       />
     );
@@ -173,7 +209,11 @@ function SiteList({
         <li key={entry.host}>
           <button type="button" onClick={() => onSelect(entry.host)}>
             <strong>{entry.host}</strong>
-            <span className="management-subtle">{siteSummary(entry)}</span>
+            {siteSummary(entry, needsRepair(entry, repairs)) && (
+              <span className="management-subtle">
+                {siteSummary(entry, needsRepair(entry, repairs))}
+              </span>
+            )}
           </button>
         </li>
       ))}
@@ -181,16 +221,27 @@ function SiteList({
   );
 }
 
-export function siteSummary(entry: SiteEntry): string {
-  const parts: string[] = [];
-  if (entry.mapped) {
-    const can = entry.mapped.operations + entry.mapped.abilities.length;
-    parts.push(`${can} thing${can === 1 ? "" : "s"} it can do`);
-    if (entry.mapped.session) parts.push(entry.mapped.sessionAccount ?? "signed in");
-  }
-  if (entry.routines.length) parts.push(`${entry.routines.length} watching`);
-  if (entry.blocked) parts.push("blocked");
-  return parts.join(" · ") || "nothing yet";
+/** `Signed in · 12 skills · 1 needs repair`: quiet words, never a handle or a raw state. */
+export function siteSummary(entry: SiteEntry, repairs = 0): string {
+  const skills = entry.mapped?.abilities.length ?? 0;
+  const watches = entry.routines.length;
+  const parts = [
+    entry.blocked ? "Blocked" : entry.mapped?.session ? "Signed in" : "",
+    skills ? plural(skills, "skill", "skills") : "",
+    repairs ? plural(repairs, "needs repair", "need repair") : "",
+    watches ? plural(watches, "watch", "watches") : "",
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+function needsRepair(entry: SiteEntry, abilities: readonly Ability[]): number {
+  return abilities.filter(
+    (ability) => siteHost(ability.site) === entry.host && ability.checkNote?.repairFailed,
+  ).length;
 }
 
 function SiteDetail({
@@ -204,16 +255,30 @@ function SiteDetail({
   chatId: string;
   onBack(): void;
 }): ReactElement {
-  const [tab, setTab] = useState<Tab>("can");
+  const [tab, setTab] = useState<Tab>("apis");
   return (
     <section className="site-detail" aria-label={entry.host}>
       <header className="site-detail-head">
-        <button type="button" onClick={onBack}>
+        <button type="button" className="aeon-button" onClick={onBack}>
           ← Sites
         </button>
         <h2>{entry.host}</h2>
+        {props.onTeachSite && (
+          <button
+            type="button"
+            className="site-teach aeon-button"
+            data-tone="primary"
+            onClick={() => props.onTeachSite?.(entry.host)}
+          >
+            Teach Aeon
+          </button>
+        )}
       </header>
-      <nav className="site-tabs" role="tablist" aria-label={`${entry.host} sections`}>
+      <nav
+        className="site-tabs aeon-segmented"
+        role="tablist"
+        aria-label={`${entry.host} sections`}
+      >
         {TABS.map(([value, label]) => (
           <button
             key={value}
@@ -227,55 +292,88 @@ function SiteDetail({
         ))}
       </nav>
       <div role="tabpanel">
-        {tab === "can" && (
-          <CanDo host={entry.host} site={entry.mapped} chatId={chatId} props={props} />
-        )}
-        {tab === "account" && <Account site={entry.mapped} chatId={chatId} props={props} />}
-        {tab === "watching" && <Watching routines={entry.routines} props={props} />}
-        {tab === "rules" && <Rules entry={entry} props={props} />}
+        <SiteTab tab={tab} entry={entry} chatId={chatId} props={props} />
       </div>
     </section>
   );
 }
 
-// Changes people often want on a site, offered as boosts so a page is better on every visit.
-const BOOST_IDEAS = ["Hide ads and sponsored items", "Dark mode", "Hide distractions"];
+function SiteTab({
+  tab,
+  entry,
+  chatId,
+  props,
+}: {
+  tab: Tab;
+  entry: SiteEntry;
+  chatId: string;
+  props: ManagementSurfaceProps;
+}): ReactElement {
+  if (tab === "boosts") return <BoostIdeas host={entry.host} suggest={props.onSuggest} />;
+  if (tab === "account")
+    return (
+      <>
+        <Account site={entry.mapped} chatId={chatId} props={props} />
+        <Rules entry={entry} props={props} />
+      </>
+    );
+  return (
+    <CanDo
+      host={entry.host}
+      site={entry.mapped}
+      chatId={chatId}
+      props={props}
+      replays={tab === "replays"}
+    />
+  );
+}
+
+/** Site APIs are skills that call the site with no page; replays drive the page (steps, scripts). */
+function onlyWays(site: Site, replays: boolean): Site {
+  return {
+    ...site,
+    abilities: site.abilities.filter((ability) => ability.ways.includes("api") !== replays),
+  };
+}
 
 function CanDo({
   host,
   site,
   chatId,
   props,
+  replays,
 }: {
   host: string;
   site: Site | undefined;
   chatId: string;
   props: ManagementSurfaceProps;
+  replays: boolean;
 }): ReactElement {
   const [running, setRunning] = useState(false);
   const suggest = props.onSuggest;
   if (!site) return <NotLearned host={host} suggest={suggest} />;
+  const shown = onlyWays(site, replays);
+  if (replays)
+    return shown.abilities.length ? (
+      <SiteAbilities site={shown} onTry={tryAbility(host, suggest)} />
+    ) : (
+      <p className="management-empty">
+        No replays yet. Teach Aeon, or let it work here, and the steps it repeats become one.
+      </p>
+    );
   return (
     <>
       {site.updatedAt ? (
         <p>
-          {site.operations} learned calls ·{" "}
-          <span className={`management-health management-health-${site.health}`}>
-            {site.health}
-          </span>
+          {site.operations} learned calls
           <span className="management-subtle"> · updated {formatWhen(site.updatedAt)}</span>
         </p>
       ) : (
         <p className="management-subtle">Comes with Aeon: these work on your own account.</p>
       )}
-      <SiteAbilities
-        site={site}
-        onTry={
-          suggest &&
-          ((ability) =>
-            suggest(`On ${host}, ${ability.description || ability.name.replace(/_/g, " ")}: `))
-        }
-      />
+      {shown.abilities.length > 0 && (
+        <SiteAbilities site={shown} onTry={tryAbility(host, suggest)} />
+      )}
       <SiteFacts notes={site.notes} />
       {site.suggestions.length > 0 && (
         <ul className="management-inputs">
@@ -294,8 +392,18 @@ function CanDo({
         onToggle={() => setRunning((value) => !value)}
       />
       {running && <SiteRunForm site={site} chatId={chatId} onAction={props.onAction} />}
-      <BoostIdeas host={host} suggest={suggest} />
     </>
+  );
+}
+
+function tryAbility(
+  host: string,
+  suggest: ((example: string) => void) | undefined,
+): ((ability: Site["abilities"][number]) => void) | undefined {
+  return (
+    suggest &&
+    ((ability) =>
+      suggest(`On ${host}, ${ability.description || ability.name.replace(/_/g, " ")}: `))
   );
 }
 
@@ -322,10 +430,12 @@ function NotLearned({
           </button>
         </div>
       )}
-      <BoostIdeas host={host} suggest={suggest} />
     </>
   );
 }
+
+// Changes people often want on a site, offered as boosts so a page is better on every visit.
+const BOOST_IDEAS = ["Hide ads and sponsored items", "Dark mode", "Hide distractions"];
 
 function BoostIdeas({
   host,
@@ -383,36 +493,6 @@ function Account({
         act={(action) => props.onAction(chatId, action, { site: site.site })}
       />
     </>
-  );
-}
-
-function Watching({
-  routines,
-  props,
-}: {
-  routines: Routine[];
-  props: ManagementSurfaceProps;
-}): ReactElement {
-  if (!routines.length)
-    return (
-      <p className="management-empty">
-        Nothing watches this site. Ask Aeon to &ldquo;tell me when … changes&rdquo; to add one.
-      </p>
-    );
-  return (
-    <ul className="site-list">
-      {routines.map((routine) => (
-        <li key={routine.routineId}>
-          <button type="button" onClick={() => props.onOpenChat(routine.chatId)}>
-            <strong>{routine.title}</strong>
-            <span className="management-subtle">
-              {routine.enabled ? "On" : "Paused"}
-              {routine.nextDueAt ? ` · next ${formatWhen(routine.nextDueAt)}` : ""}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }
 

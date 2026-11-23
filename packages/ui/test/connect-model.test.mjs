@@ -4,7 +4,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ComposerPanels } from "../dist/composer-panels.js";
 import { HomeStart } from "../dist/home-start.js";
-import { HomeTopBar } from "../dist/home-top-bar.js";
 
 const home = (overrides) =>
   renderToStaticMarkup(
@@ -14,7 +13,6 @@ const home = (overrides) =>
         connected: true,
         projectId: "",
         modelCatalog: { defaultModel: null, models: [] },
-        homeRoutines: [],
         openChatIds: new Set(),
         onAsk() {},
         onOpenChat() {},
@@ -113,6 +111,23 @@ test("a Chat whose model cannot start says why and offers Sign in again", () => 
   assert.match(html, />Sign in again<\/button>/);
 });
 
+test("a rate limit or timeout never offers Sign in again: one Retry instead", () => {
+  for (const controlsError of ["429 Too Many Requests: rate limit reached", "Request timed out"]) {
+    const html = renderToStaticMarkup(
+      createElement(ComposerPanels, {
+        connected: true,
+        controls: null,
+        controlsError,
+        attachments: [],
+        onManageModels() {},
+      }),
+    );
+    assert.doesNotMatch(html, /Sign in again/);
+    assert.equal(html.match(/<button/g).length, 1);
+    assert.match(html, />Retry<\/button>/);
+  }
+});
+
 test("a failed sign-in from the home picker is shown there too", () => {
   const html = home({
     modelCatalog: { defaultModel: model, models: [model] },
@@ -121,11 +136,4 @@ test("a failed sign-in from the home picker is shown there too", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /Aeon could not open the sign-in page\./);
   assert.match(html, /id="home-model-picker"/);
-});
-
-test("the home top bar has no brand and keeps the page tabs on the right", () => {
-  const html = renderToStaticMarkup(createElement(HomeTopBar, { view: "sites", onView() {} }));
-  assert.doesNotMatch(html, /home-top-brand|Aeon home/);
-  assert.match(html, /class="home-top-nav"/);
-  assert.match(html, /aria-current="page"[^>]*>Sites/);
 });

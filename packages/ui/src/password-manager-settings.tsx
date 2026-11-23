@@ -14,7 +14,7 @@ export function PasswordManagerSettings(props: {
     <div className="settings-groups">
       <SettingsGroup
         title="Password manager"
-        footer="On a sign-in page Aeon asks your password manager to fill the form. Aeon never sees the password or the one-time code."
+        footer="On a sign-in page Aeon asks your password manager to fill the form. The model never sees the password or the one-time code."
       >
         <ValueRow
           label="Fills sign-ins"
@@ -23,9 +23,11 @@ export function PasswordManagerSettings(props: {
           {...(status?.tone ? { tone: status.tone } : {})}
         />
       </SettingsGroup>
-      <SettingsGroup title="Set up">
-        <ValueRow label="Bitwarden" value={<code>aeon signin setup bitwarden</code>} />
-        <ValueRow label="Proton Pass" value={<code>aeon signin setup proton</code>} />
+      <SettingsGroup
+        title="When it can't"
+        footer="No password manager, a locked vault or a captcha: Aeon stops on the sign-in page and hands it to you. You sign in, press I'm done, and it carries on."
+      >
+        <ValueRow label="Works with" value="Bitwarden · Proton Pass" />
       </SettingsGroup>
     </div>
   );
@@ -37,7 +39,10 @@ function describe(signIn: SignIn | null): {
   tone?: "needs" | "ok";
 } {
   if (!signIn || signIn.state === "not_set_up")
-    return { value: "Not set up", detail: "Pick one below, in a terminal." };
+    return {
+      value: "Not set up",
+      detail: "Until one is set up, Aeon hands sign-ins to you. Setup is in Advanced.",
+    };
   if (!signIn.provider) return { value: "Not answering", tone: "needs" };
   const name = signIn.provider[0]?.toUpperCase() + signIn.provider.slice(1);
   if (signIn.state === "unlocked") return { value: `${name} · Unlocked`, tone: "ok" };

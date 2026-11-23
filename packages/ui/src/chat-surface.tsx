@@ -11,6 +11,7 @@ import type { AnswerOffer } from "./answer-lines.js";
 import type { TranscriptRow } from "./transcript-model.js";
 import { PiSessionPanel } from "./pi-session-panel.js";
 import { ExtensionDialogs } from "./extension-dialogs.js";
+import { pendingHandoff } from "./handoff-card.js";
 import {
   ToolImageContext,
   WorkspaceImageContext,
@@ -137,11 +138,19 @@ function ControlBar({
   );
 }
 
+/**
+ * One owner per state: a pending hand-off is the transcript's card alone (no control banner
+ * beside it), and a Chat that cannot start says so once, in the composer, never also up here.
+ */
 function ChatBanners(props: ChatSurfaceProps): ReactElement {
+  const handoff = pendingHandoff(props.rows);
+  const startError = Boolean(props.composer.controlsError && !props.composer.controls);
   return (
     <>
-      {props.notice && <ChatNotice text={props.notice} onDismiss={props.onDismissNotice} />}
-      {props.userControl && (
+      {props.notice && !startError && (
+        <ChatNotice text={props.notice} onDismiss={props.onDismissNotice} />
+      )}
+      {props.userControl && !handoff && (
         <ControlBar tabId={props.userControl.tabId} onGiveBack={props.onGiveBack} />
       )}
     </>
@@ -178,6 +187,7 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               onPinMessage={props.onPinAnswer}
               onAnswerOffer={props.onAnswerOffer}
               onAnswerWrong={props.onAnswerWrong}
+              onRetry={(text) => void props.composer.onSend(text, "followUp", [])}
             />
           ) : props.compact ? (
             <div className="transcript-wrap" />

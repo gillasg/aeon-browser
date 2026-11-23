@@ -10,8 +10,10 @@ import { hideHandoffAsk, showHandoffAsk } from "./native-browser-ask.js";
 import { showAgentBadge, showAgentNeeds, tabRecording } from "./native-browser-cursor.js";
 
 // Hand-off: the agent pauses and asks the user to do something in the real tab (sign in, 2FA,
-// pick an option). The cursor turns amber, points at the element when one is given, and its pill
-// carries the request with Done and Cancel; the cell waits until one is clicked. Login flows
+// pick an option). The cursor points at the element when one is given, a 1px ochre ring marks it,
+// and one obsidian card 12px beside the ring carries the request with I'm done and Skip. With
+// the side panel open in that window the panel's card owns the controls and the page shows only
+// the ring; the cell waits until one is clicked. Login flows
 // navigate, so the pill and the ask are shown again on each new document. The typed answer lives
 // in the isolated world (native-browser-ask.ts), never where the page can read or forge it. A
 // system notification is sent only when the user cannot see the tab (its window is not in front,
@@ -57,6 +59,24 @@ export function answeredHandoff(
   return answer !== undefined ? { answer } : outcome;
 }
 
+/**
+ * Whether Aeon's side panel is open in this window. The panel's own hand-off card then owns the
+ * controls, so the page draws only the ring (one owner per state).
+ */
+export async function sidePanelOpen(windowId: number): Promise<boolean> {
+  const runtime = chrome.runtime as typeof chrome.runtime & {
+    getContexts?: (filter: {
+      contextTypes: string[];
+      windowIds?: number[];
+    }) => Promise<{ windowId: number }[]>;
+  };
+  if (typeof runtime.getContexts !== "function") return false;
+  const contexts = await runtime
+    .getContexts({ contextTypes: ["SIDE_PANEL"], windowIds: [windowId] })
+    .catch(() => []);
+  return contexts.length > 0;
+}
+
 /** Whether the user can see the tab now: active in a focused window, and not being recorded. */
 async function userSees(tabId: number, windowId: number): Promise<boolean> {
   if (tabRecording(tabId)) return false;
@@ -81,7 +101,16 @@ function followNavigation(
   return (details) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
     showAgentNeeds(tabId, message, spotlight, meta);
-    void showHandoffAsk(tabId, point, meta);
+    void chrome.tabs.get(tabId).then(
+      async (tab) => {
+        if (await sidePanelOpen(tab.windowId)) return;
+        await showHandoffAsk(tabId, point, meta, {
+          ...(spotlight ? { box: spotlight } : {}),
+          message,
+        });
+      },
+      () => undefined,
+    );
   };
 }
 
@@ -121,16 +150,18 @@ export async function handOffToUser(
   showAgentNeeds(tabId, message, spotlight, meta);
   const follow = followNavigation(tabId, message, spotlight, meta);
   chrome.webNavigation.onCommitted.addListener(follow);
-  void showHandoffAsk(
-    tabId,
-    spotlight
-      ? {
-          x: Math.round(spotlight.x + spotlight.width / 2),
-          y: Math.round(spotlight.y + spotlight.height / 2),
-        }
-      : undefined,
-    meta,
-  );
+  if (!(await sidePanelOpen(tab.windowId)))
+    void showHandoffAsk(
+      tabId,
+      spotlight
+        ? {
+            x: Math.round(spotlight.x + spotlight.width / 2),
+            y: Math.round(spotlight.y + spotlight.height / 2),
+          }
+        : undefined,
+      meta,
+      { ...(spotlight ? { box: spotlight } : {}), message },
+    );
   engineDebug("handoff", "shown", { tab: tabId });
   const startedAt = Date.now();
   try {

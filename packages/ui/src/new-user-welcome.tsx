@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from "react";
 
-// The whole first-run experience, on the Manage tab's first open and in the side panel's empty
-// state: one line about Aeon and four general tasks. No tour, no dialog. A click puts the task in
+// The whole first-run experience, in the side panel's idle canvas: up to three quiet suggestion
+// rows under the "Do anything on …" line. No tour, no dialog. A click puts the task in
 // the ask box, ready to send (or to send after the one-time model connect below); it never sends.
 // It goes for good once any task is sent, picked or typed. Settings can bring it back with
 // "Welcome / Show again".
@@ -9,7 +9,6 @@ import { useState, type ReactElement } from "react";
 const KEY = "aeonWelcome";
 
 export const WELCOME_EXAMPLES = [
-  "Turn this site into an API I can call",
   "Tell me when the price on this page drops",
   "Fill this form with my details",
   "Hide the parts of this site I never use",
@@ -40,17 +39,16 @@ export function NewUserWelcome({
   };
   return (
     <section className="new-user-welcome" aria-label="Welcome to Aeon">
-      <p className="new-user-line">
-        Aeon works in your Chrome, with your logins.
-        {needsModel ? " Connect a model below once, then try one of these:" : " Try one of these:"}
-      </p>
-      <div className="new-user-examples">
+      {needsModel && <p className="new-user-line">Connect a model below once, then try one:</p>}
+      <ul className="new-user-examples">
         {WELCOME_EXAMPLES.map((example) => (
-          <button key={example} type="button" onClick={() => pick(example)}>
-            {example}
-          </button>
+          <li key={example}>
+            <button type="button" onClick={() => pick(example)}>
+              {example}
+            </button>
+          </li>
         ))}
-      </div>
+      </ul>
       {onLearn && (
         <button type="button" className="new-user-learn" onClick={onLearn}>
           What can Aeon do?

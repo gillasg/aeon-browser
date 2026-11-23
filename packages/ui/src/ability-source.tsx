@@ -17,7 +17,7 @@ export function CodeBadge({ ways }: { ways: readonly string[] }): ReactElement |
   );
 }
 
-/** The saved source of each code way. Shown, never gated. */
+/** The saved source of each code way, folded behind `Show code` so the card stays scannable. */
 export function AbilitySource({
   sources,
 }: {
@@ -25,7 +25,8 @@ export function AbilitySource({
 }): ReactElement | null {
   if (!sources?.length) return null;
   return (
-    <div className="ability-source">
+    <details className="ability-source">
+      <summary>Show code</summary>
       {sources.map((source, index) => (
         <pre key={source.runtime + String(index)}>
           <span>{source.runtime === "page" ? "Page code" : "Node code"}</span>
@@ -33,7 +34,7 @@ export function AbilitySource({
           {source.code}
         </pre>
       ))}
-    </div>
+    </details>
   );
 }
 

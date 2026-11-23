@@ -43,21 +43,15 @@ const speed = {
   wrong: { routeId: "r1" },
 };
 
-test("a run card becomes a speed line, a learned line and two offers", async () => {
+test("a run card becomes a speed line, a learned line and one offer", async () => {
   const lines = await load("../../../packages/ui/src/answer-lines.ts");
   const footer = lines.footerFromCard(speed);
   assert.deepEqual(
     footer.lines.map((line) => line.text),
-    [
-      "1.1 s · from memory (was 38 s)",
-      "Learned: orders",
-      "Do it fresh",
-      "Partial: 20 of 143 rows.",
-    ],
+    ["1.1 s · from memory (was 38 s)", "Learned: orders", "Do it fresh"],
   );
   assert.equal(footer.lines[2].label, "Do it fresh");
   assert.equal(footer.lines[2].followUp, "Do that again from scratch, without the saved way.");
-  assert.equal(footer.lines[3].label, "Get all");
   assert.equal(footer.wrong.routeId, "r1");
 });
 
@@ -83,7 +77,7 @@ test("a later learned card keeps the speed line, and internal names are dropped"
   assert.equal(lines.runCardOf({ kind: "run-card", card: speed }), speed);
 });
 
-test("offers stop at two", async () => {
+test("offers stop at one", async () => {
   const lines = await load("../../../packages/ui/src/answer-lines.ts");
   const footer = lines.footerFromCard({
     items: [
@@ -94,7 +88,7 @@ test("offers stop at two", async () => {
   });
   assert.deepEqual(
     footer.lines.map((line) => line.id),
-    ["a", "b"],
+    ["a"],
   );
 });
 
@@ -113,7 +107,7 @@ test("a save offer reads as one line and never doubles in a merged footer", asyn
   };
   const first = lines.footerFromCard(card);
   const offer = first.lines.find((line) => line.kind === "offer");
-  assert.equal(offer.label, "Save this as an ability");
+  assert.equal(offer.label, "Save as a skill");
   assert.match(offer.followUp, /^Save what you just did as an ability/);
   const merged = lines.mergeFooters(first, lines.footerFromCard(card));
   assert.equal(merged.lines.filter((line) => line.kind === "offer").length, 1);
@@ -143,9 +137,11 @@ test("the lines render under an answer, with the offer's own words beside its bu
       onOffer(offer) {
         picked = offer.followUp;
       },
-      onWrong() {
-        picked = "wrong";
+      onRetry() {
+        picked = "retry";
       },
+      copyText: "The answer.",
+      duration: "33s",
     }),
   );
   assert.match(html, /answer-lines/);
@@ -153,6 +149,9 @@ test("the lines render under an answer, with the offer's own words beside its bu
   assert.match(html, /Learned: orders/);
   assert.match(html, /Partial: 20 of 143 rows\./);
   assert.match(html, />Get all</);
-  assert.match(html, />Wrong</);
+  assert.doesNotMatch(html, /Wrong answer/);
+  assert.match(html, /aria-label="Copy"/);
+  assert.match(html, /aria-label="Retry"/);
+  assert.match(html, /answer-duration">33s</);
   assert.equal(picked, "");
 });

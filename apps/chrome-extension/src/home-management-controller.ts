@@ -1,8 +1,4 @@
-import {
-  DaemonUiRequestSchema,
-  type HomeRoutineCardDto,
-  type ManagementSnapshotDto,
-} from "@aeon/protocol";
+import { DaemonUiRequestSchema, type ManagementSnapshotDto } from "@aeon/protocol";
 import type { ManagementActionName, NewTabHomeProps } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
 
@@ -10,29 +6,24 @@ type Theme = "dark" | "midnight" | "light" | "system";
 type HomeManagementProps = Pick<
   NewTabHomeProps,
   | "managementSnapshot"
-  | "homeRoutines"
   | "managementLoading"
   | "managementError"
   | "managementSelectedChatId"
   | "theme"
-  | "sidebarDefaultOpen"
   | "onManagementLoad"
   | "onManagementRefresh"
   | "onManagementSelectChat"
   | "onManagementOpenChat"
   | "onManagementAction"
   | "onTheme"
-  | "onSidebarDefault"
 >;
 
 export class HomeManagementController {
   snapshot: ManagementSnapshotDto | null = null;
-  homeRoutines: HomeRoutineCardDto[] = [];
   loading = false;
   error = "";
   selectedChatId = "";
   theme: Theme = "dark";
-  sidebarDefaultOpen = false;
   private requestGeneration = 0;
 
   constructor(
@@ -45,12 +36,10 @@ export class HomeManagementController {
   viewProps(): HomeManagementProps {
     return {
       managementSnapshot: this.snapshot,
-      homeRoutines: this.homeRoutines,
       managementLoading: this.loading,
       managementError: this.error,
       managementSelectedChatId: this.selectedChatId,
       theme: this.theme,
-      sidebarDefaultOpen: this.sidebarDefaultOpen,
       onManagementLoad: () => void this.load(),
       onManagementRefresh: () => void this.load(),
       onManagementSelectChat: (chatId: string) => {
@@ -64,52 +53,20 @@ export class HomeManagementController {
         input: Record<string, unknown>,
       ) => void this.runAction(chatId, action, input),
       onTheme: (value: Theme) => void this.saveTheme(value),
-      onSidebarDefault: (value: boolean) => void this.saveSidebarDefault(value),
     };
   }
 
   async readPreferences(): Promise<void> {
-    const values = await chrome.storage.sync.get(["aeon-theme", "aeon-chat-sidebar-open"]);
+    const values = await chrome.storage.sync.get(["aeon-theme"]);
     const savedTheme = values["aeon-theme"];
     if (savedTheme === "light" || savedTheme === "system" || savedTheme === "midnight")
       this.theme = savedTheme;
     if (savedTheme === "atmosphere") this.theme = "light";
-    this.sidebarDefaultOpen = values["aeon-chat-sidebar-open"] === true;
     document.documentElement.dataset.theme = this.theme;
   }
 
   async load(selectedChatId = this.selectedChatId): Promise<void> {
     await this.loadSnapshot(selectedChatId, true);
-  }
-
-  async loadForHome(): Promise<void> {
-    const activeClient = this.client();
-    if (!activeClient) return;
-    this.error = "";
-    try {
-      const requestId = crypto.randomUUID();
-      const after = activeClient.send(
-        DaemonUiRequestSchema.parse({
-          kind: "command",
-          requestId,
-          operation: "management.home",
-          payload: {},
-        }),
-      );
-      const response = await activeClient.waitFor(
-        (message) =>
-          (message.kind === "command.completed" || message.kind === "command.failed") &&
-          message.requestId === requestId,
-        after,
-      );
-      if (response.kind === "command.failed") throw new Error(response.message);
-      if (response.kind !== "command.completed" || response.result.kind !== "management.home")
-        throw new Error("Aeon returned an invalid home routine snapshot.");
-      this.homeRoutines = response.result.snapshot.routines;
-    } catch (error) {
-      this.error = toMessage(error);
-    }
-    this.onChange();
   }
 
   private async getManagementClient(): Promise<UiClient | undefined> {
@@ -146,14 +103,6 @@ export class HomeManagementController {
       if (response.kind !== "command.completed" || response.result.kind !== "management.snapshot")
         throw new Error("Aeon returned an invalid management snapshot.");
       this.snapshot = response.result.snapshot;
-      this.homeRoutines = response.result.snapshot.routines.slice(0, 3).map((routine) => ({
-        routineId: routine.routineId,
-        chatId: routine.chatId,
-        chatTitle: routine.chatTitle,
-        title: routine.title,
-        nextDueAt: routine.nextDueAt,
-        enabled: routine.enabled,
-      }));
       loadDefaultChatResources = this.chooseDefaultChat(chooseDefaultChat);
     } catch (error) {
       if (generation === this.requestGeneration) this.error = toMessage(error);
@@ -195,14 +144,6 @@ export class HomeManagementController {
       if (response.kind !== "command.completed" || response.result.kind !== "management.snapshot")
         throw new Error("Aeon returned an invalid management action response.");
       this.snapshot = response.result.snapshot;
-      this.homeRoutines = response.result.snapshot.routines.slice(0, 3).map((routine) => ({
-        routineId: routine.routineId,
-        chatId: routine.chatId,
-        chatTitle: routine.chatTitle,
-        title: routine.title,
-        nextDueAt: routine.nextDueAt,
-        enabled: routine.enabled,
-      }));
     } catch (error) {
       if (generation === this.requestGeneration) this.error = toMessage(error);
     } finally {
@@ -230,12 +171,6 @@ export class HomeManagementController {
     this.theme = value;
     document.documentElement.dataset.theme = value;
     await chrome.storage.sync.set({ "aeon-theme": value });
-    this.onChange();
-  }
-
-  private async saveSidebarDefault(value: boolean): Promise<void> {
-    this.sidebarDefaultOpen = value;
-    await chrome.storage.sync.set({ "aeon-chat-sidebar-open": value });
     this.onChange();
   }
 }

@@ -94,7 +94,10 @@ body {
   left: 0;
   width: min(360px, calc(100vw - 20px));
   max-height: min(480px, calc(100dvh - 58px));
-  overflow: auto;
+  /* Only the chat list scrolls; Manage stays pinned under it, one click away with 100 chats. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: var(--aeon-s-2);
   border: 1px solid var(--panel-line);
   border-radius: var(--aeon-r-md);
@@ -104,18 +107,10 @@ body {
 .picker-menu[hidden] {
   display: none;
 }
-.picker-all-chats {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: 35px;
-  padding: 0 var(--aeon-s-2);
-  border-color: transparent;
-  background: transparent;
-  text-align: left;
-}
 .picker-chat-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   min-height: 0;
   padding: var(--aeon-s-1) 0;
   border-block: 1px solid var(--panel-line);
@@ -275,41 +270,27 @@ iframe {
   flex: none;
 }
 
-/* The Manage icon's knobs sit on the slider lines, filled with the header behind them. */
-.panel-icon-knob {
-  fill: var(--panel-header);
-}
-
-/* What Aeon knows about the active tab's site: one quiet line under the header. */
-.panel-xray {
-  display: block;
-  width: 100%;
-  height: 20px;
-  margin: 0;
-  padding: 0 var(--aeon-s-3);
-  overflow: hidden;
+/* The switcher's pinned footer: Manage, under one hairline. */
+.picker-divider {
+  flex: none;
+  margin: var(--aeon-s-1) 0;
   border: 0;
-  border-radius: 0;
+  border-top: var(--hair) solid var(--ink-dry);
+}
+.picker-manage {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--aeon-s-2);
+  border-color: transparent;
   background: transparent;
-  /* fg-3 is under 4.5:1 on the panel in both themes, so the counts take fg-2 and the host fg-1. */
-  color: var(--aeon-fg-2);
-  font-size: var(--aeon-fs-xs);
-  font-variant-numeric: tabular-nums;
-  line-height: 20px;
-  letter-spacing: 0;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
 }
-.panel-xray:hover {
-  background: transparent;
-  text-decoration: underline;
-}
-.panel-xray:focus-visible {
-  outline: none;
-  box-shadow: var(--aeon-focus-ring);
-}
-.panel-xray-host {
-  color: var(--aeon-fg-1);
+.picker-manage:hover:not(:disabled) {
+  color: var(--fg-1);
 }

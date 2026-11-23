@@ -37,7 +37,11 @@ test("partial answer after a tool is outside the work disclosure before message-
       },
     });
     const html = renderToStaticMarkup(
-      createElement(TranscriptTurn, { rows: [...model.rows], actions: { actionsDisabled: true } }),
+      createElement(TranscriptTurn, {
+        rows: [...model.rows],
+        actions: { actionsDisabled: true },
+        live: true,
+      }),
     );
     assert.ok(html.lastIndexOf(text) > html.lastIndexOf("</details>"));
     assert.match(html, /Reasoning increment/);

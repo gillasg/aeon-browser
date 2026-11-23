@@ -35,7 +35,6 @@ test("new tab hides its saved model catalog while disconnected", () => {
         connected: false,
         projectId: "",
         modelCatalog: { defaultModel: model, models: [model] },
-        homeRoutines: [],
         openChatIds: new Set(),
         onAsk() {},
         onOpenChat() {},

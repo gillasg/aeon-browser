@@ -17,6 +17,7 @@ import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { markSeen, setNeeds } from "./orb-control.js";
 import {
   CURSOR_STOP,
+  ORB_TO_PANEL,
   type OrbToContent,
   type OrbVerify,
   type OrbVisualState,
@@ -32,11 +33,12 @@ import {
 } from "./orb-run.js";
 import { OrbSession } from "./orb-session.js";
 import { playSound } from "./orb-sounds.js";
-import { OrbBox, type OrbTab, type OrbViewModel } from "./orb-view.js";
+import { OrbBox, islandState, type OrbTab, type OrbViewModel } from "./orb-view.js";
 import { localOfferAction } from "../offer-actions.js";
 import { reportWrongInput } from "../answer-offer.js";
 import { openManage } from "../manage-tab.js";
-import type { OrbShown } from "./orb-messages.js";
+import { installBrowserPreview } from "../chat-browser-preview.js";
+import type { OrbLayout, OrbShown } from "./orb-messages.js";
 import {
   applySummon,
   askSummon,
@@ -83,6 +85,11 @@ let update: ((next: ReactNode) => void) | undefined;
 /** The chat shown came from another tab's orb, not this tab's own. */
 let borrowed = false;
 let bootedAt = Number.POSITIVE_INFINITY;
+/** The last message sent from here, for Retry. */
+let lastPrompt = "";
+/** `Type / for Teach, Watch, Fill` shows on the first few summons, then never again. */
+const HINT_KEY = "aeon-orb-hint-shown";
+const HINT_SUMMONS = 3;
 
 const session = new OrbSession(tabId, {
   event: (event) => onEvent(event),
@@ -104,6 +111,8 @@ const ux: SiteUx = {
 };
 
 void boot();
+// Work in another tab shows its live tile in the box; work on this tab shows none.
+installBrowserPreview(() => model.chatId);
 
 async function boot(): Promise<void> {
   // Framed by the content script on an http(s) page. A top-level open, or a frame without the
@@ -123,6 +132,7 @@ async function boot(): Promise<void> {
   render();
   void loadLearning(ux);
   void askSummon(ux);
+  void countHint();
   listen();
   sendPrefs();
   toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
@@ -139,6 +149,8 @@ async function boot(): Promise<void> {
     const handed = changes[TAB_CHAT]?.newValue;
     if (typeof handed === "string" && handed && handed !== model.chatId)
       void selectChat(handed, false);
+    if (`aeon-learn:${tabId}` in changes || `aeon-learned:${tabId}` in changes)
+      void loadLearning(ux);
   });
   const remembered = await rememberedChat();
   bootedAt = Date.now();
@@ -162,7 +174,10 @@ async function rememberedChat(): Promise<{ chatId?: string; borrowed: boolean }>
 /** Opened again after closing: a chat borrowed from another tab gives way to a fresh one. */
 function reopened(message: OrbShown): void {
   applySummon(ux, message.summon);
+  void countHint();
   void loadXray(ux);
+  // Teach may have started while the box was closed (Manage → Sites → Teach Aeon).
+  void loadLearning(ux);
   focusPrompt();
   if (!borrowed || Date.now() - bootedAt < 1500) return;
   borrowed = false;
@@ -223,6 +238,10 @@ async function connectSession(): Promise<void> {
 
 function listen(): void {
   new ResizeObserver(() => reportSize()).observe(root);
+  // A click on the cursor focuses the frame without any message; typing must still land in the field.
+  addEventListener("focus", () => {
+    if (document.activeElement === document.body || !document.activeElement) focusPrompt();
+  });
   addEventListener("keydown", (event) => {
     if (event.key === "Escape") toContent({ kind: "aeon.orb.hide", keepRunning: true });
   });
@@ -275,9 +294,13 @@ async function answerWrong(): Promise<void> {
   await submit(WRONG_FOLLOW_UP);
 }
 
-// Sent, the box folds back to the cursor, whose pill carries the run. A chat this cursor already
+// Sent, the box stays where it is: compose, then the working pill, then the answer in place. It
+// folds to the cursor's pill only when the user dismisses it. A chat this cursor already
 // has gets the message as its next turn; otherwise a new chat starts with this tab as context.
 async function submit(text: string): Promise<void> {
+  lastPrompt = text;
+  model.startedAt = Date.now();
+  delete model.durationMs;
   model.busy = true;
   model.tabChoices = null;
   borrowed = false;
@@ -287,7 +310,6 @@ async function submit(text: string): Promise<void> {
   sync();
   playSound("start");
   clearPrompt();
-  toContent({ kind: "aeon.orb.hide", keepRunning: true });
   try {
     if (model.chatId && session.chatId === model.chatId) await session.again(text);
     else
@@ -389,6 +411,8 @@ function syncBox(current: OrbRun): void {
   else delete model.line;
   if (current.footer) model.footer = current.footer;
   else delete model.footer;
+  if (current.status === "done" && model.startedAt !== undefined && model.durationMs === undefined)
+    model.durationMs = Date.now() - model.startedAt;
   render();
   if (ask) focusPrompt();
 }
@@ -428,7 +452,7 @@ function sendNewActions(current: OrbRun): void {
   if (steps.length && !userControl) toContent({ kind: "aeon.orb.cursor", steps });
 }
 
-/** For 6 s after a run ends the minimised pill says its receipt (`0.8 s · site API`). */
+/** For 6 s after a run ends the minimised pill says its receipt (`0.8 s · via skill`). */
 function showReceiptOnPill(): void {
   const short = receiptOf(run?.footer)?.short;
   if (!short) return;
@@ -457,23 +481,72 @@ function visual(state: OrbVisualState, label: string): void {
   toContent({ kind: "aeon.orb.visual", state, label });
 }
 
-/** Hand-off is manual: the chat moves to the side panel beside this page, and the box collapses. */
+/**
+ * Hand-off is manual: the chat moves to the side panel beside this page, and the box collapses.
+ * The worker opens the panel (as for the cursor's ☰): sidePanel.open called from this framed
+ * page does not reliably carry the click's gesture. Without the panel, the chat opens in a tab.
+ */
+function openPanel(chatId: string | undefined): Promise<boolean> {
+  return chrome.runtime
+    .sendMessage({ kind: ORB_TO_PANEL, chatId })
+    .then((reply: unknown) => (reply as { ok?: unknown } | undefined)?.ok === true)
+    .catch(() => false);
+}
+
 function toSidePanel(): void {
   const chatId = session.chatId;
   if (!chatId) return;
-  // Must run before any await: opening the side panel needs the click's user gesture.
-  const opened = chrome.sidePanel.open({ tabId });
-  void chrome.tabs
-    .get(tabId)
-    .then((current) =>
-      chrome.storage.session.set({ [sidePanelSelectionKey(current.windowId)]: chatId }),
-    )
-    .catch(() => undefined);
-  // The cursor stays: only the transcript moves to the side panel.
-  void opened.then(
-    () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
-    () => toTab(),
+  void openPanel(chatId).then((ok) =>
+    ok ? toContent({ kind: "aeon.orb.hide", keepRunning: true }) : toTab(),
   );
+}
+
+/**
+ * ⌘↵: the panel opens beside this page on this chat (the keypress is the user gesture
+ * sidePanel.open needs), and a draft goes there as the next message. Never automatic.
+ */
+function promote(text?: string): void {
+  const opened = openPanel(session.chatId);
+  void opened.then((ok) => {
+    if (ok) toContent({ kind: "aeon.orb.hide", keepRunning: true });
+    else if (!text) toTab();
+  });
+  if (text)
+    void submit(text).then(async () => {
+      const chatId = session.chatId;
+      if (!chatId || !(await opened)) return;
+      const windowId = (await chrome.tabs.get(tabId).catch(() => undefined))?.windowId;
+      if (windowId !== undefined)
+        await chrome.storage.session
+          .set({ [sidePanelSelectionKey(windowId)]: chatId })
+          .catch(() => undefined);
+    });
+}
+
+function retry(): void {
+  if (lastPrompt && !model.busy) void submit(lastPrompt);
+}
+
+function copyAnswer(): void {
+  const text = (run?.answer ?? model.line?.text ?? "").trim();
+  if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
+}
+
+async function countHint(): Promise<void> {
+  const stored = (await chrome.storage.local.get(HINT_KEY).catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  const shown = Number(stored[HINT_KEY]) || 0;
+  model.hint = shown < HINT_SUMMONS;
+  render();
+  if (model.hint) await chrome.storage.local.set({ [HINT_KEY]: shown + 1 }).catch(() => undefined);
+}
+
+function dismissHint(): void {
+  model.hint = false;
+  render();
+  void chrome.storage.local.set({ [HINT_KEY]: HINT_SUMMONS }).catch(() => undefined);
 }
 
 function toTab(): void {
@@ -524,6 +597,10 @@ function view(): ReactNode {
       toSidePanel,
       answerOffer: (offer) => void answerOffer(offer),
       answerWrong: () => void answerWrong(),
+      retry,
+      promote,
+      copyAnswer,
+      dismissHint,
       toggleLearning: () => void toggleLearning(ux),
       openManage: (route) => void openManage(route).catch(() => undefined),
       removeTarget: () => {
@@ -538,9 +615,16 @@ function view(): ReactNode {
   });
 }
 
+let lastLayout = "";
 function render(): void {
   if (update) update(view());
   else update = mountAeonUi(root, view());
+  // A width change alone may not change the root's height, so say the new layout at once.
+  const layout = (model.learning ? "teach" : "") + islandState(model);
+  if (layout !== lastLayout) {
+    lastLayout = layout;
+    requestAnimationFrame(reportSize);
+  }
 }
 
 function sendPrefs(): void {
@@ -551,7 +635,15 @@ function sendPrefs(): void {
 
 function reportSize(): void {
   const box = root.getBoundingClientRect();
-  toContent({ kind: "aeon.orb.panel", width: Math.ceil(box.width), height: Math.ceil(box.height) });
+  const state = islandState(model);
+  const wide = state === "answer" || state === "error";
+  const layout: OrbLayout = model.learning ? "teach" : wide ? "answer" : "compose";
+  toContent({
+    kind: "aeon.orb.panel",
+    width: Math.ceil(box.width),
+    height: Math.ceil(box.height),
+    layout,
+  });
 }
 
 function toContent(message: OrbToContent): void {

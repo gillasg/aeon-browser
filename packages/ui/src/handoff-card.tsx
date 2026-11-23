@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import type { TranscriptRow } from "./transcript-model.js";
 
 // A browser hand-off in progress: the agent's code cell is waiting for the user to act in a tab.
-// The page shows its own banner; this card is the chat-side copy of the same request.
+// One owner per state: while the panel shows this card, the page shows only its ring.
 export interface PendingHandoff {
   toolCallId: string;
   message: string;
@@ -46,27 +46,29 @@ function runningHandoff(partial: string): { message: string; tabId: number } | n
   }
 }
 
+/**
+ * The one place the panel asks for the user's hand: a neutral card, the agent's message, `I'm
+ * done` (the only ochre on the panel) and a quiet Skip. No badge, no stripe, no coloured border.
+ */
 export function HandoffCard({ handoff }: { handoff: PendingHandoff }): ReactElement {
   const [answered, setAnswered] = useState(false);
   useEffect(() => setAnswered(false), [handoff.toolCallId, handoff.message]);
   const send = (action: HandoffAction) => {
-    if (action !== "focus") setAnswered(true);
+    setAnswered(true);
     window.dispatchEvent(
       new CustomEvent(HANDOFF_EVENT, { detail: { tabId: handoff.tabId, action } }),
     );
   };
   return (
-    <section className="handoff-card" role="status" aria-label="The agent needs you">
-      <header>
-        <span>Browser</span>
-        <span className="handoff-badge">Action needed</span>
-      </header>
-      <p>{handoff.message}</p>
+    <section className="handoff-card" role="status" aria-label="Aeon needs you">
+      <p>{handoff.message || "Aeon needs you in this tab."}</p>
       <div className="handoff-actions">
-        <button type="button" className="handoff-primary" onClick={() => send("focus")}>
-          Take over
-        </button>
-        <button type="button" disabled={answered} onClick={() => send("done")}>
+        <button
+          type="button"
+          className="handoff-done"
+          disabled={answered}
+          onClick={() => send("done")}
+        >
           I&apos;m done
         </button>
         <button

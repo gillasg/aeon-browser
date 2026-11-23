@@ -31,45 +31,46 @@ const PAGE_STYLE = [
   "box-shadow:inset 0 0 0 1.5px var(--aeon-island-glow-line),inset 0 0 22px var(--aeon-island-glow-mid),inset 0 0 80px var(--aeon-island-glow-soft);",
   "transition:opacity .3s ease;animation:edge 2.8s ease-in-out infinite}",
   ".g.on{opacity:1}.g.user{animation:none;opacity:.35}@keyframes edge{50%{opacity:.7}}",
-  ".needs .g{opacity:0!important}.needs .p{background:var(--aeon-island-needs)!important}",
+  ".needs .g{opacity:0!important}.needs .p{background:var(--aeon-island-bg)!important;color:var(--aeon-island-ink)}",
   ".needs .s{border-color:var(--aeon-island-needs-line)}",
-  ".needs .p{display:block;white-space:normal;width:300px;max-width:min(340px,80vw);padding:10px 10px 8px 12px;",
-  "border-radius:var(--aeon-r-14);pointer-events:auto;line-height:17px}",
-  ".needs .p .sp,.needs .p > .tr,.needs .p > .stop{display:none}",
+  // A hand-off has one owner on the page: the isolated-world card beside the ring (or, with the
+  // side panel open, the panel's card). The cursor's own pill steps aside so there are never two.
+  ".needs .p{display:none!important}",
   ".clean .g,.clean .p,.clean .s,.clean .co,.clean .k,.clean svg.trail{display:none!important}",
   ".c{position:absolute;left:0;top:0;will-change:transform;transition:opacity .18s ease}",
-  ".a,.t{position:absolute;left:-1px;top:-1px;filter:drop-shadow(0 1px 2px var(--aeon-cursor-shadow));",
+  ".a,.t{position:absolute;left:-1px;top:-1px;filter:drop-shadow(0 0 0 transparent);",
   "transition:transform 120ms ease,opacity 120ms ease}",
   ".t{left:-6px;top:-11px;opacity:0}.c.text .a{opacity:0}.c.text .t{opacity:1}",
   ".c.down .a,.c.down .t{transform:scale(.82)}",
-  ".c.idle .a{animation:b 2.4s ease-in-out infinite}@keyframes b{50%{transform:scale(1.06);opacity:.85}}",
+  ".g.on~.c .a{animation:halo 2.4s ease-in-out infinite alternate}@keyframes halo{to{filter:drop-shadow(0 0 6px var(--aeon-cursor-shadow))}}",
+  "@media (prefers-reduced-motion:reduce){.g.on~.c .a{animation:none;filter:drop-shadow(0 0 4px var(--aeon-cursor-shadow))}.g{animation:none}}",
   "i{position:absolute;left:-16px;top:-16px;width:32px;height:32px;border-radius:var(--aeon-r-half);",
   "border:2px solid var(--aeon-island-ripple);background:var(--aeon-island-ripple-fill);transform:scale(0);opacity:0}",
   "i.on{animation:r 520ms cubic-bezier(.2,.7,.2,1)}@keyframes r{0%{transform:scale(.25);opacity:1}100%{transform:scale(1.6);opacity:0}}",
   ".p{position:absolute;left:18px;top:20px;display:flex;align-items:center;gap:8px;max-width:360px;",
-  "padding:5px 5px 5px 12px;border-radius:var(--aeon-r-full);background:var(--aeon-island-bg);",
-  "color:var(--aeon-island-ink);font:500 var(--aeon-fs-md)/17px system-ui,-apple-system,Segoe UI,sans-serif;",
-  "white-space:nowrap;box-shadow:0 6px 18px var(--aeon-island-shadow);opacity:0;transform:translateY(-3px);",
+  "padding:5px 5px 5px 12px;border-radius:var(--aeon-r-full);background:var(--aeon-island-bg);-webkit-backdrop-filter:blur(18px) saturate(1.2);backdrop-filter:blur(18px) saturate(1.2);",
+  "color:var(--aeon-island-ink);font:500 var(--aeon-fs-md)/17px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;",
+  "white-space:nowrap;box-shadow:var(--aeon-island-elev);opacity:0;transform:translateY(-3px);",
   "transition:opacity 160ms ease,transform 160ms ease}",
   ".p.on{opacity:1;transform:none}.p.on .ic{pointer-events:auto}.p.on .tr,.p.on .stop{pointer-events:none}",
   ".p .tx{overflow:hidden;text-overflow:ellipsis;min-width:0}.needs .p .tx{display:block;white-space:normal}",
   ".p .sp{width:11px;height:11px;flex:none;border-radius:var(--aeon-r-half);border:2px solid var(--aeon-island-spin);",
   "border-top-color:var(--aeon-island-ink);animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}",
   ".p .ic{width:24px;height:24px;flex:none;border:0;border-radius:var(--aeon-r-half);display:grid;place-items:center;",
-  "background:var(--aeon-island-line-strong);color:var(--aeon-island-ink);font:600 var(--aeon-fs-xs)/1 system-ui,sans-serif;",
+  "background:var(--aeon-island-line-strong);color:var(--aeon-island-ink);font:500 var(--aeon-fs-xs)/1 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;",
   "cursor:pointer;padding:0}.p .ic:hover{background:var(--aeon-island-wash-24)}",
   "svg.trail{position:absolute;inset:0;width:100%;height:100%;overflow:visible}",
-  ".s{position:fixed;left:0;top:0;border-radius:var(--aeon-r-12);border:2px solid var(--aeon-island-ring);",
-  "box-shadow:0 0 0 9999px var(--aeon-island-spot);opacity:0;pointer-events:none;",
+  ".s{position:fixed;left:0;top:0;border-radius:var(--aeon-r-12);border:1px solid var(--aeon-island-ring);",
+  "box-shadow:none;opacity:0;pointer-events:none;",
   "transition:left .25s ease,top .25s ease,width .25s ease,height .25s ease,opacity .2s ease}.s.on{opacity:1}",
   ".co{position:fixed;max-width:280px;padding:7px 10px;border-radius:var(--aeon-r-md);background:var(--aeon-island-callout);",
-  "color:var(--aeon-island-ink);font:500 var(--aeon-fs-sm)/16px system-ui,-apple-system,Segoe UI,sans-serif;",
-  "box-shadow:0 8px 24px var(--aeon-island-callout-shadow);opacity:0;transform:translateY(4px);",
+  "color:var(--aeon-island-ink);font:500 var(--aeon-fs-sm)/16px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;",
+  "box-shadow:var(--aeon-island-elev);opacity:0;transform:translateY(4px);",
   "transition:opacity .18s ease,transform .18s ease;pointer-events:none}",
-  ".co.on{opacity:1;transform:none}.co b{display:block;font-weight:600}.co span{display:block;opacity:.75;font-size:var(--aeon-fs-xs);margin-top:2px}",
+  ".co.on{opacity:1;transform:none}.co b{display:block;font-weight:500}.co span{display:block;opacity:.75;font-size:var(--aeon-fs-xs);margin-top:2px}",
   ".k{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(6px);padding:6px 10px;",
-  "border-radius:var(--aeon-r-8);background:var(--aeon-island-keys);color:var(--aeon-island-ink);",
-  "font:600 var(--aeon-fs-xs)/14px system-ui;opacity:0;transition:opacity .18s ease,transform .18s ease;pointer-events:none}",
+  "border-radius:var(--aeon-r-8);background:var(--aeon-island-keys);color:var(--aeon-island-ink);box-shadow:var(--aeon-island-elev);",
+  "font:500 var(--aeon-fs-xs)/14px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;opacity:0;transition:opacity .18s ease,transform .18s ease;pointer-events:none}",
   ".k.on{opacity:1;transform:translateX(-50%)}",
 ].join("");
 
@@ -100,10 +101,11 @@ const PAGE_BODY = `
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:strict";
     var root = host.attachShadow({ mode: "closed" });
     var arrow = svg("svg", { class: "a", width: String(mark.width || 22), height: String(mark.height || 20), viewBox: String(mark.viewBox || "0 0 25 23") }, [
-      svg("path", { d: String(mark.path || ""), fill: "var(--aeon-cursor)", stroke: "var(--aeon-cursor-stroke)", "stroke-width": "1.5", "stroke-linejoin": "round" })
+      svg("path", { d: String(mark.path || ""), fill: "var(--aeon-cursor)", stroke: "var(--aeon-cursor-stroke)", "stroke-width": "1", "stroke-linejoin": "round" })
     ]);
-    var noseX = 1.2 / 25 * Number(mark.width || 22);
-    var noseY = 1.2 / 23 * Number(mark.height || 20);
+    var box = String(mark.viewBox || "0 0 25 23").split(" ");
+    var noseX = 1.2 / Number(box[2] || 25) * Number(mark.width || 22);
+    var noseY = 1.2 / Number(box[3] || 23) * Number(mark.height || 20);
     arrow.style.left = (-noseX) + "px";
     arrow.style.top = (-noseY) + "px";
     root.append(sheet(tokenCss || ""), sheet(styleText), make("div", { class: "w" }, [
@@ -206,9 +208,8 @@ const PAGE_BODY = `
   var s = host.__s;
   if (update.glowColor && update.glowColor !== s.glowColor) {
     s.glowColor = update.glowColor;
-    var rgb = toRgb(update.glowColor);
-    if (rgb) s.glow.style.boxShadow = "inset 0 0 0 1.5px rgba(" + rgb + ",.85),inset 0 0 22px rgba(" + rgb + ",.5),inset 0 0 80px rgba(" + rgb + ",.22)";
-    if (rgb && update.glowColor !== (mark && mark.neutralGlow)) s.pill.style.background = "rgba(" + rgb + ",.95)";
+    // Dynamic Ink: the edge glow and the pill stay neutral bone on obsidian whatever the site's
+    // colour, so the cursor reads as one entity on every page.
   }
   if (update.glowOnly && !s.cursorShown) s.cursor.style.opacity = "0";
   if (update.x !== undefined || update.y !== undefined) { s.cursorShown = true; s.cursor.style.opacity = "1"; }
@@ -350,17 +351,6 @@ const PAGE_BODY = `
     state.callout.classList.remove("on");
     state.keys.classList.remove("on");
     state.publish();
-  }
-  function toRgb(color) {
-    var text = String(color || "").trim();
-    var hex = /^#([0-9a-f]{6})$/i.exec(text);
-    if (hex) {
-      var n = parseInt(hex[1], 16);
-      return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
-    }
-    if (text.indexOf("rgb") !== 0) return "";
-    var parts = text.slice(text.indexOf("(") + 1, text.lastIndexOf(")")).split(",");
-    return parts.length >= 3 ? parts.slice(0, 3).map(function (part) { return String(Number(part)).trim(); }).join(",") : "";
   }
 `;
 

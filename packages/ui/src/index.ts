@@ -12,7 +12,6 @@ export {
 export { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 export { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 export { NewTabHome, type NewTabHomeProps } from "./home-surface.js";
-export type { HomeRunActions, HomeRunPreview } from "./home-live.js";
 export type {
   ModelAccountsProps,
   ModelAccountsState,
@@ -91,8 +90,9 @@ export {
 } from "./answer-lines.js";
 export { formatReceipt, pickReceipt, RECEIPT_PRIORITY } from "./answer-receipt.js";
 export { hashRoute, parseHashRoute } from "./manage-route.js";
-export { MANAGE_NAV } from "./home-top-bar.js";
+export { MANAGE_NAV } from "./manage-nav.js";
 export { WELCOME_EXAMPLES } from "./new-user-welcome.js";
+export { seedHomeQuery } from "./learn-page.js";
 export {
   ACTIVITY_LOG_KEY,
   logApiWrites,
@@ -109,3 +109,4 @@ export {
   type PrivacyState,
 } from "./privacy-settings.js";
 export { FormsSettings, fieldLabel, type FormField } from "./forms-settings.js";
+export { piSlashCommandsKey, showThinkingKey, useAgentFlag } from "./agent-tab-view.js";

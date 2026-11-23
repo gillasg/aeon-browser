@@ -131,7 +131,7 @@ test("New Tab is Ask-only and applies its dynamic Pi selection before the first 
   assert.doesNotMatch(homeStart, /home-mode-switch|function ModeSwitch|Search or type a URL/);
   assert.doesNotMatch(page, /chrome\.search\.query|function searchWeb/);
   assert.match(page, /operation: "chat\.model-catalog"/);
-  assert.match(homeManagement, /operation: "management\.home"/);
+  assert.doesNotMatch(homeManagement, /operation: "management\.home"/);
   assert.ok(
     page.indexOf("await startHomePrompt(activeClient") < page.indexOf("saveInitialDisplay(chatId"),
   );

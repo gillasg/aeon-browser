@@ -21,6 +21,7 @@ interface ChatTranscriptProps {
   onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
   onAnswerOffer?: ((offer: AnswerOffer) => void) | undefined;
   onAnswerWrong?: (() => void) | undefined;
+  onRetry?: ((text: string) => void) | undefined;
   actionsDisabled?: boolean;
   running?: boolean;
   starting?: boolean;
@@ -35,6 +36,7 @@ export function ChatTranscript({
   onPinMessage,
   onAnswerOffer,
   onAnswerWrong,
+  onRetry,
   actionsDisabled = false,
   running = false,
   starting = false,
@@ -50,6 +52,7 @@ export function ChatTranscript({
     onPinMessage,
     onAnswerOffer,
     onAnswerWrong,
+    onRetry,
   });
   return (
     <div
@@ -130,6 +133,7 @@ function turnActions({
   onPinMessage,
   onAnswerOffer,
   onAnswerWrong,
+  onRetry,
 }: {
   actionsDisabled: boolean;
   onEditEntry?: ((entryId: string) => Promise<void> | void) | undefined;
@@ -137,6 +141,7 @@ function turnActions({
   onPinMessage?: ((text: string) => Promise<void> | void) | undefined;
   onAnswerOffer?: ((offer: AnswerOffer) => void) | undefined;
   onAnswerWrong?: (() => void) | undefined;
+  onRetry?: ((text: string) => void) | undefined;
 }): TranscriptActions {
   return {
     actionsDisabled,
@@ -145,6 +150,7 @@ function turnActions({
     ...(onPinMessage ? { onPinMessage } : {}),
     ...(onAnswerOffer ? { onAnswerOffer } : {}),
     ...(onAnswerWrong ? { onAnswerWrong } : {}),
+    ...(onRetry ? { onRetry } : {}),
   };
 }
 

@@ -69,8 +69,9 @@ body {
   background: var(--bg);
   color: var(--text);
   font:
-    13.5px/1.45 system-ui,
-    -apple-system,
+    13.5px/1.45 -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
     "Segoe UI",
     sans-serif;
 }

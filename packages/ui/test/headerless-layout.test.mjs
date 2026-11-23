@@ -13,37 +13,39 @@ test("a chat page has no chat list: home and new chat, no title bar", () => {
   assert.doesNotMatch(html, /<header|Connected|Aeon/);
 });
 
-test("new tab has no sidebar: a top bar, a quiet welcome and the dashboard", () => {
+const homeProps = {
+  chats: [],
+  modelCatalog: null,
+  developmentFixture: false,
+  catalogOpen: false,
+  openChatIds: new Set(),
+  catalogResults: [],
+  managementSnapshot: null,
+  onManagementLoad() {},
+};
+
+test("Manage is one sidebar and a page: no landing, no top bar, no composer", () => {
   globalThis.localStorage = { getItem: () => null };
-  globalThis.location = { search: "" };
-  const html = renderToStaticMarkup(
-    createElement(NewTabHome, {
-      chats: [],
-      modelCatalog: null,
-      developmentFixture: false,
-      catalogOpen: false,
-      homeRoutines: [],
-      openChatIds: new Set(),
-      catalogResults: [],
-    }),
-  );
-  assert.match(html, /class="home-top-bar"/);
-  assert.doesNotMatch(html, /home-top-brand|aria-label="Aeon home"/);
-  assert.match(html, /class="home-top-nav"/);
+  globalThis.location = { search: "", hash: "" };
+  const html = renderToStaticMarkup(createElement(NewTabHome, homeProps));
+  assert.match(html, /class="manage-sidebar"/);
+  assert.doesNotMatch(html, /home-top-bar|home-core|placeholder="Ask Aeon to do anything"/);
+  for (const page of ["Automations", "Sites", "My Details", "Sign-in", "Settings", "Advanced"])
+    assert.match(html, new RegExp(`>${page}</button>`));
+  assert.match(html, /aria-current="page"[^>]*>Sites</);
+  delete globalThis.localStorage;
+  delete globalThis.location;
+});
+
+test("the side panel's idle canvas is one quiet line, three examples and the composer", () => {
+  globalThis.localStorage = { getItem: () => null };
+  globalThis.location = { search: "?host=panel", hash: "" };
+  const html = renderToStaticMarkup(createElement(NewTabHome, homeProps));
+  assert.doesNotMatch(html, /manage-sidebar/);
+  assert.match(html, /Do anything on the web/);
   assert.match(html, /placeholder="Ask Aeon to do anything"/);
-  assert.doesNotMatch(html, /id="chat-sidebar"|id="pinned-label"|id="projects-label"/);
-  for (const page of ["Models", "Sites", "Watches", "Forms", "Blocked", "Learn"])
-    assert.match(html, new RegExp(`>${page}<`));
-  assert.match(html, /aria-label="Settings"/);
-  // A quiet home: the core and the ask box, with no empty sections under them.
-  assert.match(html, /class="home-core" data-mode="idle"/);
-  assert.doesNotMatch(html, /Recent|Press Watch/);
-  // First run is one line and four general examples, never a tour or a modal.
-  assert.match(html, /Aeon works in your Chrome, with your logins/);
-  assert.match(html, /Turn this site into an API I can call/);
   assert.match(html, /Fill this form with my details/);
-  assert.match(html, /Hide the parts of this site I never use/);
-  assert.doesNotMatch(html, /role="dialog"|tour-actions/);
+  assert.doesNotMatch(html, /role="dialog"|tour-actions|Turn this site into an API/);
   delete globalThis.localStorage;
   delete globalThis.location;
 });

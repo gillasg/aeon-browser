@@ -1,4 +1,3 @@
-import { humanize } from "./management-automations.js";
 import { CommandPalette, type PaletteItem } from "./command-palette.js";
 import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
@@ -7,47 +6,37 @@ import { usePageTitle } from "./page-title.js";
 import type { ChatCatalogItemDto } from "@aeon/protocol";
 import { HomeCatalog } from "./home-catalog.js";
 import type { ManagementSnapshotDto } from "@aeon/protocol";
-import type { HomeRoutineCardDto } from "@aeon/protocol";
 import type { PiModelCatalogDto } from "@aeon/protocol";
 import type { ComposerModel, ComposerAttachment } from "./chat-composer.js";
 import { HomeStart } from "./home-start.js";
 import { ManagementSurface } from "./management-surface.js";
 import type { ManagementActionName, ManagementSection } from "./management-types.js";
-import { HomeTopBar, viewFromRoute, type HomeView } from "./home-top-bar.js";
-import { HomeDashboard } from "./home-dashboard.js";
-import { HomeCore } from "./home-core.js";
-import type { HomeRunActions, HomeRunPreview } from "./home-live.js";
 import { ActivityPanel } from "./activity-panel.js";
 import { type ActivityEntry, useActivityLog } from "./activity-log.js";
 import { hashRoute } from "./manage-route.js";
 import { ModelAccounts } from "./model-accounts.js";
 import { BrowserAccounts } from "./browser-accounts.js";
 import { Segmented } from "./segmented.js";
-import { LearnPage, seedHomeQuery } from "./learn-page.js";
 import { PasswordManagerSettings } from "./password-manager-settings.js";
-import { BlockedSitesSettings } from "./blocked-sites-settings.js";
 import { FormsSettings, type FormField } from "./forms-settings.js";
 import type { ModelAccountsProps } from "./model-accounts-types.js";
+import { AdvancedSettings } from "./advanced-settings.js";
+import { MANAGE_NAV, viewFromRoute, type ManageView } from "./manage-nav.js";
 
 export interface NewTabHomeProps {
   developmentFixture: boolean;
   connectionLabel: string;
   connected?: boolean;
   chats: readonly ChatCatalogItemDto[];
-  /** Chats whose agent is working right now. */
+  /** Chats whose agent is working right now, and chats waiting on the user (the Chats page). */
   runningChatIds?: ReadonlySet<string>;
-  /** Live frames of the tabs running chats act in, by chat. */
-  previews?: ReadonlyMap<string, HomeRunPreview>;
-  /** Show a background run's window, or stop it. */
-  runActions?: HomeRunActions;
-  /** Chats waiting on the user (an approval or a question). */
   needsChatIds?: ReadonlySet<string>;
   modelCatalog: PiModelCatalogDto | null;
   /** Sign-in progress for "Connect a model". */
   modelLogin?: ModelLoginState;
   /** Opens the model sign-in page (every provider Pi supports). */
   onConnectModel?(): void;
-  /** The Models tab of Settings: sign-ins, API keys and the default model. */
+  /** Settings → Models: sign-ins, API keys and the default model. */
   modelAccounts?: ModelAccountsProps;
   openChatIds: ReadonlySet<string>;
   catalogOpen: boolean;
@@ -67,6 +56,10 @@ export interface NewTabHomeProps {
   onReadAttachments?(files: readonly File[]): Promise<ComposerAttachment[]>;
   onNewChat(): void;
   onOpenChat(chatId: string): void;
+  /** Puts an example in the side panel's ask box (Manage has no composer of its own). */
+  onSuggest?(example: string): void;
+  /** Manage → Sites → Teach Aeon: opens the site and starts the Teach recorder there. */
+  onTeachSite?(host: string): void;
   /** Reverses an API write from the Activity page, when the site knows the reverse. */
   onUndoActivity?(entry: ActivityEntry): void;
   onCatalog(): void;
@@ -79,12 +72,10 @@ export interface NewTabHomeProps {
   onRename(chat: ChatCatalogItemDto): void;
   onDelete(chat: ChatCatalogItemDto): void;
   managementSnapshot: ManagementSnapshotDto | null;
-  homeRoutines: readonly HomeRoutineCardDto[];
   managementLoading: boolean;
   managementError: string;
   managementSelectedChatId: string;
   theme: "dark" | "midnight" | "light" | "system";
-  sidebarDefaultOpen: boolean;
   onManagementLoad(): void;
   onManagementRefresh(): void;
   onManagementSelectChat(chatId: string): void;
@@ -98,7 +89,7 @@ export interface NewTabHomeProps {
   blockedSites?: readonly string[];
   onBlockedSiteAdd?(site: string): void;
   onBlockedSiteRemove?(site: string): void;
-  /** Settings → Forms: the form profile, its last refusal, and the user's edits. */
+  /** Autofill & Sign-in: the form profile, its last refusal, and the user's edits. */
   formProfile?: readonly FormField[];
   formProfileRefused?: string;
   onFormFieldSave?(field: string, value: string): void;
@@ -108,29 +99,17 @@ export interface NewTabHomeProps {
   outsideContext?: boolean;
   onOutsideContext?(enabled: boolean): void;
   onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
-  onSidebarDefault(open: boolean): void;
-}
-
-type SettingsSection = "settings" | "models" | "signin" | "forms" | "blocked" | "advanced";
-
-const SECTION_ROUTES = new Set(["models", "signin", "forms", "blocked"]);
-
-/** A route name to a page: `models` is the Models tab of Settings, `watches` the Watches page. */
-function routeTo(route: string | null): { view: HomeView; settingsSection?: SettingsSection } {
-  if (route && SECTION_ROUTES.has(route))
-    return { view: "settings", settingsSection: route as SettingsSection };
-  return viewFromRoute(route === "watches" ? "automations" : route);
 }
 
 /** `#sites?host=…` (how other surfaces open Manage) wins over `?view=`. */
-function homeRoute(): { view: HomeView; settingsSection?: SettingsSection } {
+function homeRoute(): ManageView {
   const hash = hashRoute().page;
-  if (hash) return routeTo(hash);
-  return routeTo(new URLSearchParams(globalThis.location?.search ?? "").get("view"));
+  if (hash) return viewFromRoute(hash);
+  return viewFromRoute(new URLSearchParams(globalThis.location?.search ?? "").get("view"));
 }
 
 /** Follows a hash route sent to a Manage tab that is already open. */
-function useHashNavigation(onRoute: (route: ReturnType<typeof homeRoute>) => void): void {
+function useHashNavigation(onRoute: (view: ManageView) => void): void {
   useEffect(() => {
     const follow = (): void => {
       if (hashRoute().page) onRoute(homeRoute());
@@ -140,61 +119,88 @@ function useHashNavigation(onRoute: (route: ReturnType<typeof homeRoute>) => voi
   }, []);
 }
 
+function inPanel(): boolean {
+  return new URLSearchParams(globalThis.location?.search ?? "").get("host") === "panel";
+}
+
+/**
+ * `home.html` is two things: inside the side panel (`?host=panel`) it is the idle canvas, one
+ * calm composer; as a tab it is Manage, one sidebar and the page it picks. No landing page.
+ */
 export function NewTabHome(props: NewTabHomeProps): ReactElement {
-  const [route] = useState(homeRoute);
-  const [view, setView] = useState<HomeView>(route.view);
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>(
-    route.settingsSection ?? "settings",
+  if (inPanel()) return <PanelIdle props={props} />;
+  return <ManageHome props={props} />;
+}
+
+function PanelIdle({ props }: { props: NewTabHomeProps }): ReactElement {
+  usePageTitle("New chat");
+  return (
+    <main className="home-main" data-screen="new-tab">
+      <span id="home-connection" hidden>
+        {props.connectionLabel}
+      </span>
+      <HomeStart props={props} />
+      <HomeError props={props} />
+    </main>
   );
+}
+
+function ManageHome({ props }: { props: NewTabHomeProps }): ReactElement {
+  const [route] = useState(homeRoute);
+  const [view, setView] = useState<ManageView>(route);
   const activity = useActivityLog();
-  // Home shows each watcher's last check, so it loads management too.
   useEffect(() => props.onManagementLoad(), []);
-  useSlashToAsk();
-  // The chat list is the Chats page; the controller still owns its search state.
-  const shown: HomeView = props.catalogOpen ? "chats" : view;
-  // The gear opens Settings' General section; Models, Forms and Blocked pass their own.
-  const go = (next: HomeView, section: SettingsSection = "settings"): void => {
+  // The chat list is a page reached from ⌘K; the controller still owns its search state.
+  const shown: ManageView = props.catalogOpen ? "chats" : view;
+  const go = (next: ManageView): void => {
     setView(next);
-    if (next === "settings") setSettingsSection(section);
     if (next === "chats") props.onCatalog();
     else props.onCloseCatalog?.();
-    if (next === "home" || next === "automations" || next === "sites" || next === "settings")
-      props.onManagementLoad();
-    syncRoute(next, section);
+    if (next !== "chats" && next !== "activity") props.onManagementLoad();
+    syncRoute(next);
   };
-  useHashNavigation((next) => go(next.view, next.settingsSection));
+  useHashNavigation(go);
   const palette = usePaletteItems(props, go);
   return (
-    <div className="home-shell" data-view={shown}>
+    <div className="home-shell manage-shell" data-view={shown}>
       <CommandPalette items={palette} />
-      <HomeTopBar
-        view={shown}
-        section={settingsSection}
-        onView={go}
-        onSection={(section) => {
-          setSettingsSection(section);
-          go("settings", section);
-        }}
-      />
-      <main className="home-main" data-screen={screenName(shown)}>
+      <ManageSidebar view={shown} onView={go} />
+      <main className="home-main" data-screen={shown === "chats" ? "catalog" : "management"}>
         <span id="home-connection" hidden>
           {props.connectionLabel}
         </span>
         <FixtureBadge on={props.developmentFixture === true} />
-        <HomePage
-          view={shown}
-          props={props}
-          activity={activity}
-          settingsSection={settingsSection}
-          onSettingsSection={(section) => {
-            setSettingsSection(section);
-            syncRoute("settings", section);
-          }}
-          onView={go}
-        />
+        <ManagePage view={shown} props={props} activity={activity} onView={go} />
         <HomeError props={props} />
       </main>
     </div>
+  );
+}
+
+function ManageSidebar({
+  view,
+  onView,
+}: {
+  view: ManageView;
+  onView(view: ManageView): void;
+}): ReactElement {
+  return (
+    <nav className="manage-sidebar" aria-label="Manage Aeon">
+      <p className="manage-sidebar-title">Aeon</p>
+      {MANAGE_NAV.map((item) => (
+        <div key={item.view} className="manage-sidebar-slot">
+          {item.divided && <hr className="manage-sidebar-divider" />}
+          <button
+            type="button"
+            id={`manage-${item.view}-link`}
+            aria-current={view === item.view ? "page" : undefined}
+            onClick={() => onView(item.view)}
+          >
+            {item.label}
+          </button>
+        </div>
+      ))}
+    </nav>
   );
 }
 
@@ -202,9 +208,7 @@ function FixtureBadge({ on }: { on: boolean }): ReactElement | null {
   if (!on) return null;
   return (
     <div className="home-status" role="status">
-      <span className="fixture-badge">
-        <i /> Development fixture
-      </span>
+      <span className="fixture-badge">Development fixture</span>
     </div>
   );
 }
@@ -223,72 +227,28 @@ function HomeError({ props }: { props: NewTabHomeProps }): ReactElement | null {
   );
 }
 
-function HomePage({
+function ManagePage({
   view,
   props,
   activity,
-  settingsSection,
-  onSettingsSection,
   onView,
 }: {
-  view: HomeView;
+  view: ManageView;
   props: NewTabHomeProps;
   activity: ReturnType<typeof useActivityLog>;
-  settingsSection: SettingsSection;
-  onSettingsSection(section: SettingsSection): void;
-  onView(view: HomeView): void;
+  onView(view: ManageView): void;
 }): ReactElement {
   if (view === "chats" || view === "activity")
     return <ChatsPage view={view} props={props} activity={activity} onView={onView} />;
-  const suggest = (example: string): void => {
-    onView("home");
-    seedHomeQuery(example);
-  };
-  if (view === "automations")
-    return <Management props={props} section="automations" onSuggest={suggest} />;
-  if (view === "sites") return <Management props={props} section="sites" onSuggest={suggest} />;
-  if (view === "learn") return <LearnPage onTry={suggest} />;
-  if (view === "settings")
-    return <SettingsPage props={props} section={settingsSection} onSection={onSettingsSection} />;
-  return <HomeLanding props={props} onView={onView} />;
+  if (view === "sites") return <Management props={props} section="sites" />;
+  if (view === "automations") return <Management props={props} section="automations" />;
+  if (view === "details") return <DetailsPage props={props} />;
+  if (view === "signin") return <SignInPage props={props} />;
+  if (view === "advanced") return <AdvancedPage props={props} />;
+  return <SettingsPage props={props} />;
 }
 
-function HomeLanding({
-  props,
-  onView,
-}: {
-  props: NewTabHomeProps;
-  onView(view: HomeView): void;
-}): ReactElement {
-  return (
-    <>
-      <HomeCore
-        working={props.runningChatIds?.size ?? 0}
-        waiting={props.needsChatIds?.size ?? 0}
-        connecting={props.connected === false}
-      />
-      <HomeStart props={{ ...props, onLearn: () => onView("learn") }} />
-      <HomeDashboard
-        chats={props.chats.filter((chat) => !chat.archived)}
-        runningChatIds={props.runningChatIds ?? new Set()}
-        needsChatIds={props.needsChatIds ?? new Set()}
-        {...(props.previews ? { previews: props.previews } : {})}
-        runActions={props.runActions}
-        openChatIds={props.openChatIds}
-        routines={props.homeRoutines}
-        watchers={props.managementSnapshot?.routines}
-        pins={props.managementSnapshot?.pins}
-        onOpenChat={props.onOpenChat}
-        onChats={() => onView("chats")}
-        onPin={props.onPin}
-        onDelete={props.onDelete}
-        onWatchers={() => onView("automations")}
-      />
-    </>
-  );
-}
-
-/** Chats and Activity (what Aeon changed on sites) share one section. */
+/** Chats and Activity (what Aeon changed on sites) share one page, reached from ⌘K. */
 function ChatsPage({
   view,
   props,
@@ -298,7 +258,7 @@ function ChatsPage({
   view: "chats" | "activity";
   props: NewTabHomeProps;
   activity: ReturnType<typeof useActivityLog>;
-  onView(view: HomeView): void;
+  onView(view: ManageView): void;
 }): ReactElement {
   return (
     <div className="aeon-page">
@@ -327,108 +287,67 @@ function ChatsPage({
   );
 }
 
-const SETTINGS_TABS: ReadonlyArray<[SettingsSection, string]> = [
-  ["settings", "General"],
-  ["models", "Models"],
-  ["signin", "Sign-in"],
-  ["forms", "Forms"],
-  ["blocked", "Blocked sites"],
-  ["advanced", "Advanced"],
-];
-
-function SettingsPage({
-  props,
-  section,
-  onSection,
-}: {
-  props: NewTabHomeProps;
-  section: SettingsSection;
-  onSection(section: SettingsSection): void;
-}): ReactElement {
-  usePageTitle(section === "models" ? "Models" : "Settings");
+/** My Details: the personal fields Aeon fills forms with, and nothing else. */
+function DetailsPage({ props }: { props: NewTabHomeProps }): ReactElement {
   return (
-    <div className="home-settings-layout">
-      <SettingsMenu section={section} onSection={onSection} />
-      <div className="home-settings-body" role="tabpanel">
-        <SettingsSectionBody props={props} section={section} />
-      </div>
-    </div>
-  );
-}
-
-function FormsSection({ props }: { props: NewTabHomeProps }): ReactElement {
-  return (
-    <SettingsSectionPage title="Forms">
+    <SectionPage title="My Details">
       <FormsSettings
         fields={props.formProfile ?? []}
         refused={props.formProfileRefused}
         onSave={(field, value) => props.onFormFieldSave?.(field, value)}
         onRemove={(field) => props.onFormFieldRemove?.(field)}
       />
-    </SettingsSectionPage>
+    </SectionPage>
   );
 }
 
-function BlockedSection({ props }: { props: NewTabHomeProps }): ReactElement {
+/** Sign-in: a password manager signs Aeon in (the model never sees a password); you otherwise. */
+function SignInPage({ props }: { props: NewTabHomeProps }): ReactElement {
   return (
-    <SettingsSectionPage title="Blocked sites">
-      <BlockedSitesSettings
-        {...(props.blockedSites ? { sites: props.blockedSites } : {})}
-        {...(props.onBlockedSiteAdd ? { onAdd: props.onBlockedSiteAdd } : {})}
-        {...(props.onBlockedSiteRemove ? { onRemove: props.onBlockedSiteRemove } : {})}
+    <SectionPage title="Sign-in">
+      <PasswordManagerSettings
+        signIn={props.managementSnapshot?.signIn ?? null}
+        loading={props.managementLoading}
       />
-    </SettingsSectionPage>
+    </SectionPage>
   );
 }
 
-function SettingsSectionBody({
-  props,
-  section,
-}: {
-  props: NewTabHomeProps;
-  section: SettingsSection;
-}): ReactElement {
-  if (section === "models")
-    return props.modelAccounts ? (
-      <>
-        <ModelAccounts {...props.modelAccounts} />
-        <BrowserAccounts
-          snapshot={props.managementSnapshot ?? null}
-          chatId={props.managementSelectedChatId}
-          onAction={props.onManagementAction}
-        />
-      </>
-    ) : (
-      <p className="aeon-page-empty">Models are not available here.</p>
-    );
-  if (section === "signin")
-    return (
-      <SettingsSectionPage title="Sign-in">
-        <PasswordManagerSettings
-          signIn={props.managementSnapshot?.signIn ?? null}
-          loading={props.managementLoading}
-        />
-      </SettingsSectionPage>
-    );
-  if (section === "forms") return <FormsSection props={props} />;
-  if (section === "blocked") return <BlockedSection props={props} />;
-  if (section === "advanced")
-    return (
-      <>
-        <Management props={props} section="resources" />
-        <Management props={props} section="capabilities" />
-      </>
-    );
-  return <Management props={props} section={section} />;
+/** Settings: one page heading, the models Aeon thinks with, then everything general. */
+function SettingsPage({ props }: { props: NewTabHomeProps }): ReactElement {
+  return (
+    <SectionPage title="Settings">
+      {props.modelAccounts && (
+        <>
+          <ModelAccounts {...props.modelAccounts} />
+          <BrowserAccounts
+            snapshot={props.managementSnapshot ?? null}
+            chatId={props.managementSelectedChatId}
+            onAction={props.onManagementAction}
+          />
+        </>
+      )}
+      <Management props={props} section="settings" subsection />
+    </SectionPage>
+  );
 }
 
-function SettingsSectionPage({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}): ReactElement {
+/** Advanced: Developer mode, site-pack import, CLI hints, MCPs and Pi extensions. */
+function AdvancedPage({ props }: { props: NewTabHomeProps }): ReactElement {
+  const chatId = props.managementSelectedChatId || props.managementSnapshot?.chats[0]?.chatId || "";
+  return (
+    <>
+      <SectionPage title="Advanced">
+        <AdvancedSettings chatId={chatId} onAction={props.onManagementAction} />
+      </SectionPage>
+      <Management props={props} section="capabilities" subsection />
+      <Management props={props} section="resources" subsection />
+    </>
+  );
+}
+
+function SectionPage({ title, children }: { title: string; children: ReactNode }): ReactElement {
+  usePageTitle(title);
   return (
     <section className="management-main" aria-label={title}>
       <header className="management-heading">
@@ -439,117 +358,50 @@ function SettingsSectionPage({
   );
 }
 
-function SettingsMenu({
-  section,
-  onSection,
-}: {
-  section: SettingsSection;
-  onSection(section: SettingsSection): void;
-}): ReactElement {
-  return (
-    <nav className="home-settings-menu" role="tablist" aria-label="Settings sections">
-      {SETTINGS_TABS.map(([value, label]) => (
-        <button
-          key={value}
-          type="button"
-          role="tab"
-          aria-selected={section === value}
-          onClick={() => onSection(value)}
-        >
-          <SettingsIcon section={value} />
-          <span>{label}</span>
-        </button>
-      ))}
-    </nav>
-  );
-}
-
-const SETTINGS_ICONS: Record<SettingsSection, string> = {
-  settings: "M4 6h12M4 10h12M4 14h12M7 4v4m6 0v4M5 12v4",
-  models: "M10 2.8 12 7l4.4 2-4.4 2-2 4.2L8 11 3.6 9 8 7Z",
-  signin: "M6 9V6.5a4 4 0 0 1 8 0V9M4.5 9h11v8h-11zM10 12.2v1.8",
-  forms: "M5 3h10v14H5zM7.5 6.5h5M7.5 9h5M7.5 11.5h5v3h-5z",
-  blocked: "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14M5 5l10 10",
-  advanced:
-    "M8 3h4v3.2a1.8 1.8 0 0 1 2.2 2.2H17v4h-2.8a1.8 1.8 0 0 1-2.2 2.2V17H8v-2.6a1.8 1.8 0 0 1-2.2-2.2H3v-4h2.8A1.8 1.8 0 0 1 8 6.2Z",
-};
-
-function SettingsIcon({ section }: { section: SettingsSection }): ReactElement {
-  return (
-    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-      <path
-        d={SETTINGS_ICONS[section]}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function Management({
   props,
   section,
-  onSuggest,
+  subsection = false,
 }: {
   props: NewTabHomeProps;
   section: ManagementSection;
-  onSuggest?(example: string): void;
+  subsection?: boolean;
 }): ReactElement {
   return (
     <ManagementSurface
       section={section}
+      subsection={subsection}
       snapshot={props.managementSnapshot}
       selectedChatId={props.managementSelectedChatId}
       loading={props.managementLoading}
       error={props.managementError}
       connectionLabel={props.connectionLabel}
       theme={props.theme}
-      sidebarDefaultOpen={props.sidebarDefaultOpen}
       onRefresh={props.onManagementRefresh}
       onSelectChat={props.onManagementSelectChat}
       onOpenChat={props.onManagementOpenChat}
       onAction={props.onManagementAction}
       onTheme={props.onTheme}
-      onSidebarDefault={props.onSidebarDefault}
       {...(props.blockedSites ? { blockedSites: props.blockedSites } : {})}
       {...(props.onBlockedSiteAdd ? { onBlockedSiteAdd: props.onBlockedSiteAdd } : {})}
       {...(props.onBlockedSiteRemove ? { onBlockedSiteRemove: props.onBlockedSiteRemove } : {})}
       {...(props.outsideContext !== undefined ? { outsideContext: props.outsideContext } : {})}
       privacy={props.privacy}
       {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
-      {...(onSuggest ? { onSuggest } : {})}
+      {...(props.onSuggest ? { onSuggest: props.onSuggest } : {})}
+      {...(props.onTeachSite ? { onTeachSite: props.onTeachSite } : {})}
     />
   );
 }
 
-/** What ⌘K offers on home: the pages, a new chat, recent chats, and every site's saved actions. */
-function usePaletteItems(props: NewTabHomeProps, go: (view: HomeView) => void): PaletteItem[] {
-  const sites = props.managementSnapshot?.sites ?? [];
+/** What ⌘K offers in Manage: the pages, a new chat, and recent chats. */
+function usePaletteItems(props: NewTabHomeProps, go: (view: ManageView) => void): PaletteItem[] {
   return useMemo(() => {
-    const ask = (text: string) => () => {
-      go("home");
-      setTimeout(() => window.dispatchEvent(new CustomEvent("aeon.home.seed", { detail: text })));
-    };
-    const pages: PaletteItem[] = (
-      [
-        ["chats", "Open chats"],
-        ["activity", "See what Aeon changed"],
-        ["automations", "Open automations"],
-        ["sites", "Open sites"],
-        ["settings", "Open settings"],
-      ] as const
-    ).map(([view, label]) => ({ id: "page:" + view, label, hint: "Go", run: () => go(view) }));
-    const siteActions: PaletteItem[] = sites.flatMap((site) =>
-      site.abilities.map((ability) => ({
-        id: `site:${site.site}:${ability.name}`,
-        label: humanize(ability.name),
-        hint: site.site,
-        run: ask(`Run ${ability.name} on ${site.site}`),
-      })),
-    );
+    const pages: PaletteItem[] = [
+      ...MANAGE_NAV.map(({ view, label }) => ({ view, label })),
+      { view: "chats" as const, label: "Chats" },
+      { view: "activity" as const, label: "What Aeon changed" },
+    ].map(({ view, label }) => ({ id: "page:" + view, label, hint: "Go", run: () => go(view) }));
     const chats: PaletteItem[] = props.chats
       .filter((chat) => !chat.archived)
       .slice(0, 20)
@@ -561,45 +413,19 @@ function usePaletteItems(props: NewTabHomeProps, go: (view: HomeView) => void): 
       }));
     return [
       { id: "new", label: "New chat", hint: "Ask Aeon", run: () => props.onNewChat() },
-      ...siteActions,
       ...pages,
       ...chats,
     ];
-  }, [sites, props.chats, props.onOpenChat, props.onNewChat, go]);
-}
-
-/** "/" anywhere on home (outside a field) jumps to the ask box. */
-function useSlashToAsk(): void {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      const target = event.target as HTMLElement | null;
-      if (event.key !== "/" || target?.closest("input, textarea, select, [contenteditable]"))
-        return;
-      const field = document.getElementById("home-query");
-      if (!field) return;
-      event.preventDefault();
-      field.focus();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-}
-
-function screenName(view: HomeView): string {
-  if (view === "home") return "new-tab";
-  if (view === "chats") return "catalog";
-  return "management";
+  }, [props.chats, props.onOpenChat, props.onNewChat, go]);
 }
 
 /** Keeps `?view=` in step with the page, so reload and Back land on the same page. */
-function syncRoute(view: HomeView, section: SettingsSection): void {
+function syncRoute(view: ManageView): void {
   const location = globalThis.location;
   if (!location) return;
   const url = new URL(location.href);
-  const value = view === "settings" ? section : view;
   // A hash route is a one-time way in; from here `?view=` keeps the page.
   if (url.hash && !(view === "sites" && hashRoute().page === "sites")) url.hash = "";
-  if (view === "home") url.searchParams.delete("view");
-  else url.searchParams.set("view", value);
+  url.searchParams.set("view", view);
   globalThis.history?.replaceState(globalThis.history.state, "", url.href);
 }

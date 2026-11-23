@@ -41,15 +41,16 @@ export interface AnswerFooter {
 
 export const WRONG_FOLLOW_UP = "That was wrong.";
 
-const OFFER_CAP = 2;
+// At most one quiet follow-on whisper under an answer.
+const OFFER_CAP = 1;
 const INTERNAL = /^(crawl|site_mapper|extract|tables|snipe)$/i;
 
 const OFFER_LABEL: Record<string, string> = {
   fresh: "Do it fresh",
   "get-all": "Get all",
   "do-rest": "Do the rest",
-  "learn-site": "Learn this site",
-  "save-ability": "Save this as an ability",
+  "learn-site": "Teach Aeon this site",
+  "save-ability": "Save as a skill",
   "save-file": "Save as file",
   watch: "Tell me when",
   schedule: "Every time",

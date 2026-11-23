@@ -3,9 +3,10 @@ import {
   agentInFrontKey,
   hideAgentCursorKey,
   humanLikeInputKey,
+  piSlashCommandsKey,
+  recordAgentTabsKey,
+  showThinkingKey,
   useAgentFlag,
-  useAgentTabView,
-  type AgentTabView,
 } from "./agent-tab-view.js";
 import type { ReactElement } from "react";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
@@ -22,7 +23,7 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
   return (
     <div className="settings-groups">
       <AppearanceSettings {...props} />
-      <ChatSettings {...props} />
+      <ChatSettings />
       <AgentTabSettings />
       {props.privacy && <PrivacySettings {...props.privacy} />}
       <OutsideAgentsSettings
@@ -30,6 +31,7 @@ export function SettingsPanel(props: ManagementSurfaceProps): ReactElement {
         {...(props.onOutsideContext ? { onOutsideContext: props.onOutsideContext } : {})}
       />
       <HelperSettings connectionLabel={props.connectionLabel} />
+      <DeveloperOptions />
     </div>
   );
 }
@@ -78,10 +80,17 @@ function AppearanceSettings(props: ManagementSurfaceProps): ReactElement {
   );
 }
 
-function ChatSettings(props: ManagementSurfaceProps): ReactElement {
+function ChatSettings(): ReactElement {
   const [mode, setMode] = useMessageSendMode();
+  const [thinking, setThinking] = useAgentFlag(showThinkingKey, true);
   return (
     <SettingsGroup title="Chats">
+      <SwitchRow
+        label="Show thinking between steps"
+        detail="Aeon's reasoning sits between its tool calls in a finished answer's work."
+        checked={thinking}
+        onChange={setThinking}
+      />
       <MenuRow<"followUp" | "steer">
         label="Messages sent while Aeon answers"
         value={mode}
@@ -91,35 +100,18 @@ function ChatSettings(props: ManagementSurfaceProps): ReactElement {
         ]}
         onChange={setMode}
       />
-      <SwitchRow
-        label="Show the chat list in full-tab chats"
-        detail="Tabs and the side panel keep their own switcher."
-        checked={props.sidebarDefaultOpen}
-        onChange={props.onSidebarDefault}
-      />
     </SettingsGroup>
   );
 }
 
 function AgentTabSettings(): ReactElement {
-  const [tabView, setTabView] = useAgentTabView();
-  // Both switches are relied on by screen recorders (Aeon Recorder); keep them.
+  // These three switches are relied on by screen recorders (Aeon Recorder); keep them.
   const [inFront, setInFront] = useAgentFlag(agentInFrontKey);
   const [hideCursor, setHideCursor] = useAgentFlag(hideAgentCursorKey);
+  const [record, setRecord] = useAgentFlag(recordAgentTabsKey);
   const [humanLike, setHumanLike] = useAgentFlag(humanLikeInputKey);
   return (
     <SettingsGroup title="Agent tabs">
-      <MenuRow<AgentTabView>
-        label="While Aeon works"
-        detail="Split shows the tab it touched last; thumbnails show every tab it works in."
-        value={tabView}
-        options={[
-          ["auto", "Automatic"],
-          ["split", "Split screen"],
-          ["thumbnails", "Thumbnails"],
-        ]}
-        onChange={setTabView}
-      />
       <SwitchRow
         label="Work in front"
         detail="Its tabs open in front so you can watch or record each step. Off: background tabs."
@@ -131,6 +123,12 @@ function AgentTabSettings(): ReactElement {
         detail="For screen recorders that draw their own."
         checked={hideCursor}
         onChange={setHideCursor}
+      />
+      <SwitchRow
+        label="Record agent tabs"
+        detail="Keeps a recording of every tab a chat works in, for screen recorders."
+        checked={record}
+        onChange={setRecord}
       />
       <SwitchRow
         label="Human-like mouse and typing"
@@ -183,6 +181,21 @@ function HelperSettings({ connectionLabel }: { connectionLabel: string }): React
         detail="Scripts and styles Aeon adds to sites, and their permissions."
         action="Open"
         onClick={() => window.open("site-scripts.html", "_blank", "noopener")}
+      />
+    </SettingsGroup>
+  );
+}
+
+/** For builders: Pi's `/` slash commands in the composer. Off by default. */
+function DeveloperOptions(): ReactElement {
+  const [slash, setSlash] = useAgentFlag(piSlashCommandsKey);
+  return (
+    <SettingsGroup title="Developer options">
+      <SwitchRow
+        label="Enable Pi slash commands (/)"
+        detail="Adds Pi's tools and its / commands to the side panel's composer."
+        checked={slash}
+        onChange={setSlash}
       />
     </SettingsGroup>
   );

@@ -7,7 +7,7 @@ import { AnswerLines } from "../dist/answer-lines-view.js";
 import { formatReceipt } from "../dist/answer-receipt.js";
 import { normalizeSite, siteKey, xrayText } from "../dist/site-xray.js";
 import { parseHashRoute } from "../dist/manage-route.js";
-import { MANAGE_NAV } from "../dist/home-top-bar.js";
+import { MANAGE_NAV } from "../dist/manage-nav.js";
 import { NewUserWelcome, WELCOME_EXAMPLES, resetWelcome } from "../dist/new-user-welcome.js";
 import { SidePanel } from "../dist/side-panel.js";
 
@@ -22,22 +22,22 @@ test("receipt copy is exact, with no emoji", () => {
   assert.equal(formatReceipt({ receipt: "repaired" }).text, "Fixed itself");
   assert.equal(
     formatReceipt({ receipt: "speed", durationMs: 800, previousMs: 34000 }).text,
-    "0.8 s via site API · no model · was 34 s",
+    "0.8 s via skill · no model · was 34 s",
   );
   assert.equal(
     formatReceipt({ receipt: "speed", durationMs: 800 }).text,
-    "0.8 s via site API · no model",
+    "0.8 s via skill · no model",
   );
   assert.equal(
     formatReceipt({ receipt: "speed", durationMs: 800, costUsd: 0 }).text,
-    "0.8 s via site API · $0.00",
+    "0.8 s via skill · $0.00",
   );
   assert.equal(formatReceipt({ receipt: "speed" }), null, "no duration, no speed line");
   assert.equal(formatReceipt({ receipt: "boost" }).text, "Boost on");
   assert.equal(formatReceipt({ receipt: "watch" }).text, "Watching · no model per check");
   for (const kind of ["vault", "repaired", "boost", "watch"])
     assert.ok(formatReceipt({ receipt: kind }).short.length <= 24);
-  assert.equal(formatReceipt({ receipt: "speed", durationMs: 800 }).short, "0.8 s · site API");
+  assert.equal(formatReceipt({ receipt: "speed", durationMs: 800 }).short, "0.8 s · via skill");
   assert.equal(formatReceipt({ receipt: "confetti" }), null);
 });
 
@@ -69,8 +69,8 @@ test("new offer kinds have their labels, and watch-below needs a real number", (
   );
   assert.deepEqual(
     footer.lines.map((line) => line.label),
-    ["Copy MCP", "Undo"],
-    "capped at two",
+    ["Copy MCP"],
+    "capped at one",
   );
   assert.deepEqual(footer.lines[0].args, { site: "shop.com" });
   assert.equal(watchBelowLabel({ price: 49999, currency: "₹" }), "Watch under ₹49999");
@@ -108,17 +108,16 @@ test("Manage hash routes and nav order", () => {
   assert.deepEqual(parseHashRoute(""), { page: "", host: "" });
   assert.deepEqual(
     MANAGE_NAV.map((item) => item.label),
-    ["Models", "Sites", "Watches", "Forms", "Blocked", "Learn"],
+    ["Automations", "Sites", "My Details", "Sign-in", "Settings", "Advanced"],
   );
 });
 
-test("the welcome has four brand-free examples, the line and the Learn link", () => {
+test("the welcome has three quiet examples and the Learn link", () => {
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   resetWelcome();
   assert.deepEqual(
     [...WELCOME_EXAMPLES],
     [
-      "Turn this site into an API I can call",
       "Tell me when the price on this page drops",
       "Fill this form with my details",
       "Hide the parts of this site I never use",
@@ -127,11 +126,10 @@ test("the welcome has four brand-free examples, the line and the Learn link", ()
   const html = renderToStaticMarkup(
     createElement(NewUserWelcome, { needsModel: false, onExample() {}, onLearn() {} }),
   );
-  assert.match(html, /Aeon works in your Chrome, with your logins\./);
   assert.match(html, /What can Aeon do\?/);
 });
 
-test("the side panel header has Manage before New chat, and X-Ray only with counts", () => {
+test("the side panel header is the switcher and New chat; Manage ends the switcher menu", () => {
   const props = {
     chats: [],
     selectedChatId: "",
@@ -141,24 +139,18 @@ test("the side panel header has Manage before New chat, and X-Ray only with coun
     onTogglePicker() {},
     onSelect() {},
     onNew() {},
-    onAllChats() {},
-    onOpenFull() {},
     onManage() {},
   };
   const html = renderToStaticMarkup(createElement(SidePanel, props));
-  assert.ok(html.indexOf('id="panel-manage"') < html.indexOf('id="panel-new-chat"'));
-  assert.ok(html.indexOf('id="panel-new-chat"') < html.indexOf('id="open-full"'));
-  assert.match(html, /aria-label="Manage Aeon"/);
-  assert.doesNotMatch(html, /panel-xray/);
-  const zero = { host: "shop.com", counts: { apis: 0, boosts: 0, watches: 0 } };
-  assert.doesNotMatch(
-    renderToStaticMarkup(createElement(SidePanel, { ...props, xray: zero })),
-    /panel-xray/,
+  assert.match(html, /id="selected-chat-title">Aeon</);
+  assert.match(html, /id="panel-new-chat"/);
+  assert.doesNotMatch(html, /open-full|panel-manage|panel-xray|Open in a tab/);
+  const chats = [{ chatId: "c1", title: "New Chat", updatedAt: new Date().toISOString() }];
+  const idle = renderToStaticMarkup(createElement(SidePanel, { ...props, chats }));
+  assert.match(idle, /id="selected-chat-title">New chat</);
+  const chosen = renderToStaticMarkup(
+    createElement(SidePanel, { ...props, chats, selectedChatId: "c1", pickerOpen: true }),
   );
-  const some = { host: "flipkart.com", counts: { apis: 4, boosts: 1, watches: 0 } };
-  const shown = renderToStaticMarkup(createElement(SidePanel, { ...props, xray: some }));
-  assert.equal(
-    /<button[^>]*id="panel-xray"[^>]*>(.*?)<\/button>/.exec(shown)[1].replace(/<[^>]+>/g, ""),
-    "flipkart.com · 4 APIs · 1 boost",
-  );
+  assert.match(chosen, /id="selected-chat-title">New chat</);
+  assert.match(chosen, /Manage Sites &amp; Settings/);
 });

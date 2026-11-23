@@ -40,7 +40,7 @@ export function SiteAbilities({
   /** Starts a chat that uses the ability, so a user sees what it does. */
   onTry?: ((ability: Site["abilities"][number]) => void) | undefined;
 }): ReactElement {
-  if (site.abilities.length === 0) return <span className="management-subtle">no abilities</span>;
+  if (site.abilities.length === 0) return <span className="management-subtle">No skills yet</span>;
   return (
     <ul className="management-inputs">
       {site.abilities.map((ability) => (
@@ -85,9 +85,6 @@ export function SiteActions({
       <button type="button" onClick={() => act("export_site", { site: site.site })}>
         Export pack
       </button>
-      <button type="button" onClick={() => act("export_recipes", { site: site.site })}>
-        Export recipes
-      </button>
       <button type="button" onClick={() => act("clear_site_session", { site: site.site })}>
         Clear session
       </button>
@@ -100,7 +97,7 @@ export function SiteActions({
         </button>
       ) : (
         <button type="button" onClick={() => act("start_site_recording", { site: site.site })}>
-          Record flow
+          Teach a skill
         </button>
       )}
     </div>
@@ -207,7 +204,7 @@ function RecipePicker({
       <label>
         Action
         <select value={recipe} onChange={(event) => onRecipe(event.target.value)}>
-          <option value="">Choose an ability</option>
+          <option value="">Choose a skill</option>
           {site.abilities.map((item) => (
             <option key={item.name} value={item.name}>
               {item.name}
@@ -233,9 +230,9 @@ function RecipeImportPath({
 }): ReactElement {
   return (
     <label>
-      Import recipes from
+      Import skills from
       <input
-        placeholder="path to a recipes JSON file"
+        placeholder="Path to a skills JSON file"
         onKeyDown={(event) => {
           if (event.key !== "Enter") return;
           const path = event.currentTarget.value.trim();

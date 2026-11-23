@@ -52,11 +52,10 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
     setQuery(text);
     requestAnimationFrame(() => document.getElementById("home-query")?.focus());
   };
-  const needsModel = Boolean(
-    props.modelCatalog && !props.modelCatalog.models.length && props.onConnectModel,
-  );
+  const needsModel = needsModelConnect(props);
   return (
     <section className="home-start" aria-label="Ask Aeon">
+      <p className="home-idle-line">Do anything on {pageHost(panelPage.record?.url)}</p>
       <NewUserWelcome needsModel={needsModel} onExample={tryExample} onLearn={props.onLearn} />
       <ProjectChip name={props.projectName} projectId={props.projectId} />
       <PageContextTray
@@ -270,4 +269,18 @@ function HomePickers({
 
 function inPanel(): boolean {
   return new URLSearchParams(globalThis.location?.search ?? "").get("host") === "panel";
+}
+
+/** `www.steam.com/app/1` → `steam.com`; a page Aeon can't read is "the web". */
+function pageHost(url: string | undefined): string {
+  try {
+    const host = new URL(url ?? "").hostname.replace(/^www\./, "");
+    return host || "the web";
+  } catch {
+    return "the web";
+  }
+}
+
+function needsModelConnect(props: HomeStartProps): boolean {
+  return Boolean(props.modelCatalog && !props.modelCatalog.models.length && props.onConnectModel);
 }

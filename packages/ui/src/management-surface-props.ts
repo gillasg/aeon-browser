@@ -4,19 +4,19 @@ import type { ManagementActionName, ManagementSection } from "./management-types
 
 export interface ManagementSurfaceProps {
   section: ManagementSection;
+  /** Shown inside another page (Settings, Advanced): a small section heading, not the page's. */
+  subsection?: boolean;
   snapshot: ManagementSnapshotDto | null;
   selectedChatId: string;
   loading: boolean;
   error: string;
   connectionLabel: string;
   theme: "dark" | "midnight" | "light" | "system";
-  sidebarDefaultOpen: boolean;
   onRefresh(): void;
   onSelectChat(chatId: string): void;
   onOpenChat(chatId: string): void;
   onAction(chatId: string, action: ManagementActionName, input: Record<string, unknown>): void;
   onTheme(theme: "dark" | "midnight" | "light" | "system"): void;
-  onSidebarDefault(open: boolean): void;
   /** The shared blocked-sites list, loaded from the daemon. */
   blockedSites?: readonly string[];
   onBlockedSiteAdd?(site: string): void;
@@ -29,4 +29,6 @@ export interface ManagementSurfaceProps {
   /** Settings → Other agents: new chats load the user's own Pi extensions (off by default). */
   /** Goes home with this example in the ask box (an empty page's one action). */
   onSuggest?(example: string): void;
+  /** Opens the site and starts Teach there (the recording pill). */
+  onTeachSite?(host: string): void;
 }

@@ -1,14 +1,14 @@
 import { Fragment, type ReactElement, type ReactNode } from "react";
 
-// A short answer shows whole in the cursor box: up to 6 rendered lines (about 320 characters), or
+// A short answer shows whole in the cursor box: up to 8 rendered lines (about 460 characters), or
 // a table of at most 4 rows by 3 columns with up to 2 lines of text. Longer answers keep the
-// two-line clamp and the Side panel link. Only bold, links, inline code and simple tables render;
+// eight-line clamp and `⌘↵ Continue in panel`. Only bold, links, inline code and simple tables render;
 // an answer with headings, images or code blocks is not shown in place at all.
 
-/** Characters per rendered line at 13 px in the 336 px the island leaves for text. */
-const LINE_CHARS = 48;
-const MAX_LINES = 6;
-const MAX_CHARS = 320;
+/** Characters per rendered line at 13 px in the 412 px a 440 px answer leaves for text. */
+const LINE_CHARS = 58;
+const MAX_LINES = 8;
+const MAX_CHARS = 460;
 
 export interface AnswerBlock {
   kind: "text" | "table";
@@ -125,17 +125,52 @@ function AnswerTable({ rows }: { rows: string[][] }): ReactElement {
   );
 }
 
-export function AnswerInPlace({ text }: { text: string }): ReactElement {
+const BULLET = /^\s*[-*+]\s+/;
+const NUMBERED = /^\s*\d+[.)]\s+/;
+const HEADING = /^\s{0,3}#{1,6}\s+/;
+
+interface TextRun {
+  kind: "p" | "ul" | "ol";
+  items: string[];
+}
+
+/** Paragraphs and list runs: `- a` / `1. a` lines become real lists, never raw dashes. */
+export function textRuns(lines: readonly string[]): TextRun[] {
+  const runs: TextRun[] = [];
+  for (const line of lines) {
+    const kind = BULLET.test(line) ? "ul" : NUMBERED.test(line) ? "ol" : "p";
+    const item = line.replace(kind === "ul" ? BULLET : kind === "ol" ? NUMBERED : HEADING, "");
+    const last = runs.at(-1);
+    if (kind !== "p" && last?.kind === kind) last.items.push(item);
+    else runs.push({ kind, items: [kind === "p" ? item.trim() : item] });
+  }
+  return runs;
+}
+
+function TextBlock({ lines }: { lines: readonly string[] }): ReactElement {
   return (
-    <div className="isl-answer">
-      {answerBlocks(text).map((block, index) =>
+    <>
+      {textRuns(lines).map((run, index) => {
+        if (run.kind === "p") return <p key={index}>{inlineParts(run.items[0] ?? "")}</p>;
+        const items = run.items.map((item, itemIndex) => (
+          <li key={itemIndex}>{inlineParts(item)}</li>
+        ));
+        return run.kind === "ul" ? <ul key={index}>{items}</ul> : <ol key={index}>{items}</ol>;
+      })}
+    </>
+  );
+}
+
+/** The answer as formatted text: paragraphs, lists, bold, links, inline code and small tables. */
+export function AnswerInPlace({ text, clamp }: { text: string; clamp?: boolean }): ReactElement {
+  return (
+    <div className="isl-answer" data-clamp={clamp ? "8" : undefined}>
+      {answerBlocks(text.replace(/```[a-z]*\n?/gi, "")).map((block, index) =>
         block.kind === "table" ? (
           <AnswerTable key={index} rows={block.rows} />
         ) : (
           <Fragment key={index}>
-            {block.lines.map((line, lineIndex) => (
-              <p key={lineIndex}>{inlineParts(line)}</p>
-            ))}
+            <TextBlock lines={block.lines} />
           </Fragment>
         ),
       )}

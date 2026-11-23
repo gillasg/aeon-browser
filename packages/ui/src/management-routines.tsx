@@ -9,10 +9,39 @@ import { EmptyState } from "./empty-state.js";
 
 type Routine = ManagementSnapshotDto["routines"][number];
 type Filter = "all" | "active" | "paused";
+/** What kind of automation a routine is: its type filter, and the choice when making one. */
+export type AutomationType = "schedule" | "watcher" | "sniper" | "webhook";
+type TypeFilter = "all" | AutomationType;
+type Sort = "name" | "next";
+
+const TYPES: ReadonlyArray<[AutomationType, string]> = [
+  ["schedule", "Schedules"],
+  ["watcher", "Watchers"],
+  ["sniper", "Snipers"],
+  ["webhook", "Webhooks"],
+];
+
+/** What the agent is asked for when a type it makes is picked (a schedule opens the editor). */
+const TYPE_PROMPT: Record<Exclude<AutomationType, "schedule">, string> = {
+  watcher: "Tell me when ",
+  sniper: "At exactly ",
+  webhook: "When a webhook is called, ",
+};
+
+export function automationType(
+  routine: Pick<Routine, "checks" | "kind" | "listen" | "webhook">,
+): AutomationType {
+  if (routine.kind === "snipe") return "sniper";
+  // Listening routines and routines that post to an outbound webhook both live under Webhooks.
+  if (routine.listen || routine.webhook?.url) return "webhook";
+  return routine.checks ? "watcher" : "schedule";
+}
 
 export function RoutinesPanel(props: ManagementSurfaceProps): ReactElement {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [type, setType] = useState<TypeFilter>("all");
+  const [sort, setSort] = useState<Sort>("name");
   const [selectedId, setSelectedId] = useState("");
   // A draft in the URL (from the orb's Watch) opens the editor prefilled.
   const [seed, setSeed] = useState(() => readRoutineDraft());
@@ -20,7 +49,12 @@ export function RoutinesPanel(props: ManagementSurfaceProps): ReactElement {
   useEffect(forgetRoutineDraft, []);
   const routines = props.snapshot?.routines ?? [];
   const selected = routines.find((item) => item.routineId === selectedId);
-  const visible = filterRoutines(routines, filter, query);
+  const visible = sortRoutines(
+    filterRoutines(routines, filter, query).filter(
+      (routine) => type === "all" || automationType(routine) === type,
+    ),
+    sort,
+  );
   if (creating)
     return (
       <RoutineEditor
@@ -42,8 +76,11 @@ export function RoutinesPanel(props: ManagementSurfaceProps): ReactElement {
         filter={filter}
         onQuery={setQuery}
         onFilter={setFilter}
-        onCreate={() => setCreating(true)}
+        onCreate={(kind) =>
+          kind === "schedule" ? setCreating(true) : props.onSuggest?.(TYPE_PROMPT[kind])
+        }
       />
+      <AutomationFilters type={type} sort={sort} onType={setType} onSort={setSort} />
       <RoutineList props={props} routines={visible} onSelect={setSelectedId} />
     </>
   );
@@ -62,7 +99,7 @@ function RoutineToolbar({
   filter: Filter;
   onQuery(value: string): void;
   onFilter(value: Filter): void;
-  onCreate(): void;
+  onCreate(type: AutomationType): void;
 }): ReactElement {
   return (
     <div className="management-toolbar">
@@ -82,16 +119,88 @@ function RoutineToolbar({
         ]}
         onChange={onFilter}
       />
-      <button
-        type="button"
-        className="aeon-button"
-        data-tone="primary"
+      <NewAutomation
         disabled={!props.snapshot?.chats.length}
-        onClick={onCreate}
-      >
-        New routine
-      </button>
+        canAsk={Boolean(props.onSuggest)}
+        onCreate={onCreate}
+      />
     </div>
+  );
+}
+
+/** New automation: pick its type first. A schedule opens the editor; the rest ask the agent. */
+function NewAutomation({
+  disabled,
+  canAsk,
+  onCreate,
+}: {
+  disabled: boolean;
+  canAsk: boolean;
+  onCreate(type: AutomationType): void;
+}): ReactElement {
+  return (
+    <details className="new-automation">
+      <summary className="aeon-button" data-tone="primary" aria-disabled={disabled}>
+        New automation
+      </summary>
+      <div className="new-automation-list" role="menu">
+        {TYPES.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="menuitem"
+            disabled={disabled || (value !== "schedule" && !canAsk)}
+            onClick={(event) => {
+              event.currentTarget.closest("details")?.removeAttribute("open");
+              onCreate(value);
+            }}
+          >
+            {label.replace(/s$/, "")}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/** For power users: narrow by type, and sort by name or by what runs next. */
+function AutomationFilters({
+  type,
+  sort,
+  onType,
+  onSort,
+}: {
+  type: TypeFilter;
+  sort: Sort;
+  onType(value: TypeFilter): void;
+  onSort(value: Sort): void;
+}): ReactElement {
+  return (
+    <div className="management-toolbar automation-filters">
+      <Segmented<TypeFilter>
+        label="Automation type"
+        value={type}
+        options={[["all", "All types"], ...TYPES]}
+        onChange={onType}
+      />
+      <Segmented<Sort>
+        label="Sort"
+        value={sort}
+        options={[
+          ["name", "Name"],
+          ["next", "Next run"],
+        ]}
+        onChange={onSort}
+      />
+    </div>
+  );
+}
+
+function sortRoutines(routines: Routine[], sort: Sort): Routine[] {
+  const next = (routine: Routine): number =>
+    routine.nextDueAt ? Date.parse(routine.nextDueAt) : Number.POSITIVE_INFINITY;
+  return [...routines].sort((a, b) =>
+    sort === "next" ? next(a) - next(b) : a.title.localeCompare(b.title),
   );
 }
 
@@ -110,7 +219,7 @@ function RoutineList({
       return <p className="management-empty">No automations match this view.</p>;
     return (
       <EmptyState
-        text="Automations run a task on a schedule, tell you when a page or site changes, or act at an exact moment (a drop or a booking opening)."
+        text="Automations run a task on a schedule, tell you when a page or site changes, act at an exact moment (a drop or a booking opening), or answer a webhook."
         action="Watch something"
         {...(props.onSuggest ? { onAction: () => props.onSuggest?.("Tell me when ") } : {})}
       />

@@ -114,7 +114,7 @@ function FieldRow({
     if (draft.trim() && draft !== field.value) onSave(field.name, draft.trim());
   };
   return (
-    <li className="settings-row">
+    <li className="settings-row form-field-row">
       <form
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
@@ -147,7 +147,7 @@ function NewFieldRow({ onSave }: { onSave(field: string, value: string): void })
   const [value, setValue] = useState("");
   const ready = Boolean(name.trim() && value.trim());
   return (
-    <li className="settings-row">
+    <li className="settings-row form-field-row">
       <form
         onSubmit={(event: FormEvent) => {
           event.preventDefault();

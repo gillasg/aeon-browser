@@ -77,7 +77,6 @@ export function ApprovalCard({
   return (
     <section className="run-approval" aria-label={`Needs you: ${title}`}>
       <header>
-        <span className="run-needs-dot" aria-hidden="true" />
         <span className="run-eyebrow">Needs you</span>
         {count !== undefined && count > 1 && (
           <span className="run-count" aria-label={`${count} waiting`}>

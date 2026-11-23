@@ -57,9 +57,9 @@ function speedParts(facts: ReceiptFacts): ReceiptParts | null {
   // "no model" unless the daemon actually computed a cost.
   const price = cost === undefined ? "no model" : "$" + cost.toFixed(2);
   return {
-    lead: `${seconds} via site API`,
+    lead: `${seconds} via skill`,
     rest: [price, ...(previous === undefined ? [] : [`was ${receiptSeconds(previous)}`])],
-    short: `${seconds} · site API`,
+    short: `${seconds} · via skill`,
   };
 }
 

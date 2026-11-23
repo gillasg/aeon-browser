@@ -1,4 +1,5 @@
-export type ManagementSection = "automations" | "sites" | "resources" | "capabilities" | "settings";
+export type ManagementSection =
+  "automations" | "sites" | "skills" | "resources" | "capabilities" | "settings";
 export type ManagementActionName =
   | "create_routine"
   | "update_routine"

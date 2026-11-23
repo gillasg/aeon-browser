@@ -75,7 +75,9 @@ test("tool turns preserve ordered thinking disclosures inside the aggregate", ()
   );
   assert.equal((html.match(/class="thinking-detail"/g) ?? []).length, 2);
   assert.ok(html.indexOf('class="thinking-detail"') < html.indexOf('class="activity-group"'));
-  assert.ok(html.indexOf('class="thinking-detail"') < html.indexOf("Final answer."));
+  // OG Codex: the work disclosure above the answer, the quiet duration under it.
+  assert.ok(html.indexOf('class="activity-card transcript-turn"') < html.indexOf("Final answer."));
+  assert.ok(html.indexOf("Final answer.") < html.indexOf('class="answer-duration"'));
   assert.match(html, /<strong>Planning the request<\/strong>/);
   assert.match(html, /<strong>Checking the result<\/strong>/);
   assert.doesNotMatch(html, /\*\*/);

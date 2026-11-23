@@ -28,6 +28,8 @@ export interface SummonTarget {
 export interface SummonInfo {
   target?: SummonTarget;
   fillForm: boolean;
+  /** Summoned from the keyboard: the box is centred at 480px with no pointer offset. */
+  keyboard?: boolean;
 }
 
 let pointer: { x: number; y: number } | undefined;

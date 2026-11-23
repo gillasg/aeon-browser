@@ -58,9 +58,10 @@
   "commands": {
     "summon-orb": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Space"
+        "default": "Alt+Shift+Space",
+        "mac": "Alt+Shift+Space"
       },
-      "description": "Summon the Aeon cursor"
+      "description": "Ask Aeon on this page"
     }
   },
   "content_scripts": [

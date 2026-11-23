@@ -429,8 +429,14 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
   return state;
 }
 
-/** Fast and still crisp: a 4K take encodes in seconds, not the minutes a slower preset took. */
-export const ENCODE_QUALITY = ["-preset", "veryfast", "-crf", "16"];
+/**
+ * Fast and still crisp. `veryfast -crf 16` took 103 s to stop a 214 s 4K take on a 6-core VPS;
+ * superfast at crf 18 is visually the same for screen video and several times quicker. Every core
+ * decodes and encodes (`-threads 0`), and +faststart keeps the clip playable before it fully loads.
+ */
+export const ENCODE_QUALITY = ["-preset", "superfast", "-crf", "18", "-threads", "0"];
+/** The clip's container flags: h264 yuv420p, moov atom first. */
+export const ENCODE_OUTPUT = ["-pix_fmt", "yuv420p", "-movflags", "+faststart"];
 
 /** Ask ffmpeg to finish (q via SIGINT, then TERM, then KILL) and encode clip.mp4 from the frames. */
 export async function stopCapture(
@@ -475,6 +481,9 @@ export async function stopCapture(
     "-v",
     "error",
     "-y",
+    // Decode the JPEG frames on every core too: at 4K the decode, not x264, was half the stop.
+    "-threads",
+    "0",
     "-framerate",
     String(state.fps),
     "-i",
@@ -482,8 +491,7 @@ export async function stopCapture(
     "-c:v",
     "libx264",
     ...ENCODE_QUALITY,
-    "-pix_fmt",
-    "yuv420p",
+    ...ENCODE_OUTPUT,
     "-r",
     String(state.fps),
     join(folder, "clip.mp4"),

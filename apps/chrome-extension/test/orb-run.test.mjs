@@ -266,8 +266,8 @@ test("the cursor's box always composes: a chat continues there and its transcrip
   );
   assert.match(chat, /data-state="compose"/);
   assert.doesNotMatch(chat, /<iframe/);
-  assert.match(chat, /Reply to Aeon/);
-  assert.match(chat, /Open the transcript in the side panel/);
+  assert.match(chat, /Reply…/);
+  assert.match(chat, /Open in panel/);
   assert.match(chat, /New chat/);
   // A question shows above the field, and the answer is typed right there.
   const ask = renderToStaticMarkup(

@@ -11,7 +11,7 @@ import {
 import { startCursorControls } from "./cursor-controls.js";
 import { drawLocalCursor, isCursorLocal, pageChatId } from "./orb-aeon-pages.js";
 import { OrbOverlay } from "./orb-overlay.js";
-import { ORB_SUMMON_INFO } from "./orb-messages.js";
+import { ORB_BUBBLE_STATE, ORB_SUMMON_INFO } from "./orb-messages.js";
 import {
   captureSummon,
   dropTarget,
@@ -60,8 +60,10 @@ function start(): void {
     }
     if (!message.open) return;
     // Read before the box opens over the page, so the box is never what the pointer is on.
+    const keyboard = message.keyboard === true;
     summon = aeonPage ? undefined : captureSummon();
-    overlay.showBubble();
+    if (keyboard) summon = { ...(summon ?? { fillForm: false }), keyboard };
+    overlay.showBubble(true, keyboard);
     const shown: OrbShown = { kind: "aeon.orb.shown", tabId: message.tabId, summon };
     void chrome.runtime.sendMessage(shown).catch(() => undefined);
   };
@@ -123,7 +125,17 @@ function onTarget(action: "drop" | "hover" | "unhover"): void {
   else hideOutline();
 }
 
+/** The shortcut asks whether the box is showing here: it opens when not, closes when it is. */
+function listenForBubbleState(current: () => OrbOverlay | undefined): void {
+  chrome.runtime.onMessage.addListener((message: unknown, sender, reply) => {
+    if (sender.id !== chrome.runtime.id) return;
+    if ((message as { kind?: unknown } | null)?.kind !== ORB_BUBBLE_STATE) return;
+    reply({ open: current()?.bubbleOpen === true });
+  });
+}
+
 function listenForEscape(current: () => OrbOverlay | undefined): void {
+  listenForBubbleState(current);
   addEventListener(
     "keydown",
     (event) => {

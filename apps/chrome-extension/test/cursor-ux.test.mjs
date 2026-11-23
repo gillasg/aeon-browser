@@ -152,7 +152,7 @@ test("Fill form needs one form with three visible, enabled fields", () => {
 
 test("short answers and small tables show in place; long, headed or coded ones do not", () => {
   assert.equal(ux.answerFits("The cheapest is **₹49,999** at [Shop](https://shop.test)."), true);
-  assert.equal(ux.answerFits("x ".repeat(200)), false);
+  assert.equal(ux.answerFits("x ".repeat(300)), false);
   assert.equal(ux.answerFits("# Title\nbody"), false);
   assert.equal(ux.answerFits("```js\ncode\n```"), false);
   const table = "| Item | Price |\n|---|---|\n| A | 10 |\n| B | 20 |\nTwo found.";
@@ -164,42 +164,78 @@ test("short answers and small tables show in place; long, headed or coded ones d
   assert.match(html, /data-numeric="true">10</);
 });
 
-test("the X-Ray strip says counts with exact plurals and is absent at zero", () => {
-  const strip = (counts) =>
-    renderToStaticMarkup(createElement(ux.XrayStrip, { host: "shop.com", counts, onOpen() {} }));
-  assert.equal(strip({ apis: 0, boosts: 0, watches: 0 }), "");
-  const html = strip({ apis: 4, boosts: 1, watches: 0 });
-  assert.match(html, /aria-label="What Aeon knows about shop.com"/);
-  assert.equal(html.replace(/<[^>]+>/g, ""), "4 APIs · 1 boost");
-});
-
-test("the power row is three prefills at most, Fill form only with a form", () => {
+test("the / palette is exactly three verbs, with Open in panel as its footer", () => {
   assert.deepEqual(
-    ux.powerItems(false).map((item) => item.label),
-    ["Boost this site", "Watch"],
+    ux.PALETTE.map((item) => item.label),
+    ["/teach", "/watch", "/fill"],
   );
   assert.deepEqual(
-    ux.powerItems(true).map((item) => item.prefill),
-    ["Change this site so that ", "Tell me when ", "Fill this form from my details"],
+    ux.paletteMatches("/").map((item) => item.verb),
+    ["teach", "watch", "fill"],
   );
+  assert.deepEqual(
+    ux.paletteMatches("/wa").map((item) => item.verb),
+    ["watch"],
+  );
+  assert.deepEqual(ux.paletteMatches("/panel"), []);
+  assert.deepEqual(ux.paletteMatches("hello /fill"), []);
+  const html = renderToStaticMarkup(
+    createElement(ux.Palette, { draft: "/", selected: 0, onPick() {} }),
+  );
+  assert.match(html, /Open in panel/);
+  assert.doesNotMatch(html, /\/panel/);
 });
 
-test("Teach says what it found, singular for one", () => {
+test("Compose has no whispers or starter chips", () => {
+  assert.equal(ux.whisperFor, undefined);
+  assert.equal(ux.Whisper, undefined);
+});
+
+test("Teach is a pill that says what it picked up, singular for one", () => {
   assert.equal(ux.teachingLabel(0), "Teaching");
-  assert.equal(ux.teachingLabel(1), "Teaching · 1 API");
-  assert.equal(ux.teachingLabel(3), "Teaching · 3 APIs");
-  assert.equal(ux.learnedLine(4, "flipkart.com"), "Learned 4 APIs on flipkart.com");
-  const idle = renderToStaticMarkup(
-    createElement(ux.TeachControl, { learning: false, found: 0, onToggle() {} }),
+  assert.equal(ux.teachingLabel(1), "Teaching · 1 step");
+  assert.equal(ux.teachingLabel(3), "Teaching · 3 steps");
+  assert.equal(ux.learnedLine(4, "flipkart.com"), "Learned a skill on flipkart.com · 4 steps");
+  const pill = renderToStaticMarkup(createElement(ux.TeachPill, { found: 3, onDone() {} }));
+  assert.match(pill, /isl-teach-pill/);
+  assert.match(pill, />Done</);
+  assert.match(pill, /aria-label="Stop teaching"/);
+});
+
+test("working, receipt and error parts carry no emoji and no colour", () => {
+  assert.equal(ux.elapsedLabel(4200), "4s");
+  assert.equal(ux.elapsedLabel(72_000), "1m 12s");
+  assert.equal(ux.durationLabel(400), "0.4s");
+  assert.equal(ux.durationLabel(12_400), "12s");
+  const working = renderToStaticMarkup(
+    createElement(ux.WorkingPill, { text: "Reading editions on Steam", elapsed: "4s" }),
   );
-  assert.match(idle, />Teach</);
-  assert.match(idle, /debugger bar/);
-  const on = renderToStaticMarkup(
-    createElement(ux.TeachControl, { learning: true, found: 2, onToggle() {} }),
+  assert.match(working, /ink-wet/);
+  assert.match(working, /◌/);
+  assert.match(working, /· 4s/);
+  const receipt = renderToStaticMarkup(
+    createElement(ux.ReceiptRow, {
+      receipt: "0.4s · via skill",
+      disabled: false,
+      onCopy() {},
+      onWrong() {},
+      onRetry() {},
+    }),
   );
-  assert.match(on, /isl-rec/);
-  assert.match(on, />Done</);
-  assert.doesNotMatch(on, /debugger bar/);
+  for (const label of ["Copy", "Wrong answer", "Retry"])
+    assert.match(receipt, new RegExp(`aria-label="${label}"`));
+  assert.doesNotMatch(receipt, /[⧉👎↻]/u);
+  const error = renderToStaticMarkup(
+    createElement(ux.ErrorCard, {
+      title: "Couldn't finish",
+      text: "Steam asked for a sign-in before showing the editions.",
+      onRetry() {},
+      onPanel() {},
+    }),
+  );
+  assert.match(error, /Steam asked for a sign-in before showing the editions\./);
+  assert.match(error, />Retry</);
+  assert.match(error, />Open in panel</);
 });
 
 test("Manage reuses an open home.html tab, never the side panel's", () => {

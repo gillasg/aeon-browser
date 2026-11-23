@@ -5,13 +5,12 @@ import { createElement } from "react";
 import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@aeon/protocol";
 import { mountAeonUi, SidePanel, type SidePanelProps } from "@aeon/ui";
 import type { UiClient } from "./ui-client-core.js";
-import { connectPage, connectionErrorMessage, openExtensionChat } from "./ui-connection.js";
+import { connectPage, connectionErrorMessage } from "./ui-connection.js";
 import { handoffKey, pendingHandoffs, saveChatContext } from "./browser-context-storage.js";
 import { applyStoredTheme } from "./theme-preferences.js";
 import { observePanelFrameTitle } from "./panel-frame-title.js";
 import { sidePanelSelectionKey as selectionKey } from "./sidebar-selection.js";
-import { manageSitesRoute, openManage } from "./manage-tab.js";
-import { watchPanelXray, type PanelXray } from "./sidepanel-xray.js";
+import { openManage } from "./manage-tab.js";
 
 const root = requiredElement("root");
 
@@ -33,8 +32,6 @@ let pickerOpen = false;
 let status = "Loading Chats…";
 let updateUi: ((view: ReturnType<typeof createView>) => void) | undefined;
 let routingContext = false;
-let xray: PanelXray;
-let xrayWatched = false;
 
 window.addEventListener("message", (event) => {
   if (
@@ -71,11 +68,10 @@ function createView() {
     onTogglePicker: (open) => setPickerOpen(open),
     onSelect: (chatId) => void selectChat(chatId),
     onNew: () => void selectChat(""),
-    onAllChats: () => void openAllChats(),
-    onOpenFull: () => void openSelectedChat(),
-    onManage: () => void openManage(),
-    xray,
-    onXray: (host) => void openManage(manageSitesRoute(host)),
+    onManage: () => {
+      setPickerOpen(false);
+      void openManage();
+    },
   };
   return createElement(SidePanel, props);
 }
@@ -128,17 +124,6 @@ async function start(): Promise<void> {
     client = connection.client;
     reconnect.watch(client);
     client.subscribe(handleDaemonMessage);
-    if (!xrayWatched) {
-      xrayWatched = true;
-      watchPanelXray(
-        windowId,
-        () => client,
-        (next) => {
-          xray = next;
-          render();
-        },
-      );
-    }
     const stored = await chrome.storage.session.get(selectionKey(windowId));
     const savedId = stored[selectionKey(windowId)];
     await refreshChats();
@@ -257,24 +242,6 @@ async function routePendingContext(): Promise<void> {
   }
 }
 
-async function openSelectedChat(): Promise<void> {
-  if (!selectedChatId) return;
-  try {
-    await openExtensionChat(selectedChatId, {
-      ...(windowId !== undefined ? { targetWindowId: windowId } : {}),
-    });
-    await closePanel();
-  } catch (error) {
-    status = `Could not open this Chat · ${messageOf(error)}`;
-  }
-  render();
-}
-
-async function openAllChats(): Promise<void> {
-  setPickerOpen(false);
-  await chrome.tabs.create({ url: `${chrome.runtime.getURL("home.html")}?view=chats` });
-  await closePanel();
-}
 function handleDaemonMessage(message: DaemonUiResponse): void {
   if (
     message.kind === "chat.event" &&
@@ -294,14 +261,6 @@ function requiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing side-panel root: ${id}`);
   return element;
-}
-
-async function closePanel(): Promise<void> {
-  const panel = chrome.sidePanel as unknown as {
-    close?: (options: { windowId: number }) => Promise<void>;
-  };
-  if (windowId !== undefined && panel.close) await panel.close({ windowId });
-  else window.close();
 }
 
 mirrorAgentTabView();

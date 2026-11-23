@@ -1,3 +1,4 @@
+import { TEACH_SITE, teachSiteInWorker } from "../teach-site.js";
 import { chatUrl, findExistingChat } from "../native-worker-tabs.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
@@ -7,17 +8,20 @@ import { paintCursor } from "aeon:cursor-paint";
 import {
   CURSOR_INSTALL,
   CURSOR_TRANSCRIPT,
+  ORB_BUBBLE_STATE,
   ORB_COMMAND,
   ORB_DISMISS,
   ORB_OFF,
   ORB_ON_KEY,
   ORB_RESTORE,
+  ORB_TO_PANEL,
   nonceKey,
   type OrbToggle,
   type OrbVerify,
 } from "./orb-messages.js";
 
-// The shortcut lives in the service worker. It starts and closes the cursor on web pages and on
+// The shortcut (a rebindable chrome.commands entry, Alt+Shift+Space by default: ⌥⇧Space on
+// macOS) lives in the service worker and opens the box keyboard-centred. It starts and closes the cursor on web pages and on
 // Aeon's own tabs (Home, a chat tab); pages Chrome keeps extensions out of (chrome://, the Web
 // Store, the PDF viewer) get the side panel instead. The worker also keeps
 // the toolbar badge: how many runs need the user, else how many finished results are unread.
@@ -51,7 +55,9 @@ function onOrbMessage(
   if (kind === ORB_RESTORE) return replyRestore(sender.tab?.id, sendResponse);
   if (kind === ORB_OFF) return stopOrb();
   if (kind === CURSOR_TRANSCRIPT) return openTabTranscript(sender.tab);
+  if (kind === ORB_TO_PANEL) return toPanel(sender.tab, request, sendResponse);
   if (kind === CURSOR_INSTALL) return installFrom(sender.tab, request);
+  if (kind === TEACH_SITE) return teachFromManage(request, sendResponse);
   if (kind !== "aeon.orb.verify") return undefined;
   void verify(request as Partial<OrbVerify>, sender).then(sendResponse, () =>
     sendResponse({ ok: false }),
@@ -72,6 +78,27 @@ function stopOrb(): undefined {
 function openTabTranscript(tab: chrome.tabs.Tab | undefined): undefined {
   if (tab) openTranscript(tab);
   return undefined;
+}
+
+/** The ask box's ⌘↵ and Open in panel: the side panel beside this tab, on the given chat. */
+function toPanel(
+  tab: chrome.tabs.Tab | undefined,
+  request: unknown,
+  sendResponse: (response?: unknown) => void,
+): true | undefined {
+  if (tab?.id === undefined) return undefined;
+  // Must run before any await: opening the side panel needs the click's user gesture.
+  const opened = chrome.sidePanel.open({ tabId: tab.id });
+  const chatId = (request as { chatId?: unknown }).chatId;
+  if (typeof chatId === "string" && chatId)
+    void chrome.storage.session
+      .set({ [sidePanelSelectionKey(tab.windowId)]: chatId })
+      .catch(() => undefined);
+  void opened.then(
+    () => sendResponse({ ok: true }),
+    () => sendResponse({ ok: false }),
+  );
+  return true;
 }
 
 function installFrom(tab: chrome.tabs.Tab | undefined, request: unknown): undefined {
@@ -136,14 +163,24 @@ function summon(tab: chrome.tabs.Tab | undefined): void {
   void toggle(tab.id);
 }
 
+// The shortcut opens the box whenever it is not showing in this tab (after Esc, a submit that
+// folded it, a reload) and closes the cursor only when the box is showing. The tab's content
+// script is the source of truth, never a remembered flag.
 async function toggle(tabId: number): Promise<void> {
-  if (await isOn()) return setOn(false);
+  if ((await isOn()) && (await bubbleOpen(tabId))) return setOn(false);
   await setOn(true);
-  await present(tabId, true);
+  await present(tabId, true, true);
   // Every other page gets the folded orb; frozen or unloaded tabs ask when they wake.
   for (const tab of await cursorTabs())
     if (tab.id !== undefined && tab.id !== tabId && !tab.discarded)
       void present(tab.id, false).catch(() => undefined);
+}
+
+async function bubbleOpen(tabId: number): Promise<boolean> {
+  const reply: unknown = await chrome.tabs
+    .sendMessage(tabId, { kind: ORB_BUBBLE_STATE }, { frameId: 0 })
+    .catch(() => undefined);
+  return (reply as { open?: unknown } | undefined)?.open === true;
 }
 
 /** Web pages and Aeon's own tabs. */
@@ -234,12 +271,33 @@ export async function presentAsk(chatId: string): Promise<void> {
   await present(tab.id, true).catch(() => undefined);
 }
 
-async function present(tabId: number, open: boolean): Promise<void> {
+/** Manage → Sites → Teach Aeon: open the site, start Teach, and open the cursor there. */
+function teachFromManage(
+  request: unknown,
+  sendResponse: (response?: unknown) => void,
+): true | undefined {
+  const host = (request as { host?: unknown } | null)?.host;
+  if (typeof host !== "string") return undefined;
+  void teachSiteInWorker(host, async (tabId) => {
+    await setOn(true);
+    await present(tabId, true);
+  }).then(
+    () => sendResponse({ ok: true }),
+    (error: unknown) => {
+      console.warn("Aeon: Teach Aeon failed to start", error);
+      sendResponse({ ok: false, error: String(error) });
+    },
+  );
+  return true;
+}
+
+async function present(tabId: number, open: boolean, keyboard = false): Promise<void> {
   const message: OrbToggle = {
     kind: "aeon.orb.toggle",
     tabId,
     nonce: await nonceFor(tabId),
     open,
+    ...(keyboard ? { keyboard } : {}),
   };
   try {
     await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });

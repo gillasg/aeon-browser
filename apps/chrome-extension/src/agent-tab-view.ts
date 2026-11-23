@@ -1,7 +1,5 @@
-// The Agent tabs setting lives in page localStorage (where the settings UI keeps its choices);
-// the worker cannot read that, so extension pages mirror it into chrome.storage.local.
-export const AGENT_TAB_VIEW_KEY = "aeonAgentTabView";
-export type AgentTabView = "auto" | "split" | "thumbnails";
+// The Agent tabs settings live in page localStorage (where the settings UI keeps its choices);
+// the worker cannot read that, so extension pages mirror them into chrome.storage.local.
 // On/off agent settings, off by default. Screen recorders (Aeon Recorder) rely on them; keep them.
 export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
 export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
@@ -75,12 +73,6 @@ function mirrorBlockedSites(): void {
 export function mirrorAgentTabView(): void {
   mirrorBlockedSites();
   const push = () => {
-    let view: AgentTabView = "auto";
-    try {
-      view = parseAgentTabView(localStorage.getItem(AGENT_TAB_VIEW_KEY));
-    } catch {
-      /* Storage may be unavailable. */
-    }
     const flags: Record<string, boolean> = {};
     for (const key of FLAGS) {
       try {
@@ -89,7 +81,7 @@ export function mirrorAgentTabView(): void {
         flags[key] = false;
       }
     }
-    void chrome.storage.local.set({ [AGENT_TAB_VIEW_KEY]: view, ...flags }).catch(() => undefined);
+    void chrome.storage.local.set(flags).catch(() => undefined);
   };
   // Settings changed outside this page (`aeon settings` from the CLI) win over the page's copy.
   void adoptStored().then(push, push);
@@ -97,11 +89,11 @@ export function mirrorAgentTabView(): void {
     if (area === "local") adopt(changes);
   });
   window.addEventListener("storage", push);
-  for (const key of [AGENT_TAB_VIEW_KEY, ...FLAGS]) window.addEventListener(key, push);
+  for (const key of FLAGS) window.addEventListener(key, push);
 }
 
 async function adoptStored(): Promise<void> {
-  const stored = await chrome.storage.local.get([AGENT_TAB_VIEW_KEY, ...FLAGS]);
+  const stored = await chrome.storage.local.get(FLAGS);
   adopt(Object.fromEntries(Object.entries(stored).map(([key, newValue]) => [key, { newValue }])));
 }
 
@@ -109,7 +101,7 @@ function adopt(changes: Record<string, { newValue?: unknown }>): void {
   // Store every changed value before announcing any: each announcement pushes the page's whole
   // copy back, which would undo a change not stored yet.
   const changed: string[] = [];
-  for (const key of [AGENT_TAB_VIEW_KEY, ...FLAGS]) {
+  for (const key of FLAGS) {
     const value = changes[key]?.newValue;
     if (value === undefined) continue;
     const text = typeof value === "boolean" ? (value ? "on" : "off") : String(value);
@@ -127,30 +119,4 @@ function adopt(changes: Record<string, { newValue?: unknown }>): void {
 export async function readAgentFlag(key: string): Promise<boolean> {
   const stored = await chrome.storage.local.get(key);
   return stored[key] === true;
-}
-
-export function parseAgentTabView(value: unknown): AgentTabView {
-  return value === "split" || value === "thumbnails" ? value : "auto";
-}
-
-export async function readAgentTabViewSetting(): Promise<AgentTabView> {
-  const stored = await chrome.storage.local.get(AGENT_TAB_VIEW_KEY);
-  return parseAgentTabView(stored[AGENT_TAB_VIEW_KEY]);
-}
-
-/**
- * The view for one chat. Automatic (the default) follows where the chat is: a full chat tab gets
- * split screen beside it; the side panel and the orb get live thumbnails and leave the user's
- * current tab alone. Background runs keep their own window either way (task spaces).
- */
-export async function readAgentTabView(chatId: string): Promise<"split" | "thumbnails"> {
-  const setting = await readAgentTabViewSetting();
-  if (setting !== "auto") return setting;
-  const page = chrome.runtime.getURL("chat.html");
-  const tabs = await chrome.tabs.query({ url: page + "*" }).catch(() => []);
-  const inTab = tabs.some((tab) => {
-    const url = new URL(tab.url ?? tab.pendingUrl ?? page);
-    return url.searchParams.get("chatId") === chatId && url.searchParams.get("host") !== "panel";
-  });
-  return inTab ? "split" : "thumbnails";
 }

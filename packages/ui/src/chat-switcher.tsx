@@ -28,7 +28,7 @@ export interface ChatSwitcherProps {
   label?: string;
   /** A round icon button (the chat page's corner) instead of a text pill (the orb). */
   icon?: boolean;
-  /** The cursor's way to the Manage tab: the list's last row, "Manage Aeon…". */
+  /** The cursor's way to the Manage tab: the list's last row, "Manage Sites & Settings ↗", pinned under the list. */
   onManage?: (() => void) | undefined;
 }
 
@@ -191,7 +191,7 @@ function ManageRow(props: { onClose(): void; onManage(): void }): ReactElement {
         props.onManage();
       }}
     >
-      Manage Aeon…
+      Manage Sites & Settings <span aria-hidden="true">↗</span>
     </button>
   );
 }

@@ -1,30 +1,41 @@
 // The hand-off's typed answer lives in the tab's isolated world, never in the page's own world:
 // page scripts cannot enumerate the field, read what the user types, or answer for them. The
-// main-world painter still draws the amber cursor and its message; this host collects Done,
-// Cancel and the typed answer and sends them to the extension worker over runtime messaging.
+// main-world painter draws the cursor and the target's ring; this host is the card, with the
+// message, I'm done, Skip and the typed answer and sends them to the extension worker over runtime messaging.
 import type { HandoffMeta } from "@browserkit/protocol";
 import { CURSOR_TOKEN_CSS } from "./cursor-mark.js";
 
 export const HANDOFF_ASK_ID = "aeon-agent-ask";
 
+// The page's one hand-off card: neutral obsidian glass with the dual hairline, the agent's message
+// in bone, `I'm done` in the one ochre and a quiet Skip. No dot, no stripe, no coloured border.
 const ASK_CSS =
-  ":host{all:initial}.ask{display:flex;align-items:center;gap:6px;width:320px;padding:5px 5px 5px 12px;" +
-  "border-radius:var(--aeon-r-full);background:var(--aeon-island-bg);color:var(--aeon-island-ink);" +
-  "font:500 var(--aeon-fs-md)/17px system-ui,-apple-system,Segoe UI,sans-serif;pointer-events:auto;" +
-  "box-shadow:0 6px 18px var(--aeon-island-shadow)}" +
-  ".ask input{flex:1;min-width:0;height:28px;border:0;border-radius:var(--aeon-r-full);padding:0 12px;" +
-  "background:var(--aeon-island-field);color:var(--aeon-island-ink);font:inherit;outline:none}" +
-  ".ask input::placeholder{color:var(--aeon-island-ink-soft)}" +
-  ".ask button{border:0;border-radius:var(--aeon-r-full);padding:5px 13px;cursor:pointer;" +
-  "font:600 var(--aeon-fs-sm)/16px system-ui,-apple-system,Segoe UI,sans-serif;" +
-  "background:var(--aeon-island-ink);color:var(--aeon-island-needs-ink)}" +
-  ".ask button.cancel{width:24px;height:24px;padding:0;display:grid;place-items:center;" +
-  "background:var(--aeon-island-line-strong);color:var(--aeon-island-ink)}";
+  ":host{all:initial}.ask{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:320px;" +
+  "max-width:calc(100vw - 32px);padding:12px 12px 10px 14px;border-radius:var(--aeon-r-12);" +
+  "background:var(--aeon-island-bg);-webkit-backdrop-filter:blur(18px) saturate(1.2);" +
+  "backdrop-filter:blur(18px) saturate(1.2);color:var(--aeon-island-ink);" +
+  "font:400 var(--aeon-fs-md)/1.45 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;pointer-events:auto;" +
+  "box-shadow:var(--aeon-island-elev)}" +
+  ".ask p{margin:0;color:var(--aeon-island-ink);white-space:normal;overflow-wrap:anywhere}" +
+  ".ask input{box-sizing:border-box;width:100%;height:28px;border:0;border-radius:var(--aeon-r-8);padding:0 10px;" +
+  "background:var(--aeon-island-wash-5);box-shadow:inset 0 0 0 1px var(--aeon-island-line);" +
+  "color:var(--aeon-island-ink);font:inherit;font-size:var(--aeon-fs-sm);outline:none}" +
+  ".ask input::placeholder{color:var(--aeon-island-faint)}" +
+  ".ask .row{display:flex;align-items:center;gap:4px}" +
+  ".ask button{border:0;border-radius:var(--aeon-r-full);padding:4px 10px;cursor:pointer;background:transparent;" +
+  "font:500 var(--aeon-fs-sm)/16px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif}" +
+  ".ask button:hover{background:var(--aeon-island-wash)}" +
+  ".ask button:focus-visible{outline:1px solid var(--aeon-island-focus);outline-offset:1px}" +
+  ".ask button.done{color:var(--aeon-island-needs-soft)}.ask button.cancel{color:var(--aeon-island-muted)}";
 
 interface AskDetail {
   style: string;
   tabId: number;
   point?: { x: number; y: number };
+  /** The target's box: the card sits 12px beside it, never over its ring. */
+  box?: { x: number; y: number; width: number; height: number };
+  /** The agent's request, shown whole. */
+  message?: string;
   /** Names the confirm button after the commitment ("Pay $42.10") instead of "Done". */
   confirm?: string;
 }
@@ -34,6 +45,7 @@ export async function showHandoffAsk(
   tabId: number,
   point?: { x: number; y: number },
   meta: HandoffMeta = {},
+  extra: { box?: { x: number; y: number; width: number; height: number }; message?: string } = {},
 ): Promise<void> {
   await chrome.scripting
     .executeScript({
@@ -45,6 +57,8 @@ export async function showHandoffAsk(
           style: CURSOR_TOKEN_CSS + ASK_CSS,
           tabId,
           ...(point ? { point } : {}),
+          ...(extra.box ? { box: extra.box } : {}),
+          ...(extra.message ? { message: extra.message } : {}),
           ...(meta.kind === "cliff-edge" && meta.actionLabel ? { confirm: meta.actionLabel } : {}),
         },
       ],
@@ -84,7 +98,7 @@ export function showAsk(detail: AskDetail): void {
     const node = document.createElement("button");
     node.className = kind;
     node.textContent = label;
-    node.setAttribute("aria-label", kind === "cancel" ? "Cancel" : label);
+    node.setAttribute("aria-label", label);
     node.addEventListener("click", (event) => {
       event.stopPropagation();
       run();
@@ -108,20 +122,34 @@ export function showAsk(detail: AskDetail): void {
   host.addEventListener("aeon-ask-remove", () =>
     window.removeEventListener("cursor-overlay-state", onState),
   );
-  // Beside the cursor, flipped to its left or above it when there is no room, and always whole
-  // inside the viewport with a 12px margin (a wing near an edge used to push the card off-screen).
+  // 12px below the target's ring (above it, or beside it, when there is no room), never over the
+  // ring, and always whole inside the viewport with a 16px margin. Without a target it sits beside
+  // the cursor; without either, bottom-centre.
   function place(): void {
-    const margin = 12;
+    const margin = 16;
+    const gap = 12;
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const box = row.getBoundingClientRect();
-    const w = box.width || 340;
-    const h = box.height || 40;
+    const rect = row.getBoundingClientRect();
+    const w = rect.width || 320;
+    const h = rect.height || 96;
     const point: { x?: unknown; y?: unknown } = cursorPoint ?? {};
+    const target = detail.box;
     let x = (width - w) / 2;
     let y = height - h - 80;
-    if (typeof point.x === "number" && typeof point.y === "number") {
-      x = point.x + 14 + w > width - margin ? point.x - 14 - w : point.x + 14;
+    if (target) {
+      x = target.x;
+      if (target.y + target.height + gap + h <= height - margin) y = target.y + target.height + gap;
+      else if (target.y - gap - h >= margin) y = target.y - gap - h;
+      else {
+        y = target.y;
+        x =
+          target.x + target.width + gap + w <= width - margin
+            ? target.x + target.width + gap
+            : target.x - gap - w;
+      }
+    } else if (typeof point.x === "number" && typeof point.y === "number") {
+      x = point.x + gap + w > width - margin ? point.x - gap - w : point.x + gap;
       y = point.y + 44 + h > height - margin ? point.y - 20 - h : point.y + 44;
     }
     host.style.left = Math.max(margin, Math.min(width - w - margin, x)) + "px";
@@ -139,11 +167,17 @@ export function showAsk(detail: AskDetail): void {
     field.addEventListener(kind, (event) => event.stopPropagation());
   const row = document.createElement("div");
   row.className = "ask";
-  row.append(
-    field,
-    makeButton("done", detail.confirm ?? "Done", finish),
-    makeButton("cancel", "✕", () => send("cancelled")),
+  row.setAttribute("role", "status");
+  row.setAttribute("aria-label", "Aeon needs you");
+  const text = document.createElement("p");
+  text.textContent = String(detail.message || "Aeon needs you in this tab.").slice(0, 300);
+  const actions = document.createElement("div");
+  actions.className = "row";
+  actions.append(
+    makeButton("done", detail.confirm ?? "I'm done", finish),
+    makeButton("cancel", "Skip", () => send("cancelled")),
   );
+  row.append(text, field, actions);
   root.append(makeStyle(), row);
   (document.documentElement || document.body).append(host);
   place();

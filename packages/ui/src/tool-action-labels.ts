@@ -18,7 +18,23 @@ export function describeBrowserAction(step: ToolStep): string {
   if (step.stepLabel) return step.stepLabel;
   const code = stringValue(step.arguments, "code");
   if (code) return step.state === "running" ? "Working in the page" : "Worked in the page";
-  return describeBrowserStep(step);
+  return withPageTitle(describeBrowserStep(step), step.result);
+}
+
+/**
+ * `Reading page` → `Reading Steam — Hollow Knight`, from the title the step's own result already
+ * carries (no extra fetch). Without one the label keeps its host or plain words.
+ */
+function withPageTitle(label: string, result: string | undefined): string {
+  const match = /^(Reading|Read|Observing|Observed) page\b/.exec(label);
+  if (!match || !result) return label;
+  let title: string | undefined;
+  try {
+    title = browserResultTitle(JSON.parse(result));
+  } catch {
+    return label;
+  }
+  return title ? `${match[1]} ${boundedText(title)}` : label;
 }
 
 function describeBrowserStep(step: ToolStep): string {

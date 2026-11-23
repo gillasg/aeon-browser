@@ -353,7 +353,7 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
        aeon record stop [--out <dir>] [--chat <id>]
        aeon record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
        aeon record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
-       aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>]
+       aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--background]
        aeon record terminal --out <dir> --run "<command>"
        aeon record gif|video|trace …   (the original screen recordings)
 
@@ -368,6 +368,8 @@ beat on the clip clock; --selector also records the element's box (page CSS px) 
 events.json. wait blocks on a real condition, never a sleep: an element, a URL, a loaded page, or
 a chat that has truly finished. run does it all for one prompt: optionally opens --url, starts,
 runs the prompt, waits for the chat to finish, holds --tail seconds, stops, attaches the trace.
+run turns Work in front on for the take (restored after) so the agent's tabs are on camera;
+--background leaves the setting as it is.
 --browser picks one connected Chrome profile; mark, wait and stop follow the one start used.
 The folder is a recording, not a video: render it with Remotion (see \`aeon video kit\`).`,
     run: async (args: Args) => {

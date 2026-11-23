@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import type { ManagementSection } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutinesPanel } from "./management-routines.js";
+import { AbilitiesPanel } from "./management-automations.js";
 import { SitesPage } from "./management-site-page.js";
 import { ResourcesPanel } from "./management-resources.js";
 import { CapabilitiesPanel } from "./management-capabilities.js";
@@ -14,24 +15,30 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
   const titles: Record<ManagementSection, string> = {
     automations: "Automations",
     sites: "Sites",
-    resources: "Skills & extensions",
-    capabilities: "MCPs / CLIs",
+    skills: "Skills",
+    resources: "Pi skills & extensions",
+    capabilities: "CLIs & MCP servers",
     settings: "Settings",
   };
-  usePageTitle(titles[props.section]);
+  usePageTitle(titles[props.section], props.subsection !== true);
+  const sub = props.subsection === true;
   return (
-    <section className="management-main" aria-label={titles[props.section]}>
-      <header className="management-heading">
-        <div>
-          <h1>{titles[props.section]}</h1>
-        </div>
-      </header>
+    <section
+      className={sub ? "management-main management-sub" : "management-main"}
+      aria-label={titles[props.section]}
+    >
+      {!(sub && props.section === "settings") && (
+        <header className="management-heading">
+          <div>{sub ? <h2>{titles[props.section]}</h2> : <h1>{titles[props.section]}</h1>}</div>
+        </header>
+      )}
       {props.error && (
         <p className="management-error" role="status">
           {props.error}
         </p>
       )}
-      {props.section === "automations" && <Automations {...props} />}
+      {props.section === "automations" && <Watches {...props} />}
+      {props.section === "skills" && <AbilitiesPanel {...props} />}
       {props.section === "sites" && <SitesPage {...props} />}
       {props.section === "resources" && <ResourcesPanel {...props} />}
       {props.section === "capabilities" && <CapabilitiesPanel {...props} />}
@@ -41,10 +48,10 @@ export function ManagementSurface(props: ManagementSurfaceProps): ReactElement {
 }
 
 /**
- * Automations: everything that runs without you typing: an instruction on a schedule, a watcher
- * that checks a page or site API and wakes the agent when it changes, and a snipe that acts at an
- * exact moment. What a site can do on request (its abilities) lives on Sites.
+ * Watches: everything that runs without you typing: an instruction on a schedule, a check of a
+ * page or site API that wakes the agent when it changes, and a snipe that acts at an exact moment.
+ * What a site can do on request (its skills) lives on Skills.
  */
-function Automations(props: ManagementSurfaceProps): ReactElement {
+function Watches(props: ManagementSurfaceProps): ReactElement {
   return <RoutinesPanel {...props} />;
 }

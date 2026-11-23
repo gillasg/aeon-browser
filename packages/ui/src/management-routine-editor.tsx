@@ -71,7 +71,7 @@ export function RoutineEditor({
       <button className="management-back" type="button" onClick={onCancel}>
         ‹ Cancel
       </button>
-      <h2>{routine ? "Edit automation" : "New automation"}</h2>
+      <h2>{routine ? "Edit watch" : "New watch"}</h2>
       <RoutineIdentityFields props={props} draft={draft} />
       <RoutineScheduleFields draft={draft} />
       <RoutineTargetFields draft={draft} />

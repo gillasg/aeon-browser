@@ -16,12 +16,24 @@ export type OrbToContent =
   | { kind: "aeon.orb.visual"; state: OrbVisualState; label: string }
   | { kind: "aeon.orb.cursor"; steps: OrbCursorStep[] }
   | { kind: "aeon.orb.spotlight"; box: OrbBox | null }
-  | { kind: "aeon.orb.panel"; width: number; height: number }
+  /**
+   * The box's measured size and the layout it wants: `answer` widens a pointer summon to 440px,
+   * `teach` folds it to the bottom-centre pill while the page stays fully usable.
+   */
+  | {
+      kind: "aeon.orb.panel";
+      width: number;
+      height: number;
+      layout?: OrbLayout;
+    }
   /** keepRunning: collapse to the orb. false: dismiss the orb unless a run is going. */
   | { kind: "aeon.orb.hide"; keepRunning: boolean }
   | { kind: "aeon.orb.prefs"; reduceMotion: boolean }
   /** The target chip: dropped (× or Backspace), or hovered (outline the element again). */
   | { kind: "aeon.orb.target"; action: "drop" | "hover" | "unhover" };
+
+/** How the box sits: beside the pointer (400, answer 440), keyboard-centred (480), or Teach's pill. */
+export type OrbLayout = "compose" | "answer" | "teach";
 
 /** orb.html → content script: what the last summon pointed at (asked once the box has loaded). */
 export const ORB_SUMMON_INFO = "aeon.orb.summon-info";
@@ -32,6 +44,8 @@ export interface OrbToggle {
   tabId: number;
   nonce: string;
   open: boolean;
+  /** Summoned from the keyboard shortcut: the box opens centred, Spotlight-style, at 480px. */
+  keyboard?: boolean;
 }
 
 /** Service worker → every content script: the orb was dismissed (the shortcut, or a move). */
@@ -42,6 +56,11 @@ export const ORB_RESTORE = "aeon.orb.restore";
 export const ORB_OFF = "aeon.orb.off";
 /** Content script → service worker: open this tab's transcript in the side panel (the cursor's ☰). */
 export const CURSOR_TRANSCRIPT = "aeon.cursor.transcript";
+/** orb.html → service worker: open the side panel on this chat (⌘↵, Open in panel). The worker
+ * opens it, the same path the cursor's ☰ takes, so the click's gesture reaches sidePanel.open. */
+export const ORB_TO_PANEL = "aeon.orb.to-panel";
+/** Service worker → content script: is the box open in this tab? The shortcut's one source of truth. */
+export const ORB_BUBBLE_STATE = "aeon.orb.bubble-state";
 /** Content script → service worker: install the shared page cursor in this tab. */
 export const CURSOR_INSTALL = "aeon.cursor.install";
 /** Content script → this tab's orb.html: stop its chat (the cursor's ■). */

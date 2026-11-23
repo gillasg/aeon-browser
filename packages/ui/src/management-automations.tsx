@@ -21,7 +21,6 @@ export function AbilitiesPanel(props: ManagementSurfaceProps): ReactElement {
   }, [running, props.onRefresh]);
   return (
     <section className="settings-group management-automations">
-      <h2>Abilities</h2>
       <ActionNote note={props.snapshot?.lastAction} />
       {abilities.length ? (
         <ul className="aeon-list ability-list">
@@ -40,11 +39,11 @@ export function AbilitiesPanel(props: ManagementSurfaceProps): ReactElement {
           ))}
         </ul>
       ) : (
-        <p className="management-empty">Nothing saved yet.</p>
+        <p className="management-empty">No skills yet. Aeon saves one each time a task works.</p>
       )}
       <p className="settings-footnote">
         Things Aeon learned to do on a site. It saves one when a task works, fixes it when the site
-        changes and drops it when it keeps failing. <code>aeon abilities run</code> runs the same.
+        changes and drops it when it keeps failing.
       </p>
     </section>
   );
@@ -117,15 +116,19 @@ function AbilityRow({
 
 function Health({ ability }: { ability: Ability }): ReactElement {
   const stats = ability.stats;
-  if (!stats?.runs) return <span className="ability-health">New</span>;
-  const ok = stats.runs - stats.failures;
+  const needsRepair = Boolean(ability.checkNote?.repairFailed);
+  const label = needsRepair ? "Needs repair" : stats?.runs ? "Works" : "New";
   return (
     <span
       className="ability-health"
-      data-tone={stats.failures ? "needs" : "ok"}
-      title={stats.lastOkAt ? `Last worked ${formatWhen(stats.lastOkAt)}` : undefined}
+      title={
+        stats?.runs
+          ? `Worked ${stats.runs - stats.failures} of ${stats.runs} runs` +
+            (stats.lastOkAt ? ` · last ${formatWhen(stats.lastOkAt)}` : "")
+          : undefined
+      }
     >
-      {ok}/{stats.runs}
+      {label}
     </span>
   );
 }

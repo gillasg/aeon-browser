@@ -1,16 +1,7 @@
-/* Shared surfaces use the active theme; wallpaper belongs only to new-tab content. */
-.attach-integrated {
-  display: none;
-}
-.home-sidebar,
 .chat-sidebar {
   background: var(--canvas);
   color: var(--text);
   border-color: var(--line);
-}
-.home-sidebar {
-  min-height: 100dvh;
-  padding-bottom: 12px;
 }
 .chat-sidebar {
   bottom: 0;
@@ -19,9 +10,7 @@
   display: none;
 }
 .sidebar-management-links button,
-.home-chat-row,
-.sidebar-row-title,
-.chat-row-title {
+.home-chat-row {
   color: var(--text);
 }
 .sidebar-management-links button:hover,
@@ -65,10 +54,8 @@ select option,
   color-scheme: inherit;
 }
 .pi-picker-menu,
-.pi-picker-panel,
 .pi-session-panel,
-.sidebar-chat-menu,
-.attachment-menu {
+.sidebar-chat-menu {
   background: var(--surface);
   color: var(--text);
   border-color: var(--line);
@@ -102,39 +89,6 @@ select option,
 .send-button:disabled {
   background: var(--surface);
   color: var(--muted);
-}
-.home-chat-card,
-.home-routine-card,
-.home-card-placeholder {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--line);
-}
-.home-chat-card-title,
-.home-routine-title,
-.home-chat-card p {
-  color: var(--text);
-}
-.home-collection-tabs button {
-  color: var(--muted);
-}
-.home-collection-tabs button[aria-selected="true"] {
-  background: var(--surface-raised);
-  color: var(--text);
-}
-.wallpaper-settings {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-}
-.wallpaper-settings button {
-  justify-self: start;
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-8);
-  padding: 8px 12px;
-  cursor: pointer;
 }
 html[data-wallpaper="true"] body:not([data-host="panel"]) .home-main[data-screen="new-tab"] {
   background-color: var(--canvas);
@@ -173,7 +127,6 @@ html[data-wallpaper="true"]
 
 .management-toolbar select,
 .settings-group select,
-.settings-inline-form input,
 .routine-editor select,
 .routine-editor input,
 .capability-editor select,
@@ -186,20 +139,14 @@ html[data-wallpaper="true"]
   background: var(--surface-raised);
   border-color: var(--line);
 }
-.home-sidebar .sidebar-row-title,
-.chat-sidebar .sidebar-row-title {
-  color: var(--text);
-}
 
 .sidebar-chat-row,
 .sidebar-chat-row[aria-current="page"] {
   color: var(--text);
 }
-.sidebar-section-label,
 .home-nav-section h2 {
   color: var(--muted);
 }
-.home-sidebar,
 .chat-sidebar {
   border-right-color: var(--line);
 }
@@ -207,7 +154,6 @@ html[data-wallpaper="true"]
 body[data-host="panel"] .home-shell {
   grid-template-columns: minmax(0, 1fr);
 }
-body[data-host="panel"] .home-sidebar,
 body[data-host="panel"] .home-shell > .chat-navigation {
   display: none;
 }
@@ -603,43 +549,23 @@ body[data-host="panel"] .home-start {
   color: var(--text);
   box-shadow: var(--aeon-drop-11);
 }
-.home-collection-actions button:hover,
-.home-collection-actions button:focus-visible,
-.home-collection-tabs button:hover,
-.home-collection-tabs button:focus-visible {
-  background: var(--surface-raised);
-  color: var(--text);
-  border-radius: var(--aeon-r-8);
-}
-.home-collection-actions button:active,
-.home-collection-tabs button:active,
 .attach-button:active,
 .chat-navigation .icon-button:active {
   background: var(--surface-raised);
   filter: brightness(1.2);
 }
 
-/* Softer sidebar surfaces shared by home and chat. */
-.home-sidebar,
 .chat-sidebar {
   background: color-mix(in srgb, var(--canvas) 60%, var(--surface));
   border-right-color: color-mix(in srgb, var(--line) 45%, var(--canvas));
 }
-.home-sidebar .sidebar-chat-item,
 .chat-sidebar .sidebar-chat-item,
-.home-sidebar .sidebar-chat-row,
 .chat-sidebar .sidebar-chat-row,
-.home-sidebar .home-chat-row,
-.home-sidebar .sidebar-project-row,
 .chat-sidebar .sidebar-project-row,
-.home-sidebar .sidebar-management-links button,
 .chat-sidebar .sidebar-management-links button {
   border-radius: var(--aeon-r-md);
 }
 
-/* Midnight: cool charcoal surfaces over a near-black canvas. */
-
-:root[data-theme="midnight"] .home-sidebar,
 :root[data-theme="midnight"] .chat-sidebar {
   background: var(--aeon-c-151521);
   border-right-color: var(--aeon-c-24242b);
@@ -805,13 +731,8 @@ body[data-host="panel"] .home-main[data-screen="new-tab"] .home-start {
   margin-top: auto;
   width: 100%;
 }
-body[data-host="panel"] .home-recent-section,
 body[data-host="panel"] .home-block {
   display: none;
-}
-/* Nothing under the side panel composer: the dashboard below it keeps no margin there. */
-body[data-host="panel"] .home-dashboard {
-  margin: 0;
 }
 body[data-host="panel"] .home-main[data-screen="new-tab"] {
   padding-bottom: 12px;
@@ -847,10 +768,16 @@ body[data-host="panel"] .composer-context-slot {
 }
 .message-context .browser-context-transcript {
   display: block;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
   border: 0;
   border-radius: var(--aeon-r-0);
   background: transparent;
+}
+/* The chip's own 280px cap is wider than a narrow panel's 78% column: keep it inside, ellipsised. */
+.message-context .browser-context-chip {
+  max-width: 100%;
 }
 .message-row.user:has(.message-context) .message-content {
   border-top-right-radius: var(--aeon-r-md);
@@ -993,10 +920,5 @@ body[data-host="panel"] .composer-context-slot {
   margin: 0 auto;
 }
 .home-attachments:empty {
-  display: none;
-}
-
-/* The side panel has its own bar (switcher, new chat, open in a tab); home's page tabs stay out. */
-body[data-host="panel"] .home-top-bar {
   display: none;
 }

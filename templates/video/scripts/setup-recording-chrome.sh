@@ -73,9 +73,12 @@ d["extensions"].setdefault("ui", {})["developer_mode"] = True
 d.setdefault("browser", {})["has_seen_welcome_page"] = True
 # The system frame (undecorated by the window manager below): no caption buttons in the tab strip.
 d["browser"]["custom_chrome_frame"] = False
-# Ctrl+Shift+Space summons the orb; seed the binding when nothing holds it yet.
+# Alt+Shift+Space summons the orb; seed the binding when nothing holds it yet.
 commands = d["extensions"].setdefault("commands", {})
-key = "linux:Ctrl+Shift+Space"
+old_key = "linux:Ctrl+Shift+Space"
+if commands.get(old_key, {}).get("command_name") == "summon-orb":
+    del commands[old_key]
+key = "linux:Alt+Shift+Space"
 if key not in commands:
     commands[key] = {"command_name": "summon-orb", "extension": ext_id, "global": False}
 # A killed Chrome leaves exit_type "Crashed", and the next start films a "Restore pages?" bubble.
@@ -89,7 +92,7 @@ if [ ! -S "/tmp/.X11-unix/X${NUM}" ]; then
     >/tmp/aeon-recording-xvfb.log 2>&1 </dev/null &
   for _ in $(seq 1 20); do [ -S "/tmp/.X11-unix/X${NUM}" ] && break; sleep 0.25; done
 fi
-# Xvfb has no window manager: focus (and so Ctrl+Shift+Space) is unreliable. When openbox is
+# Xvfb has no window manager: focus (and so Alt+Shift+Space) is unreliable. When openbox is
 # installed and nothing manages the display, start it undecorated with Chrome maximized, so the
 # frame never shows caption buttons or black borders.
 if command -v openbox >/dev/null 2>&1 && \

@@ -71,17 +71,6 @@ summary:focus-visible {
   display: flex;
   flex-direction: column;
 }
-.topbar {
-  z-index: 3;
-  flex: 0 0 54px;
-  display: flex;
-  align-items: center;
-  gap: var(--aeon-s-3);
-  padding: 0 var(--aeon-s-6);
-  border-bottom: 1px solid var(--aeon-swatch-262626);
-  background: var(--canvas);
-  color: var(--aeon-swatch-d4d4cf);
-}
 .icon-button {
   display: grid;
   width: 32px;
@@ -106,42 +95,6 @@ summary:focus-visible {
   stroke-width: 1.5;
   stroke-linecap: round;
 }
-.brand-mark {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: var(--aeon-r-md);
-  background: var(--aeon-swatch-292927);
-  color: var(--aeon-swatch-d8cab3);
-  font:
-    600 var(--aeon-fs-18)/1 Georgia,
-    serif;
-}
-.brand-name {
-  margin-left: -4px;
-  color: var(--aeon-swatch-c7c7c1);
-  font-size: var(--aeon-fs-md);
-  font-weight: 550;
-}
-.topbar-spacer {
-  flex: 1;
-}
-.resource-toggle {
-  min-height: 32px;
-  padding: 0 var(--aeon-s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-md);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--aeon-fs-sm);
-  cursor: pointer;
-}
-.resource-toggle:hover,
-.resource-toggle[aria-pressed="true"] {
-  background: var(--surface-raised);
-}
 .fixture-badge,
 .connection-state {
   display: inline-flex;
@@ -156,8 +109,7 @@ summary:focus-visible {
   letter-spacing: 0.035em;
 }
 .fixture-badge i,
-.connection-state i,
-.model-note i {
+.connection-state i {
   width: 6px;
   height: 6px;
   border-radius: var(--aeon-r-half);
@@ -486,6 +438,8 @@ summary:focus-visible {
   border-top-right-radius: 0;
 }
 .message-context .browser-context-transcript {
+  min-width: 0;
+  max-width: 100%;
   border-bottom-right-radius: 0;
 }
 .message-content {
@@ -535,6 +489,7 @@ summary:focus-visible {
 }
 .message-context {
   width: auto;
+  min-width: 0;
   max-width: min(78%, 680px);
   align-self: flex-end;
 }
@@ -825,18 +780,12 @@ summary:focus-visible {
 .routine-activity[open] > summary .routine-activity-chevron {
   transform: rotate(90deg);
 }
-.routine-activity-kind,
-.routine-activity-slot,
-.routine-activity-label {
+.routine-activity-slot {
   color: var(--aeon-faint);
   font-size: var(--aeon-fs-xs);
 }
 .routine-activity-slot {
   margin: var(--aeon-s-2) 0 var(--aeon-s-1) 24px;
-}
-.routine-activity-label {
-  margin: var(--aeon-s-3) 0 1px;
-  text-transform: uppercase;
 }
 .routine-activity-instruction {
   max-height: 160px;
@@ -925,7 +874,7 @@ summary:focus-visible {
 }
 .message-markdown ul,
 .message-markdown ol {
-  padding-left: var(--aeon-s-7);
+  padding-left: 1.25em;
 }
 .message-markdown li + li {
   margin-top: var(--aeon-s-1);
@@ -1107,22 +1056,6 @@ summary:focus-visible {
   flex: none;
   font-variant-numeric: tabular-nums;
 }
-.activity-live-action {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--aeon-s-3);
-  margin: 1px 0 var(--aeon-s-3);
-  color: var(--aeon-swatch-929292);
-  font-size: var(--aeon-fs-lg);
-  font-weight: 450;
-}
-.activity-live-action > span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .activity-card > summary:focus-visible,
 .activity-bundle > summary:focus-visible,
@@ -1255,28 +1188,6 @@ summary:focus-visible {
   color: var(--aeon-muted);
   font-size: var(--aeon-fs-xs);
 }
-.activity-browser-actions {
-  display: grid;
-  gap: var(--aeon-s-2);
-  margin: 0;
-  padding: 0 0 0 var(--aeon-s-3);
-  list-style: none;
-}
-.activity-browser-actions li {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--aeon-s-3);
-  min-height: 24px;
-  color: var(--aeon-swatch-b7b7b7);
-  font-size: var(--aeon-fs-base);
-}
-.activity-browser-actions li span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .activity-browser-action-rows {
   display: grid;
   gap: 2px;
@@ -1299,31 +1210,6 @@ summary:focus-visible {
   margin: var(--aeon-s-2) 0;
   color: var(--aeon-muted);
   font-size: var(--aeon-fs-sm);
-}
-.activity-browser-raw {
-  margin-left: var(--aeon-s-3);
-}
-.activity-browser-raw:not([open]) {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  right: 0;
-  margin: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.activity-browser-call:focus-within > .activity-browser-raw:not([open]),
-.activity-browser-call:hover > .activity-browser-raw:not([open]) {
-  opacity: 1;
-  pointer-events: auto;
-}
-.activity-browser-raw > summary {
-  padding: 0 var(--aeon-s-2);
-  border-radius: var(--aeon-r-sm);
-  background: var(--aeon-surface);
-}
-.activity-browser-raw[open] > .activity-source-name {
-  margin-left: 0;
 }
 .activity-operation-detail {
   margin: var(--aeon-s-2) 0;
@@ -1753,19 +1639,6 @@ summary:focus-visible {
   transform: translateY(-50%);
   color: var(--aeon-swatch-a0a0a0);
 }
-.welcome-mark {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  margin-bottom: var(--aeon-s-4);
-  place-items: center;
-  border-radius: var(--aeon-r-lg);
-  background: var(--aeon-swatch-2c2c2c);
-  color: var(--aeon-swatch-d5d5d5);
-  font:
-    600 var(--aeon-fs-2xl)/1 Georgia,
-    serif;
-}
 .welcome p {
   margin: 0;
   font-size: var(--aeon-fs-lg);
@@ -1827,7 +1700,7 @@ summary:focus-visible {
   opacity: 0.85;
 }
 .sync-notice[data-error="true"] {
-  color: var(--aeon-swatch-c78b84);
+  color: var(--fg-1);
 }
 
 .composer-dock {
@@ -1862,7 +1735,7 @@ summary:focus-visible {
   box-shadow: none;
 }
 .composer:focus-within {
-  border-color: var(--aeon-swatch-555555);
+  border-color: color-mix(in srgb, var(--aeon-swatch-555555) 70%, var(--aeon-swatch-3b3b3b));
 }
 .composer textarea {
   display: block;
@@ -1914,16 +1787,6 @@ summary:focus-visible {
   opacity: 1;
   cursor: not-allowed;
 }
-.model-note {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--aeon-s-2);
-  color: var(--aeon-muted);
-  font-size: var(--aeon-fs-sm);
-}
-.model-note i {
-  background: var(--aeon-swatch-9c8969);
-}
 .send-button {
   background: var(--aeon-swatch-f3f3f3);
   color: var(--aeon-swatch-232323);
@@ -1938,8 +1801,10 @@ summary:focus-visible {
   cursor: default;
 }
 .send-button svg {
+  display: block;
   width: 17px;
   height: 17px;
+  margin: auto;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
@@ -1947,8 +1812,10 @@ summary:focus-visible {
   stroke-linejoin: round;
 }
 .stop-icon-button svg {
-  width: 16px;
-  height: 16px;
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: auto;
   fill: currentColor;
   stroke: none;
 }
@@ -2156,19 +2023,11 @@ summary:focus-visible {
 .pi-picker-options button[aria-selected="true"] {
   background: var(--surface-raised);
 }
-.pi-picker-option-label,
-.pi-picker-option-id {
+.pi-picker-option-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.pi-picker-options button .pi-picker-option-id {
-  grid-column: 1;
-  grid-row: 2;
-  color: var(--muted);
-  font-size: var(--aeon-fs-sm);
 }
 .pi-picker-options button .pi-picker-option-check {
   grid-column: 2;
@@ -2316,51 +2175,6 @@ body[data-host="home"] .home-model-controls .pi-picker-effort summary {
   color: var(--aeon-text);
   font-variant-numeric: tabular-nums;
 }
-.composer-mode-menu {
-  position: relative;
-  margin-right: auto;
-}
-.composer-mode-menu > summary {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: var(--aeon-r-half);
-  color: var(--muted);
-  font-size: var(--aeon-fs-20);
-  line-height: 1;
-  cursor: pointer;
-  list-style: none;
-}
-.composer-mode-menu > summary::-webkit-details-marker {
-  display: none;
-}
-.composer-mode-menu > summary:hover,
-.composer-mode-menu[open] > summary {
-  background: var(--surface-raised);
-  color: var(--text);
-}
-.composer-more-menu {
-  position: absolute;
-  z-index: 32;
-  bottom: calc(100% + 7px);
-  left: 0;
-  min-width: 220px;
-  padding: var(--aeon-s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-md);
-  background: var(--surface);
-  box-shadow: var(--aeon-drop-4);
-}
-.input-mode-wrap {
-  display: grid;
-  gap: var(--aeon-s-1);
-  color: var(--muted);
-  font-size: var(--aeon-fs-xs);
-}
-.input-mode-wrap select {
-  width: 100%;
-}
 .attachment-list {
   display: flex;
   width: min(100%, 940px);
@@ -2392,28 +2206,6 @@ body[data-host="home"] .home-model-controls .pi-picker-effort summary {
   font: inherit;
   cursor: pointer;
 }
-.queue-view {
-  width: min(100%, 940px);
-  margin: var(--aeon-s-2) auto 0;
-  padding: var(--aeon-s-2) var(--aeon-s-3);
-  border: 1px solid var(--aeon-swatch-343832);
-  border-radius: var(--aeon-r-md);
-  color: var(--aeon-swatch-a5a89f);
-  font-size: var(--aeon-fs-xs);
-}
-.queue-view[hidden] {
-  display: none;
-}
-.queue-view strong {
-  display: block;
-  margin-bottom: 1px;
-  color: var(--aeon-swatch-d2d4cc);
-  font-weight: 550;
-}
-.queue-view p {
-  margin: var(--aeon-s-1) 0;
-  overflow-wrap: anywhere;
-}
 
 .chat-sidebar {
   position: fixed;
@@ -2438,29 +2230,6 @@ body[data-host="home"] .home-model-controls .pi-picker-effort summary {
   height: 28px;
   font-size: var(--aeon-fs-xl);
   font-weight: 300;
-}
-.new-chat-button {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--aeon-swatch-393936);
-  border-radius: var(--aeon-r-md);
-  background: var(--aeon-swatch-292927);
-  text-align: left;
-  cursor: pointer;
-  flex: none;
-  height: 36px;
-  min-height: 36px;
-  margin: 12px 0;
-  padding: 6px 10px;
-  gap: 10px;
-  font-size: var(--aeon-fs-base);
-}
-.new-chat-button:hover {
-  background: var(--aeon-swatch-333330);
-}
-.new-chat-button span {
-  color: var(--aeon-swatch-bdbdb7);
-  font-size: var(--aeon-fs-lg);
 }
 
 .search-box svg {
@@ -2529,19 +2298,11 @@ body[data-host="home"] .home-model-controls .pi-picker-effort summary {
   }
 }
 @media (max-width: 640px) {
-  .topbar {
-    padding: 0 var(--aeon-s-3);
-  }
   .connection-state {
     display: none;
   }
   .fixture-badge {
     margin-left: auto;
-  }
-  .resource-toggle {
-    max-width: 132px;
-    padding: 0 var(--aeon-s-2);
-    font-size: var(--aeon-fs-xs);
   }
   .loaded-resources {
     padding: var(--aeon-s-3);
@@ -2594,7 +2355,6 @@ body[data-host="home"] .home-model-controls .pi-picker-effort summary {
   }
 }
 
-body[data-host="panel"] .topbar,
 body[data-host="panel"] .chat-sidebar,
 body[data-host="panel"] .sidebar-scrim {
   display: none !important;
@@ -2621,10 +2381,6 @@ body[data-host="panel"] .composer-meta .pi-picker summary {
   height: 26px;
   font-size: var(--aeon-fs-base);
 }
-
-body[data-host="panel"] .composer-more-menu {
-  min-width: 190px;
-}
 body[data-host="panel"] .pi-picker-menu {
   max-height: min(440px, calc(100dvh - 18px));
 }
@@ -2637,14 +2393,6 @@ body[data-host="panel"] .composer-meta .pi-picker-menu {
 }
 body[data-host="panel"] .composer-meta .pi-picker-effort .pi-picker-menu {
   width: 190px;
-}
-body[data-host="panel"] .composer-mode-menu > summary {
-  width: 24px;
-  height: 24px;
-}
-body[data-host="panel"] .queue-view {
-  margin-inline: var(--aeon-s-2);
-  width: calc(100% - 18px);
 }
 /* ask_user and other agent questions: one quiet card with an amber dot, the question as plain
    reading text, and the same buttons as the hand-off card (filled answer, text-only Cancel). */
@@ -2771,8 +2519,7 @@ body[data-host="panel"] .queue-view {
   margin-bottom: 8px;
 }
 .activity-bundle > summary,
-.activity-step > summary,
-.activity-live-action {
+.activity-step > summary {
   font-size: var(--aeon-fs-lg);
   font-weight: 500;
   color: var(--aeon-c-949494);
@@ -2839,13 +2586,6 @@ body[data-host="panel"] .queue-view {
 .activity-step:hover > .activity-raw-details {
   opacity: 1;
   pointer-events: auto;
-}
-.inline-edit-preview-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 .pi-picker-value {
   min-width: 0;
@@ -3051,14 +2791,6 @@ body[data-host="panel"] .queue-view {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.pi-picker-chevron {
-  flex: none;
-  color: var(--aeon-faint);
-  opacity: 0;
-}
-.pi-picker[open] .pi-picker-chevron {
-  opacity: 1;
-}
 .thinking-detail summary {
   display: flex;
   align-items: center;
@@ -3073,15 +2805,6 @@ body[data-host="panel"] .queue-view {
 .thinking-detail summary:focus-visible,
 .thinking-detail[open] summary {
   color: var(--aeon-muted);
-}
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  color: var(--aeon-swatch-d4d4ce);
-  font-weight: 550;
-  gap: 10px;
-  font-size: var(--aeon-fs-base);
 }
 
 .sidebar-chat-row {
@@ -3255,7 +2978,6 @@ body:not([data-embedded="true"]) .transcript {
 }
 .activity-bundle > summary,
 .activity-step > summary,
-.activity-live-action,
 .transcript-turn > summary,
 .thinking-detail {
   font-size: var(--aeon-fs-base);
@@ -3356,8 +3078,7 @@ body:not([data-embedded="true"]) .transcript {
   color: var(--aeon-text);
 }
 
-.pi-picker-options button,
-.pi-picker-button {
+.pi-picker-options button {
   font-size: var(--aeon-fs-base);
   font-weight: 400;
 }
@@ -3419,32 +3140,12 @@ body[data-host="panel"] .composer-meta {
   border: 0;
   padding-top: 68px;
 }
-.management-return {
-  position: absolute;
-  top: 16px;
-  right: 24px;
-  z-index: 4;
-  padding: 6px 12px;
-  background: var(--aeon-surface);
-  color: var(--aeon-text);
-  border: 1px solid var(--aeon-line);
-  border-radius: var(--aeon-r-md);
-  cursor: pointer;
-}
 
 .sidebar-management-links {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin: 14px 0 8px;
-}
-.chat-sidebar .new-chat-button {
-  border: 0;
-  background: transparent;
-  padding: 6px 12px;
-  font-weight: 400;
-  margin-top: 44px;
-  margin: 0 0 4px;
 }
 
 /* Neutral chat palette and one scroll surface for chat navigation. */
@@ -3467,14 +3168,6 @@ body[data-host="panel"] .composer-meta {
   min-height: 36px;
   flex-shrink: 0;
 }
-.sidebar-section-label {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: var(--aeon-fs-md);
-  margin: 18px 12px 8px;
-  color: var(--aeon-c-707070);
-  font-weight: 600;
-}
 
 /* Hover actions remain reachable across the gap below a response. */
 .message-actions::before {
@@ -3491,8 +3184,7 @@ body[data-host="panel"] .composer-meta {
 .activity-card > summary:hover,
 .activity-bundle > summary:hover,
 .activity-step > summary:hover,
-.thinking-detail > summary:hover,
-.activity-browser-operation > summary:hover {
+.thinking-detail > summary:hover {
   color: var(--aeon-text);
 }
 .activity-step > summary:hover .activity-step-name {
@@ -3827,10 +3519,7 @@ body[data-host="panel"] .composer-meta {
   border-radius: var(--aeon-r-full) var(--aeon-r-full) var(--aeon-r-full) var(--aeon-r-3);
   background: var(--aeon-c-ffffff);
   color: var(--aeon-c-111111);
-  font:
-    600 var(--aeon-fs-xs)/1 "Segoe UI",
-    system-ui,
-    sans-serif;
+  font: 500 var(--aeon-fs-xs)/1 var(--aeon-font);
   box-shadow: var(--aeon-drop-6);
   cursor: pointer;
 }
@@ -4041,6 +3730,8 @@ body[data-host="panel"] .composer-meta {
   object-fit: contain;
 }
 .browser-context-page-label {
+  /* A flex child: without this a long title pushes the chip past the panel's edge. */
+  min-width: 0;
   color: var(--aeon-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4058,6 +3749,9 @@ body[data-host="panel"] .composer-meta {
   padding: 0;
 }
 
+/* Work in another tab: a compact live tile the size of the send button, in the work area above
+   the composer. A click morphs it to the column's full width with the tab's title and Jump to
+   tab; it melts away when the work there ends. Work on the tab in front shows none. */
 .aeon-browser-previews {
   position: fixed;
   right: 16px;
@@ -4065,91 +3759,131 @@ body[data-host="panel"] .composer-meta {
   z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: flex-end;
+  gap: var(--aeon-s-2);
   pointer-events: none;
 }
-.aeon-browser-previews[data-view="thumbnails"] {
-  top: 72px;
-  bottom: 112px;
-  justify-content: flex-start;
-  overflow-y: auto;
+.aeon-browser-previews.expanded {
+  left: 16px;
+}
+/* Above the composer's page-context chip, never over it (it hid the chip's remove button). */
+body:has(.composer-context-slot .browser-context-chip) .aeon-browser-previews {
+  bottom: 152px;
 }
 .aeon-browser-preview {
   display: flex;
   flex: none;
   flex-direction: column;
-  width: 220px;
-  pointer-events: auto;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-  padding: 0;
+  width: 56px;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid var(--aeon-border);
-  border-radius: var(--aeon-r-12);
+  border-radius: var(--aeon-r-8);
   background: var(--aeon-surface-raised);
   box-shadow: var(--aeon-shadow-md);
   color: var(--aeon-muted);
-  font: 500 var(--aeon-fs-sm)/16px inherit;
-  text-align: left;
+  font: 500 var(--aeon-fs-sm) / 16px inherit;
+  pointer-events: auto;
+  animation: preview-in var(--t-base) var(--ease);
+  transition:
+    width var(--t-fold) var(--ease),
+    border-radius var(--t-fold) var(--ease),
+    opacity var(--t-base) var(--ease),
+    transform var(--t-base) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+.aeon-browser-preview.expanded {
+  width: 100%;
+  border-radius: var(--aeon-r-12);
+}
+.aeon-browser-preview.leaving {
+  opacity: 0;
+  transform: scale(0.92);
+}
+@keyframes preview-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.aeon-preview-thumb {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
   cursor: pointer;
 }
 .aeon-browser-preview img {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  height: 36px;
   object-fit: cover;
   object-position: top;
   background: var(--aeon-surface);
+  transition: height var(--t-fold) var(--ease);
 }
-.aeon-browser-preview span {
-  overflow: hidden;
+.aeon-browser-preview.expanded img {
+  height: auto;
+  aspect-ratio: 16 / 10;
+}
+.aeon-preview-meta {
+  display: none;
+  align-items: center;
+  gap: var(--aeon-s-2);
   padding: 6px 10px;
+}
+.aeon-browser-preview.expanded .aeon-preview-meta {
+  display: flex;
+}
+.aeon-preview-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.aeon-preview-jump {
+  flex: none;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--aeon-r-sm);
+  background: none;
+  color: var(--aeon-text);
+  font: inherit;
+  cursor: pointer;
+}
+.aeon-preview-jump:hover {
+  background: color-mix(in srgb, var(--aeon-text) 8%, transparent);
 }
 .aeon-browser-preview:hover {
   border-color: var(--aeon-border-strong);
 }
-.aeon-browser-preview[data-view="thumbnails"] {
-  width: 240px;
+.aeon-browser-preview.latest {
+  border-color: var(--aeon-border-strong);
 }
-.aeon-browser-preview.latest[data-view="thumbnails"] {
-  border-color: var(--aeon-accent);
-  box-shadow: var(--aeon-drop-7);
-}
-@media (max-width: 900px) {
-  .aeon-browser-previews[data-view="thumbnails"] .aeon-browser-preview {
-    width: 160px;
+@media (prefers-reduced-motion: reduce) {
+  .aeon-browser-preview,
+  .aeon-browser-preview img {
+    animation: none;
+    transition: none;
   }
 }
 
-/* Hand-off: the agent waits for the user in a tab (shape after the Grok takeover card). */
+/* Hand-off: the agent waits for the user in a tab. A neutral obsidian card on the dry hairline;
+   the only colour is the ochre text of "I'm done". */
 .handoff-card {
   display: grid;
-  gap: 10px;
-  width: min(100%, 420px);
-  margin: 12px 0;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-lg);
+  gap: var(--aeon-s-3);
+  width: 100%;
+  margin: var(--aeon-s-3) 0;
+  padding: var(--aeon-s-3) var(--aeon-s-4);
+  border: var(--hair) solid var(--ink-dry);
+  border-radius: var(--r-card);
   background: var(--surface);
-  color: var(--text);
-}
-.handoff-card header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-weight: 550;
-}
-.handoff-badge {
-  padding: 2px 8px;
-  border-radius: var(--aeon-r-full);
-  background: var(--aeon-c-16a34a-15);
-  color: var(--aeon-c-4ade80);
-  font-size: var(--aeon-fs-sm);
-  font-weight: 500;
+  color: var(--fg-1);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
 }
 .handoff-card p {
   margin: 0;
@@ -4158,30 +3892,34 @@ body[data-host="panel"] .composer-meta {
 .handoff-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--aeon-s-2);
 }
 .handoff-actions button {
-  padding: 7px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--aeon-r-md);
+  height: 30px;
+  padding: 0 var(--aeon-s-3);
+  border: var(--hair) solid var(--ink-dry);
+  border-radius: var(--r-row);
   background: transparent;
-  color: var(--text);
+  color: var(--fg-1);
   font: inherit;
+  font-weight: var(--fw-med);
   cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease);
+}
+.handoff-actions button:hover:not(:disabled) {
+  border-color: var(--ink-wet-hi);
+}
+.handoff-actions .handoff-done {
+  color: var(--aeon-needs);
+}
+.handoff-actions .handoff-skip {
+  border-color: transparent;
+  color: var(--fg-3);
+  font-weight: var(--fw-reg);
 }
 .handoff-actions button:disabled {
   opacity: 0.5;
   cursor: default;
-}
-.handoff-actions .handoff-primary {
-  border-color: transparent;
-  background: var(--text);
-  color: var(--surface);
-}
-.handoff-actions .handoff-skip {
-  margin-left: auto;
-  border: 0;
-  color: var(--muted);
 }
 
 /* Shared run parts (@aeon/ui run-cards): Aeon's theme. The orb's island has its own dark skin. */
@@ -4191,24 +3929,18 @@ body[data-host="panel"] .composer-meta {
   gap: 6px;
   margin-bottom: 6px;
 }
-.run-needs-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--aeon-r-half);
-  background: var(--aeon-needs);
-}
 .run-eyebrow {
   font-size: var(--aeon-fs-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--aeon-needs);
+  color: var(--fg-1);
 }
 .run-count {
   min-width: 16px;
   padding: 0 5px;
+  border: var(--hair) solid var(--ink-dry);
   border-radius: var(--aeon-r-full);
-  background: var(--aeon-needs);
-  color: var(--aeon-canvas);
+  color: var(--fg-2);
   font-size: var(--aeon-fs-xs);
   font-weight: 700;
   text-align: center;
@@ -4307,11 +4039,38 @@ body[data-host="panel"] .composer-meta {
   font: inherit;
   font-size: var(--aeon-fs-md);
 }
+.chat-switcher-menu input,
+.chat-switcher-manage {
+  flex: none;
+}
 .chat-switcher-menu ul {
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0;
   padding: 0 6px 6px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
+}
+/* Pinned under the list, never scrolled away: Manage is always one click. */
+.chat-switcher-menu .chat-switcher-manage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 9px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--aeon-fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.chat-switcher-menu .chat-switcher-manage:hover {
+  color: var(--text);
 }
 .chat-switcher-menu li {
   display: flex;
@@ -4348,11 +4107,12 @@ body[data-host="panel"] .composer-meta {
   border-radius: var(--aeon-r-half);
   background: transparent;
 }
+/* State in ash, never colour: running is a soft ring, needs a solid bone mark. */
 .chat-switcher-menu li i[data-state="running"] {
-  background: var(--aeon-c-7c5cff);
+  box-shadow: inset 0 0 0 1px var(--muted);
 }
 .chat-switcher-menu li i[data-state="needs"] {
-  background: var(--aeon-c-e08a00);
+  background: var(--text);
 }
 .chat-switcher-empty {
   color: var(--muted);
@@ -4429,33 +4189,161 @@ body[data-host="orb"] .composer-meta {
   font-size: var(--aeon-fs-sm);
 }
 
-/* The orb's live thumbnail stays a small corner tile so it never covers the chat; hover or focus
-   opens it to full size with the tab's title. */
-body[data-host="orb"] .aeon-browser-previews,
-body[data-host="orb"] .aeon-browser-previews[data-view="thumbnails"] {
-  top: 10px;
-  right: 10px;
-  bottom: auto;
-  align-items: flex-end;
-  overflow: visible;
+/* The chat turn, OG Codex: flat and borderless. Upgrades: quieter 13px rows on a 28px rhythm so
+   the answer leads, one monochrome breath on the live step only, smooth disclosure folds. */
+.transcript-turn > summary,
+.activity-bundle > summary,
+.activity-step > summary {
+  font-size: var(--aeon-fs-md);
+  line-height: 20px;
 }
-body[data-host="orb"] .aeon-browser-preview,
-body[data-host="orb"] .aeon-browser-preview[data-view="thumbnails"] {
-  width: 56px;
-  border-radius: var(--aeon-r-8);
-  box-shadow: var(--aeon-drop-9);
+.transcript-turn > summary {
+  min-height: 28px;
+}
+.activity-bundle > summary,
+.activity-step > summary {
+  min-height: 28px;
+}
+.transcript-turn > summary .activity-duration {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transcript-turn[data-running="true"] .activity-step[data-state="running"] > summary {
+  animation: step-breathe var(--breathe);
+}
+@keyframes step-breathe {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.transcript-turn::details-content,
+.activity-bundle::details-content,
+.activity-step::details-content,
+.thinking-detail::details-content {
+  block-size: 0;
+  overflow: clip;
   transition:
-    width 200ms cubic-bezier(0.32, 0.72, 0, 1),
-    border-color 160ms ease;
+    block-size var(--t-base) var(--ease),
+    content-visibility var(--t-base) allow-discrete;
 }
-body[data-host="orb"] .aeon-browser-preview span {
-  display: none;
+.transcript-turn[open]::details-content,
+.activity-bundle[open]::details-content,
+.activity-step[open]::details-content,
+.thinking-detail[open]::details-content {
+  block-size: auto;
 }
-body[data-host="orb"] .aeon-browser-preview:hover,
-body[data-host="orb"] .aeon-browser-preview:focus-visible {
-  width: 220px;
+:root {
+  interpolate-size: allow-keywords;
 }
-body[data-host="orb"] .aeon-browser-preview:hover span,
-body[data-host="orb"] .aeon-browser-preview:focus-visible span {
-  display: block;
+@media (prefers-reduced-motion: reduce) {
+  .transcript-turn::details-content,
+  .activity-bundle::details-content,
+  .activity-step::details-content,
+  .thinking-detail::details-content {
+    transition: none;
+  }
+}
+
+/* Under the answer: what was learned, one quiet offer, and the hover icons. */
+.answer-lines {
+  position: relative;
+}
+.answer-line {
+  color: var(--fg-3);
+}
+.answer-offer {
+  color: var(--fg-2);
+}
+.answer-offer:hover:not(:disabled) {
+  color: var(--fg-1);
+}
+.answer-actions {
+  display: flex;
+  gap: var(--aeon-s-1);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.message-row:hover ~ .answer-lines .answer-actions,
+.answer-lines:hover .answer-actions,
+.answer-actions:focus-within {
+  opacity: 1;
+}
+.answer-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--aeon-s-2);
+  min-height: 28px;
+}
+.answer-duration {
+  color: var(--fg-3);
+  font-size: var(--aeon-fs-md);
+  font-variant-numeric: tabular-nums;
+}
+.answer-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-row);
+  background: none;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+.answer-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.answer-icon:hover:not(:disabled) {
+  color: var(--fg-1);
+}
+.answer-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The composer: the `@ site · page` chip sits left-aligned at its top, the model name truncates
+   instead of clipping at 420 px. */
+.composer-context-slot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--aeon-s-1);
+  margin-right: auto;
+}
+.composer-context-slot .browser-context-chip {
+  max-width: 100%;
+  border-color: var(--ink-dry);
+  background: transparent;
+  color: var(--fg-2);
+}
+.composer-context-slot .browser-context-page-label {
+  color: var(--fg-2);
+}
+body[data-host="panel"] .composer-meta .pi-picker summary {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(200px, 48vw);
+}
+body[data-host="panel"] .composer-meta .pi-picker summary .provider-icon {
+  align-self: center;
+}
+body[data-host="panel"] .composer-meta .pi-picker-value {
+  display: inline-block;
+  min-width: 0;
+  line-height: 20px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

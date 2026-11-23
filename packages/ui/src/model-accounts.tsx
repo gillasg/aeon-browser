@@ -22,7 +22,7 @@ export function ModelAccounts(props: ModelAccountsProps): ReactElement {
   return (
     <section className="aeon-page model-accounts" aria-labelledby="models-heading">
       <header className="aeon-page-head">
-        <h1 id="models-heading">Models</h1>
+        <h2 id="models-heading">Models</h2>
         <p>
           Sign in once. Aeon, the Pi CLI and other Pi apps on this computer share the same logins.
         </p>

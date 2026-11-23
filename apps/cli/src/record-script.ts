@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { Args } from "browserkit/dist/args.js";
 import type { AttentionChat } from "./client.js";
 import type { DaemonHost } from "./host.js";
+import type { AeonClient } from "./client.js";
 import { loadState, type RecordState } from "./record-capture.js";
 import type { Box, Mark, SoundCue } from "./record-events.js";
 
@@ -285,7 +286,7 @@ export async function run(host: DaemonHost, steps: RecordSteps, args: Args): Pro
   const prompt = args.positional[1];
   if (!prompt)
     throw new Error(
-      'Usage: aeon record run "<prompt>" [--url <url>] [--browser name] [--out dir] [--window chrome|--tabs] [--no-mouse] [--tail s]',
+      'Usage: aeon record run "<prompt>" [--url <url>] [--browser name] [--out dir] [--window chrome|--tabs] [--no-mouse] [--tail s] [--background]',
     );
   const started = Date.now();
   await openUrl(host, text(args, "url"));
@@ -323,6 +324,37 @@ async function runPrompt(
   const client = await host.connect();
   const { runTasks } = await import("./run.js");
   const tail = Number(text(args, "tail") ?? 2.5);
+  // The camera films the window in front: the agent's tabs must open there, or the take shows
+  // nothing. Work in front is on for the take and restored after; --background keeps it as is.
+  const restore = args.flags.background === true ? undefined : await workInFront(client);
+  try {
+    return await promptTake(client, runTasks, host, steps, args, prompt, started, tail);
+  } finally {
+    if (restore) await client.settings({ agentInFront: false }).catch(() => undefined);
+  }
+}
+
+/** Turns Work in front on; true when it was off (so the take restores it). */
+async function workInFront(client: AeonClient): Promise<boolean> {
+  const browsers = await client.settings(undefined).catch(() => [] as unknown[]);
+  const off = browsers.some(
+    (browser) => (browser as { agentInFront?: unknown } | null)?.agentInFront !== true,
+  );
+  if (!off) return false;
+  await client.settings({ agentInFront: true }).catch(() => undefined);
+  return true;
+}
+
+async function promptTake(
+  client: AeonClient,
+  runTasks: typeof import("./run.js").runTasks,
+  host: DaemonHost,
+  steps: RecordSteps,
+  args: Args,
+  prompt: string,
+  started: (chatId: string) => void,
+  tail: number,
+): Promise<string | undefined> {
   const [result] = await runTasks(client, [prompt], {
     parallel: 1,
     quiet: false,

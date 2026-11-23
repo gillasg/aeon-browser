@@ -86,13 +86,11 @@ const props = {
   error: "",
   connectionLabel: "Connected",
   theme: "dark",
-  sidebarDefaultOpen: false,
   onRefresh: () => undefined,
   onSelectChat: () => undefined,
   onOpenChat: () => undefined,
   onAction: () => undefined,
   onTheme: () => undefined,
-  onSidebarDefault: () => undefined,
 };
 
 test("the Abilities list renders abilities, inputs, how often they worked and Run", () => {
@@ -100,7 +98,7 @@ test("the Abilities list renders abilities, inputs, how often they worked and Ru
   assert.match(html, /Daily prices/);
   assert.match(html, /Reads three shops/);
   assert.match(html, /query/);
-  assert.match(html, /2\/2/);
+  assert.match(html, />Works</);
   assert.match(html, />Run</);
   assert.match(html, /Exported to \/tmp\/x\.json/);
 });
@@ -110,9 +108,10 @@ test("the Sites page lists every site with what Aeon can do, the account and rul
     createElement(SitesPage, { ...props, section: "sites", blockedSites: ["bad.example"] }),
   );
   assert.match(html, /shop\.example/);
-  assert.match(html, /test@example\.com/);
+  // The account handle lives in Site detail only, never on the row.
+  assert.doesNotMatch(html, /test@example\.com/);
   assert.match(html, /bad\.example/);
-  assert.match(html, /blocked/);
+  assert.match(html, /Blocked/);
 });
 
 test("code ways are marked with their source, and site notes render as facts", () => {
@@ -139,6 +138,6 @@ test("a site's entry joins its mapped API, routines and block rule", () => {
     ["bad.example", "shop.example"],
   );
   assert.equal(entries[1].routines.length, 1);
-  assert.match(siteSummary(entries[1]), /1 watching/);
-  assert.equal(siteSummary(entries[0]), "blocked");
+  assert.match(siteSummary(entries[1]), /1 watch\b/);
+  assert.equal(siteSummary(entries[0]), "Blocked");
 });

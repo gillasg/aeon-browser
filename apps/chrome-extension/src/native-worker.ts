@@ -9,12 +9,9 @@ import { installSiteFacts } from "./site-facts-worker.js";
 import { installEngineListeners } from "@browserkit/engine/native-engine-install";
 import {
   AGENT_IN_FRONT_KEY,
-  AGENT_TAB_VIEW_KEY,
   HIDE_AGENT_CURSOR_KEY,
   RECORD_AGENT_TABS_KEY,
   readAgentFlag,
-  readAgentTabView,
-  readAgentTabViewSetting,
 } from "./agent-tab-view.js";
 import { handleOpenChatMessage } from "./native-worker-open-chat.js";
 import { installOrb } from "./orb/orb-worker.js";
@@ -109,7 +106,8 @@ configureEngine({
   notificationIcon: "completion-icon.png",
   // The shared group is simply "Aeon"; a chat's own group carries its title.
   tabGroupTitle: (owner, title) => (owner.startsWith("shared") ? "Aeon" : (title ?? "Aeon")),
-  agentView: readAgentTabView,
+  // Chats live in the side panel: the agent's tabs show as live thumbnails, never split screen.
+  agentView: () => Promise.resolve("thumbnails"),
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
   hideAgentCursor: () => readAgentFlag(HIDE_AGENT_CURSOR_KEY),
   recordAgentTabs: () => readAgentFlag(RECORD_AGENT_TABS_KEY),
@@ -117,13 +115,6 @@ configureEngine({
   agentGlowColor: () => Promise.resolve("#7c5cff"),
 });
 // Aeon's own view settings, beside the engine's, for browser.settings() when the user asks.
-registerSetting("agentView", {
-  about:
-    "How a chat shows the agent's tabs: auto (split view from a chat tab, thumbnails from the side panel), split, or thumbnails",
-  values: ["auto", "split", "thumbnails"],
-  read: readAgentTabViewSetting,
-  write: (value) => chrome.storage.local.set({ [AGENT_TAB_VIEW_KEY]: value }),
-});
 registerSetting("agentInFront", {
   about: "Open the agent's tabs in front and switch to them as it works (for filming it)",
   values: [true, false],

@@ -5,8 +5,9 @@ export function pageTitle(name: string): string {
   return `Aeon · ${name}`;
 }
 
-export function usePageTitle(name: string): void {
+/** `on: false` for a section shown inside another page, which keeps that page's title. */
+export function usePageTitle(name: string, on = true): void {
   useEffect(() => {
-    if (typeof document !== "undefined") document.title = pageTitle(name);
-  }, [name]);
+    if (on && typeof document !== "undefined") document.title = pageTitle(name);
+  }, [name, on]);
 }
