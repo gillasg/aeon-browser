@@ -208,6 +208,7 @@ function createView() {
     chatId,
     title,
     connection,
+    missingChromeFlags: client?.missingChromeFlags,
     notice,
     onDismissNotice: dismissNotice,
     userControl,

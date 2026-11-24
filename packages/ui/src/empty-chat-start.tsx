@@ -18,6 +18,8 @@ export function EmptyChatStart(props: ChatSurfaceProps): ReactElement {
             : {}),
           ...(props.composer.modelLogin ? { modelLogin: props.composer.modelLogin } : {}),
           chatId: props.chatId,
+          connected: props.connection.state === "connected",
+          missingChromeFlags: props.missingChromeFlags,
           browserContext: props.composer.browserContext,
           onRemoveContext: props.composer.onRemoveBrowserContext,
           projectName: props.composer.projectName ?? null,

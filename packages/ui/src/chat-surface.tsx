@@ -28,6 +28,7 @@ export interface ChatSurfaceProps {
   chatId: string;
   title: string;
   connection: { label: string; state: "connecting" | "connected" | "error" };
+  missingChromeFlags?: readonly string[] | undefined;
   notice: string;
   onDismissNotice?(): void;
   /** A tab the user took over from the agent; the run waits until it is given back. */

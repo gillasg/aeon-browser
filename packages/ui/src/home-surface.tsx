@@ -27,6 +27,7 @@ export interface NewTabHomeProps {
   developmentFixture: boolean;
   connectionLabel: string;
   connected?: boolean;
+  missingChromeFlags?: readonly string[] | undefined;
   chats: readonly ChatCatalogItemDto[];
   /** Chats whose agent is working right now, and chats waiting on the user (the Chats page). */
   runningChatIds?: ReadonlySet<string>;

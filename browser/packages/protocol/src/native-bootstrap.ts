@@ -104,6 +104,7 @@ export const AuthReplySchema = z.discriminatedUnion("kind", [
       protocolVersion: ProtocolVersionSchema,
       role: z.enum(["extension-executor", "ui"]),
       connectionId: z.string().uuid(),
+      missingChromeFlags: z.array(z.string().min(1)).optional(),
     })
     .strict(),
   z

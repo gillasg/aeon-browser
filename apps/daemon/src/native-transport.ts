@@ -22,6 +22,7 @@ import { attachNativeExecutor } from "./native-executor-messages.js";
 import { authorizeNativeUiScope } from "./native-ui-authz.js";
 import { BrowserControlService } from "./browser-control-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
+import { createChromeFlagsProbe, type ChromeFlagsProbe } from "./chrome-flags-probe.js";
 
 const MAX_BOOTSTRAP_BYTES = 16 * 1024;
 // Matches the browserkit bridge; the extension refuses messages over 24 MB itself.
@@ -40,10 +41,12 @@ export async function startNativeTransport(
   browserControl = new BrowserControlService(),
   threadCoordination?: ThreadCoordinationService,
   attention?: CoreAttention,
+  chromeFlagsProbe: ChromeFlagsProbe = createChromeFlagsProbe(),
 ): Promise<NativeTransport> {
   const grants = new GrantAuthority(extensionOrigin);
   const inventories = new BrowserInventoryRegistry();
   browserControl.useInventories(inventories);
+  void chromeFlagsProbe.refresh();
   const server = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -76,6 +79,7 @@ export async function startNativeTransport(
       browserControl,
       threadCoordination,
       attention,
+      chromeFlagsProbe,
     );
   });
   await once(server, "listening");
@@ -145,6 +149,7 @@ function authenticateSocket(
   browserControl: BrowserControlService,
   threadCoordination?: ThreadCoordinationService,
   attention?: CoreAttention,
+  chromeFlagsProbe?: ChromeFlagsProbe,
 ): void {
   const timeout = globalThis.setTimeout(() => rejectSocket(socket, "MALFORMED_HELLO"), 3_000);
   const onHello = (data: RawData, binary: boolean): void => {
@@ -157,11 +162,13 @@ function authenticateSocket(
     const check = grants.consume(origin, hello);
     if (!check.ok) return rejectSocket(socket, check.code);
 
+    const missingChromeFlags = hello.role === "ui" ? chromeFlagsProbe?.current() : undefined;
     const ready = AuthReplySchema.parse({
       kind: "auth.ready",
       protocolVersion: SUPPORTED_PROTOCOL_VERSION,
       role: hello.role,
       connectionId: randomUUID(),
+      ...(missingChromeFlags?.length ? { missingChromeFlags: [...missingChromeFlags] } : {}),
     });
     socket.send(JSON.stringify(ready));
     if (check.context.role === "ui") {

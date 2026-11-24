@@ -120,6 +120,7 @@ function createView() {
     developmentFixture: !__AEON_NATIVE_TRANSPORT__,
     connectionLabel,
     connected: client?.socket.readyState === WebSocket.OPEN && connectionLabel === "Connected",
+    missingChromeFlags: client?.missingChromeFlags,
     chats,
     runningChatIds,
     needsChatIds,

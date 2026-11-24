@@ -55,7 +55,7 @@ export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectR
       kind: "failed",
       code: reply?.kind === "auth.rejected" ? reply.code : "CONNECTION_TIMEOUT",
     };
-  return { kind: "connected", client: new UiClient(socket) };
+  return { kind: "connected", client: new UiClient(socket, reply.missingChromeFlags) };
 }
 
 function authenticate(socket: WebSocket, hello: unknown) {

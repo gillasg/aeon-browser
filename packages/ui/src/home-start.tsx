@@ -29,7 +29,7 @@ type HomeStartProps = Pick<
   chatId?: string;
   connected?: boolean;
   /** Optional Chrome flags the daemon saw missing; drives the quiet relaunch notice. */
-  missingChromeFlags?: readonly string[];
+  missingChromeFlags?: readonly string[] | undefined;
   /** "What can Aeon do?": the Learn page. */
   onLearn?(): void;
 };

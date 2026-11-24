@@ -30,7 +30,10 @@ export class UiClient {
   private pingTimer: number | undefined;
   private awaitingPong: string | undefined;
 
-  constructor(readonly socket: WebSocket) {
+  constructor(
+    readonly socket: WebSocket,
+    readonly missingChromeFlags: readonly string[] = [],
+  ) {
     socket.addEventListener("message", (event) => {
       let parsed: unknown;
       try {
