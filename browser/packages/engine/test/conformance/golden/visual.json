@@ -1,0 +1,66 @@
+{
+  "scenario": "visual",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Visual"
+    },
+    {
+      "step": "screenshot-format",
+      "kind": "ok",
+      "result": "image/jpeg"
+    },
+    {
+      "step": "screenshot-png",
+      "kind": "check",
+      "result": "image/jpeg"
+    },
+    {
+      "step": "pixels",
+      "kind": "image",
+      "result": {
+        "probes": [
+          {
+            "at": [
+              "<TIME>",
+              "<TIME>"
+            ],
+            "rgb": [
+              255,
+              0,
+              0
+            ]
+          },
+          {
+            "at": [
+              "<TIME>",
+              "<TIME>"
+            ],
+            "rgb": [
+              0,
+              0,
+              255
+            ]
+          },
+          {
+            "at": [
+              "<TIME>",
+              "<TIME>"
+            ],
+            "rgb": [
+              0,
+              128,
+              0
+            ]
+          }
+        ],
+        "size": [
+          "<BYTES>",
+          "<BYTES>"
+        ],
+        "type": "png"
+      }
+    }
+  ]
+}

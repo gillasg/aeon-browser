@@ -1,0 +1,15 @@
+{
+  "scenario": "drag",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Drag"
+    },
+    {
+      "step": "drag",
+      "kind": "ok",
+      "result": "dropped payload"
+    }
+  ]
+}

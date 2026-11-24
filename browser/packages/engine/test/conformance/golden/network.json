@@ -1,0 +1,81 @@
+{
+  "scenario": "network",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Network"
+    },
+    {
+      "step": "run",
+      "kind": "ok",
+      "result": "data 42 | xhr 201 | worker ok | redirect /landed | abort AbortError"
+    },
+    {
+      "step": "server-log",
+      "kind": "check",
+      "result": [
+        "PRIMARY GET /api/data?q=1",
+        "PRIMARY POST /api/xhr",
+        "PRIMARY GET /worker.js",
+        "PRIMARY GET /api/worker",
+        "PRIMARY GET /r/1",
+        "PRIMARY GET /r/2",
+        "PRIMARY GET /landed",
+        "PRIMARY GET /gate/abort",
+        "CROSS GET /network/frame",
+        "CROSS GET /api/frame"
+      ]
+    },
+    {
+      "step": "captured",
+      "kind": "ok",
+      "result": []
+    },
+    {
+      "step": "redirect-hops",
+      "kind": "ok",
+      "result": []
+    },
+    {
+      "step": "redirect-hops-match-log",
+      "kind": "check",
+      "result": 0
+    },
+    {
+      "step": "xhr-body",
+      "kind": "ok",
+      "result": null
+    },
+    {
+      "step": "worker-request",
+      "kind": "ok",
+      "result": []
+    },
+    {
+      "step": "worker-request-captured",
+      "kind": "check",
+      "result": 0
+    },
+    {
+      "step": "cross-frame-fetch",
+      "kind": "ok",
+      "result": []
+    },
+    {
+      "step": "cross-frame-fetch-captured",
+      "kind": "check",
+      "result": 0
+    },
+    {
+      "step": "aborted",
+      "kind": "ok",
+      "result": []
+    },
+    {
+      "step": "cross-frame-first-request",
+      "kind": "ok",
+      "result": []
+    }
+  ]
+}

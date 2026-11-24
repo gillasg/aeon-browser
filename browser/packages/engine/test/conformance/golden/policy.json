@@ -1,0 +1,27 @@
+{
+  "scenario": "policy",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Policy"
+    },
+    {
+      "step": "blocked-navigate",
+      "kind": "err",
+      "result": {
+        "error": "SITE_BLOCKED: the user blocked blocked.test for the agent. Do not use it; tell the user if the task needs it."
+      }
+    },
+    {
+      "step": "blocked-fast",
+      "kind": "ok",
+      "result": true
+    },
+    {
+      "step": "still-on-allowed",
+      "kind": "ok",
+      "result": "PRIMARY/policy"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "scenario": "dialogs",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Dialogs"
+    },
+    {
+      "step": "alert",
+      "kind": "ok",
+      "result": {
+        "dialog": {
+          "accepted": true,
+          "message": "hello alert",
+          "type": "alert"
+        },
+        "out": "alert done"
+      }
+    },
+    {
+      "step": "confirm",
+      "kind": "ok",
+      "result": {
+        "dialog": {
+          "accepted": true,
+          "message": "sure?",
+          "type": "confirm"
+        },
+        "out": "confirm true"
+      }
+    },
+    {
+      "step": "prompt",
+      "kind": "ok",
+      "result": {
+        "dialog": {
+          "accepted": true,
+          "message": "name?",
+          "type": "prompt"
+        },
+        "out": "prompt dflt"
+      }
+    },
+    {
+      "step": "dialog-during-input",
+      "kind": "ok",
+      "result": {
+        "dialog": null,
+        "effect": "confirmed",
+        "value": "abc"
+      }
+    },
+    {
+      "step": "onload",
+      "kind": "ok",
+      "result": "Onload dialog"
+    },
+    {
+      "step": "frame-dialog",
+      "kind": "ok",
+      "result": {
+        "accepted": true,
+        "message": "in frame?",
+        "type": "confirm"
+      }
+    },
+    {
+      "step": "frame-dialog-dom",
+      "kind": "eventually",
+      "result": "inner true"
+    }
+  ]
+}

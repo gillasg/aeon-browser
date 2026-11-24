@@ -1,0 +1,89 @@
+{
+  "scenario": "app",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "App"
+    },
+    {
+      "step": "snapshot",
+      "kind": "ok",
+      "result": [
+        "e0 RootWebArea App",
+        "e1 form ",
+        "e2 textbox Name",
+        "e3 combobox Color",
+        "e4 button Save",
+        "e5 button Under",
+        "e6 StaticText Save",
+        "e7 textbox Covered",
+        "e8 StaticText Under",
+        "e9 textbox Live",
+        "e10 option Red",
+        "e11 option Green",
+        "e12 option Blue"
+      ]
+    },
+    {
+      "step": "fill",
+      "kind": "ok",
+      "result": "confirmed"
+    },
+    {
+      "step": "select",
+      "kind": "ok",
+      "result": "g"
+    },
+    {
+      "step": "click",
+      "kind": "ok",
+      "result": "changed"
+    },
+    {
+      "step": "result",
+      "kind": "ok",
+      "result": "saved Ada g"
+    },
+    {
+      "step": "fill-covered",
+      "kind": "err",
+      "result": {
+        "error": "TARGET_BLOCKED: covered by div \"\"; act inside it (bu.state() shows its ids) or close it first tab <TAB> (PRIMARY/app) while the agent tried fill"
+      }
+    },
+    {
+      "step": "fill-covered-force",
+      "kind": "ok",
+      "result": {
+        "error": "TARGET_BLOCKED: covered by div \"\"; act inside it (bu.state() shows its ids) or close it first tab <TAB> (PRIMARY/app) while the agent tried fill"
+      }
+    },
+    {
+      "step": "click-covered",
+      "kind": "err",
+      "result": {
+        "error": "TARGET_BLOCKED: covered by div \"\"; act inside it (bu.state() shows its ids) or close it first tab <TAB> (PRIMARY/app) while the agent tried click"
+      }
+    },
+    {
+      "step": "click-covered-fast",
+      "kind": "check",
+      "result": false
+    },
+    {
+      "step": "fill-remount",
+      "kind": "ok",
+      "result": {
+        "error": "INPUT_FAILED: The focused input did not retain the requested value. Inspect it before continuing."
+      }
+    },
+    {
+      "step": "stale-ref",
+      "kind": "err",
+      "result": {
+        "error": "STALE_REF: id absent from the latest state; observe again"
+      }
+    }
+  ]
+}

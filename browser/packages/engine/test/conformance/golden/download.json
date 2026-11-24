@@ -1,0 +1,23 @@
+{
+  "scenario": "download",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Download"
+    },
+    {
+      "step": "download",
+      "kind": "ok",
+      "result": {
+        "persisted": true,
+        "started": true
+      }
+    },
+    {
+      "step": "on-disk",
+      "kind": "check",
+      "result": "report body 12345\n"
+    }
+  ]
+}

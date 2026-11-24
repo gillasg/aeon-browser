@@ -1,0 +1,23 @@
+{
+  "scenario": "non_html",
+  "steps": [
+    {
+      "step": "json",
+      "kind": "ok",
+      "result": "# \n\n```\n{\"items\":[1,2,3],\"name\":\"fixture\"}\n```"
+    },
+    {
+      "step": "text",
+      "kind": "ok",
+      "result": "# \n\n```\nplain text body\nline two\n```"
+    },
+    {
+      "step": "png",
+      "kind": "ok",
+      "result": [
+        40,
+        30
+      ]
+    }
+  ]
+}

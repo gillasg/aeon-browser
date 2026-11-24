@@ -87,6 +87,10 @@ jobs:
             sudo apt-get satisfy -y --no-install-recommends "$pkg"
           done < "$deps"
       - run: pnpm check
+      # The Claw & Primitive contract: deterministic, zero-LLM, loopback-only, Node alone (no
+      # Chrome, no model calls), on every OS Aeon ships to. `pnpm check` already built what it loads.
+      - name: Claw & Primitive contract
+        run: pnpm test:claws
       # On main the Mac session reuses these built outputs instead of rebuilding from scratch.
       # The paths mirror the pnpm workspace build outputs; name carries the commit so the session
       # only restores it when its own commit matches.
@@ -141,6 +145,40 @@ jobs:
         run: xvfb-run -a pnpm --dir browser run test:browser && xvfb-run -a pnpm test:browser
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+      # The real-Chrome conformance sweep: Aeon's engine through the built bridge and extension
+      # against the two-origin fixture site, judged against golden transcripts and pinned
+      # divergences. A missing Chrome fails it. Windows reports without blocking until it has a
+      # run of green builds.
+      - name: Conformance sweep
+        if: runner.os == 'macOS'
+        run: pnpm test:conformance
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+          AEON_CONFORMANCE_REQUIRE: chrome
+          AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
+      - name: Conformance sweep
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm test:conformance
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+          AEON_CONFORMANCE_REQUIRE: chrome
+          AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
+      - name: Conformance sweep (informational)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        run: pnpm test:conformance
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+          AEON_CONFORMANCE_REQUIRE: chrome
+          AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
+      - name: Keep conformance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-output-${{ matrix.os }}
+          path: conformance-output
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Keep browser test output
         if: failure()
         uses: actions/upload-artifact@v4

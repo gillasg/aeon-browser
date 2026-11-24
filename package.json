@@ -26,7 +26,8 @@
     "start": "node apps/daemon/dist/main.js --core",
     "aeon": "node apps/cli/dist/cli.js",
     "test:browser": "node scripts/run-tests.mjs --browser \"apps/*/test/*.test.mjs\" \"packages/*/test/*.test.mjs\" \"scripts/*.test.mjs\" \"benchmarks/*.test.mjs\" \"templates/video/test/*.test.mjs\"",
-    "check:browser": "pnpm build && pnpm --dir browser run test:browser && pnpm test:browser",
+    "test:conformance": "pnpm --dir browser run test:conformance",
+    "check:browser": "pnpm build && pnpm --dir browser run test:browser && pnpm test:browser && pnpm test:conformance",
     "build:browser": "pnpm --dir browser run build"
   },
   "devDependencies": {

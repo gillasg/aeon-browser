@@ -1,0 +1,49 @@
+{
+  "scenario": "hangs",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Hangs"
+    },
+    {
+      "step": "busy-loop",
+      "kind": "err",
+      "result": {
+        "error": "TIMEOUT: Error: {\"code\":-32603,\"message\":\"Internal error\"}"
+      }
+    },
+    {
+      "step": "alive-after",
+      "kind": "ok",
+      "result": 1
+    },
+    {
+      "step": "auth-401",
+      "kind": "err",
+      "result": {
+        "error": "CHROME_ERROR: navigation failed: net::ERR_INVALID_AUTH_CREDENTIALS"
+      }
+    },
+    {
+      "step": "gate-pending",
+      "kind": "ok",
+      "result": null
+    },
+    {
+      "step": "gate-pending-bounded",
+      "kind": "check",
+      "result": false
+    },
+    {
+      "step": "gate-held",
+      "kind": "check",
+      "result": 1
+    },
+    {
+      "step": "gate-released",
+      "kind": "ok",
+      "result": "slow released"
+    }
+  ]
+}

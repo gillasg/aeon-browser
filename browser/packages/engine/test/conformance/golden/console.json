@@ -1,0 +1,36 @@
+{
+  "scenario": "console",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Console"
+    },
+    {
+      "step": "start",
+      "kind": "ok",
+      "result": 0
+    },
+    {
+      "step": "log",
+      "kind": "ok",
+      "result": "unchanged"
+    },
+    {
+      "step": "entries",
+      "kind": "eventually",
+      "result": [
+        "log plain log 1",
+        "warning careful",
+        "error bad thing"
+      ]
+    },
+    {
+      "step": "errors-only",
+      "kind": "eventually",
+      "result": [
+        "error bad thing"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "scenario": "leak_canary",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Baseline"
+    },
+    {
+      "step": "fingerprint",
+      "kind": "ok",
+      "result": {
+        "dark": false,
+        "dpr": 1,
+        "onLine": true,
+        "print": false,
+        "reducedMotion": "<HOST>",
+        "ua": "HeadlessChrome",
+        "viewport": [
+          1280,
+          600
+        ]
+      }
+    },
+    {
+      "step": "matches-baseline",
+      "kind": "check",
+      "result": true
+    },
+    {
+      "step": "no-dialog",
+      "kind": "ok",
+      "result": 1
+    },
+    {
+      "step": "chrome-tabs",
+      "kind": "check",
+      "result": 4
+    }
+  ]
+}

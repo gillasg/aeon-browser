@@ -1,0 +1,32 @@
+{
+  "scenario": "inert-main",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Inert main"
+    },
+    {
+      "step": "snapshot",
+      "kind": "ok",
+      "result": [
+        "RootWebArea Inert main",
+        "dialog Consent",
+        "button Accept",
+        "StaticText Accept cookies?",
+        "StaticText Accept",
+        "RootWebArea Cross",
+        "button Cross"
+      ]
+    },
+    {
+      "step": "state",
+      "kind": "ok",
+      "result": {
+        "accept": true,
+        "hidden": false,
+        "modalText": true
+      }
+    }
+  ]
+}

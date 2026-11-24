@@ -1,0 +1,63 @@
+{
+  "scenario": "frames",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Frames"
+    },
+    {
+      "step": "frame-urls",
+      "kind": "eventually",
+      "result": [
+        "PRIMARY/frames",
+        "PRIMARY/frames/same",
+        "CROSS/frames/cross",
+        "CROSS/frames/n1",
+        "PRIMARY/frames/n2",
+        "CROSS/frames/n3"
+      ]
+    },
+    {
+      "step": "snapshot",
+      "kind": "ok",
+      "result": [
+        "e0 RootWebArea Frames",
+        "f1:e0 RootWebArea Same",
+        "f1:e1 button Same",
+        "f1:e2 StaticText Same",
+        "f2:e0 RootWebArea Cross",
+        "f2:e1 button Cross",
+        "f3:e0 RootWebArea N1",
+        "f4:e0 RootWebArea N2",
+        "f5:e0 RootWebArea N3"
+      ]
+    },
+    {
+      "step": "click-same-text",
+      "kind": "ok",
+      "result": {
+        "error": "TARGET_NOT_FOUND: no text \"Same\" tab <TAB> (PRIMARY/frames) while the agent tried click"
+      }
+    },
+    {
+      "step": "click-cross-text",
+      "kind": "ok",
+      "result": {
+        "error": "TARGET_NOT_FOUND: no text \"Cross\" tab <TAB> (PRIMARY/frames) while the agent tried click"
+      }
+    },
+    {
+      "step": "click-cross-ref",
+      "kind": "ok",
+      "result": "unchanged"
+    },
+    {
+      "step": "embedded",
+      "kind": "ok",
+      "result": [
+        "CROSS/frames/n3 = level 3 deep text"
+      ]
+    }
+  ]
+}

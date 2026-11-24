@@ -1,0 +1,47 @@
+{
+  "scenario": "spa",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "SPA home"
+    },
+    {
+      "step": "push-state",
+      "kind": "ok",
+      "result": "navigated"
+    },
+    {
+      "step": "after-push",
+      "kind": "ok",
+      "result": {
+        "title": "SPA next",
+        "url": "PRIMARY/spa/next",
+        "view": "next view"
+      }
+    },
+    {
+      "step": "reload-server",
+      "kind": "ok",
+      "result": "next view (server)"
+    },
+    {
+      "step": "bf-a",
+      "kind": "ok",
+      "result": "BF A"
+    },
+    {
+      "step": "bf-to-b",
+      "kind": "ok",
+      "result": "BF B"
+    },
+    {
+      "step": "bf-back",
+      "kind": "ok",
+      "result": {
+        "title": "BF A",
+        "url": "PRIMARY/bf/a"
+      }
+    }
+  ]
+}

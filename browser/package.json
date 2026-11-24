@@ -19,7 +19,8 @@
     "agent-text:check": "node scripts/build-agent-text.mjs --check",
     "check": "pnpm format:check && pnpm lint && pnpm agent-text:check && pnpm typecheck && pnpm build && pnpm test",
     "test:browser": "node scripts/run-tests.mjs --browser \"test/*.test.mjs\" && node scripts/package-e2e.mjs",
-    "check:browser": "pnpm build && pnpm test:browser"
+    "test:conformance": "node scripts/run-tests.mjs --browser \"packages/engine/test/conformance/*.test.mjs\"",
+    "check:browser": "pnpm build && pnpm test:browser && pnpm test:conformance"
   },
   "devDependencies": {
     "@types/node": "26.6.3",

@@ -1,0 +1,35 @@
+{
+  "scenario": "popups",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Popups"
+    },
+    {
+      "step": "window-open",
+      "kind": "ok",
+      "result": 1
+    },
+    {
+      "step": "target-blank",
+      "kind": "ok",
+      "result": 1
+    },
+    {
+      "step": "chrome-tabs",
+      "kind": "check",
+      "result": 2
+    },
+    {
+      "step": "close-popups",
+      "kind": "ok",
+      "result": 2
+    },
+    {
+      "step": "chrome-tabs-after",
+      "kind": "check",
+      "result": 0
+    }
+  ]
+}

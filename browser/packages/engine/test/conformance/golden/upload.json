@@ -1,0 +1,34 @@
+{
+  "scenario": "upload",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Upload"
+    },
+    {
+      "step": "set-file",
+      "kind": "ok",
+      "result": "upload-payload.txt"
+    },
+    {
+      "step": "submit",
+      "kind": "ok",
+      "result": "navigated"
+    },
+    {
+      "step": "upload-result",
+      "kind": "eventually",
+      "result": "got upload-payload.txt with payload"
+    },
+    {
+      "step": "server-got-file",
+      "kind": "check",
+      "result": {
+        "filename": "upload-payload.txt",
+        "payload": true,
+        "type": "multipart/form-data"
+      }
+    }
+  ]
+}

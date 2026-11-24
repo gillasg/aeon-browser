@@ -1,0 +1,26 @@
+{
+  "scenario": "baseline",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "Baseline"
+    },
+    {
+      "step": "fingerprint",
+      "kind": "ok",
+      "result": {
+        "dark": false,
+        "dpr": 1,
+        "onLine": true,
+        "print": false,
+        "reducedMotion": "<HOST>",
+        "ua": "HeadlessChrome",
+        "viewport": [
+          1280,
+          600
+        ]
+      }
+    }
+  ]
+}

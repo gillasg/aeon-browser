@@ -1,0 +1,28 @@
+{
+  "scenario": "csp",
+  "steps": [
+    {
+      "step": "open",
+      "kind": "ok",
+      "result": "CSP"
+    },
+    {
+      "step": "inline-blocked",
+      "kind": "ok",
+      "result": "strict"
+    },
+    {
+      "step": "evaluate-under-csp",
+      "kind": "ok",
+      "result": 42
+    },
+    {
+      "step": "snapshot",
+      "kind": "ok",
+      "result": [
+        "RootWebArea CSP",
+        "StaticText strict"
+      ]
+    }
+  ]
+}
