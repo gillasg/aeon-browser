@@ -142,6 +142,13 @@ export const EFFECTS = [
     errors: ["INVALID_INPUT"],
   },
   {
+    name: "page.claws",
+    call: "page.db, page.downloads, page.archive, page.freeze, page.dryRun",
+    does: "the tab's IndexedDB, Cache Storage and storage changes, its downloads, PDF/MHTML receipts, state snapshots and dry-run interception of writes; each turns its CDP domain on only while used, and returns scrubbed values",
+    needs: ["tab"],
+    errors: ["INVALID_INPUT", "TARGET_NOT_FOUND", "TIMEOUT", "CODE_ERROR", "EXPECTATION_FAILED"],
+  },
+  {
     name: "browser.info",
     call: "browser.openTab(url) with no tab yet",
     does: "finds the connected browser to open the first tab in",

@@ -31,6 +31,7 @@ import { googleCall } from "./native-browser-google.js";
 import { fetchCall, isFetchRequest } from "./native-browser-fetch.js";
 import { mappedNotice, noteFetchStatus } from "./native-browser-fetch-guard.js";
 import { noteChallengeSeen } from "./native-browser-human-input.js";
+import { clawsCall } from "./native-browser-claws.js";
 
 type Value = Record<string, unknown>;
 
@@ -215,6 +216,12 @@ function tabEffects(host: EffectHost): Effect<Cell>[] {
       match: named("rules"),
       tab: target,
       run: (_, value, tabId = 0) => rulesCall(tabId, value),
+    },
+    {
+      name: "page.claws",
+      match: named("claws"),
+      tab: target,
+      run: (_, value, tabId = 0) => clawsCall(tabId, value),
     },
     {
       name: "page.permission",
