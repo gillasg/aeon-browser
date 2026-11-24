@@ -96,3 +96,14 @@ export {
 
 export * from "./rewind.js";
 export * from "./secret-scrub.js";
+export {
+  CHROME_FEATURE_FLAG,
+  CHROME_FLAGS,
+  CHROME_LAUNCH_FLAGS,
+  chromeFlagPurpose,
+  chromePlatform,
+  chromeRelaunchCommand,
+  mergeChromeFlags,
+  missingChromeFlags,
+  type ChromePlatform,
+} from "./chrome-launch-flags.js";

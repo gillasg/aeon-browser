@@ -17,11 +17,11 @@ const version = SUPPORTED_PROTOCOL_VERSION;
 const flags = CHROME_FLAGS.join(" ");
 
 test("the flags fix prints the exact relaunch command for each OS", () => {
-  assert.match(chromeFlagsCommand("darwin"), /^\/Applications\/Google\\ Chrome\.app/);
-  assert.match(chromeFlagsCommand("win32"), /^chrome\.exe /);
+  assert.match(chromeFlagsCommand("darwin"), /^open -na "Google Chrome" --args /);
+  assert.match(chromeFlagsCommand("win32"), /^Start-Process chrome\.exe -ArgumentList '--/);
   assert.match(chromeFlagsCommand("linux"), /^google-chrome /);
   for (const platform of ["darwin", "win32", "linux"]) {
-    assert.ok(chromeFlagsCommand(platform).includes(flags));
+    for (const flag of CHROME_FLAGS) assert.ok(chromeFlagsCommand(platform).includes(flag));
   }
 });
 
@@ -83,7 +83,7 @@ test("each failed check names the one fix", () => {
   assert.match(byName.extension.fix, /Aeon extension loaded/);
   assert.equal(byName.flags.status, "ok");
   assert.match(byName.flags.detail, /normal Chrome launch/);
-  assert.match(byName.flags.fix, /Optional: relaunch Chrome/);
+  assert.match(byName.flags.fix, /Optional: quit Chrome, then relaunch/);
   assert.match(byName.model.fix, /Sign in to a model/);
   assert.match(byName.supervisor.detail, /is not running\./);
   assert.match(byName.supervisor.fix, /Aeon/);
@@ -228,4 +228,21 @@ test("runDoctor exits 1 and prints json when the daemon is down", async () => {
   } finally {
     process.stdout.write = write;
   }
+});
+
+test("the flags check names each missing flag with its purpose and prints the relaunch command", () => {
+  const partial = CHROME_FLAGS.filter((flag) => !flag.startsWith("--silent")).join(" ");
+  const checks = doctorChecks(
+    facts({ chromeCommandLines: [`google-chrome ${partial}`], platform: "linux" }),
+  );
+  const check = checks.find((item) => item.name === "flags");
+  assert.equal(check?.status, "ok");
+  assert.match(
+    check?.detail ?? "",
+    /--silent-debugger-extension-api \(hides Chrome's debugger bar/,
+  );
+  assert.doesNotMatch(check?.detail ?? "", /--extensions-on-chrome-urls/);
+  assert.match(formatDoctor(checks, false), /relaunch it with: google-chrome --extensions-on/);
+  const json = JSON.parse(formatDoctor(checks, true));
+  assert.ok(json);
 });

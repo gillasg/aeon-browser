@@ -4,6 +4,7 @@ import { serializeAnnotations, useAnnotations } from "./transcript-annotations.j
 import { PiQueue } from "./pi-queue.js";
 import { useMessageSendMode } from "./message-send-mode.js";
 import { PromptField } from "./prompt-field.js";
+import { markWelcomeDone } from "./new-user-welcome.js";
 import { ComposerPanels, AttachmentList } from "./composer-panels.js";
 import { PageContextTray } from "./page-context-tray.js";
 import type { PiBrowserContextRecord } from "@aeon/protocol";
@@ -128,6 +129,7 @@ function ComposerEntry(
       props.connected &&
       (await props.onSend(message, props.mode, props.attachments))
     ) {
+      markWelcomeDone();
       setText("");
       annotations?.clear(records.map((record) => record.id));
     }

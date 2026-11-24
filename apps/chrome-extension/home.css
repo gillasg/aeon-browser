@@ -1352,3 +1352,32 @@ body[data-host="panel"] .new-user-examples button:hover {
 .model-accounts .aeon-page-head {
   margin-bottom: var(--aeon-s-3);
 }
+.readiness-strip {
+  display: grid;
+  width: min(100%, 760px);
+  gap: var(--aeon-s-2);
+  margin: var(--aeon-s-3) auto 0;
+  padding: var(--aeon-s-2) var(--aeon-s-3);
+  border: 1px solid var(--aeon-line);
+  border-radius: var(--aeon-r-lg);
+  color: var(--aeon-muted);
+  font-size: 12px;
+}
+.readiness-strip p {
+  margin: 0;
+}
+.readiness-command {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.readiness-actions {
+  display: flex;
+  gap: var(--aeon-s-2);
+}
+.readiness-actions button {
+  border: 0;
+  background: none;
+  color: var(--aeon-accent);
+  cursor: pointer;
+  font: inherit;
+}

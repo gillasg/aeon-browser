@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 
 // The whole first-run experience, in the side panel's idle canvas: up to three quiet suggestion
 // rows under the "Do anything on …" line. No tour, no dialog. A click puts the task in
@@ -7,6 +7,8 @@ import { useState, type ReactElement } from "react";
 // "Welcome / Show again".
 
 const KEY = "aeonWelcome";
+/** Fired when any task is sent, so an open welcome hides at once, not on the next load. */
+export const WELCOME_DONE_EVENT = "aeon.welcome.done";
 
 export const WELCOME_EXAMPLES = [
   "Tell me when the price on this page drops",
@@ -31,6 +33,12 @@ export function NewUserWelcome({
       return true; // A private window may reject storage; never block the home page.
     }
   });
+  useEffect(() => {
+    if (seen) return;
+    const hide = (): void => setSeen(true);
+    window.addEventListener(WELCOME_DONE_EVENT, hide);
+    return () => window.removeEventListener(WELCOME_DONE_EVENT, hide);
+  }, [seen]);
   if (seen) return null;
   const pick = (text: string): void => {
     markWelcomeDone();
@@ -65,6 +73,7 @@ export function markWelcomeDone(): void {
   } catch {
     /* Nothing to remember. */
   }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(WELCOME_DONE_EVENT));
 }
 
 export function resetWelcome(): void {

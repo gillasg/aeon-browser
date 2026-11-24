@@ -14,6 +14,8 @@ import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js"
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
 import { NewUserWelcome, markWelcomeDone } from "./new-user-welcome.js";
 import { PromptField } from "./prompt-field.js";
+import { ReadinessStrip } from "./readiness-strip.js";
+import { platformName } from "./platform.js";
 import type { NewTabHomeProps } from "./home-surface.js";
 
 type HomeStartProps = Pick<
@@ -26,6 +28,8 @@ type HomeStartProps = Pick<
   onRemoveContext?(): void;
   chatId?: string;
   connected?: boolean;
+  /** Optional Chrome flags the daemon saw missing; drives the quiet relaunch notice. */
+  missingChromeFlags?: readonly string[];
   /** "What can Aeon do?": the Learn page. */
   onLearn?(): void;
 };
@@ -33,15 +37,7 @@ type HomeStartProps = Pick<
 export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
   const panelPage = usePanelPage();
   const [query, setQuery] = useState("");
-  // The ⌘K palette puts a site action in the ask box ("aeon.home.seed").
-  useEffect(() => {
-    const seed = (event: Event): void => {
-      setQuery(String((event as CustomEvent<string>).detail ?? ""));
-      requestAnimationFrame(() => document.getElementById("home-query")?.focus());
-    };
-    window.addEventListener("aeon.home.seed", seed);
-    return () => window.removeEventListener("aeon.home.seed", seed);
-  }, []);
+  useHomeSeed(setQuery);
   const files = useHomeAttachments(props.onReadAttachments);
   const selection = useHomeSelection(props.modelCatalog);
   const ask = (value: string): void => {
@@ -50,7 +46,7 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
   };
   const tryExample = (text: string): void => {
     setQuery(text);
-    requestAnimationFrame(() => document.getElementById("home-query")?.focus());
+    focusQuery();
   };
   const needsModel = needsModelConnect(props);
   return (
@@ -77,6 +73,11 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
         onSubmit={ask}
         onFiles={(items) => void files.add(items)}
       />
+      <ReadinessStrip
+        connected={props.connected}
+        missingChromeFlags={props.missingChromeFlags}
+        platform={platformName}
+      />
       <HomeModelControls
         connected={props.connected}
         modelLogin={props.modelLogin}
@@ -89,6 +90,22 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
       />
     </section>
   );
+}
+
+function useHomeSeed(setQuery: (value: string) => void): void {
+  // The ⌘K palette puts a site action in the ask box ("aeon.home.seed").
+  useEffect(() => {
+    const seed = (event: Event): void => {
+      setQuery(String((event as CustomEvent<string>).detail ?? ""));
+      focusQuery();
+    };
+    window.addEventListener("aeon.home.seed", seed);
+    return () => window.removeEventListener("aeon.home.seed", seed);
+  }, []);
+}
+
+function focusQuery(): void {
+  requestAnimationFrame(() => document.getElementById("home-query")?.focus());
 }
 
 function useHomeSelection(catalog: PiModelCatalogDto | null) {

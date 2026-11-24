@@ -36,7 +36,8 @@ test("Linux: copies the system .desktop, adds flags once, keeps user args, undo 
   const text = readFileSync(target, "utf8");
   assert.equal(count(text, MANAGED_MARK), 1);
   for (const flag of CHROME_FLAGS) assert.equal(count(text, flag), 2);
-  assert.match(text, /Exec=\/usr\/bin\/google-chrome-stable --silent\S* .*--user-flag %U/);
+  assert.match(text, /Exec=\/usr\/bin\/google-chrome-stable --user-flag --\S.* %U/);
+  assert.match(text, /--silent-debugger-extension-api/);
   assert.equal(readFileSync(source, "utf8"), DESKTOP);
   undoChromeFlags(env);
   assert.equal(existsSync(target), false);

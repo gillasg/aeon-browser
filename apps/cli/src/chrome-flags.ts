@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { CHROME_FLAGS } from "./doctor-checks.js";
+import { CHROME_FLAGS, mergeChromeFlags } from "@aeon/protocol";
 
 // Opt-in, reversible Chrome launch flags. Linux: a user copy of google-chrome.desktop with the flags
 // on every Exec= line. Windows: the user's Chrome shortcuts get the flags appended, old arguments
@@ -30,22 +30,21 @@ export interface FlagResult {
   detail: string;
 }
 
-/** Appends the flags an argument string lacks; never duplicates, keeps the user's own args. */
+/** Adds the flags an argument string lacks; never duplicates, merges --disable-features lists. */
 export function withFlags(argumentsText: string, flags: readonly string[] = CHROME_FLAGS): string {
-  const present = new Set(argumentsText.split(/\s+/).filter(Boolean));
-  const missing = flags.filter((flag) => !present.has(flag));
-  return [argumentsText.trim(), ...missing].filter(Boolean).join(" ");
+  return mergeChromeFlags(argumentsText.split(/\s+/).filter(Boolean), flags).join(" ");
 }
 
 /** Puts the flags right after the executable on every Exec= line, before %U and friends. */
 export function patchDesktop(text: string, flags: readonly string[] = CHROME_FLAGS): string {
   const lines = text.split("\n").map((line) => {
     if (!line.startsWith("Exec=")) return line;
-    const parts = line.slice(5).split(" ");
-    const present = new Set(parts);
-    const missing = flags.filter((flag) => !present.has(flag));
-    if (!missing.length) return line;
-    return "Exec=" + [parts[0], ...missing, ...parts.slice(1)].filter(Boolean).join(" ");
+    const [exe = "", ...rest] = line.slice(5).split(" ");
+    const options = rest.filter((part) => part.startsWith("--"));
+    const others = rest.filter((part) => !part.startsWith("--"));
+    const merged = mergeChromeFlags(options, flags);
+    const next = "Exec=" + [exe, ...merged, ...others].filter(Boolean).join(" ");
+    return merged.join(" ") === options.join(" ") ? line : next;
   });
   const body = lines.join("\n");
   return body.includes(MANAGED_MARK) ? body : `${MANAGED_MARK}\n${body}`;

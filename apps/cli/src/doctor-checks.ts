@@ -1,11 +1,12 @@
-import { SUPPORTED_PROTOCOL_VERSION, type ProtocolVersion } from "@aeon/protocol";
+import {
+  SUPPORTED_PROTOCOL_VERSION,
+  chromeFlagPurpose,
+  chromeRelaunchCommand,
+  missingChromeFlags,
+  type ProtocolVersion,
+} from "@aeon/protocol";
 
-export const CHROME_FLAGS = [
-  "--silent-debugger-extension-api",
-  "--disable-background-timer-throttling",
-  "--disable-renderer-backgrounding",
-  "--disable-backgrounding-occluded-windows",
-] as const;
+export { CHROME_FLAGS } from "@aeon/protocol";
 
 const OPEN_AEON = "Open Chrome with Aeon loaded so the daemon starts.";
 const UPDATE =
@@ -27,18 +28,18 @@ const SUPERVISOR_NAME =
       ? "LaunchAgent com.aeon.daemon"
       : "User service aeon-daemon";
 /** The exact command to relaunch Chrome with, so a normal install can fix the flags check. */
-export function chromeFlagsCommand(platform: NodeJS.Platform = process.platform): string {
-  const flags = CHROME_FLAGS.join(" ");
-  if (platform === "darwin")
-    return `/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome ${flags}`;
-  if (platform === "win32") return `chrome.exe ${flags}`;
-  return `google-chrome ${flags}`;
+export function chromeFlagsCommand(
+  platform: NodeJS.Platform = process.platform,
+  flags?: readonly string[],
+): string {
+  return chromeRelaunchCommand(platform, flags);
 }
 
 // None of these flags is needed to use Aeon: a normal Chrome launch pairs the extension and runs
-// every tool. They hide Chrome's debugger bar (shown while Aeon drives a page through the debugger) and
-// keep background tabs' timers warm, so this check is informational rather than a gate.
-const FLAGS_FIX = `Optional: relaunch Chrome with ${chromeFlagsCommand()} to hide the debugger bar and keep background tabs fast.`;
+// every tool. They hide Chrome's debugger bar and keep background tabs' timers warm, so this check
+// is informational rather than a gate, but it names each missing flag and the relaunch command.
+const flagsFix = (platform: NodeJS.Platform): string =>
+  `Optional: quit Chrome, then relaunch it with: ${chromeFlagsCommand(platform)}`;
 
 export type CheckName =
   | "daemon"
@@ -58,6 +59,8 @@ export interface Check {
   status: "ok" | "fail";
   detail: string;
   fix: string;
+  /** Printed under an ok line too: optional advice worth acting on. */
+  note?: string;
 }
 
 /** What the health ping reported. Absent when the daemon never answered. */
@@ -85,6 +88,8 @@ export interface DoctorFacts {
   modelSignedIn: boolean;
   loginTask: boolean;
   dirs: DataDir[];
+  /** The OS the relaunch command is written for; defaults to this one. */
+  platform?: NodeJS.Platform;
   /** Aeon uses the calling agent's model through MCP instead of a signed-in model. */
   mcpUsesClientModel?: boolean;
   /** Set when the daemon is down and the supervisor remembered why the last start failed. */
@@ -96,7 +101,7 @@ export function doctorChecks(facts: DoctorFacts): Check[] {
     daemonCheck(facts.daemon, facts.startError),
     protocolCheck(facts.daemon),
     extensionCheck(facts.daemon),
-    flagsCheck(facts.chromeCommandLines),
+    flagsCheck(facts.chromeCommandLines, facts.platform ?? process.platform),
     facts.mcpUsesClientModel
       ? line("model", "ok", "Aeon uses your agent's model through MCP.", MODEL_FIX)
       : facts.modelSignedIn
@@ -178,16 +183,16 @@ function extensionCheck(report: HealthView | undefined): Check {
   return line("extension", "fail", "No extension is connected to the daemon.", OPEN_EXTENSION);
 }
 
-function flagsCheck(lines: string[]): Check {
-  const missing = CHROME_FLAGS.filter((flag) => !lines.some((command) => command.includes(flag)));
-  if (!missing.length) return line("flags", "ok", "Chrome has Aeon's flags.", FLAGS_FIX);
+function flagsCheck(lines: string[], platform: NodeJS.Platform): Check {
+  const fix = flagsFix(platform);
+  const missing = missingChromeFlags(lines);
+  if (!missing.length) return line("flags", "ok", "Chrome has all of Aeon's flags.", fix);
   // Not a gate: Aeon works without them; Chrome just shows its debugger bar and slows background tabs.
-  return line(
-    "flags",
-    "ok",
-    "A normal Chrome launch works. Optional flags are off: Chrome shows its debugger bar and slows background tabs.",
-    FLAGS_FIX,
-  );
+  const listed = missing.map((flag) => `${flag} (${chromeFlagPurpose(flag)})`).join("; ");
+  return {
+    ...line("flags", "ok", `A normal Chrome launch works. Missing optional flags: ${listed}.`, fix),
+    note: fix,
+  };
 }
 
 function dataCheck(dirs: DataDir[]): Check {
@@ -204,7 +209,8 @@ function dataCheck(dirs: DataDir[]): Check {
 
 function formatLine(check: Check): string {
   const head = `${check.name.padEnd(12)}${check.status.padEnd(6)}${check.detail}\n`;
-  return check.status === "fail" ? `${head}            Fix: ${check.fix}\n` : head;
+  if (check.status === "fail") return `${head}            Fix: ${check.fix}\n`;
+  return check.note ? `${head}            ${check.note}\n` : head;
 }
 
 function line(name: CheckName, status: "ok" | "fail", detail: string, fix: string): Check {

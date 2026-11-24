@@ -29,6 +29,12 @@ export function PasswordManagerSettings(props: {
       >
         <ValueRow label="Works with" value="Bitwarden · Proton Pass" />
       </SettingsGroup>
+      <SettingsGroup
+        title="This Chrome profile"
+        footer="Aeon runs in your current Chrome profile, so Chrome's own saved passwords and passkeys (WebAuthn) work as they always do: Chrome fills them and you confirm. Aeon never stores a password in plain text."
+      >
+        <ValueRow label="Passkeys" value="Chrome's own prompt" />
+      </SettingsGroup>
     </div>
   );
 }
