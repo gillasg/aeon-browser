@@ -49,15 +49,13 @@
       "step": "fill-covered",
       "kind": "err",
       "result": {
-        "error": "TARGET_BLOCKED: covered by div \"\"; act inside it (bu.state() shows its ids) or close it first tab <TAB> (PRIMARY/app) while the agent tried fill"
+        "error": "TARGET_BLOCKED: Can't reach the field: covered by div \"\". Close it first, or pass {force: true}. tab <TAB> (PRIMARY/app) while the agent tried fill"
       }
     },
     {
       "step": "fill-covered-force",
       "kind": "ok",
-      "result": {
-        "error": "TARGET_BLOCKED: covered by div \"\"; act inside it (bu.state() shows its ids) or close it first tab <TAB> (PRIMARY/app) while the agent tried fill"
-      }
+      "result": "forced"
     },
     {
       "step": "click-covered",

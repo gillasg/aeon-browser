@@ -12,14 +12,6 @@ export const TESTED_WITH = "Chrome for Testing 157.0.8103.78";
 export const divergences = [
   {
     scenario: "app",
-    step: "fill-covered-force",
-    pointer: "",
-    kind: "Bug",
-    expected: "fill with {force: true} writes a covered text field",
-    note: "force is ignored: the cover check still refuses the fill with TARGET_BLOCKED",
-  },
-  {
-    scenario: "app",
     step: "click-covered-fast",
     pointer: "*",
     intermittent: true,
@@ -68,42 +60,6 @@ export const divergences = [
     note: "the format option is ignored and a JPEG is saved",
   },
 
-  {
-    scenario: "network",
-    step: "captured",
-    pointer: "*",
-    intermittent: true,
-    kind: "Bug",
-    expected: "capture lists every request the page made, matching the fixture's request log",
-    note: "redirect hops, worker requests and the cross-origin frame's own fetch are missing; the frame document itself is captured only on some runs (out-of-process frame startup race)",
-  },
-  {
-    scenario: "network",
-    step: "cross-frame-first-request",
-    pointer: "*",
-    intermittent: true,
-    kind: "Bug",
-    expected: "the cross-origin iframe's first request is always captured",
-    note: "captured only when the network session attaches before the frame starts",
-  },
-  {
-    scenario: "frames",
-    step: "snapshot",
-    pointer: "*",
-    intermittent: true,
-    kind: "Bug",
-    expected: "a snapshot of nested cross-origin frames always succeeds",
-    note: "some runs fail with CHROME_ERROR: Maximum call stack size exceeded",
-  },
-  {
-    scenario: "frames",
-    step: "click-cross-ref",
-    pointer: "*",
-    intermittent: true,
-    kind: "Bug",
-    expected: "the cross-origin frame's ref from the snapshot clicks",
-    note: "STALE_REF whenever the snapshot before it failed",
-  },
   {
     scenario: "upload",
     step: "submit",
