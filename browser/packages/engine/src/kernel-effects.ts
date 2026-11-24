@@ -232,6 +232,34 @@ export const EFFECTS = [
     needs: [],
     errors: [],
   },
+  {
+    name: "page.visual",
+    call: "page.canvas.list/tap, page.visual.regionDiff(clip, baseline?), page.visual.occlusion(target)",
+    does: "canvases and their drawn text, a clipped pixel diff against a baseline, and whether something covers a target",
+    needs: ["tab"],
+    errors: ["INVALID_INPUT", "TARGET_NOT_FOUND", "UNSUPPORTED"],
+  },
+  {
+    name: "page.mediaTap",
+    call: "page.media.audioState(), page.media.captions.start/stop/list/waitFor",
+    does: "whether the tab plays sound, its media elements, and captions watched between start and stop",
+    needs: ["tab"],
+    errors: ["INVALID_INPUT", "TIMEOUT"],
+  },
+  {
+    name: "page.pip",
+    call: "page.pip(action?)",
+    does: "enters, exits or reports picture-in-picture for the tab",
+    needs: ["tab"],
+    errors: ["UNSUPPORTED"],
+  },
+  {
+    name: "browser.workspaces",
+    call: "browser.workspaces.*, browser.suspension.protect/suspendIdle/status",
+    does: "the user's tab groups, saved workspaces, and keeping or discarding background tabs",
+    needs: [],
+    errors: ["INVALID_INPUT"],
+  },
 ] as const satisfies readonly EffectDoc[];
 
 export type EffectName = (typeof EFFECTS)[number]["name"];

@@ -32,6 +32,12 @@ import { fetchCall, isFetchRequest } from "./native-browser-fetch.js";
 import { mappedNotice, noteFetchStatus } from "./native-browser-fetch-guard.js";
 import { noteChallengeSeen } from "./native-browser-human-input.js";
 import { clawsCall } from "./native-browser-claws.js";
+import {
+  mediaTapEffect,
+  pipEffect,
+  visualEffect,
+  workspacesEffect,
+} from "./native-browser-claw-effects.js";
 
 type Value = Record<string, unknown>;
 
@@ -297,6 +303,35 @@ function browserEffects(host: EffectHost): Effect<Cell>[] {
   ];
 }
 
+// Visual, media-tap and workspace claws: each opens its DevTools channel only when called.
+function clawEffects(): Effect<Cell>[] {
+  return [
+    {
+      name: "page.visual",
+      match: named("visual"),
+      tab: target,
+      run: (_, value, tabId = 0) => visualEffect(value, tabId),
+    },
+    {
+      name: "page.mediaTap",
+      match: named("mediaTap"),
+      tab: target,
+      run: (_, value, tabId = 0) => mediaTapEffect(value, tabId),
+    },
+    {
+      name: "page.pip",
+      match: named("pip"),
+      tab: target,
+      run: (_, value, tabId = 0) => pipEffect(value, tabId),
+    },
+    {
+      name: "browser.workspaces",
+      match: (value) => named("workspaces")(value) || named("suspension")(value),
+      run: (_, value) => workspacesEffect(value),
+    },
+  ];
+}
+
 /**
  * Every effect a cell can ask for, secrets first so nothing else can claim a secret request.
  * Throws at startup unless they match their declarations in kernel-effects.ts.
@@ -307,6 +342,7 @@ export function cellEffects(host: EffectHost): Effect<Cell>[] {
     ...webEffects(host),
     ...tabEffects(host),
     ...browserEffects(host),
+    ...clawEffects(),
   ];
   checkDeclared(effects);
   return effects;

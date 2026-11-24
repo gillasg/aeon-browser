@@ -30,6 +30,7 @@ import { browserMediaChallengesApi } from "./code-api-media-challenges.js";
 import { browserMediaApi } from "./code-media-api.js";
 import { browserClawsApi } from "./code-api-claws.js";
 import { browserRound3ClawsApi } from "./code-api-round3-claws.js";
+import { browserVisualMediaClawsApi } from "./code-api-visual-media-claws.js";
 import { browserSurfaceApi, browserWindowApi } from "./code-api-surface.js";
 import { browserActApi } from "./code-api-act.js";
 import { browserSleepApi } from "./code-api-sleep.js";
@@ -128,6 +129,7 @@ scope.__call = (request: unknown) => {
 evaluate(
   [
     browserWindowApi,
+    browserVisualMediaClawsApi,
     browserSurfaceApi,
     browserMediaApi,
     browserTimingApi,

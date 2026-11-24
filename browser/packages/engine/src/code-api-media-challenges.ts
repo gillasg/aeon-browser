@@ -230,7 +230,9 @@ function __extendPageControls(target, base) {
       inspect: () => __mediaInspect(target),
       // The first HLS (.m3u8) or DASH (.mpd) manifest this tab requested, with its headers.
       manifest: () => __mediaManifest(target),
+      ...__visualMediaTap(target),
     }),
+    ...__extendPageVisualMediaClaws(target),
     challenges: async () => __challenges(target),
     webmcp: Object.freeze({
       list: () => browser.page(target).inspect(__pageWebmcpList),

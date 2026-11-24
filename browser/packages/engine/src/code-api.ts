@@ -380,7 +380,7 @@ var browser = Object.freeze({
   // What is queued or running: per-tab queues and the lock for what a step shares.
   scheduler: async () => (await __step({op:'scheduler', target:__hostTarget()})).data,
   // Windows and zoom: the browser's own window list, resizing, and per-tab zoom.
-  windows: __windows,
+  windows: __windows, workspaces: __visualMediaWorkspaces, suspension: __visualMediaSuspension,
   setZoom: (factor, tabId) => __zoom(factor, tabId),
   // How agents look and run here, for when the user asks: browser.settings() lists each setting
   // with its value and choices; browser.settings({name: value}) changes them and returns all.
