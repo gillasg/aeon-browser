@@ -12,10 +12,14 @@ import { loadState, type RecordState } from "./record-capture.js";
 import type { Box, Mark, SoundCue } from "./record-events.js";
 
 const MARKS = "marks.json";
-// The tab on camera: the active web page, read in place. browser.activeTab() refuses a tab another
-// session holds, and reads need no attaching.
-const ACTIVE =
-  "const tabs = await browser.tabs(); const tab = tabs.find((t) => t.active && /^https?:/.test(t.url)) ?? tabs.find((t) => /^https?:/.test(t.url)); if (!tab) throw new Error('No web page is open');";
+// The tab on camera: the active tab, whatever it shows (a site, an Aeon page, about:blank), read in
+// place. browser.activeTab() refuses Aeon's pages and a tab another session holds; reads need no
+// attaching.
+export const ACTIVE =
+  "const tabs = await browser.tabs(); const tab = tabs.find((t) => t.active) ?? tabs[0]; if (!tab) throw new Error('No tab is open');";
+// Page code cannot run in Aeon's own pages (Chrome refuses scripting there, so the engine's password
+// check fails first): say so plainly instead of the engine's PASSWORD_PAGE text.
+const READABLE = `${ACTIVE} if (tab.aeonUi) throw new Error("The active tab is an Aeon page, which page code cannot read: mark it with --box x,y,w,h, or read a web page");`;
 const CUES = new Set(["key", "trigger", "arrive", "shutter"]);
 const SESSION = "aeon-record";
 
@@ -43,6 +47,39 @@ export function parseBox(value: string): Box {
 
 /** What the page reports about its window, in CSS px. */
 export type PageFrame = { dpr: number; top: number; side: number };
+/** The page's own sizes (CSS px) behind a frame: outer can be 0 under Xvfb with no decorations. */
+export type PageSizes = {
+  dpr: number;
+  innerWidth: number;
+  innerHeight: number;
+  outerWidth: number;
+  outerHeight: number;
+};
+
+/**
+ * The browser UI around the viewport. Chrome's own outer size wins when it is real; when it is not
+ * (outerHeight 0 under Xvfb/openbox) the captured window size (device px) stands in for it.
+ */
+export function frameOf(page: PageSizes, geometry?: { w: number; h: number }): PageFrame {
+  const dpr = page.dpr > 0 ? page.dpr : 1;
+  const outerH = page.outerHeight > page.innerHeight ? page.outerHeight : (geometry?.h ?? 0) / dpr;
+  const outerW = page.outerWidth >= page.innerWidth ? page.outerWidth : (geometry?.w ?? 0) / dpr;
+  return {
+    dpr,
+    top: Math.max(0, outerH - page.innerHeight),
+    side: Math.max(0, (outerW - page.innerWidth) / 2),
+  };
+}
+
+/** A box cut to the viewport; null when none of it is visible. */
+export function clampBox(box: Box, width: number, height: number): Box | null {
+  const x = Math.max(0, box.x);
+  const y = Math.max(0, box.y);
+  const right = Math.min(width, box.x + box.width);
+  const bottom = Math.min(height, box.y + box.height);
+  if (right <= x || bottom <= y) return null;
+  return { x, y, width: right - x, height: bottom - y };
+}
 
 /**
  * A page box (CSS px) in captured-window px: the toolbar above the viewport and the side borders
@@ -76,20 +113,29 @@ export function withMarkCues(cues: SoundCue[], marks: Mark[]): SoundCue[] {
   return [...cues, ...extra].sort((a, b) => a.t - b.t);
 }
 
-/** Reads an element's bounds and the window frame from the active tab; a read, so no glow. */
-function boundsCode(selector: string | undefined): string {
-  return `${ACTIVE}
+/** Reads an element's bounds and the page's sizes from the active tab; a read, so no glow. */
+export function boundsCode(selector: string | undefined): string {
+  return `${READABLE}
 return await browser.page(tab.id).inspect((selector) => {
   const node = selector ? document.querySelector(selector) : null;
   const rect = node ? node.getBoundingClientRect() : null;
   return {
     box: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
-    dpr: devicePixelRatio, top: outerHeight - innerHeight, side: (outerWidth - innerWidth) / 2,
+    dpr: devicePixelRatio, innerWidth, innerHeight, outerWidth, outerHeight,
   };
 }, ${JSON.stringify(selector ?? "")});`;
 }
 
 type Bounds = { box: Box | null } & PageFrame;
+type PageBounds = { box: Box | null } & PageSizes;
+
+/** The visible part of the element, with the frame that places it in the captured window. */
+export function boundsOf(read: PageBounds, geometry?: { w: number; h: number }): Bounds {
+  return {
+    box: read.box ? clampBox(read.box, read.innerWidth, read.innerHeight) : null,
+    ...frameOf(read, geometry),
+  };
+}
 
 export function markOf(
   name: string,
@@ -135,11 +181,13 @@ export async function mark(host: DaemonHost, steps: RecordSteps, args: Args): Pr
   const boxFlag = text(args, "box");
   let bounds: Bounds | undefined;
   if (selector) {
-    bounds = (await host.runInBrowser(boundsCode(selector), {
+    const read = (await host.runInBrowser(boundsCode(selector), {
       session: SESSION,
       timeoutMs: 8_000,
-    })) as Bounds;
-    if (!bounds?.box) throw new Error(`No element matches ${selector} in the active tab`);
+    })) as PageBounds | null;
+    if (!read?.box) throw new Error(`No element matches ${selector} in the active tab`);
+    bounds = boundsOf(read, state.geometry);
+    if (!bounds.box) throw new Error(`${selector} is outside the visible page`);
   }
   const label = text(args, "label");
   const cue = text(args, "cue");
@@ -206,7 +254,7 @@ function waitForChat(host: DaemonHost, chatId: string, timeoutMs: number): Promi
 
 function pageRead(host: DaemonHost, body: string, arg: string): Promise<unknown> {
   return host.runInBrowser(
-    `${ACTIVE}
+    `${READABLE}
 return await browser.page(tab.id).inspect((arg) => { ${body} }, ${JSON.stringify(arg)});`,
     { session: SESSION, timeoutMs: 8_000 },
   );

@@ -3,8 +3,8 @@
 # aeon-daemon: eval keeps running on its own CFT browser/profile/display.
 # Default capture: a 1280x720 logical window at DPR 2, so frames are a 2560x1440 master that
 # delivers a sharp 1920x1080 cut with up to a 1.33x optical push-in (2-3x less disk and a faster
-# encode than 4K). Set AEON_RECORDING_DPR=3 for a 3840x2160 master on flagship shoots. Export the same AEON_RECORDING_DPR for `aeon record` so
-# events.json carries dpr and the logical size.
+# encode than 4K). Set AEON_RECORDING_DPR=3 for a 3840x2160 master on flagship shoots. The display and DPR are saved for
+# `aeon record --browser <name>`, so events.json carries dpr and the logical size.
 set -euo pipefail
 
 DISPLAY_NUM="${AEON_RECORDING_DISPLAY:-:120}"
@@ -73,7 +73,7 @@ d["extensions"].setdefault("ui", {})["developer_mode"] = True
 d.setdefault("browser", {})["has_seen_welcome_page"] = True
 # The system frame (undecorated by the window manager below): no caption buttons in the tab strip.
 d["browser"]["custom_chrome_frame"] = False
-# Alt+Shift+Space summons the orb; seed the binding when nothing holds it yet.
+# Alt+Shift+Space summons the cursor box; seed the binding when nothing holds it yet.
 commands = d["extensions"].setdefault("commands", {})
 old_key = "linux:Ctrl+Shift+Space"
 if commands.get(old_key, {}).get("command_name") == "summon-orb":
@@ -81,6 +81,9 @@ if commands.get(old_key, {}).get("command_name") == "summon-orb":
 key = "linux:Alt+Shift+Space"
 if key not in commands:
     commands[key] = {"command_name": "summon-orb", "extension": ext_id, "global": False}
+# Chrome 157 draws a New Tab Page footer ("Aeon" + "Customize Chrome") under extension pages.
+d.setdefault("ntp_footer", {}).setdefault("settings", {}).update(
+    extension_attribution=False, management_notice=False)
 # A killed Chrome leaves exit_type "Crashed", and the next start films a "Restore pages?" bubble.
 d.setdefault("profile", {}).update(exit_type="Normal", exited_cleanly=True)
 with open(pref, "w") as f: json.dump(d, f, separators=(",", ":"))
@@ -123,6 +126,8 @@ if [ -n "$GEOMETRY" ] && [ "$GEOMETRY" != "$SCREEN" ]; then
 fi
 
 if ! pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1; then
+  # It opens on Aeon's own new-chat canvas, not about:blank: the engine lists and drives web and Aeon
+  # pages only, so a blank start leaves nothing for `aeon record ui` or the frame check to read.
   # No --enable-automation and no remote debugging: no test bar, no "controlled by software" bar.
   NET_ARGS=()
   [ -z "$PROXY" ] || NET_ARGS=(--proxy-server="$PROXY" --webrtc-ip-handling-policy=disable_non_proxied_udp)
@@ -130,8 +135,9 @@ if ! pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1; then
     --user-data-dir="$PROFILE" \
     --no-first-run --no-default-browser-check --disable-gpu --silent-debugger-extension-api \
     --force-device-scale-factor="$DPR" \
+    --disable-features=NtpFooter \
     "${NET_ARGS[@]}" \
-    --window-size="$LOGICAL_W,$LOGICAL_H" --window-position=0,0 about:blank \
+    --window-size="$LOGICAL_W,$LOGICAL_H" --window-position=0,0 "chrome-extension://$EXT_ID/home.html?host=panel" \
     >/tmp/aeon-recording-chrome.log 2>&1 </dev/null &
 fi
 
@@ -179,36 +185,56 @@ if [ -n "$ID" ] && [ "$NAMED" != "True" ]; then
   aeon browsers name "$ID" "$BROWSER" >/dev/null
 fi
 
+# Remember where this browser lives, so `aeon record ... --browser $BROWSER` finds its display and
+# DPR without exported DISPLAY/AEON_RECORDING_DPR (the CLI's dataDirectory()/recordings/browsers.json).
+DATA_DIR="${AEON_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aeon/data}"
+mkdir -p "$DATA_DIR/recordings"
+python3 - "$DATA_DIR/recordings/browsers.json" "$BROWSER" "$DISPLAY_NUM" "$DPR" <<'PY'
+import json, os, sys
+path, name, display, dpr = sys.argv[1:5]
+try:
+    saved = json.load(open(path)) if os.path.exists(path) else {}
+except Exception:
+    saved = {}
+saved[name] = {"display": display, "dpr": float(dpr)}
+with open(path, "w") as f: json.dump(saved, f, indent=2)
+PY
+
 # Per-profile settings through the daemon, targeted at this browser only (eval is untouched).
 aeon tool --browser "$BROWSER" browser_code \
   '{"code":"await browser.settings({agentInFront:true, cursor:\"shown\"}); return true;"}' \
   >/dev/null 2>&1 || true
 
 # Clean-frame check: a bar under the toolbar ("controlled by automated software", "Restore pages?")
-# steals viewport height; the wrong DPR means a soft master. Refuse to film either.
-# Read a real page tab: the cell's own sandbox document has no window (it reported w: 0).
+# steals viewport height; the wrong DPR means a soft master. Refuse to film either. Page code cannot
+# run in Aeon's own pages, so the active tab visits a plain page for the read and comes back: no tab
+# opens (a new one would join the session's tab group) and none is left behind.
 FRAME="$(aeon tool --browser "$BROWSER" browser_code \
-  '{"code":"const tab = (await browser.tabs()).find((t) => t.active && /^https?:/.test(t.url)) ?? await browser.openTab(\"https://example.com/\", {newTab: true}); return await browser.page(tab.id).inspect(() => ({dpr: devicePixelRatio, bars: outerHeight - innerHeight, w: innerWidth}));"}' 2>/dev/null || true)"
-python3 - "$FRAME" "$DPR" "$LOGICAL_W" <<'PY' || exit 1
+  '{"code":"const tabs = await browser.tabs(); const tab = tabs.find((t) => t.active) ?? tabs[0]; if (!tab) throw new Error(\"no tab\"); const page = browser.page(tab.id); const back = tab.aeonUi ? tab.url : null; if (back) await page.navigate(\"https://example.com/\"); try { return await page.inspect(() => ({dpr: devicePixelRatio, outer: outerHeight, inner: innerHeight, w: innerWidth})); } finally { if (back) await page.cdp(\"Page.navigate\", {url: back}); }"}' 2>&1 || true)"
+python3 - "$FRAME" "$DPR" "$LOGICAL_W" "$LOGICAL_H" <<'PY' || exit 1
 import json, re, sys
-raw, dpr, width = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
+raw, dpr, width, height = sys.argv[1], float(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
 m = re.search(r'\{[^{}]*"dpr"[^{}]*\}', raw.replace('\\"', '"'))
 if not m:
-    print("Clean-frame check skipped (the page could not be read).", file=sys.stderr)
-    sys.exit(0)
+    print("Not a clean frame: the active tab could not be read: " + raw.strip()[:300], file=sys.stderr)
+    sys.exit(1)
 f = json.loads(m.group(0))
+# Undecorated under openbox/Xvfb, outerHeight can be 0: the window is the logical size we set.
+outer = f["outer"] if f["outer"] > f["inner"] else height
+bars = outer - f["inner"]
 problems = []
 if abs(f["dpr"] - dpr) > 0.01:
     problems.append(f"devicePixelRatio is {f['dpr']}, expected {dpr:g}")
 # Tab strip + toolbar is ~87 CSS px; any infobar adds 40 or more.
-if f["bars"] > 110:
-    problems.append(f"{f['bars']} px of browser UI above the page: an infobar is showing")
+if bars > 110:
+    problems.append(f"{bars} px of browser UI above the page: an infobar is showing")
 if f["w"] != width:
     problems.append(f"viewport is {f['w']} px wide, expected {width}")
 if problems:
     print("Not a clean frame: " + "; ".join(problems), file=sys.stderr)
     sys.exit(1)
+print(f"Clean frame: DPR {f['dpr']:g}, {bars} px of browser UI, {f['w']} px wide")
 PY
 
 echo "Recording Chrome ready: browser=$BROWSER display=$DISPLAY_NUM profile=$PROFILE capture=$SCREEN (DPR $DPR)"
-echo "Record with: AEON_RECORDING_DPR=$DPR aeon record start --window chrome"
+echo "Record with: aeon record start --window chrome --browser $BROWSER"

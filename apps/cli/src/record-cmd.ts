@@ -33,6 +33,7 @@ import {
   type Trace,
   type VideoEvent,
 } from "./record-events.js";
+import { useRecordingBrowser } from "./record-browsers.js";
 import { mark, readMarks, run, wait, withMarkCues, type RecordSteps } from "./record-script.js";
 import { saveTabTakes, type SavedTake } from "./record-takes.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
@@ -295,6 +296,7 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   const folder = stopFolder(args);
   const before = loadState(folder);
   if (!host.browser && before.browser) host.pinBrowser(before.browser);
+  useRecordingBrowser(args, host.browser);
   const opts: RecordOptions = { source: before.source, ffmpeg: before.ffmpeg, log };
   const state = await stopCapture(folder, opts);
   nameStopChat(state, args);
@@ -349,14 +351,14 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     name: "record",
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
-    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>]
+    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>] [--display :N]
        aeon record stop [--out <dir>] [--chat <id>]
        aeon record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
        aeon record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
-       aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--background]
+       aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--display :N] [--background]
        aeon record terminal --out <dir> --run "<command>"
-       aeon record ui cursor|sidepanel|home|chats|automations|sites|settings|models|learn|reload [--mark <name>] [--out <dir>]
-       aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>]
+       aeon record ui cursor|sidepanel|home|chat|manage|chats|automations|sites|settings|models|learn|reload [--mark <name>] [--out <dir>] [--display :N]
+       aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>] [--browser <name>] [--display :N]
        aeon record assemble <dir...> [--out <file.mp4>] [--width 1920] [--height 1080] [--fps 30] [--max-idle <ms>] [--zoom] [--sound] [--end-cmd "<cmd>"] [--end-repo "<url>"] [--ffmpeg <bin>]
        aeon record gif|video|trace …   (the original screen recordings)
 
@@ -373,13 +375,17 @@ a chat that has truly finished. run does it all for one prompt: optionally opens
 runs the prompt, waits for the chat to finish, holds --tail seconds, stops, attaches the trace.
 run turns Work in front on for the take (restored after) so the agent's tabs are on camera;
 --background leaves the setting as it is.
---browser picks one connected Chrome profile; mark, wait and stop follow the one start used.
+--browser picks one connected Chrome profile; mark, wait and stop follow the one start used. On
+Linux a browser set up by setup-recording-chrome.sh brings its own X display and DPR; --display
+overrides DISPLAY for capture, xdotool and xwininfo.
 ui drives Aeon's own surfaces on camera: cursor summons the cursor box (Alt+Shift+Space),
-sidepanel opens the side panel from the cursor box, home|chats|automations|sites|settings|models|learn
-open that Aeon page (reused and focused if open), reload reloads the active web tab; --mark marks
+sidepanel opens the side panel from the cursor box, home|chat open the new-chat canvas (home.html?host=panel),
+manage opens Manage, chats|automations|sites|settings|models|learn open that Manage page, all in one
+reused tab (never a new grouped tab), reload reloads the active tab; --mark marks
 the beat. shoot films a whole walkthrough from a plan: {"scenes": [{"name": "…", "steps": [{"open":
 "https://…"}, {"ui": "cursor"}, {"run": "…", "tail": 2}, {"mark": "arrive", "selector": "…"},
-{"wait": "idle"}, {"hold": 1500}, {"reload": true}, {"terminal": "…"}, {"code": "…"}]}]}. Each
+{"wait": "idle"}, {"hold": 1500}, {"reload": true}, {"terminal": "…"}, {"code": "…"}]}]}. A scene's
+"prepare" steps (open, ui, wait, hold, reload, code; no marks) run before the camera rolls. Each
 scene is its own take folder; capture always stops, even when a step fails. --assemble (or an
 --out ending in .mp4) cuts the takes into one MP4.
 assemble is the fast editor (pure ffmpeg, x264 superfast, about real time): takes stitched in
@@ -390,6 +396,7 @@ arrivals and receipts stay), --zoom punches in on marked boxes but never past na
 Remotion kit (\`aeon video kit\`) is for short flagship launch cuts.`,
     run: async (args: Args) => {
       const action = args.positional[0];
+      useRecordingBrowser(args, host.browser);
       if (action === "start") return start(host, args);
       if (action === "stop") return stop(host, args);
       if (action === "terminal") return terminal(host, args);

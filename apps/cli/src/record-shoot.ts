@@ -23,7 +23,8 @@ export type ShootStep =
   | { terminal: string }
   | { code: string; timeout?: number };
 
-export type ShootScene = { name: string; steps: ShootStep[] };
+/** prepare runs before the camera rolls, so a take opens on its framed first state. */
+export type ShootScene = { name: string; prepare?: ShootStep[]; steps: ShootStep[] };
 export type ShootPlan = { scenes: ShootScene[]; out?: string; browser?: string; fps?: number };
 
 const CUES = ["key", "trigger", "arrive", "shutter"];
@@ -139,6 +140,19 @@ const STEP_PARSERS: Record<string, Parser> = {
   },
 };
 
+// Before the camera rolls there is no clip clock to mark, no take to attach a terminal or a chat to.
+const PREPARE = ["open", "ui", "wait", "hold", "reload", "code"];
+
+function prepareStep(raw: unknown, where: string): ShootStep {
+  const step = stepOf(raw, where);
+  const kind = Object.keys(step)[0] ?? "";
+  if (!PREPARE.includes(kind) || "mark" in step)
+    throw new Error(
+      `${where}: prepare runs before recording starts, so it takes ${PREPARE.join(", ")} (no marks)`,
+    );
+  return step;
+}
+
 /** Parses and checks a whole plan up front, so a typo fails before anything is filmed. */
 export function parsePlan(raw: unknown): ShootPlan {
   if (!isObject(raw) || !Array.isArray(raw.scenes) || raw.scenes.length === 0)
@@ -150,8 +164,12 @@ export function parsePlan(raw: unknown): ShootPlan {
       throw new Error(`${where}: a scene has a name and steps[]`);
     if (names.has(scene.name)) throw new Error(`${where}: scene "${scene.name}" is named twice`);
     names.add(scene.name);
+    if (scene.prepare !== undefined && !Array.isArray(scene.prepare))
+      throw new Error(`${where}: prepare is a list of steps`);
+    const prepare = (scene.prepare ?? []).map((s, j) => prepareStep(s, `${where}.prepare[${j}]`));
     return {
       name: scene.name,
+      ...(prepare.length ? { prepare } : {}),
       steps: scene.steps.map((s, j) => stepOf(s, `${where}.steps[${j}]`)),
     };
   });
@@ -213,6 +231,7 @@ export async function shoot(plan: ShootPlan, outDir: string, deps: ShootDeps): P
   for (const [index, scene] of plan.scenes.entries()) {
     const folder = deps.join(outDir, sceneFolder(index, scene.name));
     deps.log(`Scene ${index + 1}/${plan.scenes.length}: ${scene.name}`);
+    for (const step of scene.prepare ?? []) await runStep(step, folder, deps);
     await deps.start(folder);
     let chatId: string | undefined;
     try {
@@ -244,4 +263,4 @@ export function shootTarget(
 }
 
 export const SHOOT_USAGE =
-  "Usage: aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--browser <name>] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>]";
+  "Usage: aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--browser <name>] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>] [--display :N]";

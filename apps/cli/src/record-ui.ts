@@ -1,5 +1,5 @@
 // `aeon record ui <action>`: drive Aeon's own surfaces on camera without coordinate hacks. Pages
-// open by their real extension URL (home.html?view=…), reused and focused when already open; the
+// open by their real extension URL (home.html?host=panel, home.html?view=…) in one reused tab; the
 // cursor is summoned with its real shortcut (Alt+Shift+Space), sent as a trusted OS keystroke to
 // the focused Chrome window; the side panel opens the way a person opens it from the cursor box
 // (Ctrl+Enter, Cmd+Enter on macOS), since Chrome only opens a side panel on a user gesture.
@@ -8,9 +8,12 @@ import type { Args } from "browserkit/dist/args.js";
 import { aeonExtensionId, extensionUrl } from "./extension-url.js";
 import type { DaemonHost } from "./host.js";
 import { findChromeWindow } from "./record-capture.js";
+import { ACTIVE } from "./record-script.js";
 
 export const PAGE_ACTIONS = [
   "home",
+  "chat",
+  "manage",
   "chats",
   "automations",
   "sites",
@@ -25,15 +28,44 @@ export type Chord = "cursor" | "panel";
 export type UiStep =
   { kind: "page"; url: string } | { kind: "keys"; chords: Chord[] } | { kind: "reload" };
 
-export const UI_USAGE = `Usage: aeon record ui ${UI_ACTIONS.join("|")} [--browser <name>] [--out <dir>] [--mark <name>]`;
+export const UI_USAGE = `Usage: aeon record ui ${UI_ACTIONS.join("|")} [--browser <name>] [--display :N] [--out <dir>] [--mark <name>]`;
 
 export function isUiAction(action: string | undefined): action is UiAction {
   return (UI_ACTIONS as readonly string[]).includes(action ?? "");
 }
 
-/** The extension page for a Manage view: home is Manage itself, the rest are `?view=` routes. */
+/**
+ * The extension page for an action. home and chat are the new-chat canvas, the composer and
+ * readiness strip (home.html?host=panel; a bare chat.html needs a chatId); manage is Manage as a
+ * tab (home.html, which opens on Sites); the rest are Manage's `?view=` routes (models lands on
+ * Settings, learn on Sites).
+ */
 export function pageUrl(extensionId: string, action: (typeof PAGE_ACTIONS)[number]): string {
-  return extensionUrl(extensionId, action === "home" ? "home.html" : `home.html?view=${action}`);
+  if (action === "home" || action === "chat")
+    return extensionUrl(extensionId, "home.html?host=panel");
+  if (action === "manage") return extensionUrl(extensionId, "home.html");
+  return extensionUrl(extensionId, `home.html?view=${action}`);
+}
+
+/**
+ * Navigates one tab in place: the active Aeon page or blank tab, else any, else the active tab.
+ * Other Aeon and blank tabs close, so switching pages never piles tabs up. Opening a new tab would
+ * put it in the session's tab group, which the camera must never see.
+ */
+export function pageCode(url: string): string {
+  const origin = /^[a-z-]+:\/\/[^/]+\//.exec(url)?.[0] ?? url; // URL#origin is "null" for extensions
+  return `const url = ${JSON.stringify(url)};
+const tabs = await browser.tabs();
+const spare = (t) => [${JSON.stringify(origin)}, "about:blank", "chrome://newtab"].some((p) => String(t.url).startsWith(p));
+const tab = tabs.find((t) => t.active && spare(t)) ?? tabs.find(spare) ?? tabs.find((t) => t.active) ?? tabs[0];
+if (!tab) throw new Error("No tab is open");
+for (const t of tabs) if (t.id !== tab.id && spare(t)) await browser.closeTab(t.id).catch(() => undefined);
+// The tab on camera moves by a raw Page.navigate: page.navigate waits for a settled load it cannot
+// see on an Aeon page, then stops the load mid-way, leaving a blank page. A tab behind others is
+// brought forward by page.navigate, which presents it.
+if (!tab.active) await browser.page(tab.id).navigate(url);
+else if (tab.url !== url) await browser.page(tab.id).cdp("Page.navigate", { url });
+return tab.id;`;
 }
 
 export function resolveUiAction(action: string | undefined, extensionId: string): UiStep {
@@ -85,15 +117,9 @@ export type UiDeps = {
   platform: NodeJS.Platform;
 };
 
-const ACTIVE =
-  "const tabs = await browser.tabs(); const tab = tabs.find((t) => t.active && /^https?:/.test(t.url)) ?? tabs.find((t) => /^https?:/.test(t.url)); if (!tab) throw new Error('No web page is open');";
-
 export async function performUi(action: string | undefined, deps: UiDeps): Promise<UiStep> {
   const step = resolveUiAction(action, isPage(action) ? await deps.extensionId() : "");
-  if (step.kind === "page")
-    await deps.run(
-      `await browser.keepPage(${JSON.stringify(step.url)}, { foreground: true }); return "opened";`,
-    );
+  if (step.kind === "page") await deps.run(pageCode(step.url));
   else if (step.kind === "reload")
     await deps.run(`${ACTIVE} await browser.page(tab.id).reload(); return tab.id;`);
   else {

@@ -15,7 +15,11 @@ import {
   FRAME_FORMAT,
 } from "../dist/record-capture.js";
 import {
+  ACTIVE,
+  boundsOf,
   chatFinished,
+  clampBox,
+  frameOf,
   markOf,
   parseBox,
   until,
@@ -110,6 +114,49 @@ test("a page box becomes clip pixels: toolbar and borders added, then scaled by 
     width: 100,
     height: 40,
   });
+});
+
+test("boxes are cut to the viewport; fully offscreen ones are null", () => {
+  assert.deepEqual(clampBox({ x: -10, y: 600, width: 100, height: 400 }, 1280, 633), {
+    x: 0,
+    y: 600,
+    width: 90,
+    height: 33,
+  });
+  assert.equal(clampBox({ x: 0, y: 700, width: 50, height: 50 }, 1280, 633), null);
+  assert.equal(clampBox({ x: 1300, y: 0, width: 50, height: 50 }, 1280, 633), null);
+});
+
+test("the frame falls back to the captured window when outerHeight is 0 (Xvfb/openbox)", () => {
+  const page = { dpr: 2, innerWidth: 1280, innerHeight: 633, outerWidth: 0, outerHeight: 0 };
+  assert.deepEqual(frameOf(page, { w: 2560, h: 1440 }), { dpr: 2, top: 87, side: 0 });
+  assert.deepEqual(frameOf(page), { dpr: 2, top: 0, side: 0 });
+  const real = { dpr: 1, innerWidth: 1270, innerHeight: 600, outerWidth: 1280, outerHeight: 690 };
+  assert.deepEqual(frameOf(real, { w: 9999, h: 9999 }), { dpr: 1, top: 90, side: 5 });
+  const bounds = boundsOf(
+    { box: { x: 10, y: 600, width: 20, height: 100 }, ...page },
+    {
+      w: 2560,
+      h: 1440,
+    },
+  );
+  assert.deepEqual(markOf("m", 5, { bounds }).windowBox, { x: 20, y: 1374, width: 40, height: 66 });
+});
+
+test("the tab on camera is the active one, Aeon pages and about:blank included", async () => {
+  const pick = (tabs) =>
+    new Function("browser", `return (async () => { ${ACTIVE} return tab.id; })();`)({
+      tabs: async () => tabs,
+    });
+  assert.equal(
+    await pick([
+      { id: 1, url: "https://a.test/", active: false },
+      { id: 2, url: "chrome-extension://x/home.html", active: true },
+    ]),
+    2,
+  );
+  assert.equal(await pick([{ id: 3, url: "about:blank", active: false }]), 3);
+  await assert.rejects(pick([]), /No tab is open/);
 });
 
 test("marks carry name, time, label, boxes and a cue; bad input is refused plainly", () => {

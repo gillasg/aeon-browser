@@ -6,6 +6,7 @@ import type { Args } from "browserkit/dist/args.js";
 import type { DaemonHost } from "./host.js";
 import { assemble, assembleOptionsOf } from "./record-assemble.js";
 import { writeEvents } from "./record-events.js";
+import { useRecordingBrowser } from "./record-browsers.js";
 import { mark, openUrl, runPrompt, wait, type RecordSteps } from "./record-script.js";
 import { parsePlan, shoot, SHOOT_USAGE, shootTarget, type ShootDeps } from "./record-shoot.js";
 import { attachTerminal, readRecording, runTerminal } from "./record-terminal.js";
@@ -99,6 +100,7 @@ export async function shootCommand(
   if (!file) throw new Error(SHOOT_USAGE);
   const plan = parsePlan(JSON.parse(readFileSync(file, "utf8")));
   if (!host.browser && plan.browser) host.pinBrowser(plan.browser);
+  useRecordingBrowser(args, host.browser);
   const { dir, mp4 } = shootTarget(
     typeof args.flags.out === "string" ? args.flags.out : plan.out,
     args.flags.assemble === true,

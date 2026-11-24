@@ -6,6 +6,7 @@ import test from "node:test";
 import { parsePlan, sceneFolder, shoot, shootTarget } from "../dist/record-shoot.js";
 import {
   chordCommand,
+  pageCode,
   pageUrl,
   performUi,
   resolveUiAction,
@@ -155,7 +156,9 @@ test("a failing step still stops its take and ends the shoot", async () => {
 test("ui actions resolve to real extension pages and shortcuts", () => {
   const id = "abcdefghijklmnopabcdefghijklmnop";
   assert.equal(extensionUrl(id, "/home.html"), `chrome-extension://${id}/home.html`);
-  assert.equal(pageUrl(id, "home"), `chrome-extension://${id}/home.html`);
+  assert.equal(pageUrl(id, "home"), `chrome-extension://${id}/home.html?host=panel`);
+  assert.equal(pageUrl(id, "chat"), `chrome-extension://${id}/home.html?host=panel`);
+  assert.equal(pageUrl(id, "manage"), `chrome-extension://${id}/home.html`);
   for (const view of ["chats", "automations", "sites", "settings", "models", "learn"])
     assert.deepEqual(resolveUiAction(view, id), {
       kind: "page",
@@ -165,7 +168,7 @@ test("ui actions resolve to real extension pages and shortcuts", () => {
   assert.deepEqual(resolveUiAction("sidepanel", id), { kind: "keys", chords: ["cursor", "panel"] });
   assert.deepEqual(resolveUiAction("reload", id), { kind: "reload" });
   assert.throws(() => resolveUiAction("bogus", id), /Usage: aeon record ui/);
-  assert.equal(UI_ACTIONS.length, 10);
+  assert.equal(UI_ACTIONS.length, 12);
 });
 
 test("the cursor shortcut is Alt+Shift+Space on every OS", () => {
@@ -204,14 +207,80 @@ test("performUi opens pages through browser code and presses chords in order", a
     platform: "linux",
   };
   await performUi("settings", deps);
-  assert.match(
-    ran[0],
-    /keepPage\("chrome-extension:\/\/id\/home\.html\?view=settings", \{ foreground: true \}\)/,
-  );
+  assert.match(ran[0], /const url = "chrome-extension:\/\/id\/home\.html\?view=settings"/);
+  assert.match(ran[0], /\.cdp\("Page\.navigate", \{ url \}\)/);
+  // No new tab (it would join the session's tab group) and no kept page.
+  assert.doesNotMatch(ran[0], /openTab|keepPage/);
   await performUi("reload", deps);
   assert.match(ran[1], /\.reload\(\)/);
   await performUi("sidepanel", deps);
   assert.deepEqual(pressed, ["alt+shift+space", "ctrl+Return"]);
+});
+
+test("pageCode reuses one Aeon or blank tab in place and closes the duplicates", async () => {
+  const url = "chrome-extension://id/home.html?view=sites";
+  const play = async (tabs) => {
+    const log = [];
+    const browser = {
+      tabs: async () => tabs,
+      closeTab: async (id) => log.push(["close", id]),
+      page: (id) => ({
+        navigate: async (to) => log.push(["navigate", id, to]),
+        cdp: async (method, params) => log.push([method, id, params.url]),
+      }),
+    };
+    const fn = new Function("browser", `return (async () => { ${pageCode(url)} })();`);
+    return { id: await fn(browser), log };
+  };
+  const web = { id: 1, url: "https://example.com/", active: false };
+  const blank = { id: 2, url: "about:blank", active: false };
+  const aeon = { id: 3, url: "chrome-extension://id/chat.html", active: true };
+  assert.deepEqual(await play([web, blank, aeon]), {
+    id: 3,
+    log: [
+      ["close", 2],
+      ["Page.navigate", 3, url],
+    ],
+  });
+  // Only a web page: it is navigated in place rather than a new tab opened.
+  assert.deepEqual(await play([{ ...web, active: true }]), {
+    id: 1,
+    log: [["Page.navigate", 1, url]],
+  });
+  // A tab behind others is presented by page.navigate.
+  assert.deepEqual(await play([{ ...blank }, { ...web, active: false }]), {
+    id: 2,
+    log: [["navigate", 2, url]],
+  });
+  // Already there and in front: nothing moves.
+  assert.deepEqual(await play([{ id: 4, url, active: true }]), { id: 4, log: [] });
+});
+
+test("prepare steps run before the camera rolls and never take marks", async () => {
+  const parsed = parsePlan({
+    scenes: [{ name: "a", prepare: [{ ui: "sites" }, { wait: "idle" }], steps: [{ hold: 5 }] }],
+  });
+  assert.deepEqual(parsed.scenes[0].prepare, [{ ui: "sites" }, { wait: "idle" }]);
+  const bad = (prepare) => () => parsePlan({ scenes: [{ name: "a", prepare, steps: [] }] });
+  assert.throws(bad([{ mark: "x" }]), /prepare\[0\].*before recording starts/);
+  assert.throws(bad([{ ui: "cursor", mark: "x" }]), /no marks/);
+  assert.throws(bad([{ run: "go" }]), /prepare/);
+  assert.throws(bad([{ terminal: "ls" }]), /prepare/);
+  assert.throws(bad("nope"), /prepare is a list/);
+  const calls = [];
+  const deps = new Proxy(
+    { join: (a, b) => `${a}/${b}`, log: () => undefined },
+    {
+      get: (target, key) =>
+        target[key] ??
+        (async (...args) => void calls.push([key, ...args.filter((a) => typeof a !== "object")])),
+    },
+  );
+  await shoot(parsed, "out", deps);
+  assert.deepEqual(
+    calls.map((c) => c[0]),
+    ["ui", "wait", "start", "hold", "stop"],
+  );
 });
 
 test("an --out ending in .mp4 is the cut; a folder holds the takes", () => {
