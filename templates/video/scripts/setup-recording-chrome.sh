@@ -23,6 +23,8 @@ PHYS_W=$((LOGICAL_W * DPR))
 PHYS_H=$((LOGICAL_H * DPR))
 SCREEN="${PHYS_W}x${PHYS_H}"
 NUM="${DISPLAY_NUM#:}"
+# Chrome takes its UI and New Tab Page language from the locale: film English on any host.
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 LANGUAGE=en_US:en
 
 mkdir -p "$PROFILE/Default" "$PROFILE/NativeMessagingHosts"
 
@@ -43,51 +45,7 @@ if [ ! -f "$EXT_DIR/manifest.json" ]; then
   echo "Built extension not found: $EXT_DIR (set AEON_EXTENSION_DIR)" >&2
   exit 1
 fi
-python3 - "$PROFILE/Default/Preferences" "$EXT_DIR" "$EXT_ID" <<'PY'
-import json, os, sys
-pref, ext_dir, ext_id = sys.argv[1:4]
-d = json.load(open(pref)) if os.path.exists(pref) else {}
-settings = d.setdefault("extensions", {}).setdefault("settings", {})
-manifest = json.load(open(os.path.join(ext_dir, "manifest.json")))
-perms = {
-    "api": manifest.get("permissions", []),
-    "explicit_host": manifest.get("host_permissions", []),
-    "scriptable_host": manifest.get("host_permissions", []),
-}
-if ext_id not in settings:
-    settings[ext_id] = {
-        "location": 4, "state": 1,
-        "from_webstore": False, "was_installed_by_default": False,
-        "was_installed_by_oem": False, "creation_flags": 38,
-        "active_permissions": perms, "granted_permissions": perms,
-        "content_settings": [], "incognito_content_settings": [],
-        "incognito_preferences": {}, "preferences": {},
-        "regular_only_preferences": {}, "withholding_permissions": False,
-    }
-# Always point at THIS build: an entry left by an older run (another worktree) otherwise loads a
-# stale extension silently.
-entry = settings[ext_id]
-entry.update(path=ext_dir, manifest=manifest, state=1)
-entry["active_permissions"] = entry["granted_permissions"] = perms
-d["extensions"].setdefault("ui", {})["developer_mode"] = True
-d.setdefault("browser", {})["has_seen_welcome_page"] = True
-# The system frame (undecorated by the window manager below): no caption buttons in the tab strip.
-d["browser"]["custom_chrome_frame"] = False
-# Alt+Shift+Space summons the cursor box; seed the binding when nothing holds it yet.
-commands = d["extensions"].setdefault("commands", {})
-old_key = "linux:Ctrl+Shift+Space"
-if commands.get(old_key, {}).get("command_name") == "summon-orb":
-    del commands[old_key]
-key = "linux:Alt+Shift+Space"
-if key not in commands:
-    commands[key] = {"command_name": "summon-orb", "extension": ext_id, "global": False}
-# Chrome 157 draws a New Tab Page footer ("Aeon" + "Customize Chrome") under extension pages.
-d.setdefault("ntp_footer", {}).setdefault("settings", {}).update(
-    extension_attribution=False, management_notice=False)
-# A killed Chrome leaves exit_type "Crashed", and the next start films a "Restore pages?" bubble.
-d.setdefault("profile", {}).update(exit_type="Normal", exited_cleanly=True)
-with open(pref, "w") as f: json.dump(d, f, separators=(",", ":"))
-PY
+python3 "$KIT_DIR/scripts/seed-recording-prefs.py" "$PROFILE/Default/Preferences" "$EXT_DIR" "$EXT_ID"
 
 if [ ! -S "/tmp/.X11-unix/X${NUM}" ]; then
   rm -f "/tmp/.X11-unix/X${NUM}"
@@ -126,6 +84,10 @@ if [ -n "$GEOMETRY" ] && [ "$GEOMETRY" != "$SCREEN" ]; then
 fi
 
 if ! pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1; then
+  # Saved tab groups (every session's group, kept by Chrome) live in the profile's sync store and
+  # come back as bookmarks-bar chips. The recording profile is never signed in: drop them while
+  # Chrome is down, on every setup or restart.
+  rm -rf "$PROFILE/Default/Sync Data"
   # It opens on Aeon's own new-chat canvas, not about:blank: the engine lists and drives web and Aeon
   # pages only, so a blank start leaves nothing for `aeon record ui` or the frame check to read.
   # No --enable-automation and no remote debugging: no test bar, no "controlled by software" bar.
@@ -135,7 +97,8 @@ if ! pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1; then
     --user-data-dir="$PROFILE" \
     --no-first-run --no-default-browser-check --disable-gpu --silent-debugger-extension-api \
     --force-device-scale-factor="$DPR" \
-    --disable-features=NtpFooter \
+    --lang=en-US \
+    --disable-features=NtpFooter,TabGroupsSaveV2,TabGroupsSaveUIUpdate,TabGroupSyncServiceDesktopMigration \
     "${NET_ARGS[@]}" \
     --window-size="$LOGICAL_W,$LOGICAL_H" --window-position=0,0 "chrome-extension://$EXT_ID/home.html?host=panel" \
     >/tmp/aeon-recording-chrome.log 2>&1 </dev/null &
@@ -205,36 +168,28 @@ aeon tool --browser "$BROWSER" browser_code \
   '{"code":"await browser.settings({agentInFront:true, cursor:\"shown\"}); return true;"}' \
   >/dev/null 2>&1 || true
 
-# Clean-frame check: a bar under the toolbar ("controlled by automated software", "Restore pages?")
-# steals viewport height; the wrong DPR means a soft master. Refuse to film either. Page code cannot
-# run in Aeon's own pages, so the active tab visits a plain page for the read and comes back: no tab
-# opens (a new one would join the session's tab group) and none is left behind.
+# Clean-frame check: a bar under the toolbar (bookmarks, "controlled by automated software",
+# "Restore pages?") steals viewport height; the wrong DPR means a soft master. Refuse to film either.
+# Page code cannot run in Aeon's own pages or chrome:// pages (a fresh start can sit on the New Tab
+# Page, which browser.tabs() does not list), so the probe opens its own tab on a tiny local page,
+# reads it and closes it. Local, not a public site: instant and deterministic even over a proxy
+# (Chrome never proxies loopback).
+PROBE_DIR="$(mktemp -d)"
+printf '<!doctype html><title>frame</title><body style="margin:0;background:#fff">' >"$PROBE_DIR/index.html"
+PROBE_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
+python3 -m http.server "$PROBE_PORT" --bind 127.0.0.1 --directory "$PROBE_DIR" >/dev/null 2>&1 &
+PROBE_PID=$!
+stop_probe() { kill "$PROBE_PID" 2>/dev/null || true; rm -rf "$PROBE_DIR"; }
+trap stop_probe EXIT
+for _ in $(seq 1 20); do
+  python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$PROBE_PORT/', timeout=1)" 2>/dev/null && break
+  sleep 0.1
+done
 FRAME="$(aeon tool --browser "$BROWSER" browser_code \
-  '{"code":"const tabs = await browser.tabs(); const tab = tabs.find((t) => t.active) ?? tabs[0]; if (!tab) throw new Error(\"no tab\"); const page = browser.page(tab.id); const back = tab.aeonUi ? tab.url : null; if (back) await page.navigate(\"https://example.com/\"); try { return await page.inspect(() => ({dpr: devicePixelRatio, outer: outerHeight, inner: innerHeight, w: innerWidth})); } finally { if (back) await page.cdp(\"Page.navigate\", {url: back}); }"}' 2>&1 || true)"
-python3 - "$FRAME" "$DPR" "$LOGICAL_W" "$LOGICAL_H" <<'PY' || exit 1
-import json, re, sys
-raw, dpr, width, height = sys.argv[1], float(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
-m = re.search(r'\{[^{}]*"dpr"[^{}]*\}', raw.replace('\\"', '"'))
-if not m:
-    print("Not a clean frame: the active tab could not be read: " + raw.strip()[:300], file=sys.stderr)
-    sys.exit(1)
-f = json.loads(m.group(0))
-# Undecorated under openbox/Xvfb, outerHeight can be 0: the window is the logical size we set.
-outer = f["outer"] if f["outer"] > f["inner"] else height
-bars = outer - f["inner"]
-problems = []
-if abs(f["dpr"] - dpr) > 0.01:
-    problems.append(f"devicePixelRatio is {f['dpr']}, expected {dpr:g}")
-# Tab strip + toolbar is ~87 CSS px; any infobar adds 40 or more.
-if bars > 110:
-    problems.append(f"{bars} px of browser UI above the page: an infobar is showing")
-if f["w"] != width:
-    problems.append(f"viewport is {f['w']} px wide, expected {width}")
-if problems:
-    print("Not a clean frame: " + "; ".join(problems), file=sys.stderr)
-    sys.exit(1)
-print(f"Clean frame: DPR {f['dpr']:g}, {bars} px of browser UI, {f['w']} px wide")
-PY
+  "{\"code\":\"const page = await browser.openTab('http://127.0.0.1:$PROBE_PORT/', {newTab: true}); try { return await page.inspect(() => ({dpr: devicePixelRatio, outer: outerHeight, inner: innerHeight, w: innerWidth})); } finally { await page.close(); }\"}" 2>&1 || true)"
+stop_probe
+trap - EXIT
+python3 "$KIT_DIR/scripts/check-recording-frame.py" "$FRAME" "$DPR" "$LOGICAL_W" "$LOGICAL_H" || exit 1
 
 echo "Recording Chrome ready: browser=$BROWSER display=$DISPLAY_NUM profile=$PROFILE capture=$SCREEN (DPR $DPR)"
 echo "Record with: aeon record start --window chrome --browser $BROWSER"
