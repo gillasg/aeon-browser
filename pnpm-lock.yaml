@@ -127,6 +127,9 @@ importers:
       "@browserkit/credentials":
         specifier: workspace:*
         version: link:../../browser/packages/credentials
+      "@browserkit/engine":
+        specifier: workspace:*
+        version: link:../../browser/packages/engine
       "@browserkit/site-mapper":
         specifier: workspace:*
         version: link:../../browser/packages/site-mapper
@@ -187,6 +190,9 @@ importers:
       "@browserkit/credentials":
         specifier: workspace:*
         version: link:../../packages/credentials
+      "@browserkit/engine":
+        specifier: workspace:*
+        version: link:../../packages/engine
       "@browserkit/site-mapper":
         specifier: workspace:*
         version: link:../../packages/site-mapper

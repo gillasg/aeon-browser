@@ -1,10 +1,9 @@
-// The offscreen document hosts browser_code realms. It outlives the service worker, so they keep
-// state while no cell is running.
+// The offscreen document records tabs, swaps the clipboard for a paste and parses HTML. It
+// outlives the service worker, so a recording keeps going while the worker sleeps.
 //
 // A message is sent only once the document answers a ping. While it is still loading,
 // hasDocument() is already true but its listener is not there yet; the message then reaches only
-// other extension pages (chat tabs), which do not answer, and the cell came back empty ("browser
-// runtime did not respond"). Several chats starting at once hit this every time.
+// other extension pages (chat tabs), which do not answer, and the request came back empty.
 
 export const OFFSCREEN = "code-offscreen.html";
 const READY_WAIT_MS = 10_000;
@@ -16,9 +15,13 @@ async function createOnce(): Promise<void> {
   creating ??= chrome.offscreen
     .createDocument({
       url: OFFSCREEN,
-      reasons: [chrome.offscreen.Reason.WORKERS, chrome.offscreen.Reason.USER_MEDIA],
+      reasons: [
+        chrome.offscreen.Reason.USER_MEDIA,
+        chrome.offscreen.Reason.CLIPBOARD,
+        chrome.offscreen.Reason.DOM_PARSER,
+      ],
       justification:
-        "Runs browser_code cells in a persistent sandboxed JavaScript realm and records tabs the user asks for.",
+        "Records tabs the user asks for, swaps the clipboard for a paste, and parses HTML.",
     })
     .catch((error: unknown) => {
       if (!String(error).includes("Only a single offscreen")) throw error;

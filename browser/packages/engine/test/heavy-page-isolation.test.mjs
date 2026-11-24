@@ -4,23 +4,25 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 const host = readFileSync(new URL("../src/code-runtime-host.ts", import.meta.url), "utf8");
-const offscreen = readFileSync(new URL("../src/code-offscreen.ts", import.meta.url), "utf8");
+const realms = readFileSync(new URL("../src/code-realm-host.ts", import.meta.url), "utf8");
+const server = readFileSync(new URL("../src/code-realm-server.ts", import.meta.url), "utf8");
 const inventory = readFileSync(
   new URL("../src/native-inventory-client.ts", import.meta.url),
   "utf8",
 );
 const tabs = readFileSync(new URL("../src/native-browser-tabs.ts", import.meta.url), "utf8");
 
-test("resetting one chat's realm closes the shared document only when its thread is blocked", () => {
-  // Closing the shared offscreen document ends every other chat's running cell, so a busy document
-  // (one that still answers) is never closed. Only one that cannot answer for 15 s is: its thread is
-  // blocked, every chat in it is already stuck, and closing it is the only recovery.
+test("resetting one chat's realm restarts the shared realm thread only when it is blocked", () => {
+  // Restarting the realms' worker thread ends every other chat's running cell, so a busy host
+  // (one that still answers) is never restarted. Only one that cannot answer for 15 s is: its
+  // thread is blocked, every chat in it is already stuck, and restarting is the only recovery.
   assert.match(host, /kind: "reset", chatId/);
   assert.match(host, /RESET_ANSWER_MS = 15_000/);
-  assert.match(host, /if \(!answered\) \{\s*await chrome\.offscreen\.closeDocument\(\)/);
-  // The offscreen handler drops just the frames of the chat named in the message, and answers at once.
-  assert.match(offscreen, /drop\(message\.chatId\);\s*reply\(true\)/);
-  assert.match(offscreen, /realms\.delete\(chatId\)/);
+  assert.match(host, /if \(!answered\) await toRealm\(\{ kind: "restart" \}\)/);
+  assert.match(server, /op\.kind === "restart"[\s\S]*?await this\.close\(\)/);
+  // The host drops just the realms of the chat named in the message, and answers at once.
+  assert.match(realms, /case "reset":\s*this\.drop\(chatId\);\s*return true/);
+  assert.match(realms, /this\.realms\.delete\(chatId\)/);
 });
 
 test("browser.tabs() bounds its wait on the inventory chain shared by every chat and tab", () => {

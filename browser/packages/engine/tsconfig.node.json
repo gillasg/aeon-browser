@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "files": [
+    "src/code-realm.ts",
+    "src/code-realm-globals.ts",
+    "src/code-realm-host.ts",
+    "src/code-realm-worker.ts",
+    "src/code-realm-server.ts"
+  ]
+}

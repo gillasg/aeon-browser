@@ -18,6 +18,7 @@ import { isWriteStep } from "./browser-step-write.js";
 import { BrowserCodeCells, type BrowserCodeCellInput } from "./browser-code-cells.js";
 import type { SiteScriptService } from "./site-script-service.js";
 import { CdpService } from "./cdp-service.js";
+import { BrowserRealmServer } from "@browserkit/engine/code-realm-server";
 import { HealthPings, type HealthReport } from "./health-ping.js";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import {
@@ -55,6 +56,9 @@ export class BrowserControlService {
   private spaceForChat: ((chatId: string) => "window" | "tabs" | undefined) | undefined;
   private cdpService: CdpService | undefined;
   private readonly health = new HealthPings();
+  /** browser_code realms, one host per browser; it outlives that browser's reconnects. */
+  private readonly realmServers = new Map<string, BrowserRealmServer>();
+  private readonly realmOf = new WeakMap<WebSocket, BrowserRealmServer>();
   private readonly cells = new BrowserCodeCells((chatId, target) =>
     this.setAssociation(chatId, target, "agent-created", "agent-open"),
   );
@@ -175,10 +179,14 @@ export class BrowserControlService {
     else this.scriptClients.delete(clientInstanceId);
     this.executors.set(clientInstanceId, socket);
     this.cells.rebind(clientInstanceId, socket);
+    const realms = this.realmServers.get(clientInstanceId) ?? new BrowserRealmServer();
+    this.realmServers.set(clientInstanceId, realms);
+    this.realmOf.set(socket, realms);
     this.resyncScripts(clientInstanceId);
     this.tidyOnStartup(clientInstanceId, socket);
     this.connectedHook?.(clientInstanceId, socket);
     socket.once("close", () => {
+      realms.socketClosed(socket);
       if (this.executors.get(clientInstanceId) === socket) {
         this.executors.delete(clientInstanceId);
         this.actionClients.delete(clientInstanceId);
@@ -191,10 +199,15 @@ export class BrowserControlService {
           setTimeout(() => pending.finish(undefined, "BROWSER_OFFLINE"), 60_000);
     });
   }
-  handleExecutorResult(candidate: unknown, socket: WebSocket): boolean {
+  /** CDP, browser_code realm, cell and popup frames, each owned by its own handler. */
+  private routedFrame(candidate: unknown, socket: WebSocket): boolean {
     if (this.cdpService?.handle(candidate)) return true;
+    if (this.realmOf.get(socket)?.handle(candidate, socket)) return true;
     if (this.cells.handle(candidate, socket)) return true;
-    if (this.adoptPopup(candidate, socket)) return true;
+    return this.adoptPopup(candidate, socket);
+  }
+  handleExecutorResult(candidate: unknown, socket: WebSocket): boolean {
+    if (this.routedFrame(candidate, socket)) return true;
     const parsed = BrowserOperationResultSchema.safeParse(candidate);
     if (!parsed.success) return false;
     const pending = this.pending.get(parsed.data.requestId);

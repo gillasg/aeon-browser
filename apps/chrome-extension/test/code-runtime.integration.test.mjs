@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import { chromeForTestingPath } from "./browser-fixture-helper.mjs";
+import { BrowserRealmServer } from "@browserkit/engine/code-realm-server";
 
 const chromePath = chromeForTestingPath();
 const extension = resolve("apps/chrome-extension/native-dist");
@@ -180,9 +181,9 @@ test(
 
       await t.test("the agent cursor appears without entering the page state", async () => {
         const result = await run(
-          "await new Promise((r) => setTimeout(r, 50)); [!!document, await page.evaluate(() => [...document.documentElement.children].some((n) => n.__cursorSurface))]",
+          "await new Promise((r) => setTimeout(r, 50)); [typeof document, await page.evaluate(() => [...document.documentElement.children].some((n) => n.__cursorSurface))]",
         );
-        assert.deepEqual(result.value, [true, true]);
+        assert.deepEqual(result.value, ["undefined", true]);
         assert.doesNotMatch((await run("await bu.state()")).output, /aeon-agent-cursor/);
         const globals = await run(
           "await page.evaluate(() => Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit|browserkit-)/.test(name)))",
@@ -222,11 +223,23 @@ test(
         assert.equal(used.value, "Fixture");
       });
 
+      const openExtensionPage = async () => {
+        const match = (item) => item.url.endsWith("/sidepanel.html");
+        const existing = (
+          await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json())
+        ).find(match);
+        if (existing) return existing;
+        await cdp("Runtime.evaluate", {
+          expression:
+            "chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel.html'), active: false })",
+          awaitPromise: true,
+        });
+        return waitForTarget(port, match);
+      };
+
       await t.test("work in a background tab publishes a live preview", async () => {
-        const offscreen = await waitForTarget(port, (item) =>
-          item.url.endsWith("/code-offscreen.html"),
-        );
-        const listener = await connect(offscreen.webSocketDebuggerUrl);
+        const panel = await openExtensionPage();
+        const listener = await connect(panel.webSocketDebuggerUrl);
         await listener("Runtime.evaluate", {
           expression:
             "globalThis.previews = []; chrome.runtime.onMessage.addListener((m) => { if (m?.kind === 'aeon.browser.preview') previews.push(!!m.image); })",
@@ -267,9 +280,7 @@ test(
         // The chat's hand-off card answers through a runtime message instead of the banner.
         const fromChat = run("await bu.handoff('Approve the order'); 'approved'");
         await handoffPage(port, pageUrl);
-        const extensionPage = await waitForTarget(port, (item) =>
-          item.url.endsWith("/code-offscreen.html"),
-        );
+        const extensionPage = await openExtensionPage();
         const sender = await connect(extensionPage.webSocketDebuggerUrl);
         await sender("Runtime.evaluate", {
           expression: `chrome.runtime.sendMessage({ kind: "aeon.handoff.answer", tabId: ${target.tabId}, answer: "done" })`,
@@ -415,11 +426,14 @@ async function fakeCore() {
   const waiting = [];
   const skills = new Map();
   const blocked = new Map();
+  // browser_code realms run in the local process, as in the daemon and the bridge.
+  const realms = new BrowserRealmServer();
   const connected = new Promise((done) =>
     server.on("connection", (ws) => {
       socket = ws;
       ws.on("message", (raw) => {
         const message = JSON.parse(String(raw));
+        if (realms.handle(message, ws)) return;
         log("core <-", message.kind, message.error ?? "");
         if (message.kind === "auth.hello")
           ws.send(
@@ -541,7 +555,7 @@ async function fakeCore() {
       );
       return Promise.race([result, sleep(10000).then(() => ({ error: "blocked sites timeout" }))]);
     },
-    close: () => server.close(),
+    close: () => (server.close(), realms.close()),
   };
 }
 

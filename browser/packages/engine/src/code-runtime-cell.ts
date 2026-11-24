@@ -1,9 +1,8 @@
-import { toOffscreen } from "./code-offscreen-host.js";
+import { toRealm } from "./code-realm-link.js";
 
-/** A deadline keeps the realm. The sandbox posts whatever the cell had already built. */
+/** A deadline keeps the realm. The realm posts whatever the cell had already built. */
 export function interruptCell(chatId: string, cellId: string): void {
-  void toOffscreen({
-    target: "aeon-code-offscreen",
+  void toRealm({
     kind: "interrupt",
     chatId,
     cellId,

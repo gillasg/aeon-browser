@@ -305,26 +305,9 @@ var google = Object.freeze({
     return __parseGoogle(page.html, options.limit ?? 10);
   },
 });
+// The realm has no DOM: the extension parses the results page with the browser's own parser.
 function __parseGoogle(html, limit) {
-  var doc = new DOMParser().parseFromString(html, 'text/html');
-  var clean = (text) => (text || '').replace(/\\s+/g, ' ').trim();
-  var seen = new Set(), results = [];
-  for (var heading of doc.querySelectorAll('a[href] h3, h3 a[href]')) {
-    var link = heading.closest('a[href]') || heading.querySelector('a[href]');
-    var href = link && link.getAttribute('href') || '';
-    if (href.startsWith('/url?')) href = new URL(href, 'https://www.google.com').searchParams.get('q') || '';
-    if (!/^https?:/.test(href) || /^https?:\\/\\/([a-z]+\\.)?google\\./.test(href) || seen.has(href)) continue;
-    seen.add(href);
-    var block = link.closest('[data-rpos], [data-hveid], .g') || link.parentElement;
-    var title = clean(heading.textContent);
-    var snippet = clean(block && block.textContent).replace(title, '').slice(0, 400);
-    var source = (() => { try { return new URL(href).hostname.replace(/^www\\./, ''); } catch { return ''; } })();
-    results.push({title, url: href, source, snippet});
-    if (results.length >= limit) break;
-  }
-  if (!results.length && /unusual traffic|detected unusual|captcha/i.test(html))
-    throw new Error('GOOGLE_BLOCKED: Google asked for a check. Use the websearch tool, or open the results in a tab.');
-  return results;
+  return __call({domParse: 'google', html: String(html || ''), limit: Number(limit) || 10});
 }
 function __waitStateName(state) {
   if (state === undefined || state === null || state === '') return 'visible';

@@ -1091,7 +1091,8 @@ test(
           const output = String(missing.stdout ?? "") + String(missing.stderr ?? "");
           assert.match(output, /nothing called text exists here/, output);
           assert.doesNotMatch(output, /WebGL/, output);
-          // A top-level name that is also a browser global keeps the agent's value in its cell.
+          // Names that used to collide with DOM window globals (history, name) keep the agent's
+          // values in the local realm and persist cleanly into the next cell.
           const shadowed = await run(
             process.execPath,
             [
@@ -1105,7 +1106,13 @@ test(
           );
           assert.match(shadowed.stdout, /"count": ?3/, shadowed.stdout);
           assert.match(shadowed.stdout, /"name": ?"kept"/, shadowed.stdout);
-          assert.match(shadowed.stdout, /browser global names/, shadowed.stdout);
+          const persisted = await run(
+            process.execPath,
+            [cli, "repl", "--session", "lists", "({count: history.length, name})"],
+            { env },
+          );
+          assert.match(persisted.stdout, /"count": ?3/, persisted.stdout);
+          assert.match(persisted.stdout, /"name": ?"kept"/, persisted.stdout);
           // A cell that works but goes the long way gets one tip, once per session.
           const tipCode = "await page.evaluate(() => localStorage.length)";
           const tipped = await run(process.execPath, [cli, "repl", "--session", "lists", tipCode], {
@@ -1196,7 +1203,7 @@ test(
             const tabs = await Promise.all(["a", "b", "c"].map((q) => browser.openTab(${JSON.stringify(siteUrl)} + "?q=" + q)));
             const sample = '<div data-rpos="0"><a href="/url?q=https://example.com/one"><h3>One result</h3></a><span>First snippet</span></div>' +
               '<div data-rpos="1"><a href="https://www.google.com/x"><h3>Google itself</h3></a></div>';
-            const parsed = __parseGoogle(sample, 5);
+            const parsed = await __parseGoogle(sample, 5);
             console.log("RESULT " + JSON.stringify({ title, url, count, second, texts, heading, items, added, typed, rows, links, parsed, regexText, regexClick, viaTab, blocked, ancestorHit, innerChecked, plainHit, plainChecked, ancestorTitle, filtered, orTexts, andCount, consoleErrors, confirmed, pdf, mobile, downloads,
               tabIds: tabs.map((tab) => tab.target.tabId) }))`,
             ],

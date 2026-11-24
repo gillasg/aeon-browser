@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { dataDirectory, statePath, type BridgeState } from "./paths.js";
 import { CdpServer } from "@browserkit/cdp";
+import { BrowserRealmServer } from "@browserkit/engine/code-realm-server";
 import { isSiteSkillRequest, siteSkillCall } from "./site-skills.js";
 import { migrateAllAbilities } from "@browserkit/site-mapper";
 import {
@@ -59,6 +60,8 @@ const EXECUTOR_PATH = "/aeon/v1";
 export class Bridge {
   private readonly executors = new Map<string, Executor>();
   private readonly cells = new Map<string, Cell>();
+  /** browser_code realms, one host per browser; it outlives that browser's reconnects. */
+  private readonly realms = new Map<string, BrowserRealmServer>();
   /** Tabs each session opened, passed back as its targets on later cells. */
   private readonly sessionTargets = new Map<string, Map<string, Target>>();
   /** One FIFO per session: a session's own cells run in the order it sent them. */
@@ -290,6 +293,7 @@ export class Bridge {
   }
 
   private dropExecutor(executor: Executor): void {
+    this.realms.get(executor.clientInstanceId)?.socketClosed(executor.socket);
     if (this.executors.get(executor.clientInstanceId) === executor)
       this.executors.delete(executor.clientInstanceId);
     for (const [cellId, cell] of this.cells)
@@ -299,6 +303,7 @@ export class Bridge {
 
   private onExecutorMessage(executor: Executor, message: Json | undefined): void {
     if (!message) return;
+    if (this.realmsFor(executor).handle(message, executor.socket)) return;
     if (message.kind === "browser.inventory.full" || message.kind === "browser.inventory.delta") {
       this.applyInventory(executor, message);
     } else if (message.kind === "browser.executor.heartbeat") {
@@ -323,6 +328,15 @@ export class Bridge {
     } else if (message.kind === "browser.dns.query") {
       void this.answerDns(executor, message);
     }
+  }
+
+  private realmsFor(executor: Executor): BrowserRealmServer {
+    const id = executor.clientInstanceId;
+    const existing = this.realms.get(id);
+    if (existing) return existing;
+    const created = new BrowserRealmServer();
+    this.realms.set(id, created);
+    return created;
   }
 
   private async answerDns(executor: Executor, message: Json): Promise<void> {

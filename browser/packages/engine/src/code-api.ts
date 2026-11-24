@@ -1,10 +1,9 @@
-// The browser_code page API, evaluated once in each chat's sandbox realm. Browser steps go through __call.
+// The browser_code page API, evaluated once in each chat's realm. Browser steps go through __call.
 
 /**
- * The realm is a manifest sandbox page with an opaque origin, so its own fetch is CORS-bound even
- * for a site the extension may reach. Route plain fetch through browser.fetch (the extension's
- * host permissions), so a check or a cell reads the same URLs the agent could, and hand back a
- * real Response.
+ * The realm runs in the local Aeon process and has no network of its own. Route plain fetch
+ * through browser.fetch (the extension's host permissions and the user's cookies), so a check or
+ * a cell reads the same URLs the agent could, and hand back a real Response.
  */
 export const browserFetchCompat = `
 globalThis.fetch = async function (input, init) {

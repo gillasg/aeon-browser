@@ -3,10 +3,10 @@
 // status a caller can act on: result says lost, resume continues from the last finished item,
 // and cancel stops both the record and the realm.
 import type { Cell } from "./code-runtime-host.js";
-import { toOffscreen } from "./code-offscreen-host.js";
-import { jobCode, jobOptions } from "./code-job-code.js";
-import { sweepCode, sweepOptions, type SweepOptions } from "./code-sweep-code.js";
-import { judgeOutcome, registrableDomain, summarizeOutcomes, type Outcome } from "./outcomes.js";
+import { toRealm } from "./code-realm-link.js";
+import { jobOptions } from "./code-job-code.js";
+import { sweepOptions, type SweepOptions } from "./code-sweep-code.js";
+import { summarizeOutcomes, type Outcome } from "./outcomes.js";
 import {
   jobs,
   jobTimers,
@@ -142,8 +142,7 @@ function clearJobTimer(job: Job): void {
 }
 
 async function stopJob(job: Job): Promise<void> {
-  await toOffscreen({
-    target: "aeon-code-offscreen",
+  await toRealm({
     kind: "stopJobs",
     jobId: job.run.cellId,
     chatId: job.run.chatId,
@@ -168,36 +167,27 @@ async function resumeJob(cell: Cell, job: Job): Promise<unknown> {
   delete job.finishedAt;
   delete job.error;
   await saveJobs();
-  const code = jobCodeFor(job, remaining, offset);
-  await toOffscreen({
-    target: "aeon-code-offscreen",
+  const spec = jobSpec(job, remaining, offset);
+  await toRealm({
     kind: "job",
     jobId: job.run.cellId,
     chatId: cell.run.chatId,
-    code,
+    spec,
   });
   watchJob(job);
   return jobState(job);
 }
 
-/** The code for a job realm: the item function, or the generated sweep function. */
-function jobCodeFor(job: Job, items: unknown[], offset?: number): string {
-  if (job.mode === "sweep")
-    return sweepCode({
-      jobId: job.run.cellId,
-      urls: items,
-      options: (job.options as SweepOptions) ?? sweepOptions({}),
-      ...(offset ? { offset } : {}),
-      judge: judgeOutcome.toString(),
-      domain: registrableDomain.toString(),
-    });
-  return jobCode({
+/** What a job realm runs: the item function, or a sweep. The local realm host writes its code. */
+function jobSpec(job: Job, items: unknown[], offset?: number): Record<string, unknown> {
+  return {
+    mode: job.mode === "sweep" ? "sweep" : "job",
     jobId: job.run.cellId,
     items,
     fn: job.fn ?? "",
-    options: job.options ?? jobOptions({}),
+    options: job.options ?? (job.mode === "sweep" ? sweepOptions({}) : jobOptions({})),
     ...(offset ? { offset } : {}),
-  });
+  };
 }
 
 async function startJob(cell: Cell, request: Record<string, unknown>): Promise<unknown> {
@@ -279,14 +269,13 @@ async function startJob(cell: Cell, request: Record<string, unknown>): Promise<u
   };
   jobs.set(jobId, job);
   await saveJobs();
-  const code = jobCodeFor(job, items);
+  const spec = jobSpec(job, items);
   try {
-    await toOffscreen({
-      target: "aeon-code-offscreen",
+    await toRealm({
       kind: "job",
       jobId,
       chatId: cell.run.chatId,
-      code,
+      spec,
     });
   } catch (error) {
     job.status = "failed";

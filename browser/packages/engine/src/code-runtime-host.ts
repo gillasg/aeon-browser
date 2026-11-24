@@ -25,7 +25,8 @@ import {
   errorCode,
   targetIdentity,
 } from "./native-browser-common.js";
-import { OFFSCREEN, offscreenClosed, toOffscreen } from "./code-offscreen-host.js";
+import { bindRealmSocket, handleRealmFrame, realmLinked, toRealm } from "./code-realm-link.js";
+import { parseInOffscreen } from "./native-browser-google.js";
 import { stepFailure } from "./code-step-errors.js";
 import { mayHaveLanded, refusedEffect, sentActionEffect } from "./native-browser-effect.js";
 import { jobs } from "./code-runtime-jobs.js";
@@ -103,6 +104,8 @@ export function handleBrowserCodeMessage(
   socket: WebSocket,
   candidate: unknown,
 ): boolean {
+  bindRealmSocket(socket);
+  if (handleRealmFrame(socket, candidate, realmEvent)) return true;
   const run = BrowserCodeRunSchema.safeParse(candidate);
   if (run.success) {
     void startCell(identity, socket, run.data);
@@ -137,36 +140,34 @@ export function handleBrowserCodeMessage(
 
 /** A dropped link reconnected: running cells and jobs answer on the new socket. */
 export function rebindBrowserCodeSocket(socket: WebSocket): void {
+  bindRealmSocket(socket);
   for (const cell of cells.values()) cell.socket = socket;
   for (const job of jobs.values()) if (job.status === "running") job.socket = socket;
 }
 
-// The offscreen reset handler answers synchronously. No answer for this long means the document's
+// The realm host's reset handler answers at once. No answer for this long means the realms'
 // thread is blocked (a synchronous loop in some realm); every chat in it is already stuck.
 const RESET_ANSWER_MS = 15_000;
 
 /**
- * Drops one chat's REPL realm (session closed or runtime reset). The offscreen document hosts a
- * realm per chat, and its `reset` handler removes only this chat's frames. A document that is merely
- * busy still answers, and the other chats keep running. Only a document that cannot answer for
- * RESET_ANSWER_MS is closed: its thread is blocked by a synchronous loop, so every chat in it is
- * already stuck, and closing it is the only way to get any chat working again.
+ * Drops one chat's REPL realm (session closed or runtime reset). The local Aeon process hosts a
+ * realm per chat, and its `reset` handler removes only this chat's realms. A host that is merely
+ * busy still answers, and the other chats keep running. Only a host that cannot answer for
+ * RESET_ANSWER_MS is restarted: its thread is blocked by a synchronous loop, so every chat in it
+ * is already stuck, and restarting it is the only way to get any chat working again.
  */
 export async function resetRealm(chatId: string): Promise<void> {
   cancelJobs(chatId);
-  if (!(await chrome.offscreen.hasDocument())) return;
+  if (!realmLinked()) return;
   const answered = await Promise.race([
-    chrome.runtime.sendMessage({ target: "aeon-code-offscreen", kind: "reset", chatId }).then(
+    toRealm({ kind: "reset", chatId }).then(
       () => true,
-      // No document listening: nothing is hung, so nothing to close.
+      // No host listening: nothing is hung, so nothing to restart.
       () => true,
     ),
     new Promise<boolean>((done) => setTimeout(done, RESET_ANSWER_MS, false)),
   ]);
-  if (!answered) {
-    await chrome.offscreen.closeDocument().catch(() => undefined);
-    offscreenClosed();
-  }
+  if (!answered) await toRealm({ kind: "restart" }).catch(() => undefined);
 }
 
 async function startCell(identity: BrowserIdentity, socket: WebSocket, run: BrowserCodeRun) {
@@ -195,8 +196,7 @@ async function startCell(identity: BrowserIdentity, socket: WebSocket, run: Brow
   // The caller's proof the connection carried the run; without it, it fails fast and reconnects.
   sendStage(cell, "received");
   try {
-    const result = (await toOffscreen({
-      target: "aeon-code-offscreen",
+    const result = (await toRealm({
       kind: "cell",
       cellId: run.cellId,
       chatId: run.chatId,
@@ -274,34 +274,28 @@ function finalize(cell: Cell, result: CellOutcome): void {
   });
 }
 
-// Offscreen relays calls from the sandboxed realm. Only that document may send them.
-chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (message?.target !== "aeon-code-host") return;
-  if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL(OFFSCREEN)) return;
+// The realm host relays calls from a cell's realm. Only frames on the extension's own link to the
+// local Aeon process reach this; the answer has the shape the realm's __call expects.
+async function realmEvent(message: Record<string, unknown>): Promise<unknown> {
   if (message.kind === "jobDone" || message.kind === "jobLost") {
-    (message.kind === "jobDone" ? finishJob : loseJob)(message as Record<string, unknown>);
-    reply({ ok: true });
-    return true;
+    (message.kind === "jobDone" ? finishJob : loseJob)(message);
+    return { ok: true };
   }
   if (message.kind === "stage") {
     const cell = cells.get(String(message.cellId));
     const stage = BrowserCodeStageSchema.safeParse(message.stage);
     if (cell && stage.success) sendStage(cell, stage.data);
-    reply({ ok: true });
-    return true;
+    return { ok: true };
   }
-  if (message.kind !== "call") return;
-  const cell = cells.get(message.cellId) ?? jobs.get(message.cellId);
-  if (!cell) {
-    reply({ error: "RUN_RESET: browser cell is no longer active" });
-    return;
-  }
-  serve(cell, message.request).then(
-    (value) => reply({ value }),
-    (error: unknown) => reply({ error: describe(error) }),
+  if (message.kind !== "call") return { error: "UNSUPPORTED: realm event" };
+  const cellId = String(message.cellId);
+  const cell = cells.get(cellId) ?? jobs.get(cellId);
+  if (!cell) return { error: "RUN_RESET: browser cell is no longer active" };
+  return serve(cell, message.request).then(
+    (value) => ({ value }),
+    (error: unknown) => ({ error: describe(error) }),
   );
-  return true;
-});
+}
 
 // Non-step requests are kernel effects (code-runtime-effects.ts): the kernel authorizes the tab
 // and checks the site each one names before it runs.
@@ -340,6 +334,7 @@ async function enforceSites(cell: Cell, step: BrowserStep): Promise<void> {
 
 async function serve(cell: Cell, request: unknown): Promise<unknown> {
   const value = request as Record<string, unknown> | null;
+  if (value?.domParse === "google") return parseInOffscreen(value);
   if (!value || typeof value.op !== "string") return serveCall(cell, value);
   const internal = takeInternal(value);
   const step = await prepare(cell, value);

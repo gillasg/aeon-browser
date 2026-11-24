@@ -52,9 +52,6 @@
     "48": "aeon-icon-48.png",
     "128": "aeon-icon-128.png"
   },
-  "sandbox": {
-    "pages": ["code-sandbox.html"]
-  },
   "commands": {
     "summon-orb": {
       "suggested_key": {

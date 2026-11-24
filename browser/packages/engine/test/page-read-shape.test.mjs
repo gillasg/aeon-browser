@@ -27,7 +27,7 @@ const TAB = {
   label: "p1",
 };
 
-const sandbox = readFileSync(new URL("../src/code-sandbox.ts", import.meta.url), "utf8");
+const sandbox = readFileSync(new URL("../src/code-realm-source.ts", import.meta.url), "utf8");
 
 async function sandboxSource() {
   const from = new Map();
@@ -35,7 +35,7 @@ async function sandboxSource() {
     for (const name of match[1].split(",").map((part) => part.trim()))
       if (name) from.set(name, match[2]);
   const list = /evaluate\(\s*\[([\s\S]*?)\]\.join/.exec(sandbox);
-  assert.ok(list, "code-sandbox.ts evaluates a joined list of runtime parts");
+  assert.ok(list, "code-realm-source.ts evaluates a joined list of runtime parts");
   const parts = [];
   for (const name of list[1]
     .split(",")

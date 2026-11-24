@@ -1,3 +1,5 @@
+import { toOffscreen } from "./code-offscreen-host.js";
+
 // Google Search from the user's own browser: the request carries their cookies, language and
 // region, so results match what they would see (local shops, prices, showtimes), with no API
 // quota. Queries run one at a time with a short gap, because bursts trigger Google's bot checks.
@@ -35,4 +37,16 @@ async function fetchResults(query: string, value: Record<string, unknown>) {
     );
   if (!response.ok) throw new Error("GOOGLE_FAILED: HTTP " + response.status);
   return { html: (await response.text()).slice(0, 3_000_000), url: finalUrl };
+}
+
+/** HTML the realm needs read as a document: the offscreen document has the browser's parser. */
+export async function parseInOffscreen(value: Record<string, unknown>): Promise<unknown> {
+  const parsed = (await toOffscreen({
+    target: "aeon-code-offscreen",
+    kind: "parseGoogle",
+    html: String(value.html ?? ""),
+    limit: Number(value.limit) || 10,
+  })) as { results?: unknown; error?: string } | undefined;
+  if (!parsed || parsed.error) throw new Error(parsed?.error ?? "INTERNAL: parser unavailable");
+  return parsed.results;
 }

@@ -3,8 +3,7 @@ import test from "node:test";
 import vm from "node:vm";
 import { browserFetchCompat } from "../dist/code-api.js";
 
-// The manifest sandbox has an opaque origin, so its own fetch is CORS-bound. The compatibility
-// shim must go through browser.fetch, which has the extension's host permissions, and still hand
+// The realm has no network of its own. The compatibility shim must go through browser.fetch, which has the extension's host permissions, and still hand
 // the cell a real Response.
 test("the realm fetch goes through browser.fetch and builds a Response", async () => {
   const calls = [];

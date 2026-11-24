@@ -14,7 +14,8 @@
     "@browserkit/tools": "workspace:*",
     "@browserkit/site-mapper": "workspace:*",
     "@browserkit/cdp": "workspace:*",
-    "@browserkit/credentials": "workspace:*"
+    "@browserkit/credentials": "workspace:*",
+    "@browserkit/engine": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.6.3",
