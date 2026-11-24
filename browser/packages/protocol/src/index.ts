@@ -11,6 +11,7 @@ export * from "./native-bootstrap.js";
 export * from "./errors.js";
 export * from "./step-event.js";
 export * from "./handoff.js";
+export * from "./handoff-status.js";
 export {
   connectionAddress,
   literalLoopback,

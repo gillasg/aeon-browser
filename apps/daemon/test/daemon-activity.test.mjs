@@ -83,3 +83,21 @@ test("core.activity reports the cause and does not stop anything", () => {
     false,
   );
 });
+
+test("a pending hand-off adds a Waiting on you line with its elapsed time", () => {
+  const lines = activityBusy(
+    {
+      workingChats: 0,
+      askingChats: 1,
+      routines: 0,
+      cells: 0,
+      abilities: 0,
+      handoffs: [{ message: "Sign in to your bank", startedAt: 1_000 }],
+    },
+    131_000,
+  );
+  assert.deepEqual(lines, [
+    "1 chat waiting on you",
+    "Waiting on you: Sign in to your bank (2m 10s)",
+  ]);
+});

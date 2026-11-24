@@ -40,6 +40,13 @@ export const BrowserTabSchema = z
     heldByOther: z.boolean().optional(),
     /** One of Aeon's own pages (home, chat, side panel): listed and drivable, marked as Aeon UI. */
     aeonUi: z.boolean().optional(),
+    /** A pending hand-off: the agent is waiting on the user in this tab since startedAt. */
+    handoff: z
+      .object({ message: z.string().max(2000), startedAt: z.number().int().nonnegative() })
+      .strict()
+      .optional(),
+    /** Set while the debugger cannot reach the tab (another extension's popup is on top). */
+    detached: z.string().max(200).optional(),
     /** Stable session label (p1, p2…), accepted anywhere a tab id is. */
     label: z
       .string()

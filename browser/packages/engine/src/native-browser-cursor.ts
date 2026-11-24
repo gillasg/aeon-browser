@@ -52,6 +52,8 @@ export interface CursorUpdate {
   start?: { x: number; y: number };
   /** The agent waits for the user: amber cursor and spotlight, no glow, the message as caption. */
   needs?: string | null;
+  /** When the hand-off began, so the cursor box shows the wait without its own clock. */
+  needsStartedAt?: number | null;
   /** Why the agent waits: a sign-in or check in the way, or a cliff edge (a commitment to approve). */
   needsKind?: string | null;
   /** The commitment a cliff-edge hand-off waits for, in words ("Pay $42.10"). */
@@ -134,6 +136,7 @@ export function showAgentNeeds(
   message: string | null,
   spotlight?: { x: number; y: number; width: number; height: number },
   meta: HandoffMeta = {},
+  startedAt?: number,
 ): void {
   const point = spotlight
     ? {
@@ -146,6 +149,7 @@ export function showAgentNeeds(
     { tabId },
     {
       needs: message,
+      needsStartedAt: message !== null ? (startedAt ?? null) : null,
       needsKind: message !== null ? (meta.kind ?? null) : null,
       needsAction: message !== null ? (meta.actionLabel ?? null) : null,
       ...(message !== null ? { glow: false } : { glow: true, hideSpotlight: true }),

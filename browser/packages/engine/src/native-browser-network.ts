@@ -10,7 +10,9 @@ import { privateAddress } from "./native-browser-policy.js";
 import { listEntries, recentOf } from "./native-browser-network-list.js";
 import {
   attachChild,
+  autoAttachParams,
   childScopes,
+  setCaptureActive,
   NETWORK_BUFFERS,
   scopeKey,
   type ChildScope,
@@ -81,7 +83,7 @@ onEngineInstall(() => {
     const tabId = source.tabId;
     if (tabId === undefined) return;
     const params = (raw ?? {}) as Params;
-    if (method === "Target.attachedToTarget") return attachChild(tabId, params);
+    if (method === "Target.attachedToTarget") return void attachChild(tabId, params);
     if (method === "Target.detachedFromTarget") {
       childScopes.delete(scopeKey(tabId, String(params.sessionId ?? "")));
       return;
@@ -104,6 +106,27 @@ onEngineInstall(() => {
   });
 });
 
+/** One recorder fed by events directly: the redirect, extra-info and abort rules under test. */
+export function networkRecorderForTest(): {
+  event(method: string, params: Params): void;
+  stop(): void;
+  entries(): NetworkEntry[];
+} {
+  const recorder: Recorder = {
+    entries: new Map(),
+    early: new Map(),
+    allTypes: true,
+    bodies: false,
+    maxBody: DEFAULT_MAX_BODY,
+    bodyBytes: 0,
+  };
+  return {
+    event: (method, params) => HANDLERS[method]?.(recorder, params, -1),
+    stop: () => flushParkedHops(recorder),
+    entries: () => [...recorder.entries.values()],
+  };
+}
+
 const HANDLERS: Record<string, (recorder: Recorder, params: Params, tabId: number) => void> = {
   "Network.requestWillBeSent": requestWillBeSent,
   "Network.requestWillBeSentExtraInfo": (recorder, params) =>
@@ -115,7 +138,11 @@ const HANDLERS: Record<string, (recorder: Recorder, params: Params, tabId: numbe
   "Network.loadingFailed": (recorder, params, tabId) => {
     const entry = recorder.entries.get(String(params.requestId));
     if (!entry) return;
-    entry.failed = String(params.errorText ?? "failed");
+    closeHop(entry);
+    // A request the page or the browser cancelled (navigation away, AbortController) is aborted,
+    // not failed: it is kept, and failures() does not count it.
+    if (params.canceled === true) entry.aborted = true;
+    else entry.failed = String(params.errorText ?? "failed");
     entry.done = true;
     recordGlobalEntry(tabId, entry, entry.documentURL);
     notifyWaiters(recorder, entry);
@@ -164,15 +191,22 @@ function requestWillBeSent(recorder: Recorder, params: Params): void {
   const request = params.request as Params;
   const existing = recorder.entries.get(id);
   if (existing && params.redirectResponse) {
+    // Closes the current hop with whatever extra info arrived for it, then opens the next one.
     const redirect = params.redirectResponse as Params;
     existing.redirects ??= [];
+    const hop = existing.redirects.length;
+    const parked = parkedExtra(existing);
     existing.redirects.push({
       url: existing.url,
       status: Number(redirect.status),
-      headers: headers(redirect.headers),
+      headers: { ...headers(redirect.headers), ...(parked ?? {}) },
+      hop,
+      requestHeaders: existing.requestHeaders,
+      ...(parked ? {} : { extraInfo: false }),
     });
     existing.url = String(request.url);
     existing.method = String(request.method);
+    existing.requestHeaders = headers(request.headers);
     return;
   }
   if (!recorder.allTypes && !API_TYPES.has(type)) return;
@@ -213,6 +247,7 @@ function responseReceived(recorder: Recorder, params: Params): void {
   entry.statusText = String(response.statusText ?? "");
   entry.mimeType = String(response.mimeType ?? "");
   entry.responseHeaders = { ...headers(response.headers), ...entry.responseHeaders };
+  closeHop(entry);
   if (typeof response.protocol === "string") entry.protocol = response.protocol;
   if (typeof response.remoteIPAddress === "string")
     entry.remoteIPAddress = response.remoteIPAddress;
@@ -226,6 +261,7 @@ function responseReceived(recorder: Recorder, params: Params): void {
 function loadingFinished(recorder: Recorder, params: Params, tabId: number): void {
   const entry = recorder.entries.get(String(params.requestId));
   if (!entry) return;
+  closeHop(entry);
   entry.size = Number(params.encodedDataLength ?? 0);
   entry.durationMs = Math.max(0, Date.now() - entry.startedAt);
   entry.done = true;
@@ -319,8 +355,38 @@ function mergeHeaders(
     if (field === "requestHeaders" && recorder.early.size < 500) recorder.early.set(id, params);
     return;
   }
+  if (field === "responseHeaders" && !entry.done) {
+    // Response extra info belongs to the hop in flight: parked until that hop closes (a redirect,
+    // the final response, or loadingFinished), so redirect hops never share or overwrite it.
+    hopExtra.set(entry, { ...(hopExtra.get(entry) ?? {}), ...headers(params.headers) });
+    return;
+  }
   entry[field] = { ...entry[field], ...headers(params.headers) };
   if (field === "requestHeaders") rememberSessionHeaders(entry.url, entry.requestHeaders);
+}
+
+/** Response extra info that arrived for the hop in flight, by entry. */
+const hopExtra = new WeakMap<NetworkEntry, Record<string, string>>();
+
+function parkedExtra(entry: NetworkEntry): Record<string, string> | undefined {
+  const parked = hopExtra.get(entry);
+  hopExtra.delete(entry);
+  return parked;
+}
+
+/** The final hop closes: its parked extra info joins the response headers. */
+function closeHop(entry: NetworkEntry): void {
+  const parked = parkedExtra(entry);
+  if (parked) entry.responseHeaders = { ...entry.responseHeaders, ...parked };
+}
+
+/** On stop, hops still open keep what arrived and are marked partial. */
+function flushParkedHops(recorder: Recorder): void {
+  for (const entry of recorder.entries.values()) {
+    if (entry.done) continue;
+    closeHop(entry);
+    entry.partial = true;
+  }
 }
 
 function frame(recorder: Recorder, params: Params, direction: "sent" | "received"): void {
@@ -368,6 +434,7 @@ onEngineInstall(() => {
   chrome.tabs.onRemoved.addListener((tabId) => {
     const recorder = recorders.get(tabId) ?? stopped.get(tabId);
     if (recorder) cancelWaiters(recorder);
+    setCaptureActive(tabId, false);
     recorders.delete(tabId);
     stopped.delete(tabId);
     holdBrowserDebugger(tabId, false);
@@ -379,12 +446,11 @@ async function enableNetwork(tabId: number): Promise<void> {
     await send(debuggee, "Network.enable", NETWORK_BUFFERS, { label: "enableNetwork" });
     // Workers and out-of-process iframes attach as they appear, so their requests land in the
     // same store as the top frame's (a player's resolver often runs in a service worker).
-    await send(
-      debuggee,
-      "Target.setAutoAttach",
-      { autoAttach: true, waitForDebuggerOnStart: false, flatten: true },
-      { label: "enableNetwork" },
-    ).catch(() => undefined);
+    // While capturing, children start paused until Network is enabled on them (attachChild).
+    setCaptureActive(tabId, recorders.has(tabId));
+    await send(debuggee, "Target.setAutoAttach", autoAttachParams(tabId), {
+      label: "enableNetwork",
+    }).catch(() => undefined);
   });
 }
 
@@ -431,8 +497,10 @@ export async function networkCall(
     const active = recorders.get(tabId);
     if (active) {
       cancelWaiters(active);
+      flushParkedHops(active);
       stopped.set(tabId, active);
     }
+    setCaptureActive(tabId, false);
     return { stopped: recorders.delete(tabId) };
   }
   const recorder = recorders.get(tabId) ?? stopped.get(tabId);
@@ -472,6 +540,7 @@ export async function learnUserTab(tabId: number, on: boolean): Promise<void> {
     // Only a passive recording is ours to detach; an agent tab keeps its debugger.
     if (!recorders.get(tabId)?.passive) return;
     recorders.delete(tabId);
+    setCaptureActive(tabId, false);
     await chrome.debugger.detach({ tabId }).catch(() => undefined);
     return;
   }

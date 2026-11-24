@@ -50,6 +50,67 @@ export interface DialogDecision {
   line: string;
 }
 
+/** A dialog answered while an action was in flight in its tab. */
+export interface AnsweredDialog {
+  type: string;
+  message: string;
+  answer: "accepted" | "dismissed";
+}
+
+// Actions in flight per tab, and the dialogs answered meanwhile. A click or fill that opens a
+// dialog freezes the renderer until it is answered, so its CDP reply can race the answer: with a
+// dialog on record the input counts as delivered, and it is never sent again.
+const inFlight = new Map<number, { depth: number; answered: AnsweredDialog[] }>();
+
+/** Marks an action in flight in this tab. Pair with endAction. */
+export function beginAction(tabId: number): void {
+  const current = inFlight.get(tabId);
+  if (current) current.depth += 1;
+  else inFlight.set(tabId, { depth: 1, answered: [] });
+}
+
+/** The dialogs answered so far during the action in flight, without ending it. */
+export function dialogsDuringAction(tabId: number): AnsweredDialog[] {
+  return [...(inFlight.get(tabId)?.answered ?? [])];
+}
+
+/** Ends the action and returns the dialogs answered while it ran. */
+export function endAction(tabId: number): AnsweredDialog[] {
+  const current = inFlight.get(tabId);
+  if (!current) return [];
+  current.depth -= 1;
+  if (current.depth <= 0) inFlight.delete(tabId);
+  return [...current.answered];
+}
+
+/**
+ * Input that opened a dialog: when the work fails after a dialog was answered in this tab, the
+ * input was delivered (its CDP reply raced the answer). Resolves with `delivered` instead of
+ * throwing, so the caller keeps its result and never sends the input again.
+ */
+export async function deliveredThroughDialog<T, D>(
+  tabId: number,
+  work: Promise<T>,
+  delivered: D,
+): Promise<T | D> {
+  try {
+    return await work;
+  } catch (error) {
+    if (dialogsDuringAction(tabId).length) return delivered;
+    throw error;
+  }
+}
+
+function noteAnsweredDuring(tabId: number, decision: DialogDecision): void {
+  const current = inFlight.get(tabId);
+  if (!current || current.answered.length >= 10) return;
+  current.answered.push({
+    type: decision.type,
+    message: decision.message,
+    answer: decision.accept ? "accepted" : "dismissed",
+  });
+}
+
 const actedAt = new Map<number, number>();
 const navigatedAt = new Map<number, number>();
 const expected = new Map<number, string>();
@@ -122,6 +183,7 @@ export function answerDialogOpening(
     message: decision.message,
     accepted: decision.accept,
   });
+  noteAnsweredDuring(tabId, decision);
   notePageConsole(tabId, decision.warn ? "warning" : "info", decision.line);
   if (decision.warn) pushWarn(tabId, decision.warn);
   return decision;
@@ -256,6 +318,7 @@ function forgetDialog(tabId: number): void {
   navigatedAt.delete(tabId);
   expected.delete(tabId);
   warns.delete(tabId);
+  inFlight.delete(tabId);
 }
 
 onEngineInstall(() => {

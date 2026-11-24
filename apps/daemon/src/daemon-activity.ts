@@ -1,5 +1,10 @@
 import { WebSocket } from "ws";
-import { CoreActivityRequestSchema, CoreActivityResultSchema } from "@aeon/protocol";
+import {
+  CoreActivityRequestSchema,
+  CoreActivityResultSchema,
+  handoffStatusLine,
+  type HandoffStatus,
+} from "@aeon/protocol";
 
 export interface ActivityCounts {
   workingChats: number;
@@ -7,6 +12,8 @@ export interface ActivityCounts {
   routines: number;
   cells: number;
   abilities: number;
+  /** Hand-offs pending in browser tabs: one "Waiting on you: <msg> (2m 10s)" line each. */
+  handoffs?: HandoffStatus[];
 }
 
 const BUSY_ROUTINE = new Set(["pending", "accepted", "running"]);
@@ -16,10 +23,11 @@ export function countBusyRoutines(runs: readonly { state: string }[]): number {
   return runs.filter((run) => BUSY_ROUTINE.has(run.state)).length;
 }
 
-export function activityBusy(counts: ActivityCounts): string[] {
+export function activityBusy(counts: ActivityCounts, now = Date.now()): string[] {
   const lines: string[] = [];
   add(lines, counts.workingChats, "chat working", "chats working");
   add(lines, counts.askingChats, "chat waiting on you", "chats waiting on you");
+  for (const handoff of counts.handoffs ?? []) lines.push(handoffStatusLine(handoff, now));
   add(lines, counts.routines, "routine running", "routines running");
   add(lines, counts.cells, "browser action running", "browser actions running");
   add(lines, counts.abilities, "ability running", "abilities running");

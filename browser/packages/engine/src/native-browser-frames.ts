@@ -1,4 +1,5 @@
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
+import { autoAttachParams } from "./native-browser-network-scopes.js";
 import { withContextRetry } from "./cdp/context-retry.js";
 import { send } from "./cdp/send.js";
 import { BrowserActionError } from "./native-browser-common.js";
@@ -30,16 +31,14 @@ onEngineInstall(() => {
       const map = sessions.get(source.tabId) ?? new Map<string, string>();
       map.set(params.targetInfo.targetId, params.sessionId);
       sessions.set(source.tabId, map);
-      void send(
-        { tabId: source.tabId, sessionId: params.sessionId },
-        "Target.setAutoAttach",
-        {
-          autoAttach: true,
-          waitForDebuggerOnStart: false,
-          flatten: true,
-        },
-        { label: "trackFrameTarget" },
-      ).catch(() => undefined);
+      const child = { tabId: source.tabId, sessionId: params.sessionId };
+      void send(child, "Target.setAutoAttach", autoAttachParams(source.tabId), {
+        label: "trackFrameTarget",
+      }).catch(() => undefined);
+      // Dialogs opened inside an out-of-process iframe reach onJavaScriptDialog only with Page on.
+      void send(child, "Page.enable", undefined, { label: "trackFrameTarget" }).catch(
+        () => undefined,
+      );
     }
     if (method === "Target.detachedFromTarget")
       for (const map of sessions.values())
@@ -50,16 +49,9 @@ onEngineInstall(() => {
   });
 });
 export async function discoverFrames(debuggee: chrome.debugger.Debuggee): Promise<FrameInfo[]> {
-  await send(
-    debuggee,
-    "Target.setAutoAttach",
-    {
-      autoAttach: true,
-      waitForDebuggerOnStart: false,
-      flatten: true,
-    },
-    { label: "discoverFrames" },
-  );
+  await send(debuggee, "Target.setAutoAttach", autoAttachParams(debuggee.tabId ?? -1), {
+    label: "discoverFrames",
+  });
   const result: FrameInfo[] = [];
   const roots: (chrome.debugger.Debuggee & { sessionId?: string })[] = [
     debuggee,

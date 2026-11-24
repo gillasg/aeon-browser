@@ -65,7 +65,7 @@ function __actElement(node, state) {
 }
 var __actMethods = {
   click: (page, id, node, args, state) => page.click(__actElement(node, state) || id),
-  fill: (page, id, node, args, state) => page.fill(__actElement(node, state) || id, args[0] ?? ''),
+  fill: (page, id, node, args, state) => page.fill(__actElement(node, state) || id, args[0] ?? '', args[1] && args[1].force === true ? {force: true} : undefined),
   // A native select takes its option label through fill.
   select: (page, id, node, args, state) => page.fill(__actElement(node, state) || id, args[0] ?? ''),
   press: (page, id, node, args, state) => page.press(__actElement(node, state) || id, args[0] || 'Enter'),

@@ -1,4 +1,5 @@
 import { removeAgentCursor, showAgentBadge, showAgentGlow } from "./native-browser-cursor.js";
+import { forgetDebuggerBlock, renewAttach } from "./native-browser-attach-block.js";
 import {
   evictForeignFrames,
   FOREIGN_FRAME,
@@ -75,6 +76,7 @@ onEngineInstall(() => {
     held.delete(tabId);
     emulated.delete(tabId);
     forget(tabId);
+    forgetDebuggerBlock(tabId);
     owners.delete(tabId);
     cancelled.delete(tabId);
   });
@@ -246,11 +248,20 @@ async function attach(tabId: number): Promise<void> {
   // Memory Saver discards background tabs, agent tabs first: load it back before driving it.
   await reviveDiscardedTab(tabId);
   try {
-    await bounded(tabId, chrome.debugger.attach({ tabId }, "1.3"), ATTACH_MS, "attach");
+    await renewAttach(tabId, () =>
+      bounded(tabId, chrome.debugger.attach({ tabId }, "1.3"), ATTACH_MS, "attach"),
+    );
   } catch (error) {
     if (!/already attached/i.test(String(error))) throw error;
-    // send succeeds only for our extension's attachment; do not take over DevTools.
-    await send({ tabId }, "Page.getFrameTree", undefined, { label: "attach", cls: "attach" });
+    // send succeeds only for our extension's attachment; do not take over DevTools. When it
+    // fails, someone else holds the tab: it stays ours, marked blocked, and the next step retries.
+    await renewAttach(tabId, () =>
+      send({ tabId }, "Page.getFrameTree", undefined, { label: "attach", cls: "attach" }).catch(
+        (cause: unknown) => {
+          throw new Error("Another debugger is already attached: " + String(cause));
+        },
+      ),
+    );
   }
   trackBrowserActivity(tabId);
   await enablePage(tabId);

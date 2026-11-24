@@ -261,8 +261,19 @@ const PAGE_BODY = `
     if (update.from) trail(s, update.from.x, update.from.y, update.x, update.y);
   } else if (update.press) press(s);
   if (update.release) rest(s, hostFor(s));
-  if (update.needs) update.caption = update.needs;
-  else if (update.caption && s.wrap.classList.contains("needs")) update.caption = undefined;
+  // The waiting state reads "Waiting on you: <msg> · 2m 10s", ticking from the engine's startedAt.
+  if (update.needs !== undefined || update.needsStartedAt !== undefined) {
+    clearInterval(s.needsTick);
+    if (update.needs && typeof update.needsStartedAt === "number") {
+      var since = update.needsStartedAt, ask = String(update.needs);
+      update.caption = waitingCaption(ask, since);
+      s.needsTick = setInterval(function () {
+        if (!s.wrap.classList.contains("needs")) { clearInterval(s.needsTick); return; }
+        s.text.textContent = waitingCaption(ask, since);
+      }, 1000);
+    } else if (update.needs) update.caption = update.needs;
+  }
+  if (!update.needs && update.caption && s.wrap.classList.contains("needs")) update.caption = undefined;
   if (update.caption && !(update.soft && Date.now() - (s.captionAt || 0) < 1500)) paintCaption(s, update);
   if (s.publish) { s.publish(); requestAnimationFrame(function () { s.publish(); }); }
   function reduceMotion() { return matchMedia("(prefers-reduced-motion: reduce)").matches; }
@@ -307,6 +318,12 @@ const PAGE_BODY = `
     state.callout.style.left = Math.max(8, Math.min(innerWidth - 288, callout.x)) + "px";
     state.callout.style.top = (callout.y > 60 ? callout.y - 44 : callout.y + (callout.height || 0) + 8) + "px";
     state.callout.classList.add("on");
+  }
+  function waitingCaption(ask, since) {
+    var total = Math.max(0, Math.floor((Date.now() - since) / 1000));
+    var h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+    var spent = h ? h + "h " + m + "m" : m ? m + "m " + sec + "s" : sec + "s";
+    return "Waiting on you: " + ask + " · " + spent;
   }
   function paintCaption(state, next) {
     state.captionAt = Date.now();

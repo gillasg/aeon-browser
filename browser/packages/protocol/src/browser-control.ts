@@ -99,6 +99,8 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       element: SemanticTargetSchema,
       value: z.string().max(20000),
       observe: z.boolean().optional(),
+      /** Skips the covered-field check; visible, enabled and editable are still required. */
+      force: z.boolean().optional(),
     })
     .strict(),
   z
@@ -322,6 +324,19 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
       evidence: z.string().max(240),
       /** Words for this step, from labelFor. A value typed into a field is never included. */
       label: z.string().max(200).optional(),
+      /** Dialogs the page opened and Aeon answered while this input was in flight. */
+      dialogs: z
+        .array(
+          z
+            .object({
+              type: z.string().max(40),
+              message: z.string().max(300),
+              answer: z.enum(["accepted", "dismissed"]),
+            })
+            .strict(),
+        )
+        .max(10)
+        .optional(),
       /** Where the input landed, measured just before it was sent (viewport CSS pixels). */
       box: z
         .object({
@@ -431,6 +446,7 @@ export const BrowserOperationResultSchema = z.discriminatedUnion("ok", [
         "USER_HAS_CONTROL",
         "RUN_RESET",
         "SITE_BLOCKED",
+        "POLICY_BLOCKED",
         "CHROME_ERROR",
       ]),
     })

@@ -1,4 +1,5 @@
 import { send } from "./cdp/send.js";
+import { unusableMainIds } from "./observe/usable-main.js";
 import { viewportFingerprint, settleBrowserPage } from "./native-browser-navigation.js";
 import {
   type BrowserSemanticNode,
@@ -219,10 +220,13 @@ function regionsOf(nodes: AxNode[]): Map<AxNode, number> {
     nodes.flatMap((node) => (node.nodeId ? [[node.nodeId, node] as const] : [])),
   );
   const memo = new Map<string, number>();
+  const inertMains = unusableMainIds(nodes);
   const region = (node: AxNode | undefined, depth: number): number => {
     if (!node || depth > 200) return 1;
     if (node.nodeId && memo.has(node.nodeId)) return memo.get(node.nodeId) ?? 1;
-    const own = REGIONS[textValue(node.role?.value).toLowerCase()];
+    const role = textValue(node.role?.value).toLowerCase();
+    // A main behind an open dialog is ordinary content, not the first region.
+    const own = role === "main" && node.nodeId && inertMains.has(node.nodeId) ? 1 : REGIONS[role];
     const value = own ?? region(node.parentId ? byId.get(node.parentId) : undefined, depth + 1);
     if (node.nodeId) memo.set(node.nodeId, value);
     return value;

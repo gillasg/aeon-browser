@@ -23,7 +23,17 @@ export interface NetworkEntry {
     url?: string;
     stack?: { url: string; functionName: string; line: number }[];
   };
-  redirects?: { url: string; status: number; headers: Record<string, string> }[];
+  redirects?: {
+    url: string;
+    status: number;
+    headers: Record<string, string>;
+    /** 0 for the first hop. */
+    hop?: number;
+    /** The request headers sent for this hop. */
+    requestHeaders?: Record<string, string>;
+    /** False when no extra info arrived for this hop (cached, or served by a service worker). */
+    extraInfo?: boolean;
+  }[];
   status?: number;
   statusText?: string;
   mimeType?: string;
@@ -43,6 +53,10 @@ export interface NetworkEntry {
   frames?: { direction: "sent" | "received"; at: number; opcode: number; data: string }[];
   messages?: { at: number; event: string; data: string }[];
   failed?: string;
+  /** Cancelled before it finished (navigation away, AbortController): kept, not a failure. */
+  aborted?: boolean;
+  /** Capture stopped while the request was still open: what arrived so far. */
+  partial?: boolean;
   done: boolean;
 }
 

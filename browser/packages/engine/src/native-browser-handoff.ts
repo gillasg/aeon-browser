@@ -8,6 +8,10 @@ import { handoffActive } from "./native-browser-control.js";
 import { noteUserLogin } from "./native-browser-vault.js";
 import { hideHandoffAsk, showHandoffAsk } from "./native-browser-ask.js";
 import { showAgentBadge, showAgentNeeds, tabRecording } from "./native-browser-cursor.js";
+import { beginHandoff, endHandoff, handoffFor } from "./native-browser-handoff-state.js";
+import { refreshInventoryTab } from "./native-inventory-client.js";
+
+export { handoffFor };
 
 // Hand-off: the agent pauses and asks the user to do something in the real tab (sign in, 2FA,
 // pick an option). The cursor points at the element when one is given, a 1px ochre ring marks it,
@@ -38,6 +42,12 @@ onEngineInstall(() => {
       typed.set(tabId, message.answer.answer.slice(0, 2000));
       answers.set(tabId, "done");
     }
+  });
+  // A closed tab ends its hand-off as cancelled; the wait loop picks the answer up.
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    if (!handoffFor(tabId)) return;
+    answers.set(tabId, "cancelled");
+    endHandoff(tabId);
   });
 });
 
@@ -100,7 +110,7 @@ function followNavigation(
     : undefined;
   return (details) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
-    showAgentNeeds(tabId, message, spotlight, meta);
+    showAgentNeeds(tabId, message, spotlight, meta, handoffFor(tabId)?.startedAt);
     void chrome.tabs.get(tabId).then(
       async (tab) => {
         if (await sidePanelOpen(tab.windowId)) return;
@@ -123,6 +133,34 @@ export async function handOffToUser(
 ): Promise<"done" | "cancelled"> {
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!tab) throw new Error("TARGET_LOST");
+  // One record per tab, cleared in the single finally below: continue, timeout, cancel and tab
+  // close all leave through it.
+  const status = beginHandoff(tabId, message);
+  publish(tabId);
+  try {
+    return await waitOnUser(tabId, tab, message, active, status.startedAt, spotlight, meta);
+  } finally {
+    endHandoff(tabId);
+    publish(tabId);
+  }
+}
+
+/** Sends the tab's inventory row again, so the daemon sees the hand-off start and end. */
+function publish(tabId: number): void {
+  void Promise.resolve()
+    .then(() => refreshInventoryTab(tabId))
+    .catch(() => undefined);
+}
+
+async function waitOnUser(
+  tabId: number,
+  tab: chrome.tabs.Tab,
+  message: string,
+  active: () => boolean,
+  startedAt: number,
+  spotlight?: { x: number; y: number; width: number; height: number },
+  meta: HandoffMeta = {},
+): Promise<"done" | "cancelled"> {
   engineDebug("handoff", "start", { tab: tabId, window: tab.windowId });
   await withLock(`window:${tab.windowId}`, async () => {
     await chrome.tabs.update(tabId, { active: true }).catch(() => undefined);
@@ -147,7 +185,7 @@ export async function handOffToUser(
   typed.delete(tabId);
   guardAgentTab(tabId, true);
   handoffActive(tabId, true);
-  showAgentNeeds(tabId, message, spotlight, meta);
+  showAgentNeeds(tabId, message, spotlight, meta, startedAt);
   const follow = followNavigation(tabId, message, spotlight, meta);
   chrome.webNavigation.onCommitted.addListener(follow);
   if (!(await sidePanelOpen(tab.windowId)))
@@ -163,11 +201,11 @@ export async function handOffToUser(
       { ...(spotlight ? { box: spotlight } : {}), message },
     );
   engineDebug("handoff", "shown", { tab: tabId });
-  const startedAt = Date.now();
   try {
     while (active() && Date.now() < deadline) {
       const answered = answers.get(tabId);
       if (answered) return answered;
+      if (!handoffFor(tabId)) return "cancelled";
       if (!(await chrome.tabs.get(tabId).catch(() => undefined))) throw new Error("TARGET_LOST");
       // A password the user types here is kept (never shown to the agent) so it can be saved.
       await noteUserLogin(tabId);

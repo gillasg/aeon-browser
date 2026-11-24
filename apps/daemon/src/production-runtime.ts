@@ -214,6 +214,7 @@ function readDaemonActivity(
     routines: Math.max(routines.busyCount(), siteRules.activeRoutineCount()),
     cells: browser.activeCellCount(),
     abilities: runningWorkflowCount(),
+    handoffs: browser.pendingHandoffs(),
   };
 }
 

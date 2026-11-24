@@ -1,6 +1,31 @@
 import { measureBox, noteActionTiming } from "./native-browser-action-timing.js";
+import {
+  actionablePoint,
+  coveredFieldMessage,
+  DEFAULT_STEP_MS,
+  holdMissingTarget,
+  normalizePreparationError,
+  relocateRef,
+  retryablePreparation,
+  type Point,
+} from "./native-browser-input-ready.js";
+export { actionablePoint, coveredFieldMessage, DEFAULT_STEP_MS, holdMissingTarget };
+import {
+  beginAction,
+  deliveredThroughDialog,
+  dialogsDuringAction,
+  endAction,
+  type AnsweredDialog,
+} from "./evidence/dialogs.js";
 import { showAgentCursor, showAgentKeys, type CursorUpdate } from "./native-browser-cursor.js";
-import { onNode, nodeState, fillTextNode, readFieldValue } from "./native-browser-dom.js";
+import {
+  fillTextNode,
+  isStaleBeforeInsert,
+  nodeState,
+  onNode,
+  readFieldValue,
+  staleBeforeInsert,
+} from "./native-browser-dom.js";
 import {
   beginReceipt,
   dropReceipt,
@@ -72,59 +97,6 @@ import { send } from "./cdp/send.js";
 import { dispatchPointer } from "./native-browser-pointer.js";
 import { KEY_CODES, KEY_MASKS } from "./native-browser-keys.js";
 
-interface Point {
-  x: number;
-  y: number;
-  activate?: boolean;
-}
-export async function actionablePoint(
-  debuggee: chrome.debugger.Debuggee,
-  id: number,
-  editable = false,
-): Promise<Point> {
-  await send(
-    debuggee,
-    "DOM.scrollIntoViewIfNeeded",
-    { backendNodeId: id },
-    {
-      label: "actionablePoint",
-    },
-  );
-  await onNode(debuggee, id, scrollNearest).catch(() => undefined);
-  const state = await onNode<{
-    visible: boolean;
-    enabled: boolean;
-    editable: boolean;
-    file: boolean;
-  }>(debuggee, id, nodeState);
-  // Before any pointer event: a click here would open the OS file dialog.
-  if (state.file) throw new Error("FILE_INPUT");
-  if (!state.visible) throw await hiddenTargetError(debuggee, id);
-  if (!state.enabled) throw new Error("TARGET_DISABLED");
-  if (editable && !state.editable) throw new Error("NOT_EDITABLE");
-  // A fill focuses the control programmatically, so it needs no stable click point; it still
-  // checks once that nothing covers the control, which is the only part of the pointer test a
-  // fill needs. The 50 ms stability loop stays for clicks.
-  if (editable) {
-    const point = await onNode<Point & { hit: boolean }>(debuggee, id, hitPoint);
-    if (!point.hit) {
-      const cover = await onNode<string>(debuggee, id, coveringElement).catch(() => "");
-      throw cover ? new BrowserActionError("TARGET_BLOCKED", cover) : new Error("TARGET_BLOCKED");
-    }
-    return { x: point.x, y: point.y };
-  }
-  let prior: Point | undefined;
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const current = await onNode<Point & { hit: boolean }>(debuggee, id, hitPoint);
-    const stable = prior && Math.abs(current.x - prior.x) < 1 && Math.abs(current.y - prior.y) < 1;
-    if (stable && current.hit)
-      return { x: current.x, y: current.y, ...(current.activate ? { activate: true } : {}) };
-    prior = current;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  const cover = await onNode<string>(debuggee, id, coveringElement).catch(() => "");
-  throw cover ? new BrowserActionError("TARGET_BLOCKED", cover) : new Error("TARGET_BLOCKED");
-}
 // A field whose value the password vault may need: a password, or the identity beside it. Other
 // fields do not pay the form probe; an unnamed control always does, since its shape is unknown.
 const VAULT_FIELD =
@@ -184,7 +156,14 @@ export async function fillNode(
           "The credential field was refilled when focused, so a planted value was not attributed to the user.",
         );
     }
-    const native = await onNode<string>(debuggee, id, setNativeValue, [value]);
+    const native = await onNode<string>(debuggee, id, setNativeValue, [value]).catch(
+      (error: unknown) => {
+        // Nothing was written yet: the node is gone (remounted), so the fill may resolve again.
+        if (/could not find node|no node with|STALE_REF/i.test(String(error)))
+          throw staleBeforeInsert();
+        throw error;
+      },
+    );
     if (native === "done") {
       if (options.vault !== false) await noteVaultFill(debuggee, id).catch(() => undefined);
       return undefined;
@@ -378,6 +357,8 @@ export async function prepareElement(
   element: BrowserElementTarget,
   revalidate: () => Promise<void>,
   editable = false,
+  deadline = Date.now() + DEFAULT_STEP_MS,
+  force = false,
 ): Promise<{
   node: AxRef;
   point: Point;
@@ -386,16 +367,18 @@ export async function prepareElement(
 }> {
   if (!("target" in request.step)) throw new Error("INVALID_TARGET");
   const missing = {
-    started: Date.now(),
+    deadline,
     quietSince: Date.now(),
     seen: undefined as number | undefined,
   };
-  for (let attempt = 0; ; attempt++) {
+  let target = element;
+  let blocked = 0;
+  for (;;) {
     await revalidate();
     try {
       const node = await resolveElement(
         debuggee,
-        element,
+        target,
         request.step.target,
         browserObservationRefs.refs,
         browserObservationRefs.latestSnapshots,
@@ -404,7 +387,7 @@ export async function prepareElement(
       );
       // A frame's node acts through its own session: DOM ids and Input coordinates are local to it.
       const frame = node.sessionId ? { ...debuggee, sessionId: node.sessionId } : debuggee;
-      const point = await actionablePoint(frame, node.backendNodeId, editable);
+      const point = await actionablePoint(frame, node.backendNodeId, editable, force);
       // Input events go to the root session in main-viewport coordinates, however deep the frame.
       const top = node.frameId
         ? await rootFramePoint(debuggee, node.frameId, point)
@@ -417,52 +400,31 @@ export async function prepareElement(
     } catch (caught) {
       const error = normalizePreparationError(caught);
       if (await holdMissingTarget(debuggee, error, missing)) continue;
-      if (attempt >= 2 || !(error instanceof Error) || !retryablePreparation(error, element))
+      // A fill whose ref went stale (a framework remounted the field) resolves again through
+      // the ref's recorded role and name, until the step's deadline.
+      const relocated = editable ? relocateRef(target, error) : undefined;
+      if (relocated && Date.now() + 200 < deadline) {
+        target = relocated;
+        continue;
+      }
+      // A cover that stays is answered fast with what covers it; an animating one gets two tries.
+      if (error instanceof Error && error.message === "TARGET_BLOCKED" && ++blocked > 2)
+        throw error;
+      if (
+        Date.now() + 200 >= deadline ||
+        !(error instanceof Error) ||
+        !retryablePreparation(error, target)
+      )
         throw error;
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
 }
 
-// A missing target is retried only while the page is still changing, and abandoned after 500 ms quiet.
-async function holdMissingTarget(
-  debuggee: chrome.debugger.Debuggee,
-  error: unknown,
-  clock: { started: number; quietSince: number; seen: number | undefined },
-): Promise<boolean> {
-  if (!(error instanceof Error) || error.message !== "TARGET_NOT_FOUND") return false;
-  const moving = await pageStillChanging(debuggee, clock.seen);
-  clock.seen = moving.changes;
-  if (moving.active) clock.quietSince = Date.now();
-  const quiet = Date.now() - clock.quietSince >= 500;
-  const capped = Date.now() - clock.started >= 3_000;
-  if (quiet || capped) throw error;
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  return true;
-}
-
-function retryablePreparation(error: Error, element: BrowserElementTarget): boolean {
-  if (["TARGET_NOT_FOUND", "TARGET_HIDDEN", "TARGET_BLOCKED"].includes(error.message)) return true;
-  return (
-    element.kind !== "ref" &&
-    (error.message === "STALE_REF" ||
-      /could not find node|no node with|context.*destroyed|cannot find context/i.test(
-        error.message,
-      ))
-  );
-}
-
-function normalizePreparationError(error: unknown): unknown {
-  if (
-    error instanceof Error &&
-    /could not find node|no node with|context.*destroyed|cannot find context/i.test(error.message)
-  )
-    return new Error("STALE_REF");
-  return error;
-}
-
 type ActionRequest = BrowserExecutorRequest & {
   step: Extract<BrowserStep, { op: "click" | "hold" | "fill" | "paste" | "scroll" }>;
+  /** One absolute deadline for every retry in this step, set once in performAction. */
+  deadline?: number;
 };
 export async function clickScreenshotPoint(
   debuggee: chrome.debugger.Debuggee,
@@ -584,6 +546,7 @@ export async function performAction(
   revalidateTarget: RevalidateTarget,
 ): Promise<BrowserExecutorResult> {
   const tabId = request.step.target.tabId;
+  request.deadline ??= Date.now() + DEFAULT_STEP_MS;
   let outcome: "navigated" | "changed" | "unchanged" | "unknown" = "unknown";
   let note: string | undefined;
   let changes: number | undefined;
@@ -592,6 +555,8 @@ export async function performAction(
   let silent = false;
   let childPoint: { x: number; y: number } | undefined;
   const actionId = beginReceipt(tabId);
+  beginAction(tabId);
+  let dialogs: AnsweredDialog[] = [];
   try {
     const scroll = await withDebugger(tabId, async (debuggee) => {
       const filled = request.step.op === "fill";
@@ -605,15 +570,22 @@ export async function performAction(
       // The click lands now, not when beginReceipt ran: pre-click validation can outlast the
       // causal window under load. Anchor the receipt here so its request is not dropped.
       noteActionStart(actionId, since);
-      const dispatched = await dispatchAction(debuggee, request, revalidateTarget);
+      // The input went out and opened a dialog: the reply raced the answer. Delivered.
+      const dispatched = await deliveredThroughDialog(
+        tabId,
+        dispatchAction(debuggee, request, revalidateTarget),
+        undefined,
+      );
       readback = dispatched?.readback;
       box = dispatched?.box;
+      const answered = dialogsDuringAction(tabId).length > 0;
       if (!filled) {
         const settled = await settleBrowserPage(debuggee, 800, since, 80);
         outcome = pageOutcome(before, settled.probe);
         // The mutation count the page reported between the two probes: evidence for a DOM change.
         if (before && settled.probe) changes = Math.max(0, settled.probe.changes - before.changes);
-        silent = request.step.op === "click" && outcome === "unchanged" && !settled.network;
+        silent =
+          request.step.op === "click" && outcome === "unchanged" && !settled.network && !answered;
         if (silent && dispatched?.nodeId)
           childPoint = await childHandlerPoint(dispatched.frame ?? debuggee, dispatched.nodeId);
       }
@@ -632,10 +604,12 @@ export async function performAction(
             liveTab,
             revalidateTarget,
           );
+    dialogs = dialogsDuringAction(tabId);
     const receipt = await finishReceipt(actionId);
     receipt.navigated ||= String(outcome) === "navigated";
     // A dialog, pop-up or download is something happening, even with no DOM change or request.
-    const missed = silent && !caused(receipt) && request.step.op === "click";
+    // A click that opened a dialog was delivered: it is never reported missed or sent again.
+    const missed = silent && !dialogs.length && !caused(receipt) && request.step.op === "click";
     if (missed && request.step.op === "click")
       note = silentClickNote(request.step.element, childPoint !== undefined);
     const query = "element" in request.step ? elementQuery(request.step.element) : undefined;
@@ -678,8 +652,10 @@ export async function performAction(
       ...(scroll ? { scroll } : {}),
       ...(box ? { box } : {}),
       label: actionLabel(request.step),
+      ...(dialogs.length ? { dialogs } : {}),
     });
   } finally {
+    endAction(tabId);
     dropReceipt(actionId);
   }
 }
@@ -719,18 +695,19 @@ async function dispatchAction(
     return undefined;
   }
   if (!request.step.element) return void (await pointHold(debuggee, request.step));
-  const {
-    node,
-    point: box,
-    frame,
-    top,
-  } = await prepareElement(
-    debuggee,
-    request,
-    request.step.element,
-    () => revalidateTarget(request, request.step.target.tabId),
-    request.step.op === "fill",
-  );
+  const element = request.step.element;
+  const deadline = request.deadline ?? Date.now() + DEFAULT_STEP_MS;
+  const prepare = () =>
+    prepareElement(
+      debuggee,
+      request,
+      element,
+      () => revalidateTarget(request, request.step.target.tabId),
+      request.step.op === "fill",
+      deadline,
+      request.step.op === "fill" && request.step.force === true,
+    );
+  const { node, point: box, frame, top } = await prepare();
   if (request.step.op === "click" || request.step.op === "fill" || request.step.op === "paste")
     await refuseForeignLoginForm(frame, node.backendNodeId);
   const measured = await measureBox(frame, node.backendNodeId);
@@ -743,15 +720,42 @@ async function dispatchAction(
   });
   if (request.step.op === "click" || request.step.op === "hold") {
     const press = { debuggee: frame, backendNodeId: node.backendNodeId, ...top };
-    const pointer = await deliverAt(debuggee, request.step, top.x, top.y, !!box.activate, press);
+    const tabId = request.step.target.tabId;
+    // The press opened a dialog; its reply came back after the answer. Delivered, never resent.
+    const pointer = await deliveredThroughDialog(
+      tabId,
+      deliverAt(debuggee, request.step, top.x, top.y, !!box.activate, press),
+      "delivered" as const,
+    );
     if (pointer === "activate") await onNode(frame, node.backendNodeId, activateNode);
     return { nodeId: node.backendNodeId, frame, ...(measured ? { box: measured } : {}) };
   } else if (request.step.op === "fill") {
-    const typed = await fillNode(frame, node.backendNodeId, request.step.value, {
-      vault: vaultField(node.name),
-    });
+    const tabId = request.step.target.tabId;
+    const value = request.step.value;
+    let field = { node, frame };
+    let typed: string | undefined;
+    for (;;) {
+      try {
+        // A dialog froze the page mid-fill; once it is answered the value is read back once.
+        typed = await deliveredThroughDialog(
+          tabId,
+          fillNode(field.frame, field.node.backendNodeId, value, {
+            vault: vaultField(field.node.name),
+          }),
+          undefined,
+        );
+        break;
+      } catch (error) {
+        // The field was remounted before any text went in: resolve it again, until the deadline.
+        // Never after a partial insert (that would type the value twice).
+        if (!isStaleBeforeInsert(error) || Date.now() + 200 >= deadline) throw error;
+        const again = await prepare();
+        field = { node: again.node, frame: again.frame };
+      }
+    }
     // The text path read the value back; only the native select path needs a separate label read.
-    const readback = typed !== undefined ? typed : await readFieldValue(frame, node.backendNodeId);
+    const readback =
+      typed !== undefined ? typed : await readFieldValue(field.frame, field.node.backendNodeId);
     return {
       ...(readback !== undefined ? { readback } : {}),
       ...(measured ? { box: measured } : {}),

@@ -1,6 +1,7 @@
 import type { BrowserSemanticNode } from "@browserkit/protocol";
 import type { AxNode } from "../native-browser-common.js";
 import { textValue } from "../native-browser-common.js";
+import { framesOutsideMain, mainScopeNote, unusableMainIds, usableMain } from "./usable-main.js";
 import {
   CELL_ROLES,
   CONTAINER_ROLES,
@@ -19,6 +20,8 @@ export function buildSemanticTree(input: {
   title?: string;
   clickables?: readonly ResolvedClickable[];
   offscreen?: readonly string[];
+  /** Frame URLs by frame id, so iframes outside main are named by origin. */
+  frameUrls?: ReadonlyMap<string, string>;
 }): SemanticTree {
   const byId = indexById(input.ax);
   const kids = childrenOf(input.ax);
@@ -33,8 +36,19 @@ export function buildSemanticTree(input: {
     if (!ax.nodeId || !include.has(ax.nodeId)) return [];
     return [toTreeNode(ax, include, byId, kids, shownById, offscreen)];
   });
-  appendClickables(nodes, input.clickables ?? []);
-  return { url: input.url, title: titleOf(input.ax, input.title), nodes };
+  const main = usableMain(nodes, input.ax);
+  appendClickables(nodes, input.clickables ?? [], main);
+  const note = mainScopeNote(
+    main ? "main" : "body",
+    unusableMainIds(input.ax).size > 0,
+    framesOutsideMain(input.ax, main?.axId, input.frameUrls),
+  );
+  return {
+    url: input.url,
+    title: titleOf(input.ax, input.title),
+    nodes,
+    ...(note ? { scopeNote: note } : {}),
+  };
 }
 
 function indexById(nodes: readonly AxNode[]): Map<string, AxNode> {
@@ -275,9 +289,12 @@ function pushText(texts: string[], name: string): void {
   if (text && !texts.includes(text)) texts.push(text);
 }
 
-function appendClickables(nodes: TreeNode[], hits: readonly ResolvedClickable[]): void {
+function appendClickables(
+  nodes: TreeNode[],
+  hits: readonly ResolvedClickable[],
+  main: TreeNode | undefined,
+): void {
   const used = new Set(nodes.map((node) => node.backendNodeId));
-  const main = nodes.find((node) => node.role === "main");
   for (const hit of hits) {
     if (used.has(hit.backendNodeId) || nodes.length >= 220) continue;
     used.add(hit.backendNodeId);

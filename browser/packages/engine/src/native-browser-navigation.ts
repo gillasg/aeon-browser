@@ -1,4 +1,13 @@
 import { noteDeviceEmulation, withFocusEmulation } from "./native-browser-session.js";
+export { viewportFingerprint } from "./native-browser-viewport-print.js";
+import { waitForIdleUntil, type IdleResult } from "./native-browser-load-result.js";
+export {
+  policyBlockedError,
+  stillLoading,
+  waitForIdleUntil,
+  type IdleResult,
+} from "./native-browser-load-result.js";
+import { policyBlockedError } from "./native-browser-load-result.js";
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
 import { withContextRetry } from "./cdp/context-retry.js";
@@ -10,6 +19,8 @@ import { noteInjectedScript } from "./stealth.js";
 
 interface Activity {
   pending: Map<string, number>;
+  /** The URL of each pending request, by the same key. */
+  urls: Map<string, string>;
   last: number;
 }
 export interface PageProbe {
@@ -29,7 +40,7 @@ export interface PageSettle {
 }
 const activity = new Map<number, Activity>();
 export function trackBrowserActivity(tabId: number): void {
-  activity.set(tabId, { pending: new Map(), last: 0 });
+  activity.set(tabId, { pending: new Map(), urls: new Map(), last: 0 });
 }
 export function forgetBrowserActivity(tabId: number): void {
   activity.delete(tabId);
@@ -39,27 +50,55 @@ onEngineInstall(() => {
     if (source.tabId === undefined) return;
     const state = activity.get(source.tabId);
     if (!state) return;
-    const data = (raw ?? {}) as { requestId?: string; type?: string };
+    const data = (raw ?? {}) as { requestId?: string; type?: string; request?: { url?: string } };
     captureNetworkActivity(
       state,
       (source.sessionId ?? "") + ":" + data.requestId,
       method,
       data.type,
+      data.request?.url,
     );
   });
 });
-function captureNetworkActivity(state: Activity, key: string, method: string, type?: string) {
+function captureNetworkActivity(
+  state: Activity,
+  key: string,
+  method: string,
+  type?: string,
+  url?: string,
+) {
   if (method === "Network.requestWillBeSent") {
     if (["WebSocket", "EventSource", "Media", "Ping", "Manifest"].includes(type ?? "")) return;
     state.pending.set(key, Date.now());
-    if (state.pending.size > 1000) state.pending.delete(state.pending.keys().next().value ?? "");
+    if (url) state.urls.set(key, url);
+    if (state.pending.size > 1000) {
+      const oldest = state.pending.keys().next().value ?? "";
+      state.pending.delete(oldest);
+      state.urls.delete(oldest);
+    }
     state.last = Date.now();
   } else if (
     ["Network.loadingFinished", "Network.loadingFailed"].includes(method) &&
     state.pending.delete(key)
-  )
+  ) {
+    state.urls.delete(key);
     state.last = Date.now();
+  }
 }
+
+/** Requests still open on a tab, oldest first, for a bounded "still loading" result. */
+export function pendingRequests(
+  tabId: number,
+  now = Date.now(),
+): Array<{ url: string; ageMs: number }> {
+  const net = activity.get(tabId);
+  if (!net) return [];
+  return [...net.pending.entries()]
+    .map(([key, at]) => ({ url: net.urls.get(key) ?? "", ageMs: Math.max(0, now - at) }))
+    .sort((a, b) => b.ageMs - a.ageMs)
+    .slice(0, 10);
+}
+
 export function primeBrowserSettle(
   debuggee: chrome.debugger.Debuggee,
 ): Promise<PageProbe | undefined> {
@@ -73,6 +112,7 @@ function networkState(tabId: number, since = 0) {
     active: (net?.last ?? 0) >= since,
   };
 }
+
 export async function settleBrowserPage(
   debuggee: chrome.debugger.Debuggee,
   capMs = 800,
@@ -396,45 +436,6 @@ export async function pageStillChanging(
   return { active: moved || net.pending > 0 || net.active, changes };
 }
 
-export async function viewportFingerprint(debuggee: chrome.debugger.Debuggee): Promise<string> {
-  const result = (await send(
-    debuggee,
-    "Runtime.evaluate",
-    { expression: `(${layoutProbe.toString()})()`, returnByValue: true },
-    { label: "viewportFingerprint", ms: 5_000 },
-  )) as { result?: { value?: string }; exceptionDetails?: unknown };
-  if (result.exceptionDetails || typeof result.result?.value !== "string" || !result.result.value)
-    throw new Error("STALE_REF");
-  return result.result.value;
-}
-function layoutProbe(): string {
-  const elements = [...document.querySelectorAll("*")];
-  const boxes: unknown[] = [];
-  for (const el of elements) {
-    const box = el.getBoundingClientRect();
-    if (
-      box.width <= 0 ||
-      box.height <= 0 ||
-      box.bottom < 0 ||
-      box.top > innerHeight ||
-      box.right < 0 ||
-      box.left > innerWidth ||
-      getComputedStyle(el).visibility === "hidden"
-    )
-      continue;
-    boxes.push([
-      el.tagName,
-      el.id,
-      el.getAttribute("aria-label"),
-      el.getAttribute("href"),
-      (el.textContent ?? "").trim().slice(0, 80),
-      ...[box.x, box.y, box.width, box.height].map(Math.round),
-    ]);
-    if (boxes.length >= 2000) return "";
-  }
-  return JSON.stringify([scrollX, scrollY, innerWidth, innerHeight, visualViewport?.scale, boxes]);
-}
-
 const INTERIM_PAGE = /^(chrome-extension|chrome|edge|about|chrome-search|chrome-untrusted):/i;
 
 // Resolves once the tab has committed to the requested page and reached DOMContentLoaded.
@@ -444,7 +445,8 @@ export async function navigateReady(
   timeoutMs = 8000,
   referer?: string,
   reload = false,
-): Promise<{ url: string; timedOut: boolean; note?: string }> {
+): Promise<{ url: string; timedOut: boolean; note?: string } & IdleResult> {
+  const deadline = Date.now() + timeoutMs;
   const navigation = await new Promise<{ url: string; timedOut: boolean; note?: string }>(
     (resolve, reject) => {
       let committed = false;
@@ -476,7 +478,10 @@ export async function navigateReady(
       const error = (event: chrome.webNavigation.WebNavigationFramedErrorCallbackDetails) => {
         if (top(event) && !event.error.includes("ERR_ABORTED")) {
           clean();
-          reject(new BrowserActionError("CHROME_ERROR", "navigation failed: " + event.error));
+          reject(
+            policyBlockedError(event.error, event.url || url) ??
+              new BrowserActionError("CHROME_ERROR", "navigation failed: " + event.error),
+          );
         }
       };
       const timer = setTimeout(
@@ -511,8 +516,9 @@ export async function navigateReady(
       });
     },
   );
-  const interactive = await waitPageInteractive(tabId);
-  return { ...navigation, timedOut: navigation.timedOut || !interactive };
+  const idle = await waitForIdleUntil(tabId, deadline);
+  const note = [navigation.note, idle.note].filter(Boolean).join("; ");
+  return { ...navigation, ...idle, ...(note ? { note } : {}) };
 }
 
 // Only commands that can change what the page shows wait for it to settle. Getters, captures,

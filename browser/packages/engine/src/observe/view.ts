@@ -86,7 +86,11 @@ export function renderCaptured(
     ...(input.expand?.length ? { expand: input.expand } : {}),
   });
   const noted = noteTruncation(view, input.truncated, budget);
-  const scoped = noteScope(noted, input.scopeNote, budget);
+  const mainNoted =
+    tree.scopeNote && `${noted}\n[${tree.scopeNote}]`.length <= budget
+      ? `${noted}\n[${tree.scopeNote}]`
+      : noted;
+  const scoped = noteScope(mainNoted, input.scopeNote, budget);
   return scoped.length > VIEW_CHAR_LIMIT ? scoped.slice(0, VIEW_CHAR_LIMIT) : scoped;
 }
 

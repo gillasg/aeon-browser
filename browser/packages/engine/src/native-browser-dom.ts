@@ -59,6 +59,7 @@ export function nodeState(this: HTMLElement): {
   enabled: boolean;
   editable: boolean;
   file: boolean;
+  textEntry: boolean;
 } {
   const box = this.getBoundingClientRect();
   const style = getComputedStyle(this);
@@ -76,6 +77,12 @@ export function nodeState(this: HTMLElement): {
       this.matches("input:not([readonly]),textarea:not([readonly]),select") ||
       this.isContentEditable,
     file: this.matches('input[type="file"]'),
+    // Where typed text goes: the only fills that are hit-tested for a cover. A select (or a
+    // checkbox) takes its value directly and is never refused for one.
+    textEntry:
+      this.matches(
+        "textarea,input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]):not([type=hidden])",
+      ) || this.isContentEditable,
   };
 }
 
@@ -279,6 +286,19 @@ function focusedInput() {
 }
 
 /** Fills a text control and returns the value it read back, or undefined when it could not. */
+/** A STALE_REF raised before any text went in: the fill may safely resolve again and retry. */
+export function staleBeforeInsert(): Error & { beforeInsert: true } {
+  return Object.assign(new Error("STALE_REF"), { beforeInsert: true as const });
+}
+
+export function isStaleBeforeInsert(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message === "STALE_REF" &&
+    (error as { beforeInsert?: unknown }).beforeInsert === true
+  );
+}
+
 export async function fillTextNode(
   debuggee: chrome.debugger.Debuggee,
   id: number,
@@ -292,7 +312,7 @@ export async function fillTextNode(
       { backendNodeId: id, objectGroup: group },
       { label: "fillTextNode" },
     )) as { object?: { objectId?: string } };
-    if (!source.object?.objectId) throw new Error("STALE_REF");
+    if (!source.object?.objectId) throw staleBeforeInsert();
     const selected = (await send(
       debuggee,
       "Runtime.callFunctionOn",
@@ -310,7 +330,7 @@ export async function fillTextNode(
       { objectId: selected.result.objectId },
       { label: "fillTextNode" },
     )) as { node?: { backendNodeId?: number } };
-    if (!node.node?.backendNodeId) throw new Error("STALE_REF");
+    if (!node.node?.backendNodeId) throw staleBeforeInsert();
     const keys = selected.result.objectId
       ? await listensForKeys(debuggee, selected.result.objectId, { deep: false })
       : false;

@@ -54,6 +54,8 @@ export interface SemanticTree {
   url: string;
   title: string;
   nodes: TreeNode[];
+  /** Where the snapshot is scoped (main, or body when main is inert) and what lies outside. */
+  scopeNote?: string;
 }
 
 export interface ClickableHit {

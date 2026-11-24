@@ -144,7 +144,7 @@ function __locator(target, element, index) {
     element,
     click: (options) => __step(Object.assign({op:'click',target,element:__wire(element),observe:false}, __pointerFields(options))),
     hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
-    fill: (value, options) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {})}),
+    fill: (value, options) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {})}),
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
     getByRole: (role, options = {}) => {
       if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with page.locator(css).getByRole(...)');
@@ -620,7 +620,7 @@ var browser = Object.freeze({
     diffScreenshot: (baseline, options = {}) => __diffScreenshot(target, baseline, options),
     recordDemonstration: (options = {}) => __recordDemonstration(target, options),
     click: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.click(options) : __step(Object.assign({op:'click',target,element:__wire(__element(target,element)),observe:false}, __pointerFields(options))); },
-    fill: (element, value, options) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value, options) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {})}); },
+    fill: (element, value, options) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value, options) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {})}); },
     paste: (element, html, text = '') => __step({op:'paste',target,element:__wire(__element(target,element)),html:String(html),text:String(text || html.replace(/<[^>]+>/g, ' ')),observe:false}),
     evaluate: async (fn, arg) => (__readNudge(fn), (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value),
     control: async () => (await __step({op:'control', target, action:'status'})).data,

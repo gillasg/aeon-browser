@@ -112,6 +112,13 @@ export class BrowserControlService {
   claimChat(chatId: string, clientInstanceId: string): void {
     if (!this.pins.has(chatId)) this.pins.set(chatId, clientInstanceId);
   }
+  /** Hand-offs the browsers report pending, oldest first ("Waiting on you" in status). */
+  pendingHandoffs(): { message: string; startedAt: number }[] {
+    return [...this.executors.keys()]
+      .flatMap((id) => this.inventories?.get(id)?.tabs ?? [])
+      .flatMap((tab) => (tab.handoff ? [tab.handoff] : []))
+      .sort((a, b) => a.startedAt - b.startedAt);
+  }
   /** The connected browsers, one per Chrome profile, with their inventory. */
   connectedBrowsers(): { clientInstanceId: string; urls: string[] }[] {
     return [...this.executors.keys()].map((clientInstanceId) => ({

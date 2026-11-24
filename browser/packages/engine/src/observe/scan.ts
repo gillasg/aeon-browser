@@ -246,7 +246,9 @@ function pushRoot(element: Element, roots: (Document | ShadowRoot)[]): void {
 }
 
 function textRegion(element: Element | null): number {
-  if (element?.closest("main,[role=main]")) return 0;
+  // Main content behind an open dialog (inert or aria-hidden) is not ranked first.
+  if (element?.closest("main,[role=main]") && !element.closest('[inert],[aria-hidden="true"]'))
+    return 0;
   if (element?.closest("footer,[role=contentinfo]")) return 3;
   if (element?.closest("header,nav,aside,[role=banner],[role=navigation],[role=complementary]"))
     return 2;

@@ -13,6 +13,8 @@ import { browserSessionHolder } from "./native-browser-session.js";
 import { ensureAgentTabsRestored, mineTabIds } from "./native-browser-tab-cleanup.js";
 import { drivablePage, sameTarget } from "./native-browser-common.js";
 import { controlOf } from "./native-browser-control.js";
+import { handoffFor } from "./native-browser-handoff-state.js";
+import { debuggerBlocked } from "./native-browser-attach-block.js";
 import { ensureSpacesRestored, labelOf } from "./native-browser-spaces.js";
 
 // Listing tabs as Chrome has them now. `mine` marks this session's tabs; every tab is listed and
@@ -42,12 +44,26 @@ export async function listTabs(request: BrowserExecutorRequest): Promise<Browser
         const holder = browserSessionHolder(tab.target.tabId);
         return holder !== undefined && holder !== request.chatId;
       })(),
+      ...tabStatus(tab.target.tabId),
       ...(labelOf(request.chatId, tab.target.tabId)
         ? { label: labelOf(request.chatId, tab.target.tabId) }
         : {}),
     })),
     focusedWindowId: currentFocusedWindowId(),
   });
+}
+
+/** A pending hand-off and a blocked debugger, as optional tab fields. */
+export function tabStatus(tabId: number): {
+  handoff?: { message: string; startedAt: number };
+  detached?: string;
+} {
+  const handoff = handoffFor(tabId);
+  const detached = debuggerBlocked(tabId);
+  return {
+    ...(handoff ? { handoff: { message: handoff.message, startedAt: handoff.startedAt } } : {}),
+    ...(detached ? { detached } : {}),
+  };
 }
 
 // Chrome only reports activation for a focused window, so a tab opened in a background or

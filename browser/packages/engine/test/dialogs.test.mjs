@@ -173,3 +173,52 @@ test("the page API exposes page.dialog.expect and prints [warn] lines", () => {
   assert.match(browserCodeApi, /page\.dialog\.expect/);
   assert.match(browserFastApi, /function __logDialogWarn/);
 });
+
+test("a click whose dispatch rejects while a dialog is answered counts as delivered, once", async () => {
+  const { beginAction, endAction, deliveredThroughDialog, dialogsDuringAction } =
+    await import("../dist/evidence/dialogs.js");
+  beginAction(40);
+  noteDialogAct(40);
+  let sends = 0;
+  const dispatch = async () => {
+    sends += 1;
+    // The renderer froze on confirm(); the answer goes out, then the reply errors.
+    answerDialogOpening(40, { type: "confirm", message: "Delete?" });
+    throw new Error("TIMEOUT: Input.dispatchMouseEvent");
+  };
+  const result = await deliveredThroughDialog(40, dispatch(), "delivered");
+  assert.equal(result, "delivered");
+  assert.equal(sends, 1, "never retried");
+  assert.deepEqual(dialogsDuringAction(40), [
+    { type: "confirm", message: "Delete?", answer: "accepted" },
+  ]);
+  assert.deepEqual(endAction(40), [{ type: "confirm", message: "Delete?", answer: "accepted" }]);
+  assert.deepEqual(dialogsDuringAction(40), []);
+});
+
+test("a dispatch failure with no dialog still fails", async () => {
+  const { beginAction, endAction, deliveredThroughDialog } =
+    await import("../dist/evidence/dialogs.js");
+  beginAction(41);
+  await assert.rejects(
+    deliveredThroughDialog(41, Promise.reject(new Error("INPUT_FAILED")), "delivered"),
+    /INPUT_FAILED/,
+  );
+  assert.deepEqual(endAction(41), []);
+});
+
+test("a dialog answered with no action in flight is not attributed to one", async () => {
+  const { dialogsDuringAction } = await import("../dist/evidence/dialogs.js");
+  answerDialogOpening(42, { type: "alert", message: "onload" });
+  assert.deepEqual(dialogsDuringAction(42), []);
+});
+
+test("a dialog in an iframe session is answered through that session", () => {
+  sent.length = 0;
+  onJavaScriptDialog({ tabId: 43, sessionId: "child-1" }, "Page.javascriptDialogOpening", {
+    type: "alert",
+    message: "from frame",
+  });
+  assert.equal(sent.at(-1)[0], "Page.handleJavaScriptDialog");
+  assert.equal(sent.at(-1)[1].accept, true);
+});

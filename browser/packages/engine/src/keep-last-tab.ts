@@ -1,9 +1,11 @@
-// Linux and Windows quit Chrome when the last tab of the last window closes. A blank tab is
-// opened first, and closes run one at a time, so the requested close still happens.
+// Linux and Windows quit Chrome when the last tab of the last window closes. macOS keeps Chrome
+// running but closes the window, which loses the user's only window. On every platform a blank
+// tab is opened first in that same window, and closes run one at a time, so the requested close
+// still happens.
 
 export interface TabCloser {
-  query(): Promise<Array<{ id?: number | undefined }>>;
-  create(tab: { url: string; active: boolean }): Promise<unknown>;
+  query(): Promise<Array<{ id?: number | undefined; windowId?: number | undefined }>>;
+  create(tab: { url: string; active: boolean; windowId?: number }): Promise<unknown>;
   remove(tabIds: number | number[]): Promise<unknown>;
 }
 
@@ -50,16 +52,29 @@ async function closeNow(
   api: TabCloser,
 ): Promise<void> {
   if (batch.ids.length === 0) return;
-  if (await lastTabs(batch.ids, api)) await api.create({ url: BLANK, active: false });
+  const keep = await lastTabs(batch.ids, api);
+  if (keep.last) {
+    await api.create({
+      url: BLANK,
+      active: false,
+      ...(keep.windowId === undefined ? {} : { windowId: keep.windowId }),
+    });
+  }
   await api.remove(batch.shape);
 }
 
-async function lastTabs(ids: number[], api: TabCloser): Promise<boolean> {
+/** True when the close would leave no tab at all; names the window that should keep one. */
+export async function lastTabs(
+  ids: number[],
+  api: TabCloser,
+): Promise<{ last: boolean; windowId?: number }> {
   const open = await api.query().catch(() => []);
   const openIds = open.map((tab) => tab.id).filter(isTabId);
-  if (openIds.length === 0) return false;
+  if (openIds.length === 0) return { last: false };
   const closing = new Set(ids);
-  return openIds.every((id) => closing.has(id));
+  if (!openIds.every((id) => closing.has(id))) return { last: false };
+  const windowId = open.find((tab) => typeof tab.windowId === "number")?.windowId;
+  return windowId === undefined ? { last: true } : { last: true, windowId };
 }
 
 function browserChrome(): typeof chrome | undefined {
@@ -73,7 +88,8 @@ function hasTabApi(tabs: typeof chrome.tabs | undefined): tabs is typeof chrome.
 function wrapRemove(tabs: typeof chrome.tabs): void {
   const original = tabs.remove.bind(tabs);
   const api: TabCloser = {
-    query: () => tabs.query({}).then((open) => open.map((tab) => ({ id: tab.id }))),
+    query: () =>
+      tabs.query({}).then((open) => open.map((tab) => ({ id: tab.id, windowId: tab.windowId }))),
     create: (tab) => tabs.create(tab),
     remove: (ids) => (Array.isArray(ids) ? original(ids) : original(ids)),
   };

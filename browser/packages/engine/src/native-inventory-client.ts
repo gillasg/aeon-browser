@@ -10,6 +10,7 @@ import {
 } from "@browserkit/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 import { aeonUiPage } from "./native-browser-common.js";
+import { handoffFor } from "./native-browser-handoff-state.js";
 
 export type TabIdentity = { tabIncarnation: string; documentEpoch: number };
 
@@ -45,7 +46,16 @@ export function toInventoryTab(
     documentEpoch: state.documentEpoch,
     // The daemon lists and gates Aeon's own pages by this mark: only the engine knows its own id.
     ...(aeonUiPage(tab.url ?? "") ? { aeonUi: true } : {}),
+    // A pending hand-off rides the inventory, so the daemon's status can say "Waiting on you".
+    ...handoffField(tab.id),
   });
+}
+
+function handoffField(tabId: number | undefined): {
+  handoff?: { message: string; startedAt: number };
+} {
+  const status = tabId === undefined ? undefined : handoffFor(tabId);
+  return status ? { handoff: { message: status.message, startedAt: status.startedAt } } : {};
 }
 
 export function inventoryIdentity(identity: BrowserIdentity): BrowserIdentity {

@@ -107,3 +107,9 @@ export {
   missingChromeFlags,
   type ChromePlatform,
 } from "./chrome-launch-flags.js";
+export {
+  clipHandoffMessage,
+  elapsedLabel,
+  handoffStatusLine,
+  type HandoffStatus,
+} from "@browserkit/protocol";

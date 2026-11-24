@@ -8,11 +8,12 @@ import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { readJournal } from "./host.js";
 import { repl } from "./repl.js";
+import { handoffLine, statusHandoffLines, type HandoffTab } from "./handoff-lines.js";
 
 // The browser itself, as Aeon sees it: the daemon and the user's Chrome. These replace the
 // bridge-only commands (status, tabs, repl, journal, serve) browserkit's own command line has.
 
-const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url, aeonUi: tab.aeonUi === true }))`;
+const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url, aeonUi: tab.aeonUi === true, ...(tab.handoff ? { handoff: tab.handoff } : {}) }))`;
 
 async function status(host: DaemonHost, args: Args): Promise<number> {
   const client = await host.connect();
@@ -26,27 +27,29 @@ async function status(host: DaemonHost, args: Args): Promise<number> {
       ? `Aeon is running; ${browsers.length} browser(s) connected.`
       : "Aeon is running; no browser connected yet. It reconnects on its own after a restart; if it stays this way, load Aeon in Chrome.",
   );
+  if (browsers.length) {
+    const list = ((await host.runInBrowser(TABS, { session: "cli" }).catch(() => [])) ??
+      []) as HandoffTab[];
+    for (const line of statusHandoffLines(list)) out(line);
+  }
   return 0;
 }
 
 async function tabs(host: DaemonHost, args: Args): Promise<number> {
-  const list = ((await host.runInBrowser(TABS, { session: "cli" })) ?? []) as {
-    target?: { tabId?: number };
-    title?: string;
+  const list = ((await host.runInBrowser(TABS, { session: "cli" })) ?? []) as (HandoffTab & {
     url?: string;
     aeonUi?: boolean;
-  }[];
+  })[];
   if (has(args, "json")) {
     printJson(list);
     return 0;
   }
-  printRows(
-    list.map((tab) => [
-      tab.target?.tabId,
-      tab.aeonUi ? `${tab.title ?? ""} (Aeon UI)` : tab.title,
-      tab.url,
-    ]),
-  );
+  for (const tab of list) {
+    printRows([
+      [tab.target?.tabId, tab.aeonUi ? `${tab.title ?? ""} (Aeon UI)` : tab.title, tab.url],
+    ]);
+    if (tab.handoff) out(handoffLine(tab.handoff));
+  }
   return 0;
 }
 

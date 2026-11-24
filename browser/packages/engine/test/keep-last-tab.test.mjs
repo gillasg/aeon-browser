@@ -153,3 +153,28 @@ function fake(initial) {
   };
   return { tabs, created, removed, api };
 }
+
+test("on macOS the last agent tab of the only window keeps a blank tab in that window", async () => {
+  const saved = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: "darwin" });
+  try {
+    const world = fake([{ id: 7, windowId: 3, url: "https://agent.test/" }]);
+    const order = [];
+    const api = {
+      query: world.api.query,
+      create: async (tab) => {
+        order.push("create");
+        return world.api.create(tab);
+      },
+      remove: async (ids) => {
+        order.push("remove");
+        return world.api.remove(ids);
+      },
+    };
+    await closeTabsKeepingBrowser(7, api);
+    assert.deepEqual(order, ["create", "remove"]);
+    assert.deepEqual(world.created, [{ url: "about:blank", active: false, windowId: 3 }]);
+  } finally {
+    if (saved) Object.defineProperty(process, "platform", saved);
+  }
+});
