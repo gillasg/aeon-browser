@@ -152,5 +152,5 @@ test("the side panel header is the switcher and New chat; Manage ends the switch
     createElement(SidePanel, { ...props, chats, selectedChatId: "c1", pickerOpen: true }),
   );
   assert.match(chosen, /id="selected-chat-title">New chat</);
-  assert.match(chosen, /Manage Sites &amp; Settings/);
+  assert.match(chosen, /Manage Aeon/);
 });

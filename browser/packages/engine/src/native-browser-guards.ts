@@ -1,4 +1,5 @@
 import type { BrowserStep } from "@browserkit/protocol";
+import { assertOpenable } from "./native-browser-common.js";
 
 // A per-tab read-only claim used to refuse writes. It is gone: `readOnly` is now guidance for
 // the agent, never a deterministic gate. The browser-wide clears below stay refused because
@@ -9,6 +10,15 @@ export function refusedCdp(
   method: string,
   params: Record<string, unknown> = {},
 ): string | undefined {
+  if (method === "DOM.setFileInputFiles")
+    return "DOM.setFileInputFiles skips the workspace upload check; use page.setFileInputFiles instead";
+  if (method === "Page.navigate") {
+    try {
+      assertOpenable(String(params.url ?? ""));
+    } catch {
+      return "Page.navigate may open only http(s) pages or Aeon's own pages; use page.goto instead";
+    }
+  }
   if (method === "Network.clearBrowserCookies" || method === "Network.clearBrowserCache")
     return `${method} is browser-wide; use browser.cookies or page.cookies instead`;
   if (method === "Storage.clearCookies")

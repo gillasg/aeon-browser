@@ -1,6 +1,7 @@
 import { send } from "./cdp/send.js";
 import { unusableMainIds } from "./observe/usable-main.js";
 import { viewportFingerprint, settleBrowserPage } from "./native-browser-navigation.js";
+import { keepTreeBaseline, treeBaseline } from "./native-browser-tree-baselines.js";
 import {
   type BrowserSemanticNode,
   BrowserExecutorResultSchema,
@@ -375,7 +376,6 @@ export async function visiblePageText(debuggee: chrome.debugger.Debuggee): Promi
 const SCREENSHOT_MAX_AGE_MS = 60_000;
 const refs = new Map<string, Map<string, AxRef>>();
 const latestSnapshots = new Map<string, string>();
-const previousTrees = new Map<string, { documentEpoch: number; nodes: Map<number, string> }>();
 const screenshots = new Map<string, ScreenshotRef>();
 export const browserObservationRefs = { refs, latestSnapshots };
 
@@ -660,9 +660,9 @@ export function compareTree(
       ].join("|"),
     );
   }
-  const previous = previousTrees.get(key);
+  const previous = treeBaseline(key);
   if (!previous || previous.documentEpoch !== documentEpoch) {
-    previousTrees.set(key, { documentEpoch, nodes: next });
+    keepTreeBaseline(key, { documentEpoch, nodes: next });
     return { added: [...next.keys()], removed: [], changed: [], unchanged: 0, reset: true };
   }
   const added: number[] = [];
@@ -675,7 +675,7 @@ export function compareTree(
     else changed.push(id);
   }
   const removed = [...previous.nodes.keys()].filter((id) => !next.has(id));
-  previousTrees.set(key, { documentEpoch, nodes: next });
+  keepTreeBaseline(key, { documentEpoch, nodes: next });
   return { added, removed, changed, unchanged };
 }
 

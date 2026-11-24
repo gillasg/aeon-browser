@@ -140,7 +140,7 @@ export function sweepCode(spec: {
         evidence = {finalUrl, title, text, screenshot: saved, network: captured.slice(-8).map((entry) => entry.method + ' ' + entry.status + ' ' + entry.url.slice(0, 160))};
       }
       let extra = null;
-      if (options.each) extra = await (0, eval)('(' + options.each + ')')(tab, item);
+      if (options.each) extra = await (globalThis.__realmEval || (0, eval))('(' + options.each + ')')(tab, item);
       const judged = judgeOutcome({readiness: ready && ready.state, found: options.capture !== 'media' && !!ready && ready.state === 'ready', captured: captured.length + (media && media.masters && media.masters.length ? 1 : 0), gate: gate && gate.gate, gateClicked: !!(gate && gate.clicked), challenge: ready && ready.state === 'challenge', requestedUrl: url, finalUrl});
       return {url, finalUrl, title, outcome: judged.outcome, reason: judged.reason, readiness: ready && ready.state, gate, playClicked, captured: captured.length, media, evidence, extra, ms: Date.now() - started};
     } catch (error) {

@@ -8,7 +8,13 @@ function installChrome(preexisting = []) {
   const rules = new Map(preexisting.map((rule) => [rule.id, rule]));
   const calls = [];
   globalThis.chrome = {
-    tabs: { get: async () => ({ url: "https://example.test/" }), onRemoved: { addListener() {} } },
+    tabs: {
+      get: async () => ({ url: "https://example.test/" }),
+      remove: async (id) => calls.push({ removed: id }),
+      onRemoved: { addListener() {} },
+      onCreated: { addListener() {} },
+    },
+    webNavigation: { onCreatedNavigationTarget: { addListener() {} } },
     storage: { local: { get: async () => ({}) } },
     declarativeNetRequest: {
       getSessionRules: async () => [...rules.values()],
@@ -90,4 +96,20 @@ test("a failed rule update leaves the tab free to be guarded again", async () =>
   chrome.declarativeNetRequest.updateSessionRules = original;
   await guardTab(9, RULES);
   assert.equal(rules.size, 1);
+});
+
+test("a popup from a guarded tab takes its rules before loading, or closes if headed to a blocked site", async () => {
+  const { rules, calls } = installChrome();
+  const { guardTab, guardPopup, releaseTabs } = await freshWorker();
+  // An unguarded opener's popups are not this module's business.
+  assert.equal(await guardPopup(20, 99, "https://blocked.test/"), false);
+  await guardTab(10, RULES);
+  assert.equal(await guardPopup(11, 10, "https://blocked.test/x"), true);
+  assert.ok(calls.some((call) => call.removed === 11));
+  assert.equal(await guardPopup(12, 10, "about:blank"), false);
+  assert.equal(rules.size, 2);
+  assert.ok([...rules.values()].some((rule) => rule.condition.tabIds[0] === 12));
+  // Releasing the opener lifts the popup's inherited rules too.
+  await releaseTabs([10]);
+  assert.equal(rules.size, 0);
 });

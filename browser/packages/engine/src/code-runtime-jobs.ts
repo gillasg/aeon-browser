@@ -10,6 +10,14 @@ export const jobs = new Map<string, Job>();
 export const jobTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const JOB_STORAGE = "aeon-code-jobs";
 export const MAX_JOB_ITEM_CHARS = 200_000;
+/** Settled jobs kept, newest first; older ones are dropped from memory and from storage. */
+export const MAX_FINISHED_JOBS = 20;
+/**
+ * Bytes of results and items all saved jobs may take together. chrome.storage.session holds 10 MB
+ * for the whole extension, and a write past it fails whole, so stay well under it.
+ */
+export const SAVED_JOBS_BUDGET = 4_000_000;
+const TRIMMED = "results too large to keep; run the job again for them";
 
 export interface Job extends Cell {
   status: "running" | "complete" | "failed" | "cancelled" | "lost";
@@ -121,15 +129,67 @@ export function emptyJob(jobId: string, chatId: string, total: number): Job {
   };
 }
 
-function savedResults(job: Job): unknown[] | undefined {
-  if (!job.results) return undefined;
+function sizeOf(value: unknown): number {
   try {
-    const text = JSON.stringify(job.results) ?? "";
-    return text.length <= 1_000_000 ? job.results : undefined;
+    return (JSON.stringify(value) ?? "").length;
   } catch {
-    // A result that cannot be stored must not drop the record itself.
-    return undefined;
+    // A value that cannot be stored must not drop the record itself.
+    return Number.POSITIVE_INFINITY;
   }
+}
+
+/** Drops settled jobs past the newest MAX_FINISHED_JOBS; running jobs are always kept. */
+export function pruneJobs(): void {
+  const settled = [...jobs.values()]
+    .filter((job) => job.status !== "running")
+    .sort((a, b) => (b.finishedAt ?? b.startedAt) - (a.finishedAt ?? a.startedAt));
+  for (const job of settled.slice(MAX_FINISHED_JOBS)) {
+    jobs.delete(job.run.cellId);
+    const timer = jobTimers.get(job.run.cellId);
+    if (timer) clearTimeout(timer);
+    jobTimers.delete(job.run.cellId);
+  }
+}
+
+/**
+ * The records written to storage. Running jobs, then the newest settled ones, get their results
+ * and items while the total fits SAVED_JOBS_BUDGET; past it a job keeps its status and says why
+ * its results are gone, so a status call still answers instead of the whole write failing.
+ */
+export function savedJobRecords(): Record<string, unknown>[] {
+  const ordered = [...jobs.values()].sort((a, b) => {
+    const running = Number(b.status === "running") - Number(a.status === "running");
+    return running || (b.finishedAt ?? b.startedAt) - (a.finishedAt ?? a.startedAt);
+  });
+  let spent = 0;
+  const fits = (value: unknown): boolean => {
+    const size = sizeOf(value);
+    if (size > 1_000_000 || spent + size > SAVED_JOBS_BUDGET) return false;
+    spent += size;
+    return true;
+  };
+  return ordered.map((job) => {
+    const results = job.results && fits(job.results) ? job.results : undefined;
+    const items = job.items && job.items.length <= 500 && fits(job.items) ? job.items : undefined;
+    const trimmed = Boolean(job.results && !results);
+    const error = job.error ?? (trimmed && job.status !== "running" ? TRIMMED : undefined);
+    return {
+      jobId: job.run.cellId,
+      chatId: job.run.chatId,
+      status: job.status,
+      total: job.total,
+      startedAt: job.startedAt,
+      ...(job.finishedAt ? { finishedAt: job.finishedAt } : {}),
+      ...(results ? { results } : {}),
+      ...(job.progress ? { progress: job.progress } : {}),
+      ...(items ? { items } : {}),
+      ...(job.fn ? { fn: job.fn } : {}),
+      ...(job.options ? { options: job.options } : {}),
+      ...(job.mode ? { mode: job.mode } : {}),
+      ...(error ? { error } : {}),
+      ...(job.artifact ? { artifact: job.artifact } : {}),
+    };
+  });
 }
 
 let jobsWriting = Promise.resolve();
@@ -143,27 +203,12 @@ export function saveJobs(): Promise<void> {
       } catch {
         return;
       }
-      const saved = [...jobs.values()].map((job) => {
-        const results = savedResults(job);
-        return {
-          jobId: job.run.cellId,
-          chatId: job.run.chatId,
-          status: job.status,
-          total: job.total,
-          startedAt: job.startedAt,
-          ...(job.finishedAt ? { finishedAt: job.finishedAt } : {}),
-          ...(results ? { results } : {}),
-          ...(job.progress ? { progress: job.progress } : {}),
-          ...(job.items && job.items.length <= 500 ? { items: job.items } : {}),
-          ...(job.fn ? { fn: job.fn } : {}),
-          ...(job.options ? { options: job.options } : {}),
-          ...(job.mode ? { mode: job.mode } : {}),
-          ...(job.error ? { error: job.error } : {}),
-          ...(job.artifact ? { artifact: job.artifact } : {}),
-        };
-      });
-      await chrome.storage.session.set({ [JOB_STORAGE]: saved });
+      pruneJobs();
+      await chrome.storage.session.set({ [JOB_STORAGE]: savedJobRecords() });
     })
-    .catch(() => undefined);
+    .catch((error: unknown) => {
+      // A failed write leaves the last good copy in storage; say so rather than lose jobs quietly.
+      console.warn("browser jobs: saving job state failed:", String(error));
+    });
   return jobsWriting;
 }

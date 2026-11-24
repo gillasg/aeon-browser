@@ -9,7 +9,7 @@ import {
   type SignInFields,
 } from "./native-browser-signin-page.js";
 import { rememberSecrets } from "./native-browser-secrets.js";
-import { finishSignIn, prepareSignIn } from "./native-browser-password-lock.js";
+import { finishSignIn, markVaultFill, prepareSignIn } from "./native-browser-password-lock.js";
 import { messagesSnapshot, waitForInboxCode } from "./native-browser-inbox-code.js";
 import { chromeFill, inFront } from "./native-browser-signin-chrome.js";
 import { chooserShown, passAccountChooser } from "./native-browser-signin-chooser.js";
@@ -101,6 +101,7 @@ export async function signInToPage(
   if (scripts)
     return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
   rememberSecrets([login.password]);
+  markVaultFill(tabId);
   const result = await fill(tabId, { login, ask, url, inbox, account }, base);
   if (result.signedIn) await finishSignIn(tabId);
   return result;
@@ -118,6 +119,7 @@ async function signInWithChrome(
   const scripts = await prepareSignIn(tabId, attempt.url);
   if (scripts)
     return { ...base, signedIn: false, reason: "PAGE_SCRIPTS", detail: scripts.join(", ") };
+  markVaultFill(tabId);
   const result = await inFront(tabId, () => fill(tabId, attempt, base));
   if (result.reason === "NO_SAVED_LOGIN")
     // Neither manager knows the site: answer as the external manager did.

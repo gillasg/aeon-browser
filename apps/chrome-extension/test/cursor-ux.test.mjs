@@ -193,9 +193,9 @@ test("Compose has no whispers or starter chips", () => {
 
 test("Teach is a pill that says what it picked up, singular for one", () => {
   assert.equal(ux.teachingLabel(0), "Teaching");
-  assert.equal(ux.teachingLabel(1), "Teaching · 1 step");
-  assert.equal(ux.teachingLabel(3), "Teaching · 3 steps");
-  assert.equal(ux.learnedLine(4, "flipkart.com"), "Learned a skill on flipkart.com · 4 steps");
+  assert.equal(ux.teachingLabel(1), "Teaching · 1 API");
+  assert.equal(ux.teachingLabel(3), "Teaching · 3 APIs");
+  assert.equal(ux.learnedLine(4, "flipkart.com"), "Learned 4 APIs on flipkart.com");
   const pill = renderToStaticMarkup(createElement(ux.TeachPill, { found: 3, onDone() {} }));
   assert.match(pill, /isl-teach-pill/);
   assert.match(pill, />Done</);

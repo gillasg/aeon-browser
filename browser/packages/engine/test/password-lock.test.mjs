@@ -10,6 +10,7 @@ import {
   documentReplaced,
   showsErrorPage,
   guardPageCode,
+  markVaultFill,
   prepareSignIn,
   runsPageCode,
 } from "../dist/native-browser-password-lock.js";
@@ -156,4 +157,51 @@ test("code in a tab showing Chrome's error page fails as NETWORK, not PASSWORD_P
     guardPageCode({ op: "evaluate", target, expression: "document.title" }),
     (error) => /^NETWORK:/.test(error.message) && !/PASSWORD_PAGE/.test(error.message),
   );
+});
+
+test("after a vault fill, page code that would read the password back is refused until it leaves", async () => {
+  const secret = "vault-pass-9";
+  let filled = true;
+  globalThis.chrome = {
+    storage: { session: { get: async () => ({}), set: async () => undefined } },
+    scripting: {
+      executeScript: async () => [
+        {
+          frameId: 0,
+          result: { password: true, agent: false, filled, secrets: filled ? [secret] : [] },
+        },
+      ],
+    },
+    webNavigation: {
+      getAllFrames: async () => [{ frameId: 0, url: "https://example.test/login" }],
+    },
+    debugger: { sendCommand: async () => ({}), attach: async () => undefined },
+    tabs: { reload: async () => undefined, get: async () => ({ id: 7, status: "complete" }) },
+  };
+  const tab = { ...target, tabId: 7 };
+  markVaultFill(7);
+  const reversed = "[...document.querySelector('input[type=password]').value].reverse().join('')";
+  await assert.rejects(
+    guardPageCode({ op: "evaluate", target: tab, expression: reversed }),
+    (error) => {
+      assert.equal(error.message, "SECRET_ON_PAGE");
+      return true;
+    },
+  );
+  await assert.rejects(
+    guardPageCode({ op: "cdp", target: tab, method: "Runtime.evaluate", params: {} }),
+    /SECRET_ON_PAGE/,
+  );
+  await assert.rejects(
+    guardPageCode({ op: "cdp", target: tab, method: "DOM.getOuterHTML", params: {} }),
+    /SECRET_ON_PAGE/,
+  );
+  // A screenshot still runs: it shows the password as dots.
+  await guardPageCode({ op: "cdp", target: tab, method: "Page.captureScreenshot", params: {} });
+  // The page moved on (no field holds the password any more): code runs again.
+  filled = false;
+  globalThis.chrome.scripting.executeScript = async () => [
+    { frameId: 0, result: { password: false, agent: false, filled: false, secrets: [] } },
+  ];
+  await guardPageCode({ op: "evaluate", target: tab, expression: "document.title" });
 });

@@ -310,10 +310,25 @@ async function saveScreenshot(root: string, request: Request, append: boolean): 
   return writePlaced(root, placed, shotBytes(request), append);
 }
 
+/**
+ * Resolves upload sources inside the workspace only. The realpath must stay under the workspace's
+ * own realpath, so an absolute host path, a `../` walk or a symlink that leads out is refused; a
+ * file from elsewhere must be copied into the workspace first, a step the user can see.
+ */
 export async function validateUploadFiles(files: string[], root: string): Promise<string[]> {
+  const realRoot = await realpath(resolve(root));
   return Promise.all(
     files.map(async (file) => {
-      const path = await realpath(resolve(root, file));
+      let path: string;
+      try {
+        path = await realpath(resolve(realRoot, file));
+      } catch {
+        throw new Error(`UPLOAD_OUTSIDE_WORKSPACE: ${file} is not a file in the workspace`);
+      }
+      if (!contained(realRoot, path))
+        throw new Error(
+          `UPLOAD_OUTSIDE_WORKSPACE: ${file} is outside the workspace; copy it into the workspace first`,
+        );
       if (!(await stat(path)).isFile()) throw new Error("Upload source is not a regular file");
       return path;
     }),

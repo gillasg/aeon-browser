@@ -32,6 +32,10 @@ const ALL_TYPES = [
   "other",
 ] as chrome.declarativeNetRequest.ResourceType[];
 const ruleIds = new Map<number, number[]>();
+// The rules each guarded tab holds, so a popup it opens inherits them before its first load.
+const tabRules = new Map<number, SiteRules>();
+// Popups guarded for an opener, lifted together with the opener's own rules.
+const popupsOf = new Map<number, Set<number>>();
 const guarding = new Map<number, Promise<void>>();
 const taken = new Set<number>();
 let swept: Promise<void> | undefined;
@@ -100,6 +104,12 @@ export function assertAllowed(rules: SiteRules, address: unknown): void {
   if (reason) throw new Error(reason);
 }
 
+/** The check each browser.fetch redirect hop must pass; undefined when nothing is limited. */
+export function hopCheck(rules: SiteRules): ((url: string) => void) | undefined {
+  if (!rules.blocked.length && !rules.only.length) return undefined;
+  return (next) => assertAllowed(rules, next);
+}
+
 /**
  * Shuts this tab's own traffic to blocked sites (and, with an "only" list, its navigations).
  * Calls for one tab share a single pass, so two cells guarding the same tab at once cannot both
@@ -135,12 +145,14 @@ async function addGuard(tabId: number, rules: SiteRules): Promise<void> {
     );
   const ids = addRules.map((item) => item.id);
   ruleIds.set(tabId, ids);
+  tabRules.set(tabId, rules);
   try {
     // Removing the ids being added makes the call a replace: an id already taken (a rule from
     // before a worker restart that the sweep could not read) is overwritten, never a duplicate.
     await chrome.declarativeNetRequest.updateSessionRules({ addRules, removeRuleIds: ids });
   } catch (error) {
     ruleIds.delete(tabId);
+    tabRules.delete(tabId);
     throw error;
   }
 }
@@ -191,7 +203,16 @@ function rule(
 /** Lifts the rules once the cell that set them is finished. */
 export async function releaseTabs(tabIds: Iterable<number>): Promise<void> {
   const removeRuleIds: number[] = [];
-  for (const tabId of tabIds) {
+  const all = new Set<number>();
+  const visit = (tabId: number) => {
+    if (all.has(tabId)) return;
+    all.add(tabId);
+    for (const child of popupsOf.get(tabId) ?? []) visit(child);
+    popupsOf.delete(tabId);
+  };
+  for (const tabId of tabIds) visit(tabId);
+  for (const tabId of all) {
+    tabRules.delete(tabId);
     await guarding.get(tabId)?.catch(() => undefined);
     for (const id of ruleIds.get(tabId) ?? []) {
       removeRuleIds.push(id);
@@ -203,6 +224,43 @@ export async function releaseTabs(tabIds: Iterable<number>): Promise<void> {
     await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds }).catch(() => undefined);
 }
 
+/**
+ * A tab a guarded tab opened (window.open, a target=_blank link) takes its opener's rules before
+ * its first load. A popup headed straight for a blocked site is closed instead. Answers whether
+ * the popup was closed.
+ */
+export async function guardPopup(
+  tabId: number,
+  openerId: number,
+  pendingUrl = "",
+): Promise<boolean> {
+  const rules = tabRules.get(openerId);
+  if (!rules) return false;
+  if (pendingUrl && blockedReason(rules, pendingUrl)) {
+    await chrome.tabs.remove(tabId).catch(() => undefined);
+    return true;
+  }
+  const set = popupsOf.get(openerId) ?? new Set<number>();
+  set.add(tabId);
+  popupsOf.set(openerId, set);
+  try {
+    await guardTab(tabId, rules);
+  } catch {
+    // The popup already sits on a blocked page: close it rather than leave it loading.
+    await chrome.tabs.remove(tabId).catch(() => undefined);
+    return true;
+  }
+  return false;
+}
+
 onEngineInstall(() => {
   chrome.tabs.onRemoved.addListener((tabId) => void releaseTabs([tabId]));
+  // Before any ownership bookkeeping: the rule has to be in place before the popup's first load.
+  chrome.tabs.onCreated.addListener((tab) => {
+    if (tab.id !== undefined && tab.openerTabId !== undefined)
+      void guardPopup(tab.id, tab.openerTabId, tab.pendingUrl ?? tab.url ?? "");
+  });
+  chrome.webNavigation.onCreatedNavigationTarget.addListener(
+    (event) => void guardPopup(event.tabId, event.sourceTabId, event.url),
+  );
 });

@@ -16,8 +16,8 @@ type Sort = "name" | "next";
 
 const TYPES: ReadonlyArray<[AutomationType, string]> = [
   ["schedule", "Schedules"],
-  ["watcher", "Watchers"],
-  ["sniper", "Snipers"],
+  ["watcher", "Watches"],
+  ["sniper", "At a moment"],
   ["webhook", "Webhooks"],
 ];
 

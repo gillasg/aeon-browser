@@ -75,7 +75,7 @@ var skills = Object.freeze({
     var before = new Set(Object.keys(globalThis));
     // Same rules as a cell: top-level const/let/function persist. A skill whose code returns an
     // object (the function form) has its function members defined as globals.
-    var value = await (0, eval)(__repl(skill.code));
+    var value = await (globalThis.__realmEval || (0, eval))(__repl(skill.code));
     if (value && typeof value === 'object')
       for (var [key, member] of Object.entries(value)) if (typeof member === 'function') globalThis[key] = member;
     var defines = Object.keys(globalThis).filter(key => !before.has(key) && typeof globalThis[key] === 'function');
@@ -192,7 +192,7 @@ var saveAbility = __saveAbility;
 // Runs an ability's page code in this cell. Built-in code opens its own tab and gets the
 // caller's page (for withPage); other page code gets a tab on its site.
 var __runPageAbility = async (plan) => {
-  var fn = await (0, eval)('(' + plan.code + ')');
+  var fn = await (globalThis.__realmEval || (0, eval))('(' + plan.code + ')');
   var current = globalThis.page;
   var tab = current;
   if (!plan.opensOwnTab) {

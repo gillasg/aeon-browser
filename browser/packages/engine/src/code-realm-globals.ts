@@ -10,7 +10,8 @@ export interface RealmTimers {
   intervals: Set<number>;
 }
 
-const PLATFORM = [
+/** The platform names a realm is given; exported so a test can walk every one of them. */
+export const PLATFORM = [
   "URL",
   "URLSearchParams",
   "atob",
@@ -36,6 +37,15 @@ let hardened = false;
 export function hardenHost(): void {
   if (hardened) return;
   hardened = true;
+  // Node's ways to load a built-in module or a native binding from a bare `process`: even if a
+  // script ever reached this thread's process, it finds no fs, child_process or sockets there.
+  const proc = process as unknown as Record<string, unknown>;
+  for (const name of ["getBuiltinModule", "binding", "_linkedBinding", "dlopen"])
+    try {
+      Object.defineProperty(proc, name, { value: undefined, writable: false, configurable: false });
+    } catch {
+      // A property the runtime made non-configurable stays; the constructor seal below still holds.
+    }
   const blocked = function constructorBlocked(): never {
     throw new Error("UNSUPPORTED: code generation through a host constructor");
   };
@@ -112,10 +122,21 @@ export function createRealmContext(owned: RealmTimers): vm.Context {
   timers(sandbox, owned);
   const context = vm.createContext(sandbox, {
     name: "aeon-browser-code",
-    codeGeneration: { strings: true, wasm: false },
+    codeGeneration: { strings: false, wasm: false },
   });
   // The realm's own name for its global, as a page realm has; set from inside the realm so it
   // is the context's global, not the host object the context was made from.
   vm.runInContext("globalThis.window = globalThis; globalThis.self = globalThis;", context);
+  // eval and Function are off in the realm, so no host constructor can turn a string into code.
+  // Agent-written source a helper runs later (page.extract({script}), site skills, sweep hooks)
+  // is compiled through this instead: in this same context, at global scope, as indirect eval
+  // would, and never in the host realm.
+  Object.defineProperty(sandbox, "__realmEval", {
+    value: (source: unknown) =>
+      vm.runInContext(String(source), context, { filename: "aeon-cell-script.js" }),
+    writable: false,
+    configurable: false,
+    enumerable: false,
+  });
   return context;
 }

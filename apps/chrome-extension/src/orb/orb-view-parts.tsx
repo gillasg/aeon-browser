@@ -67,16 +67,16 @@ export function Palette({
   );
 }
 
-/** `Teaching`, `Teaching · 3 steps`: what Teach has picked up so far, singular for 1. */
+/** `Teaching`, `Teaching · 3 APIs`: what Teach has picked up so far, singular for 1. */
 export function teachingLabel(found: number): string {
   if (found <= 0) return "Teaching";
-  return `Teaching · ${found} ${found === 1 ? "step" : "steps"}`;
+  return `Teaching · ${found} ${found === 1 ? "API" : "APIs"}`;
 }
 
-/** `Learned a skill on flipkart.com · 4 steps`, after Done. */
+/** `Learned 4 APIs on example.com`, after Done. */
 export function learnedLine(found: number, host: string): string {
-  const steps = `${found} ${found === 1 ? "step" : "steps"}`;
-  return host ? `Learned a skill on ${host} · ${steps}` : `Learned a skill · ${steps}`;
+  const apis = `${found} ${found === 1 ? "API" : "APIs"}`;
+  return host ? `Learned ${apis} on ${host}` : `Learned ${apis}`;
 }
 
 /** Teach as a bottom-centre whisper pill: the page under it stays fully usable. */

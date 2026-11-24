@@ -41,12 +41,21 @@ export function isFetchRequest(value: Record<string, unknown> | null): boolean {
   return Boolean(value && typeof value.fetch === "object" && value.fetch);
 }
 
-export async function fetchCall(value: Record<string, unknown>): Promise<unknown> {
+/** Checks one address a fetch is about to reach (the first one and every redirect hop). */
+export type HopCheck = (url: string) => void | Promise<void>;
+
+const MAX_REDIRECTS = 10;
+
+export async function fetchCall(
+  value: Record<string, unknown>,
+  checkHop?: HopCheck,
+): Promise<unknown> {
   const request = value.fetch as FetchRequest;
   const url = new URL(String(request.url));
   if (url.protocol !== "http:" && url.protocol !== "https:")
     throw new Error("browser.fetch only supports http and https addresses");
   await assertBrowserNetwork(url.href);
+  await checkHop?.(url.href);
   const split = splitHeaders(request.headers);
   const timeout = Math.min(Math.max(Number(request.timeoutMs ?? TIMEOUT_MS), 1000), 120_000);
   let body = request.body;
@@ -57,18 +66,23 @@ export async function fetchCall(value: Record<string, unknown>): Promise<unknown
   const rateWaitMs = hostBudget.take(url.host);
   if (rateWaitMs) await new Promise((resolve) => setTimeout(resolve, rateWaitMs));
   let response: Response;
+  const signal = AbortSignal.timeout(timeout);
   try {
     response = await withFetchHeaders(url, split, () =>
-      fetch(url, {
-        method: request.method ?? "GET",
-        headers: split.headers,
-        ...(body !== undefined ? { body } : {}),
-        credentials: request.credentials ?? "include",
-        redirect: "follow",
-        signal: AbortSignal.timeout(timeout),
-      }),
+      followGuarded(
+        url,
+        {
+          method: request.method ?? "GET",
+          headers: split.headers,
+          ...(body !== undefined ? { body } : {}),
+          credentials: request.credentials ?? "include",
+          signal,
+        },
+        checkHop,
+      ),
     );
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("SITE_BLOCKED")) throw error;
     throw await fetchFailure(url, error);
   }
   const result: Record<string, unknown> = {
@@ -100,6 +114,49 @@ export async function fetchCall(value: Record<string, unknown>): Promise<unknown
     text: text.length > cap ? text.slice(0, cap) : text,
     ...(text.length > cap ? { truncated: true, length: text.length } : {}),
   };
+}
+
+/**
+ * Follows redirects one hop at a time, so each next address passes the site policy and the
+ * network check before any request is sent to it. A 302 to a blocked site never reaches it.
+ */
+async function followGuarded(
+  first: URL,
+  init: RequestInit,
+  checkHop: HopCheck | undefined,
+): Promise<Response> {
+  if (!checkHop) return fetch(first, { ...init, redirect: "follow" });
+  let url = first;
+  let current = init;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const response = await fetch(url, { ...current, redirect: "manual" });
+    if (response.type === "opaqueredirect") {
+      // This runtime hides the Location of a manual redirect: follow it natively, then refuse
+      // the answer if it ended on a site the policy forbids.
+      const followed = await fetch(url, { ...current, redirect: "follow" });
+      await checkHop(followed.url || url.href);
+      return followed;
+    }
+    const location = response.headers.get("location");
+    if (response.status < 300 || response.status > 399 || !location) return response;
+    const next = new URL(location, url);
+    if (next.protocol !== "http:" && next.protocol !== "https:")
+      throw new Error(`browser.fetch was redirected to an unsupported address (${next.protocol})`);
+    await response.body?.cancel().catch(() => undefined);
+    await assertBrowserNetwork(next.href);
+    await checkHop(next.href);
+    // 303, and 301/302 after a POST, turn into a GET without a body, as browsers do.
+    const method = String(current.method ?? "GET").toUpperCase();
+    if (
+      response.status === 303 ||
+      ((response.status === 301 || response.status === 302) && method === "POST")
+    ) {
+      const { body: _body, ...rest } = current;
+      current = { ...rest, method: "GET" };
+    }
+    url = next;
+  }
+  throw new Error(`browser.fetch stopped after ${MAX_REDIRECTS} redirects`);
 }
 
 interface SplitHeaders {

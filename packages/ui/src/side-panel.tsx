@@ -135,7 +135,7 @@ function PickerMenu({ props }: { props: SidePanelProps }): ReactElement {
       />
       <hr className="picker-divider" />
       <button id="picker-manage" className="picker-manage" type="button" onClick={props.onManage}>
-        Manage Sites & Settings <span aria-hidden="true">↗</span>
+        Manage Aeon <span aria-hidden="true">↗</span>
       </button>
     </div>
   );

@@ -15,6 +15,7 @@ import { ensureFedCm, forgetFedCm } from "./native-browser-fedcm.js";
 import { withLock } from "./native-browser-scheduler.js";
 import { trackBrowserActivity, forgetBrowserActivity } from "./native-browser-navigation.js";
 import { forgetDomains } from "./cdp/domains.js";
+import { forgetTrees } from "./native-browser-tree-baselines.js";
 import { bounded, send, sendWake } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
@@ -229,6 +230,7 @@ function forget(tabId: number): void {
   if (entry?.timer !== undefined) clearTimeout(entry.timer);
   attachments.delete(tabId);
   forgetDomains(tabId);
+  forgetTrees(tabId);
   networkOn.delete(tabId);
   networkWanted.delete(tabId);
   networkFlight.delete(tabId);

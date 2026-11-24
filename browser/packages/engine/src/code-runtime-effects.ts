@@ -28,7 +28,7 @@ import { closeTabCall } from "./code-tab-close.js";
 import { rulesCall } from "./native-browser-rules.js";
 import { permissionCall } from "./native-browser-permissions.js";
 import { googleCall } from "./native-browser-google.js";
-import { fetchCall, isFetchRequest } from "./native-browser-fetch.js";
+import { fetchCall, isFetchRequest, type HopCheck } from "./native-browser-fetch.js";
 import { mappedNotice, noteFetchStatus } from "./native-browser-fetch-guard.js";
 import { noteChallengeSeen } from "./native-browser-human-input.js";
 import { clawsCall } from "./native-browser-claws.js";
@@ -45,6 +45,8 @@ type Value = Record<string, unknown>;
 export interface EffectHost {
   callCore(cell: Cell, request: unknown): Promise<unknown>;
   handoff(cell: Cell, request: object): Promise<unknown>;
+  /** The cell's per-hop site check for browser.fetch redirects; undefined when nothing is blocked. */
+  fetchHops?(cell: Cell): Promise<HopCheck | undefined>;
 }
 
 const has = (key: string) => (value: Value) => isObject(value[key]);
@@ -119,7 +121,7 @@ async function guardedFetch(host: EffectHost, cell: Cell, value: Value): Promise
   const request = value.fetch as { url?: unknown; expectMissing?: unknown };
   const url = String(request.url);
   const chatId = cell.run.chatId;
-  const result = (await fetchCall(value)) as Value;
+  const result = (await fetchCall(value, await host.fetchHops?.(cell))) as Value;
   noteFetchStatus(chatId, url, Number(result.status), request.expectMissing === true);
   const mapped = await mappedNotice(chatId, url, (site) =>
     host.callCore(cell, { siteMapper: "operations", site }),

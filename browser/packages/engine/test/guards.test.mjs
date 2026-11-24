@@ -20,3 +20,10 @@ test("browser-wide clears are refused, scoped storage is not", () => {
   );
   assert.equal(cdpChangesPage("Page.captureScreenshot"), false);
 });
+
+test("raw cdp cannot skip the upload check or the navigation scheme check", () => {
+  assert.match(refusedCdp("DOM.setFileInputFiles", { files: ["/etc/hosts"] }), /setFileInputFiles/);
+  assert.match(refusedCdp("Page.navigate", { url: "file:///etc/hosts" }), /page\.goto/);
+  assert.match(refusedCdp("Page.navigate", { url: "data:text/html,x" }), /page\.goto/);
+  assert.equal(refusedCdp("Page.navigate", { url: "https://example.com/" }), undefined);
+});

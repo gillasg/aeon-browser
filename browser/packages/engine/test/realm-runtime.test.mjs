@@ -71,7 +71,7 @@ test("no host constructor builds code that reaches the process", async () => {
       () => (function () {}).constructor('return typeof process')()]
       .map((f) => { try { return String(f()); } catch (error) { return 'blocked'; } })`,
   );
-  assert.deepEqual(escapes.value, ["blocked", "blocked", "blocked", "undefined"]);
+  assert.deepEqual(escapes.value, ["blocked", "blocked", "blocked", "blocked"]);
   await server.close();
 });
 

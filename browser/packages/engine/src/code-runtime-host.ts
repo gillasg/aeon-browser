@@ -55,6 +55,7 @@ import {
 import {
   NO_RULES,
   assertAllowed,
+  hopCheck,
   combinedRules,
   guardTab,
   releaseTabs,
@@ -299,7 +300,11 @@ async function realmEvent(message: Record<string, unknown>): Promise<unknown> {
 
 // Non-step requests are kernel effects (code-runtime-effects.ts): the kernel authorizes the tab
 // and checks the site each one names before it runs.
-const EFFECTS = cellEffects({ callCore, handoff });
+const EFFECTS = cellEffects({
+  callCore,
+  handoff,
+  fetchHops: async (cell) => hopCheck(await siteRulesFor(cell)),
+});
 const CHECKS: KernelChecks<Cell> = {
   authorize: (cell, target) => authorizedTarget(cell, target).tabId,
   guardTab: (cell, tabId) => guardCellTab(cell, tabId),
@@ -328,6 +333,8 @@ async function guardCellTab(cell: Cell, tabId: number): Promise<void> {
 async function enforceSites(cell: Cell, step: BrowserStep): Promise<void> {
   const rules = await siteRulesFor(cell);
   assertAllowed(rules, (step as { url?: unknown }).url);
+  const params = step.op === "cdp" && step.method === "Page.navigate" ? step.params : undefined;
+  assertAllowed(rules, (params as { url?: unknown } | undefined)?.url); // a raw Page.navigate
   const target = (step as { target?: { tabId?: unknown } }).target;
   if (typeof target?.tabId === "number") await guardCellTab(cell, target.tabId);
 }

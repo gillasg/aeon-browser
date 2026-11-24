@@ -186,6 +186,6 @@ test("Teach folds the box to its pill", async () => {
     createElement(orb.OrbBox, { model: { ...model, learning: true, learnFound: 3 }, actions }),
   );
   assert.match(html, /data-state="teach"/);
-  assert.match(html, /Teaching · 3 steps/);
+  assert.match(html, /Teaching · 3 APIs/);
   assert.doesNotMatch(html, /<textarea/);
 });

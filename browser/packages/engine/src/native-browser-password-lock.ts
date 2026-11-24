@@ -25,6 +25,20 @@ const planted = new SessionMap<Set<string>>(
   (ids) => [...ids],
   (ids) => new Set(Array.isArray(ids) ? ids.map(String) : []),
 );
+// Tabs where a password manager (Aeon's vault, or Chrome's saved passwords) just filled a password.
+// While that password still sits in a field, no agent code runs in the page: literal redaction
+// cannot catch a value read back reversed, chunked or encoded, so the read itself is refused.
+const vaultFilled = new SessionMap<boolean>(
+  "aeon-vault-filled",
+  (value) => value,
+  (value) => value === true,
+);
+
+/** Marks a tab as holding a vault-filled password until the field is emptied or the page goes. */
+export function markVaultFill(tabId: number): void {
+  vaultFilled.set(tabId, true);
+}
+
 /** DevTools calls that read nothing from the page: a screenshot shows a password as dots. */
 const LEAVES_PAGE_ALONE = new Set([
   "Page.captureScreenshot",
@@ -86,6 +100,7 @@ export function notePlantedScript(tabId: number, result: unknown): void {
 export function forgetPasswordLock(tabId: number): void {
   typed.delete(tabId);
   planted.delete(tabId);
+  vaultFilled.delete(tabId);
 }
 onEngineInstall(() => chrome.tabs.onRemoved.addListener(forgetPasswordLock));
 
@@ -237,8 +252,18 @@ export async function guardPageCode(step: BrowserStep): Promise<void> {
   if (!runsPageCode(step) || !("target" in step)) return;
   const tabId = step.target.tabId;
   await typed.ready;
+  await vaultFilled.ready;
   const state = await checkedProbe(tabId);
   hidePasswordValues(state);
+  if (vaultFilled.get(tabId)) {
+    if (state.filled)
+      throw new BrowserActionError(
+        "SECRET_ON_PAGE",
+        "A password the vault filled is still in a field on this page, so code cannot run in it or read it. Submit the form, clear the field, or navigate away, then try again.",
+      );
+    // The field was emptied or the document replaced: the page is open to code again.
+    vaultFilled.delete(tabId);
+  }
   if (!state.password || state.filled) return;
   await reload(tabId);
   hidePasswordValues(await checkedProbe(tabId));

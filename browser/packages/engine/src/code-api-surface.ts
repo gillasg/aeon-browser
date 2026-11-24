@@ -356,7 +356,7 @@ function __extendPageSurface(target, base) {
             target = tab.target;
           }
           if (spec.ready !== false) await page.waitReady({ timeoutMs: spec.readyTimeoutMs || 10000 });
-          var value = await (0, eval)('(' + script + ')(page, bu)');
+          var value = await (globalThis.__realmEval || (0, eval))('(' + script + ')(page, bu)');
           var data = await value;
           if (spec.schema && !__validShape(data, spec.schema)) throw Error('EXTRACT_SCHEMA: the value does not match the schema');
           var rows = Array.isArray(data) ? data : (spec.rowKey ? [data] : data);
