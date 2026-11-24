@@ -1,4 +1,4 @@
-// `aeon record start|stop|mark|wait|run|terminal` take a lean path: a scripted recording calls
+// `aeon record start|stop|mark|wait|run|terminal|ui|shoot|assemble` take a lean path: a scripted recording calls
 // them once per beat, and loading the whole command line cost seconds of dead air per call.
 import { parseArgs } from "browserkit/dist/args.js";
 import { DaemonHost } from "./host.js";

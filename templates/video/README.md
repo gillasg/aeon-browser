@@ -19,14 +19,15 @@ Get it with `aeon video kit <dir>`. It is not part of Aeon's build.
 ## Shoot
 
 ```sh
-scripts/setup-recording-chrome.sh             # 1280x720 logical at DPR 3 -> 3840x2160 master
+scripts/setup-recording-chrome.sh             # 1280x720 logical at DPR 2 -> 2560x1440 master
 scripts/demo-video.sh "find the price of ..."  # record, lint, score, render out/demo.mp4
 ```
 
 The recording Chrome runs on its own Xvfb display, sized to exactly `1280·DPR × 720·DPR`, so
 there is no black padding and no cutoff. It launches without `--enable-automation`, resets the
 profile's crash state on every run, and refuses to film when an infobar shows or the DPR is wrong.
-`AEON_RECORDING_DPR=2` gives a 2560×1440 master on smaller machines.
+The default 2560×1440 master allows a 1.33x optical push-in into 1080p; `AEON_RECORDING_DPR=3`
+gives a 3840×2160 master (up to 2x) for flagship launch cuts.
 
 ## Edit
 

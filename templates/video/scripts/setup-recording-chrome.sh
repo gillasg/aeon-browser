@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # One-time, idempotent setup for the SEPARATE recording Chrome. Never touches aeon-chrome or
 # aeon-daemon: eval keeps running on its own CFT browser/profile/display.
-# Default capture: a 1280x720 logical window at DPR 3, so frames are a 3840x2160 master that
-# delivers a sharp 1920x1080 cut with up to a 2x optical push-in. Set AEON_RECORDING_DPR=2 for a
-# 2560x1440 master on smaller machines. Export the same AEON_RECORDING_DPR for `aeon record` so
+# Default capture: a 1280x720 logical window at DPR 2, so frames are a 2560x1440 master that
+# delivers a sharp 1920x1080 cut with up to a 1.33x optical push-in (2-3x less disk and a faster
+# encode than 4K). Set AEON_RECORDING_DPR=3 for a 3840x2160 master on flagship shoots. Export the same AEON_RECORDING_DPR for `aeon record` so
 # events.json carries dpr and the logical size.
 set -euo pipefail
 
@@ -15,7 +15,7 @@ EXT_DIR="${AEON_EXTENSION_DIR:-$(cd "$KIT_DIR/../.." 2>/dev/null && pwd)/apps/ch
 PROXY="${AEON_RECORDING_PROXY:-}"
 EXT_ID="npcdopokfkpfmepknhoecppgdgmkmihh"
 BROWSER="${AEON_RECORDING_BROWSER:-recording}"
-DPR="${AEON_RECORDING_DPR:-3}"
+DPR="${AEON_RECORDING_DPR:-2}"
 WINDOW="${AEON_RECORDING_SIZE:-1280x720}" # logical (CSS) px
 LOGICAL_W="${WINDOW%x*}"
 LOGICAL_H="${WINDOW#*x}"

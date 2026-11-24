@@ -60,6 +60,10 @@ const BOOLEAN = new Set([
   "verbose",
   "webhook-only",
   "window",
+  "zoom",
+  "sound",
+  "assemble",
+  "background",
 ]);
 
 export function parseArgs(argv: string[]): Args {

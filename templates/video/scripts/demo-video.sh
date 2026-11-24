@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One command: record the dedicated recording-Chrome window (1280x720 at DPR 3), run an Aeon task
+# One command: record the dedicated recording-Chrome window (1280x720 at DPR 2; AEON_RECORDING_DPR=3 for 4K), run an Aeon task
 # in that browser, stop the take, lint the edit, score it, and render the 1920x1080 DirectorCut.
 # Usage: scripts/demo-video.sh "<task>" [--out file.mp4] [--fps 30] [--max-seconds 30] [--director director.json]
 set -euo pipefail
@@ -8,7 +8,7 @@ KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BROWSER="${AEON_RECORDING_BROWSER:-recording}"
 DISPLAY_NUM="${AEON_RECORDING_DISPLAY:-:120}"
 MAX_SECONDS="${AEON_VIDEO_MAX_SECONDS:-30}"
-export AEON_RECORDING_DPR="${AEON_RECORDING_DPR:-3}"
+export AEON_RECORDING_DPR="${AEON_RECORDING_DPR:-2}"
 DIRECTOR=""
 
 usage() { sed -n '2,3p' "$0" | sed 's/^# //'; exit 1; }

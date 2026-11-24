@@ -305,7 +305,7 @@ export async function run(host: DaemonHost, steps: RecordSteps, args: Args): Pro
   return 0;
 }
 
-async function openUrl(host: DaemonHost, url: string | undefined): Promise<void> {
+export async function openUrl(host: DaemonHost, url: string | undefined): Promise<void> {
   if (!url) return;
   await host.runInBrowser(
     `${ACTIVE} await browser.page(tab.id).goto(${JSON.stringify(url)}); return tab.id;`,
@@ -314,7 +314,7 @@ async function openUrl(host: DaemonHost, url: string | undefined): Promise<void>
 }
 
 /** Runs the prompt as a real chat, waits until it has truly finished, then holds --tail. */
-async function runPrompt(
+export async function runPrompt(
   host: DaemonHost,
   steps: RecordSteps,
   args: Args,

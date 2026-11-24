@@ -11,7 +11,9 @@ if (argv[0] === "repl" && !help) {
 } else if (
   argv[0] === "record" &&
   !help &&
-  ["start", "stop", "mark", "wait", "run", "terminal"].includes(argv[1] ?? "")
+  ["start", "stop", "mark", "wait", "run", "terminal", "ui", "shoot", "assemble"].includes(
+    argv[1] ?? "",
+  )
 ) {
   const { runRecord } = await import("./record-fast.js");
   const { exitAfterFlush } = await import("./exit.js");

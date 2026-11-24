@@ -1,11 +1,12 @@
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { createAeonModelRuntime, resolvePiAgentDirectory } from "@aeon/pi-adapter";
 import { has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
+import { aeonExtensionId, extensionIdFromKey, extensionUrl } from "./extension-url.js";
 import type { DaemonHost } from "./host.js";
+
+export { extensionIdFromKey };
 
 // `aeon login` connects an AI model the same way the extension does: it opens Aeon's Models page
 // (Settings → Models) in the connected Chrome and waits until a model answers. Logins land in Pi's
@@ -49,21 +50,8 @@ export function describeStatus(status: ModelLoginStatus): string {
   return `Connected:\n${lines.join("\n")}\nDefault model: ${status.defaultModel ?? fallback}\n`;
 }
 
-/** Chrome's id for an extension with this manifest `key`: SHA-256 of the key, letters a–p. */
-export function extensionIdFromKey(key: string): string {
-  const digest = createHash("sha256").update(Buffer.from(key, "base64")).digest("hex");
-  return [...digest.slice(0, 32)]
-    .map((digit) => String.fromCharCode(97 + parseInt(digit, 16)))
-    .join("");
-}
-
 async function modelsPageUrl(): Promise<string> {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-  const manifest = JSON.parse(
-    await readFile(join(root, "apps", "chrome-extension", "manifest.native.json"), "utf8"),
-  ) as { key?: string };
-  if (!manifest.key) throw new Error("Aeon's extension manifest has no key.");
-  return `chrome-extension://${extensionIdFromKey(manifest.key)}/home.html?view=models`;
+  return extensionUrl(await aeonExtensionId(), "home.html?view=models");
 }
 
 const WAIT_MS = 10 * 60_000;

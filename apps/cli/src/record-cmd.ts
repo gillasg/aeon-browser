@@ -355,6 +355,9 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
        aeon record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
        aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--background]
        aeon record terminal --out <dir> --run "<command>"
+       aeon record ui cursor|sidepanel|home|chats|automations|sites|settings|models|learn|reload [--mark <name>] [--out <dir>]
+       aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>]
+       aeon record assemble <dir...> [--out <file.mp4>] [--width 1920] [--height 1080] [--fps 30] [--max-idle <ms>] [--zoom] [--sound] [--end-cmd "<cmd>"] [--end-repo "<url>"] [--ffmpeg <bin>]
        aeon record gif|video|trace …   (the original screen recordings)
 
 start captures the real window (x11grab on Linux, avfoundation on macOS, gdigrab on
@@ -371,7 +374,20 @@ runs the prompt, waits for the chat to finish, holds --tail seconds, stops, atta
 run turns Work in front on for the take (restored after) so the agent's tabs are on camera;
 --background leaves the setting as it is.
 --browser picks one connected Chrome profile; mark, wait and stop follow the one start used.
-The folder is a recording, not a video: render it with Remotion (see \`aeon video kit\`).`,
+ui drives Aeon's own surfaces on camera: cursor summons the cursor box (Alt+Shift+Space),
+sidepanel opens the side panel from the cursor box, home|chats|automations|sites|settings|models|learn
+open that Aeon page (reused and focused if open), reload reloads the active web tab; --mark marks
+the beat. shoot films a whole walkthrough from a plan: {"scenes": [{"name": "…", "steps": [{"open":
+"https://…"}, {"ui": "cursor"}, {"run": "…", "tail": 2}, {"mark": "arrive", "selector": "…"},
+{"wait": "idle"}, {"hold": 1500}, {"reload": true}, {"terminal": "…"}, {"code": "…"}]}]}. Each
+scene is its own take folder; capture always stops, even when a step fails. --assemble (or an
+--out ending in .mp4) cuts the takes into one MP4.
+assemble is the fast editor (pure ffmpeg, x264 superfast, about real time): takes stitched in
+order with hard cuts, --max-idle trims stillness longer than that between beats (holds after
+arrivals and receipts stay), --zoom punches in on marked boxes but never past native pixels (a
+2560x1440 master allows 1.33x into 1080p), --sound scores keys, triggers and arrival chords, and
+--end-cmd/--end-repo add a plain end card. Default to shoot + assemble for walkthroughs; the
+Remotion kit (\`aeon video kit\`) is for short flagship launch cuts.`,
     run: async (args: Args) => {
       const action = args.positional[0];
       if (action === "start") return start(host, args);
@@ -380,8 +396,16 @@ The folder is a recording, not a video: render it with Remotion (see \`aeon vide
       if (action === "mark") return mark(host, steps, args);
       if (action === "wait") return wait(host, steps, args);
       if (action === "run") return run(host, steps, args);
+      if (action === "assemble")
+        return (await import("./record-assemble.js")).assembleCommand(args, log);
+      if (action === "shoot")
+        return (await import("./record-shoot-cmd.js")).shootCommand(host, steps, args);
+      if (action === "ui")
+        return (await import("./record-shoot-cmd.js")).recordUi(host, steps, args);
       if (original) return original.run({ ...args, positional: args.positional.slice(1) });
-      throw new Error("Usage: aeon record start|stop|mark|wait|run|terminal|gif|video|trace");
+      throw new Error(
+        "Usage: aeon record start|stop|mark|wait|run|terminal|ui|shoot|assemble|gif|video|trace",
+      );
     },
   };
 }
