@@ -192,7 +192,7 @@ function PickerSummary({
     >
       <span className="pi-picker-value">
         {provider && <ProviderIcon provider={provider} modelId={modelId} />}
-        {value}
+        <span className="pi-picker-label">{value}</span>
       </span>
       <span id={`${id}-hover-hint`} className="pi-picker-hover-card" role="tooltip">
         <strong>{hint}</strong>

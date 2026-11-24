@@ -89,8 +89,14 @@ kbd {
 /* One input row: the @ site chip, left-aligned, then the field. */
 .isl-input {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--aeon-fs-sm);
+  color: var(--muted);
+}
+.isl-input > textarea {
+  flex: 1 1 0;
 }
 
 .isl-context {
@@ -98,8 +104,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 55%;
-  padding-top: 3px;
+  max-width: 50%;
 }
 
 textarea {
@@ -113,10 +118,10 @@ textarea {
   outline: none;
   padding: 4px 0;
   background: transparent;
-  color: inherit;
   font: inherit;
   font-size: var(--aeon-fs-base);
   line-height: 1.45;
+  color: var(--aeon-island-ink);
   caret-color: var(--aeon-island-ink);
   field-sizing: content;
   max-height: 120px;
@@ -134,27 +139,17 @@ textarea::placeholder {
   line-height: 1.45;
 }
 
-.isl-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 2px;
-  margin-top: 6px;
-  font-size: var(--aeon-fs-sm);
-  color: var(--muted);
-}
-
 .isl-notice {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
-  padding: 0 6px;
+  max-width: 40%;
+  padding: 0 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.isl-foot[data-warn="true"] .isl-notice {
+.isl-input[data-warn="true"] .isl-notice {
   color: var(--aeon-island-ink);
 }
 
@@ -331,7 +326,7 @@ button.icon:hover,
 .isl-add {
   width: 22px;
   height: 22px;
-  margin-left: 2px;
+  margin: 0 2px 0 0;
   background: var(--aeon-island-wash-5);
   font-size: var(--aeon-fs-15);
 }

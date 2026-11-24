@@ -922,3 +922,66 @@ body[data-host="panel"] .composer-context-slot {
 .home-attachments:empty {
   display: none;
 }
+
+/* Composer micro-polish: one tight row, controls on the field's centerline. */
+.composer,
+.home-query-form {
+  min-height: 52px;
+  gap: 8px;
+  padding: 7px;
+  align-items: center;
+}
+.composer textarea,
+.home-query-form textarea {
+  min-height: 24px;
+  padding: 2px 0;
+}
+.composer-controls {
+  align-self: center;
+  min-height: 0;
+}
+.composer .send-button,
+.home-query-form .home-send-button,
+.composer .attach-button,
+.home-query-form .attach-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  line-height: 0;
+}
+.send-button svg,
+.home-send-button svg,
+.stop-icon-button svg {
+  display: block;
+  margin: 0;
+}
+
+/* Model logo, name and effort share one optical centerline. */
+.pi-picker summary {
+  align-items: center;
+}
+.pi-picker-value,
+body[data-host="panel"] .composer-meta .pi-picker-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 20px;
+}
+.pi-picker-value .provider-icon {
+  display: block;
+  align-self: center;
+}
+.pi-picker-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-meta,
+.home-model-controls {
+  align-items: center;
+  margin-top: 4px;
+  padding-inline: 4px;
+}

@@ -231,7 +231,8 @@ function Compose({
     <>
       {model.ask && <p className="isl-ask">{model.ask}</p>}
       <RunningLine model={model} actions={actions} />
-      <div className="isl-input">
+      <div className="isl-input" data-warn={String(Boolean(model.notice))}>
+        <AddTab model={model} actions={actions} />
         <ContextLead model={model} actions={actions} />
         <textarea
           id="prompt"
@@ -245,12 +246,12 @@ function Compose({
             keys.setSelected(0);
           }}
         />
+        <Trail model={model} actions={actions} />
       </div>
       {keys.matches.length > 0 && (
         <Palette draft={keys.draft} selected={keys.selected} onPick={keys.pick} />
       )}
       {model.learned ? <p className="isl-learned">{model.learned}</p> : null}
-      <Foot model={model} actions={actions} />
     </>
   );
 }
@@ -280,25 +281,38 @@ function ContextLead({
   );
 }
 
-function Foot({ model, actions }: { model: OrbViewModel; actions: OrbViewActions }): ReactElement {
+/** The leading + sits on the input's own centerline: no separate footer strip. */
+function AddTab({
+  model,
+  actions,
+}: {
+  model: OrbViewModel;
+  actions: OrbViewActions;
+}): ReactElement {
   return (
-    <div className="isl-foot" data-warn={String(Boolean(model.notice))}>
-      <button
-        type="button"
-        className="isl-add"
-        title="Add a tab"
-        aria-label="Add a tab"
-        aria-expanded={model.tabChoices !== null}
-        onClick={actions.pickTabs}
-      >
-        +
-      </button>
-      <span className="isl-notice">{model.notice}</span>
+    <button
+      type="button"
+      className="isl-add"
+      title="Add a tab"
+      aria-label="Add a tab"
+      aria-expanded={model.tabChoices !== null}
+      onClick={actions.pickTabs}
+    >
+      +
+    </button>
+  );
+}
+
+/** Trailing controls on the same row as the field; the tab list wraps below it. */
+function Trail({ model, actions }: { model: OrbViewModel; actions: OrbViewActions }): ReactElement {
+  return (
+    <>
+      {model.notice ? <span className="isl-notice">{model.notice}</span> : null}
       {model.chatId && <Button label="Open in panel" onClick={actions.toSidePanel} icon="panel" />}
       {model.chatId && <Button label="New chat" onClick={actions.newChat} icon="new" />}
       <Switcher model={model} actions={actions} icon />
       {model.tabChoices && <TabChoices model={model} actions={actions} />}
-    </div>
+    </>
   );
 }
 
