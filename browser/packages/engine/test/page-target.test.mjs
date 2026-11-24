@@ -86,9 +86,10 @@ function evaluateValue(expression) {
   return null;
 }
 
+let listed = null;
 function reply(request) {
   if (request.browserInfo) return { clientInstanceIds: [KEY.clientInstanceId] };
-  if (request.op === "listTabs") return { kind: "tabs", focusedWindowId: 1, tabs: [TAB] };
+  if (request.op === "listTabs") return { kind: "tabs", focusedWindowId: 1, tabs: listed || [TAB] };
   if (request.op === "openTab") return { kind: "tab", tab: TAB, navigation: "ok" };
   if (request.op === "observe") {
     return {
@@ -236,4 +237,34 @@ test("browser.page(number), openTab then read, and the post-cell observation tak
     false,
     read.logs.join("\n"),
   );
+});
+
+test("browser.page(id) binds the live run and incarnation after Chrome reuses a tab id", async () => {
+  const OLD = { ...KEY, tabId: 42 };
+  const GONE = { ...KEY, tabId: 7 };
+  const NEW = {
+    ...KEY,
+    tabId: 42,
+    browserRunId: "44444444-4444-4444-8444-444444444444",
+    tabIncarnation: "55555555-5555-4555-8555-555555555555",
+  };
+  const box = await realm(await sandboxSource());
+  try {
+    listed = [
+      { ...TAB, target: OLD, label: undefined },
+      { ...TAB, target: GONE, label: undefined },
+    ];
+    const first = await box.cell("return (await browser.tabs()).length;");
+    assert.equal(first.error, undefined, first.error?.message);
+    listed = [{ ...TAB, target: NEW, label: undefined }];
+    const second = await box.cell(
+      "await browser.tabs();\nreturn await browser.page(42).evaluate(() => 'marker-eval');",
+    );
+    assert.equal(second.error, undefined, `${second.error?.message}\n${second.logs.join("\n")}`);
+    assert.deepEqual(targetOf(second.steps, "evaluate", "marker-eval").target, NEW);
+    const gone = await box.cell("return await browser.page(7).evaluate(() => 'marker-eval');");
+    assert.match(String(gone.error?.message), /TARGET_LOST/);
+  } finally {
+    listed = null;
+  }
 });

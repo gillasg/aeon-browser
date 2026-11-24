@@ -6,6 +6,14 @@ ${locatorShorthandSource}
 var __states = new Map(), __tabs = new Map(), __seen = new Map(), __dirty = new Map(), __valueOnly = new Map(), __opened = new Map(), __busy = new Set(), __keptTabs = new Set(), __closedTabs = new Map(), __focusedWindowId, __attachedTarget, __lastTarget;
 var __labels = new Map();
 var __key = target => JSON.stringify(target);
+// One entry per tabId: a new run or incarnation of the same id replaces the old one.
+function __putTab(tab) {
+  var key = __key(tab.target);
+  for (var [old, entry] of __tabs) if (old !== key && entry.target && entry.target.tabId === tab.target.tabId) __tabs.delete(old);
+  __closedTabs.delete(tab.target.tabId);
+  if (__lastTarget && typeof __lastTarget === 'object' && __lastTarget.tabId === tab.target.tabId) __lastTarget = tab.target;
+  __tabs.set(key, tab);
+}
 // Steps are checked against a target key. Agents pass the id, label, or listed tab they were shown,
 // so every call resolves that to the key before it is sent. Direct calls (saved reads) too.
 var __hostCall = __call;
@@ -141,7 +149,7 @@ async function __labelTarget(label) {
   if (!__isTargetKey(host)) throw Error('NO_TAB: open or attach a tab first (browser.openTab / bu.use)');
   var found = (await __step({op:'session', target: host, action:'resolve', label: String(label)})).data;
   __labels.set(found.label || String(label), found.tab.target);
-  __tabs.set(__key(found.tab.target), found.tab);
+  __putTab(found.tab);
   return found.tab.target;
 }
 function __clamp(value, min, max) { return Math.min(max, Math.max(min, Math.round(Number(value)) || min)); }
@@ -349,8 +357,11 @@ async function __step(step, readOnly = false) {
     action = false;
   }
   if (result.url && step.target && __tabs.has(__key(step.target))) __tabs.set(__key(step.target), {...__tabs.get(__key(step.target)), url: result.url});
-  if (result.kind === 'tab') { __lastTarget = result.tab.target; __tabs.set(__key(__lastTarget),result.tab); if (result.tab.label) __labels.set(result.tab.label, result.tab.target); await __learnOn(__lastTarget); }
-  if (result.kind === 'tabs') for (var tab of result.tabs) { __tabs.set(__key(tab.target),tab); if (tab.label) __labels.set(tab.label, tab.target); }
+  if (result.kind === 'tab') { __lastTarget = result.tab.target; __putTab(result.tab); if (result.tab.label) __labels.set(result.tab.label, result.tab.target); await __learnOn(__lastTarget); }
+  if (result.kind === 'tabs') {
+    if (step.op === 'listTabs' && !step.query && !step.mine) { var live = new Set(result.tabs.map(tab => __key(tab.target))); for (var old of [...__tabs.keys()]) if (!live.has(old)) __tabs.delete(old); }
+    for (var tab of result.tabs) { __putTab(tab); if (tab.label) __labels.set(tab.label, tab.target); }
+  }
   var observation = result.kind === 'semantic' ? result : result.observation;
   if (observation) {
     __states.set(__key(step.target), observation);
