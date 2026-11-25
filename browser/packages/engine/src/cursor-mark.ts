@@ -89,9 +89,9 @@ export const CURSOR_VARS: Readonly<Record<string, string>> = {
   "--aeon-island-edge":
     "inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%), 0 0 0 1px rgb(0 0 0 / 92%)",
   "--aeon-island-elev":
-    "inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%), 0 0 0 1px rgb(0 0 0 / 92%), 0 26px 76px rgb(0 0 0 / 88%), 0 8px 24px rgb(0 0 0 / 65%)",
+    "inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%), 0 0 0 1px rgb(0 0 0 / 92%)",
   "--aeon-island-needs-rim":
-    "inset 0 1px 0 rgb(245 166 35 / 34%), inset 0 0 0 1px rgb(245 166 35 / 28%), 0 0 0 1px rgb(0 0 0 / 92%), 0 26px 76px rgb(0 0 0 / 88%), 0 0 32px rgb(245 166 35 / 10%)",
+    "inset 0 1px 0 rgb(245 166 35 / 34%), inset 0 0 0 1px rgb(245 166 35 / 28%), 0 0 0 1px rgb(0 0 0 / 92%)",
   "--aeon-island-rim":
     "inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%)",
   "--aeon-island-spring": "440ms cubic-bezier(0.22, 1, 0.36, 1)",

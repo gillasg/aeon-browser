@@ -34,11 +34,8 @@ body {
   padding: 8px 8px 8px 14px;
   border-radius: var(--aeon-r-full);
   background: var(--aeon-island-bg);
-  /* Top-lit hairline and a levitation shadow sized to stay inside the frame's pad. */
-  box-shadow:
-    var(--aeon-island-edge),
-    0 14px 22px -6px var(--aeon-island-shadow-deep),
-    0 4px 10px var(--aeon-island-shadow-deep);
+  /* Top-lit hairline and a tight dark framing edge only: never a drop shadow beneath. */
+  box-shadow: var(--aeon-island-edge);
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.011em;
   color: var(--aeon-island-text);

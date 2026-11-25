@@ -18,7 +18,7 @@ const LAYER_STYLE = `
   border-radius: var(--aeon-r-full); pointer-events: auto; white-space: nowrap;
   will-change: transform; font: 500 var(--aeon-fs-md)/17px -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
   color: var(--aeon-island-ink); background: var(--aeon-island-bg);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
   box-shadow: var(--aeon-island-elev); transition: opacity .3s ease;
 }
 .pill[hidden] { display: none; }
