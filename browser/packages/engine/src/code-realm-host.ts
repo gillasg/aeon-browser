@@ -21,6 +21,8 @@ interface JobRealm extends Realm {
 interface Cell {
   chatId: string;
   startedAt: number;
+  /** Set while the cell waits on a human hand-off: its deadline clock is paused meanwhile. */
+  parkedAt?: number | undefined;
   reply: (value: unknown) => void;
 }
 // A chat can pause for minutes while the model thinks; its REPL must survive that. Evict only
@@ -29,6 +31,9 @@ const MAX_REALMS = 4;
 const MAX_JOB_REALMS = 2;
 const REALM_IDLE_MS = 20 * 60_000;
 const CELL_MAX_MS = 10 * 60_000;
+// A cell parked on bu.handoff / human.handoff (a passkey, a fingerprint, a one-time code) waits as
+// long as the hand-off itself may, so the person's pause never times the cell out.
+export const HANDOFF_PARK_MAX_MS = 30 * 60_000 + 60_000;
 const SWEEP_MS = 30_000;
 const DROPPED_JOB = "the worker dropped this job before it finished; start it again";
 
@@ -188,7 +193,7 @@ export class RealmHost {
     // A cell that never got a `done` (a deadline passed in the extension) must not pin a realm
     // or accumulate reply callbacks for the life of the process.
     for (const [cellId, cell] of this.cells)
-      if (now - cell.startedAt >= CELL_MAX_MS) {
+      if (cellExpired(cell, now)) {
         this.cells.delete(cellId);
         cell.reply({ output: "", error: "TIMEOUT: browser cell did not finish" });
       }
@@ -273,6 +278,9 @@ export class RealmHost {
   }
 
   private relayCall(realm: CodeRealm, message: Record<string, unknown>): void {
+    const cell = this.cells.get(String(message.cellId));
+    const parks = cell !== undefined && parksOnHuman(message.request);
+    if (parks) cell.parkedAt = Date.now();
     void this.link
       .event({ kind: "call", cellId: message.cellId, request: message.request })
       .then(
@@ -282,7 +290,14 @@ export class RealmHost {
           },
         (error: unknown) => ({ error: String(error instanceof Error ? error.message : error) }),
       )
-      .then((response) => realm.receive({ kind: "reply", callId: message.callId, ...response }));
+      .then((response) => {
+        // The deadline resumes where it paused: the time spent waiting on the person is not counted.
+        if (parks && cell.parkedAt !== undefined) {
+          cell.startedAt += Date.now() - cell.parkedAt;
+          cell.parkedAt = undefined;
+        }
+        realm.receive({ kind: "reply", callId: message.callId, ...response });
+      });
   }
 
   private jobDone(owner: { chatId?: string; jobId?: string }, message: Record<string, unknown>) {
@@ -300,4 +315,21 @@ export class RealmHost {
       })
       .catch(() => undefined);
   }
+}
+
+/** A hand-off call that blocks on the person (not `{start: true}` or `{cancel: true}`). */
+export function parksOnHuman(request: unknown): boolean {
+  const handoff = (request as { handoff?: unknown } | undefined)?.handoff;
+  if (!handoff || typeof handoff !== "object") return false;
+  const options = handoff as { start?: unknown; cancel?: unknown };
+  return options.start !== true && options.cancel !== true;
+}
+
+/** CELL_MAX_MS of running time; a parked cell instead gets the hand-off's own window. */
+export function cellExpired(
+  cell: { startedAt: number; parkedAt?: number | undefined },
+  now: number,
+) {
+  if (cell.parkedAt !== undefined) return now - cell.parkedAt >= HANDOFF_PARK_MAX_MS;
+  return now - cell.startedAt >= CELL_MAX_MS;
 }

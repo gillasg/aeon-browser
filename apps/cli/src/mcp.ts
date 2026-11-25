@@ -36,13 +36,16 @@ import {
   taskAugmentedCall,
   type McpExtensions,
 } from "./mcp-extensions.js";
+import type { TaskContext } from "./mcp-tasks.js";
+import { CODE_SURFACE_NAMES, CODE_SURFACE_TOOLS, ParkingLot } from "./mcp-code-mode.js";
+import { codeSurfaceCall } from "./mcp-code-tools.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
 // (browser_code, browser_tabs, crawl, site_mapper, extract), as with browserkit. Runs start in the background and are polled, because a
 // browser task can take far longer than an MCP client waits for one call.
 type Json = Record<string, unknown>;
-interface Run {
+export interface Run {
   total: number;
   chats: (string | undefined)[];
   results?: ChatResult[];
@@ -320,6 +323,14 @@ function searchTool(client: AeonClient, args: Json): Promise<unknown> {
 interface McpConnection {
   modern: boolean;
 }
+/** `code` (default): the five fixed tools. `full`: every tool, one per mapped operation too. */
+export type McpSurface = "code" | "full";
+type Send = (message: Json) => void;
+const stdoutSend: Send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`);
+/** Where notifications and our own requests go: stdout, or the HTTP event streams. */
+let notifySend: Send = stdoutSend;
+let surface: McpSurface = "code";
+let parking = new ParkingLot();
 interface McpDeps {
   aeon: () => Promise<AeonClient>;
   runs: Map<string, Run>;
@@ -361,16 +372,17 @@ async function answerCall(
   deps: McpDeps,
   modern: boolean,
   session: string | undefined,
+  send: Send,
 ): Promise<void> {
   const controller = new AbortController();
   const key = String(id);
   deps.pending.set(key, controller);
   try {
     const result = await handle(message, deps.aeon, deps.runs, modern, session, controller.signal);
-    if (!controller.signal.aborted) reply(id, mcpResult(result as Json, modern));
+    if (!controller.signal.aborted) send(reply(id, mcpResult(result as Json, modern)));
   } catch (error) {
     if (!controller.signal.aborted)
-      reply(id, undefined, error instanceof Error ? error.message : String(error));
+      send(reply(id, undefined, error instanceof Error ? error.message : String(error)));
   } finally {
     if (deps.pending.get(key) === controller) deps.pending.delete(key);
   }
@@ -382,18 +394,51 @@ async function answerRequest(
   deps: McpDeps,
   modern: boolean,
   session: string | undefined,
+  send: Send,
 ): Promise<void> {
   try {
     const result = await handle(message, deps.aeon, deps.runs, modern, session);
-    reply(id, mcpResult(result as Json, modern));
+    send(reply(id, mcpResult(result as Json, modern)));
   } catch (error) {
-    reply(id, undefined, error instanceof Error ? error.message : String(error));
+    send(reply(id, undefined, error instanceof Error ? error.message : String(error)));
   }
 }
 
-export async function runMcpServer(site?: string): Promise<void> {
+export interface McpServerOptions {
+  surface?: McpSurface;
+}
+
+/** A started server: feed it client messages, then close it. Used by stdio and HTTP alike. */
+export interface McpSession {
+  /** One client message; `send` gets its reply (none for a notification). */
+  receive(message: Json, send: Send): Promise<void>;
+  close(): void;
+}
+
+export async function runMcpServer(site?: string, options: McpServerOptions = {}): Promise<void> {
   // One mapped site as its own MCP server: one tool per operation, called with the user's logins.
   if (site) return runSiteMcpServer(siteName(site));
+  const server = await startMcpServer(options, stdoutSend);
+  const lines = createInterface({ input: process.stdin });
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    let message: Json;
+    try {
+      message = JSON.parse(line) as Json;
+    } catch {
+      stdoutSend(reply(null, undefined, "Parse error"));
+      continue;
+    }
+    await server.receive(message, stdoutSend);
+  }
+  server.close();
+}
+
+/** Starts the shared server state; `notify` carries notifications and our sampling requests. */
+export async function startMcpServer(options: McpServerOptions, notify: Send): Promise<McpSession> {
+  surface = options.surface ?? "code";
+  notifySend = notify;
+  parking = new ParkingLot();
   let client: AeonClient | undefined;
   catalogState = { tools: [], fingerprint: "", primed: false };
   const stopCatalog = watchCatalog();
@@ -406,39 +451,38 @@ export async function runMcpServer(site?: string): Promise<void> {
   // A model call is routed to the agent when it offered sampling and Aeon has no model of its own,
   // or the user asked to prefer the agent's model. Both facts are read once, here at session start.
   const sampler = new SamplingBridge();
-  sampler.setSender((request) => process.stdout.write(`${JSON.stringify(request)}\n`));
+  sampler.setSender((request) => notifySend(request as Json));
   sampler.setUseClientModel(
     (await readUseClientModel()) || !(await modelSignedIn(modelAuthPath())),
   );
   setSamplingBridge(sampler);
   extensions = createExtensions(
-    (method, params) =>
-      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`),
-    (name, args, signal) =>
-      callToolResult({ name, arguments: args }, deps.aeon, deps.runs, undefined, signal),
+    (method, params) => notifySend({ jsonrpc: "2.0", method, params }),
+    (name, args, signal, context) =>
+      callToolResult({ name, arguments: args }, deps.aeon, deps.runs, undefined, signal, context),
     () => catalogState.tools,
   );
-  const lines = createInterface({ input: process.stdin });
-  for await (const line of lines) await processMcpLine(line, deps, sampler);
-  stopCatalog();
-  extensions?.close();
-  extensions = undefined;
-  for (const controller of deps.pending.values()) controller.abort();
-  sampler.close();
-  setSamplingBridge(undefined);
-  client?.close();
+  return {
+    receive: (message, send) => processMcpMessage(message, deps, sampler, send),
+    close: () => {
+      stopCatalog();
+      extensions?.close();
+      extensions = undefined;
+      for (const controller of deps.pending.values()) controller.abort();
+      sampler.close();
+      setSamplingBridge(undefined);
+      client?.close();
+    },
+  };
 }
 
-/** One stdin line: a client request, a notification, or a reply to our own sampling request. */
-async function processMcpLine(line: string, deps: McpDeps, sampler: SamplingBridge): Promise<void> {
-  if (!line.trim()) return;
-  let message: Json;
-  try {
-    message = JSON.parse(line) as Json;
-  } catch {
-    reply(null, undefined, "Parse error");
-    return;
-  }
+/** One client message: a request, a notification, or a reply to our own sampling request. */
+async function processMcpMessage(
+  message: Json,
+  deps: McpDeps,
+  sampler: SamplingBridge,
+  send: Send,
+): Promise<void> {
   const params = mcpParams(message);
   // A reply to one of our own sampling/createMessage requests is not a client request.
   if (message.id !== undefined && sampler.receive(String(message.id), message)) return;
@@ -452,8 +496,8 @@ async function processMcpLine(line: string, deps: McpDeps, sampler: SamplingBrid
   const modern = deps.conn.modern;
   const session = mcpSessionFromMeta(params);
   if (method === "tools/call" || method === "tasks/result")
-    void answerCall(message, message.id, deps, modern, session);
-  else await answerRequest(message, message.id, deps, modern, session);
+    void answerCall(message, message.id, deps, modern, session, send);
+  else await answerRequest(message, message.id, deps, modern, session, send);
 }
 
 function initializeResult(params: Json): Json {
@@ -470,13 +514,38 @@ function listResult(method: string, modern: boolean): Json {
   return mcpListResult(method === "resources/list" ? { resources: [] } : { prompts: [] }, modern);
 }
 
+function codeCall(
+  params: { name: string; arguments?: Json },
+  aeon: () => Promise<AeonClient>,
+  runs: Map<string, Run>,
+  session: string | undefined,
+  signal: AbortSignal | undefined,
+  context: TaskContext | undefined,
+): Promise<unknown> {
+  return codeSurfaceCall(params.name, params.arguments ?? {}, {
+    aeon,
+    parking,
+    catalog: () => catalogState.tools,
+    session: session ?? "mcp",
+    startRun: async (args) => startRun(await aeon(), args, runs),
+    runs,
+    callChat: async (name, args, cellSignal) =>
+      callChatTool(await aeon(), name, args, session, cellSignal),
+    ...(signal ? { signal } : {}),
+    ...(context ? { context } : {}),
+  });
+}
+
 async function callToolResult(
   params: { name: string; arguments?: Json },
   aeon: () => Promise<AeonClient>,
   runs: Map<string, Run>,
   session: string | undefined,
   signal: AbortSignal | undefined,
+  context?: TaskContext,
 ): Promise<unknown> {
+  if (surface === "code" && CODE_SURFACE_NAMES.has(params.name))
+    return codeCall(params, aeon, runs, session, signal, context);
   if (params.name === "catalog_search" || params.name.startsWith("site__")) {
     try {
       return text(await callCatalog(params.name, params.arguments ?? {}, catalogState.tools));
@@ -505,6 +574,7 @@ async function handle(
   if (method === "initialize") return initializeResult(mcpParams(message));
   if (method === "server/discover") return mcpDiscoverResult({ name: "aeon", version: "0.1.0" });
   if (method === "tools/list") {
+    if (surface === "code") return mcpListResult({ tools: CODE_SURFACE_TOOLS }, modern);
     const listed = await refreshCatalog(false);
     return mcpListResult(
       { tools: [...tools, ...listed.map(catalogMcpTool), ...(await chatTools(aeon))] },
@@ -647,7 +717,11 @@ async function inspectTool(client: AeonClient, name: string, args: Json): Promis
   throw new Error("Unknown tool " + name);
 }
 
-function startRun(client: AeonClient, args: Json, runs: Map<string, Run>): { runId: string } {
+export function startRun(
+  client: AeonClient,
+  args: Json,
+  runs: Map<string, Run>,
+): { runId: string } {
   const tasks = (args.tasks as string[]).filter((task) => typeof task === "string" && task.trim());
   const runId = randomUUID();
   const run: Run = { total: tasks.length, chats: new Array<string | undefined>(tasks.length) };
@@ -691,10 +765,14 @@ function watchCatalog(): () => void {
 async function refreshCatalog(notify: boolean): Promise<CatalogTool[]> {
   const next = await loadCatalog();
   const fingerprint = catalogFingerprint(next);
-  if (notify && catalogState.primed && fingerprint !== catalogState.fingerprint)
-    process.stdout.write(
-      `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" })}\n`,
-    );
+  // The code surface is fixed: a new mapped site is found through aeon_find, not a new tool.
+  if (
+    surface === "full" &&
+    notify &&
+    catalogState.primed &&
+    fingerprint !== catalogState.fingerprint
+  )
+    notifySend({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
   catalogState = { tools: next, fingerprint, primed: true };
   return next;
 }
@@ -708,14 +786,10 @@ function text(value: unknown) {
   };
 }
 
-function reply(id: unknown, result?: unknown, error?: string): void {
-  process.stdout.write(
-    JSON.stringify(
-      error === undefined
-        ? { jsonrpc: "2.0", id, result }
-        : { jsonrpc: "2.0", id, error: { code: -32603, message: error } },
-    ) + "\n",
-  );
+function reply(id: unknown, result?: unknown, error?: string): Json {
+  return error === undefined
+    ? { jsonrpc: "2.0", id, result }
+    : { jsonrpc: "2.0", id, error: { code: -32603, message: error } };
 }
 
 function withoutTrace(result: ChatResult): Omit<ChatResult, "trace"> {

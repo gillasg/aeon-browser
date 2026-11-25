@@ -6,7 +6,12 @@ import type { CatalogTool } from "./catalog.js";
 // The events/* and tasks/* methods of `aeon mcp`, and the task runner behind them.
 
 type Json = Record<string, unknown>;
-export type CallTool = (name: string, args: Json, signal: AbortSignal) => Promise<unknown>;
+export type CallTool = (
+  name: string,
+  args: Json,
+  signal: AbortSignal,
+  context?: TaskContext,
+) => Promise<unknown>;
 export const WATCH_TASK = "aeon_watch";
 
 export interface McpExtensions {
@@ -99,7 +104,7 @@ async function runTask(name: string, args: Json, context: TaskContext, deps: Run
   }
   const tool = deps.catalog().find((item) => item.name === name);
   if (tool?.effect === "irreversible") await confirm(tool, args, context);
-  const result = await deps.callTool(name, args, context.signal);
+  const result = await deps.callTool(name, args, context.signal, context);
   if (needsSignIn(result)) {
     await context.ask({ kind: "sign_in", message: `Sign in for ${name}, then answer to retry.` });
     return deps.callTool(name, args, context.signal);

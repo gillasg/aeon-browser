@@ -14,8 +14,7 @@ import { providerCommands } from "./provider-commands.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
-import { runMcpServer } from "./mcp.js";
-import { MCP_SERVER_ACTIONS, MCP_SERVERS_HELP, mcpServersCommand } from "./mcp-servers-cmd.js";
+import { mcpCommands } from "./mcp-commands.js";
 import { inspect, runTasks, type RunOptions } from "./run.js";
 import { nextDay, searchAeon } from "./search.js";
 import type { ChatResult } from "./results.js";
@@ -648,16 +647,6 @@ function signin(args: Args): Promise<number> {
   return signinCommand(args.positional, flag(args, "browser"));
 }
 
-function mcp(args: Args): Promise<number> {
-  // The raw words keep `-- <command> --its-flags` and repeated --header intact.
-  if (MCP_SERVER_ACTIONS.has(args.positional[0] ?? "")) {
-    const argv = process.argv.slice(2);
-    return mcpServersCommand(argv.slice(argv.indexOf("mcp") + 1));
-  }
-  const site = flag(args, "site") ?? args.positional[0];
-  return runMcpServer(site).then(() => 0);
-}
-
 async function cdp(host: DaemonHost, args: Args): Promise<number> {
   const client = await host.connect();
   const action = has(args, "status") ? "status" : has(args, "stop") ? "stop" : "start";
@@ -704,18 +693,8 @@ export function aeonCommands(host: DaemonHost): Command[] {
   status            say which password manager answers, and whether it is unlocked`,
     run: signin,
   });
-  overrides.set("mcp", {
-    name: "mcp",
-    group: "Browser",
-    summary: "stdio MCP server, or add/list/remove the MCP servers Aeon's chats can call",
-    help: `Usage: aeon mcp [site]
-
-Without a site: Aeon's chats and its tools for another agent. With a site: one mapped site's
-operations as MCP tools, with the user's logins. (--site=<site> is accepted too.)
-
-${MCP_SERVERS_HELP}`,
-    run: mcp,
-  });
+  for (const command of mcpCommands(BROWSERKIT_COMMANDS.find((item) => item.name === "map")))
+    overrides.set(command.name, command);
   overrides.set("cdp", {
     name: "cdp",
     group: "Browser",

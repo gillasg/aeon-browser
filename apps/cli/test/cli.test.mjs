@@ -261,7 +261,7 @@ function fakeClient() {
 function mcp(messages) {
   return new Promise((resolve, reject) => {
     // An empty data folder, so an Aeon running on this machine does not add its tools.
-    const child = spawn(process.execPath, [cli, "mcp"], {
+    const child = spawn(process.execPath, [cli, "mcp", "--surface", "full"], {
       stdio: ["pipe", "pipe", "inherit"],
       env: {
         ...process.env,
