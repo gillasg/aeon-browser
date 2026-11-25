@@ -140,7 +140,8 @@ test("DOM control descriptors keep their element token; real tokens still seal",
     },
     "example.com",
   );
-  for (const raw of [CSRF, JWT, COOKIE, "abcdef0123456789xyz"]) assert.equal(leaks(secrets, raw), false);
+  for (const raw of [CSRF, JWT, COOKIE, "abcdef0123456789xyz"])
+    assert.equal(leaks(secrets, raw), false);
   assert.match(secrets.token, SEALED_RE);
   assert.throws(() => vault.release(secrets, "https://evil.test", "fetch"), /SECRET_EGRESS/);
   assert.equal(vault.release(secrets.token, "https://api.example.com", "fetch"), CSRF);
