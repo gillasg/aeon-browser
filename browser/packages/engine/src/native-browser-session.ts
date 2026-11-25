@@ -31,7 +31,7 @@ import {
 interface Attachment {
   chatId: string;
   attached: Promise<void>;
-  timer?: number;
+  timer?: number | undefined;
 }
 const attachments = new Map<number, Attachment>();
 const owners = new Map<number, string>();
@@ -58,10 +58,54 @@ export function onBrowserSessionBound(listener: (tabId: number) => void): void {
   boundListeners.add(listener);
 }
 
+/** Whether this extension's debugger is attached (or attaching) to the tab. */
+export function browserDebuggerAttached(tabId: number): boolean {
+  return attachments.has(followReplacement(tabId));
+}
+
+// A mutating run attaches once and stays attached until it ends; the debugger leaves 20 s after
+// the run, never between its steps (a detach/attach cycle mid-run flashes Chrome's debugging bar).
+export const RUN_END_DETACH_MS = 20_000;
+const IDLE_DETACH_MS = 90_000;
+const runs = new Map<string, number>();
+
+/** A run (a code cell) of this chat started: its attached tabs stay attached until it ends. */
+export function beginBrowserRun(chatId: string): void {
+  runs.set(chatId, (runs.get(chatId) ?? 0) + 1);
+}
+
+/** The run ended: each tab it attached detaches after RUN_END_DETACH_MS unless a step comes. */
+export function endBrowserRun(chatId: string): void {
+  const left = (runs.get(chatId) ?? 1) - 1;
+  if (left > 0) {
+    runs.set(chatId, left);
+    return;
+  }
+  runs.delete(chatId);
+  for (const [tabId, entry] of attachments) {
+    if (entry.chatId !== chatId) continue;
+    if (entry.timer !== undefined) clearTimeout(entry.timer);
+    entry.timer = globalThis.setTimeout(() => idleDetach(tabId), RUN_END_DETACH_MS);
+  }
+}
+
+/** Marks a run of this chat as started (true) or ended (false). */
+export function browserRun(chatId: string, started: boolean): void {
+  if (started) beginBrowserRun(chatId);
+  else endBrowserRun(chatId);
+}
+
+function armIdle(tabId: number, entry: Attachment): void {
+  if (entry.timer !== undefined) clearTimeout(entry.timer);
+  entry.timer = runs.has(entry.chatId)
+    ? undefined
+    : globalThis.setTimeout(() => idleDetach(tabId), IDLE_DETACH_MS);
+}
+
 function idleDetach(tabId: number): void {
   const entry = attachments.get(tabId);
   if (held.has(tabId) && entry) {
-    entry.timer = globalThis.setTimeout(() => idleDetach(tabId), 90_000);
+    entry.timer = globalThis.setTimeout(() => idleDetach(tabId), IDLE_DETACH_MS);
     return;
   }
   void detach(tabId);
@@ -181,8 +225,7 @@ async function runWithBrowserDebugger<T>(
     if (attachments.get(tabId) !== entry) throw new Error("DEBUGGER_DETACHED");
     if (networkWanted.has(tabId)) await ensureNetwork(tabId);
     await ensureFedCm(tabId);
-    if (entry.timer !== undefined) clearTimeout(entry.timer);
-    entry.timer = globalThis.setTimeout(() => idleDetach(tabId), 90_000);
+    armIdle(tabId, entry);
     void showAgentBadge(tabId);
     void chrome.action.setTitle({ tabId, title: engineConfig.controllingTitle(chatId) });
     return await action({ tabId });

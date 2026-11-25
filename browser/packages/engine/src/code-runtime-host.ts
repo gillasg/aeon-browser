@@ -34,7 +34,8 @@ import { finishJob, cancelJobs, loseJob } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
 import { agentTypedIn, noteAgentText } from "./native-browser-password-lock.js";
 import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
-import { browserSessionOwner } from "./native-browser-session.js";
+import { browserRun, browserSessionOwner } from "./native-browser-session.js";
+import { sendToBridge as send } from "./code-runtime-socket.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { notePreviewActivity } from "./native-browser-preview.js";
 import { matchChromeSaving } from "./native-browser-chrome-saving.js";
@@ -194,6 +195,7 @@ async function startCell(identity: BrowserIdentity, socket: WebSocket, run: Brow
   };
   cell.startedAt = Date.now();
   cells.set(run.cellId, cell);
+  browserRun(run.chatId, true);
   // The caller's proof the connection carried the run; without it, it fails fast and reconnects.
   sendStage(cell, "received");
   try {
@@ -232,7 +234,7 @@ function finish(cell: Cell, result: CellOutcome): void {
 }
 
 function finalize(cell: Cell, result: CellOutcome): void {
-  cells.delete(cell.run.cellId);
+  if (cells.delete(cell.run.cellId)) browserRun(cell.run.chatId, false);
   void releaseTabs(cell.guarded);
   // A failed cell's opened tabs stay with the chat until the normal end-of-run tidy.
   if (result.error) keepStepsTabs(cell.run.chatId, cell.steps);
@@ -763,29 +765,6 @@ function progress(cell: Cell): void {
       steps: progressSteps(cell.steps, MAX_TRACE),
     });
   }, 150);
-}
-
-// The bridge accepts frames up to 32 MB. A cell that returns more is refused here so the failure
-// is its own message (a result drops its value, a call fails alone) instead of a closed socket.
-const MAX_MESSAGE_CHARS = 24_000_000;
-function send(socket: WebSocket, message: unknown): boolean {
-  if (socket.readyState !== WebSocket.OPEN) return false;
-  let text = JSON.stringify(message);
-  const limit = MAX_MESSAGE_CHARS;
-  if (text.length > limit) {
-    const result = message as { kind?: string; value?: unknown; steps?: unknown[] };
-    if (result.kind !== "browser.code.result") return false;
-    const size = (text.length / 1_000_000).toFixed(1);
-    text = JSON.stringify({
-      ...result,
-      value: undefined,
-      steps: [],
-      output: "",
-      error: `RESULT_TOO_LARGE: the result was ${size} MB. Return less, or write it with artifact(name, data) and return a summary.`,
-    });
-  }
-  socket.send(text);
-  return true;
 }
 
 function describe(error: unknown): string {
