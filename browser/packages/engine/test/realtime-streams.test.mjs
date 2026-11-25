@@ -110,7 +110,7 @@ test("WebSocket, SSE and WebRTC frames are captured, filtered, scrubbed and desc
     data: '{"symbol":"X","price":1.5,"apiKey":"zzzz"}',
   });
   fire(3, "Runtime.bindingCalled", {
-    name: "__aeonRtcTap",
+    name: streams.RTC_TAP.binding,
     payload: JSON.stringify({
       direction: "received",
       label: "game",
@@ -219,7 +219,10 @@ test("notifications: lazy BackgroundService/ServiceWorker, scrubbed capture, bad
   assert.equal(got.kind, "push");
   assert.ok(!JSON.stringify(got).includes(SECRET));
   const tap = (message) =>
-    fire(6, "Runtime.bindingCalled", { name: "__aeonPushTap", payload: JSON.stringify(message) });
+    fire(6, "Runtime.bindingCalled", {
+      name: push.PUSH_TAP.binding,
+      payload: JSON.stringify(message),
+    });
   tap({
     kind: "notification",
     title: "New mail",
@@ -247,7 +250,7 @@ test("notifications: lazy BackgroundService/ServiceWorker, scrubbed capture, bad
   assert.ok(after.includes("Runtime.removeBinding"));
   assert.equal(pushActive(6), false);
   fire(6, "Runtime.bindingCalled", {
-    name: "__aeonPushTap",
+    name: push.PUSH_TAP.binding,
     payload: '{"kind":"badge","count":1}',
   });
   await assert.rejects(pushCall(6, "list", {}), /Not observing/);

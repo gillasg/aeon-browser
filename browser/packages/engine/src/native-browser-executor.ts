@@ -53,7 +53,14 @@ import { guardPrivateTab } from "./native-browser-private-rules.js";
 import { handlesHostPlumbing, hostPlumbing } from "./native-browser-host-plumbing.js";
 import { touchSpace } from "./native-browser-spaces.js";
 import { withManualScreencast } from "./native-browser-screencast.js";
-import { injectedScripts, judgeStealth, noteInjectedScript, type StealthProbe } from "./stealth.js";
+import {
+  activeTaps,
+  injectedScripts,
+  judgeStealth,
+  noteInjectedScript,
+  tapsNeedRuntime,
+  type StealthProbe,
+} from "./stealth.js";
 import { controlError, controlOf, stepInput, waitForQuietUser } from "./native-browser-control.js";
 import { isWriteStep } from "./native-browser-scheduler.js";
 import { controlOrSessionStep } from "./native-browser-extra-session.js";
@@ -317,8 +324,9 @@ export async function performExtra(
       }
       if (step.op === "stealth")
         return judgeStealth((step.probe ?? {}) as StealthProbe, {
-          runtimeEnabled: consoleCaptureEnabled(tabId),
+          runtimeEnabled: consoleCaptureEnabled(tabId) || tapsNeedRuntime(tabId),
           injectedScripts: injectedScripts(tabId),
+          activeTaps: activeTaps(tabId),
         });
       if (step.op === "popups") return { tabs: await browserPopups(tabId) };
       return readOrWait(debuggee, request, () => revalidate(request, tabId));

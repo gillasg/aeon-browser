@@ -1,11 +1,18 @@
 // The visible agent cursor and its caption, for the user watching the agent work. Purely
 // cosmetic: every update is sent without awaiting, never fails or delays an action, ignores
 // pointer input and stays out of the accessibility tree. Animation runs inside the page, so the
-// agent moves on while the cursor is still gliding.
+// agent moves on while the cursor is still gliding. The painter runs in the extension's isolated
+// world (chrome.scripting), never through a CDP evaluation in the page's own world: page scripts
+// cannot read its host's expandos, its state or its bus, and no Runtime call is made per frame.
 import type { HandoffMeta } from "@browserkit/protocol";
-import { send } from "./cdp/send.js";
-import { cursorExpression } from "./cursor-page.js";
-import { BADGE_FALLBACK, NEEDS_BADGE, NEUTRAL_GLOW } from "./cursor-mark.js";
+import { CURSOR_SCRIPT_FILE } from "./cursor-page.js";
+import {
+  BADGE_FALLBACK,
+  CURSOR_MARK,
+  CURSOR_TOKEN_CSS,
+  NEEDS_BADGE,
+  NEUTRAL_GLOW,
+} from "./cursor-mark.js";
 import { engineConfig } from "./engine-config.js";
 import { browserSessionTabs } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
@@ -216,16 +223,31 @@ function updateAgentCursor(debuggee: chrome.debugger.Debuggee, update: CursorUpd
     .catch(() => false)
     .then((hidden) => {
       if (tabId !== undefined && epoch !== cursorEpoch(tabId)) return undefined;
-      return hidden
-        ? undefined
-        : send(
-            debuggee,
-            "Runtime.evaluate",
-            { expression: cursorExpression(update), silent: true },
-            { label: "updateAgentCursor", ms: 5_000 },
-          );
+      return hidden || tabId === undefined ? undefined : paintIsolated(tabId, update);
     })
     .catch(() => undefined);
+}
+
+async function paintIsolated(tabId: number, update: CursorUpdate): Promise<void> {
+  const target = { tabId, frameIds: [0] };
+  const paint = () =>
+    chrome.scripting.executeScript({
+      target,
+      world: "ISOLATED",
+      func: callPainter,
+      args: [update, CURSOR_TOKEN_CSS, CURSOR_MARK],
+    });
+  const [first] = await paint();
+  if (first?.result === true) return;
+  await chrome.scripting.executeScript({ target, world: "ISOLATED", files: [CURSOR_SCRIPT_FILE] });
+  await paint();
+}
+function callPainter(update: object, css: string, mark: object): boolean {
+  // Injected with chrome.scripting into the isolated world: no imports, only that world's globals.
+  const scope = globalThis as { __cursorPaint?: (u: object, c: string, m: object) => void };
+  if (!scope.__cursorPaint) return false;
+  scope.__cursorPaint(update, css, mark);
+  return true;
 }
 
 /** Fade out and remove the cursor in a session's tabs (all tabs without a session), e.g. once
@@ -241,7 +263,7 @@ export async function removeAgentCursor(tabId: number): Promise<void> {
     .then(() =>
       chrome.scripting.executeScript({
         target: { tabId },
-        world: "MAIN",
+        world: "ISOLATED",
         func: removeCursor,
         args: [drop],
       }),
@@ -249,7 +271,7 @@ export async function removeAgentCursor(tabId: number): Promise<void> {
     .catch(() => undefined);
 }
 function removeCursor(drop?: boolean): void {
-  // This function is injected with chrome.scripting, so it may only use page globals: no imports.
+  // Injected with chrome.scripting into the isolated world the painter runs in: no imports.
   const parent = document.documentElement || document.body;
   let host: HTMLElement | undefined;
   for (const child of Array.from(parent.children)) {
@@ -261,8 +283,9 @@ function removeCursor(drop?: boolean): void {
   const surface = host as (HTMLElement & { __s?: { summoned?: boolean } }) | undefined;
   if (!host || !surface) return;
   if (!drop && surface.__s?.summoned) {
-    // A summoned cursor glides home: dispatch a neutral command, never a page-visible attribute.
-    dispatchEvent(
+    // A summoned cursor glides home: a command on the isolated-world bus, never on the page's window.
+    const scope = globalThis as { __cursorBus?: EventTarget };
+    scope.__cursorBus?.dispatchEvent(
       new CustomEvent("cursor-overlay-command", { detail: { x: 0, y: 0, release: true } }),
     );
     return;

@@ -2,7 +2,7 @@
 // isolated world, are the ones that act. A page-dispatched event is not trusted and does nothing.
 
 import { CURSOR_STOP, CURSOR_TRANSCRIPT } from "./orb-messages.js";
-import { CURSOR_STATE_EVENT } from "@browserkit/engine/cursor-bus";
+import { CURSOR_STATE_EVENT, cursorBus } from "@browserkit/engine/cursor-bus";
 
 export interface ControlBox {
   x: number;
@@ -117,9 +117,9 @@ function placeButton(node: HTMLButtonElement, box: ControlBox | null): void {
 }
 
 function watchCursor(sync: () => void): void {
-  // The main-world cursor publishes its control boxes over a neutral event. Nothing is written into
-  // the page DOM, so there is no host to observe and no id to look up.
-  window.addEventListener(CURSOR_STATE_EVENT, (event) => {
+  // The cursor publishes its control boxes on the isolated-world bus. Nothing is written into the
+  // page DOM or dispatched on its window, so a page has nothing to observe or forge.
+  cursorBus().addEventListener(CURSOR_STATE_EVENT, (event) => {
     currentControls = JSON.stringify(
       (event as CustomEvent<{ controls?: unknown }>).detail?.controls ?? null,
     );

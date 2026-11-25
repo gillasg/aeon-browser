@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -41,4 +41,7 @@ const copies = [
   ...[16, 32, 48, 128].map((size) => [join(root, `assets/icon-${size}.png`), `icon-${size}.png`]),
 ];
 await Promise.all(copies.map(([from, to]) => copyFile(from, join(output, to))));
+// The cursor painter the engine injects into the extension's isolated world on web pages.
+const cursorPage = await import("@browserkit/engine/cursor-page");
+await writeFile(join(output, cursorPage.CURSOR_SCRIPT_FILE), cursorPage.cursorScriptSource());
 process.stdout.write(`Built the extension at ${output}\n`);

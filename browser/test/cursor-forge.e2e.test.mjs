@@ -56,7 +56,8 @@ test(
       );
       assert.match(result.stdout, /FORGED 1/);
       assert.match(result.stdout, /TITLE continued/);
-      assert.match(result.stdout, /CONTROLS [^0]/);
+      // The painter runs in the isolated world: the page finds one host but cannot read its state.
+      assert.match(result.stdout, /CONTROLS 0\b/);
     } finally {
       chrome?.kill();
       bridge.kill();
@@ -79,7 +80,7 @@ function repl(url) {
     console.log("FORGED " + (await page.evaluate(() => document.documentElement.dataset.forged || "")));
     console.log("TITLE " + (await page.title()));
     console.log("CONTROLS " + (await page.evaluate(() => {
-      const host = [...document.documentElement.children].find((n) => n.__cursorSurface);
+      const host = [...document.documentElement.children].find((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict");
       return host && host.__s && host.__s.controls ? JSON.stringify(host.__s.controls).length : 0;
     })));`;
 }

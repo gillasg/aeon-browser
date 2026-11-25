@@ -1,7 +1,7 @@
 // The cursor's host is a plain, unlabelled element with a closed shadow root. Page scripts cannot
-// select it (no id, class or data-aeon-* attribute) and cannot read inside the shadow root. State
-// crosses between the main-world painter and the isolated-world orb over these two neutral DOM
-// events, so nothing about Aeon is written into the page DOM.
+// select it (no id, class or data-aeon-* attribute) and cannot read inside the shadow root. The
+// painter and the orb share the extension's isolated world, and state crosses between them on an
+// EventTarget that lives only in that world: nothing is dispatched on the page's window.
 
 export const CURSOR_STATE_EVENT = "cursor-overlay-state";
 export const CURSOR_COMMAND_EVENT = "cursor-overlay-command";
@@ -26,11 +26,20 @@ export interface CursorSurfaceCommand {
   release?: boolean;
 }
 
+/** The isolated-world bus the painter and the orb share; the page's window never sees it. */
+export function cursorBus(): EventTarget {
+  const scope = globalThis as { __cursorBus?: EventTarget };
+  return (scope.__cursorBus ??= new EventTarget());
+}
+
 /**
- * Finds the painter's host from the main world. The painter marks it with a non-enumerable expando
- * rather than an id, so a page script has no selector for it. Isolated worlds have their own DOM
- * wrappers and cannot see this expando; they use CURSOR_STATE_EVENT instead.
+ * Whether a child of <html> is the cursor's host, judged from any world by its fixed inline style
+ * (expandos set by the isolated-world painter are invisible to other worlds).
  */
+export const CURSOR_HOST_TEST =
+  'n.style.zIndex === "2147483647" && n.style.contain === "strict" && n.style.position === "fixed"';
+
+/** Finds the painter's host from the world it was painted in. */
 export function findCursorSurface(): HTMLElement | undefined {
   const parent = document.documentElement || document.body;
   if (!parent) return undefined;

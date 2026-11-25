@@ -39,6 +39,11 @@ globalThis.chrome = {
   scripting: {
     executeScript: async (details) => {
       asks.push(details);
+      // The cursor paints in the isolated world; its update travels as the injected args.
+      if (details.world === "ISOLATED" && details.args) {
+        evaluated.push(JSON.stringify(details.args[0]));
+        return [{ result: true }];
+      }
       return [];
     },
   },

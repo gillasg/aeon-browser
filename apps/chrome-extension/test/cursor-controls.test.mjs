@@ -130,7 +130,7 @@ test("the buttons mount only while the pill shows them, then leave the page", as
   assert.deepEqual(controlHosts(), [], "the buttons stayed after the pill went away");
 });
 
-/** The few DOM pieces cursor-controls.ts touches; state arrives on a neutral window event. */
+/** The few DOM pieces cursor-controls.ts touches; state arrives on the isolated-world bus. */
 function fakePage() {
   const documentElement = new FakeNode("html");
   const listeners = {};
@@ -139,6 +139,9 @@ function fakePage() {
     createElement: (tag) => new FakeNode(tag),
   };
   globalThis.window = {
+    addEventListener: () => assert.fail("cursor state must not travel on the page's window"),
+  };
+  globalThis.__cursorBus = {
     addEventListener: (kind, fn) => {
       listeners[kind] = fn;
     },

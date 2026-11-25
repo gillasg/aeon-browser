@@ -26,8 +26,45 @@ export function injectedScripts(tabId: number): InjectedScript[] {
   return [...(injected.get(tabId) ?? [])];
 }
 
+/** A tap the engine armed on a tab: what it wraps, the world it runs in, whether it needs Runtime. */
+export interface ArmedTap {
+  label: string;
+  world: "main" | "isolated";
+  /** Page functions the tap replaces while armed (restored when it disarms). */
+  wraps: string[];
+  /** The tap needs the Runtime domain (bindings, evaluation). */
+  runtime: boolean;
+}
+
+// The tap ledger: every tap arms and disarms here, so stealthCheck reports exactly what is on.
+const taps = new Map<number, Map<string, ArmedTap>>();
+
+/** Records an armed tap. Arming the same label twice keeps one entry. */
+export function armTap(tabId: number, tap: ArmedTap): void {
+  const armed = taps.get(tabId) ?? new Map<string, ArmedTap>();
+  armed.set(tap.label, { ...tap, wraps: [...tap.wraps] });
+  taps.set(tabId, armed);
+}
+
+/** Forgets a tap. Returns whether any tap still armed on the tab needs the Runtime domain. */
+export function disarmTap(tabId: number, label: string): { runtimeInUse: boolean } {
+  const armed = taps.get(tabId);
+  armed?.delete(label);
+  if (armed && armed.size === 0) taps.delete(tabId);
+  return { runtimeInUse: tapsNeedRuntime(tabId) };
+}
+
+export function activeTaps(tabId: number): ArmedTap[] {
+  return [...(taps.get(tabId)?.values() ?? [])].map((tap) => ({ ...tap, wraps: [...tap.wraps] }));
+}
+
+export function tapsNeedRuntime(tabId: number): boolean {
+  return activeTaps(tabId).some((tap) => tap.runtime);
+}
+
 export function forgetStealth(tabId: number): void {
   injected.delete(tabId);
+  taps.delete(tabId);
 }
 
 export interface StealthProbe {
@@ -44,9 +81,12 @@ export interface StealthProbe {
 export interface StealthState {
   runtimeEnabled: boolean;
   injectedScripts: InjectedScript[];
+  /** Taps armed on the tab right now (from the ledger). */
+  activeTaps?: ArmedTap[];
 }
 
 export interface StealthReport extends StealthState {
+  activeTaps: ArmedTap[];
   /** True when a page can observe the agent itself; engine-only metadata does not count. */
   detectable: boolean;
   /** One readable line per signal a page can see. */
@@ -62,8 +102,16 @@ export function judgeStealth(probe: StealthProbe, state: StealthState): StealthR
   const diagnostics: string[] = [];
   if (probe.webdriver === true)
     signals.push("navigator.webdriver is true (Chrome is in automation mode)");
-  if (state.runtimeEnabled)
-    signals.push("the Runtime domain is enabled for this tab (console capture is on)");
+  const armed = state.activeTaps ?? [];
+  if (state.runtimeEnabled) {
+    const users = armed.filter((tap) => tap.runtime).map((tap) => tap.label);
+    signals.push(
+      users.length
+        ? `the Runtime domain is enabled for this tab (used by: ${users.join(", ")})`
+        : "the Runtime domain is enabled for this tab (console capture is on)",
+    );
+  }
+  for (const tap of armed) judgeTap(tap, signals, diagnostics);
   for (const name of probe.globals ?? [])
     signals.push(`a page global named ${name} was added by the agent`);
   for (const name of probe.overlays ?? []) signals.push(`an agent overlay is present: ${name}`);
@@ -87,6 +135,16 @@ export function judgeStealth(probe: StealthProbe, state: StealthState): StealthR
     diagnostics,
     runtimeEnabled: state.runtimeEnabled,
     injectedScripts: state.injectedScripts,
+    activeTaps: armed,
     probe,
   };
+}
+
+function judgeTap(tap: ArmedTap, signals: string[], diagnostics: string[]): void {
+  if (tap.world === "isolated" && tap.wraps.length === 0) {
+    diagnostics.push(`an isolated-world tap is armed (page code cannot read it): ${tap.label}`);
+    return;
+  }
+  const wraps = tap.wraps.length ? ` (wraps ${tap.wraps.join(", ")})` : "";
+  signals.push(`a tap is armed in the page's own world: ${tap.label}${wraps}`);
 }

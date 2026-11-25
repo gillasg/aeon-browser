@@ -2,6 +2,8 @@
 // bounded ring with event-driven waiters, filters, JSON shape inference and the page-script tap.
 // Nothing here talks to Chrome until a tap is started for a tab.
 import { send } from "./cdp/send.js";
+import { consoleCaptureEnabled } from "./native-browser-events.js";
+import { armTap, disarmTap } from "./stealth.js";
 import { hideSecrets } from "./native-browser-secrets.js";
 
 export const RING_MAX = 200;
@@ -284,30 +286,88 @@ export function waitMs(options: Record<string, unknown>): number {
   return Number.isFinite(ms) && ms >= 0 ? Math.min(ms, WAIT_MAX) : 30_000;
 }
 
-/** A page script that reports through a CDP binding, on this document and on later ones. */
-export async function installTap(tabId: number, binding: string, source: string): Promise<string> {
+/** A per-worker random page name: a tap's binding and switch carry nothing that names Aeon. */
+export function tapName(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return "_" + Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("");
+}
+
+export interface TapSpec {
+  /** Ledger label, shown by page.stealthCheck(). */
+  label: string;
+  binding: string;
+  /** A non-enumerable window function the source defines; calling it restores the originals. */
+  off: string;
+  source: string;
+  /** Page functions the source replaces. */
+  wraps: string[];
+}
+
+/** A page script that reports through a CDP binding, on this document and on later ones. Arms the
+ * tap in the stealth ledger, so stealthCheck reports it and the last disarm turns Runtime off. */
+export async function installTap(tabId: number, tap: TapSpec): Promise<string> {
   const label = "realtimeTap";
+  armTap(tabId, { label: tap.label, world: "main", wraps: tap.wraps, runtime: true });
   await send({ tabId }, "Runtime.enable", {}, { label });
-  await send({ tabId }, "Runtime.addBinding", { name: binding }, { label });
+  await send({ tabId }, "Runtime.addBinding", { name: tap.binding }, { label });
   const added = (await send(
     { tabId },
     "Page.addScriptToEvaluateOnNewDocument",
-    { source },
+    { source: tap.source },
     { label },
   )) as { identifier?: string } | undefined;
-  await send({ tabId }, "Runtime.evaluate", { expression: source }, { label }).catch(
+  await send({ tabId }, "Runtime.evaluate", { expression: tap.source }, { label, ms: 5_000 }).catch(
     () => undefined,
   );
   return String(added?.identifier ?? "");
 }
 
-export async function removeTap(tabId: number, binding: string, identifier: string) {
+/** Restores the page's originals in the current document, removes the binding and the script
+ * for later documents, and turns Runtime off when nothing else on the tab still needs it. */
+export async function removeTap(tabId: number, tap: TapSpec, identifier: string): Promise<void> {
   const label = "realtimeTap";
   if (identifier)
     await send({ tabId }, "Page.removeScriptToEvaluateOnNewDocument", { identifier }, { label })
       .then(() => undefined)
       .catch(() => undefined);
-  await send({ tabId }, "Runtime.removeBinding", { name: binding }, { label }).catch(
+  await send(
+    { tabId },
+    "Runtime.evaluate",
+    { expression: restoreSource(tap) },
+    { label, ms: 5_000 },
+  ).catch(() => undefined);
+  await send({ tabId }, "Runtime.removeBinding", { name: tap.binding }, { label }).catch(
     () => undefined,
   );
+  const { runtimeInUse } = disarmTap(tabId, tap.label);
+  if (!runtimeInUse && !consoleCaptureEnabled(tabId))
+    await send({ tabId }, "Runtime.disable", undefined, { label }).catch(() => undefined);
+}
+
+/** The debugger is gone (detach, tab closed): CDP cannot reach the page any more, so the ledger
+ * entry goes and the originals are restored through chrome.scripting in the current document. */
+export function dropTap(tabId: number, tap: TapSpec): void {
+  disarmTap(tabId, tap.label);
+  void Promise.resolve()
+    .then(() =>
+      chrome.scripting.executeScript({
+        target: { tabId, allFrames: true },
+        world: "MAIN",
+        func: callOff,
+        args: [tap.off],
+      }),
+    )
+    .catch(() => undefined);
+}
+function callOff(off: string): void {
+  // Injected with chrome.scripting: no imports.
+  const scope = window as unknown as Record<string, unknown>;
+  const restore = scope[off];
+  if (typeof restore === "function") (restore as () => void)();
+}
+
+function restoreSource(tap: TapSpec): string {
+  const off = JSON.stringify(tap.off);
+  const binding = JSON.stringify(tap.binding);
+  return `(() => { try { const off = window[${off}]; if (typeof off === "function") off(); } catch {} try { delete window[${binding}]; } catch {} })()`;
 }
