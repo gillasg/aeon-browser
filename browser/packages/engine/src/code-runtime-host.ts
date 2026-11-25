@@ -33,7 +33,8 @@ import { jobs } from "./code-runtime-jobs.js";
 import { finishJob, cancelJobs, loseJob } from "./code-runtime-job-control.js";
 import { executeLocalBrowserStep } from "./native-browser-executor.js";
 import { agentTypedIn, noteAgentText } from "./native-browser-password-lock.js";
-import { scrubError, scrubSecrets } from "./native-browser-secrets.js";
+import { scrubError } from "./native-browser-secrets.js";
+import { releaseCall, releaseStep, sealCallResult, sealStepResult } from "./code-runtime-seal.js";
 import { browserRun, browserSessionOwner } from "./native-browser-session.js";
 import { sendToBridge as send } from "./code-runtime-socket.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
@@ -313,10 +314,10 @@ const CHECKS: KernelChecks<Cell> = {
   guardSite: async (cell, site) => assertAllowed(await siteRulesFor(cell), site),
 };
 
-async function serveCall(cell: Cell, value: Record<string, unknown> | null): Promise<unknown> {
+async function serveCall(cell: Cell, raw: Record<string, unknown> | null): Promise<unknown> {
+  const value = releaseCall(cell.run.chatId, raw);
   const done = value ? await runEffect(EFFECTS, CHECKS, cell, value) : undefined;
-  // Nothing that reaches agent code carries a password, whatever answered it.
-  return scrubSecrets(done ? done.value : await callCore(cell, value));
+  return sealCallResult(cell.run.chatId, raw, done ? done.value : await callCore(cell, value));
 }
 
 function siteRulesFor(cell: Cell): Promise<SiteRules> {
@@ -346,7 +347,7 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   if (value?.domParse === "google") return parseInOffscreen(value);
   if (!value || typeof value.op !== "string") return serveCall(cell, value);
   const internal = takeInternal(value);
-  const step = await prepare(cell, value);
+  const step = releaseStep(cell.run.chatId, await prepare(cell, value));
   authorize(cell, step);
   await enforceSites(cell, step);
   noteAgentText(step);
@@ -364,15 +365,9 @@ async function serve(cell: Cell, request: unknown): Promise<unknown> {
   let resultTab: number | undefined;
   if (isSubmitLike(step) && "target" in step) await beforeSubmit(cell, step.target.tabId);
   try {
-    const result = await scrubSecrets(
-      await executeLocalBrowserStep(
-        cell.identity,
-        cell.run.chatId,
-        cell.run.toolCallId,
-        cell.operationId,
-        step,
-      ),
-    );
+    const { chatId, toolCallId } = cell.run;
+    const ran = executeLocalBrowserStep(cell.identity, chatId, toolCallId, cell.operationId, step);
+    const result = await sealStepResult(chatId, step, ran);
     if (result.kind === "tab") {
       await guardCellTab(cell, result.tab.target.tabId);
       const key = targetIdentity(result.tab.target);
