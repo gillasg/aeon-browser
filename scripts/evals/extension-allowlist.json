@@ -1,0 +1,66 @@
+{
+  "forbiddenHostPermissions": ["<all_urls>", "file:///*", "*://*/*"],
+  "manifests": {
+    "apps/chrome-extension/manifest.native.json": {
+      "permissions": [
+        "alarms",
+        "bookmarks",
+        "clipboardRead",
+        "clipboardWrite",
+        "contentSettings",
+        "contextMenus",
+        "cookies",
+        "debugger",
+        "declarativeNetRequest",
+        "downloads",
+        "history",
+        "nativeMessaging",
+        "notifications",
+        "offscreen",
+        "privacy",
+        "scripting",
+        "sidePanel",
+        "storage",
+        "tabCapture",
+        "tabGroups",
+        "tabs",
+        "userScripts",
+        "webNavigation"
+      ],
+      "host_permissions": ["http://*/*", "https://*/*"]
+    },
+    "browser/apps/extension/manifest.json": {
+      "permissions": [
+        "alarms",
+        "bookmarks",
+        "clipboardRead",
+        "clipboardWrite",
+        "contentSettings",
+        "cookies",
+        "debugger",
+        "declarativeNetRequest",
+        "downloads",
+        "history",
+        "nativeMessaging",
+        "notifications",
+        "offscreen",
+        "privacy",
+        "scripting",
+        "storage",
+        "tabCapture",
+        "tabGroups",
+        "tabs",
+        "userScripts",
+        "webNavigation"
+      ],
+      "host_permissions": ["http://*/*", "https://*/*"]
+    }
+  },
+  "requiredArtifacts": [
+    "apps/daemon/dist/main.js",
+    "apps/cli/dist/cli.js",
+    "apps/chrome-extension/native-dist/manifest.json",
+    "browser/apps/extension/build/manifest.json",
+    "browser/apps/bridge/dist/cli.js"
+  ]
+}
