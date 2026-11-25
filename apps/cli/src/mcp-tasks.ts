@@ -32,6 +32,12 @@ export interface TaskRecord {
 export interface TaskContext {
   signal: AbortSignal;
   ask: (request: { message: string; requestedSchema?: Json; kind?: string }) => Promise<Json>;
+  /**
+   * The call waits on the person in Chrome (a passkey, a code): input_required with no answer
+   * needed; `resumed` moves the task back to working once the hand-off clears there.
+   */
+  parked: (message: string) => void;
+  resumed: () => void;
 }
 export type TaskRunner = (name: string, args: Json, context: TaskContext) => Promise<unknown>;
 
@@ -126,6 +132,20 @@ export class TaskManager {
     const context: TaskContext = {
       signal: live.controller.signal,
       ask: (request) => this.ask(task, live, request),
+      parked: (message) =>
+        this.update(task, {
+          status: "input_required",
+          statusMessage: message,
+          inputRequest: { kind: "handoff", message },
+        }),
+      resumed: () => {
+        if (task.status === "input_required" && !live.answer)
+          this.update(task, {
+            status: "working",
+            statusMessage: undefined,
+            inputRequest: undefined,
+          });
+      },
     };
     try {
       const result = await this.options.run(task.name, args, context);

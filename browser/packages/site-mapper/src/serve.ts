@@ -26,6 +26,8 @@ export interface ServeOptions extends SiteMapperOptions {
   token?: string;
   /** Serve only this mapped site (default: every mapped site). */
   site?: string;
+  /** Also accept these tokens (per-client, revocable), sent as x-site-to-api-token or Bearer. */
+  authorize?: (token: string) => boolean | Promise<boolean>;
 }
 
 export interface Server {
@@ -161,7 +163,8 @@ async function proxyPath(ctx: SiteCtx, client: SiteMapper): Promise<boolean> {
   return false;
 }
 
-function allowedHost(request: IncomingMessage): boolean {
+/** The DNS-rebinding guard: a loopback Host, and no Origin but our own or an extension. */
+export function allowedHost(request: Pick<IncomingMessage, "headers">): boolean {
   const host = request.headers.host ?? "";
   const origin = request.headers.origin;
   // Pages on other sites may not call in; browser extensions may (calls still need the token).
@@ -178,10 +181,13 @@ export async function serve(options: ServeOptions = {}): Promise<Server> {
     return apis.get(site) as Promise<SiteMapper>;
   };
   let base = "";
-  const authorized = (request: IncomingMessage) => {
-    const given = Buffer.from(String(request.headers["x-site-to-api-token"] ?? ""));
+  const authorized = async (request: IncomingMessage): Promise<boolean> => {
+    const bearer = /^Bearer\s+(\S+)$/i.exec(String(request.headers.authorization ?? ""))?.[1];
+    const raw = String(request.headers["x-site-to-api-token"] ?? bearer ?? "");
+    const given = Buffer.from(raw);
     const expected = Buffer.from(token);
-    return given.length === expected.length && timingSafeEqual(given, expected);
+    if (given.length === expected.length && timingSafeEqual(given, expected)) return true;
+    return raw !== "" && options.authorize !== undefined && (await options.authorize(raw));
   };
 
   async function siteRoute(ctx: Ctx, name: string): Promise<void> {
@@ -190,7 +196,7 @@ export async function serve(options: ServeOptions = {}): Promise<Server> {
     if (!model) return send(ctx.response, 404, { error: `${site} is not mapped` });
     const siteCtx: SiteCtx = { ...ctx, site, model, overrides: await readOverrides(site) };
     if (publicFile(siteCtx)) return;
-    if (!authorized(ctx.request))
+    if (!(await authorized(ctx.request)))
       return send(ctx.response, 401, { error: "Missing or wrong x-site-to-api-token" });
     const client = await api(site);
     const [, , what, id] = ctx.parts;

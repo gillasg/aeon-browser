@@ -47,7 +47,7 @@ function startSite() {
 }
 
 function mcp(home) {
-  const child = spawn(process.execPath, [cli, "mcp"], {
+  const child = spawn(process.execPath, [cli, "mcp", "--surface", "full"], {
     env: {
       ...process.env,
       AEON_DATA_DIR: join(home, "data"),

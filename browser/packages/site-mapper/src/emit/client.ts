@@ -5,13 +5,13 @@ import { itemsSchema } from "../runtime/model-helpers.js";
 // A typed TypeScript client for a mapped site: one method per operation, typed parameters and
 // responses, and async iterators for every paginated operation.
 
-function pascal(text: string): string {
+export function pascal(text: string): string {
   return text
     .replace(/(^|[^A-Za-z0-9]+)([A-Za-z0-9])/g, (_, __, char: string) => char.toUpperCase())
     .replace(/^\d/, "N$&");
 }
 
-function propertyName(name: string): string {
+export function propertyName(name: string): string {
   return /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
 }
 
@@ -66,7 +66,7 @@ function objectType(schema: JsonSchema, depth: number): string {
   return `{\n${fields.join("\n")}\n${"  ".repeat(depth)}}`;
 }
 
-function paramsType(operation: Operation): string {
+export function paramsType(operation: Operation): string {
   const fields = inputParams(operation).map(
     (param: Param) =>
       `  ${propertyName(param.name)}${param.in === "path" ? "" : "?"}: ${tsType(param.schema, 1)};`,
@@ -90,7 +90,7 @@ function bodyFields(operation: Operation): string[] | undefined {
   return [...fields, `  body?: ${tsType(schema, 1)};`];
 }
 
-function responseType(operation: Operation): string {
+export function responseType(operation: Operation): string {
   const ok = Object.entries(operation.responses).find(([status]) => status.startsWith("2"))?.[1];
   return ok?.schema ? tsType(ok.schema) : "unknown";
 }

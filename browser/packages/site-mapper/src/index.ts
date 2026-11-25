@@ -191,6 +191,12 @@ export { extractEmbedded } from "./infer/html.js";
 export { toOpenApi, toAsyncApi } from "./emit/openapi.js";
 export { toYaml } from "./emit/yaml.js";
 export { generateClient } from "./emit/client.js";
+export {
+  generateStandaloneClient,
+  operationDeclaration,
+  provenWrite,
+  type StandaloneClient,
+} from "./emit/client-standalone.js";
 export { markdownReport, curlExample, redactedSamples } from "./emit/report.js";
 export { htmlReport } from "./emit/html.js";
 export { createRedactor } from "./redact.js";
@@ -215,7 +221,7 @@ export { RecordingSession, PassiveRecorder, type Recording, type RecordOptions }
 export { checkHealth, repair, readHealth, type HealthReport, type HealthResult } from "./health.js";
 export { detectChallenge, type Challenge } from "./challenge.js";
 export { coverage, type Suggestion } from "./coverage.js";
-export { serve, type Server, type ServeOptions } from "./serve.js";
+export { allowedHost, serve, type Server, type ServeOptions } from "./serve.js";
 export { runMcpServer, siteTools, operationInputSchema } from "./mcp.js";
 export { catalogToolsForSite, searchCatalog, type CatalogTool } from "./catalog.js";
 export {

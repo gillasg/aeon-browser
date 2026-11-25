@@ -340,7 +340,7 @@ test("rest serves one mapped site with docs and a token", async (t) => {
 
 function mcp(home, args, messages) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(process.execPath, [cli, "mcp", ...args], {
+    const child = spawn(process.execPath, [cli, "mcp", "--surface", "full", ...args], {
       stdio: ["pipe", "pipe", "inherit"],
       env: {
         ...process.env,
