@@ -64,7 +64,7 @@ function fakeChrome() {
       onRemoved: event("removed"),
       get: async (tabId) => ({ id: tabId, url: fakeChrome.url ?? "https://example.com/" }),
     },
-    debugger: { onDetach: event("detach") },
+    debugger: { onDetach: event("detach"), onEvent: event("debuggerEvent") },
     storage: {
       session: {
         get: async (key) => (store.has(key) ? { [key]: store.get(key) } : {}),
@@ -157,6 +157,43 @@ test("Teach counts the APIs learned on the site browsed to, and keeps the result
     assert.equal(store.has("aeon-learn:9"), false);
   } finally {
     delete globalThis.__harEntries;
+    delete globalThis.__askCore;
+    delete fakeChrome.url;
+  }
+});
+
+test("Teach flushes once the page goes quiet, not on every finished request", async () => {
+  const { listeners } = fakeChrome();
+  const learning = await load("../src/browse-learning.ts");
+  learning.installBrowseLearning();
+  const ask = (message) =>
+    new Promise((resolve) => listeners.message(message, { id: "ext" }, resolve));
+  const takes = () =>
+    globalThis.__learnCalls.filter((call) => call.join() === "network,11,take").length;
+  const finished = (tabId, sessionId) =>
+    listeners.debuggerEvent(
+      { tabId, ...(sessionId ? { sessionId } : {}) },
+      "Network.loadingFinished",
+    );
+  try {
+    globalThis.__askCore = () => [];
+    fakeChrome.url = "https://example.com/";
+    await ask({ kind: "aeon.learn.set", tabId: 11, on: true });
+    const started = takes();
+    // A burst of finished requests, each 100 ms apart, pushes the flush back: none lands mid-burst.
+    for (let i = 0; i < 4; i++) {
+      finished(11);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    // A child session and a tab that is not teaching never schedule a flush.
+    finished(11, "child-session");
+    finished(12);
+    assert.equal(takes(), started);
+    // Quiet for 1.5 s: exactly one flush for the whole burst.
+    await new Promise((resolve) => setTimeout(resolve, 1_700));
+    assert.equal(takes(), started + 1);
+    await ask({ kind: "aeon.learn.set", tabId: 11, on: false });
+  } finally {
     delete globalThis.__askCore;
     delete fakeChrome.url;
   }

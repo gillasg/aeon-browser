@@ -15,6 +15,7 @@ export {
   fromMitmproxy,
   encodeTnetstring,
 } from "./load/index.js";
+export { firstCallLine } from "./call-line.js";
 export { filterExchanges, learnNoise, type FilterOptions } from "./filter.js";
 export {
   inputParams,

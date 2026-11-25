@@ -120,7 +120,8 @@ function finish(raw: {
   return response;
 }
 
-/** Keeps one background tab per site page origin, opened on first use and reused after. */
+/** Keeps one tab per site page origin: the user's open tab of it when there is one, else a background
+ * tab opened on first use, reused after. */
 export class PageTransport implements Transport {
   readonly name = "page" as const;
 
@@ -153,7 +154,16 @@ try { if (typeof __call === 'function') __borrowed = (await __call({network: 'se
 const __store = (globalThis.__siteToApiTabs ??= {});
 let __tab = __store[${JSON.stringify(origin)}];
 if (__tab) { try { if ((await __tab.inspect(() => location.origin)) !== ${JSON.stringify(origin)}) __tab = undefined; } catch { __tab = undefined; } }
-if (!__tab) { __tab = await browser.openTab(${JSON.stringify(home)}); __store[${JSON.stringify(origin)}] = __tab; }
+if (!__tab) {
+  // The user's own open tab of this origin first (the active one if several): no cold start, no new tab.
+  try {
+    const __same = (await browser.tabs()).filter((t) => { try { return !t.heldByOther && !t.aeonUi && new URL(t.url).origin === ${JSON.stringify(origin)}; } catch { return false; } });
+    const __own = __same.find((t) => t.active) || __same[0];
+    if (__own) { await browser.attachTab(__own.target); __tab = __own; }
+  } catch { __tab = undefined; }
+  if (!__tab) __tab = await browser.openTab(${JSON.stringify(home)});
+  __store[${JSON.stringify(origin)}] = __tab;
+}
 ${borrow}await __tab.inspect(${run})`;
     return (await this.bridge()).run(code, { session: this.session, timeoutMs });
   }

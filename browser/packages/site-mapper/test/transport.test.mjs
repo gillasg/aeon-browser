@@ -216,3 +216,37 @@ test("preferences live beside the site, and a broken file means none", async (t)
     assert.deepEqual(await readTransportPreferences("shop.example"), {});
   });
 });
+
+test("page transport adopts the user's open tab of the origin before opening one", async () => {
+  const { PageTransport } = await import("../dist/runtime/transports.js");
+  const run = async (tabs) => {
+    const log = [];
+    const page = (name) => ({ name, inspect: async () => name });
+    const browser = {
+      tabs: async () => tabs.map((tab) => ({ ...page(tab.name), ...tab })),
+      attachTab: async (target) => log.push(["attach", target]),
+      openTab: async (url) => (log.push(["open", url]), page("opened")),
+    };
+    const bridge = {
+      run: async (code) => {
+        delete globalThis.__siteToApiTabs;
+        const body = code.replace(/\nawait __tab\.inspect/, "\nreturn await __tab.inspect");
+        return new Function("browser", `return (async () => { ${body} })()`)(browser);
+      },
+    };
+    const result = await new PageTransport(async () => bridge).inPage("https://shop.test/", "1");
+    return { result, log };
+  };
+  const own = await run([
+    { name: "other", url: "https://elsewhere.test/", active: true, target: 1 },
+    { name: "back", url: "https://shop.test/a", active: false, target: 2 },
+    { name: "front", url: "https://shop.test/b", active: true, target: 3 },
+  ]);
+  assert.equal(own.result, "front");
+  assert.deepEqual(own.log, [["attach", 3]]);
+  const none = await run([
+    { name: "other", url: "https://elsewhere.test/", active: true, target: 1 },
+  ]);
+  assert.equal(none.result, "opened");
+  assert.deepEqual(none.log, [["open", "https://shop.test/"]]);
+});

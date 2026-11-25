@@ -27,15 +27,10 @@ async function __snipeRunner(page, item) {
   }
   return {ok: false, attempts, firedAt: new Date(firstAt).toISOString(), lateMs: firstAt - item.at, last};
 }
-// The site's clock against ours, from its Date header (to the second), when asked to sync.
+// The site's clock against ours: the median of several probes (browser.clock), so the Date header's
+// one-second floor and a slow trip average out. 0 when the site gives no usable Date header.
 async function __snipeOffset(url) {
-  try {
-    var sent = Date.now();
-    var response = await browser.fetch(url, {method: 'HEAD', as: 'text'});
-    var header = response.headers && (response.headers.date || response.headers.Date);
-    var server = Date.parse(header);
-    return Number.isFinite(server) ? server + 500 - (sent + Date.now()) / 2 : 0;
-  } catch { return 0; }
+  try { return (await __clockSync(url)).serverOffsetMs; } catch { return 0; }
 }
 async function __snipe(options = {}) {
   var at = typeof options.at === 'number' ? options.at : Date.parse(options.at);

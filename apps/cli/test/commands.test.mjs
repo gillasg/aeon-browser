@@ -159,6 +159,21 @@ test("a mapped site is callable over direct transport, and its operations are li
   ]);
   assert.equal(called.code, 0, called.stderr);
   assert.equal(JSON.parse(called.stdout).items[0].name, "lamp");
+  // One receipt line on stderr; stdout stays the bare JSON answer.
+  assert.match(called.stderr, /^\d+(\.\d)? s · site API · no model$/m, called.stderr);
+
+  const quiet = await aeon(home, [
+    "call",
+    "127.0.0.1",
+    operation.id,
+    '{"q":"lamp"}',
+    "--transport",
+    "direct",
+    "--json",
+  ]);
+  assert.equal(quiet.code, 0, quiet.stderr);
+  assert.equal(JSON.parse(quiet.stdout).items[0].name, "lamp");
+  assert.doesNotMatch(quiet.stderr, /site API/);
 
   const ops = await aeon(home, ["ops", "127.0.0.1", "--json"]);
   assert.equal(ops.code, 0, ops.stderr);

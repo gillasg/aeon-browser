@@ -82,20 +82,35 @@ async function call(args: Args): Promise<number> {
     transport === "page" || transport === "direct" ? { transport } : {},
   );
   const params = callParams(args, json);
+  const started = performance.now();
   if (has(args, "all") || flag(args, "max-items")) {
     const items: unknown[] = [];
     for await (const item of api.paginate(operation, params, {
       maxItems: Number(flag(args, "max-items") ?? 10_000),
     }))
       items.push(item);
+    callReceipt(args, performance.now() - started);
     printJson(items);
     return 0;
   }
   const result = api.pageEndpoint(operation)
     ? await api.fetchPage(operation, params as Record<string, string>)
     : await api.call(operation, params);
+  callReceipt(args, performance.now() - started);
   printJson(result);
   return 0;
+}
+
+/** `0.4 s`, `34 s`: the same rounding as Aeon's answer receipt. */
+function receiptSeconds(ms: number): string {
+  const seconds = ms / 1000;
+  return `${seconds < 10 ? (Math.round(seconds * 10) / 10).toFixed(1) : String(Math.round(seconds))} s`;
+}
+
+/** One line on stderr, so stdout stays the JSON answer. Silent with --json. */
+function callReceipt(args: Args, ms: number): void {
+  if (has(args, "json")) return;
+  process.stderr.write(`${receiptSeconds(ms)} · site API · no model\n`);
 }
 
 async function watch(args: Args): Promise<number> {

@@ -2,9 +2,10 @@ import { learnUserTab, networkCall } from "@browserkit/engine/native-browser-net
 import { askCore } from "./companion-requests.js";
 
 // "Learn this site while I browse": a tab the user switches on from the orb records the site's
-// own requests while they use it (Chrome shows its debugger bar meanwhile), and every 20 seconds
-// and on each page load what it recorded is built into the site's API, with no model. Never on
-// for every tab: one switch, one tab, until it is turned off or the tab closes.
+// own requests while they use it (Chrome shows its debugger bar meanwhile). What it recorded is
+// built into the site's API, with no model: 1.5 seconds after the site goes quiet (no request
+// finished for that long), every 20 seconds as a fallback, and on each page load. Never on for
+// every tab: one switch, one tab, until it is turned off or the tab closes.
 
 const KEY = (tabId: number) => `aeon-learn:${tabId}`;
 /** The last session's result, so an orb that only sees learning end (the user closed Chrome's
@@ -22,7 +23,10 @@ interface Teaching {
   found: number;
 }
 const EVERY_MS = 20_000;
+/** Quiet time after the last finished request before a flush, so the pill ticks as you click. */
+const IDLE_MS = 1_500;
 const timers = new Map<number, number>();
+const idleTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
 export type BrowseLearning =
   | { kind: "aeon.learn.set"; tabId: number; on: boolean }
@@ -55,6 +59,30 @@ export function installBrowseLearning(): void {
     const tabId = source.tabId;
     if (tabId !== undefined) void whileTeaching(tabId, () => stop(tabId));
   });
+  // Each finished request restarts the quiet timer; only a teaching tab's requests count.
+  chrome.debugger.onEvent.addListener((source, method) => {
+    const tabId = source.tabId;
+    if (tabId === undefined || source.sessionId || method !== "Network.loadingFinished") return;
+    if (timers.has(tabId)) armIdleFlush(tabId);
+  });
+}
+
+/** Flushes once the tab has been quiet for IDLE_MS; a busy page keeps pushing it back. */
+function armIdleFlush(tabId: number): void {
+  clearIdleFlush(tabId);
+  idleTimers.set(
+    tabId,
+    globalThis.setTimeout(() => {
+      idleTimers.delete(tabId);
+      void whileTeaching(tabId, () => flush(tabId));
+    }, IDLE_MS),
+  );
+}
+
+function clearIdleFlush(tabId: number): void {
+  const timer = idleTimers.get(tabId);
+  if (timer !== undefined) globalThis.clearTimeout(timer);
+  idleTimers.delete(tabId);
 }
 
 /** Runs `then` when the tab is teaching: the in-memory timer, or (after Chrome slept this worker
@@ -140,6 +168,7 @@ async function stop(tabId: number): Promise<{ found: number; site: string }> {
   const timer = timers.get(tabId);
   if (timer !== undefined) globalThis.clearInterval(timer);
   timers.delete(tabId);
+  clearIdleFlush(tabId);
   if (timer !== undefined || state !== undefined) {
     await flush(tabId);
     await learnUserTab(tabId, false).catch(() => undefined);

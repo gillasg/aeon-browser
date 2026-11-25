@@ -7,6 +7,7 @@ import {
   checkCaptures,
   editApi,
   explore,
+  firstCallLine,
   importCaptures,
   learnedNoise,
   loadModel,
@@ -103,6 +104,8 @@ async function buildAndReport(
   for (const op of model.operations)
     out(`  ${op.bucket.padEnd(6)} ${op.method.padEnd(6)} ${op.id}  ${op.path}`);
   out(`Files: ${result.dir}`);
+  const call = firstCallLine(model.site, model.operations);
+  if (call) out(call);
 }
 
 async function recordPassive(args: Args): Promise<void> {
@@ -223,7 +226,7 @@ export const mapCommand: Command = {
   name: "map",
   group: "Map a site",
   summary: "record a flow in the browser (or explore sites), then build its API",
-  help: `Usage: browserkit map <url> [--attach <tab>] [--name <n>] [--for <s> | --until-idle <s>] [--no-build]
+  help: `Usage: browserkit map <url> [--attach <tab|active>] [--name <n>] [--for <s> | --until-idle <s>] [--no-build]
        browserkit map --passive <domain,...> [--name <n>] [--for <s> | --until-idle <s>] [--no-build]
        browserkit map --explore <site> [site ...] [--goal <g>] [--parallel <n>] [--loud] [--actions]
 
@@ -231,7 +234,7 @@ Records the site's own requests while you use it, then builds an OpenAPI spec, a
 client and a callable API from them.
 
   <url>                  a page to open and record (https:// is added when missing)
-  --attach <tab>         record a tab you already have open (id, or text from its title/URL)
+  --attach <tab>         record a tab you already have open (id, active for the tab in front, or text from its title/URL)
   --passive <domains>    record every tab on these domains
   --for <s>              stop recording after this many seconds
   --until-idle <s>       stop once no new request has come for this many seconds (at most 15
