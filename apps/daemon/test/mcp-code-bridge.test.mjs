@@ -15,6 +15,7 @@ function fakeManager() {
         servers: [
           {
             serverId: "cap_wiki",
+            displayName: "Wiki",
             tools: [
               { name: "echo", description: "Echo text\nover two lines" },
               { name: "fail", description: "Fail on purpose" },
@@ -37,15 +38,20 @@ function fakeManager() {
   return { manager, state };
 }
 
-test("list returns names with one-line descriptions, and never Aeon's own tools", async () => {
+test("list returns counts and one-line refs under a slug, never Aeon's own tools", async () => {
   const { manager } = fakeManager();
   const bridge = new McpCodeBridge(manager);
-  const refs = await bridge.list();
-  assert.deepEqual(refs, [
-    { name: "cap_wiki.echo", description: "Echo text over two lines" },
-    { name: "cap_wiki.fail", description: "Fail on purpose" },
+  const listed = await bridge.list();
+  assert.deepEqual(listed.servers, [
+    { server: "wiki", serverId: "cap_wiki", displayName: "Wiki", toolCount: 2 },
   ]);
-  assert.ok(!refs.some((ref) => /browser_code|browser_tabs|crawl/.test(ref.name)));
+  assert.deepEqual(listed.tools, [
+    { server: "wiki", slug: "wiki", name: "echo", description: "Echo text over two lines" },
+    { server: "wiki", slug: "wiki", name: "fail", description: "Fail on purpose" },
+  ]);
+  assert.equal(listed.truncated, false);
+  assert.match(listed.hint, /mcp\.search/);
+  assert.ok(!listed.tools.some((ref) => /browser_code|browser_tabs|crawl/.test(ref.name)));
 });
 
 test("call takes JSON args, returns parsed JSON, and discovers lazily", async () => {
@@ -70,7 +76,7 @@ test("an unknown tool throws no MCP tool named X with the available names", asyn
   const bridge = new McpCodeBridge(manager);
   await assert.rejects(
     bridge.call("cap_wiki", "nope", {}),
-    /no MCP tool named cap_wiki\.nope.*cap_wiki\.echo.*cap_wiki\.fail/,
+    /no MCP tool named cap_wiki\.nope.*wiki\.(echo|fail).*mcp\.search/,
   );
 });
 

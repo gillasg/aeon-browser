@@ -3,6 +3,7 @@ import type {
   CapabilityRegistryFile,
   CapabilityVerification,
 } from "@aeon/domain";
+import { isValidCredentialReference } from "./mcp-credentials.js";
 
 export const REGISTRY_SCHEMA_VERSION = 1;
 export const MAX_CAPABILITIES = 100;
@@ -150,14 +151,7 @@ export function needsCheck(): CapabilityVerification {
 
 function readCredentialReference(value: unknown): string | null {
   if (value === null || value === undefined) return null;
-  if (
-    typeof value !== "string" ||
-    !(
-      /^env:[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(value) ||
-      value === "external-config-only" ||
-      /^external:[A-Za-z0-9._:-]{1,120}$/.test(value)
-    )
-  )
+  if (typeof value !== "string" || value.length > 1200 || !isValidCredentialReference(value))
     throw new Error(
       "credentialReference must be null or a non-secret external credential reference.",
     );

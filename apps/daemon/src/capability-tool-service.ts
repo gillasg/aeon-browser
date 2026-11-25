@@ -291,6 +291,7 @@ function credentialBinding(
   | "manual_pi_binding_required" {
   const reference = capability.credentialReference;
   if (!reference) return "not_configured";
-  if (reference.startsWith("env:")) return "environment_reference";
+  if (reference.startsWith("env:") || reference.startsWith("header:"))
+    return "environment_reference";
   return capability.kind === "mcp" ? "manual_pi_binding_required" : "external_configuration";
 }
