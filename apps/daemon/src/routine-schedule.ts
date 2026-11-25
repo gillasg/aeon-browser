@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { RoutineSchedule } from "@aeon/domain";
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
@@ -55,9 +56,35 @@ function parseCalendar(value: Record<string, unknown>, timeZone: string): Routin
 /** A one-time routine's next run once it has run: never. */
 export const NEVER = "9999-12-31T00:00:00.000Z";
 
-export function nextRoutineOccurrence(schedule: RoutineSchedule, after: string | Date): string {
+/** The most a recurring routine's phase moves, so a 09:00 routine stays a morning routine. */
+const MAX_PHASE_MS = 10 * 60_000;
+
+/**
+ * Fleet diversity (I-5): a recurring routine's whole series shifts by a fixed offset of up to
+ * ±10% of its interval, seeded by its routine id (a random UUID made on this install), so
+ * installs never fire together on :00. One-time routines keep their exact time, and snipers
+ * never go through here: they sync to the server clock instead.
+ */
+export function routinePhaseMs(schedule: RoutineSchedule, seed: string | undefined): number {
+  if (!seed || schedule.kind === "once") return 0;
+  const interval = schedule.kind === "interval" ? schedule.everyMinutes * 60_000 : 86_400_000;
+  const span = Math.min(interval * 0.1, MAX_PHASE_MS);
+  const unit = createHash("sha256").update(seed).digest().readUInt32BE(0) / 0xffffffff;
+  return Math.round((unit * 2 - 1) * span);
+}
+
+export function nextRoutineOccurrence(
+  schedule: RoutineSchedule,
+  after: string | Date,
+  phaseSeed?: string,
+): string {
   const afterMs = typeof after === "string" ? Date.parse(after) : after.getTime();
   if (!Number.isFinite(afterMs)) throw new Error("Routine reference time is invalid.");
+  const phase = routinePhaseMs(schedule, phaseSeed);
+  if (phase) {
+    const next = nextRoutineOccurrence(schedule, new Date(afterMs - phase));
+    return new Date(Date.parse(next) + phase).toISOString();
+  }
   if (schedule.kind === "interval") return nextInterval(schedule, afterMs);
   if (schedule.kind === "once")
     return Date.parse(schedule.atUtc) > afterMs ? schedule.atUtc : NEVER;
@@ -68,6 +95,7 @@ export function collectDueSlots(
   schedule: RoutineSchedule,
   firstDueAt: string,
   now: string,
+  phaseSeed?: string,
 ): {
   slots: string[];
   nextDueAt: string;
@@ -77,7 +105,7 @@ export function collectDueSlots(
   const slots: string[] = [];
   while (Date.parse(slot) <= currentTime) {
     slots.push(slot);
-    slot = nextRoutineOccurrence(schedule, slot);
+    slot = nextRoutineOccurrence(schedule, slot, phaseSeed);
   }
   return { slots, nextDueAt: slot };
 }

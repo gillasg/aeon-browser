@@ -38,7 +38,6 @@ export const ManagementActionRequestSchema = z
           "update_capability",
           "remove_capability",
           "recheck_capability",
-          "pin_result",
           "run_workflow",
           "cancel_workflow",
           "import_workflow",

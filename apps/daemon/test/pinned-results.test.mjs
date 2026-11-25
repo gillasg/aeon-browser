@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -25,24 +25,6 @@ test("history keeps the changes, not every check", () => {
   for (let index = 0; index < 20; index += 1)
     first.push({ at: "2026-10-22T10:00:00.000Z", value: String(index) });
   assert.equal(pushHistory(first, "new", "2026-10-22T11:00:00.000Z").length, 12);
-});
-
-test("a saved answer is pinned once, updated by title, and removed", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-pins-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const pins = new PinnedResults(root);
-  const created = await pins.execute(
-    { title: "Cheapest flight", value: "₹4,200", detail: "AI 806 · 6:10 AM" },
-    "chat-1",
-  );
-  assert.equal("pinId" in created && created.value, "₹4,200");
-  const again = await pins.execute({ title: "cheapest flight", value: "₹3,900" }, "chat-1");
-  assert.equal("pinId" in again && again.pinId, "pinId" in created && created.pinId);
-  assert.equal((await pins.list()).length, 1);
-  const removed = await pins.execute({ title: "Cheapest flight", remove: true }, "chat-1");
-  assert.deepEqual(removed, { removed: true });
-  assert.equal((await pins.list()).length, 0);
-  assert.ok(JSON.parse(await readFile(join(root, "pinned-results.json"), "utf8")));
 });
 
 test("every watcher check updates its pin, passed or not", async (t) => {

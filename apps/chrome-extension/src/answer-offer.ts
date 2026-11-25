@@ -25,13 +25,8 @@ export async function sendAnswerOffer(input: {
   url?: string;
   onError(message: string): void;
   onNotice?(message: string): void;
-  pin(text: string): Promise<void>;
 }): Promise<void> {
   try {
-    if (input.offer.action === "pin") {
-      await input.pin(input.answerText);
-      return;
-    }
     const local = await localOfferAction(input.offer, input.url);
     if (local.handled) {
       input.onNotice?.(local.notice);

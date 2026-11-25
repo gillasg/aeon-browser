@@ -5,6 +5,7 @@ import { setTabRecording, showAgentGlow } from "./native-browser-cursor.js";
 import { beginManualScreencast, endManualScreencast } from "./native-browser-screencast.js";
 import { browserSessionOwner, withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
+import { needPermission } from "./native-browser-optional.js";
 
 // Video recordings of a tab for page.recordVideo: a real video file (MP4 where Chrome can encode
 // it, else WebM) made by MediaRecorder in the offscreen document. Tab capture gives true pixels
@@ -176,6 +177,7 @@ async function startTabCapture(
   options: { audio: boolean; format: string; fps: number },
 ): Promise<Started> {
   try {
+    await needPermission("tabCapture");
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
     return (await toOffscreen({
       target: OFFSCREEN,

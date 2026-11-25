@@ -139,7 +139,12 @@ export class RoutineScheduler {
     const now = new Date().toISOString();
     for (const routine of this.store.listDueRoutines(now)) {
       if (!routine.nextDueAt) continue;
-      const collected = collectDueSlots(routine.schedule, routine.nextDueAt, now);
+      const collected = collectDueSlots(
+        routine.schedule,
+        routine.nextDueAt,
+        now,
+        routine.routineId,
+      );
       const slots = collected.slots.map((scheduledSlot) => ({
         runId: randomUUID(),
         scheduledSlot,

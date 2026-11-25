@@ -277,12 +277,6 @@ async function answerOffer(offer: AnswerOffer): Promise<void> {
     notice(messageOf(error));
     return;
   }
-  if (offer.action === "pin") {
-    const value = (run?.answer ?? "").trim().slice(0, 200);
-    if (!value) return;
-    void session.createPin("Answer", value).catch((error: unknown) => notice(messageOf(error)));
-    return;
-  }
   if (offer.followUp.trim()) void submit(offer.followUp);
 }
 

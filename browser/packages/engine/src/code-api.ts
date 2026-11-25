@@ -587,7 +587,8 @@ var browser = Object.freeze({
       reset: (type) => __call({permission:'set', target, type, setting:'ask'}),
     }),
     setLocation: async (latitude, longitude, accuracy = 50) => {
-      await __call({permission:'set', target, type:'location', setting:'allow'});
+      // The grant needs optional contentSettings; without it the override and shim below still answer.
+      await __call({permission:'set', target, type:'location', setting:'allow'}).catch((e) => { if (!/PERMISSION_NEEDED/.test(String(e && e.message))) throw e; });
       await __step({op:'cdp', target, method:'Emulation.setGeolocationOverride', params:{latitude, longitude, accuracy}});
       // When the OS has location turned off, Chrome still denies the request; answer it with the
       // chosen coordinates instead, on this page and on pages this tab loads later.

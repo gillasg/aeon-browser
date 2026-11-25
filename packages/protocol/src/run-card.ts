@@ -10,7 +10,6 @@ export const RunCardOfferActionSchema = z.enum([
   "do-rest",
   "fresh",
   "relearn",
-  "pin",
   "add-to-table",
   "copy-mcp",
   "run-api",

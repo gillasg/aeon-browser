@@ -114,7 +114,6 @@ test("an answer offer handled here passes the page url and shows its notice", as
     url: "https://example.com/page",
     onError: (message) => errors.push(message),
     onNotice: (message) => notices.push(message),
-    pin: async () => undefined,
   });
   assert.deepEqual(errors, []);
   assert.deepEqual(notices, ["Boost off"]);

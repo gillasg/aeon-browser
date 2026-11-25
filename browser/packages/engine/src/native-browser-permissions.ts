@@ -2,6 +2,7 @@
 // notifications, camera...) are browser UI that no page or extension can click, so the agent
 // decides ahead of time: allowing or blocking the permission for that site means the prompt
 // never appears and cannot stall the task.
+import { needPermission } from "./native-browser-optional.js";
 const TYPES = {
   location: "location",
   notifications: "notifications",
@@ -26,6 +27,7 @@ export async function permissionCall(
   const setting = String(value.setting);
   if (!SETTINGS.includes(setting as (typeof SETTINGS)[number]))
     throw new Error("INVALID_PERMISSION: setting must be allow, block or ask");
+  await needPermission("contentSettings");
   const settings = chrome.contentSettings[type] as chrome.contentSettings.ContentSetting<string>;
   await settings.set({
     primaryPattern: origin + "/*",

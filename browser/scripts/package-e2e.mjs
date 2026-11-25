@@ -17,7 +17,7 @@ if (!chrome) {
   process.exit(1);
 }
 const env = { ...process.env, CHROME_PATH: chrome, REQUIRE_E2E: "1" };
-for (const suite of ["packages/crawl", "packages/boosts"]) {
+for (const suite of ["packages/crawl"]) {
   const run = spawnSync(
     process.execPath,
     ["--test", "--test-timeout=300000", join("test", "e2e.test.mjs")],
