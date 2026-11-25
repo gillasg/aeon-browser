@@ -46,8 +46,10 @@ const CELL_TIMEOUT_MS = 60_000;
 
 /** The chat's connected MCP tools, exposed inside browser_code as mcp.<server>.<tool>(args). The daemon owns this. */
 export interface McpBridge {
-  /** Names and one-line descriptions, as {name: 'server.tool', description}. */
-  list(signal?: AbortSignal): Promise<{ name: string; description: string }[]>;
+  /** Per-server counts and a capped set of one-line tool refs, with a hint to search for more. */
+  list(signal?: AbortSignal): Promise<unknown>;
+  /** The tools that best match a query, as one-line refs; `limit` defaults to 8. */
+  search?(query: string, options?: { limit?: number }, signal?: AbortSignal): Promise<unknown>;
   /** Call one tool with JSON args; throws the tool's text on error. */
   call(
     server: string,
@@ -567,6 +569,11 @@ async function serveMcp(
   if (!mcp)
     throw new Error("No MCP tools are connected to this chat; there is nothing for mcp.* to call.");
   if (request.list === true) return mcp.list(signal);
+  if (typeof request.search === "string") {
+    if (!mcp.search) throw new Error("mcp.search is unavailable here; use mcp.list().");
+    const limit = typeof request.limit === "number" ? request.limit : undefined;
+    return mcp.search(request.search, limit === undefined ? {} : { limit }, signal);
+  }
   const server = String(request.server ?? "");
   const tool = String(request.tool ?? "");
   const args =

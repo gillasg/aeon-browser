@@ -15,6 +15,7 @@ import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
 import { runMcpServer } from "./mcp.js";
+import { MCP_SERVER_ACTIONS, MCP_SERVERS_HELP, mcpServersCommand } from "./mcp-servers-cmd.js";
 import { inspect, runTasks, type RunOptions } from "./run.js";
 import { nextDay, searchAeon } from "./search.js";
 import type { ChatResult } from "./results.js";
@@ -648,6 +649,11 @@ function signin(args: Args): Promise<number> {
 }
 
 function mcp(args: Args): Promise<number> {
+  // The raw words keep `-- <command> --its-flags` and repeated --header intact.
+  if (MCP_SERVER_ACTIONS.has(args.positional[0] ?? "")) {
+    const argv = process.argv.slice(2);
+    return mcpServersCommand(argv.slice(argv.indexOf("mcp") + 1));
+  }
   const site = flag(args, "site") ?? args.positional[0];
   return runMcpServer(site).then(() => 0);
 }
@@ -701,11 +707,13 @@ export function aeonCommands(host: DaemonHost): Command[] {
   overrides.set("mcp", {
     name: "mcp",
     group: "Browser",
-    summary: "stdio MCP server: browser_code, browser_tabs, crawl, site_mapper",
+    summary: "stdio MCP server, or add/list/remove the MCP servers Aeon's chats can call",
     help: `Usage: aeon mcp [site]
 
 Without a site: Aeon's chats and its tools for another agent. With a site: one mapped site's
-operations as MCP tools, with the user's logins. (--site=<site> is accepted too.)`,
+operations as MCP tools, with the user's logins. (--site=<site> is accepted too.)
+
+${MCP_SERVERS_HELP}`,
     run: mcp,
   });
   overrides.set("cdp", {

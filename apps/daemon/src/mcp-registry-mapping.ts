@@ -1,5 +1,6 @@
 import { posix, win32 } from "node:path";
 import type { McpCapability } from "@aeon/domain";
+import { parseCredentialBindings, type CredentialBinding } from "./mcp-credentials.js";
 
 export type PiMcpServerConfig =
   | {
@@ -39,7 +40,7 @@ export function mapMcpCapabilityToPi(
   defaultWorkingDirectory: string,
 ): MappedPiMcpServer {
   const name = piMcpServerName(capability.id);
-  const { envCredential, manualCredential } = credentialBinding(capability.credentialReference);
+  const { bindings, manualCredential } = credentialBinding(capability.credentialReference);
   if (capability.transport === "stdio") {
     if (!capability.command) throw new Error("Legacy stdio MCP capability is missing its command.");
     return {
@@ -52,7 +53,13 @@ export function mapMcpCapabilityToPi(
           defaultWorkingDirectory,
           capability.workingDirectory ?? ".",
         ),
-        ...(envCredential ? { env: { [envCredential]: envReference(envCredential) } } : {}),
+        ...(bindings.length
+          ? {
+              env: Object.fromEntries(
+                bindings.map((binding) => [binding.env, envReference(binding.env)]),
+              ),
+            }
+          : {}),
         ...describe(capability),
         enabled: !manualCredential,
         exposure: "codemode",
@@ -66,9 +73,7 @@ export function mapMcpCapabilityToPi(
     config: {
       type: "http",
       url: capability.endpoint,
-      ...(envCredential
-        ? { headers: { Authorization: `Bearer ${envReference(envCredential)}` } }
-        : {}),
+      ...(bindings.length ? { headers: piHeaders(bindings) } : {}),
       ...describe(capability),
       enabled: !manualCredential,
       exposure: "codemode",
@@ -124,12 +129,22 @@ function resolveConfiguredDirectory(base: string, child?: string): string {
   return child === undefined ? paths.resolve(base) : paths.resolve(base, child);
 }
 
+function piHeaders(bindings: CredentialBinding[]): Record<string, string> {
+  return Object.fromEntries(
+    bindings.map((binding) =>
+      binding.header
+        ? [binding.header, envReference(binding.env)]
+        : ["Authorization", `Bearer ${envReference(binding.env)}`],
+    ),
+  );
+}
+
 function credentialBinding(credential: string | null | undefined): {
-  envCredential: string | null;
+  bindings: CredentialBinding[];
   manualCredential: boolean;
 } {
   return {
-    envCredential: credential?.startsWith("env:") ? credential.slice(4) : null,
+    bindings: parseCredentialBindings(credential),
     manualCredential:
       credential === "external-config-only" || (credential?.startsWith("external:") ?? false),
   };

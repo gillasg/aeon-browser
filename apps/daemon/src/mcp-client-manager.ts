@@ -16,6 +16,14 @@ const CONNECTION_TIMEOUT_MS = 10_000;
 const MCP_SDK_VERSION = "2.2.0";
 const MAX_OPEN_CLIENTS = 4;
 const IDLE_CLIENT_MS = 5 * 60_000;
+/** A tool listing is reused this long; a `tools/list_changed` notification or reconnect drops it sooner. */
+export const DISCOVERY_TTL_MS = 30_000;
+
+export interface McpClientManagerOptions {
+  /** Clock for the discovery cache (tests). */
+  now?: () => number;
+  discoveryTtlMs?: number;
+}
 
 interface ManagedClient {
   signature: string;
@@ -30,8 +38,13 @@ interface ManagedClient {
 
 interface DiscoveredTools {
   signature: string;
+  /** The hash pinned by the last explicit listing; a call never runs against a different one. */
   schemaHash: string;
   tools: Tool[];
+  advertisedCount: number;
+  fetchedAt: number;
+  /** Set by `tools/list_changed`: the next use refetches instead of trusting the cache. */
+  stale: boolean;
 }
 
 export class McpClientManager {
@@ -39,7 +52,16 @@ export class McpClientManager {
   private readonly discovered = new Map<string, DiscoveredTools>();
   private readonly transportAdapter = new McpTransportAdapter();
 
-  constructor(private readonly registry: CapabilityRegistry) {}
+  private readonly now: () => number;
+  private readonly ttlMs: number;
+
+  constructor(
+    private readonly registry: Pick<CapabilityRegistry, "snapshot">,
+    options: McpClientManagerOptions = {},
+  ) {
+    this.now = options.now ?? Date.now;
+    this.ttlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
+  }
 
   async listMcpTools(serverId?: string, signal?: AbortSignal): Promise<unknown> {
     const snapshot = await this.registry.snapshot();
@@ -52,13 +74,11 @@ export class McpClientManager {
     for (const capability of candidates) {
       try {
         const managed = await this.ensureClient(capability, signal);
-        const result = await managed.client.listTools(undefined, {
-          cacheMode: "refresh",
-          signal: requestSignal(signal),
-        });
-        const tools = boundedTools(result.tools);
-        const schemaHash = hash(tools);
-        this.discovered.set(capability.id, { signature: managed.signature, schemaHash, tools });
+        const { tools, advertisedCount } = await this.discoverForListing(
+          capability.id,
+          managed,
+          signal,
+        );
         servers.push({
           serverId: capability.id,
           displayName: capability.displayName,
@@ -68,9 +88,9 @@ export class McpClientManager {
           protocolVersion: managed.protocolVersion,
           serverCapabilities: boundValue(managed.serverCapabilities),
           connectedAt: managed.connectedAt,
-          advertisedToolCount: result.tools.length,
+          advertisedToolCount: advertisedCount,
           returnedToolCount: tools.length,
-          toolsTruncated: tools.length < result.tools.length,
+          toolsTruncated: tools.length < advertisedCount,
           tools: tools.map((tool) => ({
             serverId: capability.id,
             name: tool.name,
@@ -163,6 +183,50 @@ export class McpClientManager {
     await Promise.all(current.map(closeManaged));
   }
 
+  /** True when the server's notification marked the listing stale (tests and status). */
+  isDiscoveryStale(capabilityId: string): boolean {
+    return this.discovered.get(capabilityId)?.stale ?? true;
+  }
+
+  private fresh(entry: DiscoveredTools | undefined, signature: string): boolean {
+    return (
+      !!entry &&
+      !entry.stale &&
+      entry.signature === signature &&
+      this.now() - entry.fetchedAt < this.ttlMs
+    );
+  }
+
+  /** An explicit listing reuses a fresh cache, or refetches and pins the new schema hash. */
+  private async discoverForListing(
+    capabilityId: string,
+    managed: ManagedClient,
+    signal?: AbortSignal,
+  ): Promise<DiscoveredTools> {
+    const cached = this.discovered.get(capabilityId);
+    if (cached && this.fresh(cached, managed.signature)) return cached;
+    const result = await managed.client.listTools(undefined, {
+      cacheMode: "refresh",
+      signal: requestSignal(signal),
+    });
+    const tools = boundedTools(result.tools);
+    const entry: DiscoveredTools = {
+      signature: managed.signature,
+      schemaHash: hash(tools),
+      tools,
+      advertisedCount: result.tools.length,
+      fetchedAt: this.now(),
+      stale: false,
+    };
+    this.discovered.set(capabilityId, entry);
+    return entry;
+  }
+
+  private markStale(capabilityId: string, managed: ManagedClient): void {
+    const entry = this.discovered.get(capabilityId);
+    if (entry && this.clients.get(capabilityId) === managed) entry.stale = true;
+  }
+
   private async ensureClient(
     capability: McpCapability,
     signal?: AbortSignal,
@@ -203,7 +267,21 @@ export class McpClientManager {
     signature: string,
     signal?: AbortSignal,
   ): Promise<ManagedClient> {
-    const client = new Client({ name: "aeon-mcp-client", version: "1.0.0" });
+    const opened: { managed?: ManagedClient } = {};
+    const client = new Client(
+      { name: "aeon-mcp-client", version: "1.0.0" },
+      {
+        listChanged: {
+          tools: {
+            autoRefresh: false,
+            debounceMs: 0,
+            onChanged: () => {
+              if (opened.managed) this.markStale(capability.id, opened.managed);
+            },
+          },
+        },
+      },
+    );
     const transport = this.transportAdapter.create(capability);
     try {
       await client.connect(transport, { timeout: CONNECTION_TIMEOUT_MS });
@@ -217,7 +295,7 @@ export class McpClientManager {
       await client.close().catch(() => {});
       throw new Error("MCP_REQUEST_CANCELLED: connection setup was cancelled.");
     }
-    const managed = {
+    const managed: ManagedClient = {
       signature,
       client,
       transport,
@@ -227,6 +305,7 @@ export class McpClientManager {
       protocolVersion: client.getNegotiatedProtocolVersion(),
       serverCapabilities: client.getServerCapabilities() ?? {},
     };
+    opened.managed = managed;
     this.clients.set(capability.id, managed);
     return managed;
   }
@@ -249,6 +328,25 @@ export class McpClientManager {
     if (!advertised)
       throw new Error("MCP_DISCOVER_FIRST: list this server's tools before invoking one.");
     const managed = await this.ensureClient(capability, signal);
+    if (advertised.signature !== managed.signature)
+      throw new Error(
+        "CAPABILITY_CHANGED: the server tool list or input schema changed; rediscover tools.",
+      );
+    const tools = this.fresh(advertised, managed.signature)
+      ? advertised.tools
+      : await this.recheckPinned(serverId, managed, advertised, signal);
+    const tool = tools.find((item) => item.name === toolName);
+    if (!tool) throw new Error(`MCP tool '${serverId}:${toolName}' is not available.`);
+    return { managed, tool };
+  }
+
+  /** The cache expired or the server announced a change: refetch and hold it to the pinned hash. */
+  private async recheckPinned(
+    serverId: string,
+    managed: ManagedClient,
+    advertised: DiscoveredTools,
+    signal?: AbortSignal,
+  ): Promise<Tool[]> {
     let refreshed: Awaited<ReturnType<Client["listTools"]>>;
     try {
       refreshed = await managed.client.listTools(undefined, {
@@ -261,13 +359,16 @@ export class McpClientManager {
       throw new Error("MCP_CONNECTION_FAILED: the configured server stopped responding.");
     }
     const tools = boundedTools(refreshed.tools);
-    if (advertised.signature !== managed.signature || advertised.schemaHash !== hash(tools))
+    if (advertised.schemaHash !== hash(tools)) {
+      advertised.stale = true;
       throw new Error(
         "CAPABILITY_CHANGED: the server tool list or input schema changed; rediscover tools.",
       );
-    const tool = tools.find((item) => item.name === toolName);
-    if (!tool) throw new Error(`MCP tool '${serverId}:${toolName}' is not available.`);
-    return { managed, tool };
+    }
+    advertised.tools = tools;
+    advertised.fetchedAt = this.now();
+    advertised.stale = false;
+    return tools;
   }
 
   private async invokeMcpTool(

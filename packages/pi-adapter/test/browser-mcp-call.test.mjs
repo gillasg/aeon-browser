@@ -68,6 +68,29 @@ test("mcp.list() reaches the bridge", async () => {
   assert.deepEqual(listed, [{ name: "cap_wiki.double", description: "Double a number" }]);
 });
 
+test("mcp.search(q, { limit }) reaches the bridge with the query and limit", async () => {
+  const seen = [];
+  const bridge = {
+    async list() {
+      return {};
+    },
+    async search(query, options) {
+      seen.push({ query, options });
+      return [{ server: "wiki", slug: "wiki", name: "double", description: "Double" }];
+    },
+    async call() {},
+  };
+  let found;
+  const run = async (_chatId, _toolCallId, input) => {
+    found = await input.codeCell.onCall({ mcp: { search: "double", limit: 2 } });
+    return JSON.stringify({ value: found, output: "" });
+  };
+  const tool = createBrowserCodeTool("chat-1", run, undefined, undefined, { mcp: bridge });
+  await tool.execute("call-1", { code: "mcp.search('double', { limit: 2 })" });
+  assert.deepEqual(seen, [{ query: "double", options: { limit: 2 } }]);
+  assert.equal(found[0].name, "double");
+});
+
 test("a tool error propagates out of the cell's onCall", async () => {
   const { bridge } = fakeBridge();
   const run = async (_chatId, _toolCallId, input) => {
