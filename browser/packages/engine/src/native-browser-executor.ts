@@ -29,8 +29,8 @@ import {
 } from "./native-browser-session.js";
 import {
   discoverFrames,
-  frameDebuggee,
   evaluateFrame,
+  frameDebuggee,
   uploadFiles,
 } from "./native-browser-frames.js";
 import {
@@ -339,8 +339,7 @@ export async function performExtra(
   if (!tab || !sameTarget(tab.target, request.step.target) || !drivablePage(tab.url))
     throw new Error("TARGET_LOST");
   const encoded = JSON.stringify(data);
-  // A CDP call is an explicit request for exactly what it returns: screenshots, PDFs and page
-  // snapshots are base64 images far past the read limit. Everything else keeps the tight cap.
+  // Explicit CDP calls (screenshots, PDFs, snapshots) skip the read cap; all else keeps it.
   const limit = step.op === "cdp" ? 24_000_000 : 1_000_000;
   if (encoded && encoded.length > limit)
     throw new BrowserActionError(
@@ -571,8 +570,7 @@ async function executeStep(
   if (step.op === "listTabs") return listTabs(request);
   if (step.op === "openTab") return openTab(identity, request);
   if (step.op === "attachTab") return attachTab(step.target);
-  // A tab another chat is driving is still usable, but it gets a short wait: a busy tab there
-  // must fail with TAB_BUSY, not hold this cell until its own deadline.
+  // Another chat's tab gets a short wait: fail with TAB_BUSY, never hold this cell to deadline.
   const holder = browserSessionHolder(step.target.tabId);
   const budgetMs = holder && holder !== request.chatId ? 5000 : undefined;
   if (controlOf(step.target.tabId) === "user" && step.op !== "control" && step.op !== "session")
@@ -639,8 +637,7 @@ async function dispatchStep(
   if (isExtraStep(step)) return performExtra({ ...request, step }, revalidateTarget);
   throw new Error("UNSUPPORTED");
 }
-// Chrome only reports activation for a focused window, so a background tab can look inactive;
-// ask each window at list time so browser.tabs() and browser.activeTab() describe it as it is now.
+// Chrome reports activation only for a focused window: ask each window at list time.
 async function assertTarget(request: BrowserExecutorRequest): Promise<chrome.tabs.Tab> {
   if (!isTargetStep(request.step)) throw new Error("INVALID_TARGET");
   const target = request.step.target;
