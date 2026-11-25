@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import type { FlagResult } from "./chrome-flags.js";
 
-// Three opt-in questions at the end of `aeon setup`. They only run on a terminal without --yes, so
+// Opt-in questions at the end of `aeon setup`. They only run on a terminal without --yes, so
 // CI and scripted installs never wait on input.
 
 export interface PromptDeps {
@@ -29,17 +29,6 @@ export async function setupPrompts(deps: PromptDeps): Promise<string[]> {
     asked.push(text);
     return yes(await deps.ask(`${text} ${fallback ? "[Y/n]" : "[y/N]"} `), fallback);
   };
-  if (
-    await question(
-      "Hide Chrome's 'debugging this browser' banner and keep background tabs fast?",
-      false,
-    )
-  ) {
-    const result = deps.applyFlags();
-    deps.say(
-      `${result.done ? "Done" : "Skipped"}: ${result.detail}. Undo with \`aeon setup --undo-flags\`.`,
-    );
-  }
   const agents = await deps.detectAgents().catch(() => []);
   if (
     agents.length &&
@@ -51,7 +40,32 @@ export async function setupPrompts(deps: PromptDeps): Promise<string[]> {
     if (await question("Sign in to an AI model now?", true)) await deps.login();
     else deps.say("Later: connect an AI model with `aeon login`.");
   }
+  // Last and optional: Enter skips it, and `aeon setup --undo-flags` reverts it at any time.
+  if (
+    await question(
+      "Optional, reversible: relaunch-ready Chrome flags that hide the 'debugging this browser' banner?",
+      false,
+    )
+  ) {
+    const result = deps.applyFlags();
+    deps.say(
+      `${result.done ? "Done" : "Skipped"}: ${result.detail}. Restart Chrome to use them; undo with \`aeon setup --undo-flags\`.`,
+    );
+  }
   return asked;
+}
+
+/** The first minute after setup: own data back from a signed-in tab, then an agent connected. */
+export function firstSixtySeconds(): string[] {
+  return [
+    "",
+    "First 60 seconds:",
+    "  1. Open any tab you are signed in to, then run:",
+    "       aeon map --attach active --until-idle 8",
+    "     Your own data comes back in about a second. No model, no API key.",
+    "  2. Connect your coding agent:",
+    "       aeon mcp",
+  ];
 }
 
 export function terminalAsk(): (question: string) => Promise<string> {

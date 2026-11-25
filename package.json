@@ -18,6 +18,7 @@
     "test": "node scripts/run-tests.mjs \"apps/*/test/*.test.mjs\" \"packages/*/test/*.test.mjs\" \"scripts/**/*.test.mjs\" \"benchmarks/*.test.mjs\" \"templates/video/test/*.test.mjs\"",
     "test:claws": "node --test --test-timeout=60000 \"browser/packages/engine/test/claws-contract/*.test.mjs\"",
     "test:artifact-gate": "node scripts/evals/artifact-gate.mjs",
+    "package:store": "pnpm --filter @aeon/chrome-extension build && node scripts/package-store-extension.mjs",
     "stress:dry-run": "node scripts/stress/run-scenarios.mjs --dry-run",
     "check": "pnpm build && pnpm --dir browser run check && pnpm format:check && pnpm lint && pnpm agent-text:check && pnpm typecheck && pnpm test && pnpm test:artifact-gate",
     "agent-text": "node browser/scripts/build-agent-text.mjs",

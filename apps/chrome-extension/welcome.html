@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Aeon</title>
+    <style>
+      :root {
+        --ink-void: #000000;
+        --ink-primary: #f3f3f1;
+        --ink-secondary: rgba(243, 243, 241, 0.56);
+        --ink-muted: rgba(243, 243, 241, 0.38);
+        --ink-divider: rgba(255, 255, 255, 0.065);
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--ink-void);
+        color: var(--ink-primary);
+        font:
+          13.5px/1.58 -apple-system,
+          BlinkMacSystemFont,
+          "SF Pro Text",
+          "Inter",
+          system-ui,
+          sans-serif;
+        letter-spacing: -0.011em;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+        padding: 18vh 16px 64px;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: -0.025em;
+        margin: 0 0 40px;
+      }
+      p {
+        margin: 0 0 14px;
+        color: var(--ink-secondary);
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        color: var(--ink-primary);
+      }
+      #status {
+        color: var(--ink-muted);
+      }
+      #status[data-state="up"] {
+        color: var(--ink-primary);
+      }
+      #setup[hidden] {
+        display: none;
+      }
+      ol {
+        margin: 0 0 14px;
+        padding-left: 18px;
+        color: var(--ink-secondary);
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--ink-divider);
+        margin: 28px 0;
+      }
+      button {
+        background: none;
+        border: 0;
+        padding: 0;
+        font: inherit;
+        color: var(--ink-primary);
+        cursor: pointer;
+        text-decoration: underline;
+        text-decoration-color: var(--ink-muted);
+        text-underline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Every site you're signed in to becomes an API your agent can call.</h1>
+      <p id="status" data-state="checking">Checking the connection to Aeon on this computer.</p>
+      <div id="setup" hidden>
+        <ol>
+          <li>In a terminal, run <code>aeon setup</code>.</li>
+          <li>Reopen this tab. It connects on its own.</li>
+        </ol>
+      </div>
+      <hr />
+      <p>
+        Open any tab you are signed in to, then press <code>Alt+Shift+Space</code> to ask on that
+        page, or run <code>aeon map --attach active --until-idle 8</code> in a terminal.
+      </p>
+      <p>Connect your coding agent with <code>aeon mcp</code>.</p>
+      <p><button id="panel" type="button">Open the side panel</button></p>
+    </main>
+    <script src="welcome.js"></script>
+  </body>
+</html>
