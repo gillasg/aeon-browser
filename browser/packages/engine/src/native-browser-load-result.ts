@@ -1,3 +1,4 @@
+import { isKernelErrorCode } from "./kernel-errors.js";
 import { BrowserActionError } from "./native-browser-common.js";
 import { pendingRequests, settleBrowserPage } from "./native-browser-navigation.js";
 
@@ -64,4 +65,25 @@ export function policyBlockedError(
     "POLICY_BLOCKED",
     `${host} is blocked by ${rule}; allow it in Settings → Sites`,
   );
+}
+
+export function hintEvaluateError(description: string): string {
+  const text = String(description ?? "");
+  if (/^ReferenceError/.test(text) && /\b(window|document|location|self|localStorage)\b/.test(text))
+    return `${text}\nHint: this cell runs in the sandbox; use page.evaluate(...) or page.inspect(...) to run code in the page.`;
+  if (
+    /^TypeError/.test(text) &&
+    /Cannot read properties of undefined \(reading 'querySelector'\)/.test(text)
+  )
+    return `${text}\nHint: this looks like page code running in the sandbox; use page.evaluate(...) or page.inspect(...).`;
+  return text;
+}
+
+/**
+ * An exception thrown by code running in the page: a coded one ("Error: TARGET_NOT_FOUND: …",
+ * thrown by the page helpers) keeps its code; any other is the code's own error, not Chrome's.
+ */
+export function pageExceptionCode(detail: string): string {
+  const head = /^(?:[A-Za-z]*Error: )?([A-Z][A-Z_]+)(?::|$)/.exec(detail)?.[1] ?? "";
+  return isKernelErrorCode(head) ? head : "CODE_ERROR";
 }

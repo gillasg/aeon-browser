@@ -30,20 +30,12 @@ const call = (fn: string, arg: unknown) => `(${fn})(${JSON.stringify(arg ?? null
 
 // Runs in the page: canvases with their size, box and context kind (never creates a context).
 const CANVAS_LIST = String((arg: { selector?: string; digest?: boolean }) => {
-  // A canvas that has a context answers only for its own kind. The tap records the kind as the
-  // page asks; otherwise each kind is probed (a canvas nobody drew on gets a 2d context).
-  const kindOf = (canvas: HTMLCanvasElement) => {
-    const tapped = (canvas as unknown as { __aeonKind?: string }).__aeonKind;
-    if (tapped) return tapped;
-    for (const kind of ["2d", "webgl2", "webgl"]) {
-      try {
-        if (canvas.getContext(kind)) return kind;
-      } catch {
-        // a kind this browser lacks
-      }
-    }
-    return "unknown";
-  };
+  const tap = (
+    window as unknown as { __aeonCanvasTap?: { kinds?: WeakMap<HTMLCanvasElement, string> } }
+  ).__aeonCanvasTap;
+  // Never probe via canvas.getContext(): calling getContext('2d') on an untouched canvas locks
+  // its context type and permanently breaks a page's later WebGL initialization.
+  const kindOf = (canvas: HTMLCanvasElement) => tap?.kinds?.get(canvas) ?? "untouched";
   const nodes = [...document.querySelectorAll(arg.selector || "canvas")].filter(
     (node): node is HTMLCanvasElement => node instanceof HTMLCanvasElement,
   );
@@ -75,7 +67,13 @@ const CANVAS_LIST = String((arg: { selector?: string; digest?: boolean }) => {
 // Runs in the page before any drawing it wants to see: remembers each context kind and, while
 // the tap runs, fillText/strokeText calls into a bounded buffer. stop() puts the originals back.
 const TEXT_TAP = String((arg: { action: string; limit?: number }) => {
-  const w = window as unknown as { __aeonCanvasTap?: { texts: unknown[]; restore: () => void } };
+  const w = window as unknown as {
+    __aeonCanvasTap?: {
+      texts: unknown[];
+      kinds: WeakMap<HTMLCanvasElement, string>;
+      restore: () => void;
+    };
+  };
   if (arg.action === "list") return w.__aeonCanvasTap ? w.__aeonCanvasTap.texts.slice() : null;
   if (arg.action === "stop") {
     const had = Boolean(w.__aeonCanvasTap);
@@ -89,6 +87,7 @@ const TEXT_TAP = String((arg: { action: string; limit?: number }) => {
   const stroke = proto.strokeText;
   const getContext = HTMLCanvasElement.prototype.getContext;
   const limit = Math.min(Math.max(Number(arg.limit) || 500, 1), 2000);
+  const kinds = new WeakMap<HTMLCanvasElement, string>();
   const texts: { text: string; x: number; y: number; op: string; canvas?: string | undefined }[] =
     [];
   const note = (op: string) =>
@@ -106,11 +105,12 @@ const TEXT_TAP = String((arg: { action: string; limit?: number }) => {
   proto.fillText = note("fill");
   proto.strokeText = note("stroke");
   HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, kind: string) {
-    (this as unknown as { __aeonKind?: string }).__aeonKind = kind;
+    kinds.set(this, kind);
     return getContext.apply(this, arguments as never);
   } as typeof getContext;
   w.__aeonCanvasTap = {
     texts,
+    kinds,
     restore: () => {
       proto.fillText = fill;
       proto.strokeText = stroke;

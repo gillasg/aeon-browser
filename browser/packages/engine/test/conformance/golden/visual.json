@@ -9,12 +9,12 @@
     {
       "step": "screenshot-format",
       "kind": "ok",
-      "result": "image/jpeg"
+      "result": "image/png"
     },
     {
       "step": "screenshot-png",
       "kind": "check",
-      "result": "image/jpeg"
+      "result": "image/png"
     },
     {
       "step": "pixels",

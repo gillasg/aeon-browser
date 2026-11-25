@@ -50,7 +50,19 @@ test("page.data name returns those rows and the footer names the call", () => {
 test("a short rate-limit page warns once and a long page does not", () => {
   assert.match(rateLimitWarning("Too many requests. Try again later.", 200), /RATE_LIMITED/);
   assert.match(rateLimitWarning("ok", 429), /fewer tabs/);
+  assert.match(rateLimitError("HTTP 429", 200), /RATE_LIMITED/);
+  assert.match(rateLimitError("429 Too Many Requests", 200), /RATE_LIMITED/);
+  assert.equal(rateLimitError("Coffee mug ₹429 in stock", 200, "Shop"), undefined);
+  assert.equal(rateLimitError("Order total $429", 200, "Cart"), undefined);
+  assert.equal(rateLimitError("429 items available", 200, "Catalog"), undefined);
   assert.equal(rateLimitWarning("a long page ".repeat(80), 200), undefined);
+  const ctx = vm.createContext({});
+  vm.runInContext(THROTTLE_PAGE_JS, ctx);
+  assert.equal(vm.runInContext(`__throttlePage("Shop", "Coffee mug ₹429 in stock")`, ctx), "");
+  assert.match(
+    vm.runInContext(`__throttlePage("Error 429", "429 - slow down")`, ctx),
+    /RATE_LIMITED/,
+  );
 });
 
 test("rush-hour and heavy-traffic interstitials are RATE_LIMITED, not page content", () => {

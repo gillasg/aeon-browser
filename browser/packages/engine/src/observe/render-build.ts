@@ -31,6 +31,7 @@ interface Build {
   expand: readonly ExpandSection[];
   hot: Set<string>;
   focusZone: Set<string>;
+  visited: Set<TreeNode>;
   order: number;
 }
 
@@ -48,6 +49,7 @@ export function buildLines(
     expand,
     hot,
     focusZone: focusZone(tree.nodes),
+    visited: new Set(),
     order: 1,
   };
   build.lines.push(headerLine(tree));
@@ -98,11 +100,14 @@ const STRUCTURAL = new Set([
 ]);
 
 function walk(node: TreeNode, parentKey: string | undefined, flags: Flags, build: Build): void {
+  if (build.visited.has(node)) return;
+  build.visited.add(node);
   if (STRUCTURAL.has(node.role) || skipNode(node, flags)) {
     walkKids(node, parentKey, flags, build);
     return;
   }
   if (isDialogRole(node.role) && parentKey) {
+    build.visited.delete(node);
     walk(node, undefined, { dialog: false, underRow: false, inSelect: false }, build);
     return;
   }

@@ -278,7 +278,12 @@ async function saveScreenshot(root: string, request: Request, append: boolean): 
  * file from elsewhere must be copied into the workspace first, a step the user can see.
  */
 export async function validateUploadFiles(files: string[], root: string): Promise<string[]> {
-  const realRoot = await realpath(resolve(root));
+  let realRoot: string;
+  try {
+    realRoot = await realpath(resolve(root));
+  } catch {
+    throw new Error("UPLOAD_OUTSIDE_WORKSPACE: the session workspace has no files yet");
+  }
   return Promise.all(
     files.map(async (file) => {
       let path: string;

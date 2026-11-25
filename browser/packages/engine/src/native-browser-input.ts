@@ -5,6 +5,7 @@ import {
   DEFAULT_STEP_MS,
   holdMissingTarget,
   normalizePreparationError,
+  refuseForeignLoginForm,
   relocateRef,
   retryablePreparation,
   type Point,
@@ -15,6 +16,7 @@ import {
   deliveredThroughDialog,
   dialogsDuringAction,
   endAction,
+  noteDialogAct,
   type AnsweredDialog,
 } from "./evidence/dialogs.js";
 import { showAgentCursor, showAgentKeys, type CursorUpdate } from "./native-browser-cursor.js";
@@ -39,11 +41,6 @@ import { focusFilledPassword, noteVaultFill } from "./native-browser-vault.js";
 import { withFocusEmulation } from "./native-browser-session.js";
 import { humanType, paceKey } from "./native-browser-human-input.js";
 import { pasteNode } from "./native-browser-paste.js";
-import {
-  foreignLoginHost,
-  foreignLoginMessage,
-  loginFormOfNode,
-} from "./native-browser-profile.js";
 import {
   type BrowserExecutorRequest,
   type BrowserElementTarget,
@@ -387,7 +384,7 @@ export async function prepareElement(
       );
       // A frame's node acts through its own session: DOM ids and Input coordinates are local to it.
       const frame = node.sessionId ? { ...debuggee, sessionId: node.sessionId } : debuggee;
-      const point = await actionablePoint(frame, node.backendNodeId, editable, force);
+      const point = await actionablePoint(frame, node.backendNodeId, editable, force, deadline);
       // Input events go to the root session in main-viewport coordinates, however deep the frame.
       const top = node.frameId
         ? await rootFramePoint(debuggee, node.frameId, point)
@@ -546,8 +543,13 @@ export async function performAction(
   revalidateTarget: RevalidateTarget,
 ): Promise<BrowserExecutorResult> {
   const tabId = request.step.target.tabId;
-  request.deadline ??= Date.now() + DEFAULT_STEP_MS;
+  const stepMs =
+    "timeoutMs" in request.step && typeof request.step.timeoutMs === "number"
+      ? request.step.timeoutMs
+      : DEFAULT_STEP_MS;
+  request.deadline ??= Date.now() + stepMs;
   let outcome: "navigated" | "changed" | "unchanged" | "unknown" = "unknown";
+  let beforeUrl: string | undefined;
   let note: string | undefined;
   let changes: number | undefined;
   let readback: string | undefined;
@@ -566,6 +568,7 @@ export async function performAction(
       if (request.step.op === "scroll")
         return scrollWithFeedback(debuggee, { ...request, step: request.step });
       const before = filled ? undefined : await primeBrowserSettle(debuggee);
+      beforeUrl = before?.url;
       const since = Date.now();
       // The click lands now, not when beginReceipt ran: pre-click validation can outlast the
       // causal window under load. Anchor the receipt here so its request is not dropped.
@@ -596,6 +599,12 @@ export async function performAction(
     if (!current) throw new Error("TARGET_LOST");
     const liveTab = await chrome.tabs.get(tabId).catch(() => undefined);
     if (!liveTab?.url || !drivablePage(liveTab.url)) throw new Error("TARGET_LOST");
+    if (
+      (request.expectedDocumentEpoch !== undefined &&
+        current.documentEpoch !== request.expectedDocumentEpoch) ||
+      (beforeUrl !== undefined && liveTab.url !== beforeUrl)
+    )
+      outcome = "navigated";
     const observation =
       scroll || (request.step.op !== "scroll" && request.step.observe === false)
         ? undefined
@@ -718,6 +727,8 @@ async function dispatchAction(
     point: { x: top.x, y: top.y },
     tAct: Date.now(),
   });
+  // A dialog this input opens counts as asked for, however long finding the element took.
+  if (debuggee.tabId !== undefined) noteDialogAct(debuggee.tabId);
   if (request.step.op === "click" || request.step.op === "hold") {
     const press = { debuggee: frame, backendNodeId: node.backendNodeId, ...top };
     const tabId = request.step.target.tabId;
@@ -769,19 +780,6 @@ async function dispatchAction(
     };
   } else await scrollAt(debuggee, top.x, top.y, request.step.direction, request.step.amount);
   return measured ? { box: measured } : undefined;
-}
-
-async function refuseForeignLoginForm(
-  frame: chrome.debugger.Debuggee,
-  backendNodeId: number,
-): Promise<void> {
-  const form = await onNode<{ page: string; action: string | null } | null>(
-    frame,
-    backendNodeId,
-    loginFormOfNode,
-  ).catch(() => null);
-  const host = form ? foreignLoginHost(form.page, form.action) : null;
-  if (host) throw new BrowserActionError("FOREIGN_FORM", foreignLoginMessage(host));
 }
 
 async function scrollViewport(

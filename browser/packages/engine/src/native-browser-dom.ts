@@ -150,6 +150,7 @@ interface Query {
 export async function queryNodes(
   debuggee: chrome.debugger.Debuggee,
   query: Query,
+  contextId?: number,
 ): Promise<number[]> {
   const group = `aeon-query-${crypto.randomUUID()}`;
   try {
@@ -159,6 +160,7 @@ export async function queryNodes(
       {
         expression: `(${findElements.toString()})(${JSON.stringify(query)})`,
         objectGroup: group,
+        ...(contextId !== undefined ? { contextId } : {}),
       },
       { label: "queryNodes", ms: 5_000 },
     )) as { result?: { objectId?: string }; exceptionDetails?: unknown };
@@ -331,6 +333,17 @@ export async function fillTextNode(
       { label: "fillTextNode" },
     )) as { node?: { backendNodeId?: number } };
     if (!node.node?.backendNodeId) throw staleBeforeInsert();
+    const stillConnected = (await send(
+      debuggee,
+      "Runtime.callFunctionOn",
+      {
+        objectId: selected.result.objectId,
+        functionDeclaration: "function () { return this.isConnected === true; }",
+        returnByValue: true,
+      },
+      { label: "fillTextNode", ms: 2_000 },
+    ).catch(() => ({ result: { value: false } }))) as { result?: { value?: boolean } };
+    if (!stillConnected.result?.value) throw staleBeforeInsert();
     const keys = selected.result.objectId
       ? await listensForKeys(debuggee, selected.result.objectId, { deep: false })
       : false;
@@ -458,7 +471,17 @@ function selectTextInput(this: HTMLInputElement | HTMLTextAreaElement) {
   }
 }
 function inputValue(this: HTMLInputElement | HTMLTextAreaElement) {
-  return this.isContentEditable ? this.innerText : this.value;
+  return this.isConnected ? (this.isContentEditable ? this.innerText : this.value) : null;
+}
+function activeInputValue(): string | null {
+  let active: Element | null = document.activeElement;
+  for (let i = 0; i < 20 && active?.shadowRoot?.activeElement; i++)
+    active = active.shadowRoot.activeElement;
+  if (!active || !(active instanceof HTMLElement)) return null;
+  if (active.isContentEditable) return active.innerText;
+  return "value" in active && typeof (active as HTMLInputElement).value === "string"
+    ? (active as HTMLInputElement).value
+    : null;
 }
 /** The value the control holds, when it is the one just typed (editors may adjust spaces). */
 async function retained(
@@ -466,8 +489,18 @@ async function retained(
   id: number,
   value: string,
 ): Promise<string | undefined> {
-  const actual = await onNode<string>(debuggee, id, inputValue);
+  const actual = await onNode<string | null>(debuggee, id, inputValue).catch(() => null);
   if (actual === value) return actual;
+  if (actual === null) {
+    const active = (await send(
+      debuggee,
+      "Runtime.evaluate",
+      { expression: `(${activeInputValue.toString()})()`, returnByValue: true },
+      { label: "retained", ms: 2_000 },
+    ).catch(() => undefined)) as { result?: { value?: string | null } } | undefined;
+    if (active?.result?.value === value) return active.result.value;
+    return undefined;
+  }
   if (!(await onNode<boolean>(debuggee, id, isRichText))) return undefined;
   const norm = (text: string) =>
     text.replace(/ /g, " ").replace(/\r/g, "").replace(/\n+/g, "\n").trim();

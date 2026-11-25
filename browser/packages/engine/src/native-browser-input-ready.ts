@@ -5,6 +5,11 @@ import { coveringElement, hitPoint, scrollNearest } from "./native-browser-input
 import { pageStillChanging } from "./native-browser-navigation.js";
 import { browserObservationRefs } from "./native-browser-observation.js";
 import { hiddenTargetError } from "./native-browser-reveal.js";
+import {
+  foreignLoginHost,
+  foreignLoginMessage,
+  loginFormOfNode,
+} from "./native-browser-profile.js";
 import { send } from "./cdp/send.js";
 
 // Getting an element ready for input: the point a click or fill uses, and the retry rules that
@@ -19,6 +24,7 @@ export async function actionablePoint(
   id: number,
   editable = false,
   force = false,
+  deadline?: number,
 ): Promise<Point> {
   await send(
     debuggee,
@@ -61,7 +67,9 @@ export async function actionablePoint(
     if (stable && current.hit)
       return { x: current.x, y: current.y, ...(current.activate ? { activate: true } : {}) };
     prior = current;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    if (deadline !== undefined && Date.now() >= deadline) break;
+    const wait = deadline !== undefined ? Math.min(50, Math.max(0, deadline - Date.now())) : 50;
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
   }
   const cover = await onNode<string>(debuggee, id, coveringElement).catch(() => "");
   throw cover ? new BrowserActionError("TARGET_BLOCKED", cover) : new Error("TARGET_BLOCKED");
@@ -124,4 +132,17 @@ export function normalizePreparationError(error: unknown): unknown {
   )
     return new Error("STALE_REF");
   return error;
+}
+
+export async function refuseForeignLoginForm(
+  frame: chrome.debugger.Debuggee,
+  backendNodeId: number,
+): Promise<void> {
+  const form = await onNode<{ page: string; action: string | null } | null>(
+    frame,
+    backendNodeId,
+    loginFormOfNode,
+  ).catch(() => null);
+  const host = form ? foreignLoginHost(form.page, form.action) : null;
+  if (host) throw new BrowserActionError("FOREIGN_FORM", foreignLoginMessage(host));
 }

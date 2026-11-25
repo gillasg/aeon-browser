@@ -12,7 +12,7 @@ import type { BrowserElementTarget, BrowserTargetKey } from "@browserkit/protoco
 import { collectAttributeHits, missMessage, type AttributeHit } from "./attribute-hint.js";
 import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom.js";
 import { ambiguousError, hiddenError, notFoundError } from "./native-browser-candidates.js";
-import { collectFrameAx } from "./native-browser-frames.js";
+import { collectFrameAx, discoverFrames, frameContext } from "./native-browser-frames.js";
 import { humanMouse } from "./native-browser-human-input.js";
 import { send } from "./cdp/send.js";
 import { withFocusEmulation } from "./native-browser-session.js";
@@ -248,16 +248,66 @@ async function resolveQueryFast(
   const visible = await visibleNodes(debuggee, ids);
   if (visible.length > 1) throw ambiguousQuery([], visible, query.value);
   const id = visible[0];
-  if (id === undefined && ids[0] !== undefined)
-    throw await hiddenQuery(debuggee, [], ids[0], query.value);
-  if (id === undefined) throw await missedQuery(debuggee, query);
-  const ref = await describeBackend(
-    debuggee,
-    { kind: "backend", backendNodeId: id, documentEpoch: documentEpoch ?? 0 },
-    documentEpoch,
-  );
-  if (!ref) throw new Error("STALE_REF");
-  return ref;
+  if (id !== undefined) {
+    const ref = await describeBackend(
+      debuggee,
+      { kind: "backend", backendNodeId: id, documentEpoch: documentEpoch ?? 0 },
+      documentEpoch,
+    );
+    if (!ref) throw new Error("STALE_REF");
+    return ref;
+  }
+  const frames = await discoverFrames(debuggee).catch(() => []);
+  const hits: {
+    id: number;
+    frameId: string;
+    sessionId?: string;
+    target: chrome.debugger.Debuggee;
+  }[] = [];
+  let hiddenInFrame: { id: number; target: chrome.debugger.Debuggee } | undefined;
+  for (const frame of frames) {
+    if (!frame.parentFrameId && !frame.sessionId) continue;
+    const frameTarget = frame.sessionId ? { ...debuggee, sessionId: frame.sessionId } : debuggee;
+    const contextId = await frameContext(frameTarget, frame.frameId).catch(() => undefined);
+    if (contextId === undefined) continue;
+    const frameIds = await queryNodes(frameTarget, query, contextId).catch(() => []);
+    if (!frameIds.length) continue;
+    const frameVisible = await visibleNodes(frameTarget, frameIds).catch(() => []);
+    for (const matchId of frameVisible) {
+      hits.push({
+        id: matchId,
+        frameId: frame.frameId,
+        ...(frame.sessionId ? { sessionId: frame.sessionId } : {}),
+        target: frameTarget,
+      });
+    }
+    if (!frameVisible.length && !hiddenInFrame && frameIds[0] !== undefined)
+      hiddenInFrame = { id: frameIds[0], target: frameTarget };
+  }
+  if (hits.length > 1)
+    throw ambiguousQuery(
+      [],
+      hits.map((h) => h.id),
+      query.value,
+    );
+  const hit = hits[0];
+  if (hit) {
+    const ref = await describeBackend(
+      hit.target,
+      { kind: "backend", backendNodeId: hit.id, documentEpoch: documentEpoch ?? 0 },
+      documentEpoch,
+    );
+    if (!ref) throw new Error("STALE_REF");
+    return {
+      ...ref,
+      frameId: hit.frameId,
+      ...(hit.sessionId ? { sessionId: hit.sessionId } : {}),
+    };
+  }
+  if (ids[0] !== undefined) throw await hiddenQuery(debuggee, [], ids[0], query.value);
+  if (hiddenInFrame)
+    throw await hiddenQuery(hiddenInFrame.target, [], hiddenInFrame.id, query.value);
+  throw await missedQuery(debuggee, query);
 }
 
 async function missedQuery(
