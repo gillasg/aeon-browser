@@ -26,6 +26,7 @@ import { BrowserActionError, assertOpenable, sameIdentity } from "./native-brows
 import { navigateReady } from "./native-browser-navigation.js";
 import { noteAgentNavigation, setAgentOpenedTab } from "./evidence/dialogs.js";
 import { captureFromTabStart } from "./native-browser-network.js";
+import { placementSpace } from "./native-browser-placement.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 import {
   ensureSpacesRestored,
@@ -42,7 +43,9 @@ export async function openTab(
 ): Promise<BrowserExecutorResult> {
   const step = validOpenTab(request, identity);
   await assertBrowserNetwork(step.url);
-  const space = step.window ? "tabs" : (step.space ?? engineConfig.defaultSpace(request.chatId));
+  const space = step.window
+    ? "tabs"
+    : await placementSpace(step, () => engineConfig.defaultSpace(request.chatId));
   await ensureSpacesRestored();
   const created = await createTab(step, request.chatId, space);
   if (created.id === undefined) throw new Error("TARGET_LOST");
@@ -120,7 +123,10 @@ async function createTab(
       }
       return chrome.tabs.create({ url: "about:blank", active: true, windowId: window.windowId });
     }
-    const front = step.foreground || (await engineConfig.agentInFront().catch(() => false));
+    // A background tab never takes the user's active tab, whatever the front setting says.
+    const front =
+      !step.background &&
+      (step.foreground || (await engineConfig.agentInFront().catch(() => false)));
     return chrome.tabs.create({ url: "about:blank", active: front });
   }
   const window = await chrome.windows.create({

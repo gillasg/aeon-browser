@@ -30,6 +30,8 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       ads: z.boolean().optional(),
       /** Its own background window (bulk work) or a tab in the user's window (a chat). */
       space: z.enum(["window", "tabs"]).optional(),
+      /** A new background or fan-out tab: placed by the tabPlacement setting, never made active. */
+      background: z.boolean().optional(),
       /** The Referer this page load sends (some providers allowlist it). */
       referer: z.string().url().max(8192).optional(),
       /** false for a background read pool: open without changing the Split View pair. */
