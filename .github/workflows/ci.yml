@@ -179,6 +179,36 @@ jobs:
           path: conformance-output
           if-no-files-found: ignore
           retention-days: 7
+      - name: Stealth probe
+        if: runner.os == 'macOS'
+        run: pnpm test:stealth-probe
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+          AEON_STEALTH_REQUIRE: chrome
+          AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
+      - name: Stealth probe
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm test:stealth-probe
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+          AEON_STEALTH_REQUIRE: chrome
+          AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
+      - name: Stealth probe (informational)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        run: pnpm test:stealth-probe
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+          AEON_STEALTH_REQUIRE: chrome
+          AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
+      - name: Keep stealth probe output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stealth-probe-output-${{ matrix.os }}
+          path: stealth-probe-output
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Keep browser test output
         if: failure()
         uses: actions/upload-artifact@v4

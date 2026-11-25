@@ -20,7 +20,8 @@
     "check": "pnpm format:check && pnpm lint && pnpm agent-text:check && pnpm typecheck && pnpm build && pnpm test",
     "test:browser": "node scripts/run-tests.mjs --browser \"test/*.test.mjs\" && node scripts/package-e2e.mjs",
     "test:conformance": "node scripts/run-tests.mjs --browser \"packages/engine/test/conformance/*.test.mjs\"",
-    "check:browser": "pnpm build && pnpm test:browser && pnpm test:conformance"
+    "test:stealth-probe": "node scripts/run-tests.mjs --browser \"packages/engine/test/stealth-probe/*.test.mjs\"",
+    "check:browser": "pnpm build && pnpm test:browser && pnpm test:conformance && pnpm test:stealth-probe"
   },
   "devDependencies": {
     "@types/node": "26.6.3",
