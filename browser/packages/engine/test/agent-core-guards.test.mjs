@@ -65,6 +65,22 @@ test("a short rate-limit page warns once and a long page does not", () => {
   );
 });
 
+test("an ordinary 429 on a page (price, order id, count) is not a rate limit", () => {
+  for (const text of ["Order #429 shipped", "Total: $429.00", "429 results", "Item 14290"])
+    assert.equal(rateLimitError(text, 200, "Shop"), undefined, text);
+  for (const text of [
+    "Error 429",
+    "HTTP 429 Too Many Requests",
+    "429 - rate limited",
+    "status: 429",
+  ])
+    assert.match(rateLimitError(text, 200, ""), /RATE_LIMITED/, text);
+  const page = new Function(`${THROTTLE_PAGE_JS}; return __throttlePage;`)();
+  assert.equal(page("Shop", "Order #429 shipped"), "");
+  assert.match(page("Error 429", "Too many requests"), /RATE_LIMITED/);
+  assert.match(page("", "HTTP 429"), /RATE_LIMITED/);
+});
+
 test("rush-hour and heavy-traffic interstitials are RATE_LIMITED, not page content", () => {
   const amazon = "Oops! It's rush hour and traffic is piling up on that page.";
   const limited = rateLimitError(amazon, 503, "503 - Service Unavailable Error");

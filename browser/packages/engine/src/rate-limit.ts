@@ -1,8 +1,12 @@
 // A short page, or a 429, is the site saying stop. A known throttle interstitial (Amazon rush
 // hour, Flipkart's traffic page) is the same thing even when the status is a 503.
 
-const GENERIC =
-  /too many (?:attempts|requests)|try again later|rate limit|slow down|(?:^|\s)(?:http\s+|error\s+|status\s+)?429(?:\s+too\s+many|\s*[:—-]|$)/i;
+// A bare 429 is a price, an order id or a count; only a status-shaped 429 is the site saying stop.
+const STATUS_429 = String.raw`(?:\b(?:error|status|http(?:\/[\d.]+)?|code)\s*[:#]?\s*429\b|\b429\s*[-:–—]?\s*(?:too many|rate)|(?:^|\s)429(?:\s*[:—-]|$))`;
+const GENERIC = new RegExp(
+  String.raw`too many (?:attempts|requests)|try again later|rate limit|slow down|` + STATUS_429,
+  "i",
+);
 const RUSH = /it['’]?s rush hour/i;
 const TRAFFIC = /traffic is piling up/i;
 const CROWD =
@@ -21,7 +25,7 @@ function __throttlePage(title, text) {
   var head = title + " " + text.slice(0, 500);
   var rush = text.length < 4000 && /it['’]?s rush hour/i.test(text) && (/traffic is piling up/i.test(text) || /503|service unavailable/i.test(title));
   var crowd = text.length < 4000 && /we(?:'re| are) (?:experiencing|facing|seeing) (?:heavy|high|a lot of) traffic|heavy traffic on (?:our|the) (?:site|page|servers)/i.test(text);
-  var generic = text.length <= 800 && /too many (?:attempts|requests)|try again later|rate limit|slow down|(?:^|\\s)(?:http\\s+|error\\s+|status\\s+)?429(?:\\s+too\\s+many|\\s*[:—-]|$)/i.test(head);
+  var generic = text.length <= 800 && new RegExp(${JSON.stringify(GENERIC.source)}, "i").test(head);
   if (!rush && !crowd && !generic) return "";
   return "RATE_LIMITED: this page is a throttle interstitial, not the site.\\nHint: retry after a pause and open fewer tabs in parallel.";
 }

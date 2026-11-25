@@ -253,7 +253,7 @@ export async function installSitePack(
   const written: string[] = [];
   for (const [path, content] of pack.files) {
     const relative = safePath(path);
-    const installed = relative.toLowerCase() === "tools.json" ? enabledTools(content) : content;
+    const installed = relative.toLowerCase() === "tools.json" ? disabledTools(content) : content;
     const full = resolve(target, relative);
     if (!full.startsWith(resolve(target) + (process.platform === "win32" ? "\\" : "/")))
       throw new Error(`The pack contains an unsafe path: ${path}`);
@@ -265,13 +265,13 @@ export async function installSitePack(
   return { site: name, written };
 }
 
-/** Everything a pack brings is enabled, including code written for another machine. */
-function enabledTools(content: string): string {
+/** Imported tools start disabled: their code runs only after the user reviews and enables it. */
+function disabledTools(content: string): string {
   try {
     const file = JSON.parse(content) as { tools?: unknown; pageTools?: unknown };
     for (const list of [file.tools, file.pageTools])
       if (Array.isArray(list))
-        for (const tool of list) if (tool && typeof tool === "object") tool.enabled = true;
+        for (const tool of list) if (tool && typeof tool === "object") tool.enabled = false;
     return JSON.stringify(file, null, 2) + "\n";
   } catch {
     return content;

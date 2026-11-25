@@ -82,7 +82,11 @@ export async function fetchCall(
       ),
     );
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("SITE_BLOCKED")) throw error;
+    if (
+      error instanceof Error &&
+      /^(SITE_BLOCKED|PRIVATE_NETWORK|REDIRECT_UNCHECKED)/.test(error.message)
+    )
+      throw error;
     throw await fetchFailure(url, error);
   }
   const result: Record<string, unknown> = {
@@ -116,27 +120,30 @@ export async function fetchCall(
   };
 }
 
+/** Headers a redirect to another origin must not carry (fetch's own redirect rule). */
+const CROSS_ORIGIN_DROP = ["authorization", "cookie", "proxy-authorization"];
+
 /**
- * Follows redirects one hop at a time, so each next address passes the site policy and the
- * network check before any request is sent to it. A 302 to a blocked site never reaches it.
+ * Follows redirects one hop at a time, so each next address passes the network check and the
+ * site policy before any request is sent to it. A 302 to a blocked or private site never reaches
+ * it, and a hop to another origin drops the caller's credentials headers.
  */
-async function followGuarded(
+export async function followGuarded(
   first: URL,
   init: RequestInit,
   checkHop: HopCheck | undefined,
 ): Promise<Response> {
-  if (!checkHop) return fetch(first, { ...init, redirect: "follow" });
   let url = first;
   let current = init;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const response = await fetch(url, { ...current, redirect: "manual" });
-    if (response.type === "opaqueredirect") {
-      // This runtime hides the Location of a manual redirect: follow it natively, then refuse
-      // the answer if it ended on a site the policy forbids.
-      const followed = await fetch(url, { ...current, redirect: "follow" });
-      await checkHop(followed.url || url.href);
-      return followed;
-    }
+    if (response.type === "opaqueredirect")
+      // This runtime hides where the redirect goes, so the next hop cannot be checked before it
+      // is sent. Refuse instead of following blind.
+      throw new Error(
+        `REDIRECT_UNCHECKED: ${url.href} redirects to an address that cannot be checked first; ` +
+          "fetch the final address directly or open it in a tab",
+      );
     const location = response.headers.get("location");
     if (response.status < 300 || response.status > 399 || !location) return response;
     const next = new URL(location, url);
@@ -144,19 +151,26 @@ async function followGuarded(
       throw new Error(`browser.fetch was redirected to an unsupported address (${next.protocol})`);
     await response.body?.cancel().catch(() => undefined);
     await assertBrowserNetwork(next.href);
-    await checkHop(next.href);
-    // 303, and 301/302 after a POST, turn into a GET without a body, as browsers do.
-    const method = String(current.method ?? "GET").toUpperCase();
-    if (
-      response.status === 303 ||
-      ((response.status === 301 || response.status === 302) && method === "POST")
-    ) {
-      const { body: _body, ...rest } = current;
-      current = { ...rest, method: "GET" };
-    }
+    await checkHop?.(next.href);
+    current = redirectInit(current, response.status, next.origin !== url.origin);
     url = next;
   }
   throw new Error(`browser.fetch stopped after ${MAX_REDIRECTS} redirects`);
+}
+
+/** The request for the next hop: 303 (and 301/302 after a POST) become a bodiless GET. */
+function redirectInit(current: RequestInit, status: number, crossOrigin: boolean): RequestInit {
+  const headers = new Headers(current.headers);
+  let next: RequestInit = { ...current };
+  const method = String(current.method ?? "GET").toUpperCase();
+  if (status === 303 || ((status === 301 || status === 302) && method === "POST")) {
+    const { body: _body, ...rest } = next;
+    next = { ...rest, method: "GET" };
+    for (const name of ["content-type", "content-length", "content-encoding", "content-language"])
+      headers.delete(name);
+  }
+  if (crossOrigin) for (const name of CROSS_ORIGIN_DROP) headers.delete(name);
+  return { ...next, headers };
 }
 
 interface SplitHeaders {

@@ -364,12 +364,15 @@ test("a node script's browser.fetch answers in browser code's shape", async () =
     response.end(JSON.stringify({ path: request.url, method: request.method }));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const url = `http://127.0.0.1:${server.address().port}/books`;
+  // A node script's fetch is pinned to its own site, so the ability belongs to the server's host.
+  const site = `127.0.0.1:${server.address().port}`;
+  const url = `http://${site}/books`;
   try {
     await withHome(async () => {
       await saveAbility(
         ability({
           name: "fetcher",
+          site,
           inputs: { type: "object", properties: { url: { type: "string" } } },
           ways: [
             {
@@ -380,8 +383,7 @@ test("a node script's browser.fetch answers in browser code's shape", async () =
           ],
         }),
       );
-      const answer = await runAbility("example.com", "fetcher", { url });
-      // Objects built inside the vm sandbox carry its prototypes; compare them as JSON.
+      const answer = await runAbility(site, "fetcher", { url });
       assert.deepEqual(JSON.parse(JSON.stringify(answer.result)), {
         status: 200,
         ok: true,

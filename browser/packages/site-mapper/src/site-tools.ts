@@ -1,10 +1,11 @@
-// Callable site tools: small saved functions that belong to a site pack. A `tool` runs in Node
-// with only siteMapper.call and browser.fetch (no imports); a `pageTool` runs in the page with its
+// Callable site tools: small saved functions that belong to a site pack. A `tool` runs on an isolated
+// worker with only siteMapper.call and browser.fetch (no imports); a `pageTool` runs in the page with its
 // arguments. Both are off until enabled, because enabling them trusts their code.
 
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import vm from "node:vm";
+import { nodeFetch } from "./ability-node.js";
+import { runSandboxed } from "./script-sandbox.js";
 import { handleSiteMapperRequest } from "./requests.js";
 import { siteDir, siteName, writeAtomic } from "./registry.js";
 import type { Json } from "./types.js";
@@ -115,7 +116,8 @@ export async function runSiteTool(
   args: Record<string, unknown>,
   host: {
     call?: (operation: string, params: Record<string, unknown>) => Promise<unknown>;
-    fetch?: typeof fetch;
+    /** Replaces the pinned browser.fetch (tests); answers in browser.fetch's result shape. */
+    fetch?: (url: string, init: Record<string, unknown>) => Promise<unknown>;
   } = {},
 ): Promise<unknown> {
   const file = await readSiteTools(site);
@@ -130,26 +132,21 @@ export async function runSiteTool(
     host.call ??
     ((operation, params) =>
       handleSiteMapperRequest({ siteMapper: "call", site, operation, params }));
-  const fetchImpl = host.fetch ?? fetch;
-  const context = vm.createContext({
-    siteMapper: {
-      call: (operation: string, params: Record<string, unknown> = {}) =>
-        call(String(operation), params),
+  return runSandboxed({
+    code: tool.code,
+    inputs,
+    filename: `${site}/${name}.js`,
+    bridges: {
+      call: (operation, params) =>
+        call(String(operation), (params ?? {}) as Record<string, unknown>),
+      fetch: (url, init) =>
+        host.fetch
+          ? host.fetch(String(url), (init ?? {}) as Record<string, unknown>)
+          : nodeFetch(site, String(url), (init ?? {}) as Record<string, unknown>),
     },
-    browser: { fetch: (url: string, options: RequestInit = {}) => fetchImpl(String(url), options) },
-    args: inputs,
+    timeoutMs: 30_000,
+    timeoutMessage: `SITE_TOOL_TIMEOUT: ${name} exceeded 30s`,
   });
-  const wrapped = `(async () => { ${tool.code}\n })()`;
-  const result = new vm.Script(wrapped, { filename: `${site}/${name}.js` }).runInContext(context, {
-    timeout: 30_000,
-  }) as Promise<unknown>;
-  const value = await Promise.race([
-    result,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`SITE_TOOL_TIMEOUT: ${name} exceeded 30s`)), 30_000),
-    ),
-  ]);
-  return value === undefined ? null : value;
 }
 
 export async function readPageTool(
