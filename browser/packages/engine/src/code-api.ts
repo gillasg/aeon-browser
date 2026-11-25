@@ -120,11 +120,20 @@ function __holdFields(options) {
   var ms = __holdMs(options);
   return ms === undefined ? {} : {ms: ms};
 }
+function __stepTimeout(options) {
+  if (!options) return undefined;
+  var raw = options.timeoutMs ?? options.timeout;
+  if (raw === undefined || raw === null) return undefined;
+  var ms = Math.round(Number(raw));
+  return Number.isFinite(ms) ? Math.max(100, Math.min(120000, ms)) : undefined;
+}
 // Playwright's button and modifiers, as the protocol fields. Unknown names are left out.
 function __pointerFields(options) {
   if (!options) return {};
   var fields = {};
   if (options.human === true) fields.human = true;
+  var timeoutMs = __stepTimeout(options);
+  if (timeoutMs !== undefined) fields.timeoutMs = timeoutMs;
   var button = String(options.button || '').toLowerCase();
   if ({left:1, middle:1, right:1, back:1, forward:1}[button]) fields.button = button;
   var raw = options.modifiers;
@@ -144,7 +153,7 @@ function __locator(target, element, index) {
     element,
     click: (options) => __step(Object.assign({op:'click',target,element:__wire(element),observe:false}, __pointerFields(options))),
     hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
-    fill: (value, options) => __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {})}),
+    fill: (value, options) => { var ms = __stepTimeout(options); return __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})}); },
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
     getByRole: (role, options = {}) => {
       if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with page.locator(css).getByRole(...)');
@@ -517,13 +526,14 @@ var browser = Object.freeze({
     navigate: async (url, options = {}) => {
       var destination = __absoluteUrl(url, target);
       try {
+        var navTimeout = options.timeoutMs ?? options.timeout;
         var result = await __step({op:"navigate", target, url: destination,
           ...(options.referer ? {referer: String(options.referer)} : {}),
           ...(options.present === false ? {present:false} : {}),
-          ...(options.timeoutMs ? {timeoutMs: Math.max(500, Math.min(Number(options.timeoutMs) || 0, 120000))} : {})});
+          ...(navTimeout ? {timeoutMs: Math.max(500, Math.min(Number(navTimeout) || 0, 120000))} : {})});
         __lastErrors.delete(__key(target));
         if (result && result.data && result.data.note) console.log(result.data.note);
-        await __noteChallenge(target, destination);
+        if (!(result && result.data && result.data.timedOut)) await __noteChallenge(target, destination);
         return result;
       } catch (error) {
         __noteNavError(target, destination, 'navigate', error);
@@ -616,11 +626,11 @@ var browser = Object.freeze({
     getByLabel: (value, options = {}) => __locator(target,__withOptions({kind:'query',by:'label',value:String(value)}, options)),
     getByPlaceholder: (value, options = {}) => __locator(target,__withOptions({kind:'query',by:'placeholder',value:String(value)}, options)),
     press: (element, key, options = {}) => __press(target, __element(target, element), key, options, __locatorFor(target, element) || undefined),
-    screenshot: (options = {}) => options.labels ? __labeledScreenshot(target) : __step({op:'observe', target, kind:'screenshot'}),
+    screenshot: (options = {}) => options.labels ? __labeledScreenshot(target) : __step({op:'observe', target, kind:'screenshot', ...(options.format === 'png' || options.format === 'jpeg' ? {format: options.format} : {})}),
     diffScreenshot: (baseline, options = {}) => __diffScreenshot(target, baseline, options),
     recordDemonstration: (options = {}) => __recordDemonstration(target, options),
     click: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.click(options) : __step(Object.assign({op:'click',target,element:__wire(__element(target,element)),observe:false}, __pointerFields(options))); },
-    fill: (element, value, options) => { var loc = __locatorFor(target, element); return loc ? loc.fill(value, options) : __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {})}); },
+    fill: (element, value, options) => { var loc = __locatorFor(target, element); if (loc) return loc.fill(value, options); var ms = __stepTimeout(options); return __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})}); },
     paste: (element, html, text = '') => __step({op:'paste',target,element:__wire(__element(target,element)),html:String(html),text:String(text || html.replace(/<[^>]+>/g, ' ')),observe:false}),
     evaluate: async (fn, arg) => (__readNudge(fn), (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value),
     control: async () => (await __step({op:'control', target, action:'status'})).data,

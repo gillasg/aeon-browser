@@ -30,52 +30,74 @@
     {
       "step": "captured",
       "kind": "ok",
-      "result": []
+      "result": [
+        "GET PRIMARY/api/data?q=1 200",
+        "GET PRIMARY/api/worker 200",
+        "GET PRIMARY/gate/abort undefined",
+        "GET PRIMARY/landed 200",
+        "GET PRIMARY/network 200",
+        "GET PRIMARY/r/1 302",
+        "GET PRIMARY/r/2 302",
+        "GET CROSS/api/frame 200",
+        "GET CROSS/network/frame 200",
+        "POST PRIMARY/api/xhr 201"
+      ]
     },
     {
       "step": "redirect-hops",
       "kind": "ok",
-      "result": []
+      "result": [
+        "PRIMARY/r/1 302",
+        "PRIMARY/r/2 302"
+      ]
     },
     {
       "step": "redirect-hops-match-log",
       "kind": "check",
-      "result": 0
+      "result": 2
     },
     {
       "step": "xhr-body",
       "kind": "ok",
-      "result": null
+      "result": "{\"hello\":\"xhr\"}"
     },
     {
       "step": "worker-request",
       "kind": "ok",
-      "result": []
+      "result": [
+        "PRIMARY/api/worker 200"
+      ]
     },
     {
       "step": "worker-request-captured",
       "kind": "check",
-      "result": 0
+      "result": 1
     },
     {
       "step": "cross-frame-fetch",
       "kind": "ok",
-      "result": []
+      "result": [
+        "CROSS/api/frame 200"
+      ]
     },
     {
       "step": "cross-frame-fetch-captured",
       "kind": "check",
-      "result": 0
+      "result": 1
     },
     {
       "step": "aborted",
       "kind": "ok",
-      "result": []
+      "result": [
+        "PRIMARY/gate/abort done"
+      ]
     },
     {
       "step": "cross-frame-first-request",
       "kind": "ok",
-      "result": []
+      "result": [
+        "CROSS/network/frame 200"
+      ]
     }
   ]
 }

@@ -1,18 +1,25 @@
 import { noteDeviceEmulation, withFocusEmulation } from "./native-browser-session.js";
 export { viewportFingerprint } from "./native-browser-viewport-print.js";
-import { waitForIdleUntil, type IdleResult } from "./native-browser-load-result.js";
-export {
+import {
+  hintEvaluateError,
+  pageExceptionCode,
   policyBlockedError,
   stillLoading,
   waitForIdleUntil,
   type IdleResult,
 } from "./native-browser-load-result.js";
-import { policyBlockedError } from "./native-browser-load-result.js";
+export {
+  hintEvaluateError,
+  pageExceptionCode,
+  policyBlockedError,
+  stillLoading,
+  waitForIdleUntil,
+  type IdleResult,
+};
 import type { BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
 import { withContextRetry } from "./cdp/context-retry.js";
 import { callClass, send } from "./cdp/send.js";
-import { isKernelErrorCode } from "./kernel-errors.js";
 import { refusedCdp } from "./native-browser-guards.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { noteInjectedScript } from "./stealth.js";
@@ -22,6 +29,7 @@ interface Activity {
   /** The URL of each pending request, by the same key. */
   urls: Map<string, string>;
   last: number;
+  navigating?: number;
 }
 export interface PageProbe {
   ready: string;
@@ -46,14 +54,28 @@ export function forgetBrowserActivity(tabId: number): void {
   activity.delete(tabId);
 }
 onEngineInstall(() => {
+  const nav = (tabId: number, on: boolean) => {
+    const s = activity.get(tabId);
+    if (s) s.navigating = on ? Date.now() : 0;
+  };
+  chrome.webNavigation?.onBeforeNavigate?.addListener((e) => e.frameId === 0 && nav(e.tabId, true));
+  for (const ev of [
+    chrome.webNavigation?.onDOMContentLoaded,
+    chrome.webNavigation?.onCompleted,
+    chrome.webNavigation?.onErrorOccurred,
+  ])
+    ev?.addListener((e) => e.frameId === 0 && nav(e.tabId, false));
   chrome.debugger.onEvent.addListener((source, method, raw) => {
-    if (source.tabId === undefined) return;
-    const state = activity.get(source.tabId);
+    const state = source.tabId !== undefined ? activity.get(source.tabId) : undefined;
     if (!state) return;
+    if (!source.sessionId && /^Page\.frame(?:RequestedNavigation|StartedLoading)$/.test(method))
+      state.navigating = Date.now();
+    else if (!source.sessionId && /^Page\.(?:frameStoppedLoading|loadEventFired)$/.test(method))
+      state.navigating = 0;
     const data = (raw ?? {}) as { requestId?: string; type?: string; request?: { url?: string } };
     captureNetworkActivity(
       state,
-      (source.sessionId ?? "") + ":" + data.requestId,
+      `${source.sessionId ?? ""}:${data.requestId}`,
       method,
       data.type,
       data.request?.url,
@@ -110,6 +132,7 @@ function networkState(tabId: number, since = 0) {
     pending: [...(net?.pending.values() ?? [])].filter((at) => Date.now() - at < 1500).length,
     quiet: Date.now() - (net?.last ?? 0) >= 80,
     active: (net?.last ?? 0) >= since,
+    navigating: Boolean(net?.navigating && Date.now() - net.navigating < 3000),
   };
 }
 
@@ -126,8 +149,8 @@ export async function settleBrowserPage(
   while (Date.now() - start < limit) {
     try {
       state = await probe(debuggee);
-      if (state?.ready === "loading") limit = Math.max(capMs, 3000);
       const net = networkState(debuggee.tabId ?? -1, since);
+      if (state?.ready === "loading" || net.navigating) limit = Math.max(capMs, 3000);
       pending = net.pending;
       if (isQuiet(state, net, since, minQuietMs))
         return {
@@ -153,13 +176,14 @@ export async function settleBrowserPage(
 }
 function isQuiet(
   state: PageProbe | undefined,
-  net: { pending: number; quiet: boolean },
+  net: { pending: number; quiet: boolean; navigating?: boolean },
   since: number,
   minQuietMs: number,
 ): state is PageProbe {
   return (
     !!state &&
     state.ready !== "loading" &&
+    !net.navigating &&
     Math.min(state.idle, Date.now() - since) >= minQuietMs &&
     !net.pending &&
     net.quiet
@@ -395,7 +419,7 @@ async function showingDocument(tabId: number, fallback: string): Promise<string>
     { tabId },
     "Runtime.evaluate",
     { expression: "location.href", returnByValue: true },
-    { label: "stopPendingNavigation", ms: 5_000 },
+    { label: "stopPendingNavigation", ms: 500 },
   ).catch(() => undefined)) as { result?: { value?: string } } | undefined;
   if (typeof live?.result?.value === "string" && live.result.value) return live.result.value;
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
@@ -413,7 +437,7 @@ async function navigationTimedOut(
     const tab = await chrome.tabs.get(tabId).catch(() => undefined);
     return { url: tab?.url ?? requested };
   }
-  await send({ tabId }, "Page.stopLoading", {}, { label: "stopPendingNavigation" }).catch(
+  await send({ tabId }, "Page.stopLoading", {}, { label: "stopPendingNavigation", ms: 500 }).catch(
     () => undefined,
   );
   const showing = await showingDocument(tabId, requested);
@@ -498,7 +522,7 @@ export async function navigateReady(
             reject,
           );
         },
-        Math.max(100, timeoutMs - 2000),
+        Math.max(100, timeoutMs - Math.min(2000, Math.floor(timeoutMs * 0.25))),
       );
       chrome.webNavigation.onCommitted.addListener(commit);
       chrome.webNavigation.onDOMContentLoaded.addListener(ready);
@@ -516,7 +540,9 @@ export async function navigateReady(
       });
     },
   );
-  const idle = await waitForIdleUntil(tabId, deadline);
+  const idle = navigation.timedOut
+    ? stillLoading(pendingRequests(tabId))
+    : await waitForIdleUntil(tabId, deadline);
   const note = [navigation.note, idle.note].filter(Boolean).join("; ");
   return { ...navigation, ...idle, ...(note ? { note } : {}) };
 }
@@ -687,17 +713,6 @@ async function stopFingerprint(debuggee: chrome.debugger.Debuggee): Promise<void
     new Promise((resolve) => setTimeout(resolve, 200)),
   ]);
 }
-export function hintEvaluateError(description: string): string {
-  const text = String(description ?? "");
-  if (/^ReferenceError/.test(text) && /\b(window|document|location|self|localStorage)\b/.test(text))
-    return `${text}\nHint: this cell runs in the sandbox; use page.evaluate(...) or page.inspect(...) to run code in the page.`;
-  if (
-    /^TypeError/.test(text) &&
-    /Cannot read properties of undefined \(reading 'querySelector'\)/.test(text)
-  )
-    return `${text}\nHint: this looks like page code running in the sandbox; use page.evaluate(...) or page.inspect(...).`;
-  return text;
-}
 
 async function evaluatePage(
   debuggee: chrome.debugger.Debuggee,
@@ -732,15 +747,6 @@ async function evaluatePage(
     );
   }
   return result.result?.value;
-}
-
-/**
- * An exception thrown by code running in the page: a coded one ("Error: TARGET_NOT_FOUND: …",
- * thrown by the page helpers) keeps its code; any other is the code's own error, not Chrome's.
- */
-export function pageExceptionCode(detail: string): string {
-  const head = /^(?:[A-Za-z]*Error: )?([A-Z][A-Z_]+)(?::|$)/.exec(detail)?.[1] ?? "";
-  return isKernelErrorCode(head) ? head : "CODE_ERROR";
 }
 
 function isEvaluationTimeout(text: string): boolean {

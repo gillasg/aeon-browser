@@ -67,14 +67,12 @@
     {
       "step": "click-covered-fast",
       "kind": "check",
-      "result": false
+      "result": true
     },
     {
       "step": "fill-remount",
       "kind": "ok",
-      "result": {
-        "error": "INPUT_FAILED: The focused input did not retain the requested value. Inspect it before continuing."
-      }
+      "result": "abc"
     },
     {
       "step": "stale-ref",

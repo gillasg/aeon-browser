@@ -423,9 +423,10 @@ function __extendPageSurface(target, base) {
       if (options.annotate) {
         await __step({op:'evaluate', target, expression: '(' + __annotateShim.toString() + ')(' + JSON.stringify(options.annotate === true ? {} : options.annotate) + ')'});
       }
+      var fmt = options.format === 'png' || options.format === 'jpeg' ? options.format : undefined;
       var shot = options.fullPage || options.annotate || options.path || options.name
         ? {data: (await page.cdp('Page.captureScreenshot', params)).data, mimeType: 'image/' + params.format}
-        : await __step({op:'observe', target, kind:'screenshot'}).then((result) => { var shot = (result && result.data) || result || {}; return {data: shot.dataBase64, mimeType: shot.mimeType}; });
+        : await __step({op:'observe', target, kind:'screenshot', ...(fmt ? {format: fmt} : {})}).then((result) => { var shot = (result && result.data) || result || {}; return {data: shot.dataBase64, mimeType: shot.mimeType}; });
       return __savedShot(shot, options);
     },
     // Wheel or click, then a screenshot, for pages whose content moves without growing the document.

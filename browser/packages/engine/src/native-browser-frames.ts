@@ -333,8 +333,11 @@ export async function collectFrameAx(
         continue;
       }
       seen.add(key);
+      const prefix = frame.sessionId ? `${frame.sessionId}:` : "";
       nodes.push({
         ...node,
+        ...(prefix && node.nodeId ? { nodeId: prefix + node.nodeId } : {}),
+        ...(prefix && node.parentId ? { parentId: prefix + node.parentId } : {}),
         frameId: frame.frameId,
         ...(frame.sessionId ? { sessionId: frame.sessionId } : {}),
       });
@@ -343,17 +346,22 @@ export async function collectFrameAx(
   for (const frame of frames) {
     if (frame.frameId === rootFrameId) continue;
     const owner = await frameOwnerId(sessions, frame.frameId);
-    if (owner === undefined) continue;
-    const node = nodes.find((entry) => entry.backendDOMNodeId === owner);
+    if (!owner) continue;
+    const node = nodes.find(
+      (entry) =>
+        entry.backendDOMNodeId === owner.backendNodeId &&
+        entry.sessionId === owner.sessionId &&
+        entry.frameId !== frame.frameId,
+    );
     if (node) node.frameOwner = frame.frameId;
   }
   return nodes;
 }
 
 async function frameOwnerId(
-  sources: chrome.debugger.Debuggee[],
+  sources: (chrome.debugger.Debuggee & { sessionId?: string })[],
   frameId: string,
-): Promise<number | undefined> {
+): Promise<{ backendNodeId: number; sessionId?: string } | undefined> {
   for (const source of sources) {
     const result = await send<{ backendNodeId?: number }>(
       source,
@@ -361,7 +369,11 @@ async function frameOwnerId(
       { frameId },
       { label: "frameOwnerId" },
     ).catch(() => undefined);
-    if (result?.backendNodeId !== undefined) return result.backendNodeId;
+    if (result?.backendNodeId !== undefined)
+      return {
+        backendNodeId: result.backendNodeId,
+        ...(source.sessionId ? { sessionId: source.sessionId } : {}),
+      };
   }
   return undefined;
 }

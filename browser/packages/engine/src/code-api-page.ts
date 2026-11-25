@@ -599,11 +599,6 @@ var bu = Object.freeze({
     // The user may type the answer into the cursor instead of doing it in the tab: that text.
     return outcome && typeof outcome === 'object' && typeof outcome.answer === 'string' ? outcome.answer : 'done';
   },
-  // The user clicked or typed in this tab: the agent is paused until they give it back.
-  control: async () => (await __step({op:'control', target, action:'status'})).data,
-  waitForControl: async (options = {}) =>
-    (await __step({op:'control', target, action:'wait', timeoutMs: Math.min(Number(options.timeoutMs ?? options.timeout ?? 30000) || 0, 120000)})).data,
-  giveBack: async () => (await __step({op:'control', target, action:'giveback'})).data,
   signIn: async (options = {}) => {
     var target = options.target || __lastTarget;
     if (!target) throw Error('Use bu.use(attachedTarget) or browser.page(target) first');

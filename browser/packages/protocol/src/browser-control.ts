@@ -81,6 +81,8 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
         .array(z.enum(["nav", "footer", "all"]))
         .max(3)
         .optional(),
+      /** Screenshot image format (defaults to jpeg). */
+      format: z.enum(["jpeg", "png"]).optional(),
     })
     .strict(),
   z
@@ -89,6 +91,7 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       target: BrowserTargetKeySchema,
       element: BrowserElementTargetSchema,
       observe: z.boolean().optional(),
+      timeoutMs: z.number().int().min(100).max(120000).optional(),
       ...pointerGesture,
     })
     .strict(),
@@ -101,6 +104,7 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       observe: z.boolean().optional(),
       /** Skips the covered-field check; visible, enabled and editable are still required. */
       force: z.boolean().optional(),
+      timeoutMs: z.number().int().min(100).max(120000).optional(),
     })
     .strict(),
   z
@@ -256,8 +260,8 @@ const ScreenshotObservationSchema = z
       })
       .strict(),
     capturedAt: z.number().int().nonnegative(),
-    mimeType: z.literal("image/jpeg"),
-    dataBase64: z.string().max(1_500_000),
+    mimeType: z.enum(["image/jpeg", "image/png"]),
+    dataBase64: z.string().max(4_000_000),
   })
   .strict();
 

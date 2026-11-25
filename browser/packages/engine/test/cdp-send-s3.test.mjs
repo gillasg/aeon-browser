@@ -362,7 +362,13 @@ async function trackFrame(tabId) {
     sessionId: "sess",
     targetInfo: { targetId: "tgt", type: "iframe" },
   });
-  await pause(callLimitMs("Target.setAutoAttach") + 300);
+  // The hung call is recorded when its timeout fires; a loaded runner fires it late.
+  const until = Date.now() + callLimitMs("Target.setAutoAttach") + MARGIN - 200;
+  const recorded = () =>
+    recent(tabId).some(
+      (row) => row.label === "trackFrameTarget" && row.method === "Target.setAutoAttach",
+    );
+  while (!recorded() && Date.now() < until) await pause(50);
 }
 
 function observeCases() {

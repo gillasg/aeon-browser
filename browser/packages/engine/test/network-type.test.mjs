@@ -48,3 +48,20 @@ test("page.network.waitFor uses the same type filter", () => {
   assert.equal(png(entries[3]), true);
   assert.equal(png(entries[4]), false);
 });
+
+test("page.network.list expands redirect hops without mutating entries", () => {
+  const redirected = entry({
+    id: "r1",
+    url: "https://example.test/landed",
+    redirects: [
+      { url: "https://example.test/r/1", status: 302, headers: { location: "/r/2" }, hop: 0 },
+      { url: "https://example.test/r/2", status: 302, headers: { location: "/landed" }, hop: 1 },
+    ],
+  });
+  const hops = listEntries([redirected], { match: "/r/" });
+  assert.deepEqual(
+    hops.map((row) => `${row.url} ${row.status}`),
+    ["https://example.test/r/1 302", "https://example.test/r/2 302"],
+  );
+  assert.equal(redirected.redirects.length, 2);
+});

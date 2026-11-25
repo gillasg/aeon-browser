@@ -33,7 +33,7 @@
     {
       "step": "gate-pending-bounded",
       "kind": "check",
-      "result": false
+      "result": true
     },
     {
       "step": "gate-held",

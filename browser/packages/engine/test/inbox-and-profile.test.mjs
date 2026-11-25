@@ -58,5 +58,8 @@ test("every element action refuses a sign-in form that posts to another site", a
     fs.readFileSync(new URL("../src/native-browser-input.ts", import.meta.url), "utf8"),
   );
   assert.match(source, /refuseForeignLoginForm\(frame, node\.backendNodeId\)/);
-  assert.match(source, /"FOREIGN_FORM"/);
+  const ready = await import("node:fs").then((fs) =>
+    fs.readFileSync(new URL("../src/native-browser-input-ready.ts", import.meta.url), "utf8"),
+  );
+  assert.match(ready, /"FOREIGN_FORM"/);
 });

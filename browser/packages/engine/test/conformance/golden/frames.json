@@ -36,16 +36,12 @@
     {
       "step": "click-same-text",
       "kind": "ok",
-      "result": {
-        "error": "TARGET_NOT_FOUND: no text \"Same\" tab <TAB> (PRIMARY/frames) while the agent tried click"
-      }
+      "result": "unchanged"
     },
     {
       "step": "click-cross-text",
       "kind": "ok",
-      "result": {
-        "error": "TARGET_NOT_FOUND: no text \"Cross\" tab <TAB> (PRIMARY/frames) while the agent tried click"
-      }
+      "result": "unchanged"
     },
     {
       "step": "click-cross-ref",

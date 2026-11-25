@@ -441,7 +441,14 @@ onEngineInstall(() => {
   });
 });
 
+// Tabs inside enableNetwork: its own Target.setAutoAttach covers children, so resumeNetwork skips.
+const enabling = new Set<number>();
 async function enableNetwork(tabId: number): Promise<void> {
+  enabling.add(tabId);
+  await enableNetworkNow(tabId).finally(() => enabling.delete(tabId));
+}
+
+async function enableNetworkNow(tabId: number): Promise<void> {
   await withBrowserDebugger(tabId, async (debuggee) => {
     await send(debuggee, "Network.enable", NETWORK_BUFFERS, { label: "enableNetwork" });
     // Workers and out-of-process iframes attach as they appear, so their requests land in the
@@ -563,6 +570,11 @@ export async function learnUserTab(tabId: number, on: boolean): Promise<void> {
 async function resumeNetwork(tabId: number): Promise<void> {
   if (!recorders.has(tabId)) return;
   await send({ tabId }, "Network.enable", NETWORK_BUFFERS, { label: "resumeNetwork" });
+  setCaptureActive(tabId, true);
+  if (enabling.has(tabId)) return; // Re-attach children after a detach, unless enableNetwork will.
+  await send({ tabId }, "Target.setAutoAttach", autoAttachParams(tabId), {
+    label: "resumeNetwork",
+  }).catch(() => undefined);
 }
 
 /**

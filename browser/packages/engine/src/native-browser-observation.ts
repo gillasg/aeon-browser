@@ -40,13 +40,17 @@ interface Capture {
   scrollX: number;
   scrollY: number;
   fingerprint: string;
+  mimeType: "image/jpeg" | "image/png";
   dataBase64: string;
 }
-export async function captureViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture> {
+export async function captureViewport(
+  debuggee: chrome.debugger.Debuggee,
+  format: "jpeg" | "png" = "jpeg",
+): Promise<Capture> {
   let failure: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await readViewport(debuggee);
+      return await readViewport(debuggee, format);
     } catch (error) {
       failure = error;
       // One retry when the capture straddled a commit. A second miss is still stale.
@@ -56,7 +60,10 @@ export async function captureViewport(debuggee: chrome.debugger.Debuggee): Promi
   throw failure;
 }
 
-async function readViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture> {
+async function readViewport(
+  debuggee: chrome.debugger.Debuggee,
+  format: "jpeg" | "png" = "jpeg",
+): Promise<Capture> {
   const metrics = (await send(debuggee, "Page.getLayoutMetrics", undefined, {
     label: "captureViewport",
   })) as {
@@ -72,17 +79,16 @@ async function readViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture
   const capture = (await send(
     debuggee,
     "Page.captureScreenshot",
-    {
-      format: "jpeg",
-      quality: 60,
-      captureBeyondViewport: false,
-    },
+    format === "png"
+      ? { format: "png", captureBeyondViewport: false }
+      : { format: "jpeg", quality: 60, captureBeyondViewport: false },
     { label: "captureViewport" },
   )) as { data?: string };
   const view = metrics.cssVisualViewport ?? {};
   const width = Math.floor(view.clientWidth ?? 0),
     height = Math.floor(view.clientHeight ?? 0);
-  if (!capture.data || width < 1 || height < 1 || capture.data.length > 1_500_000)
+  const maxBytes = format === "png" ? 4_000_000 : 1_500_000;
+  if (!capture.data || width < 1 || height < 1 || capture.data.length > maxBytes)
     throw new Error("UNSUPPORTED");
   if ((await viewportFingerprint(debuggee)) !== fingerprint) throw new Error("STALE_REF");
   return {
@@ -90,6 +96,7 @@ async function readViewport(debuggee: chrome.debugger.Debuggee): Promise<Capture
     scrollX: view.pageX ?? 0,
     scrollY: view.pageY ?? 0,
     fingerprint,
+    mimeType: format === "png" ? "image/png" : "image/jpeg",
     dataBase64: capture.data,
   };
 }
@@ -700,9 +707,10 @@ export async function captureScreenshot(
   revalidateTarget: RevalidateTarget,
 ): Promise<BrowserExecutorResult> {
   const target = targetForRequest(request);
+  const format = request.step.op === "observe" ? (request.step.format ?? "jpeg") : "jpeg";
   const result = await withDebugger(target.tabId, async (debuggee) => {
     await revalidateTarget(request, target.tabId);
-    const capture = await captureViewport(debuggee);
+    const capture = await captureViewport(debuggee, format);
     await revalidateTarget(request, target.tabId);
     const screenshotId = crypto.randomUUID();
     const capturedAt = Date.now();
@@ -726,7 +734,7 @@ export async function captureScreenshot(
       url: tab.url ?? "",
       viewport: capture.viewport,
       capturedAt,
-      mimeType: "image/jpeg" as const,
+      mimeType: capture.mimeType,
       dataBase64: capture.dataBase64,
     };
   });

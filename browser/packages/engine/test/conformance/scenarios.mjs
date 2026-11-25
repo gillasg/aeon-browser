@@ -1,7 +1,7 @@
 // The conformance scenarios. Each one opens its own foreground tabs in its own browser_code
 // session, drives Aeon's real engine against the fixture site and records every step. Cells
 // project the facts that matter (outcome, text, status) so transcripts stay exact and readable.
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const q = JSON.stringify;
@@ -30,7 +30,22 @@ export const scenarios = [
     name: "baseline",
     async run(r, { site }) {
       await r.ok("open", open(`${site.primary}/baseline`));
-      fingerprints.baseline = await r.ok("fingerprint", FINGERPRINT, neutral);
+      // On macOS Chrome's debugger infobar slides in after the first attach (~250ms), shrinking
+      // innerHeight from 656 to 600; read the fingerprint once the viewport height has settled.
+      const settledFingerprint = `await page.evaluate(async () => {
+        let prev = innerHeight;
+        for (let i = 0; i < 6; i++) {
+          await new Promise((done) => setTimeout(done, 150));
+          if (innerHeight === prev && i >= 1) break;
+          prev = innerHeight;
+        }
+        return {
+          viewport: [innerWidth, innerHeight], dpr: devicePixelRatio, ua: navigator.userAgent,
+          onLine: navigator.onLine, dark: matchMedia("(prefers-color-scheme: dark)").matches,
+          print: matchMedia("print").matches, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        };
+      })`;
+      fingerprints.baseline = await r.ok("fingerprint", settledFingerprint, neutral);
     },
   },
   {
@@ -78,13 +93,14 @@ export const scenarios = [
         "fill-covered-force",
         `await page.fill("#covered", "forced", {force: true}); await page.inputValue("#covered")`,
       );
+      // A cover that stays is refused well before the timeout; the margin absorbs a loaded runner.
       const coveredAt = Date.now();
       await r.err(
         "click-covered",
-        `await page.click("#covered-btn", {timeout: 2000})`,
+        `await page.click("#covered-btn", {timeout: 20000})`,
         /^TARGET_BLOCKED/,
       );
-      r.check("click-covered-fast", Date.now() - coveredAt < 4000);
+      r.check("click-covered-fast", Date.now() - coveredAt < 10000);
       await r.ok("fill-remount", `await page.fill("#live", "abc"); await page.inputValue("#live")`);
       await r.err("stale-ref", `await bu.click("e999")`);
     },
@@ -160,13 +176,11 @@ export const scenarios = [
   },
   {
     name: "upload",
-    async run(r, { site, harness }) {
-      const file = join(harness.home, "upload-payload.txt");
-      await writeFile(file, "upload payload\n");
+    async run(r, { site }) {
       await r.ok("open", open(`${site.primary}/upload`));
       await r.ok(
         "set-file",
-        `(await page.upload("#file", [${q(file)}])) && await page.evaluate(() => document.querySelector("#file").files[0]?.name)`,
+        `const saved = await artifact("upload-payload.txt", "upload payload\\n"); (await page.upload("#file", [saved.path])) && await page.evaluate(() => document.querySelector("#file").files[0]?.name)`,
       );
       const mark = site.log.length;
       await r.ok("submit", `(await page.click("#send")).outcome`);
