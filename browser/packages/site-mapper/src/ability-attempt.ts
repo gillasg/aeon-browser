@@ -210,6 +210,7 @@ async function attemptScript(
     way.code,
     inputs,
     host.call ?? (async (operation, params) => handleCall(ability.site, operation, params)),
+    ability.site,
   );
 }
 

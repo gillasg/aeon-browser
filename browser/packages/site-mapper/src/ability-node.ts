@@ -1,9 +1,10 @@
-// The node runtime of a script way. Its `browser.fetch` answers in the same shape as browser
+// The node runtime of a script way, run on an isolated worker (script-sandbox.ts). Its `browser.fetch` answers in the same shape as browser
 // code's (status, ok, url, headers, then json, text or base64), so an ability written in a cell
 // runs unchanged here. One difference stays: node has no browser session, so no cookies are sent;
 // a signed-in call belongs in an api way (the site's session) or a page script.
 
-import vm from "node:vm";
+import { hopRefusal, reachOf } from "./runtime/net-guard.js";
+import { runSandboxed } from "./script-sandbox.js";
 
 const TIMEOUT_MS = 30_000;
 const MAX_TEXT = 2_000_000;
@@ -45,43 +46,97 @@ async function body(response: Response, as: NodeFetchInit["as"]): Promise<Record
     : { text };
 }
 
-/** browser.fetch for node scripts, in browser code's result shape. */
-export async function nodeFetch(url: string, init: NodeFetchInit = {}): Promise<unknown> {
-  const response = await fetch(String(url), {
-    method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
-    headers: requestHeaders(String(url), init),
-    ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}),
-    ...(init.body !== undefined ? { body: init.body } : {}),
-    redirect: "follow",
-    signal: AbortSignal.timeout(init.timeoutMs ?? TIMEOUT_MS),
-  });
-  return {
-    status: response.status,
-    ok: response.ok,
-    url: response.url,
-    headers: Object.fromEntries(response.headers),
-    ...(await body(response, init.as)),
-  };
+const MAX_HOPS = 5;
+const DROP_HEADERS = ["cookie", "authorization", "proxy-authorization"];
+
+/** A pack script's fetch stays on its own site: the same host, or a subdomain of it. */
+export function onSite(url: URL, site: string): boolean {
+  const home = site.toLowerCase().replace(/^www\./, "");
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  return host === home || url.host.toLowerCase() === home || host.endsWith("." + home);
 }
 
-export async function runNodeScript(
+async function assertPinned(url: URL, site: string): Promise<void> {
+  if (url.protocol !== "http:" && url.protocol !== "https:")
+    throw new Error(`SITE_PINNED: ${url.protocol} is not an http address`);
+  if (!onSite(url, site)) throw new Error(`SITE_PINNED: ${url.host} is not ${site}`);
+  const refused = await hopRefusal(url.href, reachOf(`https://${site}/`));
+  if (refused) throw new Error(`PRIVATE_NETWORK: ${refused}`);
+}
+
+/**
+ * browser.fetch for pack scripts, in browser code's result shape. Every hop is pinned to the
+ * script's site and checked against the private network before it is sent; no cookie is sent.
+ */
+export async function nodeFetch(
+  site: string,
+  url: string,
+  init: NodeFetchInit = {},
+): Promise<unknown> {
+  let target = new URL(String(url));
+  const headers = new Headers(requestHeaders(target.href, init));
+  headers.delete("cookie");
+  const hop: Hop = {
+    method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
+    headers,
+    ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}),
+    ...(init.body !== undefined ? { body: init.body } : {}),
+  };
+  const signal = AbortSignal.timeout(init.timeoutMs ?? TIMEOUT_MS);
+  for (let count = 0; count <= MAX_HOPS; count++) {
+    await assertPinned(target, site);
+    const response = await fetch(target, { ...hop, redirect: "manual", signal });
+    const location = response.headers.get("location");
+    if (response.status < 300 || response.status > 399 || !location)
+      return {
+        status: response.status,
+        ok: response.ok,
+        url: target.href,
+        headers: Object.fromEntries(response.headers),
+        ...(await body(response, init.as)),
+      };
+    await response.body?.cancel().catch(() => undefined);
+    const next = new URL(location, target);
+    redirectHop(hop, response.status, next.origin !== target.origin);
+    target = next;
+  }
+  throw new Error(`SITE_PINNED: more than ${MAX_HOPS} redirects`);
+}
+
+interface Hop {
+  method: string;
+  headers: Headers;
+  body?: string;
+}
+
+/** 303 (and 301/302 after a POST) become a bodiless GET; another origin gets no credentials. */
+function redirectHop(hop: Hop, status: number, crossOrigin: boolean): void {
+  if (crossOrigin) for (const name of DROP_HEADERS) hop.headers.delete(name);
+  if (status === 303 || (status <= 302 && hop.method.toUpperCase() === "POST")) {
+    hop.method = "GET";
+    delete hop.body;
+    hop.headers.delete("content-type");
+  }
+}
+
+export function runNodeScript(
   code: string,
   inputs: Record<string, unknown>,
   call: (operation: string, params: Record<string, unknown>) => Promise<unknown>,
+  site: string,
 ): Promise<unknown> {
-  const context = vm.createContext({
-    siteMapper: { call, write: call },
-    browser: { fetch: nodeFetch },
+  const bridge = (operation: unknown, params: unknown) =>
+    call(String(operation), (params ?? {}) as Record<string, unknown>);
+  return runSandboxed({
+    code,
     inputs,
-    args: inputs,
-  });
-  const result = new vm.Script(`(async () => { ${code}\n })()`, {
     filename: "ability.js",
-  }).runInContext(context, { timeout: TIMEOUT_MS }) as Promise<unknown>;
-  return Promise.race([
-    result,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("ABILITY_TIMEOUT: node script exceeded 30s")), TIMEOUT_MS),
-    ),
-  ]);
+    bridges: {
+      call: bridge,
+      write: bridge,
+      fetch: (url, init) => nodeFetch(site, String(url), (init ?? {}) as NodeFetchInit),
+    },
+    timeoutMs: TIMEOUT_MS,
+    timeoutMessage: "ABILITY_TIMEOUT: node script exceeded 30s",
+  });
 }

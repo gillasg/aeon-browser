@@ -5,6 +5,7 @@ import {
   formatFinding,
   installSitePack,
   readSitePack,
+  setSiteToolsEnabled,
   skillsForSite,
   type PackBoost,
 } from "@browserkit/site-mapper";
@@ -15,7 +16,7 @@ import type { DaemonHost } from "./host.js";
 
 // Site packs for Aeon: a mapped site plus the site skills and boosts written for it. Export strips
 // sessions, cookies and credential-bearing bodies/headers. Import writes the site, saves skills and
-// boosts DISABLED, and prints their code; the user enables them explicitly.
+// boosts DISABLED (site tools too), and prints their code; the user enables them explicitly.
 
 interface Skill {
   name: string;
@@ -147,7 +148,7 @@ async function importPack(host: DaemonHost, args: Args): Promise<number> {
     return 0;
   }
   process.stdout.write(
-    `Imported ${installed.site}: ${installed.written.length} site files. Skills and boosts are DISABLED.\n`,
+    `Imported ${installed.site}: ${installed.written.length} site files. Skills, site tools and boosts are DISABLED.\n`,
   );
   printImportedCode(skills, pack.boosts);
   process.stdout.write(
@@ -195,6 +196,7 @@ async function enablePack(host: DaemonHost, args: Args): Promise<number> {
   const site = args.positional[1];
   if (!site) throw new Error("Usage: aeon pack enable <site>");
   const skills = await enableSkills(site);
+  const tools = await setSiteToolsEnabled(site, "all", undefined, true);
   let boosts: { id?: string; name?: string }[] = [];
   let warning: string | undefined;
   try {
@@ -205,10 +207,11 @@ async function enablePack(host: DaemonHost, args: Args): Promise<number> {
   } catch (error) {
     warning = `Boosts not enabled: ${error instanceof Error ? error.message : String(error)}`;
   }
-  if (has(args, "json")) printJson({ site, skills, boosts, ...(warning ? { warning } : {}) });
+  if (has(args, "json"))
+    printJson({ site, skills, tools, boosts, ...(warning ? { warning } : {}) });
   else {
     process.stdout.write(
-      `Enabled ${skills.length} skills and ${boosts.length} boosts for ${site}.\n`,
+      `Enabled ${skills.length} skills, ${tools} site tools and ${boosts.length} boosts for ${site}.\n`,
     );
     for (const name of skills) process.stdout.write(`  skill ${name}\n`);
     for (const boost of boosts) process.stdout.write(`  boost ${String(boost.name ?? boost.id)}\n`);
