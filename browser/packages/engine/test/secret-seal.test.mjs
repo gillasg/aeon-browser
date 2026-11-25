@@ -123,3 +123,25 @@ test("siteOf groups subdomains and two-level suffixes", () => {
   assert.equal(siteOf("https://www.bbc.co.uk"), "bbc.co.uk");
   assert.equal(siteOf("localhost:3000"), "localhost");
 });
+
+test("DOM control descriptors keep their element token; real tokens still seal", () => {
+  const vault = new SealVault();
+  const control = { token: "ctrl-1", kind: "select", label: "Country" };
+  assert.deepEqual(vault.sealValue(control, "example.com"), control);
+  const found = { frame: 0, token: "ff12", selector: '[data-aeon-t="ff12"]', control: {} };
+  assert.deepEqual(vault.sealValue(found, "example.com"), found);
+  const secrets = vault.sealValue(
+    {
+      token: CSRF,
+      csrf_token: CSRF + "x",
+      access_token: JWT,
+      headers: { Authorization: "Bearer abcdef0123456789xyz" },
+      cookies: [{ name: "sid", value: COOKIE, domain: ".example.com" }],
+    },
+    "example.com",
+  );
+  for (const raw of [CSRF, JWT, COOKIE, "abcdef0123456789xyz"]) assert.equal(leaks(secrets, raw), false);
+  assert.match(secrets.token, SEALED_RE);
+  assert.throws(() => vault.release(secrets, "https://evil.test", "fetch"), /SECRET_EGRESS/);
+  assert.equal(vault.release(secrets.token, "https://api.example.com", "fetch"), CSRF);
+});

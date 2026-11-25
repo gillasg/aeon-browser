@@ -18,6 +18,7 @@ const HEADER_LINE =
 const COOKIE_FLAG = /(\s(?:-b|--cookie)\s+)(['"])([^'"]{4,})\2/g;
 const JWT = /\beyJ[\w-]{6,}\.[\w-]{6,}\.[\w-]{6,}/g;
 const BEARER = /\b(Bearer|Basic|Token)\s+([\w~+/.=-]{12,})/g;
+const CONTROL_KEYS = ["kind", "role", "label", "selector", "control", "frame", "tag"];
 const MAX_SEALS = 2000;
 
 interface Seal {
@@ -100,7 +101,9 @@ export class SealVault {
     const out: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(record)) {
       const secret =
-        SECRET_KEY.test(key) || (isCookie && key === "value") || headerPair(record, key);
+        (SECRET_KEY.test(key) && !(key === "token" && isControl(record))) ||
+        (isCookie && key === "value") ||
+        headerPair(record, key);
       out[key] =
         secret && typeof item === "string" && item.length >= 4
           ? this.seal(item, here)
@@ -143,6 +146,11 @@ export class SealVault {
         throw egressError(what, dest, `a secret sealed for ${seal.site ?? "an unknown site"}`);
     return out;
   }
+}
+
+/** A DOM control descriptor: its bare `token` is the element handle, not a credential. */
+function isControl(record: Record<string, unknown>): boolean {
+  return CONTROL_KEYS.some((key) => key in record);
 }
 
 function headerPair(record: Record<string, unknown>, key: string): boolean {
