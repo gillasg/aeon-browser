@@ -16,7 +16,7 @@ const card = (items) => ({ chatId: "c", runId: "r", items, wrong: {} });
 test("receipt copy is exact, with no emoji", () => {
   assert.equal(
     formatReceipt({ receipt: "vault" }).text,
-    "Filled from your vault · the model never saw it",
+    "Filled from My Details · the model never saw it",
   );
   assert.equal(formatReceipt({ receipt: "repaired", version: 2 }).text, "Fixed itself · now v2");
   assert.equal(formatReceipt({ receipt: "repaired" }).text, "Fixed itself");

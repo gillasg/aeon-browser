@@ -31,6 +31,8 @@ async function buildOrb() {
       outfile: join(output, "orb.js"),
       define: { __AEON_NATIVE_TRANSPORT__: "true" },
     }),
-    ...["orb.html", "orb.css"].map((file) => copyFile(join(appRoot, file), join(output, file))),
+    ...["orb.html", "orb.css", "orb-ink.css"].map((file) =>
+      copyFile(join(appRoot, file), join(output, file)),
+    ),
   ]);
 }

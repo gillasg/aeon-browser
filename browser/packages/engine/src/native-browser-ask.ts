@@ -7,26 +7,29 @@ import { CURSOR_TOKEN_CSS } from "./cursor-mark.js";
 
 export const HANDOFF_ASK_ID = "aeon-agent-ask";
 
-// The page's one hand-off card: neutral obsidian glass with the dual hairline, the agent's message
-// in bone, `I'm done` in the one ochre and a quiet Skip. No dot, no stripe, no coloured border.
+// The page's one hand-off card: AMOLED obsidian with the amber rim and faint halo, a glowing
+// amber dot before the agent's message, `I'm done` as a dark-amber glass pill and a quiet Skip.
+// Amber is the only colour Aeon ever shows, and only here.
 const ASK_CSS =
-  ":host{all:initial}.ask{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:320px;" +
-  "max-width:calc(100vw - 32px);padding:12px 12px 10px 14px;border-radius:var(--aeon-r-12);" +
-  "background:var(--aeon-island-bg);-webkit-backdrop-filter:blur(18px) saturate(1.2);" +
-  "backdrop-filter:blur(18px) saturate(1.2);color:var(--aeon-island-ink);" +
-  "font:400 var(--aeon-fs-md)/1.45 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;pointer-events:auto;" +
-  "box-shadow:var(--aeon-island-elev)}" +
-  ".ask p{margin:0;color:var(--aeon-island-ink);white-space:normal;overflow-wrap:anywhere}" +
-  ".ask input{box-sizing:border-box;width:100%;height:28px;border:0;border-radius:var(--aeon-r-8);padding:0 10px;" +
-  "background:var(--aeon-island-wash-5);box-shadow:inset 0 0 0 1px var(--aeon-island-line);" +
+  ":host{all:initial}.ask{box-sizing:border-box;display:flex;flex-direction:column;gap:10px;width:320px;" +
+  "max-width:calc(100vw - 32px);padding:13px 13px 11px 15px;border-radius:var(--aeon-r-18);" +
+  "background:var(--aeon-island-needs);color:var(--aeon-island-ink);-webkit-font-smoothing:antialiased;" +
+  "font:400 var(--aeon-fs-md)/1.5 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;pointer-events:auto;" +
+  "letter-spacing:-0.011em;box-shadow:var(--aeon-island-needs-rim)}" +
+  ".ask p{position:relative;margin:0;padding-left:14px;color:var(--aeon-island-ink);white-space:normal;overflow-wrap:anywhere}" +
+  ".ask p::before{content:'';position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:var(--aeon-r-half);" +
+  "background:var(--aeon-island-needs-soft);box-shadow:0 0 8px var(--aeon-island-needs-soft)}" +
+  ".ask input{box-sizing:border-box;width:100%;height:30px;border:0;border-radius:var(--aeon-r-full);padding:0 12px;" +
+  "background:transparent;box-shadow:inset 0 0 0 1px var(--aeon-island-needs-line);" +
   "color:var(--aeon-island-ink);font:inherit;font-size:var(--aeon-fs-sm);outline:none}" +
   ".ask input::placeholder{color:var(--aeon-island-faint)}" +
-  ".ask .row{display:flex;align-items:center;gap:4px}" +
-  ".ask button{border:0;border-radius:var(--aeon-r-full);padding:4px 10px;cursor:pointer;background:transparent;" +
+  ".ask .row{display:flex;align-items:center;gap:6px}" +
+  ".ask button{border:0;border-radius:var(--aeon-r-full);padding:5px 12px;cursor:pointer;background:transparent;" +
   "font:500 var(--aeon-fs-sm)/16px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif}" +
   ".ask button:hover{background:var(--aeon-island-wash)}" +
   ".ask button:focus-visible{outline:1px solid var(--aeon-island-focus);outline-offset:1px}" +
-  ".ask button.done{color:var(--aeon-island-needs-soft)}.ask button.cancel{color:var(--aeon-island-muted)}";
+  ".ask button.done{color:var(--aeon-island-needs-ink);background:var(--aeon-island-needs-hot);" +
+  "box-shadow:inset 0 0 0 1px var(--aeon-island-needs-line)}.ask button.cancel{color:var(--aeon-island-muted)}";
 
 interface AskDetail {
   style: string;

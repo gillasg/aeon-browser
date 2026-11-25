@@ -2361,6 +2361,28 @@ body[data-host="panel"] .sidebar-scrim {
 }
 body[data-host="panel"] {
   min-height: 0;
+  /* AMOLED side panel: a pure black void, bone text, a weightless pill composer. */
+  --aeon-canvas: var(--ink-void);
+  --aeon-bg-0: var(--ink-void);
+  --aeon-bg-1: var(--ink-void);
+  --aeon-text: var(--aeon-island-ink);
+  --fg-1: var(--aeon-island-ink);
+  background: var(--ink-void);
+  -webkit-font-smoothing: antialiased;
+}
+body[data-host="panel"] .composer-dock {
+  background: transparent;
+}
+body[data-host="panel"] .message-row.user .message-content {
+  border-color: transparent;
+  background: var(--aeon-island-bg);
+  box-shadow: var(--aeon-island-edge);
+}
+body[data-host="panel"] .composer {
+  border-color: transparent;
+  border-radius: var(--aeon-r-xl);
+  background: var(--aeon-island-bg);
+  box-shadow: var(--aeon-island-edge);
 }
 body[data-host="panel"] .chat-main {
   height: auto;
@@ -4277,8 +4299,21 @@ body[data-host="orb"] .composer-meta {
 .answer-meta {
   display: flex;
   align-items: center;
-  gap: var(--aeon-s-2);
+  justify-content: flex-start;
+  gap: var(--aeon-s-1);
   min-height: 28px;
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease);
+}
+.message-row:hover ~ .answer-lines .answer-meta,
+.answer-lines:hover .answer-meta,
+.answer-meta:focus-within {
+  opacity: 1;
+}
+.answer-time {
+  color: var(--aeon-island-faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
 }
 .answer-duration {
   color: var(--fg-3);

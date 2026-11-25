@@ -15,10 +15,9 @@ export function MessageActions(props: MessageActionProps): ReactElement {
   const isUser = props.message?.role === "user";
   return (
     <div className={`message-actions ${isUser ? "for-user" : "for-assistant"}`}>
-      {isUser && <MessageTime entry={props.entry} />}
+      <MessageTime entry={props.entry} />
       <CopyAction text={props.text} isUser={isUser} />
       <RoleAction props={props} isUser={isUser} />
-      {!isUser && <MessageTime entry={props.entry} />}
     </div>
   );
 }
@@ -143,8 +142,9 @@ function MessageTime({ entry }: { entry?: PiEntryDto | undefined }): ReactElemen
   const timestamp = new Date(entry.timestamp);
   if (!Number.isFinite(timestamp.valueOf())) return null;
   const formatted = new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(timestamp);
   const full = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",

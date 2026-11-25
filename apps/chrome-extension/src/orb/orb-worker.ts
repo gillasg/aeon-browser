@@ -142,7 +142,7 @@ async function updateBadge(): Promise<void> {
   const unread = keys.filter((key) => key.startsWith(UNREAD_PREFIX)).length;
   const count = needs || unread;
   await chrome.action.setBadgeText({ text: count ? String(Math.min(count, 99)) : "" });
-  await chrome.action.setBadgeBackgroundColor({ color: needs ? "#c9a46a" : "#3f3f46" });
+  await chrome.action.setBadgeBackgroundColor({ color: needs ? "#f5a623" : "#000000" });
   await chrome.action.setTitle({
     title: needs
       ? `Aeon · ${needs} need${needs === 1 ? "s" : ""} you`

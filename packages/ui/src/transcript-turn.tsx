@@ -4,12 +4,11 @@ import { ChatActivityGroup } from "./chat-activity.js";
 import { DisclosureChevron } from "./activity-icons.js";
 import { TranscriptMessage } from "./transcript-message.js";
 import { TurnThinking } from "./turn-thinking.js";
-import { AnswerLines } from "./answer-lines-view.js";
 import type { AnswerOffer } from "./answer-lines.js";
 import { runVisibleInterval } from "./visible-work.js";
 import { showThinkingKey, useAgentFlag } from "./agent-tab-view.js";
 import { describeToolAction } from "./chat-activity-summary.js";
-import { formatSeconds, linesAfterReceipt, receiptText, receiptVia } from "./turn-receipt.js";
+import { formatSeconds } from "./turn-receipt.js";
 export interface TranscriptActions {
   actionsDisabled: boolean;
   onEditEntry?: (entryId: string) => Promise<void> | void;
@@ -43,13 +42,7 @@ export function TranscriptTurn({
   const outer = useRef<HTMLDetailsElement>(null);
   const now = useTurnClock(state.active, outer);
   const [showThinking] = useAgentFlag(showThinkingKey, true);
-  if (!state.hasWork)
-    return (
-      <>
-        {rows.map((row) => renderRow(row, actions))}
-        {turnLines(rows, actions, undefined)}
-      </>
-    );
+  if (!state.hasWork) return <>{rows.map((row) => renderRow(row, actions))}</>;
   const seconds = secondsOf(rows, state.steps, state.active ? now : undefined);
   return (
     <>
@@ -78,7 +71,6 @@ export function TranscriptTurn({
         </div>
       </details>
       {state.final.map((row) => renderRow(row, actions, true))}
-      {turnLines(rows, actions, state.active ? undefined : { seconds, final: state.final })}
     </>
   );
 }
@@ -90,46 +82,6 @@ function workingLine(seconds: number, steps: readonly ToolStep[]): string {
   return `Working · ${formatSeconds(seconds)}${prose ? ` — ${prose}` : ""}`;
 }
 
-function footerOf(rows: readonly TranscriptRow[]) {
-  return rows.find((row) => row.kind === "entry" && row.entry.message?.role === "user")?.footer;
-}
-
-function textOf(row: TranscriptRow | undefined, role: "user" | "assistant"): string {
-  if (!row || row.kind === "tool-group") return "";
-  const message = row.kind === "transient" ? row.message : row.entry.message;
-  if (message?.role !== role) return "";
-  return message.content
-    .map((block) => (block.type === "text" ? block.text : ""))
-    .join("")
-    .trim();
-}
-
-function turnLines(
-  rows: readonly TranscriptRow[],
-  actions: TranscriptActions,
-  done: { seconds: number; final: readonly TranscriptRow[] } | undefined,
-): ReactElement | null {
-  const footer = footerOf(rows);
-  const prompt = rows.map((row) => textOf(row, "user")).find(Boolean) ?? "";
-  const answer = done
-    ? done.final
-        .map((row) => textOf(row, "assistant"))
-        .filter(Boolean)
-        .join("\n\n")
-    : "";
-  const retry = done && actions.onRetry && prompt ? () => actions.onRetry?.(prompt) : undefined;
-  const shown = footer ? (done ? linesAfterReceipt(footer) : footer) : { lines: [] };
-  return (
-    <AnswerLines
-      footer={shown}
-      disabled={actions.actionsDisabled}
-      {...(done ? { duration: receiptText(done.seconds, receiptVia(footer)) } : {})}
-      {...(answer ? { copyText: answer } : {})}
-      {...(actions.onAnswerOffer ? { onOffer: actions.onAnswerOffer } : {})}
-      {...(retry ? { onRetry: retry } : {})}
-    />
-  );
-}
 function turnState(rows: readonly TranscriptRow[], live: boolean) {
   const steps = rows.flatMap((row) => (row.kind === "tool-group" ? row.group.steps : []));
   const streaming = rows.some(

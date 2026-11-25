@@ -9,6 +9,7 @@ export const RAW_COLOR_FILES = [
   "apps/chrome-extension/chat.css",
   "apps/chrome-extension/home.css",
   "apps/chrome-extension/orb.css",
+  "apps/chrome-extension/orb-ink.css",
   "apps/chrome-extension/atmosphere.css",
   "apps/chrome-extension/pages.css",
   "apps/chrome-extension/sidebar-layout.css",

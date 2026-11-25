@@ -7,16 +7,16 @@
 :root {
   color-scheme: dark;
   font: var(--aeon-font-body);
-  background: var(--aeon-panel-canvas);
-  color: var(--aeon-panel-text);
+  background: var(--ink-void);
+  color: var(--aeon-island-ink);
   font-synthesis: none;
-  --panel-bg: var(--aeon-panel-canvas);
-  --panel-header: var(--aeon-panel-header);
+  --panel-bg: var(--ink-void);
+  --panel-header: var(--ink-void);
   --panel-surface: var(--aeon-panel-surface);
   --panel-raised: var(--aeon-panel-raised);
   --panel-selected: var(--aeon-panel-selected);
-  --panel-line: var(--aeon-panel-line);
-  --panel-text: var(--aeon-panel-text);
+  --panel-line: var(--ink-panel-line);
+  --panel-text: var(--aeon-island-ink);
   --panel-muted: var(--aeon-panel-muted);
   --panel-faint: var(--aeon-panel-faint);
   --panel-accent: var(--aeon-panel-accent);
@@ -36,7 +36,9 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
+  border-left: 1px solid var(--ink-panel-edge);
   font: inherit;
+  -webkit-font-smoothing: antialiased;
 }
 #root {
   display: flex;
@@ -50,7 +52,6 @@ body {
   gap: var(--aeon-s-2);
   min-height: 44px;
   padding: var(--aeon-s-2) var(--aeon-s-3);
-  border-bottom: 1px solid var(--panel-line);
   background: var(--panel-header);
 }
 

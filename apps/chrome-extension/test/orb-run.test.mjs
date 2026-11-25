@@ -240,7 +240,10 @@ test("the cursor's box always composes: a chat continues there and its transcrip
   assert.match(compose, /x.com/);
   assert.match(compose, /Remove x.com/);
   assert.match(compose, /Add a tab/);
-  assert.match(compose, /chat-switcher/, "the switcher shows before any chat is open");
+  assert.match(compose, /Ask about x.com/);
+  assert.doesNotMatch(compose, /chat-switcher|APIs|boost/, "no switcher or counters in the box");
+  assert.match(compose, /aria-label="Send"/);
+  assert.match(compose, /Open in Side Panel/);
   const choices = renderToStaticMarkup(
     createElement(view.OrbBox, {
       model: {
@@ -267,8 +270,7 @@ test("the cursor's box always composes: a chat continues there and its transcrip
   assert.match(chat, /data-state="compose"/);
   assert.doesNotMatch(chat, /<iframe/);
   assert.match(chat, /Reply…/);
-  assert.match(chat, /Open in panel/);
-  assert.match(chat, /New chat/);
+  assert.match(chat, /Open in Side Panel/);
   // A question shows above the field, and the answer is typed right there.
   const ask = renderToStaticMarkup(
     createElement(view.OrbBox, {

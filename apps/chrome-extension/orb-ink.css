@@ -1,0 +1,129 @@
+/* AMOLED Dynamic Ink: obsidian island, a faint dot aura top-right, 2x2 dots, quiet controls. */
+.island::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(var(--aeon-island-wash-10) 0.75px, transparent 0.75px) 0 0 / 12px 12px;
+  mask: radial-gradient(70% 90% at 100% 0%, var(--aeon-island-ink) 0%, transparent 70%);
+}
+.island[data-state="answer"],
+.island[data-state="error"] {
+  padding: 12px 14px 8px 16px;
+  border-radius: 24px;
+}
+.ink-dots {
+  flex: none;
+  display: inline-grid;
+  grid-template-columns: 3px 3px;
+  gap: 3px;
+  margin-right: 6px;
+}
+.ink-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--aeon-r-half);
+  background: var(--aeon-island-dot);
+}
+.ink-dots i:nth-child(1) {
+  opacity: 0.95;
+}
+.ink-dots i:nth-child(2),
+.ink-dots i:nth-child(3) {
+  opacity: 0.36;
+}
+.ink-dots i:nth-child(4) {
+  opacity: 0.14;
+}
+.ink-dots[data-live="true"] i {
+  animation: ink-wave 1.4s ease-in-out infinite;
+}
+.ink-dots[data-live="true"] i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.ink-dots[data-live="true"] i:nth-child(4) {
+  animation-delay: 0.36s;
+}
+.ink-dots[data-live="true"] i:nth-child(3) {
+  animation-delay: 0.54s;
+}
+@keyframes ink-wave {
+  0%,
+  100% {
+    opacity: 0.14;
+  }
+  40% {
+    opacity: 0.95;
+  }
+}
+.isl-send {
+  all: unset;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--aeon-r-full);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background var(--aeon-island-spring),
+    color var(--aeon-island-spring);
+}
+.isl-send[data-ready="true"] {
+  background: var(--aeon-island-ink);
+  color: var(--aeon-island-bg-solid);
+}
+.isl-send svg {
+  width: 14px;
+  height: 14px;
+}
+.isl-echo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.isl-echo-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.isl-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  opacity: 0;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity var(--aeon-island-spring);
+}
+.island:hover .isl-foot,
+.isl-foot:focus-within {
+  opacity: 1;
+}
+.island[data-state="answer"] .isl-input {
+  border-top: 1px solid var(--aeon-island-line);
+  padding-top: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ink-dots[data-live="true"] i {
+    animation: none;
+  }
+}
+.island[data-state="working"] {
+  padding: 4px 6px 4px 12px;
+}
+.island[data-state="working"] .isl-input {
+  display: none;
+}
+.island[data-state="working"] .isl-working {
+  margin: 0;
+  padding: 4px 0;
+}

@@ -66,9 +66,9 @@ function speedParts(facts: ReceiptFacts): ReceiptParts | null {
 function partsOf(kind: ReceiptKind, facts: ReceiptFacts): ReceiptParts | null {
   if (kind === "vault")
     return {
-      lead: "Filled from your vault",
+      lead: "Filled from My Details",
       rest: ["the model never saw it"],
-      short: "Filled from vault",
+      short: "Filled from My Details",
     };
   if (kind === "repaired") {
     const version = finite(facts.version);

@@ -202,29 +202,17 @@ test("Teach is a pill that says what it picked up, singular for one", () => {
   assert.match(pill, /aria-label="Stop teaching"/);
 });
 
-test("working, receipt and error parts carry no emoji and no colour", () => {
-  assert.equal(ux.elapsedLabel(4200), "4s");
-  assert.equal(ux.elapsedLabel(72_000), "1m 12s");
-  assert.equal(ux.durationLabel(400), "0.4s");
-  assert.equal(ux.durationLabel(12_400), "12s");
+test("working, footer and error parts carry no emoji, counters or colour", () => {
   const working = renderToStaticMarkup(
-    createElement(ux.WorkingPill, { text: "Reading editions on Steam", elapsed: "4s" }),
+    createElement(ux.WorkingPill, { text: "Reading editions on Steam" }),
   );
-  assert.match(working, /ink-wet/);
-  assert.match(working, /◌/);
-  assert.match(working, /· 4s/);
-  const receipt = renderToStaticMarkup(
-    createElement(ux.ReceiptRow, {
-      receipt: "0.4s · via skill",
-      disabled: false,
-      onCopy() {},
-      onWrong() {},
-      onRetry() {},
-    }),
-  );
-  for (const label of ["Copy", "Wrong answer", "Retry"])
-    assert.match(receipt, new RegExp(`aria-label="${label}"`));
-  assert.doesNotMatch(receipt, /[⧉👎↻]/u);
+  assert.match(working, /ink-dots/);
+  assert.match(working, /data-live="true"/);
+  assert.doesNotMatch(working, /◌|· \d/);
+  const foot = renderToStaticMarkup(createElement(ux.AnswerFoot, { time: "13:47", onCopy() {} }));
+  assert.match(foot, />13:47</);
+  assert.match(foot, /aria-label="Copy"/);
+  assert.doesNotMatch(foot, /Wrong|Retry|Why|via|[⧉👎↻]/u);
   const error = renderToStaticMarkup(
     createElement(ux.ErrorCard, {
       title: "Couldn't finish",

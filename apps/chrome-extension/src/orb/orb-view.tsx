@@ -1,6 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type ReactElement } from "react";
 import {
-  ChatSwitcher,
   piSlashCommandsKey,
   useAgentFlag,
   type AnswerFooter,
@@ -12,12 +11,12 @@ import { AnswerInPlace, answerFits } from "./orb-answer.js";
 import {
   ErrorCard,
   Palette,
-  ReceiptRow,
+  AnswerFoot,
+  InkDots,
+  SendButton,
   TargetChip,
   TeachPill,
   WorkingPill,
-  durationLabel,
-  elapsedLabel,
   paletteMatches,
   verbPrefill,
   type OrbTargetChip,
@@ -52,8 +51,10 @@ export interface OrbViewModel {
   hint?: boolean;
   /** When the current run started here, for the working pill's `· 4s`. */
   startedAt?: number;
-  /** How long the finished run took, for the receipt's one duration. */
+  /** How long the finished run took; with `startedAt`, the answer's hover-only `13:47`. */
   durationMs?: number;
+  /** The message this run answers, echoed muted above the answer. */
+  asked?: string;
   /** The page has a form worth filling (3 or more visible, enabled fields). */
   fillForm?: boolean;
   /** What the pointer was on, or the selection, when the cursor was summoned. */
@@ -232,6 +233,7 @@ function Compose({
       {model.ask && <p className="isl-ask">{model.ask}</p>}
       <RunningLine model={model} actions={actions} />
       <div className="isl-input" data-warn={String(Boolean(model.notice))}>
+        {model.line && islandState(model) === "answer" ? null : <InkDots />}
         <AddTab model={model} actions={actions} />
         <ContextLead model={model} actions={actions} />
         <textarea
@@ -247,6 +249,11 @@ function Compose({
           }}
         />
         <Trail model={model} actions={actions} />
+        <SendButton
+          ready={Boolean(keys.draft.trim())}
+          disabled={model.busy}
+          onSend={() => enter(keys.draft.trim(), false, keys, actions)}
+        />
       </div>
       {keys.matches.length > 0 && (
         <Palette draft={keys.draft} selected={keys.selected} onPick={keys.pick} />
@@ -308,9 +315,9 @@ function Trail({ model, actions }: { model: OrbViewModel; actions: OrbViewAction
   return (
     <>
       {model.notice ? <span className="isl-notice">{model.notice}</span> : null}
-      {model.chatId && <Button label="Open in panel" onClick={actions.toSidePanel} icon="panel" />}
-      {model.chatId && <Button label="New chat" onClick={actions.newChat} icon="new" />}
-      <Switcher model={model} actions={actions} icon />
+      {islandState(model) === "answer" ? null : (
+        <Button label="Open in Side Panel" onClick={() => actions.promote()} icon="panel" />
+      )}
       {model.tabChoices && <TabChoices model={model} actions={actions} />}
     </>
   );
@@ -319,19 +326,9 @@ function Trail({ model, actions }: { model: OrbViewModel; actions: OrbViewAction
 function promptPlaceholder(model: OrbViewModel): string {
   if (model.ask) return "Type the answer here…";
   if (model.chatId) return "Reply…";
-  // Aeon's own pages are never page context.
-  return model.context.length ? "Ask about this page…" : "Ask Aeon anything…";
-}
-
-/** Ticks once a second while the working pill shows. */
-function useElapsed(startedAt: number | undefined, on: boolean): string | undefined {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!on || startedAt === undefined) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [on, startedAt]);
-  return on && startedAt !== undefined ? elapsedLabel(now - startedAt) : undefined;
+  // Aeon's own pages are never page context. Never an inventory count here.
+  const host = model.context[0]?.host || model.host;
+  return model.context.length && host ? `Ask about ${host}` : "Ask…";
 }
 
 function RunningLine({
@@ -342,10 +339,9 @@ function RunningLine({
   actions: OrbViewActions;
 }): ReactElement | null {
   const state = islandState(model);
-  const elapsed = useElapsed(model.startedAt, state === "working");
   const line = model.line;
   if (!line || state === "compose") return null;
-  if (state === "working") return <WorkingPill text={line.text} elapsed={elapsed} />;
+  if (state === "working") return <WorkingPill text={line.text} />;
   if (state === "error")
     return (
       <ErrorCard
@@ -360,6 +356,10 @@ function RunningLine({
   const inPlace = answerFits(line.text);
   return (
     <>
+      <div className="isl-echo">
+        <span className="isl-echo-text">{model.asked ?? ""}</span>
+        <Button label="Open in Side Panel" onClick={actions.toSidePanel} icon="panel" />
+      </div>
       {inPlace ? (
         <AnswerInPlace text={line.text} />
       ) : (
@@ -370,31 +370,16 @@ function RunningLine({
           </button>
         </div>
       )}
-      <ReceiptRow
-        receipt={receiptText(model)}
-        disabled={model.busy}
-        onCopy={actions.copyAnswer}
-        onWrong={model.footer?.wrong ? actions.answerWrong : undefined}
-        onRetry={actions.retry}
-      />
+      <AnswerFoot time={finishedAt(model)} onCopy={actions.copyAnswer} />
     </>
   );
 }
 
-/** `0.4s · via skill`, or just `0.4s`: one duration, never two. */
-export function receiptText(model: Pick<OrbViewModel, "footer" | "durationMs">): string {
-  const parts: string[] = [];
-  if (model.durationMs !== undefined) parts.push(durationLabel(model.durationMs));
-  for (const line of model.footer?.lines ?? []) {
-    if (line.kind !== "receipt") continue;
-    const via = /\bvia\b.*$/.exec(line.lead)?.[0];
-    if (line.receipt === "speed" && via) {
-      if (!parts.length) parts.push(line.lead.replace(/\s*via\b.*$/, "").replace(" s", "s"));
-      parts.push(via);
-    } else parts.push(line.lead);
-    break;
-  }
-  return parts.join(" · ");
+/** `13:47`: when the run finished, local time. Never how long it took. */
+export function finishedAt(model: Pick<OrbViewModel, "startedAt" | "durationMs">): string {
+  if (model.startedAt === undefined || model.durationMs === undefined) return "";
+  const at = new Date(model.startedAt + model.durationMs);
+  return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
 }
 
 function ContextChip({ tab, actions }: { tab: OrbTab; actions: OrbViewActions }): ReactElement {
@@ -447,32 +432,8 @@ function TabChoices({
   );
 }
 
-function Switcher({
-  model,
-  actions,
-  icon = false,
-}: {
-  model: OrbViewModel;
-  actions: OrbViewActions;
-  icon?: boolean;
-}): ReactElement {
-  return (
-    <ChatSwitcher
-      chats={model.chats}
-      currentChatId={model.chatId}
-      running={model.running}
-      needs={model.needs}
-      onSelect={actions.selectChat}
-      onOpen={actions.loadChats}
-      onManage={() => actions.openManage()}
-      icon={icon}
-    />
-  );
-}
-
 // 16px line icons in one stroke weight, so the bar reads as one set.
 const ICONS = {
-  new: "M8 3.5v9M3.5 8h9",
   panel: "M3 3.5h10v9H3zM9.5 3.5v9",
 } as const;
 
