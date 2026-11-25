@@ -214,6 +214,9 @@ export { rebuild, importCaptures, saveRecording, loadFlows } from "./workflow.js
 export { RecordingSession, PassiveRecorder, type Recording, type RecordOptions } from "./record.js";
 export { checkHealth, repair, readHealth, type HealthReport, type HealthResult } from "./health.js";
 export { detectChallenge, type Challenge } from "./challenge.js";
+export * from "./circuit-breaker.js";
+export * from "./human-budget.js";
+export * from "./why-broke.js";
 export { coverage, type Suggestion } from "./coverage.js";
 export { serve, type Server, type ServeOptions } from "./serve.js";
 export { runMcpServer, siteTools, operationInputSchema } from "./mcp.js";

@@ -7,7 +7,7 @@ import type { RuntimeResponse } from "./runtime/request.js";
 import { isJsonThrottle, isRateLimited } from "./runtime/limits.js";
 
 export interface Challenge {
-  vendor: "cloudflare" | "datadome" | "perimeterx" | "akamai" | "unknown";
+  vendor: "cloudflare" | "datadome" | "perimeterx" | "akamai" | "kasada" | "unknown";
   /** What gave it away, for the health report. */
   evidence: string;
   /** A check already cleared in this tab. Solving another one is the wrong next step. */
@@ -27,6 +27,7 @@ const HEADER_MARKERS: [string, Challenge["vendor"]][] = [
   ["x-datadome", "datadome"],
   ["x-px-block", "perimeterx"],
   ["x-akamai-transformed", "akamai"],
+  ["x-kpsdk-ct", "kasada"],
 ];
 
 /** Page markers. On a 200 they also have to disagree with the last good page. */

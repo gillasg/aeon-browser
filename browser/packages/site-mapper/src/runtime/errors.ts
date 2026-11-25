@@ -3,6 +3,7 @@
 
 import type { Challenge } from "../challenge.js";
 import { BrowserNotConnected } from "./bridge.js";
+import { captchaHandoff, type CaptchaHandoff } from "../why-broke.js";
 import { isRateLimited } from "./limits.js";
 import { withNotes } from "./outcome.js";
 import type { Operation } from "../types.js";
@@ -33,6 +34,8 @@ export class SignedOut extends HttpError {
 
 /** The site refused the call with a bot wall (Cloudflare, DataDome, PerimeterX, Akamai). */
 export class Challenged extends HttpError {
+  /** Invariant I-7: the wall goes to the person in Chrome, never to a retry or a solver. */
+  readonly handoff: CaptchaHandoff;
   constructor(
     operationId: string,
     response: RuntimeResponse,
@@ -40,10 +43,19 @@ export class Challenged extends HttpError {
   ) {
     super(operationId, response);
     this.name = "Challenged";
+    this.handoff = captchaHandoff(siteOf(response.url, operationId), wall, response.url);
     const named = `SITE_BLOCKED: A ${wall.vendor} bot wall answered ${operationId} (${wall.evidence})`;
     this.message = wall.repeat
       ? `${named}. A check already cleared in this tab; fresh browser needed.`
       : `${named}. There is nothing to repair: open the site in a tab, clear the check like a person would, then call again. Re-recording only teaches the wall.`;
+  }
+}
+
+function siteOf(url: string | undefined, fallback: string): string {
+  try {
+    return url ? new URL(url).hostname : fallback;
+  } catch {
+    return fallback;
   }
 }
 
