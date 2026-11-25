@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTimingKit } from "../dist/native-browser-sniper.js";
 import { browserTimingApi } from "../dist/code-api-timing.js";
+import { browserSnipeApi } from "../dist/code-api-snipe.js";
 
 const kit = createTimingKit();
 
@@ -140,4 +141,47 @@ test("the sandbox embeds the same kit and the accounts calls", () => {
   // The embedded source must evaluate on its own (no imports).
   const make = new Function(`return (${createTimingKit.toString()})();`);
   assert.equal(typeof make().poolMap, "function");
+});
+
+test("browser.snipe's clock offset is the browser.clock median of several probes, not one HEAD", async () => {
+  // The sandbox's own source, evaluated against a fake site whose clock is 5 s ahead of ours.
+  const load = (fake) =>
+    new Function(
+      "browser",
+      browserTimingApi +
+        browserSnipeApi +
+        "; return { clock: __clockSync, offset: __snipeOffset };",
+    )(fake);
+  const SKEW = 5000;
+  let probes = 0;
+  const site = {
+    fetch: async () => {
+      probes++;
+      // The Date header is floored to the second, as real sites send it.
+      const header = new Date(Math.floor((Date.now() + SKEW) / 1000) * 1000).toUTCString();
+      return { headers: { date: header } };
+    },
+  };
+  const { clock, offset } = load(site);
+  const synced = await clock("https://site.test/");
+  assert.equal(probes, 5, "clock sync probes five times");
+  probes = 0;
+  const snipeOffset = await offset("https://site.test/");
+  assert.equal(probes, 5, "snipe reads its offset through the same median sync");
+  // Each header is at most a second early, and the half step adds back 500 ms: within 600 ms.
+  assert.ok(Math.abs(snipeOffset - SKEW) <= 600, `snipe offset ${snipeOffset} ms`);
+  assert.ok(
+    Math.abs(synced.serverOffsetMs - SKEW) <= 600,
+    `clock offset ${synced.serverOffsetMs} ms`,
+  );
+
+  // A site with no usable Date header, or no answer at all, means no offset: 0, never a throw.
+  const none = load({ fetch: async () => ({ headers: {} }) });
+  assert.equal(await none.offset("https://site.test/"), 0);
+  const down = load({
+    fetch: async () => {
+      throw new Error("offline");
+    },
+  });
+  assert.equal(await down.offset("https://site.test/"), 0);
 });

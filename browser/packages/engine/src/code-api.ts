@@ -188,6 +188,14 @@ function __netFilter(value) {
   if (value === undefined || value === null) return {};
   return typeof value === 'string' ? {match: value} : value;
 }
+// Several profiles and no tab named: the profile whose window the user last focused (its active tab).
+// Throws only when no connected profile has the focused window.
+async function __focusedProfile(clients) {
+  var tabs = await browser.tabs();
+  var focused = tabs.find(tab => tab.active && tab.windowId === __focusedWindowId && clients.includes(tab.target && tab.target.clientInstanceId));
+  if (!focused) throw Error('Multiple browser profiles are connected; choose clientInstanceId from browser.tabs()');
+  return focused.target.clientInstanceId;
+}
 var browser = Object.freeze({
   waitFor: (event, options = {}) => __event(options.target || __lastTarget,event,options),
   // Listed tabs work as pages too (agents call tab.locator(...) or use tab.id); attach a tab
@@ -249,8 +257,7 @@ var browser = Object.freeze({
     if (!clientInstanceId) {
       const clients = (await __call({browserInfo:true})).clientInstanceIds;
       if (clients.length === 0) throw Error('BROWSER_OFFLINE: no browser executor is connected');
-      if (clients.length !== 1) throw Error('Multiple browser profiles are connected; choose clientInstanceId from browser.tabs()');
-      clientInstanceId = clients[0];
+      clientInstanceId = clients.length === 1 ? clients[0] : await __focusedProfile(clients);
     }
     // One working tab per site: a URL on an origin this session already has a tab for navigates that
     // tab. Pass {newTab: true} for a separate tab.

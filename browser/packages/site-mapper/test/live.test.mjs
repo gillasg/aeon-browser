@@ -304,3 +304,23 @@ test("a plain 418 is not a rate limit", async () => {
   await assert.rejects(plain.client.call("load"), /HTTP 418/);
   assert.equal(plain.sent(), 1);
 });
+
+test("after mapping, one runnable aeon call line with the observed params", async () => {
+  const { firstCallLine } = await import("../dist/index.js");
+  const op = (id, role, bucket, extra = {}) => ({ id, role, bucket, params: [], ...extra });
+  const line = firstCallLine("shop.test", [
+    op("addToCart", "action", "high"),
+    op("listFeed", "read", "low"),
+    op("searchProducts", "read", "high", {
+      params: [
+        { name: "q", in: "query", examples: ["lamp's"] },
+        { name: "v", in: "query", constant: "2", examples: ["2"] },
+        { name: "ts", in: "query", generated: "timestamp-ms", examples: ["1"] },
+        { name: "x-token", in: "header", examples: ["secret"] },
+      ],
+      graphql: { variables: [{ name: "limit", examples: [5] }] },
+    }),
+  ]);
+  assert.equal(line, `aeon call shop.test searchProducts '{"q":"lamp'\\''s","limit":5}'`);
+  assert.equal(firstCallLine("shop.test", [op("buy", "action", "high")]), undefined);
+});

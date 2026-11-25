@@ -264,7 +264,9 @@ test("boost helpers count only enabled boosts and pick the latest change", () =>
 });
 
 test("Copy MCP copies a server entry for the site", () => {
-  assert.deepEqual(JSON.parse(ux.mcpSnippet("shop.com")), {
+  const [add, config] = ux.mcpSnippet("shop.com").split("\n\n");
+  assert.equal(add, "claude mcp add shop.com -- aeon mcp shop.com");
+  assert.deepEqual(JSON.parse(config), {
     mcpServers: { "shop.com": { command: "aeon", args: ["mcp", "shop.com"] } },
   });
 });

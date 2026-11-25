@@ -14,7 +14,7 @@ export interface Recording {
 
 export interface RecordOptions {
   url: string;
-  /** Record a tab the user already has open (a tab id, or text matching its title or URL). */
+  /** Record a tab the user already has open (a tab id, `active` for the tab in front, or text matching its title or URL). */
   attach?: string | number;
   bridge?: () => Promise<Bridge>;
   /** Bring the tab to the front so the user can use it. Default true. */
@@ -92,7 +92,7 @@ export class RecordingSession {
       const which = JSON.stringify(options.attach);
       await bridge.run(
         `const __match = ${which};
-const __tabs = typeof __match === 'number' ? [{ tabId: __match }] : await browser.tabs(__match);
+const __tabs = typeof __match === 'number' ? [{ tabId: __match }] : __match === 'active' ? [await browser.activeTab()] : await browser.tabs(__match);
 if (!__tabs.length) throw new Error('No open tab matches ' + __match);
 globalThis.__recTabs = [await browser.attachTab(__tabs[0].tabId)];
 await globalThis.__recTabs[0].network.start({ types: 'all'${options.dryRun ? ", dryRun: true" : ""} });
