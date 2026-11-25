@@ -1,7 +1,7 @@
 import type { BrowserExecutorRequest, BrowserTargetKey } from "@browserkit/protocol";
 import { send } from "./cdp/send.js";
 import { onEngineInstall } from "./native-engine-install.js";
-import { forgetStealth } from "./stealth.js";
+import { forgetStealth, tapsNeedRuntime } from "./stealth.js";
 
 interface EventItem {
   method: string;
@@ -265,6 +265,7 @@ export async function enableConsoleCapture(tabId: number): Promise<void> {
 /** Turns console capture off again: a page can detect the Runtime domain, so it is opt-in. */
 export async function disableConsoleCapture(tabId: number): Promise<void> {
   if (!runtimeEnabled.delete(tabId)) return;
+  if (tapsNeedRuntime(tabId)) return;
   await send({ tabId }, "Runtime.disable", undefined, { label: "disableConsoleCapture" }).catch(
     () => undefined,
   );

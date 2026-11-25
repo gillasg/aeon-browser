@@ -5,7 +5,7 @@ import {
   type OrbToContent,
   type OrbVisualState,
 } from "./orb-messages.js";
-import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "@browserkit/engine/cursor-bus";
+import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT, cursorBus } from "@browserkit/engine/cursor-bus";
 import type { OrbBox, OrbCursorStep } from "./orb-run.js";
 import type { OrbLayout } from "./orb-messages.js";
 import { OVERLAY_STYLE } from "./orb-overlay-style.js";
@@ -42,13 +42,13 @@ interface Point {
   y: number;
 }
 
-// The main-world cursor publishes its position and presence over neutral events; the page DOM has
+// The cursor publishes its position and presence on the isolated-world bus; the page DOM has
 // no id, class or attribute for it. Cache the latest values here in the isolated world.
 let cursorPoint: Point | undefined;
 let cursorPresent = false;
 /** Overlays whose paused loop should run again when the cursor moves or comes and goes. */
 const sleepers = new Set<() => void>();
-window.addEventListener(CURSOR_STATE_EVENT, (event) => {
+cursorBus().addEventListener(CURSOR_STATE_EVENT, (event) => {
   const detail = (event as CustomEvent<{ present?: boolean; point?: Point }>).detail;
   if (!detail) return;
   cursorPresent = detail.present !== false;
@@ -240,7 +240,7 @@ export class OrbOverlay {
     this.host.remove();
     if (!cursorPresent) return;
     if (this.acting)
-      window.dispatchEvent(
+      cursorBus().dispatchEvent(
         new CustomEvent(CURSOR_COMMAND_EVENT, { detail: { x: 0, y: 0, release: true } }),
       );
     else cursorPresent = false;
@@ -518,7 +518,7 @@ export class OrbOverlay {
     const key = JSON.stringify({ x, y, place, release: false });
     if (key === this.summonKey && !release) return;
     this.summonKey = key;
-    window.dispatchEvent(
+    cursorBus().dispatchEvent(
       new CustomEvent(CURSOR_COMMAND_EVENT, { detail: { x, y, place, release } }),
     );
   }

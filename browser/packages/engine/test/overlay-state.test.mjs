@@ -24,7 +24,7 @@ globalThis.chrome = {
       if (method === "Runtime.evaluate") {
         if (params.expression.includes("data-aeon-overlay"))
           return { result: { type: "object", subtype: "array", objectId: "overlays" } };
-        if (params.expression.includes("__cursorSurface")) {
+        if (params.expression.includes("2147483647")) {
           return state.cursor
             ? { result: { type: "object", subtype: "node", objectId: "cursor" } }
             : { result: { type: "object", subtype: "null", value: null } };

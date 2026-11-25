@@ -106,7 +106,7 @@ function repl(url) {
     const main = await page.evaluate(() => ({
       globals: Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit)/.test(name)),
       overlays: [...document.querySelectorAll('[id^="aeon-"],[data-aeon-overlay],#aeon-agent-cursor')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase()),
-      cursorShown: [...document.documentElement.children].some((n) => n.__cursorSurface),
+      cursorShown: [...document.documentElement.children].some((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict"),
       pageCanFindCursor: !!document.querySelector('#aeon-agent-cursor, [data-aeon-overlay], [id^="aeon-"][data-aeon-cursor]')
     }));
     console.log("STEALTH " + JSON.stringify({report, main}));`;

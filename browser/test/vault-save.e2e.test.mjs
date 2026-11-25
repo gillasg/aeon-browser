@@ -30,7 +30,7 @@ let workerCdp;
 
 // What a page says about the hand-off and the cursor, read from its own main world.
 const PROBE = `(() => {
-  const cursor = [...document.documentElement.children].find((n) => n.__cursorSurface);
+  const cursor = [...document.documentElement.children].find((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict");
   const ask = document.getElementById("aeon-agent-ask");
   return {
     url: location.href,

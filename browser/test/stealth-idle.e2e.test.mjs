@@ -72,7 +72,7 @@ test(
         const tells = await tellOn(idlePage);
         const cursors = await evalValue(
           idlePage,
-          "[...document.documentElement.children].filter((n) => n.__cursorSurface).length",
+          "[...document.documentElement.children].filter((n) => n.style.zIndex === '2147483647' && n.style.contain === 'strict').length",
         );
         if (tells.overlays.length || tells.markers.length || cursors)
           throw new Error("cursor still there");
@@ -120,7 +120,7 @@ async function assertNoPagePaint(page) {
   assert.equal(
     await evalValue(
       page,
-      "!![...document.documentElement.children].find((n) => n.__cursorSurface)",
+      "!![...document.documentElement.children].find((n) => n.style.zIndex === '2147483647' && n.style.contain === 'strict')",
     ),
     false,
     "a page event painted Aeon's cursor",

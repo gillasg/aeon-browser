@@ -123,12 +123,13 @@ async function drawOnAeonPage(tabId: number, x: number, y: number): Promise<void
 }
 
 async function installSharedCursor(tabId: number, x: number, y: number): Promise<void> {
-  // The painter runs from the worker's own function: no page listener and no page global, so a
-  // page can neither paint Aeon's cursor nor fingerprint the profile by dispatching an event.
+  // The painter runs from the worker's own function in the extension's isolated world: no page
+  // listener, no page global and no page-visible expando, so a page can neither paint Aeon's
+  // cursor, read its state, nor fingerprint the profile.
   await chrome.scripting
     .executeScript({
       target: { tabId, frameIds: [0] },
-      world: "MAIN",
+      world: "ISOLATED",
       func: paintCursor,
       args: [summonUpdate(x, y), CURSOR_TOKEN_CSS, CURSOR_MARK],
     })

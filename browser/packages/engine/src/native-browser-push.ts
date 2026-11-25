@@ -2,12 +2,16 @@
 // unread counts for one tab, scrubbed and kept in a bounded ring. Strictly lazy: BackgroundService
 // and ServiceWorker are enabled only between start() (or waitFor()) and stop() / tab close.
 import { send } from "./cdp/send.js";
+import { disarmTap } from "./stealth.js";
 import { holdBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { publishBrowserEvent } from "./native-browser-events.js";
 import {
   Ring,
+  dropTap,
   installTap,
+  tapName,
+  type TapSpec,
   readFilter,
   removeTap,
   scrubText,
@@ -32,7 +36,20 @@ interface TabPush {
 }
 
 export const PUSH_EVENT = "Aeon.pushEvent";
-const BINDING = "__aeonPushTap";
+/** The tap's binding and its restore switch: random per worker, so neither names Aeon. */
+export const PUSH_TAP: TapSpec = {
+  label: "notifications tap",
+  binding: tapName(),
+  off: tapName(),
+  source: "",
+  wraps: [
+    "Notification",
+    "navigator.setAppBadge",
+    "navigator.clearAppBadge",
+    "ServiceWorkerRegistration.prototype.showNotification",
+  ],
+};
+const BINDING = PUSH_TAP.binding;
 const SERVICES = ["pushMessaging", "notifications"] as const;
 const tabs = new Map<number, TabPush>();
 const listeners = new Set<(tabId: number, event: PushEvent) => void>();
@@ -144,13 +161,13 @@ export function pushDebuggerEvent(tabId: number, method: string, params: Params)
 
 // Page hooks: the Badging API, Notification and showNotification, and "(3) Inbox" title counts.
 function tapSource(): string {
+  const off = JSON.stringify(PUSH_TAP.off);
   return `(() => {
-  if (window.__aeonPushTapped) return;
-  window.__aeonPushTapped = true;
+  if (window[${off}]) return;
   const tell = (message) => { try { const fn = window[${JSON.stringify(BINDING)}]; if (fn) fn(JSON.stringify({url: location.href, ...message})); } catch {} };
-  const nav = navigator;
-  if (nav.setAppBadge) { const set = nav.setAppBadge.bind(nav); nav.setAppBadge = (count) => { tell({kind: 'badge', event: 'set', count: count ?? null}); return set(count); }; }
-  if (nav.clearAppBadge) { const clear = nav.clearAppBadge.bind(nav); nav.clearAppBadge = () => { tell({kind: 'badge', event: 'clear', count: 0}); return clear(); }; }
+  const nav = navigator, undo = [];
+  if (nav.setAppBadge) { const set = nav.setAppBadge.bind(nav); nav.setAppBadge = (count) => { tell({kind: 'badge', event: 'set', count: count ?? null}); return set(count); }; undo.push(() => delete nav.setAppBadge); }
+  if (nav.clearAppBadge) { const clear = nav.clearAppBadge.bind(nav); nav.clearAppBadge = () => { tell({kind: 'badge', event: 'clear', count: 0}); return clear(); }; undo.push(() => delete nav.clearAppBadge); }
   if (window.Notification) {
     const Native = window.Notification;
     const Wrapped = function (title, options = {}) { tell({kind: 'notification', event: 'show', title: String(title), body: String(options.body ?? ''), tag: options.tag}); return new Native(title, options); };
@@ -158,15 +175,24 @@ function tapSource(): string {
     Object.defineProperty(Wrapped, 'permission', {get: () => Native.permission});
     Wrapped.requestPermission = Native.requestPermission.bind(Native);
     window.Notification = Wrapped;
+    undo.push(() => { window.Notification = Native; });
   }
   if (window.ServiceWorkerRegistration) {
     const proto = ServiceWorkerRegistration.prototype, show = proto.showNotification;
     proto.showNotification = function (title, options = {}) { tell({kind: 'notification', event: 'show', title: String(title), body: String(options.body ?? ''), tag: options.tag}); return show.apply(this, arguments); };
+    undo.push(() => { proto.showNotification = show; });
   }
+  let observer;
   const unread = () => { const found = /^\\s*[(\\[](\\d+)\\+?[)\\]]/.exec(document.title); tell({kind: 'title', title: document.title, count: found ? Number(found[1]) : null}); };
-  const watch = () => { const head = document.head || document.documentElement; if (!head) return; new MutationObserver(unread).observe(head, {subtree: true, childList: true, characterData: true}); unread(); };
+  const watch = () => { const head = document.head || document.documentElement; if (!head) return; observer = new MutationObserver(unread); observer.observe(head, {subtree: true, childList: true, characterData: true}); unread(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch, {once: true}); else watch();
+  undo.push(() => { document.removeEventListener('DOMContentLoaded', watch); if (observer) observer.disconnect(); });
+  Object.defineProperty(window, ${off}, {configurable: true, value: () => { for (const step of undo.reverse()) { try { step(); } catch {} } delete window[${off}]; }});
 })();`;
+}
+
+function pushTap(): TapSpec {
+  return { ...PUSH_TAP, source: tapSource() };
 }
 
 async function start(tabId: number): Promise<unknown> {
@@ -179,7 +205,7 @@ async function start(tabId: number): Promise<unknown> {
   for (const service of SERVICES)
     await send({ tabId }, "BackgroundService.startObserving", { service }, { label });
   await send({ tabId }, "ServiceWorker.enable", undefined, { label });
-  entry.tap = await installTap(tabId, BINDING, tapSource());
+  entry.tap = await installTap(tabId, pushTap());
   return { observing: true, events: 0 };
 }
 
@@ -190,7 +216,7 @@ async function teardown(tabId: number, entry: TabPush): Promise<void> {
       () => undefined,
     );
   await send({ tabId }, "ServiceWorker.disable", undefined, { label }).catch(() => undefined);
-  await removeTap(tabId, BINDING, entry.tap);
+  await removeTap(tabId, pushTap(), entry.tap);
 }
 
 export async function stopPush(tabId: number): Promise<{ stopped: boolean }> {
@@ -234,8 +260,13 @@ onEngineInstall(() => {
     if (source.tabId !== undefined && tabs.has(source.tabId) && !source.sessionId)
       pushDebuggerEvent(source.tabId, method, (params ?? {}) as Params);
   });
-  chrome.tabs.onRemoved.addListener(forget);
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    forget(tabId);
+    disarmTap(tabId, PUSH_TAP.label);
+  });
   chrome.debugger.onDetach.addListener((source) => {
-    if (source.tabId !== undefined) forget(source.tabId);
+    if (source.tabId === undefined || !tabs.has(source.tabId)) return;
+    forget(source.tabId);
+    dropTap(source.tabId, PUSH_TAP);
   });
 });

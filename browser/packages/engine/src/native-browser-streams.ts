@@ -2,12 +2,16 @@
 // in a bounded, scrubbed ring and described as compact stream descriptors. Strictly lazy: a tab
 // with no started tap costs one Map lookup per debugger event, and no domain is enabled for it.
 import { send } from "./cdp/send.js";
+import { disarmTap } from "./stealth.js";
 import { holdBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { publishBrowserEvent } from "./native-browser-events.js";
 import {
   Ring,
+  dropTap,
   installTap,
+  tapName,
+  type TapSpec,
   readFilter,
   removeTap,
   scrubText,
@@ -47,7 +51,19 @@ interface TabStreams {
 }
 
 export const STREAM_EVENT = "Aeon.streamFrame";
-const RTC_BINDING = "__aeonRtcTap";
+/** The WebRTC tap's binding and restore switch: random per worker, so neither names Aeon. */
+export const RTC_TAP: TapSpec = {
+  label: "WebRTC data-channel tap",
+  binding: tapName(),
+  off: tapName(),
+  source: "",
+  wraps: [
+    "RTCDataChannel.prototype.send",
+    "RTCDataChannel.prototype.addEventListener",
+    "RTCDataChannel.prototype.onmessage",
+  ],
+};
+const RTC_BINDING = RTC_TAP.binding;
 const tabs = new Map<number, TabStreams>();
 const listeners = new Set<(tabId: number, frame: StreamFrame) => void>();
 
@@ -182,9 +198,9 @@ export function streamEvent(tabId: number, method: string, params: Params): void
 
 // Wraps RTCDataChannel send and message delivery in the page; reports through the binding.
 function rtcTapSource(): string {
+  const off = JSON.stringify(RTC_TAP.off);
   return `(() => {
-  if (!window.RTCDataChannel || window.__aeonRtcTapped) return;
-  window.__aeonRtcTapped = true;
+  if (!window.RTCDataChannel || window[${off}]) return;
   const tell = (channel, direction, data) => {
     try {
       const binary = typeof data !== 'string';
@@ -200,7 +216,16 @@ function rtcTapSource(): string {
   proto.addEventListener = function (type) { if (type === 'message') watch(this); return add.apply(this, arguments); };
   const desc = Object.getOwnPropertyDescriptor(proto, 'onmessage');
   if (desc && desc.set) Object.defineProperty(proto, 'onmessage', {...desc, set(value) { watch(this); desc.set.call(this, value); }});
+  Object.defineProperty(window, ${off}, {configurable: true, value: () => {
+    proto.send = send; proto.addEventListener = add;
+    if (desc) Object.defineProperty(proto, 'onmessage', desc);
+    delete window[${off}];
+  }});
 })();`;
+}
+
+function rtcTap(): TapSpec {
+  return { ...RTC_TAP, source: rtcTapSource() };
 }
 
 async function start(tabId: number, options: Params): Promise<unknown> {
@@ -213,7 +238,7 @@ async function start(tabId: number, options: Params): Promise<unknown> {
   }
   if (options.webrtc === true && entry.webrtc === undefined) {
     entry.webrtc = "";
-    entry.webrtc = await installTap(tabId, RTC_BINDING, rtcTapSource());
+    entry.webrtc = await installTap(tabId, rtcTap());
   }
   return { streaming: true, webrtc: entry.webrtc !== undefined, frames: entry.ring.items.length };
 }
@@ -225,7 +250,7 @@ export async function stopStreams(tabId: number): Promise<{ stopped: boolean }> 
   tabs.delete(tabId);
   entry.ring.close();
   // Network stays on: the tab's actions and page.network share that domain.
-  if (entry.webrtc !== undefined) await removeTap(tabId, RTC_BINDING, entry.webrtc);
+  if (entry.webrtc !== undefined) await removeTap(tabId, rtcTap(), entry.webrtc);
   holdBrowserDebugger(tabId, false);
   return { stopped: true };
 }
@@ -278,10 +303,13 @@ onEngineInstall(() => {
   chrome.tabs.onRemoved.addListener((tabId) => {
     tabs.get(tabId)?.ring.close();
     tabs.delete(tabId);
+    disarmTap(tabId, RTC_TAP.label);
   });
   chrome.debugger.onDetach.addListener((source) => {
     if (source.tabId === undefined) return;
-    tabs.get(source.tabId)?.ring.close();
+    const entry = tabs.get(source.tabId);
+    entry?.ring.close();
     tabs.delete(source.tabId);
+    if (entry?.webrtc !== undefined) dropTap(source.tabId, RTC_TAP);
   });
 });

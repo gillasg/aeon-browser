@@ -75,16 +75,9 @@ export async function buildExtension() {
 
 async function writeCursorPage(output) {
   const module = await import(pathToFileURL(engine("cursor-page")).href);
-  // Aeon's own extension pages load this file as a script and call the function it leaves behind.
-  // Web pages get the painter as an injected function (aeon:cursor-paint), never as a listener.
-  const source = [
-    "(() => {",
-    "  const paint = " + module.cursorFunctionSource() + ";",
-    '  if (location.protocol === "chrome-extension:") globalThis.__cursorPaint = paint;',
-    "})();",
-    "",
-  ].join("\n");
-  await writeFile(join(output, "cursor-page.js"), source);
+  // Aeon's own pages load this file as a script; on web pages the engine injects it into the
+  // extension's isolated world, so the painter and its globals never reach the page's world.
+  await writeFile(join(output, module.CURSOR_SCRIPT_FILE), module.cursorScriptSource());
 }
 
 /** `aeon:cursor-paint` is the painter as a function literal the worker injects; no page event. */

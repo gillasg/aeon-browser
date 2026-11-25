@@ -377,23 +377,9 @@ function paused(tabId, method, url) {
   for (const listener of debuggerEvents) listener({ tabId }, "Fetch.requestPaused", params);
 }
 
+// The cursor makes no CDP call at all: it paints through chrome.scripting in the isolated world.
 function cursorCases() {
-  return [
-    direct(
-      "updateAgentCursor",
-      "Runtime.evaluate",
-      async (tabId) => {
-        cursor.showAgentCursor({ tabId }, 8, 9, false);
-        await until(() => failed(tabId, "updateAgentCursor"));
-      },
-      {
-        eval: true,
-        prepare() {
-          configureEngine({ hideAgentCursor: async () => false, agentGlow: async () => false });
-        },
-      },
-    ),
-  ];
+  return [];
 }
 
 function pasteRequest(tabId) {

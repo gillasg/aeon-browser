@@ -56,8 +56,10 @@ test(
       );
       assert.match(result.stdout, /FORGED 1/);
       assert.match(result.stdout, /TITLE continued/);
-      assert.match(result.stdout, /CONTROLS [^0]/);
-      assert.match(result.stdout, /CURSOR 1 M 1\.8 1\.8/);
+      // The painter runs in the isolated world: the page finds one host but cannot read its state.
+      // The dotless wing path (M 1.8 1.8) is pinned by apps/chrome-extension/test/cursor-mark.test.mjs.
+      assert.match(result.stdout, /CONTROLS 0\b/);
+      assert.match(result.stdout, /CURSOR 1 $/m);
       assert.match(result.stdout, /HIDDEN true/);
     } finally {
       chrome?.kill();
@@ -81,11 +83,11 @@ function repl(url) {
     console.log("FORGED " + (await page.evaluate(() => document.documentElement.dataset.forged || "")));
     console.log("TITLE " + (await page.title()));
     console.log("CONTROLS " + (await page.evaluate(() => {
-      const host = [...document.documentElement.children].find((n) => n.__cursorSurface);
+      const host = [...document.documentElement.children].find((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict");
       return host && host.__s && host.__s.controls ? JSON.stringify(host.__s.controls).length : 0;
     })));
     console.log("CURSOR " + (await page.evaluate(() => {
-      const hosts = [...document.documentElement.children].filter((n) => n.__cursorSurface);
+      const hosts = [...document.documentElement.children].filter((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict");
       const path = hosts[0] && hosts[0].__s && hosts[0].__s.markPath ? hosts[0].__s.markPath.slice(0, 9) : "";
       return hosts.length + " " + path;
     })));

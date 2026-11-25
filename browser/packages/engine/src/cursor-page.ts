@@ -1,5 +1,5 @@
-// Page-world painter for the one cursor. The engine evaluates this source through CDP, and the
-// Aeon extension installs the same source, so both worlds share one host and one glide.
+// The one cursor's painter. On web pages it runs in the extension's isolated world (injected with
+// chrome.scripting), so its host expandos, state and event bus are invisible to page scripts.
 import { CURSOR_MARK, CURSOR_TOKEN_CSS, glideDuration, glidePoint } from "./cursor-mark.js";
 import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "./cursor-bus.js";
 
@@ -78,6 +78,9 @@ const PAGE_BODY = `
   var styleText = ${JSON.stringify(PAGE_STYLE)};
   var STATE_EVENT = ${JSON.stringify(CURSOR_STATE_EVENT)};
   var COMMAND_EVENT = ${JSON.stringify(CURSOR_COMMAND_EVENT)};
+  // The bus lives in the world the painter runs in (the extension's isolated world on web pages),
+  // so a page script can neither hear the cursor nor send it commands.
+  var bus = globalThis.__cursorBus || (globalThis.__cursorBus = new EventTarget());
   var make = function (tag, attrs, kids, ns) {
     var node = ns ? document.createElementNS(ns, tag) : document.createElement(tag);
     var values = attrs || {};
@@ -137,7 +140,7 @@ const PAGE_BODY = `
       markPath: String(mark && mark.path || "")
     };
     state.emit = function () {
-      dispatchEvent(new CustomEvent(STATE_EVENT, { detail: {
+      bus.dispatchEvent(new CustomEvent(STATE_EVENT, { detail: {
         present: true, point: state.point, controls: state.controls
       }}));
     };
@@ -182,8 +185,8 @@ const PAGE_BODY = `
         state.restWatch.disconnect();
         cancelAnimationFrame(state.frame);
         clearTimeout(state.hide); clearTimeout(state.keysHide); clearInterval(state.type);
-        dispatchEvent(new CustomEvent(STATE_EVENT, { detail: { present: false } }));
-        window.removeEventListener(COMMAND_EVENT, state.onCommand);
+        bus.dispatchEvent(new CustomEvent(STATE_EVENT, { detail: { present: false } }));
+        bus.removeEventListener(COMMAND_EVENT, state.onCommand);
         host.remove();
       }, 1200);
     };
@@ -201,7 +204,7 @@ const PAGE_BODY = `
       if (data.release) state.agent = false;
       applySummon(state, data);
     };
-    window.addEventListener(COMMAND_EVENT, state.onCommand);
+    bus.addEventListener(COMMAND_EVENT, state.onCommand);
     (document.documentElement || document.body).append(host);
     state.place();
   }
@@ -399,4 +402,17 @@ export function cursorExpression(update: object): string {
     JSON.stringify(CURSOR_MARK) +
     "); })()"
   );
+}
+
+/** The file a world loads to get the painter (`cursor-page.js`): it leaves `__cursorPaint` behind in
+ * that world only. Web pages load it into the extension's isolated world, so the page never sees it. */
+export const CURSOR_SCRIPT_FILE = "cursor-page.js";
+export function cursorScriptSource(): string {
+  return [
+    "(() => {",
+    "  const paint = " + cursorFunctionSource() + ";",
+    "  globalThis.__cursorPaint = paint;",
+    "})();",
+    "",
+  ].join("\n");
 }
