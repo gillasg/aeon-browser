@@ -146,3 +146,17 @@ test("DOM control descriptors keep their element token; real tokens still seal",
   assert.throws(() => vault.release(secrets, "https://evil.test", "fetch"), /SECRET_EGRESS/);
   assert.equal(vault.release(secrets.token, "https://api.example.com", "fetch"), CSRF);
 });
+
+test("redacted placeholder sentinels are left as-is and never stored", () => {
+  const vault = new SealVault();
+  const sealed = vault.sealValue(
+    { password: "[set]", confirm: "[set]", token: "[redacted]", realPassword: "hunter2-secret" },
+    "example.com",
+  );
+  assert.equal(sealed.password, "[set]");
+  assert.equal(sealed.confirm, "[set]");
+  assert.equal(sealed.token, "[redacted]");
+  assert.match(sealed.realPassword, SEALED_RE);
+  assert.equal(leaks(sealed, "hunter2-secret"), false);
+  assert.equal(vault.size, 1);
+});

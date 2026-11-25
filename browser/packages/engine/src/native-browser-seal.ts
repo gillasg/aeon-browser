@@ -18,6 +18,7 @@ const HEADER_LINE =
 const COOKIE_FLAG = /(\s(?:-b|--cookie)\s+)(['"])([^'"]{4,})\2/g;
 const JWT = /\beyJ[\w-]{6,}\.[\w-]{6,}\.[\w-]{6,}/g;
 const BEARER = /\b(Bearer|Basic|Token)\s+([\w~+/.=-]{12,})/g;
+const REDACTED_SENTINEL = /^\[(set|redacted|masked|hidden|empty|unset)\]$/i;
 const CONTROL_KEYS = ["kind", "role", "label", "selector", "control", "frame", "tag"];
 const MAX_SEALS = 2000;
 
@@ -54,7 +55,7 @@ export class SealVault {
 
   /** The handle for a raw secret (the same value always gets the same handle). */
   seal(value: string, site: string | null): string {
-    if (value.startsWith(SEAL_PREFIX)) return value;
+    if (value.startsWith(SEAL_PREFIX) || REDACTED_SENTINEL.test(value.trim())) return value;
     const known = this.byValue.get(value);
     if (known) return known;
     const handle = SEAL_PREFIX + randomId();
