@@ -8,8 +8,9 @@ import { McpClientManager } from "../dist/mcp-client-manager.js";
 // A stdio fixture that counts tools/list calls in a file. Calling `mutate` changes the echo schema
 // and, when `notify` is set, announces it with notifications/tools/list_changed.
 const SERVER = `import { createInterface } from "node:readline";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 const counter = process.argv[2];
+writeFileSync(process.argv[3], String(process.pid));
 let version = 1;
 const input = createInterface({ input: process.stdin });
 input.on("close", () => process.exit(0));
@@ -38,11 +39,27 @@ for await (const line of input) {
 }
 `;
 
+// The stdio child keeps the temp directory as its working directory, and on Windows that blocks
+// rmdir until the process has exited. Wait for the pid the fixture server wrote to disappear.
+async function waitForExit(pidFile) {
+  const pid = Number(await readFile(pidFile, "utf8").catch(() => ""));
+  if (!pid) return;
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), "aeon-mcp-cache-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
   const serverPath = join(directory, "server.mjs");
   const counter = join(directory, "lists");
+  const pidFile = join(directory, "pid");
   await writeFile(serverPath, SERVER, "utf8");
   await writeFile(counter, "", "utf8");
   const capability = {
@@ -50,7 +67,7 @@ async function fixture(t) {
     kind: "mcp",
     transport: "stdio",
     command: process.execPath,
-    args: [serverPath, counter],
+    args: [serverPath, counter, pidFile],
     endpoint: null,
     workingDirectory: directory,
     displayName: "Cache fixture",
@@ -65,7 +82,12 @@ async function fixture(t) {
     { snapshot: async () => ({ revision: 1, capabilities: [capability] }) },
     { now: () => clock },
   );
-  t.after(() => manager.closeAll());
+  // One ordered teardown: close the client, wait for the child to exit, then remove the directory.
+  t.after(async () => {
+    await manager.closeAll();
+    await waitForExit(pidFile);
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
   return {
     manager,
     lists: async () => (await readFile(counter, "utf8")).length,
