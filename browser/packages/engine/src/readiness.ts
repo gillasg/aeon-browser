@@ -2,6 +2,7 @@
 // page is classified here, in the extension, so the same rules apply to browser code, the check
 // path and anything else asking "is this ready, empty, signed out, walled, missing or broken?".
 // The classifier is pure and exhaustively testable; only the snapshot touches a page.
+import { type BotVendor, detectVendors } from "./antibot-vendors.js";
 
 export type ReadinessState =
   "ready" | "empty" | "loading" | "login" | "challenge" | "not-found" | "error";
@@ -29,6 +30,9 @@ export interface ReadinessSnapshot {
   metaRefresh?: boolean;
   /** A visible captcha widget frame or response field (reCAPTCHA, hCaptcha, Turnstile, Arkose). */
   captchaWidget?: boolean;
+  /** `document.cookie` and script/frame sources, for bot-vendor markers. */
+  cookies?: string;
+  scripts?: string[];
 }
 
 /**
@@ -60,6 +64,8 @@ export interface Readiness {
   textLength: number;
   at: string;
   gate?: Gate;
+  /** Bot vendors the page runs; human-paced input starts from action 1 on these. */
+  vendors?: BotVendor[];
 }
 
 // Passive checks: a JavaScript challenge or redirect that clears on its own within seconds.
@@ -158,6 +164,11 @@ const EMPTY = [
 const includesAny = (haystack: string, needles: string[]): string[] =>
   needles.filter((needle) => haystack.includes(needle));
 
+function vendorsOf(snapshot: ReadinessSnapshot): { vendors?: BotVendor[] } {
+  const vendors = detectVendors({ cookies: snapshot.cookies, scripts: snapshot.scripts });
+  return vendors.length ? { vendors } : {};
+}
+
 /**
  * Order matters: a wall beats a form, a loading page beats an empty one, and a 404 beats "ready".
  * Every branch records why, because "empty" without evidence is not actionable.
@@ -176,6 +187,7 @@ export function classifyReadiness(snapshot: ReadinessSnapshot): Readiness {
     httpStatus: snapshot.httpStatus ?? null,
     textLength,
     at: new Date().toISOString(),
+    ...vendorsOf(snapshot),
   });
 
   const gated = (state: ReadinessState, kind: GateKind, interactive: boolean): Readiness => ({
@@ -367,6 +379,8 @@ export const readinessSnapshotExpression = `(() => {
     rows: document.querySelectorAll("li, article, [role=listitem], tr").length,
     forms: document.forms ? document.forms.length : 0,
     hasOneTimeCode: !!document.querySelector("input[autocomplete=one-time-code], input[inputmode=numeric][maxlength='6'], input[name*=otp i]"),
+    cookies: (() => { try { return document.cookie.slice(0, 8000); } catch { return ""; } })(),
+    scripts: [...document.querySelectorAll("script[src], iframe[src]")].slice(0, 200).map((n) => n.src || ""),
     metaRefresh: !!document.querySelector("meta[http-equiv=refresh i]"),
     captchaWidget: [...document.querySelectorAll("iframe")].some((f) => /recaptcha\\/(api2|enterprise)|hcaptcha\\.com|challenges\\.cloudflare\\.com|arkoselabs|funcaptcha|captcha-delivery\\.com/.test(f.src || "") && !/size=invisible/.test(f.src || "")) || !!document.querySelector("#px-captcha")
   };

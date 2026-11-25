@@ -1,5 +1,5 @@
 import { tier0Step } from "./native-browser-tier0-step.js";
-import { noteChallengeSeen } from "./native-browser-human-input.js";
+import { armVendorKinematics } from "./antibot-vendors.js";
 import { noteActionTiming } from "./native-browser-action-timing.js";
 import { closedByAction } from "./native-browser-closed-tab.js";
 import { respondFailure, sendFailure } from "./native-browser-result.js";
@@ -286,8 +286,8 @@ export async function performExtra(
         const readiness = classifyReadiness(
           ((await evaluate(debuggee, readinessSnapshotExpression)) ?? {}) as ReadinessSnapshot,
         );
-        // A gate switches this tab to human-paced input; an interactive one carries the pause.
-        if (readiness.gate) noteChallengeSeen(tabId);
+        // A gate or a bot vendor switches this tab to human-paced input; a gate carries the pause.
+        armVendorKinematics(tabId, readiness);
         const handoff = humanHandoff(readiness);
         return handoff ? { ...readiness, handoff } : readiness;
       }

@@ -32,6 +32,8 @@ import { docsExpression, docsTargets, type SiteDocs } from "./docs.js";
 import { paginate, type PaginateOptions } from "./paginate.js";
 import { applyPaceNotes, exportPaced, notePaceLimit, takePace } from "../pace.js";
 import { readSiteFacts } from "../site-notes.js";
+import { isRung0Paused, recordChallenge } from "../circuit-breaker.js";
+import { type BudgetKind, humanBudget } from "../human-budget.js";
 export {
   BadRequest,
   Challenged,
@@ -64,14 +66,22 @@ export interface SiteMapperOptions {
   signers?: Record<string, string>;
   /** Saved multi-step actions (default: the site's overrides). */
   actions?: Record<string, SiteAction>;
+  /** The signed-in account, for the per-(site, account) breaker and budget. Default "default". */
+  account?: string;
 }
 
 const SESSION_FRESH_MS = 12 * 3600_000;
 const REFRESH_EVERY_MS = 10 * 60_000;
 
 /** Halves the site's pace on a 429 or a challenge page. Returns the wall when there was one. */
-function paceOnChallenge(site: string, response: RuntimeResponse): Challenge | undefined {
+function paceOnChallenge(
+  site: string,
+  response: RuntimeResponse,
+  account?: string,
+): Challenge | undefined {
   const wall = observeExchange(site, response);
+  // I-8: the first wall pauses direct replay for this (site, account) for 24 hours.
+  if (wall) recordChallenge(site, wall, account);
   if (wall || isRateLimited(response)) notePaceLimit(site);
   return wall;
 }
@@ -127,6 +137,8 @@ export class SiteClient {
     const mode = this.options.transport ?? "auto";
     if (mode === "page") return this.page;
     if (mode === "direct") return this.direct;
+    // A tripped breaker runs the call in the live page, with human-paced input.
+    if (isRung0Paused(this.site, this.options.account)) return this.page;
     if (await this.needsBrowser(operation)) return this.page;
     // The transport that answered last time starts the next call.
     return (await this.preferredTransport(operation.id)) === "page" ? this.page : this.direct;
@@ -259,7 +271,9 @@ export class SiteClient {
     const retries = readOnly ? (this.options.retries ?? 3) : 0;
     for (let attempt = 0; ; attempt++) {
       try {
-        const response = await this.limiter.run(() => transport.send(request, context));
+        const response = await this.budgeted(readOnly ? "read" : "write", transport, () =>
+          this.limiter.run(() => transport.send(request, context)),
+        );
         if (!shouldRetryRead(readOnly, response, attempt, retries)) return response;
         await sleep(retryDelay(attempt, response.headers["retry-after"]));
       } catch (error) {
@@ -267,6 +281,15 @@ export class SiteClient {
         await sleep(retryDelay(attempt));
       }
     }
+  }
+
+  /** I-4: on a site that tripped the breaker, calls queue inside the human volume budget. */
+  private async budgeted<T>(kind: BudgetKind, transport: Transport, work: () => Promise<T>) {
+    const account = this.options.account;
+    if (!isRung0Paused(this.site, account)) return work();
+    const run = () => humanBudget.run(this.site, { kind }, work, account);
+    if (transport !== this.page) return run();
+    return humanBudget.run(this.site, { kind: "lane" }, run, account);
   }
 
   private async prepare(
@@ -431,7 +454,7 @@ export class SiteClient {
     if (operation.role === "auth") throw new WriteThroughApi(id);
     await takePace(this.site);
     const response = await this.exchange(operation, params, 0, false);
-    paceOnChallenge(this.site, response);
+    paceOnChallenge(this.site, response, this.options.account);
     return response;
   }
 
@@ -564,7 +587,7 @@ export class SiteClient {
     // An export already took a token for this row. A second take would halve the printed rate.
     if (options?.pace !== false) await takePace(this.site);
     const response = await this.request(id, params);
-    const wall = paceOnChallenge(this.site, response);
+    const wall = paceOnChallenge(this.site, response, this.options.account);
     return finishRead(id, response, wall, { operation: this.operation(id), params });
   }
 
@@ -660,7 +683,7 @@ export class SiteClient {
       headers: { accept: "text/html" },
     };
     const response = await this.limiter.run(() => this.direct.send(request, { auth: [], home }));
-    paceOnChallenge(this.site, response);
+    paceOnChallenge(this.site, response, this.options.account);
     return extractEmbedded(response.text ?? "");
   }
 
