@@ -331,28 +331,30 @@ test(
         },
       );
 
-      await t.test("agent tabs are grouped, and rules, history and bookmarks work", async () => {
-        const cell = (code) =>
-          run(process.execPath, [cli, "repl", "--session", "tools", code], { env });
-        const opened = await cell(
-          `page = await browser.openTab(${JSON.stringify(siteUrl)}); page.target.tabId`,
-        );
-        assert.match(opened.stdout, /→ \d+/, opened.stdout + opened.stderr);
-        const tabId = Number(/→ (\d+)/.exec(opened.stdout)[1]);
-        const grouped = await worker("Runtime.evaluate", {
-          expression: `chrome.tabs.get(${tabId}).then(async (t) => t.groupId === -1 ? null : (await chrome.tabGroups.get(t.groupId)).title)`,
-          awaitPromise: true,
-          returnByValue: true,
-        });
-        // The shared group carries the host name and how many chats have tabs in it ("Agent · 3").
-        assert.equal(
-          String(grouped.result.result.value)
-            .replace(/\u2063.*$/, "")
-            .replace(/\s*·\s*\d+$/, ""),
-          "Agent",
-        );
+      await t.test(
+        "agent tabs are grouped, rules work, history and bookmarks ask for their permission",
+        async () => {
+          const cell = (code) =>
+            run(process.execPath, [cli, "repl", "--session", "tools", code], { env });
+          const opened = await cell(
+            `page = await browser.openTab(${JSON.stringify(siteUrl)}); page.target.tabId`,
+          );
+          assert.match(opened.stdout, /→ \d+/, opened.stdout + opened.stderr);
+          const tabId = Number(/→ (\d+)/.exec(opened.stdout)[1]);
+          const grouped = await worker("Runtime.evaluate", {
+            expression: `chrome.tabs.get(${tabId}).then(async (t) => t.groupId === -1 ? null : (await chrome.tabGroups.get(t.groupId)).title)`,
+            awaitPromise: true,
+            returnByValue: true,
+          });
+          // The shared group carries the host name and how many chats have tabs in it ("Agent · 3").
+          assert.equal(
+            String(grouped.result.result.value)
+              .replace(/\u2063.*$/, "")
+              .replace(/\s*·\s*\d+$/, ""),
+            "Agent",
+          );
 
-        const { stdout } = await cell(`
+          const { stdout } = await cell(`
           await page.rules.block({ urls: ["/api/items"] });
           await page.rules.mock("/api/mocked", { mocked: true });
           await page.rules.headers({ "Accept-Language": "hi-IN" });
@@ -362,22 +364,25 @@ test(
           const rules = (await page.rules.list()).length;
           await page.rules.clear();
           const after = await page.evaluate(() => fetch("/api/items").then(() => "loaded", () => "blocked"));
-          const visited = (await browser.history.search("Shop", { days: 1 })).length > 0;
-          const mark = await browser.bookmarks.create({ title: "bue-test", url: ${JSON.stringify(siteUrl)} });
-          const found = (await browser.bookmarks.search("bue-test")).length;
-          await browser.bookmarks.remove(mark.id);
-          console.log("RESULT " + JSON.stringify({ blocked, mocked, language, rules, after, visited, found }))`);
-        assert.match(stdout, /RESULT /, stdout);
-        assert.deepEqual(JSON.parse(/RESULT (.*)/.exec(stdout)[1]), {
-          blocked: "blocked",
-          mocked: { mocked: true },
-          language: "hi-IN",
-          rules: 3,
-          after: "loaded",
-          visited: true,
-          found: 1,
-        });
-      });
+          const refused = (call) => call.then(() => "granted", (error) => String(error.message));
+          const history = await refused(browser.history.search("Shop", { days: 1 }));
+          const bookmark = await refused(browser.bookmarks.create({ title: "bue-test", url: ${JSON.stringify(siteUrl)} }));
+          console.log("RESULT " + JSON.stringify({ blocked, mocked, language, rules, after, history, bookmark }))`);
+          assert.match(stdout, /RESULT /, stdout);
+          const { history, bookmark, ...rules } = JSON.parse(/RESULT (.*)/.exec(stdout)[1]);
+          assert.deepEqual(rules, {
+            blocked: "blocked",
+            mocked: { mocked: true },
+            language: "hi-IN",
+            rules: 3,
+            after: "loaded",
+          });
+          // history and bookmarks are optional permissions: until the user grants them in
+          // chrome://extensions, the agent is told which one to allow.
+          assert.match(history, /PERMISSION_NEEDED: allow "history"/, stdout);
+          assert.match(bookmark, /PERMISSION_NEEDED: allow "bookmarks"/, stdout);
+        },
+      );
 
       await t.test("only the agent's own tabs join its group", async () => {
         const cell = (code) =>
