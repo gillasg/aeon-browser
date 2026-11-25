@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = readFileSync(new URL("../src/code-api-data.ts", import.meta.url), "utf8");
+const source = readFileSync(new URL("../src/page-readers.ts", import.meta.url), "utf8");
 const start = source.indexOf("function __waitRead(");
 const end = source.indexOf("\n}\n", start);
 assert.ok(start >= 0 && end > start, "__waitRead is still a module-level page function");

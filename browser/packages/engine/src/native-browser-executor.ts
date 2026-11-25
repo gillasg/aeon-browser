@@ -1,3 +1,4 @@
+import { tier0Step } from "./native-browser-tier0-step.js";
 import { noteChallengeSeen } from "./native-browser-human-input.js";
 import { noteActionTiming } from "./native-browser-action-timing.js";
 import { closedByAction } from "./native-browser-closed-tab.js";
@@ -260,6 +261,8 @@ export async function performExtra(
     data = await executeSiteScript(step.action, tabId, step.definition, step.scriptId, () =>
       revalidate(request, tabId),
     );
+  } else if ((data = await tier0Step(request, () => revalidate(request, tabId))) !== undefined) {
+    // Read without the debugger (native-browser-tier0.ts).
   } else
     data = await withBrowserDebugger(tabId, async (debuggee) => {
       await revalidate(request, tabId);
