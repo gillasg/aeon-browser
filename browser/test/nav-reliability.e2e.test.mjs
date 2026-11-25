@@ -172,7 +172,7 @@ await phase("NAV", async () => {
   await page.goto(${JSON.stringify(`${origin}/`)});
   let status = "ok";
   let landed = null;
-  try { landed = await page.goto(${JSON.stringify(`${origin}/hang`)}, { timeoutMs: 3000 }); }
+  try { landed = await page.goto(${JSON.stringify(`${origin}/hang`)}, { timeoutMs: 1200 }); }
   catch (error) { status = "ERR " + String(error && error.message || error).replace(/\\n/g, " | "); }
   await new Promise((done) => setTimeout(done, 2500));
   let text = "";
@@ -184,7 +184,7 @@ await phase("RELOAD", async () => {
   await page.goto(${JSON.stringify(`${origin}/sticky`)});
   let status = "ok";
   let landed = null;
-  try { landed = await page.reload({ timeoutMs: 3000 }); }
+  try { landed = await page.reload({ timeoutMs: 1200 }); }
   catch (error) { status = "ERR " + String(error && error.message || error).replace(/\\n/g, " | "); }
   await new Promise((done) => setTimeout(done, 2500));
   let text = "";
