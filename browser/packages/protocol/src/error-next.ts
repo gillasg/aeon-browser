@@ -91,6 +91,7 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   // The action may have applied. No next call: a repeat could submit it twice.
   INPUT_MAY_HAVE_LANDED: null,
   STALE_REF: readState,
+  WRONG_TAB: readState,
   TAB_DEAD: tabs,
   TAB_UNRESPONSIVE: tabs,
   DEBUGGER_DETACHED: readState,

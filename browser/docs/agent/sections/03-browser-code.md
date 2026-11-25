@@ -14,6 +14,11 @@ const rows = await page.list("tr"); // every row, scrolling lists that draw lazi
 await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, hold-to-record
 ```
 
+- The same steps under their contract names: `page.click('t7:e12')` takes a tab-qualified id
+  (`page.ref` is `t7`; on another tab it throws `WRONG_TAB` instead of acting); `human.handoff(why,
+  {page, kind, actionLabel, target})`, `human.signIn()`, `human.fillProfile()` and
+  `human.fillCode()` are `bu.handoff`/`signIn`/`fillProfile`/`fillCode`; `site.ops/call/watch/write`
+  are `siteMapper.*`; `page.wire([{match, abort: true}])` sets `page.rules` and returns `{undo}`.
 - Hold a control with `page.hold(target, {ms})`, `bu.hold(id, {ms})` or `page.holdAt(x, y, {ms})`
   (1500 ms unless `{ms}` says otherwise, at most 15000): a hold-to-confirm button, a long-press
   menu or hold-to-record. The receipt matches a click. `help('visual')`.
@@ -31,7 +36,7 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
   the user blocked answers `SITE_BLOCKED`, so tell them. Work through the user's tabs
   in place, all at once with `Promise.all`, navigating them too when the task is about them; for
   anything else open your own tab, so what the user is watching stays put.
-- `bu.state()` (the same call as `page.state({...})`; bare `page.state()` returns a quick
+- `bu.state()` (the same call as `page.state()`; `page.summary()` returns a quick
   url/title/scroll/headings/forms/counts summary) prints `host/path · title`, then the page in
   sections. Open dialogs come first. A nav or footer is one line (`nav "Main" (14 links)`) until
   `{expand: ["nav"]}` or `{expand: ["all"]}`. Rows are named from their first cells, so identical

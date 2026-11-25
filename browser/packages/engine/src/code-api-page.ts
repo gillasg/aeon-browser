@@ -379,6 +379,7 @@ async function __step(step, readOnly = false) {
   return result;
 }
 function __element(target, element) {
+  element = __tabRef(target, element);
   if (element && typeof element === 'object' && !element.kind) {
     if (typeof element.text === 'string') return {kind:'query',by:'text',value:element.text};
     if (typeof element.ref === 'string' && typeof element.snapshotId === 'string') return {kind:'ref',ref:element.ref,snapshotId:element.snapshotId};
@@ -399,6 +400,7 @@ function __element(target, element) {
 // XPath and filtered shorthands cannot travel in the engine's element schema; use a page-side
 // locator (the indexed path) instead.
 function __locatorFor(target, element) {
+  element = __tabRef(target, element);
   if (typeof element !== 'string') return null;
   var parsed = __parseSelector(element);
   return parsed.spec.by === 'xpath' || parsed.index !== undefined || parsed.spec.filters || parsed.spec.scopeSpec
