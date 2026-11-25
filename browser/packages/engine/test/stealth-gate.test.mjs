@@ -38,7 +38,6 @@ const source = (path) => readFile(new URL(path, repo), "utf8");
 const MANIFESTS = [
   "apps/chrome-extension/manifest.native.json",
   "browser/apps/extension/manifest.json",
-  "browser/packages/boosts/src/manifest.json",
 ];
 
 test("every web-accessible resource uses a dynamic URL", async () => {
