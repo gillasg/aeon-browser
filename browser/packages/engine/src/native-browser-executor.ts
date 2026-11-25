@@ -7,6 +7,7 @@ import { callClass, send } from "./cdp/send.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
 import { inventoryMatchesRequest, isTargetStep } from "./native-browser-target-step.js";
+import { isExtraStep, isPageAction } from "./native-browser-step-guards.js";
 import {
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
@@ -684,58 +685,6 @@ function enqueueTarget(
   };
   void current.then(cleanup, cleanup);
   return current;
-}
-function isPageAction(
-  step: BrowserStep,
-): step is Extract<BrowserStep, { op: "click" | "hold" | "fill" | "paste" | "scroll" }> {
-  return ["click", "hold", "fill", "paste", "scroll"].includes(step.op);
-}
-function isExtraStep(step: BrowserStep): step is Extract<
-  BrowserStep,
-  {
-    op:
-      | "press"
-      | "read"
-      | "wait"
-      | "navigate"
-      | "diagnostics"
-      | "console"
-      | "stealth"
-      | "control"
-      | "session"
-      | "siteScript"
-      | "popups"
-      | "evaluate"
-      | "cdp"
-      | "readiness"
-      | "settle"
-      | "cookies"
-      | "networkStore"
-      | "scheduler"
-      | "waitFor";
-  }
-> {
-  return [
-    "press",
-    "read",
-    "wait",
-    "navigate",
-    "diagnostics",
-    "console",
-    "stealth",
-    "control",
-    "session",
-    "siteScript",
-    "popups",
-    "evaluate",
-    "cdp",
-    "readiness",
-    "settle",
-    "cookies",
-    "networkStore",
-    "scheduler",
-    "waitFor",
-  ].includes(step.op);
 }
 function sendResult(
   socket: WebSocket,
