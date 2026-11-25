@@ -7,18 +7,16 @@ import { CURSOR_TOKEN_CSS } from "./cursor-mark.js";
 
 export const HANDOFF_ASK_ID = "aeon-agent-ask";
 
-// The page's one hand-off card: AMOLED obsidian with the amber rim and faint halo, a glowing
-// amber dot before the agent's message, `I'm done` as a dark-amber glass pill and a quiet Skip.
-// Amber is the only colour Aeon ever shows, and only here.
+// The page's one hand-off card: the same neutral obsidian hairline as the cursor box, the agent's
+// message in bone, `I'm done` as a dark-amber glass pill and a quiet Skip. Amber is the only
+// colour Aeon ever shows, and only on the controls that need your hand.
 const ASK_CSS =
   ":host{all:initial}.ask{box-sizing:border-box;display:flex;flex-direction:column;gap:10px;width:320px;" +
   "max-width:calc(100vw - 32px);padding:13px 13px 11px 15px;border-radius:var(--aeon-r-18);" +
   "background:var(--aeon-island-needs);color:var(--aeon-island-ink);-webkit-font-smoothing:antialiased;" +
   "font:400 var(--aeon-fs-md)/1.5 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;pointer-events:auto;" +
-  "letter-spacing:-0.011em;box-shadow:var(--aeon-island-needs-rim)}" +
-  ".ask p{position:relative;margin:0;padding-left:14px;color:var(--aeon-island-ink);white-space:normal;overflow-wrap:anywhere}" +
-  ".ask p::before{content:'';position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:var(--aeon-r-half);" +
-  "background:var(--aeon-island-needs-soft);box-shadow:0 0 8px var(--aeon-island-needs-soft)}" +
+  "letter-spacing:-0.011em;box-shadow:var(--aeon-island-edge)}" +
+  ".ask p{margin:0;color:var(--aeon-island-ink);white-space:normal;overflow-wrap:anywhere}" +
   ".ask input{box-sizing:border-box;width:100%;height:30px;border:0;border-radius:var(--aeon-r-full);padding:0 12px;" +
   "background:transparent;box-shadow:inset 0 0 0 1px var(--aeon-island-needs-line);" +
   "color:var(--aeon-island-ink);font:inherit;font-size:var(--aeon-fs-sm);outline:none}" +
