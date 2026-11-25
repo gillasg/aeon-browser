@@ -99,14 +99,7 @@ export function createProductionRuntime(dataDirectory: string): {
   routines.onCheck = (routine, check) => void pins.recordCheck(routine, check);
   routines.onFired = (routine, value) =>
     void recordRoutineEvent(dataRoot, routine, value).catch(() => undefined);
-  const capabilityTools = new CapabilityToolService(
-    registry,
-    mcpMigration,
-    pi,
-    store,
-    routines,
-    pins,
-  );
+  const capabilityTools = new CapabilityToolService(registry, mcpMigration, pi, store, routines);
   pi.setThreadToolHost(threadCoordination);
   pi.setCapabilityToolHost(capabilityTools);
   installManagementActions(service, browserControl, capabilityTools, dataRoot);

@@ -33,12 +33,7 @@ function isCommandFor(request: UiRequest, operations: readonly string[]): boolea
   return request.kind === "command" && operations.includes(request.operation);
 }
 
-const CHAT_MANAGEMENT_ACTIONS = new Set([
-  "create_routine",
-  "pin_result",
-  "report_wrong",
-  "decline_offer",
-]);
+const CHAT_MANAGEMENT_ACTIONS = new Set(["create_routine", "report_wrong", "decline_offer"]);
 
 function authorizesChatScope(chatId: string, request: UiRequest): boolean {
   // These two are about the machine's models, not one Chat, so a Chat page may ask too.

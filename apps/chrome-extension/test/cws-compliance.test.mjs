@@ -18,6 +18,15 @@ const MANIFESTS = [
   { manifest: "browser/apps/extension/manifest.json", dist: "browser/apps/extension/build" },
 ];
 
+const STORE_OPTIONAL = [
+  "history",
+  "bookmarks",
+  "clipboardRead",
+  "contentSettings",
+  "privacy",
+  "tabCapture",
+];
+
 function files(directory) {
   if (!existsSync(directory)) return [];
   return readdirSync(directory).flatMap((name) => {
@@ -55,6 +64,14 @@ for (const { manifest: path, dist } of MANIFESTS) {
       assert.ok(reasons[permission]?.length > 20, `${permission} needs a justification`);
   });
 
+  test(`${path}: sensitive permissions are optional and asked for on use`, () => {
+    for (const permission of STORE_OPTIONAL) {
+      assert.ok(!manifest.permissions?.includes(permission), `${permission} is not install-time`);
+      assert.ok(manifest.optional_permissions?.includes(permission), `${permission} is optional`);
+    }
+    assert.ok(manifest.description.length <= 132, "store descriptions fit 132 characters");
+  });
+
   test(`${path}: the build has no code sandbox and evaluates no strings`, () => {
     const built = files(join(root, dist));
     if (!built.length) return;
@@ -76,6 +93,7 @@ test("the justification table names no permission that no manifest declares", ()
   for (const { manifest: path } of MANIFESTS) {
     const manifest = read(path);
     for (const permission of manifest.permissions ?? []) all.add(permission);
+    for (const permission of manifest.optional_permissions ?? []) all.add(permission);
     for (const host of manifest.host_permissions ?? []) all.add(`host_permissions:${host}`);
   }
   for (const permission of Object.keys(reasons)) assert.ok(all.has(permission), permission);

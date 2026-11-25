@@ -83,7 +83,7 @@ test("offers stop at one", async () => {
     items: [
       { kind: "offer", id: "a", text: "One", action: "watch" },
       { kind: "offer", id: "b", text: "Two", action: "schedule" },
-      { kind: "offer", id: "c", text: "Three", action: "pin" },
+      { kind: "offer", id: "c", text: "Three", action: "relearn" },
     ],
   });
   assert.deepEqual(

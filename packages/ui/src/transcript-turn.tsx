@@ -13,7 +13,6 @@ export interface TranscriptActions {
   actionsDisabled: boolean;
   onEditEntry?: (entryId: string) => Promise<void> | void;
   onBranchEntry?: (entryId: string) => Promise<void> | void;
-  onPinMessage?: (text: string) => Promise<void> | void;
   onAnswerOffer?(offer: AnswerOffer): void;
   onAnswerWrong?(): void;
   /** Sends the turn's prompt again. */

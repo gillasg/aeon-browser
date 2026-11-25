@@ -127,8 +127,9 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
   const webhook = parseWebhook(options.args.webhook, options.args.webhookSecret, null);
   const webhookOnly = optionalBoolean(options.args.webhookOnly, "webhookOnly", false);
   const timestamp = now.toISOString();
+  const routineId = randomUUID();
   const saved = options.store.createRoutine({
-    routineId: randomUUID(),
+    routineId,
     chatId,
     title,
     instruction,
@@ -137,7 +138,7 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
     sites,
     listen,
     schedule,
-    nextDueAt: nextRoutineOccurrence(schedule, now),
+    nextDueAt: nextRoutineOccurrence(schedule, now, routineId),
     requiredBrowserInstanceId,
     webhook,
     webhookOnly,

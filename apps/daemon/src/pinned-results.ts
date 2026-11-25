@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { ChatId, RoutineRecord } from "@aeon/domain";
+import type { RoutineRecord } from "@aeon/domain";
 import { siteMapperRequest } from "@aeon/pi-adapter";
 
 // Pinned results: answers the user wants to keep on the new-tab home, with their history. A pin
@@ -43,7 +43,6 @@ interface PinnedFile {
 const MAX_PINS = 50;
 const MAX_HISTORY = 12;
 const DEFAULT_REFRESH_MINUTES = 15;
-const MIN_REFRESH_MINUTES = 5;
 const MAX_VALUE = 200;
 const REFRESH_EVERY_MS = 60_000;
 
@@ -72,22 +71,6 @@ export class PinnedResults {
   async list(): Promise<PinRecord[]> {
     const pins = await this.load();
     return [...pins].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  }
-
-  /** The agent's `pin_result`: create, update by title, or remove. */
-  async execute(
-    args: Record<string, unknown>,
-    chatId: ChatId,
-  ): Promise<PinRecord | { removed: boolean }> {
-    const title = requiredTitle(args.title);
-    if (args.remove === true) return { removed: await this.remove(title) };
-    const existing = (await this.load()).find(
-      (pin) => pin.title.toLowerCase() === title.toLowerCase(),
-    );
-    const pin = pinFromArgs(args, title, chatId, existing);
-    await this.replace(pin);
-    if (pin.source === "api") await this.refresh(pin.pinId);
-    return (await this.load()).find((item) => item.pinId === pin.pinId) ?? pin;
   }
 
   /**
@@ -153,14 +136,6 @@ export class PinnedResults {
     }
   }
 
-  private async remove(title: string): Promise<boolean> {
-    const pins = await this.load();
-    const next = pins.filter((pin) => pin.title.toLowerCase() !== title.toLowerCase());
-    if (next.length === pins.length) return false;
-    await this.save({ pins: next });
-    return true;
-  }
-
   private async replace(pin: PinRecord): Promise<void> {
     const pins = await this.load();
     const index = pins.findIndex((item) => item.pinId === pin.pinId);
@@ -216,55 +191,6 @@ function recordValue(record: Record<string, unknown>): string {
       .join(" · ")
       .slice(0, MAX_VALUE);
   return JSON.stringify(record).slice(0, MAX_VALUE);
-}
-
-/** The record the agent's pin_result makes, from its arguments and any earlier pin. */
-function pinFromArgs(
-  args: Record<string, unknown>,
-  title: string,
-  chatId: ChatId,
-  existing: PinRecord | undefined,
-): PinRecord {
-  const site = optionalString(args.site, 200);
-  const operation = optionalString(args.operation, 200);
-  const source: PinRecord["source"] = site && operation ? "api" : "answer";
-  const value = optionalString(args.value, MAX_VALUE) ?? existing?.value ?? "";
-  const now = new Date().toISOString();
-  const checkedAt = source === "api" ? null : now;
-  const pin: PinRecord = {
-    pinId: existing?.pinId ?? randomUUID(),
-    title,
-    value,
-    ...pinExtras(args, site, operation, source),
-    source,
-    chatId,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-    checkedAt,
-    needsYou: false,
-    history: pushHistory(existing?.history, value, now),
-  };
-  return pin;
-}
-
-/** The optional parts of an agent-made pin, left off when they are empty. */
-function pinExtras(
-  args: Record<string, unknown>,
-  site: string | undefined,
-  operation: string | undefined,
-  source: PinRecord["source"],
-): Partial<PinRecord> {
-  const extras: Partial<PinRecord> = {};
-  const detail = optionalString(args.detail, 300);
-  const condition = optionalString(args.condition, 200);
-  const params = record(args.params);
-  if (detail) extras.detail = detail;
-  if (condition) extras.condition = condition;
-  if (site) extras.site = site;
-  if (operation) extras.operation = operation;
-  if (params) extras.params = params;
-  if (source === "api") extras.refreshMinutes = refreshMinutes(args.refreshMinutes);
-  return extras;
 }
 
 /** The pin a watcher's check updates, or undefined when there is nothing to show yet. */
@@ -340,26 +266,4 @@ function isPin(value: unknown): value is PinRecord {
     typeof pin.updatedAt === "string" &&
     Array.isArray(pin.history)
   );
-}
-
-function requiredTitle(value: unknown): string {
-  const title = optionalString(value, 120);
-  if (!title) throw new Error("A pin needs a title");
-  return title;
-}
-
-function optionalString(value: unknown, max: number): string | undefined {
-  if (typeof value !== "string" || !value.trim()) return undefined;
-  return value.trim().slice(0, max);
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function refreshMinutes(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_REFRESH_MINUTES;
-  return Math.min(1440, Math.max(MIN_REFRESH_MINUTES, Math.round(value)));
 }

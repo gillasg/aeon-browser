@@ -10,7 +10,6 @@
     "format:check": "prettier --check \"apps/**/*.{ts,mjs,json,html}\" \"packages/**/*.{ts,mjs,json,html,css}\" \"test/*.mjs\" \"*.{json,yaml}\"",
     "test": "pnpm test:engine && pnpm test:site-mapper && pnpm test:crawl && pnpm test:workflows && pnpm test:boosts && node scripts/run-tests.mjs \"test/*.test.mjs\"",
     "test:boosts": "pnpm --filter site-boosts test:unit",
-    "test:boosts:e2e": "pnpm --filter site-boosts test:e2e",
     "test:site-mapper": "pnpm --filter @browserkit/site-mapper test:unit",
     "test:workflows": "pnpm --filter @browserkit/tools test",
     "test:engine": "pnpm --filter @browserkit/engine test",

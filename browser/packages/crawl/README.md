@@ -1,6 +1,6 @@
 # browser-crawl
 
-**Crawl anything, including behind your logins.** Turn a site into Markdown, JSON or a dataset: plain HTTP where it works, your own browser where a page needs JavaScript or a sign-in, and a site's own API when a host has mapped it with site-to-api.
+**Crawl anything, including behind your logins.** Turn a site into Markdown, JSON or a dataset: plain HTTP where it works, your own browser where a page needs JavaScript or a sign-in, and a site's own API when Aeon has mapped it.
 
 ```bash
 npx browser-crawl crawl https://docs.example.com --limit 200 --out docs/
@@ -20,14 +20,14 @@ const page = await scrape("https://shop.example/p/lamp", { formats: ["markdown",
 - **Behind logins.** Pages that need a sign-in are fetched in your own browser, with your sessions, SSO and two-factor already done. When a page asks you to sign in or verify, that one page waits for you (up to five minutes) while the rest of the crawl continues.
 - **Rarely blocked.** The browser is a real one, and plain requests carry a current browser's headers. It never announces itself as a bot.
 - **Fast by default.** Every page is tried over plain HTTP first; only pages that need JavaScript (or a site that checks for bots) go to the browser, and the crawler remembers which sites need it.
-- **Through APIs when it can.** For a site mapped with site-to-api, pages come back as the data they are built from, and whole collections are paged through the site's own API: no HTML parsing, many times faster.
+- **Through APIs when it can.** For a site Aeon has mapped, pages come back as the data they are built from, and whole collections are paged through the site's own API: no HTML parsing, many times faster.
 - **The page's own data.** Besides Markdown, you get the JSON the page loaded itself and its embedded state (Next.js, Nuxt, Apollo, Redux, JSON-LD).
-- **Polite.** robots.txt is not consulted (it is read only to find sitemaps). Requests to each host are spaced out, slow down when the site does, and back off on 429 and 503 answers, honouring `Retry-After`.
+- **Polite.** Requests to each host are spaced out, slow down when the site does, and back off on 429 and 503 answers, honouring `Retry-After`.
 
 ## Requirements
 
 - Node.js 22.19 or newer.
-- For browser fetching: Chrome or Edge with the [browserkit](https://github.com/gillasg/browserkit) (set up once with `npx browserkit setup`). Without it, everything runs over plain HTTP. Apps that already drive a browser can use theirs instead: `useBrowser({ run, status, close })`, where `run(code, { session, timeoutMs })` runs browser code.
+- For browser fetching: Chrome or Edge with [Aeon](https://github.com/gillasg/aeon-browser) installed. Without it, everything runs over plain HTTP. Apps that already drive a browser can use theirs instead: `useBrowser({ run, status, close })`, where `run(code, { session, timeoutMs })` runs browser code.
 
 ## Commands
 
@@ -37,7 +37,7 @@ const page = await scrape("https://shop.example/p/lamp", { formats: ["markdown",
 | `map <url>`                      | A fast list of a site's URLs from its sitemaps and links. `--search` ranks them by a phrase.                           |
 | `crawl <url>`                    | A whole site, or the part you choose. Ctrl+C pauses; `--resume` continues.                                             |
 | `crawl --prompt "<request>"`     | Describe the crawl in plain English (needs a model).                                                                   |
-| `crawl --api <site>:<operation>` | Every item of a paginated operation of a site mapped with site-to-api (needs a host that installs the adapter).        |
+| `crawl --api <site>:<operation>` | Every item of a paginated operation of a site Aeon has mapped (needs a host that installs the adapter).                |
 | `sync <url> <folder>`            | A Markdown mirror that only re-fetches pages that changed and removes pages that are gone.                             |
 | `search "<query>"`               | Google in your browser (your region and language). `--scrape` reads the results too.                                   |
 | `find "<query>"`                 | Build a list: search, keep results that meet `--criteria`, fill `--columns name,founded=year founded` (needs a model). |
@@ -73,7 +73,7 @@ Pages fetched in the browser include the content of open shadow roots (web compo
 | actions (library and API)                           | Click, write, press, scroll, wait, run JavaScript, take screenshots, in order.                                        |
 | `--block-resources image,media,font`                | Load pages faster in the browser.                                                                                     |
 | `--mobile`, `--language hi-IN`                      | Fetch as a phone, or in another language.                                                                             |
-| `--cookies`, `--header`, HTTP auth                  | For plain fetches. Cookies exported with `site-to-api session <site>` are used automatically.                         |
+| `--cookies`, `--header`, HTTP auth                  | For plain fetches. Cookies exported from a mapped site's session are used automatically.                              |
 | `proxy` option, `BROWSER_CRAWL_PROXY`               | Send plain fetches through your proxy (`http://user:pass@host:port`), for example to see a site from another country. |
 | `--max-age <ms>`                                    | Use the cached copy when it is this fresh. Otherwise pages are re-checked with ETag and Last-Modified.                |
 | `--concurrency`, `--delay-ms`, `--retries`          | Throughput. Concurrency also drops by itself when memory runs short.                                                  |
@@ -141,9 +141,7 @@ pnpm install
 pnpm check
 ```
 
-browser-crawl has no sibling packages: a change here is committed only here. `node scripts/link-repos.mjs --revisions` prints the revision of each linked repo.
-
-The end-to-end test drives a private, headless Chrome for Testing with browserkit. It runs when it finds the extension (`BUE_DIR`, default `../browserkit`) and Chrome (`CHROME_PATH`), and always in CI.
+The end-to-end test drives a private, headless Chrome for Testing with Aeon's browser extension. It runs when it finds the extension (`BUE_DIR`) and Chrome (`CHROME_PATH`), and always in CI.
 
 ## License
 

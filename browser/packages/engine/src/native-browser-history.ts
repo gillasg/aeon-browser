@@ -3,6 +3,7 @@
 // Without since/until, visit counts are Chrome's per-URL totals, so a page first seen inside the
 // days window still carries its older visits. With since and/or until, each URL is counted from
 // chrome.history.getVisits inside that window, and the result includes those visit times.
+import { needPermission } from "./native-browser-optional.js";
 const PAGE = 5000;
 const MAX_SEARCH = 5000;
 const MAX_SCAN = 200_000;
@@ -61,8 +62,10 @@ interface Picked {
 export async function historyCall(
   action: string,
   value: Request,
-  api: HistoryApi = chromeHistory(),
+  given?: HistoryApi,
 ): Promise<unknown> {
+  if (!given) await needPermission("history");
+  const api = given ?? chromeHistory();
   if (action === "search") return search(value, api);
   if (action === "top") return top(value, api);
   throw new Error("UNSUPPORTED: browser.history." + action);

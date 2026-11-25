@@ -23,17 +23,19 @@
     "webNavigation",
     "downloads",
     "offscreen",
-    "tabCapture",
     "tabGroups",
     "alarms",
-    "history",
-    "bookmarks",
     "cookies",
     "declarativeNetRequest",
+    "clipboardWrite"
+  ],
+  "optional_permissions": [
+    "tabCapture",
+    "history",
+    "bookmarks",
     "contentSettings",
     "privacy",
-    "clipboardRead",
-    "clipboardWrite"
+    "clipboardRead"
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "icons": {

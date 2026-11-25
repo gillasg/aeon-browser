@@ -76,8 +76,9 @@ export class RoutineManagementTools {
       check || checkShell || listen ? 1 : 5,
     );
     const timestamp = now.toISOString();
+    const routineId = randomUUID();
     const saved = this.store.createRoutine({
-      routineId: randomUUID(),
+      routineId,
       chatId,
       title,
       instruction,
@@ -86,7 +87,7 @@ export class RoutineManagementTools {
       sites: optionalSites(args.sites, []),
       listen,
       schedule,
-      nextDueAt: nextRoutineOccurrence(schedule, now),
+      nextDueAt: nextRoutineOccurrence(schedule, now, routineId),
       // A routine runs in its chat's browser: with several Chrome profiles connected, a check with
       // no browser fails AMBIGUOUS_BROWSER on every run and the watcher never fires.
       requiredBrowserInstanceId:
@@ -154,7 +155,7 @@ export class RoutineManagementTools {
         webhookOnly,
         effect,
         enabled,
-        nextDueAt: enabled ? nextRoutineOccurrence(schedule, new Date()) : null,
+        nextDueAt: enabled ? nextRoutineOccurrence(schedule, new Date(), current.routineId) : null,
       },
       new Date().toISOString(),
     );

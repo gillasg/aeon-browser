@@ -3,6 +3,7 @@ import { forgetAgentTab } from "./native-browser-tab-cleanup.js";
 import { disableQuietTab } from "./native-browser-quiet.js";
 import { historyCall } from "./native-browser-history.js";
 import { identityCall, isIdentityRequest } from "./native-browser-identity.js";
+import { needPermission } from "./native-browser-optional.js";
 
 // The user's history and bookmarks, for questions like "that article I read last week" and for
 // organizing bookmarks. Results are compact records; the code runtime gets them as plain data.
@@ -102,6 +103,7 @@ async function downloadsCall(action: string, value: Request): Promise<unknown> {
 }
 
 async function bookmarksCall(action: string, value: Request): Promise<unknown> {
+  await needPermission("bookmarks");
   const id = String(value.id ?? "");
   if (action === "search")
     return (await chrome.bookmarks.search(String(value.query ?? "")))

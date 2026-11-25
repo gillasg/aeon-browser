@@ -55,7 +55,6 @@ export interface ChatSurfaceProps {
   transcriptActionsDisabled?: boolean;
   onEditMessage?(entryId: string): Promise<void> | void;
   onBranchMessage?(entryId: string): Promise<void> | void;
-  onPinAnswer?: ((text: string) => Promise<void> | void) | undefined;
   onAnswerOffer?: ((offer: AnswerOffer) => void) | undefined;
   onAnswerWrong?: (() => void) | undefined;
   onNewChat(): void;
@@ -185,7 +184,6 @@ function ChatContent(props: ChatSurfaceProps): ReactElement {
               }
               {...(props.onEditMessage ? { onEditEntry: props.onEditMessage } : {})}
               {...(props.onBranchMessage ? { onBranchEntry: props.onBranchMessage } : {})}
-              onPinMessage={props.onPinAnswer}
               onAnswerOffer={props.onAnswerOffer}
               onAnswerWrong={props.onAnswerWrong}
               onRetry={(text) => void props.composer.onSend(text, "followUp", [])}

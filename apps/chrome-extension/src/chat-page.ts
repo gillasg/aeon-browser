@@ -236,7 +236,6 @@ function createView() {
     onSelectChat: (nextChatId: string) => void sidebar.openChat(nextChatId),
     ...sidebar.actionProps(),
     onNewChat: () => openNewChat(),
-    onPinAnswer: (text: string) => void pinAnswer(text),
     onAnswerOffer: (offer: AnswerOffer) => void offerAnswer(offer),
     onAnswerWrong: () => void wrongAnswer(),
   });
@@ -260,7 +259,6 @@ async function offerAnswer(offer: AnswerOffer): Promise<void> {
     ...(url ? { url } : {}),
     onError: showError,
     onNotice: showError,
-    pin: pinAnswer,
   });
 }
 
@@ -279,16 +277,9 @@ async function wrongAnswer(): Promise<void> {
   ).catch((error: unknown) => showError(error instanceof Error ? error.message : "Couldn't send."));
 }
 
-/** Keeps an answer on the new-tab home through the same management grant the orb uses. */
-async function pinAnswer(text: string): Promise<void> {
-  const value = text.trim().slice(0, 200);
-  if (!value) return;
-  await managementAction("pin_result", { title: pinTitle(title), value });
-}
-
 /** One management action through this chat's grant; throws when Aeon refuses it. */
 async function managementAction(
-  action: "pin_result" | "report_wrong",
+  action: "report_wrong",
   input: Record<string, unknown>,
 ): Promise<void> {
   if (!client) throw new Error("Aeon is not connected.");
@@ -310,13 +301,6 @@ async function managementAction(
   if (response.kind === "command.failed") throw new Error(response.message);
 }
 
-function pinTitle(current: string): string {
-  const stripped = current
-    .replace(/\s*Aeon\s*$/, "")
-    .replace(/[^\w\s]+$/, "")
-    .trim();
-  return (stripped || "Chat").slice(0, 120);
-}
 function render(): void {
   if (updateUi) updateUi(createView());
   else updateUi = mountAeonUi(root, createView());
