@@ -57,7 +57,7 @@ test(
       assert.match(result.stdout, /FORGED 1/);
       assert.match(result.stdout, /TITLE continued/);
       assert.match(result.stdout, /CONTROLS [^0]/);
-      assert.match(result.stdout, /CURSOR 1 M 1\.2 1\.2/);
+      assert.match(result.stdout, /CURSOR 1 M 1\.8 1\.8/);
       assert.match(result.stdout, /HIDDEN true/);
     } finally {
       chrome?.kill();

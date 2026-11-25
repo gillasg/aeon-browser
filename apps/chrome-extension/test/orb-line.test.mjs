@@ -90,9 +90,10 @@ test("a running step is one breathing pill above the field, with no panel link",
     }),
   );
   assert.match(html, /data-state="working"/);
-  assert.match(html, /isl-working ink-wet/);
+  assert.match(html, /class="isl-working"/);
+  assert.match(html, /ink-dots" data-live="true"/);
   assert.match(html, /Reading your orders/);
-  assert.match(html, /· 4s/);
+  assert.doesNotMatch(html, /· 4s/);
   assert.doesNotMatch(html, /isl-line-more/);
   assert.match(html, /<textarea/);
 });
@@ -128,37 +129,34 @@ const footer = {
   ],
 };
 
-test("a finished answer dries into one receipt line; a running step has none", async () => {
+test("a finished answer shows the echo, the prose and a hover-only time + Copy foot", async () => {
   const orb = await view();
   const done = renderToStaticMarkup(
     createElement(orb.OrbBox, {
-      model: { ...model, line: { text: "Twenty three orders.", more: true }, footer },
+      model: {
+        ...model,
+        asked: "How many orders?",
+        startedAt: new Date(2026, 10, 25, 13, 47, 0).getTime(),
+        durationMs: 400,
+        line: { text: "Twenty three orders.", more: true },
+        footer,
+      },
       actions,
     }),
   );
   assert.match(done, /data-state="answer"/);
   assert.match(done, /isl-answer/);
-  assert.match(done, /class="isl-receipt-text">0\.4s · via skill</);
-  assert.doesNotMatch(done, /no model/);
-  const timed = renderToStaticMarkup(
-    createElement(orb.OrbBox, {
-      model: {
-        ...model,
-        durationMs: 1200,
-        line: { text: "Twenty three orders.", more: true },
-        footer: { lines: [] },
-      },
-      actions,
-    }),
-  );
-  assert.match(timed, /class="isl-receipt-text">1\.2s</);
+  assert.match(done, /class="isl-echo-text">How many orders\?</);
+  assert.match(done, /class="isl-foot-time">13:47</);
+  assert.match(done, /aria-label="Copy"/);
+  assert.doesNotMatch(done, /via skill|no model|0\.4s|Retry|Wrong answer|Learned/);
   const running = renderToStaticMarkup(
     createElement(orb.OrbBox, {
       model: { ...model, line: { text: "Reading your orders · 23 found", more: false }, footer },
       actions,
     }),
   );
-  assert.doesNotMatch(running, /isl-receipt/);
+  assert.doesNotMatch(running, /isl-foot/);
 });
 
 test("Compose never shows the X-Ray strip or the power row", async () => {

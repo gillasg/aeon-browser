@@ -100,75 +100,64 @@ export function TeachPill({ found, onDone }: { found: number; onDone(): void }):
   );
 }
 
-/** `4s`, `1m 12s`. */
-export function elapsedLabel(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-}
-
-/** `0.4s`, `12s`: a finished run's one duration. */
-export function durationLabel(ms: number): string {
-  const seconds = ms / 1000;
-  return seconds < 10
-    ? `${(Math.round(seconds * 10) / 10).toFixed(1)}s`
-    : `${Math.round(seconds)}s`;
-}
-
-/** Wet: one breathing-hairline pill, `◌ Reading editions on Steam · 4s   ⌘↵  esc`. */
-export function WorkingPill({
-  text,
-  elapsed,
-}: {
-  text: string;
-  elapsed?: string | undefined;
-}): ReactElement {
+/** The 2×2 micro-dot constellation: calm graduated dots at rest, a sequential wave while working. */
+export function InkDots({ live = false }: { live?: boolean }): ReactElement {
   return (
-    <p className="isl-working ink-wet" role="status">
-      <span className="isl-working-glyph" aria-hidden="true">
-        ◌
-      </span>
+    <span className="ink-dots" data-live={String(live)} aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+/** Working: a compact capsule, the dot wave and one calm phrase. No counters, no timer. */
+export function WorkingPill({ text }: { text: string }): ReactElement {
+  return (
+    <p className="isl-working" role="status">
+      <InkDots live />
       <span className="isl-working-text">{text}</span>
-      {elapsed ? <span className="isl-working-time">· {elapsed}</span> : null}
       <span className="isl-keys" aria-hidden="true">
-        <kbd>⌘↵</kbd>
         <kbd>esc</kbd>
       </span>
     </p>
   );
 }
 
-/** Dry: one non-wrapping receipt line, `0.4s · via skill`, with hover icons, never emoji. */
-export function ReceiptRow({
-  receipt,
-  onCopy,
-  onWrong,
-  onRetry,
+/** Quiet ↑; a bone pill with an obsidian arrow once there is something to send. */
+export function SendButton({
+  ready,
   disabled,
+  onSend,
 }: {
-  receipt: string;
-  onCopy(): void;
-  onWrong?: (() => void) | undefined;
-  onRetry?: (() => void) | undefined;
+  ready: boolean;
   disabled: boolean;
+  onSend(): void;
 }): ReactElement {
   return (
-    <div className="isl-receipt">
-      <span className="isl-receipt-text">{receipt}</span>
-      <span className="isl-receipt-icons">
-        <IconButton label="Copy" onClick={onCopy} disabled={false}>
-          <Icon d="M5.5 5.5V3.5h7v7h-2M3.5 5.5h7v7h-7z" />
-        </IconButton>
-        {onWrong ? (
-          <IconButton label="Wrong answer" onClick={onWrong} disabled={disabled}>
-            <Icon d="M5.5 9V3.5h6.2a1.2 1.2 0 0 1 1.2 1l.6 3.9a1.2 1.2 0 0 1-1.2 1.4H9.5l.5 2.3a1 1 0 0 1-1.9.7L5.5 9ZM3 3.5h2.5V9H3z" />
-          </IconButton>
-        ) : null}
-        {onRetry ? (
-          <IconButton label="Retry" onClick={onRetry} disabled={disabled}>
-            <Icon d="M12.5 7.5A4.5 4.5 0 1 1 11.2 4.3M12.8 2.5v2.8H10" />
-          </IconButton>
-        ) : null}
-      </span>
+    <button
+      type="button"
+      className="isl-send"
+      data-ready={String(ready)}
+      title="Send"
+      aria-label="Send"
+      disabled={disabled}
+      onClick={onSend}
+    >
+      <Icon d="M8 12.5v-9M4.5 7 8 3.5 11.5 7" />
+    </button>
+  );
+}
+
+/** Hover-only, left-aligned: the finish time and an icon-only Copy. Nothing else. */
+export function AnswerFoot({ time, onCopy }: { time: string; onCopy(): void }): ReactElement {
+  return (
+    <div className="isl-foot">
+      {time ? <time className="isl-foot-time">{time}</time> : null}
+      <IconButton label="Copy" onClick={onCopy} disabled={false}>
+        <Icon d="M5.5 5.5V3.5h7v7h-2M3.5 5.5h7v7h-7z" />
+      </IconButton>
     </div>
   );
 }

@@ -38,7 +38,7 @@ const PAGE_STYLE = [
   ".needs .p{display:none!important}",
   ".clean .g,.clean .p,.clean .s,.clean .co,.clean .k,.clean svg.trail{display:none!important}",
   ".c{position:absolute;left:0;top:0;will-change:transform;transition:opacity .18s ease}",
-  ".a,.t{position:absolute;left:-1px;top:-1px;filter:drop-shadow(0 0 0 transparent);",
+  ".a,.t{position:absolute;left:-1px;top:-1px;filter:drop-shadow(0 1px 2px var(--aeon-cursor-shadow));",
   "transition:transform 120ms ease,opacity 120ms ease}",
   ".t{left:-6px;top:-11px;opacity:0}.c.text .a{opacity:0}.c.text .t{opacity:1}",
   ".c.down .a,.c.down .t{transform:scale(.82)}",
@@ -101,11 +101,11 @@ const PAGE_BODY = `
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:strict";
     var root = host.attachShadow({ mode: "closed" });
     var arrow = svg("svg", { class: "a", width: String(mark.width || 22), height: String(mark.height || 20), viewBox: String(mark.viewBox || "0 0 25 23") }, [
-      svg("path", { d: String(mark.path || ""), fill: "var(--aeon-cursor)", stroke: "var(--aeon-cursor-stroke)", "stroke-width": "1", "stroke-linejoin": "round" })
+      svg("path", { d: String(mark.path || ""), fill: "var(--aeon-cursor)", stroke: "var(--aeon-cursor-stroke)", "stroke-width": "1.25", "stroke-linejoin": "round" })
     ]);
     var box = String(mark.viewBox || "0 0 25 23").split(" ");
-    var noseX = 1.2 / Number(box[2] || 25) * Number(mark.width || 22);
-    var noseY = 1.2 / Number(box[3] || 23) * Number(mark.height || 20);
+    var noseX = 1.8 / Number(box[2] || 25) * Number(mark.width || 22);
+    var noseY = 1.8 / Number(box[3] || 23) * Number(mark.height || 20);
     arrow.style.left = (-noseX) + "px";
     arrow.style.top = (-noseY) + "px";
     root.append(sheet(tokenCss || ""), sheet(styleText), make("div", { class: "w" }, [

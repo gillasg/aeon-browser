@@ -299,6 +299,7 @@ async function answerWrong(): Promise<void> {
 // has gets the message as its next turn; otherwise a new chat starts with this tab as context.
 async function submit(text: string): Promise<void> {
   lastPrompt = text;
+  model.asked = text;
   model.startedAt = Date.now();
   delete model.durationMs;
   model.busy = true;
