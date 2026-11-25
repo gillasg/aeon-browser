@@ -157,7 +157,8 @@ export function mcpCommands(map: Command | undefined): Command[] {
     {
       name: "mcp",
       group: "Browser",
-      summary: "MCP server (stdio or HTTP), or add/list/remove the MCP servers Aeon's chats can call",
+      summary:
+        "MCP server (stdio or HTTP), or add/list/remove the MCP servers Aeon's chats can call",
       help: `Usage: aeon mcp [site] [--surface code|full]
        aeon mcp --http [--port 4790] [--surface code|full]
        aeon mcp token create|list|revoke --name <client>

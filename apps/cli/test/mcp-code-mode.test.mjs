@@ -162,7 +162,9 @@ test("client tokens: hashed at rest in a 0600 file, verified, revoked", async (t
   const saved = await readTokens(dir);
   assert.equal(saved.length, 1);
   assert.ok(!JSON.stringify(saved).includes(token), "the token itself is never stored");
-  assert.equal((await stat(join(dir, "mcp-tokens.json"))).mode & 0o777, 0o600);
+  if (process.platform !== "win32") {
+    assert.equal((await stat(join(dir, "mcp-tokens.json"))).mode & 0o777, 0o600);
+  }
   assert.equal(await verifyToken(token, dir), "agent-one");
   assert.equal(await verifyToken(token + "x", dir), undefined);
   assert.equal(await verifyToken("nope", dir), undefined);
