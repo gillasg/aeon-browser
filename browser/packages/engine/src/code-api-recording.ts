@@ -21,8 +21,11 @@ function __cdpStream(target, event, handler, options = {}) {
   return Object.freeze({ready, stop: async () => { stopped = true; await loop.catch(() => {}); }, done: loop});
 }
 
+// Provenance events page.why() leaves while a tab records; saved as events.json beside frames.json.
+var __provRecordings = new Map();
 async function __recordTab(target, options = {}) {
-  var page = browser.page(target);
+  var page = browser.page(target), events = [];
+  __provRecordings.set(__key(target), events);
   var name = String(options.name || 'recording-' + Date.now()).replace(/[^A-Za-z0-9._-]+/g, '-');
   var frames = [], writes = [], every = Math.max(1, Math.round(60 / Math.min(60, options.fps ?? 30)));
   var stream = __cdpStream(target, 'Page.screencastFrame', (params) => {
@@ -38,6 +41,8 @@ async function __recordTab(target, options = {}) {
     await page.cdp('Page.stopScreencast', {}).catch(() => {});
     await stream.stop();
     await Promise.all(writes);
+    if (__provRecordings.get(__key(target)) === events) __provRecordings.delete(__key(target));
+    if (events.length) await __call({workspace:'artifact', name: name + '/events.json', value: JSON.stringify({events}, null, 1)});
     var summary = {folder: name, frames: frames.length, startedAt, stoppedAt: Date.now(),
       fps: frames.length > 1 ? Math.round((frames.length - 1) / ((frames[frames.length - 1].t - frames[0].t) / 1000) * 10) / 10 : 0};
     await __call({workspace:'artifact', name: name + '/frames.json', value: JSON.stringify({...summary, frames}, null, 1)});

@@ -64,7 +64,7 @@ import {
   type StealthProbe,
 } from "./stealth.js";
 import { controlError, controlOf, stepInput, waitForQuietUser } from "./native-browser-control.js";
-import { isWriteStep } from "./native-browser-scheduler.js";
+import { isWriteStep, scheduleStep, schedulerStatus } from "./native-browser-scheduler.js";
 import { controlOrSessionStep } from "./native-browser-extra-session.js";
 import { refusedCdp } from "./native-browser-guards.js";
 import {
@@ -120,7 +120,6 @@ import {
   statsGlobal,
   type StoreFilter,
 } from "./network-store.js";
-import { scheduleStep, schedulerStatus } from "./native-browser-scheduler.js";
 import { guardPageCode, notePlantedScript } from "./native-browser-password-lock.js";
 import { noteAgentClick } from "./native-browser-fedcm.js";
 import { dialogExpectResult, noteDialogActivity } from "./evidence/dialogs.js";
@@ -608,7 +607,6 @@ async function executeStep(
     budgetMs,
   );
 }
-
 /** Every step that can change the page returns once it has settled, never mid-reaction. */
 async function afterSettle<T>(debuggee: chrome.debugger.Debuggee, run: () => Promise<T>) {
   await primeBrowserSettle(debuggee);
@@ -705,7 +703,6 @@ function sendResult(
     ),
   );
 }
-
 /** Runs one browser_code step inside the extension: same queueing, claims and target checks, no socket. */
 export async function executeLocalBrowserStep(
   identity: BrowserIdentity,
