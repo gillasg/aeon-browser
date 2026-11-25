@@ -48,3 +48,35 @@ function luhn(digits: string): boolean {
   }
   return sum % 10 === 0;
 }
+
+/** A sealed-secret handle as the browser engine hands it to agent code. */
+export const SEALED_HANDLE = /aeon-sealed:[a-z0-9]{12}/;
+
+/**
+ * Throws SECRET_EGRESS when a value bound for an outside tool (an MCP server) carries a sealed
+ * secret handle or a raw bearer/JWT credential. Ordinary arguments pass untouched.
+ */
+export function assertNoSealedSecrets(value: unknown, what: string, depth = 0): void {
+  if (depth > 40) return;
+  if (typeof value === "string") {
+    const leak = SEALED_HANDLE.test(value)
+      ? "a sealed secret"
+      : JWT_ONE.test(value) || BEARER_ONE.test(value)
+        ? "a raw credential"
+        : undefined;
+    if (leak)
+      throw new Error(
+        `SECRET_EGRESS: ${what} carries ${leak}. Sealed secrets never leave for an outside tool; ` +
+          `pass the data the tool needs, not cookies or tokens.`,
+      );
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    assertNoSealedSecrets(key, what, depth + 1);
+    assertNoSealedSecrets(item, what, depth + 1);
+  }
+}
+
+const JWT_ONE = /\beyJ[\w-]{6,}\.[\w-]{6,}\.[\w-]{6,}/;
+const BEARER_ONE = /\bBearer\s+[\w~+/.=-]{12,}/;

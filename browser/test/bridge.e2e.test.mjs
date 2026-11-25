@@ -1385,7 +1385,8 @@ test(
           assert.equal(result.setCookie, true);
           assert.deepEqual(result.bodyQuery, { q: "phone" });
           assert.deepEqual(result.replayed, ["laptop", 2, null, "sig-1"]);
-          assert.equal(result.csrf, "token-123");
+          // The echoed CSRF token is a secret: the agent only ever sees its sealed handle.
+          assert.match(result.csrf, /^aeon-sealed:[a-z0-9]{12}$/);
           assert.equal(result.harEntries, true);
           assert.equal(result.jsonLd, "Phone");
           assert.equal(result.next, "Phone");

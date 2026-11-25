@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import {
+  assertNoSealedSecrets,
   clampTimeoutMs,
   describeError,
   errorNextCall,
@@ -580,6 +581,8 @@ async function serveMcp(
     request.args && typeof request.args === "object" && !Array.isArray(request.args)
       ? (request.args as Record<string, unknown>)
       : {};
+  // Egress canary: a cookie or token never leaves for an outside MCP server.
+  assertNoSealedSecrets(args, `mcp.call ${server}.${tool}`);
   const value = await mcp.call(server, tool, args, signal);
   steps.push({ action: "mcp", result: value, server, tool });
   return value;
