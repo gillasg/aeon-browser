@@ -17,11 +17,42 @@ const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const STATE_CHANGING_PATH =
   /(^|\/)(logout|signout|sign-out|unsubscribe|delete|remove|destroy|archive|block|mute|like|unlike|follow|unfollow|vote|report|send|submit|create|update|edit|save|add|checkout|order|buy|pay|purchase|book|reserve|cancel|refund|invite|accept|reject|approve|join|leave|upload|post|comment|reply|message|share|subscribe)(\/|$)/i;
 
+// A POST whose last path segment names a read (Bandcamp's /api/discover/1/discover_web, a
+// search or list endpoint) is a read too, but only when no segment changes state and the body
+// holds only filter/paging keys: no write verb, no unknown field.
+const READ_SEGMENT =
+  /(^|[-_])(search|discover|list|query|feed|browse|filter|lookup|suggest)([-_]|$)/i;
+const WRITE_BODY =
+  /\b(mutation|delete|remove|create|update|insert|add|send|submit|purchase|checkout|pay)\b/i;
+const FILTER_KEY =
+  /^(q|query|term|search|keywords?|filters?|facets?|tags?|tag_norm_names|category(_id)?|genre(_id)?|slice|sort|order_by|sort_by|cursor|after|before|page|page_size|per_page|size|limit|offset|count|from|start|geoname_id|location|lang|locale|include_result_types|format)$/i;
+
+function readOnlyPost(url: string, body?: string): boolean {
+  let segments: string[];
+  try {
+    segments = new URL(url).pathname.split("/").filter(Boolean);
+  } catch {
+    return false;
+  }
+  const last = segments.at(-1) ?? "";
+  if (!READ_SEGMENT.test(last) || STATE_CHANGING_PATH.test(`/${segments.join("/")}`)) return false;
+  if (!body) return true;
+  if (WRITE_BODY.test(body)) return false;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+    return Object.keys(parsed).every((key) => FILTER_KEY.test(key));
+  } catch {
+    return false;
+  }
+}
+
 /** True when a request only reads: reads go through even during a dry run. */
 export function looksLikeRead(method: string, url: string, body?: string): boolean {
   if (body && /\bmutation\b/.test(body)) return false;
   if (body && /"query"\s*:\s*"\s*(query\b|\{)/.test(body)) return true;
   if (body && /"query"\s*:/.test(body)) return false;
+  if (method.toUpperCase() === "POST") return readOnlyPost(url, body);
   if (!READ_METHODS.has(method.toUpperCase())) return false;
   try {
     return !STATE_CHANGING_PATH.test(new URL(url).pathname);

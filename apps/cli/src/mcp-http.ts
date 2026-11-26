@@ -24,7 +24,8 @@ export interface HttpMcpOptions {
 
 export interface HttpMcpServer {
   url: string;
-  /** Pushes a notification or request to every open event stream. */
+  /** Pushes a notification or request to the event streams it belongs to: a subscription's
+   * events go only to the session that subscribed; everything else goes to every stream. */
   broadcast: Send;
   close(): Promise<void>;
 }
@@ -60,11 +61,7 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
 export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServer> {
   const verify = options.verify ?? ((token: string) => verifyToken(token));
   const audit = options.audit ?? ((line: string) => process.stderr.write(`${line}\n`));
-  const streams = new Set<ServerResponse>();
-  const broadcast: Send = (message) => {
-    for (const stream of streams)
-      stream.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`);
-  };
+  const { streams, owners, broadcast } = sessionRouter();
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     if (!allowedHost(request)) return sendJson(response, 403, { error: "Forbidden" });
@@ -80,7 +77,10 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
       );
     const session = String(request.headers["mcp-session-id"] ?? "") || randomUUID();
     if (request.method === "GET") return openStream(response, session);
-    if (request.method === "DELETE") return sendJson(response, 204, undefined);
+    if (request.method === "DELETE") {
+      for (const [id, owner] of owners) if (owner === session) owners.delete(id);
+      return sendJson(response, 204, undefined);
+    }
     if (request.method !== "POST") return sendJson(response, 405, { error: "Method not allowed" });
     return handlePost(request, response, session, client);
   }
@@ -106,6 +106,9 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
     const send: Send = (reply) => {
       if (answered) return broadcast(reply);
       answered = true;
+      const subscription = (reply.result as Json | undefined)?.subscriptionId;
+      if (message.method === "events/subscribe" && typeof subscription === "string")
+        owners.set(subscription, session);
       sendJson(response, 200, reply, { "mcp-session-id": session });
     };
     await options.receive(withSession(message, session), send, client);
@@ -124,8 +127,13 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
       "mcp-session-id": session,
     });
     response.write(": open\n\n");
-    streams.add(response);
-    response.on("close", () => streams.delete(response));
+    const set = streams.get(session) ?? new Set<ServerResponse>();
+    streams.set(session, set);
+    set.add(response);
+    response.on("close", () => {
+      set.delete(response);
+      if (!set.size) streams.delete(session);
+    });
   }
 
   const server = createServer((request, response) => {
@@ -145,7 +153,7 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
     broadcast,
     close: () =>
       new Promise((resolve) => {
-        for (const stream of streams) stream.end();
+        for (const set of streams.values()) for (const stream of set) stream.end();
         server.close(() => resolve());
       }),
   };
@@ -163,6 +171,33 @@ function withSession(message: Json, session: string): Json {
       _meta: { [MCP_SESSION_META]: `http-${session.slice(0, 12)}`, ...meta },
     },
   };
+}
+
+/** Open event streams per session, and which session owns each event subscription. */
+function sessionRouter() {
+  const streams = new Map<string, Set<ServerResponse>>();
+  // Which session subscribed to an event stream (aeon/tap included): its frames go there only.
+  const owners = new Map<string, string>();
+  const write = (stream: ServerResponse, message: Json) =>
+    stream.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`);
+  const broadcast: Send = (message) => {
+    const subscription = subscriptionOf(message);
+    if (subscription !== undefined) {
+      const owner = owners.get(subscription);
+      // Fail closed: a subscription's events never reach a session that did not open it.
+      for (const stream of owner ? (streams.get(owner) ?? []) : []) write(stream, message);
+      return;
+    }
+    for (const set of streams.values()) for (const stream of set) write(stream, message);
+  };
+  return { streams, owners, broadcast };
+}
+
+/** The subscription a pushed event belongs to, if it is one. */
+function subscriptionOf(message: Json): string | undefined {
+  if (message.method !== "notifications/events/emitted") return undefined;
+  const id = (message.params as Json | undefined)?.subscriptionId;
+  return id === undefined ? "" : String(id);
 }
 
 function toolName(message: Json): string {

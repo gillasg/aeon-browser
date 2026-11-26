@@ -19,9 +19,12 @@ export function inferEffect(input: {
   text?: string;
   override?: unknown;
   fallback?: CallEffect;
+  /** How the operation was classified when mapped: "read" makes a read-only POST a read. */
+  kind?: string;
 }): CallEffect {
   if (isCallEffect(input.override)) return input.override;
   if (input.text && IRREVERSIBLE.test(input.text)) return "irreversible";
+  if (input.kind === "read") return "read";
   const method = (input.method ?? "").toUpperCase();
   if (READ_METHODS.has(method)) return "read";
   if (WRITE_METHODS.has(method)) return "write";
