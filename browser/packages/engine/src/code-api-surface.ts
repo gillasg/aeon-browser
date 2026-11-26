@@ -325,14 +325,12 @@ function __extendPageSurface(target, base) {
     }) + ')'})).data.value,
     // Computed styles and the box for one element.
     styles: async (selector, options = {}) => (await __step({op:'evaluate', target, expression: '(' + __stylesOf.toString() + ')(' + JSON.stringify(String(selector)) + ',' + JSON.stringify(options.props || []) + ')'})).data.value,
-    // Frames: the main document and a named, url-matched or indexed sub-frame.
+    // Frames: the main document, or one sub-frame by frameKey/frameId, index, name, 'srcdoc' or url.
     mainFrame: async () => __framePage(target, { frameId: '', url: (await page.url()), name: 'main', main: true }),
     frame: async (match) => {
       var frames = await __step({op:'frames', target, action:'list'});
       var list = frames.data || [];
-      var wanted = typeof match === 'number' ? list[match] : typeof match === 'string'
-        ? list.find((item) => (item.name || '') === match) || list.find((item) => String(item.url || '').includes(match))
-        : list.find((item) => (match.name && item.name === match.name) || (match.url && String(item.url || '').includes(match.url))) || (match.index !== undefined ? list[match.index] : undefined);
+      var wanted = __matchFrame(list, match);
       if (!wanted) throw Error('FRAME_NOT_FOUND: ' + JSON.stringify(match) + '; page.frames() lists ' + list.length + ' frames');
       return __framePage(target, wanted);
     },

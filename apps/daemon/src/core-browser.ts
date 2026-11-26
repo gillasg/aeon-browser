@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { CoreBrowserRunRequestSchema, CoreBrowserRunResultSchema } from "@aeon/protocol";
-import { createAeonHostHandler, sessionChatId, siteMapperRequest } from "@aeon/pi-adapter";
+import { join } from "node:path";
+import {
+  cellWorkspaceCall,
+  createAeonHostHandler,
+  sessionChatId,
+  siteMapperRequest,
+} from "@aeon/pi-adapter";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { pin } from "./core-browsers.js";
@@ -39,7 +45,7 @@ export function handleBrowserRun(
           timeoutMs,
           ownerTitle: "Session · " + session,
           space: "window",
-          onCall: (call: unknown) => cliCall(chatId)(call),
+          onCall: cliCall(chatId, join(directory, "workspaces", chatId)),
           onProgress: () => undefined,
         },
       }),
@@ -73,11 +79,13 @@ function rejectInvalid(
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // What a CLI cell may ask the daemon for: site notes, abilities, site APIs, learned hints and
-// sign-ins, as a chat's cells do. Only the chat workspace (files, checkpoints) stays with chats.
-function cliCall(chatId: string): (call: unknown) => Promise<unknown> {
+// sign-ins, as a chat's cells do, plus workspace files and upload checks rooted in the session's
+// own workspace folder, so artifact() and page.upload() work from `aeon repl` as in a chat.
+export function cliCall(chatId: string, workspace: string): (call: unknown) => Promise<unknown> {
   const host = createAeonHostHandler({
     source: "external",
     siteMapper: (request) => siteMapperRequest(chatId, request),
+    extra: (request) => cellWorkspaceCall(request, workspace),
   });
   return (call) =>
     host(call, { source: "external", scope: chatId }) ?? Promise.resolve({ error: "UNSUPPORTED" });

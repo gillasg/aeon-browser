@@ -40,6 +40,7 @@ export {
   type SiteRulesProvider,
 } from "./browser-host-requests.js";
 export { exploreForRoutine } from "./site-mapping.js";
+export { cellWorkspaceCall } from "./browser-workspace.js";
 export { getSavedRead, putSavedRead, type SavedRead } from "./saved-reads.js";
 export {
   enableSiteSkills,

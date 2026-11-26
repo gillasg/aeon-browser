@@ -20,6 +20,27 @@ function __event(target, event, options = {}) {
   }
   return Object.freeze({ready,dispose,then:(resolve,reject)=>(consumed??=consume()).then(resolve,reject)});
 }
+// Picks one frame of page.frames(): an exact frameKey or frameId (or the frame itself) first, so
+// two frames on one URL stay apart; then an index, a name, 'srcdoc' for about:srcdoc frames
+// (which have no URL of their own), and last a URL substring, the first match as before.
+function __matchFrame(list, match) {
+  if (typeof match === 'number') return list[match];
+  var spec = typeof match === 'string' ? {any: match} : match || {};
+  var key = spec.frameKey ?? spec.any, id = spec.frameId ?? spec.any;
+  var hit = (key !== undefined && list.find((f) => f.frameKey === key)) || (id !== undefined && list.find((f) => f.frameId === id));
+  if (hit || spec.frameKey !== undefined || spec.frameId !== undefined) return hit || undefined;
+  if (spec.any !== undefined) {
+    var named = list.find((f) => (f.name || '') === spec.any);
+    if (named) return named;
+    if (/^(about:)?srcdoc$/i.test(spec.any)) spec = {url: 'about:srcdoc', srcdoc: true};
+    else return list.find((f) => String(f.url || '').includes(spec.any));
+  }
+  var found = list.filter((f) => (!spec.name || f.name === spec.name) && (!spec.url || String(f.url || '').includes(spec.url)));
+  if (!spec.name && !spec.url) return spec.index !== undefined ? list[spec.index] : undefined;
+  if (spec.index !== undefined) return found[spec.index] || (found.length ? undefined : list[spec.index]);
+  if (spec.srcdoc && found.length > 1) throw Error('FRAME_AMBIGUOUS: ' + found.length + ' about:srcdoc frames; pass one frameKey from page.frames() (' + found.map((f) => f.frameKey).join(', ') + ') or {url: "about:srcdoc", index}');
+  return found[0];
+}
 function __framePage(target, info) {
   var scoped={frameId:info.frameId,frameKey:info.frameKey};
   var call=async(action,fields={})=>(await __step({op:'frames',target,action,...scoped,...fields})).data;

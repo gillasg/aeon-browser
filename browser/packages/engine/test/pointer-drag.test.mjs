@@ -56,3 +56,59 @@ test("a click is hover move, then press, then release, in W3C order", async () =
     .map((c) => c.params.type);
   assert.deepEqual(types, ["mouseMoved", "mousePressed", "mouseReleased"]);
 });
+
+test("an intercepted HTML5 drag is replayed as dragEnter, dragOver, drop at the target", async () => {
+  calls.length = 0;
+  const listeners = new Set();
+  globalThis.chrome.debugger.onEvent = {
+    addListener: (fn) => listeners.add(fn),
+    removeListener: (fn) => listeners.delete(fn),
+  };
+  const data = { items: [{ mimeType: "text/plain", data: "a" }], dragOperationsMask: 1 };
+  globalThis.chrome.debugger.sendCommand = async (_d, method, params) => {
+    calls.push({ method, params });
+    if (
+      method === "Input.dispatchMouseEvent" &&
+      params.type === "mouseMoved" &&
+      params.buttons === 1
+    )
+      for (const fn of listeners) fn({ tabId: 9 }, "Input.dragIntercepted", { data });
+    return {};
+  };
+  try {
+    const result = await dispatchPointer(
+      { tabId: 9 },
+      { op: "pointer", action: "drag", x: 10, y: 10, toX: 300, toY: 200 },
+    );
+    assert.deepEqual(result, { dragged: true, html5: true });
+    const drags = calls.filter((c) => c.method === "Input.dispatchDragEvent").map((c) => c.params);
+    assert.deepEqual(
+      drags.map((d) => d.type),
+      ["dragEnter", "dragOver", "drop"],
+    );
+    assert.deepEqual(drags[2].data, data);
+    assert.deepEqual([drags[2].x, drags[2].y], [300, 200]);
+    const intercept = calls.filter((c) => c.method === "Input.setInterceptDrags");
+    assert.deepEqual(
+      intercept.map((c) => c.params.enabled),
+      [true, false],
+    );
+    assert.equal(listeners.size, 0);
+  } finally {
+    delete globalThis.chrome.debugger.onEvent;
+  }
+});
+
+test("a pointer-only drag (nothing intercepted) finishes on the mouse path", async () => {
+  calls.length = 0;
+  globalThis.chrome.debugger.sendCommand = async (_d, method, params) => {
+    calls.push({ method, params });
+    return {};
+  };
+  const result = await dispatchPointer(
+    { tabId: 9 },
+    { op: "pointer", action: "drag", x: 10, y: 10, toX: 50, toY: 50 },
+  );
+  assert.deepEqual(result, { dragged: true, html5: false });
+  assert.equal(calls.filter((c) => c.method === "Input.dispatchDragEvent").length, 0);
+});

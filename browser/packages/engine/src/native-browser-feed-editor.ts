@@ -61,12 +61,12 @@ export function feedStep(arg: {
 }
 
 // Which rich editor holds the target (or the focused element, or the first editor on the page).
-export function editorDetect(arg: {
+export async function editorDetect(arg: {
   target?: string;
   op?: string;
   text?: string;
   at?: string;
-}): unknown {
+}): Promise<unknown> {
   const doc = document as any;
   const win = globalThis as any;
   const start: any = arg.target
@@ -154,6 +154,8 @@ export function editorDetect(arg: {
   }
   const text = String(arg.text ?? "");
   const replace = arg.op === "replace";
+  const before = read();
+  const expected = replace ? text : arg.at === "start" ? text + before : before + text;
   if (model) {
     const range = replace
       ? model.getFullModelRange()
@@ -224,7 +226,65 @@ export function editorDetect(arg: {
       );
     }
   }
-  return { ...meta, done: arg.op, length: read().length };
+  // Read the editor back: an editor that ignores a synchronous DOM-selection insert (Lexical
+  // reconciles from its own state) must not be reported as edited.
+  const norm = (value: string): string => value.replace(/\s+/g, " ").trim();
+  const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0));
+  const confirmed = async (): Promise<boolean> => {
+    await settle();
+    return norm(read()) === norm(expected);
+  };
+  if (!(await confirmed())) {
+    const lexical = editable?.__lexicalEditor;
+    if (lexical && typeof lexical.parseEditorState === "function") {
+      // The editor's own state, so its model and the DOM agree: one paragraph per line.
+      const paragraphs = expected.split("\n").map((line) => ({
+        type: "paragraph",
+        version: 1,
+        direction: null,
+        format: "",
+        indent: 0,
+        children: line
+          ? [
+              {
+                type: "text",
+                version: 1,
+                text: line,
+                detail: 0,
+                format: 0,
+                mode: "normal",
+                style: "",
+              },
+            ]
+          : [],
+      }));
+      try {
+        lexical.setEditorState(
+          lexical.parseEditorState({
+            root: {
+              type: "root",
+              version: 1,
+              direction: null,
+              format: "",
+              indent: 0,
+              children: paragraphs,
+            },
+          }),
+        );
+      } catch {
+        // Falls through to the read-back below.
+      }
+    }
+  }
+  if (!(await confirmed()))
+    return {
+      ...meta,
+      done: false,
+      effect: "unconfirmed",
+      length: read().length,
+      hint: "The editor did not take the text; click into it and use page.keyboard.insertText.",
+    };
+  return { ...meta, done: arg.op, effect: "confirmed", length: read().length };
 }
 
 // Cache Storage on this origin, read from disk by the browser: no request leaves the page.

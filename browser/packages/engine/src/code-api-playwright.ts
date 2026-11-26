@@ -135,7 +135,21 @@ async function __diffScreenshot(target, baseline, options) {
 // Resolves a locator spec to elements inside the page (runs page-side, so it must be self-contained).
 function __resolveInPage(spec, within) {
   var roots = within ? [within] : spec.scopeSpec ? __resolveInPage(spec.scopeSpec) : spec.scope ? [...document.querySelectorAll(spec.scope)] : [document];
-  var all = (selector) => roots.flatMap((root) => [...root.querySelectorAll(selector)]);
+  // Open shadow roots are walked in tree order (a host's shadow content right after the host), as
+  // fillForm and page.batch do, so web-component pages resolve the same through every path.
+  var deep = (root, selector, out) => {
+    if (root.shadowRoot) deep(root.shadowRoot, selector, out);
+    for (var el of root.querySelectorAll('*')) {
+      if (el.matches(selector)) out.push(el);
+      if (el.shadowRoot) deep(el.shadowRoot, selector, out);
+    }
+    return out;
+  };
+  var all = (selector) => roots.flatMap((root) => deep(root, selector, []));
+  var byId = (el, id) => { var home = el.getRootNode(); return (home.getElementById ? home.getElementById(id) : null) || document.getElementById(id); };
+  var labelTexts = (el) => [...(el.labels || [])].map(text)
+    .concat((el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map((id) => byId(el, id)).filter(Boolean).map(text))
+    .concat([el.getAttribute('aria-label') || '', el.localName.includes('-') ? el.getAttribute('label') || '' : '']);
   var xpath = (value) => roots.flatMap((root) => {
     var result = document.evaluate(value, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
     return Array.from({length: result.snapshotLength}, (_, i) => result.snapshotItem(i));
@@ -147,7 +161,10 @@ function __resolveInPage(spec, within) {
   if (spec.by === 'css') found = all(spec.value);
   else if (spec.by === 'xpath') found = xpath(spec.value);
   else if (spec.by === 'text') found = all('body *').filter((el) => match(text(el)) && ![...el.children].some((child) => match(text(child))));
-  else if (spec.by === 'label') found = all('input,textarea,select,[contenteditable]').filter((el) => [...(el.labels || [])].some((label) => match(text(label))) || match(el.getAttribute('aria-label') || ''));
+  else if (spec.by === 'label') found = all('input,textarea,select,[contenteditable],[role=combobox],[role=textbox],[role=searchbox],[role=listbox],[role=spinbutton],[role=slider],[role=checkbox],[role=radio],[role=switch],[label]')
+    .filter((el) => (el.localName.includes('-') || !el.hasAttribute('label') || el.matches('input,textarea,select,[contenteditable],[role]')) && labelTexts(el).some((value) => value && match(value)))
+    // A labeled host whose own shadow control carries the same label is one field: keep the control.
+    .filter((el, _, list) => !(el.shadowRoot && list.some((other) => other !== el && el.shadowRoot.contains(other))));
   else if (spec.by === 'placeholder') found = all('[placeholder]').filter((el) => match(el.getAttribute('placeholder') || ''));
   else {
     var roles = {button:'button,[role=button],input[type=button],input[type=submit]', link:'a[href],[role=link]',
@@ -200,11 +217,22 @@ function __pickInPage(found, a) {
   var list = a.visibleFirst ? found : a.index < 0 ? found.slice(a.index).slice(0, 1) : found.slice(a.index, a.index + 1);
   if (!list.length) throw new Error('TARGET_NOT_FOUND: no element matches');
   var offscreen = 0;
+  // A custom-element host (display: contents or inline, its box drawn by its shadow root or
+  // slotted children) has no box of its own: the first descendant with one stands for it.
+  var boxed = (el) => {
+    var rect = el.getBoundingClientRect();
+    if (rect.width && rect.height) return el;
+    var kids = el.localName === 'slot' ? el.assignedElements({flatten: true}) : [...(el.shadowRoot ? el.shadowRoot.children : []), ...(el.children || [])];
+    for (var kid of kids) { var inner = boxed(kid); if (inner) return inner; }
+    return null;
+  };
   for (var el of list) {
-    var rect = el.getBoundingClientRect(), style = getComputedStyle(el);
-    if (!rect.width || !rect.height || style.visibility === 'hidden' || style.display === 'none') continue;
-    el.scrollIntoView({block: 'center', inline: 'center'});
-    rect = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none') continue;
+    var shown = boxed(el);
+    if (!shown || getComputedStyle(shown).visibility === 'hidden') continue;
+    shown.scrollIntoView({block: 'center', inline: 'center'});
+    var rect = shown.getBoundingClientRect();
     var x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
     if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) { offscreen++; continue; }
     if (a.nonce) el.setAttribute('data-aeon-pick', a.nonce);
@@ -259,7 +287,9 @@ async function __fillDone(target, element, index, options, result) {
     el.removeEventListener('change', mark);
     return true;
   }, commit) && committed;
-  return {...result, value: fill.value, via: fill.via, committed};
+  // One vocabulary: a write the engine confirmed did change the page, so the outcome says so.
+  var outcome = result && result.outcome === 'unknown' && result.effect === 'confirmed' ? 'changed' : result && result.outcome;
+  return {...result, ...(outcome ? {outcome} : {}), value: fill.value, via: fill.via, committed};
 }
 var __mouseAt = new Map();
 function __extendLocator(target, element, base, index) {
