@@ -2,7 +2,9 @@ import { code } from "./code.js";
 import { sourceMaps } from "./sourcemap-read.js";
 import { operationEffect } from "./effect.js";
 import { formatPace, paceExpectedMs, setBatchRate } from "./pace.js";
-import { listSites, loadModel, siteName } from "./registry.js";
+import { listSites, loadModel, readOverrides, saveModel, siteName } from "./registry.js";
+import { callWithBundleHeal, healOpFromBundle, type BundleHealDeps } from "./bundle-heal-run.js";
+import type { SiteModel } from "./types.js";
 import type { Params } from "./runtime/request.js";
 import { siteMapper } from "./runtime/site-mapper.js";
 import { watch } from "./watch.js";
@@ -18,6 +20,7 @@ export interface SiteMapperRequest {
     | "sites"
     | "operations"
     | "call"
+    | "heal"
     | "watch"
     | "action"
     | "channel"
@@ -71,6 +74,15 @@ async function operations(site: string): Promise<unknown> {
   }));
 }
 
+/** Bundle repair against the saved model, the live bundles and the mapped runtime. */
+const liveHealDeps: BundleHealDeps = {
+  loadModel,
+  saveModel: async (model: SiteModel) => saveModel(model, await readOverrides(model.site)),
+  bundle: async (site, op) => (await code(op.origin || site, { bundle: true })).bundle,
+  call: async (site, id, params, model) =>
+    (await siteMapper(site, model ? { model } : {})).call(id, params),
+};
+
 type Handler = (site: string, request: SiteMapperRequest) => Promise<unknown>;
 
 const HANDLERS: Record<
@@ -96,8 +108,23 @@ const HANDLERS: Record<
     undoLive(site, required(request.operation, "operation"), request.params ?? {}),
   rewind: async (site, request) =>
     (await rewindForOperation(site, required(request.operation, "operation"))) ?? null,
-  call: async (site, request) =>
-    (await siteMapper(site)).call(required(request.operation, "operation"), request.params ?? {}),
+  call: (site, request) =>
+    callWithBundleHeal(
+      site,
+      required(request.operation, "operation"),
+      request.params ?? {},
+      liveHealDeps,
+    ),
+  heal: (site, request) =>
+    healOpFromBundle(
+      site,
+      required(request.operation, "operation"),
+      request.params ?? {},
+      liveHealDeps,
+      {
+        allowWrite: request.options?.allowWrite === true,
+      },
+    ),
   export: async (site, request) => exportRows(site, request),
   pace: async (site, request) => pacePreview(site, request),
 };

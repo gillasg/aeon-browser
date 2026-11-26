@@ -428,7 +428,8 @@ function graphqlObject(ctx: Ctx, node: Node): void {
   const named = operationName ? { operationName } : {};
   if (query && /\b(query|mutation|subscription)\b|^\s*\{/.test(query))
     graphqlOperation(ctx, node, "graphql-body", query, named);
-  const hash = literal(property(node, "sha256Hash"));
+  const hash =
+    literal(property(node, "sha256Hash")) ?? (operationName ? nestedHash(node) : undefined);
   if (hash && /^[0-9a-f]{64}$/i.test(hash))
     add(ctx, node, {
       kind: "graphql",
@@ -437,6 +438,12 @@ function graphqlObject(ctx: Ctx, node: Node): void {
       sha256: hash,
       ...named,
     });
+}
+
+/** `{operationName, extensions: {persistedQuery: {sha256Hash}}}`: the hash named by its operation. */
+function nestedHash(node: Node): string | undefined {
+  const persisted = property(property(node, "extensions"), "persistedQuery");
+  return literal(property(persisted, "sha256Hash"));
 }
 
 function flagKey(ctx: Ctx, node: unknown): void {
