@@ -1,6 +1,7 @@
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { send } from "./cdp/send.js";
+import { readSegment } from "@browserkit/site-mapper/request-words";
 
 // Dry run: while a tab records with {dryRun: true}, requests that would change something (a like,
 // a message, a post, a purchase) are answered by the browser itself with an empty success and never
@@ -20,8 +21,6 @@ const STATE_CHANGING_PATH =
 // A POST whose last path segment names a read (Bandcamp's /api/discover/1/discover_web, a
 // search or list endpoint) is a read too, but only when no segment changes state and the body
 // holds only filter/paging keys: no write verb, no unknown field.
-const READ_SEGMENT =
-  /(^|[-_])(search|discover|list|query|feed|browse|filter|lookup|suggest)([-_]|$)/i;
 const WRITE_BODY =
   /\b(mutation|delete|remove|create|update|insert|add|send|submit|purchase|checkout|pay)\b/i;
 const FILTER_KEY =
@@ -35,7 +34,7 @@ function readOnlyPost(url: string, body?: string): boolean {
     return false;
   }
   const last = segments.at(-1) ?? "";
-  if (!READ_SEGMENT.test(last) || STATE_CHANGING_PATH.test(`/${segments.join("/")}`)) return false;
+  if (!readSegment(last) || STATE_CHANGING_PATH.test(`/${segments.join("/")}`)) return false;
   if (!body) return true;
   if (WRITE_BODY.test(body)) return false;
   try {

@@ -77,6 +77,8 @@ export interface Param {
    * the spec and the typed client, and filled in the page.
    */
   derived?: "signer" | "session";
+  /** A persisted GraphQL query hash in the path: replayed, and rotated by the bundle heal. */
+  persistedHash?: true;
   examples?: string[];
 }
 
