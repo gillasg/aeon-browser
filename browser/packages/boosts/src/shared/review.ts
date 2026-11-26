@@ -22,6 +22,8 @@ const GRANT_WARNINGS: Record<string, string> = {
   "GM.setClipboard": "Can write to your clipboard",
   GM_notification: "Can show notifications",
   "GM.notification": "Can show notifications",
+  GM_webSocket: "Can hold live connections to the sites it may reach",
+  "GM.webSocket": "Can hold live connections to the sites it may reach",
 };
 
 const ANTIFEATURES: Record<string, string> = {
@@ -35,7 +37,7 @@ const ANTIFEATURES: Record<string, string> = {
 
 function connectLine(boost: Boost): string | undefined {
   const grants = boost.meta?.grant ?? [];
-  const canRequest = grants.some((g) => /xmlhttpRequest|xmlHttpRequest/.test(g));
+  const canRequest = grants.some((g) => /xmlhttpRequest|xmlHttpRequest|webSocket/.test(g));
   if (!canRequest && !/\bSB\.(fetch|api)\b/.test(boost.js ?? "")) return undefined;
   const connect = boost.meta?.connect ?? [];
   if (!connect.length || connect.includes("*"))
