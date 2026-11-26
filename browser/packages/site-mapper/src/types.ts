@@ -98,6 +98,7 @@ export interface Dependency {
     | { kind: "cookie"; name: string }
     | { kind: "meta"; name: string; page: string }
     | { kind: "input"; name: string; page: string }
+    | { kind: "script"; name: string; page: string }
     | { kind: "storage"; storage: "localStorage" | "sessionStorage"; key: string; pointer?: string }
     | { kind: "generated"; generator: "uuid" | "timestamp-ms" | "timestamp-s" | "nonce" };
   /** Share of samples where the value was traced to this source. */
@@ -121,8 +122,14 @@ export interface Pagination {
 export interface Signing {
   headers: string[];
   query: string[];
-  /** The script frame that built the request, to find the signing code. */
-  initiator?: { url: string; functionName: string; line: number };
+  /** Values the page makes fresh for every call: replay must get new ones, never reuse a recorded one. */
+  tokens?: { in: "header" | "query"; param: string }[];
+  /**
+   * The script frame that built the request, to find the signing code. `module` is the script's
+   * path with content hashes stripped (`signer.a1b2c3d4.js` → `signer.js`), so it still names the
+   * signer after the bundle is rebuilt; `url` and `line` point at the recorded build.
+   */
+  initiator?: { url: string; functionName: string; line: number; module?: string };
   /** Make calls through the page's own XMLHttpRequest (its hooks sign them) or its fetch. */
   via: "fetch" | "xhr";
 }
@@ -246,6 +253,8 @@ export interface SecurityScheme {
   source?:
     | { kind: "cookie"; name: string }
     | { kind: "meta"; name: string }
+    | { kind: "hidden-input"; name: string; selector: string }
+    | { kind: "inline-script"; name: string }
     | { kind: "response"; operationId: string; pointer: string }
     | { kind: "storage"; storage: "localStorage" | "sessionStorage"; key: string; pointer?: string }
     | { kind: "constant"; value: string };

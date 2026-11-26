@@ -9,7 +9,7 @@ const API_KEY_HEADER =
   /^(x-)?(api[-_]?key|apikey|x-.*-key|api[-_]?token|auth[-_]?token|access[-_]?token|client[-_]?id|app[-_]?id|subscription-key|x-algolia-api-key|x-algolia-application-id)$/i;
 const API_KEY_QUERY =
   /^(key|api[-_]?key|apikey|access[-_]?token|client[-_]?id|app[-_]?id|x-algolia-api-key|x-algolia-application-id)$/i;
-const CSRF = /csrf|xsrf/i;
+const CSRF = /csrf|xsrf|forgery|^_token$|^authenticity_token$|requestverificationtoken/i;
 const SESSION_COOKIE = /sess|sid|auth|token|login|jwt|user|remember|connect\.sid|_identity/i;
 
 interface Draft extends SecurityScheme {
@@ -35,6 +35,13 @@ function toSchemeSource(
   if (!source) return undefined;
   if (source.kind === "cookie") return { kind: "cookie", name: source.name };
   if (source.kind === "meta") return { kind: "meta", name: source.name };
+  if (source.kind === "input")
+    return {
+      kind: "hidden-input",
+      name: source.name,
+      selector: `input[type="hidden"][name="${source.name.replace(/["\\]/g, "\\$&")}"]`,
+    };
+  if (source.kind === "script") return { kind: "inline-script", name: source.name };
   if (source.kind === "response")
     return { kind: "response", operationId: source.operationId, pointer: source.pointer };
   if (source.kind === "storage")
@@ -147,14 +154,34 @@ function apiKeys(
   }
 }
 
-/** Where a request carries its CSRF token: a header, or a field of a form body. */
-function csrfCarrier(member: Member | undefined): { header?: string; field?: string } | undefined {
-  const header = Object.keys(member?.exchange.requestHeaders ?? {}).find((key) => CSRF.test(key));
+/** Where a request carries its CSRF token: a header, a query parameter, or a body field. */
+function csrfCarrier(
+  member: Member | undefined,
+): { header?: string; query?: string; field?: string } | undefined {
+  const header = Object.keys(member?.exchange.requestHeaders ?? {}).find(
+    (key) => CSRF.test(key) && key !== "cookie",
+  );
   if (header) return { header };
-  if (!member?.body?.form) return undefined;
-  const fields = Object.keys((member.body.value ?? {}) as object);
-  const field = fields.find((key) => CSRF.test(key) || key === "authenticity_token");
+  if (!member) return undefined;
+  const query = [...new URL(member.exchange.url).searchParams.keys()].find((key) => CSRF.test(key));
+  if (query) return { query };
+  const value = member.body?.value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const field = Object.keys(value).find((key) => CSRF.test(key));
   return field ? { field } : undefined;
+}
+
+function csrfTarget(carrier: { header?: string; query?: string; field?: string }): {
+  key: string;
+  target: string;
+  where?: "header" | "query";
+} {
+  if (carrier.header)
+    return { key: carrier.header, target: `header:${carrier.header}`, where: "header" };
+  if (carrier.query)
+    return { key: carrier.query, target: `query:${carrier.query}`, where: "query" };
+  const field = carrier.field as string;
+  return { key: field, target: `body:/${field}` };
 }
 
 function csrf(
@@ -165,10 +192,9 @@ function csrf(
 ): void {
   const carrier = csrfCarrier(members[0]);
   if (!carrier) return;
-  const key = (carrier.header ?? carrier.field) as string;
+  const { key, target, where } = csrfTarget(carrier);
   const scheme: SecurityScheme = { name: name("csrfToken"), type: "csrf", key, origins: [] };
-  if (carrier.header) scheme.in = "header";
-  const target = carrier.header ? `header:${key}` : `body:/${key}`;
+  if (where) scheme.in = where;
   const cookie = /(csrf|xsrf)[^=;]*/i.exec(members[0]?.exchange.requestHeaders.cookie ?? "")?.[0];
   const source =
     toSchemeSource(dependencySource(operation, target)) ??

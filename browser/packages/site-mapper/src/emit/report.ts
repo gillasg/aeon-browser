@@ -111,6 +111,8 @@ export function markdownReport(model: SiteModel, rules: Overrides["redact"] = {}
 function describeSource(source: NonNullable<SiteModel["security"][number]["source"]>): string {
   if (source.kind === "cookie") return `cookie \`${source.name}\``;
   if (source.kind === "meta") return `the page's \`${source.name}\` meta tag`;
+  if (source.kind === "hidden-input") return `the page's hidden input \`${source.name}\``;
+  if (source.kind === "inline-script") return `the page's inline script \`${source.name}\``;
   if (source.kind === "response") return `\`${source.operationId}\` response \`${source.pointer}\``;
   if (source.kind === "storage") return `${source.storage} \`${source.key}\``;
   return "a fixed value";

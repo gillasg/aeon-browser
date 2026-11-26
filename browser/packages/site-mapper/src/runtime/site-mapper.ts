@@ -1,7 +1,7 @@
 import { originMatches } from "../filter.js";
 import { type Challenge, observeExchange } from "../challenge.js";
 import { breakingChanges, responseChanges } from "../diff.js";
-import { extractEmbedded, metaTags } from "../infer/html.js";
+import { extractEmbedded, hiddenInputs, inlineScriptTokens, metaTags } from "../infer/html.js";
 import { getPointer } from "../infer/schema.js";
 import { loadModel, readOverrides, readSession, siteHome, siteName } from "../registry.js";
 import {
@@ -217,7 +217,7 @@ export class SiteClient {
     return headers;
   }
 
-  /** CSRF tokens kept in a page's meta tag, for calls made outside the browser. */
+  /** CSRF tokens kept in a page's meta tag, hidden input or inline script, for calls made outside the browser. */
   private async metaAuth(
     operation: Operation,
     transport: Transport,
@@ -225,9 +225,22 @@ export class SiteClient {
     const headers: Record<string, string> = {};
     if (transport.name !== "direct") return headers;
     for (const scheme of this.schemes(operation)) {
-      if (scheme.source?.kind !== "meta" || !scheme.key || scheme.in !== "header") continue;
-      const name = scheme.source.name;
-      const value = await this.cached(`meta:${name}`, async () => {
+      const source = scheme.source;
+      if (!source || !scheme.key || scheme.in !== "header") continue;
+      if (
+        source.kind !== "meta" &&
+        source.kind !== "hidden-input" &&
+        source.kind !== "inline-script"
+      )
+        continue;
+      const name = source.name;
+      const read =
+        source.kind === "meta"
+          ? metaTags
+          : source.kind === "hidden-input"
+            ? hiddenInputs
+            : inlineScriptTokens;
+      const value = await this.cached(`${source.kind}:${name}`, async () => {
         const page = await transport.send(
           {
             operationId: "page",
@@ -238,7 +251,7 @@ export class SiteClient {
           },
           { auth: [], home: this.home(operation) },
         );
-        return metaTags(page.text ?? "")[name] ?? "";
+        return read(page.text ?? "")[name] ?? "";
       });
       if (value) headers[scheme.key] = value;
     }

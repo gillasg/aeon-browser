@@ -178,6 +178,27 @@ export function hiddenInputs(html: string): Record<string, string> {
   return inputs;
 }
 
+const SCRIPT_TOKEN_NAME = /csrf|xsrf|token|forgery/i;
+
+/**
+ * Tokens an inline script assigns: `window.__CSRF__ = "…"`, `csrfToken: "…"`. Keyed by the
+ * assigned name without its `window.` prefix.
+ */
+export function inlineScriptTokens(html: string): Record<string, string> {
+  const tokens: Record<string, string> = {};
+  for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    if (attr(script[1] ?? "", "src") !== undefined) continue;
+    const code = script[2] ?? "";
+    for (const match of code.matchAll(
+      /(?:^|[^\w$.])((?:window|self|globalThis)\.)?([A-Za-z_$][\w$]*)["']?\s*[:=]\s*(["'])([^"'\\\s]{6,512})\3/g,
+    )) {
+      const name = match[2] as string;
+      if (SCRIPT_TOKEN_NAME.test(name) && !(name in tokens)) tokens[name] = match[4] as string;
+    }
+  }
+  return tokens;
+}
+
 /** Same-origin links on a page: used to suggest flows that would widen the API. */
 export function links(html: string, base: string): string[] {
   const found = new Set<string>();

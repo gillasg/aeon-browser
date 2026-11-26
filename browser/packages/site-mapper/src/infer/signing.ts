@@ -18,6 +18,45 @@ function varies(values: string[]): boolean {
   return values.length < 2 || new Set(values).size === values.length;
 }
 
+/** Query names sites use for per-call challenge and signing tokens. */
+const TOKEN_QUERY =
+  /^(chal_t|challenge|sig|_sig|sign|signature|token|nonce|h|ts|csrf|_csrf|auth_token|_token|hmac|x-bogus|msToken|_signature)$/i;
+/** Query names that change per call for ordinary reasons: paging, search, sorting, ids. */
+const PLAIN_QUERY =
+  /^(cursor|after|before|next|prev|page|page_?token|offset|start|limit|count|size|per_?page|q|query|search|term|keywords?|sort|order|filter|lang|locale|id|ids|callback|_|cb|v|ver|version)$/i;
+
+function queryTokens(operation: Operation, members: Member[]): string[] {
+  const names = operation.params.filter((p) => p.in === "query").map((p) => p.name);
+  return names.filter((name) => {
+    if (PLAIN_QUERY.test(name) || !untraced(operation, `query:${name}`)) return false;
+    const values = members
+      .map((m) => new URL(m.exchange.url).searchParams.get(name))
+      .filter((v): v is string => !!v);
+    if (!values.length) return false;
+    const hashLike = values.every((v) => ENTROPY.test(v));
+    const fresh = values.length >= 2 && varies(values);
+    if (TOKEN_QUERY.test(name)) return hashLike || fresh;
+    return hashLike && fresh;
+  });
+}
+
+/** A script's path without host-specific query or content hashes: stable across rebuilds. */
+export function stableModule(url: string): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  const path = parsed.pathname
+    .split("/")
+    .map((part) =>
+      part.replace(/[.-](?:[0-9a-f]{8,}|(?=[0-9a-f]*\d)[0-9a-f]{6,7})(?=\.(?:m|c)?js$)/i, ""),
+    )
+    .join("/");
+  return parsed.host + path;
+}
+
 function signedNames(
   operation: Operation,
   members: Member[],
@@ -46,15 +85,28 @@ const LIBRARY =
 
 export function detectSigning(operation: Operation, members: Member[]): Signing | undefined {
   const headers = signedNames(operation, members, "header");
-  const query = signedNames(operation, members, "query");
+  const query = [
+    ...new Set([...signedNames(operation, members, "query"), ...queryTokens(operation, members)]),
+  ];
   if (!headers.length && !query.length) return undefined;
   const stack =
     members.find((m) => m.exchange.initiator?.stack?.length)?.exchange.initiator?.stack ?? [];
   const frame = stack.find((f) => f.url && !LIBRARY.test(f.url)) ?? stack[0];
   const viaXhr = stack.some((f) => /XMLHttpRequest|\.send$|^send$/.test(f.functionName));
-  const signing: Signing = { headers, query, via: viaXhr ? "xhr" : "fetch" };
-  if (frame)
+  const signing: Signing = {
+    headers,
+    query,
+    tokens: [
+      ...headers.map((param) => ({ in: "header" as const, param })),
+      ...query.map((param) => ({ in: "query" as const, param })),
+    ],
+    via: viaXhr ? "xhr" : "fetch",
+  };
+  if (frame) {
     signing.initiator = { url: frame.url, functionName: frame.functionName, line: frame.line };
+    const module = stableModule(frame.url);
+    if (module) signing.initiator.module = module;
+  }
   return signing;
 }
 

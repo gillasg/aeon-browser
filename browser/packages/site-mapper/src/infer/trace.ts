@@ -1,7 +1,7 @@
 import type { Dependency, Exchange, Operation } from "../types.js";
 import type { Member } from "./operations.js";
 import { generalize, leaves } from "./schema.js";
-import { extractEmbedded, hiddenInputs, metaTags } from "./html.js";
+import { extractEmbedded, hiddenInputs, inlineScriptTokens, metaTags } from "./html.js";
 
 // Deterministic value tracing: for every value a request sends, find the earlier response,
 // cookie, page tag or storage entry it came from. What can't be traced but changes every call
@@ -111,6 +111,8 @@ function indexDocuments(index: ValueIndex, input: TraceInput): void {
       index.add(value, at, { kind: "meta", name, page: pageId });
     for (const [name, value] of Object.entries(hiddenInputs(html)))
       index.add(value, at, { kind: "input", name, page: pageId });
+    for (const [name, value] of Object.entries(inlineScriptTokens(html)))
+      index.add(value, at, { kind: "script", name, page: pageId });
     const embedded = extractEmbedded(html);
     for (const [pointer, value] of leaves(embedded))
       index.add(value, at, { kind: "response", operationId: pageId, pointer: generalize(pointer) });
@@ -160,7 +162,7 @@ export function inputsOf(member: Member, operation: Operation): [string, string]
     if (!FREE_TEXT.test(name)) inputs.push([`query:${name}`, value]);
   inputs.push(...bodyInputs(member));
   for (const [name, value] of Object.entries(member.exchange.requestHeaders))
-    if (/^(authorization|x-.*)$/.test(name))
+    if (/^(authorization|x-.*)$/.test(name) || /csrf|xsrf|forgery/i.test(name))
       inputs.push([`header:${name}`, value.replace(/^(Bearer|Token|Basic)\s+/i, "")]);
   for (const [name, value] of cookies(member.exchange.requestHeaders.cookie))
     if (/csrf|xsrf/i.test(name)) inputs.push([`cookie:${name}`, value]);
