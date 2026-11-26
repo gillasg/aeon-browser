@@ -313,9 +313,10 @@ function __extendPageSurface(target, base) {
       stripScripts: options.stripScripts !== false,
       max: Math.min(Math.max(options.max || 200000, 1000), 1000000),
     }) + ')'})).data.value,
-    // Where the page is: url, title, scroll, headings, forms and counts. With options it is
-    // bu.state's observation ({query}, {selector}, {max}), which is what a cut page points at.
-    state: (options) => options && typeof options === 'object' && Object.keys(options).length ? observe(options) : summary(),
+    // page.state() is always bu.state's numbered observation ({query}, {selector}, {max} scope it).
+    // Where the page is (url, title, scroll, headings, forms and counts) is page.summary().
+    state: (options) => observe(options && typeof options === 'object' ? options : {}),
+    summary,
     // Find text on the page without reading all of it.
     find: async (text, options = {}) => (await __step({op:'evaluate', target, expression: '(' + __findIn.toString() + ')(' + JSON.stringify(String(text)) + ',' + JSON.stringify({
       max: options.max || 20,

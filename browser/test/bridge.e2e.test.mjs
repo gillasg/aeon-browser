@@ -1755,6 +1755,7 @@ test(
   const attempt = async (name, fn) => { try { steps[name] = await fn(); } catch (error) { steps[name] = {error: String((error && error.message) || error)}; } };
   await attempt('html', () => page.html({stripScripts: true}));
   await attempt('state', () => page.state());
+  await attempt('summary', () => page.summary());
   await attempt('find', () => page.find('Shop'));
   await attempt('styles', () => page.styles('h1'));
   await attempt('frames', () => page.diagnoseFrames());
@@ -1785,8 +1786,13 @@ test(
           false,
           "scripts are stripped by default",
         );
-        assert.equal(result.state.title, "Shop");
-        assert.ok(result.state.headings.length >= 1);
+        assert.equal(
+          typeof result.state,
+          "string",
+          "page.state() is the numbered observation text",
+        );
+        assert.equal(result.summary.title, "Shop");
+        assert.ok(result.summary.headings.length >= 1);
         assert.ok(result.find.count >= 1, "page search finds the heading");
         assert.ok(result.styles.styles.display, "h1 has a computed display");
         assert.ok(result.frames.count >= 1);

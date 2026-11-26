@@ -60,6 +60,10 @@ export const ERRORS = {
     "the action was sent but its result is unknown: " + INPUT_MAY_HAVE_LANDED_NOTE,
   ],
   STALE_REF: ["model", "that bu id is from an older read: read bu.state() again"],
+  WRONG_TAB: [
+    "model",
+    "that t<tab>:e<id> ref belongs to another tab: act on browser.page(<tab>) or read this page.state() again",
+  ],
   TAB_DEAD: ["page", "the tab was closed or crashed: open a new one with browser.openTab(url)"],
   TAB_UNRESPONSIVE: [
     "page",

@@ -28,6 +28,7 @@ import { browserActApi } from "./code-api-act.js";
 import { browserSleepApi } from "./code-api-sleep.js";
 import { browserSpeedApi } from "./code-api-speed.js";
 import { browserMcpApi } from "./code-api-mcp.js";
+import { browserL2Api } from "./code-api-l2.js";
 import { browserStorageClawsApi } from "./code-api-storage-claws.js";
 import { browserWhyApi } from "./code-api-why.js";
 
@@ -67,6 +68,7 @@ export function realmRuntimeSource(evaluate: (source: string) => unknown): void 
       browserStorageClawsApi,
       browserRound3ClawsApi,
       browserWhyApi,
+      browserL2Api,
     ].join("\n"),
   );
 }

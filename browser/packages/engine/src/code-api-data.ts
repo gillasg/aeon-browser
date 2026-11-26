@@ -231,7 +231,8 @@ function __extendPageData(target, base) {
         .trim();
       var fallbackNote;
       if (mdBody.length < 40 && !timedOut()) {
-        var axState = await base.state().catch(() => '');
+        // The summary, as before page.state() became the numbered view: page.read keeps its shape.
+        var axState = await (base.summary || base.state)().catch(() => '');
         var axText = typeof axState === 'string' ? axState.trim() : '';
         if (axText.length > Math.max(40, String(markdown.markdown || '').trim().length)) {
           markdown = {
