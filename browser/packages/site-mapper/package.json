@@ -19,6 +19,10 @@
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
     },
+    "./request-words": {
+      "types": "./dist/request-words.d.ts",
+      "import": "./dist/request-words.js"
+    },
     "./providers": {
       "types": "./dist/providers.d.ts",
       "import": "./dist/providers.js"

@@ -44,7 +44,7 @@ export function operationEffect(operation: {
   return inferEffect({
     override: operation.effect,
     method: operation.method,
-    kind: operation.kind ?? operation.role,
+    kind: operation.role === "read" ? "read" : (operation.kind ?? operation.role),
     text: [
       operation.id,
       operation.path,

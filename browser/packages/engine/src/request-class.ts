@@ -1,3 +1,5 @@
+import { isNoiseHost } from "@browserkit/site-mapper/request-words";
+export { READ_SEGMENT } from "@browserkit/site-mapper/request-words";
 // One taxonomy for every request a page makes: is it the site's own API, or plumbing around it
 // (bot challenges, sensors, trackers, beacons, media, assets, documents)? Learning, waits and
 // listings all read the same answer, so a video manifest or a challenge call is never mistaken
@@ -85,11 +87,15 @@ function mimeOf(mime: string | undefined): string {
   return (mime ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
 }
 
+function isTrackerParsed(parsed: Parsed): boolean {
+  return TRACKERS.test(parsed.host) || TRACKER_PATHS.test(parsed.path) || isNoiseHost(parsed.host);
+}
+
 /** Ad, analytics and error-reporting calls: never part of a site's own API. */
 export function isTrackerUrl(url: string): boolean {
   const parsed = parse(url);
   if (!parsed) return true;
-  return TRACKERS.test(parsed.host) || TRACKER_PATHS.test(parsed.path);
+  return isTrackerParsed(parsed);
 }
 
 function isChallenge(parsed: Parsed): boolean {
@@ -188,6 +194,7 @@ export function classifyRequest(facts: RequestFacts): RequestClass {
   if (isSensor(parsed, facts)) return "sensor";
   if (TRACKERS.test(parsed.host) || TRACKER_PATHS.test(parsed.path)) return "tracker";
   if (isBeacon(parsed, facts)) return "beacon";
+  if (isNoiseHost(parsed.host)) return "tracker";
   if (isMedia(parsed, mime, type)) return "media";
   if (isAsset(parsed, mime, type)) return "asset";
   if (isDocument(mime, type)) return "document";

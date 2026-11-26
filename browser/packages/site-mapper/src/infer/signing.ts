@@ -1,5 +1,6 @@
 import type { Operation, Signing } from "../types.js";
 import type { Member } from "./operations.js";
+import { isSealedValue } from "../sealed.js";
 
 // Finds request signatures: values that change on every call, come from no response, cookie
 // or storage, and look like hashes. Records which script built the request, so calls can go
@@ -8,6 +9,11 @@ import type { Member } from "./operations.js";
 const SIGN_NAME =
   /(sign|signature|sig$|hmac|digest|x-s$|x-t$|x-bogus|_signature|mstoken|x-gorgon|x-khronos|x-argus|x-ladon|x-tt-params|x-request-sign|x-sign|nonce|x-client-data|anti-?content|x-zse-96)/i;
 const ENTROPY = /^(?=.*\d)(?=.*[a-zA-Z])[A-Za-z0-9+/=_.:-]{16,}$/;
+
+/** A value shaped like a secret: high entropy, or one the capture sealed or redacted. */
+function secretShaped(value: string): boolean {
+  return ENTROPY.test(value) || isSealedValue(value);
+}
 
 function untraced(operation: Operation, target: string): boolean {
   const dep = operation.dependencies.find((d) => d.target === target);
@@ -33,7 +39,7 @@ function queryTokens(operation: Operation, members: Member[]): string[] {
       .map((m) => new URL(m.exchange.url).searchParams.get(name))
       .filter((v): v is string => !!v);
     if (!values.length) return false;
-    const hashLike = values.every((v) => ENTROPY.test(v));
+    const hashLike = values.every(secretShaped);
     const fresh = values.length >= 2 && varies(values);
     if (TOKEN_QUERY.test(name)) return hashLike || fresh;
     return hashLike && fresh;
@@ -72,7 +78,7 @@ function signedNames(
       )
       .filter((v): v is string => !!v);
     if (!values.length || !untraced(operation, `${location}:${name}`)) return false;
-    const hashLike = values.every((v) => ENTROPY.test(v));
+    const hashLike = values.every(secretShaped);
     return (
       (SIGN_NAME.test(name) && hashLike) ||
       (hashLike && varies(values) && members.length >= 2 && /^x-/i.test(name))
@@ -129,5 +135,22 @@ export function markSignedParams(operation: Operation): void {
       (param.in === "query" && signing.query.includes(param.name)) ||
       (param.in === "header" && PAGE_SUPPLIED.test(param.name));
     if (signed) param.derived = "signer";
+  }
+}
+
+const CSRF_HEADER = /csrf|xsrf/i;
+
+/**
+ * An anti-forgery header the capture only ever saw as one sealed handle is the session's, not
+ * the caller's: it is filled from the live page at call time (AniList's `x-csrf-token`).
+ */
+export function markSealedCsrf(operation: Operation, members: Member[]): void {
+  for (const param of operation.params) {
+    if (param.in !== "header" || param.derived || !CSRF_HEADER.test(param.name)) continue;
+    const values = members.map((m) => m.exchange.requestHeaders[param.name]);
+    const first = values[0];
+    if (!first || !isSealedValue(first) || values.some((v) => v !== first)) continue;
+    param.derived = "session";
+    param.required = false;
   }
 }

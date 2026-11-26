@@ -127,11 +127,23 @@ function pick(scored: Scored[], what: string): RebindProposal {
   return { rebind: best.rebind };
 }
 
+/** A path segment's value: itself, or the recorded constant of the param it templates. */
+function segmentValue(op: Operation, segment: string | undefined): string | undefined {
+  const param = /^\{(.+)\}$/.exec(segment ?? "")?.[1];
+  if (!param) return segment;
+  return op.params.find((p) => p.in === "path" && p.name === param)?.constant;
+}
+
+/** The persisted hash next to the operation name, before it (/<hash>/Name) or after (/Name/<hash>). */
 function hashFromPath(op: Operation, name: string): { index: number; hash: string } | undefined {
   const parts = segments(op.path);
   const at = parts.lastIndexOf(name);
-  const hash = at > 0 ? parts[at - 1] : undefined;
-  return hash && HASH_SEGMENT.test(hash) ? { index: at - 1, hash } : undefined;
+  if (at < 0) return undefined;
+  for (const index of [at + 1, at - 1]) {
+    const hash = index >= 0 ? segmentValue(op, parts[index]) : undefined;
+    if (hash && HASH_SEGMENT.test(hash)) return { index, hash };
+  }
+  return undefined;
 }
 
 function graphqlRebinds(op: Operation, graph: BundleGraph, name: string): Scored[] {
@@ -261,6 +273,11 @@ export function proposeRebind(op: Operation, graph: BundleGraph): RebindProposal
 }
 
 /** A copy of the operation pointed at the new hash or path. */
+/** A persisted-hash path param carries the new hash too. */
+function rehashParams(op: Operation, hash: string): void {
+  for (const param of op.params) if (param.persistedHash) param.constant = hash;
+}
+
 export function applyRebind(op: Operation, rebind: BundleRebind): Operation {
   const next = structuredClone(op);
   next.path = rebind.path;
@@ -272,5 +289,6 @@ export function applyRebind(op: Operation, rebind: BundleRebind): Operation {
     if (ext?.persistedQuery) ext.persistedQuery.sha256Hash = hash;
   }
   if (next.match?.graphql?.hash) next.match.graphql.hash = hash;
+  rehashParams(next, hash);
   return next;
 }

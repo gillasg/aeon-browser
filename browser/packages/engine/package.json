@@ -25,6 +25,7 @@
     "acorn": "8.18.0",
     "zod": "4.6.5",
     "@browserkit/protocol": "workspace:*",
+    "@browserkit/site-mapper": "workspace:*",
     "site-boosts": "workspace:*"
   },
   "devDependencies": {

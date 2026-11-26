@@ -1,3 +1,5 @@
+import { markPersistedHash } from "./persisted-hash.js";
+import { readSegment } from "../request-words.js";
 import { documentShape } from "./html.js";
 import { isTelemetry, type Classified } from "../filter.js";
 import { isSessionSecretHeader, withoutSessionValues } from "../session-headers.js";
@@ -182,6 +184,17 @@ function separatingParam(clusters: Member[][]): string | undefined {
 const STANDARD_HEADERS =
   /^(accept|accept-language|accept-encoding|content-type|content-length|user-agent|referer|origin|cookie|host|connection|cache-control|pragma|priority|dnt|te|upgrade-insecure-requests|if-none-match|if-modified-since|sec-.*|authorization|x-forwarded-.*)$/;
 
+/**
+ * Telemetry, tracing, correlation and client-hint headers: fresh on every request or describing
+ * the device, never something a caller knows. They are never inputs.
+ */
+export const TELEMETRY_HEADERS =
+  /^(sentry-trace|baggage|traceparent|tracestate|request-id|x-request-id|x-correlation-id|x-client-request-id|x-[a-z0-9-]*trace-id|x-[a-z0-9-]*network-log-link|x-b3-[a-z-]+|b3|x-amzn-trace-id|x-cloud-trace-context|x-datadog-[a-z-]+|newrelic|x-newrelic-id|ect|rtt|downlink|dpr|viewport-width|width|device-memory|save-data|sec-ch-[a-z-]+)$/i;
+
+export function isTelemetryHeader(name: string): boolean {
+  return TELEMETRY_HEADERS.test(name);
+}
+
 function stringSchema(values: string[]): Param["schema"] {
   if (values.every((value) => /^-?\d+$/.test(value))) return { type: "integer" };
   if (values.every((value) => /^-?\d+(\.\d+)?$/.test(value))) return { type: "number" };
@@ -218,6 +231,11 @@ function collectParams(
     };
     if (total >= 2 && new Set(list).size === 1 && presence === total)
       param.constant = list[0] as string;
+    // A header the page sent with one value (a platform flag, a schema name) is replayed as is:
+    // a caller never has to pass it.
+    if (location === "header" && param.constant === undefined && new Set(list).size === 1)
+      param.constant = list[0] as string;
+    if (location === "header") param.required = false;
     return param;
   });
 }
@@ -226,7 +244,7 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
   const total = group.members.length;
   const path: Param[] = group.pathParams.map(({ name, kind }) => {
     const values = group.members.map((member) => member.pathValues[name] ?? "");
-    return {
+    const param: Param = {
       name,
       in: "path",
       required: true,
@@ -238,6 +256,8 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
             : stringSchema(values),
       examples: [...new Set(values)].slice(0, 3),
     };
+    markPersistedHash(param, group.template, group.members);
+    return param;
   });
   const query = collectParams(
     "query",
@@ -249,7 +269,9 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
   const headers = collectParams(
     "header",
     group.members.map((m) =>
-      Object.entries(m.exchange.requestHeaders).filter(([key]) => !STANDARD_HEADERS.test(key)),
+      Object.entries(m.exchange.requestHeaders).filter(
+        ([key]) => !STANDARD_HEADERS.test(key) && !isTelemetryHeader(key),
+      ),
     ),
     total,
   );
@@ -262,7 +284,6 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
 // one page fallback, while a passed write can delete or buy something.
 const STATE_CHANGING_PATH =
   /(^|\/)(logout|signout|sign-out|unsubscribe|delete|remove|destroy|archive|block|mute|like|unlike|follow|unfollow|vote|report|send|submit|create|update|edit|save|add|checkout|order|buy|pay|purchase|book|reserve|cancel|refund|invite|accept|reject|approve|join|leave|upload|post|comment|reply|message|share|subscribe)(\/|$)/i;
-const READ_SEGMENT = /^(search|query|list|find|filter|lookup|suggest|autocomplete|browse|fetch)$/i;
 const READ_RPC =
   /(^|\.)(get|list|search|query|find|fetch|read|view|lookup|check|status|info|describe)(\.|$)/i;
 
@@ -288,7 +309,7 @@ function role(group: Group): Operation["role"] {
 
 /** A POST is a read when its last segment says so, or it only ever answers a list. */
 function bodyReadRole(group: Group): Operation["role"] {
-  if (READ_SEGMENT.test(lastSegment(group.template))) return "read";
+  if (readSegment(lastSegment(group.template))) return "read";
   return listReadPost(group) ? "read" : "action";
 }
 

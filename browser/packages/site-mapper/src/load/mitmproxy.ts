@@ -1,3 +1,4 @@
+import { joinHeader } from "./har.js";
 import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
 import type { Exchange } from "../types.js";
 
@@ -50,7 +51,7 @@ function headers(value: TValue | undefined): Record<string, string> {
   for (const pair of value) {
     if (!Array.isArray(pair)) continue;
     const name = text(pair[0]).toLowerCase();
-    result[name] = result[name] ? `${result[name]}, ${text(pair[1])}` : text(pair[1]);
+    result[name] = joinHeader(result[name] || undefined, text(pair[1]), name);
   }
   return result;
 }

@@ -1,3 +1,4 @@
+import { localProxyHop, replaceHeaders } from "./native-browser-network-headers.js";
 import { send } from "./cdp/send.js";
 import {
   holdBrowserDebugger,
@@ -248,13 +249,13 @@ function responseReceived(recorder: Recorder, params: Params): void {
   entry.status = Number(response.status);
   entry.statusText = String(response.statusText ?? "");
   entry.mimeType = String(response.mimeType ?? "");
-  entry.responseHeaders = { ...headers(response.headers), ...entry.responseHeaders };
+  entry.responseHeaders = replaceHeaders(headers(response.headers), entry.responseHeaders ?? {});
   closeHop(entry);
   if (typeof response.protocol === "string") entry.protocol = response.protocol;
   if (typeof response.remoteIPAddress === "string")
     entry.remoteIPAddress = response.remoteIPAddress;
   const privateRemote = privateAddress(entry.remoteIPAddress ?? "");
-  if (privateRemote)
+  if (privateRemote && !localProxyHop(entry.url, entry.remoteIPAddress ?? "", response.remotePort))
     entry.privateNetwork =
       `PRIVATE_NETWORK: the request reached ${privateRemote} after the URL preflight; ` +
       "this is a DNS-rebinding result, not an allowed destination";
@@ -369,7 +370,7 @@ function mergeHeaders(
     hopExtra.set(entry, { ...(hopExtra.get(entry) ?? {}), ...headers(params.headers) });
     return;
   }
-  entry[field] = { ...entry[field], ...headers(params.headers) };
+  entry[field] = replaceHeaders(entry[field], headers(params.headers));
   if (field === "requestHeaders") rememberSessionHeaders(entry.url, entry.requestHeaders);
 }
 

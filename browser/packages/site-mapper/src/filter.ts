@@ -1,5 +1,6 @@
 import type { Category, Exchange, NoiseReport, Overrides } from "./types.js";
 import { boundedTest } from "./bounded-regex.js";
+import { isNoiseHost } from "./request-words.js";
 
 // Keeps the requests that make up a site's API and drops everything else, saying why.
 
@@ -221,6 +222,7 @@ function isDocument(exchange: Exchange): boolean {
 
 function analyticsHost(url: URL): boolean {
   const target = url.hostname + url.pathname;
+  if (isNoiseHost(url.hostname)) return true;
   return ANALYTICS_HOSTS.some(
     (host) => target === host || target.startsWith(host) || target.includes("." + host),
   );

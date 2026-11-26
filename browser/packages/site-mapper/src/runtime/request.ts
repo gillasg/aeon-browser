@@ -2,6 +2,8 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { parseJson } from "../infer/schema.js";
 import { declaredInputs, plainInputName } from "./bad-request.js";
 import { isSessionSecretHeader } from "../session-headers.js";
+import { isTelemetryHeader } from "../infer/operations.js";
+import { isSealedValue, undoubled } from "../sealed.js";
 import type { Dependency, Operation, Param } from "../types.js";
 
 // Builds a concrete request from an operation and the caller's parameters. The last recorded
@@ -15,6 +17,8 @@ export interface RuntimeRequest {
   url: string;
   headers: Record<string, string>;
   body?: string;
+  /** Headers only the live page can fill (their recording was sealed): send through the page. */
+  pageHeaders?: string[];
 }
 
 export interface RuntimeResponse {
@@ -221,7 +225,7 @@ function serializeBody(operation: Operation, body: unknown): string | undefined 
   return typeof body === "string" ? body : JSON.stringify(body);
 }
 
-type Resolved = { value?: string; missing?: boolean };
+type Resolved = { value?: string; missing?: boolean; page?: boolean };
 
 interface Inputs {
   params: Params;
@@ -252,12 +256,28 @@ function fallbackValue(param: Param): Resolved {
   // Values that belong to the user's session (CSRF tokens, auth headers) are never replayed from a
   // recording: the transport reads them from the live tab, its cookies or the site's own calls.
   if (param.in === "header" && isSessionSecretHeader(param.name)) return {};
+  if (param.in === "header") return headerFallback(param);
   if (param.constant !== undefined) return { value: param.constant };
   // A page number is semantic, not recorded: the first page is safe.
   if (param.in === "query" && /^(page|pageNum|pageNumber)$/i.test(param.name) && param.required)
     return { value: "1" };
   // No recorded values: a missing required parameter must be supplied by the caller.
   return { missing: Boolean(param.required) };
+}
+
+/**
+ * A header is never the caller's to supply: the recorded value is replayed, and the page or
+ * session fills what it owns. A sealed handle or a redacted value is never replayed: the page
+ * sends the real one, so the call needs the page transport.
+ */
+function headerFallback(param: Param): Resolved {
+  if (isTelemetryHeader(param.name)) return {};
+  const recorded = param.constant ?? param.examples?.[0];
+  if (recorded === undefined) return {};
+  const value = undoubled(String(recorded));
+  if (isSealedValue(value)) return { page: true };
+  if (/^(<\w+>|\[session\])$/.test(value)) return {};
+  return { value };
 }
 
 function isSigned(operation: Operation, param: Param): boolean {
@@ -273,6 +293,7 @@ interface Parts {
   url: URL;
   headers: Record<string, string>;
   missing: string[];
+  pageHeaders: string[];
 }
 
 function applyParams(operation: Operation, inputs: Inputs, consumed: Set<string>): Parts {
@@ -281,11 +302,13 @@ function applyParams(operation: Operation, inputs: Inputs, consumed: Set<string>
     url: new URL(operation.origin),
     headers: {},
     missing: [],
+    pageHeaders: [],
   };
   for (const param of operation.params) {
     consumed.add(param.name);
     if (isSigned(operation, param)) continue;
-    const { value, missing } = paramValue(operation, param, inputs);
+    const { value, missing, page } = paramValue(operation, param, inputs);
+    if (page) parts.pageHeaders.push(param.name);
     if (value === undefined) {
       if (missing) parts.missing.push(`${param.in}:${param.name}`);
     } else if (param.in === "path")
@@ -321,6 +344,18 @@ function extraQuery(operation: Operation, url: URL, inputs: Inputs, consumed: Se
       url.searchParams.set(target.slice(6), String(value));
 }
 
+function contentType(operation: Operation, headers: Record<string, string>): void {
+  const mime = operation.requestBody?.mime;
+  if (mime) headers["content-type"] = mime + (operation.requestBody?.form ? ";charset=UTF-8" : "");
+}
+
+/** Session-derived headers (a sealed CSRF token): only the live page fills them. */
+function sessionHeaders(operation: Operation): string[] {
+  return operation.params
+    .filter((param) => param.in === "header" && param.derived === "session")
+    .map((param) => param.name);
+}
+
 /** Builds the request; `missing` lists required inputs nobody supplied, for dependency resolution. */
 export function buildRequest(
   operation: Operation,
@@ -329,14 +364,13 @@ export function buildRequest(
   const sets = (params[SET] ?? {}) as Params;
   const inputs: Inputs = { params, sets, generated: generatedTargets(operation) };
   const consumed = new Set<string>([SET]);
-  const { path, url, headers, missing } = applyParams(operation, inputs, consumed);
+  const { path, url, headers, missing, pageHeaders } = applyParams(operation, inputs, consumed);
   const body = buildBody(operation, inputs, consumed);
   if (operation.kind === "graphql" && operation.method === "GET")
     graphqlQuery(operation, url, params, consumed);
   extraQuery(operation, url, inputs, consumed);
   url.pathname = path;
-  const mime = operation.requestBody?.mime;
-  if (mime) headers["content-type"] = mime + (operation.requestBody?.form ? ";charset=UTF-8" : "");
+  contentType(operation, headers);
   // Next links from link-style pagination replace the whole URL.
   const href = typeof sets.$url === "string" ? sets.$url : url.href;
   const request: RuntimeRequest = {
@@ -346,6 +380,8 @@ export function buildRequest(
     url: href,
     headers,
   };
+  const page = [...pageHeaders, ...sessionHeaders(operation)];
+  if (page.length) request.pageHeaders = page;
   const serialized = serializeBody(operation, body);
   if (serialized !== undefined && operation.method !== "GET") request.body = serialized;
   return { request, missing: missing.filter((target) => !(target in sets)) };

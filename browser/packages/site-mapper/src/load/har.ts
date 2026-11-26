@@ -33,12 +33,18 @@ interface HarEntry {
   pageref?: string;
 }
 
+/** Joins a repeated header, keeping one copy of a value already present (early and late captures). */
+export function joinHeader(old: string | undefined, value: string, key: string): string {
+  if (old === undefined || key === "cookie") return value;
+  return old.split(", ").includes(value) ? old : `${old}, ${value}`;
+}
+
 export function headerMap(headers: HarHeader[] | undefined): Record<string, string> {
   const map: Record<string, string> = {};
   for (const { name, value } of headers ?? []) {
     if (name.startsWith(":")) continue;
     const key = name.toLowerCase();
-    map[key] = map[key] !== undefined && key !== "cookie" ? `${map[key]}, ${value}` : value;
+    map[key] = joinHeader(map[key], value, key);
   }
   return map;
 }

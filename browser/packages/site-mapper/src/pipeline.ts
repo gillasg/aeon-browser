@@ -14,7 +14,7 @@ import {
 } from "./infer/operations.js";
 import { buildChannels, buildPages } from "./infer/pages.js";
 import { detectPagination } from "./infer/pagination.js";
-import { detectSigning, markSignedParams } from "./infer/signing.js";
+import { detectSigning, markSealedCsrf, markSignedParams } from "./infer/signing.js";
 import { traceDependencies, type StorageSnapshot } from "./infer/trace.js";
 import { detectCapabilities } from "./infer/capabilities.js";
 import { isCallEffect } from "./effect.js";
@@ -93,6 +93,7 @@ function annotate(operation: Operation, members: Member[], overrides: Overrides)
   const signing = detectSigning(operation, members);
   if (signing) operation.signing = signing;
   markSignedParams(operation);
+  markSealedCsrf(operation, members);
   const capabilities = overrides.capabilities?.[operation.id] ?? detectCapabilities(operation);
   if (capabilities.length) operation.capabilities = capabilities;
   const effect = overrides.effects?.[operation.id];
