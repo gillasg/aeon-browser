@@ -95,7 +95,12 @@ async function navigateOpenedTab(
       const ready = await navigateReady(tabId, url, timeoutMs, referer);
       return ready.note;
     });
-    return note?.slice(0, 400);
+    // "Still loading: N requests pending" is a healthy page with beacons left, not a failure.
+    const failure = note
+      ?.split("; ")
+      .filter((part) => !/^Still loading:/.test(part))
+      .join("; ");
+    return failure ? failure.slice(0, 400) : undefined;
   } catch (error) {
     // The reason names Chrome's own error (net::ERR_CONNECTION_REFUSED…), not just our code.
     const detail = error instanceof BrowserActionError ? error.detail : undefined;
