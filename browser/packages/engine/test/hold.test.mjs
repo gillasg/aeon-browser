@@ -6,6 +6,8 @@ const session = {};
 const local = {};
 const TAB_ID = 7;
 let nodeAtPoint = () => ({ backendNodeId: 42 });
+// What the press probe reads back: did the page see the mousedown? Default: always yes.
+let probeSeen = () => true;
 
 function sink() {
   return { addListener() {}, removeListener() {}, hasListener: () => false };
@@ -45,6 +47,13 @@ function sendCommand(_debuggee, method, params) {
     return Promise.resolve({ frameTree: { frame: { id: "frame" } } });
   if (method === "Page.createIsolatedWorld") return Promise.resolve({ executionContextId: 3 });
   if (method === "DOM.resolveNode") return Promise.resolve({ object: { objectId: "obj" } });
+  if (
+    method === "Runtime.callFunctionOn" &&
+    /requestAnimationFrame/.test(params.functionDeclaration)
+  )
+    return Promise.resolve({ result: { value: true } });
+  if (method === "Runtime.callFunctionOn" && /probe\.rec\.seen/.test(params.functionDeclaration))
+    return Promise.resolve({ result: { value: probeSeen() } });
   if (method === "Runtime.callFunctionOn")
     return Promise.resolve({ result: { value: nodeAtPoint(params).backendNodeId === 42 } });
   if (method === "Runtime.evaluate") {
@@ -350,4 +359,46 @@ test("press-and-hold", async (t) => {
       assert.equal(events.filter((event) => event.params.type === "mouseReleased").length, 0);
     },
   );
+
+  await t.test("a press the page never received is released and sent again", async () => {
+    calls.length = 0;
+    // The renderer drops the first press (no frame yet); the second one arrives.
+    let presses = 0;
+    probeSeen = () => presses >= 2;
+    const counting = calls.push.bind(calls);
+    calls.push = (call) => {
+      if (call.method === "Input.dispatchMouseEvent" && call.params.type === "mousePressed")
+        presses += 1;
+      return counting(call);
+    };
+    try {
+      await holdAt({ tabId: 3 }, 100, 200, 120, target);
+    } finally {
+      calls.push = counting;
+      probeSeen = () => true;
+    }
+    const events = mice().filter((event) => event.params.type !== "mouseMoved");
+    assert.deepEqual(
+      events.map((event) => event.params.type),
+      ["mousePressed", "mouseReleased", "mousePressed", "mouseReleased"],
+    );
+    // The dwell counts from the press the page saw, not the dropped one.
+    assert.ok(events[3].at - events[2].at >= 120, `${events[3].at - events[2].at} ms`);
+  });
+
+  await t.test("a press the page never sees is reported, with the button released", async () => {
+    calls.length = 0;
+    probeSeen = () => false;
+    try {
+      await assert.rejects(holdAt({ tabId: 3 }, 100, 200, 30, target), /TARGET_LOST/);
+    } finally {
+      probeSeen = () => true;
+    }
+    const types = mice()
+      .map((event) => event.params.type)
+      .filter((type) => type !== "mouseMoved");
+    assert.equal(types.filter((type) => type === "mousePressed").length, 3);
+    assert.equal(types.filter((type) => type === "mouseReleased").length, 3);
+    assert.equal(types.at(-1), "mouseReleased");
+  });
 });

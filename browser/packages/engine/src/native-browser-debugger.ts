@@ -15,6 +15,7 @@ import { ambiguousError, hiddenError, notFoundError } from "./native-browser-can
 import { collectFrameAx, discoverFrames, frameContext } from "./native-browser-frames.js";
 import { humanMouse } from "./native-browser-human-input.js";
 import { send } from "./cdp/send.js";
+import { pressConfirmed } from "./native-browser-press-probe.js";
 import { withFocusEmulation } from "./native-browser-session.js";
 export { withBrowserDebugger as withDebugger } from "./native-browser-session.js";
 
@@ -719,12 +720,7 @@ async function holdPressed(
 ): Promise<void> {
   const at = await land(debuggee, x, y, "holdAt");
   await verifyPressTarget(debuggee, at, target, true);
-  await send(
-    debuggee,
-    "Input.dispatchMouseEvent",
-    { type: "mousePressed", ...at, button: "left", clickCount: 1, buttons: 1 },
-    { label: "holdAt" },
-  );
+  await pressConfirmed(debuggee, at, target);
   // The page times its dwell from the mousedown it receives, so the clock starts when the press
   // has landed. Counting from before the send made a slow renderer shorten the hold (a 1.2s hold
   // against a 1s control released before the page had seen a second pass).
