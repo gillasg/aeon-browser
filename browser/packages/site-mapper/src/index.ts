@@ -197,6 +197,26 @@ export {
   provenWrite,
   type StandaloneClient,
 } from "./emit/client-standalone.js";
+export { generateDirectClient } from "./emit/standalone-client.js";
+export { observations, type Observations } from "./emit/observations.js";
+export {
+  analyzeBundle,
+  analyzeBundles,
+  confirmCandidates,
+  type BundleCandidate,
+  type BundleGraph,
+} from "./bundle-graph.js";
+export {
+  decodeMap,
+  decodeVlq,
+  discoverMapUrl,
+  mapUrlRefusal,
+  originalPosition,
+} from "./sourcemap.js";
+export { sourceMaps, type SourceMapsResult } from "./sourcemap-read.js";
+export { periodicEndpoints, withoutPeriodicSteps } from "./periodic.js";
+export { emitFromHar, modelFromCapture, type HarEmit, type HarEmitResult } from "./har-emit.js";
+export { serveMock, type MockServer } from "./mock-serve.js";
 export { markdownReport, curlExample, redactedSamples } from "./emit/report.js";
 export { htmlReport } from "./emit/html.js";
 export { createRedactor } from "./redact.js";

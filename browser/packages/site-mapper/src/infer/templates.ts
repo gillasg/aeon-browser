@@ -65,7 +65,8 @@ function paramName(previous: string | undefined, kind: SegmentKind): string {
   if (!previous || /^v\d+$/i.test(previous) || previous === "api")
     return kind === "slug" ? "slug" : "id";
   const base = singular(previous);
-  return camel(base + (kind === "slug" ? " slug" : " id"));
+  // A slug is the resource itself (/repos/{repo}); an id-shaped value is its id (/users/{userId}).
+  return camel(kind === "slug" ? base : base + " id");
 }
 
 interface ParsedTemplate {

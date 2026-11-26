@@ -190,12 +190,22 @@ async function __whyOp(entry) {
   var ops = await siteMapper.operations(host).catch(() => null);
   return Array.isArray(ops) ? provOperation(entry.method, entry.url, ops) : undefined;
 }
+// Link 4 upgrade: when the script has a source map, the original file and line (page.code.sourcemaps).
+async function __whyOriginal(page, file, line, col) {
+  if (typeof __reOriginal !== 'function') return undefined;
+  try { return await __reOriginal(file, line, col, await __reHref(page)); } catch { return undefined; }
+}
 async function __whySource(page, component, key) {
-  if (component && component.file) return {file: component.file, ...(component.line ? {line: component.line} : {}), ...(component.column ? {column: component.column} : {})};
+  if (component && component.file) {
+    var mapped = await __whyOriginal(page, component.file, component.line, component.column);
+    return {file: component.file, ...(component.line ? {line: component.line} : {}), ...(component.column ? {column: component.column} : {}), ...(mapped ? {original: mapped} : {})};
+  }
   for (var search of [component && component.name !== 'Anonymous' ? component.name : '', key].filter(Boolean)) {
     var found = await page.sources({search, max: 1}).catch(() => null);
     var hit = found && found.hits && found.hits[0];
-    if (hit) return {file: hit.file, line: hit.line};
+    if (!hit) continue;
+    var original = await __whyOriginal(page, hit.file, hit.line, hit.col);
+    return {file: hit.file, line: hit.line, ...(original ? {original} : {})};
   }
   return undefined;
 }
@@ -238,6 +248,7 @@ async function __pageWhy(target, input, options = {}) {
   return result;
 }
 function __extendPageWhy(target, base) {
-  return Object.assign(base, {why: (input, options = {}) => __pageWhy(target, input, options)});
+  var extended = Object.assign(base, {why: (input, options = {}) => __pageWhy(target, input, options)});
+  return typeof __extendPageRe === 'function' ? __extendPageRe(target, extended) : extended;
 }
 `;

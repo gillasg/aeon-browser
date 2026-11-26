@@ -157,7 +157,7 @@ test("GraphQL, JSON-RPC and shape-split operations keep what tells them apart", 
 
 test("server-rendered pages become page endpoints with their embedded data", async (t) => {
   const { model } = await shopModel(t);
-  const product = model.pages.find((p) => p.path === "/products/{productSlug}");
+  const product = model.pages.find((p) => p.path === "/products/{product}");
   assert.ok(product, JSON.stringify(model.pages.map((p) => p.path)));
   assert.deepEqual(product.embedded.sort(), ["jsonld", "next"]);
   assert.ok(product.schema.properties.jsonLd);
@@ -220,7 +220,7 @@ test("path templates: ids by shape, slugs by variation, names from neighbours", 
   assert.equal(paths[6].template, "/1/indexes/items/query", "an API version stays in the path");
   assert.equal(paths[7].template, "/api/3/products/{productId}");
   assert.equal(paths[0].template, "/users/{userId}/orders/{orderId}");
-  assert.equal(paths[1].template, "/shop/{shopSlug}");
+  assert.equal(paths[1].template, "/shop/{shop}");
   assert.equal(paths[4].template, "/api/v2/categories");
   assert.equal(paths[5].template, "/files/{fileId}");
 });
@@ -322,7 +322,7 @@ test("pages with JSON-LD in CDATA comments become one slug page endpoint", async
   };
   const exchanges = parseCapture(JSON.stringify(har), "films");
   const { model } = await buildSiteModel(exchanges, { site: "films.example" });
-  const page = model.pages.find((p) => p.path === "/film/{filmSlug}/");
+  const page = model.pages.find((p) => p.path === "/film/{film}/");
   assert.ok(page, JSON.stringify(model.pages.map((p) => p.path)));
   assert.deepEqual(page.embedded, ["jsonld"]);
   assert.equal(page.sampleCount, 2);

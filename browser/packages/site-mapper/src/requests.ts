@@ -1,4 +1,5 @@
 import { code } from "./code.js";
+import { sourceMaps } from "./sourcemap-read.js";
 import { operationEffect } from "./effect.js";
 import { formatPace, paceExpectedMs, setBatchRate } from "./pace.js";
 import { listSites, loadModel, siteName } from "./registry.js";
@@ -25,6 +26,7 @@ export interface SiteMapperRequest {
     | "undo"
     | "rewind"
     | "code"
+    | "sourcemaps"
     | "export"
     | "pace";
   site?: string;
@@ -71,7 +73,10 @@ async function operations(site: string): Promise<unknown> {
 
 type Handler = (site: string, request: SiteMapperRequest) => Promise<unknown>;
 
-const HANDLERS: Record<Exclude<SiteMapperRequest["siteMapper"], "sites" | "code">, Handler> = {
+const HANDLERS: Record<
+  Exclude<SiteMapperRequest["siteMapper"], "sites" | "code" | "sourcemaps">,
+  Handler
+> = {
   operations,
   action: async (site, request) =>
     (await siteMapper(site)).action(required(request.name, "action name"), request.params ?? {}),
@@ -130,6 +135,11 @@ function rowParams(shared: Params, row: unknown): Params {
 
 export async function handleSiteMapperRequest(request: SiteMapperRequest): Promise<unknown> {
   if (request.siteMapper === "sites") return listSites();
+  if (request.siteMapper === "sourcemaps")
+    return sourceMaps(
+      required(request.url, "url"),
+      request.options as Parameters<typeof sourceMaps>[1],
+    );
   if (request.siteMapper === "code")
     return code(required(request.url, "url"), request.options as Parameters<typeof code>[1]);
   const handler = HANDLERS[request.siteMapper] as Handler | undefined;

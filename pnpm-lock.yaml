@@ -373,6 +373,9 @@ importers:
       "@browserkit/protocol":
         specifier: workspace:*
         version: link:../protocol
+      acorn:
+        specifier: 8.18.0
+        version: 8.18.0
       fflate:
         specifier: 0.8.3
         version: 0.8.3

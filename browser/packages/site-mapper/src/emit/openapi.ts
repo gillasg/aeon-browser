@@ -1,3 +1,4 @@
+import { observations } from "./observations.js";
 import { createRedactor, type Redactor } from "../redact.js";
 import { documentedParams } from "../params.js";
 import { publicAbility } from "../ability-publish.js";
@@ -99,6 +100,12 @@ function tag(operation: { path: string }): string {
   return literal ?? "root";
 }
 
+/** Per-field sample counts, so a reader can weigh a field seen once against one seen always. */
+function evidence(operation: Operation): Doc {
+  const observed = observations(operation.samples);
+  return observed ? { "x-aeon-observations": observed } : {};
+}
+
 function extensions(operation: Operation, redactor: Redactor): Doc {
   const doc: Doc = {
     "x-confidence": operation.confidence,
@@ -135,6 +142,7 @@ function operationDoc(
     parameters: parameters(operation, skip, redactor),
     responses: responses(operation),
     ...extensions(operation, redactor),
+    ...evidence(operation),
   };
   if (operation.requestBody)
     doc.requestBody = {

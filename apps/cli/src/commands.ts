@@ -26,6 +26,7 @@ import { loginCommands } from "./model-login-cmd.js";
 import { doctorCommand } from "./doctor.js";
 import { rollbackCommand } from "./rollback.js";
 import { packCommand } from "./pack.js";
+import { reCommand } from "./re-cmd.js";
 import { listTools, runTool } from "./tools.js";
 import { abilitiesCommand } from "./abilities-cmd.js";
 import { probeDaemonActivity, runUpdateWhenIdle } from "./update-idle.js";
@@ -482,6 +483,7 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
     doctorCommand(host),
     agentSurfaceCommand(),
     rollbackCommand(),
+    reCommand(),
     {
       name: "run",
       group: "Aeon",

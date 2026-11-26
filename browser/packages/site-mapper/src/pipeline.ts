@@ -1,3 +1,4 @@
+import { withoutPeriodicSteps } from "./periodic.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { filterExchanges, filterOptions, learnNoise, originMatches } from "./filter.js";
@@ -133,7 +134,7 @@ export async function buildSiteModel(
   });
   if (options.until === "filter") return { model, learned, stage: "filter" };
 
-  const grouped = groupExchanges(kept, overrides.templates);
+  const grouped = groupExchanges(withoutPeriodicSteps(kept), overrides.templates);
   grouped.documents = grouped.documents.filter((doc) =>
     originMatches(new URL(doc.origin), options.site),
   );

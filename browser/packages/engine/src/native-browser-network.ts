@@ -40,9 +40,9 @@ const MAX_ENTRIES = 1500;
 const DEFAULT_MAX_BODY = 1_000_000;
 const MAX_TOTAL_BODY = 60_000_000;
 const MAX_FRAMES = 200;
-const API_TYPES = new Set(["XHR", "Fetch", "EventSource", "WebSocket", "Document"]);
+const API_TYPES = new Set(["XHR", "Fetch", "EventSource", "WebSocket", "Document", "Ping"]);
 // A passively recorded tab keeps the page itself and the site's own calls, not fonts and images.
-const PASSIVE_TYPES = new Set(["XHR", "Fetch", "Document"]);
+const PASSIVE_TYPES = new Set(["XHR", "Fetch", "Document", "Ping"]);
 const PASSIVE_MAX_BODY = 256_000;
 const TEXTUAL = /json|text|javascript|xml|html|graphql|x-www-form-urlencoded|csv|event-stream/i;
 interface Recorder {
@@ -107,7 +107,7 @@ onEngineInstall(() => {
 });
 
 /** One recorder fed by events directly: the redirect, extra-info and abort rules under test. */
-export function networkRecorderForTest(): {
+export function networkRecorderForTest(options: { allTypes?: boolean; passive?: boolean } = {}): {
   event(method: string, params: Params): void;
   stop(): void;
   entries(): NetworkEntry[];
@@ -115,10 +115,11 @@ export function networkRecorderForTest(): {
   const recorder: Recorder = {
     entries: new Map(),
     early: new Map(),
-    allTypes: true,
+    allTypes: options.allTypes ?? true,
     bodies: false,
     maxBody: DEFAULT_MAX_BODY,
     bodyBytes: 0,
+    ...(options.passive ? { passive: true } : {}),
   };
   return {
     event: (method, params) => HANDLERS[method]?.(recorder, params, -1),

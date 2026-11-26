@@ -40,6 +40,8 @@ Map a site
   explore <site> [site ...] [--goal g] [--parallel n]     an AI agent uses each site to map it, in parallel
       --actions                                           also map its actions (like, send, post) in dry run: blocked, never sent
   import <site> <file.har|flows> ...                      add HAR or mitmproxy captures
+  re har <file> --emit client|pack|mock [--out p] [--site s] [--port n]
+                                                          offline: typed client, site pack, or a replay-only mock
   build <site> [--until ${STAGES.join("|")}] [--work dir]  rebuild from all flows
   docs <site>                                             its published API documents and GraphQL schemas
   edit <site> "<change>"                                  change the API in plain English
@@ -378,6 +380,30 @@ async function noise(args: Args): Promise<void> {
   for (const item of await learnedNoise()) out(item);
 }
 
+async function reCommand(args: Args): Promise<void> {
+  const [, what, file] = args.positional;
+  const emit = flag(args, "emit");
+  if (what !== "har" || !file || (emit !== "client" && emit !== "pack" && emit !== "mock"))
+    throw new Error("Usage: site-to-api re har <file> --emit client|pack|mock");
+  const { emitFromHar } = await import("./har-emit.js");
+  const out = flag(args, "out");
+  const site = flag(args, "site");
+  const port = flag(args, "port");
+  const result = await emitFromHar(file, {
+    emit,
+    ...(out ? { out } : {}),
+    ...(site ? { site } : {}),
+    ...(port ? { port: Number(port) } : {}),
+  });
+  printEmit(result);
+  if (result.server) await new Promise(() => undefined);
+}
+
+function printEmit(result: { summary: string; written: string[] }): void {
+  out(result.summary);
+  for (const path of result.written) out(path);
+}
+
 /** Commands that work without a site. */
 const GLOBAL: Record<string, (args: Args) => Promise<void>> = {
   record,
@@ -389,6 +415,7 @@ const GLOBAL: Record<string, (args: Args) => Promise<void>> = {
   serve: serveForever,
   mcp: (args) => runMcpServer(args.positional[1]),
   noise,
+  re: reCommand,
 };
 
 /** Commands about one site: `site-to-api <command> <site> …`. */
