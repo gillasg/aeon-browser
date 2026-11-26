@@ -12,6 +12,7 @@ import {
   ffmpegArgs,
   keepSpans,
   beatsOf,
+  assembleMeta,
   layout,
   scoreHits,
   totalMs,
@@ -91,6 +92,8 @@ export async function assemble(
   log(
     `Assembled ${takes.length} take(s), ${segments.length} segment(s), ${(durationMs / 1000).toFixed(1)} s: ${request.out}`,
   );
+  // Walkthrough cuts only: idle trims are unlabelled, so this output is never a house launch film.
+  writeFileSync(`${request.out}.json`, JSON.stringify(assembleMeta(durationMs), null, 2) + "\n");
   return { out: request.out, durationMs };
 }
 

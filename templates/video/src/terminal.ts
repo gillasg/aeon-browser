@@ -4,6 +4,60 @@ import type { Rect, TerminalCast } from "./types.ts";
 
 export type TermLine = { kind: "in" | "out" | "err"; text: string };
 
+// CSI/OSC escapes and lone control bytes a PTY emits; the pane shows text only.
+const ANSI =
+  /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(\u0007|\u001b\\)|\u001b[()][A-Z0-9]|\u001b[=>]/g;
+
+/** Text as a terminal would show it: escapes gone, carriage-return redraws collapsed. */
+export function stripAnsi(text: string): string {
+  return text
+    .replace(ANSI, "")
+    .split("\n")
+    .map((line) => line.split("\r").filter(Boolean).at(-1) ?? "")
+    .join("\n")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "");
+}
+
+type StreamRow = {
+  type?: string;
+  message?: { content?: { type?: string; text?: string; name?: string; input?: unknown }[] };
+  result?: string;
+  duration_ms?: number;
+};
+
+const firstArg = (input: unknown): string => {
+  if (!input || typeof input !== "object") return "";
+  const v = Object.values(input as Record<string, unknown>)[0];
+  return typeof v === "string" ? v.split("\n")[0]!.slice(0, 80) : "";
+};
+
+/**
+ * Stream-JSON agent output (one JSON object per line) as the rows a person would read: text,
+ * each tool with its first argument, `Learned on …`, the result and the real elapsed time.
+ */
+export function streamJsonLines(jsonl: string): string[] {
+  const out: string[] = [];
+  for (const raw of jsonl.split("\n")) {
+    let row: StreamRow;
+    try {
+      row = JSON.parse(raw) as StreamRow;
+    } catch {
+      continue;
+    }
+    for (const part of row.message?.content ?? []) {
+      if (part.type === "tool_use")
+        out.push(`› ${part.name ?? "tool"} ${firstArg(part.input)}`.trimEnd());
+      else if (part.type === "text" && part.text)
+        out.push(...part.text.split("\n").filter(Boolean));
+    }
+    if (row.type === "result") {
+      if (row.result) out.push(...row.result.split("\n").filter(Boolean));
+      if (row.duration_ms !== undefined) out.push(`${(row.duration_ms / 1000).toFixed(1)} s`);
+    }
+  }
+  return out;
+}
+
 /** Lines visible at clip time `t` (ms). The command is a `$` line; output stays in arrival order. */
 export function terminalLines(cast: TerminalCast, t: number, max = 16): TermLine[] {
   const lines: TermLine[] = [];
@@ -23,8 +77,9 @@ export function terminalLines(cast: TerminalCast, t: number, max = 16): TermLine
         lines.push({ kind: "in", text: (i === 0 ? "$ " : "") + (parts[i] ?? "") });
       continue;
     }
-    const ended = event.text.endsWith("\n");
-    const parts = event.text.split("\n");
+    const clean = stripAnsi(event.text);
+    const ended = clean.endsWith("\n");
+    const parts = clean.split("\n");
     if (ended) parts.pop();
     for (let i = 0; i < parts.length; i++) {
       const piece = parts[i] ?? "";

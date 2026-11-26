@@ -49,25 +49,9 @@ export async function openManage(route?: string): Promise<void> {
   if (tab.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
 }
 
-/** Set in chrome.storage.local (or a webdriver-driven browser) to skip the first-install tab. */
-export const WELCOME_DISABLED_KEY = "aeon-welcome-disabled";
-
-/** Whether a fresh install should open the welcome tab: installs only, never updates or tests. */
-export function shouldWelcome(reason: string, disabled: unknown, automated: boolean): boolean {
-  return reason === "install" && disabled !== true && !automated;
-}
-
-/** First run only: a quiet welcome tab with the connection status and the first commands. */
+/** First run only: the welcome and the model connection live on Manage, not on New Tab. */
 export function installManageOnFirstRun(): void {
   chrome.runtime.onInstalled.addListener((details) => {
-    void chrome.storage.local
-      .get(WELCOME_DISABLED_KEY)
-      .then((items) => {
-        const automated = (globalThis.navigator as { webdriver?: boolean } | undefined)?.webdriver;
-        if (shouldWelcome(details.reason, items[WELCOME_DISABLED_KEY], automated === true))
-          return chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
-        return undefined;
-      })
-      .catch(() => undefined);
+    if (details.reason === "install") void openManage().catch(() => undefined);
   });
 }

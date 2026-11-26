@@ -62,8 +62,8 @@ test("native-pixel invariant: a 3x master allows 2x into 1080p, and the camera n
   assert.ok(cam.z <= 2 + 1e-9, `z=${cam.z}`);
 });
 
-test("fromEvents pushes in on real element bounds and keeps every move out of holds", () => {
-  const events = [click(1000, { x: 340, y: 170, width: 600, height: 48 })];
+test("fromEvents pushes in on a beat's real element bounds and keeps every move out of holds", () => {
+  const events = [click(1000, { x: 340, y: 170, width: 600, height: 48 }, "summon")];
   const cues = fromEvents(events, src);
   assert.equal(cues.length, 1);
   assert.deepEqual(cues[0].focusRect, { x: 1020, y: 510, w: 1800, h: 144 });

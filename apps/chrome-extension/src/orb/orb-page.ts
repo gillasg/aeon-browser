@@ -15,6 +15,7 @@ import { openExtensionChat } from "../ui-connection.js";
 import { watchChatRunState } from "../chat-run-state.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { markSeen, setNeeds } from "./orb-control.js";
+import { filmBeat, watchFilm } from "./orb-film.js";
 import {
   CURSOR_STOP,
   ORB_TO_PANEL,
@@ -142,6 +143,7 @@ async function boot(): Promise<void> {
     model.needs = state.needs;
     render();
   });
+  watchFilm();
   await connectSession();
   void loadChats();
   void loadXray(ux);
@@ -149,6 +151,8 @@ async function boot(): Promise<void> {
     const handed = changes[TAB_CHAT]?.newValue;
     if (typeof handed === "string" && handed && handed !== model.chatId)
       void selectChat(handed, false);
+    if (`aeon-learned:${tabId}` in changes) filmBeat("learned");
+    else if (`aeon-learn:${tabId}` in changes) filmBeat("teach");
     if (`aeon-learn:${tabId}` in changes || `aeon-learned:${tabId}` in changes)
       void loadLearning(ux);
   });
@@ -174,6 +178,7 @@ async function rememberedChat(): Promise<{ chatId?: string; borrowed: boolean }>
 /** Opened again after closing: a chat borrowed from another tab gives way to a fresh one. */
 function reopened(message: OrbShown): void {
   applySummon(ux, message.summon);
+  filmBeat("summon");
   void countHint();
   void loadXray(ux);
   // Teach may have started while the box was closed (Manage → Sites → Teach Aeon).
@@ -293,6 +298,7 @@ async function answerWrong(): Promise<void> {
 // has gets the message as its next turn; otherwise a new chat starts with this tab as context.
 async function submit(text: string): Promise<void> {
   lastPrompt = text;
+  filmBeat("send", { text });
   model.asked = text;
   model.startedAt = Date.now();
   delete model.durationMs;
@@ -429,6 +435,8 @@ function sync(): void {
  * never joins a tab group; the engine's glow shows the agent is working in it. */
 function changed(state: OrbVisualState): void {
   if (state === lastState) return;
+  if (state === "needs") filmBeat("handoff");
+  else if (lastState === "needs") filmBeat("resume");
   lastState = state;
   if (state !== "done") receiptPillShown = false;
   void setNeeds(tabId, state === "needs", session.chatId ?? "");
@@ -452,6 +460,7 @@ function showReceiptOnPill(): void {
   const short = receiptOf(run?.footer)?.short;
   if (!short) return;
   receiptPillShown = true;
+  filmBeat("receipt", { text: short });
   receiptUntil = Date.now() + RECEIPT_PILL_MS;
   globalThis.setTimeout(() => {
     receiptUntil = 0;

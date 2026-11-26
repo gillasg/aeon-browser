@@ -1,16 +1,18 @@
 // Solo -> Pair: the browser glides left to 58% and the real terminal emerges on the right, with
-// the returned line on the same scanline as the value on the page.
+// the returned line on the same scanline as the value on the page, joined by one dotted row.
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import { camAt, ease, type Size } from "./camera.ts";
+import { camAt, ease, viewTransform, type Size } from "./camera.ts";
 import { Shot } from "./Camera.tsx";
-import { pairLayout, scanlinePad } from "./pair.ts";
+import { DotScanline } from "./DotMatrix.tsx";
+import { INK } from "./dotmatrix.ts";
+import { pairCam, pairLayout, paneFont, scanlinePad } from "./pair.ts";
 import { terminalLines } from "./terminal.ts";
 import type { DirectorEdit } from "./types.ts";
 
 export const PAIR_EASE_MS = 580;
-export const TERM_BG = "#141518";
-export const TERM_INK = "#E6E8EC";
+export const TERM_BG = INK.void;
+export const TERM_INK = INK.primary;
 
 export const Pair: React.FC<{ edit: DirectorEdit; base: string; t: number; out: Size }> = ({
   edit,
@@ -22,22 +24,29 @@ export const Pair: React.FC<{ edit: DirectorEdit; base: string; t: number; out: 
   const k = ease(Math.max(0, Math.min(1, (t - pair.pairAtMs) / PAIR_EASE_MS)));
   const { browser, terminal } = pairLayout(out, k);
   const vp = { width: browser.w, height: browser.h };
-  const font = Math.round(Math.max(out.width, out.height) * 0.0235);
-  const lineHeight = Math.round(font * 1.5);
   const src = { width: edit.source.width, height: edit.source.height };
   const lines = edit.terminal ? terminalLines(edit.terminal, t, 40) : [];
+  const final = edit.terminal ? terminalLines(edit.terminal, Infinity, 40) : lines;
+  const font = paneFont(out, terminal.w, final);
+  const lineHeight = Math.round(font * 1.5);
+  const cam = pairCam(camAt(edit.cues, t, src, vp, { holds: edit.holds, rest: "stage" }), src, vp);
+  const vt = viewTransform(cam, src, vp);
+  // The connector leaves from the window's right edge, never across the page it shows.
+  const windowRight = browser.x + Math.min(browser.w, vt.x + src.width * vt.scale);
   const align =
     pair.alignPageY !== undefined
       ? scanlinePad({
           pageY: pair.alignPageY,
-          cam: camAt(edit.cues, t, src, vp, { holds: edit.holds, rest: "stage" }),
+          cam,
           src,
           browser,
           terminal,
           lineHeight,
           line: pair.alignTerminalLine ?? 0,
         })
-      : { pad: font, aligned: true };
+      : { pad: font, aligned: false, y: 0 };
+  // The connector waits for the glide to land, then draws left to right in 420 ms.
+  const draw = Math.max(0, Math.min(1, (t - pair.pairAtMs - PAIR_EASE_MS) / 420));
   return (
     <AbsoluteFill>
       <div
@@ -49,7 +58,7 @@ export const Pair: React.FC<{ edit: DirectorEdit; base: string; t: number; out: 
           height: browser.h,
         }}
       >
-        <Shot edit={edit} base={base} t={t} viewport={vp} />
+        <Shot edit={edit} base={base} t={t} viewport={vp} keepLeft />
       </div>
       {k > 0 ? (
         <div
@@ -61,7 +70,7 @@ export const Pair: React.FC<{ edit: DirectorEdit; base: string; t: number; out: 
             height: terminal.h,
             backgroundColor: TERM_BG,
             borderRadius: 12,
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.07), 0 24px 60px rgba(0,0,0,0.45)",
+            boxShadow: `inset 0 1px 0 ${INK.rimTop}, inset 0 0 0 1px ${INK.hairline}`,
             opacity: k,
             overflow: "hidden",
             color: TERM_INK,
@@ -76,13 +85,12 @@ export const Pair: React.FC<{ edit: DirectorEdit; base: string; t: number; out: 
                   height: lineHeight,
                   whiteSpace: "pre",
                   overflow: "hidden",
-                  textOverflow: "ellipsis",
                   color:
                     line.kind === "in"
                       ? TERM_INK
                       : line.kind === "err"
-                        ? "#E8A0A0"
-                        : "rgba(230,232,236,0.78)",
+                        ? INK.muted
+                        : "rgba(243,243,241,0.78)",
                 }}
               >
                 {line.text}
@@ -90,6 +98,14 @@ export const Pair: React.FC<{ edit: DirectorEdit; base: string; t: number; out: 
             ))}
           </div>
         </div>
+      ) : null}
+      {align.aligned && draw > 0 ? (
+        <DotScanline
+          x0={windowRight + font * 0.4}
+          x1={terminal.x + font * 0.6}
+          y={align.y}
+          k={draw}
+        />
       ) : null}
     </AbsoluteFill>
   );

@@ -1,7 +1,9 @@
-// The stage: an architectural surface under soft overhead light, and the real Chrome window
-// resting on it with a grounded shadow and a 1 px rim catchlight. Never a SaaS gradient.
+// The stage: the AMOLED void (#000000) with a quiet dot field, and the real Chrome window resting
+// on it inside a 1 px hairline with a top-lit catchlight. Never a SaaS gradient or a glow.
 import React from "react";
 import { AbsoluteFill } from "remotion";
+import { DotField } from "./DotMatrix.tsx";
+import { INK } from "./dotmatrix.ts";
 import type { Surface } from "./types.ts";
 import type { OutRect } from "./pair.ts";
 
@@ -10,12 +12,12 @@ export const SURFACES: Record<
   { base: string; light: string; ink: string; mute: string; shadow: string; rim: string }
 > = {
   obsidian: {
-    base: "#0B0C0F",
-    light: "rgba(255, 246, 232, 0.075)",
-    ink: "#E6E8EC",
-    mute: "rgba(230, 232, 236, 0.56)",
-    shadow: "0 1px 2px rgba(0,0,0,0.55), 0 12px 28px rgba(0,0,0,0.45), 0 48px 96px rgba(0,0,0,0.5)",
-    rim: "rgba(255, 255, 255, 0.14)",
+    base: INK.void,
+    light: "rgba(255, 255, 255, 0.045)",
+    ink: INK.primary,
+    mute: INK.muted,
+    shadow: `inset 0 1px 0 ${INK.rimTop}`,
+    rim: INK.hairline,
   },
   stone: {
     base: "#ECEAE4",
@@ -29,7 +31,11 @@ export const SURFACES: Record<
 };
 
 /** The surface under everything, lit from above. */
-export const StageSurface: React.FC<{ surface: Surface }> = ({ surface }) => {
+export const StageSurface: React.FC<{
+  surface: Surface;
+  ms?: number;
+  size?: { width: number; height: number };
+}> = ({ surface, ms, size }) => {
   const s = SURFACES[surface];
   return (
     <AbsoluteFill
@@ -37,7 +43,16 @@ export const StageSurface: React.FC<{ surface: Surface }> = ({ surface }) => {
         backgroundColor: s.base,
         backgroundImage: `radial-gradient(ellipse 70% 55% at 50% -8%, ${s.light}, transparent 72%)`,
       }}
-    />
+    >
+      {surface === "obsidian" && size && ms !== undefined ? (
+        <DotField
+          width={size.width}
+          height={size.height}
+          ms={ms}
+          pitch={Math.round(size.width / 64)}
+        />
+      ) : null}
+    </AbsoluteFill>
   );
 };
 

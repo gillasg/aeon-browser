@@ -189,10 +189,14 @@ function clearOfHolds(cue: CameraCue, holds: HoldRegion[]): CameraCue | undefine
   return tEnd > tStart ? { ...cue, tStart, tEnd } : undefined;
 }
 
+/** The only beats that may move the camera: the story, never each agent click. */
+export const CAMERA_BEATS = new Set(["summon", "send", "receipt", "learned", "teach", "prompt"]);
+
 /**
- * Camera cues motivated only by real events: each click, type or key press with bounds gets a
- * push-in that arrives as the action happens and breathes out after it. Close actions share one
- * move. Moves never start or end inside a hold.
+ * Camera cues motivated only by story beats with real bounds (summon, send, receipt, learned,
+ * teach): a push-in that arrives as the beat lands and breathes out after it. Plain agent clicks,
+ * typing and key presses never move the camera. Close beats share one move; moves never start or
+ * end inside a hold.
  */
 export function fromEvents(
   events: VideoEvent[],
@@ -203,7 +207,7 @@ export function fromEvents(
   const merge = options.mergeMs ?? 700;
   const cues: CameraCue[] = [];
   for (const e of events) {
-    if (e.kind !== "click" && e.kind !== "type" && e.kind !== "press") continue;
+    if (!e.beat || !CAMERA_BEATS.has(e.beat)) continue;
     const rect = eventRect(e, src, options.pageOffset);
     if (!rect) continue;
     const tStart = Math.max(0, e.t - EASE_DEFAULT_MS);

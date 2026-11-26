@@ -6,8 +6,9 @@ import { EditorialBeat } from "./EditorialBeat.tsx";
 import { End } from "./End.tsx";
 import { Pair } from "./Pair.tsx";
 import { StageSurface } from "./Stage.tsx";
+import { DotBadge } from "./DotMatrix.tsx";
 import { TimeCut } from "./TimeCut.tsx";
-import { toSource, toVideo, videoLength } from "./timeline.ts";
+import { segmentAt, toSource, toVideo, videoLength } from "./timeline.ts";
 import type { DirectorEdit } from "./types.ts";
 
 export type DirectorProps = { edit: DirectorEdit; base: string };
@@ -28,9 +29,12 @@ export const DirectorCut: React.FC<DirectorProps> = ({ edit, base }) => {
     );
   const t = toSource(edit.segments, vt);
   const paired = edit.pair && t >= edit.pair.pairAtMs;
+  // Every speed change wears its label for as long as it plays.
+  const seg = segmentAt(edit.segments, vt);
+  const dot = Math.max(2, Math.round(width * 0.0024));
   return (
     <AbsoluteFill>
-      <StageSurface surface={edit.surface} />
+      <StageSurface surface={edit.surface} ms={vt} size={out} />
       {paired ? (
         <Pair edit={edit} base={base} t={t} out={out} />
       ) : (
@@ -61,6 +65,17 @@ export const DirectorCut: React.FC<DirectorProps> = ({ edit, base }) => {
           height={height}
         />
       ))}
+      {seg && seg.speed !== 1 && seg.label ? (
+        <div
+          style={{
+            position: "absolute",
+            top: Math.round(width * 0.03),
+            right: Math.round(width * 0.03),
+          }}
+        >
+          <DotBadge text={seg.label} dot={dot} />
+        </div>
+      ) : null}
       {audio}
     </AbsoluteFill>
   );

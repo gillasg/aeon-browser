@@ -182,6 +182,24 @@ export class AeonClient {
     });
   }
 
+  /** `aeon record`'s beat bus in every connected Chrome: arm, disarm, read or clear. */
+  film(action: "arm" | "disarm" | "read" | "clear", timeoutMs = 10_000): Promise<Json> {
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        reject(new Error("Aeon did not answer the beat bus in time."));
+      }, timeoutMs);
+      this.waiting.set(requestId, (message) => {
+        if (message.kind !== "core.film.result") return;
+        clearTimeout(timer);
+        this.waiting.delete(requestId);
+        resolve(message);
+      });
+      this.socket.send(JSON.stringify({ kind: "core.film", requestId, action }));
+    });
+  }
+
   /** Runs browser code in the user's Chrome and returns the cell's own value and output. */
   browserRun(
     body: { code: string; session: string; timeoutMs?: number; browser?: string },

@@ -53,4 +53,9 @@ intl["accept_languages"] = "en-US,en"
 intl["selected_languages"] = "en-US,en"
 intl["app_locale"] = "en-US"
 d.setdefault("translate", {})["enabled"] = False
+# Chrome bubbles don't change innerHeight, so nothing downstream can see them: never offer to save
+# a password, and block site notification prompts by default.
+d["credentials_enable_service"] = False
+d.setdefault("profile", {})["password_manager_enabled"] = False
+d["profile"].setdefault("default_content_setting_values", {})["notifications"] = 2
 with open(pref, "w") as f: json.dump(d, f, separators=(",", ":"))

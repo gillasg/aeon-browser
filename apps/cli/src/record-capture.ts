@@ -5,6 +5,13 @@
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  deferEncode,
+  firstFrameMtime,
+  progressArgs,
+  readProgress,
+  trueT0,
+} from "./record-truth.js";
 
 export type Source = "window" | "screen" | "tabs";
 export type RecordOptions = {
@@ -19,6 +26,8 @@ export type RecordOptions = {
   /** Leave the OS pointer out of the frames, so only Aeon's own cursor is on camera. */
   noMouse?: boolean;
   log?: (line: string) => void;
+  /** Encode clip.mp4 in the background (nice 19) instead of blocking stop. */
+  deferClip?: boolean;
 };
 export type RecordState = {
   version: 1;
@@ -43,6 +52,11 @@ export type RecordState = {
   noMouse?: boolean;
   /** --browser at start: the Chrome profile later mark/wait/stop calls read from. */
   browser?: string;
+  /** ffmpeg's dropped / duplicated frame counts, read from -progress at stop. */
+  dropped?: number;
+  dup?: number;
+  /** pid of the background clip.mp4 encode when stop ran with --defer-clip. */
+  encodePid?: number;
 };
 
 export const isWindows = process.platform === "win32";
@@ -250,6 +264,7 @@ export function captureArgs(
       "-r",
       fps,
       ...FRAME_FORMAT,
+      ...progressArgs(folder),
       out,
     ];
   }
@@ -272,6 +287,7 @@ export function captureArgs(
       "-r",
       fps,
       ...FRAME_FORMAT,
+      ...progressArgs(folder),
       out,
     ];
   }
@@ -297,6 +313,7 @@ export function captureArgs(
     "-r",
     fps,
     ...FRAME_FORMAT,
+    ...progressArgs(folder),
     out,
   ];
 }
@@ -412,6 +429,8 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
     ...pointerOption(opts),
     frames: 0,
   };
+  const spawnAt = Date.now();
+  state.startedAt = spawnAt;
   const child = spawn(ffmpeg, captureArgs(state, folder), {
     stdio: ["ignore", "ignore", "pipe"],
     detached: !testMode,
@@ -425,6 +444,8 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
   saveState(folder, state);
   await waitForFrames(folder, testMode, child, () => stderr);
   state.frames = countFrames(folder);
+  // t=0 is the first frame ffmpeg delivered, not the moment we asked it to start.
+  state.startedAt = trueT0({ spawnAt, now: Date.now(), mtimeMs: firstFrameMtime(folder) });
   saveState(folder, state);
   return state;
 }
@@ -448,36 +469,17 @@ export async function stopCapture(
     rmSync(join(folder, STATE), { force: true });
     return state;
   }
-  if (state.pid) {
-    const done = exited(state.pid);
-    try {
-      process.kill(state.pid, "SIGINT");
-    } catch {
-      // Already gone.
-    }
-    if (!(await done(5000))) {
-      try {
-        process.kill(state.pid, "SIGTERM");
-      } catch {
-        // Already gone.
-      }
-    }
-    if (!(await done(2000))) {
-      try {
-        process.kill(state.pid, "SIGKILL");
-      } catch {
-        // Already gone.
-      }
-    }
-  }
+  if (state.pid) await endCapture(state.pid);
   const frames = readdirSync(join(folder, "frames"))
     .filter((f) => f.endsWith(".jpg"))
     .sort();
   if (!frames.length)
     throw new Error("The recording captured no frames. Was the window unminimized and visible?");
   state.frames = frames.length;
+  const progress = readProgress(folder);
+  if (progress) Object.assign(state, progress);
   const ffmpeg = opts.ffmpeg ?? state.ffmpeg;
-  await run(ffmpeg, [
+  const encode = [
     "-v",
     "error",
     "-y",
@@ -495,12 +497,43 @@ export async function stopCapture(
     "-r",
     String(state.fps),
     join(folder, "clip.mp4"),
-  ]).catch((error: Error) => {
+  ];
+  if (opts.deferClip) {
+    const pid = deferEncode(ffmpeg, encode);
+    if (pid !== undefined) state.encodePid = pid;
+    rmSync(join(folder, STATE), { force: true });
+    return state;
+  }
+  await run(ffmpeg, encode).catch((error: Error) => {
     // A fake ffmpeg in tests exits 0 but writes nothing; keep the frames and the log anyway.
     if (!opts.ffmpeg) throw error;
   });
   rmSync(join(folder, STATE), { force: true });
   return state;
+}
+
+/** Ask ffmpeg to finish: q via SIGINT, then TERM, then KILL. */
+async function endCapture(pid: number): Promise<void> {
+  const done = exited(pid);
+  try {
+    process.kill(pid, "SIGINT");
+  } catch {
+    // Already gone.
+  }
+  if (!(await done(5000))) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // Already gone.
+    }
+  }
+  if (!(await done(2000))) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
 }
 
 /** A reparented ffmpeg can be a zombie: kill(pid, 0) still succeeds, but it has already stopped. */

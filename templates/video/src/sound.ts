@@ -14,6 +14,16 @@ export type Score = {
 
 const db = (d: number) => 10 ** (d / 20);
 
+/**
+ * Aeon's own sounds, exactly as apps/chrome-extension/src/orb/orb-sounds.ts plays them (a test
+ * keeps the two equal). The film scores these notes, never a chord Aeon does not play.
+ */
+export const NOTES = {
+  start: [523.25],
+  needs: [659.25, 523.25],
+  done: [523.25, 783.99],
+} as const;
+
 /** The score of an edit: recording cues + director beats, mapped onto the video clock. */
 export function scoreFor(
   edit: DirectorEdit,
@@ -107,8 +117,8 @@ function trigger(bus: Bus, start: number, rand: () => number) {
   }
 }
 
-/** Bell-like arrival: D5 + A5, 6 ms attack, 240 ms exponential decay, a whisper of inharmonic air. */
-function chord(bus: Bus, start: number, gainDb = -14, notes: number[] = [587.33, 880]) {
+/** Bell-like arrival on Aeon's notes (C5 + G5 for done), 6 ms attack, 240 ms exponential decay, a whisper of inharmonic air. */
+function chord(bus: Bus, start: number, gainDb = -14, notes: number[] = [...NOTES.done]) {
   const n = Math.round(1.1 * SAMPLE_RATE);
   const g = db(gainDb);
   const attack = 0.006 * SAMPLE_RATE;
@@ -151,8 +161,8 @@ export function synthesize(score: Score, seed = 7): Bus {
     const jitter = h.kind === "key" ? Math.round((rand() - 0.5) * 0.004 * SAMPLE_RATE) : 0;
     if (h.kind === "key") key(bus, s(h.t) + jitter, rand);
     else if (h.kind === "trigger") trigger(bus, s(h.t), rand);
-    else if (h.kind === "chord") chord(bus, s(h.t));
-    else chord(bus, s(h.t), -20, [880]);
+    else if (h.kind === "chord") chord(bus, s(h.t), -14, [...NOTES.done]);
+    else chord(bus, s(h.t), -20, [...NOTES.needs]);
   }
   return bus;
 }
