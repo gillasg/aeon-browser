@@ -5,6 +5,7 @@ import {
   withBrowserDebugger,
 } from "./native-browser-session.js";
 import { toHar, type NetworkEntry } from "./native-browser-network-format.js";
+import { detailOf, textBodyOf, waitedEntry, wireBodyOf } from "./native-browser-network-wire.js";
 import { replayUrlRefusal } from "./code-api-data.js";
 import { privateAddress } from "./native-browser-policy.js";
 import { listEntries, recentOf } from "./native-browser-network-list.js";
@@ -22,12 +23,7 @@ import { onEngineInstall } from "./native-engine-install.js";
 import { harvestReply } from "./harvest.js";
 import { failuresOf, pathOf } from "./native-browser-network-failures.js";
 export { failuresOf } from "./native-browser-network-failures.js";
-import {
-  bodyPreview,
-  describeWait,
-  waitMatcher,
-  type Waitable,
-} from "./native-browser-network-wait.js";
+import { describeWait, waitMatcher, type Waitable } from "./native-browser-network-wait.js";
 import { isTrackerUrl, takeLearned } from "./native-browser-network-learn.js";
 import { rememberSessionHeaders, sessionHeadersFor } from "./native-browser-session-headers.js";
 import { hideSecrets } from "./native-browser-secrets.js";
@@ -44,6 +40,7 @@ const API_TYPES = new Set(["XHR", "Fetch", "EventSource", "WebSocket", "Document
 // A passively recorded tab keeps the page itself and the site's own calls, not fonts and images.
 const PASSIVE_TYPES = new Set(["XHR", "Fetch", "Document", "Ping"]);
 const PASSIVE_MAX_BODY = 256_000;
+const DECODABLE = /protobuf|octet-stream|x-component|grpc/i;
 const TEXTUAL = /json|text|javascript|xml|html|graphql|x-www-form-urlencoded|csv|event-stream/i;
 interface Recorder {
   entries: Map<string, NetworkEntry>;
@@ -111,6 +108,8 @@ export function networkRecorderForTest(options: { allTypes?: boolean; passive?: 
   event(method: string, params: Params): void;
   stop(): void;
   entries(): NetworkEntry[];
+  get(id: string): unknown;
+  body(id: string, options?: Params): Promise<unknown>;
 } {
   const recorder: Recorder = {
     entries: new Map(),
@@ -125,6 +124,8 @@ export function networkRecorderForTest(options: { allTypes?: boolean; passive?: 
     event: (method, params) => HANDLERS[method]?.(recorder, params, -1),
     stop: () => flushParkedHops(recorder),
     entries: () => [...recorder.entries.values()],
+    get: (id) => detailOf(entryOf(recorder, id)),
+    body: (id, options) => bodyOf(-1, recorder, id, options),
   };
 }
 
@@ -297,7 +298,8 @@ async function captureBodies(tabId: number, recorder: Recorder, entry: NetworkEn
     if (typeof post?.postData === "string") entry.requestBody = hideSecrets(post.postData);
     delete entry.requestBodyPending;
   }
-  if (!textual || (entry.size ?? 0) > recorder.maxBody * 2) return;
+  const decodable = DECODABLE.test(entry.mimeType ?? "");
+  if ((!textual && !decodable) || (entry.size ?? 0) > recorder.maxBody * 2) return;
   const result = await command(
     tabId,
     "Network.getResponseBody",
@@ -306,7 +308,11 @@ async function captureBodies(tabId: number, recorder: Recorder, entry: NetworkEn
   );
   if (typeof result?.body !== "string") return;
   const text = result.base64Encoded ? "" : result.body;
-  if (result.base64Encoded) entry.bodyBase64 = true;
+  if (result.base64Encoded) {
+    entry.bodyBase64 = true;
+    entry.rawBody = result.body.slice(0, Math.ceil((recorder.maxBody * 4) / 3 / 4) * 4);
+    recorder.bodyBytes += entry.rawBody.length;
+  }
   entry.bodyBytes = text.length;
   entry.body = text.length > recorder.maxBody ? text.slice(0, recorder.maxBody) : text;
   if (text.length > recorder.maxBody) entry.bodyTruncated = true;
@@ -329,9 +335,10 @@ function command(
 function trimBodies(recorder: Recorder): void {
   for (const entry of recorder.entries.values()) {
     if (recorder.bodyBytes <= MAX_TOTAL_BODY) return;
-    if (!entry.body) continue;
-    recorder.bodyBytes -= entry.body.length;
+    if (!entry.body && !entry.rawBody) continue;
+    recorder.bodyBytes -= (entry.body?.length ?? 0) + (entry.rawBody?.length ?? 0);
     delete entry.body;
+    delete entry.rawBody;
     entry.bodyDropped = true;
   }
 }
@@ -340,7 +347,7 @@ function add(recorder: Recorder, entry: NetworkEntry): void {
   recorder.entries.set(entry.id, entry);
   for (const [key, old] of recorder.entries) {
     if (recorder.entries.size <= MAX_ENTRIES) break;
-    recorder.bodyBytes -= old.body?.length ?? 0;
+    recorder.bodyBytes -= (old.body?.length ?? 0) + (old.rawBody?.length ?? 0);
     recorder.entries.delete(key);
   }
 }
@@ -527,8 +534,8 @@ export async function networkCall(
     const match = typeof options.match === "string" ? options.match : "";
     return failuresOf([...recorder.entries.values()], match);
   }
-  if (action === "get") return entryOf(recorder, options.id);
-  if (action === "body") return bodyOf(tabId, recorder, options.id);
+  if (action === "get") return detailOf(entryOf(recorder, options.id));
+  if (action === "body") return bodyOf(tabId, recorder, options.id, options);
   if (action === "har") return toHar([...recorder.entries.values()], { raw: options.raw === true });
   if (action === "clear") {
     recorder.entries.clear();
@@ -742,32 +749,6 @@ function recentHint(recorder: Recorder): string {
   return "; captured meanwhile: " + recent.join(", ") + ". page.network.list() has the rest";
 }
 
-function waitedEntry(entry: NetworkEntry): Record<string, unknown> {
-  return {
-    id: entry.id,
-    method: entry.method,
-    url: entry.url,
-    type: entry.type,
-    ...(entry.status !== undefined ? { status: entry.status } : {}),
-    ...(entry.statusText ? { statusText: entry.statusText } : {}),
-    ...(entry.failed ? { failed: entry.failed } : {}),
-    ...(entry.mimeType ? { mimeType: entry.mimeType } : {}),
-    ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
-    ...(entry.size !== undefined ? { size: entry.size } : {}),
-    headers: responseHeadersOf(entry.responseHeaders),
-    body: bodyPreview(entry),
-  };
-}
-
-/** Response headers, capped: enough to read a content type or a block header. */
-function responseHeadersOf(headers: Record<string, string> | undefined): Record<string, string> {
-  const all = Object.entries(headers ?? {});
-  const kept = Object.fromEntries(
-    all.slice(0, 40).map(([name, value]) => [name.toLowerCase(), String(value).slice(0, 500)]),
-  );
-  return all.length > 40 ? { ...kept, "x-headers-not-shown": String(all.length - 40) } : kept;
-}
-
 export function recorderOf(tabId: number): { entries: Map<string, NetworkEntry> } | undefined {
   return recorders.get(tabId) ?? stopped.get(tabId);
 }
@@ -778,22 +759,18 @@ function entryOf(recorder: Recorder, id: unknown): NetworkEntry {
   return entry;
 }
 
-async function bodyOf(tabId: number, recorder: Recorder, id: unknown): Promise<unknown> {
+async function bodyOf(
+  tabId: number,
+  recorder: Recorder,
+  id: unknown,
+  options: Params = {},
+): Promise<unknown> {
   const entry = entryOf(recorder, id);
   if (!entry.done) throw new Error("That request is still loading; try again shortly");
   if (entry.body === undefined && !entry.bodyBase64) await captureBodies(tabId, recorder, entry);
+  if (options.as === "base64" || options.decode !== undefined) return wireBodyOf(entry, options);
   if (entry.bodyBase64) return { binary: true, bytes: entry.size ?? 0 };
   if (entry.body === undefined)
     return { unavailable: true, reason: entry.bodyDropped ? "dropped to save memory" : "no body" };
-  if (!entry.bodyTruncated) {
-    try {
-      return JSON.parse(entry.body) as unknown;
-    } catch {
-      // Not JSON: return the text.
-    }
-  }
-  return {
-    text: entry.body,
-    ...(entry.bodyTruncated ? { truncated: true, length: entry.bodyBytes } : {}),
-  };
+  return textBodyOf(entry as NetworkEntry & { body: string });
 }

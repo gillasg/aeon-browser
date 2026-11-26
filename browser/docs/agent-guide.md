@@ -171,6 +171,7 @@ await page.network.start(); // { types: "all" } records every resource, { bodies
 await page.network.list("/api"); // or { match, method, type }: id, url, method, status, json
 await page.network.get(id); // full request and response: headers (cookies too), bodies, initiator stack
 await page.network.body(id); // the parsed response
+await page.network.body(id, { decode: "auto" }); // protobuf, JSPB, RSC flight, framed JSON: {format, value}
 await page.network.save("flow.har"); // a HAR file in the workspace (works after stop() too)
 ```
 

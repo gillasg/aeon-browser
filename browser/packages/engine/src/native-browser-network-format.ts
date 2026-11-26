@@ -47,6 +47,8 @@ export interface NetworkEntry {
   durationMs?: number;
   body?: string;
   bodyBase64?: boolean;
+  /** The binary body as CDP sent it (base64), bounded; read through page.network.body(id, {decode}). */
+  rawBody?: string;
   bodyTruncated?: boolean;
   bodyBytes?: number;
   bodyDropped?: boolean;
