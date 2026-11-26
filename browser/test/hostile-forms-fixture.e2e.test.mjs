@@ -198,9 +198,9 @@ test(
       assert.ok(editor.model.inputs > 0, out);
       // 6. Open shadow root: label fill and role click reach inside.
       assert.equal(line("O"), "open-v", out);
-      // 7. Closed shadow root: the accessibility tree reaches it (role fill and click work);
-      // label and CSS lookups cannot see into it and say so.
-      assert.match(line("X1")?.error ?? "", /TARGET_NOT_FOUND/, out);
+      // 7. Closed shadow root: the accessibility tree reaches it (label fill, role fill and
+      // click work); CSS lookups cannot see into it and say so.
+      assert.equal(line("X1"), "filled", out);
       assert.equal(line("X2"), "clicked", out);
       assert.equal(line("X5"), "filled", out);
       assert.match(line("X3")?.error ?? "", /TARGET_NOT_FOUND/, out);
