@@ -123,3 +123,15 @@ export function graftLive(arg: { id: string; css: string | null }): unknown {
   if (!existing) (doc.head || doc.documentElement).appendChild(style);
   return { applied: true };
 }
+
+// Whether a graft for host ('example.com' or '*.example.com') covers the page at url.
+export function graftCovers(host: string, url: unknown): boolean {
+  let page: string;
+  try {
+    page = new URL(String(url)).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  const bare = host.replace(/^\*\./, "");
+  return page === bare || (host.startsWith("*.") && page.endsWith("." + bare));
+}

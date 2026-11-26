@@ -225,7 +225,11 @@ test("page.graft persists through boosts, lists only grafts and removes by id", 
   const { page, saved, inspected } = sandbox({ boosts: [{ id: "dark", name: "dark" }] });
   const out = await page.graft.apply({ id: "price", css: ".price{color:red}" });
   assert.deepEqual(plain(out), { id: "graft-price", host: "shop.example.com", persisted: true });
-  assert.deepEqual(inspected, [], "a persisted graft is applied by the boost engine, not injected");
+  assert.deepEqual(
+    inspected,
+    ["graftLive"],
+    "a css graft for this site shows now, not after a reload",
+  );
   assert.deepEqual(plain(saved.get("graft-price").sites), ["shop.example.com"]);
   assert.deepEqual(
     plain(await page.graft.list({})).map((g) => g.id),

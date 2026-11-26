@@ -88,7 +88,12 @@ function stAt(value: unknown, pointer: string): unknown {
 }
 
 function stFn(value: unknown, name: string): boolean {
-  return Boolean(value) && typeof (value as Bag)[name] === "function";
+  try {
+    return Boolean(value) && typeof (value as Bag)[name] === "function";
+  } catch {
+    // A cross-origin frame's WindowProxy throws SecurityError on any property read.
+    return false;
+  }
 }
 
 /** Page side: live stores that React providers hold (Redux, TanStack Query, Apollo). */
@@ -153,9 +158,16 @@ function stFromWindow(w: Bag, doc: Document, found: Bag[]): void {
     if (stFn(w[name], "getQueryCache"))
       found.push({ kind: "tanstack", source: name, live: w[name] });
   for (const name of Object.keys(w).slice(0, 2000)) {
+    // Frame indices and other windows (often cross-origin) are never stores.
+    if (/^\d+$/.test(name)) continue;
     let value: unknown;
     try {
       value = w[name];
+      if (
+        value === w ||
+        (typeof value === "object" && value !== null && (value as Bag).window === value)
+      )
+        continue;
     } catch {
       continue;
     }

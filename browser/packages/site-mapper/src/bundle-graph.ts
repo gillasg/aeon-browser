@@ -523,8 +523,9 @@ function summarize(graph: BundleGraph): string {
 /** Marks candidates that real traffic has hit: same method (when known) and a matching path. */
 export function confirmCandidates(
   graph: BundleGraph,
-  observed: readonly { method?: string; url: string }[],
+  observed: readonly { method?: string; url: string; body?: string }[],
 ): BundleGraph {
+  observedGraphql(graph, observed);
   const seen = observed.map((item) => ({
     method: item.method?.toUpperCase(),
     path: pathOf(item.url),
@@ -543,6 +544,93 @@ export function confirmCandidates(
     if (hit) Object.assign(candidate, { confirmed: true, provenance: "observed" });
   }
   return graph;
+}
+
+/** GraphQL operations seen in real traffic: confirm the static ones, add those the code hid. */
+function observedGraphql(
+  graph: BundleGraph,
+  observed: readonly { method?: string; url: string; body?: string }[],
+): void {
+  for (const item of observed) {
+    for (const op of graphqlOpsOf(item.url, item.body)) {
+      const known = graph.candidates.find(
+        (c) =>
+          c.kind === "graphql" &&
+          ((op.name && c.operationName === op.name) || (op.sha256 && c.sha256 === op.sha256)),
+      );
+      if (known) {
+        Object.assign(known, { confirmed: true, provenance: "observed" });
+        continue;
+      }
+      if (graph.candidates.length >= MAX_CANDIDATES) return;
+      graph.candidates.push({
+        kind: "graphql",
+        sink: "observed",
+        method: item.method?.toUpperCase() ?? "POST",
+        url: item.url.split("?")[0] ?? item.url,
+        ...(op.name ? { operationName: op.name } : {}),
+        ...(op.type ? { operationType: op.type } : {}),
+        ...(op.sha256 ? { sha256: op.sha256 } : {}),
+        file: item.url,
+        line: 0,
+        offset: 0,
+        provenance: "observed",
+        confirmed: true,
+      });
+    }
+  }
+}
+
+type ObservedOp = { name?: string; type?: string; sha256?: string };
+
+function graphqlOpsOf(url: string, body: string | undefined): ObservedOp[] {
+  const fromBody = (() => {
+    try {
+      const parsed = body ? (JSON.parse(body) as unknown) : undefined;
+      return (Array.isArray(parsed) ? parsed : parsed ? [parsed] : []) as Record<string, unknown>[];
+    } catch {
+      return [];
+    }
+  })();
+  let params: Record<string, unknown>[] = [];
+  try {
+    const search = new URL(url).searchParams;
+    if (search.has("operationName") || search.has("query") || search.has("extensions"))
+      params = [
+        {
+          operationName: search.get("operationName") ?? undefined,
+          query: search.get("query") ?? undefined,
+          extensions: JSON.parse(search.get("extensions") ?? "null") as unknown,
+        },
+      ];
+  } catch {
+    params = [];
+  }
+  if (!/graphql|gql/i.test(url) && !fromBody.some((op) => op && (op.query || op.operationName)))
+    return [];
+  return [...fromBody, ...params].flatMap(observedOp);
+}
+
+function persistedHash(extensions: unknown): string | undefined {
+  const hash = (extensions as { persistedQuery?: { sha256Hash?: unknown } } | null)?.persistedQuery
+    ?.sha256Hash;
+  return typeof hash === "string" ? hash : undefined;
+}
+
+function observedOp(op: Record<string, unknown>): ObservedOp[] {
+  if (!op || typeof op !== "object") return [];
+  const query = typeof op.query === "string" ? op.query : "";
+  const head = /\b(query|mutation|subscription)\s+([A-Za-z_]\w*)/.exec(query);
+  const name = typeof op.operationName === "string" ? op.operationName : head?.[2];
+  const sha256 = persistedHash(op.extensions);
+  if (!name && !sha256) return [];
+  return [
+    {
+      ...(name ? { name } : {}),
+      ...(head ? { type: head[1] } : {}),
+      ...(sha256 ? { sha256 } : {}),
+    },
+  ];
 }
 
 function pathOf(url: string): string {

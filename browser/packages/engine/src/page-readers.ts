@@ -467,13 +467,35 @@ export function __pageRequest(request) {
     var body = request.json !== undefined ? JSON.stringify(request.json) : request.body;
     if (request.json !== undefined && !headers.has("content-type"))
       headers.set("content-type", "application/json");
-    var response = await fetch(request.url, {
+    var init = {
       method: request.method || "GET",
       headers,
       body,
       credentials: request.credentials || "include",
       redirect: request.redirect || "follow",
-    });
+    };
+    var response;
+    try {
+      response = await fetch(request.url, init);
+    } catch (error) {
+      // A site's bot defense can wrap window.fetch and fail calls it did not expect: retry once
+      // through an untouched fetch from a fresh same-origin frame.
+      if (!(error instanceof TypeError)) throw error;
+      var frame = document.createElement("iframe");
+      frame.style.display = "none";
+      (document.body || document.documentElement).appendChild(frame);
+      try {
+        var pristine = frame.contentWindow && frame.contentWindow.fetch;
+        if (typeof pristine !== "function") throw error;
+        response = await pristine.call(
+          frame.contentWindow,
+          new URL(request.url, location.href).href,
+          init,
+        );
+      } finally {
+        frame.remove();
+      }
+    }
     if (response.type === "opaqueredirect")
       return { status: 0, ok: false, url: request.url, type: "opaqueredirect", headers: {} };
     var text = await response.text();

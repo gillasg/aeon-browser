@@ -70,6 +70,8 @@ export const browserCapabilitySteps = [
       y: z.number().finite().min(0).max(50000),
       toX: z.number().finite().min(0).max(50000).optional(),
       toY: z.number().finite().min(0).max(50000).optional(),
+      // Playwright's click({timeout}) arrives here from a locator: the step's own deadline.
+      timeoutMs: z.number().int().min(100).max(120000).optional(),
       ...pointerGesture,
     })
     .strict(),

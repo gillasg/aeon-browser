@@ -173,14 +173,19 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
 ]);
 export type CoreToolRequest = z.infer<typeof CoreToolRequestSchema>;
 
+/** The longest cell a client may send, in characters. */
+export const CORE_BROWSER_CODE_MAX = 65536;
+/** The longest a client cell may run, in milliseconds. */
+export const CORE_BROWSER_TIMEOUT_MAX = 600000;
+
 /** A local client (the Aeon CLI) runs browser code in the user's Chrome, through Core. */
 export const CoreBrowserRunRequestSchema = z
   .object({
     kind: z.literal("core.browser.run"),
     requestId: z.string().uuid(),
-    code: z.string().min(1).max(16000),
+    code: z.string().min(1).max(CORE_BROWSER_CODE_MAX),
     session: z.string().min(1).max(100),
-    timeoutMs: z.number().int().min(1000).max(600000).optional(),
+    timeoutMs: z.number().int().min(1000).max(CORE_BROWSER_TIMEOUT_MAX).optional(),
     /** A name from `aeon browsers`: the session runs only in that Chrome profile. */
     browser: z.string().min(1).max(40).optional(),
   })
