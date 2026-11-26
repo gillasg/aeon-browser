@@ -1,4 +1,5 @@
 // One shot: the stage surface and the real frame placed by the camera at clip time `t`.
+import { pairCam } from "./pair.ts";
 import React from "react";
 import { AbsoluteFill, Img } from "remotion";
 import { camAt, STAGE_ZOOM, viewTransform, type Size } from "./camera.ts";
@@ -6,14 +7,17 @@ import { FocusDim, StageSurface, StageWindow } from "./Stage.tsx";
 import { frameAt } from "./timeline.ts";
 import type { DirectorEdit } from "./types.ts";
 
-export const Shot: React.FC<{ edit: DirectorEdit; base: string; t: number; viewport: Size }> = ({
-  edit,
-  base,
-  t,
-  viewport,
-}) => {
+export const Shot: React.FC<{
+  edit: DirectorEdit;
+  base: string;
+  t: number;
+  viewport: Size;
+  /** Pair pane: keep the window's left edge (tab strip, URL bar) in frame. */
+  keepLeft?: boolean;
+}> = ({ edit, base, t, viewport, keepLeft }) => {
   const src = { width: edit.source.width, height: edit.source.height };
-  const cam = camAt(edit.cues, t, src, viewport, { holds: edit.holds, rest: "stage" });
+  const moved = camAt(edit.cues, t, src, viewport, { holds: edit.holds, rest: "stage" });
+  const cam = keepLeft ? pairCam(moved, src, viewport) : moved;
   const vt = viewTransform(cam, src, viewport);
   const frame = frameAt(edit.source.frames, t);
   const push = Math.max(0, Math.min(1, (cam.z / STAGE_ZOOM - 1) / 0.5));

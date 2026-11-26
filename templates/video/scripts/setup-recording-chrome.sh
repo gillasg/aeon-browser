@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # One-time, idempotent setup for the SEPARATE recording Chrome. Never touches aeon-chrome or
 # aeon-daemon: eval keeps running on its own CFT browser/profile/display.
-# Default capture: a 1280x720 logical window at DPR 2, so frames are a 2560x1440 master that
-# delivers a sharp 1920x1080 cut with up to a 1.33x optical push-in (2-3x less disk and a faster
-# encode than 4K). Set AEON_RECORDING_DPR=3 for a 3840x2160 master on flagship shoots. The display and DPR are saved for
+# Default capture: a 1280x720 logical window at DPR 3, so frames are a 3840x2160 master that
+# delivers a sharp 1920x1080 cut with up to a 2x optical push-in (the phone floor needs it).
+# Set AEON_RECORDING_DPR=2 only for quick, non-house takes. The display and DPR are saved for
 # `aeon record --browser <name>`, so events.json carries dpr and the logical size.
 set -euo pipefail
 
@@ -15,7 +15,7 @@ EXT_DIR="${AEON_EXTENSION_DIR:-$(cd "$KIT_DIR/../.." 2>/dev/null && pwd)/apps/ch
 PROXY="${AEON_RECORDING_PROXY:-}"
 EXT_ID="npcdopokfkpfmepknhoecppgdgmkmihh"
 BROWSER="${AEON_RECORDING_BROWSER:-recording}"
-DPR="${AEON_RECORDING_DPR:-2}"
+DPR="${AEON_RECORDING_DPR:-3}"
 WINDOW="${AEON_RECORDING_SIZE:-1280x720}" # logical (CSS) px
 LOGICAL_W="${WINDOW%x*}"
 LOGICAL_H="${WINDOW#*x}"
@@ -62,7 +62,7 @@ if command -v openbox >/dev/null 2>&1 && \
   cat >"$RC" <<'XML'
 <?xml version="1.0"?>
 <openbox_config xmlns="http://openbox.org/3.4/rc">
-  <focus><focusNew>yes</focusNew><followMouse>no</followMouse></focus>
+  <focus><focusNew>no</focusNew><followMouse>no</followMouse></focus>
   <applications>
     <application class="*"><decor>no</decor></application>
     <application class="Google-chrome"><decor>no</decor><maximized>yes</maximized></application>
@@ -165,7 +165,7 @@ PY
 
 # Per-profile settings through the daemon, targeted at this browser only (eval is untouched).
 aeon tool --browser "$BROWSER" browser_code \
-  '{"code":"await browser.settings({agentInFront:true, cursor:\"shown\"}); return true;"}' \
+  '{"code":"await browser.settings({agentInFront:true, agentTabPlacement:\"group\", cursor:\"shown\"}); return true;"}' \
   >/dev/null 2>&1 || true
 
 # Clean-frame check: a bar under the toolbar (bookmarks, "controlled by automated software",

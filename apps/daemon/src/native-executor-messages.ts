@@ -20,6 +20,7 @@ import { GrantAuthority, type GrantContext } from "./grant-authority.js";
 import { BrowserControlService } from "./browser-control-service.js";
 import { handleCompanionMessage } from "./companion-requests.js";
 import { handleAgentSettingsReply } from "./agent-settings.js";
+import { handleFilmReply } from "./film-relay.js";
 import { handleBlockedSitesReply } from "./core-blocked-sites.js";
 import { installedExtensionBuild } from "./extension-build.js";
 
@@ -51,7 +52,7 @@ export function attachNativeExecutor(
     if (handleInventory(socket, candidate, executor, inventories, state, browserControl)) return;
     if (browserControl.handleExecutorResult(candidate, socket)) return;
     if (handleChatReply(candidate, browserControl)) return;
-    if (handleAgentSettingsReply(candidate)) return;
+    if (handleRelayReply(candidate)) return;
     if (handleBlockedSitesReply(candidate)) return;
     if (handleCompanionMessage(socket, candidate, { service, browserControl })) return;
     if (browserControl.handleHealthReply(candidate)) return;
@@ -255,4 +256,9 @@ function parseJson(data: RawData, binary: boolean): unknown {
   } catch {
     return undefined;
   }
+}
+
+/** Replies to requests Core relayed to the extension for a local client (settings, beat bus). */
+function handleRelayReply(candidate: unknown): boolean {
+  return handleAgentSettingsReply(candidate) || handleFilmReply(candidate);
 }

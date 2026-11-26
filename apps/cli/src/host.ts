@@ -102,6 +102,10 @@ export class DaemonHost {
     };
   }
 
+  async film(action: "arm" | "disarm" | "read" | "clear"): Promise<Json> {
+    return (await this.connect()).film(action);
+  }
+
   async browsers(rename?: { browser: string; name: string }): Promise<Json> {
     return (await this.connect()).browsers(rename);
   }

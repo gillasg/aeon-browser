@@ -14,7 +14,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appRoot, dataDirectory, hostPaths } from "../node/paths.mjs";
 import { stopSupervisor } from "../node/host.mjs";
-import { allowedOrigins, storeExtensionIds } from "./allowed-origins.mjs";
 import { launchAgent, systemdUnit } from "./service-files.mjs";
 
 // Installs the Mac/Linux half of Aeon: the Node native host wrapper, its Chrome manifests, the
@@ -34,7 +33,6 @@ const EXTENSION_ID = "npcdopokfkpfmepknhoecppgdgmkmihh";
 const EXTENSION_KEY =
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA89DgbMVu50oH2AAiN0vILGKRKc2ePGR9r1W92yDIiVq9n1rxtqxQZSLsxPKuymvi3wB9hpo0h9vJ3++teaw8fqBllliSeELEAUmPNhauLcvlKe1nhkbgRf2wXilCUVI+zumNinkqw5h85rew1FI894ev8M9wWzSHm90eL9WILlWTrjhdaNTpMs2w9sF8GrsKj+sX1anF9/iUfZ9hbracUa47Z2b4KiviZp5SlF6o+0SwFHbeOVM0Aq2nHMFujmfaOcW7TkxDdPXBns2uRY1CTmRIyi3B1pONLQd8ERteRbOlj2BM9AYIrnGyJScaKAu7OUht0gI4C/NlEhdQruxTfQIDAQAB";
 
-const STORE_IDS = storeExtensionIds();
 const say = (line) => process.stdout.write(line + "\n");
 
 if (process.platform === "win32") {
@@ -106,7 +104,7 @@ function writeManifests() {
     description: "Aeon native messaging host",
     path: launcher,
     type: "stdio",
-    allowed_origins: allowedOrigins(EXTENSION_ID, STORE_IDS),
+    allowed_origins: [`chrome-extension://${EXTENSION_ID}/`],
   };
   for (const folder of nativeMessagingFolders()) {
     mkdirSync(folder, { recursive: true, mode: 0o700 });
@@ -118,15 +116,12 @@ function nativeMessagingFolders() {
   const home = homedir();
   if (process.platform === "darwin") {
     const support = join(home, "Library", "Application Support");
-    const edge = STORE_IDS.length ? ["Microsoft Edge"] : [];
-    return ["Google/Chrome", "Google/Chrome for Testing", "Chromium", ...edge].map((product) =>
+    return ["Google/Chrome", "Google/Chrome for Testing", "Chromium"].map((product) =>
       join(support, product, "NativeMessagingHosts"),
     );
   }
   const config = process.env.XDG_CONFIG_HOME || join(home, ".config");
-  // Edge only reads its own folder; it is written once a store id (Edge Add-ons) is configured.
-  const edge = STORE_IDS.length ? ["microsoft-edge"] : [];
-  return ["google-chrome", "google-chrome-for-testing", "chromium", ...edge].map((product) =>
+  return ["google-chrome", "google-chrome-for-testing", "chromium"].map((product) =>
     join(config, product, "NativeMessagingHosts"),
   );
 }

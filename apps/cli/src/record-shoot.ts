@@ -12,23 +12,32 @@ export type ShootStep =
   | { run: string; tail?: number; background?: boolean; timeout?: number }
   | { mark: string; label?: string; selector?: string; box?: string; cue?: string }
   | {
-      wait: "selector" | "url" | "idle" | "chat";
+      wait: "selector" | "url" | "idle" | "chat" | "beat";
       selector?: string;
       url?: string;
+      /** A chat id, or "latest": the first chat that starts working after the take began. */
       chat?: string;
+      beat?: string;
       timeout?: number;
     }
   | { hold: number }
   | { reload: true }
   | { terminal: string }
-  | { code: string; timeout?: number };
+  | { code: string; timeout?: number }
+  /** Director stand-ins for a person: real per-key X events, tagged actor "director". */
+  | { type: string; delay?: number; actor: "director" }
+  | { press: string; actor: "director" }
+  /** prepare only: forget a site's ops and routes, or remove a boost and clear its cache. */
+  | { reset: string; boost?: boolean }
+  /** Join a page value to the terminal row that returned it (provenance first, then exact text). */
+  | { align: string; line?: number };
 
 /** prepare runs before the camera rolls, so a take opens on its framed first state. */
 export type ShootScene = { name: string; prepare?: ShootStep[]; steps: ShootStep[] };
 export type ShootPlan = { scenes: ShootScene[]; out?: string; browser?: string; fps?: number };
 
 const CUES = ["key", "trigger", "arrive", "shutter"];
-const WAITS = ["selector", "url", "idle", "chat"];
+const WAITS = ["selector", "url", "idle", "chat", "beat"];
 
 type Raw = Record<string, unknown>;
 const isObject = (v: unknown): v is Raw => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -115,6 +124,7 @@ const STEP_PARSERS: Record<string, Parser> = {
       ...pick("selector"),
       ...pick("url"),
       ...pick("chat"),
+      ...pick("beat"),
       ...(p.timeout !== undefined ? { timeout: p.timeout as number } : {}),
     };
   },
@@ -129,6 +139,32 @@ const STEP_PARSERS: Record<string, Parser> = {
     need(str(command), where, "terminal needs a command to run");
     return { terminal: command as string };
   },
+  type: (body, p, where) => {
+    const text = str(body) ? body : p.text;
+    need(str(text), where, "type needs text");
+    need(optNum(p.delay), where, "delay is a number");
+    return {
+      type: text as string,
+      ...(p.delay !== undefined ? { delay: p.delay as number } : {}),
+      actor: "director",
+    };
+  },
+  press: (body, p, where) => {
+    const key = str(body) ? body : p.key;
+    need(str(key) && /^[\w+]+$/.test(key as string), where, "press needs a key like Return");
+    return { press: key as string, actor: "director" };
+  },
+  reset: (body, p, where) => {
+    const site = str(body) ? body : p.site;
+    need(str(site), where, "reset needs a site");
+    return { reset: site as string, ...(p.boost === true ? { boost: true } : {}) };
+  },
+  align: (body, p, where) => {
+    const value = str(body) ? body : p.text;
+    need(str(value), where, "align needs the page value's exact text");
+    need(optNum(p.line), where, "line is a number");
+    return { align: value as string, ...(p.line !== undefined ? { line: p.line as number } : {}) };
+  },
   code: (body, p, where) => {
     const js = str(body) ? body : p.js;
     need(str(js), where, "code needs js");
@@ -141,11 +177,13 @@ const STEP_PARSERS: Record<string, Parser> = {
 };
 
 // Before the camera rolls there is no clip clock to mark, no take to attach a terminal or a chat to.
-const PREPARE = ["open", "ui", "wait", "hold", "reload", "code"];
+const PREPARE = ["open", "ui", "wait", "hold", "reload", "code", "reset"];
 
 function prepareStep(raw: unknown, where: string): ShootStep {
   const step = stepOf(raw, where);
   const kind = Object.keys(step)[0] ?? "";
+  if (kind === "wait" && "wait" in step && step.wait === "beat")
+    throw new Error(`${where}: no beats are recorded before the camera rolls`);
   if (!PREPARE.includes(kind) || "mark" in step)
     throw new Error(
       `${where}: prepare runs before recording starts, so it takes ${PREPARE.join(", ")} (no marks)`,
@@ -166,6 +204,11 @@ export function parsePlan(raw: unknown): ShootPlan {
     names.add(scene.name);
     if (scene.prepare !== undefined && !Array.isArray(scene.prepare))
       throw new Error(`${where}: prepare is a list of steps`);
+    for (const [j, raw] of (scene.steps as unknown[]).entries())
+      if (isObject(raw) && "reset" in raw)
+        throw new Error(
+          `${where}.steps[${j}]: reset runs in prepare only, before the camera rolls`,
+        );
     const prepare = (scene.prepare ?? []).map((s, j) => prepareStep(s, `${where}.prepare[${j}]`));
     return {
       name: scene.name,
@@ -204,25 +247,44 @@ export type ShootDeps = {
   reload(): Promise<void>;
   terminal(folder: string, command: string): Promise<void>;
   code(js: string, timeoutMs: number | undefined): Promise<void>;
+  type(folder: string, step: Extract<ShootStep, { type: string }>): Promise<void>;
+  press(folder: string, step: Extract<ShootStep, { press: string }>): Promise<void>;
+  reset(step: Extract<ShootStep, { reset: string }>): Promise<void>;
+  align(folder: string, step: Extract<ShootStep, { align: string }>): Promise<void>;
   join(dir: string, name: string): string;
   log(line: string): void;
 };
+
+type Runner = (step: never, folder: string, deps: ShootDeps) => Promise<string | undefined | void>;
+const RUNNERS: Record<string, Runner> = {
+  open: (s: { open: string }, _f, d) => d.open(s.open),
+  ui: (s: Extract<ShootStep, { ui: UiAction }>, f, d) => d.ui(s.ui, f, s.mark),
+  run: (s: Extract<ShootStep, { run: string }>, f, d) => d.run(f, s),
+  mark: (s: Extract<ShootStep, { mark: string }>, f, d) => d.mark(f, s),
+  wait: (s: Extract<ShootStep, { wait: string }>, f, d) => d.wait(f, s),
+  hold: (s: { hold: number }, _f, d) => d.hold(s.hold),
+  reload: (_s, _f, d) => d.reload(),
+  terminal: (s: { terminal: string }, f, d) => d.terminal(f, s.terminal),
+  type: (s: Extract<ShootStep, { type: string }>, f, d) => d.type(f, s),
+  press: (s: Extract<ShootStep, { press: string }>, f, d) => d.press(f, s),
+  reset: (s: Extract<ShootStep, { reset: string }>, _f, d) => d.reset(s),
+  align: (s: Extract<ShootStep, { align: string }>, f, d) => d.align(f, s),
+  code: (s: { code: string; timeout?: number }, _f, d) => d.code(s.code, s.timeout),
+};
+
+/** The step's kind: its one known key (a ui step's `mark` is a parameter). */
+const kindOfStep = (step: ShootStep): string =>
+  Object.keys(RUNNERS).find((k) => k in step && !(k === "mark" && "ui" in step)) ?? "code";
 
 async function runStep(
   step: ShootStep,
   folder: string,
   deps: ShootDeps,
 ): Promise<string | undefined> {
-  if ("open" in step) await deps.open(step.open);
-  else if ("ui" in step) await deps.ui(step.ui, folder, step.mark);
-  else if ("run" in step) return deps.run(folder, step);
-  else if ("mark" in step) await deps.mark(folder, step);
-  else if ("wait" in step) await deps.wait(folder, step);
-  else if ("hold" in step) await deps.hold(step.hold);
-  else if ("reload" in step) await deps.reload();
-  else if ("terminal" in step) await deps.terminal(folder, step.terminal);
-  else await deps.code(step.code, step.timeout);
-  return undefined;
+  const kind = kindOfStep(step);
+  const runner = RUNNERS[kind] ?? RUNNERS.code;
+  const result = runner ? await runner(step as never, folder, deps) : undefined;
+  return kind === "run" && typeof result === "string" ? result : undefined;
 }
 
 /** Films every scene in order. Returns the take folders; a failing step still stops its take. */

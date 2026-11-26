@@ -1,6 +1,9 @@
-// A real time-compression cut: the wall clock on both sides, read from the recording.
+// A real time-compression cut: the wall clock on both sides, read from the recording, drawn as
+// dot-matrix clocks on a black chip.
 import React from "react";
 import { ease } from "./camera.ts";
+import { DotText } from "./DotMatrix.tsx";
+import { INK } from "./dotmatrix.ts";
 import { SURFACES } from "./Stage.tsx";
 import { wallClock } from "./timeline.ts";
 import type { Surface, TimeCut as Cut } from "./types.ts";
@@ -21,11 +24,12 @@ export const TimeCut: React.FC<{
   const k =
     ease(Math.min(1, since / 480)) * (1 - ease(Math.max(0, (since - TIMECUT_MS + 420) / 420)));
   const s = SURFACES[surface];
-  const size = Math.round(width * 0.016);
-  const row = (clock: string, detail?: string, strong = false) => (
-    <div style={{ color: strong ? s.ink : s.mute }}>
-      {clock}
-      {detail ? <span style={{ color: s.mute }}>{"  ·  " + detail}</span> : null}
+  const dot = Math.max(2, Math.round(width * 0.0021));
+  const size = Math.round(width * 0.011);
+  const row = (clock: string, detail: string | undefined, strong: boolean, ms: number) => (
+    <div style={{ display: "flex", alignItems: "center", gap: dot * 5 }}>
+      <DotText text={clock} dot={dot} ms={ms} color={strong ? INK.primary : INK.muted} />
+      {detail ? <span style={{ color: s.mute }}>{detail}</span> : null}
     </div>
   );
   return (
@@ -34,14 +38,19 @@ export const TimeCut: React.FC<{
         position: "absolute",
         left: Math.round(width * 0.045),
         bottom: Math.round(width * 0.035),
-        font: `500 ${size}px/1.5 ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace`,
-        letterSpacing: "0.02em",
+        display: "flex",
+        flexDirection: "column",
+        gap: dot * 4,
+        padding: dot * 5,
+        background: INK.void,
+        borderRadius: dot * 4,
+        boxShadow: `inset 0 1px 0 ${INK.rimTop}, inset 0 0 0 1px ${INK.hairline}`,
+        font: `500 ${size}px/1.4 ui-monospace, "SF Mono", Menlo, monospace`,
         opacity: k,
-        transform: `translateY(${(1 - k) * 8}px)`,
       }}
     >
-      {row(wallClock(startedAt, before), cut.beforeDetail)}
-      {row(wallClock(startedAt, cut.t), cut.afterDetail, true)}
+      {row(wallClock(startedAt, before), cut.beforeDetail, false, since)}
+      {row(wallClock(startedAt, cut.t), cut.afterDetail, true, since - 180)}
     </div>
   );
 };

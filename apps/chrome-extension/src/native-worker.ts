@@ -18,6 +18,7 @@ import { installOrb } from "./orb/orb-worker.js";
 import { installSiteAnswers } from "./orb/orb-site.js";
 import { installBrowseLearning } from "./browse-learning.js";
 import { handleSettingsMessage } from "./native-worker-settings.js";
+import { handleFilmMessage } from "./native-worker-film.js";
 import { handleBlockedSitesMessage } from "./native-worker-blocked-sites.js";
 import { handlePasswordSavingMessage } from "./native-worker-password-saving.js";
 import { migrateLegacyChromeStorage } from "@browserkit/engine/legacy-storage-migration";
@@ -396,6 +397,7 @@ function handleCoreMessage(candidate: unknown, socket: WebSocket): boolean {
 function handleNativeSettings(candidate: unknown, socket: WebSocket): boolean {
   return (
     handleSettingsMessage(candidate, socket) ||
+    handleFilmMessage(candidate, socket) ||
     handleBlockedSitesMessage(candidate, socket) ||
     handlePasswordSavingMessage(candidate)
   );

@@ -334,3 +334,12 @@ export function ffmpegArgs(
     out,
   ];
 }
+
+/** The sidecar every assemble output carries: `house: false` keeps it out of launch films. */
+export function assembleMeta(durationMs: number): {
+  kind: "walkthrough";
+  house: false;
+  durationMs: number;
+} {
+  return { kind: "walkthrough", house: false, durationMs };
+}

@@ -1,11 +1,14 @@
 // The real wiring of `aeon record shoot` and `aeon record ui`: plan steps become the same
 // start/stop/mark/wait/run calls a hand-written recording script would make, in one process.
+import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Args } from "browserkit/dist/args.js";
 import type { DaemonHost } from "./host.js";
 import { assemble, assembleOptionsOf } from "./record-assemble.js";
 import { writeEvents } from "./record-events.js";
+import { alignInto } from "./record-align.js";
+import { beatSeen, readBeats, type FilmAction } from "./record-beats.js";
 import { useRecordingBrowser } from "./record-browsers.js";
 import { mark, openUrl, runPrompt, wait, type RecordSteps } from "./record-script.js";
 import { parsePlan, shoot, SHOOT_USAGE, shootTarget, type ShootDeps } from "./record-shoot.js";
@@ -35,6 +38,7 @@ export function liveShootDeps(host: DaemonHost, steps: RecordSteps, args: Args):
       positional: ["mark", name],
       flags: { ...at(folder).flags, ...extra },
     }).then(() => undefined);
+  const director = directorDeps(host, markNamed);
   return {
     start: async (folder) => {
       mkdirSync(folder, { recursive: true });
@@ -66,6 +70,8 @@ export function liveShootDeps(host: DaemonHost, steps: RecordSteps, args: Args):
     },
     mark: (folder, step) => markNamed(folder, step.mark, markFlags(step)),
     wait: async (folder, step) => {
+      if (step.wait === "beat")
+        return director.waitBeat(step.beat ?? "receipt", step.timeout ?? 60_000);
       const extra: Record<string, string> = { for: step.wait };
       for (const key of ["selector", "url", "chat"] as const) {
         const value = step[key];
@@ -85,8 +91,56 @@ export function liveShootDeps(host: DaemonHost, steps: RecordSteps, args: Args):
     code: async (js, timeoutMs) => {
       await host.runInBrowser(js, { session: SESSION, timeoutMs: timeoutMs ?? 60_000 });
     },
+    type: director.type,
+    press: director.press,
+    reset: director.reset,
+    align: director.align,
     join,
     log: steps.log,
+  };
+}
+
+const filmBus = (host: DaemonHost) => (action: FilmAction) => host.film(action);
+
+/** Steps a person would do, done by the director with real X key events and disclosed as such. */
+function directorDeps(
+  host: DaemonHost,
+  markNamed: (folder: string, name: string, extra?: Record<string, string>) => Promise<void>,
+): Pick<ShootDeps, "type" | "press" | "reset" | "align"> & {
+  waitBeat(beat: string, timeoutMs: number): Promise<void>;
+} {
+  const xdo = (args: string[]) => execFileSync("xdotool", args, { stdio: "ignore" });
+  return {
+    type: async (folder, step) => {
+      await markNamed(folder, "director:type", { label: step.type, cue: "key" });
+      xdo(["type", "--delay", String(step.delay ?? 70), "--", step.type]);
+    },
+    press: async (folder, step) => {
+      await markNamed(folder, "director:press", { label: step.press, cue: "trigger" });
+      xdo(["key", "--clearmodifiers", step.press]);
+    },
+    reset: async (step) => {
+      const { forgetAbility, listAbilities } = await import("@browserkit/site-mapper");
+      for (const ability of await listAbilities(step.reset).catch(() => []))
+        await forgetAbility(step.reset, ability.name).catch(() => false);
+      if (step.boost)
+        await host.runInBrowser(
+          `const site = ${JSON.stringify(step.reset)}; const all = await browser.boosts.list("https://" + site + "/"); for (const b of all ?? []) await browser.boosts.remove(b.id); return true;`,
+          { session: SESSION, timeoutMs: 15_000 },
+        );
+    },
+    align: async (folder, step) => {
+      const aligned = alignInto(readRecording(folder), step.align, step.line);
+      if (aligned) await writeEvents(folder, aligned);
+    },
+    waitBeat: async (beat, timeoutMs) => {
+      const since = Date.now();
+      while (Date.now() - since < timeoutMs) {
+        if (beatSeen(await readBeats(filmBus(host)), beat, since)) return;
+        await sleep(250);
+      }
+      throw new Error(`Timed out after ${timeoutMs} ms waiting for the ${beat} beat`);
+    },
   };
 }
 

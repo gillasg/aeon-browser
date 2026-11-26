@@ -2,11 +2,20 @@
 // a fake, and allows lighting, motivated glides, quiet editorial lines and sound.
 import { camAt, clampEase, fitScale, maxZoom, requestedZoom } from "./camera.ts";
 import { holdAt } from "./hold.ts";
+import { houseIssues, type HouseRule } from "./lint-house.ts";
 import { pairLayout } from "./pair.ts";
 import type { DirectorEdit } from "./types.ts";
 
 export type LintRule =
-  "upscale" | "phone-floor" | "hold" | "speed-label" | "editorial" | "slide" | "effect" | "ease";
+  | "upscale"
+  | "phone-floor"
+  | "hold"
+  | "speed-label"
+  | "editorial"
+  | "slide"
+  | "effect"
+  | "ease"
+  | HouseRule;
 export type LintIssue = { rule: LintRule; message: string };
 export type LintResult = { ok: boolean; issues: LintIssue[] };
 
@@ -28,7 +37,15 @@ function viewportAt(edit: DirectorEdit, t: number) {
   return { width: edit.output.width, height: edit.output.height };
 }
 
-export function lintEdit(edit: DirectorEdit): LintResult {
+/** The taste linter, plus the house grammar when `edit.house` (or `options.house`) is on. */
+export function lintEdit(edit: DirectorEdit, options: { house?: boolean } = {}): LintResult {
+  const result = tasteLint(edit);
+  if (!(options.house ?? edit.house)) return result;
+  const issues = [...result.issues, ...houseIssues(edit)];
+  return { ok: issues.length === 0, issues };
+}
+
+function tasteLint(edit: DirectorEdit): LintResult {
   const issues: LintIssue[] = [];
   const src = { width: edit.source.width, height: edit.source.height };
   const fail = (rule: LintRule, message: string) => issues.push({ rule, message });

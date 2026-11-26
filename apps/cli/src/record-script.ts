@@ -236,12 +236,15 @@ function waitForChat(host: DaemonHost, chatId: string, timeoutMs: number): Promi
     (client) =>
       new Promise<void>((resolve, reject) => {
         let seenWorking = false;
+        // "latest": the first chat seen working after this wait began (a box-typed prompt).
+        let target = chatId === "latest" ? undefined : chatId;
         const timer = setTimeout(() => {
           stop();
           reject(new Error(`Timed out after ${timeoutMs} ms waiting for chat ${chatId}`));
         }, timeoutMs);
         const stop = client.onAttention((chats) => {
-          const chat = chats.find((item) => item.chatId === chatId);
+          target ??= chats.find((item) => item.working)?.chatId;
+          const chat = target ? chats.find((item) => item.chatId === target) : undefined;
           if (chat?.working) seenWorking = true;
           if (!chatFinished(chat, seenWorking)) return;
           clearTimeout(timer);

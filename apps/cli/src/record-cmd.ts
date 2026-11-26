@@ -37,8 +37,10 @@ import { useRecordingBrowser } from "./record-browsers.js";
 import { mark, readMarks, run, wait, withMarkCues, type RecordSteps } from "./record-script.js";
 import { saveTabTakes, type SavedTake } from "./record-takes.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
+import { frameTruthError } from "./record-truth.js";
+import { armBeats, readBeats, withBeats, type FilmAction } from "./record-beats.js";
 
-const log = (line: string) => process.stdout.write(line + "\n");
+export const log = (line: string): boolean => process.stdout.write(line + "\n");
 
 /** The last `record start`, so `record stop` finds it without repeating --out. */
 function pointer(out?: string): string {
@@ -124,6 +126,7 @@ async function start(host: DaemonHost, args: Args): Promise<number> {
     ...(terminal ? { terminal } : {}),
     note: "Recording in progress; run `aeon record stop` to finish the log.",
   });
+  await armBeats((action) => host.film(action), true);
   log(`Recording ${state.source} into ${folder}`);
   if (state.source === "tabs") log("Aeon's hidden tab takes are on; they are collected at stop.");
   else log("Keep the window unminimized. Run `aeon record stop` when done.");
@@ -217,6 +220,8 @@ function baseClip(
     durationMs,
     frames: state.frames,
     ...clipScale(size, Number(process.env.AEON_RECORDING_DPR) || undefined),
+    ...(state.dropped === undefined ? {} : { dropped: state.dropped }),
+    ...(state.dup === undefined ? {} : { dup: state.dup }),
   };
 }
 
@@ -297,18 +302,30 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   const before = loadState(folder);
   if (!host.browser && before.browser) host.pinBrowser(before.browser);
   useRecordingBrowser(args, host.browser);
-  const opts: RecordOptions = { source: before.source, ffmpeg: before.ffmpeg, log };
+  const opts: RecordOptions = {
+    source: before.source,
+    ffmpeg: before.ffmpeg,
+    log,
+    ...(args.flags?.["defer-clip"] ? { deferClip: true } : {}),
+  };
   const state = await stopCapture(folder, opts);
   nameStopChat(state, args);
   const size = frameSize(folder, ffprobeBinary(opts));
   const clip = baseClip(state, size, clipDuration(state.frames, state.fps));
   const trace = await traceOf(host, state.chatId);
-  const events = trace ? eventsFromTrace(trace, state.startedAt) : [];
+  const bus = (action: FilmAction) => host.film(action);
+  const beats = await readBeats(bus);
+  await armBeats(bus, false);
+  const events = withBeats(
+    trace ? eventsFromTrace(trace, state.startedAt) : [],
+    beats,
+    state.startedAt,
+  );
   const clips = await clipsForStop(host, state, events, clip);
   await releaseTabTakes(host, state);
-  await writeEvents(
-    folder,
-    stopRecording(
+  const kept = readRecording(folder)?.align;
+  await writeEvents(folder, {
+    ...stopRecording(
       clip,
       clips,
       events,
@@ -316,8 +333,15 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
       traceNote(state.chatId, trace !== undefined),
       readMarks(folder),
     ),
-  );
+    ...(kept ? { align: kept } : {}),
+  });
   log(`Stopped. ${state.frames} frames, ${events.length} action(s). Folder: ${folder}`);
+  if (state.encodePid) log("clip.mp4 is encoding in the background (--defer-clip).");
+  const refused = frameTruthError(clip);
+  if (refused) {
+    log(refused);
+    return 1;
+  }
   return 0;
 }
 
@@ -340,19 +364,25 @@ async function terminal(_host: DaemonHost, args: Args): Promise<number> {
 }
 
 /** `aeon record`: start/stop are ours; gif/video/trace stay the browserkit command's. */
-export function recordCommand(original: Command | undefined, host: DaemonHost): Command {
-  const steps: RecordSteps = {
+/** start/stop/folder/log wired to this host: what shoot, qualify and film drive. */
+export function recordSteps(host: DaemonHost): RecordSteps {
+  return {
     start: (args) => start(host, args),
     stop: (args) => stop(host, args),
     folder: stopFolder,
     log,
   };
+}
+
+export function recordCommand(original: Command | undefined, host: DaemonHost): Command {
+  const steps = recordSteps(host);
   return {
     name: "record",
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
     help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>] [--display :N]
-       aeon record stop [--out <dir>] [--chat <id>]
+       aeon record stop [--out <dir>] [--chat <id>] [--defer-clip]
+       aeon record qualify <clip.json> [--runs 3]
        aeon record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
        aeon record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
        aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--display :N] [--background]
@@ -407,11 +437,13 @@ Remotion kit (\`aeon video kit\`) is for short flagship launch cuts.`,
         return (await import("./record-assemble.js")).assembleCommand(args, log);
       if (action === "shoot")
         return (await import("./record-shoot-cmd.js")).shootCommand(host, steps, args);
+      if (action === "qualify")
+        return (await import("./record-qualify.js")).qualifyCommand(host, steps, args);
       if (action === "ui")
         return (await import("./record-shoot-cmd.js")).recordUi(host, steps, args);
       if (original) return original.run({ ...args, positional: args.positional.slice(1) });
       throw new Error(
-        "Usage: aeon record start|stop|mark|wait|run|terminal|ui|shoot|assemble|gif|video|trace",
+        "Usage: aeon record start|stop|mark|wait|run|terminal|ui|shoot|qualify|assemble|gif|video|trace",
       );
     },
   };

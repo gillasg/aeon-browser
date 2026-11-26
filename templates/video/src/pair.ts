@@ -1,6 +1,6 @@
 // Solo -> Pair geometry, and the scanline rule: the page value and the terminal line that returned
 // it sit on the same horizontal pixel row. Computed from real bounds; no arrows, no boxes.
-import { viewTransform, type Cam, type Size } from "./camera.ts";
+import { fitScale, viewTransform, type Cam, type Size } from "./camera.ts";
 
 export const PAIR_BROWSER_SHARE = 0.58;
 /** Output-px rectangle. */
@@ -51,4 +51,25 @@ export function scanlinePad(input: {
   const pad = y - input.terminal.y - input.line * input.lineHeight - input.lineHeight / 2;
   if (pad < 0) return { pad: 0, aligned: false, y };
   return { pad, aligned: true, y };
+}
+
+/**
+ * The camera with the window's left edge kept in frame: the URL bar and tab strip start there, so
+ * a push never crops them. Right-side cropping is allowed when the push is wider than the pane.
+ */
+export function pairCam(cam: Cam, src: Size, vp: Size): Cam {
+  const scale = fitScale(src, vp) * cam.z;
+  const w = src.width * scale;
+  const minCx = vp.width / 2 / scale; // left edge at x = 0
+  const cx = w <= vp.width ? src.width / 2 : Math.min(cam.cx, minCx);
+  return { ...cam, cx };
+}
+
+/** Monospace size that fits the longest line in the pane with no truncation. */
+export function paneFont(out: Size, paneW: number, lines: { text: string }[]): number {
+  const base = Math.round(Math.max(out.width, out.height) * 0.0235);
+  const longest = Math.max(1, ...lines.map((line) => [...line.text].length));
+  // Pane padding is one font size per side; a monospace cell is ~0.6 em wide.
+  const fit = Math.floor(paneW / (longest * 0.6 + 2));
+  return Math.max(10, Math.min(base, fit));
 }

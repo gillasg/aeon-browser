@@ -297,6 +297,28 @@ export const NativeSettingsReplySchema = z
   })
   .strict();
 
+/** `aeon record`: arm, read or clear the beat bus (chrome.storage.session) in every connected Chrome. */
+export const FilmActionSchema = z.enum(["arm", "disarm", "read", "clear"]);
+export type FilmAction = z.infer<typeof FilmActionSchema>;
+export const CoreFilmRequestSchema = z
+  .object({ kind: z.literal("core.film"), requestId: z.string().uuid(), action: FilmActionSchema })
+  .strict();
+export const NativeFilmRequestSchema = z
+  .object({
+    kind: z.literal("native.film"),
+    requestId: z.string().uuid(),
+    action: FilmActionSchema,
+  })
+  .strict();
+export const NativeFilmReplySchema = z
+  .object({
+    kind: z.literal("native.film.result"),
+    requestId: z.string().uuid(),
+    ok: z.boolean(),
+    beats: z.array(z.record(z.string(), z.unknown())).max(5000),
+  })
+  .strict();
+
 /**
  * A local client (`aeon browsers`) lists the connected browsers (one per Chrome profile) and can
  * name one. A name is how `aeon run --browser <name>` keeps a chat in that one browser.

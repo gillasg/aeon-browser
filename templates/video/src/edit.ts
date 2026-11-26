@@ -1,5 +1,6 @@
 // events.json + director.json -> one DirectorEdit per output. Pure, so the linter, the audio
 // generator and Remotion all see exactly the same edit.
+import { autoEdit, autoPair } from "./auto.ts";
 import { eventRect, fromEvents } from "./camera.ts";
 import { holdsAfterBeats } from "./hold.ts";
 import { videoLength } from "./timeline.ts";
@@ -8,6 +9,7 @@ import type { BeatMark, DirectorEdit, DirectorScript, Frame, RecordingEvents } f
 export const DIRECTOR_CUT = { width: 1920, height: 1080, fps: 30 };
 export const DIRECTOR_SQUARE = { width: 1080, height: 1080, fps: 30 };
 export const REPO = "github.com/gillasg/aeon-browser";
+export const END_COMMAND = "npm i -g aeon-browser";
 
 export function sourceFrames(recording: RecordingEvents): Frame[] {
   const fps = recording.clip.fps || 30;
@@ -32,6 +34,9 @@ export function buildEdit(
   });
   const beats = [...tagged, ...(script.beats ?? [])].sort((a, b) => a.t - b.t);
   const holds = script.holds ?? holdsAfterBeats(beats, script.holdMs);
+  // Window captures: events.json boxes are CSS px; frames are dpr× that.
+  const dpr = clip.dpr ?? 1;
+  const pair = script.pair ?? autoPair(recording, { x: dpr, y: dpr });
   return {
     version: 1,
     output,
@@ -40,17 +45,24 @@ export function buildEdit(
     focusDim: Math.min(0.38, Math.max(0, script.focusDim ?? 0.22)),
     cues: script.cues ?? fromEvents(recording.events, src, { holds }),
     holds,
-    segments: script.segments ?? [{ s0: 0, s1: durationMs, speed: 1 }],
+    segments: script.segments ?? autoEdit(recording, script.targetMs),
     editorial: script.editorial ?? [],
     timeCuts: script.timeCuts ?? [],
     beats,
     compile: script.compile ?? [],
-    ...(script.pair ? { pair: script.pair } : {}),
-    end: script.end ?? { command: "npx aeon-browser", repo: REPO, durationMs: 2400 },
+    ...(pair ? { pair } : {}),
+    end: script.end ?? { command: END_COMMAND, repo: REPO, durationMs: 2400 },
     ...(recording.terminal ? { terminal: recording.terminal } : {}),
     effects: script.effects ?? [],
     slides: script.slides ?? [],
     ...(script.audioSrc ? { audioSrc: script.audioSrc } : {}),
+    ...(script.house !== undefined ? { house: script.house } : {}),
+    take: {
+      frames: clip.frames,
+      ...(clip.dropped !== undefined ? { dropped: clip.dropped } : {}),
+      ...(clip.dup !== undefined ? { dup: clip.dup } : {}),
+      ...(clip.clean !== undefined ? { clean: clip.clean } : {}),
+    },
   };
 }
 

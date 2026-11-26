@@ -29,6 +29,7 @@ import { packCommand } from "./pack.js";
 import { listTools, runTool } from "./tools.js";
 import { abilitiesCommand } from "./abilities-cmd.js";
 import { probeDaemonActivity, runUpdateWhenIdle } from "./update-idle.js";
+import { filmEntry } from "./film-entry.js";
 import { recordCommand, videoCommand } from "./record-cmd.js";
 
 // Every command Aeon has: its own chat commands, then browserkit's commands in the same groups,
@@ -530,6 +531,7 @@ Hold, TimeCut, EditorialBeat and End primitives driven by events.json from
 render. Aeon records; Remotion renders. See the kit's README.`,
       run: (args) => videoCommand(args),
     },
+    filmEntry(host),
   ];
 }
 

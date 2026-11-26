@@ -1,11 +1,12 @@
 import { ORB_SOUNDS_KEY, orbFlag } from "@aeon/ui";
+import { filmBeat } from "./orb-film.js";
 
 // Optional, off by default: a soft tone when a run starts, when it needs you, and when it's done.
 // Synthesized, so there are no audio files to ship.
 
 export type OrbSound = "start" | "needs" | "done";
 
-const NOTES: Record<OrbSound, number[]> = {
+export const NOTES: Record<OrbSound, number[]> = {
   start: [523.25],
   needs: [659.25, 523.25],
   done: [523.25, 783.99],
@@ -14,6 +15,8 @@ const NOTES: Record<OrbSound, number[]> = {
 let audio: AudioContext | undefined;
 
 export function playSound(sound: OrbSound): void {
+  // Ahead of the mute check: a recording scores the sound Aeon would play, even when muted.
+  filmBeat("sound", { cue: sound });
   if (!orbFlag(ORB_SOUNDS_KEY)) return;
   try {
     audio ??= new AudioContext();

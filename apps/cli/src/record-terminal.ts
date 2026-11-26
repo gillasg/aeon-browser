@@ -1,7 +1,9 @@
 // A terminal cast beside a tab recording: the command and what it printed, with times on the
-// clip clock. Asciinema-style text is enough for the video kit to draw a pane. No pty.
+// clip clock. Asciinema-style text is enough for the video kit to draw a pane. On Linux the command
+// runs under a PTY (util-linux `script`), so tools that check for a terminal behave as they would
+// for a person; the kit strips the escapes.
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RecordingEvents, TerminalCast, TerminalEvent } from "./record-events.js";
 
@@ -79,6 +81,17 @@ export function attachTerminal(
   };
 }
 
+/** How to run `command`: under a PTY via `script` on Linux when it is installed, else a shell. */
+export function ptySpawn(
+  command: string,
+  platform: NodeJS.Platform = process.platform,
+  hasScript = existsSync("/usr/bin/script"),
+): { cmd: string; args: string[]; shell: boolean } {
+  if (platform === "linux" && hasScript)
+    return { cmd: "/usr/bin/script", args: ["-qfec", command, "/dev/null"], shell: false };
+  return { cmd: command, args: [], shell: true };
+}
+
 /** Run a command and keep its output. The exit code is the command's, even when the cast is saved. */
 export async function runTerminal(command: string): Promise<{ code: number; cast: TerminalCast }> {
   const startedAt = Date.now();
@@ -86,11 +99,15 @@ export async function runTerminal(command: string): Promise<{ code: number; cast
   let used = command.length;
   const take = (kind: "out" | "err") => (buf: Buffer) => {
     if (used >= MAX_CHARS) return;
-    const text = buf.toString("utf8").slice(0, MAX_CHARS - used);
+    const text = buf
+      .toString("utf8")
+      .replace(/\r\n/g, "\n")
+      .slice(0, MAX_CHARS - used);
     used += text.length;
     if (text) chunks.push({ at: Date.now(), kind, text });
   };
-  const child = spawn(command, { shell: true, stdio: ["ignore", "pipe", "pipe"] });
+  const how = ptySpawn(command);
+  const child = spawn(how.cmd, how.args, { shell: how.shell, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.on("data", take("out"));
   child.stderr.on("data", take("err"));
   const code = await new Promise<number>((resolve) => {

@@ -18,6 +18,7 @@ import type { ThreadCoordinationService } from "./thread-coordination-service.js
 import { attachDevChatCommands } from "./dev-chat-connection.js";
 import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
+import { handleCoreFilm } from "./film-relay.js";
 import { handleBlockedSites } from "./core-blocked-sites.js";
 import { handleBrowsers, handleChatPin, pin } from "./core-browsers.js";
 import { sessionChatId } from "@aeon/pi-adapter";
@@ -150,6 +151,7 @@ function routeAuthenticated(
     () => handleOpenChat(socket, candidate, service, browser),
     () => handleChatStop(socket, candidate, service, browser),
     () => handleSettings(socket, candidate, browser),
+    () => handleCoreFilm(socket, candidate, () => browser.executorSockets()),
     () => handleBrowserRun(socket, candidate, browser, directory),
     () => handleCdpRequest(socket, candidate, browser, directory),
     () => handleModelComplete(socket, candidate, service),
