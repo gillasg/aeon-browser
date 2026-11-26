@@ -6,7 +6,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { commandHelp } from "browserkit/dist/usage.js";
 import { aeonCommands } from "../dist/commands.js";
@@ -29,9 +29,13 @@ async function modulesLoaded(args, env = {}) {
   const counter = join(dir, "counter.mjs");
   await writeFile(counter, COUNTER);
   try {
-    const result = await run(process.execPath, ["--import", counter, cli, ...args], {
-      env: { ...process.env, ...env },
-    }).catch((error) => error);
+    const result = await run(
+      process.execPath,
+      ["--import", pathToFileURL(counter).href, cli, ...args],
+      {
+        env: { ...process.env, ...env },
+      },
+    ).catch((error) => error);
     const count = Number(/MODULES (\d+)/.exec(String(result.stderr))?.[1]);
     return { count, stdout: String(result.stdout), code: result.code ?? 0 };
   } finally {
