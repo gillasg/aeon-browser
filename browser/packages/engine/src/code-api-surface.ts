@@ -522,7 +522,8 @@ function __extendPageSurface(target, base) {
           if (pattern) { pattern.lastIndex = at; var found = pattern.exec(text); index = found ? found.index : -1; }
           else index = text.indexOf(String(options.search), at);
           if (index < 0) return;
-          hits.push({file, line: text.slice(0, index).split(nl).length, code: text.slice(Math.max(0, index - 150), index + 250)});
+          var before = text.slice(0, index);
+          hits.push({file, line: before.split(nl).length, col: index - before.lastIndexOf(nl) - 1, code: text.slice(Math.max(0, index - 150), index + 250)});
           at = index + 1;
         }
       };
@@ -533,6 +534,10 @@ function __extendPageSurface(target, base) {
           try { scan(file, String((await browser.fetch(file, {as: 'text'})).text || '')); }
           catch { unread.push(file); }
         }));
+      }
+      if (options.original) {
+        var pageHref = await __reHref(page);
+        for (var hit of hits) { var original = await __reOriginal(hit.file, hit.line, hit.col, pageHref).catch(() => undefined); if (original) hit.original = original; }
       }
       return {hits, searched: files.length + listed.inline.length, ...(unread.length ? {unread} : {})};
     },

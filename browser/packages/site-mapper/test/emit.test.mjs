@@ -87,7 +87,7 @@ test("OpenAPI 3.1: paths, security schemes, extensions, variants", async (t) => 
     doc.paths["/api/products/{productId}"].get.parameters.map((p) => p.name),
     ["productId"],
   );
-  assert.ok(doc.paths["/products/{productSlug}"].get["x-page-endpoint"]);
+  assert.ok(doc.paths["/products/{product}"].get["x-page-endpoint"]);
   const cart = doc.paths["/api/cart"].post;
   assert.ok(
     !cart.parameters.some((p) => p.name === "x-csrf-token"),
@@ -128,7 +128,7 @@ test("the generated TypeScript client is valid and typed", async (t) => {
   );
   assert.match(client, /getProduct\(params: GetProductParams\)/);
   assert.match(client, /paginate: \{\n\s+listProducts/);
-  assert.match(client, /productPage\(params: \{ productSlug: string \}\)/);
+  assert.match(client, /productPage\(params: \{ product: string \}\)/);
   const output = ts.transpileModule(client, {
     reportDiagnostics: true,
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },

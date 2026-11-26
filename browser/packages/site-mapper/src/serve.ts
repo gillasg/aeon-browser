@@ -63,7 +63,7 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
   return text ? (JSON.parse(text) as Record<string, unknown>) : {};
 }
 
-function matchPath(
+export function matchPath(
   operation: Operation,
   method: string,
   path: string,

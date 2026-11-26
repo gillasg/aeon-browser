@@ -47,7 +47,7 @@ test(
       const all = [];
       for await (const item of shop.paginate.listProducts({ limit: 10 })) all.push(item);
       assert.equal(all.length, site.products.length);
-      const page = await shop.productPage({ productSlug: site.products[5].slug });
+      const page = await shop.productPage({ product: site.products[5].slug });
       assert.equal(page.jsonLd[0].name, site.products[5].name);
     });
 
@@ -151,7 +151,7 @@ async function recordAndBuild(api, name, site) {
   assert.deepEqual(signed.signing?.headers, ["x-signature"]);
   assert.ok(signed.signing.initiator?.url, "the recorder captured the script that made the call");
   assert.ok(model.security.some((s) => s.type === "csrf" && s.source?.kind === "meta"));
-  assert.ok(model.pages.some((p) => p.path === "/products/{productSlug}"));
+  assert.ok(model.pages.some((p) => p.path === "/products/{product}"));
 }
 
 async function connectExtension(profile, env) {

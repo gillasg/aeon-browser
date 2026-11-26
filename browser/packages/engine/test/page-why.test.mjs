@@ -13,6 +13,7 @@ import {
 } from "../dist/provenance.js";
 import { browserWhyApi } from "../dist/code-api-why.js";
 import { browserRecordingApi } from "../dist/code-api-recording.js";
+import { browserReApi } from "../dist/code-api-re.js";
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
@@ -77,7 +78,7 @@ test("operations match by method and path template, most literal first", () => {
   assert.equal(provLeafKey("/data/metrics/0/revenue"), "revenue");
 });
 
-function realm({ read, entries = [], bodies = {}, ops, hits = [] }) {
+function realm({ read, entries = [], bodies = {}, ops, hits = [], maps }) {
   const calls = [];
   const page = {
     inspect: async (expression) => {
@@ -109,6 +110,7 @@ function realm({ read, entries = [], bodies = {}, ops, hits = [] }) {
     __element: (_t, id) => ({ kind: "backend", backendNodeId: Number(id), name: "Revenue" }),
     __call: async (req) => {
       calls.push(req);
+      if (req.siteMapper === "sourcemaps") return maps(req);
       return { data: { subscriptionId: 1, events: [] } };
     },
     siteMapper: {
@@ -118,7 +120,10 @@ function realm({ read, entries = [], bodies = {}, ops, hits = [] }) {
       },
     },
   });
-  vm.runInContext(browserRecordingApi + "\n" + browserWhyApi, ctx);
+  vm.runInContext(
+    browserRecordingApi + "\n" + browserWhyApi + (maps ? "\n" + browserReApi : ""),
+    ctx,
+  );
   return { ctx, calls, page };
 }
 
@@ -302,4 +307,24 @@ test("the page reader resolves a point to its element, React owner and source", 
     __NEXT_DATA__: { page: "/p" },
     __INITIAL_STATE__: { price: 1234.5 },
   });
+});
+
+test("link 4 gains the original file and line when the script has a source map", async () => {
+  const { ctx, calls } = realm({
+    read: { element, component: { name: "RevenueCard", framework: "react" }, hydration: {} },
+    hits: [{ file: "https://a.test/app.js", line: 1, col: 420, code: "function RevenueCard(" }],
+    maps: (req) => ({
+      positions: [
+        { ...req.options.positions[0], original: { source: "src/Revenue.tsx", line: 12, col: 2 } },
+      ],
+    }),
+  });
+  const result = plain(await vm.runInContext("__pageWhy({tabId: 1}, '#rev')", ctx));
+  assert.deepEqual(result.source, {
+    file: "https://a.test/app.js",
+    line: 1,
+    original: { source: "src/Revenue.tsx", line: 12, col: 2 },
+  });
+  const request = calls.find((call) => call && call.siteMapper === "sourcemaps");
+  assert.deepEqual(plain(request.options.positions), [{ line: 1, col: 420 }]);
 });
