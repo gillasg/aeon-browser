@@ -166,3 +166,78 @@ test("a result carrying its run time finishes the cell; one the daemon can't rea
   cells.handle({ ...base, cellId: messages[1].cellId, surprise: true }, connection);
   await assert.rejects(bad, /BROWSER_RESULT_INVALID/);
 });
+
+test("a cancelled stalled cell answers at once; its realm resets only if still busy after 1 s", async () => {
+  const messages = [];
+  const cells = new BrowserCodeCells(() => undefined);
+  const connection = socket(messages);
+  const session = randomUUID();
+  const input = (code) => ({
+    code,
+    timeoutMs: 60_000,
+    onCall: async () => ({}),
+    onProgress: () => undefined,
+  });
+  const controller = new globalThis.AbortController();
+  const stalled = cells.run(
+    connection,
+    randomUUID(),
+    session,
+    "call-1",
+    [],
+    input("await new Promise(() => {})"),
+    controller.signal,
+  );
+  const stalledId = messages[0].cellId;
+  cells.handle(
+    { kind: "browser.code.progress", cellId: stalledId, steps: [], stage: "evaluating" },
+    connection,
+  );
+  const started = Date.now();
+  controller.abort();
+  await assert.rejects(stalled, /RUN_RESET: browser workflow cancelled/);
+  const soft = messages.filter((m) => m.kind === "browser.code.cancel" && m.cellId === stalledId);
+  assert.deepEqual(
+    soft.map((m) => m.reset),
+    [false],
+  );
+  // The session's next cell runs and answers promptly.
+  const next = cells.run(connection, randomUUID(), session, "call-2", [], input("1"));
+  const nextId = messages.filter((m) => m.kind === "browser.code.run").at(-1).cellId;
+  cells.handle(
+    { kind: "browser.code.result", cellId: nextId, output: "1", value: 1, steps: [], opened: [] },
+    connection,
+  );
+  assert.equal((await next).output, "1");
+  assert.ok(Date.now() - started < 2_000);
+  await new Promise((resolve) => setTimeout(resolve, 1_100));
+  const resets = messages.filter(
+    (m) => m.kind === "browser.code.cancel" && m.cellId === stalledId && m.reset,
+  );
+  assert.equal(resets.length, 1);
+});
+
+test("a cancelled cell that answers within 1 s keeps its realm", async () => {
+  const messages = [];
+  const cells = new BrowserCodeCells(() => undefined);
+  const connection = socket(messages);
+  const controller = new globalThis.AbortController();
+  const run = cells.run(
+    connection,
+    randomUUID(),
+    randomUUID(),
+    "call-1",
+    [],
+    { code: "1", timeoutMs: 60_000, onCall: async () => ({}), onProgress: () => undefined },
+    controller.signal,
+  );
+  const cellId = messages[0].cellId;
+  controller.abort();
+  await assert.rejects(run);
+  cells.handle(
+    { kind: "browser.code.result", cellId, output: "", error: "RUN_RESET", steps: [], opened: [] },
+    connection,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 1_100));
+  assert.equal(messages.filter((m) => m.kind === "browser.code.cancel" && m.reset).length, 0);
+});

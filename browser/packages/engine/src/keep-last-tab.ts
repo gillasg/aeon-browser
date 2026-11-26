@@ -10,6 +10,21 @@ export interface TabCloser {
 }
 
 const BLANK = "about:blank";
+/** A tab call that has not settled by now is treated as failed so later closes still run. */
+export const TAB_OP_TIMEOUT_MS = 6_000;
+
+/** Settles with a timeout error when `work` has not settled within `ms`. */
+export function withTabTimeout<T>(
+  work: Promise<T>,
+  what: string,
+  ms = TAB_OP_TIMEOUT_MS,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} did not finish within ${ms} ms`)), ms);
+  });
+  return Promise.race([Promise.resolve(work), timeout]).finally(() => clearTimeout(timer));
+}
 
 let tail: Promise<void> = Promise.resolve();
 let guardInstalled = false;
@@ -54,13 +69,16 @@ async function closeNow(
   if (batch.ids.length === 0) return;
   const keep = await lastTabs(batch.ids, api);
   if (keep.last) {
-    await api.create({
-      url: BLANK,
-      active: false,
-      ...(keep.windowId === undefined ? {} : { windowId: keep.windowId }),
-    });
+    await withTabTimeout(
+      api.create({
+        url: BLANK,
+        active: false,
+        ...(keep.windowId === undefined ? {} : { windowId: keep.windowId }),
+      }),
+      "Opening the keep-alive tab",
+    );
   }
-  await api.remove(batch.shape);
+  await withTabTimeout(api.remove(batch.shape), "Tab close");
 }
 
 /** True when the close would leave no tab at all; names the window that should keep one. */
@@ -68,7 +86,7 @@ export async function lastTabs(
   ids: number[],
   api: TabCloser,
 ): Promise<{ last: boolean; windowId?: number }> {
-  const open = await api.query().catch(() => []);
+  const open = await withTabTimeout(api.query(), "Tab lookup").catch(() => []);
   const openIds = open.map((tab) => tab.id).filter(isTabId);
   if (openIds.length === 0) return { last: false };
   const closing = new Set(ids);

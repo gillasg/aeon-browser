@@ -51,12 +51,9 @@ function objectSchema(objects: Record<string, unknown>[], depth: number, b: Boun
       depth + 1,
       b,
     );
-  const required = kept.filter((key) => objects.every((object) => key in object));
-  return {
-    type: "object",
-    properties,
-    ...(required.length ? { required } : {}),
-  };
+  // No `required`: a key seen in every sample can still be absent from a valid live answer, and a
+  // client that validates output would then reject the reply.
+  return { type: "object", properties };
 }
 
 function merge(samples: unknown[], depth: number, b: Bounds): Schema {
@@ -98,6 +95,26 @@ export function outputSchemaFromJsonSchema(
   return objectRoot(trim(schema, 1, bounds(opts)));
 }
 
+/** Drops `required` below the root wrapper: recorded and saved schemas come from samples. */
+function optional(schema: Schema, root: boolean): Schema {
+  const out: Schema = { ...schema };
+  if (!(root && isWrapper(schema))) delete out.required;
+  if (out.properties && typeof out.properties === "object")
+    out.properties = Object.fromEntries(
+      Object.entries(out.properties as Record<string, Schema>).map(([k, v]) => [
+        k,
+        v && typeof v === "object" ? optional(v, false) : v,
+      ]),
+    );
+  if (out.items && typeof out.items === "object") out.items = optional(out.items as Schema, false);
+  return out;
+}
+
+function isWrapper(schema: Schema): boolean {
+  const keys = Object.keys((schema.properties ?? {}) as Schema);
+  return keys.length === 1 && (keys[0] === "items" || keys[0] === "value");
+}
+
 function trim(schema: Schema, depth: number, b: Bounds): Schema {
   const out: Schema = {};
   if (schema.type !== undefined) out.type = schema.type;
@@ -108,10 +125,6 @@ function trim(schema: Schema, depth: number, b: Bounds): Schema {
       b.maxProperties,
     );
     out.properties = Object.fromEntries(entries.map(([k, v]) => [k, trim(v ?? {}, depth + 1, b)]));
-    const required = Array.isArray(schema.required)
-      ? (schema.required as string[]).filter((key) => entries.some(([k]) => k === key))
-      : [];
-    if (required.length) out.required = required;
   }
   if (schema.items && typeof schema.items === "object")
     out.items = trim(schema.items as Schema, depth + 1, b);
@@ -133,7 +146,7 @@ export function structuredOutput(
 
 /** The operation's saved `outputSchema`, else one from its recorded 2xx JSON response schema. */
 export function operationOutputSchema(operation: Operation): Record<string, unknown> | undefined {
-  if (operation.outputSchema?.type === "object") return operation.outputSchema;
+  if (operation.outputSchema?.type === "object") return optional(operation.outputSchema, true);
   const ok = Object.entries(operation.responses ?? {})
     .filter(([status]) => /^2/.test(status))
     .sort(([a], [b]) => a.localeCompare(b))

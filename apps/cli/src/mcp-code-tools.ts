@@ -5,7 +5,7 @@ import {
   searchCatalog,
 } from "@browserkit/tools/site-to-api";
 import type { AeonClient } from "./client.js";
-import { callCatalog, type CatalogTool } from "./catalog.js";
+import { callCatalogResult, type CatalogTool } from "./catalog.js";
 import { answer, questions } from "./converse.js";
 import type { TaskContext } from "./mcp-tasks.js";
 import {
@@ -27,6 +27,8 @@ export interface CodeToolDeps {
   aeon: () => Promise<AeonClient>;
   parking: ParkingLot;
   catalog: () => readonly CatalogTool[];
+  /** Resolves once the first catalog load has finished (or a bounded wait ran out). */
+  catalogReady?: () => Promise<void>;
   session: string;
   runs: Map<string, Run>;
   startRun: (args: Json) => Promise<{ runId: string }>;
@@ -52,7 +54,7 @@ export async function codeSurfaceCall(
   try {
     if (name === "browser_code") return await browserCode(args, deps);
     if (name === "aeon_find") return text(await find(args, deps));
-    if (name === "aeon_call") return text(await call(args, deps));
+    if (name === "aeon_call") return await call(args, deps);
     if (name === "aeon_resume") return await resume(args, deps);
     if (name === "aeon_run") return await run(args, deps);
     return errorResult(new Error(`Unknown tool ${name}`));
@@ -73,13 +75,15 @@ function browserCode(args: Json, deps: CodeToolDeps): Promise<unknown> {
       })
     )?.value;
   const context = deps.context;
+  // Only a hand-off that starts while this cell runs can be this cell's.
+  const since = Date.now();
   return runParkableCell(
     deps.parking,
     {
       run: (signal) => deps.callChat("browser_code", args, signal),
-      watchHandoff: (signal) => pollHandoff(listTabs, signal),
+      watchHandoff: (signal) => pollHandoff(listTabs, signal, { since }),
       watchCleared: async (signal) => {
-        await pollHandoff(listTabs, signal, { cleared: true });
+        await pollHandoff(listTabs, signal, { cleared: true, since });
       },
     },
     {
@@ -100,6 +104,7 @@ function findTool(tools: readonly CatalogTool[], ref: string): CatalogTool | und
 }
 
 async function find(args: Json, deps: CodeToolDeps): Promise<unknown> {
+  await deps.catalogReady?.();
   const tools = deps.catalog();
   const ref = typeof args.ref === "string" ? args.ref.trim() : "";
   if (ref.startsWith("site:")) {
@@ -129,10 +134,12 @@ async function find(args: Json, deps: CodeToolDeps): Promise<unknown> {
 }
 
 async function call(args: Json, deps: CodeToolDeps): Promise<unknown> {
+  await deps.catalogReady?.();
   const ref = String(args.ref ?? "");
   const tool = findTool(deps.catalog(), ref);
   const params = (args.params as Json | undefined) ?? {};
-  return callCatalog(tool?.name ?? ref, params, deps.catalog());
+  // The same result as the site tool itself, structuredContent included.
+  return callCatalogResult(tool?.name ?? ref, params, deps.catalog());
 }
 
 async function run(args: Json, deps: CodeToolDeps): Promise<unknown> {

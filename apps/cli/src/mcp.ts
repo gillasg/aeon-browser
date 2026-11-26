@@ -39,7 +39,8 @@ import {
 import type { TaskContext } from "./mcp-tasks.js";
 import { CODE_SURFACE_NAMES, CODE_SURFACE_TOOLS, ParkingLot } from "./mcp-code-mode.js";
 import { codeSurfaceCall } from "./mcp-code-tools.js";
-import { RESOURCES, rpcError, resourceRequest, watchSkills } from "./mcp-resources.js";
+import { RESOURCES, resourceRequest, watchSkills } from "./mcp-resources.js";
+import { reply, text, withoutTrace } from "./mcp-reply.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -443,6 +444,7 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
   let client: AeonClient | undefined;
   catalogState = { tools: [], fingerprint: "", primed: false };
   const stopCatalog = watchCatalog();
+  void catalogReady();
   const stopSkills = watchSkills((message) => notifySend(message));
   const deps: McpDeps = {
     aeon: async () => (client ??= await AeonClient.connect()),
@@ -525,6 +527,7 @@ function codeCall(
     aeon,
     parking,
     catalog: () => catalogState.tools,
+    catalogReady,
     session: session ?? "mcp",
     startRun: async (args) => startRun(await aeon(), args, runs),
     runs,
@@ -585,7 +588,8 @@ async function handle(
   if (method === "ping") return mcpResult({}, modern);
   const extended = extensionRequest(method, mcpParams(message));
   if (extended) return extended;
-  if (method !== "tools/call") throw new Error("Method not found");
+  if (method !== "tools/call")
+    throw Object.assign(new Error(`Method not found: ${method}`), { code: -32601 });
   return callToolResult(
     message.params as { name: string; arguments?: Json },
     aeon,
@@ -711,6 +715,8 @@ async function toolValue(
 }
 
 async function inspectTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
+  // Fail fast: anything else is not a tool, and must not wait on a chat lookup.
+  if (name !== "aeon_trace" && name !== "aeon_result") throw new Error("Unknown tool " + name);
   const result = await inspect(client, String(args.chatId));
   if (name === "aeon_trace") return result.trace;
   if (name === "aeon_result") return withoutTrace(result);
@@ -762,6 +768,21 @@ function watchCatalog(): () => void {
   return () => clearInterval(timer);
 }
 
+const CATALOG_READY_MS = 10_000;
+let catalogPriming: Promise<unknown> | undefined;
+
+/** Waits (bounded) for the first catalog load, so a call right after initialize finds its tool. */
+async function catalogReady(): Promise<void> {
+  if (catalogState.primed) return;
+  catalogPriming ??= refreshCatalog(false).finally(() => (catalogPriming = undefined));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    catalogPriming.catch(() => undefined),
+    new Promise((resolve) => (timer = setTimeout(resolve, CATALOG_READY_MS))),
+  ]);
+  clearTimeout(timer);
+}
+
 async function refreshCatalog(notify: boolean): Promise<CatalogTool[]> {
   const next = await loadCatalog();
   const fingerprint = catalogFingerprint(next);
@@ -775,25 +796,4 @@ async function refreshCatalog(notify: boolean): Promise<CatalogTool[]> {
     notifySend({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
   catalogState = { tools: next, fingerprint, primed: true };
   return next;
-}
-
-function text(value: unknown) {
-  return {
-    content: [
-      { type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 2) },
-    ],
-    isError: false,
-  };
-}
-
-function reply(id: unknown, result?: unknown, error?: unknown): Json {
-  return error === undefined
-    ? { jsonrpc: "2.0", id, result }
-    : { jsonrpc: "2.0", id, error: rpcError(error) };
-}
-
-function withoutTrace(result: ChatResult): Omit<ChatResult, "trace"> {
-  const copy: Partial<ChatResult> = { ...result };
-  delete copy.trace;
-  return copy as Omit<ChatResult, "trace">;
 }

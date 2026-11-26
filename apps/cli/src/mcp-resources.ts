@@ -55,13 +55,12 @@ async function readSkill(site: string): Promise<Skill | undefined> {
   const dir = siteDir(site);
   const text = await readFile(join(dir, "SKILL.md"), "utf8").catch(() => undefined);
   if (text === undefined) return undefined;
+  // Operations live in the site's model.json; api.json is the lazily compiled ops file and may
+  // not exist yet. Both feed the version, so a new or changed operation bumps it.
+  const modelText = await readFile(join(dir, "model.json"), "utf8").catch(() => "");
   const ops = await readFile(join(dir, "api.json"), "utf8").catch(() => "");
-  let parsed: { compiledAt?: unknown; ops?: unknown[] } = {};
-  try {
-    parsed = ops ? (JSON.parse(ops) as typeof parsed) : {};
-  } catch {
-    // A torn api.json still versions by its bytes.
-  }
+  const model = parseJson<{ generatedAt?: unknown; operations?: unknown[] }>(modelText);
+  const parsed = parseJson<{ compiledAt?: unknown; ops?: unknown[] }>(ops);
   const healed = await readHealLog(site, { limit: 50 }).catch(() => []);
   const lastHealedAt = healed
     .filter((entry) => entry.event === "repaired")
@@ -69,12 +68,41 @@ async function readSkill(site: string): Promise<Skill | undefined> {
     .sort()
     .pop();
   const meta: SkillMeta = {
-    version: createHash("sha256").update(text).update("\0").update(ops).digest("hex").slice(0, 12),
-    ...(typeof parsed.compiledAt === "string" ? { updatedAt: parsed.compiledAt } : {}),
+    version: createHash("sha256")
+      .update(text)
+      .update("\0")
+      .update(modelText)
+      .update("\0")
+      .update(ops)
+      .digest("hex")
+      .slice(0, 12),
+    ...updatedAt(model.generatedAt, parsed.compiledAt),
     ...(lastHealedAt ? { lastHealedAt } : {}),
-    operations: Array.isArray(parsed.ops) ? parsed.ops.length : 0,
+    operations: Array.isArray(model.operations)
+      ? model.operations.length
+      : Array.isArray(parsed.ops)
+        ? parsed.ops.length
+        : 0,
   };
   return { site, text, meta };
+}
+
+/** Parsed JSON, or {} for a missing or torn file (which still versions by its bytes). */
+function parseJson<T extends object>(text: string): Partial<T> {
+  try {
+    const value: unknown = text ? JSON.parse(text) : {};
+    return value && typeof value === "object" ? (value as Partial<T>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function updatedAt(...stamps: unknown[]): { updatedAt?: string } {
+  const latest = stamps
+    .filter((stamp): stamp is string => typeof stamp === "string")
+    .sort()
+    .pop();
+  return latest ? { updatedAt: latest } : {};
 }
 
 async function allSkills(): Promise<Skill[]> {

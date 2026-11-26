@@ -12,7 +12,7 @@ import {
 } from "../dist/index.js";
 import { readOpsFile, writeOpsFile } from "../dist/site-ops-file.js";
 
-test("one object sample: types and required keys", () => {
+test("one object sample: types, and no key is required", () => {
   const schema = inferOutputSchema([{ id: 1, name: "a", price: 2.5, ok: true, gone: null }]);
   assert.deepEqual(schema, {
     type: "object",
@@ -23,15 +23,14 @@ test("one object sample: types and required keys", () => {
       ok: { type: "boolean" },
       gone: { type: "null" },
     },
-    required: ["id", "name", "price", "ok", "gone"],
   });
 });
 
-test("several samples: union of keys, required only when always present", () => {
+test("several samples: union of keys, none required", () => {
   const schema = inferOutputSchema([{ id: 1, a: "x" }, { id: 2.5, b: 1 }, null]);
   assert.equal(schema.type, "object", "null answers do not change the object root");
   assert.deepEqual(Object.keys(schema.properties), ["id", "a", "b"]);
-  assert.deepEqual(schema.required, ["id"]);
+  assert.equal(schema.required, undefined);
   assert.equal(schema.properties.id.type, "number", "integer and number merge to number");
 });
 
@@ -44,7 +43,7 @@ test("nested objects and arrays", () => {
   assert.deepEqual(user.properties.tags, { type: "array", items: { type: "string" } });
   assert.deepEqual(user.properties.posts.items, { type: "object" }, "level 4 is a leaf");
   const posts = inferOutputSchema([{ posts: [{ t: "x" }, { t: "y", n: 1 }] }]).properties.posts;
-  assert.deepEqual(posts.items.required, ["t"]);
+  assert.equal(posts.items.required, undefined);
   assert.deepEqual(Object.keys(posts.items.properties), ["t", "n"]);
 });
 
@@ -117,4 +116,24 @@ test("api.json round-trips outputSchema and still reads files without it", async
   const file = await readOpsFile("s.example");
   assert.deepEqual(file.ops[0].outputSchema, outputSchema);
   assert.equal(file.ops[1].outputSchema, undefined);
+});
+
+test("saved and recorded schemas keep only the root wrapper's required", () => {
+  const saved = operationOutputSchema({
+    outputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "object", properties: { normalized: {} }, required: ["normalized"] },
+      },
+      required: ["query"],
+    },
+  });
+  assert.equal(saved.required, undefined);
+  assert.equal(saved.properties.query.required, undefined);
+  const recorded = outputSchemaFromJsonSchema({
+    type: "array",
+    items: { type: "object", properties: { id: {} }, required: ["id"] },
+  });
+  assert.deepEqual(recorded.required, ["items"]);
+  assert.equal(recorded.properties.items.items.required, undefined);
 });

@@ -2,7 +2,7 @@
 // The page does not choose. Alert is accepted. A confirm or prompt is accepted only when the agent
 // acted in this tab in the last 5s (a prompt keeps the page's default text); otherwise it is
 // dismissed and the model gets a [warn] line. beforeunload is accepted only when this navigation
-// was started by the agent in a tab the agent opened. page.dialog.expect sets the next answer.
+// was started by the agent in a tab the agent opened, or the agent is closing the tab. page.dialog.expect sets the next answer.
 import type { BrowserExecutorResult, BrowserStep } from "@browserkit/protocol";
 import { refreshInventoryTab } from "../native-inventory-client.js";
 import { drivablePage, sameTarget } from "../native-browser-common.js";
@@ -38,6 +38,8 @@ export interface DialogInput {
   actedWithin: boolean;
   agentOpenedTab: boolean;
   agentStartedNavigation: boolean;
+  /** The agent is closing this tab: a beforeunload must not hold the close. */
+  closing?: boolean;
   expected?: string;
 }
 export interface DialogDecision {
@@ -122,6 +124,13 @@ export function setAgentOpenedTab(read: (tabId: number) => boolean): void {
   agentOpened = read;
 }
 
+let closingTab: (tabId: number) => boolean = () => false;
+
+/** Tab cleanup registers how to tell that the agent is closing a tab. */
+export function setClosingTab(read: (tabId: number) => boolean): void {
+  closingTab = read;
+}
+
 export function noteDialogAct(tabId: number, now = Date.now()): void {
   actedAt.set(tabId, now);
 }
@@ -176,6 +185,7 @@ export function answerDialogOpening(
     actedWithin: within(actedAt.get(tabId), now, DIALOG_ACT_MS),
     agentOpenedTab: opened ?? agentOpened(tabId),
     agentStartedNavigation: within(navigatedAt.get(tabId), now, DIALOG_NAV_MS),
+    closing: closingTab(tabId),
     ...(pending !== undefined ? { expected: pending } : {}),
   });
   noteReceiptDialog(tabId, {
@@ -245,6 +255,7 @@ function fromExpect(type: string, message: string, input: DialogInput): DialogDe
 }
 
 function leaveDialog(type: string, message: string, input: DialogInput): DialogDecision {
+  if (input.closing) return accept(type, message, "");
   if (input.agentOpenedTab && input.agentStartedNavigation) return accept(type, message, "");
   return dismiss(type, message, leaveWarn(message));
 }

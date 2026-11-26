@@ -229,15 +229,18 @@ const tapLabel = (kind: TapKind): string => `MCP live tap (${kind})`;
 
 async function readTapFilter(raw: unknown, source: TapSource): Promise<TapFilter> {
   const value = (raw && typeof raw === "object" ? raw : {}) as Json;
-  const tab = await source.resolveTab(tabRef(value.tab));
+  // Check the whole filter first: a bad one fails at once, before any browser round trip.
   const kind = readKind(value.kind);
   const dir = readDir(value.dir);
+  const ref = tabRef(value.tab);
+  const where = readWhere(value.where);
+  const tab = await source.resolveTab(ref);
   return {
     tab,
     kinds: kind === "all" ? [...KINDS] : [kind],
     dir,
     ...(typeof value.match === "string" && value.match ? { match: value.match } : {}),
-    ...(readWhere(value.where) ?? {}),
+    ...(where ?? {}),
   };
 }
 

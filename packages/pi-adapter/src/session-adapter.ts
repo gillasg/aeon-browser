@@ -153,8 +153,9 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     name: string,
     session: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ content: unknown[]; isError: boolean }> {
-    return runExternalTool(this.completionOptions(), this.browserTool, name, session, args);
+    return runExternalTool(this.completionOptions(), this.browserTool, name, session, args, signal);
   }
 
   invalidateModelCatalog(): void {

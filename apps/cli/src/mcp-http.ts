@@ -62,6 +62,8 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
   const verify = options.verify ?? ((token: string) => verifyToken(token));
   const audit = options.audit ?? ((line: string) => process.stderr.write(`${line}\n`));
   const { streams, owners, broadcast } = sessionRouter();
+  // Which token identity created each session: another token never attaches to it.
+  const sessionClients = sessionBindings(() => streams);
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     if (!allowedHost(request)) return sendJson(response, 403, { error: "Forbidden" });
@@ -76,11 +78,10 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
         { "www-authenticate": "Bearer" },
       );
     const session = String(request.headers["mcp-session-id"] ?? "") || randomUUID();
+    if (!sessionClients.claim(session, client))
+      return sendJson(response, 403, { error: "This session belongs to another token" });
     if (request.method === "GET") return openStream(response, session);
-    if (request.method === "DELETE") {
-      for (const [id, owner] of owners) if (owner === session) owners.delete(id);
-      return sendJson(response, 204, undefined);
-    }
+    if (request.method === "DELETE") return closeSession(response, session, owners, sessionClients);
     if (request.method !== "POST") return sendJson(response, 405, { error: "Method not allowed" });
     return handlePost(request, response, session, client);
   }
@@ -102,6 +103,7 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
       });
     }
     if (message.method) audit(`mcp ${client} ${String(message.method)}${toolName(message)}`);
+    if (refusedUnsubscribe(message, session, owners, response)) return;
     let answered = false;
     const send: Send = (reply) => {
       if (answered) return broadcast(reply);
@@ -153,6 +155,7 @@ export async function serveMcpHttp(options: HttpMcpOptions): Promise<HttpMcpServ
     broadcast,
     close: () =>
       new Promise((resolve) => {
+        sessionClients.stop();
         for (const set of streams.values()) for (const stream of set) stream.end();
         server.close(() => resolve());
       }),
@@ -170,6 +173,81 @@ function withSession(message: Json, session: string): Json {
       ...(params as Json),
       _meta: { [MCP_SESSION_META]: `http-${session.slice(0, 12)}`, ...meta },
     },
+  };
+}
+
+function closeSession(
+  response: ServerResponse,
+  session: string,
+  owners: Map<string, string>,
+  bindings: SessionBindings,
+): void {
+  for (const [id, owner] of owners) if (owner === session) owners.delete(id);
+  bindings.delete(session);
+  sendJson(response, 204, undefined);
+}
+
+/** Only the session that subscribed may end a subscription: another's gets unsubscribed:false. */
+function refusedUnsubscribe(
+  message: Json,
+  session: string,
+  owners: Map<string, string>,
+  response: ServerResponse,
+): boolean {
+  if (message.method !== "events/unsubscribe") return false;
+  const id = String((message.params as Json | undefined)?.subscriptionId ?? "");
+  if (owners.get(id) === session) {
+    owners.delete(id);
+    return false;
+  }
+  if (message.id === undefined) sendJson(response, 202, undefined);
+  else
+    sendJson(
+      response,
+      200,
+      { jsonrpc: "2.0", id: message.id, result: { unsubscribed: false } },
+      { "mcp-session-id": session },
+    );
+  return true;
+}
+
+export interface SessionBindings {
+  /** True when `client` may use `session` (binding it on first use). */
+  claim(session: string, client: string): boolean;
+  delete(session: string): boolean;
+  size(): number;
+  sweep(): void;
+  stop(): void;
+}
+
+/** A session unused this long, with no open stream, is forgotten. */
+export const SESSION_IDLE_MS = 30 * 60_000;
+
+/** Session id to the token identity that created it. Entries end on DELETE or when idle, so the
+ * map cannot grow without bound (every request without a session id makes a new one). */
+export function sessionBindings(
+  streams: () => Map<string, Set<ServerResponse>>,
+  idleMs = SESSION_IDLE_MS,
+): SessionBindings {
+  const bound = new Map<string, { client: string; seen: number }>();
+  const sweep = () => {
+    const now = Date.now();
+    for (const [session, entry] of bound)
+      if (now - entry.seen >= idleMs && !streams().has(session)) bound.delete(session);
+  };
+  const timer = setInterval(sweep, Math.min(idleMs, 60_000));
+  timer.unref?.();
+  return {
+    claim(session: string, client: string): boolean {
+      const entry = bound.get(session);
+      if (entry && entry.client !== client) return false;
+      bound.set(session, { client, seen: Date.now() });
+      return true;
+    },
+    delete: (session: string) => bound.delete(session),
+    size: () => bound.size,
+    sweep,
+    stop: () => clearInterval(timer),
   };
 }
 

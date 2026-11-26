@@ -44,6 +44,8 @@ const LINK_GRACE_MS = 60_000;
 const ACK_MS = 10_000;
 /** How long an interrupted cell may take to post the value it already built. */
 const PARTIAL_WAIT_MS = 3_000;
+/** A cancelled cell's realm is reset only if it is still busy this long after the cancel. */
+export const CANCEL_RESET_MS = 1_000;
 
 function startedStage(stage: BrowserCodeStage): boolean {
   return stage === "evaluating" || stage === "result-sent";
@@ -94,6 +96,8 @@ function deadlineClock(
 /** Runs browser_code cells inside a connected executor: one round trip per cell, not per step. */
 export class BrowserCodeCells {
   private readonly cells = new Map<string, Pending>();
+  /** Cancelled cells whose realm resets unless the browser answers first. */
+  private readonly cancelled = new Map<string, ReturnType<typeof setTimeout>>();
   constructor(private readonly adopt: (chatId: string, target: BrowserTargetKey) => void) {}
 
   /** Cells still in flight, including an ability or a routine check. */
@@ -116,8 +120,11 @@ export class BrowserCodeCells {
         if (socket.readyState === WebSocket.OPEN)
           socket.send(JSON.stringify({ kind: "browser.code.cancel", cellId, reset }));
       };
+      // A cancelled cell answers at once, so the next cell in the session is not held. Its realm
+      // is interrupted now and reset only if it is still busy (no result) after CANCEL_RESET_MS.
       const abort = () => {
-        cancel(true);
+        cancel(false);
+        this.resetIfBusy(cellId, () => cancel(true));
         finish(undefined, new Error("RUN_RESET: browser workflow cancelled; runtime reset"));
       };
       const close = () => {
@@ -183,6 +190,23 @@ export class BrowserCodeCells {
     });
   }
 
+  private resetIfBusy(cellId: string, reset: () => void): void {
+    const timer = setTimeout(() => {
+      this.cancelled.delete(cellId);
+      reset();
+    }, CANCEL_RESET_MS);
+    timer.unref?.();
+    this.cancelled.set(cellId, timer);
+  }
+
+  /** The browser answered a cancelled cell: its realm is free, so no reset. */
+  private settleCancelled(cellId: string): void {
+    const timer = this.cancelled.get(cellId);
+    if (!timer) return;
+    clearTimeout(timer);
+    this.cancelled.delete(cellId);
+  }
+
   /**
    * An open socket the browser no longer reads (a suspended worker, a half-open link) held every
    * cell to its full deadline. Unanswered after ACK_MS: drop it so the browser reconnects, and say so.
@@ -240,6 +264,7 @@ export class BrowserCodeCells {
     }
     const result = BrowserCodeResultSchema.safeParse(candidate);
     if (!result.success) return this.rejectUnreadable(candidate, result.error, socket);
+    this.settleCancelled(result.data.cellId);
     const cell = this.cells.get(result.data.cellId);
     if (cell?.socket === socket) cell.finish(withTimeoutWarn(result.data, cell.timeoutWarn));
   }

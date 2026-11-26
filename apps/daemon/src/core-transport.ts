@@ -259,6 +259,9 @@ function handleSettings(
   );
   return true;
 }
+/** External tool calls still running, by request id, so a core.tool.cancel can stop one. */
+const runningTools = new Map<string, AbortController>();
+
 /** The chat tools for agents outside Aeon: listed, or called in a named session. */
 function handleToolRequest(
   socket: WebSocket,
@@ -275,9 +278,16 @@ function handleToolRequest(
     send({ tools: service.externalTools() });
     return true;
   }
+  if (request.data.kind === "core.tool.cancel") {
+    runningTools.get(requestId)?.abort();
+    return true;
+  }
   const { tool, session, browser, arguments: input } = request.data;
+  const controller = new AbortController();
+  runningTools.set(requestId, controller);
   (browser ? pinSession(session, browser) : Promise.resolve())
-    .then(() => service.callExternalTool(tool, session, input))
+    .then(() => service.callExternalTool(tool, session, input, controller.signal))
+    .finally(() => runningTools.delete(requestId))
     .then(
       (result) => send(result),
       (error: unknown) =>

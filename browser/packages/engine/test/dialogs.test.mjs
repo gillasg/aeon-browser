@@ -22,6 +22,7 @@ const {
   noteAgentNavigation,
   noteDialogAct,
   onJavaScriptDialog,
+  setClosingTab,
   takeDialogWarns,
   withDialogWarn,
 } = await import("../dist/evidence/dialogs.js");
@@ -95,6 +96,24 @@ test("beforeunload is accepted only for an agent navigation in a tab the agent o
     true,
   );
   assert.equal(stale.accept, false);
+});
+
+test("beforeunload is accepted on any tab the agent is closing, even a user tab", () => {
+  setClosingTab((tabId) => tabId === 31);
+  try {
+    const closing = answerDialogOpening(
+      31,
+      { type: "beforeunload", message: "leave" },
+      9_000,
+      false,
+    );
+    assert.equal(closing.accept, true);
+    assert.equal(closing.warn, undefined);
+    const other = answerDialogOpening(32, { type: "beforeunload", message: "leave" }, 9_000, false);
+    assert.equal(other.accept, false);
+  } finally {
+    setClosingTab(() => false);
+  }
 });
 
 test("page.dialog.expect answers the next dialog once, then the rule applies again", () => {

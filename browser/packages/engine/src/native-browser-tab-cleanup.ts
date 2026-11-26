@@ -12,6 +12,7 @@ import { onEngineInstall } from "./native-engine-install.js";
 import { followReplacement } from "./native-browser-replaced.js";
 import { spaceWindowIds } from "./native-browser-spaces.js";
 import { setFetchTabOwner } from "./native-browser-fetch-tab.js";
+import { setClosingTab } from "./evidence/dialogs.js";
 
 type Tracked = {
   touched: number;
@@ -175,6 +176,11 @@ export function guardAgentTab(tabId: number, guard: boolean): void {
   else guarded.delete(tabId);
 }
 
+/** True while the agent is closing this tab (its beforeunload is then accepted). */
+export function isClosing(tabId: number): boolean {
+  return closing.has(tabId);
+}
+
 export function isAgentTab(tabId: number): boolean {
   return tracked.has(tabId);
 }
@@ -234,21 +240,44 @@ export async function closeChatTab(chatId: string, tabId: number): Promise<{ clo
 }
 
 /**
- * Chrome often ignores tabs.remove while a debugger is attached, and a collapsed tab group can
- * swallow the close. Detach and leave the group first, then remove, and try once more if the tab
- * is still there. The close counts only after the tab is gone.
+ * The first remove runs with the debugger still attached, so a beforeunload the close raises
+ * reaches the dialog handler (which accepts it for a closing tab). Chrome often ignores
+ * tabs.remove while a debugger is attached, and a collapsed tab group can swallow the close, so a
+ * tab still open after that detaches and leaves the group, then is removed again (twice at most).
+ * The close counts only after the tab is gone.
  */
 async function removeVerified(tabId: number): Promise<boolean> {
+  // Marked before anything else, so a beforeunload raised by the close is accepted, not held.
+  closing.add(tabId);
+  await ungroupForClose(tabId);
+  if (await removeAndCheck(tabId, ATTACHED_CLOSE_MS)) return true;
   for (let attempt = 0; attempt < 2; attempt++) {
     await releaseForClose(tabId);
-    closing.add(tabId);
-    await chrome.tabs.remove(tabId).catch(() => undefined);
-    closing.delete(tabId);
-    tracked.delete(tabId);
-    const still = await chrome.tabs.get(tabId).catch(() => undefined);
-    if (!still) return true;
+    if (await removeAndCheck(tabId, 0)) return true;
   }
+  closing.delete(tabId);
   return false;
+}
+
+/** How long a remove with the debugger attached may take to close the tab before the detach. */
+const ATTACHED_CLOSE_MS = 600;
+
+async function removeAndCheck(tabId: number, settleMs: number): Promise<boolean> {
+  await chrome.tabs.remove(tabId).catch(() => undefined);
+  tracked.delete(tabId);
+  const deadline = Date.now() + settleMs;
+  for (;;) {
+    if (!(await chrome.tabs.get(tabId).catch(() => undefined))) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+async function ungroupForClose(tabId: number): Promise<void> {
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  const groupId = tab?.groupId;
+  if (typeof groupId === "number" && groupId >= 0)
+    await chrome.tabs.ungroup?.(tabId).catch(() => undefined);
 }
 
 async function releaseForClose(tabId: number): Promise<void> {
@@ -259,10 +288,7 @@ async function releaseForClose(tabId: number): Promise<void> {
     // The explicit detach below still runs.
   }
   await chrome.debugger?.detach?.({ tabId }).catch(() => undefined);
-  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-  const groupId = tab?.groupId;
-  if (typeof groupId === "number" && groupId >= 0)
-    await chrome.tabs.ungroup?.(tabId).catch(() => undefined);
+  await ungroupForClose(tabId);
 }
 
 export async function unsplitForClose(
@@ -465,6 +491,7 @@ function save(): void {
 
 onEngineInstall(() => {
   setFetchTabOwner(isAgentTab);
+  setClosingTab(isClosing);
   chrome.runtime.onStartup.addListener(() => {
     tracked.clear();
     stats.clear();

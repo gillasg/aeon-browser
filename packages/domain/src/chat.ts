@@ -362,6 +362,7 @@ export interface PiSessionPort {
     name: string,
     session: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ content: unknown[]; isError: boolean }>;
   openOrCreate(input: OpenPiSessionInput): Promise<PiSessionHandle>;
   searchTranscript(

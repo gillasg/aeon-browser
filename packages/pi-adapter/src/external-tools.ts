@@ -109,6 +109,7 @@ export async function runExternalTool(
   name: string,
   session: string,
   args: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<ExternalToolResult> {
   const tools = toolsFor(options, run, session);
   const tool = name === "browser_tabs" ? tools.browser_code : tools[name];
@@ -125,7 +126,7 @@ export async function runExternalTool(
   );
   await mkdir(workspace, { recursive: true });
   const execute = () =>
-    tool.execute(randomUUID(), input as never, undefined, undefined, undefined as never);
+    tool.execute(randomUUID(), input as never, signal, undefined, undefined as never);
   const result = await inChat(sessionChatId("external", session), () =>
     full ? fullOutput(execute) : execute(),
   );
