@@ -167,7 +167,9 @@ async function startDownload(request: Download): Promise<unknown> {
 // ---------- page.downloads: a lazy CDP download bus ----------
 // Off until start(): then Browser.setDownloadBehavior turns download events on for this tab and
 // every download it begins is tracked from willBegin through inProgress to completed or
-// canceled. stop() (or a detach) turns events off again; nothing listens while idle.
+// canceled. stop() (or a detach) turns events off again; nothing listens while idle. A tab
+// attached through the extension debugger may not reach the Browser domain; there the tab's own
+// Page.download* events (same fields) are tracked instead, with Chrome's default save behavior.
 export type DownloadState = "willBegin" | "inProgress" | "completed" | "canceled";
 export interface TrackedDownload {
   guid: string;
@@ -215,7 +217,11 @@ export class DownloadBus {
       ? { behavior: "allowAndName", downloadPath: path, eventsEnabled: true }
       : { behavior: "default", eventsEnabled: true };
     try {
-      await this.port.send("Browser.setDownloadBehavior", behavior);
+      await this.port.send("Browser.setDownloadBehavior", behavior).catch(async (error) => {
+        if (!missingMethod(error)) throw error;
+        if (path) throw new Error("UNSUPPORTED: downloadPath needs a browser-level connection");
+        await this.port.send("Page.enable");
+      });
     } catch (error) {
       if (!this.on) {
         this.off?.();
@@ -382,4 +388,12 @@ export async function archivePage(
     capturedAt: new Date().toISOString(),
     ...(options.base64 === true || options.save ? { base64: bytesBase64(bytes) } : {}),
   };
+}
+
+// The attached target has no Browser domain: Chrome says "wasn't found" (-32601) or refuses
+// browser-level commands outright.
+function missingMethod(error: unknown): boolean {
+  return /-32601|wasn't found|browser-level commands/.test(
+    String((error as Error)?.message ?? error),
+  );
 }
