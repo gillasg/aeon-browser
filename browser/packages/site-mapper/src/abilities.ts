@@ -7,6 +7,7 @@ import { withResultAsserts, type AbilityAssert } from "./ability-assert.js";
 import { defaultHost } from "./ability-attempt.js";
 import { testedAbility, withTested, type AbilityTested } from "./ability-digest.js";
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
+import { syncSiteOps } from "./site-ops-sync.js";
 import { takeHealReceipt, type HealReceipt } from "./ability-heal.js";
 import { versionedSave } from "./ability-heal-receipt.js";
 import { rewindForAbility, type Rewind } from "./rewind.js";
@@ -402,6 +403,7 @@ export async function saveAbility(
   const inferred = inferredOf(prepared);
   const { ability: saved, healed } = await versionedSave(site, existing, next);
   await writeAtomic(path, JSON.stringify(saved, null, 2) + "\n");
+  await syncSiteOps(site);
   const warnings =
     options.check === false ? [] : [...contractWarnings(saved), ...scrubWarnings(scrub.marks)];
   return {
@@ -572,6 +574,7 @@ export async function trashAbility(
     join(abilityDirectory(site), abilitySlug(ability.name) + ".json"),
     join(abilityDirectory(site), "." + abilitySlug(ability.name) + "." + stamp + ".deleted"),
   );
+  await syncSiteOps(site);
   return true;
 }
 

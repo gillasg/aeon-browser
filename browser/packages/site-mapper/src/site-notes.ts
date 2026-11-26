@@ -1,9 +1,12 @@
 // Site notes are facts, not prose. A page the agent read cannot leave an instruction that
-// later visits load into the prompt. Each fact is a short key and value of a fixed kind.
+// later visits load into the prompt. Each fact is a short key and value of a fixed kind. They
+// live in the Facts section of the site's `SKILL.md`; every agent write passes the instruction
+// filter and the same-origin URL check here. The user's own section is written by `site-skill.ts`.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { siteDir, siteName } from "./registry.js";
+import { readSkillFile, writeSkillFile } from "./site-skill-file.js";
 
 export type SiteNoteKind = "selector" | "url" | "pace" | "quirk" | "page" | "control";
 
@@ -16,8 +19,8 @@ export interface SiteNote {
 const KEY_MAX = 40;
 const VALUE_MAX = 120;
 const FACT_MAX = 240;
-const NOTES_JSON = "notes.json";
-const NOTES_MD = "notes.md";
+const LEGACY_JSON = "notes.json";
+const LEGACY_MD = "notes.md";
 const KINDS = new Set<SiteNoteKind>(["selector", "url", "pace", "quirk", "page", "control"]);
 const KIND_CAP: Record<SiteNoteKind, number> = {
   selector: 30,
@@ -38,9 +41,8 @@ export async function readSiteNotes(site: string): Promise<string> {
 export async function readSiteFacts(site: string): Promise<SiteNote[]> {
   const stored = await readStored(site);
   if (stored) return stored;
-  const legacy = await readLegacy(site);
-  if (!legacy.trim()) return [];
-  const facts = factsFromText(legacy);
+  const facts = await readLegacy(site);
+  if (!facts.length) return [];
   await writeFacts(site, facts);
   return facts;
 }
@@ -169,7 +171,7 @@ function mergeFacts(current: readonly SiteNote[], incoming: readonly SiteNote[])
   return facts;
 }
 
-function originOk(site: string, note: SiteNote): boolean {
+export function originOk(site: string, note: SiteNote): boolean {
   const want =
     site
       .replace(/^www\./, "")
@@ -240,35 +242,41 @@ function slug(line: string): string {
 }
 
 async function readStored(site: string): Promise<SiteNote[] | undefined> {
-  try {
-    const parsed = JSON.parse(
-      await readFile(join(siteDir(siteName(site)), NOTES_JSON), "utf8"),
-    ) as { facts?: unknown };
-    if (!Array.isArray(parsed.facts)) return [];
-    return parsed.facts.flatMap((item) => {
-      const fact = acceptSiteNote(item);
-      return fact ? [fact] : [];
-    });
-  } catch {
-    return undefined;
-  }
+  const doc = await readSkillFile(site);
+  return doc ? acceptAll(doc.facts) : undefined;
 }
 
-async function readLegacy(site: string): Promise<string> {
+function acceptAll(items: readonly unknown[]): SiteNote[] {
+  return items.flatMap((item) => {
+    const fact = acceptSiteNote(item);
+    return fact ? [fact] : [];
+  });
+}
+
+/** Before `SKILL.md`: `notes.json` facts, or the older `notes.md` prose. Left on disk as they were. */
+async function readLegacy(site: string): Promise<SiteNote[]> {
+  const folder = siteDir(siteName(site));
   try {
-    return await readFile(join(siteDir(siteName(site)), NOTES_MD), "utf8");
+    const parsed = JSON.parse(await readFile(join(folder, LEGACY_JSON), "utf8")) as {
+      facts?: unknown;
+    };
+    if (Array.isArray(parsed.facts)) return acceptAll(parsed.facts);
   } catch {
-    return "";
+    // No facts file: try the prose file.
+  }
+  try {
+    return factsFromText(await readFile(join(folder, LEGACY_MD), "utf8"));
+  } catch {
+    return [];
   }
 }
 
 async function writeFacts(site: string, facts: readonly SiteNote[]): Promise<string> {
-  const folder = siteDir(siteName(site));
-  await mkdir(folder, { recursive: true });
-  const path = join(folder, NOTES_JSON);
-  const clean = facts.slice(0, FACT_MAX);
-  await writeFile(path, JSON.stringify({ facts: clean }, null, 2) + "\n", "utf8");
-  const rendered = renderSiteNotes(clean);
-  await writeFile(join(folder, NOTES_MD), rendered ? rendered + "\n" : "", "utf8");
-  return path;
+  return writeSkillFile(site, { facts: facts.slice(0, FACT_MAX) });
+}
+
+/** Re-renders `SKILL.md` after `api.json` changed, moving old notes in first so none are lost. */
+export async function refreshSiteSkill(site: string): Promise<string> {
+  await readSiteFacts(site);
+  return writeSkillFile(site, {});
 }

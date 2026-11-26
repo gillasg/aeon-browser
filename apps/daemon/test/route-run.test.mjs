@@ -136,13 +136,14 @@ test("a finished run saves a route and the next prompt gets the draft", async ()
     const saved = await listRoutes("shop.test");
     assert.equal(saved.length, 1);
     assert.equal(saved[0].watcher, undefined);
-    const again = await recorder.prepare("chat", "orders for 2025");
-    assert.equal(again.text, "orders for 2025");
+    assert.equal((await recorder.prepare("chat", "orders for 2025")).draft, undefined);
+    const again = await recorder.prepare("chat", "orders for 2024");
+    assert.equal(again.text, "orders for 2024");
     assert.equal(again.draft.site, "shop.test");
     assert.match(again.draft.cell, /await page\.click/);
-    assert.equal(again.draft.cell.includes("orders for 2025"), false);
+    assert.equal(again.draft.cell.includes("orders for 2024"), false);
     await recorder.observe("chat", { kind: "run-state", state: "running-unconfirmed" });
-    await recorder.observe("chat", stepEvent("shop.test", "Orders 2025"));
+    await recorder.observe("chat", stepEvent("shop.test", "Orders 2024"));
     await recorder.observe("chat", { kind: "run-state", state: "idle" });
     assert.match(cards.at(-1).card.items[0].text, /with a saved draft/);
     assert.equal(cards.at(-1).card.items[0].text.includes("from memory"), false);

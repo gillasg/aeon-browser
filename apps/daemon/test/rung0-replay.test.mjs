@@ -15,7 +15,8 @@ function route(overrides = {}) {
     id: "r1",
     site: "shop.test",
     signature: ["orders", "shop", "test"],
-    inputs: [{ name: "year", example: "2024" }],
+    inputs: [{ name: "year", example: "2025" }],
+    trigger: "orders on shop.test for 2025",
     inputHistory: [{ year: "2024" }, { year: "2025" }],
     steps: [],
     reads: [],
@@ -110,17 +111,15 @@ test("misses, doubt, errors and timeouts fall back instead of answering", async 
   assert.equal((await tryRung0(prompt, {}, unpromoted)).reason, "not promoted");
   const ambiguous = deps({ listRoutes: async () => [route({ ambiguous: true })] });
   assert.equal((await tryRung0(prompt, {}, ambiguous)).reason, "ambiguous slots");
-  // Two numbers in the prompt: which one is the year is a guess.
-  assert.equal(
-    (await tryRung0("orders on shop.test for 2025 and 2026", {}, deps())).reason,
-    "slot uncertain",
-  );
-  const weak = deps({
-    listRoutes: async () => [
-      route({ signature: ["orders", "shop", "test", "refunds", "returns"] }),
-    ],
-  });
-  assert.equal((await tryRung0(prompt, {}, weak)).reason, "low score");
+  // Only the exact saved request repeats; a look-alike or a new value goes to the model.
+  for (const lookAlike of [
+    "orders on shop.test for 2025 and 2026",
+    "orders on shop.test for 2026",
+    "refunds and orders on shop.test for 2025",
+  ])
+    assert.equal((await tryRung0(lookAlike, {}, deps())).reason, "no route", lookAlike);
+  const legacy = deps({ listRoutes: async () => [route({ trigger: undefined })] });
+  assert.equal((await tryRung0(prompt, {}, legacy)).reason, "no route");
   const stepsOnly = deps({
     readAbility: async () => ability({ ways: [{ kind: "steps", steps: [] }] }),
   });
@@ -143,7 +142,9 @@ test("the tab the prompt came from names the site; selections and attachments ne
   assert.equal(rung0Eligible({ text: "x", browserContext: page }), true);
   assert.equal(rung0Eligible({ text: "x", browserContext: { ...page, kind: "selection" } }), false);
   assert.equal(rung0Eligible({ text: "x", attachments: [{}] }), false);
-  const local = deps({ listRoutes: async () => [route({ signature: ["orders"] })] });
+  const local = deps({
+    listRoutes: async () => [route({ signature: ["orders"], trigger: "orders for 2025" })],
+  });
   const outcome = await tryRung0("orders for 2025", { sites: ["shop.test"] }, local);
   assert.equal(outcome.hit, true);
 });

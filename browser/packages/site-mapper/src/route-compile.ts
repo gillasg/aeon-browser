@@ -1,6 +1,7 @@
 // Compile a run into a route. Only a run with success evidence compiles. A correction never does.
 
 import { createHash } from "node:crypto";
+import { exactTrigger } from "./route-match.js";
 import { inferSlots } from "./route-slots.js";
 import type { ObservedStep, Route, RouteStep } from "./route-types.js";
 
@@ -54,6 +55,7 @@ export function compileRoute(input: CompileInput): CompileOutcome {
     okRuns: 1,
     lastOkAt: now.toISOString(),
     summary: signature.slice(0, 6).join(" ") || "saved run",
+    trigger: exactTrigger(input.prompt),
     cell: draftCell(steps),
     ambiguous: inferred.ambiguous,
     expiresAt: new Date(now.getTime() + LIFE * DAY).toISOString(),

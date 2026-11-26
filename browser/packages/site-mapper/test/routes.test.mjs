@@ -67,16 +67,28 @@ function steps(year) {
   ];
 }
 
-test("a later prompt matches the route and takes the new number", () => {
+test("only the exact same request repeats a route; a look-alike goes to the model", () => {
   const compiled = compileRoute({
     site: "shop.test",
-    prompt: "orders for 2024",
+    prompt: "Show my orders for 2024",
     steps: steps("2024"),
   });
   assert.equal(compiled.ok, true);
-  const hit = matchSavedRoute("orders for 2025", [compiled.route]);
-  assert.equal(hit.inputs.value, "2025");
-  assert.equal(matchSavedRoute("unrelated weather", [compiled.route]), undefined);
+  const hit = matchSavedRoute("  show my ORDERS for 2024. ", [compiled.route]);
+  assert.equal(hit.score, 1);
+  assert.equal(hit.inputs.value, "2024");
+  // Every one of these shares at least half of the route's words; none may match.
+  for (const prompt of [
+    "orders for 2025",
+    "show my orders for 2025",
+    "cancel my orders for 2024",
+    "show orders 2024",
+    "show my orders for 2024 and delete them",
+    "unrelated weather",
+  ])
+    assert.equal(matchSavedRoute(prompt, [compiled.route]), undefined, prompt);
+  const legacy = { ...compiled.route, trigger: undefined };
+  assert.equal(matchSavedRoute("show my orders for 2024", [legacy]), undefined);
 });
 
 test("a prompt value in a step becomes a slot, and two values in one arg do not", () => {

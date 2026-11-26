@@ -37,6 +37,8 @@ export interface Route {
   okRuns: number;
   lastOkAt: string;
   summary: string;
+  /** The normalized request this route repeats; only that exact request replays it. */
+  trigger?: string;
   cell: string;
   /** Two prompt values could fill one slot. Replay starts at rung 1. */
   ambiguous: boolean;

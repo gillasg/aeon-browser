@@ -10,6 +10,19 @@ import {
   siteSkillCall,
 } from "../dist/browser-site-skills.js";
 
+// Skills live in the unified site memory; each test gets its own home.
+const previousHome = process.env.SITE_TO_API_HOME;
+let home;
+test.beforeEach(async () => {
+  home = await mkdtemp(join(tmpdir(), "aeon-skills-home-"));
+  process.env.SITE_TO_API_HOME = home;
+});
+test.afterEach(async () => {
+  if (previousHome === undefined) delete process.env.SITE_TO_API_HOME;
+  else process.env.SITE_TO_API_HOME = previousHome;
+  await rm(home, { recursive: true, force: true });
+});
+
 test("imported skills are enabled", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "aeon-skills-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

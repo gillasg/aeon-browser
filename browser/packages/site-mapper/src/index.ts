@@ -444,3 +444,39 @@ export {
   type Rewind,
 } from "./rewind.js";
 export { elapsedLabel, mcpCommandForSite, runReceipt, type RunReceipt } from "./run-receipt.js";
+export {
+  agentWriteSiteSkill,
+  readSiteSkill,
+  siteSkillBrief,
+  SKILL_FILE,
+  skillPath,
+  writeSiteSkillUser,
+} from "./site-skill.js";
+export { OPS_FILE, opsPath, type SiteOpGuards, type SiteOpKind } from "./site-ops-file.js";
+export {
+  abilityOp,
+  compileSiteOps,
+  readSiteOps,
+  runSiteOp,
+  type SiteOp,
+  type SiteOpRun,
+  type SiteOpsFile,
+} from "./site-ops.js";
+export {
+  allHelpers,
+  dropHelper,
+  helperProblem,
+  saveHelper,
+  type HelperAuthor,
+  type SiteHelper,
+} from "./site-helpers.js";
+export {
+  enableSiteHelpers,
+  importSiteHelpers,
+  isSiteHelperRequest,
+  readSiteHelpers,
+  siteHelperCall,
+  type SiteHelperRequest,
+} from "./site-helpers-call.js";
+export { migrateLegacyHelpers } from "./site-memory-migrate.js";
+export { exactTrigger } from "./route-match.js";
