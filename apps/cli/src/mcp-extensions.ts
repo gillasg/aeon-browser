@@ -2,6 +2,8 @@ import { aeonDataDirectory } from "@aeon/location";
 import { EVENTS_EXTENSION, EventHub, nextEvent } from "./mcp-events.js";
 import { TASKS_EXTENSION, TaskManager, type TaskContext } from "./mcp-tasks.js";
 import type { CatalogTool } from "./catalog.js";
+import type { AeonClient } from "./client.js";
+import { BrowserTapSource, cellRunner } from "./mcp-tap-browser.js";
 
 // The events/* and tasks/* methods of `aeon mcp`, and the task runner behind them.
 
@@ -17,13 +19,15 @@ export const WATCH_TASK = "aeon_watch";
 export interface McpExtensions {
   events: EventHub;
   tasks: TaskManager;
-  close: () => void;
+  close: () => Promise<void>;
 }
 
 export function createExtensions(
   notify: (method: string, params: Json) => void,
   callTool: CallTool,
   catalog: () => readonly CatalogTool[],
+  /** The daemon behind the live aeon/tap streams of the connected browser. */
+  aeon?: () => Promise<AeonClient>,
 ): McpExtensions {
   const dataDirectory = aeonDataDirectory();
   const pollMs = Number(process.env.AEON_EVENTS_POLL_MS ?? 1000);
@@ -31,6 +35,7 @@ export function createExtensions(
     dataDirectory,
     notify,
     pollMs: Number.isFinite(pollMs) && pollMs >= 20 ? pollMs : 1000,
+    ...(aeon ? { tap: new BrowserTapSource(cellRunner(aeon)) } : {}),
   });
   const tasks = new TaskManager({
     dataDirectory,
@@ -40,9 +45,10 @@ export function createExtensions(
   return {
     events,
     tasks,
-    close: () => {
-      events.stop();
+    // Taps disarm through the daemon, so they finish before its socket goes.
+    close: async () => {
       tasks.close();
+      await events.close();
     },
   };
 }

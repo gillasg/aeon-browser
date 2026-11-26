@@ -183,7 +183,8 @@ function parentsOf(root: unknown, segments: string[]): unknown[] {
 
 const splitPath = (path: string): string[] => (path ? path.split(".") : []);
 
-function whereHolds(item: unknown, where: JsonWhere): boolean {
+/** Whether one JSON object satisfies a where clause (also used by live MCP tap filters). */
+export function whereHolds(item: unknown, where: JsonWhere): boolean {
   if (!isRecord(item)) return false;
   const value = item[where.key];
   if (where.exists !== undefined) return (value !== undefined) === where.exists;

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readEventLog, type AeonEventKind, type AeonEventRecord } from "@aeon/location";
 import { scrubSecrets } from "@aeon/protocol";
+import { TAP_EVENT, TAP_STREAM_INFO, TapStreams, type TapSource } from "./mcp-tap-stream.js";
 
 // MCP Events (io.modelcontextprotocol/events): routine firings as subscribable streams. A
 // subscriber polls with a cursor, or is pushed notifications/events/emitted while connected.
@@ -54,14 +55,19 @@ export interface EventHubOptions {
   dataDirectory: string;
   notify: (method: string, params: Json) => void;
   pollMs?: number;
+  /** Live frames for the aeon/tap family; without one, subscribing to it fails. */
+  tap?: TapSource;
 }
 
 export class EventHub {
   private readonly subscriptions = new Map<string, Subscription>();
   private timer: NodeJS.Timeout | undefined;
   private pushing = false;
+  private readonly taps: TapStreams;
 
-  constructor(private readonly options: EventHubOptions) {}
+  constructor(private readonly options: EventHubOptions) {
+    this.taps = new TapStreams(options.tap, options.notify);
+  }
 
   list(): Json {
     return {
@@ -69,11 +75,16 @@ export class EventHub {
         name: stream.name,
         description: stream.description,
         payloadSchema: PAYLOAD_SCHEMA,
-      })),
+      })).concat([TAP_STREAM_INFO as never]),
     };
   }
 
   async subscribe(params: Json): Promise<Json> {
+    if (params.name === TAP_EVENT) {
+      const subscriptionId = randomUUID();
+      await this.taps.subscribe(subscriptionId, params.filter);
+      return { subscriptionId, name: TAP_EVENT, cursor: "0" };
+    }
     const name = streamName(params.name);
     const filter = readFilter(params.filter);
     const cursor = params.cursor === undefined ? await this.latest() : parseCursor(params.cursor);
@@ -83,7 +94,9 @@ export class EventHub {
     return { subscriptionId, name, cursor: String(cursor) };
   }
 
-  unsubscribe(params: Json): Json {
+  async unsubscribe(params: Json): Promise<Json> {
+    const id = String(params.subscriptionId ?? "");
+    if (this.taps.has(id)) return { unsubscribed: await this.taps.end(id) };
     const removed = this.subscriptions.delete(String(params.subscriptionId ?? ""));
     if (!this.subscriptions.size) this.stop();
     return { unsubscribed: removed };
@@ -114,9 +127,16 @@ export class EventHub {
 
   private subscriptionFor(params: Json): Subscription | undefined {
     if (typeof params.subscriptionId !== "string") return undefined;
+    if (this.taps.has(params.subscriptionId)) throw new Error("aeon/tap is push-only: no poll");
     const subscription = this.subscriptions.get(params.subscriptionId);
     if (!subscription) throw new Error(`Unknown subscriptionId ${params.subscriptionId}`);
     return subscription;
+  }
+
+  /** The client is gone: polling stops and every live tap disarms. */
+  async close(): Promise<void> {
+    this.stop();
+    await this.taps.close();
   }
 
   stop(): void {
