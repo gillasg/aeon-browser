@@ -242,6 +242,7 @@ export class ChatService {
     name: string,
     session: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ content: unknown[]; isError: boolean }> => {
     if (name === CHAT_REVIEW_TOOL.name) return this.reviews.run(args);
     if (name === CONTEXT_TOOL.name)
@@ -265,7 +266,7 @@ export class ChatService {
         isError: false,
       }));
     if (!this.pi.callExternalTool) throw new Error("Aeon's tools are not available");
-    return this.pi.callExternalTool(name, session, args);
+    return this.pi.callExternalTool(name, session, args, signal);
   };
   async searchChats(
     query: string,

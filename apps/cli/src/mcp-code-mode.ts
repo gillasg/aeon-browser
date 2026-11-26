@@ -141,7 +141,7 @@ export class ParkingLot {
       status: "paused",
       handle,
       why: handoff.why,
-      kind: handoff.kind ?? "auth",
+      kind: handoff.kind ?? "handoff",
       where: { tab: handoff.tab ?? "", title: handoff.title ?? "" },
       expiresAt: new Date(now + PARK_MS).toISOString(),
       resumeWith: "aeon_resume",
@@ -240,14 +240,22 @@ export async function runParkableCell(
 interface TabRow {
   target?: { tabId?: number };
   title?: string;
-  handoff?: { message?: string; kind?: string };
+  /** This session's chat opened the tab. */
+  mine?: boolean;
+  handoff?: { message?: string; kind?: string; startedAt?: number };
 }
 
-/** The first pending hand-off in a tab listing. */
-export function pendingHandoff(tabs: unknown): Handoff | undefined {
+/** Hand-offs this long before the cell started still count, for clock rounding. */
+const HANDOFF_SKEW_MS = 250;
+
+/** The first pending hand-off in a tab listing that is this session's. Ownership decides first: a
+ * hand-off on a tab this session opened is ours, one on a tab it did not open is another client's
+ * (client B's hand-off never pauses client A's cell). Only a row without `mine` falls back to
+ * `since`: a hand-off already pending when the cell started belongs to another cell or client. */
+export function pendingHandoff(tabs: unknown, since?: number): Handoff | undefined {
   if (!Array.isArray(tabs)) return undefined;
   for (const tab of tabs as TabRow[])
-    if (tab?.handoff)
+    if (tab?.handoff && ownHandoff(tab, since))
       return {
         why: String(tab.handoff.message ?? ""),
         ...(tab.handoff.kind ? { kind: tab.handoff.kind } : {}),
@@ -257,13 +265,23 @@ export function pendingHandoff(tabs: unknown): Handoff | undefined {
   return undefined;
 }
 
-export const HANDOFF_TABS_CODE = `(await browser.tabs()).filter((tab) => tab.handoff).map((tab) => ({ target: tab.target, title: tab.title, handoff: tab.handoff }))`;
+function ownHandoff(tab: TabRow, since: number | undefined): boolean {
+  if (typeof tab.mine === "boolean") return tab.mine;
+  return !startedBefore(tab.handoff?.startedAt, since);
+}
+
+function startedBefore(startedAt: number | undefined, since: number | undefined): boolean {
+  if (since === undefined) return false;
+  return typeof startedAt !== "number" || startedAt < since - HANDOFF_SKEW_MS;
+}
+
+export const HANDOFF_TABS_CODE = `(await browser.tabs()).filter((tab) => tab.handoff).map((tab) => ({ target: tab.target, title: tab.title, mine: tab.mine, handoff: tab.handoff }))`;
 
 /** Polls `list` until it shows a hand-off (or no longer does, with `cleared`). */
 export async function pollHandoff(
   list: () => Promise<unknown>,
   signal: AbortSignal,
-  options: { cleared?: boolean; everyMs?: number; firstMs?: number } = {},
+  options: { cleared?: boolean; everyMs?: number; firstMs?: number; since?: number } = {},
 ): Promise<Handoff | undefined> {
   const every = options.everyMs ?? 1000;
   let wait = options.firstMs ?? every;
@@ -271,7 +289,7 @@ export async function pollHandoff(
     await sleep(wait, signal);
     wait = every;
     if (signal.aborted) return undefined;
-    const found = pendingHandoff(await list().catch(() => []));
+    const found = pendingHandoff(await list().catch(() => []), options.since);
     if (options.cleared ? !found : found) return found ?? { why: "" };
   }
   return undefined;

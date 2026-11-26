@@ -46,7 +46,8 @@ globalThis.chrome = {
   tabGroups: { TAB_GROUP_ID_NONE: -1 },
 };
 
-const { closeChatTab, agentTabSummary } = await import("../dist/native-browser-tab-cleanup.js");
+const { closeChatTab, agentTabSummary, isClosing } =
+  await import("../dist/native-browser-tab-cleanup.js");
 const { recordReplacement } = await import("../dist/native-browser-replaced.js");
 
 test("close detaches a grouped tab before remove and counts it", async () => {
@@ -111,4 +112,28 @@ test("closing a replaced id closes the tab that replaced it", async () => {
   assert.deepEqual(result, { closed: 9 });
   assert.equal(tabs.has(9), false);
   assert.equal(agentTabSummary("chat-d").closed, 1);
+});
+
+test("a tab is marked closing before remove, so its beforeunload is accepted", async () => {
+  tabs.clear();
+  order.length = 0;
+  detached = new Set();
+  tabs.set(12, tab(12));
+  const original = chrome.tabs.remove;
+  const seen = [];
+  chrome.tabs.remove = async (id) => {
+    // Chrome raises beforeunload here; the dialog handler asks isClosing.
+    seen.push(isClosing(id));
+    tabs.delete(id);
+  };
+  try {
+    const started = Date.now();
+    assert.deepEqual(await closeChatTab("chat-c", 12), { closed: 12 });
+    assert.ok(Date.now() - started < 1_000);
+    assert.deepEqual(seen, [true]);
+    tabs.set(13, tab(13));
+    assert.deepEqual(await closeChatTab("chat-c", 13), { closed: 13 });
+  } finally {
+    chrome.tabs.remove = original;
+  }
 });

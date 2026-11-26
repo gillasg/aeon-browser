@@ -170,6 +170,8 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
       browser: z.string().min(1).max(40).optional(),
     })
     .strict(),
+  /** The client cancelled its call (MCP notifications/cancelled): stop the work, not just the wait. */
+  z.object({ kind: z.literal("core.tool.cancel"), requestId: z.string().uuid() }).strict(),
 ]);
 export type CoreToolRequest = z.infer<typeof CoreToolRequestSchema>;
 

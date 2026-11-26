@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { serveMcpHttp } from "../dist/mcp-http.js";
+import { serveMcpHttp, sessionBindings } from "../dist/mcp-http.js";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 const auth = { authorization: "Bearer aeon_mcp_good" };
@@ -120,4 +120,29 @@ test("stdio: malformed JSON gets JSON-RPC -32700 Parse error", async () => {
   assert.equal(reply.id, null);
   assert.equal(reply.error.code, -32700);
   assert.equal(reply.error.message, "Parse error");
+});
+
+test("HTTP session bindings: another token is refused, and idle or closed sessions are dropped", () => {
+  const streams = new Map();
+  const bindings = sessionBindings(() => streams, 1_000_000);
+  try {
+    assert.equal(bindings.claim("s1", "alice"), true);
+    assert.equal(bindings.claim("s1", "bob"), false);
+    assert.equal(bindings.claim("s2", "bob"), true);
+    bindings.delete("s2");
+    assert.equal(bindings.size(), 1);
+  } finally {
+    bindings.stop();
+  }
+  const idle = sessionBindings(() => streams, 0);
+  try {
+    idle.claim("s3", "alice");
+    streams.set("s4", new Set());
+    idle.claim("s4", "alice");
+    idle.sweep();
+    // s3 expired; s4 still has an open stream.
+    assert.equal(idle.size(), 1);
+  } finally {
+    idle.stop();
+  }
 });

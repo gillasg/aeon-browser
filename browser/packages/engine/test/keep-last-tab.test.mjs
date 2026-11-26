@@ -178,3 +178,25 @@ test("on macOS the last agent tab of the only window keeps a blank tab in that w
     if (saved) Object.defineProperty(process, "platform", saved);
   }
 });
+
+test("a close that never settles times out and later closes still run", async () => {
+  const removed = [];
+  let hang = true;
+  const api = {
+    query: async () => [{ id: 1 }, { id: 2 }, { id: 3 }],
+    create: async () => undefined,
+    remove: (ids) => {
+      if (hang) {
+        hang = false;
+        return new Promise(() => {});
+      }
+      removed.push(ids);
+      return Promise.resolve();
+    },
+  };
+  const stuck = closeTabsKeepingBrowser(1, api);
+  const next = closeTabsKeepingBrowser(2, api);
+  await assert.rejects(stuck, /did not finish/);
+  await next;
+  assert.deepEqual(removed, [2]);
+});

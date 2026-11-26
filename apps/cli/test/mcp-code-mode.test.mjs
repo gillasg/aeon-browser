@@ -154,6 +154,21 @@ test("pendingHandoff and pollHandoff read the tab listing", async () => {
   assert.equal(found.why, "Passkey");
 });
 
+test("a hand-off counts by ownership first: another client's never pauses this cell", () => {
+  const theirs = { mine: false, title: "B", handoff: { message: "B login", startedAt: 5_000 } };
+  const ours = { mine: true, title: "A", handoff: { message: "A login", startedAt: 100 } };
+  // Client B raised a hand-off mid-cell (after `since`) on its own tab: not ours.
+  assert.equal(pendingHandoff([theirs], 1_000), undefined);
+  // Ours counts even if it started before `since` (e.g. a cell in this session raised it).
+  assert.equal(pendingHandoff([theirs, ours], 1_000)?.why, "A login");
+  // No ownership field: `since` is the fallback.
+  assert.equal(pendingHandoff([{ handoff: { message: "old", startedAt: 100 } }], 1_000), undefined);
+  assert.equal(
+    pendingHandoff([{ handoff: { message: "new", startedAt: 2_000 } }], 1_000)?.why,
+    "new",
+  );
+});
+
 test("client tokens: hashed at rest in a 0600 file, verified, revoked", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "aeon-tokens-"));
   t.after(() => rm(dir, { recursive: true, force: true }));

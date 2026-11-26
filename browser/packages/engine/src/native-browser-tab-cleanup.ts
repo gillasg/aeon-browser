@@ -12,6 +12,7 @@ import { onEngineInstall } from "./native-engine-install.js";
 import { followReplacement } from "./native-browser-replaced.js";
 import { spaceWindowIds } from "./native-browser-spaces.js";
 import { setFetchTabOwner } from "./native-browser-fetch-tab.js";
+import { setClosingTab } from "./evidence/dialogs.js";
 
 type Tracked = {
   touched: number;
@@ -175,6 +176,11 @@ export function guardAgentTab(tabId: number, guard: boolean): void {
   else guarded.delete(tabId);
 }
 
+/** True while the agent is closing this tab (its beforeunload is then accepted). */
+export function isClosing(tabId: number): boolean {
+  return closing.has(tabId);
+}
+
 export function isAgentTab(tabId: number): boolean {
   return tracked.has(tabId);
 }
@@ -239,15 +245,16 @@ export async function closeChatTab(chatId: string, tabId: number): Promise<{ clo
  * is still there. The close counts only after the tab is gone.
  */
 async function removeVerified(tabId: number): Promise<boolean> {
+  // Marked before anything else, so a beforeunload raised by the close is accepted, not held.
+  closing.add(tabId);
   for (let attempt = 0; attempt < 2; attempt++) {
     await releaseForClose(tabId);
-    closing.add(tabId);
     await chrome.tabs.remove(tabId).catch(() => undefined);
-    closing.delete(tabId);
     tracked.delete(tabId);
     const still = await chrome.tabs.get(tabId).catch(() => undefined);
     if (!still) return true;
   }
+  closing.delete(tabId);
   return false;
 }
 
@@ -465,6 +472,7 @@ function save(): void {
 
 onEngineInstall(() => {
   setFetchTabOwner(isAgentTab);
+  setClosingTab(isClosing);
   chrome.runtime.onStartup.addListener(() => {
     tracked.clear();
     stats.clear();

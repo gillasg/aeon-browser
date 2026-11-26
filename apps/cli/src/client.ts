@@ -145,8 +145,11 @@ export class AeonClient {
         finish();
         reject(noReply(what));
       }, timeoutMs);
-      // A 2026-07-28 notifications/cancelled stops waiting on this reply. The call is not retried.
+      // A 2026-07-28 notifications/cancelled stops the call in Aeon too, so the session's next
+      // cell is not queued behind it. The call is not retried.
       const onAbort = () => {
+        if (this.waiting.has(requestId))
+          this.socket.send(JSON.stringify({ kind: "core.tool.cancel", requestId }));
         finish();
         reject(new Error("MCP_REQUEST_CANCELLED: the tool call was cancelled."));
       };
