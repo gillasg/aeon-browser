@@ -296,6 +296,40 @@ test("downloads track willBegin to completed or canceled and stop cleanly", asyn
   assert.deepEqual(clawDomains(claws), []);
 });
 
+test("downloads fall back to the tab's Page events when the Browser domain is out of reach", async () => {
+  const refused = new Error('{"code":-32000,"message":"Cannot not access browser-level commands"}');
+  const port = fakePort({ "Browser.setDownloadBehavior": refused });
+  const claws = makeClaws(port);
+  await assert.rejects(
+    runClaw(claws, { claws: "downloads.start", options: { downloadPath: "/tmp/dl" } }),
+    /UNSUPPORTED: downloadPath/,
+  );
+  assert.equal(port.listenerCount(), 0);
+  await runClaw(claws, { claws: "downloads.start" });
+  assert.deepEqual(port.methods(), [
+    "Browser.setDownloadBehavior",
+    "Browser.setDownloadBehavior",
+    "Page.enable",
+  ]);
+  const waiting = runClaw(claws, { claws: "downloads.waitFor", filter: { filename: "r.csv" } });
+  port.emit("Page.downloadWillBegin", {
+    guid: "p1",
+    url: "https://app.test/r.csv",
+    suggestedFilename: "r.csv",
+  });
+  port.emit("Page.downloadProgress", {
+    guid: "p1",
+    state: "completed",
+    totalBytes: 3,
+    receivedBytes: 3,
+  });
+  const done = await waiting;
+  assert.equal(done.state, "completed");
+  assert.equal(done.totalBytes, 3);
+  await runClaw(claws, { claws: "downloads.stop" });
+  assert.equal(port.listenerCount(), 0);
+});
+
 test("PDF and MHTML receipts carry a sha256 digest and scrubbed metadata", async () => {
   const pdf = Buffer.from("%PDF-1.7 fake");
   const mhtml = "From: <Saved by Blink>\r\nContent-Type: multipart/related";
