@@ -24,6 +24,8 @@ import { enableQuietTab } from "./native-browser-quiet.js";
 import { refreshInventoryTab } from "./native-inventory-client.js";
 import { BrowserActionError, assertOpenable, sameIdentity } from "./native-browser-common.js";
 import { navigateReady } from "./native-browser-navigation.js";
+import { navigationFailure } from "./native-browser-load-result.js";
+import { settleOpenedTab } from "./native-browser-tab-replaced.js";
 import { noteAgentNavigation, setAgentOpenedTab } from "./evidence/dialogs.js";
 import { captureFromTabStart } from "./native-browser-network.js";
 import { placementSpace } from "./native-browser-placement.js";
@@ -66,10 +68,10 @@ export async function openTab(
   if (step.quiet) await enableQuietTab(created.id, { ads: step.ads === true });
   const navigation = await navigateOpenedTab(created.id, step.url, step.timeoutMs, step.referer);
   assertRequestActive(request);
-  const tab = await refreshInventoryTab(created.id);
+  const { id, tab } = await settleOpenedTab(created.id, refreshInventoryTab);
   if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
-  bindBrowserSession(created.id, request.chatId);
-  const label = noteLabel(request.chatId, created.id, tab.url);
+  bindBrowserSession(id, request.chatId);
+  const label = noteLabel(request.chatId, id, tab.url);
   return BrowserExecutorResultSchema.parse({
     kind: "tab",
     tab: { ...tab, ...(label ? { label, control: "agent" as const } : {}) },
@@ -90,17 +92,10 @@ async function navigateOpenedTab(
 ): Promise<string | undefined> {
   try {
     noteAgentNavigation(tabId);
-    const note = await withBrowserDebugger(tabId, async () => {
+    return await withBrowserDebugger(tabId, async () => {
       await captureFromTabStart(tabId);
-      const ready = await navigateReady(tabId, url, timeoutMs, referer);
-      return ready.note;
+      return navigationFailure(await navigateReady(tabId, url, timeoutMs, referer));
     });
-    // "Still loading: N requests pending" is a healthy page with beacons left, not a failure.
-    const failure = note
-      ?.split("; ")
-      .filter((part) => !/^Still loading:/.test(part))
-      .join("; ");
-    return failure ? failure.slice(0, 400) : undefined;
   } catch (error) {
     // The reason names Chrome's own error (net::ERR_CONNECTION_REFUSED…), not just our code.
     const detail = error instanceof BrowserActionError ? error.detail : undefined;
