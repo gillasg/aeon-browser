@@ -207,6 +207,24 @@ export {
   type BundleGraph,
 } from "./bundle-graph.js";
 export {
+  applyRebind,
+  isHealableFailure,
+  pathScore,
+  proposeRebind,
+  safeToReplay,
+  trustedOrigin,
+  type BundleHealKind,
+  type BundleHealReceipt,
+  type BundleRebind,
+} from "./bundle-heal.js";
+export {
+  callWithBundleHeal,
+  healOpFromBundle,
+  resetBundleHealCache,
+  type BundleHealDeps,
+  type BundleHealOutcome,
+} from "./bundle-heal-run.js";
+export {
   decodeMap,
   decodeVlq,
   discoverMapUrl,

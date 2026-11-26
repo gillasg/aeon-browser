@@ -111,6 +111,7 @@ var siteMapper=Object.freeze({
   sites:()=>__call({siteMapper:'sites'}),
   operations:site=>__call({siteMapper:'operations', ...(__siteObject(site) || {site})}),
   call:(site,operation,params={})=>__call({siteMapper:'call', ...(__siteObject(site) || {site,operation,params})}),
+  heal:(site,operation,params={},options={})=>__call({siteMapper:'heal', ...(__siteObject(site) || {site,operation,params,options})}),
   undo:(site,operation,params={})=>__call({siteMapper:'undo', ...(__siteObject(site) || {site,operation,params})}),
   write:(site,operation,params={})=>__call({siteMapper:'write', ...(__siteObject(site) || {site,operation,params})}),
   batch:(site,operation,items,options={})=>{
