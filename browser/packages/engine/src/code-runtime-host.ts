@@ -70,6 +70,7 @@ import { engineConfig } from "./engine-config.js";
 import { agentTabSummary, keepStepsTabs, unusedAgentTabs } from "./native-browser-tab-cleanup.js";
 import { setOwnerTitle } from "./native-browser-owner.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
+import { uploadPaths } from "./code-upload-paths.js";
 
 const MAX_STEPS = 1000;
 const MAX_TRACE = 256;
@@ -691,7 +692,7 @@ async function prepare(cell: Cell, value: Record<string, unknown>): Promise<Brow
         ? "window"
         : (cell.run.space ?? engineConfig.defaultSpace(cell.run.chatId));
   if (value.op === "upload" && Array.isArray(value.files))
-    value.files = await callCore(cell, { validateUpload: value.files });
+    value.files = uploadPaths(await callCore(cell, { validateUpload: value.files }));
   const parsed = BrowserStepSchema.safeParse(value);
   if (parsed.success) return parsed.data;
   // The model's arguments did not fit the step: name the field, so it can fix that one.

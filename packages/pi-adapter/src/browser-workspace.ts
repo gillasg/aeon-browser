@@ -334,3 +334,19 @@ export async function validateUploadFiles(files: string[], root: string): Promis
     }),
   );
 }
+
+/**
+ * Workspace files and upload checks for a cell with no chat around it (`aeon repl`, CLI
+ * commands): the same answers a chat's cells get, rooted in `root`. Undefined when the request
+ * is neither, so the caller can try its other handlers.
+ */
+export function cellWorkspaceCall(request: unknown, root: string): Promise<unknown> | undefined {
+  if (isWorkspaceRequest(request))
+    return mkdir(root, { recursive: true }).then(() => workspaceCall(root, request));
+  const upload = (request as { validateUpload?: unknown } | null)?.validateUpload;
+  if (Array.isArray(upload))
+    return mkdir(root, { recursive: true }).then(() =>
+      validateUploadFiles(upload.map(String), root),
+    );
+  return undefined;
+}

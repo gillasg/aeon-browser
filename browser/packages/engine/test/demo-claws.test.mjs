@@ -403,31 +403,55 @@ function editorDom(kind) {
     InputEvent,
     Event: InputEvent,
     getSelection: () => ({ removeAllRanges() {}, addRange() {} }),
+    setTimeout,
   });
   context.globalThis = context;
   return { context, node, events, read: () => doc };
 }
 
-test("editor: detects, reads and writes CodeMirror, ProseMirror and textarea", () => {
+test("editor: detects, reads and writes CodeMirror, ProseMirror and textarea", async () => {
   const cm = editorDom("codemirror");
-  assert.equal(runIn(cm.context, editorDetect, {}).kind, "codemirror");
-  assert.equal(runIn(cm.context, editorDetect, { op: "insert", text: "!" }).length, 6);
+  assert.equal((await runIn(cm.context, editorDetect, {})).kind, "codemirror");
+  assert.equal((await runIn(cm.context, editorDetect, { op: "insert", text: "!" })).length, 6);
   assert.equal(cm.read(), "hello!");
-  runIn(cm.context, editorDetect, { op: "replace", text: "new" });
-  assert.deepEqual(plain(runIn(cm.context, editorDetect, { op: "read" }).lines), ["new"]);
+  await runIn(cm.context, editorDetect, { op: "replace", text: "new" });
+  assert.deepEqual(plain((await runIn(cm.context, editorDetect, { op: "read" })).lines), ["new"]);
 
   const pm = editorDom("prosemirror");
   assert.equal(
-    runIn(pm.context, editorDetect, { op: "insert", text: " world" }).kind,
+    (await runIn(pm.context, editorDetect, { op: "insert", text: " world" })).kind,
     "prosemirror",
   );
   assert.equal(pm.node.textContent, "hello world");
 
   const ta = editorDom("textarea");
-  runIn(ta.context, editorDetect, { op: "replace", text: "typed" });
+  await runIn(ta.context, editorDetect, { op: "replace", text: "typed" });
   assert.equal(ta.node.value, "typed");
   assert.deepEqual(ta.events, ["input", "change"]);
-  assert.equal(runIn(editorDom("none").context, editorDetect, {}).kind, null);
+  assert.equal((await runIn(editorDom("none").context, editorDetect, {})).kind, null);
+});
+
+test("editor: a Lexical-like editor that ignores DOM inserts is written through its own state", async () => {
+  const lex = editorDom("lexical");
+  lex.context.document.querySelector = (sel) => (sel === "[data-lexical-editor]" ? lex.node : null);
+  lex.context.document.execCommand = () => true;
+  lex.node.__lexicalEditor = {
+    parseEditorState: (json) => json,
+    setEditorState: (state) => {
+      lex.node.innerText = state.root.children
+        .map((p) => p.children.map((t) => t.text).join(""))
+        .join("\n\n");
+    },
+  };
+  const done = await runIn(lex.context, editorDetect, { op: "replace", text: "fresh\ntext" });
+  assert.equal(done.done, "replace");
+  assert.equal(done.effect, "confirmed");
+  assert.equal(lex.node.innerText, "fresh\n\ntext");
+
+  delete lex.node.__lexicalEditor;
+  const stuck = await runIn(lex.context, editorDetect, { op: "replace", text: "never" });
+  assert.equal(stuck.done, false);
+  assert.equal(stuck.effect, "unconfirmed");
 });
 
 test("cache read: filters by name, url regex and type, parses JSON, bounds size", async () => {

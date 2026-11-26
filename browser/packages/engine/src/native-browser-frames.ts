@@ -8,12 +8,13 @@ import { onNode } from "./native-browser-dom.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
 interface FrameNode {
-  frame: { id: string; url: string; loaderId?: string; parentId?: string };
+  frame: { id: string; url: string; name?: string; loaderId?: string; parentId?: string };
   childFrames?: FrameNode[];
 }
 interface FrameInfo {
   frameId: string;
   url: string;
+  name?: string;
   frameKey: string;
   sessionId?: string;
   parentFrameId?: string;
@@ -159,6 +160,7 @@ function appendFrameTree(
     const info = {
       frameId: node.frame.id,
       url: node.frame.url,
+      ...(node.frame.name ? { name: node.frame.name } : {}),
       frameKey: node.frame.id + ":" + (node.frame.loaderId ?? ""),
       ...(source.sessionId ? { sessionId: source.sessionId } : {}),
       ...(parent ? { parentFrameId: parent } : {}),

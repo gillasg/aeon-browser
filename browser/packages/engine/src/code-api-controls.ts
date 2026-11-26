@@ -22,12 +22,13 @@ function __pageControls(arg) {
   var SELECTOR = 'input,select,textarea,button,a[href],[role],[contenteditable]';
   var FIELDS = ['checkbox','radio','switch','combobox','listbox','slider','spinbutton','textbox','searchbox','file','color'];
   var ACTIONS = ['button','link','tab','menuitem','menuitemcheckbox','menuitemradio','option','treeitem'];
+  // Aeon's own overlay (the orb, the hand-off card) is not the page: fillForm never reads it.
   var deep = (selector) => {
     var roots = [document], out = [];
     while (roots.length) {
       var root = roots.shift();
-      out.push(...root.querySelectorAll(selector));
-      for (var el of root.querySelectorAll('*')) if (el.shadowRoot) roots.push(el.shadowRoot);
+      out.push(...[...root.querySelectorAll(selector)].filter((el) => !el.closest('[data-aeon-overlay]')));
+      for (var el of root.querySelectorAll('*')) if (el.shadowRoot && !el.closest('[data-aeon-overlay]')) roots.push(el.shadowRoot);
     }
     return out;
   };
@@ -326,6 +327,13 @@ async function __batchFind(target, op, wait = true) {
   return {frame, token, selector: '[data-aeon-t="' + token + '"]', control: found.control};
 }
 async function __batchFrame(target, part) {
+  // An exact frameKey/frameId, index, {name, url, index} or 'srcdoc' names one frame outright.
+  var all = await browser.page(target).frames().catch(() => []);
+  if (typeof part !== 'string' || /^(about:)?srcdoc$/i.test(part) || all.some((f) => f.frameKey === part || f.frameId === part)) {
+    var hit = __matchFrame(all, part);
+    if (!hit) throw Error('FRAME: no frame matches ' + JSON.stringify(part) + '; await page.frames() lists them');
+    return hit;
+  }
   var frames = (await __otherFrames(target)).filter((f) => String(f.url).includes(String(part)));
   if (frames.length !== 1) throw Error('FRAME: ' + frames.length + ' frames have ' + JSON.stringify(part) + ' in their URL; await page.frames() lists them');
   return frames[0];
