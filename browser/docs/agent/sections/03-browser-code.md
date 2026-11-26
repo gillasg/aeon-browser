@@ -19,6 +19,10 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
   {page, kind, actionLabel, target})`, `human.signIn()`, `human.fillProfile()` and
   `human.fillCode()` are `bu.handoff`/`signIn`/`fillProfile`/`fillCode`; `site.ops/call/watch/write`
   are `siteMapper.*`; `page.wire([{match, abort: true}])` sets `page.rules` and returns `{undo}`.
+- `locator.fill(v)` returns `{value, via, committed}` (`via` is `keys`, `insertText`, `paste` or
+  `native-setter`). `{commit: 'enter' | 'blur' | 'change'}` commits after the fill: Enter for a
+  search box or combobox, blur or change for fields that save on leave. `first()` fills the copy
+  on screen; one stuck off-screen is `TARGET_HIDDEN`.
 - Hold a control with `page.hold(target, {ms})`, `bu.hold(id, {ms})` or `page.holdAt(x, y, {ms})`
   (1500 ms unless `{ms}` says otherwise, at most 15000): a hold-to-confirm button, a long-press
   menu or hold-to-record. The receipt matches a click. `help('visual')`.

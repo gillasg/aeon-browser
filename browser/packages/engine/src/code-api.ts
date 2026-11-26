@@ -83,7 +83,7 @@ function __locator(target, element, index) {
     element,
     click: (options) => __step(Object.assign({op:'click',target,element:__wire(element),observe:false}, __pointerFields(options))),
     hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
-    fill: (value, options) => { var ms = __stepTimeout(options); return __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})}); },
+    fill: async (value, options) => { var ms = __stepTimeout(options); return __fillDone(target, element, index, options, await __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})})); },
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
     getByRole: (role, options = {}) => {
       if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with page.locator(css).getByRole(...)');

@@ -301,11 +301,13 @@ export function isStaleBeforeInsert(error: unknown): boolean {
   );
 }
 
+/** Which input landed a fill: real keys, one insert (or the editing command), a paste, or the setter. */
+export type FillVia = "keys" | "native-setter" | "insertText" | "paste";
 export async function fillTextNode(
   debuggee: chrome.debugger.Debuggee,
   id: number,
   value: string,
-): Promise<string | undefined> {
+): Promise<{ readback: string; via: FillVia }> {
   const group = "aeon-fill-" + crypto.randomUUID();
   try {
     const source = (await send(
@@ -351,14 +353,15 @@ export async function fillTextNode(
     else await clearSelection(debuggee);
     const field = node.node.backendNodeId;
     const kept = await retained(debuggee, field, value);
-    if (kept !== undefined) return kept;
+    if (kept !== undefined) return { readback: kept, via: keys ? "keys" : "insertText" };
     // Rich-text editors (Draft.js, ProseMirror, Lexical, Slate, Quill) can drop or reorder typed
     // characters; the editing command and a paste are what they reliably accept.
     for (const replace of [insertTextCommand, pasteText]) {
       if (!value || !(await onNode<boolean>(debuggee, field, isRichText))) break;
       await onNode(debuggee, field, replace, [value]);
       const after = await retained(debuggee, field, value);
-      if (after !== undefined) return after;
+      if (after !== undefined)
+        return { readback: after, via: replace === pasteText ? "paste" : "insertText" };
     }
     throw new BrowserActionError(
       "INPUT_FAILED",
