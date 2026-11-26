@@ -1,4 +1,4 @@
-// The fast path's score: the same synthesized cues as the video kit (templates/video/src/sound.ts):
+// The fast path's score: synthesized cues from events.json:
 // hushed keys, a dry trigger, a soft arrival note and a bell chord on receipts. Pure TypeScript,
 // deterministic, 48 kHz 16-bit stereo, no audio assets and no dependencies.
 import type { SoundCueKind } from "./record-events.js";

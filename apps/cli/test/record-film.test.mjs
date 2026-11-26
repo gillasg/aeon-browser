@@ -1,6 +1,6 @@
 // Clock and frame truth, the beat bus, director steps, the scanline join, qualify and `aeon film`.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -20,7 +20,7 @@ import {
   today,
 } from "../dist/record-qualify.js";
 import { frameTruthError, parseProgress, progressArgs, trueT0 } from "../dist/record-truth.js";
-import { contactSheetArgs, directorFor, film, FILM_STAGES, preflight } from "../dist/film-cmd.js";
+import { contactSheetArgs, film, preflight, renderArgs, renderKit } from "../dist/film-cmd.js";
 
 test("t0 is the first frame, never before the spawn", () => {
   assert.equal(trueT0({ spawnAt: 1000, now: 1500, mtimeMs: 1180 }), 1180);
@@ -231,57 +231,112 @@ test("qualify: three passes in a row, same plan, same day", async () => {
   assert.equal(qualified(flaky, hash, now).ok, false);
 });
 
-test("aeon film: refuses without qualify, then runs every stage in order", async () => {
+const filmDeps = (dir, ran, written) => ({
+  log: () => undefined,
+  shoot: async () => [join(dir, "takes/01-boost")],
+  run: (cmd, args, cwd) => (ran.push({ line: [cmd, ...args].join(" "), cwd }), 0),
+  copy: (from, to) => written.push(["copy", from, to]),
+  read: () => JSON.stringify({ clip: { fps: 60 } }),
+  write: (p, d) => writeFileSync(p, d),
+  now: () => Date.now(),
+});
+const qualifyFile = (dir, clip) =>
+  writeFileSync(
+    join(dir, "qualify.json"),
+    JSON.stringify({
+      planHash: planHash(clip),
+      date: today(),
+      runs: [1, 2, 3].map(() => ({ ok: true, reasons: [], ms: 1 })),
+    }),
+  );
+
+test("aeon film: camera only, no kit: qualify, shoot, raw contact sheet, take.json", async () => {
   const dir = mkdtempSync(join(tmpdir(), "aeon-film-"));
   try {
     const clipPath = join(dir, "clip.json");
     writeFileSync(clipPath, JSON.stringify(clipJson));
     const clip = parseClip(clipJson);
-    const kit = join(dir, "kit");
-    mkdirSync(join(kit, "src"), { recursive: true });
     const ran = [];
-    const deps = {
-      log: () => undefined,
-      shoot: async () => [join(dir, "takes/01-boost")],
-      run: (cmd, args) => (ran.push([cmd, ...args].join(" ")), 0),
-      copy: () => undefined,
-      write: (p, d) => writeFileSync(p, d),
-      now: () => Date.now(),
-    };
-    const options = { kit, out: dir, ffmpeg: "ffmpeg" };
+    const written = [];
+    const deps = filmDeps(dir, ran, written);
+    const options = { out: dir, ffmpeg: "ffmpeg" };
     await assert.rejects(film(clipPath, clip, options, deps), /Not filming/);
-    writeFileSync(
-      join(dir, "qualify.json"),
-      JSON.stringify({
-        planHash: planHash(clip),
-        date: today(),
-        runs: [1, 2, 3].map(() => ({ ok: true, reasons: [], ms: 1 })),
-      }),
-    );
+    qualifyFile(dir, clip);
     const result = await film(clipPath, clip, options, deps);
-    assert.deepEqual(result.stages, [...FILM_STAGES]);
-    assert.ok(ran[0].includes("scripts/render.mjs DirectorCut --house --frames-dir"));
-    assert.ok(ran[1].includes("tile=4x3"));
-    const director = JSON.parse(readFileSync(join(kit, "src/director.json"), "utf8"));
-    assert.equal(director.house, true);
-    assert.equal(director.end.command, "aeon boosts");
+    assert.deepEqual(result.stages, ["preflight", "qualify", "shoot", "contact", "deliver"]);
+    assert.equal(ran.length, 1, "no kit, no render");
+    assert.ok(ran[0].line.includes("tile=4x3"));
+    assert.ok(ran[0].line.includes("-framerate 60"));
+    assert.ok(ran[0].line.includes(join(dir, "takes/01-boost/frames/%06d.jpg")));
+    assert.equal(written.length, 0);
     const meta = JSON.parse(readFileSync(result.meta, "utf8"));
-    assert.equal(meta.house, true);
+    assert.equal(meta.frames, join(dir, "takes/01-boost/frames"));
+    assert.equal(meta.events, join(dir, "takes/01-boost/events.json"));
+    assert.equal(meta.contact, join(dir, "contact.png"));
     assert.equal(meta.planHash, planHash(clip));
+    assert.equal(meta.video, undefined);
+    assert.ok(!existsSync(join(dir, "src/director.json")));
+    const skipped = await film(clipPath, clip, { ...options, skipQualify: true }, deps);
+    assert.ok(!skipped.stages.includes("qualify"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("film preflight and defaults never print an npx command", () => {
-  assert.equal(
-    preflight({ kit: "/k", kitReady: true, freeBytes: 9 * 1024 ** 3, ffmpeg: true }).length,
-    0,
+test("aeon film --kit stages the take and renders Scene, forwarding stills", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "aeon-film-"));
+  try {
+    const clipPath = join(dir, "clip.json");
+    writeFileSync(clipPath, JSON.stringify(clipJson));
+    const clip = parseClip(clipJson);
+    qualifyFile(dir, clip);
+    const kit = join(dir, "kit");
+    const ran = [];
+    const written = [];
+    const options = { kit, out: dir, ffmpeg: "ffmpeg", stills: "0,120", stillMs: "2000" };
+    const result = await film(clipPath, clip, options, filmDeps(dir, ran, written));
+    assert.deepEqual(result.stages, [
+      "preflight",
+      "qualify",
+      "shoot",
+      "contact",
+      "render",
+      "deliver",
+    ]);
+    const render = ran.find((r) => r.line.includes("scripts/render.mjs"));
+    assert.equal(render.cwd, kit);
+    assert.ok(render.line.includes("scripts/render.mjs Scene --frames-dir"));
+    assert.ok(render.line.includes("--stills 0,120 --still-ms 2000"));
+    assert.ok(!/house|DirectorCut|lint/.test(render.line));
+    assert.deepEqual(written[0].slice(1), [
+      join(dir, "takes/01-boost/events.json"),
+      join(kit, "src/recording.json"),
+    ]);
+    assert.equal(JSON.parse(readFileSync(result.meta, "utf8")).video, join(dir, "film.mp4"));
+    assert.throws(
+      () => renderKit(kit, "/t", { out: "/o.mp4" }, { run: () => 1, copy: () => undefined }),
+      /render failed/,
+    );
+    assert.deepEqual(renderArgs("/t", "/o.mp4", {}), [
+      "scripts/render.mjs",
+      "Scene",
+      "--frames-dir",
+      join("/t", "frames"),
+      "--out",
+      "/o.mp4",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("film preflight needs no kit and never prints an npx command", () => {
+  assert.equal(preflight({ freeBytes: 9 * 1024 ** 3, ffmpeg: true }).length, 0);
+  assert.equal(preflight({ freeBytes: 0, ffmpeg: false }).length, 2);
+  assert.match(
+    preflight({ kit: "/k", kitReady: false, freeBytes: 9 * 1024 ** 3, ffmpeg: true })[0],
+    /npm install/,
   );
-  assert.equal(
-    preflight({ kit: undefined, kitReady: false, freeBytes: 0, ffmpeg: false }).length,
-    3,
-  );
-  assert.ok(!JSON.stringify(directorFor(parseClip({ scenes: clipJson.scenes }))).includes("npx"));
-  assert.ok(contactSheetArgs("a.mp4", "b.png").includes("b.png"));
+  assert.ok(!contactSheetArgs("f", "b.png").join(" ").includes("npx"));
+  assert.ok(contactSheetArgs("f", "b.png").includes("b.png"));
 });

@@ -523,14 +523,14 @@ with what it has.`,
     {
       name: "video",
       group: "Aeon",
-      summary: "copy the Director's Studio Remotion kit for rendering a recording",
+      summary: "copy the Open Studio Remotion kit for editing a recording",
       help: `Usage: aeon video kit <dir>
 
-Copies the Director's Studio Remotion kit into <dir>: DirectorCut (1920x1080),
-DirectorSquare (1080x1080) and RecordingRaw compositions; Stage, Camera, Pair,
-Hold, TimeCut, EditorialBeat and End primitives driven by events.json from
-\`aeon record\`; a synthesized score; and a taste linter that runs before every
-render. Aeon records; Remotion renders. See the kit's README.`,
+Copies the Open Studio Remotion kit into <dir>: a blank src/Scene.tsx that plays the raw
+take full-bleed and is rewritten from scratch for each video, RecordingRaw for unedited
+proof, src/recording.ts timing helpers over events.json from \`aeon record\`, and
+scripts/render.mjs (MP4 or --stills PNGs for review). Aeon records; Remotion renders.
+See the kit's README.`,
       run: (args) => videoCommand(args),
     },
     filmEntry(host),

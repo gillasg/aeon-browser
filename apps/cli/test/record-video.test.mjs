@@ -129,18 +129,18 @@ test("aeon video kit copies the Remotion starter kit without adding a dependency
       "README.md",
       "EVENTS.md",
       "src/Root.tsx",
-      "src/DirectorCut.tsx",
-      "src/Stage.tsx",
-      "src/camera.ts",
-      "src/lint.ts",
-      "scripts/generate-audio.mjs",
+      "src/Scene.tsx",
+      "src/recording.ts",
+      "src/RecordingRaw.tsx",
+      "scripts/render.mjs",
       "public/frames/000001.jpg",
     ])
       assert.ok(existsSync(join(target, file)), `${file} was copied`);
     const readme = readFileSync(join(target, "README.md"), "utf8");
     assert.match(readme, /events\.json/);
-    assert.match(readme, /DirectorCut/);
-    assert.match(readme, /1920×1080/);
+    assert.match(readme, /Scene\.tsx/);
+    assert.match(readme, /--stills/);
+    assert.ok(!existsSync(join(target, "src/DirectorCut.tsx")));
     const aeonPackage = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"));
     assert.ok(
       !aeonPackage.dependencies?.remotion && !aeonPackage.devDependencies?.remotion,

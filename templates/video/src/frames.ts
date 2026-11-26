@@ -1,15 +1,25 @@
-// Which source frames an edit actually shows, so staging links only those (≤ a few hundred)
-// instead of copying a whole take.
-import { frameAt, toSource, videoLength } from "./timeline.ts";
-import type { DirectorEdit } from "./types.ts";
+// Captured frames on disk: list a take's frames/ and stage them into the kit's public/frames.
+import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 
-export function referencedFrames(edit: DirectorEdit): string[] {
-  const picture = videoLength(edit.segments);
-  const step = 1000 / edit.output.fps;
-  const names = new Set<string>();
-  for (let vt = 0; vt <= picture; vt += step) {
-    const f = frameAt(edit.source.frames, toSource(edit.segments, vt));
-    if (f) names.add(f.f);
+export const listFrames = (dir: string): string[] =>
+  existsSync(dir)
+    ? readdirSync(dir)
+        .filter((f) => f.endsWith(".jpg"))
+        .sort()
+    : [];
+
+/** Hardlink (else copy) every frame of `from` into `to`, replacing what was there. */
+export function stageFrames(from: string, to: string): number {
+  rmSync(to, { recursive: true, force: true });
+  mkdirSync(to, { recursive: true });
+  const names = listFrames(from);
+  for (const f of names) {
+    try {
+      linkSync(join(from, f), join(to, f));
+    } catch {
+      copyFileSync(join(from, f), join(to, f));
+    }
   }
-  return [...names].sort();
+  return names.length;
 }

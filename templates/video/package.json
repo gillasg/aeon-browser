@@ -1,22 +1,16 @@
 {
   "name": "aeon-video-kit",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Aeon Director's Studio: Remotion kit for cinema-grade Aeon films. Not part of Aeon's build.",
+  "description": "Aeon Open Studio: a blank Remotion canvas around a real aeon record take. Not part of Aeon's build.",
   "scripts": {
     "studio": "remotion studio src/Root.tsx",
-    "still": "remotion still src/Root.tsx DirectorCut out/still.png --frame=60",
-    "still:square": "remotion still src/Root.tsx DirectorSquare out/still-square.png --frame=60",
-    "audio": "node scripts/generate-audio.mjs",
-    "lint:edit": "node scripts/lint-edit.mjs",
-    "render": "node scripts/render.mjs DirectorCut",
-    "render:square": "node scripts/render.mjs DirectorSquare",
-    "render:raw": "node scripts/render.mjs RecordingRaw --no-lint",
+    "stills": "node scripts/render.mjs Scene --still-ms 0,2000,6000",
+    "render": "node scripts/render.mjs Scene",
+    "render:raw": "node scripts/render.mjs RecordingRaw",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.mjs",
-    "render:house": "node scripts/render.mjs DirectorCut --house",
-    "still:pair": "remotion still src/Root.tsx DirectorCut out/still-pair.png --frame=150"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.535",

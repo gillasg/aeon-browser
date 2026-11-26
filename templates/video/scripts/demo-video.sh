@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One command: record the dedicated recording-Chrome window (1280x720 at DPR 3, a 3840x2160 master), run an Aeon task
-# in that browser, stop the take, lint the edit, score it, and render the 1920x1080 DirectorCut.
-# Usage: scripts/demo-video.sh "<task>" [--out file.mp4] [--fps 30] [--max-minutes N] [--director director.json]
+# in that browser, stop the take, and render src/Scene.tsx (1920x1080) around the real frames.
+# Usage: scripts/demo-video.sh "<task>" [--out file.mp4] [--fps 30] [--max-minutes N]
 set -euo pipefail
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,7 +9,6 @@ BROWSER="${AEON_RECORDING_BROWSER:-recording}"
 DISPLAY_NUM="${AEON_RECORDING_DISPLAY:-:120}"
 MAX_MINUTES="${AEON_VIDEO_MAX_MINUTES:-}"
 export AEON_RECORDING_DPR="${AEON_RECORDING_DPR:-3}"
-DIRECTOR=""
 
 usage() { sed -n '2,3p' "$0" | sed 's/^# //'; exit 1; }
 TASK=""
@@ -18,7 +17,6 @@ while [ $# -gt 0 ]; do
     --out) OUT="${2:-}"; [ -n "$OUT" ] || usage; shift 2 ;;
     --fps) FPS="${2:-}"; [ -n "$FPS" ] || usage; shift 2 ;;
     --max-minutes) MAX_MINUTES="${2:-}"; [ -n "$MAX_MINUTES" ] || usage; shift 2 ;;
-    --director) DIRECTOR="${2:-}"; [ -f "$DIRECTOR" ] || usage; shift 2 ;;
     -h|--help) usage ;;
     *) [ -z "$TASK" ] || usage; TASK="$1"; shift ;;
   esac
@@ -71,15 +69,9 @@ rm -f "$KIT_DIR/public/frames"/*.jpg
 find "$WORK/recording/frames" -maxdepth 1 -name '*.jpg' -exec cp -l -t "$KIT_DIR/public/frames/" {} + 2>/dev/null \
   || find "$WORK/recording/frames" -maxdepth 1 -name '*.jpg' -exec cp -t "$KIT_DIR/public/frames/" {} +
 cp "$WORK/recording/events.json" "$KIT_DIR/src/recording.json"
-# The camera comes from events.json alone unless a director script is given.
-if [ -n "$DIRECTOR" ]; then
-  cp "$DIRECTOR" "$KIT_DIR/src/director.json"
-else
-  printf '{ "surface": "obsidian", "audioSrc": "audio/score.wav" }\n' >"$KIT_DIR/src/director.json"
-fi
 
 cd "$KIT_DIR"
-# Lints (refuses slop), synthesizes the score, renders H.264, and writes $OUT.json.
-node scripts/render.mjs DirectorCut --out "$OUT"
+# Renders src/Scene.tsx (rewrite it per video) to H.264 and writes $OUT.json.
+node scripts/render.mjs Scene --out "$OUT"
 
 echo "$OUT"
