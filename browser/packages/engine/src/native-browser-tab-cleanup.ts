@@ -11,6 +11,7 @@ import { currentInventoryTabs } from "./native-inventory-client.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { followReplacement } from "./native-browser-replaced.js";
 import { spaceWindowIds } from "./native-browser-spaces.js";
+import { setFetchTabOwner } from "./native-browser-fetch-tab.js";
 
 type Tracked = {
   touched: number;
@@ -463,6 +464,7 @@ function save(): void {
 }
 
 onEngineInstall(() => {
+  setFetchTabOwner(isAgentTab);
   chrome.runtime.onStartup.addListener(() => {
     tracked.clear();
     stats.clear();

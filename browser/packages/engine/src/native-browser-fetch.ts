@@ -11,6 +11,7 @@ import {
 import { HostBudget } from "./native-browser-rate.js";
 import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
+import { fetchInTab, ownedTabOn, redirectRefusal } from "./native-browser-fetch-tab.js";
 
 const MAX_TEXT = 5_000_000;
 const MAX_BINARY = 16_000_000;
@@ -65,10 +66,10 @@ export async function fetchCall(
   }
   const rateWaitMs = hostBudget.take(url.host);
   if (rateWaitMs) await new Promise((resolve) => setTimeout(resolve, rateWaitMs));
-  let response: Response;
+  let fetched: Fetched;
   const signal = AbortSignal.timeout(timeout);
   try {
-    response = await withFetchHeaders(url, split, () =>
+    fetched = await withFetchHeaders(url, split, () =>
       followGuarded(
         url,
         {
@@ -89,11 +90,15 @@ export async function fetchCall(
       throw error;
     throw await fetchFailure(url, error);
   }
+  const { response } = fetched;
+  const finalUrl = fetched.finalUrl ?? response.url;
   const result: Record<string, unknown> = {
     status: response.status,
     ok: response.ok,
-    url: response.url,
+    url: finalUrl,
     headers: Object.fromEntries(response.headers),
+    via: fetched.via,
+    ...(fetched.redirected || response.redirected ? { redirected: true, finalUrl } : {}),
     ...(rateWaitMs ? { rateWaitMs } : {}),
   };
   if ((response.status === 401 || response.status === 403) && !split.referer && !split.origin)
@@ -123,29 +128,35 @@ export async function fetchCall(
 /** Headers a redirect to another origin must not carry (fetch's own redirect rule). */
 const CROSS_ORIGIN_DROP = ["authorization", "cookie", "proxy-authorization"];
 
+export interface Fetched {
+  response: Response;
+  /** "worker": the extension's own request; "tab": re-issued in an Aeon tab on that origin. */
+  via: "worker" | "tab";
+  finalUrl?: string;
+  redirected?: boolean;
+}
+
 /**
  * Follows redirects one hop at a time, so each next address passes the network check and the
  * site policy before any request is sent to it. A 302 to a blocked or private site never reaches
- * it, and a hop to another origin drops the caller's credentials headers.
+ * it, and a hop to another origin drops the caller's credentials headers. Where the runtime hides
+ * the redirect (an MV3 worker's opaqueredirect), the request moves into an Aeon tab on that
+ * origin and the final address is checked before the body is read; with no such tab it is refused.
  */
 export async function followGuarded(
   first: URL,
   init: RequestInit,
   checkHop: HopCheck | undefined,
-): Promise<Response> {
+): Promise<Fetched> {
   let url = first;
   let current = init;
+  let redirected = false;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const response = await fetch(url, { ...current, redirect: "manual" });
-    if (response.type === "opaqueredirect")
-      // This runtime hides where the redirect goes, so the next hop cannot be checked before it
-      // is sent. Refuse instead of following blind.
-      throw new Error(
-        `REDIRECT_UNCHECKED: ${url.href} redirects to an address that cannot be checked first; ` +
-          "fetch the final address directly or open it in a tab",
-      );
+    if (response.type === "opaqueredirect") return viaTab(url, current, checkHop);
     const location = response.headers.get("location");
-    if (response.status < 300 || response.status > 399 || !location) return response;
+    if (response.status < 300 || response.status > 399 || !location)
+      return { response, via: "worker", ...(redirected ? { redirected, finalUrl: url.href } : {}) };
     const next = new URL(location, url);
     if (next.protocol !== "http:" && next.protocol !== "https:")
       throw new Error(`browser.fetch was redirected to an unsupported address (${next.protocol})`);
@@ -154,8 +165,17 @@ export async function followGuarded(
     await checkHop?.(next.href);
     current = redirectInit(current, response.status, next.origin !== url.origin);
     url = next;
+    redirected = true;
   }
   throw new Error(`browser.fetch stopped after ${MAX_REDIRECTS} redirects`);
+}
+
+async function viaTab(url: URL, init: RequestInit, checkHop: HopCheck | undefined) {
+  const tabId = await ownedTabOn(url.origin);
+  if (tabId === undefined) throw redirectRefusal(url);
+  const { signal: _signal, ...rest } = init;
+  const done = await fetchInTab(tabId, url, rest, checkHop);
+  return { ...done, via: "tab" as const };
 }
 
 /** The request for the next hop: 303 (and 301/302 after a POST) become a bodiless GET. */

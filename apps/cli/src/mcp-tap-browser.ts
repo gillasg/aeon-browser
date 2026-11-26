@@ -89,7 +89,7 @@ export class BrowserTapSource implements TapSource {
     while (this.tabs.get(tab) === entry) {
       try {
         const frames = (await this.run(
-          `const p = await browser.tab(${tab}); const s = ${entry.since}; if (!(await p.streams.waitFor({since: s}, ${WAIT_MS}))) return []; return p.streams.list({since: s});`,
+          `const p = await browser.tab(${tab}); const s = ${entry.since}; if (!(await p.streams.waitFor({since: s}, ${WAIT_MS}))) return []; const r = await p.streams.list({since: s}); return Array.isArray(r) ? r : r.frames;`,
           WAIT_MS + 10_000,
         )) as EngineFrame[] | null;
         failures = 0;

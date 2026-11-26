@@ -130,7 +130,8 @@ test("WebSocket, SSE and WebRTC frames are captured, filtered, scrubbed and desc
   assert.equal(all[0].json.token, "[redacted]");
   assert.equal(all[0].format, "json");
   assert.equal(all[2].format, "binary");
-  assert.equal(all[2].data, "");
+  assert.equal(all[2].data, "AAAA");
+  assert.equal(all[2].bytes, 3);
   assert.equal(all[4].format, "ndjson");
   assert.equal((await streamsCall(3, "list", { kind: "sse" }))[0].event, "price");
   assert.equal((await streamsCall(3, "list", { direction: "sent" })).length, 1);
