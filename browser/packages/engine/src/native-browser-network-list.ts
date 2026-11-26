@@ -1,5 +1,6 @@
 // Listing a recording: filters for match/method/type, frame scope and an incremental cursor.
 import { summarize, type NetworkEntry } from "./native-browser-network-format.js";
+import { classFilter, classOfEntry } from "./request-class.js";
 
 export interface ListOptions {
   match?: string;
@@ -8,6 +9,8 @@ export interface ListOptions {
   since?: number;
   frames?: "top" | "all";
   cursor?: boolean;
+  /** One request class or several: "api", ["api", "graphql"]. */
+  class?: string | string[];
 }
 
 function expandRedirects(entries: Iterable<NetworkEntry>): NetworkEntry[] {
@@ -47,12 +50,14 @@ export function listEntries(
   const method = typeof options.method === "string" ? options.method.toUpperCase() : undefined;
   const since = typeof options.since === "number" ? options.since : undefined;
   const topOnly = options.frames === "top";
+  const classes = classFilter(options.class);
   return expandRedirects(entries)
     .filter((entry) => !topOnly || (!entry.frameUrl && !entry.source))
     .filter((entry) => since === undefined || entry.startedAt > since)
     .filter((entry) => !match || entry.url.includes(match))
     .filter((entry) => !method || entry.method === method)
     .filter((entry) => typeof options.type !== "string" || matchesType(entry, options.type))
+    .filter((entry) => !classes || classes(classOfEntry(entry)))
     .map(summarize);
 }
 

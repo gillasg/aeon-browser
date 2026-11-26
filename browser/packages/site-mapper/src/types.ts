@@ -48,6 +48,8 @@ export interface Exchange {
   messages?: SseMessage[];
   /** The page that made the request, when known. */
   pageUrl?: string;
+  /** The title of that page (HAR pages[].title), so a slug taken from it becomes a slot. */
+  pageTitle?: string;
   /** What was done on the page just before the request ('click "Remove"'), when recorded. */
   step?: string;
 }
