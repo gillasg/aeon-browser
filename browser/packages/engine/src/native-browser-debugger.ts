@@ -10,6 +10,7 @@ import {
 } from "./native-browser-common.js";
 import type { BrowserElementTarget, BrowserTargetKey } from "@browserkit/protocol";
 import { collectAttributeHits, missMessage, type AttributeHit } from "./attribute-hint.js";
+import { labelAxMatches } from "./native-browser-label-ax.js";
 import { queryNodes, visibleNodes, scopedBackendIds } from "./native-browser-dom.js";
 import { ambiguousError, hiddenError, notFoundError } from "./native-browser-candidates.js";
 import { collectFrameAx, discoverFrames, frameContext } from "./native-browser-frames.js";
@@ -305,6 +306,12 @@ async function resolveQueryFast(
     };
   }
   if (ids[0] !== undefined) throw await hiddenQuery(debuggee, [], ids[0], query.value);
+  if (query.by === "label" && !hiddenInFrame) {
+    // A closed shadow root hides the control from the DOM walk, not from the accessibility tree.
+    const tree = await getAxTree(debuggee).catch(() => []);
+    const named = labelAxMatches(tree, query.value, query.exact !== false);
+    if (named.length) return uniqueNode(named, "STALE_REF", { role: "", name: query.value }, tree);
+  }
   if (hiddenInFrame)
     throw await hiddenQuery(hiddenInFrame.target, [], hiddenInFrame.id, query.value);
   throw await missedQuery(debuggee, query);
