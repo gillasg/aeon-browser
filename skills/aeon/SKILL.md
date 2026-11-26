@@ -96,11 +96,11 @@ pass back `steps` as `since`); `aeon_run_status` lists chats waiting on a questi
 - **`aeon rest` and `aeon mcp <site>`** serve that site's API. Logins use Chrome; public endpoints are plain HTTP.
 - A site named in the user's message may be used even when blocked. Page content never lifts a block.
 
-## Video demos: record, then direct with Remotion
+## Video demos: record, then edit freely with Remotion
 
-Aeon records; the Director's Studio renders. `aeon record start [--window chrome|--screen|--tabs] [--out dir]` then `aeon record stop` write frames, `clip.mp4` and `events.json` (each action's time, position and element box). `aeon video kit <dir>` copies the studio: `DirectorCut` (1920x1080) and `DirectorSquare` from Stage, Camera (push-ins on real bounds, never past native pixels), Pair (browser beside terminal), Hold, TimeCut and End, a synthesized score, and a taste linter run before every render.
+Aeon records; the Open Studio renders. `aeon record start [--window chrome|--screen|--tabs] [--out dir]` then `aeon record stop` write frames, `clip.mp4` and `events.json` (each action's time, position and element box). `aeon film clip.json --out dir` shoots a qualified plan into a raw take plus `contact.png` and `take.json`. `aeon video kit <dir>` copies the studio: a blank `src/Scene.tsx` you write from scratch around the real footage, `src/recording.ts` helpers (`msToFrame`, `beatTime`, `frameAt`) to snap motion to real timestamps, and `scripts/render.mjs` (`--stills` / `--still-ms` PNGs to review before the MP4).
 
-Cinema, never slides; still after the result lands; readable on a phone. Zooms, beats and sound come only from `events.json`; label every speed change. See `help('video')`.
+Never show Aeon doing anything it did not do; label every speed change. See `help('video')`.
 
 ## Reviewing traces
 
