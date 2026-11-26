@@ -10,6 +10,8 @@ import {
   type AbilityHost,
   type AbilityRunResult,
 } from "./abilities.js";
+import { operationOutputSchema } from "./output-schema.js";
+import type { Operation } from "./types.js";
 import { loadModel, siteName } from "./registry.js";
 import { refreshSiteSkill } from "./site-notes.js";
 import {
@@ -22,6 +24,11 @@ import {
 } from "./site-ops-file.js";
 
 export type { SiteOp, SiteOpsFile } from "./site-ops-file.js";
+
+function withOutputSchema(operation: Operation): { outputSchema?: Record<string, unknown> } {
+  const schema = operationOutputSchema(operation);
+  return schema ? { outputSchema: schema } : {};
+}
 
 /** Rebuilds `api.json` (helpers kept as they are) and the ops part of `SKILL.md`. */
 export async function compileSiteOps(site: string): Promise<SiteOpsFile> {
@@ -42,6 +49,7 @@ export async function compileSiteOps(site: string): Promise<SiteOpsFile> {
       method: operation.method,
       path: operation.path,
       ...(operation.summary ? { summary: operation.summary } : {}),
+      ...withOutputSchema(operation),
     }));
   const file = await writeOpsFile(host, [...fromApi, ...fromAbilities, ...helpers]);
   await refreshSiteSkill(host);

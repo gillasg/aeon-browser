@@ -5,6 +5,7 @@ import {
   loadModel,
   runAbility,
   searchCatalog,
+  structuredOutput,
   type CatalogTool,
 } from "@browserkit/tools/site-to-api";
 import { siteMapper } from "@browserkit/tools/site-to-api/runtime";
@@ -53,6 +54,33 @@ export function catalogMcpTool(tool: CatalogTool): Record<string, unknown> {
     description: tool.description,
     inputSchema: tool.inputSchema,
     annotations: tool.annotations,
+    ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
+  };
+}
+
+/** Runs a catalog tool and answers with its MCP result (text, plus structuredContent). */
+export async function callCatalogResult(
+  name: string,
+  args: Record<string, unknown>,
+  tools: readonly CatalogTool[],
+): Promise<Record<string, unknown>> {
+  return catalogCallResult(name, await callCatalog(name, args, tools), tools);
+}
+
+/** A catalog call's MCP result: the JSON as text, plus `structuredContent` when declared. */
+export function catalogCallResult(
+  name: string,
+  value: unknown,
+  tools: readonly CatalogTool[],
+): Record<string, unknown> {
+  const schema = tools.find((tool) => tool.name === name)?.outputSchema;
+  const structured = schema ? structuredOutput(value, schema) : undefined;
+  return {
+    content: [
+      { type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 2) },
+    ],
+    ...(structured ? { structuredContent: structured } : {}),
+    isError: false,
   };
 }
 

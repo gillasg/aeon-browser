@@ -23,8 +23,8 @@ import {
 import { modelAuthPath, modelSignedIn } from "./doctor-io.js";
 import { SamplingBridge, readUseClientModel, setSamplingBridge } from "./mcp-sampling.js";
 import {
-  callCatalog,
   catalogFingerprint,
+  callCatalogResult,
   catalogMcpTool,
   loadCatalog,
   type CatalogTool,
@@ -39,6 +39,7 @@ import {
 import type { TaskContext } from "./mcp-tasks.js";
 import { CODE_SURFACE_NAMES, CODE_SURFACE_TOOLS, ParkingLot } from "./mcp-code-mode.js";
 import { codeSurfaceCall } from "./mcp-code-tools.js";
+import { RESOURCES, rpcError, resourceRequest, watchSkills } from "./mcp-resources.js";
 
 // The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
 // and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
@@ -400,7 +401,7 @@ async function answerRequest(
     const result = await handle(message, deps.aeon, deps.runs, modern, session);
     send(reply(id, mcpResult(result as Json, modern)));
   } catch (error) {
-    send(reply(id, undefined, error instanceof Error ? error.message : String(error)));
+    send(reply(id, undefined, error));
   }
 }
 
@@ -442,6 +443,7 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
   let client: AeonClient | undefined;
   catalogState = { tools: [], fingerprint: "", primed: false };
   const stopCatalog = watchCatalog();
+  const stopSkills = watchSkills((message) => notifySend(message));
   const deps: McpDeps = {
     aeon: async () => (client ??= await AeonClient.connect()),
     runs: new Map<string, Run>(),
@@ -466,6 +468,7 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
     receive: (message, send) => processMcpMessage(message, deps, sampler, send),
     close: async () => {
       stopCatalog();
+      stopSkills();
       await extensions?.close().catch(() => undefined);
       extensions = undefined;
       for (const controller of deps.pending.values()) controller.abort();
@@ -505,13 +508,9 @@ function initializeResult(params: Json): Json {
   const version = MCP_PROTOCOLS.find((candidate) => candidate === asked) ?? MCP_PROTOCOLS[0];
   return {
     protocolVersion: version,
-    capabilities: { tools: { listChanged: true }, ...extensionCapabilities() },
+    capabilities: { tools: { listChanged: true }, ...RESOURCES, ...extensionCapabilities() },
     serverInfo: { name: "aeon", version: "0.1.0" },
   };
-}
-
-function listResult(method: string, modern: boolean): Json {
-  return mcpListResult(method === "resources/list" ? { resources: [] } : { prompts: [] }, modern);
 }
 
 function codeCall(
@@ -548,7 +547,7 @@ async function callToolResult(
     return codeCall(params, aeon, runs, session, signal, context);
   if (params.name === "catalog_search" || params.name.startsWith("site__")) {
     try {
-      return text(await callCatalog(params.name, params.arguments ?? {}, catalogState.tools));
+      return await callCatalogResult(params.name, params.arguments ?? {}, catalogState.tools);
     } catch (error) {
       return { ...text(error instanceof Error ? error.message : String(error)), isError: true };
     }
@@ -581,7 +580,8 @@ async function handle(
       modern,
     );
   }
-  if (method === "resources/list" || method === "prompts/list") return listResult(method, modern);
+  const resource = resourceRequest(method, mcpParams(message), modern);
+  if (resource) return resource;
   if (method === "ping") return mcpResult({}, modern);
   const extended = extensionRequest(method, mcpParams(message));
   if (extended) return extended;
@@ -786,10 +786,10 @@ function text(value: unknown) {
   };
 }
 
-function reply(id: unknown, result?: unknown, error?: string): Json {
+function reply(id: unknown, result?: unknown, error?: unknown): Json {
   return error === undefined
     ? { jsonrpc: "2.0", id, result }
-    : { jsonrpc: "2.0", id, error: { code: -32603, message: error } };
+    : { jsonrpc: "2.0", id, error: rpcError(error) };
 }
 
 function withoutTrace(result: ChatResult): Omit<ChatResult, "trace"> {
