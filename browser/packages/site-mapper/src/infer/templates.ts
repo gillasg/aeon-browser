@@ -106,6 +106,53 @@ export interface TemplateInput {
   url: string;
   /** Shape of the JSON response, so different resources at one position are never merged. */
   shape?: string;
+  /** The page that made the request: a segment naming that page is a slot from one sample. */
+  pageUrl?: string;
+  pageTitle?: string;
+}
+
+/** A segment reduced to letters and digits, so Dieter_Rams, dieter-rams and "Dieter Rams" agree. */
+function slugKey(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+/** The title without its site suffix: "Dieter Rams - Wikipedia" names "Dieter Rams". */
+function titleKeys(title: string | undefined): string[] {
+  if (!title) return [];
+  const head = title.split(/\s+[-|–—·:]\s+/)[0] ?? title;
+  return [...new Set([slugKey(title), slugKey(head)])].filter((key) => key.length >= 3);
+}
+
+function pageSegmentKeys(pageUrl: string | undefined): Set<string> {
+  if (!pageUrl) return new Set();
+  try {
+    const segments = new URL(pageUrl).pathname.split("/").map(safeDecode);
+    // A name-like segment only: plain words like "wiki" or ids are matched by shape already.
+    return new Set(
+      segments.filter((segment) => /[-_ ]/.test(segment) && /[a-z]/i.test(segment)).map(slugKey),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/** Positions whose value names the page the request came from: "title" or the usual slug name. */
+function pageSlots(input: TemplateInput, segments: string[]): Map<number, "title" | "slug"> {
+  const slots = new Map<number, "title" | "slug">();
+  const titles = titleKeys(input.pageTitle);
+  const pageKeys = pageSegmentKeys(input.pageUrl);
+  segments.forEach((segment, index) => {
+    if (index === 0 || !/[a-z]/i.test(segment)) return;
+    const key = slugKey(segment);
+    if (key.length < 3) return;
+    if (titles.includes(key)) slots.set(index, "title");
+    else if (pageKeys.has(key) && /[-_ ]/.test(segment)) slots.set(index, "slug");
+  });
+  return slots;
 }
 
 /**
@@ -120,23 +167,23 @@ export function templatePaths(inputs: TemplateInput[], overrides: string[] = [])
     const kinds = segments.map((segment, index) =>
       isVersion(segments, index) ? undefined : shapeKind(segment),
     );
-    return { url, segments, kinds, shape: input.shape ?? "" };
+    return { url, segments, kinds, shape: input.shape ?? "", page: pageSlots(input, segments) };
   });
   const slugPositions = findSlugPositions(split);
-  return split.map(({ url, segments, kinds }) => {
+  return split.map(({ url, segments, kinds, page }) => {
     const forced = matchOverride(url, segments, parsedOverrides);
     if (forced) return forced;
     const params: TemplatedPath["params"] = [];
     const used = new Map<string, number>();
     const parts = segments.map((segment, index) => {
+      const fromPage = page.get(index);
       const kind =
         kinds[index] ??
-        (slugPositions.has(siblingKey(url.origin, segments, kinds, index)) ? "slug" : undefined);
+        (fromPage || slugPositions.has(siblingKey(url.origin, segments, kinds, index))
+          ? "slug"
+          : undefined);
       if (!kind || segment === "") return segment;
-      const previous = [...segments.slice(0, index)]
-        .reverse()
-        .find((part, back) => !kinds[index - 1 - back] && part);
-      let name = paramName(previous, kind);
+      let name = fromPage === "title" ? "title" : slotName(segments, kinds, index, kind);
       const seen = used.get(name) ?? 0;
       used.set(name, seen + 1);
       if (seen) name += seen + 1;
@@ -145,6 +192,18 @@ export function templatePaths(inputs: TemplateInput[], overrides: string[] = [])
     });
     return { template: "/" + parts.join("/"), params };
   });
+}
+
+function slotName(
+  segments: string[],
+  kinds: (SegmentKind | undefined)[],
+  index: number,
+  kind: SegmentKind,
+): string {
+  const previous = [...segments.slice(0, index)]
+    .reverse()
+    .find((part, back) => !kinds[index - 1 - back] && part);
+  return paramName(previous, kind);
 }
 
 /** An API version (/1/indexes/…, /api/2/…) is part of the path, not an id. */

@@ -1,13 +1,13 @@
 import { toHar, type NetworkEntry } from "./native-browser-network-format.js";
+import { classOfEntry, isApiLikeClass } from "./request-class.js";
+
+export { isTrackerUrl } from "./request-class.js";
 
 // What a recording hands over for learning a site's API after each step: the finished
 // requests not handed over before, as HAR, without what must never be saved (cookies and the
 // cookies a response sets, passwords and card numbers in bodies). Passive recordings forget
 // what they hand over, so a long task doesn't pile up requests.
 
-const TRACKERS =
-  /(^|\.)(google-analytics\.com|googletagmanager\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|adservice\.google\.com|facebook\.net|connect\.facebook\.com|segment\.(io|com)|sentry\.io|hotjar\.(com|io)|mixpanel\.com|amplitude\.com|datadoghq\.com|browser-intake-datadoghq\.com|nr-data\.net|newrelic\.com|clarity\.ms|fullstory\.com|heap(analytics)?\.io|intercom\.io|branch\.io|appsflyer\.com|adnxs\.com|criteo\.(com|net)|taboola\.com|outbrain\.com|scorecardresearch\.com|quantserve\.com|bing\.com\/bat|bat\.bing\.com|snapchat\.com|tiktok\.com\/api\/v\d\/pixel|analytics\.)/i;
-const TRACKER_PATHS = /\/(collect|beacon|pixel|track|telemetry|log_event|jserror|rum)(\/|\?|$)/i;
 const SECRET_HEADERS = new Set(["cookie", "set-cookie"]);
 const SECRET_FIELDS = /pass(word|wd)?|pwd|otp|one.?time|cvv|cvc|card.?number|security.?code|pin$/i;
 
@@ -18,24 +18,14 @@ interface Taking {
   bodyBytes: number;
 }
 
-/** Ad, analytics and error-reporting calls: never part of a site's own API. */
-export function isTrackerUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return TRACKERS.test(parsed.hostname) || TRACKER_PATHS.test(parsed.pathname);
-  } catch {
-    return true;
-  }
-}
-
 /** The finished requests since the last take, as HAR, with secrets removed. */
 export function takeLearned(recorder: Taking): unknown {
   recorder.taken ??= new Set();
   const ready = [...recorder.entries.values()].filter(
     (entry) => entry.done && !entry.requestBodyPending && !recorder.taken?.has(entry.id),
   );
-  // The page itself is listed by page.network, but a site's API is its calls, not its documents.
-  const calls = ready.filter((entry) => entry.type !== "Document");
+  // A site's API is its calls: not its documents, assets, media, challenges, sensors or beacons.
+  const calls = ready.filter((entry) => isApiLikeClass(classOfEntry(entry)));
   for (const entry of ready) {
     if (recorder.passive && entry.body !== undefined) {
       recorder.bodyBytes -= entry.body.length;
@@ -44,7 +34,7 @@ export function takeLearned(recorder: Taking): unknown {
     }
     recorder.taken.add(entry.id);
   }
-  return toHar(calls.filter((entry) => !isTrackerUrl(entry.url)).map(withoutSecrets));
+  return toHar(calls.map(withoutSecrets));
 }
 
 function withoutSecrets(entry: NetworkEntry): NetworkEntry {

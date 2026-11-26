@@ -88,6 +88,8 @@ export function groupExchanges(kept: Classified[], templates: string[] = []): Gr
   const templated = templatePaths(
     api.map(({ exchange, category }) => ({
       url: exchange.url,
+      ...(exchange.pageUrl ? { pageUrl: exchange.pageUrl } : {}),
+      ...(exchange.pageTitle ? { pageTitle: exchange.pageTitle } : {}),
       shape:
         category === "document"
           ? documentShape(exchange.responseBody ?? "")
@@ -281,7 +283,61 @@ function role(group: Group): Operation["role"] {
   if (group.method === "GET" || group.method === "HEAD") {
     return STATE_CHANGING_PATH.test(group.template) ? "action" : "read";
   }
-  return READ_SEGMENT.test(lastSegment(group.template)) ? "read" : "action";
+  return bodyReadRole(group);
+}
+
+/** A POST is a read when its last segment says so, or it only ever answers a list. */
+function bodyReadRole(group: Group): Operation["role"] {
+  if (READ_SEGMENT.test(lastSegment(group.template))) return "read";
+  return listReadPost(group) ? "read" : "action";
+}
+
+const WRITE_BODY =
+  /"(action|mutation|op|operation|intent|command)"\s*:\s*"(delete|remove|create|update|add|save|submit|send|buy|pay|cancel)|"(password|card_?number|cvv|payment)"/i;
+const LIST_KEYS =
+  /^(items|results|releases|data|entries|records|hits|list|rows|nodes|edges|products|posts|events|docs)$/i;
+
+/** True for a JSON value that is a list, or an envelope carrying one non-empty list. */
+function listLike(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(
+    ([key, item]) => LIST_KEYS.test(key) && Array.isArray(item) && item.length > 0,
+  );
+}
+
+/**
+ * A POST that only asks for a page of results (a search or discovery feed with filters in its
+ * body): every sample answers with a list, and neither its path nor its body names a write.
+ */
+function listReadPost(group: Group): boolean {
+  if (group.method !== "POST" || STATE_CHANGING_PATH.test(group.template)) return false;
+  if (!group.members.length) return false;
+  return group.members.every(
+    (member) =>
+      member.exchange.status < 400 &&
+      listLike(member.json) &&
+      queryBody(member.exchange.requestBody ?? ""),
+  );
+}
+
+const QUERY_KEY =
+  /^(page|size|limit|offset|cursor|after|before|first|last|sort|order|slice|filters?|facets?|category|categories|tags?|genre|query|q|term|search|keywords?|from|to|start|end|range|lang|locale|region|geo|location|format|fields|include|type|kind|view|mode|count|per_?page|page_?size)/i;
+
+/** A body that reads like a query: most of its fields are filters, paging or sorting. */
+function queryBody(body: string): boolean {
+  if (WRITE_BODY.test(body)) return false;
+  let value: unknown;
+  try {
+    value = JSON.parse(body || "{}");
+  } catch {
+    return false;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  if (!keys.length) return true;
+  const queryKeys = keys.filter((key) => QUERY_KEY.test(key)).length;
+  return queryKeys * 2 >= keys.length;
 }
 
 function responses(group: Group): Operation["responses"] {

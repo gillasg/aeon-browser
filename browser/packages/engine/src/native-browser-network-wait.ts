@@ -1,5 +1,6 @@
 import type { NetworkEntry } from "./native-browser-network-format.js";
 import { matchesType } from "./native-browser-network-list.js";
+import { classFilter, classOfEntry } from "./request-class.js";
 
 // One request by what it looks like: a URL substring or regex, optionally a method and statuses.
 // page.network.waitFor uses it, so a click can be followed by the call it causes without a sleep.
@@ -22,7 +23,9 @@ export function waitMatcher(options: Record<string, unknown>): (entry: Waitable)
   const method = typeof options.method === "string" ? options.method.toUpperCase() : undefined;
   const type = typeof options.type === "string" && options.type ? options.type : undefined;
   const status = statusMatcher(options.status);
+  const classes = classFilter(options.class);
   return (entry) =>
+    (!classes || classes(classOfEntry(entry))) &&
     urls(entry.url) &&
     (!method || entry.method === method) &&
     (!type || matchesType(entry, type)) &&

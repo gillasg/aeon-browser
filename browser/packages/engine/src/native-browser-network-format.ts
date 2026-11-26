@@ -1,3 +1,4 @@
+import { classOfEntry } from "./request-class.js";
 // Recorded network entries, their compact summaries for listing, and HAR 1.2 export.
 export interface NetworkEntry {
   id: string;
@@ -66,6 +67,7 @@ export function summarize(entry: NetworkEntry): Record<string, unknown> {
     method: entry.method,
     url: entry.url,
     type: entry.type,
+    class: classOfEntry(entry),
   };
   if (entry.status !== undefined) summary.status = entry.status;
   if (entry.mimeType) summary.mimeType = entry.mimeType;

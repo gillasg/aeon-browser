@@ -70,13 +70,20 @@ function resourceType(entry: HarEntry): string | undefined {
   return undefined;
 }
 
-function withStep(exchange: Exchange, entry: HarEntry): Exchange {
+function withStep(exchange: Exchange, entry: HarEntry, titles: Map<string, string>): Exchange {
+  const title = entry.pageref ? titles.get(entry.pageref) : undefined;
+  if (title) exchange.pageTitle = title.slice(0, 200);
   if (typeof entry._step === "string" && entry._step) exchange.step = entry._step.slice(0, 200);
   return exchange;
 }
 
 export function fromHar(har: unknown, source: string): Exchange[] {
-  const entries = ((har as { log?: { entries?: HarEntry[] } })?.log?.entries ?? []) as HarEntry[];
+  const log = (har as { log?: { entries?: HarEntry[]; pages?: { id?: string; title?: string }[] } })
+    ?.log;
+  const entries = (log?.entries ?? []) as HarEntry[];
+  const titles = new Map<string, string>();
+  for (const page of log?.pages ?? [])
+    if (page.id && typeof page.title === "string" && page.title) titles.set(page.id, page.title);
   return entries.map((entry, index) => {
     const content = entry.response.content ?? {};
     const exchange: Exchange = {
@@ -104,7 +111,7 @@ export function fromHar(har: unknown, source: string): Exchange[] {
     if (entry._eventSourceMessages) exchange.messages = entry._eventSourceMessages;
     const referer = exchange.requestHeaders.referer;
     if (referer) exchange.pageUrl = referer;
-    return withStep(exchange, entry);
+    return withStep(exchange, entry, titles);
   });
 }
 

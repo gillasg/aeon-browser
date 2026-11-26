@@ -126,6 +126,7 @@ const BOT_DEFENSE = [
   /recaptcha\/|hcaptcha\.com|challenges\.cloudflare\.com|arkoselabs\.com|funcaptcha/i,
   /perimeterx\.net|px-cdn\.net|px-cloud\.net|\/px\/[a-z0-9]+\/(xhr|init)/i,
   /datadome\.co|captcha-delivery\.com|\/akam\/\d+\/|kasada|\/149e9513-01fa-4fb0-aad4-566afd725d1b\//i,
+  /\/__challenge_|\/\.well-known\/vercel\/security\/|awswaf\.com/i,
   /imperva|incapsula|_Incapsula_Resource|\/_sec\/cp_challenge|queue-it\.net/i,
 ];
 
@@ -153,7 +154,11 @@ const EVENT_BODY =
   /"(events?|event_type|eventName|event_name|ts|timestamp|sid|session_id|batch|anonymousId|distinct_id|client_id)"/;
 
 const STATIC_FILE =
-  /\.(js|mjs|css|map|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|m4a|pdf|zip|wasm)(\?|$)/i;
+  /\.(js|mjs|css|map|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|m4a|m4s|mpd|m3u8|ogg|pdf|zip|wasm)(\?|$)/i;
+
+// Media manifests and segments, images, fonts, styles: content, never an operation.
+const STATIC_MIME =
+  /^(image\/|font\/|video\/|audio\/|text\/css|application\/(wasm|dash\+xml|vnd\.apple\.mpegurl|x-mpegurl))/i;
 
 const STATIC_PATHS =
   /\/(_next\/static|static\/|assets\/|favicon|manifest\.json|robots\.txt|sw\.js|service-worker|\.well-known\/)/i;
@@ -249,6 +254,12 @@ function dropReason(exchange: Exchange, url: URL, options: FilterOptions): strin
   return staticReason(exchange, url);
 }
 
+function isStaticContent(exchange: Exchange, url: URL): boolean {
+  if (STATIC_FILE.test(url.pathname) || STATIC_PATHS.test(url.pathname)) return true;
+  const mime = (exchange.responseMime ?? exchange.responseHeaders["content-type"] ?? "").trim();
+  return STATIC_MIME.test(mime);
+}
+
 function staticReason(exchange: Exchange, url: URL): string | undefined {
   const type = exchange.resourceType;
   if (
@@ -258,7 +269,7 @@ function staticReason(exchange: Exchange, url: URL): string | undefined {
     )
   )
     return `static ${type}`;
-  if (STATIC_FILE.test(url.pathname) || STATIC_PATHS.test(url.pathname)) return "static file";
+  if (isStaticContent(exchange, url)) return "static file";
   const stream =
     type === "eventsource" || type === "websocket" || !!exchange.frames || !!exchange.messages;
   if (!stream && isTelemetry(exchange, url)) return "telemetry";
