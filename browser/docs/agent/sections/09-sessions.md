@@ -14,7 +14,8 @@ or another session's; actions in one tab queue, reads run in parallel.
 - **Many sites:** `browser.sweep(urls, {gate: true, pilot: 5})` returns one outcome per URL (`ok`,
   `gated`, `dead`…) as a durable job; start with a pilot. `help('sweep')`, `help('jobs')`.
 - **Network:** `page.network.list()` works without `start()`, `page.network.body(id)` reads what a
-  call returned, `page.media()` parses video manifests. `help('network')`.
+  call returned (`{decode: "auto"}` for protobuf, RSC or framed JSON), `page.media()` parses video
+  manifests. `help('network')`.
 - **Clearing state:** cookies, storage, service workers, permissions. `help('state')`.
 - **Other tools:** `browserkit cdp` starts a local DevTools endpoint for Playwright or Puppeteer
   (`connectOverCDP(url)`); its tabs close when the client disconnects.
