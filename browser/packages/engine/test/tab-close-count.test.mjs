@@ -59,9 +59,15 @@ test("close detaches a grouped tab before remove and counts it", async () => {
   assert.deepEqual(result, { closed: 4 });
   assert.equal(tabs.has(4), false);
   assert.equal(agentTabSummary("chat-a").closed, 1);
+  // The first remove runs attached (so a beforeunload reaches the dialog handler); this mock
+  // ignores it, like Chrome often does, so the close detaches before the remove that lands.
+  const firstRemove = order.findIndex((entry) => entry[0] === "remove" && entry[1] === 4);
   const detachAt = order.findIndex((entry) => entry[0] === "detach" && entry[1] === 4);
-  const removeAt = order.findIndex((entry) => entry[0] === "remove" && entry[1] === 4);
-  assert.ok(detachAt !== -1 && removeAt !== -1 && detachAt < removeAt, JSON.stringify(order));
+  const lastRemove = order.findLastIndex((entry) => entry[0] === "remove" && entry[1] === 4);
+  assert.ok(firstRemove !== -1 && firstRemove < detachAt, JSON.stringify(order));
+  assert.ok(detachAt < lastRemove, JSON.stringify(order));
+  const ungroupAt = order.findIndex((entry) => entry[0] === "ungroup" && entry[1] === 4);
+  assert.ok(ungroupAt !== -1 && ungroupAt < firstRemove, JSON.stringify(order));
   assert.ok(order.some((entry) => entry[0] === "ungroup" && entry[1] === 4));
 });
 
@@ -114,7 +120,7 @@ test("closing a replaced id closes the tab that replaced it", async () => {
   assert.equal(agentTabSummary("chat-d").closed, 1);
 });
 
-test("a tab is marked closing before remove, so its beforeunload is accepted", async () => {
+test("a tab is marked closing and still attached at the first remove, so its beforeunload is accepted", async () => {
   tabs.clear();
   order.length = 0;
   detached = new Set();
@@ -123,14 +129,14 @@ test("a tab is marked closing before remove, so its beforeunload is accepted", a
   const seen = [];
   chrome.tabs.remove = async (id) => {
     // Chrome raises beforeunload here; the dialog handler asks isClosing.
-    seen.push(isClosing(id));
+    seen.push([isClosing(id), detached.has(id)]);
     tabs.delete(id);
   };
   try {
     const started = Date.now();
     assert.deepEqual(await closeChatTab("chat-c", 12), { closed: 12 });
     assert.ok(Date.now() - started < 1_000);
-    assert.deepEqual(seen, [true]);
+    assert.deepEqual(seen, [[true, false]]);
     tabs.set(13, tab(13));
     assert.deepEqual(await closeChatTab("chat-c", 13), { closed: 13 });
   } finally {
