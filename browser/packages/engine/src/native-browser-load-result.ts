@@ -39,6 +39,23 @@ export function stillLoading(pending: Array<{ url: string; ageMs: number }>): Id
   };
 }
 
+/**
+ * Why a page load failed, if it did. Only a navigation that timed out before committing fails;
+ * requests still pending on a page that loaded (beacons, long polls) are not a failure.
+ */
+export function navigationFailure(ready: {
+  timedOut: boolean;
+  note?: string;
+  pending?: Array<{ url: string; ageMs: number }>;
+}): string | undefined {
+  if (!ready.timedOut || !ready.note) return undefined;
+  const loading = stillLoading(ready.pending ?? []).note ?? "";
+  const reason = ready.note.endsWith(loading)
+    ? ready.note.slice(0, ready.note.length - loading.length).replace(/;\s*$/, "")
+    : ready.note;
+  return reason ? reason.slice(0, 400) : undefined;
+}
+
 const POLICY_ERRORS: Array<[RegExp, string]> = [
   [/ERR_BLOCKED_BY_CLIENT/, "a site rule"],
   [/ERR_BLOCKED_BY_ADMINISTRATOR/, "an administrator policy"],
