@@ -32,6 +32,7 @@ import { browserL2Api } from "./code-api-l2.js";
 import { browserStorageClawsApi } from "./code-api-storage-claws.js";
 import { browserWhyApi } from "./code-api-why.js";
 import { browserReApi } from "./code-api-re.js";
+import { browserPosthocExtractApi } from "./code-api-posthoc-extract.js";
 import { browserDemoClawsApi } from "./code-api-demo-claws.js";
 
 /** The whole runtime, evaluated into each fresh realm before its first cell. */
@@ -72,6 +73,7 @@ export function realmRuntimeSource(evaluate: (source: string) => unknown): void 
       browserWhyApi,
       browserL2Api,
       browserReApi,
+      browserPosthocExtractApi,
       browserDemoClawsApi,
     ].join("\n"),
   );
