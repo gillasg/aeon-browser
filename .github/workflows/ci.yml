@@ -13,21 +13,9 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            chrome-platform: win64
-            chrome-binary: chrome-win64/chrome.exe
-          - os: macos-26
-            chrome-platform: mac-arm64
-            chrome-binary: chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
-          - os: ubuntu-latest
-            chrome-platform: linux64
-            chrome-binary: chrome-linux64/chrome
+  # OS-independent static checks run once, on Linux.
+  static:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -37,6 +25,169 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm build
+      - run: pnpm --dir browser run format:check
+      - run: pnpm --dir browser run lint
+      - run: pnpm --dir browser run typecheck
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm agent-text:check
+      - run: pnpm typecheck
+      - run: pnpm test:artifact-gate
+
+  # The fast lane (no browser) on every OS Aeon ships to, built once.
+  unit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm build
+      - run: pnpm --dir browser run test && pnpm test
+      # The Claw & Primitive contract: deterministic, zero-LLM, loopback-only, Node alone (no
+      # Chrome, no model calls), on every OS Aeon ships to.
+      - name: Claw & Primitive contract
+        run: pnpm test:claws
+      # On main the Mac session reuses these built outputs instead of rebuilding from scratch.
+      # The paths mirror the pnpm workspace build outputs; name carries the commit so the session
+      # only restores it when its own commit matches.
+      - name: Upload macOS build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'macOS' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeon-macos-build-${{ github.sha }}
+          path: |
+            apps/daemon/dist
+            apps/cli/dist
+            packages/domain/dist
+            packages/location/dist
+            packages/protocol/dist
+            packages/store/dist
+            packages/pi-adapter/dist
+            packages/ui/dist
+            browser/apps/bridge/dist
+            browser/packages/protocol/dist
+            browser/packages/credentials/dist
+            browser/packages/site-mapper/dist
+            browser/packages/crawl/dist
+            browser/packages/tools/dist
+            browser/packages/cdp/dist
+            browser/packages/engine/dist
+            apps/chrome-extension/native-dist
+          if-no-files-found: error
+          retention-days: 7
+
+  # The real-Chrome lane, sharded per OS. Each OS covers every browser test file across its
+  # shards (`split`), plus one shard for the canary, package, root browser tests and sweeps.
+  browser-e2e:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            chrome-platform: linux64
+            chrome-binary: chrome-linux64/chrome
+            shard: 1
+            split: "1/3"
+            canary: false
+            package: false
+            sweeps: false
+          - os: ubuntu-latest
+            chrome-platform: linux64
+            chrome-binary: chrome-linux64/chrome
+            shard: 2
+            split: "2/3"
+            canary: false
+            package: false
+            sweeps: false
+          - os: ubuntu-latest
+            chrome-platform: linux64
+            chrome-binary: chrome-linux64/chrome
+            shard: 3
+            split: "3/3"
+            canary: false
+            package: false
+            sweeps: false
+          - os: ubuntu-latest
+            chrome-platform: linux64
+            chrome-binary: chrome-linux64/chrome
+            shard: 4
+            split: ""
+            canary: true
+            package: true
+            sweeps: true
+          - os: windows-latest
+            chrome-platform: win64
+            chrome-binary: chrome-win64/chrome.exe
+            shard: 1
+            split: "1/3"
+            canary: false
+            package: false
+            sweeps: false
+          - os: windows-latest
+            chrome-platform: win64
+            chrome-binary: chrome-win64/chrome.exe
+            shard: 2
+            split: "2/3"
+            canary: false
+            package: false
+            sweeps: false
+          - os: windows-latest
+            chrome-platform: win64
+            chrome-binary: chrome-win64/chrome.exe
+            shard: 3
+            split: "3/3"
+            canary: false
+            package: false
+            sweeps: false
+          - os: windows-latest
+            chrome-platform: win64
+            chrome-binary: chrome-win64/chrome.exe
+            shard: 4
+            split: ""
+            canary: true
+            package: true
+            sweeps: true
+          - os: macos-26
+            chrome-platform: mac-arm64
+            chrome-binary: chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+            shard: 1
+            split: "1/2"
+            canary: true
+            package: false
+            sweeps: true
+          - os: macos-26
+            chrome-platform: mac-arm64
+            chrome-binary: chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+            shard: 2
+            split: "2/2"
+            canary: false
+            package: true
+            sweeps: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Cache Chrome for Testing
         uses: actions/cache@v4
@@ -86,63 +237,51 @@ jobs:
             [ -z "$pkg" ] && continue
             sudo apt-get satisfy -y --no-install-recommends "$pkg"
           done < "$deps"
-      - run: pnpm check
-      # The Claw & Primitive contract: deterministic, zero-LLM, loopback-only, Node alone (no
-      # Chrome, no model calls), on every OS Aeon ships to. `pnpm check` already built what it loads.
-      - name: Claw & Primitive contract
-        run: pnpm test:claws
-      # On main the Mac session reuses these built outputs instead of rebuilding from scratch.
-      # The paths mirror the pnpm workspace build outputs; name carries the commit so the session
-      # only restores it when its own commit matches.
-      - name: Upload macOS build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'macOS' && success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: aeon-macos-build-${{ github.sha }}
-          path: |
-            apps/daemon/dist
-            apps/cli/dist
-            packages/domain/dist
-            packages/location/dist
-            packages/protocol/dist
-            packages/store/dist
-            packages/pi-adapter/dist
-            packages/ui/dist
-            browser/apps/bridge/dist
-            browser/packages/protocol/dist
-            browser/packages/credentials/dist
-            browser/packages/site-mapper/dist
-            browser/packages/crawl/dist
-            browser/packages/tools/dist
-            browser/packages/cdp/dist
-            browser/packages/engine/dist
-            apps/chrome-extension/native-dist
-          if-no-files-found: error
-          retention-days: 7
-      # After the build: the canary runs the built bridge and the built extension.
+      - run: pnpm build
       - name: Canary
-        if: runner.os != 'Linux'
+        if: matrix.canary && runner.os != 'Linux'
         working-directory: browser
         run: node --test test/canary.e2e.test.mjs
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
           REQUIRE_E2E: "1"
       - name: Canary
-        if: runner.os == 'Linux'
+        if: matrix.canary && runner.os == 'Linux'
         working-directory: browser
         run: xvfb-run -a node --test test/canary.e2e.test.mjs
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
           REQUIRE_E2E: "1"
-      # The real-Chrome lane (`pnpm check:browser` without its build, which `pnpm check` already did).
-      - name: Browser lane
-        if: runner.os != 'Linux'
-        run: pnpm --dir browser run test:browser && pnpm test:browser
+      - name: Browser tests (shard ${{ matrix.split }})
+        if: matrix.split != '' && runner.os != 'Linux'
+        working-directory: browser
+        run: node scripts/run-tests.mjs --browser "test/*.test.mjs" --shard=${{ matrix.split }}
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-      - name: Browser lane
-        if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm --dir browser run test:browser && xvfb-run -a pnpm test:browser
+      - name: Browser tests (shard ${{ matrix.split }})
+        if: matrix.split != '' && runner.os == 'Linux'
+        working-directory: browser
+        run: xvfb-run -a node scripts/run-tests.mjs --browser "test/*.test.mjs" --shard=${{ matrix.split }}
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+      - name: Package e2e
+        if: matrix.package && runner.os != 'Linux'
+        run: node browser/scripts/package-e2e.mjs
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+      - name: Package e2e
+        if: matrix.package && runner.os == 'Linux'
+        run: xvfb-run -a node browser/scripts/package-e2e.mjs
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+      - name: Root browser tests
+        if: matrix.package && runner.os != 'Linux'
+        run: pnpm test:browser
+        env:
+          CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
+      - name: Root browser tests
+        if: matrix.package && runner.os == 'Linux'
+        run: xvfb-run -a pnpm test:browser
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
       # The real-Chrome conformance sweep: Aeon's engine through the built bridge and extension
@@ -150,21 +289,21 @@ jobs:
       # divergences. A missing Chrome fails it. Windows reports without blocking until it has a
       # run of green builds.
       - name: Conformance sweep
-        if: runner.os == 'macOS'
+        if: matrix.sweeps && runner.os == 'macOS'
         run: pnpm test:conformance
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
           AEON_CONFORMANCE_REQUIRE: chrome
           AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
       - name: Conformance sweep
-        if: runner.os == 'Linux'
+        if: matrix.sweeps && runner.os == 'Linux'
         run: xvfb-run -a pnpm test:conformance
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
           AEON_CONFORMANCE_REQUIRE: chrome
           AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
       - name: Conformance sweep (informational)
-        if: runner.os == 'Windows'
+        if: matrix.sweeps && runner.os == 'Windows'
         continue-on-error: true
         run: pnpm test:conformance
         env:
@@ -172,7 +311,7 @@ jobs:
           AEON_CONFORMANCE_REQUIRE: chrome
           AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
       - name: Keep conformance output
-        if: always()
+        if: always() && matrix.sweeps
         uses: actions/upload-artifact@v4
         with:
           name: conformance-output-${{ matrix.os }}
@@ -180,21 +319,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Stealth probe
-        if: runner.os == 'macOS'
+        if: matrix.sweeps && runner.os == 'macOS'
         run: pnpm test:stealth-probe
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
           AEON_STEALTH_REQUIRE: chrome
           AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
       - name: Stealth probe
-        if: runner.os == 'Linux'
+        if: matrix.sweeps && runner.os == 'Linux'
         run: xvfb-run -a pnpm test:stealth-probe
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
           AEON_STEALTH_REQUIRE: chrome
           AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
       - name: Stealth probe (informational)
-        if: runner.os == 'Windows'
+        if: matrix.sweeps && runner.os == 'Windows'
         continue-on-error: true
         run: pnpm test:stealth-probe
         env:
@@ -202,7 +341,7 @@ jobs:
           AEON_STEALTH_REQUIRE: chrome
           AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
       - name: Keep stealth probe output
-        if: always()
+        if: always() && matrix.sweeps
         uses: actions/upload-artifact@v4
         with:
           name: stealth-probe-output-${{ matrix.os }}
@@ -213,7 +352,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-test-output-${{ matrix.os }}
+          name: browser-test-output-${{ matrix.os }}-${{ matrix.shard }}
           path: browser/test-output
           if-no-files-found: ignore
           retention-days: 7
