@@ -199,10 +199,14 @@ ${borrow}await __tab.inspect(${run})`;
   }
 }
 
-export const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+/**
+ * What plain HTTP from Node says it is. Never a Chrome string: Node's TLS handshake is not
+ * Chrome's, and a site that sees a Chrome UA on a non-Chrome handshake treats it as a forged
+ * client (429s, walls). A call that needs to look like the browser goes through the page.
+ */
+export const DIRECT_USER_AGENT = "aeon/0.2";
 
-/** Plain HTTP from Node, with the user's exported cookies and browser-like headers. */
+/** Plain HTTP from Node, with the user's exported cookies and an honest user agent. */
 export class DirectTransport implements Transport {
   readonly name = "direct" as const;
 
@@ -238,7 +242,7 @@ export class DirectTransport implements Transport {
   async send(request: RuntimeRequest, context: CallContext): Promise<RuntimeResponse> {
     const home = new URL(context.home);
     const headers: Record<string, string> = {
-      "user-agent": this.session?.userAgent ?? BROWSER_USER_AGENT,
+      "user-agent": DIRECT_USER_AGENT,
       accept: "application/json, text/plain, */*",
       "accept-language": this.session?.language ?? "en-US,en;q=0.9",
       origin: home.origin,

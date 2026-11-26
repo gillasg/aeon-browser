@@ -3,6 +3,7 @@ import { sourceMaps } from "./sourcemap-read.js";
 import { operationEffect } from "./effect.js";
 import { formatPace, paceExpectedMs, setBatchRate } from "./pace.js";
 import { listSites, loadModel, readOverrides, saveModel, siteName } from "./registry.js";
+import { HEAL_TIMEOUT, healDeadlineMs, withDeadline } from "./deadline.js";
 import { callWithBundleHeal, healOpFromBundle, type BundleHealDeps } from "./bundle-heal-run.js";
 import type { SiteModel } from "./types.js";
 import type { Params } from "./runtime/request.js";
@@ -116,14 +117,16 @@ const HANDLERS: Record<
       liveHealDeps,
     ),
   heal: (site, request) =>
-    healOpFromBundle(
-      site,
-      required(request.operation, "operation"),
-      request.params ?? {},
-      liveHealDeps,
-      {
-        allowWrite: request.options?.allowWrite === true,
-      },
+    withDeadline(
+      healOpFromBundle(
+        site,
+        required(request.operation, "operation"),
+        request.params ?? {},
+        liveHealDeps,
+        { allowWrite: request.options?.allowWrite === true },
+      ),
+      healDeadlineMs(),
+      HEAL_TIMEOUT,
     ),
   export: async (site, request) => exportRows(site, request),
   pace: async (site, request) => pacePreview(site, request),

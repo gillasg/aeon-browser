@@ -179,3 +179,26 @@ test("end to end: 404 → bundle re-scan → rebind → retry answers → next c
   assert.deepEqual(second.data.tweets, [1, 2]);
   assert.equal(scans, 1);
 });
+
+test("a persisted hash after the operation name (/Name/<hash>) rebinds, from the param constant", () => {
+  const suggest = op({
+    kind: "graphql",
+    path: "/api/v3/AutoSuggestionsQuery/{autoSuggestionsQueryId}",
+    params: [
+      {
+        name: "autoSuggestionsQueryId",
+        in: "path",
+        required: false,
+        schema: { type: "string" },
+        constant: SHA_OLD,
+        persistedHash: true,
+      },
+    ],
+    graphql: { operationName: "AutoSuggestionsQuery", variablesPath: "query:variables" },
+  });
+  const graph = graphOf(`fetch("/api/v3/AutoSuggestionsQuery/${SHA_NEW}")`);
+  const out = proposeRebind(suggest, graph);
+  assert.equal(out.rebind?.kind, "graphql_hash", JSON.stringify(out));
+  assert.equal(out.rebind.path, `/api/v3/AutoSuggestionsQuery/${SHA_NEW}`);
+  assert.equal(out.rebind.oldTarget, `AutoSuggestionsQuery@${SHA_OLD}`);
+});

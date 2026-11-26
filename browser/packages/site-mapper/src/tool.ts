@@ -8,6 +8,7 @@ import { toAsyncApi, toOpenApi } from "./emit/openapi.js";
 import { markdownReport, redactedSamples } from "./emit/report.js";
 import { toYaml } from "./emit/yaml.js";
 import { checkHealth, repair } from "./health.js";
+import { HEAL_TIMEOUT, healDeadlineMs, withDeadline } from "./deadline.js";
 import { loadCapture } from "./load/index.js";
 import { loadModel, readOverrides, siteName } from "./registry.js";
 import { listAbilities, readAbility, runAbility, testAbility } from "./abilities.js";
@@ -155,6 +156,12 @@ async function channel(input: SiteToolInput): Promise<unknown> {
 }
 
 async function heal(input: SiteToolInput): Promise<unknown> {
+  // A probe is bounded; a repair re-records flows and runs as long as recording takes.
+  if (input.repair) return healReport(input);
+  return withDeadline(healReport(input), healDeadlineMs(), HEAL_TIMEOUT);
+}
+
+async function healReport(input: SiteToolInput): Promise<unknown> {
   const report = await checkHealth(input.site);
   const failing = report.results
     .filter((r) => r.status === "broken" || r.status === "drift")

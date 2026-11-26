@@ -1,9 +1,10 @@
+import { initialSession, paceOnChallenge, sessionRefresher } from "./client-helpers.js";
+import { directWall, pageAfterWall } from "./page-retry.js";
 import { originMatches } from "../filter.js";
-import { type Challenge, observeExchange } from "../challenge.js";
 import { breakingChanges, responseChanges } from "../diff.js";
 import { extractEmbedded, hiddenInputs, inlineScriptTokens, metaTags } from "../infer/html.js";
 import { getPointer } from "../infer/schema.js";
-import { loadModel, readOverrides, readSession, siteHome, siteName } from "../registry.js";
+import { loadModel, readOverrides, siteHome, siteName } from "../registry.js";
 import {
   readTransportPreferences,
   recordTransportPreference,
@@ -12,7 +13,7 @@ import {
 import type { Operation, PageEndpoint, SecurityScheme, SiteModel } from "../types.js";
 import { BrowserNotConnected, type Bridge } from "./bridge.js";
 import { finishRead, WriteThroughApi } from "./errors.js";
-import { isRateLimited, RateLimiter, retryDelay, shouldRetryRead, sleep } from "./limits.js";
+import { RateLimiter, retryDelay, shouldRetryRead, sleep } from "./limits.js";
 import { isDnsFailure, isFetchFailure, isNetworkRefusal, isOk } from "./outcome.js";
 import { buildRequest, type Params, type RuntimeRequest, type RuntimeResponse } from "./request.js";
 import { fillMissingInputs } from "./resolve-missing.js";
@@ -27,12 +28,11 @@ import {
   type ChannelOptions,
   type ChannelResult,
 } from "./channels.js";
-import { exportSession } from "./session-export.js";
 import { docsExpression, docsTargets, type SiteDocs } from "./docs.js";
 import { paginate, type PaginateOptions } from "./paginate.js";
-import { applyPaceNotes, exportPaced, notePaceLimit, takePace } from "../pace.js";
+import { applyPaceNotes, exportPaced, takePace } from "../pace.js";
 import { readSiteFacts } from "../site-notes.js";
-import { isRung0Paused, recordChallenge } from "../circuit-breaker.js";
+import { isRung0Paused } from "../circuit-breaker.js";
 import { type BudgetKind, humanBudget } from "../human-budget.js";
 export {
   BadRequest,
@@ -72,19 +72,6 @@ export interface SiteMapperOptions {
 
 const SESSION_FRESH_MS = 12 * 3600_000;
 const REFRESH_EVERY_MS = 10 * 60_000;
-
-/** Halves the site's pace on a 429 or a challenge page. Returns the wall when there was one. */
-function paceOnChallenge(
-  site: string,
-  response: RuntimeResponse,
-  account?: string,
-): Challenge | undefined {
-  const wall = observeExchange(site, response);
-  // I-8: the first wall pauses direct replay for this (site, account) for 24 hours.
-  if (wall) recordChallenge(site, wall, account);
-  if (wall || isRateLimited(response)) notePaceLimit(site);
-  return wall;
-}
 
 export class SiteClient {
   readonly site: string;
@@ -133,10 +120,12 @@ export class SiteClient {
     return this.model.security.filter((scheme) => operation.security.includes(scheme.name));
   }
 
-  private async chooseTransport(operation: Operation): Promise<Transport> {
+  private async chooseTransport(operation: Operation, request: RuntimeRequest): Promise<Transport> {
     const mode = this.options.transport ?? "auto";
     if (mode === "page") return this.page;
     if (mode === "direct") return this.direct;
+    // A header recorded sealed or redacted is only real in the page.
+    if (request.pageHeaders?.length) return this.page;
     // A tripped breaker runs the call in the live page, with human-paced input.
     if (isRung0Paused(this.site, this.options.account)) return this.page;
     if (await this.needsBrowser(operation)) return this.page;
@@ -287,6 +276,7 @@ export class SiteClient {
         const response = await this.budgeted(readOnly ? "read" : "write", transport, () =>
           this.limiter.run(() => transport.send(request, context)),
         );
+        if (this.wallToPage(transport, readOnly, response)) return response;
         if (!shouldRetryRead(readOnly, response, attempt, retries)) return response;
         await sleep(retryDelay(attempt, response.headers["retry-after"]));
       } catch (error) {
@@ -327,7 +317,12 @@ export class SiteClient {
     readOnly: boolean,
   ): Promise<{ response: RuntimeResponse; transport: Transport }> {
     try {
-      return { response: await this.send(transport, request, context, readOnly), transport };
+      const response = await this.send(transport, request, context, readOnly);
+      if (!this.wallToPage(transport, readOnly, response)) return { response, transport };
+      const paged = await pageAfterWall(response, this.page, () =>
+        this.send(this.page, request, context, readOnly),
+      );
+      return paged ?? { response, transport };
     } catch (error) {
       const pageRetry = await this.retryPageFetch(transport, error, request, context, readOnly);
       if (pageRetry) return pageRetry;
@@ -446,6 +441,11 @@ export class SiteClient {
       : undefined;
   }
 
+  /** A direct read walled by a 429 or challenge in auto mode: the page retries it, no backoff. */
+  private wallToPage(transport: Transport, readOnly: boolean, response: RuntimeResponse): boolean {
+    return readOnly && this.canRetryInPage({ transport }) && directWall(response);
+  }
+
   private canRetryInPage(sent: { transport: Transport }): boolean {
     return sent.transport === this.direct && (this.options.transport ?? "auto") === "auto";
   }
@@ -479,7 +479,7 @@ export class SiteClient {
   ): Promise<RuntimeResponse> {
     const request = await this.prepare(operation, params, depth);
     // Writes go out from the site's tab, as the page itself sent them (signing, cookies, origin).
-    const chosen = readOnly ? await this.chooseTransport(operation) : this.page;
+    const chosen = readOnly ? await this.chooseTransport(operation, request) : this.page;
     Object.assign(
       request.headers,
       await this.responseAuth(operation, params, depth),
@@ -723,25 +723,6 @@ type Outcome = {
   drifted: boolean;
   authRetried: boolean;
 };
-
-async function initialSession(
-  model: SiteModel,
-  options: SiteMapperOptions,
-): Promise<SessionFile | undefined> {
-  if (options.session === false) return undefined;
-  return options.session ?? (await readSession(model.site));
-}
-
-/** A session the user exported is renewed from their browser when it expires or is refused. */
-function sessionRefresher(
-  model: SiteModel,
-  options: SiteMapperOptions,
-): (() => Promise<SessionFile | undefined>) | undefined {
-  if (options.refreshSession === false) return undefined;
-  return (
-    options.refreshSession ?? (async () => (await exportSession(model, options.bridge)).session)
-  );
-}
 
 /** Opens a mapped site from the registry (or a given model) as a callable API. */
 export async function siteMapper(
