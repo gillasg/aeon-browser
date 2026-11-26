@@ -1,10 +1,20 @@
 #!/usr/bin/env node
 // aeon. `aeon repl` takes a lean path (repl-fast.ts) because agents call it once per step; every
-// `aeon record` scripted actions likewise (record-fast.ts); every
-// other command, and repl's --help, loads the full command line (cli-main.ts).
+// `aeon record` scripted actions likewise (record-fast.ts), and `aeon call|find|watch|status`
+// (site-fast.ts). `--version` reads package.json and nothing else. Every other command, and
+// repl's --help, loads the full command line (cli-main.ts).
 const argv = process.argv.slice(2);
 const help = argv.some((arg) => arg === "--help" || arg === "-h");
-if (argv[0] === "repl" && !help) {
+const SITE_FAST = new Set(["call", "find", "watch", "status"]);
+if (["version", "--version", "-v", "-V"].includes(argv[0] ?? "")) {
+  const { readFileSync } = await import("node:fs");
+  const manifest = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as {
+    version?: string;
+  };
+  process.stdout.write(`aeon ${manifest.version ?? "unknown"}\n`);
+} else if (argv[0] === "repl" && !help) {
   const { runRepl } = await import("./repl-fast.js");
   const { exitAfterFlush } = await import("./exit.js");
   await exitAfterFlush(await runRepl(argv));
@@ -18,4 +28,8 @@ if (argv[0] === "repl" && !help) {
   const { runRecord } = await import("./record-fast.js");
   const { exitAfterFlush } = await import("./exit.js");
   await exitAfterFlush(await runRecord(argv));
+} else if (SITE_FAST.has(argv[0] ?? "")) {
+  const { runSiteFast } = await import("./site-fast.js");
+  const { exitAfterFlush } = await import("./exit.js");
+  await exitAfterFlush(await runSiteFast(argv));
 } else await import("./cli-main.js");

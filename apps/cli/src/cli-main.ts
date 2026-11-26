@@ -22,7 +22,7 @@ const EXIT_CODES: Record<string, number> = {
 };
 
 const HELP = new Set(["help", "--help", "-h"]);
-const VERSION = new Set(["version", "--version", "-v"]);
+const VERSION = new Set(["version", "--version", "-v", "-V"]);
 
 function printVersion(): number {
   const manifest = JSON.parse(

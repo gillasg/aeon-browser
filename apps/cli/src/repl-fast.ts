@@ -28,10 +28,24 @@ class LeanRunner {
   }
 }
 
+const SHORT_FLAGS: Record<string, string> = { "-q": "--quiet" };
+
+/**
+ * repl's arguments: flags work before or after the code (`aeon repl "1+1" -q`), and `--` ends
+ * them, so everything after it is code even when it looks like a flag.
+ */
+export function replArgs(argv: string[]): ReturnType<typeof parseArgs> {
+  const stop = argv.indexOf("--");
+  const head = (stop === -1 ? argv : argv.slice(0, stop)).map((arg) => SHORT_FLAGS[arg] ?? arg);
+  const args = parseArgs(head);
+  if (stop !== -1) args.positional.push(...argv.slice(stop + 1));
+  return args;
+}
+
 export async function runRepl(argv: string[]): Promise<number> {
   const runner = new LeanRunner();
   try {
-    const args = parseArgs(argv);
+    const args = replArgs(argv);
     return await repl(runner, { ...args, positional: args.positional.slice(1) });
   } catch (error) {
     if (process.argv.includes("--json")) {
