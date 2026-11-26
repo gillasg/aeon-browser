@@ -412,7 +412,7 @@ export interface McpServerOptions {
 export interface McpSession {
   /** One client message; `send` gets its reply (none for a notification). */
   receive(message: Json, send: Send): Promise<void>;
-  close(): void;
+  close(): Promise<void>;
 }
 
 export async function runMcpServer(site?: string, options: McpServerOptions = {}): Promise<void> {
@@ -431,7 +431,7 @@ export async function runMcpServer(site?: string, options: McpServerOptions = {}
     }
     await server.receive(message, stdoutSend);
   }
-  server.close();
+  await server.close();
 }
 
 /** Starts the shared server state; `notify` carries notifications and our sampling requests. */
@@ -448,8 +448,7 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
     pending: new Map<string, AbortController>(),
     conn: { modern: false },
   };
-  // A model call is routed to the agent when it offered sampling and Aeon has no model of its own,
-  // or the user asked to prefer the agent's model. Both facts are read once, here at session start.
+  // Sampling goes to the agent when it offered it and Aeon has no model, or the user prefers it.
   const sampler = new SamplingBridge();
   sampler.setSender((request) => notifySend(request as Json));
   sampler.setUseClientModel(
@@ -461,12 +460,13 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
     (name, args, signal, context) =>
       callToolResult({ name, arguments: args }, deps.aeon, deps.runs, undefined, signal, context),
     () => catalogState.tools,
+    deps.aeon,
   );
   return {
     receive: (message, send) => processMcpMessage(message, deps, sampler, send),
-    close: () => {
+    close: async () => {
       stopCatalog();
-      extensions?.close();
+      await extensions?.close().catch(() => undefined);
       extensions = undefined;
       for (const controller of deps.pending.values()) controller.abort();
       sampler.close();

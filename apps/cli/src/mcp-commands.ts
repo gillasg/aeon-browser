@@ -86,7 +86,7 @@ async function mcpCommand(args: Args): Promise<number> {
   );
   await waitForSignal();
   await server.close();
-  session.close();
+  await session.close();
   return 0;
 }
 
