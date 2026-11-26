@@ -19,7 +19,7 @@ async function __poolMap(items, worker, options = {}) {
   return __timing.poolMap(Array.from(items), (item, index, lane) => {
     lane.tab = lane.tab || (async (url) => {
       if (lane.page) { if (url) await lane.page.goto(url, {present: false}); return lane.page; }
-      lane.page = await browser.openTab(url || 'about:blank', {new: true, present: false});
+      lane.page = await browser.openTab(url || 'about:blank', {new: true, present: false, background: true});
       var page = lane.page;
       lane.onCleanup(() => page.close().catch(() => undefined));
       return page;

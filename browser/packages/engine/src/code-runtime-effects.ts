@@ -245,7 +245,10 @@ function browserEffects(host: EffectHost): Effect<Cell>[] {
     {
       name: "browser.info",
       match: (value) => value.browserInfo === true,
-      run: async (cell) => ({ clientInstanceIds: [cell.identity.clientInstanceId] }),
+      run: async (cell) => ({
+        clientInstanceIds: [cell.identity.clientInstanceId],
+        browsers: [{ clientInstanceId: cell.identity.clientInstanceId, focused: true }],
+      }),
     },
     {
       name: "job.start",

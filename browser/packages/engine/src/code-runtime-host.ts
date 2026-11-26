@@ -685,7 +685,7 @@ async function prepare(cell: Cell, value: Record<string, unknown>): Promise<Brow
     );
   if (value.op === "openTab" && !value.clientInstanceId)
     value.clientInstanceId = cell.identity.clientInstanceId;
-  if (value.op === "openTab" && value.space === undefined)
+  if (value.op === "openTab" && value.space === undefined && value.background !== true)
     value.space =
       value.quiet === true
         ? "window"

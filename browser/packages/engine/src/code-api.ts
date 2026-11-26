@@ -183,12 +183,8 @@ var browser = Object.freeze({
     return __call({tabs:'move', tabIds: ids, index: options.index ?? -1, ...(options.windowId !== undefined ? {windowId: options.windowId} : {})});
   },
   openTab: async (url, options = {}) => {
-    let clientInstanceId = options.clientInstanceId || __lastTarget?.clientInstanceId;
-    if (!clientInstanceId) {
-      const clients = (await __call({browserInfo:true})).clientInstanceIds;
-      if (clients.length === 0) throw Error('BROWSER_OFFLINE: no browser executor is connected');
-      clientInstanceId = clients.length === 1 ? clients[0] : await __focusedProfile(clients);
-    }
+    // {browser: 'viewer'} names a profile (browser.profiles()); several and none named: the focused one.
+    const clientInstanceId = await __pickClient(options, __lastTarget);
     // One working tab per site: a URL on an origin this session already has a tab for navigates that
     // tab. Pass {newTab: true} for a separate tab.
     url = String(url);
@@ -214,7 +210,7 @@ var browser = Object.freeze({
       } finally { __busy.delete(__key(known)); }
     }
     const result = await __step({op:'openTab', clientInstanceId, url,
-      foreground: options.foreground === true,
+      foreground: options.foreground === true, ...__placementStep(options),
       ...(options.referer ? {referer: String(options.referer)} : {}),
       ...(options.quiet === true ? {quiet:true} : {}),
       ...(options.ads === true ? {ads:true} : {}),
@@ -340,7 +336,9 @@ var browser = Object.freeze({
       : {tabGroups:'get'});
     return result.enabled === true;
   },
-  pool: Object.assign((items, worker, options = {}) => __pool(items, worker, options), {map: (items, worker, options) => __poolMap(items, worker, options)}),
+  pool: Object.assign((items, worker, options = {}) => __pool(items, worker, options), {map: (items, worker, options) => options && options.across ? __poolAcross(items, worker, options) : __poolMap(items, worker, options)}),
+  // browser.profiles(): the connected Chrome profiles; browser.diff(a, b): what differs between two values.
+  profiles: () => __profiles(), diff: (a, b, options) => __diff(a, b, options),
   // Server clock and exact timing: browser.clock(url) -> {serverOffsetMs, rttMs}; browser.scheduleAt(ms, fn, {offsetMs, leadMs, signal}).
   clock: (url, options) => __clockSync(String(url), options),
   scheduleAt: (at, fn, options) => __timing.scheduleAt(typeof at === 'number' ? at : Date.parse(at), fn, options),
