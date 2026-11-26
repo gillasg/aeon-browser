@@ -608,7 +608,9 @@ var browser = Object.freeze({
       // The tab is recorded from its first request on, so this works without start(). An empty
       // list says why it is empty (it never is a bare []).
       list: async (options = {}) => {
-        var filter = typeof options === 'string' ? {match: options} : options;
+        var filter = typeof options === 'string' ? {match: options} : {...options};
+        // {quiet: true}: an internal probe, so an empty answer logs nothing.
+        var quiet = filter.quiet === true; delete filter.quiet;
         var incremental = filter.cursor === true || filter.since !== undefined;
         var reply;
         try { reply = await __call({network:'list', target, ...filter}); }
@@ -619,7 +621,7 @@ var browser = Object.freeze({
           reply = incremental ? {entries: [], cursor: 0} : [];
         }
         var entries = incremental ? (reply && reply.entries) || [] : reply;
-        if (!entries.length) {
+        if (!entries.length && !quiet) {
           var state = await __call({network:'state', target}).catch(() => ({}));
           var note = state.note;
           if (!note && state.recent && state.recent.length)

@@ -11,12 +11,12 @@ async function __reHref(page) {
   try { return String(await page.evaluate(() => location.href)); } catch { return String(page.url); }
 }
 async function __reObserved(page) {
-  var rows = await page.network.list('').catch(() => []);
+  var rows = await page.network.list({quiet: true}).catch(() => []);
   var list = Array.isArray(rows) ? rows : (rows && (rows.entries || rows.requests || rows.rows)) || [];
-  return list.slice(0, 500).map((row) => ({method: row.method, url: String(row.url || '')})).filter((row) => row.url);
+  return list.slice(0, 500).map((row) => ({method: row.method, url: String(row.url || ''), ...(typeof row.requestBody === 'string' ? {body: row.requestBody.slice(0, 20000)} : {})})).filter((row) => row.url);
 }
 async function __reCached(page) {
-  var rows = await page.network.list({type: 'javascript'}).catch(() => []);
+  var rows = await page.network.list({type: 'Script', quiet: true}).catch(() => []);
   var list = Array.isArray(rows) ? rows : (rows && (rows.entries || rows.requests || rows.rows)) || [];
   var cached = {}, total = 0;
   for (var row of list.slice(0, 60)) {

@@ -176,6 +176,7 @@ function __extendPageData(target, base) {
         // No merge with the recording: an omitted field must not be silently replayed.
         request.json = changes.json;
       } else if (changes.body !== undefined) request.body = changes.body;
+      else if (entry.requestBody !== undefined && !/^(GET|HEAD)$/i.test(request.method || 'GET')) request.body = entry.requestBody;
       // Fail before fetch: a tab that has left the sending page would lose cookies or be blocked.
       var tabOrigin = await base.inspect('location.origin');
       var refusal = replayOriginRefusal(String(id), url.href, entry.documentURL, tabOrigin == null ? 'null' : String(tabOrigin));

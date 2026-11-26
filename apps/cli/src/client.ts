@@ -203,11 +203,12 @@ export class AeonClient {
   /** Runs browser code in the user's Chrome and returns the cell's own value and output. */
   browserRun(
     body: { code: string; session: string; timeoutMs?: number; browser?: string },
-    timeoutMs = 11 * 60_000,
+    timeoutMs?: number,
   ): Promise<Json> {
     const requestId = randomUUID();
-    // A cell asked to run longer than the default still gets its own time plus a minute.
-    const wait = Math.max(timeoutMs, (body.timeoutMs ?? 0) + 60_000);
+    // The cell's own deadline (the daemon's 60s default when none is given) plus a grace period:
+    // a dropped frame fails the call instead of hanging it.
+    const wait = timeoutMs ?? (body.timeoutMs ?? 60_000) + 30_000;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);

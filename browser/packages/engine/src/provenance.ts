@@ -10,6 +10,8 @@ export interface ProvTargetValue {
   trimmed: string;
   lower: string;
   num?: number;
+  /** How far a raw number may sit from num and still be the same value (compact 2.8K is ±50). */
+  tol?: number;
 }
 
 export interface ProvMatch {
@@ -37,17 +39,52 @@ export interface ProvOperation {
   path?: string;
 }
 
-/** What an element shows, trimmed and lowercased, plus its number when it reads as one. */
+/**
+ * What an element shows, trimmed and lowercased, plus its number when it reads as one: thousands
+ * separators (10,385,963), compact suffixes (2.8K, 1.2M, 3.4B, with the rounding they imply as
+ * `tol`), European and currency decimals (59,99€, €21, ₹1,999) and a trailing unit word (ratings).
+ */
 export function provNormalize(text: unknown): ProvTargetValue {
-  const raw = String(text ?? "");
+  const raw = text === undefined || text === null ? "" : String(text);
   const trimmed = raw.replace(/\s+/g, " ").trim();
   const out: ProvTargetValue = { raw, trimmed, lower: trimmed.toLowerCase() };
-  const shaped = /^[-+(]?\s*[$€£¥₹]?\s*[-+]?(\d{1,3}(,\d{3})+|\d+)?(\.\d+)?\s*%?\)?$/;
-  if (!shaped.test(trimmed) || !/\d/.test(trimmed)) return out;
-  const negative = /^\(.*\)$/.test(trimmed) || /^-|^[$€£¥₹]\s*-/.test(trimmed);
-  const digits = trimmed.replace(/[^\d.]/g, "");
-  const value = Number(digits);
-  if (digits && Number.isFinite(value)) out.num = negative ? -value : value;
+  const units =
+    /\s+(ratings?|reviews?|views?|viewers?|watching|stars?|total|followers?|likes?|votes?|players?|users?|members?|comments?|downloads?|items?|results?)$/i;
+  let core = trimmed.replace(units, "").replace(/\s+/g, "");
+  const negative = /^\(.*\)$/.test(core) || /^-|^[$€£¥₹]-/.test(core);
+  core = core.replace(/^[(+-]+|\)$/g, "").replace(/^(US|CA|AU)?[$€£¥₹]|[$€£¥₹]$/g, "");
+  core = core.replace(/^[-+]/, "").replace(/%$/, "");
+  const shaped = /^(\d[\d.,]*)([kmbt])?$/i.exec(core);
+  if (!shaped || !shaped[1]) return out;
+  let digits = shaped[1];
+  const comma = digits.lastIndexOf(","),
+    dot = digits.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) {
+    // Both separators: the last one is the decimal point.
+    const decimal = comma > dot ? "," : ".";
+    digits = digits.split(decimal === "," ? "." : ",").join("");
+    digits = digits.replace(",", ".");
+  } else if (comma >= 0) {
+    const groups = digits.split(",");
+    const thousands = groups.slice(1).every((group) => group.length === 3) && groups.length > 1;
+    if (thousands && (groups.length > 2 || !shaped[2])) digits = groups.join("");
+    else if (groups.length === 2) digits = groups.join(".");
+    else return out;
+  } else if (dot >= 0) {
+    const groups = digits.split(".");
+    if (groups.length > 2) {
+      if (!groups.slice(1).every((group) => group.length === 3)) return out;
+      digits = groups.join("");
+    }
+  }
+  if (!/^\d+(\.\d+)?$/.test(digits)) return out;
+  const scale: Record<string, number> = { k: 1e3, m: 1e6, b: 1e9, t: 1e12 };
+  const factor = shaped[2] ? (scale[shaped[2].toLowerCase()] ?? 1) : 1;
+  const places = (digits.split(".")[1] ?? "").length;
+  const value = Number(digits) * factor;
+  if (!Number.isFinite(value)) return out;
+  out.num = negative ? -value : value;
+  if (factor > 1) out.tol = (0.5 * factor) / Math.pow(10, places);
   return out;
 }
 
@@ -65,7 +102,8 @@ export function provLeafKind(
   if (clean.toLowerCase() === target.lower) return "normalized";
   if (target.num !== undefined) {
     const own = typeof leaf === "number" ? leaf : provNormalize(clean).num;
-    if (own !== undefined && Math.abs(own - target.num) < 1e-9) return "normalized";
+    if (own !== undefined && Math.abs(own - target.num) <= (target.tol ?? 1e-9))
+      return "normalized";
   }
   if (
     typeof leaf === "string" &&

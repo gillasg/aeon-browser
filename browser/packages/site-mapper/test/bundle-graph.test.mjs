@@ -182,3 +182,41 @@ test("the pre-filter, URL gate and parse fallbacks keep noise out", () => {
   assert.equal(broken.candidates.length, 0);
   assert.match(broken.notes[0], /could not parse/);
 });
+
+test("observed GraphQL traffic confirms static operations and adds hidden ones", () => {
+  const graph = analyzeBundles([[FILE, "gql`query Me { me { id } }`"]]);
+  confirmCandidates(graph, [
+    {
+      method: "POST",
+      url: "https://shop.test/graphql",
+      body: '{"operationName":"Me","query":"query Me { me { id } }"}',
+    },
+    {
+      method: "POST",
+      url: "https://shop.test/gql",
+      body: '[{"operationName":"Feed","extensions":{"persistedQuery":{"sha256Hash":"abc"}}}]',
+    },
+  ]);
+  const ops = graph.candidates.filter((c) => c.kind === "graphql");
+  assert.equal(ops.find((c) => c.operationName === "Me")?.confirmed, true);
+  const feed = ops.find((c) => c.operationName === "Feed");
+  assert.equal(feed?.sha256, "abc");
+  assert.equal(feed?.provenance, "observed");
+});
+
+test("error statuses and bot challenge pages are never read as the site's code", async () => {
+  const { refused } = await import("../dist/code.js");
+  assert.equal(refused({ status: 404, text: "console.log(1)" }), true);
+  assert.equal(refused({ status: 403, text: "<html>" }), true);
+  assert.equal(
+    refused({
+      status: 200,
+      text: "<html><title>Just a moment...</title><script>__cf_chl_rt_tk=1</script>",
+    }),
+    true,
+  );
+  assert.equal(refused({ status: 429, text: "" }), true);
+  assert.equal(refused({ status: 200, text: '<html><a href="/vercel/security">' }), true);
+  assert.equal(refused({ status: 200, text: "<html><title>Shop</title>" }), false);
+  assert.equal(refused({ status: 200, text: "function a(){}" }), false);
+});

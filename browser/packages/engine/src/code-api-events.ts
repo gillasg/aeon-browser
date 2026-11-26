@@ -117,6 +117,7 @@ function __extendPageEvents(target, base) {
     waitForMessage: async (match = '', options = {}) => {
       await recording();
       var counts = new Map(), deadline = deadlineOf(options);
+      var matches = (data) => { var text = typeof data === 'string' ? data : JSON.stringify(data) ?? String(data); if (match instanceof RegExp) { match.lastIndex = 0; return match.test(text); } return typeof match === 'function' ? Boolean(match(data)) : text.includes(String(match)); };
       var streams = async () => (await __call({network: 'list', target})).filter((entry) => entry.type === 'WebSocket' || entry.type === 'EventSource');
       for (var stream of await streams()) {
         var full = await __call({network: 'get', target, id: stream.id});
@@ -128,7 +129,7 @@ function __extendPageEvents(target, base) {
           var full = await __call({network: 'get', target, id: stream.id});
           var items = full.frames || full.messages || [], from = counts.get(stream.id) ?? 0;
           counts.set(stream.id, items.length);
-          var fresh = items.slice(from).filter((item) => item.direction !== 'sent' && String(item.data).includes(match));
+          var fresh = items.slice(from).filter((item) => item.direction !== 'sent' && matches(item.data));
           if (fresh.length) return {url: full.url, messages: fresh.map((item) => item.data)};
         }
       }

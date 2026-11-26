@@ -18,13 +18,42 @@ function whyPageRead(input: {
     String((el as HTMLElement).innerText ?? el.textContent ?? "")
       .replace(/\s+/g, " ")
       .trim();
+  // Text nodes only, outside script/style/noscript/template, with a node budget: the smallest
+  // element whose text holds the value, found in milliseconds on a large page.
   const byText = (text: string): Element | null => {
     const want = text.replace(/\s+/g, " ").trim().toLowerCase();
+    if (!want || want === "undefined" || want === "null" || !document.body) return null;
+    const hidden = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|svg)$/i;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        for (let at = node.parentElement; at && at !== document.body; at = at.parentElement)
+          if (hidden.test(at.tagName)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
     let best: Element | null = null;
-    for (const el of Array.from(document.querySelectorAll("body *"))) {
-      const own = visible(el).toLowerCase();
-      if (!own || !own.includes(want)) continue;
-      if (!best || visible(best).length >= own.length) best = el;
+    let bestLength = Infinity;
+    for (let node = walker.nextNode(), seen = 0; node && seen < 50000; node = walker.nextNode()) {
+      seen++;
+      const own = String(node.nodeValue ?? "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+      const parent = node.parentElement;
+      if (!parent) continue;
+      // A value split over child elements ("$1,234" + ".50") is caught on the parent's text.
+      const holder = own.includes(want)
+        ? parent
+        : own && want.startsWith(own) && parent.parentElement
+          ? parent.parentElement
+          : null;
+      if (!holder || holder === document.body) continue;
+      const length = visible(holder).length;
+      if (length < bestLength && visible(holder).toLowerCase().includes(want)) {
+        best = holder;
+        bestLength = length;
+        if (length === want.length) break;
+      }
     }
     return best;
   };
@@ -38,7 +67,10 @@ function whyPageRead(input: {
       el = null;
     }
   }
-  if (!el && (input.text || input.selector)) el = byText(String(input.text || input.selector));
+  const wanted = [input.text, input.selector].find(
+    (value) => typeof value === "string" && value.trim(),
+  );
+  if (!el && wanted) el = byText(wanted);
   const out: Record<string, unknown> = { hydration: whyHydration() };
   if (!el) return out;
   const box = el.getBoundingClientRect();
@@ -179,10 +211,36 @@ async function __whyNetwork(page, value, missing) {
   for (var i = 0; i < json.length; i++) {
     var body;
     try { body = await page.network.body(json[i].id); } catch { continue; }
-    var text = body && typeof body === 'object' ? body.body : body;
-    var data; try { data = typeof text === 'string' ? JSON.parse(text) : text; } catch { continue; }
+    var data = __whyJson(body);
+    if (data === undefined) continue;
     for (var hit of provSearch(data, value)) found.push({...hit, recency: i + 1, source: 'network', entry: json[i]});
   }
+  return found;
+}
+// network.body() gives the parsed JSON itself, {text} for other text, or {body} from older hosts.
+function __whyJson(body) {
+  var parse = (text) => { try { return JSON.parse(text); } catch { return undefined; } };
+  if (typeof body === 'string') return parse(body);
+  if (!body || typeof body !== 'object') return undefined;
+  if (Array.isArray(body)) return body;
+  if (body.unavailable || body.binary) return undefined;
+  var keys = Object.keys(body);
+  if (typeof body.text === 'string' && keys.every((k) => k === 'text' || k === 'truncated' || k === 'length')) return parse(body.text);
+  if ('body' in body && keys.length === 1) return typeof body.body === 'string' ? parse(body.body) : body.body;
+  return body;
+}
+// WebSocket and event-stream frames the tab received (page.streams), newest last: live values.
+async function __whyStreams(page, value, base) {
+  var frames;
+  try { frames = page.streams && await page.streams.list({limit: 200}); } catch { return []; }
+  var list = Array.isArray(frames) ? frames : (frames && (frames.items || frames.frames)) || [];
+  var found = [];
+  list.slice(-200).forEach((frame, i) => {
+    if (!frame || frame.direction === 'sent') return;
+    var data = frame.json !== undefined ? frame.json : __whyJson(frame.data);
+    if (data === undefined || data === null || typeof data !== 'object') return;
+    for (var hit of provSearch(data, value, {maxMatches: 10})) found.push({...hit, recency: base + i + 1, source: 'stream', stream: frame.stream || frame.url});
+  });
   return found;
 }
 async function __whyOp(entry) {
@@ -218,6 +276,8 @@ async function __whyJoin(page, result, missing) {
     var op = await __whyOp(e);
     if (!op) missing.push('site-op');
     result.request = {id: e.id, method: String(e.method || 'GET').toUpperCase(), path, url: e.url, ...(e.status ? {status: e.status} : {}), ...(op ? {op} : {})};
+  } else if (best.source === 'stream') {
+    result.stream = {url: best.stream};
   } else {
     missing.push('network-body');
     result.hydration = {kind: best.source};
@@ -232,6 +292,7 @@ async function __pageWhy(target, input, options = {}) {
   var result = {value: shown, ...(el && el.bounds ? {bounds: el.bounds} : {})};
   var value = provNormalize(shown), hydration = read.hydration || {};
   var candidates = await __whyNetwork(page, value, missing);
+  candidates.push(...await __whyStreams(page, value, candidates.length + 40));
   for (var name of Object.keys(hydration).sort())
     for (var hit of provSearch(hydration[name], value)) candidates.push({...hit, recency: 0, source: name});
   result.best = provRank(candidates)[0];

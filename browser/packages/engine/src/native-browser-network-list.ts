@@ -68,6 +68,11 @@ export function recentOf(entries: readonly NetworkEntry[]): string[] {
 /** A Chrome resource type (Fetch, XHR, Document) or a MIME: json, html, image/png, image/, +json. */
 export function matchesType(entry: { type?: string; mimeType?: string }, wanted: string): boolean {
   if (entry.type === wanted) return true;
+  const want = wanted.toLowerCase();
+  if (entry.type && entry.type.toLowerCase() === want) return true;
+  // Scripts by resource type or MIME: 'Script', 'script', 'javascript' and 'js' all mean them.
+  if (/^(script|javascript|js)$/.test(want))
+    return entry.type === "Script" || /javascript|ecmascript/.test(mimeOf(entry.mimeType));
   return mimeMatches(mimeOf(entry.mimeType), wanted.toLowerCase());
 }
 

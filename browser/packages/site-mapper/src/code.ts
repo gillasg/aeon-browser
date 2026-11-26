@@ -15,7 +15,7 @@ export interface SiteCodeOptions {
   /** Parse the JS for candidate API calls, routes and chunks (default true). */
   bundle?: boolean;
   /** Requests already seen, so candidates they hit are marked confirmed. */
-  observed?: readonly { method?: string; url: string }[];
+  observed?: readonly { method?: string; url: string; body?: string }[];
   /** Script bodies the browser already holds, by URL: used before fetching them again. */
   cached?: Readonly<Record<string, string>>;
 }
@@ -60,10 +60,8 @@ export async function code(input: string, options: SiteCodeOptions = {}): Promis
   const origin = new URL(url).origin;
   const { maxFiles, maxBytes, timeoutMs } = limits(options);
   const page = await read(url, maxBytes, timeoutMs);
-  const scripts = scriptsOf(page.text, page.url);
-  const buildId =
-    /\/_next\/static\/([^/"']+)\/_buildManifest\.js/.exec(page.text)?.[1] ??
-    /"buildId"\s*:\s*"([^"]+)"/.exec(page.text)?.[1];
+  const scripts = refused(page) ? [] : scriptsOf(page.text, page.url);
+  const buildId = buildIdOf(page.text);
   const collected = await collectFiles(
     scripts,
     manifestCandidates(page.url, buildId, scripts),
@@ -73,7 +71,8 @@ export async function code(input: string, options: SiteCodeOptions = {}): Promis
     timeoutMs,
     options.cached,
   );
-  const texts = new Map([[page.url, page.text], ...collected.texts]);
+  // A 4xx/5xx or bot challenge page is not the site: its markup must not read as the site's code.
+  const texts = pageTexts(page, collected);
   const sourceMaps = await collectSourceMaps(
     texts,
     collected,
@@ -151,7 +150,7 @@ async function collectFiles(
       if (!sameOrigin(url, origin) || seen.has(url) || files.length >= maxFiles) continue;
       seen.add(url);
       const file = await heldOrFetched(url, cached, maxBytes, timeoutMs);
-      if (!file) continue;
+      if (!file || refused(file)) continue;
       files.push(meta(file));
       texts.push([file.url, file.text]);
       headers.set(file.url, file.headers);
@@ -315,6 +314,35 @@ export async function read(url: string, maxBytes: number, timeoutMs: number): Pr
     if (!plain) throw error;
     return { url, status: 0, text: plain, headers: {}, via: "http" };
   }
+}
+
+function buildIdOf(text: string): string | undefined {
+  return (
+    /\/_next\/static\/([^/"']+)\/_buildManifest\.js/.exec(text)?.[1] ??
+    /"buildId"\s*:\s*"([^"]+)"/.exec(text)?.[1]
+  );
+}
+
+// A 4xx/5xx or bot challenge page is not the site: its markup must not read as the site's code.
+function pageTexts(
+  page: CodeFile,
+  collected: { texts: [string, string][]; notes: string[] },
+): Map<string, string> {
+  if (!refused(page)) return new Map([[page.url, page.text], ...collected.texts]);
+  collected.notes.push(`the page answered ${page.status || "a challenge"}, not the site`);
+  return new Map(collected.texts);
+}
+
+/** An error status or a bot challenge (Cloudflare, Vercel) in place of the real file. */
+export function refused(file: Pick<CodeFile, "status" | "text">): boolean {
+  if (file.status >= 400) return true;
+  const head = file.text.slice(0, 20_000);
+  return (
+    /^\s*</.test(head) &&
+    /__cf_chl_(rt_tk|opt|jschl)|cdn-cgi\/challenge-platform|<title>\s*Just a moment|vercel\/security|_vercel\/security|x-vercel-challenge/i.test(
+      head,
+    )
+  );
 }
 
 export interface CodeFile {

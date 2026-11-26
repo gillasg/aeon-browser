@@ -26,7 +26,7 @@ export function handleBrowserRun(
   directory: string,
 ): boolean {
   const request = CoreBrowserRunRequestSchema.safeParse(candidate);
-  if (!request.success) return false;
+  if (!request.success) return rejectInvalid(socket, candidate, request.error.issues);
   const { requestId, code, session } = request.data;
   const timeoutMs = request.data.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const chatId = sessionChatId("external", session);
@@ -50,6 +50,27 @@ export function handleBrowserRun(
     );
   return true;
 }
+
+// A run request the schema refuses still gets an answer naming what was wrong, so the client
+// never waits on a frame that was silently dropped.
+function rejectInvalid(
+  socket: WebSocket,
+  candidate: unknown,
+  issues: readonly { path: PropertyKey[]; message: string }[],
+): boolean {
+  const message = candidate as { kind?: unknown; requestId?: unknown } | null;
+  if (typeof message !== "object" || message === null || message.kind !== "core.browser.run")
+    return false;
+  const requestId = message.requestId;
+  if (typeof requestId !== "string" || !UUID.test(requestId)) return true;
+  const detail = issues
+    .map((issue) => `${issue.path.map(String).join(".") || "request"}: ${issue.message}`)
+    .join("; ");
+  reply(socket, requestId, { error: "INVALID_INPUT", detail });
+  return true;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // What a CLI cell may ask the daemon for: site notes, abilities, site APIs, learned hints and
 // sign-ins, as a chat's cells do. Only the chat workspace (files, checkpoints) stays with chats.

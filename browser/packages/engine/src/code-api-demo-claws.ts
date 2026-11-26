@@ -24,6 +24,7 @@ import {
   GRAFT_PREFIX,
   HOST,
   graftBoost,
+  graftCovers,
   graftHash,
   graftId,
   graftLive,
@@ -49,6 +50,7 @@ const embedded = [
   graftId,
   graftBoost,
   graftHash,
+  graftCovers,
   isGraft,
 ];
 
@@ -100,12 +102,18 @@ async function __d8GraftApply(base, spec) {
     return {id: boost.id, host, persisted: false};
   }
   var saved = await browser.boosts.save(boost);
+  // Shown now on this page too, not only after a reload, when the graft is for this site.
+  if (boost.css && graftCovers(host, await __d8PageUrl(base))) await base.inspect(__d8GraftLive, {id: boost.id, css: boost.css}).catch(() => undefined);
   return Object.assign({id: boost.id, host, persisted: true}, saved && saved.warning ? {warning: saved.warning} : {});
 }
 async function __d8GraftList(options) {
   var host = options && options.host ? graftMatch(options.host, '') : '';
   var all = await browser.boosts.list(host ? 'https://' + host.replace(/^\\*\\./, '') + '/' : undefined);
-  return [].concat(all || []).filter(isGraft).map((boost) => ({id: boost.id, name: boost.name, sites: boost.sites, enabled: boost.enabled !== false, css: Boolean(boost.css), js: Boolean(boost.js)}));
+  return [].concat(all || []).filter(isGraft).map((boost) => ({id: boost.id, name: boost.name, sites: boost.sites, enabled: boost.enabled !== false, css: __d8GraftHas(boost, 'css'), js: __d8GraftHas(boost, 'js')}));
+}
+// boosts.list() summarizes a boost as {parts: ['css', 'js', …]}; a full boost carries the fields.
+function __d8GraftHas(boost, part) {
+  return Array.isArray(boost.parts) ? boost.parts.indexOf(part) >= 0 : Boolean(boost[part]);
 }
 async function __d8GraftRemove(base, id) {
   var full = graftId(id);
