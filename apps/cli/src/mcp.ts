@@ -426,7 +426,7 @@ export async function runMcpServer(site?: string, options: McpServerOptions = {}
     try {
       message = JSON.parse(line) as Json;
     } catch {
-      stdoutSend(reply(null, undefined, "Parse error"));
+      stdoutSend({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
       continue;
     }
     await server.receive(message, stdoutSend);
