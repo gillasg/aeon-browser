@@ -9,6 +9,7 @@ import {
   joinRows,
   joinSelect,
   pipeTransform,
+  pipeViewTarget,
 } from "./native-browser-join.js";
 import {
   confineFilePath,
@@ -39,6 +40,7 @@ const embedded = [
   joinSelect,
   joinDelta,
   pipeTransform,
+  pipeViewTarget,
   confineFilePath,
   detectFileFormat,
   parseDelimited,
@@ -58,7 +60,7 @@ const HELP = {
   graft:
     "page.graft.apply({id?, match?: 'example.com' | '*.example.com', css?, js?, data?, widgets?, persist?: true}) puts a live overlay on a site (badges, extra table columns, bulk buttons, data from another site as the frozen `data` constant inside js) and keeps it on every reload with no model call; it is a boost underneath. persist: false applies css to this visit only. page.graft.list({host?}) lists grafts; page.graft.remove(id) takes one off every page.",
   join: "browser.join(left, right, {on: 'id' | ['id', 'userId'] | (row, side) => key, type?: 'inner'|'left'|'right'|'full', select?: [names] | (l, r) => row}) joins rows from any two sources (site.call results, page tables, files); clashing right fields come back as right_<name>. {delta: true} compares an old snapshot (left) with a new one (right): {added, removed, changed: [{key, fields, before, after}], unchanged, summary}.",
-  pipe: "site.pipe([{call: ['github.com', 'listIssues', {repo}]}, {filter: {state: 'open'}}, {join: {with: {call: [...]}, on: ['user', 'login'], type: 'left'}}, {dedupe: 'id'}, {sort: {by: 'updated', desc: true}}, {limit: 20}, {to: 'issues.json'}]) runs compiled site ops and transforms (map, filter, pick, flat, join, dedupe, sort, limit) with zero model calls; {from: rows} starts from data, {to: name | fn} saves or hands the rows on. Returns {rows, steps: [{step, rows}], models: 0}.",
+  pipe: "site.pipe([{call: ['github.com', 'listIssues', {repo}]}, {filter: {state: 'open'}}, {join: {with: {call: [...]}, on: ['user', 'login'], type: 'left'}}, {dedupe: 'id'}, {sort: {by: 'updated', desc: true}}, {limit: 20}, {to: 'issues.json'}]) runs compiled site ops and transforms (map, filter, pick, flat, join, dedupe, sort, limit) with zero model calls; {from: rows} starts from data, {to: name | fn} saves or hands the rows on; {to: {view: {url, token, title?}}} pushes them to a live viewer on 127.0.0.1 or localhost (never another host). Returns {rows, steps: [{step, rows}], models: 0}.",
   cache:
     "page.cache.read({cacheName?, url?: string | RegExp, contentType?, limit = 50, maxBytes = 200000, body?}) reads the site's Cache Storage (service-worker caches) from disk with no network request: {caches, entries: [{cacheName, url, status, contentType, json | text, truncated}]}. Secrets in bodies are redacted.",
   parse:
@@ -204,6 +206,13 @@ async function __d8PipeSource(step) {
   if (typeof call[0] !== 'string' || typeof call[1] !== 'string') throw Error('INVALID_INPUT: site.pipe call is [host, op, params?]');
   return site.call(call[0], call[1], call[2] || {});
 }
+async function __d8PipeView(view, rows) {
+  var target = pipeViewTarget(view);
+  var headers = {'content-type': 'application/json'};
+  if (target.token) { headers.authorization = 'Bearer ' + target.token; headers['x-aeon-view-token'] = target.token; }
+  var response = await fetch(target.url, {method: 'POST', headers, body: JSON.stringify({rows, title: target.title})});
+  if (!response.ok) throw Error('UPSTREAM: site.pipe view push answered ' + response.status);
+}
 async function __d8Pipe(steps, options) {
   if (!Array.isArray(steps) || !steps.length) throw Error('INVALID_INPUT: site.pipe takes a non-empty array of steps: help("pipe")');
   var rows = options && options.input !== undefined ? options.input : [], trace = [];
@@ -213,6 +222,7 @@ async function __d8Pipe(steps, options) {
     if (step.call || step.from !== undefined) rows = await __d8PipeSource(step);
     else if (step.to !== undefined) {
       if (typeof step.to === 'function') await step.to(rows);
+      else if (step.to && typeof step.to === 'object' && step.to.view !== undefined) await __d8PipeView(step.to.view, rows);
       else await artifact(String(step.to), JSON.stringify(rows, null, 2));
     } else {
       if (step.join && step.join.with && !Array.isArray(step.join.with)) step = {join: Object.assign({}, step.join, {with: await __d8PipeSource(step.join.with)})};

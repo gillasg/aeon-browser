@@ -183,3 +183,33 @@ export function pipeTransform(rows: unknown, step: Row, join: typeof joinRows): 
       JSON.stringify(Object.keys(step)),
   );
 }
+
+// The live viewer sink of site.pipe ({to: {view}}): only a loopback push URL, so a pipe can never
+// send rows to another machine.
+export function pipeViewTarget(view: unknown): {
+  url: string;
+  token: string | undefined;
+  title: string | undefined;
+} {
+  const spec = (typeof view === "string" ? { url: view } : (view ?? {})) as Row;
+  let parsed: URL;
+  try {
+    parsed = new URL(String(spec.url ?? ""));
+  } catch {
+    throw new Error(
+      "INVALID_INPUT: site.pipe {to: {view}} needs a push URL like http://127.0.0.1:<port>/push",
+    );
+  }
+  const loopback = ["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname);
+  if (parsed.protocol !== "http:" || !loopback || parsed.username || parsed.password)
+    throw new Error(
+      "INVALID_INPUT: site.pipe views must be http://127.0.0.1 or http://localhost, not " +
+        parsed.origin,
+    );
+  if (parsed.pathname === "/" || parsed.pathname === "") parsed.pathname = "/push";
+  return {
+    url: parsed.href,
+    token: typeof spec.token === "string" ? spec.token : undefined,
+    title: typeof spec.title === "string" ? spec.title : undefined,
+  };
+}

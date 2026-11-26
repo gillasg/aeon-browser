@@ -1,5 +1,6 @@
 import type { Tracker } from "./tracker.js";
 import type { Transport } from "./transport.js";
+import { webSocket, type WebSocketDetails } from "./ws.js";
 import { fromBase64, xmlHttpRequest, type XhrDetails } from "./xhr.js";
 
 // The userscript API: GM_* functions and the promise-based GM.* object.
@@ -291,6 +292,7 @@ export function gmApis(context: GmContext): Api {
     cookie: cookieApi(context),
     xmlhttpRequest: (details: XhrDetails) =>
       xmlHttpRequest(context.transport, details, context.report),
+    webSocket: (details: WebSocketDetails) => webSocket(context.transport, details, context.report),
   };
 }
 
@@ -303,6 +305,7 @@ const SYNC_ONLY = new Set([
   "addElement",
   "addStyle",
   "openInTab",
+  "webSocket",
 ]);
 
 /** Builds the GM_* functions and the GM object a script may use. */

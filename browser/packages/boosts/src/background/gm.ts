@@ -5,6 +5,7 @@ import { recordHealth } from "./health.js";
 import { copyToClipboard } from "./offscreen.js";
 import { syncSoon } from "./scripts.js";
 import { getBoost, getValues, log, setValues } from "./store.js";
+import { socketHub, type SocketArgs, type SocketData } from "./ws.js";
 import { mayConnect, runXhr, type XhrArgs } from "./xhr.js";
 
 // The service-worker side of the userscript API: one port per running script.
@@ -28,6 +29,9 @@ interface Ctx {
 /** Operations that need a grant, by the API names that allow them. */
 const NEEDS: Record<string, string[]> = {
   xhr: ["xmlhttpRequest", "xmlHttpRequest"],
+  ws: ["webSocket"],
+  "ws.send": ["webSocket"],
+  "ws.close": ["webSocket"],
   download: ["download"],
   notify: ["notification"],
   clipboard: ["setClipboard"],
@@ -54,6 +58,10 @@ const ports = new Map<string, Set<chrome.runtime.Port>>();
 const streams = new Map<string, AbortController>();
 const tabStore = new Map<string, Map<number, unknown>>();
 const opened = new Map<number, chrome.runtime.Port>();
+const sockets = socketHub();
+
+const connectList = (ctx: Ctx): string[] | undefined =>
+  ctx.boost.kind === "boost" ? undefined : (ctx.boost.meta?.connect ?? []);
 
 export interface MenuCommand {
   boostId: string;
@@ -252,6 +260,14 @@ const handlers: Record<string, Handler> = {
   },
   "menu.unregister": (ctx, { id }) =>
     menus.get(ctx.tabId ?? -1)?.delete(`${ctx.boost.id}:${String(id)}`),
+  "ws.send": (ctx, { sid, data }) => sockets.send(ctx.port, String(sid), data as SocketData),
+  "ws.close": (ctx, { sid, code, reason }) =>
+    sockets.close(
+      ctx.port,
+      String(sid),
+      typeof code === "number" ? code : undefined,
+      typeof reason === "string" ? reason : undefined,
+    ),
   api: (_ctx, { site, operation, params }) =>
     callSiteMapper(String(site), String(operation), (params as Record<string, unknown>) ?? {}),
   companion: (ctx, { kind, data }) =>
@@ -282,6 +298,18 @@ function startStream(ctx: Ctx, call: Call): void {
   void runXhr(args, emit, controller.signal).finally(() => streams.delete(key));
 }
 
+function openSocket(ctx: Ctx, call: Call): void {
+  const emit = (event: string, data?: unknown): void => {
+    try {
+      ctx.port.postMessage({ t: "event", id: call.id, event, data });
+    } catch {
+      sockets.release(ctx.port);
+    }
+  };
+  const owner = { connect: connectList(ctx), pageUrl: ctx.url };
+  sockets.open(ctx.port, owner, (call.args ?? {}) as unknown as SocketArgs, emit);
+}
+
 async function handle(ctx: Ctx, call: Call): Promise<void> {
   if (call.t === "cancel") {
     streams.get(`${ctx.boost.id}:${call.id}:${ctx.tabId}:${ctx.frameId}`)?.abort();
@@ -291,7 +319,7 @@ async function handle(ctx: Ctx, call: Call): Promise<void> {
     ctx.port.postMessage({ t: "reply", id: call.id, error: `${call.op} needs a @grant` });
     return;
   }
-  if (call.stream && call.op === "xhr") return startStream(ctx, call);
+  if (call.stream) return call.op === "ws" ? openSocket(ctx, call) : startStream(ctx, call);
   const handler = handlers[call.op];
   try {
     if (!handler) throw new Error(`Unknown operation ${call.op}`);
@@ -328,6 +356,7 @@ export function listenToScripts(): void {
     });
     port.onDisconnect.addListener(() => {
       set.delete(port);
+      sockets.release(port);
       for (const list of menus.values())
         for (const [key, command] of list) if (command.port === port) list.delete(key);
     });
