@@ -27,6 +27,7 @@ import {
   onNode,
   readFieldValue,
   staleBeforeInsert,
+  type FillVia,
 } from "./native-browser-dom.js";
 import {
   beginReceipt,
@@ -131,7 +132,7 @@ export async function fillNode(
   id: number,
   value: string,
   options: { vault?: boolean } = {},
-): Promise<string | undefined> {
+): Promise<{ readback?: string; via: FillVia }> {
   // A control's focus handler runs only while its document is the focused one, and a combobox
   // can move focus into a replacement input there. Aeon fills tabs the user is not looking at,
   // so emulate focus for the fill or the value lands in an input we never measured.
@@ -163,12 +164,12 @@ export async function fillNode(
     );
     if (native === "done") {
       if (options.vault !== false) await noteVaultFill(debuggee, id).catch(() => undefined);
-      return undefined;
+      return { via: "native-setter" };
     }
     if (native !== "text") throw new Error(native);
-    const readback = await fillTextNode(debuggee, id, value);
+    const typed = await fillTextNode(debuggee, id, value);
     if (options.vault !== false) await noteVaultFill(debuggee, id).catch(() => undefined);
-    return readback;
+    return typed;
   });
 }
 function setNativeValue(this: HTMLInputElement | HTMLSelectElement, value: string): string {
@@ -553,6 +554,7 @@ export async function performAction(
   let note: string | undefined;
   let changes: number | undefined;
   let readback: string | undefined;
+  let via: FillVia | undefined;
   let box: { x: number; y: number; width: number; height: number } | undefined;
   let silent = false;
   let childPoint: { x: number; y: number } | undefined;
@@ -580,6 +582,7 @@ export async function performAction(
         undefined,
       );
       readback = dispatched?.readback;
+      via = dispatched?.via;
       box = dispatched?.box;
       const answered = dialogsDuringAction(tabId).length > 0;
       if (!filled) {
@@ -660,6 +663,7 @@ export async function performAction(
       ...(observation ? { observation } : {}),
       ...(scroll ? { scroll } : {}),
       ...(box ? { box } : {}),
+      ...(via ? { fill: { via, ...(readback !== undefined ? { value: readback } : {}) } } : {}),
       label: actionLabel(request.step),
       ...(dialogs.length ? { dialogs } : {}),
     });
@@ -688,6 +692,7 @@ async function dispatchAction(
 ): Promise<
   | {
       readback?: string;
+      via?: FillVia;
       nodeId?: number;
       frame?: chrome.debugger.Debuggee;
       box?: { x: number; y: number; width: number; height: number };
@@ -744,7 +749,7 @@ async function dispatchAction(
     const tabId = request.step.target.tabId;
     const value = request.step.value;
     let field = { node, frame };
-    let typed: string | undefined;
+    let typed: { readback?: string; via: FillVia } | undefined;
     for (;;) {
       try {
         // A dialog froze the page mid-fill; once it is answered the value is read back once.
@@ -766,9 +771,10 @@ async function dispatchAction(
     }
     // The text path read the value back; only the native select path needs a separate label read.
     const readback =
-      typed !== undefined ? typed : await readFieldValue(field.frame, field.node.backendNodeId);
+      typed?.readback ?? (await readFieldValue(field.frame, field.node.backendNodeId));
     return {
       ...(readback !== undefined ? { readback } : {}),
+      ...(typed ? { via: typed.via } : {}),
       ...(measured ? { box: measured } : {}),
     };
   } else if (request.step.op === "paste") {

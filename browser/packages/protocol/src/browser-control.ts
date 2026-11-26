@@ -343,6 +343,14 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
         )
         .max(10)
         .optional(),
+      /** A fill's receipt: the value it read back and which input landed it. */
+      fill: z
+        .object({
+          value: z.string().max(100_000).optional(),
+          via: z.enum(["keys", "native-setter", "insertText", "paste"]),
+        })
+        .strict()
+        .optional(),
       /** Where the input landed, measured just before it was sent (viewport CSS pixels). */
       box: z
         .object({

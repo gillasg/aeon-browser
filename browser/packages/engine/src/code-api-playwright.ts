@@ -191,33 +191,75 @@ function __locatorRead(target, element, index, op, arg) {
   return browser.page(target).inspect(expression);
 }
 // An indexed locator (nth/first/last) cannot use the engine's unique-match targeting, so it is
-// clicked at the element's centre after scrolling it into view.
-// Like Playwright, it waits a moment for the element to be visible, and refuses a hidden one rather
-// than clicking empty space (a field collapsed behind a search button is 0×0).
-async function __clickIndexed(target, element, index, options, hold) {
-  var box;
+// picked in the page: first() (and a filtered locator's default) takes the first match on screen,
+// nth(i) takes that match. Like Playwright, it waits a moment for the element to be visible, and
+// refuses a hidden one rather than acting on empty space (a field collapsed behind a search
+// button is 0×0). One still off-screen after scrolling (a transformed or sticky header) is
+// TARGET_HIDDEN, never a pointer at negative coordinates. A nonce stamps it for the engine's fill.
+function __pickInPage(found, a) {
+  var list = a.visibleFirst ? found : a.index < 0 ? found.slice(a.index).slice(0, 1) : found.slice(a.index, a.index + 1);
+  if (!list.length) throw new Error('TARGET_NOT_FOUND: no element matches');
+  var offscreen = 0;
+  for (var el of list) {
+    var rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+    if (!rect.width || !rect.height || style.visibility === 'hidden' || style.display === 'none') continue;
+    el.scrollIntoView({block: 'center', inline: 'center'});
+    rect = el.getBoundingClientRect();
+    var x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) { offscreen++; continue; }
+    if (a.nonce) el.setAttribute('data-aeon-pick', a.nonce);
+    return {x, y};
+  }
+  return {hidden: true, offscreen: offscreen > 0};
+}
+async function __pickIndexed(target, element, index, nonce) {
   for (var waited = 0; ; waited += 250) {
-    box = await __locatorRead(target, element, index, (found) => {
-      var el = found[0];
-      if (!el) throw new Error('TARGET_NOT_FOUND: no element matches');
-      el.scrollIntoView({block: 'center', inline: 'center'});
-      var rect = el.getBoundingClientRect();
-      var hidden = !rect.width || !rect.height || getComputedStyle(el).visibility === 'hidden';
-      return {hidden, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2};
-    });
-    if (!box.hidden) break;
+    var box = await __locatorRead(target, element, undefined, __pickInPage, {index, visibleFirst: index === 0, nonce});
+    if (!box.hidden) return box;
+    if (waited >= 2000 && box.offscreen) throw new Error('TARGET_HIDDEN: the element stays off-screen after scrolling (inside a transformed, sticky or clipped ancestor); target the copy the page shows, e.g. a locator scoped to the visible container');
     if (waited >= 2000) throw new Error('TARGET_HIDDEN: the element is not visible (0×0 or hidden); it may be collapsed behind a button or menu that opens it: open that first, then retry');
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+}
+async function __clickIndexed(target, element, index, options, hold) {
+  var box = await __pickIndexed(target, element, index);
   var page = browser.page(target);
   if (hold) return page.holdAt(box.x, box.y, options);
   var gesture = __pointerFields(options);
   return options && options.clickCount === 2 ? page.doubleClickAt(box.x, box.y, gesture) : page.clickAt(box.x, box.y, gesture);
 }
-// A fill is only done when the field reads back what was typed (Playwright's fill returns nothing).
-async function __checkFilled(target, element, index, value) {
-  var now = await __locatorRead(target, element, index, (found) => { var el = found[0]; return el ? ('value' in el ? String(el.value) : String(el.innerText || '')) : null; });
-  if (now !== null && value && !String(now).includes(value)) throw new Error('INPUT_FAILED: the field reads ' + JSON.stringify(String(now).slice(0, 80)) + ' after filling ' + JSON.stringify(value.slice(0, 80)) + ': check what has focus with bu.state()');
+// One verified write path: the indexed element is stamped and filled by the engine's own fill
+// (focus emulation, remount retry, keys or insert, the rich-text ladder). The stamp always goes.
+async function __fillIndexed(target, element, index, value, options) {
+  var nonce = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  try {
+    await __pickIndexed(target, element, index, nonce);
+    return await __locator(target, {kind: 'query', by: 'css', value: '[data-aeon-pick="' + nonce + '"]'}).fill(value, options);
+  } finally {
+    await browser.page(target).inspect('document.querySelectorAll(' + JSON.stringify('[data-aeon-pick="' + nonce + '"]') + ').forEach((el) => el.removeAttribute("data-aeon-pick"))').catch(() => {});
+  }
+}
+// fill's receipt: the step result plus {value, via, committed}. commit: 'enter' presses Enter (a
+// search box or combobox), 'blur' leaves the field (v-model.lazy, blur validation), 'change'
+// blurs and fires change when the blur did not.
+async function __fillDone(target, element, index, options, result) {
+  var fill = (result && result.fill) || {};
+  var committed = Boolean(result && result.effect === 'confirmed');
+  var commit = options && options.commit;
+  if (commit !== undefined && !['enter', 'blur', 'change'].includes(commit)) throw new Error("INVALID_INPUT: commit is 'enter', 'blur' or 'change'");
+  if (commit === 'enter') await browser.page(target).keyboard('Enter');
+  else if (commit) committed = await __locatorRead(target, element, index, function (found, kind) {
+    var el = found[0];
+    if (!el) return false;
+    var fired = false, mark = () => { fired = true; };
+    el.addEventListener('change', mark);
+    if (el.getRootNode().activeElement === el) el.blur();
+    else { el.dispatchEvent(new FocusEvent('blur')); el.dispatchEvent(new FocusEvent('focusout', {bubbles: true})); }
+    if (kind === 'change' && !fired) el.dispatchEvent(new Event('change', {bubbles: true}));
+    el.removeEventListener('change', mark);
+    return true;
+  }, commit) && committed;
+  return {...result, value: fill.value, via: fill.via, committed};
 }
 var __mouseAt = new Map();
 function __extendLocator(target, element, base, index) {
@@ -264,7 +306,7 @@ function __extendLocator(target, element, base, index) {
       click: (options) => __clickIndexed(target, element, at0, options),
       hold: (options) => __clickIndexed(target, element, at0, options, true),
       dblclick: (options) => __clickIndexed(target, element, at0, Object.assign({}, options, {clickCount: 2})),
-      fill: async (value) => { await __clickIndexed(target, element, at0); await browser.page(target).keyboard('ControlOrMeta+a'); await browser.page(target).keyboard(String(value)); await __checkFilled(target, element, at0, String(value)); },
+      fill: (value, options) => __fillIndexed(target, element, at0, value, options),
     } : {
       dblclick: (options) => __clickIndexed(target, element, 0, Object.assign({}, options, {clickCount: 2})),
     }),
