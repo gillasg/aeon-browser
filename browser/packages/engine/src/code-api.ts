@@ -230,6 +230,7 @@ var browser = Object.freeze({
       console.log('[warn] tab ' + result.tab.target.tabId + ' opened, but ' + url + ' did not load: ' + (result.reason || 'navigation failed') + '; the tab is still yours (page.navigation is "failed", page.lastError says why)');
     }
     else await __noteChallenge(result.tab.target, url);
+    await __pnWallNote(result.tab.target);
     return __openResult(result.tab, false, result.navigation === 'failed' ? result.reason : undefined);
   },
   // A tab kept for later: an open tab on the URL is reused (and attached to this session), else a

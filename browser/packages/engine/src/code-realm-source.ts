@@ -34,6 +34,7 @@ import { browserWhyApi } from "./code-api-why.js";
 import { browserReApi } from "./code-api-re.js";
 import { browserPosthocExtractApi } from "./code-api-posthoc-extract.js";
 import { browserDemoClawsApi } from "./code-api-demo-claws.js";
+import { browserPosthocNetApi } from "./code-api-posthoc-net.js";
 
 /** The whole runtime, evaluated into each fresh realm before its first cell. */
 export function realmRuntimeSource(evaluate: (source: string) => unknown): void {
@@ -75,6 +76,7 @@ export function realmRuntimeSource(evaluate: (source: string) => unknown): void 
       browserReApi,
       browserPosthocExtractApi,
       browserDemoClawsApi,
+      browserPosthocNetApi,
     ].join("\n"),
   );
 }
