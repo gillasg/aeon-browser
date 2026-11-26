@@ -34,7 +34,7 @@ test("the native host pins that id and refuses a manifest with any other key", (
   const source = readFileSync(join(root, "apps", "native-host", "scripts", "install.mjs"), "utf8");
   assert.match(source, new RegExp(`EXTENSION_ID = "${FIXED_ID}"`));
   assert.match(source, /if \(manifest\.key !== EXTENSION_KEY\)/);
-  assert.match(source, /allowed_origins: \[`chrome-extension:\/\/\$\{EXTENSION_ID\}\/`\]/);
+  assert.match(source, /allowed_origins: allowedOrigins\(EXTENSION_ID, STORE_IDS\)/);
 });
 
 test("setup never generates or pins a per-install extension key", () => {

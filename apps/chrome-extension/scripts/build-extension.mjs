@@ -24,6 +24,7 @@ const STATIC_FILES = [
   "home.html",
   "home.css",
   "sidepanel.html",
+  "welcome.html",
   "code-offscreen.html",
   "sidepanel.css",
   "geist-latin.woff2",
@@ -56,6 +57,7 @@ export async function buildExtension() {
     [join(appRoot, "src/site-scripts-page.ts"), "site-scripts.js"],
     [join(appRoot, "src/home-page.ts"), "home.js"],
     [join(appRoot, "src/sidepanel-page.ts"), "sidepanel.js"],
+    [join(appRoot, "src/welcome-page.ts"), "welcome.js"],
     [engine("code-offscreen"), "code-offscreen.js"],
   ];
   await buildEntries(shared, output, entries);

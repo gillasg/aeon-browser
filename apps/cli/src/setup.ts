@@ -13,7 +13,7 @@ import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
 import { applyChromeFlags, defaultFlagEnv, undoChromeFlags, type FlagEnv } from "./chrome-flags.js";
 import { login, modelLoginStatus } from "./model-login-cmd.js";
-import { setupPrompts, terminalAsk } from "./setup-prompts.js";
+import { firstSixtySeconds, setupPrompts, terminalAsk } from "./setup-prompts.js";
 
 // `aeon setup` installs the shim and the skill, then guides the user through the only manual step:
 // loading the unpacked extension in Chrome. The script opens chrome://extensions, copies the folder
@@ -107,6 +107,7 @@ async function finishSetup(
   // Chats need a model; say how to connect one instead of letting the first chat fail.
   if (!interactive && (await connectedModels().catch(() => undefined)) === 0)
     say("Next: connect an AI model with `aeon login` (or Settings → Models in Aeon).");
+  for (const line of firstSixtySeconds()) say(line);
 }
 
 async function doctor(host: DaemonHost): Promise<number> {
@@ -227,7 +228,8 @@ Installs the aeon command and the Aeon skill, opens chrome://extensions, puts th
 folder on your clipboard, prints the three clicks and waits until Aeon connects. No Chrome
 flags are needed. --again repeats any missing install step (native host, service, extension).
 --no-wait prints the clicks without waiting; --yes is the short, non-interactive wait for CI.
-On a terminal it then offers three opt-ins: Chrome launch flags, coding-agent MCP, model sign-in.
+On a terminal it then offers opt-ins: coding-agent MCP, model sign-in and, last, optional
+reversible Chrome launch flags. It ends with the first commands to run.
 --quiet-bar adds the optional Chrome flags to your Chrome launcher (Linux .desktop, Windows
 shortcuts, macOS "Aeon Chrome" app); --undo-flags removes them again.`,
       run: (args) => setup(host, args),
