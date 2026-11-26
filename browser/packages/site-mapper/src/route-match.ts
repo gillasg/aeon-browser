@@ -1,7 +1,7 @@
-// Picks a saved route for a prompt. Word overlap only, and only on one site, so a near miss
-// stays with the model.
+// Picks a saved route for a prompt: the exact same request, normalized, and nothing else. There
+// is no word-overlap scoring and no slot guessing, so a prompt that merely resembles a saved run
+// always goes to the model. A hit replays with the values the route was saved with.
 
-import { contentWords } from "./route-compile.js";
 import type { Route } from "./route-types.js";
 
 export interface RouteHit {
@@ -22,39 +22,27 @@ export function sitesNamed(prompt: string): string[] {
   return [...found];
 }
 
-/** The closest route on this site, when at least half of its signature words are in the prompt. */
+/** Case, spacing and trailing punctuation do not count; every word and value does. */
+export function exactTrigger(prompt: string): string {
+  return prompt
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.!?]+$/, "")
+    .trim();
+}
+
+/** The route saved for exactly this request on this site, if any. */
 export function matchSavedRoute(prompt: string, routes: readonly Route[]): RouteHit | undefined {
-  const words = new Set(contentWords(prompt));
-  let best: RouteHit | undefined;
-  for (const route of routes) {
-    const hit = score(route, words, prompt);
-    if (hit && (!best || hit.score > best.score)) best = hit;
-  }
-  return best;
+  const trigger = exactTrigger(prompt);
+  if (!trigger) return undefined;
+  const route = routes.find((item) => item.trigger !== undefined && item.trigger === trigger);
+  return route ? { route, inputs: inputsFor(route), score: 1 } : undefined;
 }
 
-function score(route: Route, words: Set<string>, prompt: string): RouteHit | undefined {
-  if (!route.signature.length) return undefined;
-  const hits = route.signature.filter((word) => words.has(word)).length;
-  const value = hits / route.signature.length;
-  if (hits < 1 || value < 0.5) return undefined;
-  return { route, inputs: inputsFor(route, prompt), score: value };
-}
-
-/** Slot values for this prompt. A new number replaces the example; anything else must be written out. */
-export function inputsFor(route: Route, prompt: string): Record<string, string> {
-  const numbers = [...prompt.matchAll(/\b\d{2,}\b/g)].map((match) => match[0] ?? "");
+/** The values the route was saved with: an exact repeat asks for the same thing. */
+export function inputsFor(route: Route): Record<string, string> {
   const inputs: Record<string, string> = {};
-  for (const input of route.inputs) {
-    const value = valueFor(input.example, prompt, numbers);
-    if (value) inputs[input.name] = value;
-  }
+  for (const input of route.inputs) if (input.example) inputs[input.name] = input.example;
   return inputs;
-}
-
-function valueFor(example: string, prompt: string, numbers: string[]): string | undefined {
-  if (!example) return undefined;
-  if (prompt.includes(example)) return example;
-  if (!/^\d+$/.test(example)) return undefined;
-  return numbers.find((value) => value !== example) ?? numbers[0];
 }

@@ -4,6 +4,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { draftCell } from "./route-compile.js";
+import { exactTrigger } from "./route-match.js";
 import type { Route, RouteStep } from "./route-types.js";
 import { writeAtomic } from "./registry.js";
 
@@ -43,6 +44,7 @@ export function actRoute(site: string, instruction: string, steps: readonly ActS
     okRuns: 1,
     lastOkAt: now.toISOString(),
     summary: instruction.slice(0, 80),
+    trigger: exactTrigger(instruction),
     cell: draftCell(routeSteps),
     ambiguous: false,
     expiresAt: new Date(now.getTime() + LIFE).toISOString(),

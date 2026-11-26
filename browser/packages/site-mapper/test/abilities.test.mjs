@@ -201,7 +201,7 @@ test("collisions suffix and notes append", async () => {
     await writeSiteNotes("example.com", "# Site\n\nfirst");
     await writeSiteNotes("example.com", "second", { append: true });
     const notes = await readFile(
-      join(process.env.SITE_TO_API_HOME, "sites/example.com/notes.md"),
+      join(process.env.SITE_TO_API_HOME, "sites/example.com/SKILL.md"),
       "utf8",
     );
     assert.match(notes, /first/);

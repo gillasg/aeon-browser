@@ -1,13 +1,8 @@
 // One answer for what can be done on a site: its abilities, the mapped operations they can use,
-// and the site's notes. WebMCP tools are added by the browser runtime, which can see the page.
+// and the site's SKILL.md brief. WebMCP tools are added by the browser runtime, which can see the page.
 
 import { abilityEffect, operationEffect, type CallEffect } from "./effect.js";
-import {
-  listAbilities,
-  readSiteNotes,
-  type Ability,
-  type AbilityPrecondition,
-} from "./abilities.js";
+import { listAbilities, type Ability, type AbilityPrecondition } from "./abilities.js";
 import { untestedWays } from "./ability-digest.js";
 import { readHealState, type HealReceipt, type HealState } from "./ability-heal.js";
 import type { AbilityWrite } from "./ability-effects.js";
@@ -15,6 +10,7 @@ import { wayId } from "./ability-stats.js";
 import { capabilityIndex } from "./infer/capabilities.js";
 import { operationInputs } from "./params.js";
 import { loadModel, siteName } from "./registry.js";
+import { siteSkillBrief } from "./site-skill.js";
 
 export interface SiteAbilitySummary {
   name: string;
@@ -70,7 +66,7 @@ export async function siteCapabilities(site: string): Promise<SiteCapabilities> 
   const host = siteName(site);
   const [abilities, notes, model, heals] = await Promise.all([
     listAbilities(host).catch(() => []),
-    readSiteNotes(host).catch(() => ""),
+    siteSkillBrief(host).catch(() => ""),
     loadModel(host).catch(() => undefined),
     readHealState(host),
   ]);
