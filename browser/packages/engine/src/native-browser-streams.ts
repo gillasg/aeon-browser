@@ -6,6 +6,7 @@ import { disarmTap } from "./stealth.js";
 import { holdBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 import { publishBrowserEvent } from "./native-browser-events.js";
+import { recorderOf } from "./native-browser-network.js";
 import {
   Ring,
   dropTap,
@@ -42,8 +43,16 @@ interface Descriptor {
   schema: Record<string, Set<string>>;
   samples: number;
 }
+interface Socket {
+  url: string;
+  /** "before-attach": the socket opened before streams.start(); its URL came from page.network. */
+  opened: "before-attach" | "observed";
+  frames: number;
+  lastAt: number;
+}
 interface TabStreams {
   ring: Ring<StreamFrame>;
+  sockets: Map<string, Socket>;
   urls: Map<string, string>;
   descriptors: Map<string, Descriptor>;
   webrtc?: string;
@@ -65,6 +74,13 @@ export const RTC_TAP: TapSpec = {
 };
 const RTC_BINDING = RTC_TAP.binding;
 const tabs = new Map<number, TabStreams>();
+type Recorded = Map<string, { url: string; type: string; status?: number; done: boolean }>;
+let recordedOf = (tabId: number): Recorded | undefined => recorderOf(tabId)?.entries;
+
+/** Tests feed the always-on network recorder's entries without CDP. */
+export function streamsRecorderForTest(source: (tabId: number) => Recorded | undefined): void {
+  recordedOf = source;
+}
 const listeners = new Set<(tabId: number, frame: StreamFrame) => void>();
 
 /** Live watchers (and tests) hear every stored frame without polling. */
@@ -136,14 +152,34 @@ export function recordFrame(tabId: number, raw: RawFrame): StreamFrame | undefin
 type Params = Record<string, unknown>;
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-function wsFrame(entry: TabStreams, params: Params, direction: "received" | "sent"): RawFrame {
+/** The socket a frame belongs to; one opened before start() takes its URL from the recorder. */
+function socketOf(tabId: number, entry: TabStreams, id: string): Socket {
+  let socket = entry.sockets.get(id);
+  if (!socket) {
+    const url = entry.urls.get(id) ?? recordedOf(tabId)?.get(id)?.url ?? "";
+    socket = { url, opened: "before-attach", frames: 0, lastAt: 0 };
+    entry.sockets.set(id, socket);
+    if (url) entry.urls.set(id, url);
+  }
+  return socket;
+}
+
+function wsFrame(
+  tabId: number,
+  entry: TabStreams,
+  params: Params,
+  direction: "received" | "sent",
+): RawFrame {
   const id = text(params.requestId);
   const response = (params.response ?? {}) as Params;
+  const socket = socketOf(tabId, entry, id);
+  socket.frames++;
+  socket.lastAt = Date.now();
   return {
     kind: "ws",
     direction,
     stream: id,
-    url: entry.urls.get(id) ?? "",
+    url: socket.url,
     data: response.payloadData,
     binary: response.opcode === 2,
   };
@@ -173,14 +209,15 @@ export function streamEvent(tabId: number, method: string, params: Params): void
   const id = text(params.requestId);
   if (method === "Network.webSocketCreated") {
     entry.urls.set(id, text(params.url));
+    entry.sockets.set(id, { url: text(params.url), opened: "observed", frames: 0, lastAt: 0 });
     entry.open.add(id);
   } else if (method === "Network.requestWillBeSent" && params.type === "EventSource")
     entry.urls.set(id, text((params.request as Params | undefined)?.url));
   else if (method === "Network.webSocketClosed") entry.open.delete(id);
   else if (method === "Network.webSocketFrameReceived")
-    recordFrame(tabId, wsFrame(entry, params, "received"));
+    recordFrame(tabId, wsFrame(tabId, entry, params, "received"));
   else if (method === "Network.webSocketFrameSent")
-    recordFrame(tabId, wsFrame(entry, params, "sent"));
+    recordFrame(tabId, wsFrame(tabId, entry, params, "sent"));
   else if (method === "Network.eventSourceMessageReceived")
     recordFrame(tabId, {
       kind: "sse",
@@ -228,10 +265,20 @@ function rtcTap(): TapSpec {
   return { ...RTC_TAP, source: rtcTapSource() };
 }
 
+function newTab(): TabStreams {
+  return {
+    ring: new Ring(),
+    sockets: new Map(),
+    urls: new Map(),
+    descriptors: new Map(),
+    open: new Set(),
+  };
+}
+
 async function start(tabId: number, options: Params): Promise<unknown> {
   let entry = tabs.get(tabId);
   if (!entry) {
-    entry = { ring: new Ring(), urls: new Map(), descriptors: new Map(), open: new Set() };
+    entry = newTab();
     tabs.set(tabId, entry);
     holdBrowserDebugger(tabId, true);
     await send({ tabId }, "Network.enable", undefined, { label: "streams" });
@@ -269,18 +316,55 @@ function descriptors(entry: TabStreams): unknown[] {
   }));
 }
 
+/** Sockets this tab has: seen by the tap, plus open (101) ones page.network saw before start(). */
+function sockets(tabId: number, entry: TabStreams): unknown[] {
+  const out = new Map<string, Socket>(entry.sockets);
+  for (const [id, found] of recordedOf(tabId) ?? [])
+    if (found.type === "WebSocket" && found.status === 101 && !found.done && !out.has(id))
+      out.set(id, { url: found.url, opened: "before-attach", frames: 0, lastAt: 0 });
+  return [...out].map(([stream, socket]) => ({ stream, ...socket, url: scrubText(socket.url) }));
+}
+
+function state(tabId: number): Record<string, unknown> {
+  const entry = tabs.get(tabId);
+  if (!entry) return { streaming: false, frames: 0 };
+  return {
+    streaming: true,
+    frames: entry.ring.items.length,
+    sockets: sockets(tabId, entry),
+    dropped: entry.ring.dropped,
+  };
+}
+
+/**
+ * Frames, newest last. With `since` (a frame's seq, or a previous `next`) it pages:
+ * {frames, next, missed}, where `missed` counts frames after the cursor the ring already evicted.
+ * Without it the plain array is returned, as before.
+ */
+function list(entry: TabStreams, options: Params): unknown {
+  const filter = readFilter(options);
+  const limit = Number(options.limit) || 200;
+  if (filter.since === undefined) return entry.ring.list(filter, limit);
+  const frames = entry.ring.list(filter, Infinity).slice(0, limit);
+  const oldest = entry.ring.items[0]?.seq ?? entry.ring.seq + 1;
+  return {
+    frames,
+    next: frames.at(-1)?.seq ?? filter.since,
+    missed: Math.max(0, oldest - filter.since - 1),
+  };
+}
+
 export async function streamsCall(tabId: number, action: string, options: Params) {
   if (action === "start") return start(tabId, options);
   if (action === "stop") return stopStreams(tabId);
-  if (action === "state")
-    return { streaming: tabs.has(tabId), frames: tabs.get(tabId)?.ring.items.length ?? 0 };
+  if (action === "state") return state(tabId);
   const entry = tabs.get(tabId);
   if (action === "waitFor") {
     const ready = entry ?? (await start(tabId, options), tabs.get(tabId));
     return ready ? ready.ring.waitFor(readFilter(options), waitMs(options)) : null;
   }
   if (!entry) throw new Error("Not streaming: call page.streams.start() first");
-  if (action === "list") return entry.ring.list(readFilter(options), Number(options.limit) || 200);
+  if (action === "list") return list(entry, options);
   if (action === "describe") return descriptors(entry);
   if (action === "clear") {
     entry.ring.items.length = 0;
@@ -292,7 +376,7 @@ export async function streamsCall(tabId: number, action: string, options: Params
 
 /** Exported for tests: a tab created without Chrome (no CDP). */
 export function streamsTabForTest(tabId: number): void {
-  tabs.set(tabId, { ring: new Ring(), urls: new Map(), descriptors: new Map(), open: new Set() });
+  tabs.set(tabId, newTab());
 }
 
 onEngineInstall(() => {

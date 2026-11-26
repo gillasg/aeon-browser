@@ -9,6 +9,8 @@ import { hideSecrets } from "./native-browser-secrets.js";
 export const RING_MAX = 200;
 export const PAYLOAD_MAX = 4096;
 export const WAIT_MAX = 55_000;
+/** Binary frames keep at most this much base64 (whole 4-char groups). */
+export const BINARY_MAX = 8192;
 const REDACTED = "[redacted]";
 const SECRET_KEY =
   /^(authorization|cookie|set-cookie|password|passwd|secret|client_secret|api[-_]?key|x-api-key|access[-_]?token|refresh[-_]?token|id[-_]?token|token|auth|session|session[-_]?id|sid|signature|sig|csrf|xsrf|bearer|credential|private[-_]?key)$/i;
@@ -96,11 +98,25 @@ function decode(text: string): { format: PayloadFormat; json?: unknown } {
   return { format: "text" };
 }
 
-/** Scrubs, decodes and caps one payload. Binary frames keep only their size. */
+/** A binary frame as CDP sends it (base64), kept bounded so a decoder can still read it. */
+function binaryPayload(raw: unknown): Payload {
+  const base64 = typeof raw === "string" ? raw.replace(/\s+/g, "") : "";
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  const bytes = Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+  const truncated = base64.length > BINARY_MAX;
+  return {
+    data: truncated ? base64.slice(0, BINARY_MAX) : base64,
+    bytes,
+    truncated,
+    format: "binary",
+  };
+}
+
+/** Scrubs, decodes and caps one payload. Binary frames keep bounded base64. */
 export function toPayload(raw: unknown, binary = false): Payload {
+  if (binary) return binaryPayload(raw);
   const text = typeof raw === "string" ? raw : raw === undefined ? "" : JSON.stringify(raw);
   const bytes = new TextEncoder().encode(text).length;
-  if (binary) return { data: "", bytes, truncated: bytes > 0, format: "binary" };
   const decoded = decode(text);
   const json = decoded.json === undefined ? undefined : scrubValue(decoded.json);
   const clean = json === undefined ? scrubText(text) : JSON.stringify(json);
