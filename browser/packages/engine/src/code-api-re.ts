@@ -66,6 +66,6 @@ function __extendPageRe(target, base) {
     bundle: (options = {}) => __reBundle(target, options),
     sourcemaps: (options = {}) => __reSourcemaps(target, options),
   });
-  return base;
+  return typeof __extendPagePosthoc === 'function' ? __extendPagePosthoc(target, base) : base;
 }
 `;
