@@ -4,6 +4,7 @@ import {
   type BashSpawnContext,
 } from "@earendil-works/pi-coding-agent";
 import { shellProxyEnv } from "@browserkit/tools/shell-proxy";
+import { detectSandboxBackend, scrubSandboxEnv, wrapSandboxedCommand } from "./os-sandbox.js";
 
 // Bash inherits a proxy that enforces the user's blocked sites, including redirects, for clients
 // that honour proxy environment variables. A command that unsets/overrides them, or a program that
@@ -16,8 +17,14 @@ export async function startShellGate(): Promise<void> {
   proxyEnv ??= await shellProxyEnv();
 }
 
+/** Secrets out of the environment, the proxy in, and the kernel sandbox around the command. */
 export function gateShellSpawn(context: BashSpawnContext): BashSpawnContext {
-  return proxyEnv ? { ...context, env: { ...context.env, ...proxyEnv } } : context;
+  const env = { ...scrubSandboxEnv(context.env), ...proxyEnv };
+  const status = detectSandboxBackend({ env: process.env });
+  const command = status.active
+    ? wrapSandboxedCommand(context.command, { cwd: context.cwd, status })
+    : context.command;
+  return { ...context, command, env };
 }
 
 interface ShellSettings {

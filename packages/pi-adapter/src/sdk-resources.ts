@@ -64,7 +64,7 @@ export function createPiResourceLoader(input: {
         : {}),
     }),
     ...(input.browserGuidance ? [browserAbilitySearch()] : []),
-    browserProfileGuard(),
+    browserProfileGuard(input.workingDirectory),
     signInCodeGuard(),
     leakedToolCallGuard(),
     emptyToolInputGuard(),
