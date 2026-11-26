@@ -173,6 +173,8 @@ export interface Operation {
     constants?: Record<string, string | number | boolean>;
   };
   responses: Record<string, { mime: string; schema?: JsonSchema }>;
+  /** MCP `outputSchema` (object root) for what the operation answers; optional, inferred. */
+  outputSchema?: JsonSchema;
   role: "read" | "action" | "auth";
   /** Set only when an override names it. Otherwise callers infer it from the method and text. */
   effect?: "read" | "write" | "irreversible";

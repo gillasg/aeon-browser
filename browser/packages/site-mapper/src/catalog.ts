@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Ability } from "./abilities.js";
 import { abilityEffect, effectAnnotations, operationEffect, type CallEffect } from "./effect.js";
 import { operationInputSchema } from "./mcp.js";
+import { operationOutputSchema } from "./output-schema.js";
 import type { SiteModel } from "./types.js";
 
 type Json = Record<string, unknown>;
@@ -16,6 +17,8 @@ export interface CatalogTool {
   description: string;
   inputSchema: Json;
   annotations: { readOnlyHint: boolean; destructiveHint: boolean };
+  /** MCP `outputSchema` (object root), when the operation's answer shape is known. */
+  outputSchema?: Json;
 }
 
 /** `amazon.in` + `searchProducts` → `site__amazon_in__searchProducts`. */
@@ -37,6 +40,7 @@ export function catalogToolsForSite(
       description: `${operation.summary ?? operation.description ?? operation.id}: ${operation.method} ${operation.path} (${effect}). Returns the operation's JSON value.`,
       inputSchema: operationInputSchema(operation),
       annotations: effectAnnotations(effect),
+      ...withSchema(operationOutputSchema(operation)),
     });
   }
   for (const ability of abilities) {
@@ -110,4 +114,8 @@ function fit(name: string, site: string, id: string): string {
   if (name.length <= 64) return name;
   const hash = createHash("sha256").update(`${site}\0${id}`).digest("hex").slice(0, 8);
   return `${name.slice(0, 64 - hash.length - 1)}_${hash}`;
+}
+
+function withSchema(schema: Json | undefined): { outputSchema?: Json } {
+  return schema ? { outputSchema: schema } : {};
 }

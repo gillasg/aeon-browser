@@ -37,6 +37,8 @@ export interface SiteOp {
   fallback?: boolean;
   effect?: "read" | "write" | "irreversible";
   guards?: SiteOpGuards;
+  /** MCP `outputSchema` (object root) for the op's answer. Optional; older files lack it. */
+  outputSchema?: Record<string, unknown>;
   /** Script ops written as helpers: the code, and the hosts it is for. */
   code?: string;
   domains?: string[];

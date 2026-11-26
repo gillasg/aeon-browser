@@ -36,6 +36,25 @@ export interface BundleHealOutcome {
   declined?: string;
 }
 
+type HealListener = (site: string, operation: string) => void;
+const healListeners = new Set<HealListener>();
+
+/** Called after a bundle heal saved a site's model (MCP resource updates). Returns unsubscribe. */
+export function onBundleHealed(listener: HealListener): () => void {
+  healListeners.add(listener);
+  return () => healListeners.delete(listener);
+}
+
+function emitHealed(site: string, operation: string): void {
+  for (const listener of healListeners) {
+    try {
+      listener(site, operation);
+    } catch {
+      // A listener's failure never breaks the call that healed.
+    }
+  }
+}
+
 export const BUNDLE_COOLDOWN_MS = 60_000;
 const scans = new Map<string, { at: number; graph: Promise<BundleGraph | undefined> }>();
 
@@ -78,6 +97,7 @@ export async function healOpFromBundle(
   if (result === undefined || isPersistedQueryMiss(result))
     return { healed: false, declined: "the rebound call did not answer" };
   await deps.saveModel(next);
+  emitHealed(site, id);
   const { kind, oldTarget, newTarget, confidence } = proposal.rebind;
   const bundleHeal: BundleHealReceipt = {
     operation: id,

@@ -219,6 +219,7 @@ export {
 } from "./bundle-heal.js";
 export {
   callWithBundleHeal,
+  onBundleHealed,
   healOpFromBundle,
   resetBundleHealCache,
   type BundleHealDeps,
@@ -264,6 +265,7 @@ export * from "./why-broke.js";
 export { coverage, type Suggestion } from "./coverage.js";
 export { allowedHost, serve, type Server, type ServeOptions } from "./serve.js";
 export { runMcpServer, siteTools, operationInputSchema } from "./mcp.js";
+export * from "./output-schema.js";
 export { catalogToolsForSite, searchCatalog, type CatalogTool } from "./catalog.js";
 export {
   abilityEffect,
