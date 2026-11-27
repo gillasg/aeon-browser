@@ -36,6 +36,12 @@ export const BrowserStepSchema = z.discriminatedUnion("op", [
       referer: z.string().url().max(8192).optional(),
       /** false for a background read pool: open without changing the Split View pair. */
       present: z.boolean().optional(),
+      /** A hard lock: the tab can be read and navigated, never clicked, typed in or submitted. */
+      readOnly: z.boolean().optional(),
+      /** A hard lock: the tab (and its redirects) may only load pages on these origins. */
+      allowedOrigins: z.array(z.string().url().max(2048)).min(1).max(32).optional(),
+      /** Open in the same window as this existing tab. */
+      windowOf: z.number().int().nonnegative().optional(),
       /** What the host calls the owner's tab group (a chat title, "Routine · …", "Mapping"). */
       ownerTitle: z.string().min(1).max(120).optional(),
       /** How long to wait for the page to load; a slow page is reported, not waited on forever. */

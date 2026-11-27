@@ -361,6 +361,9 @@ importers:
       "@types/chrome":
         specifier: 0.3.0
         version: 0.3.0
+      linkedom:
+        specifier: 0.18.13
+        version: 0.18.13
 
   browser/packages/protocol:
     dependencies:

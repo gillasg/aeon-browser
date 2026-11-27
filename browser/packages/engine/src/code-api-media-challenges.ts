@@ -234,6 +234,8 @@ function __extendPageControls(target, base) {
     }),
     ...__extendPageVisualMediaClaws(target),
     challenges: async () => __challenges(target),
+    // The user points at elements (with optional notes): {status, picks: [{selector, role, name, tag, text, rect, note}]}.
+    pick: (options = {}) => __pick(target, options),
     webmcp: Object.freeze({
       list: () => browser.page(target).inspect(__pageWebmcpList),
       call: (name, input = {}) => browser.page(target).inspect(__pageWebmcpCall, {name, input}),

@@ -1,3 +1,4 @@
+import { assertTabLocks } from "./native-browser-tab-locks.js";
 import { tier0Step } from "./native-browser-tier0-step.js";
 import { armVendorKinematics } from "./antibot-vendors.js";
 import { noteActionTiming } from "./native-browser-action-timing.js";
@@ -580,6 +581,7 @@ async function executeStep(
   if (step.op !== "control" && step.op !== "session") await waitForQuietUser(step.target.tabId);
   if (controlOf(step.target.tabId) === "user" && step.op !== "control" && step.op !== "session")
     throw new Error(controlError(step.target.tabId));
+  await assertTabLocks(step.target.tabId, step);
   if (isWriteStep(step)) activateClaim(request);
   const tab = await assertTarget(request);
   bindBrowserSession(step.target.tabId, request.chatId);

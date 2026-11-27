@@ -86,6 +86,11 @@ export function spaceWindowIds(): Set<number> {
   );
 }
 
+/** The chat's own window, as recorded (it may have closed since). */
+export function knownSpaceWindow(chatId: string): number | undefined {
+  return spaces.get(chatId)?.windowId;
+}
+
 export function spaceOf(chatId: string): SpaceKind | undefined {
   return spaces.get(chatId)?.space;
 }

@@ -189,7 +189,7 @@ var browser = Object.freeze({
     // tab. Pass {newTab: true} for a separate tab.
     url = String(url);
     const origin = __originOf(url);
-    var known = options.newTab === true || options.new === true || options.window ? undefined : __opened.get(origin || url);
+    var known = options.newTab === true || options.new === true || options.window || options.readOnly === true || options.allowedOrigins || options.windowOf !== undefined ? undefined : __opened.get(origin || url);
     // Parallel opens on one site: the first navigates the working tab, the rest get their own tabs.
     if (known && __busy.has(__key(known))) known = undefined;
     if (known) {
@@ -216,9 +216,12 @@ var browser = Object.freeze({
       ...(options.ads === true ? {ads:true} : {}),
       ...(options.space === 'window' || options.space === 'tabs' ? {space: options.space} : {}),
       ...(options.present === false ? {present:false} : {}),
+      ...(options.readOnly === true ? {readOnly:true} : {}),
+      ...(options.allowedOrigins ? {allowedOrigins: [].concat(options.allowedOrigins).map(String)} : {}),
+      ...(options.windowOf !== undefined ? {windowOf: typeof options.windowOf === 'number' ? options.windowOf : (options.windowOf.tabId ?? options.windowOf.target?.tabId)} : {}),
       ...(options.timeoutMs ? {timeoutMs: Math.max(500, Math.min(Number(options.timeoutMs) || 0, 120000))} : {}),
       ...(options.window ? {window: {width: Math.round(options.window.width ?? 1920), height: Math.round(options.window.height ?? 1080)}} : {})});
-    if (!options.window) __opened.set(origin || url, result.tab.target);
+    if (!options.window && options.readOnly !== true && !options.allowedOrigins) __opened.set(origin || url, result.tab.target);
     // What an earlier session learned about this host (a gate, a required referer, a play click)
     // arrives as one line, so a new run starts where the last one ended.
     __call({learned:{url}}).then((note) => {
