@@ -2,7 +2,7 @@
 // --remote-debugging-port or pipe, no --enable-automation. The native-messaging manifest goes
 // into the profile's own NativeMessagingHosts folder, and everything is driven through the
 // bridge and the native host, as in the product. With no display, a private Xvfb is started.
-import { spawn, execFile } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,6 +16,10 @@ const cli = join(here, "apps/bridge/dist/cli.js");
 const extension = join(here, "apps/extension/build");
 const NATIVE_HOST = "com.browserkit.bridge";
 const EXTENSION_ID = "dmlgohfphkbenjopdphcojgjeidlmajj";
+const WIN_HOST_KEYS = [
+  `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${NATIVE_HOST}`,
+  `HKCU\\Software\\Chromium\\NativeMessagingHosts\\${NATIVE_HOST}`,
+];
 
 export const chromePath =
   process.env.CHROME_PATH ??
@@ -56,14 +60,55 @@ async function display() {
   return { env: { DISPLAY: `:${number}` }, stop: () => xvfb.kill() };
 }
 
+function queryWinReg(key) {
+  try {
+    const out = execFileSync("reg.exe", ["query", key, "/ve"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    });
+    const match = /REG_SZ\s+(.+)/.exec(out);
+    return match ? match[1].trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function setWinReg(key, value) {
+  if (value === undefined) {
+    try {
+      execFileSync("reg.exe", ["delete", key, "/f"], { stdio: "ignore", windowsHide: true });
+    } catch {
+      // Key did not exist.
+    }
+    return;
+  }
+  execFileSync("reg.exe", ["add", key, "/ve", "/t", "REG_SZ", "/d", value, "/f"], {
+    stdio: "ignore",
+    windowsHide: true,
+  });
+}
+
 async function installNativeHost(profile, home) {
-  const folder = join(profile, "NativeMessagingHosts");
+  const win = process.platform === "win32";
+  const folder = win ? home : join(profile, "NativeMessagingHosts");
   await mkdir(folder, { recursive: true });
-  const launcher = join(home, "host.sh");
-  await writeFile(launcher, `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
-  await chmod(launcher, 0o755);
+  const launcher = join(home, win ? "host.cmd" : "host.sh");
+  if (win) {
+    await writeFile(
+      launcher,
+      `@echo off\r\nset "BROWSERKIT_HOME=${home}"\r\n"${process.execPath}" "${cli}" %*\r\n`,
+    );
+  } else {
+    await writeFile(
+      launcher,
+      `#!/bin/sh\nexport BROWSERKIT_HOME="${home}"\nexec "${process.execPath}" "${cli}" "$@"\n`,
+    );
+    await chmod(launcher, 0o755);
+  }
+  const manifest = join(folder, `${NATIVE_HOST}.json`);
   await writeFile(
-    join(folder, `${NATIVE_HOST}.json`),
+    manifest,
     JSON.stringify({
       name: NATIVE_HOST,
       description: "browserkit bridge",
@@ -72,6 +117,32 @@ async function installNativeHost(profile, home) {
       allowed_origins: [`chrome-extension://${EXTENSION_ID}/`],
     }),
   );
+  if (!win) return () => {};
+  const previous = WIN_HOST_KEYS.map((key) => [key, queryWinReg(key)]);
+  for (const key of WIN_HOST_KEYS) setWinReg(key, manifest);
+  return () => {
+    for (const [key, prior] of previous) setWinReg(key, prior);
+  };
+}
+
+function killTree(child) {
+  if (!child || child.exitCode !== null) return;
+  if (process.platform === "win32" && child.pid) {
+    try {
+      execFileSync("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      return;
+    } catch {
+      // Fall through to child.kill().
+    }
+  }
+  try {
+    child.kill();
+  } catch {
+    // Already stopped.
+  }
 }
 
 export async function waitFor(check, timeout = 30_000) {
@@ -100,37 +171,47 @@ export async function launchProduct(options = {}) {
     SITE_TO_API_HOME: join(home, "s2a"),
     ...(options.env ?? {}),
   };
-  await installNativeHost(profile, home);
-  const bridge = spawn(process.execPath, [cli, "serve"], { env, stdio: "ignore" });
-  await waitFor(async () => JSON.parse(await readFile(join(home, "bridge.json"), "utf8")));
-  const args = productArgs(profile, screen.headless === true);
-  const chrome = spawn(chromePath, args, { env, stdio: "ignore" });
-  const status = async () => (await run(process.execPath, [cli, "status"], { env })).stdout;
-  await waitFor(async () => {
-    const out = await status();
-    if (!/1 browser/.test(out)) throw new Error(out);
-  }, 60_000);
-  return {
-    args,
-    env,
-    home,
-    /** Runs one browser-code cell through the bridge; returns stdout. */
-    async repl(code, session = "product-launch") {
-      const result = await run(process.execPath, [cli, "repl", "--session", session, code], {
-        env,
-        maxBuffer: 16 * 1024 * 1024,
-      });
-      return result.stdout;
-    },
-    async close() {
-      chrome.kill();
-      bridge.kill();
-      screen.stop();
-      await sleep(300);
-      for (const dir of [profile, home])
-        await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
-          () => {},
-        );
-    },
+  let restoreHost = () => {};
+  let bridge;
+  let chrome;
+  const close = async () => {
+    killTree(chrome);
+    killTree(bridge);
+    screen.stop();
+    restoreHost();
+    await sleep(300);
+    for (const dir of [profile, home])
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+        () => {},
+      );
   };
+  try {
+    restoreHost = await installNativeHost(profile, home);
+    bridge = spawn(process.execPath, [cli, "serve"], { env, stdio: "ignore" });
+    await waitFor(async () => JSON.parse(await readFile(join(home, "bridge.json"), "utf8")));
+    const args = productArgs(profile, screen.headless === true);
+    chrome = spawn(chromePath, args, { env, stdio: "ignore" });
+    const status = async () => (await run(process.execPath, [cli, "status"], { env })).stdout;
+    await waitFor(async () => {
+      const out = await status();
+      if (!/1 browser/.test(out)) throw new Error(out);
+    }, 60_000);
+    return {
+      args,
+      env,
+      home,
+      /** Runs one browser-code cell through the bridge; returns stdout. */
+      async repl(code, session = "product-launch") {
+        const result = await run(process.execPath, [cli, "repl", "--session", session, code], {
+          env,
+          maxBuffer: 16 * 1024 * 1024,
+        });
+        return result.stdout;
+      },
+      close,
+    };
+  } catch (error) {
+    await close();
+    throw error;
+  }
 }
