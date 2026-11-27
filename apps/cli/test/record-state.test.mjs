@@ -65,43 +65,58 @@ async function tempHome(t) {
 const pointer = (home) =>
   JSON.parse(readFileSync(join(home, "data", "recordings", "current"), "utf8"));
 
-test("one pointer, a refused second start, and a stop that follows the pointer", async (t) => {
-  const home = await tempHome(t);
-  const env = fakeFfmpeg(home);
-  const folder = join(home, "take-one");
-  const start = await graft(home, ["record", "start", "--screen", "--out", folder], env);
-  assert.equal(start.code, 0, start.stderr);
-  assert.deepEqual(pointer(home), { folder, out: folder });
+test(
+  "one pointer, a refused second start, and a stop that follows the pointer",
+  // The fake ffmpeg is a POSIX shell script; Windows cannot run it as a program.
+  { skip: process.platform === "win32" ? "the fake ffmpeg is a /bin/sh script" : false },
+  async (t) => {
+    const home = await tempHome(t);
+    const env = fakeFfmpeg(home);
+    const folder = join(home, "take-one");
+    const start = await graft(home, ["record", "start", "--screen", "--out", folder], env);
+    assert.equal(start.code, 0, start.stderr);
+    assert.deepEqual(pointer(home), { folder, out: folder });
 
-  const again = await graft(home, ["record", "start", "--tabs", "--out", join(home, "two")], env);
-  assert.notEqual(again.code, 0);
-  assert.match(again.stderr, /RECORDING_RUNNING: stop it first \(graft record stop\)/);
-  assert.deepEqual(pointer(home), { folder, out: folder }, "the live take keeps the pointer");
+    const again = await graft(home, ["record", "start", "--tabs", "--out", join(home, "two")], env);
+    assert.notEqual(again.code, 0);
+    assert.match(again.stderr, /RECORDING_RUNNING: stop it first \(graft record stop\)/);
+    assert.deepEqual(pointer(home), { folder, out: folder }, "the live take keeps the pointer");
 
-  const stop = await graft(
-    home,
-    ["record", "stop", "--out", join(home, "somewhere-else"), "--allow-stutter"],
-    env,
-  );
-  assert.equal(stop.code, 0, stop.stderr);
-  assert.match(stop.stdout, new RegExp(`Folder: ${folder}`));
-  assert.ok(existsSync(join(folder, "events.json")));
-  assert.ok(!existsSync(join(home, "data", "recordings", "current")), "stop clears the pointer");
-});
+    const stop = await graft(
+      home,
+      ["record", "stop", "--out", join(home, "somewhere-else"), "--allow-stutter"],
+      env,
+    );
+    assert.equal(stop.code, 0, stop.stderr);
+    assert.ok(stop.stdout.includes(`Folder: ${folder}`), stop.stdout);
+    assert.ok(existsSync(join(folder, "events.json")));
+    assert.ok(!existsSync(join(home, "data", "recordings", "current")), "stop clears the pointer");
+  },
+);
 
 test("start checks that a daemon answers for the data dir", async (t) => {
   const home = await tempHome(t);
-  const refused = await graft(home, ["record", "start", "--tabs", "--out", join(home, "x")]);
+  const folder = join(home, "x");
+  const refused = await graft(home, ["record", "start", "--tabs", "--out", folder]);
   assert.notEqual(refused.code, 0);
   assert.match(refused.stderr, /DAEMON_NOT_RUNNING/);
   assert.ok(!existsSync(join(home, "data", "recordings", "current")));
 
   const daemon = await startFakeDaemon(join(home, "data"));
   t.after(() => daemon.close());
-  const ok = await graft(home, ["record", "start", "--tabs", "--out", join(home, "x")]);
+  const ok = await graft(home, ["record", "start", "--tabs", "--out", folder]);
   assert.equal(ok.code, 0, ok.stderr);
-  const stop = await graft(home, ["record", "stop"]);
+  assert.deepEqual(pointer(home), { folder, out: folder });
+
+  const again = await graft(home, ["record", "start", "--tabs", "--out", join(home, "two")]);
+  assert.notEqual(again.code, 0);
+  assert.match(again.stderr, /RECORDING_RUNNING: stop it first \(graft record stop\)/);
+  assert.deepEqual(pointer(home), { folder, out: folder });
+
+  const stop = await graft(home, ["record", "stop", "--out", join(home, "other")]);
   assert.equal(stop.code, 0, stop.stderr);
+  assert.ok(stop.stdout.includes(`Folder: ${folder}`), stop.stdout);
+  assert.ok(!existsSync(join(home, "data", "recordings", "current")), "stop clears the pointer");
 });
 
 /** Runs page.recordTab against a fake page whose tab closes after `frames` frames. */
