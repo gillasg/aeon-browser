@@ -1,4 +1,5 @@
 import { SECRET_HEADERS } from "../redact.js";
+import { isSealedValue } from "../sealed.js";
 import { parseJson } from "../infer/schema.js";
 import type { SecurityScheme } from "../types.js";
 import { sharedBridge, type Bridge } from "./bridge.js";
@@ -247,7 +248,7 @@ export class DirectTransport implements Transport {
       "accept-language": this.session?.language ?? "en-US,en;q=0.9",
       origin: home.origin,
       referer: home.href,
-      ...request.headers,
+      ...unsealed(request.headers),
     };
     this.authHeaders(context, headers);
     // Same as the page: the session's XSRF cookie goes into the header the site expects.
@@ -292,6 +293,11 @@ export class DirectTransport implements Transport {
       ...(redirect ? {} : { text: response.text }),
     };
   }
+}
+
+/** A sealed handle or redacted value is only real in the page: never sent over plain HTTP. */
+function unsealed(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers).filter(([, value]) => !isSealedValue(value)));
 }
 
 function hopHeadersFor(

@@ -296,6 +296,20 @@ interface Parts {
   pageHeaders: string[];
 }
 
+/** The query fields a GraphQL GET builds from its envelope (graphqlQuery), not raw inputs. */
+function isGraphqlEnvelope(operation: Operation, param: Param): boolean {
+  return (
+    operation.kind === "graphql" &&
+    operation.method === "GET" &&
+    param.in === "query" &&
+    /^(variables|extensions|operationName)$/.test(param.name)
+  );
+}
+
+/** Filled by signing or the GraphQL envelope: never replayed or asked for. */
+const notAnInput = (operation: Operation, param: Param) =>
+  isSigned(operation, param) || isGraphqlEnvelope(operation, param);
+
 function applyParams(operation: Operation, inputs: Inputs, consumed: Set<string>): Parts {
   const parts: Parts = {
     path: operation.path,
@@ -306,7 +320,7 @@ function applyParams(operation: Operation, inputs: Inputs, consumed: Set<string>
   };
   for (const param of operation.params) {
     consumed.add(param.name);
-    if (isSigned(operation, param)) continue;
+    if (notAnInput(operation, param)) continue;
     const { value, missing, page } = paramValue(operation, param, inputs);
     if (page) parts.pageHeaders.push(param.name);
     if (value === undefined) {

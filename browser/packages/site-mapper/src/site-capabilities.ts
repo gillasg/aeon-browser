@@ -9,7 +9,8 @@ import type { AbilityWrite } from "./ability-effects.js";
 import { wayId } from "./ability-stats.js";
 import { capabilityIndex } from "./infer/capabilities.js";
 import { operationInputs } from "./params.js";
-import { loadModel, siteName } from "./registry.js";
+import { siteName } from "./registry.js";
+import { loadCurrentModel } from "./model-refresh.js";
 import { siteSkillBrief } from "./site-skill.js";
 
 export interface SiteAbilitySummary {
@@ -67,7 +68,7 @@ export async function siteCapabilities(site: string): Promise<SiteCapabilities> 
   const [abilities, notes, model, heals] = await Promise.all([
     listAbilities(host).catch(() => []),
     siteSkillBrief(host).catch(() => ""),
-    loadModel(host).catch(() => undefined),
+    loadCurrentModel(host).catch(() => undefined),
     readHealState(host),
   ]);
   const operations = model?.operations ?? [];

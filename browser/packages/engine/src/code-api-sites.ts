@@ -314,9 +314,14 @@ function __stepLabel(step) {
 async function __learnFromCell() {
   var lines = [], approved = __handedOff;
   __handedOff = false;
-  for (var target of [...__learnTouched.values()]) {
+  var touched = [...__learnTouched.values()];
+  // Tabs this cell already closed hand over what they recorded before closing.
+  if (!touched.length) return;
+  var closed = await __call({network: 'take-closed', tabs: touched.map(t => t && t.tabId)}).catch(() => []);
+  var closedHar = new Map((Array.isArray(closed) ? closed : []).filter(item => item && item.har).map(item => [item.tabId, item.har]));
+  for (var target of touched) {
     try {
-      var har = await __call({network: 'take', target});
+      var har = closedHar.get(target && target.tabId) || await __call({network: 'take', target});
       var entries = (har && har.log && har.log.entries) || [];
       if (!entries.length) continue;
       var key = __key(target);

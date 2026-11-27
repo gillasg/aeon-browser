@@ -2,11 +2,13 @@
 export * from "./types.js";
 export {
   buildSiteModel,
+  INFERENCE_VERSION,
   STAGES,
   type BuildOptions,
   type BuildResult,
   type Stage,
 } from "./pipeline.js";
+export { isStaleModel, loadCurrentModel } from "./model-refresh.js";
 export {
   loadCapture,
   parseCapture,

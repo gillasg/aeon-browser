@@ -11,7 +11,7 @@ export { isTrackerUrl } from "./request-class.js";
 const SECRET_HEADERS = new Set(["cookie", "set-cookie"]);
 const SECRET_FIELDS = /pass(word|wd)?|pwd|otp|one.?time|cvv|cvc|card.?number|security.?code|pin$/i;
 
-interface Taking {
+export interface Taking {
   entries: Map<string, NetworkEntry>;
   passive?: boolean;
   taken?: Set<string>;

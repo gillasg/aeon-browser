@@ -4,7 +4,8 @@ import { originMatches } from "../filter.js";
 import { breakingChanges, responseChanges } from "../diff.js";
 import { extractEmbedded, hiddenInputs, inlineScriptTokens, metaTags } from "../infer/html.js";
 import { getPointer } from "../infer/schema.js";
-import { loadModel, readOverrides, siteHome, siteName } from "../registry.js";
+import { readOverrides, siteHome, siteName } from "../registry.js";
+import { loadCurrentModel } from "../model-refresh.js";
 import {
   readTransportPreferences,
   recordTransportPreference,
@@ -729,7 +730,7 @@ export async function siteMapper(
   site: string,
   options: SiteMapperOptions = {},
 ): Promise<SiteMapper> {
-  const model = options.model ?? (await loadModel(site));
+  const model = options.model ?? (await loadCurrentModel(site));
   if (!model)
     throw new Error(
       `${siteName(site)} is not mapped yet. Record it first: browserkit map https://${siteName(site)}`,

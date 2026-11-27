@@ -107,6 +107,13 @@ export const EFFECTS = [
     errors: ["INVALID_INPUT"],
   },
   {
+    name: "net.closed",
+    call: "end-of-cell learning (internal)",
+    does: "what tabs this cell closed had recorded, handed over once for learning",
+    needs: [],
+    errors: [],
+  },
+  {
     name: "net.capture",
     call: "page.network.list/waitFor/get/body/save, page.replay()",
     does: "the tab's recorded requests, and replaying one",

@@ -65,3 +65,26 @@ test("custom redaction patterns are bounded", () => {
   );
   assert.throws(() => createRedactor({ patterns: ["["] }).text("x"), /needs a valid regex/);
 });
+
+test("a slow pattern on a weird localhost URL degrades instead of aborting the rebuild", async () => {
+  const { filterExchanges } = await import("../dist/index.js");
+  const slow = "^(a+)+$";
+  const exchange = (url) => ({
+    id: url,
+    source: "live",
+    method: "GET",
+    url,
+    status: 200,
+    requestHeaders: { accept: "application/json" },
+    responseHeaders: { "content-type": "application/json" },
+    responseBody: "{}",
+    startedAt: 0,
+  });
+  const urls = [
+    "http://127.0.0.1/api/items?x=" + "a".repeat(40) + "!",
+    "http://127.0.0.1:3773/api/items?x=" + "a".repeat(40) + "!",
+  ];
+  const result = filterExchanges(urls.map(exchange), { noise: ["(a+)+$", "["] });
+  assert.equal(result.kept.length + result.noise.reduce((n, r) => n + r.count, 0), 2);
+  assert.equal(createRedactor({ patterns: [slow] }).text("a".repeat(40) + "!"), "<redacted>");
+});
