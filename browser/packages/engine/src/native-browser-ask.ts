@@ -81,7 +81,7 @@ export function showAsk(detail: AskDetail): void {
   if (old) old.remove();
   const host = document.createElement("div");
   host.id = id;
-  host.setAttribute("data-graft-overlay", "");
+  host.setAttribute("data-ux-overlay", "");
   host.style.cssText = "position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none";
   const root = host.attachShadow({ mode: "closed" });
   function send(value: "done" | "cancelled" | { answer: string }): void {

@@ -44,6 +44,13 @@ export const EFFECTS = [
     errors: [],
   },
   {
+    name: "net.pageCall",
+    call: "mapped-site calls from the site's own tab",
+    does: "sends one request with the page's own fetch, sign-in values filled in by the engine and never shown to code",
+    needs: ["tab"],
+    errors: ["NETWORK"],
+  },
+  {
     name: "net.fetch",
     call: "browser.fetch(url, options)",
     does: "fetches with the user's cookies and no tab; the first fetch to a mapped site lists its operations as mapped, and the third not-found address on one site stops with URL_GUESSING unless {expectMissing: true}",

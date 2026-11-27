@@ -150,7 +150,7 @@ function outlineLayer(): { host: HTMLElement; box: HTMLElement } {
   if (outline) return outline;
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;inset:0;z-index:2147483646;pointer-events:none";
-  host.setAttribute("data-graft-overlay", "");
+  host.setAttribute("data-ux-overlay", "");
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = OUTLINE_STYLE;

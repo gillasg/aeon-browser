@@ -318,11 +318,11 @@ function domQuietProbe() {
   // Runs in the tab's own isolated world (or, on a page that has none, its own window). The
   // observer and its state never touch the page's globals in the normal case.
   // Graft's own layers (labels, annotations, the agent cursor) are not the page changing.
-  const OVERLAY = "[data-graft-overlay],[data-browserkit-overlay]";
+  const OVERLAY = "[data-ux-overlay],[data-uxb-overlay]";
   const host = window as unknown as {
-    __graftQuiet?: { last: number; changes: number; document: string; observer: MutationObserver };
+    __uxQuiet?: { last: number; changes: number; document: string; observer: MutationObserver };
   };
-  if (!host.__graftQuiet) {
+  if (!host.__uxQuiet) {
     const state = {
       last: performance.now(),
       changes: 0,
@@ -366,14 +366,14 @@ function domQuietProbe() {
       },
       true,
     );
-    host.__graftQuiet = state;
+    host.__uxQuiet = state;
   }
   return {
     ready: document.readyState,
-    idle: performance.now() - host.__graftQuiet.last,
+    idle: performance.now() - host.__uxQuiet.last,
     url: location.href,
-    document: host.__graftQuiet.document,
-    changes: host.__graftQuiet.changes,
+    document: host.__uxQuiet.document,
+    changes: host.__uxQuiet.changes,
   };
   function blurCommit(target: EventTarget | null) {
     return (

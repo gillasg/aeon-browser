@@ -18,20 +18,20 @@ import { noteInjectedScript } from "./stealth.js";
 // Records a download navigate on the page. Chrome still performs the download; if the
 // first one in the document is dropped before the request, the receipt reissues it.
 const HOOK = `(() => {
-  if (window.__graftDownloadHook) return;
-  window.__graftDownloadHook = true;
+  if (window.__uxDownloadHook) return;
+  window.__uxDownloadHook = true;
   const nav = window.navigation;
   if (!nav || !nav.addEventListener) return;
   nav.addEventListener("navigate", (event) => {
     if (event.downloadRequest == null) return;
     const href = event.destination && event.destination.url;
     if (!href) return;
-    window.__graftDlAttempt = { href: String(href), name: String(event.downloadRequest), t: Date.now() };
+    window.__uxDlAttempt = { href: String(href), name: String(event.downloadRequest), t: Date.now() };
   });
 })()`;
 
 const READ_ATTEMPT = `(() => {
-  const attempt = window.__graftDlAttempt;
+  const attempt = window.__uxDlAttempt;
   if (!attempt || typeof attempt.href !== "string") return null;
   return { href: attempt.href, name: String(attempt.name || ""), t: Number(attempt.t) || 0 };
 })()`;

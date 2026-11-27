@@ -28,12 +28,12 @@ function __withTimeout(promise, ms, code) {
 // red-marked PNG. Images arrive in chunks because a single evaluate expression is capped at
 // 20k characters and a screenshot is much larger. Used by page.diffScreenshot.
 function __diffImageParts(options) {
-  var store = window.__browserkitDiffParts || {};
+  var store = window.__uxbDiffParts || {};
   var beforeSource = (store[options.id + ':before'] || []).join('');
   var afterSource = (store[options.id + ':after'] || []).join('');
   delete store[options.id + ':before'];
   delete store[options.id + ':after'];
-  if (!Object.keys(store).length) delete window.__browserkitDiffParts;
+  if (!Object.keys(store).length) delete window.__uxbDiffParts;
   function load(source) {
     return new Promise(function (resolve, reject) {
       var image = new Image();
@@ -79,7 +79,7 @@ async function __diffPush(target, id, side, data) {
   for (var i = 0; i < data.length; i += size) {
     var part = { key: id + ':' + side, chunk: data.slice(i, i + size) };
     await __isolatedEval(target, '(' + function (part) {
-      var store = window.__browserkitDiffParts || (window.__browserkitDiffParts = {});
+      var store = window.__uxbDiffParts || (window.__uxbDiffParts = {});
       (store[part.key] || (store[part.key] = [])).push(part.chunk);
     }.toString() + ')(' + JSON.stringify(part) + ')');
   }
@@ -114,11 +114,11 @@ async function __diffScreenshot(target, baseline, options) {
     result = await __isolatedEval(target, '(' + __diffImageParts.toString() + ')(' + JSON.stringify({ id: id, threshold: threshold, wantImage: Boolean(options.path) }) + ')');
   } finally {
     await __isolatedEval(target, '(' + function (key) {
-      var store = window.__browserkitDiffParts;
+      var store = window.__uxbDiffParts;
       if (!store) return;
       delete store[key + ':before'];
       delete store[key + ':after'];
-      if (!Object.keys(store).length) delete window.__browserkitDiffParts;
+      if (!Object.keys(store).length) delete window.__uxbDiffParts;
     }.toString() + ')(' + JSON.stringify(id) + ')').catch(function () {});
   }
   if (options.path) {
@@ -235,7 +235,7 @@ function __pickInPage(found, a) {
     var rect = shown.getBoundingClientRect();
     var x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
     if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) { offscreen++; continue; }
-    if (a.nonce) el.setAttribute('data-graft-pick', a.nonce);
+    if (a.nonce) el.setAttribute('data-ux-pick', a.nonce);
     return {x, y};
   }
   return {hidden: true, offscreen: offscreen > 0};
@@ -262,9 +262,9 @@ async function __fillIndexed(target, element, index, value, options) {
   var nonce = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   try {
     await __pickIndexed(target, element, index, nonce);
-    return await __locator(target, {kind: 'query', by: 'css', value: '[data-graft-pick="' + nonce + '"]'}).fill(value, options);
+    return await __locator(target, {kind: 'query', by: 'css', value: '[data-ux-pick="' + nonce + '"]'}).fill(value, options);
   } finally {
-    await browser.page(target).inspect('document.querySelectorAll(' + JSON.stringify('[data-graft-pick="' + nonce + '"]') + ').forEach((el) => el.removeAttribute("data-graft-pick"))').catch(() => {});
+    await browser.page(target).inspect('document.querySelectorAll(' + JSON.stringify('[data-ux-pick="' + nonce + '"]') + ').forEach((el) => el.removeAttribute("data-ux-pick"))').catch(() => {});
   }
 }
 // fill's receipt: the step result plus {value, via, committed}. commit: 'enter' presses Enter (a

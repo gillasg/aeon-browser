@@ -251,7 +251,7 @@ async function probePaths(
 
 /** A site that answers a nonsense path with its HTML page has a catch-all: paths cannot be typed. */
 async function answersAnyPath(origin: string, timeoutMs: number): Promise<boolean> {
-  const probe = await get(`${origin}/__browserkit_missing_${Date.now()}`, timeoutMs);
+  const probe = await get(`${origin}/__uxb_missing_${Date.now()}`, timeoutMs);
   return Boolean(probe && probe.status === 200 && /html/i.test(probe.contentType));
 }
 

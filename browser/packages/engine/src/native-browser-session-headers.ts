@@ -7,6 +7,8 @@
 
 const SESSION_HEADER =
   /^(authorization|x-csrf-token|x-xsrf-token|csrf-token|x-xsrftoken|x-csrftoken|x-api-key|x-auth-token|x-access-token|x-client-transaction-id|x-requested-with|x-twitter-active-user|x-twitter-auth-type|x-twitter-client-language)$/i;
+/** A value a recording already hid: never the real header, so it never replaces one. */
+const HIDDEN = /<redacted>|graft-sealed:|^\[(set|redacted|masked|hidden|empty|unset|session)\]$/i;
 const FRESH_MS = 30 * 60_000;
 const MAX_ORIGINS = 200;
 
@@ -26,7 +28,7 @@ export function rememberSessionHeaders(url: string, headers: Record<string, stri
   const origin = originOf(url);
   if (!origin) return;
   const found = Object.entries(headers).filter(
-    ([name, value]) => SESSION_HEADER.test(name) && value,
+    ([name, value]) => SESSION_HEADER.test(name) && value && !HIDDEN.test(value),
   );
   if (!found.length) return;
   const known = seen.get(origin)?.headers ?? {};

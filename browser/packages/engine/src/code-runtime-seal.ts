@@ -3,7 +3,7 @@
 // for an MCP server, is checked by the egress canary first.
 
 import { currentInventoryTabs } from "./native-inventory-client.js";
-import { vaultFor } from "./native-browser-seal.js";
+import { SEALED_RE, vaultFor } from "./native-browser-seal.js";
 import { scrubSecrets } from "./native-browser-secrets.js";
 
 type Step = { op: string; target?: { tabId?: unknown }; url?: unknown; value?: unknown };
@@ -27,6 +27,7 @@ export async function sealStepResult<T>(
 
 /** The step with same-site handles released; a secret bound for another site throws. */
 export function releaseStep<T extends Step>(chatId: string, step: T): T {
+  refuseSealedCode(step);
   const vault = vaultFor(chatId);
   if (!vault.size) return step;
   if (step.op === "navigate" || step.op === "openTab") {
@@ -40,6 +41,22 @@ export function releaseStep<T extends Step>(chatId: string, step: T): T {
     return { ...step, [key]: vault.release(value, tabUrl(step), step.op) };
   }
   return step;
+}
+
+/** Page code never carries a sealed handle: it would run in the page and could reach the wire. */
+function refuseSealedCode(step: Step): void {
+  const raw = step as { expression?: unknown; params?: { expression?: unknown } };
+  const code =
+    step.op === "evaluate"
+      ? raw.expression
+      : step.op === "cdp"
+        ? raw.params?.expression
+        : undefined;
+  if (typeof code !== "string" || !new RegExp(SEALED_RE.source).test(code)) return;
+  throw new Error(
+    "SECRET_IN_PAGE_CODE: a sealed value can't be pasted into page code; use page.request(...) " +
+      "or browser.fetch(...), which send it to its own site",
+  );
 }
 
 /** A host call (fetch, mcp.*) with the canary applied: fetch may replay same-site; MCP never. */
@@ -68,7 +85,9 @@ export async function sealCallResult<T>(
   value: Record<string, unknown> | null,
   out: T,
 ): Promise<T> {
-  const fetch = value?.fetch as { url?: unknown } | undefined;
+  const fetch = (value?.fetch ??
+    (value?.pageCall as { request?: unknown } | undefined)?.request) as
+    { url?: unknown } | undefined;
   const site = typeof fetch?.url === "string" ? fetch.url : null;
   // Nothing that reaches agent code carries a password, whatever answered it.
   return vaultFor(chatId).sealValue(await scrubSecrets(out), site);

@@ -21,6 +21,7 @@ import { fillMissingInputs } from "./resolve-missing.js";
 import type { SessionFile } from "./session.js";
 import { stopsRetry } from "./net-guard.js";
 import { DirectTransport, PageTransport, type CallContext, type Transport } from "./transports.js";
+import { chooseTransport, rememberedTransport } from "./transport-choice.js";
 import { pageExtractExpression } from "./page-extract.js";
 import { runAction, type ActionResult, type SiteAction } from "./actions.js";
 import {
@@ -49,7 +50,7 @@ export {
 // or `for await (const item of api.paginate.searchProducts({ q }))`.
 
 export interface SiteMapperOptions {
-  /** auto (default): direct when nothing needs the browser, else the page. */
+  /** auto (default): the page whenever a browser is connected, else direct. */
   transport?: "auto" | "page" | "direct";
   model?: SiteModel;
   session?: SessionFile | false;
@@ -121,17 +122,16 @@ export class SiteClient {
     return this.model.security.filter((scheme) => operation.security.includes(scheme.name));
   }
 
-  private async chooseTransport(operation: Operation, request: RuntimeRequest): Promise<Transport> {
-    const mode = this.options.transport ?? "auto";
-    if (mode === "page") return this.page;
-    if (mode === "direct") return this.direct;
-    // A header recorded sealed or redacted is only real in the page.
-    if (request.pageHeaders?.length) return this.page;
-    // A tripped breaker runs the call in the live page, with human-paced input.
-    if (isRung0Paused(this.site, this.options.account)) return this.page;
-    if (await this.needsBrowser(operation)) return this.page;
-    // The transport that answered last time starts the next call.
-    return (await this.preferredTransport(operation.id)) === "page" ? this.page : this.direct;
+  private chooseTransport(operation: Operation, request: RuntimeRequest): Promise<Transport> {
+    return chooseTransport({
+      mode: this.options.transport ?? "auto",
+      page: this.page,
+      direct: this.direct,
+      pageHeaders: Boolean(request.pageHeaders?.length),
+      paused: isRung0Paused(this.site, this.options.account),
+      needsBrowser: () => this.needsBrowser(operation),
+      preferred: () => this.preferredTransport(operation.id),
+    });
   }
 
   /** True when only the browser can make the call: a signer, or auth with no fresh session. */
@@ -162,8 +162,9 @@ export class SiteClient {
     id: string,
     transport: TransportNote["transport"],
   ): Promise<void> {
-    // The map is the source of truth in memory; an unchanged answer writes nothing.
-    if (this.prefs?.[id]?.transport === transport) return;
+    // The map is the source of truth in memory; an unchanged answer writes nothing. Only a move
+    // to the page is remembered: stealth wins over the few milliseconds direct would save.
+    if (!rememberedTransport(transport) || this.prefs?.[id]?.transport === transport) return;
     this.prefs = { ...(this.prefs ?? {}), [id]: { transport, at: new Date().toISOString() } };
     await recordTransportPreference(this.site, id, transport).catch(() => undefined);
   }

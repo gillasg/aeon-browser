@@ -136,11 +136,11 @@ function probe(
     return any;
   };
   const filledNow = filled(document);
-  if (mark || filledNow) page.__graftPasswordPage = true;
-  const ran = page.__graftAgentCode === true;
-  if (agent) page.__graftAgentCode = true;
+  if (mark || filledNow) page.__uxPasswordPage = true;
+  const ran = page.__uxAgentCode === true;
+  if (agent) page.__uxAgentCode = true;
   return {
-    password: page.__graftPasswordPage === true,
+    password: page.__uxPasswordPage === true,
     agent: ran,
     filled: filledNow,
     secrets,

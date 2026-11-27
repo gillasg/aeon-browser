@@ -3,6 +3,12 @@
 // and the site's own fetch wrapper (which signs requests, like real sites do).
 import vm from "node:vm";
 import { sign } from "./fixture-site.mjs";
+import {
+  parsePageCall,
+  preparePageCall,
+  withJson,
+} from "../../engine/dist/native-browser-page-call.js";
+import { SealVault } from "../../engine/dist/native-browser-seal.js";
 
 class FakeTab {
   constructor(browser, url) {
@@ -165,6 +171,7 @@ export class FakeBrowser {
     const browser = {
       openTab: async (url) => {
         const tab = new FakeTab(this, url);
+        tab.target = { tabId: this.tabs.length + 1 };
         await tab.load();
         this.tabs.push(tab);
         return tab;
@@ -173,16 +180,23 @@ export class FakeBrowser {
     const lines = code.trim().split("\n");
     lines[lines.length - 1] = "return " + lines[lines.length - 1];
     // The engine's in-memory sign-in headers, when a test sets them.
+    // and the engine's page call (native-browser-page-call.ts), run as the engine runs it.
     const sessionHeaders = this.sessionHeaders;
-    const __call = sessionHeaders
-      ? async (request) => (request.network === "session-headers" ? sessionHeaders : undefined)
-      : undefined;
+    this.vault ??= new SealVault();
+    const __call = async (request) => {
+      if (!request?.pageCall) return undefined;
+      const tab = this.tabs.find((item) => item.target.tabId === request.pageCall.target?.tabId);
+      if (!tab) throw new Error("INVALID_TARGET: no such tab");
+      const call = parsePageCall(request.pageCall);
+      const expression = preparePageCall(this.vault, tab.url, call, () => sessionHeaders ?? {});
+      return withJson(await tab.inspect(expression));
+    };
     const context = vm.createContext({
       browser,
       globalThis: (this.globals ??= {}),
       JSON,
       Error,
-      ...(__call ? { __call } : {}),
+      __call,
     });
     const value = await vm.runInContext(`(async () => { ${lines.join("\n")} })()`, context);
     const encoded = JSON.stringify(value ?? null) ?? "null";

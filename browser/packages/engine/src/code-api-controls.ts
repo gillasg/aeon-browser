@@ -13,7 +13,7 @@ export const browserControlsApi = `
 var __classifyGate = ${classifyGate};
 var __pickAffirmative = ${affirmativeIndex};
 // Page-side. mode 'list': controls with their state. mode 'find': the one element a batch target
-// names, tagged with data-graft-t so the engine acts on it. mode 'select': picks options in a
+// names, tagged with data-ux-t so the engine acts on it. mode 'select': picks options in a
 // native select. mode 'popup': whether an ARIA combobox is open or aria-disabled. mode 'pick':
 // the visible option inside aria-controls. Open shadow roots are searched; iframes are the caller's job.
 function __pageControls(arg) {
@@ -27,8 +27,8 @@ function __pageControls(arg) {
     var roots = [document], out = [];
     while (roots.length) {
       var root = roots.shift();
-      out.push(...[...root.querySelectorAll(selector)].filter((el) => !el.closest('[data-graft-overlay]')));
-      for (var el of root.querySelectorAll('*')) if (el.shadowRoot && !el.closest('[data-graft-overlay]')) roots.push(el.shadowRoot);
+      out.push(...[...root.querySelectorAll(selector)].filter((el) => !el.closest('[data-ux-overlay]')));
+      for (var el of root.querySelectorAll('*')) if (el.shadowRoot && !el.closest('[data-ux-overlay]')) roots.push(el.shadowRoot);
     }
     return out;
   };
@@ -183,8 +183,8 @@ function __pageControls(arg) {
   };
   var tagged = (attr) => deep('[' + attr + '="' + arg.token + '"]')[0];
   var findOne = (t, attr, token, clear) => {
-    // A find clears only the previous step's tag; the batch's data-graft-f tags stay for later fields.
-    if (clear) for (var old of deep('[data-graft-t]')) old.removeAttribute('data-graft-t');
+    // A find clears only the previous step's tag; the batch's data-ux-f tags stay for later fields.
+    if (clear) for (var old of deep('[data-ux-t]')) old.removeAttribute('data-ux-t');
     var els = candidates(t), seen = els.filter(visible);
     if (seen.length) els = seen;
     if (t.nth != null) els = els.slice(t.nth, t.nth === -1 ? undefined : t.nth + 1);
@@ -193,12 +193,12 @@ function __pageControls(arg) {
     // A hidden styled checkbox is clicked through its label; its state is still read from it.
     var act = !shown(el) && el.labels && [...el.labels].find(shown) || el;
     act.setAttribute(attr, token);
-    el.setAttribute('data-graft-s', token);
+    el.setAttribute('data-ux-s', token);
     return {count: 1, control: {...describe(el), tag: el.tagName.toLowerCase(), text: cut(ownText(el), 2000)}};
   };
-  var find = () => findOne(arg.find, 'data-graft-t', arg.token, true);
+  var find = () => findOne(arg.find, 'data-ux-t', arg.token, true);
   var select = () => {
-    var el = tagged('data-graft-s');
+    var el = tagged('data-ux-s');
     if (!el) throw new Error('STALE_REF: the control is gone');
     if (el.tagName !== 'SELECT') return {custom: true};
     var options = [...el.options], picked = [];
@@ -228,7 +228,7 @@ function __pageControls(arg) {
   var optionName = (o) => labelOf(o) || cut(ownText(o), 60);
   var optionValue = (o) => o.getAttribute('data-value') || o.getAttribute('value') || '';
   var popup = () => {
-    var el = tagged('data-graft-s');
+    var el = tagged('data-ux-s');
     if (!el) throw new Error('STALE_REF: the control is gone');
     if (el.getAttribute('aria-disabled') === 'true') return {disabled: true};
     var root = optionRoot(el);
@@ -236,7 +236,7 @@ function __pageControls(arg) {
   };
   // Already-selected multi options are reported, not tagged: clicking one would toggle it off.
   var pick = () => {
-    var el = tagged('data-graft-s');
+    var el = tagged('data-ux-s');
     if (!el) throw new Error('STALE_REF: the control is gone');
     var root = optionRoot(el), options = visibleOptions(root);
     if (!options.length) return {waiting: true};
@@ -248,23 +248,23 @@ function __pageControls(arg) {
     var multi = (root && root.getAttribute && root.getAttribute('aria-multiselectable') === 'true') || el.getAttribute('aria-multiselectable') === 'true';
     var name = optionName(hit) || optionValue(hit);
     if (multi && hit.getAttribute('aria-selected') === 'true') return {already: true, name};
-    hit.setAttribute('data-graft-o', arg.tag);
-    return {name, selector: '[data-graft-o="' + arg.tag + '"]'};
+    hit.setAttribute('data-ux-o', arg.tag);
+    return {name, selector: '[data-ux-o="' + arg.tag + '"]'};
   };
   if (arg.mode === 'find') return find();
   if (arg.mode === 'findMany') {
     // fillForm's fields: one page scan tags each control so its fill needs no second find.
-    for (var stale of deep('[data-graft-f]')) stale.removeAttribute('data-graft-f');
+    for (var stale of deep('[data-ux-f]')) stale.removeAttribute('data-ux-f');
     return arg.finds.map((spec, index) => {
       var token = arg.token + '-' + index;
-      var result = findOne(spec, 'data-graft-f', token, index === 0);
-      return {...result, token, selector: '[data-graft-f="' + token + '"]'};
+      var result = findOne(spec, 'data-ux-f', token, index === 0);
+      return {...result, token, selector: '[data-ux-f="' + token + '"]'};
     });
   }
   if (arg.mode === 'select') return select();
   if (arg.mode === 'popup') return popup();
   if (arg.mode === 'pick') return pick();
-  if (arg.mode === 'cleanup') { for (var el of deep('[data-graft-t],[data-graft-s],[data-graft-f],[data-graft-o]')) { el.removeAttribute('data-graft-t'); el.removeAttribute('data-graft-s'); el.removeAttribute('data-graft-f'); el.removeAttribute('data-graft-o'); } return true; }
+  if (arg.mode === 'cleanup') { for (var el of deep('[data-ux-t],[data-ux-s],[data-ux-f],[data-ux-o]')) { el.removeAttribute('data-ux-t'); el.removeAttribute('data-ux-s'); el.removeAttribute('data-ux-f'); el.removeAttribute('data-ux-o'); } return true; }
   return list();
 }
 // Frames worth reading: real pages, not ad or tracking frames, at most eight.
@@ -324,7 +324,7 @@ async function __batchFind(target, op, wait = true) {
   if (found.count !== 1)
     throw Error((found.count ? 'AMBIGUOUS: ' + found.count + ' elements match ' : 'TARGET_NOT_FOUND: nothing matches ') + JSON.stringify(op.target) +
       (found.matches && found.matches.length ? ' (' + found.matches.join('; ') + '); add {exact: true}, {nth} or a role' : ''));
-  return {frame, token, selector: '[data-graft-t="' + token + '"]', control: found.control};
+  return {frame, token, selector: '[data-ux-t="' + token + '"]', control: found.control};
 }
 async function __batchFrame(target, part) {
   // An exact frameKey/frameId, index, {name, url, index} or 'srcdoc' names one frame outright.
@@ -408,11 +408,11 @@ async function __locatorSelect(target, element, index, value) {
   await __locatorRead(target, element, index, function (found, token) {
     var el = found[0];
     if (!el) throw new Error('TARGET_NOT_FOUND: no element matches');
-    el.setAttribute('data-graft-t', token);
-    el.setAttribute('data-graft-s', token);
+    el.setAttribute('data-ux-t', token);
+    el.setAttribute('data-ux-s', token);
   }, token);
   try {
-    return await __batchSelect(target, {value: value, target: {}}, {token: token, selector: '[data-graft-t="' + token + '"]'});
+    return await __batchSelect(target, {value: value, target: {}}, {token: token, selector: '[data-ux-t="' + token + '"]'});
   } finally {
     await browser.page(target).inspect(__pageControls, {mode: 'cleanup'}).catch(function () {});
   }
@@ -582,8 +582,8 @@ function __pageOverlay(arg) {
   };
   var labelOf = (el) => clean(el.getAttribute('aria-label') || el.innerText || el.value || el.getAttribute('title') || '').slice(0, 60);
   var tag = (el, kind) => {
-    for (var old of deep('[data-graft-t]')) old.removeAttribute('data-graft-t');
-    el.setAttribute('data-graft-t', arg.token);
+    for (var old of deep('[data-ux-t]')) old.removeAttribute('data-ux-t');
+    el.setAttribute('data-ux-t', arg.token);
     return {kind, label: labelOf(el) || el.id || el.className};
   };
   var REJECT = ['#onetrust-reject-all-handler', '.ot-pc-refuse-all-handler', '#CybotCookiebotDialogBodyButtonDecline', '#CybotCookiebotDialogBodyLevelButtonLevelOptinDeclineAll',
@@ -637,7 +637,7 @@ async function __overlayCleared(evaluate, token, timeoutMs = 3000) {
   var deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     var present = await evaluate(
-      (t) => !!document.querySelector('[data-graft-t="' + t + '"]'),
+      (t) => !!document.querySelector('[data-ux-t="' + t + '"]'),
       token,
     ).catch(() => false);
     if (!present) return true;
@@ -650,7 +650,7 @@ async function __overlayRound(target, accept) {
   var hit = await page.inspect(__pageOverlay, {token, accept});
   if (hit) return hit.blocked ? hit : {
     ...hit,
-    act: () => page.locator('[data-graft-t="' + token + '"]').click(),
+    act: () => page.locator('[data-ux-t="' + token + '"]').click(),
     cleared: () => __overlayCleared((fn, arg) => page.inspect(fn, arg), token),
   };
   // Consent tools that live in their own iframe.
@@ -658,7 +658,7 @@ async function __overlayRound(target, accept) {
     var inFrame = await frame.evaluate(__pageOverlay, {token, accept}).catch(() => null);
     if (inFrame && !inFrame.blocked) return {
       ...inFrame,
-      act: () => frame.click('[data-graft-t="' + token + '"]'),
+      act: () => frame.click('[data-ux-t="' + token + '"]'),
       cleared: () => __overlayCleared((fn, arg) => frame.evaluate(fn, arg), token),
     };
   }
@@ -687,8 +687,8 @@ function __pageGate(arg) {
   var clean = (value) => String(value ?? '').replace(/\\s+/g, ' ').trim();
   var shown = (el) => { var r = el.getBoundingClientRect(); var style = getComputedStyle(el); return r.width > 40 && r.height > 40 && style.visibility !== 'hidden' && style.display !== 'none'; };
   var tag = (el, kind) => {
-    for (var old of document.querySelectorAll('[data-graft-t]')) old.removeAttribute('data-graft-t');
-    el.setAttribute('data-graft-t', arg.token);
+    for (var old of document.querySelectorAll('[data-ux-t]')) old.removeAttribute('data-ux-t');
+    el.setAttribute('data-ux-t', arg.token);
     return {gate: kind, label: clean(el.innerText || el.value || el.getAttribute('aria-label') || '').slice(0, 80)};
   };
   var area = innerWidth * innerHeight;
@@ -722,10 +722,10 @@ var __GATE_FRAMES = /age|gate|consent|cmp|privacy|region|country|enter|intro|spl
 async function __gateRound(target) {
   var token = 'g' + (++__tagSeq), page = browser.page(target);
   var hit = await page.inspect(__pageGate, {token});
-  if (hit) return hit.blocked ? hit : {...hit, act: () => page.locator('[data-graft-t="' + token + '"]').click()};
+  if (hit) return hit.blocked ? hit : {...hit, act: () => page.locator('[data-ux-t="' + token + '"]').click()};
   for (var frame of await __otherFrames(target, __GATE_FRAMES)) {
     var inFrame = await frame.evaluate(__pageGate, {token}).catch(() => null);
-    if (inFrame) return inFrame.blocked ? inFrame : {...inFrame, act: () => frame.click('[data-graft-t="' + token + '"]')};
+    if (inFrame) return inFrame.blocked ? inFrame : {...inFrame, act: () => frame.click('[data-ux-t="' + token + '"]')};
   }
   return null;
 }

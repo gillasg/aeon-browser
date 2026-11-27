@@ -14,6 +14,11 @@ browserkit abilities run shop.example order --inputs '{"item":"tea"}' --key orde
 browserkit abilities test shop.example search  # its stored cases; fails on constant output
 ```
 
+- **Calls go out from the site's own tab.** While a browser is connected, every mapped call is
+  sent by the page itself (the user's open tab of that site, or one background tab), with its
+  cookies and sign-in headers filled in by the engine; `--transport direct` is only for when no
+  browser is connected. A sealed value never goes into `page.evaluate`: use `page.request(...)`
+  or `browser.fetch(...)`, which send it to its own site.
 - **A mapped site says what it can do.** The first turn's `[saved]` line names its saved
   abilities and `[api]` its mapped reads; a `[site]` line repeats them when you open the site.
   Run the one that fits instead of clicking through the pages, and when it covers the request

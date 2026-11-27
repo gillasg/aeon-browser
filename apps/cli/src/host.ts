@@ -130,7 +130,15 @@ function browserError(result: BrowserCell): Error {
 export function daemonBridge(host: DaemonHost): Bridge {
   return {
     run: (code, options) => host.runInBrowser(code, options ?? {}),
-    status: () => Promise.resolve({ browsers: 1 }),
+    status: async () => {
+      try {
+        const reply = await host.browsers();
+        const list = Array.isArray(reply.browsers) ? reply.browsers : [];
+        return { browsers: list.length };
+      } catch {
+        return { browsers: 0 };
+      }
+    },
     close: () => undefined,
   };
 }

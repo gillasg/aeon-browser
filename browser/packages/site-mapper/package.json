@@ -23,6 +23,10 @@
       "types": "./dist/request-words.d.ts",
       "import": "./dist/request-words.js"
     },
+    "./session-headers": {
+      "types": "./dist/session-headers.d.ts",
+      "import": "./dist/session-headers.js"
+    },
     "./providers": {
       "types": "./dist/providers.d.ts",
       "import": "./dist/providers.js"

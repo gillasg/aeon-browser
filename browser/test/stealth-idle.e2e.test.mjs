@@ -135,13 +135,13 @@ function repl(url) {
     await page.waitForTimeout(500);`;
 }
 
-const globalsOnly = `Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|browserkit-)/.test(name))`;
+const globalsOnly = `Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|__ux|browserkit-)/.test(name))`;
 
 // The one list of what an idle page must not carry, kept as source for Runtime.evaluate.
 const tellsFn = `() => ({
   globals: ${globalsOnly},
   symbols: Object.getOwnPropertySymbols(window).map((key) => Symbol.keyFor(key) || String(key)).filter((name) => /graft|browserkit/i.test(name)),
-  overlays: [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-graft-overlay],[data-browserkit-overlay]')].map((node) => node.id ? "#" + node.id : node.tagName.toLowerCase()),
+  overlays: [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-ux-overlay],[data-uxb-overlay]')].map((node) => node.id ? "#" + node.id : node.tagName.toLowerCase()),
   markers: [...document.querySelectorAll("*")].flatMap((node) => [...node.attributes].map((attr) => attr.name)).filter((name) => /graft|browserkit/i.test(name)),
   rootMarkers: [...document.documentElement.attributes, ...(document.body ? [...document.body.attributes] : [])].map((attr) => attr.name).filter((name) => /graft|browserkit/i.test(name)),
   scripts: [...document.querySelectorAll("script[src]")].map((node) => node.src).filter((src) => /^chrome-extension:/.test(src)),

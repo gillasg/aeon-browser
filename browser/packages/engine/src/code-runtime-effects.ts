@@ -10,6 +10,8 @@ import { toOffscreen } from "./code-offscreen-host.js";
 import { notePreviewActivity } from "./native-browser-preview.js";
 import { fillCodeOnPage, signInToPage } from "./native-browser-signin.js";
 import { fillProfileOnPage } from "./native-browser-profile.js";
+import { parsePageCall, preparePageCall, runPageCall } from "./native-browser-page-call.js";
+import { vaultFor } from "./native-browser-seal.js";
 import { sessionHeadersFor } from "./native-browser-session-headers.js";
 import { resetChatTabs, reapChatPopups } from "./native-browser-tab-cleanup.js";
 import { disableQuietTab, enableQuietTab } from "./native-browser-quiet.js";
@@ -138,6 +140,17 @@ function webEffects(host: EffectHost): Effect<Cell>[] {
       run: async (_, value) => ({
         headers: sessionHeadersFor(String((value.sessionHeaders as { url?: unknown }).url ?? "")),
       }),
+    },
+    {
+      name: "net.pageCall",
+      match: has("pageCall"),
+      tab: inner("pageCall"),
+      run: async (cell, value, tabId = 0) => {
+        const call = parsePageCall(value.pageCall);
+        const tab = await chrome.tabs.get(tabId);
+        const vault = vaultFor(cell.run.chatId);
+        return runPageCall(tabId, preparePageCall(vault, tab.url, call, sessionHeadersFor));
+      },
     },
     {
       name: "net.fetch",

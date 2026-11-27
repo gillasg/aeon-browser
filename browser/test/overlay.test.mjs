@@ -43,7 +43,7 @@ test("the injected input watcher carries its own overlay check", async () => {
 
   listener({
     isTrusted: true,
-    composedPath: () => [{ hasAttribute: (name) => name === "data-browserkit-overlay" }],
+    composedPath: () => [{ hasAttribute: (name) => name === "data-uxb-overlay" }],
   });
   assert.equal(sent.length, 0);
   // Looking around (a click on plain text) is not taking part; a click on a control is.

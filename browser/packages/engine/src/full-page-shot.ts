@@ -26,10 +26,10 @@ export function scrollsForShot(overflowY: string): boolean {
   return overflowY !== "visible";
 }
 
-/** Page probe. Marks each candidate with data-graft-shot so a later evaluate can scroll it. */
+/** Page probe. Marks each candidate with data-ux-shot so a later evaluate can scroll it. */
 export function pageScrollerProbe(): ShotProbe {
-  document.querySelectorAll("[data-graft-shot]").forEach((node) => {
-    node.removeAttribute("data-graft-shot");
+  document.querySelectorAll("[data-ux-shot]").forEach((node) => {
+    node.removeAttribute("data-ux-shot");
   });
   const root = document.scrollingElement || document.documentElement;
   const documentScrolls = root.scrollHeight - root.clientHeight > 80;
@@ -51,9 +51,9 @@ export function pageScrollerProbe(): ShotProbe {
     if (style.overflowY === "visible" || style.visibility === "hidden" || style.display === "none")
       continue;
     const index = scrollers.length;
-    node.setAttribute("data-graft-shot", String(index));
+    node.setAttribute("data-ux-shot", String(index));
     scrollers.push({
-      selector: '[data-graft-shot="' + index + '"]',
+      selector: '[data-ux-shot="' + index + '"]',
       scrollHeight: node.scrollHeight,
       clientHeight: node.clientHeight,
       top: box.top,
@@ -123,7 +123,7 @@ async function __stitchFullPage(page, options) {
   var offsets = chosen ? __stitchOffsets(chosen.scrollHeight, chosen.clientHeight) : [];
   var clear = function () {
     return page.evaluate(function () {
-      document.querySelectorAll('[data-graft-shot]').forEach(function (node) { node.removeAttribute('data-graft-shot'); });
+      document.querySelectorAll('[data-ux-shot]').forEach(function (node) { node.removeAttribute('data-ux-shot'); });
     }).catch(function () {});
   };
   if (!chosen || offsets.length < 2) { await clear(); return null; }

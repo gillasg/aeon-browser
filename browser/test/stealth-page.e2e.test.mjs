@@ -104,10 +104,10 @@ function repl(url) {
     await page.waitForTimeout(300);
     const report = await page.stealthCheck();
     const main = await page.evaluate(() => ({
-      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit)/.test(name)),
-      overlays: [...document.querySelectorAll('[id^="graft-"],[data-graft-overlay],#graft-agent-cursor')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase()),
+      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|__ux)/.test(name)),
+      overlays: [...document.querySelectorAll('[id^="graft-"],[data-ux-overlay],#graft-agent-cursor')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase()),
       cursorShown: [...document.documentElement.children].some((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict"),
-      pageCanFindCursor: !!document.querySelector('#graft-agent-cursor, [data-graft-overlay], [id^="graft-"][data-graft-cursor]')
+      pageCanFindCursor: !!document.querySelector('#graft-agent-cursor, [data-ux-overlay], [id^="graft-"][data-ux-cursor]')
     }));
     console.log("STEALTH " + JSON.stringify({report, main}));`;
 }
@@ -136,8 +136,8 @@ async function untouchPage(port, url) {
   });
   const dom = await page.send("Runtime.evaluate", {
     expression: `(() => ({
-      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit)/.test(name)),
-      overlays: [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-graft-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase())
+      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|__ux)/.test(name)),
+      overlays: [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-ux-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase())
     }))()`,
     returnByValue: true,
   });

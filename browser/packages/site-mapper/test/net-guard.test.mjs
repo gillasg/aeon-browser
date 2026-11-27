@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { classifyFailure } from "../dist/ability-writes.js";
 import { DirectTransport, PageTransport } from "../dist/index.js";
-import { pageCallExpression } from "../dist/runtime/transports.js";
+import { pageCallSource } from "../../engine/dist/native-browser-page-call.js";
 import {
   connectionAddress,
   preflightHost,
@@ -538,10 +538,7 @@ test("a write does not follow an https downgrade, and an upgrade drops the body"
 });
 
 test("an opaque browser redirect is not reported as a 302", async () => {
-  const source = pageCallExpression(requestOf("https://shop.example/order", "POST", "sku=1"), {
-    auth: [],
-    home: "https://shop.example/",
-  });
+  const source = pageCallSource();
   assert.match(source, /type: 'opaqueredirect'/);
   assert.doesNotMatch(source, /opaque \? 302/);
   const hidden = { status: 0, headers: {}, type: "opaqueredirect" };
@@ -613,10 +610,7 @@ test("a cross-site read drops secrets, cookies, origin, and credentials", async 
     );
     assert.equal(response.text, "away");
     assertDropped(seen[0]);
-    const source = pageCallExpression(requestOf(`${origin}/start`, "GET"), {
-      auth: [],
-      home: `${origin}/`,
-    });
+    const source = pageCallSource();
     assert.match(source, /req\.crossSite \? 'omit' : 'include'/);
     assert.match(source, /withCredentials = credentials === 'include'/);
   } finally {

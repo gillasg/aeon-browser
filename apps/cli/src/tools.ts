@@ -182,7 +182,7 @@ export async function runTool(client: GraftClient, rest: string[]): Promise<numb
     kind: "core.tool.call",
     tool: call.name,
     session: call.session,
-    arguments: { ...call.input, ...(call.asJson ? { __graftFull: true } : {}) },
+    arguments: { ...call.input, ...(call.asJson ? { __uxFull: true } : {}) },
     ...(call.browser ? { browser: call.browser } : {}),
   });
   const content = (reply.content as Content[] | undefined) ?? [];

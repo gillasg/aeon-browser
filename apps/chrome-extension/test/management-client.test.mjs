@@ -26,7 +26,7 @@ test("management uses one lazy scoped connection and reacquires it after close",
             }));
             builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({
               contents:
-                "export async function connectNativeUi(scope){return globalThis.__graftManagementConnect(scope)}",
+                "export async function connectNativeUi(scope){return globalThis.__uxManagementConnect(scope)}",
               loader: "js",
             }));
           },
@@ -36,7 +36,7 @@ test("management uses one lazy scoped connection and reacquires it after close",
     const { createManagementClient } = await import(pathToFileURL(outfile).href);
     let calls = 0;
     const clients = [];
-    globalThis.__graftManagementConnect = async (scope) => {
+    globalThis.__uxManagementConnect = async (scope) => {
       assert.deepEqual(scope, { kind: "management" });
       calls++;
       const client = { socket: new globalThis.EventTarget() };
@@ -57,18 +57,18 @@ test("management uses one lazy scoped connection and reacquires it after close",
     assert.equal(await createManagementClient(false, () => catalog)(), catalog);
     assert.equal(calls, 3);
   } finally {
-    delete globalThis.__graftManagementConnect;
+    delete globalThis.__uxManagementConnect;
     await rm(directory, { recursive: true, force: true });
   }
 });
 
 async function verifyRetry(getClient, clients) {
   clients[1].socket.dispatchEvent(new globalThis.Event("close"));
-  const connect = globalThis.__graftManagementConnect;
-  globalThis.__graftManagementConnect = async () => {
+  const connect = globalThis.__uxManagementConnect;
+  globalThis.__uxManagementConnect = async () => {
     throw new Error("Temporary connect failure");
   };
   await assert.rejects(getClient(), /Temporary connect failure/);
-  globalThis.__graftManagementConnect = connect;
+  globalThis.__uxManagementConnect = connect;
   assert.equal(await getClient(), clients[2]);
 }
