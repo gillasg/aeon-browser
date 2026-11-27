@@ -1,3 +1,4 @@
+import { world } from "./lifecycle.js";
 import type { Transport } from "./transport.js";
 
 // What a script did on this page (elements it found, errors it hit), sent once things settle so
@@ -29,7 +30,7 @@ export class Tracker {
   }
 
   private schedule(): void {
-    this.timer ??= setTimeout(() => this.send(), 4000);
+    this.timer ??= world().original.setTimeout(() => this.send(), 4000);
   }
 
   private send(): void {

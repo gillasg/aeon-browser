@@ -135,7 +135,12 @@ export function sbHelpers(context: GmContext, store: ValueStore): Record<string,
   return {
     onElement,
     waitFor,
-    panel,
+    panel: (options: PanelOptions) => {
+      const host = panel(options);
+      // Taken off the page again when the script stops.
+      context.current?.()?.node(host);
+      return host;
+    },
     fetch: sbFetch,
     api: (site: string, operation: string, params: Record<string, unknown> = {}) =>
       transport.call("api", { site, operation, params }),

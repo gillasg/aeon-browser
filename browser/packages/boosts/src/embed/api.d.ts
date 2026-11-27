@@ -19,7 +19,14 @@ export interface BoostEngineOptions {
   ) => Promise<unknown>;
 }
 
-export interface BoostSummary {
+export interface BoostRunState {
+  lastRun: { at: number; url: string } | null;
+  lastError: { message: string; stack?: string; at: number; url: string } | null;
+  tabs: number[];
+  health: string;
+}
+
+export interface BoostSummary extends BoostRunState {
   id: string;
   name: string;
   enabled: boolean;
@@ -28,11 +35,23 @@ export interface BoostSummary {
   updated: number;
 }
 
+export interface Warning {
+  code: string;
+  message: string;
+}
+
+export interface SavedBoost extends BoostSummary {
+  warnings: Warning[];
+}
+
 export interface BoostEngine {
   list(url?: string): Promise<BoostSummary[]>;
   get(id: string): Promise<Record<string, unknown> | undefined>;
   /** Saves a boost (new without an id, replaced with one) and applies it in open tabs. */
-  save(input: Record<string, unknown>): Promise<BoostSummary>;
+  save(input: Record<string, unknown>): Promise<SavedBoost>;
+  /** Live viewers boosts may push to (GM.liveView.push); their tokens stay in the worker. */
+  rememberView(view: Record<string, unknown>): Promise<{ id: string }>;
+  forgetView(id: string): Promise<void>;
   remove(id: string): Promise<void>;
   setEnabled(id: string, enabled: boolean): Promise<void>;
   /** The wire rules of the boosts active on this URL, as saved. */

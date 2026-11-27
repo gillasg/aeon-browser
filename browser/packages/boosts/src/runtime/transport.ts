@@ -123,6 +123,9 @@ export interface PagePolicy {
 /** Calls a page-world script may make. Everything else needs the isolated world. */
 const PAGE_OPS = new Set([
   "started",
+  "stopped",
+  "error",
+  "csp",
   "log",
   "health",
   "css.insert",

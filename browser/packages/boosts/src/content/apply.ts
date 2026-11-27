@@ -2,6 +2,7 @@ import { boostCss, cssSelectors } from "../shared/css.js";
 import type { Boost, HealthReport, HtmlPart, Target } from "../shared/types.js";
 import { ActionRunner } from "./actions.js";
 import { findTargets, safeQueryAll, sampleOf } from "./target.js";
+import { ShadowStyles } from "./shadow.js";
 import { Widgets } from "./widgets.js";
 
 // Applies boosts to the page: styles, zaps (including text-matched ones), added HTML and actions,
@@ -50,6 +51,7 @@ class Applied {
   private insertedCss?: string;
   private runner?: ActionRunner;
   private widgets?: Widgets;
+  private shadow?: ShadowStyles;
   private hidden = new Set<HTMLElement>();
   private added = new Set<Element>();
   private errors: string[] = [];
@@ -61,7 +63,11 @@ class Applied {
 
   start(): void {
     const css = boostCss(this.boost, location.href);
-    if (css) this.addStyle(css);
+    if (css) {
+      this.addStyle(css);
+      this.shadow = new ShadowStyles(css);
+      this.shadow.start();
+    }
     if (this.boost.actions?.length) this.runner = new ActionRunner(this.boost.actions);
     if (this.boost.widgets?.length)
       this.widgets = new Widgets(document, this.boost.id, this.boost.widgets);
@@ -119,6 +125,7 @@ class Applied {
 
   stop(): void {
     this.widgets?.unmount();
+    this.shadow?.stop();
     this.style?.remove();
     if (this.insertedCss)
       void this.send("css.remove", { css: this.insertedCss }).catch(() => undefined);

@@ -4,6 +4,7 @@
 // instead keep a small LRU working set and evict realms that have not run a cell in a while.
 import { CodeRealm } from "./code-realm.js";
 import { jobSource } from "./code-job-source.js";
+import { withBoostSyntax } from "./code-realm-boost-check.js";
 
 /** The extension side: `event` sends one realm event and resolves with the extension's answer. */
 export interface RealmLink {
@@ -296,7 +297,11 @@ export class RealmHost {
           cell.startedAt += Date.now() - cell.parkedAt;
           cell.parkedAt = undefined;
         }
-        realm.receive({ kind: "reply", callId: message.callId, ...response });
+        realm.receive({
+          kind: "reply",
+          callId: message.callId,
+          ...withBoostSyntax(message.request, response),
+        });
       });
   }
 

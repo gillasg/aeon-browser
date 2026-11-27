@@ -272,6 +272,10 @@ export interface Health {
   misses: number;
   repairedAt?: number;
   repairError?: string;
+  /** When the script last started on a page, and where. */
+  lastRun?: { at: number; url: string };
+  /** The script's last uncaught error. */
+  lastError?: { message: string; stack?: string; at: number; url: string };
 }
 
 export type ProviderId = "anthropic" | "openai" | "gemini" | "openrouter" | "custom" | "companion";

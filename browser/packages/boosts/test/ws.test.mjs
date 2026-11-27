@@ -4,7 +4,14 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
 import { WebSocketServer } from "ws";
-import { MAX_SOCKETS, socketHub, socketRefusal, webSocket } from "../build-test/lib.mjs";
+import {
+  KEEP_ALIVE_MS,
+  MAX_SOCKETS,
+  MAX_TOTAL_SOCKETS,
+  socketHub,
+  socketRefusal,
+  webSocket,
+} from "../build-test/lib.mjs";
 
 async function echoServer() {
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -124,5 +131,46 @@ test("GM.webSocket caps sockets per script and closes them all when the script g
   hub.release(transport.key);
   await until(() => closed.length === MAX_SOCKETS);
   assert.ok(closed.every((code) => code === 1000));
+  server.close();
+});
+
+test("all scripts together hold at most 32 sockets, with a clear message", async () => {
+  const { server, url } = await echoServer();
+  const hub = socketHub();
+  const errors = [];
+  let opened = 0;
+  const scripts = Array.from({ length: 5 }, () => transportTo(hub, { connect: ["127.0.0.1"] }));
+  for (const transport of scripts)
+    for (let i = 0; i < 7; i++)
+      webSocket(
+        transport,
+        { url, onopen: () => opened++, onerror: (e) => errors.push(e.error) },
+        () => undefined,
+      );
+  assert.equal(MAX_TOTAL_SOCKETS, 32);
+  assert.equal(hub.total(), 32);
+  assert.equal(errors.length, 3);
+  assert.match(errors[0], /All boosts together may hold at most 32 sockets/);
+  await until(() => opened === 32);
+  for (const transport of scripts) hub.release(transport.key);
+  assert.equal(hub.total(), 0);
+  server.close();
+});
+
+test("an open socket keeps the service worker awake every 20 s, and stops once all close", async () => {
+  assert.equal(KEEP_ALIVE_MS, 20_000);
+  const { server, url } = await echoServer();
+  let pings = 0;
+  const hub = socketHub({ keepAliveMs: 40, keepAlive: () => pings++ });
+  const transport = transportTo(hub, { connect: ["127.0.0.1"] });
+  let open = false;
+  // A quiet socket: nothing is sent or received after it opens.
+  webSocket(transport, { url, onopen: () => (open = true) }, () => undefined);
+  await until(() => open);
+  await until(() => pings >= 3);
+  hub.release(transport.key);
+  const after = pings;
+  await new Promise((done) => setTimeout(done, 200));
+  assert.ok(pings <= after + 1, `no pings once every socket closed (${after} then ${pings})`);
   server.close();
 });

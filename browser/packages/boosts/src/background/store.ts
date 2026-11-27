@@ -129,6 +129,29 @@ export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
   return settings;
 }
 
+/** A strict Content-Security-Policy a host enforced on its last load (seen by a violation). */
+export interface CspNote {
+  directive: string;
+  at: number;
+}
+
+export async function getCsp(host: string): Promise<CspNote | undefined> {
+  const stored = await chrome.storage.local.get(key("csp"));
+  return (stored[key("csp")] as Record<string, CspNote> | undefined)?.[host];
+}
+
+export async function noteCsp(host: string, directive: string): Promise<void> {
+  const stored = await chrome.storage.local.get(key("csp"));
+  const all = (stored[key("csp")] as Record<string, CspNote> | undefined) ?? {};
+  if (all[host]?.directive === directive && Date.now() - all[host].at < 60_000) return;
+  all[host] = { directive, at: Date.now() };
+  const hosts = Object.keys(all);
+  // Keep the 200 most recent hosts.
+  for (const old of hosts.sort((a, b) => (all[a]?.at ?? 0) - (all[b]?.at ?? 0)).slice(0, -200))
+    delete all[old];
+  await chrome.storage.local.set({ [key("csp")]: all });
+}
+
 export interface SiteState {
   /** Nothing runs on this site. */
   off?: boolean;

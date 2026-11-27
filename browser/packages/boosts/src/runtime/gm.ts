@@ -1,3 +1,4 @@
+import { world, type Run } from "./lifecycle.js";
 import type { Tracker } from "./tracker.js";
 import type { Transport } from "./transport.js";
 import { webSocket, type WebSocketDetails } from "./ws.js";
@@ -21,6 +22,10 @@ type Listener = (key: string, oldValue: unknown, newValue: unknown, remote: bool
 type Callback<T> = ((value: T) => void) | undefined;
 type Api = Record<string, unknown>;
 
+const setTimeoutOriginal = (done: (value: unknown) => void, ms: number): void => {
+  world().original.setTimeout(() => done(undefined), ms);
+};
+
 const clone = <T>(value: T): T =>
   value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 
@@ -29,10 +34,27 @@ export interface GmContext {
   transport: Transport;
   tracker: Tracker;
   report(error: unknown): void;
+  /** The script's current run on this page, if it is running. */
+  current?: () => Run | undefined;
+  /** Replaces the value snapshot with a fresh read from storage (set by the values API). */
+  refreshValues?: () => Promise<void>;
 }
 
-function valuesApi({ config, transport }: GmContext): Api {
+const FRESH_VALUES_MS = 400;
+
+function valuesApi(context: GmContext): Api {
+  const { config, transport } = context;
   const values: Record<string, unknown> = { ...config.values };
+  // At each start: read storage through the channel, bounded so a slow worker never stalls it.
+  context.refreshValues = async () => {
+    const stored = await Promise.race([
+      transport.call("values.get").catch(() => undefined),
+      new Promise((done) => setTimeoutOriginal(done, FRESH_VALUES_MS)),
+    ]);
+    if (!stored || typeof stored !== "object") return;
+    for (const key of Object.keys(values)) if (!(key in stored)) delete values[key];
+    Object.assign(values, stored);
+  };
   const listeners = new Map<number, { key: string; fn: Listener }>();
   let nextListener = 1;
   const changed = (key: string, oldValue: unknown, newValue: unknown, remote: boolean): void => {
@@ -83,16 +105,18 @@ function valuesApi({ config, transport }: GmContext): Api {
   };
 }
 
-function addStyle({ transport }: GmContext, css: string): HTMLStyleElement {
+function addStyle({ transport, current }: GmContext, css: string): HTMLStyleElement {
   const style = document.createElement("style");
   style.textContent = css;
   (document.head ?? document.documentElement).appendChild(style);
+  current?.()?.node(style);
   // A strict Content-Security-Policy blocks inline styles: let the extension insert it instead.
   if (!style.sheet) void transport.call("css.insert", { css });
   return style;
 }
 
 function addElement(
+  context: GmContext,
   parentOrTag: Node | string,
   tagOrAttrs?: string | Record<string, unknown>,
   attrs?: Record<string, unknown>,
@@ -109,6 +133,8 @@ function addElement(
     else element.setAttribute(name, String(value));
   }
   parent.appendChild(element);
+  // Taken off the page again when the script stops.
+  context.current?.()?.node(element);
   return element;
 }
 
@@ -224,7 +250,20 @@ function miscApi(context: GmContext): Api {
   const { transport, report } = context;
   return {
     addStyle: (css: string) => addStyle(context, css),
-    addElement,
+    addElement: (
+      parentOrTag: Node | string,
+      tagOrAttrs?: string | Record<string, unknown>,
+      attrs?: Record<string, unknown>,
+    ) => addElement(context, parentOrTag, tagOrAttrs, attrs),
+    onStop: (handler: () => void) => context.current?.()?.onStop(handler),
+    liveView: {
+      /** Rows (an array) replace the viewer's table; anything else is one frame in its feed. */
+      push: (data: unknown, options?: { view?: string }) =>
+        transport.call("liveView.push", {
+          data: clone(data),
+          ...(options?.view ? { view: String(options.view) } : {}),
+        }),
+    },
     log: (...args: unknown[]) => {
       console.log(...args);
       void transport.call("log", { text: args.map(String).join(" ") });
@@ -292,7 +331,11 @@ export function gmApis(context: GmContext): Api {
     cookie: cookieApi(context),
     xmlhttpRequest: (details: XhrDetails) =>
       xmlHttpRequest(context.transport, details, context.report),
-    webSocket: (details: WebSocketDetails) => webSocket(context.transport, details, context.report),
+    webSocket: (details: WebSocketDetails) => {
+      const socket = webSocket(context.transport, details, context.report);
+      context.current?.()?.add(() => socket.close());
+      return socket;
+    },
   };
 }
 
@@ -306,6 +349,7 @@ const SYNC_ONLY = new Set([
   "addStyle",
   "openInTab",
   "webSocket",
+  "onStop",
 ]);
 
 /** Builds the GM_* functions and the GM object a script may use. */

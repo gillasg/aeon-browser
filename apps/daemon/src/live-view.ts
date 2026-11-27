@@ -11,6 +11,8 @@ export interface LiveViewOptions {
   port?: number;
   maxRows?: number;
   maxEvents?: number;
+  /** The clock for activity times (tests). */
+  now?: () => number;
 }
 
 export interface LiveViewState {
@@ -30,6 +32,8 @@ export interface LiveView {
   pushRows(rows: unknown[], meta?: { title?: string | undefined }): void;
   pushFrame(frame: unknown): void;
   snapshot(): LiveViewState;
+  /** When anything last pushed to or read from this viewer (epoch ms). */
+  lastActivity(): number;
   close(): Promise<void>;
 }
 
@@ -109,18 +113,25 @@ export async function startLiveView(options: LiveViewOptions = {}): Promise<Live
     frames: [],
   };
   const clients = new Set<ServerResponse>();
+  const now = options.now ?? Date.now;
+  let activeAt = now();
+  const touch = (): void => {
+    activeAt = now();
+  };
   const broadcast = (event: string, data: unknown): void => {
     const chunk = sseChunk(event, data);
     for (const client of clients) client.write(chunk);
   };
   const view = {
     pushRows(rows: unknown[], meta: { title?: string | undefined } = {}): void {
+      touch();
       state.rows = (Array.isArray(rows) ? rows : [rows]).slice(-maxRows);
       if (meta.title) state.title = meta.title;
       state.updatedAt = Date.now();
       broadcast("rows", { title: state.title, rows: state.rows, updatedAt: state.updatedAt });
     },
     pushFrame(frame: unknown): void {
+      touch();
       state.frames.push(frame);
       if (state.frames.length > maxEvents) state.frames.splice(0, state.frames.length - maxEvents);
       state.updatedAt = Date.now();
@@ -130,6 +141,7 @@ export async function startLiveView(options: LiveViewOptions = {}): Promise<Live
   };
   const hosts = new Set<string>();
   const server = createServer((req, res) => {
+    touch();
     void route(req, res, { view, clients, token, maxEvents, state, hosts });
   });
   await new Promise<void>((resolve, reject) => {
@@ -147,6 +159,8 @@ export async function startLiveView(options: LiveViewOptions = {}): Promise<Live
     pushUrl: `${base}/push`,
     token,
     ...view,
+    // An open viewer tab keeps it in use.
+    lastActivity: () => (clients.size ? now() : activeAt),
     close: () =>
       new Promise<void>((resolve) => {
         for (const client of clients) client.end();

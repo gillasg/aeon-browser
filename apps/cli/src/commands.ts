@@ -11,6 +11,7 @@ import { speedLine } from "./speed.js";
 import { converseCommands } from "./converse-commands.js";
 import { browserCommands } from "./browser-commands.js";
 import { fetchCommand } from "./fetch-cmd.js";
+import { liveCommand } from "./live-cmd.js";
 import { providerCommands } from "./provider-commands.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
@@ -733,7 +734,12 @@ browserkit, rebuilds Graft, updates the native host and waits for the extension 
   for (const command of BROWSERKIT_COMMANDS.filter((item) => SCOPED.has(item.name)))
     if (!overrides.has(command.name))
       overrides.set(command.name, { ...command, help: `${command.help}\n\n${BROWSER_NOTE}` });
-  const own = [...graftOnlyCommands(host), ...browsersCommands(host), fetchCommand(host)];
+  const own = [
+    ...graftOnlyCommands(host),
+    ...browsersCommands(host),
+    fetchCommand(host),
+    liveCommand(host),
+  ];
   // A command Graft defines itself (pack) replaces browserkit's; help lists each name once.
   const taken = new Set(own.map((command) => command.name));
   const commands = BROWSERKIT_COMMANDS.filter((command) => !taken.has(command.name)).map(

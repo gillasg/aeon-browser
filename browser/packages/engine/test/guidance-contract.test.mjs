@@ -88,9 +88,10 @@ test("the agent text never tells the agent to attach a tab before using it", () 
 });
 
 test("every error code named in the agent text is one the engine can raise", () => {
-  // Codes come from errors.ts, sign-in reasons from the engine and the credentials package.
-  const errors = ["protocol", "engine", "credentials"]
-    .map((pkg) => join(browserRoot, "packages", pkg, "src"))
+  // Codes come from errors.ts, sign-in reasons from the engine and the credentials package, and
+  // boost save warnings from the boost engine's checks.
+  const errors = ["protocol/src", "engine/src", "credentials/src", "boosts/src/shared"]
+    .map((dir) => join(browserRoot, "packages", dir))
     .flatMap((dir) =>
       readdirSync(dir)
         .filter((name) => name.endsWith(".ts") && name !== "code-api-help.ts")

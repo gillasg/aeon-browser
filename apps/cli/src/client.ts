@@ -304,6 +304,17 @@ export class GraftClient {
     });
   }
 
+  /** `graft live`: start, list or stop the daemon's live viewers. */
+  async live(body: {
+    liveView: "start" | "stop" | "list";
+    title?: string;
+    id?: string;
+  }): Promise<unknown> {
+    const reply = await this.ask("core.live", body, "core.live.result", 15_000);
+    if (typeof reply.error === "string") throw new Error(reply.error);
+    return reply.result;
+  }
+
   /** The app-level health ping: daemon, extension and engine, not a socket ping. */
   health(timeoutMs = 2500): Promise<Json> {
     return this.ask("core.health", {}, "core.health.result", timeoutMs);
