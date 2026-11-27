@@ -54,12 +54,59 @@ function toSchemeSource(
   return undefined;
 }
 
+/** Finds the operation a `response:<url>#<pointer>` tag names, by its URL without the query. */
+type Producer = (url: string) => string | undefined;
+
+/**
+ * The recorder's provenance tag for a request header, as a scheme source. Call-time discovery
+ * (dependencies, the live page) stays the fallback when no recording tagged it.
+ */
+function provenanceSource(
+  members: Member[],
+  header: string,
+  producer: Producer,
+): SecurityScheme["source"] | undefined {
+  const tag = members.map((m) => m.exchange.provenance?.[header]).find(Boolean);
+  if (!tag) return undefined;
+  const [kind, ...rest] = tag.split(":");
+  const name = rest.join(":");
+  if (!name) return undefined;
+  if (kind === "meta") return { kind: "meta", name };
+  if (kind === "cookie") return { kind: "cookie", name };
+  if (kind === "storage") return { kind: "storage", storage: "localStorage", key: name };
+  if (kind !== "response") return undefined;
+  const hash = name.lastIndexOf("#");
+  const operationId = producer(hash < 0 ? name : name.slice(0, hash));
+  if (!operationId || hash < 0) return undefined;
+  return { kind: "response", operationId, pointer: name.slice(hash + 1) };
+}
+
+function producers(entries: { operation: Operation; members: Member[] }[]): Producer {
+  const byUrl = new Map<string, string>();
+  for (const { operation, members } of entries)
+    for (const { exchange } of members) {
+      const url = new URL(exchange.url);
+      if (!byUrl.has(url.origin + url.pathname)) byUrl.set(url.origin + url.pathname, operation.id);
+    }
+  return (raw) => {
+    try {
+      const url = new URL(raw);
+      return byUrl.get(url.origin + url.pathname);
+    } catch {
+      return undefined;
+    }
+  };
+}
+
+let producer: Producer = () => undefined;
+
 export function inferSecurity(
   entries: { operation: Operation; members: Member[] }[],
 ): SecurityScheme[] {
   const origins = new Set(entries.map((entry) => entry.operation.origin));
   const multi = origins.size > 1;
   const drafts = new Map<string, Draft>();
+  producer = producers(entries);
   const add = (scheme: SecurityScheme, operation: Operation) => {
     const draft = drafts.get(scheme.name) ?? { ...scheme, operations: new Set<string>() };
     draft.operations.add(operation.id);
@@ -116,7 +163,9 @@ function authorization(
   };
   if (/^[\w-]+\.[\w-]+\.[\w-]+$/.test(token)) scheme.bearerFormat = "JWT";
   const source =
-    toSchemeSource(dependencySource(operation, "header:authorization")) ?? constantSource(values);
+    toSchemeSource(dependencySource(operation, "header:authorization")) ??
+    provenanceSource(members, "authorization", producer) ??
+    constantSource(values);
   if (source) scheme.source = source;
   add(scheme, operation);
 }
@@ -148,6 +197,7 @@ function apiKeys(
     };
     const source =
       toSchemeSource(dependencySource(operation, `${param.in}:${param.name}`)) ??
+      (header ? provenanceSource(members, param.name, producer) : undefined) ??
       constantSource(values);
     if (source) scheme.source = source;
     add(scheme, operation);
@@ -198,6 +248,7 @@ function csrf(
   const cookie = /(csrf|xsrf)[^=;]*/i.exec(members[0]?.exchange.requestHeaders.cookie ?? "")?.[0];
   const source =
     toSchemeSource(dependencySource(operation, target)) ??
+    (where === "header" ? provenanceSource(members, key, producer) : undefined) ??
     (cookie ? ({ kind: "cookie", name: cookie } as const) : undefined);
   if (source) scheme.source = source;
   add(scheme, operation);

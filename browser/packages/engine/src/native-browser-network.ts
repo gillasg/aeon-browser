@@ -25,7 +25,7 @@ import { harvestReply } from "./harvest.js";
 import { failuresOf, pathOf } from "./native-browser-network-failures.js";
 export { failuresOf } from "./native-browser-network-failures.js";
 import { describeWait, waitMatcher, type Waitable } from "./native-browser-network-wait.js";
-import { isTrackerUrl, takeLearned } from "./native-browser-network-learn.js";
+import { isTrackerUrl, tagProvenance, takeLearned } from "./native-browser-network-learn.js";
 import { keepClosedTab } from "./native-browser-network-closed.js";
 import { rememberSessionHeaders, sessionHeadersFor } from "./native-browser-session-headers.js";
 import { hideSecrets } from "./native-browser-secrets.js";
@@ -40,7 +40,7 @@ const MAX_TOTAL_BODY = 60_000_000;
 const MAX_FRAMES = 200;
 const API_TYPES = new Set(["XHR", "Fetch", "EventSource", "WebSocket", "Document", "Ping"]);
 // A passively recorded tab keeps the page itself and the site's own calls, not fonts and images.
-const PASSIVE_TYPES = new Set(["XHR", "Fetch", "Document", "Ping"]);
+const PASSIVE_TYPES = new Set(["XHR", "Fetch", "EventSource", "Document", "Ping"]);
 const PASSIVE_MAX_BODY = 256_000;
 const DECODABLE = /protobuf|octet-stream|x-component|grpc/i;
 const TEXTUAL = /json|text|javascript|xml|html|graphql|x-www-form-urlencoded|csv|event-stream/i;
@@ -235,6 +235,7 @@ function requestWillBeSent(recorder: Recorder, params: Params): void {
   if (typeof request.postData === "string") entry.requestBody = hideSecrets(request.postData);
   else if (request.hasPostData) entry.requestBodyPending = true;
   add(recorder, entry);
+  tagProvenance(recorder.entries, entry);
   rememberSessionHeaders(entry.url, entry.requestHeaders);
   const early = recorder.early.get(id);
   if (early) {
@@ -372,7 +373,10 @@ function mergeHeaders(
     return;
   }
   entry[field] = replaceHeaders(entry[field], headers(params.headers));
-  if (field === "requestHeaders") rememberSessionHeaders(entry.url, entry.requestHeaders);
+  if (field === "requestHeaders") {
+    tagProvenance(recorder.entries, entry);
+    rememberSessionHeaders(entry.url, entry.requestHeaders);
+  }
 }
 
 /** Response extra info that arrived for the hop in flight, by entry. */

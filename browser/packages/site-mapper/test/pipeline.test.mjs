@@ -72,7 +72,10 @@ test("schemas: required only when always present, formats, enums", async (t) => 
   const query = Object.fromEntries(
     list.params.filter((p) => p.in === "query").map((p) => [p.name, p]),
   );
-  assert.equal(query.limit.required, true);
+  // A limit the page always sent is the caller's to change: optional, defaulting to that value.
+  assert.equal(query.limit.required, false);
+  assert.equal(typeof query.limit.default, "string");
+  assert.equal(query.limit.constant, undefined);
   assert.equal(query.cursor.required, false);
 });
 

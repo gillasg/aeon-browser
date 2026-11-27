@@ -2,6 +2,8 @@
 // Ids are recognised by shape (UUIDs, numbers, hex, base62); slugs by variation across siblings.
 // Parameter names come from the segment before them.
 
+import { similarity } from "./schema.js";
+
 export type SegmentKind = "uuid" | "integer" | "hex" | "id" | "date" | "slug";
 
 export interface TemplatedPath {
@@ -232,35 +234,59 @@ function siblingKey(
 }
 
 const SLUG = /^(?=.*[a-z])[a-z0-9]+([-_.][a-z0-9]+)+$/i;
+/** A root under which the next single word names a resource, never a value: /api/products. */
+const API_ROOT = /^(api|v\d+|rest|graphql)$/i;
 
-function findSlugPositions(
-  split: { url: URL; segments: string[]; kinds: (SegmentKind | undefined)[]; shape: string }[],
-): Set<string> {
-  const groups = new Map<string, { values: Set<string>; shapes: Set<string> }>();
+interface Split {
+  url: URL;
+  segments: string[];
+  kinds: (SegmentKind | undefined)[];
+  shape: string;
+}
+
+/** A plain word right under an API root names its own endpoint: only a bundle route templates it. */
+function apiResource(segments: string[], index: number): boolean {
+  return index === 1 && API_ROOT.test(segments[0] ?? "") && /^[a-z]+$/i.test(segments[1] ?? "");
+}
+
+/** Every pair of known shapes alike: siblings that answer the same kind of record. */
+function alikeShapes(shapes: string[]): boolean {
+  return shapes.every((shape, index) =>
+    shapes.slice(index + 1).every((other) => similarity(shape, other) >= 0.6),
+  );
+}
+
+function isSlugPosition(values: Map<string, string>): boolean {
+  const list = [...values.keys()];
+  const slugs = list.filter((value) => SLUG.test(value)).length;
+  if (list.length >= 3 && slugs / list.length >= 0.6) return true;
+  // An unknown shape (no body, not JSON) never counts as the same shape.
+  const known = [...values.values()].filter(Boolean);
+  if (known.length >= 3 && alikeShapes(known)) return true;
+  // Pages carrying the same kind of embedded data (a film page, a product page) are one
+  // template from the second example on, whatever their slugs look like.
+  const first = known[0] ?? "";
+  return (
+    list.length >= 2 &&
+    known.length === list.length &&
+    first.startsWith("html:") &&
+    known.every((shape) => shape === first)
+  );
+}
+
+function findSlugPositions(split: Split[]): Set<string> {
+  // Per sibling position: each value seen, with the first known shape it answered.
+  const groups = new Map<string, Map<string, string>>();
   for (const { url, segments, kinds, shape } of split) {
     segments.forEach((segment, index) => {
-      if (kinds[index] || !segment || index === 0) return;
+      if (kinds[index] || !segment || index === 0 || apiResource(segments, index)) return;
       const key = siblingKey(url.origin, segments, kinds, index);
-      const group = groups.get(key) ?? { values: new Set(), shapes: new Set() };
-      group.values.add(segment);
-      group.shapes.add(shape);
-      groups.set(key, group);
+      const values = groups.get(key) ?? new Map<string, string>();
+      if (!values.get(segment)) values.set(segment, shape);
+      groups.set(key, values);
     });
   }
   const positions = new Set<string>();
-  for (const [key, { values, shapes }] of groups) {
-    const list = [...values];
-    const slugs = list.filter((value) => SLUG.test(value)).length;
-    const sameShape = shapes.size === 1 && !shapes.has("");
-    // Pages carrying the same kind of embedded data (a film page, a product page) are one
-    // template from the second example on, whatever their slugs look like.
-    const samePage = sameShape && [...shapes][0]?.startsWith("html:") === true;
-    if (
-      (list.length >= 3 && slugs / list.length >= 0.6) ||
-      (list.length >= 5 && sameShape) ||
-      (list.length >= 2 && samePage)
-    )
-      positions.add(key);
-  }
+  for (const [key, values] of groups) if (isSlugPosition(values)) positions.add(key);
   return positions;
 }

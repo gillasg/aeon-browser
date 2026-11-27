@@ -19,6 +19,7 @@ interface HarEntry {
   _eventSourceMessages?: SseMessage[];
   /** The page action that caused the request (recorders that know it set this). */
   _step?: string;
+  _provenance?: unknown;
   request: {
     method: string;
     url: string;
@@ -83,6 +84,27 @@ function withStep(exchange: Exchange, entry: HarEntry, titles: Map<string, strin
   return exchange;
 }
 
+const PROVENANCE_TAG = /^(meta|cookie|storage|response):.{1,400}$/;
+
+/** Provenance tags only: a value that is not a tag is never kept. */
+function provenanceOf(raw: unknown): Record<string, string> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tags = raw
+    .map((item) => [(item as { for?: unknown })?.for, (item as { from?: unknown })?.from])
+    .filter(
+      (pair): pair is [string, string] =>
+        typeof pair[0] === "string" && typeof pair[1] === "string" && PROVENANCE_TAG.test(pair[1]),
+    );
+  return tags.length ? Object.fromEntries(tags) : undefined;
+}
+
+/** Who sent the request, and where its secret headers came from. */
+function withOrigin(exchange: Exchange, entry: HarEntry): void {
+  if (entry._initiator) exchange.initiator = entry._initiator;
+  const provenance = provenanceOf(entry._provenance);
+  if (provenance) exchange.provenance = provenance;
+}
+
 export function fromHar(har: unknown, source: string): Exchange[] {
   const log = (har as { log?: { entries?: HarEntry[]; pages?: { id?: string; title?: string }[] } })
     ?.log;
@@ -111,7 +133,7 @@ export function fromHar(har: unknown, source: string): Exchange[] {
       exchange.responseBody = content.text;
       if (content.encoding === "base64") exchange.responseBase64 = true;
     }
-    if (entry._initiator) exchange.initiator = entry._initiator;
+    withOrigin(exchange, entry);
     const wsFrames = frames(entry);
     if (wsFrames) exchange.frames = wsFrames;
     if (entry._eventSourceMessages) exchange.messages = entry._eventSourceMessages;

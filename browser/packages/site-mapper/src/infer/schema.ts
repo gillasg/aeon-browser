@@ -192,6 +192,8 @@ export function mergeInto(target: Accumulator, source: Accumulator): void {
 
 /** The top-level key set of a JSON value: how responses are told apart by shape. */
 export function shapeKey(value: unknown): string {
+  // No body, or one that is not JSON: unknown, which never matches another shape.
+  if (value === undefined) return "";
   if (Array.isArray(value)) return "[" + shapeKey(value[0]) + "]";
   if (value && typeof value === "object") return Object.keys(value).sort().join(",");
   return typeOf(value);

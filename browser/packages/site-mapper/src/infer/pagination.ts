@@ -1,6 +1,6 @@
 import type { Operation, Pagination } from "../types.js";
 import type { Member } from "./operations.js";
-import { generalize, leaves } from "./schema.js";
+import { generalize, getPointer, leaves } from "./schema.js";
 
 // Detects how an operation pages through results: cursors, offsets, page numbers or next links.
 // The runtime turns detected pagination into async iterators.
@@ -95,6 +95,9 @@ function nextFromResponse(pointers: { pointer: string; value: unknown }[]) {
 
 interface Evidence {
   params: Candidate[];
+  pointers: { pointer: string; value: unknown }[];
+  /** Per query param, the numbers it carried in order, with each answer's item count. */
+  steps: Map<string, { value: number; items: number }[]>;
   next: ReturnType<typeof nextFromResponse>;
   items?: string;
   linkHeader: boolean;
@@ -110,9 +113,12 @@ function gather(operation: Operation, members: Member[]): Evidence {
       d.source.operationId === operation.id &&
       !d.target.startsWith("path:"),
   );
+  const pointers = responsePointers(members);
   const evidence: Evidence = {
     params,
-    next: nextFromResponse(responsePointers(members)),
+    pointers,
+    steps: numericSteps(members),
+    next: nextFromResponse(pointers),
     linkHeader: members.some((m) => /rel="?next"?/i.test(m.exchange.responseHeaders.link ?? "")),
   };
   const items = members.map((m) => itemsPointer(m.json)).find(Boolean);
@@ -128,10 +134,42 @@ function cursorParam(e: Evidence): Candidate | undefined {
 }
 
 function cursorStyle(e: Evidence): Pagination | undefined {
+  const encoded = encodedCursor(e);
+  if (encoded) return encoded;
   const param = cursorParam(e);
   if (!param || !(e.next.cursor || e.traced)) return undefined;
   const nextPointer = e.traced?.pointer ?? generalize(e.next.cursor?.pointer ?? "");
   return { style: "cursor", param: param.target, nextPointer };
+}
+
+/** True for an opaque base64 token that decodes to digits or JSON: an encoded position. */
+export function isEncodedCursor(value: unknown): boolean {
+  if (typeof value !== "string" || value.length < 4 || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(value))
+    return false;
+  const text = Buffer.from(value.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+  if (/^\d+$/.test(text)) return true;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return !!parsed && typeof parsed === "object";
+  } catch {
+    return false;
+  }
+}
+
+/** A `next…` response key holding an encoded cursor, paired with the request param it feeds. */
+function encodedCursor(e: Evidence): Pagination | undefined {
+  const next = e.pointers.find(
+    (p) => /^next/i.test(lastKey(p.pointer)) && isEncodedCursor(p.value),
+  );
+  if (!next) return undefined;
+  const key = lastKey(next.pointer)
+    .replace(/^next[_-]?/i, "")
+    .toLowerCase();
+  const param =
+    e.params.find((p) => p.name.toLowerCase() === key) ??
+    e.params.find((p) => CURSOR_PARAM.test(p.name));
+  if (!param) return undefined;
+  return { style: "cursor", param: param.target, nextPointer: generalize(next.pointer) };
 }
 
 function linkStyle(e: Evidence): Pagination | undefined {
@@ -140,8 +178,49 @@ function linkStyle(e: Evidence): Pagination | undefined {
   return undefined;
 }
 
+/** Numeric query values per param, in recording order, next to how many items each answer had. */
+function numericSteps(members: Member[]): Evidence["steps"] {
+  const steps: Evidence["steps"] = new Map();
+  for (const member of members) {
+    const pointer = itemsPointer(member.json);
+    const list = pointer === undefined ? undefined : getPointer(member.json, pointer);
+    const items = Array.isArray(list)
+      ? list.length
+      : Array.isArray(member.json)
+        ? member.json.length
+        : 0;
+    for (const [name, raw] of new URL(member.exchange.url).searchParams)
+      if (/^\d+$/.test(raw))
+        steps.set(name, [...(steps.get(name) ?? []), { value: Number(raw), items }]);
+  }
+  return steps;
+}
+
+/**
+ * An offset proven by the recording: a page as long as the limit, and the param advancing by
+ * exactly that limit from one call to the next, whatever the site named it.
+ */
+function provenOffset(e: Evidence): Candidate | undefined {
+  for (const limit of e.params.filter((p) => LIMIT_PARAM.test(p.name))) {
+    const sizes = e.steps.get(limit.name);
+    const size = sizes?.[0]?.value;
+    if (!size || !sizes?.every((step) => step.value === size)) continue;
+    for (const [name, steps] of e.steps) {
+      if (name === limit.name || steps.length < 2) continue;
+      const advances = steps.every(
+        (step, index) => index === 0 || step.value - (steps[index - 1]?.value ?? 0) === size,
+      );
+      if (advances && steps.some((step) => step.items === size))
+        return e.params.find((p) => p.name === name && p.target.startsWith("query:"));
+    }
+  }
+  return undefined;
+}
+
 function countedStyle(e: Evidence): Pagination | undefined {
   const listed = !!(e.items || e.next.total);
+  const proven = provenOffset(e);
+  if (proven) return { style: "offset", param: proven.target };
   const offset = e.params.find((p) => OFFSET_PARAM.test(p.name));
   if (offset && listed) return { style: "offset", param: offset.target };
   const page = e.params.find((p) => PAGE_PARAM.test(p.name));
