@@ -81,9 +81,9 @@ ${browserInputFieldHelpers}
 function __locator(target, element, index) {
   var loc = Object.freeze(__timeActions(__extendLocator(target, element, {
     element,
-    click: (options) => __step(Object.assign({op:'click',target,element:__wire(element),observe:false}, __pointerFields(options))),
+    click: (options) => __viaState(target, element, (el) => __step(Object.assign({op:'click',target,element:__wire(el),observe:false}, __pointerFields(options)))),
     hold: (options) => __step(Object.assign({op:'hold',target,element:__wire(element),observe:false}, __holdFields(options))),
-    fill: async (value, options) => { var ms = __stepTimeout(options); return __fillDone(target, element, index, options, await __step({op:'fill',target,element:__wire(element),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})})); },
+    fill: async (value, options) => { var ms = __stepTimeout(options); return __fillDone(target, element, index, options, await __viaState(target, element, (el) => __step({op:'fill',target,element:__wire(el),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})}))); },
     press: (key, options) => __press(target, element, key, options, __pressKeys.includes(String(key)) && index === undefined && !(element.filters || element.regex) ? undefined : loc),
     getByRole: (role, options = {}) => {
       if (element.kind !== 'query' || element.by !== 'css') throw Error('Scope with page.locator(css).getByRole(...)');
@@ -108,6 +108,18 @@ function __withOptions(element, options = {}) {
   return Object.keys(filter).length ? {...element, filters: [...(element.filters || []), filter]} : element;
 }
 function __withFilter(element, filter) { return {...element, filters: [...(element.filters || []), filter]}; }
+// Waits in 8 s steps (the engine's cap per wait) until the download leaves in_progress.
+async function __downloadDone(target, started, timeoutMs) {
+  var until = Date.now() + timeoutMs, item = started;
+  while (item && item.state === 'in_progress' && Date.now() < until)
+    item = (await __step({op:'downloads',target,action:'wait',downloadId:started.downloadId,timeoutMs:Math.min(8000, Math.max(0, until - Date.now()))})).data;
+  if (!item || item.state !== 'complete') throw Error('DOWNLOAD_FAILED: ' + (item && item.state === 'in_progress' ? 'still downloading after ' + timeoutMs + ' ms' : (item && item.error) || 'the download did not finish'));
+  return {path: item.filename, state: 'complete', downloadId: item.downloadId, url: item.url, bytes: item.bytesReceived};
+}
+// Caught before the step's own checks, which would only say the URL is invalid.
+function __refuseFileUrl(url) {
+  if (/^\\s*file:/i.test(String(url))) throw Error("URL_NOT_ALLOWED: file URLs can't be opened; put the file in the workspace (artifact(name, data)) and use page.upload");
+}
 function __originOf(url) { try { return new URL(url).origin; } catch { return ''; } }
 // Host-wide calls (cookies, the network store, the scheduler) still need a live tab to answer on.
 function __hostTarget() {
@@ -188,6 +200,7 @@ var browser = Object.freeze({
     // One working tab per site: a URL on an origin this session already has a tab for navigates that
     // tab. Pass {newTab: true} for a separate tab.
     url = String(url);
+    __refuseFileUrl(url);
     const origin = __originOf(url);
     var known = options.newTab === true || options.new === true || options.window || options.readOnly === true || options.allowedOrigins || options.windowOf !== undefined ? undefined : __opened.get(origin || url);
     // Parallel opens on one site: the first navigates the working tab, the rest get their own tabs.
@@ -232,8 +245,11 @@ var browser = Object.freeze({
       __noteNavError(result.tab.target, url, 'openTab', result.reason || 'navigation failed');
       console.log('[warn] tab ' + result.tab.target.tabId + ' opened, but ' + url + ' did not load: ' + (result.reason || 'navigation failed') + '; the tab is still yours (page.navigation is "failed", page.lastError says why)');
     }
-    else await __noteChallenge(result.tab.target, url);
-    await __pnWallNote(result.tab.target);
+    // The challenge check and the paywall check read the page independently: run them together.
+    await Promise.all([
+      result.navigation === 'failed' ? null : __noteChallenge(result.tab.target, url),
+      __pnWallNote(result.tab.target),
+    ]);
     return __openResult(result.tab, false, result.navigation === 'failed' ? result.reason : undefined);
   },
   // A tab kept for later: an open tab on the URL is reused (and attached to this session), else a
@@ -440,7 +456,12 @@ var browser = Object.freeze({
     drag: (x,y,toX,toY) => __step({op:'pointer',target,action:'drag',x,y,toX,toY}),
     keyboard: (keys, options) => __step({op:'keys',target,keys,...(options && options.human === true ? {human:true} : {})}),
     reconnect: () => __step({op:'reconnect',target}),
-    download: async (url, filename) => (await __step({op:'downloads',target,action:'start',url,...(filename?{filename}:{})})).data,
+    // page.download(url, {wait: true}) returns once the file is saved: {path, state: 'complete'}.
+    download: async (url, options) => {
+      var opts = typeof options === 'string' ? {filename: options} : (options || {});
+      var started = (await __step({op:'downloads',target,action:'start',url,...(opts.filename?{filename:opts.filename}:{})})).data;
+      return opts.wait ? __downloadDone(target, started, Number(opts.timeoutMs) || 60000) : started;
+    },
     resolveDownload: async (token) => (await __step({op:'downloads',target,action:'resolve',token})).data,
     waitForDownload: async (downloadId, options = {}) => {var deadline=Date.now()+(options.timeoutMs??20000);while(Date.now()<deadline){var result=(await __step({op:'downloads',target,action:'wait',downloadId,timeoutMs:Math.min(1000,deadline-Date.now())})).data;if(result.state==='complete')return result;if(result.state==='interrupted')throw Error('DOWNLOAD_INTERRUPTED: '+result.error);}throw Error('TIMEOUT: download still in progress; do not start it again');},
     cancelDownload: (downloadId) => __step({op:'downloads',target,action:'cancel',downloadId}),
@@ -464,6 +485,7 @@ var browser = Object.freeze({
     wait: (selector, options = {}) => typeof selector === 'number' ? __sleep(selector) : __waitSelector(target, selector, options),
     navigate: async (url, options = {}) => {
       var destination = __absoluteUrl(url, target);
+      __refuseFileUrl(destination);
       try {
         var navTimeout = options.timeoutMs ?? options.timeout;
         var result = await __step({op:"navigate", target, url: destination,
@@ -559,7 +581,8 @@ var browser = Object.freeze({
     popups: () => __step({op:"popups", target}),
     removePreview: (scriptId) => __step({op:"siteScript", target, action:"remove", scriptId}),
     snapshot: (options = {}) => { const {max,target:ignored,...filters}=options; return __step({op:'observe',target,kind:'semantic',...filters}); },
-    locator: (selector, options = {}) => { var parsed = __parseSelector(String(selector)); return __locator(target,__withOptions(parsed.spec, options), parsed.index); },
+    // A ref is an element, never CSS: page.locator("f3:e2").fill() acts on that node.
+    locator: (selector, options = {}) => { if (__TARGET_REF.test(String(selector).trim())) return __locator(target, __element(target, String(selector).trim())); var parsed = __parseSelector(String(selector)); return __locator(target,__withOptions(parsed.spec, options), parsed.index); },
     getByRole: (role, options = {}) => __locator(target,__withOptions({kind:'locator',role,name:options.name === undefined ? '' : String(options.name),exact:options.name !== undefined && options.exact !== false}, options)),
     getByText: (value, options = {}) => __locator(target,__withOptions({kind:'query',by:'text',value:String(value)}, options)),
     getByLabel: (value, options = {}) => __locator(target,__withOptions({kind:'query',by:'label',value:String(value)}, options)),
@@ -568,8 +591,9 @@ var browser = Object.freeze({
     screenshot: (options = {}) => options.labels ? __labeledScreenshot(target) : __step({op:'observe', target, kind:'screenshot', ...(options.format === 'png' || options.format === 'jpeg' ? {format: options.format} : {})}),
     diffScreenshot: (baseline, options = {}) => __diffScreenshot(target, baseline, options),
     recordDemonstration: (options = {}) => __recordDemonstration(target, options),
-    click: (element, options) => { var loc = __locatorFor(target, element); return loc ? loc.click(options) : __step(Object.assign({op:'click',target,element:__wire(__element(target,element)),observe:false}, __pointerFields(options))); },
-    fill: (element, value, options) => { var loc = __locatorFor(target, element); if (loc) return loc.fill(value, options); var ms = __stepTimeout(options); return __step({op:'fill',target,element:__wire(__element(target,element)),value:String(value),observe:false,...(options && options.human === true ? {human:true} : {}),...(options && options.force === true ? {force:true} : {}),...(ms !== undefined ? {timeoutMs: ms} : {})}); },
+    // One resolver for ids, frame and tab refs, exact visible names and CSS (code-api-target.ts).
+    click: async (element, options) => __clickResolved(target, await __resolveTarget(target, element), options),
+    fill: async (element, value, options) => __fillResolved(target, await __resolveTarget(target, element), value, options),
     paste: (element, html, text = '') => __step({op:'paste',target,element:__wire(__element(target,element)),html:String(html),text:String(text || html.replace(/<[^>]+>/g, ' ')),observe:false}),
     evaluate: async (fn, arg) => (__readNudge(fn), (await __step({op:'evaluate',target,expression:__expression(fn,arg)})).data.value),
     control: async () => (await __step({op:'control', target, action:'status'})).data,

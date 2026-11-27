@@ -282,7 +282,9 @@ export async function validateUploadFiles(files: string[], root: string): Promis
   try {
     realRoot = await realpath(resolve(root));
   } catch {
-    throw new Error("UPLOAD_OUTSIDE_WORKSPACE: the session workspace has no files yet");
+    throw new Error(
+      "UPLOAD_OUTSIDE_WORKSPACE: the session workspace has no files yet; save the file there first with artifact(name, data) (or page.saveMedia(url)), then page.upload(selector, [name])",
+    );
   }
   return Promise.all(
     files.map(async (file) => {
@@ -290,11 +292,13 @@ export async function validateUploadFiles(files: string[], root: string): Promis
       try {
         path = await realpath(resolve(realRoot, file));
       } catch {
-        throw new Error(`UPLOAD_OUTSIDE_WORKSPACE: ${file} is not a file in the workspace`);
+        throw new Error(
+          `UPLOAD_OUTSIDE_WORKSPACE: ${file} is not a file in the workspace; save it there with artifact(name, data) (or page.saveMedia(url)) first`,
+        );
       }
       if (!contained(realRoot, path))
         throw new Error(
-          `UPLOAD_OUTSIDE_WORKSPACE: ${file} is outside the workspace; copy it into the workspace first`,
+          `UPLOAD_OUTSIDE_WORKSPACE: ${file} is outside the workspace; save it there first with artifact(name, data) (or page.saveMedia(url)), then upload that name`,
         );
       if (!(await stat(path)).isFile()) throw new Error("Upload source is not a regular file");
       return path;

@@ -194,6 +194,8 @@ export class CodeRealm {
     }
     // Named, so a timer the cell's own code sets can be told from the runtime's (code-api-sleep).
     const syncMs = Number(message.timeoutMs) > 0 ? Number(message.timeoutMs) : CELL_SYNC_MS;
+    // Long helpers (page.list) end their own loops a few seconds before the cell's deadline.
+    this.evaluate(`globalThis.__cellEndsAt = ${Date.now() + syncMs};`);
     let value = await this.evaluate(toReplScript(code), "graft-cell.js", syncMs);
     const delivered = this.evaluate("__hasDelivered ? {value: __deliveryValue} : null") as {
       value: unknown;

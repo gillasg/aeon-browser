@@ -557,7 +557,8 @@ function observedStep(step: SeenStep): ObservedStep {
     id: step.id,
     kind: step.kind,
     ...(step.target ? { target: step.target } : {}),
-    ...(step.effect ? { effect: step.effect } : {}),
+    // A route step that opened a tab did its work: routes know it as confirmed.
+    ...(step.effect ? { effect: step.effect === "opened_tab" ? "confirmed" : step.effect } : {}),
     write: step.write,
     ...(step.sensitive ? { sensitive: true } : {}),
     pageType: pageType(step.url),

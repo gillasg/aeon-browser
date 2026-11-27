@@ -12,7 +12,7 @@ before the next.
 
 A whole form is one call: `await page.fillForm({Email: 'a@b.c', Country: 'India', 'I agree': true},
 {submit: 'Continue', expect: 'Thank you'})`; each key is a field's label and the field picks fill,
-select or check. `page.controls.inspect()` gives every field's state; `page.batch(steps)` mixes
+select or check (an autocomplete is typed into, then its matching option clicked). `page.controls.inspect()` gives every field's state; `page.batch(steps)` mixes
 any steps in one call (`help("forms")`). Fields about the
 user: `await bu.fillProfile()` fills them from their form profile without you seeing the values;
 for each field it reports `missing`, ask the user, then offer to keep the answer and on yes

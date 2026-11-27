@@ -355,6 +355,11 @@ function __extendLocator(target, element, base, index) {
     hover: async () => { var b = await read((found) => { if (!found.length) throw new Error('TARGET_NOT_FOUND: no element matches'); found[0].scrollIntoView({block: 'center', inline: 'center'}); var r = found[0].getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; }); await browser.page(target).hover(b.x, b.y); return b; },
     boundingBox: () => read((found) => { if (!found.length) return null; var r = found[0].getBoundingClientRect(); return {x: r.left, y: r.top, width: r.width, height: r.height}; }),
     scrollIntoViewIfNeeded: () => read((found) => { if (found[0]) found[0].scrollIntoView({block: 'center'}); return true; }),
+    dragTo: (other) => __dragTo(target, self(), other),
+    setInputFiles: (files) => {
+      if (element.kind !== 'query' || element.by !== 'css') throw Error('INVALID_TARGET: setInputFiles needs a CSS locator, e.g. page.locator("input[type=file]").setInputFiles(paths)');
+      return browser.page(target).upload(element.value, [].concat(files));
+    },
   });
 }
 // Page-side: rows of the first matching table (or role=table grid) keyed by header text.
@@ -422,9 +427,10 @@ function __extendPage(target, base) {
     type: (text) => keys(String(text)),
     insertText: (text) => keys(String(text)),
   });
-  var byRole = base.getByRole, byText = base.getByText, coordHover = base.hover;
+  var byRole = base.getByRole, byText = base.getByText;
   // Agents sometimes reach for page.playwright.X: it is the page itself.
   base.playwright = base;
+  var actions = __targetActions(target, base);
   return __extendPageCause(target, __extendPagePosthocNet(target, __extendPageDemoClaws(target, __extendPageL2(target, __extendPageWhy(target, __extendPageStorageClaws(target, __extendPageRound3(target, __extendPageClaws(target, __extendPageAct(target, __extendPageSurface(target, __extendPageControls(target, __extendPageEvents(target, __extendPageData(target, Object.assign(base, {
     // Playwright accepts a RegExp for names and text. The engine's own targeting matches strings,
     // so a regex locator resolves in the page and acts on its first match.
@@ -434,12 +440,13 @@ function __extendPage(target, base) {
     getByText: (value, options = {}) => value instanceof RegExp
       ? __locator(target, {kind: 'query', by: 'text', regex: [value.source, value.flags]})
       : byText(value, options),
+    // click, type, hover, check and the rest name a target the one way (code-api-target.ts).
+    type: actions.type, dblclick: actions.dblclick, hover: actions.hover, check: actions.check, uncheck: actions.uncheck,
     // Playwright-style text snapshot of the page: the same view as bu.state().
     ariaSnapshot: (options = {}) => bu.state({...options, target}),
     // A common guess for the same view.
     domSnapshot: (options = {}) => bu.state({...options, target}),
     goto: (url, options) => base.navigate(url, options),
-    hover: (a, b) => typeof a === 'string' ? css(a).first().hover() : coordHover(a, b),
     reload: async (options = {}) => {
       // The address already known for this tab. Reading it from the page is code, and a page
       // holding a password the agent did not type refuses that; reload is how that page reopens.
@@ -466,11 +473,10 @@ function __extendPage(target, base) {
     hoverSelector: (selector) => css(selector).first().hover(),
     waitForSelector: (selector, options = {}) => base.locator(selector).first().waitFor({state: options.state, timeout: options.timeout ?? options.timeoutMs ?? 5000}),
     bringToFront: async () => undefined,
-    check: (selector) => css(selector).first().check(),
-    uncheck: (selector) => css(selector).first().uncheck(),
     selectOption: (selector, value) => css(selector).first().selectOption(value),
-    dblclick: (selector, options) => css(selector).first().dblclick(options),
-    type: (selector, value) => css(selector).first().fill(value),
+    // Playwright's frame locator: the engine reaches into frames itself, so this scopes nothing.
+    frameLocator: (selector) => __frameLocator(target, selector),
+    setInputFiles: (selector, files) => base.upload(selector, [].concat(files)),
     waitForLoadState: (state, options = {}) => base.waitFor(state === 'domcontentloaded' ? () => document.readyState !== 'loading' : () => document.readyState === 'complete', {timeoutMs: options.timeout ?? 8000}),
     // A common guess from other tools. Unlike waitForLoadState('load'), a timeout is not a
     // failure when the DOM is already interactive.

@@ -538,7 +538,6 @@ function caused(receipt: ReturnType<typeof takeReceipt>): boolean {
 }
 
 type RevalidateTarget = (request: BrowserExecutorRequest, tabId: number) => Promise<void>;
-
 export async function performAction(
   request: ActionRequest,
   revalidateTarget: RevalidateTarget,
@@ -641,6 +640,7 @@ export async function performAction(
             ...(receipt.download?.filename
               ? { download: { filename: receipt.download.filename } }
               : {}),
+            ...(receipt.popups.length ? { popups: receipt.popups } : {}),
           },
           expectedValue(request.step),
           {
@@ -657,6 +657,7 @@ export async function performAction(
       outcome,
       effect: effect.effect,
       evidence: effect.evidence,
+      ...(effect.tab ? { tab: effect.tab } : {}),
       ...(effect.next ? { next: effect.next } : {}),
       receipt,
       ...(note ? { note } : {}),

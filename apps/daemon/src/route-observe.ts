@@ -9,7 +9,7 @@ export interface SeenStep {
   kind: string;
   site: string;
   write: boolean;
-  effect?: "confirmed" | "unverifiable" | "suspected_noop" | "refused";
+  effect?: "confirmed" | "opened_tab" | "unverifiable" | "suspected_noop" | "refused";
   sensitive?: boolean;
   target?: { role?: string; name?: string; css?: string; text?: string };
   url?: string;
@@ -269,6 +269,7 @@ function partialOf(progress: SeenEvent["progress"]): LiveRun["partial"] | undefi
 
 const EFFECTS = new Set<SeenStep["effect"]>([
   "confirmed",
+  "opened_tab",
   "unverifiable",
   "suspected_noop",
   "refused",

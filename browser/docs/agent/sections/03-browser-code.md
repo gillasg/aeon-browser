@@ -7,15 +7,16 @@ Globals: `browser`, `page`, `bu`, `siteMapper`, `google`, `skills`, `artifact`, 
 ```js
 const page = await browser.openTab("https://shop.example");
 await bu.state(); // host/path · title, then [id] role "name" under its row or dialog
-await bu.click(12); // act by bu id, role or visible text
+await page.click("Load details"); // a bu id, f3:e2, t7:e12, an exact visible name, or CSS
 await page.locator("input[name=q]").fill("lamp");
 await page.getByRole("button", { name: "Search" }).click();
 const rows = await page.list("tr"); // every row, scrolling lists that draw lazily
 await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, hold-to-record
 ```
 
-- The same steps under their contract names: `page.click('t7:e12')` takes a tab-qualified id
-  (`page.ref` is `t7`; on another tab it throws `WRONG_TAB` instead of acting); `human.handoff(why,
+- click/type/fill/hover/check take one target form; a name two controls share throws
+  `TARGET_AMBIGUOUS` with each id. A click that opened a tab says `effect: "opened_tab"`, `tab:
+  {id, url}`: never click again. `page.ref` is `t7` (another tab's id: `WRONG_TAB`); `human.handoff(why,
   {page, kind, actionLabel, target})`, `human.signIn()`, `human.fillProfile()` and
   `human.fillCode()` are `bu.handoff`/`signIn`/`fillProfile`/`fillCode`; `site.ops/call/watch/write`
   are `siteMapper.*`; `page.wire([{match, abort: true}])` sets `page.rules` and returns `{undo}`.

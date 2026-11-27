@@ -50,6 +50,17 @@ async function sandboxSource() {
 
 function evaluateValue(expression) {
   const source = String(expression);
+  // page.read reads the page in one call (__readBatch): expand, settle, Markdown, data, probe.
+  if (source.includes("__readBatch"))
+    return {
+      expand: { clicked: [], skipped: [] },
+      wait: { settled: true },
+      markdown: { markdown: "The lamp is in stock", notes: [] },
+      title: TAB.title,
+      url: TAB.url,
+      data: { notes: [] },
+      probe: { rows: 0, scrollers: 0, frames: 0, bodyChars: 0, shadows: [] },
+    };
   if (source.includes("__expandRead")) return { clicked: [], skipped: [] };
   if (source.includes("__waitRead")) return { settled: true };
   if (source.includes("__readMarkdown")) return { markdown: "The lamp is in stock", notes: [] };

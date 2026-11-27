@@ -82,8 +82,13 @@ export function assertOpenable(url: string): void {
     throw new Error(
       "PROTECTED_UI: Chrome's own pages and other extensions' pages are not open to the agent; open a web page or one of Graft's own pages (home, chat)",
     );
+  if (/^file:/i.test(url)) throw new Error(FILE_URL_REFUSAL);
   throw new Error("INVALID_TARGET");
 }
+
+/** A file URL is never opened: the page would read the user's disk. Uploads go through the workspace. */
+export const FILE_URL_REFUSAL =
+  "URL_NOT_ALLOWED: file URLs can't be opened; put the file in the workspace (artifact(name, data)) and use page.upload";
 
 export function textValue(value: unknown): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";

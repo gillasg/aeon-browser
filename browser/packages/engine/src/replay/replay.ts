@@ -11,6 +11,7 @@ const RANK: Record<string, number> = {
   suspected_noop: 1,
   unverifiable: 2,
   confirmed: 3,
+  opened_tab: 3,
 };
 
 export async function replay(

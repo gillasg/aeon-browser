@@ -84,7 +84,7 @@ async function adopt(tabId: number, openerId: number): Promise<void> {
     // A popup is tracked and parked for its opener, but it is not the agent's own tab: it never
     // joins the agent group, even when Chrome copied the opener's group onto it.
     trackAgentTab(tabId, owner, { popup: true, url: tab.url ?? "" });
-    noteReceiptPopup(openerId, tabId, tab.url ?? "");
+    noteReceiptPopup(openerId, tabId, tab.url || tab.pendingUrl || "");
     await ungroupAgentIntruder(tabId);
     publishBrowserEvent(openerId, "popup", { tabId, openerId });
     await publishPopup(tabId, openerId, owner, connection);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import vm from "node:vm";
 import { browserDataApi } from "../dist/code-api-data.js";
+import { browserReadApi } from "../dist/code-api-read.js";
 import { browserSitesApi } from "../dist/code-api-sites.js";
 import { createSemanticNodes, filterVisibleTextNodes } from "../dist/native-browser-observation.js";
 import { renderState } from "../dist/observe/render.js";
@@ -115,11 +116,23 @@ test("page.read falls back to accessibility state text when SPA dialog markdown 
     console: { warn() {}, log() {}, error() {}, info() {}, debug() {} },
   });
   vm.runInContext(browserDataApi, ctx);
+  vm.runInContext(browserReadApi, ctx);
   const dialogState =
     '127.0.0.1:3773/settings · Settings\ndialog "Provider Settings"\n  [1] textbox "API Key"\n  [2] button "Save settings"';
   const base = {
     inspect: async (fn) => {
       const text = String(fn);
+      // The read's one page call: Markdown near empty, but the page has text (the dialog).
+      if (text.includes("__readBatch"))
+        return {
+          expand: { clicked: [], skipped: [] },
+          wait: { settled: true },
+          markdown: { markdown: "# Settings", partial: false, notes: [], chars: 10 },
+          title: "Settings",
+          url: "http://127.0.0.1:3773/settings",
+          data: { notes: [], partial: false },
+          probe: { rows: 0, scrollers: 0, frames: 0, bodyChars: 120, shadows: [] },
+        };
       if (text.includes("document.title")) return "Settings";
       if (text.includes("location.href")) return "http://127.0.0.1:3773/settings";
       if (text.includes("__expandRead")) return { clicked: [], skipped: [] };

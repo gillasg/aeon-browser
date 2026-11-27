@@ -3,6 +3,7 @@ import vm from "node:vm";
 import test from "node:test";
 import { browserDataApi } from "../dist/code-api-data.js";
 import { browserFastApi } from "../dist/code-api-page.js";
+import { browserReadApi } from "../dist/code-api-read.js";
 
 test("a pool publishes each finished value and drops a dead tab", () => {
   assert.match(browserDataApi, /globalThis\.__partialValue = results\.slice\(\)/);
@@ -12,10 +13,10 @@ test("a pool publishes each finished value and drops a dead tab", () => {
 });
 
 test("page.read stops after four reads of the same page and honours a short time budget", () => {
-  assert.match(browserDataApi, /if \(times > 4\)/);
-  assert.match(browserDataApi, /stopped: this page was read/);
-  assert.match(browserDataApi, /Math\.max\(500, budget > 0 \? budget : 30000\)/);
-  assert.match(browserDataApi, /time budget spent/);
+  assert.match(browserReadApi, /if \(times > 4\)/);
+  assert.match(browserReadApi, /stopped: this page was read/);
+  assert.match(browserReadApi, /Math\.max\(500, budget > 0 \? budget : 30000\)/);
+  assert.match(browserReadApi, /time budget spent/);
   assert.match(browserFastApi, /__readCounts\.clear\(\)/);
 });
 
