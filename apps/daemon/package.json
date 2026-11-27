@@ -20,11 +20,14 @@
     "ws": "8.22.0",
     "@earendil-works/pi-ai": "1.6.0",
     "proper-lockfile": "4.1.2",
-    "@browserkit/engine": "workspace:*"
+    "@browserkit/engine": "workspace:*",
+    "@browserkit/protocol": "workspace:*",
+    "better-sqlite3": "13.0.3"
   },
   "devDependencies": {
     "@types/node": "26.6.3",
     "@types/ws": "8.18.1",
-    "@types/proper-lockfile": "4.1.4"
+    "@types/proper-lockfile": "4.1.4",
+    "@types/better-sqlite3": "9.6.0"
   }
 }

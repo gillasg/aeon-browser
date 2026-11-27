@@ -5,6 +5,7 @@ import {
   inferRoutineEffect,
   optionalBoolean,
   parseEffect,
+  assertWebhookResolves,
   parseWebhook,
 } from "./routine-fields.js";
 import { optionalListen } from "./routine-listen.js";
@@ -124,6 +125,7 @@ async function create(options: ExternalRoutineOptions, origin: Origin): Promise<
   const requiredBrowserInstanceId = browserName
     ? await browserFor(options, browserName, chatId)
     : null;
+  await assertWebhookResolves(options.args.webhook);
   const webhook = parseWebhook(options.args.webhook, options.args.webhookSecret, null);
   const webhookOnly = optionalBoolean(options.args.webhookOnly, "webhookOnly", false);
   const timestamp = now.toISOString();

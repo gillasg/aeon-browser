@@ -4,6 +4,7 @@ import {
   inferRoutineEffect,
   optionalBoolean,
   parseEffect,
+  assertWebhookResolves,
   parseWebhook,
 } from "./routine-fields.js";
 import { optionalListen } from "./routine-listen.js";
@@ -33,11 +34,11 @@ export class RoutineManagementTools {
   execute(name: string, args: Record<string, unknown>, chatId: ChatId): unknown {
     switch (name) {
       case "create_routine":
-        return this.create(args, chatId);
+        return assertWebhookResolves(args.webhook).then(() => this.create(args, chatId));
       case "preview_routine_schedule":
         return previewSchedule(args.schedule);
       case "update_routine":
-        return this.update(args, chatId);
+        return assertWebhookResolves(args.webhook).then(() => this.update(args, chatId));
       case "list_routines":
         return this.store.listRoutines(chatId).map((routine) => ({
           ...routine,

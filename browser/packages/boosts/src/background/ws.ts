@@ -14,6 +14,8 @@ export interface SocketOwner {
   /** Whether the script is a boost (any host) or a userscript limited to its @connect list. */
   connect: string[] | undefined;
   pageUrl?: string;
+  /** The hosts of the script's own sites: its reach when it has no @connect list. */
+  sites?: string[];
 }
 
 type Emit = (event: string, data?: unknown) => void;
@@ -48,7 +50,7 @@ export function socketRefusal(url: string, owner: SocketOwner): string | undefin
   }
   if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:")
     return `Only ws: and wss: sockets are allowed, not ${parsed.protocol}`;
-  if (!mayConnect(url, owner.pageUrl, owner.connect))
+  if (!mayConnect(url, owner.pageUrl, owner.connect, owner.sites))
     return `This script may not connect to ${parsed.hostname}: add it to @connect`;
   return undefined;
 }

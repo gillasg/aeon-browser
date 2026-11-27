@@ -30,7 +30,7 @@ const runAt = (boost: Boost): chrome.userScripts.RegisteredUserScript["runAt"] =
 
 function scriptInfo(boost: Boost): Record<string, unknown> {
   const meta = { match: [], include: [], exclude: [], grant: [], resource: [], ...boost.meta };
-  const injectInto = boost.jsWorld === "isolated" ? "content" : "page";
+  const injectInto = boost.jsWorld === "page" ? "page" : "content";
   return {
     script: {
       name: boost.name,
@@ -82,7 +82,7 @@ function scriptCode(
   const config = {
     id: boost.id,
     nonce,
-    world: boost.jsWorld === "isolated" ? "isolated" : "page",
+    world: boost.jsWorld === "page" ? "page" : "isolated",
     grantAll: boost.kind === "boost",
     grants: boost.meta?.grant ?? [],
     values,
@@ -104,6 +104,16 @@ function scriptCode(
   ].join("\n");
 }
 
+/** A page-world script reaches its declared @connect hosts, else only its own sites' hosts. */
+export function pagePolicy(boost: Boost): { connect: string[]; sites: string[] } {
+  const connect = (boost.meta?.connect ?? []).filter((rule) => rule.trim() !== "*");
+  if (connect.length) return { connect, sites: [] };
+  const hosts = chromePatterns(boost.sites)
+    .map((pattern) => /^[^:]+:\/\/(?:\*\.)?([^/*]+)\//.exec(pattern)?.[1])
+    .filter((host): host is string => Boolean(host));
+  return { connect: [], sites: [...new Set(hosts)] };
+}
+
 /** The registrations for one boost. `blocked` are rules where it must not run (site switches). */
 export function buildRegistration(
   boost: Boost,
@@ -111,7 +121,8 @@ export function buildRegistration(
   blocked: SiteRule[],
   nonce: string,
 ): Built {
-  const page = boost.jsWorld !== "isolated";
+  // Isolated is the default: page JavaScript cannot reach an isolated script channel.
+  const page = boost.jsWorld === "page";
   const check = urlCheck(boost.sites, [...(boost.excludes ?? []), ...blocked]);
   const matches = chromePatterns(boost.sites);
   const common = {
@@ -137,7 +148,7 @@ export function buildRegistration(
     runAt: "document_start",
     js: [
       {
-        code: `(() => { ${check}\n${__GM_RUNTIME__}\n__sbRuntime.bridge(${JSON.stringify(nonce)}, ${JSON.stringify(boost.id)}); })();`,
+        code: `(() => { ${check}\n${__GM_RUNTIME__}\n__sbRuntime.bridge(${JSON.stringify(nonce)}, ${JSON.stringify(boost.id)}, ${JSON.stringify(pagePolicy(boost))}); })();`,
       },
     ],
     world: "USER_SCRIPT",

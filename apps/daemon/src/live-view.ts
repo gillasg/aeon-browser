@@ -22,6 +22,8 @@ export interface LiveViewState {
 
 export interface LiveView {
   url: string;
+  /** The link to open in a browser: `url` with the read token in its fragment. */
+  viewerUrl: string;
   eventsUrl: string;
   pushUrl: string;
   token: string;
@@ -46,7 +48,9 @@ function originAllowed(origin: string | undefined): boolean {
   }
 }
 
-function tokenOf(req: IncomingMessage): string {
+function tokenOf(req: IncomingMessage, query?: URLSearchParams): string {
+  const fromQuery = query?.get("t");
+  if (fromQuery) return fromQuery;
   const header = req.headers.authorization ?? "";
   if (header.startsWith("Bearer ")) return header.slice(7).trim();
   const own = req.headers["x-graft-view-token"];
@@ -124,8 +128,9 @@ export async function startLiveView(options: LiveViewOptions = {}): Promise<Live
     },
     snapshot: (): LiveViewState => structuredClone(state),
   };
+  const hosts = new Set<string>();
   const server = createServer((req, res) => {
-    void route(req, res, { view, clients, token, maxEvents, state });
+    void route(req, res, { view, clients, token, maxEvents, state, hosts });
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -133,8 +138,11 @@ export async function startLiveView(options: LiveViewOptions = {}): Promise<Live
   });
   const { port } = server.address() as AddressInfo;
   const base = `http://127.0.0.1:${port}`;
+  hosts.add(`127.0.0.1:${port}`).add(`localhost:${port}`);
   return {
     url: `${base}/`,
+    // The token rides in the fragment: browsers never send it to the server or in a referrer.
+    viewerUrl: `${base}/#t=${token}`,
     eventsUrl: `${base}/events`,
     pushUrl: `${base}/push`,
     token,
@@ -155,6 +163,8 @@ interface Route {
   token: string;
   maxEvents: number;
   state: LiveViewState;
+  /** The Host values this viewer answers to; anything else is a rebinding attempt. */
+  hosts: Set<string>;
 }
 
 function openEvents(req: IncomingMessage, res: ServerResponse, ctx: Route): void {
@@ -184,12 +194,25 @@ async function push(req: IncomingMessage, res: ServerResponse, ctx: Route): Prom
   send(res, 200, { ok: true });
 }
 
+/** Reads need the token too: `?t=` for EventSource, which cannot set headers. */
+function read(req: IncomingMessage, res: ServerResponse, ctx: Route, url: URL): void {
+  if (!sameToken(tokenOf(req, url.searchParams), ctx.token))
+    return send(res, 401, { error: "token required: open the viewer link that has #t= in it" });
+  if (url.pathname === "/events") return openEvents(req, res, ctx);
+  send(res, 200, ctx.view.snapshot());
+}
+
 async function route(req: IncomingMessage, res: ServerResponse, ctx: Route): Promise<void> {
-  const path = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
-  if (req.method === "GET" && path === "/")
+  if (!ctx.hosts.has(String(req.headers.host ?? "").toLowerCase()))
+    return send(res, 421, { error: "wrong host: open the viewer at 127.0.0.1 or localhost" });
+  const url = new URL(req.url ?? "/", "http://127.0.0.1");
+  const path = url.pathname;
+  if (req.method === "GET" && path === "/") {
+    res.setHeader("referrer-policy", "no-referrer");
     return send(res, 200, liveViewHtml(ctx.state.title, ctx.maxEvents), "text/html");
-  if (req.method === "GET" && path === "/events") return openEvents(req, res, ctx);
-  if (req.method === "GET" && path === "/state") return send(res, 200, ctx.view.snapshot());
+  }
+  if (req.method === "GET" && (path === "/events" || path === "/state"))
+    return read(req, res, ctx, url);
   if (req.method === "POST" && path === "/push") return push(req, res, ctx);
   send(res, 404, { error: "not found" });
 }

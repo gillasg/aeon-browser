@@ -118,6 +118,9 @@ importers:
       "@browserkit/engine":
         specifier: workspace:*
         version: link:../../browser/packages/engine
+      "@browserkit/protocol":
+        specifier: workspace:*
+        version: link:../../browser/packages/protocol
       "@browserkit/site-mapper":
         specifier: workspace:*
         version: link:../../browser/packages/site-mapper
@@ -145,6 +148,9 @@ importers:
       "@modelcontextprotocol/client":
         specifier: 2.2.0
         version: 2.2.0
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
       proper-lockfile:
         specifier: 4.1.2
         version: 4.1.2
@@ -152,6 +158,9 @@ importers:
         specifier: 8.22.0
         version: 8.22.0
     devDependencies:
+      "@types/better-sqlite3":
+        specifier: 9.6.0
+        version: 9.6.0
       "@types/node":
         specifier: 26.6.3
         version: 26.6.3

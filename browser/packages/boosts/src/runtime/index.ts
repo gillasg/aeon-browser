@@ -1,7 +1,7 @@
 import { exposeGm, gmApis, type ScriptConfig } from "./gm.js";
 import { sbHelpers, type ValueStore } from "./sb.js";
 import { Tracker } from "./tracker.js";
-import { eventTransport, portTransport, startBridge } from "./transport.js";
+import { eventTransport, portTransport, startBridge, type PagePolicy } from "./transport.js";
 
 // The runtime every script gets, built into a self-contained string the service worker puts in
 // front of each script's code. `start` returns the names the script sees as globals.
@@ -85,7 +85,7 @@ export function start(config: ScriptConfig): Record<string, unknown> {
   return globals;
 }
 
-/** The isolated-world half for page-world scripts. */
-export function bridge(nonce: string, id: string): void {
-  startBridge(nonce, `sb:${id}`);
+/** The isolated-world half for page-world scripts, limited to what `policy` lets the page reach. */
+export function bridge(nonce: string, id: string, policy: PagePolicy): void {
+  startBridge(nonce, `sb:${id}`, policy);
 }

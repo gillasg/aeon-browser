@@ -62,7 +62,7 @@ function scriptWarnings(boost: Boost): string[] {
 function scriptLines(boost: Boost, review: Review): void {
   if (!boost.js) return;
   review.lines.push(
-    `Runs JavaScript${boost.jsWorld === "isolated" ? "" : " with access to the page's own data"}`,
+    `Runs JavaScript${boost.jsWorld === "page" ? " with access to the page's own data" : ""}`,
   );
   review.level = connectLine(boost) ? "high" : "medium";
   const loads = boost.meta?.require ?? (boost.requires ?? []).map((r) => r.url);
