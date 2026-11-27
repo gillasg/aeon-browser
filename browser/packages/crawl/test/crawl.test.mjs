@@ -148,6 +148,7 @@ test("events, stats, cursor-paged results and signed webhooks", async (t) => {
     {
       url: origin + "/docs/intro",
       source: "links",
+      scope: "site",
       limit: 3,
       ...fast,
       webhook: {

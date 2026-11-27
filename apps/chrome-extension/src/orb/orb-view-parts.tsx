@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 
 // The cursor box's quiet parts: the `/` palette (Developer options), Teach's pill,
 // the working pill, the answer's receipt row and the error card. Bone and ash on obsidian; the
@@ -112,16 +112,73 @@ export function InkDots({ live = false }: { live?: boolean }): ReactElement {
   );
 }
 
-/** Working: a compact capsule, the dot wave and one calm phrase. No counters, no timer. */
-export function WorkingPill({ text }: { text: string }): ReactElement {
+/** `Working · 4s — Reading editions on Steam`: one calm line; without a start time, the phrase. */
+export function workingLine(text: string, startedAt?: number, now = Date.now()): string {
+  const phrase = text.replace(/\s+/g, " ").trim();
+  if (startedAt === undefined) return phrase;
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  return phrase ? `Working · ${seconds}s — ${phrase}` : `Working · ${seconds}s`;
+}
+
+/** Working: a compact capsule, the dot wave and one single-line phrase that never wraps. */
+export function WorkingPill({
+  text,
+  startedAt,
+}: {
+  text: string;
+  startedAt?: number | undefined;
+}): ReactElement {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (startedAt === undefined) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
   return (
     <p className="isl-working" role="status">
       <InkDots live />
-      <span className="isl-working-text">{text}</span>
+      <span className="isl-working-text">{workingLine(text, startedAt, now)}</span>
       <span className="isl-keys" aria-hidden="true">
         <kbd>esc</kbd>
       </span>
     </p>
+  );
+}
+
+export interface RunTab {
+  tabId: number;
+  title: string;
+  host: string;
+  favIconUrl?: string;
+}
+
+/**
+ * Tabs the run opened and left open in the background, as quiet pills under the answer. One
+ * click switches to that tab; the tab the user is on was never touched.
+ */
+export function RunTabPills({
+  tabs,
+  onJump,
+}: {
+  tabs: readonly RunTab[];
+  onJump(tabId: number): void;
+}): ReactElement | null {
+  if (!tabs.length) return null;
+  return (
+    <ul className="isl-run-tabs" aria-label="Opened in the background">
+      {tabs.map((tab) => (
+        <li key={tab.tabId}>
+          <button type="button" title={tab.title || tab.host} onClick={() => onJump(tab.tabId)}>
+            {tab.favIconUrl && /^https?:/.test(tab.favIconUrl) ? (
+              <img src={tab.favIconUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <i aria-hidden="true" />
+            )}
+            <span>{tab.title || tab.host}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

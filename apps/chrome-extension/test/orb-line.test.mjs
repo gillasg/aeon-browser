@@ -93,7 +93,7 @@ test("a running step is one breathing pill above the field, with no panel link",
   assert.match(html, /class="isl-working"/);
   assert.match(html, /ink-dots" data-live="true"/);
   assert.match(html, /Reading your orders/);
-  assert.doesNotMatch(html, /· 4s/);
+  assert.match(html, /Working · 4s — Reading your orders/, "one calm timed line");
   assert.doesNotMatch(html, /isl-line-more/);
   assert.match(html, /<textarea/);
 });

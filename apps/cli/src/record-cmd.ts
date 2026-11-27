@@ -2,11 +2,9 @@
 // start leaves a real-window/screen capture running (or switches on Graft's hidden tab takes); stop
 // writes the final events.json in the folder. The folder is self-contained: frames, clip.mp4 and a
 // log an editor can trust.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync } from "node:fs";
 import type { Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
-import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 import {
   defaultFolder,
@@ -34,6 +32,13 @@ import {
   type VideoEvent,
 } from "./record-events.js";
 import { useRecordingBrowser } from "./record-browsers.js";
+import {
+  refuseIfRecording,
+  releasePointer,
+  requireDaemon,
+  stopTarget,
+  writePointer,
+} from "./record-state.js";
 import { mark, readMarks, run, wait, withMarkCues, type RecordSteps } from "./record-script.js";
 import { saveTabTakes, type SavedTake } from "./record-takes.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
@@ -42,17 +47,9 @@ import { armBeats, readBeats, withBeats, type FilmAction } from "./record-beats.
 
 export const log = (line: string): boolean => process.stdout.write(line + "\n");
 
-/** The last `record start`, so `record stop` finds it without repeating --out. */
-function pointer(out?: string): string {
-  return join(dataDirectory(), "recordings", out ? "current-explicit" : "current");
-}
-function remember(folder: string, out?: string): void {
-  const file = pointer(out);
-  mkdirSync(join(file, ".."), { recursive: true });
-  writeFileSync(file, folder);
-}
-function remembered(out?: string): string {
-  return readFileSync(pointer(out), "utf8").trim();
+/** A fake ffmpeg (GRAFT_FFMPEG or --ffmpeg) is a test take: it needs no daemon. */
+function testTake(opts: RecordOptions): boolean {
+  return !!(opts.ffmpeg ?? process.env.GRAFT_FFMPEG);
 }
 
 function sourceOf(args: Args): Source {
@@ -88,9 +85,11 @@ function optionsOf(args: Args): RecordOptions {
 
 async function start(host: DaemonHost, args: Args): Promise<number> {
   const opts = optionsOf(args);
+  refuseIfRecording();
+  if (!testTake(opts)) await requireDaemon(() => host.connect());
   const folder = defaultFolder(opts.out);
   mkdirSync(folder, { recursive: true });
-  remember(folder, opts.out);
+  writePointer({ folder, ...(opts.out ? { out: opts.out } : {}) });
   const state = await startCapture(folder, opts);
   if (host.browser) {
     state.browser = host.browser;
@@ -192,7 +191,7 @@ function flagString(args: Args, name: string): string | undefined {
 
 function stopFolder(args: Args): string {
   const out = flagString(args, "out");
-  return out ? defaultFolder(out) : remembered();
+  return stopTarget(out ? defaultFolder(out) : undefined);
 }
 
 /** The chat usually starts after the recording, so stop can name it too. */
@@ -309,6 +308,7 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
     ...(args.flags?.["defer-clip"] ? { deferClip: true } : {}),
   };
   const state = await stopCapture(folder, opts);
+  releasePointer(folder);
   nameStopChat(state, args);
   const size = frameSize(folder, ffprobeBinary(opts));
   const clip = baseClip(state, size, clipDuration(state.frames, state.fps));
@@ -349,7 +349,7 @@ async function terminal(_host: DaemonHost, args: Args): Promise<number> {
   const out = typeof args.flags?.out === "string" ? args.flags.out : undefined;
   let folder: string;
   try {
-    folder = out ? defaultFolder(out) : remembered();
+    folder = out ? defaultFolder(out) : stopTarget(undefined);
   } catch {
     throw new Error('Usage: graft record terminal --out <dir> --run "<command>"');
   }

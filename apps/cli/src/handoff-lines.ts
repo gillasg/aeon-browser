@@ -1,4 +1,4 @@
-import { clipHandoffMessage, elapsedLabel } from "@graft/protocol";
+import { clipHandoffMessage, elapsedLabel } from "@graft/protocol/handoff-status";
 
 /** A tab row as `graft tabs` and `graft status` read it. */
 export interface HandoffTab {

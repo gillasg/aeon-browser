@@ -360,6 +360,46 @@ button.icon:hover,
   border-radius: var(--graft-r-3);
   background: var(--graft-island-line-strong);
 }
+.isl-run-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.isl-run-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 3px 10px 3px 6px;
+  border: 0;
+  border-radius: var(--graft-r-full);
+  background: var(--graft-island-wash-5);
+  box-shadow: inset 0 0 0 1px var(--graft-island-line);
+  color: var(--graft-island-chip);
+  font-size: var(--graft-fs-sm);
+  cursor: pointer;
+}
+.isl-run-tabs button:hover {
+  background: var(--graft-island-wash-10);
+  color: var(--graft-island-raise);
+}
+.isl-run-tabs button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.isl-run-tabs img,
+.isl-run-tabs i {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--graft-r-3);
+  background: var(--graft-island-line-strong);
+}
 .isl-tabs-empty {
   padding: 6px 8px;
   color: var(--muted);

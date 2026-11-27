@@ -217,7 +217,6 @@ export async function scrape(
     const result = await buildResult(fetched, options, 0, ctx);
     const html = fetched.html ?? fetched.body.toString("utf8");
     if (!shouldRenderShell(result.markdown, html, fetched.fetchedBy, options.render)) return result;
-    await ctx.fetcher.noteBrowser(url);
     const again = await ctx.fetcher.browser.fetch(url, options);
     return await buildResult(again, options, 0, ctx);
   } finally {

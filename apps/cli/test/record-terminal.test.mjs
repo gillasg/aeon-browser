@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { promisify } from "node:util";
+import { startFakeDaemon } from "./fake-daemon.mjs";
 import { alignCast, attachTerminal, terminalCast } from "../dist/record-terminal.js";
 
 const run = promisify(execFile);
@@ -48,8 +49,10 @@ test("a terminal cast is timestamped, ordered, and aligned to the clip clock", (
   assert.equal(bare.version, 1);
 });
 
-test("graft record terminal writes the command and stop keeps it", async () => {
+test("graft record terminal writes the command and stop keeps it", async (t) => {
   const home = await mkdtemp(join(tmpdir(), "graft-term-"));
+  const daemon = await startFakeDaemon(join(home, "data"));
+  t.after(() => daemon.close());
   try {
     const folder = join(home, "demo");
     const start = await graft(home, ["record", "start", "--tabs", "--out", folder]);

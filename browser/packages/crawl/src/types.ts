@@ -117,6 +117,8 @@ export interface CrawlOptions extends ScrapeOptions {
   subdomains?: boolean;
   /** Follow links to other sites. */
   external?: boolean;
+  /** `path` (default): stay under the start URL's folder. `site`: the whole site. */
+  scope?: "path" | "site";
   /** Ignore all query parameters (true) or these ones when deduplicating. */
   ignoreQuery?: boolean | string[];
   strategy?: "bfs" | "dfs" | "best";

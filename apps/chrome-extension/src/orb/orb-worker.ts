@@ -2,6 +2,7 @@ import { TEACH_SITE, teachSiteInWorker } from "../teach-site.js";
 import { chatUrl, findExistingChat } from "../native-worker-tabs.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
+import { jumpToRunTab, runTabs } from "./orb-run-tabs.js";
 import { CURSOR_LOCAL, isGraftTabPage, isCursorPage, summonUpdate } from "./orb-graft-pages.js";
 import { CURSOR_MARK, CURSOR_TOKEN_CSS } from "@browserkit/engine/cursor-mark";
 import { paintCursor } from "graft:cursor-paint";
@@ -13,7 +14,9 @@ import {
   ORB_DISMISS,
   ORB_OFF,
   ORB_ON_KEY,
+  ORB_JUMP_TAB,
   ORB_RESTORE,
+  ORB_RUN_TABS,
   ORB_TO_PANEL,
   nonceKey,
   type OrbToggle,
@@ -58,10 +61,32 @@ function onOrbMessage(
   if (kind === ORB_TO_PANEL) return toPanel(sender.tab, request, sendResponse);
   if (kind === CURSOR_INSTALL) return installFrom(sender.tab, request);
   if (kind === TEACH_SITE) return teachFromManage(request, sendResponse);
+  if (RUN_TAB_KINDS.has(kind)) return runTabRequest(String(kind), request, sender, sendResponse);
   if (kind !== "graft.orb.verify") return undefined;
   void verify(request as Partial<OrbVerify>, sender).then(sendResponse, () =>
     sendResponse({ ok: false }),
   );
+  return true;
+}
+
+const RUN_TAB_KINDS: ReadonlySet<unknown> = new Set([ORB_RUN_TABS, ORB_JUMP_TAB]);
+
+function runTabRequest(
+  kind: string,
+  request: unknown,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void,
+): true {
+  const { chatId, tabId } = request as { chatId?: unknown; tabId?: unknown };
+  const work =
+    kind === ORB_RUN_TABS
+      ? typeof chatId === "string" && chatId
+        ? runTabs(chatId, sender.tab?.id)
+        : Promise.resolve([])
+      : typeof tabId === "number"
+        ? jumpToRunTab(tabId)
+        : Promise.resolve(false);
+  void work.then(sendResponse, () => sendResponse(kind === ORB_RUN_TABS ? [] : false));
   return true;
 }
 

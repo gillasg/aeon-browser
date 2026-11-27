@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./handoff-status": {
+      "types": "./dist/handoff-status.d.ts",
+      "import": "./dist/handoff-status.js"
     }
   },
   "scripts": {

@@ -118,8 +118,12 @@ test("auto mode switches to the browser for pages that need JavaScript, and reme
     "the JSON the page loaded itself",
   );
   const next = await scrape(`${origin}/pricing`, {}, { fetcher });
-  assert.equal(next.fetchedBy, "browser", "the host needed a browser once, so it gets one");
-  assert.equal(browser.calls.length, 2);
+  assert.equal(
+    next.fetchedBy,
+    "static",
+    "one JavaScript page does not send the whole site to Chrome",
+  );
+  assert.equal(browser.calls.length, 1);
   const forced = await scrape(`${origin}/pricing`, { render: "static" }, { fetcher });
   assert.equal(forced.fetchedBy, "static");
 });

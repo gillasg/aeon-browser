@@ -31,14 +31,19 @@ interface RecordSummary {
   folder: string;
   frames: number;
   fps: number;
+  fpsAsked?: number;
+  fpsDelivered?: number;
   warning?: string;
+  /** Set when the tab closed mid-take; the frames captured before that are still encoded. */
+  lost?: string;
 }
 
 async function recordFrames(url: string, seconds: number, fps: number): Promise<RecordSummary> {
   const name = `record-${Date.now()}`;
   const code = `(async () => {
   const tab = await browser.openTab(${JSON.stringify(url)}, { window: { width: 1280, height: 800 } });
-  await tab.settle({ quietMs: 400, timeoutMs: 15000 }).catch(() => undefined);
+  // A page that animates never goes quiet: a short cap, not 15 s of waiting, before the take.
+  await tab.settle({ quietMs: 300, timeoutMs: 2500 }).catch(() => undefined);
   const summary = await tab.recordTab({ fps: ${fps}, seconds: ${seconds}, name: ${JSON.stringify(name)} });
   console.log('RESULT ' + JSON.stringify(summary));
   return summary;
@@ -158,6 +163,10 @@ async function gifOrVideo(args: Args, kind: "gif" | "video"): Promise<number> {
     throw error;
   }
   if (has(args, "json")) out(JSON.stringify({ ...summary, ...encoded }));
+  else if (summary.lost || summary.warning)
+    out(
+      `Recorded ${summary.frames} frames at ${summary.fps} fps; wrote ${encoded.out}. ${[summary.lost, summary.warning].filter(Boolean).join(" ")}`,
+    );
   else
     out(
       `Recorded ${summary.frames} frames at ${summary.fps} fps; wrote ${encoded.out} (${Math.round(encoded.bytes / 1024)} KB).`,

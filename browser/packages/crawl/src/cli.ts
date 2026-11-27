@@ -22,6 +22,7 @@ const usage = `browser-crawl: crawl anything, including behind your logins.
   scrape <url>               one page    [--formats markdown,links,...] [--render auto|static|browser]
   map <url>                  list URLs   [--search phrase] [--limit n]
   crawl <url>                a site      [--limit n] [--max-depth n] [--include /blog/**] [--exclude ...]
+                                         [--scope site] (default: stay under the start URL's folder)
                                          [--query text --adaptive] [--strategy bfs|dfs|best] [--source all|sitemaps|links]
                                          [--out results.jsonl|.csv|.json|site.md|folder] [--state dir] [--hooks file.mjs]
   crawl --prompt "<request>" describe the crawl in plain English (needs a model)

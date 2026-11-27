@@ -56,17 +56,31 @@ export class Scope {
   private readonly includes: RegExp[];
   private readonly excludes: RegExp[];
   private readonly hosts: Set<string>;
+  private readonly prefixes: string[];
 
   constructor(
     start: string[],
     private readonly options: Pick<
       CrawlOptions,
-      "include" | "exclude" | "matchFullUrl" | "subdomains" | "external" | "ignoreQuery"
+      "include" | "exclude" | "matchFullUrl" | "subdomains" | "external" | "ignoreQuery" | "scope"
     >,
   ) {
     this.includes = (options.include ?? []).map(patternToRegex);
     this.excludes = (options.exclude ?? []).map(patternToRegex);
     this.hosts = new Set(start.map((url) => new URL(url).host));
+    // Include patterns, other sites and `scope: "site"` all choose their own reach.
+    const wide =
+      options.scope === "site" ||
+      !!options.external ||
+      !!options.subdomains ||
+      !!options.include?.length;
+    this.prefixes = wide ? [] : start.map(startFolder);
+  }
+
+  private underStart(url: URL): boolean {
+    if (!this.prefixes.length) return true;
+    const here = url.origin + url.pathname;
+    return this.prefixes.some((prefix) => here.startsWith(prefix) || here + "/" === prefix);
   }
 
   private onSite(url: URL): boolean {
@@ -88,6 +102,7 @@ export class Scope {
     }
     if (!/^https?:$/.test(url.protocol)) return "not a web page";
     if (!this.onSite(url)) return "another site";
+    if (!this.underStart(url)) return "outside the start path";
     const target = this.options.matchFullUrl ? url.href : url.pathname + url.search;
     const path = this.options.matchFullUrl ? url.href : url.pathname;
     // A pattern written as a whole URL (https://site/docs/**) is matched against the whole URL.
@@ -96,6 +111,12 @@ export class Scope {
     if (this.excludes.some(matches)) return "excluded";
     return undefined;
   }
+}
+
+/** The folder a start URL sits in: `/docs/intro` → `/docs/`, `/docs/` → `/docs/`. */
+export function startFolder(input: string): string {
+  const url = new URL(input);
+  return url.origin + url.pathname.slice(0, url.pathname.lastIndexOf("/") + 1);
 }
 
 const BINARY =

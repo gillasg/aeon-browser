@@ -54,7 +54,8 @@ test("graft --version, -v and -V print the package version and load under 100 mo
 
 test("graft call --help loads a fraction of the full command line", async () => {
   const fast = await modulesLoaded(["call", "--help"]);
-  const full = await modulesLoaded(["map", "--help"]);
+  // Help now prints from the build's help.json; compare with a real (failing) full command run.
+  const full = await modulesLoaded(["map"]);
   assert.match(fast.stdout, /^Usage: graft call <site> <operation>/);
   assert.equal(fast.code, 0);
   assert.ok(fast.count * 2 < full.count, `call ${fast.count} vs full ${full.count} modules`);

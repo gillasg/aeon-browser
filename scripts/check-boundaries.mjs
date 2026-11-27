@@ -60,9 +60,9 @@ function moduleSpecifiers(source) {
   return specifiers;
 }
 
-// Light entry points a package may expose beside its root: a constant a hot path needs without
-// loading the whole package (graft repl starts ~100 ms faster without the protocol's schemas).
-const LIGHT_ENTRIES = ["@graft/protocol/version"];
+// Light entry points a package may expose beside its root: small helpers a hot path needs without
+// loading the whole package (graft repl / status start faster without the protocol's schemas).
+const LIGHT_ENTRIES = ["@graft/protocol/version", "@graft/protocol/handoff-status"];
 
 for (const [name, relativePath] of packagePaths) {
   const packageRoot = join(root, relativePath);

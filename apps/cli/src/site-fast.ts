@@ -4,7 +4,7 @@
 import { has, parseArgs } from "browserkit/dist/args.js";
 import { out, printError } from "browserkit/dist/output.js";
 import { commandHelp, type Command } from "browserkit/dist/usage.js";
-import { DaemonHost, installGraftCliHost } from "./host.js";
+import { DaemonHost, installCliHostOnly, installGraftCliHost } from "./host.js";
 
 const EXIT_CODES: Record<string, number> = {
   failed: 1,
@@ -32,6 +32,8 @@ const LOADERS: Record<string, Loader> = {
       .find((command) => command.name === "status"),
 };
 
+const BRIDGED = new Set(["call", "find"]);
+
 export const SITE_FAST_COMMANDS: ReadonlySet<string> = new Set(Object.keys(LOADERS));
 
 /** The command `graft <name>` runs on the lean path, or undefined when it has none. */
@@ -42,7 +44,8 @@ export function siteFastCommand(name: string, host: DaemonHost): Promise<Command
 export async function runSiteFast(argv: string[]): Promise<number> {
   const host = new DaemonHost();
   try {
-    installGraftCliHost(host);
+    if (BRIDGED.has(argv[0] ?? "")) await installGraftCliHost(host);
+    else installCliHostOnly(host);
     const args = parseArgs(argv);
     const [name = "", ...rest] = args.positional;
     const command = await siteFastCommand(name, host);
@@ -58,7 +61,9 @@ export async function runSiteFast(argv: string[]): Promise<number> {
     return await reportError(error);
   } finally {
     host.close();
-    await closeBridges();
+    // Only call and find load the site and crawl bridges; importing them just to close them
+    // cost seconds on every `graft status`.
+    if (BRIDGED.has(argv[0] ?? "")) await closeBridges();
   }
 }
 

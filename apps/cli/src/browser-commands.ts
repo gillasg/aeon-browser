@@ -15,6 +15,19 @@ import { handoffLine, statusHandoffLines, type HandoffTab } from "./handoff-line
 
 const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url, graftUi: tab.graftUi === true, ...(tab.handoff ? { handoff: tab.handoff } : {}) }))`;
 
+/** Status's hand-off lines are extra: a busy Chrome must not hold `graft status` open. */
+const STATUS_EXTRA_MS = 400;
+function quick<T>(work: Promise<T>): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(undefined), STATUS_EXTRA_MS);
+    timer.unref();
+    work.then(
+      (value) => (clearTimeout(timer), resolve(value)),
+      () => (clearTimeout(timer), resolve(undefined)),
+    );
+  });
+}
+
 async function status(host: DaemonHost, args: Args): Promise<number> {
   const client = await host.connect();
   const browsers = await waitForBrowser(() => client.settings(undefined));
@@ -28,7 +41,7 @@ async function status(host: DaemonHost, args: Args): Promise<number> {
       : "Graft is running; no browser connected yet. It reconnects on its own after a restart; if it stays this way, load Graft in Chrome.",
   );
   if (browsers.length) {
-    const list = ((await host.runInBrowser(TABS, { session: "cli" }).catch(() => [])) ??
+    const list = ((await quick(host.runInBrowser(TABS, { session: "cli", timeoutMs: 2_000 }))) ??
       []) as HandoffTab[];
     for (const line of statusHandoffLines(list)) out(line);
   }

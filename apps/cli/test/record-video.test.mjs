@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { startFakeDaemon } from "./fake-daemon.mjs";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -97,9 +98,11 @@ test(
   },
 );
 
-test("graft record start --tabs records the folder and stop finishes it without a display", async () => {
+test("graft record start --tabs records the folder and stop finishes it without a display", async (t) => {
   const home = await mkdtemp(join(tmpdir(), "graft-record-tabs-"));
   try {
+    const daemon = await startFakeDaemon(join(home, "data"));
+    t.after(() => daemon.close());
     const folder = join(home, "tabs-recording");
     const start = await graft(home, ["record", "start", "--tabs", "--out", folder]);
     assert.equal(start.code, 0, start.stderr);
