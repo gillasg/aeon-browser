@@ -253,8 +253,8 @@ async function __isolatedEval(target, expression) {
 }
 // What the page itself can check about being driven. Never patches anything: it only reads.
 function __stealthProbe() {
-  var globals = Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|browserkit-)/.test(name));
-  var overlays = [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-graft-overlay],[data-browserkit-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase());
+  var globals = Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|__ux|browserkit-)/.test(name));
+  var overlays = [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-ux-overlay],[data-uxb-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase());
   var wrapped = [], leaks = [];
   var native = /\\{\\s*\\[native code\\]\\s*\\}/;
   var functions = [['window.open', window.open], ['window.confirm', window.confirm], ['window.prompt', window.prompt], ['window.alert', window.alert], ['HTMLMediaElement.play', HTMLMediaElement.prototype.play]];
@@ -643,7 +643,7 @@ async function __labeledScreenshot(target) {
       labels.push([n.backendNodeId, Math.min(box[0],box[6]), Math.min(box[1],box[3])]);
     } catch {}
   }
-  var draw = '(()=>{var h=document.createElement("div");h.id="graft-labels";h.setAttribute("data-graft-overlay","");h.setAttribute("aria-hidden","true");h.style.cssText="position:fixed;inset:0;z-index:2147483646;pointer-events:none";for(var [id,x,y] of '+JSON.stringify(labels)+'){var b=document.createElement("b");b.textContent=id;b.style.cssText="position:fixed;left:"+Math.max(0,x)+"px;top:"+Math.max(0,y-14)+"px;font:600 11px/14px system-ui;padding:0 3px;background:#4f46e5;color:#fff;border-radius:3px;box-shadow:0 0 0 1px #fff";h.append(b)}document.documentElement.append(h)})()';
+  var draw = '(()=>{var h=document.createElement("div");h.id="graft-labels";h.setAttribute("data-ux-overlay","");h.setAttribute("aria-hidden","true");h.style.cssText="position:fixed;inset:0;z-index:2147483646;pointer-events:none";for(var [id,x,y] of '+JSON.stringify(labels)+'){var b=document.createElement("b");b.textContent=id;b.style.cssText="position:fixed;left:"+Math.max(0,x)+"px;top:"+Math.max(0,y-14)+"px;font:600 11px/14px system-ui;padding:0 3px;background:#4f46e5;color:#fff;border-radius:3px;box-shadow:0 0 0 1px #fff";h.append(b)}document.documentElement.append(h)})()';
   await __call({op:'evaluate',target,expression:draw});
   try { return await __step({op:'observe', target, kind:'screenshot'}); }
   finally { await __call({op:'evaluate',target,expression:'document.getElementById("graft-labels")?.remove()'}).catch(()=>{}); }

@@ -170,9 +170,9 @@ async function injectWatcher(tabId: number): Promise<void> {
 // scrolling, clicks on plain text or empty space, selecting, arrow and page keys outside a field,
 // and shortcuts with Ctrl, Alt or Meta are ignored.
 function watchUserInput(): void {
-  const state = globalThis as unknown as { __browserkitUserWatch?: boolean };
-  if (state.__browserkitUserWatch) return;
-  state.__browserkitUserWatch = true;
+  const state = globalThis as unknown as { __uxbUserWatch?: boolean };
+  if (state.__uxbUserWatch) return;
+  state.__uxbUserWatch = true;
   const modifiers = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "OS"]);
   const interactive =
     "a[href],button,input,select,textarea,label,summary,[contenteditable=''],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=option],[role=menuitem],[role=tab],[role=combobox],[role=textbox],[onclick]";
@@ -203,7 +203,7 @@ function watchUserInput(): void {
           node &&
           typeof (node as unknown as { hasAttribute?: unknown }).hasAttribute === "function" &&
           // Graft's own layers: the control banner, and the cursor's pill (☰, ■, an ask's field).
-          ["data-browserkit-overlay", "data-graft-overlay"].some((name) =>
+          ["data-uxb-overlay", "data-ux-overlay"].some((name) =>
             (node as unknown as { hasAttribute(name: string): boolean }).hasAttribute(name),
           ),
       )
@@ -232,7 +232,7 @@ function controlBanner(): void {
   if (document.getElementById("browserkit-control")) return;
   const host = document.createElement("div");
   host.id = "browserkit-control";
-  host.setAttribute("data-browserkit-overlay", "");
+  host.setAttribute("data-uxb-overlay", "");
   host.style.cssText =
     "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483647;";
   const root = host.attachShadow({ mode: "closed" });

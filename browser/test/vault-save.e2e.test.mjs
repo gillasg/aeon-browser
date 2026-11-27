@@ -71,7 +71,7 @@ const WORKER_STATE = `(async () => {
       type: target.type,
       url: target.url,
     })),
-    engineLog: typeof globalThis.__graftEngineDebug === "function" ? globalThis.__graftEngineDebug() : [],
+    engineLog: typeof globalThis.__uxEngineDebug === "function" ? globalThis.__uxEngineDebug() : [],
   };
 })()`;
 

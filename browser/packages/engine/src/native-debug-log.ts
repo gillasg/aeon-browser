@@ -22,6 +22,6 @@ export function readEngineDebug(): EngineDebugEntry[] {
 
 // The bundled worker has no module exports at runtime; the buffer is read through this hook.
 const hook = globalThis as typeof globalThis & {
-  __graftEngineDebug?: () => EngineDebugEntry[];
+  __uxEngineDebug?: () => EngineDebugEntry[];
 };
-hook.__graftEngineDebug ??= readEngineDebug;
+hook.__uxEngineDebug ??= readEngineDebug;

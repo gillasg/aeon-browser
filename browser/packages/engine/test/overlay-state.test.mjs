@@ -1,5 +1,5 @@
 // Graft's own overlay is not page state: the nodes under its hosts (the hand-off card and the orb,
-// marked data-graft-overlay, and the cursor painter's host, found by its expando) are left out of
+// marked data-ux-overlay, and the cursor painter's host, found by its expando) are left out of
 // what bu.state reads. The page's own nodes stay in.
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -22,7 +22,7 @@ globalThis.chrome = {
   debugger: {
     sendCommand: async (debuggee, method, params = {}) => {
       if (method === "Runtime.evaluate") {
-        if (params.expression.includes("data-graft-overlay"))
+        if (params.expression.includes("data-ux-overlay"))
           return { result: { type: "object", subtype: "array", objectId: "overlays" } };
         if (params.expression.includes("2147483647")) {
           return state.cursor

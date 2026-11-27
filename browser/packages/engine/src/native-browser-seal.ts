@@ -88,7 +88,8 @@ export class SealVault {
 
   /** A deep copy with secret-named fields and secret-shaped strings sealed. */
   sealValue<T>(value: T, site: string | null, kind?: string): T {
-    return this.walk(value, site, 0, kind === "cookies") as T;
+    // A URL and its site seal alike, so a handle always releases back to that site.
+    return this.walk(value, siteOf(site), 0, kind === "cookies") as T;
   }
 
   private walk(value: unknown, site: string | null, depth: number, cookie: boolean): unknown {

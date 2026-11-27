@@ -131,7 +131,7 @@
 :root[data-theme="light"] {
   color-scheme: light;
 }
-[data-graft-root="true"] {
+[data-ux-root="true"] {
   display: contents;
 }
 /* Established Graft palette. */
@@ -299,7 +299,7 @@
 :root[data-theme="light"] {
   color-scheme: light;
 }
-[data-graft-root="true"] {
+[data-ux-root="true"] {
   display: contents;
 }
 :root[data-theme="midnight"] {

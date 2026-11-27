@@ -94,14 +94,14 @@ test("generated live code attaches to an existing tab, waits for a response, run
   assert.match(code, /browser\.tab\(/);
   assert.doesNotMatch(code, /browser\.openTab\(/); // never open a tab just to listen
   assert.match(code, /waitForResponse\("\/api\/status", \{type: "json", timeoutMs: 55000\}\)/);
-  assert.match(code, /var response = __graftLiveFound/);
+  assert.match(code, /var response = __uxLiveFound/);
   assert.match(code, /browser\.changes\('s', response\.body\.items\)/);
 });
 
 test("generated live code signals idle when no tab matches", () => {
   const code = liveCheckCode("return 1", { url: "/api/x" }, []);
-  assert.match(code, /if \(!__graftLiveTab\) return \{__liveIdle: true\}/);
-  assert.match(code, /if \(!__graftLiveFound\) return \{__liveIdle: true\}/);
+  assert.match(code, /if \(!__uxLiveTab\) return \{__liveIdle: true\}/);
+  assert.match(code, /if \(!__uxLiveFound\) return \{__liveIdle: true\}/);
 });
 
 // --------------------------------------------------------- dedupe / fallback
@@ -277,13 +277,13 @@ test("a stream or push listen waits on the engine's event-driven taps, not on re
   const ws = liveCheckCode("return response.json", { url: "/live", type: "ws" }, []);
   assert.match(
     ws,
-    /__graftLivePage\.streams\.waitFor\(\{url: "\/live", kind: "ws", direction: "received"\}, 55000\)/,
+    /__uxLivePage\.streams\.waitFor\(\{url: "\/live", kind: "ws", direction: "received"\}, 55000\)/,
   );
   assert.doesNotMatch(ws, /waitForResponse/);
   const any = liveCheckCode("return 1", { url: "/feed", type: "stream" }, []);
   assert.match(any, /streams\.waitFor\(\{url: "\/feed", direction: "received"\}, 55000\)/);
   const push = liveCheckCode("return response.title", { url: "mail", type: "notification" }, []);
-  assert.match(push, /__graftLivePage\.notifications\.waitFor\(\{kind: "notification"\}, 55000\)/);
+  assert.match(push, /__uxLivePage\.notifications\.waitFor\(\{kind: "notification"\}, 55000\)/);
   assert.match(push, /return response\.title$/);
   const json = liveCheckCode("return 1", { url: "/api", type: "json" }, []);
   assert.match(json, /waitForResponse\("\/api", \{type: "json", timeoutMs: 55000\}\)/);

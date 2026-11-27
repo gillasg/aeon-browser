@@ -97,7 +97,7 @@ const SNAPSHOT_JS = `(() => {
     const nodes = document.querySelectorAll("*");
     for (const el of nodes) {
       for (const key of Object.getOwnPropertyNames(el)) {
-        if (/^(__graft|__webdriver|__cdp|cdc_)/.test(key)) hits.push(el.tagName + "." + key);
+        if (/^(__graft|__ux|__webdriver|__cdp|cdc_)/.test(key)) hits.push(el.tagName + "." + key);
       }
       if (el.tagName === "IFRAME" && String(el.src || "").startsWith("chrome-extension://")) {
         hits.push("iframe:" + el.src);

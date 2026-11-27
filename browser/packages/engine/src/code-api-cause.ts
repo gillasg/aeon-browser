@@ -47,7 +47,7 @@ async function __causeEntries(target, base) {
 }
 async function __causeQuiet(read) { try { return await read(); } catch (error) { return undefined; } }
 function __causeObserve(token) {
-  var bag = globalThis.__graftCause || (globalThis.__graftCause = {});
+  var bag = globalThis.__uxCause || (globalThis.__uxCause = {});
   var state = {added: 0, removed: 0, changedText: 0, samples: []};
   var note = (text) => { text = String(text || '').trim().replace(/\\s+/g, ' '); if (text && state.samples.length < 3) state.samples.push(text.slice(0, 120)); };
   var observer = new MutationObserver((records) => {
@@ -62,7 +62,7 @@ function __causeObserve(token) {
   return true;
 }
 function __causeCollect(token) {
-  var bag = globalThis.__graftCause || {}, item = bag[token];
+  var bag = globalThis.__uxCause || {}, item = bag[token];
   if (!item) return null;
   item.observer.disconnect();
   delete bag[token];

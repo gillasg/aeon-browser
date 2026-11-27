@@ -125,13 +125,13 @@ export function liveWaitCode(listen: RoutineListen): string {
   const type = listen.type ?? "";
   if (STREAM_TYPES.has(type)) {
     const kind = type === "stream" ? "" : `kind: ${JSON.stringify(type)}, `;
-    return `__graftLivePage.streams.waitFor({url: ${url}, ${kind}direction: "received"}, 55000)`;
+    return `__uxLivePage.streams.waitFor({url: ${url}, ${kind}direction: "received"}, 55000)`;
   }
   if (PUSH_TYPES.has(type)) {
     const kind = type === "notifications" ? "" : `, kind: ${JSON.stringify(type)}`;
-    return `__graftLivePage.notifications.waitFor({${kind.slice(2)}}, 55000)`;
+    return `__uxLivePage.notifications.waitFor({${kind.slice(2)}}, 55000)`;
   }
-  return `__graftLivePage.waitForResponse(${url}, {${type ? `type: ${JSON.stringify(type)}, ` : ""}timeoutMs: 55000})`;
+  return `__uxLivePage.waitForResponse(${url}, {${type ? `type: ${JSON.stringify(type)}, ` : ""}timeoutMs: 55000})`;
 }
 
 /**
@@ -147,12 +147,12 @@ export function liveCheckCode(check: string, listen: RoutineListen, sites: strin
      return ${hosts}.some(function(s){ return h === s || h.endsWith('.' + s); });`
     : `return u.includes(${JSON.stringify(listen.url)});`;
   // Names are prefixed so they cannot shadow the engine's internal realm globals (e.g. __tabs).
-  return `var __graftLiveTabs = await browser.tabs();
-var __graftLiveTab = __graftLiveTabs.find(function(t){ var u = String(t.url || ''); ${tabTest} });
-if (!__graftLiveTab) return {__liveIdle: true};
-var __graftLivePage = await browser.tab(__graftLiveTab.id ?? __graftLiveTab.tabId ?? __graftLiveTab);
-var __graftLiveFound = await ${liveWaitCode(listen)};
-if (!__graftLiveFound) return {__liveIdle: true};
-var response = __graftLiveFound;
+  return `var __uxLiveTabs = await browser.tabs();
+var __uxLiveTab = __uxLiveTabs.find(function(t){ var u = String(t.url || ''); ${tabTest} });
+if (!__uxLiveTab) return {__liveIdle: true};
+var __uxLivePage = await browser.tab(__uxLiveTab.id ?? __uxLiveTab.tabId ?? __uxLiveTab);
+var __uxLiveFound = await ${liveWaitCode(listen)};
+if (!__uxLiveFound) return {__liveIdle: true};
+var response = __uxLiveFound;
 ${check}`;
 }

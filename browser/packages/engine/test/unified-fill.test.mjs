@@ -35,7 +35,7 @@ function el(rect, style = {}) {
 test("indexed fill has no bespoke keyboard path", () => {
   assert.doesNotMatch(browserPlaywrightApi, /keyboard\('ControlOrMeta\+a'\)/);
   assert.match(browserPlaywrightApi, /fill: \(value, options\) => __fillIndexed\(/);
-  assert.match(browserPlaywrightApi, /finally \{[^}]*removeAttribute\("data-graft-pick"\)/);
+  assert.match(browserPlaywrightApi, /finally \{[^}]*removeAttribute\("data-ux-pick"\)/);
 });
 
 test("first() picks the on-screen copy over a transformed duplicate", () => {
@@ -43,8 +43,8 @@ test("first() picks the on-screen copy over a transformed duplicate", () => {
   const visible = el({ x: 10, y: 208, width: 95, height: 16 });
   const box = pick([header, visible], { index: 0, visibleFirst: true, nonce: "n1" });
   assert.deepEqual(box, { x: 57.5, y: 216 });
-  assert.equal(visible.attrs["data-graft-pick"], "n1");
-  assert.equal(header.attrs["data-graft-pick"], undefined);
+  assert.equal(visible.attrs["data-ux-pick"], "n1");
+  assert.equal(header.attrs["data-ux-pick"], undefined);
 });
 
 test("an element stuck off-screen reports offscreen, a collapsed one hidden", () => {

@@ -34,6 +34,31 @@ export async function providerCookiesWith(run: CodeRunner, providerId: string): 
   );
 }
 
+/**
+ * A fetch made by the user's own browser (browser.fetch: its cookies, user agent and TLS), so a
+ * provider sees the browser, never Node. Cookie headers are dropped: the browser sends its own.
+ */
+export function browserFetchWith(run: CodeRunner): typeof fetch {
+  return (async (input: string | URL | Request, init: RequestInit = {}) => {
+    const headers = Object.fromEntries(
+      [...new Headers(init.headers).entries()].filter(
+        ([name]) => !/^(cookie|user-agent)$/i.test(name),
+      ),
+    );
+    const request = {
+      method: init.method ?? "GET",
+      headers,
+      as: "text",
+      ...(typeof init.body === "string" ? { body: init.body } : {}),
+    };
+    const code = `(async () => browser.fetch(${JSON.stringify(String(input))}, ${JSON.stringify(request)}))()`;
+    const answer = (await run(code, { timeoutMs: 180_000 })) as
+      { status?: number; text?: string; json?: unknown } | undefined;
+    const text = answer?.text ?? (answer?.json === undefined ? "" : JSON.stringify(answer.json));
+    return new Response(text, { status: answer?.status || 502 });
+  }) as typeof fetch;
+}
+
 /** The page fallback: open the provider and read the typed answer. */
 export async function uiAnswerWith(
   run: CodeRunner,
@@ -73,7 +98,13 @@ export async function askProviderWith(
         elapsedMs: 0,
       };
     const direct = cookies
-      ? await askDirect(provider.id, { prompt, model, cookies, timeoutMs })
+      ? await askDirect(provider.id, {
+          prompt,
+          model,
+          cookies,
+          timeoutMs,
+          fetchImpl: browserFetchWith(run),
+        })
       : undefined;
     if (direct && (direct.ok || options.transport === "direct")) return direct;
     if (direct && options.transport === "auto") {

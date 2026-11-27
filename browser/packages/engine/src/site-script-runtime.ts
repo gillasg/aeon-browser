@@ -17,16 +17,16 @@ export function readScripts(value: unknown): SiteScriptDefinition[] {
 }
 
 const bootstrap = `
-const previous = globalThis.__graftSiteScript;
+const previous = globalThis.__uxSiteScript;
 if (previous && previous.revision === revision && !previous.failed) return {alreadyApplied:true};
 previous?.dispose();
 const cleanups = [], controller = new AbortController();
 const state = {revision, failed:false, completed:false, url:location.href, startedAt:Date.now(), value:null, error:null, dispose: () => {
   controller.abort();
   for (const cleanup of cleanups.splice(0).reverse()) {try {cleanup();} catch {}}
-  delete globalThis.__graftSiteScript;
+  delete globalThis.__uxSiteScript;
 }};
-globalThis.__graftSiteScript = state;
+globalThis.__uxSiteScript = state;
 const report = (error) => {
   state.failed = true; state.error = String(error?.message || error).slice(0,1000);
   globalThis.chrome?.runtime?.sendMessage?.({kind:'graft.script.report', scriptId, revision,
@@ -70,7 +70,7 @@ try {
 } catch(error) {report(error); return {applied:false, error:String(error?.message || error).slice(0,1000)};}
 })()`;
 }
-export const siteScriptCleanup = "globalThis.__graftSiteScript?.dispose(); ({removed:true})";
+export const siteScriptCleanup = "globalThis.__uxSiteScript?.dispose(); ({removed:true})";
 
 export async function inspectSiteScript(tabId: number, scriptId?: string): Promise<unknown> {
   if (!scriptId) throw new Error("Provide scriptId for status.");
@@ -85,7 +85,7 @@ export async function inspectSiteScript(tabId: number, scriptId?: string): Promi
       worldId: "graft-site-" + scriptId,
       js: [
         {
-          code: `(() => {const s = globalThis.__graftSiteScript; return s ? {revision:s.revision,
+          code: `(() => {const s = globalThis.__uxSiteScript; return s ? {revision:s.revision,
         completed:s.completed === true, failed:s.failed, error:s.error, startedAt:s.startedAt,
         url:location.href, value:s.value} : {executed:false,url:location.href};})()`,
         },

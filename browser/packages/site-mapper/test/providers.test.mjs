@@ -1,5 +1,5 @@
 // The provider composer marker is temporary: any throw after it is set (a re-render, a
-// navigation, a refused key) must still remove it, or the page keeps [data-graft-composer].
+// navigation, a refused key) must still remove it, or the page keeps [data-ux-composer].
 import assert from "node:assert/strict";
 import test from "node:test";
 import { uiScript } from "../dist/providers.js";
@@ -20,8 +20,8 @@ function fakeProviderPage() {
   const send = element("button");
   const document = {
     querySelectorAll(selector) {
-      if (selector === "[data-graft-composer]")
-        return [composer].filter((node) => node.hasAttribute("data-graft-composer"));
+      if (selector === "[data-ux-composer]")
+        return [composer].filter((node) => node.hasAttribute("data-ux-composer"));
       if (selector === "textarea") return [composer];
       if (selector === "button") return [send];
       return [];
@@ -46,7 +46,7 @@ function fakeProviderPage() {
       }),
     }),
   };
-  return { page, document, marked: () => document.querySelectorAll("[data-graft-composer]") };
+  return { page, document, marked: () => document.querySelectorAll("[data-ux-composer]") };
 }
 
 function element(tag) {

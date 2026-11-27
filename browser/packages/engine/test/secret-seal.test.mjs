@@ -128,7 +128,7 @@ test("DOM control descriptors keep their element token; real tokens still seal",
   const vault = new SealVault();
   const control = { token: "ctrl-1", kind: "select", label: "Country" };
   assert.deepEqual(vault.sealValue(control, "example.com"), control);
-  const found = { frame: 0, token: "ff12", selector: '[data-graft-t="ff12"]', control: {} };
+  const found = { frame: 0, token: "ff12", selector: '[data-ux-t="ff12"]', control: {} };
   assert.deepEqual(vault.sealValue(found, "example.com"), found);
   const secrets = vault.sealValue(
     {

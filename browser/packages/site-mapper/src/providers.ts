@@ -202,14 +202,10 @@ export function cookieHeader(cookies: { name: string; value?: string }[] | strin
     .join("; ");
 }
 
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
-
 function jsonHeaders(cookies: string): Record<string, string> {
   return {
     "content-type": "application/json",
     accept: "*/*",
-    "user-agent": USER_AGENT,
     cookie: cookies,
     origin: "https://chatgpt.com",
   };
@@ -276,7 +272,6 @@ export function directRequest(provider: ProviderId, options: AskDirectOptions): 
         headers: {
           "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
           accept: "*/*",
-          "user-agent": USER_AGENT,
           cookie: cookies,
           origin: "https://gemini.google.com",
           referer: "https://gemini.google.com/app",
@@ -345,7 +340,7 @@ async function fetchJson(
 ): Promise<unknown | undefined> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const response = await fetchImpl(url, {
-    headers: { accept: "application/json", "user-agent": USER_AGENT, cookie: cookies },
+    headers: { accept: "application/json", cookie: cookies },
     signal: AbortSignal.timeout(Math.min(options.timeoutMs ?? 20000, 60000)),
   });
   if (!response.ok) return undefined;
@@ -549,6 +544,11 @@ export async function askDirect(
 // Finds the page's message box (the provider's own selectors first, then any visible text box),
 // marks it, types the prompt and sends it with Enter, clicking Send only if the text is still
 // there. Chat sites redesign often; this survives a renamed class or a new editor.
+// Marks set on the provider's page while a prompt is sent, removed after. Random per process,
+// so the page never sees a fixed name it could recognise.
+const COMPOSER_MARK = `data-k${randomUUID().slice(0, 8)}`;
+const OLD_IMAGE_MARK = `data-k${randomUUID().slice(0, 8)}`;
+
 function sendPromptCode(definition: ProviderDefinition, prompt: string): string {
   return `const prompt = ${JSON.stringify(prompt)};
   const composers = ${JSON.stringify([...definition.ui.composer, "[role='textbox']", "textarea", "[contenteditable='true']"])};
@@ -560,7 +560,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
       for (const selector of list) {
         let found;
         try { found = [...document.querySelectorAll(selector)].find(shown); } catch { continue; }
-        if (found) { document.querySelectorAll("[data-graft-composer]").forEach((el) => el.removeAttribute("data-graft-composer")); found.setAttribute("data-graft-composer", ""); return true; }
+        if (found) { document.querySelectorAll("[${COMPOSER_MARK}]").forEach((el) => el.removeAttribute("${COMPOSER_MARK}")); found.setAttribute("${COMPOSER_MARK}", ""); return true; }
       }
       return false;
     }, composers);
@@ -568,7 +568,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
   }
   if (!marked) throw new Error("PROVIDER_UI: no message box on the page; the user may be signed out, or the page changed");
   try {
-    const box = page.locator("[data-graft-composer]").first();
+    const box = page.locator("[${COMPOSER_MARK}]").first();
     await box.click();
     // Some sites keep an unsent draft in the box: clear it so only this prompt is sent.
     await page.keyboard("Control+a");
@@ -577,7 +577,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
     await page.waitForTimeout(400);
     await box.press("Enter");
     await page.waitForTimeout(1500);
-    const left = () => page.evaluate(() => { const el = document.querySelector("[data-graft-composer]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
+    const left = () => page.evaluate(() => { const el = document.querySelector("[${COMPOSER_MARK}]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
     if (await left()) {
       for (const selector of ${JSON.stringify(definition.ui.send)}) {
         const send = page.locator(selector).first();
@@ -589,7 +589,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
   } finally {
     // Any throw after the marker is set (a re-render, a navigation, a refused key) must not leave
     // the marker on the page for the rest of the tab's life.
-    await page.evaluate(() => document.querySelectorAll("[data-graft-composer]").forEach((el) => el.removeAttribute("data-graft-composer"))).catch(() => {});
+    await page.evaluate(() => document.querySelectorAll("[${COMPOSER_MARK}]").forEach((el) => el.removeAttribute("${COMPOSER_MARK}"))).catch(() => {});
   }
 `;
 }
@@ -683,13 +683,13 @@ export function imageScript(
   const deadline = Date.now() + ${Math.min(options.timeoutMs ?? 180000, 300000)};
   ${files ? `await page.upload("input[type=file]", ${files});` : ""}
   // Images already on the page (avatar, uploads, older answers) are never the answer.
-  await page.evaluate(() => document.querySelectorAll("img").forEach((img) => img.setAttribute("data-graft-old", "")));
+  await page.evaluate(() => document.querySelectorAll("img").forEach((img) => img.setAttribute("${OLD_IMAGE_MARK}", "")));
   try {
     ${sendPromptCode(PROVIDERS.gemini, prompt)}
     while (Date.now() < deadline) {
       await page.waitForTimeout(1000);
       const found = await page.evaluate(() => {
-        const fresh = [...document.querySelectorAll("img:not([data-graft-old])")].filter((img) => {
+        const fresh = [...document.querySelectorAll("img:not([${OLD_IMAGE_MARK}])")].filter((img) => {
           const box = img.getBoundingClientRect();
           return img.complete && img.naturalWidth >= 256 && box.width >= 150 && box.height >= 150;
         });
@@ -708,7 +708,7 @@ export function imageScript(
     }
     throw new Error("PROVIDER_TIMEOUT: Gemini returned no image; the page may have changed");
   } finally {
-    await page.evaluate(() => document.querySelectorAll("img[data-graft-old]").forEach((img) => img.removeAttribute("data-graft-old"))).catch(() => {});
+    await page.evaluate(() => document.querySelectorAll("img[${OLD_IMAGE_MARK}]").forEach((img) => img.removeAttribute("${OLD_IMAGE_MARK}"))).catch(() => {});
   }
 })()`;
 }

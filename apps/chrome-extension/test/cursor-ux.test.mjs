@@ -93,7 +93,7 @@ test("plain wrappers, huge, tiny, iframes and Graft's overlay are rejected", () 
   assert.equal(ux.acceptable(node("LI", { box: { width: 900, height: 700 } }), viewport), false);
   assert.equal(ux.acceptable(node("BUTTON", { box: { width: 3, height: 10 } }), viewport), false);
   assert.equal(ux.acceptable(node("IFRAME"), viewport), false);
-  const overlay = node("BUTTON", { attrs: { "data-graft-overlay": "" }, text: "Stop" });
+  const overlay = node("BUTTON", { attrs: { "data-ux-overlay": "" }, text: "Stop" });
   const under = node("A", { attrs: { href: "/x" }, text: "Deal" });
   assert.equal(ux.pickTarget([overlay, under], viewport), under);
 });

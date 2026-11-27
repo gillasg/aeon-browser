@@ -114,9 +114,9 @@ export async function runExternalTool(
   const tools = toolsFor(options, run, session);
   const tool = name === "browser_tabs" ? tools.browser_code : tools[name];
   if (!tool) throw new Error(`Unknown tool ${name}`);
-  const full = args.__graftFull === true;
+  const full = args.__uxFull === true;
   const clean = { ...args };
-  delete clean.__graftFull;
+  delete clean.__uxFull;
   const input = name === "browser_tabs" ? { code: TABS_CODE } : clean;
   const workspace = resolve(
     options.sessionDirectory,

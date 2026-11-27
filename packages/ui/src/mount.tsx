@@ -12,5 +12,5 @@ export function mountGraftUi(rootElement: Element, view: ReactNode): (next: Reac
 }
 
 function HostRoot({ children }: { children: ReactNode }) {
-  return <div data-graft-root="true">{children}</div>;
+  return <div data-ux-root="true">{children}</div>;
 }

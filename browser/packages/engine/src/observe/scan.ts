@@ -258,7 +258,7 @@ function textRegion(element: Element | null): number {
 function visibleLine(node: Node, visible: WeakMap<Element, boolean>): string {
   let element = node.parentElement;
   const text = node.textContent?.replace(/\s+/g, " ").trim();
-  if (!element || !text || element.closest("script,style,noscript,[data-graft-overlay]")) return "";
+  if (!element || !text || element.closest("script,style,noscript,[data-ux-overlay]")) return "";
   while (element.parentElement && getComputedStyle(element).display === "contents")
     element = element.parentElement;
   if (!visible.has(element)) {
@@ -334,7 +334,7 @@ function clickableOf(
 function armed(el: Element): boolean {
   const selector =
     "a,button,input,select,textarea,summary,[role='button'],[role='link'],[role='textbox'],[role='checkbox'],[role='radio'],[role='switch'],[role='tab'],[role='menuitem'],[role='combobox']";
-  if (el.tagName === "BODY" || el.tagName === "HTML" || el.closest("[data-graft-overlay]"))
+  if (el.tagName === "BODY" || el.tagName === "HTML" || el.closest("[data-ux-overlay]"))
     return false;
   if (el.matches(selector) || el.parentElement?.closest(selector)) return false;
   const style = getComputedStyle(el);

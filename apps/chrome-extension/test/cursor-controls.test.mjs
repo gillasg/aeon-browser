@@ -117,9 +117,9 @@ test("the buttons mount only while the pill shows them, then leave the page", as
   const [style, transcript, stop] = host.shadow.children;
   assert.equal(style.tagName, "STYLE");
   // Graft's own controls are not page content for the agent's page state (see cursor-controls.ts).
-  assert.equal(transcript.getAttribute("data-graft-overlay"), "");
+  assert.equal(transcript.getAttribute("data-ux-overlay"), "");
   assert.equal(transcript.getAttribute("aria-hidden"), null);
-  assert.equal(stop.getAttribute("data-graft-overlay"), "");
+  assert.equal(stop.getAttribute("data-ux-overlay"), "");
   assert.equal(transcript.hidden, false);
   assert.equal(transcript.style.left, "4px");
   assert.equal(stop.hidden, true);

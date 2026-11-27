@@ -27,7 +27,7 @@ class Element extends Node {
     return this.attrs[name] ?? null;
   }
   matches(selector) {
-    return selector.includes("data-graft-overlay") && "data-graft-overlay" in this.attrs;
+    return selector.includes("data-ux-overlay") && "data-ux-overlay" in this.attrs;
   }
   closest(selector) {
     return this.matches(selector) ? this : null;

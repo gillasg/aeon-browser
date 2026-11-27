@@ -186,7 +186,7 @@ test(
         assert.deepEqual(result.value, ["undefined", true]);
         assert.doesNotMatch((await run("await bu.state()")).output, /graft-agent-cursor/);
         const globals = await run(
-          "await page.evaluate(() => Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|browserkit-)/.test(name)))",
+          "await page.evaluate(() => Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|__ux|browserkit-)/.test(name)))",
         );
         assert.deepEqual(globals.value, [], "the extension left a page global behind");
       });

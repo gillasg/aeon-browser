@@ -62,7 +62,7 @@ export function ownText(node: TargetNode): string {
 
 export function isOverlay(node: TargetNode | null): boolean {
   for (let current = node; current; current = current.parentElement)
-    if (current.hasAttribute("data-graft-overlay")) return true;
+    if (current.hasAttribute("data-ux-overlay")) return true;
   return false;
 }
 

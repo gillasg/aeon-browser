@@ -212,11 +212,11 @@ function snapshot(requestId) {
 
 function bootstrap(endpoint) {
   return `
-    globalThis.__graftTestErrors = [];
+    globalThis.__uxTestErrors = [];
     addEventListener("error", (event) =>
-      globalThis.__graftTestErrors.push(String(event.error?.stack ?? event.message)));
+      globalThis.__uxTestErrors.push(String(event.error?.stack ?? event.message)));
     addEventListener("unhandledrejection", (event) =>
-      globalThis.__graftTestErrors.push(String(event.reason?.stack ?? event.reason)));
+      globalThis.__uxTestErrors.push(String(event.reason?.stack ?? event.reason)));
     globalThis.chrome.runtime.sendMessage = async (message) => {
       if (message?.kind === "graft.native.page-grant") return {
         ok: true,
@@ -289,7 +289,7 @@ async function waitFor(browser, sessionId, expression, timeoutMs = 35_000) {
   const state = await evaluate(
     browser,
     sessionId,
-    "JSON.stringify({url: location.href, title: document.title, text: document.body?.innerText?.slice(0, 500), connection: document.getElementById('connection-state')?.innerText, errors: globalThis.__graftTestErrors})",
+    "JSON.stringify({url: location.href, title: document.title, text: document.body?.innerText?.slice(0, 500), connection: document.getElementById('connection-state')?.innerText, errors: globalThis.__uxTestErrors})",
   ).catch((error) => String(error));
   throw new Error("Chat page did not reach the expected state: " + state);
 }

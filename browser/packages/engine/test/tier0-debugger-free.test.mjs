@@ -52,7 +52,7 @@ function sendCommand(_debuggee, method, params) {
     return Promise.resolve({ result: { value: nodeAtPoint(params).backendNodeId === 42 } });
   if (method === "Runtime.evaluate") {
     const expression = String(params?.expression ?? "");
-    if (expression.includes("__graftQuiet")) {
+    if (expression.includes("__uxQuiet")) {
       return Promise.resolve({
         result: {
           value: {

@@ -11,7 +11,7 @@ function __changeProbe(arg) {
 }
 
 function __mediaRecorder(arg) {
-  var state = window.__browserkitMediaRecording;
+  var state = window.__uxbMediaRecording;
   if (arg.action === 'start') {
     var element = document.querySelector(arg.selector);
     if (!element) return {error: 'No element matches ' + arg.selector};
@@ -19,7 +19,7 @@ function __mediaRecorder(arg) {
     if (!stream) return {error: 'This element cannot be recorded'};
     var type = stream.getVideoTracks().length ? 'video/webm' : 'audio/webm';
     var recorder = new MediaRecorder(stream, {mimeType: type});
-    state = window.__browserkitMediaRecording = {recorder, chunks: [], type};
+    state = window.__uxbMediaRecording = {recorder, chunks: [], type};
     recorder.ondataavailable = (event) => event.data.size && state.chunks.push(event.data);
     recorder.start(1000);
     if (element.paused && element.play) element.play().catch(() => {});
@@ -31,7 +31,7 @@ function __mediaRecorder(arg) {
       var blob = new Blob(state.chunks, {type: state.type});
       var bytes = new Uint8Array(await blob.arrayBuffer()), binary = '';
       for (var i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
-      delete window.__browserkitMediaRecording;
+      delete window.__uxbMediaRecording;
       resolve({type: state.type, bytes: bytes.length, base64: btoa(binary)});
     };
     state.recorder.stop();

@@ -97,7 +97,7 @@ function button(label: string): HTMLButtonElement {
   // Not page content: the engine's page state leaves these out. The host carries no attribute of
   // its own (a page must not find the cursor), so the buttons say it themselves, inside the shadow.
   // A marker, not aria-hidden: screen readers still reach the cursor's controls.
-  node.setAttribute("data-graft-overlay", "");
+  node.setAttribute("data-ux-overlay", "");
   node.title = label;
   return node;
 }

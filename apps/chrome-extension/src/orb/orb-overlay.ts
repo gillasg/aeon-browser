@@ -268,10 +268,10 @@ export class OrbOverlay {
     layer.append(this.hit, this.pill, this.frame);
     shadow.append(style, layer);
     // An extension reload leaves the old script's cursor on the page with nothing driving it.
-    for (const stale of document.querySelectorAll("[data-graft-orb]")) stale.remove();
-    this.host.setAttribute("data-graft-orb", "");
-    // The engine leaves every data-graft-overlay subtree out of the page state the agent reads.
-    this.host.setAttribute("data-graft-overlay", "");
+    for (const stale of document.querySelectorAll("[data-ux-orb]")) stale.remove();
+    this.host.setAttribute("data-ux-orb", "");
+    // The engine leaves every data-ux-overlay subtree out of the page state the agent reads.
+    this.host.setAttribute("data-ux-overlay", "");
     document.documentElement.append(this.host);
   }
 
