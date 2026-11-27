@@ -232,7 +232,8 @@ function __pageControls(arg) {
     if (!el) throw new Error('STALE_REF: the control is gone');
     if (el.getAttribute('aria-disabled') === 'true') return {disabled: true};
     var root = optionRoot(el);
-    return {open: roleOf(el) === 'listbox' || visibleOptions(root).length > 0};
+    var editable = (/^(INPUT|TEXTAREA)$/.test(el.tagName) && !el.readOnly) || el.isContentEditable;
+    return {open: roleOf(el) === 'listbox' || visibleOptions(root).length > 0, editable, value: editable ? (el.value != null ? el.value : ownText(el)) : undefined};
   };
   // Already-selected multi options are reported, not tagged: clicking one would toggle it off.
   var pick = () => {
@@ -368,8 +369,8 @@ function __optionWant(item) {
   return item;
 }
 // Polls the open list. A miss names the options that were actually visible.
-async function __pickOption(scope, token, value) {
-  var deadline = Date.now() + 4000, last;
+async function __pickOption(scope, token, value, waitMs = 4000) {
+  var deadline = Date.now() + waitMs, last;
   do {
     last = await scope(__pageControls, {mode: 'pick', token, want: String(value), tag: 'o' + (++__tagSeq)});
     if (!last.waiting) break;
@@ -393,6 +394,7 @@ async function __batchSelect(target, op, found) {
   // option that lives inside aria-controls.
   var popup = await scope(__pageControls, {mode: 'popup', token: found.token});
   if (popup.disabled) throw Error('TARGET_DISABLED: the control is aria-disabled');
+  if (popup.editable && values.length === 1) return __typeAndPick(target, scope, found, values[0]);
   if (!popup.open) await __batchAct(target, found, 'click');
   var picked = [];
   for (var value of values) {
@@ -401,6 +403,17 @@ async function __batchSelect(target, op, found) {
     picked.push(hit.name);
   }
   return {selected: picked};
+}
+// An autocomplete (a combobox you type in, its options arriving after a request): type the value,
+// wait up to 3 s for a visible option that matches, click it, then read the field back.
+async function __typeAndPick(target, scope, found, value) {
+  await __batchAct(target, found, 'fill', value);
+  var hit = await __pickOption(scope, found.token, value, 3000);
+  if (!hit.already) await __batchAct(target, {...found, selector: hit.selector}, 'click');
+  var after = await scope(__pageControls, {mode: 'popup', token: found.token}).catch(() => ({}));
+  var norm = (text) => String(text ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+  var verified = after.value === undefined || norm(after.value) === norm(hit.name) || norm(after.value).includes(norm(value));
+  return {selected: [hit.name], value: after.value, verified};
 }
 // selectOption tags the locator's element, then uses the same select path as page.batch.
 async function __locatorSelect(target, element, index, value) {
@@ -528,7 +541,7 @@ function __batchDone(result, kind, found) {
   };
 }
 function __worstEffect(effects) {
-  var rank = {refused: 0, suspected_noop: 1, unverifiable: 2, confirmed: 3};
+  var rank = {refused: 0, suspected_noop: 1, unverifiable: 2, confirmed: 3, opened_tab: 3};
   var best = 'confirmed', score = 3, seen = false;
   for (var effect of effects) {
     var key = rank[effect] === undefined ? 'unverifiable' : effect;

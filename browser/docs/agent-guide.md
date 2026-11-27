@@ -139,7 +139,8 @@ await page.clickAt(400, 300); // viewport coordinates
 await page.saveMedia("img.product"); // [{saved: "media/photo.jpg", mime, bytes}]; {all: true} for every match
 await page.saveMedia("https://example.com/a.png", { name: "a.png" }); // URLs, data: and blob: too
 await page.upload("#photo-dropzone", ["media/photo.jpg", "https://example.com/b.png"]); // finds the hidden file input
-await page.upload("input[type=file]", ["C:/path/file.pdf"]);
+await artifact("notes.txt", "file contents"); // uploads come from the workspace, never a host path
+await page.upload("input[type=file]", ["notes.txt"]);
 await page.download(url);
 ```
 

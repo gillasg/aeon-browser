@@ -411,7 +411,10 @@ export function __waitRead(options) {
   var root =
     document.querySelector('main, [role="main"], #main, #content, .content') || document.body;
   var max = Math.max(200, Math.min(5000, Number(options.maxMs) || 5000));
-  var min = Math.min(max, Math.max(0, Number(options.minMs) || 1500));
+  // A loaded document without scripts cannot draw anything later: it needs no floor.
+  var still =
+    document.readyState === "complete" && document.scripts && document.scripts.length === 0;
+  var min = still ? 0 : Math.min(max, Math.max(0, Number(options.minMs) || 1500));
   var started = Date.now(),
     lastText = -1,
     lastResources = -1,
@@ -442,10 +445,131 @@ export function __waitRead(options) {
       if (performance.now() < min) stable = 0;
       else if (stable >= 2) return finish(true);
       if (Date.now() - started >= max) return finish(false);
-      setTimeout(tick, 200);
+      setTimeout(tick, 100);
     };
     tick();
   });
+}
+
+// What page.read needs to decide its next steps, read in the same call as the Markdown: are there
+// repeated rows (a list worth collecting), panels that scroll, frames, a window that scrolls on?
+export function __readProbe() {
+  var visible = (el) => el.getClientRects().length > 0;
+  var guesses = [
+    "[data-index]",
+    "[data-key]",
+    "[role=row]",
+    "[role=listitem]",
+    "[role=article]",
+    "article",
+    "li",
+  ];
+  var rows = 0;
+  for (var css of guesses) {
+    var count = [...document.querySelectorAll(css)].filter(visible).length;
+    if (count >= 3) {
+      rows = count;
+      break;
+    }
+  }
+  var scrollers = 0;
+  for (var el of document.querySelectorAll("body *")) {
+    if (el.scrollHeight <= el.clientHeight + 40) continue;
+    var box = el.getBoundingClientRect();
+    if (
+      box.width >= 120 &&
+      box.height >= 80 &&
+      /(auto|scroll)/.test(getComputedStyle(el).overflowY)
+    )
+      scrollers += 1;
+  }
+  var page = document.scrollingElement || document.documentElement;
+  var shadows = [];
+  var walk = (root) => {
+    for (var host of root.querySelectorAll("*")) {
+      if (!host.shadowRoot) continue;
+      var text = Array.from(host.shadowRoot.children)
+        .map((child) => child.innerText || "")
+        .join("\n")
+        .trim();
+      if (text)
+        shadows.push({
+          kind: "shadow",
+          where: host.tagName.toLowerCase() + (host.id ? "#" + host.id : ""),
+          text,
+        });
+      walk(host.shadowRoot);
+    }
+  };
+  walk(document);
+  return {
+    rows,
+    scrollers,
+    frames: document.querySelectorAll("iframe, frame").length,
+    windowScrolls: page.scrollHeight > window.innerHeight + 200,
+    bodyChars: document.body ? document.body.innerText.trim().length : 0,
+    shadows: shadows.slice(0, 30),
+  };
+}
+
+// Scrolls the window to its end so an infinite feed loads its next page, again while it grows,
+// until two rounds in a row add nothing or the budget runs out; then puts the scroll back.
+export function __readWindowScroll(options) {
+  var page = document.scrollingElement || document.documentElement;
+  var start = page.scrollTop;
+  var began = Date.now();
+  var budget = Math.max(300, Number(options.budgetMs) || 4000);
+  var stable = 0,
+    rounds = 0;
+  return new Promise((done) => {
+    var finish = (complete) => {
+      page.scrollTop = start;
+      window.dispatchEvent(new Event("scroll"));
+      done({ complete, rounds, height: page.scrollHeight });
+    };
+    var round = () => {
+      if (Date.now() - began > budget) return finish(false);
+      rounds += 1;
+      var height = page.scrollHeight;
+      page.scrollTop = height;
+      window.dispatchEvent(new Event("scroll"));
+      var waited = 0;
+      var poll = () => {
+        if (page.scrollHeight > height) {
+          stable = 0;
+          return setTimeout(round, 0);
+        }
+        if (waited < 400) {
+          waited += 50;
+          return setTimeout(poll, 50);
+        }
+        if (++stable >= 2) return finish(true);
+        setTimeout(round, 0);
+      };
+      setTimeout(poll, 50);
+    };
+    round();
+  });
+}
+
+// One page call for page.read: expand, settle, then Markdown, title, URL, data and the probe.
+export function __readBatch(fns, options) {
+  var expand =
+    options.expand === false
+      ? { clicked: [], skipped: [] }
+      : fns.expand({ max: options.maxClicks ?? 10 });
+  var waiting = options.skipWait
+    ? Promise.resolve({ settled: false, partial: true, note: "time budget spent" })
+    : fns.wait({ maxMs: options.waitMs });
+  return waiting.then((wait) => ({
+    expand,
+    wait,
+    markdown: fns.markdown(options.markdown),
+    title: document.title,
+    url: location.href,
+    data: fns.data(fns.metadata, options.data),
+    probe: fns.probe(),
+  }));
 }
 
 // A request the page itself makes: its cookies, origin, Sec-Fetch-* headers and TLS session.

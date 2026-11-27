@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import WebSocket from "ws";
 import { chromePort } from "./chrome-port.mjs";
+import { seedDownloadDir } from "./download-dir.mjs";
 
 export const chromePath =
   process.env.CHROME_PATH ??
@@ -42,10 +43,11 @@ export async function startBridgeChrome(name) {
   };
   try {
     await waitFor(async () => JSON.parse(await readFile(join(home, "bridge.json"), "utf8")));
+    const downloads = await seedDownloadDir(profile);
     chrome = spawn(chromePath, chromeArgs(profile), { stdio: "ignore" });
     const { port, browser } = await connectExtension(profile, env);
     const repl = (code, timeout = 120000) => replIn(env, name, code, timeout);
-    return { repl, browser, port, stop, env, cli };
+    return { repl, browser, port, stop, env, cli, downloads };
   } catch (error) {
     await stop();
     throw error;

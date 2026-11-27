@@ -74,6 +74,17 @@ function evaluateValue(expression) {
   if (source.includes("__pageChallenge")) return [];
   if (source.includes("__listStep")) return { selector: "li", items: [], top: 0, moved: false };
   if (source.includes("__scrollerStep")) return source.includes('"index":-1') ? [] : null;
+  // page.read reads the page in one call (__readBatch): expand, settle, Markdown, data, probe.
+  if (source.includes("__readBatch"))
+    return {
+      expand: { clicked: [], skipped: [] },
+      wait: { settled: true },
+      markdown: { markdown: "hello", notes: [] },
+      title: "Pixelscan",
+      url: "https://pixelscan.net/",
+      data: { notes: [] },
+      probe: { rows: 0, scrollers: 0, frames: 0, bodyChars: 0, shadows: [] },
+    };
   if (source.includes("__expandRead")) return { clicked: [], skipped: [] };
   if (source.includes("__waitRead")) return { settled: true };
   if (source.includes("__readMarkdown")) return { markdown: "hello", notes: [] };

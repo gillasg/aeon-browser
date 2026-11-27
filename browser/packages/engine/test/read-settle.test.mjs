@@ -15,7 +15,7 @@ assert.ok(start >= 0 && end > start, "__waitRead is still a module-level page fu
 const WAIT_READ = source.slice(start, end + 2);
 
 /** A pretend page: `pageTime` is its own clock at the call, `textAt(pageTime)` its text length. */
-function page({ pageTime, textAt, resourcesAt = () => 0 }) {
+function page({ pageTime, textAt, resourcesAt = () => 0, document: extra = {} }) {
   const clock = { now: 0, timers: [] };
   const root = {
     get innerText() {
@@ -23,7 +23,7 @@ function page({ pageTime, textAt, resourcesAt = () => 0 }) {
     },
   };
   const sandbox = {
-    document: { querySelector: () => root, body: root },
+    document: { querySelector: () => root, body: root, ...extra },
     performance: {
       now: () => pageTime + clock.now,
       getEntriesByType: () => Array.from({ length: resourcesAt(pageTime + clock.now) }, () => ({})),
@@ -86,4 +86,26 @@ test("a page that keeps changing is partial at the cap", async () => {
   assert.equal(result.settled, false);
   assert.equal(result.partial, true);
   assert.match(result.note, /still changing after 1000 ms/);
+});
+
+test("a loaded page without scripts needs no floor", async () => {
+  // Nothing can draw later on a static document: two quiet ticks end the wait at once.
+  const subject = page({
+    pageTime: 300,
+    textAt: () => 50,
+    document: { readyState: "complete", scripts: [] },
+  });
+  const result = await settle(subject);
+  assert.equal(result.settled, true);
+  assert.ok(result.ms <= 300, `a static page waited ${result.ms} ms`);
+});
+
+test("a page with scripts keeps the floor from its own load", async () => {
+  const subject = page({
+    pageTime: 300,
+    textAt: () => 50,
+    document: { readyState: "complete", scripts: [{}] },
+  });
+  const result = await settle(subject);
+  assert.ok(result.ms >= 1100, `a scripted page ended after ${result.ms} ms`);
 });

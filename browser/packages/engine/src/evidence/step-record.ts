@@ -73,7 +73,7 @@ export function stepEventFrom(input: {
     kind,
     label,
     site: siteOf(result?.url).slice(0, 200),
-    write: WRITES.has(kind) && effect === "confirmed",
+    write: WRITES.has(kind) && (effect === "confirmed" || effect === "opened_tab"),
     via: "page" as const,
     ...(target ? { target: wireTarget(target) } : {}),
     ...(effect ? { effect } : {}),
@@ -314,6 +314,7 @@ function siteOf(url: unknown): string {
 function isEffect(value: unknown): value is StepEffect {
   return (
     value === "confirmed" ||
+    value === "opened_tab" ||
     value === "unverifiable" ||
     value === "suspected_noop" ||
     value === "refused"

@@ -74,6 +74,14 @@ interface InventorySession extends BrowserIdentity {
   chain: Promise<void>;
   windows: Map<number, BrowserWindow>;
   tabs: Map<number, BrowserTab>;
+  /** Tab refreshes queued and not started yet: a later event for the tab joins the queued one. */
+  pending: Map<number, PendingUpsert>;
+}
+interface PendingUpsert {
+  navigated: boolean;
+  /** Events merged into this refresh; a merged loading-to-complete cycle still counts as a load. */
+  events: number;
+  done: Promise<void>;
 }
 
 let active: InventorySession | undefined;
@@ -98,6 +106,7 @@ export async function synchronizeBrowserInventory(
     chain: Promise.resolve(),
     windows: new Map(),
     tabs: new Map(),
+    pending: new Map(),
   };
   active = session;
   socket.addEventListener(
@@ -150,10 +159,7 @@ export async function refreshInventoryTab(
 ): Promise<BrowserTab | undefined> {
   const session = active;
   if (!session) return undefined;
-  const work = session.chain
-    .then(() => upsertTab(tabId))
-    .catch(() => session.socket.close(4001, "Inventory sync required"));
-  session.chain = work;
+  const work = queueUpsert(session, tabId, false);
   if (maxWaitMs === undefined) await work;
   else await withTimeout(work, maxWaitMs);
   return active === session ? session.tabs.get(tabId) : undefined;
@@ -179,13 +185,13 @@ export function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 function installListeners(): void {
   if (listenersInstalled) return;
   listenersInstalled = true;
-  chrome.tabs.onCreated.addListener((tab) => queue(() => upsertTab(tab.id)));
+  chrome.tabs.onCreated.addListener((tab) => queueTab(tab.id, false));
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) =>
-    queue(() => upsertTab(tabId, changeInfo.url !== undefined || changeInfo.status === "loading")),
+    queueTab(tabId, changeInfo.url !== undefined || changeInfo.status === "loading"),
   );
-  chrome.tabs.onMoved.addListener((tabId) => queue(() => upsertTab(tabId)));
-  chrome.tabs.onAttached.addListener((tabId) => queue(() => upsertTab(tabId)));
-  chrome.tabs.onActivated.addListener(({ tabId }) => queue(() => upsertTab(tabId)));
+  chrome.tabs.onMoved.addListener((tabId) => queueTab(tabId, false));
+  chrome.tabs.onAttached.addListener((tabId) => queueTab(tabId, false));
+  chrome.tabs.onActivated.addListener(({ tabId }) => queueTab(tabId, false));
   chrome.tabs.onRemoved.addListener((tabId) => queue(() => removeTab(tabId)));
   chrome.tabs.onReplaced.addListener((addedId, removedId) =>
     queue(async () => {
@@ -203,6 +209,38 @@ function installListeners(): void {
 
 function queue(change: Change): void {
   if (active) enqueue(active, change);
+}
+
+function queueTab(tabId: number | undefined, navigated: boolean): void {
+  if (active && tabId !== undefined) void queueUpsert(active, tabId, navigated);
+}
+
+/**
+ * One refresh of a tab on the shared chain. A tab that loads fires many updates; while one refresh
+ * for it waits its turn, later updates join it instead of each adding a refresh (and two daemon
+ * round trips) to the chain that every tab's steps wait behind.
+ */
+function queueUpsert(session: InventorySession, tabId: number, navigated: boolean): Promise<void> {
+  const waiting = session.initializing ? undefined : session.pending.get(tabId);
+  if (waiting) {
+    waiting.navigated ||= navigated;
+    waiting.events += 1;
+    return waiting.done;
+  }
+  const entry: PendingUpsert = { navigated, events: 1, done: Promise.resolve() };
+  const change = () => {
+    if (session.pending.get(tabId) === entry) session.pending.delete(tabId);
+    return upsertTab(tabId, entry.navigated, entry.events > 1);
+  };
+  if (session.initializing) {
+    session.queued.push(change);
+    return Promise.resolve();
+  }
+  session.pending.set(tabId, entry);
+  entry.done = session.chain = session.chain
+    .then(change)
+    .catch(() => session.socket.close(4001, "Inventory sync required"));
+  return entry.done;
 }
 
 function enqueue(session: InventorySession, change: Change): void {
@@ -248,18 +286,26 @@ async function buildFullInventory(session: InventorySession) {
   });
 }
 
-async function upsertTab(tabId: number | undefined, navigated = false): Promise<void> {
+async function upsertTab(
+  tabId: number | undefined,
+  navigated = false,
+  merged = false,
+): Promise<void> {
   const session = active;
   if (!session || tabId === undefined) return;
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!isInventoryTab(tab)) return removeTab(tabId);
   const map = await readTabMap();
+  const before = JSON.stringify(map[String(tabId)] ?? null);
   const state = identityFor(map, tabId);
   const previous = session.tabs.get(tabId);
-  if (shouldAdvanceDocumentEpoch(navigated, previous, tab)) state.documentEpoch += 1;
-  await writeTabMap(map);
+  if (shouldAdvanceDocumentEpoch(navigated, previous, tab, merged)) state.documentEpoch += 1;
+  if (JSON.stringify(map[String(tabId)]) !== before) await writeTabMap(map);
   await upsertWindow(tab.windowId);
-  await emit(session, { kind: "tab.upsert", tab: toInventoryTab(tab, session, state) });
+  const next = toInventoryTab(tab, session, state);
+  // The daemon already has this exact tab: no delta, no round trip.
+  if (previous && JSON.stringify(previous) === JSON.stringify(next)) return;
+  await emit(session, { kind: "tab.upsert", tab: next });
 }
 
 function isInventoryTab(tab: chrome.tabs.Tab | undefined): tab is chrome.tabs.Tab & {
@@ -268,13 +314,17 @@ function isInventoryTab(tab: chrome.tabs.Tab | undefined): tab is chrome.tabs.Ta
   return tab !== undefined && tab.windowId !== undefined && !tab.incognito;
 }
 
-function shouldAdvanceDocumentEpoch(
+export function shouldAdvanceDocumentEpoch(
   navigated: boolean,
-  previous: BrowserTab | undefined,
-  tab: chrome.tabs.Tab,
+  previous: Pick<BrowserTab, "status" | "url"> | undefined,
+  tab: Pick<chrome.tabs.Tab, "status" | "url">,
+  merged = false,
 ): boolean {
+  // A load that began and finished between two refreshes leaves the status as it was: a refresh
+  // that merged a navigation with later updates still saw a new document.
+  const cycled = merged && previous?.status === "complete" && tab.status === "complete";
   return Boolean(
-    (navigated && previous?.status !== tab.status) ||
+    (navigated && (previous?.status !== tab.status || cycled)) ||
     (previous && previous.url !== (tab.url ?? "")),
   );
 }
@@ -294,7 +344,10 @@ async function upsertWindow(windowId: number | undefined): Promise<void> {
   if (!session || windowId === undefined) return;
   const window = await chrome.windows.get(windowId).catch(() => undefined);
   if (!window || window.incognito || window.id === undefined) return;
-  await emit(session, { kind: "window.upsert", window: toInventoryWindow(window) });
+  const next = toInventoryWindow(window);
+  const known = session.windows.get(next.windowId);
+  if (known && JSON.stringify(known) === JSON.stringify(next)) return;
+  await emit(session, { kind: "window.upsert", window: next });
 }
 
 async function refreshWindows(): Promise<void> {

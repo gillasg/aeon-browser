@@ -88,5 +88,9 @@ test("a private-network check does not look up Graft's own pages or about:blank 
 test("exactly about:blank opens; other about: and file: URLs stay refused", () => {
   assert.doesNotThrow(() => common.assertOpenable("about:blank"));
   for (const url of ["about:blank#x", "about:srcdoc", "about:version", "file:///etc/hosts"])
-    assert.throws(() => common.assertOpenable(url), /INVALID_TARGET|PROTECTED_UI/, url);
+    assert.throws(
+      () => common.assertOpenable(url),
+      /INVALID_TARGET|PROTECTED_UI|URL_NOT_ALLOWED/,
+      url,
+    );
 });

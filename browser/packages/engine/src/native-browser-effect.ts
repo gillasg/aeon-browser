@@ -11,13 +11,15 @@ import {
   type EffectNextContext,
 } from "@browserkit/protocol";
 
-export type StepEffect = "confirmed" | "unverifiable" | "suspected_noop" | "refused";
+export type StepEffect = "confirmed" | "opened_tab" | "unverifiable" | "suspected_noop" | "refused";
 
 export interface EffectVerdict {
   effect: StepEffect;
   evidence: string;
   /** The call to run when the effect was not confirmed. */
   next?: string;
+  /** The tab the step opened, for opened_tab. */
+  tab?: { id: number; url: string };
 }
 
 export type StepOutcome = "navigated" | "changed" | "unchanged" | "unknown";
@@ -37,6 +39,8 @@ export interface StepObservation {
   dialog?: { type: string; accepted: boolean };
   /** A download this step started. */
   download?: { filename: string };
+  /** Tabs this tab opened during the step (a target=_blank link, window.open). */
+  popups?: { tabId: number; url: string }[];
 }
 
 const MAX_EVIDENCE = 200;
@@ -109,6 +113,15 @@ function inputVerdict(op: string, observation: StepObservation, expected?: strin
             evidence: shorten(`value read back differs: ${quote(observation.readback)}`),
           };
   }
+  // A new tab whose opener is this tab: the click did something, somewhere else. Clicking again
+  // would open a second tab (or place a second order).
+  const opened = observation.popups?.[0];
+  if (opened && op !== "fill" && op !== "paste")
+    return {
+      effect: "opened_tab",
+      evidence: shorten(`opened tab ${opened.tabId}${opened.url ? ` (${opened.url})` : ""}`),
+      tab: { id: opened.tabId, url: opened.url },
+    };
   if (observation.outcome === "navigated")
     return {
       effect: "confirmed",

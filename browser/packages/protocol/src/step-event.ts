@@ -18,7 +18,13 @@ const stepDialog = z
   })
   .strict();
 
-export const StepEffectSchema = z.enum(["confirmed", "unverifiable", "suspected_noop", "refused"]);
+export const StepEffectSchema = z.enum([
+  "confirmed",
+  "opened_tab",
+  "unverifiable",
+  "suspected_noop",
+  "refused",
+]);
 export type StepEffect = z.infer<typeof StepEffectSchema>;
 
 export const StepEventSchema = z
@@ -90,6 +96,7 @@ const WORST: Readonly<Record<StepEffect, number>> = {
   suspected_noop: 1,
   unverifiable: 2,
   confirmed: 3,
+  opened_tab: 3,
 };
 
 /** The least successful effect in a batch. An empty list is unverifiable. */

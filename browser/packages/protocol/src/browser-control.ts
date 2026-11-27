@@ -339,7 +339,12 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
        * is a suspected no-op; a step that did not run is refused. The model line shows it as
        * label → effect (evidence). The trace and eval rows read it too.
        */
-      effect: z.enum(["confirmed", "unverifiable", "suspected_noop", "refused"]),
+      effect: z.enum(["confirmed", "opened_tab", "unverifiable", "suspected_noop", "refused"]),
+      /** The tab this step opened (a target=_blank link, window.open), when effect is opened_tab. */
+      tab: z
+        .object({ id: z.number().int(), url: z.string().max(8192) })
+        .strict()
+        .optional(),
       /** The short readback the effect rests on. */
       evidence: z.string().max(240),
       /** Words for this step, from labelFor. A value typed into a field is never included. */

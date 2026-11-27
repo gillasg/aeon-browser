@@ -83,7 +83,7 @@ async function __actRun(page, method, id, node, args, state) {
   return run(page, id, node, args, state);
 }
 function __worstEffect(effects) {
-  var rank = {refused: 0, suspected_noop: 1, unverifiable: 2, confirmed: 3};
+  var rank = {refused: 0, suspected_noop: 1, unverifiable: 2, confirmed: 3, opened_tab: 3};
   var best = 'confirmed', score = 3, seen = false;
   for (var effect of effects) {
     var key = rank[effect] === undefined ? 'unverifiable' : effect;

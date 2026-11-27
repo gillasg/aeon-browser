@@ -5,6 +5,7 @@
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { seedDownloadDir } from "./download-dir.mjs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -163,6 +164,7 @@ export async function waitFor(check, timeout = 30_000) {
 export async function launchProduct(options = {}) {
   const home = await mkdtemp(join(tmpdir(), "product-launch-"));
   const profile = await mkdtemp(join(tmpdir(), "product-launch-chrome-"));
+  await seedDownloadDir(profile);
   const screen = options.headless ? { env: {}, headless: true, stop() {} } : await display();
   const env = {
     ...process.env,
