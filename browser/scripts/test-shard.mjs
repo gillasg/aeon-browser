@@ -1,5 +1,6 @@
-// Deterministic test sharding: `--shard=<index>/<total>` (1-indexed) keeps every total-th file of
-// the sorted list, so the shards of one run are disjoint and together cover every file.
+// Deterministic test sharding: `--shard=<index>/<total>` (1-indexed). Files are dealt longest
+// first onto the lightest shard, so the shards of one run are disjoint, together cover every
+// file, and finish near the same time. Every-total-th dealing left one shard with both slow files.
 export function parseShard(argv) {
   const arg = argv.find((a) => a.startsWith("--shard"));
   if (arg === undefined) return null;
@@ -18,7 +19,38 @@ export function parseShard(argv) {
   return { index, total };
 }
 
+// Seconds a file takes on a CI runner (Linux, real Chrome). Unlisted files count as DEFAULT_COST.
+// Only rough sizes matter: a stale number moves files between shards, never drops one.
+const COST = {
+  "pace-export.e2e.test.mjs": 195,
+  "bridge.e2e.test.mjs": 135,
+  "receipts.e2e.test.mjs": 44,
+  "vault-save.e2e.test.mjs": 33,
+  "dialogs.e2e.test.mjs": 30,
+  "challenge-wait.e2e.test.mjs": 23,
+  "page-controls.e2e.test.mjs": 15,
+  "cdp-bound.e2e.test.mjs": 15,
+  "file-input-click.e2e.test.mjs": 15,
+  "evaluate-timeout.e2e.test.mjs": 12,
+  "hold.e2e.test.mjs": 11,
+  "frame-input.e2e.test.mjs": 10,
+};
+const DEFAULT_COST = 5;
+
+function cost(file) {
+  return COST[file.split(/[\\/]/).pop()] ?? DEFAULT_COST;
+}
+
 export function selectShard(files, shard) {
   const sorted = [...files].sort();
-  return shard ? sorted.filter((_, idx) => idx % shard.total === shard.index - 1) : sorted;
+  if (!shard) return sorted;
+  const loads = Array.from({ length: shard.total }, () => 0);
+  const byCost = [...sorted].sort((a, b) => cost(b) - cost(a) || (a < b ? -1 : 1));
+  const mine = new Set();
+  for (const file of byCost) {
+    const lightest = loads.indexOf(Math.min(...loads));
+    loads[lightest] += cost(file);
+    if (lightest === shard.index - 1) mine.add(file);
+  }
+  return sorted.filter((file) => mine.has(file));
 }

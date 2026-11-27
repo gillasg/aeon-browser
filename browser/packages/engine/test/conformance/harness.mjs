@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import WebSocket from "ws";
+import { chromePort } from "../../../../test/helpers/chrome-port.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const browserRoot = resolve(here, "../../../..");
@@ -82,13 +83,7 @@ function cdpSocket(url) {
 }
 
 async function devtoolsPort(profile) {
-  return poll(async () => {
-    const port = Number(
-      (await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0],
-    );
-    if (!Number.isInteger(port) || port <= 0) throw new Error("no DevTools port yet");
-    return port;
-  }, 60_000);
+  return chromePort(profile);
 }
 
 /** The native host's bootstrap reply, which the extension would normally get from Chrome. */
