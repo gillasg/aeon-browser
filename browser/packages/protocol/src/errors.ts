@@ -90,6 +90,14 @@ export const ERRORS = {
     "user",
     "another extension's popup (usually a password manager's menu) keeps blocking this tab: ask the user to close it or finish the step (bu.handoff), then continue",
   ],
+  TAB_READ_ONLY: [
+    "model",
+    "this tab was opened read-only: read it (state, text, screenshot, navigate), or open another tab to act",
+  ],
+  TAB_ORIGIN_BLOCKED: [
+    "model",
+    "this tab may only visit the origins it was opened with (allowedOrigins): open another tab for that site",
+  ],
   CLAIM_CONFLICT: [
     "model",
     "another chat is using that tab; browser.attachTab(tab) gives this chat its own copy, or browser.openTab(url, {newTab: true})",

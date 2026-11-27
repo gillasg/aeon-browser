@@ -31,8 +31,12 @@ import { captureFromTabStart } from "./native-browser-network.js";
 import { placementSpace } from "./native-browser-placement.js";
 import { matchWindowViewport } from "./native-browser-window-viewport.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
+import { normalOrigins, originAllowed, setTabLocks } from "./native-browser-tab-locks.js";
+import { mineTabIds } from "./native-browser-tab-cleanup.js";
+import { chromeTabWindows, resolveTabWindow } from "./native-browser-tab-window.js";
 import {
   ensureSpacesRestored,
+  knownSpaceWindow,
   noteLabel,
   noteSpace,
   spaceWindow,
@@ -46,18 +50,22 @@ export async function openTab(
 ): Promise<BrowserExecutorResult> {
   const step = validOpenTab(request, identity);
   await assertBrowserNetwork(step.url);
-  const space = step.window
-    ? "tabs"
-    : await placementSpace(step, () => engineConfig.defaultSpace(request.chatId));
+  const space =
+    step.window || step.windowOf !== undefined
+      ? "tabs"
+      : await placementSpace(step, () => engineConfig.defaultSpace(request.chatId));
   await ensureSpacesRestored();
-  const created = await createTab(step, request.chatId, space);
+  const { tab: created, followed } = await createTab(step, request.chatId, space);
   if (created.id === undefined) throw new Error("TARGET_LOST");
-  if (!step.window)
+  // A tab placed beside other tabs (windowOf, or following the chat's moved tabs) leaves the
+  // chat's own window record as it was.
+  if (!step.window && !followed)
     noteSpace(request.chatId, space, space === "window" ? created.windowId : undefined);
   trackAgentTab(created.id, request.chatId, { url: step.url });
   bindBrowserSession(created.id, request.chatId);
   markAgentTabGrouped(created.id);
   claimAgentTab(created.id);
+  await lockOpenedTab(created.id, step);
   if (await engineConfig.privateNetwork())
     await guardPrivateTab(created.id, await engineConfig.privateNetworkPorts());
   await groupAgentTab(
@@ -78,6 +86,7 @@ export async function openTab(
   const { id, tab } = await settleOpenedTab(created.id, refreshInventoryTab);
   if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
   bindBrowserSession(id, request.chatId);
+  if (id !== created.id) await lockOpenedTab(id, step);
   const label = noteLabel(request.chatId, id, tab.url);
   return BrowserExecutorResultSchema.parse({
     kind: "tab",
@@ -113,41 +122,66 @@ async function navigateOpenedTab(
 }
 
 // A window of its own is focused and normal-sized, so Chrome keeps painting it (screencasts and
-// screenshots of a minimized or hidden window stall).
+// screenshots of a minimized or hidden window stall). Otherwise the tab opens where the chat's
+// tabs are now (the user may have dragged them to another window), or beside step.windowOf.
 async function createTab(
   step: Extract<BrowserStep, { op: "openTab" }>,
   chatId: string,
   space: "window" | "tabs",
-): Promise<chrome.tabs.Tab> {
-  if (!step.window) {
-    if (space === "window") {
-      const window = await spaceWindow(chatId);
-      // The new window's first tab becomes the agent tab: active inside its unfocused window,
-      // so Chrome keeps painting it and every later tab starts from a real page, not a stray blank.
-      if (window.freshTabId !== undefined) {
-        await chrome.tabs.update(window.freshTabId, { active: true });
-        const tab = await chrome.tabs.get(window.freshTabId).catch(() => undefined);
-        if (!tab) throw new Error("TARGET_LOST");
-        return tab;
-      }
-      return chrome.tabs.create({ url: "about:blank", active: true, windowId: window.windowId });
-    }
-    // A background tab never takes the user's active tab, whatever the front setting says.
-    const front =
-      !step.background &&
-      (step.foreground || (await engineConfig.agentInFront().catch(() => false)));
-    return chrome.tabs.create({ url: "about:blank", active: front });
+): Promise<{ tab: chrome.tabs.Tab; followed: boolean }> {
+  if (step.window) return { tab: await createWindowTab(step.window), followed: false };
+  const follow = await resolveTabWindow(chromeTabWindows, {
+    ...(step.windowOf !== undefined ? { windowOf: step.windowOf } : {}),
+    ownTabs: mineTabIds(chatId),
+  });
+  const spaceWindowId = space === "window" ? knownSpaceWindow(chatId) : undefined;
+  if (space === "window" && (follow === undefined || follow === spaceWindowId))
+    return { tab: await createSpaceTab(chatId), followed: false };
+  // A background tab never takes the user's active tab, whatever the front setting says.
+  const front =
+    !step.background && (step.foreground || (await engineConfig.agentInFront().catch(() => false)));
+  const tab = await chrome.tabs.create({
+    url: "about:blank",
+    active: space === "tabs" && front,
+    ...(follow !== undefined ? { windowId: follow } : {}),
+  });
+  return { tab, followed: step.windowOf !== undefined || space === "window" };
+}
+
+async function createSpaceTab(chatId: string): Promise<chrome.tabs.Tab> {
+  const window = await spaceWindow(chatId);
+  // The new window's first tab becomes the agent tab: active inside its unfocused window,
+  // so Chrome keeps painting it and every later tab starts from a real page, not a stray blank.
+  if (window.freshTabId !== undefined) {
+    await chrome.tabs.update(window.freshTabId, { active: true });
+    const tab = await chrome.tabs.get(window.freshTabId).catch(() => undefined);
+    if (!tab) throw new Error("TARGET_LOST");
+    return tab;
   }
+  return chrome.tabs.create({ url: "about:blank", active: true, windowId: window.windowId });
+}
+
+async function createWindowTab(size: { width: number; height: number }): Promise<chrome.tabs.Tab> {
   const window = await chrome.windows.create({
     url: "about:blank",
     focused: true,
     type: "normal",
-    width: step.window.width,
-    height: step.window.height,
+    width: size.width,
+    height: size.height,
   });
   const tab = window?.tabs?.[0];
   if (!tab) throw new Error("TARGET_LOST");
   return tab;
+}
+
+async function lockOpenedTab(
+  tabId: number,
+  step: Extract<BrowserStep, { op: "openTab" }>,
+): Promise<void> {
+  await setTabLocks(tabId, {
+    ...(step.readOnly ? { readOnly: true } : {}),
+    ...(step.allowedOrigins ? { allowedOrigins: step.allowedOrigins } : {}),
+  });
 }
 
 function validOpenTab(
@@ -157,5 +191,12 @@ function validOpenTab(
   if (request.step.op !== "openTab" || request.step.clientInstanceId !== identity.clientInstanceId)
     throw new Error("INVALID_TARGET");
   assertOpenable(request.step.url);
+  if (request.step.allowedOrigins) {
+    const origins = normalOrigins(request.step.allowedOrigins);
+    if (!originAllowed(request.step.url, origins))
+      throw new Error(
+        `TAB_ORIGIN_BLOCKED: ${request.step.url} is not on the allowedOrigins it lists`,
+      );
+  }
   return request.step;
 }

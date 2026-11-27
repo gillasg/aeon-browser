@@ -104,6 +104,8 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
     "Another extension's popup is blocking this tab. Close it or finish the step, then tell me to continue.",
   ),
   CLAIM_CONFLICT: tabs,
+  TAB_READ_ONLY: tabs,
+  TAB_ORIGIN_BLOCKED: tabs,
   RUN_RESET: readState,
   TIMEOUT: readState,
   // The user blocked the site. Another route would ignore that choice.
