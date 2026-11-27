@@ -24,7 +24,9 @@ function __listStep(selector, options) {
     return document.scrollingElement;
   })();
   var start = scroller.scrollTop;
-  if (options.restore) { scroller.scrollTop = options.scrollTo; return {selector: chosen}; }
+  var max = options.max || Infinity;
+  var target = scroller === document.scrollingElement ? window : scroller;
+  if (options.restore) { scroller.scrollTop = options.scrollTo; target.dispatchEvent(new Event('scroll')); return {selector: chosen}; }
   var read = () => rowsOf(chosen).map((row) => {
     var link = row.querySelector('a[rel="bookmark"], a[href*="/status/"], a[href*="/p/"], a[href*="/post/"], a[href*="/item/"]') || row.querySelector('a[href]');
     var href = link ? link.href : null;
@@ -41,28 +43,36 @@ function __listStep(selector, options) {
   };
   var numbered = (list) => list.length >= 3 && list.every((item) => /^\\d+$/.test(item.key ?? ''));
   var began = Date.now();
-  if (options.scrollTo != null) scroller.scrollTop = options.scrollTo;
-  take();
+  var reset = options.scrollTo != null && Math.abs(scroller.scrollTop - options.scrollTo) >= 2;
+  var stale = reset ? read().map(idOf).join('\\n') : null;
+  if (options.scrollTo != null) {
+    scroller.scrollTop = options.scrollTo;
+    if (reset) target.dispatchEvent(new Event('scroll'));
+  }
   return new Promise((done) => {
     var finish = () => done({selector: chosen, items, top: start, end: scroller.scrollTop, ended, screens, inner: scroller !== document.scrollingElement});
     var screen = () => {
-      if (screens >= (options.screens || 40) || Date.now() - began > (options.budgetMs || 2500)) return finish();
+      if (seen.size > max || screens >= (options.screens || 40) || Date.now() - began > (options.budgetMs || 2500)) return finish();
       screens += 1;
       var before = scroller.scrollTop;
       var step = Math.max(300, view() * 0.95);
       var drawn = read();
       if (numbered(drawn)) {
         // Numbered rows: jump to the row after the last one drawn, by the rows' own height.
-        var last = Math.max(...drawn.map((item) => Number(item.key)));
+        var nums = drawn.map((item) => Number(item.key));
+        var last = Math.max(...nums), low = Math.min(...nums);
         var height = rowHeight();
-        if (height > 0) step = Math.max(step, Math.min(view() * 2, (last + 1) * height - before - height));
+        if (height > 0 && Math.abs(low * height - before) <= view() * 1.5) {
+          step = Math.max(step, Math.min(view() * 2, (last + 1) * height - before - height));
+        }
       }
       scroller.scrollTop = before + step;
-      (scroller === document.scrollingElement ? window : scroller).dispatchEvent(new Event('scroll'));
+      target.dispatchEvent(new Event('scroll'));
       var moved = Math.abs(scroller.scrollTop - before) >= 2;
       var waited = 0, limit = moved ? (options.waitMs || 250) : (options.endWaitMs || 1500);
       var poll = () => {
         var added = take();
+        if (seen.size > max) return finish();
         if (added) return setTimeout(screen, 0);
         if (waited >= limit) { if (!moved) { ended = true; return finish(); } return setTimeout(screen, 0); }
         waited += 50;
@@ -70,7 +80,19 @@ function __listStep(selector, options) {
       };
       setTimeout(poll, moved ? 30 : 50);
     };
-    screen();
+    var begin = () => {
+      take();
+      if (seen.size > max) return finish();
+      screen();
+    };
+    if (!reset) return begin();
+    var resetWait = 0, resetLimit = options.waitMs || 250;
+    var waitReset = () => {
+      if (read().map(idOf).join('\\n') !== stale || resetWait >= resetLimit) return begin();
+      resetWait += 30;
+      setTimeout(waitReset, 30);
+    };
+    setTimeout(waitReset, 30);
   });
 }
 // Sandbox-side: page calls of a few seconds each, so long lists never hit the evaluate timeout.
@@ -84,9 +106,9 @@ async function __collectList(base, selector, options) {
   var complete = false, scrolls = 0, inner = false;
   var step = (args) => base.inspect('(' + __listStep.toString() + ')(' + JSON.stringify(chosen) + ', ' + JSON.stringify(args) + ')');
   var snapshot = () => ({partial: true, count: seen.size, selector: chosen, items: [...seen.values()].slice(0, max)});
-  for (var i = 0; i < (options.maxScrolls ?? 300) && Date.now() < deadline && seen.size < max; i++) {
+  for (var i = 0; i < (options.maxScrolls ?? 300) && Date.now() < deadline && seen.size <= max; i++) {
     var read = await step({maxText: options.maxText, ...(i === 0 ? {scrollTo: 0} : {}), known: [...seen.keys()],
-      waitMs: options.waitMs, budgetMs: Math.max(300, Math.min(3000, deadline - Date.now())), screens: options.screens});
+      max, waitMs: options.waitMs, budgetMs: Math.max(300, Math.min(3000, deadline - Date.now())), screens: options.screens});
     if (read.missing) {
       if (i === 0) throw Error('TARGET_NOT_FOUND: no repeated rows found; pass the row selector, e.g. page.list(".result-card")');
       break;
@@ -100,13 +122,14 @@ async function __collectList(base, selector, options) {
       if (!seen.has(id)) seen.set(id, item);
     }
     globalThis.__partialValue = snapshot();
+    if (seen.size > max) break;
     if (read.ended) { complete = true; break; }
   }
   if (start !== null) await step({scrollTo: start, restore: true}).catch(() => {});
   globalThis.__partialValue = undefined;
   var items = [...seen.values()].slice(0, max);
   if (items.length && items.every((item) => /^\\d+$/.test(item.key ?? ''))) items.sort((a, b) => a.key - b.key);
-  var why = seen.size >= max ? ' (max reached)' : Date.now() >= deadline ? ' (time budget)' : '';
+  var why = seen.size > max ? ' (max reached)' : Date.now() >= deadline ? ' (time budget)' : '';
   return {
     count: items.length,
     complete,
