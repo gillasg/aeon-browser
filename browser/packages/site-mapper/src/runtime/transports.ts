@@ -1,6 +1,7 @@
 import { SECRET_HEADERS } from "../redact.js";
 import { isSealedValue } from "../sealed.js";
 import { parseJson } from "../infer/schema.js";
+import { ndjson } from "../infer/bodies.js";
 import type { SecurityScheme } from "../types.js";
 import { sharedBridge, type Bridge } from "./bridge.js";
 import { followRedirects, type HopTarget, type SingleHop } from "./net-guard.js";
@@ -77,7 +78,10 @@ function finish(raw: {
   if (raw.url) response.url = raw.url;
   if (raw.json !== undefined) response.json = raw.json;
   else {
-    const json = parseJson(raw.text);
+    const mime =
+      Object.entries(raw.headers ?? {}).find(([k]) => k.toLowerCase() === "content-type")?.[1] ??
+      "";
+    const json = /x-ndjson|jsonl|json-seq/i.test(mime) ? ndjson(raw.text) : parseJson(raw.text);
     if (json !== undefined) response.json = json;
     else if (raw.text !== undefined) response.text = raw.text;
   }

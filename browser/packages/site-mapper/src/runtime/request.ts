@@ -191,20 +191,43 @@ function jsonBody(operation: Operation, params: Params, consumed: Set<string>): 
   // Other bodies start empty: every field must be passed, never replayed from the recording.
   // The exception is a field that had the same value in every recorded body: the caller never
   // needed to say it, so it is filled in, and anything the caller passes still wins.
-  let body: unknown = { ...operation.requestBody?.constants };
+  const recorded = operation.requestBody;
+  let body: unknown = { ...recorded?.defaults, ...recorded?.constants };
   if (params.body !== undefined) {
     consumed.add("body");
     body = isRecord(body) && isRecord(params.body) ? { ...body, ...params.body } : params.body;
   }
   if (!isRecord(body)) return body;
-  // Top-level body fields can be passed directly: api.addToCart({ productId: 7 }).
+  topFields(operation, body, params, consumed);
+  if (operation.kind === "rest" || operation.kind === "action") restFields(body, params, consumed);
+  return body;
+}
+
+/** Top-level body fields can be passed directly: api.addToCart({ productId: 7 }). */
+function topFields(
+  operation: Operation,
+  body: Record<string, unknown>,
+  params: Params,
+  consumed: Set<string>,
+): void {
   const top = Object.keys((operation.requestBody?.schema.properties as object | undefined) ?? {});
   for (const key of top)
     if (params[key] !== undefined && !consumed.has(key)) {
       body[key] = params[key];
       consumed.add(key);
     }
-  return body;
+}
+
+/**
+ * A REST write takes the caller's other fields too: a PATCH recorded with only `name` still
+ * sets `price`. Unknown names never reach a GraphQL or RPC envelope.
+ */
+function restFields(body: Record<string, unknown>, params: Params, consumed: Set<string>): void {
+  for (const [key, value] of Object.entries(params))
+    if (value !== undefined && !consumed.has(key) && !key.startsWith("$")) {
+      body[key] = value;
+      consumed.add(key);
+    }
 }
 
 function bodyFor(operation: Operation, params: Params, consumed: Set<string>): unknown {
@@ -213,8 +236,24 @@ function bodyFor(operation: Operation, params: Params, consumed: Set<string>): u
   return jsonBody(operation, params, consumed);
 }
 
+const BOUNDARY = "----formBoundary7MA4YWxkTrZu0gW";
+
+/** Multipart text fields; a file field's value is sent as a file with its own name. */
+function multipartBody(body: Record<string, unknown>): string {
+  const parts = Object.entries(body).map(([name, value]) => {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    return `--${BOUNDARY}\r\nContent-Disposition: form-data; name="${name.replace(/"/g, "%22")}"\r\n\r\n${text}\r\n`;
+  });
+  return parts.join("") + `--${BOUNDARY}--\r\n`;
+}
+
+function isMultipart(operation: Operation): boolean {
+  return /multipart\/form-data/i.test(operation.requestBody?.mime ?? "");
+}
+
 function serializeBody(operation: Operation, body: unknown): string | undefined {
   if (body === undefined) return undefined;
+  if (isMultipart(operation) && isRecord(body)) return multipartBody(body);
   if (operation.requestBody?.form)
     return new URLSearchParams(
       Object.entries(body as Record<string, unknown>).map(([k, v]) => [
@@ -247,17 +286,32 @@ function paramValue(operation: Operation, param: Param, inputs: Inputs): Resolve
   const target = `${param.in}:${param.name}`;
   const source = operation.dependencies.find((dep) => dep.target === target)?.source;
   // Fresh values come from the producing operation (resolved by the caller) or the session.
-  if (source && source.kind !== "generated") return { missing: source.kind === "response" };
-  return fallbackValue(param);
+  // A cursor fed by this same operation's previous page is absent on the first page.
+  const ownPage = source?.kind === "response" && source.operationId === operation.id;
+  if (source && source.kind !== "generated" && !ownPage)
+    return { missing: source.kind === "response" };
+  return fallbackValue(param, operation);
+}
+
+/** The paging param's first page: offset 0, page 1, no cursor. */
+function firstPage(param: Param, operation: Operation | undefined): Resolved | undefined {
+  const paging = operation?.pagination;
+  if (paging?.param !== `${param.in}:${param.name}`) return undefined;
+  if (paging.style === "offset") return { value: "0" };
+  return paging.style === "page" ? { value: "1" } : {};
 }
 
 /** What to send when nobody passed a value and nothing produces one. */
-function fallbackValue(param: Param): Resolved {
+function fallbackValue(param: Param, operation?: Operation): Resolved {
   // Values that belong to the user's session (CSRF tokens, auth headers) are never replayed from a
   // recording: the transport reads them from the live tab, its cookies or the site's own calls.
   if (param.in === "header" && isSessionSecretHeader(param.name)) return {};
   if (param.in === "header") return headerFallback(param);
   if (param.constant !== undefined) return { value: param.constant };
+  // An optional input the caller left out is sent as the site sent it.
+  if (param.default !== undefined) return { value: param.default };
+  const first = firstPage(param, operation);
+  if (first) return first;
   // A page number is semantic, not recorded: the first page is safe.
   if (param.in === "query" && /^(page|pageNum|pageNumber)$/i.test(param.name) && param.required)
     return { value: "1" };
@@ -360,7 +414,10 @@ function extraQuery(operation: Operation, url: URL, inputs: Inputs, consumed: Se
 
 function contentType(operation: Operation, headers: Record<string, string>): void {
   const mime = operation.requestBody?.mime;
-  if (mime) headers["content-type"] = mime + (operation.requestBody?.form ? ";charset=UTF-8" : "");
+  if (mime && isMultipart(operation))
+    headers["content-type"] = `multipart/form-data; boundary=${BOUNDARY}`;
+  else if (mime)
+    headers["content-type"] = mime + (operation.requestBody?.form ? ";charset=UTF-8" : "");
 }
 
 /** Session-derived headers (a sealed CSRF token): only the live page fills them. */

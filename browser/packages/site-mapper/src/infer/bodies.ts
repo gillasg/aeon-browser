@@ -7,6 +7,8 @@ export interface ParsedBody {
   mime: string;
   value?: unknown;
   form?: boolean;
+  /** Multipart fields that carried a file. */
+  files?: string[];
 }
 
 export function requestMime(exchange: Exchange): string {
@@ -27,14 +29,60 @@ export function parseRequestBody(exchange: Exchange): ParsedBody | undefined {
     for (const [key, item] of new URLSearchParams(raw)) value[key] = parseJson(item) ?? item;
     return { mime, value, form: true };
   }
+  if (mime.includes("multipart/form-data")) return multipart(exchange, raw, mime);
+  return plainBody(raw, mime);
+}
+
+function plainBody(raw: string, mime: string): ParsedBody {
   const json = parseJson(raw);
   if (json !== undefined) return { mime: mime || "application/json", value: json };
   return { mime: mime || "text/plain" };
 }
 
+const PART_NAME = /content-disposition:[^\r\n]*?\bname="([^"]*)"/i;
+const PART_FILE = /content-disposition:[^\r\n]*?\bfilename="/i;
+
+/** Text fields keep their values; file fields are named only (their bytes are never kept). */
+function multipart(exchange: Exchange, raw: string, mime: string): ParsedBody {
+  const header = exchange.requestHeaders["content-type"] ?? "";
+  const boundary =
+    /boundary="?([^";]+)"?/i.exec(header)?.[1] ?? /^--([^\r\n]+)/.exec(raw)?.[1] ?? "";
+  const value: Record<string, unknown> = {};
+  const files: string[] = [];
+  if (boundary)
+    for (const part of raw.split("--" + boundary)) {
+      const name = PART_NAME.exec(part)?.[1];
+      if (!name) continue;
+      if (PART_FILE.test(part)) {
+        files.push(name);
+        continue;
+      }
+      const text = part
+        .split(/\r?\n\r?\n/)
+        .slice(1)
+        .join("\n\n")
+        .replace(/\r?\n$/, "");
+      value[name] = text;
+    }
+  return { mime, value, ...(files.length ? { files } : {}) };
+}
+
+/** A response body as JSON; newline-delimited JSON becomes an array of its lines. */
 export function responseJson(exchange: Exchange): unknown {
   if (exchange.responseBase64) return undefined;
+  const mime = exchange.responseMime ?? exchange.responseHeaders["content-type"] ?? "";
+  if (/x-ndjson|jsonl|json-seq/i.test(mime)) return ndjson(exchange.responseBody);
   return parseJson(exchange.responseBody);
+}
+
+export function ndjson(text: string | undefined): unknown[] | undefined {
+  if (text === undefined) return undefined;
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => (line.startsWith(String.fromCharCode(30)) ? line.slice(1) : line).trim())
+    .filter(Boolean);
+  const values = lines.map((line) => parseJson(line));
+  return values.every((item) => item !== undefined) ? values : undefined;
 }
 
 export interface GraphqlCall {

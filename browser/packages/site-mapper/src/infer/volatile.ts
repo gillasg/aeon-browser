@@ -108,3 +108,21 @@ export function volatileFields(samples: Sample[]): VolatileField[] {
     if (!found.has(field.pointer)) found.set(field.pointer, field);
   return [...found.values()].slice(0, MAX_FIELDS);
 }
+
+const HASH = /^[0-9a-f]{16,}$/i;
+const MINTED = /^[A-Za-z0-9+/=_-]{24,}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const YEAR_MS = 365 * 24 * 3600 * 1000;
+
+/** A value a client mints rather than chooses: a hash, a nonce, a UUID or a current timestamp. */
+export function looksGenerated(value: unknown): boolean {
+  if (typeof value === "number") return nearNow(value);
+  if (typeof value !== "string") return false;
+  if (/^\d{10}(\d{3})?$/.test(value)) return nearNow(Number(value));
+  return HASH.test(value) || UUID.test(value) || (MINTED.test(value) && /\d/.test(value));
+}
+
+function nearNow(value: number): boolean {
+  const ms = value < 1e12 ? value * 1000 : value;
+  return Math.abs(ms - Date.now()) < 5 * YEAR_MS && value >= 1e9;
+}

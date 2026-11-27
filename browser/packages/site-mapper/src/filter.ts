@@ -220,9 +220,18 @@ function isDocument(exchange: Exchange): boolean {
   return !exchange.resourceType && exchange.method === "GET" && mime.includes("html");
 }
 
+/** A host whose first label says it only collects: telemetry.example.com, rum.example.net. */
+const COLLECTOR_LABEL =
+  /^(telemetry|metrics|events|log|logs|rum|stats|collector|beacon|insights|track(ing)?)$/i;
+
+export function collectorHost(url: URL): boolean {
+  const labels = url.hostname.split(".");
+  return labels.length > 2 && COLLECTOR_LABEL.test(labels[0] ?? "");
+}
+
 function analyticsHost(url: URL): boolean {
   const target = url.hostname + url.pathname;
-  if (isNoiseHost(url.hostname)) return true;
+  if (isNoiseHost(url.hostname) || collectorHost(url)) return true;
   return ANALYTICS_HOSTS.some(
     (host) => target === host || target.startsWith(host) || target.includes("." + host),
   );
@@ -247,8 +256,33 @@ function transportReason(exchange: Exchange): string | undefined {
   return exchange.status === 0 ? "failed or blocked" : undefined;
 }
 
-function optionReason(url: URL, options: FilterOptions): string | undefined {
-  if (options.origins?.length && !options.origins.some((origin) => originMatches(url, origin)))
+/** The page that made a request: its referer, or the script that sent it. */
+function initiatorUrls(exchange: Exchange): URL[] {
+  const urls = [exchange.pageUrl, exchange.initiator?.url, exchange.initiator?.stack?.[0]?.url];
+  return urls.flatMap((href) => {
+    try {
+      return href ? [new URL(href)] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * A call to another host that the site's own page made and that answers with data is the
+ * site's API too (a search service on its own domain): it is attributed to the site.
+ */
+function sitesOwnCall(exchange: Exchange, origins: string[]): boolean {
+  const fromSite = initiatorUrls(exchange).some((page) =>
+    origins.some((origin) => originMatches(page, origin)),
+  );
+  return fromSite && isUsefulResponse(exchange);
+}
+
+function optionReason(url: URL, options: FilterOptions, exchange?: Exchange): string | undefined {
+  const origins = options.origins ?? [];
+  const outside = origins.length > 0 && !origins.some((origin) => originMatches(url, origin));
+  if (outside && !(exchange && sitesOwnCall(exchange, origins)))
     return "outside the allowed origins";
   if (options.include?.length && !matchesAny(options.include, url)) return "not matched by include";
   if (matchesAny(options.exclude, url)) return "matched by exclude";
@@ -257,7 +291,7 @@ function optionReason(url: URL, options: FilterOptions): string | undefined {
 
 /** Why an exchange is not part of the API, or undefined to keep it. */
 function dropReason(exchange: Exchange, url: URL, options: FilterOptions): string | undefined {
-  const reason = transportReason(exchange) ?? optionReason(url, options);
+  const reason = transportReason(exchange) ?? optionReason(url, options, exchange);
   if (reason) return reason;
   if (analyticsHost(url)) return "analytics or ads";
   if (BOT_DEFENSE.some((pattern) => pattern.test(url.href))) return "bot defense";
@@ -317,7 +351,7 @@ function answersNothing(exchange: Exchange): boolean {
  * anyone can call for its result.
  */
 export function isTelemetry(exchange: Exchange, url: URL): boolean {
-  if (sentByBeacon(exchange)) return true;
+  if (sentByBeacon(exchange) || collectorHost(url)) return true;
   const writes = exchange.method !== "GET" && exchange.method !== "HEAD";
   const onNoisePath = NOISE_PATHS.test(url.pathname);
   if (writes && answersNothing(exchange))

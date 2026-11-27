@@ -44,6 +44,11 @@ export interface Exchange {
   responseBody?: string;
   responseBase64?: boolean;
   initiator?: Initiator;
+  /**
+   * Where the recorder found each secret request header's raw value (`meta:csrf`,
+   * `cookie:sid`, `storage:token`, `response:<url>#<pointer>`). Only the tag, never the value.
+   */
+  provenance?: Record<string, string>;
   frames?: Frame[];
   messages?: SseMessage[];
   /** The page that made the request, when known. */
@@ -67,8 +72,10 @@ export interface Param {
   in: "path" | "query" | "header" | "cookie";
   required: boolean;
   schema: JsonSchema;
-  /** A value that was the same in every sample. */
+  /** Protocol plumbing or a minted value that was the same in every sample: never an input. */
   constant?: string;
+  /** What the site sent every time for an optional input: replayed when the caller passes none. */
+  default?: string;
   /** Values the client makes up itself: fresh ones are generated on every call. */
   generated?: "uuid" | "timestamp-ms" | "timestamp-s" | "nonce";
   /**
@@ -182,6 +189,8 @@ export interface Operation {
     form?: boolean;
     /** Top-level fields that had the same value in every recorded body; replay fills them in. */
     constants?: Record<string, string | number | boolean>;
+    /** Top-level fields the caller may set, with the value every recording sent. */
+    defaults?: Record<string, string | number | boolean>;
   };
   responses: Record<string, { mime: string; schema?: JsonSchema }>;
   /** MCP `outputSchema` (object root) for what the operation answers; optional, inferred. */

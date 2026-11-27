@@ -15,6 +15,7 @@ import {
   type ParsedBody,
 } from "./bodies.js";
 import { bodyConstants } from "./body-constants.js";
+import { constantOrDefault, inputExamples, inputSchema, splitBodyConstants } from "./inputs.js";
 import { inferSchema, shapeKey, similarity } from "./schema.js";
 import { camel, singular, templatePaths, type SegmentKind } from "./templates.js";
 import { undoubled } from "../sealed.js";
@@ -196,11 +197,11 @@ export function isTelemetryHeader(name: string): boolean {
   return TELEMETRY_HEADERS.test(name);
 }
 
-function stringSchema(values: string[]): Param["schema"] {
+function stringSchema(values: string[], name = "", slug = false): Param["schema"] {
   if (values.every((value) => /^-?\d+$/.test(value))) return { type: "integer" };
   if (values.every((value) => /^-?\d+(\.\d+)?$/.test(value))) return { type: "number" };
   if (values.every((value) => value === "true" || value === "false")) return { type: "boolean" };
-  return inferSchema(values);
+  return inputSchema(inferSchema(values), name, values, slug);
 }
 
 function collectParams(
@@ -227,11 +228,11 @@ function collectParams(
       name,
       in: location,
       required: presence === total,
-      schema: stringSchema(list),
-      examples: [...new Set(list)].slice(0, 3),
+      schema: stringSchema(list, name),
+      examples: inputExamples(list),
     };
-    if (total >= 2 && new Set(list).size === 1 && presence === total)
-      param.constant = list[0] as string;
+    if (location === "query" && total >= 2 && new Set(list).size === 1 && presence === total)
+      constantOrDefault(param, list[0] as string);
     // A header the page sent with one value (a platform flag, a schema name) is replayed as is:
     // a caller never has to pass it.
     if (location === "header" && param.constant === undefined && new Set(list).size === 1)
@@ -254,8 +255,8 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
           ? { type: "integer" }
           : kind === "uuid"
             ? { type: "string", format: "uuid" }
-            : stringSchema(values),
-      examples: [...new Set(values)].slice(0, 3),
+            : stringSchema(values, name, kind === "slug"),
+      examples: inputExamples(values),
     };
     markPersistedHash(param, group.template, group.members);
     return param;
@@ -393,9 +394,22 @@ function requestBody(group: Group): Operation["requestBody"] {
     schema: values.length ? inferSchema(values) : {},
   };
   if (first.form) body.form = true;
-  const constants = bodyConstants(values);
+  // A GraphQL or JSON-RPC envelope (query, operationName, jsonrpc) is never the caller's.
+  const recorded = bodyConstants(values);
+  const envelope = group.kind === "graphql" || group.kind === "jsonrpc";
+  const { constants, defaults } = envelope
+    ? { constants: recorded, defaults: undefined }
+    : splitBodyConstants(recorded);
   if (constants) body.constants = constants;
+  if (defaults) body.defaults = defaults;
+  if (first.files?.length) addFileFields(body.schema, first.files);
   return body;
+}
+
+/** Multipart file parts are binary strings, whatever text a recording kept of them. */
+function addFileFields(schema: Param["schema"], files: string[]): void {
+  const properties = (schema.properties ??= {}) as Record<string, Param["schema"]>;
+  for (const name of files) properties[name] = { type: "string", format: "binary" };
 }
 
 function graphqlTemplate(group: Group): Operation["graphql"] {
@@ -416,6 +430,15 @@ function graphqlTemplate(group: Group): Operation["graphql"] {
   const variables = graphqlVariables(calls);
   if (variables.length) template.variables = variables;
   return template;
+}
+
+/** GraphQL `variables` is an object, also when a persisted GET sent it as JSON text or not at all. */
+export function variablesSchema(calls: readonly (GraphqlCall | undefined)[]): Param["schema"] {
+  const records = calls
+    .map((call) => call?.variables)
+    .filter((value) => !!value && typeof value === "object" && !Array.isArray(value));
+  const schema = records.length ? inferSchema(records) : {};
+  return schema.type === "object" ? schema : { type: "object", properties: {} };
 }
 
 /** The one value every recording had, or undefined when they differ or any is missing. */
@@ -524,8 +547,23 @@ export function buildOperation(group: Group): Operation {
   if (body) operation.requestBody = body;
   const graphql = graphqlTemplate(group);
   if (graphql) operation.graphql = graphql;
+  if (group.kind === "graphql") objectVariables(operation, group);
   operation.id = operationName(operation);
   return operation;
+}
+
+/** The `variables` input of a GraphQL operation, query string or body, is an object schema. */
+function objectVariables(operation: Operation, group: Group): void {
+  const schema = variablesSchema(group.members.map((member) => member.graphql));
+  for (const param of operation.params)
+    if (param.in === "query" && param.name === "variables") {
+      param.schema = schema;
+      delete param.constant;
+      delete param.default;
+    }
+  const properties = operation.requestBody?.schema.properties as
+    Record<string, Param["schema"]> | undefined;
+  if (properties && "variables" in properties) properties.variables = schema;
 }
 
 const VERBS: Record<string, string> = {
