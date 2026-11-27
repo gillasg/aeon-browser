@@ -19,18 +19,12 @@
     {
       "step": "entries",
       "kind": "eventually",
-      "result": [
-        "log plain log 1",
-        "warning careful",
-        "error bad thing"
-      ]
+      "result": ["log plain log 1", "warning careful", "error bad thing"]
     },
     {
       "step": "errors-only",
       "kind": "eventually",
-      "result": [
-        "error bad thing"
-      ]
+      "result": ["error bad thing"]
     }
   ]
 }

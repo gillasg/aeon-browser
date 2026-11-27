@@ -66,6 +66,7 @@ PLAN*.md
 plans/
 notes/
 apps/chrome-extension/test/.orb-module-*
+packages/pi-adapter/.agent-footprint-*
 
 # Stealth bench runs stay on the machine that ran them.
 /benchmarks/stealth/results/

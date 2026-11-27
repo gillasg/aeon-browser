@@ -2,12 +2,13 @@
  * End to end: the built extension's Chat page, a fake Core, and real Chrome. Clicking
  * "Add or manage models…" opens Graft's Models page in a new tab.
  */
+import { waitForDebugPort } from "./browser-cdp-helper.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -305,14 +306,7 @@ async function evaluate(browser, sessionId, expression) {
 }
 
 async function debugPort(profile) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      return Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]);
-    } catch {
-      await sleep(100);
-    }
-  }
-  throw new Error("Chrome did not open a debugging port");
+  return Number(await waitForDebugPort(profile));
 }
 
 async function waitForTarget(port, match) {

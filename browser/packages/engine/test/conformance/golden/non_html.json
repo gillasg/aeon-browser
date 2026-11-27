@@ -14,10 +14,7 @@
     {
       "step": "png",
       "kind": "ok",
-      "result": [
-        40,
-        30
-      ]
+      "result": [40, 30]
     }
   ]
 }

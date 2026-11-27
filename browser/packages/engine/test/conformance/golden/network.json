@@ -33,6 +33,7 @@
       "result": [
         "GET PRIMARY/api/data?q=1 200",
         "GET PRIMARY/api/worker 200",
+        "GET PRIMARY/gate-arrived/abort 200",
         "GET PRIMARY/gate/abort undefined",
         "GET PRIMARY/landed 200",
         "GET PRIMARY/network 200",
@@ -46,10 +47,7 @@
     {
       "step": "redirect-hops",
       "kind": "ok",
-      "result": [
-        "PRIMARY/r/1 302",
-        "PRIMARY/r/2 302"
-      ]
+      "result": ["PRIMARY/r/1 302", "PRIMARY/r/2 302"]
     },
     {
       "step": "redirect-hops-match-log",
@@ -64,9 +62,7 @@
     {
       "step": "worker-request",
       "kind": "ok",
-      "result": [
-        "PRIMARY/api/worker 200"
-      ]
+      "result": ["PRIMARY/api/worker 200"]
     },
     {
       "step": "worker-request-captured",
@@ -76,9 +72,7 @@
     {
       "step": "cross-frame-fetch",
       "kind": "ok",
-      "result": [
-        "CROSS/api/frame 200"
-      ]
+      "result": ["CROSS/api/frame 200"]
     },
     {
       "step": "cross-frame-fetch-captured",
@@ -88,16 +82,12 @@
     {
       "step": "aborted",
       "kind": "ok",
-      "result": [
-        "PRIMARY/gate/abort done"
-      ]
+      "result": ["PRIMARY/gate/abort done"]
     },
     {
       "step": "cross-frame-first-request",
       "kind": "ok",
-      "result": [
-        "CROSS/network/frame 200"
-      ]
+      "result": ["CROSS/network/frame 200"]
     }
   ]
 }

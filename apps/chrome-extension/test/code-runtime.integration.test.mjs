@@ -1,11 +1,12 @@
 /* eslint-disable max-lines-per-function, complexity -- one end-to-end scenario with its fake Core */
 // End to end: the built extension in real Chrome, connected to a fake Core, running browser_code cells.
+import { waitForDebugPort } from "./browser-cdp-helper.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -650,14 +651,7 @@ async function callOnNode(page, node, functionDeclaration, args = []) {
 }
 
 async function debugPort(profile) {
-  for (let i = 0; i < 100; i++) {
-    try {
-      return Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]);
-    } catch {
-      await sleep(100);
-    }
-  }
-  throw new Error("Chrome did not open a debugging port");
+  return Number(await waitForDebugPort(profile));
 }
 
 async function waitForTarget(port, match) {

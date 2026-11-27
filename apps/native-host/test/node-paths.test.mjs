@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { posix, win32 } from "node:path";
 import test from "node:test";
 import { appRoot, dataDirectory, hostPaths, runtimeDirectory, socketPath } from "../node/paths.mjs";
@@ -60,7 +59,8 @@ test(
   () => {
     // The Chrome-launched host and the launchd supervisor both call hostPaths(); a single resolved
     // runtime directory is what makes them agree on the bootstrap socket.
-    const privateTemp = mkdtempSync(posix.join(tmpdir(), "graft-mac-tmp-"));
+    // Short and fixed: an ambient TMPDIR can be long enough to push the socket over 104 bytes.
+    const privateTemp = mkdtempSync("/tmp/graft-mac-tmp-");
     try {
       const options = { env: { TMPDIR: privateTemp }, platform: "darwin", home: "/Users/tester" };
       const expected = posix.join(privateTemp, "graft");

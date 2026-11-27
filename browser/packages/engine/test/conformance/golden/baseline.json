@@ -16,10 +16,7 @@
         "print": false,
         "reducedMotion": "<HOST>",
         "ua": "HeadlessChrome",
-        "viewport": [
-          1280,
-          600
-        ]
+        "viewport": [1280, 600]
       }
     }
   ]

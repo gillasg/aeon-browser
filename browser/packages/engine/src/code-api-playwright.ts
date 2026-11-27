@@ -34,12 +34,16 @@ function __diffImageParts(options) {
   delete store[options.id + ':before'];
   delete store[options.id + ':after'];
   if (!Object.keys(store).length) delete window.__uxbDiffParts;
+  // createImageBitmap on raw bytes, not an <img> onload: Chrome can hold back image loading in a
+  // background tab (seen on macOS), which stalled the evaluate past its deadline.
   function load(source) {
-    return new Promise(function (resolve, reject) {
-      var image = new Image();
-      image.onload = function () { resolve(image); };
-      image.onerror = function () { reject(new Error('SCREENSHOT_DECODE_FAILED')); };
-      image.src = source;
+    var comma = source.indexOf(',');
+    var mime = (/^data:([^;,]+)/.exec(source) || [])[1] || 'image/png';
+    var binary = atob(source.slice(comma + 1));
+    var bytes = new Uint8Array(binary.length);
+    for (var b = 0; b < binary.length; b++) bytes[b] = binary.charCodeAt(b);
+    return createImageBitmap(new Blob([bytes], { type: mime })).catch(function () {
+      throw new Error('SCREENSHOT_DECODE_FAILED');
     });
   }
   return (async function () {

@@ -1,13 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-export async function waitForDebugPort(profilePath) {
-  const deadline = Date.now() + 15000;
+// Cold macOS runners can take well over 15s to write DevToolsActivePort, and a half-written
+// file reads as an empty or zero port, so poll until the first line is a real port.
+export async function waitForDebugPort(profilePath, timeout = 60000) {
+  const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     try {
       const port = (await readFile(join(profilePath, "DevToolsActivePort"), "utf8")).split(
         /\r?\n/,
       )[0];
-      if (/^\d+$/.test(port)) return port;
+      if (/^\d+$/.test(port) && Number(port) > 0) return port;
     } catch {
       /* Chrome writes its debugging port after startup. */
     }
