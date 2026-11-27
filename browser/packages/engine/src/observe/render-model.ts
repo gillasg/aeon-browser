@@ -30,6 +30,8 @@ export interface Line {
   id?: number;
   value?: string;
   token?: string;
+  /** A table's " columns: a | b" suffix, kept when the row count is redone. */
+  columns?: string;
 }
 
 export const RANK: Record<Section, number> = {

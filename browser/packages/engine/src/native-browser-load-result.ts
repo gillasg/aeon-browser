@@ -84,6 +84,25 @@ export function policyBlockedError(
   );
 }
 
+/**
+ * The tab is still open but now shows a page the agent cannot drive: another extension's block
+ * page, Chrome's error page, or a policy page. That is a blocked site, not a closed tab.
+ */
+export function blockedPageError(url: string): BrowserActionError | undefined {
+  const kind = /^chrome-extension:/i.test(url)
+    ? "another extension's block page"
+    : /^chrome-error:/i.test(url)
+      ? "Chrome's error page"
+      : /^chrome:\/\/(policy|blocked|managed)/i.test(url)
+        ? "a browser policy page"
+        : "";
+  if (!kind) return undefined;
+  return new BrowserActionError(
+    "POLICY_BLOCKED",
+    `the tab is open but now shows ${kind} (${url.slice(0, 200)}) instead of the site; the site is likely blocked there, so ask the user or try another site`,
+  );
+}
+
 export function hintEvaluateError(description: string): string {
   const text = String(description ?? "");
   if (/^ReferenceError/.test(text) && /\b(window|document|location|self|localStorage)\b/.test(text))

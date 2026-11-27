@@ -116,13 +116,34 @@ function toolText(result: CallResult): string {
 
 function toolValue(result: CallResult): unknown {
   if (result?.structuredContent !== undefined) return result.structuredContent;
-  const text = (result?.content ?? [])
+  const texts = (result?.content ?? [])
     .filter((part) => part && part.text !== undefined)
-    .map((part) => String(part.text ?? ""))
-    .join("\n");
+    .map((part) => String(part.text ?? ""));
+  const whole = parseJson(texts.join("\n"));
+  if (whole.ok) return whole.value;
+  // A JSON block plus a warning block stays JSON: the warning goes in its own field.
+  const parsed = texts.map(parseJson);
+  const data = parsed.flatMap((item) =>
+    item.ok && typeof item.value === "object" && item.value ? [item.value] : [],
+  );
+  const [only] = data;
+  if (data.length !== 1 || !only) return texts.join("\n");
+  const warnings = texts
+    .filter((_, index) => parsed[index]?.ok !== true)
+    .map((text) => text.trim());
+  return withWarnings(only, warnings.filter(Boolean));
+}
+
+function parseJson(text: string): { ok: boolean; value?: unknown } {
   try {
-    return JSON.parse(text) as unknown;
+    return { ok: true, value: JSON.parse(text) as unknown };
   } catch {
-    return text;
+    return { ok: false };
   }
+}
+
+function withWarnings(value: object, warnings: string[]): unknown {
+  if (!warnings.length) return value;
+  if (Array.isArray(value)) return Object.assign(value, { warnings });
+  return "warnings" in value ? { ...value, toolWarnings: warnings } : { ...value, warnings };
 }

@@ -76,3 +76,39 @@ test("candidates stay at eight", () => {
   const matches = Array.from({ length: 12 }, (_, index) => node(index + 1, "button", "Edit"));
   assert.equal(ambiguousCandidates(matches, matches).length, 8);
 });
+
+test("a typo in the name still finds the control it meant", () => {
+  assert.ok(nameScore("Sav chnges", "Save changes") > 0);
+  assert.ok(nameScore("Sumbit", "Submit") > 0);
+  assert.equal(nameScore("Sumbit", "Cancel"), 0);
+  const tree = [node(12, "button", "Save changes"), node(13, "button", "Cancel")];
+  assert.deepEqual(
+    nearestCandidates(tree, "button", "Sav chnges").map((item) => item.id),
+    [12],
+  );
+});
+
+test("nearest candidates stop at five", () => {
+  const tree = Array.from({ length: 9 }, (_, index) => node(index + 1, "button", `Save ${index}`));
+  assert.equal(nearestCandidates(tree, "button", "Save").length, 5);
+});
+
+test("a page with none of the role says so and offers other roles", () => {
+  const tree = [node(20, "checkbox", "Save changes"), node(21, "heading", "Settings")];
+  const error = notFoundError(tree, "button", "Save changes");
+  assert.match(error.detail, /The page has no button elements/);
+  assert.equal(error.recovery.candidates[0].id, 20);
+  assert.equal(error.recovery.candidates[0].role, "checkbox");
+});
+
+test("a huge page is scanned only up to the cap", () => {
+  const tree = Array.from({ length: 6000 }, (_, index) => node(index + 1, "button", `B${index}`));
+  tree.push(node(9999, "button", "Save changes"));
+  const started = performance.now();
+  const error = notFoundError(tree, "button", "Save changes!");
+  assert.ok(performance.now() - started < 500);
+  assert.equal(
+    (error.recovery.candidates ?? []).some((item) => item.id === 9999),
+    false,
+  );
+});
