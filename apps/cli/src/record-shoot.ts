@@ -1,8 +1,8 @@
-// `aeon record shoot <plan.json>`: a whole walkthrough from a declarative plan. Every scene is its
-// own take (its own folder); its steps open pages, drive Aeon's UI, run real prompts, mark beats,
+// `graft record shoot <plan.json>`: a whole walkthrough from a declarative plan. Every scene is its
+// own take (its own folder); its steps open pages, drive Graft's UI, run real prompts, mark beats,
 // wait on real conditions and hold still. Capture always stops in `finally`, so a failed step
 // never leaves ffmpeg running. With --assemble (or an --out ending in .mp4) the takes are cut
-// into one MP4 by `aeon record assemble`.
+// into one MP4 by `graft record assemble`.
 import type { UiAction } from "./record-ui.js";
 import { isUiAction, UI_ACTIONS } from "./record-ui.js";
 
@@ -325,4 +325,4 @@ export function shootTarget(
 }
 
 export const SHOOT_USAGE =
-  "Usage: aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--browser <name>] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>] [--display :N]";
+  "Usage: graft record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--browser <name>] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>] [--display :N]";

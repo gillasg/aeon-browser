@@ -11,7 +11,7 @@ import {
 } from "../dist/site-mapping.js";
 
 async function tempMapping(t) {
-  const root = await mkdtemp(join(tmpdir(), "aeon-mapping-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-mapping-"));
   const home = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = join(root, "registry");
   t.after(async () => {

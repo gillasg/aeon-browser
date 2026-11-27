@@ -1,7 +1,7 @@
 // Runs a site recipe: resolves parameters, tries its strategies in order (site API, then page
 // collect, then a script), pages a cursor API, maps and filters records, and keeps write receipts
 // so a repeat is a no-op. The host supplies the four touch points (call, write, collect, script),
-// so the same runtime works from the CLI, an MCP session or Aeon's daemon.
+// so the same runtime works from the CLI, an MCP session or Graft's daemon.
 
 import {
   findReceipt,

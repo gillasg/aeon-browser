@@ -12,7 +12,7 @@ import { sensitivePaths } from "./os-sandbox.js";
 const PROFILE_PATH =
   /(chrome|chromium|edge|brave)[^"'\n]{0,40}user[ _]data|login[ _]data|google-chrome[\\/]|\.config[\\/](chromium|microsoft-edge|brave)|application support[\\/](google[\\/]chrome|chromium|microsoft edge|bravesoftware)/i;
 
-/** Tools that act on the machine itself rather than through Aeon's browser tools. */
+/** Tools that act on the machine itself rather than through Graft's browser tools. */
 const MACHINE_TOOLS = new Set([
   "bash",
   "powershell",
@@ -36,7 +36,7 @@ export function touchesBrowserProfile(toolName: string, input: unknown): boolean
 }
 
 export const CREDENTIAL_REFUSAL =
-  "BLOCKED: keychains, SSH/GPG keys, cloud credentials and Aeon's own tokens are never read, copied or changed from a tool.";
+  "BLOCKED: keychains, SSH/GPG keys, cloud credentials and Graft's own tokens are never read, copied or changed from a tool.";
 
 const FILE_TOOLS = new Set(["read", "write", "edit", "ls", "find", "grep"]);
 const SHELL_TOOLS = new Set(["bash", "powershell"]);

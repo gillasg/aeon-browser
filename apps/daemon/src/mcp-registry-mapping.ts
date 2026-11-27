@@ -1,5 +1,5 @@
 import { posix, win32 } from "node:path";
-import type { McpCapability } from "@aeon/domain";
+import type { McpCapability } from "@graft/domain";
 import { parseCredentialBindings, type CredentialBinding } from "./mcp-credentials.js";
 
 export type PiMcpServerConfig =
@@ -99,7 +99,7 @@ export function mapRegisteredCliBridge(
       command: bridge.command,
       args: [bridge.scriptPath, "--registry", bridge.registryPath],
       cwd: resolveConfiguredDirectory(defaultWorkingDirectory),
-      description: "The command-line tools the user registered in Aeon.",
+      description: "The command-line tools the user registered in Graft.",
       enabled: true,
       exposure: "codemode",
     },

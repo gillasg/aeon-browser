@@ -1,7 +1,7 @@
 import { migrateLegacyChromeStorage } from "./legacy-storage-migration.js";
 
-const INSTANCE_KEY = "aeon-client-instance-id";
-const RUN_KEY = "aeon-browser-run-id";
+const INSTANCE_KEY = "graft-client-instance-id";
+const RUN_KEY = "graft-browser-run-id";
 
 export interface BrowserIdentity {
   clientInstanceId: string;

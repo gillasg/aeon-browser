@@ -14,7 +14,7 @@ function __htmlOf(options) {
   if (!root) return { error: 'nothing matches ' + options.selector };
   var clone = root.cloneNode(true);
   if (options.stripScripts !== false) for (var el of clone.querySelectorAll('script,style,noscript,link[rel=stylesheet]')) el.remove();
-  for (var attr of ['data-aeon-overlay']) for (var marked of clone.querySelectorAll?.('[' + attr + ']') || []) marked.remove();
+  for (var attr of ['data-graft-overlay']) for (var marked of clone.querySelectorAll?.('[' + attr + ']') || []) marked.remove();
   var html = options.outer ? clone.outerHTML : clone.innerHTML;
   var max = Math.max(1000, options.max || 200000);
   return { html: html.length > max ? html.slice(0, max) : html, length: html.length, truncated: html.length > max };
@@ -626,7 +626,7 @@ function __validShape(value, schema) {
 // Annotation for screenshots: numbered boxes over interactive elements, as a page overlay.
 function __annotateShim() {
   var layer = document.createElement('div');
-  layer.setAttribute('data-aeon-overlay', 'annotate');
+  layer.setAttribute('data-graft-overlay', 'annotate');
   layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
   var index = 0;
   for (var node of document.querySelectorAll('button,a,[role=button],input,select,textarea')) {

@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { CoreBrowserRunRequestSchema, CoreBrowserRunResultSchema } from "@aeon/protocol";
+import { CoreBrowserRunRequestSchema, CoreBrowserRunResultSchema } from "@graft/protocol";
 import { join } from "node:path";
 import {
   cellWorkspaceCall,
-  createAeonHostHandler,
+  createGraftHostHandler,
   sessionChatId,
   siteMapperRequest,
-} from "@aeon/pi-adapter";
+} from "@graft/pi-adapter";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { pin } from "./core-browsers.js";
 
-// `aeon repl`, and every command that needs the browser, run browser code in the user's Chrome
+// `graft repl`, and every command that needs the browser, run browser code in the user's Chrome
 // through the same executor as browser_code. The CLI gets the cell's own value and output back
 // (not the model-facing summary), so it can print exactly what browserkit prints.
 
@@ -80,9 +80,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // What a CLI cell may ask the daemon for: site notes, abilities, site APIs, learned hints and
 // sign-ins, as a chat's cells do, plus workspace files and upload checks rooted in the session's
-// own workspace folder, so artifact() and page.upload() work from `aeon repl` as in a chat.
+// own workspace folder, so artifact() and page.upload() work from `graft repl` as in a chat.
 export function cliCall(chatId: string, workspace: string): (call: unknown) => Promise<unknown> {
-  const host = createAeonHostHandler({
+  const host = createGraftHostHandler({
     source: "external",
     siteMapper: (request) => siteMapperRequest(chatId, request),
     extra: (request) => cellWorkspaceCall(request, workspace),

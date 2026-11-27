@@ -15,14 +15,14 @@ import { waitForConnection } from "../apps/bridge/dist/commands/browser.js";
 
 const existing = (paths) => (path) => paths.includes(path);
 
-test("the source checkout's Aeon extension is preferred over browserkit's", () => {
-  const [aeon, aeonDist, browserkit] = sourceBuilds(
+test("the source checkout's Graft extension is preferred over browserkit's", () => {
+  const [graft, graftDist, browserkit] = sourceBuilds(
     pathToFileURL(resolve("/repo/browser/apps/bridge/dist/x.js")).href,
   );
-  assert.equal(aeon, resolve("/repo/apps/chrome-extension/native-dist"));
-  assert.equal(aeonDist, resolve("/repo/apps/chrome-extension/dist"));
+  assert.equal(graft, resolve("/repo/apps/chrome-extension/native-dist"));
+  assert.equal(graftDist, resolve("/repo/apps/chrome-extension/dist"));
   assert.equal(browserkit, resolve("/repo/browser/apps/extension/build"));
-  const all = [aeon, aeonDist, browserkit];
+  const all = [graft, graftDist, browserkit];
   assert.equal(
     resolveExtensionFolder(all, existing([join(browserkit, "manifest.json")])),
     browserkit,
@@ -30,9 +30,9 @@ test("the source checkout's Aeon extension is preferred over browserkit's", () =
   assert.equal(
     resolveExtensionFolder(
       all,
-      existing([join(aeon, "manifest.json"), join(browserkit, "manifest.json")]),
+      existing([join(graft, "manifest.json"), join(browserkit, "manifest.json")]),
     ),
-    aeon,
+    graft,
   );
   assert.equal(resolveExtensionFolder(all, existing([])), undefined);
 });
@@ -40,15 +40,15 @@ test("the source checkout's Aeon extension is preferred over browserkit's", () =
 test("release assets match the newest naming first", () => {
   const asset = (name) => ({ name, browser_download_url: `https://x/${name}` });
   assert.equal(
-    matchReleaseAsset([asset("browserkit-0.3.zip"), asset("aeon-extension-1.0.zip")]).name,
-    "aeon-extension-1.0.zip",
+    matchReleaseAsset([asset("browserkit-0.3.zip"), asset("graft-extension-1.0.zip")]).name,
+    "graft-extension-1.0.zip",
   );
   assert.equal(
-    matchReleaseAsset([asset("aeon-browser-extension-1.0.zip"), asset("notes.txt")]).name,
-    "aeon-browser-extension-1.0.zip",
+    matchReleaseAsset([asset("graft-browser-extension-1.0.zip"), asset("notes.txt")]).name,
+    "graft-browser-extension-1.0.zip",
   );
   assert.equal(matchReleaseAsset([asset("browserkit-0.3.zip")]).name, "browserkit-0.3.zip");
-  assert.equal(matchReleaseAsset([asset("aeon-cli.tar.gz")]), undefined);
+  assert.equal(matchReleaseAsset([asset("graft-cli.tar.gz")]), undefined);
   assert.equal(matchReleaseAsset(undefined), undefined);
 });
 

@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/daemon",
+  "name": "@graft/daemon",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,11 +8,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.2.0",
-    "@aeon/domain": "workspace:*",
-    "@aeon/location": "workspace:*",
-    "@aeon/pi-adapter": "workspace:*",
-    "@aeon/protocol": "workspace:*",
-    "@aeon/store": "workspace:*",
+    "@graft/domain": "workspace:*",
+    "@graft/location": "workspace:*",
+    "@graft/pi-adapter": "workspace:*",
+    "@graft/protocol": "workspace:*",
+    "@graft/store": "workspace:*",
     "@browserkit/cdp": "workspace:*",
     "@browserkit/credentials": "workspace:*",
     "@browserkit/tools": "workspace:*",

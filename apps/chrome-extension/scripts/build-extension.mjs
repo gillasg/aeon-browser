@@ -14,8 +14,8 @@ const STATIC_FILES = [
   "manifest.native.json",
   "chat.html",
   "completion-icon.png",
-  "aeon-icon.svg",
-  ...[16, 32, 48, 128].map((size) => "aeon-icon-" + size + ".png"),
+  "graft-icon.svg",
+  ...[16, 32, 48, 128].map((size) => "graft-icon-" + size + ".png"),
   "viewer.html",
   "site-scripts.html",
   "site-scripts.css",
@@ -46,7 +46,7 @@ export async function buildExtension() {
     jsx: "automatic",
     target: "chrome116",
     loader: { ".ttf": "file" },
-    define: { __AEON_NATIVE_TRANSPORT__: "true", __AEON_BUILD_INFO__: JSON.stringify(buildInfo) },
+    define: { __GRAFT_NATIVE_TRANSPORT__: "true", __GRAFT_BUILD_INFO__: JSON.stringify(buildInfo) },
     plugins: [cursorPaintPlugin(cursorPage)],
   };
   const entries = [
@@ -75,18 +75,18 @@ export async function buildExtension() {
 
 async function writeCursorPage(output) {
   const module = await import(pathToFileURL(engine("cursor-page")).href);
-  // Aeon's own pages load this file as a script; on web pages the engine injects it into the
+  // Graft's own pages load this file as a script; on web pages the engine injects it into the
   // extension's isolated world, so the painter and its globals never reach the page's world.
   await writeFile(join(output, module.CURSOR_SCRIPT_FILE), module.cursorScriptSource());
 }
 
-/** `aeon:cursor-paint` is the painter as a function literal the worker injects; no page event. */
+/** `graft:cursor-paint` is the painter as a function literal the worker injects; no page event. */
 function cursorPaintPlugin(cursorPage) {
-  const namespace = "aeon-cursor-paint";
+  const namespace = "graft-cursor-paint";
   return {
     name: namespace,
     setup(builder) {
-      builder.onResolve({ filter: /^aeon:cursor-paint$/ }, () => ({ path: namespace, namespace }));
+      builder.onResolve({ filter: /^graft:cursor-paint$/ }, () => ({ path: namespace, namespace }));
       builder.onLoad({ filter: /.*/, namespace }, () => ({
         contents: "export const paintCursor = " + cursorPage.cursorFunctionSource() + ";",
         loader: "js",
@@ -127,7 +127,7 @@ async function buildEntries(shared, output, entries) {
   );
 }
 
-// Which revision of Aeon this build used, plus a stamp unique to this build: two builds of one
+// Which revision of Graft this build used, plus a stamp unique to this build: two builds of one
 // revision (a dirty tree, a rebuilt dependency) must still differ, or a stale worker matches.
 function buildInfoText() {
   let revision = null;
@@ -139,7 +139,7 @@ function buildInfoText() {
   } catch {
     // Not a git checkout.
   }
-  return JSON.stringify({ aeon: revision, build: randomUUID() }, null, 2) + "\n";
+  return JSON.stringify({ graft: revision, build: randomUUID() }, null, 2) + "\n";
 }
 
 // Chrome keeps an extension's registered service worker across restarts while the manifest

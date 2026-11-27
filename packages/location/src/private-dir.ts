@@ -2,7 +2,7 @@ import { constants, lstatSync } from "node:fs";
 import { chmod, lstat, mkdir, open, readlink } from "node:fs/promises";
 import { isAbsolute, dirname, join, parse, relative, resolve, sep } from "node:path";
 
-const DEFAULT_FIX = "Set AEON_DATA_DIR or BROWSERKIT_HOME to a directory you own with mode 700.";
+const DEFAULT_FIX = "Set GRAFT_DATA_DIR or BROWSERKIT_HOME to a directory you own with mode 700.";
 
 export class UntrustedDirError extends Error {
   readonly fix: string;

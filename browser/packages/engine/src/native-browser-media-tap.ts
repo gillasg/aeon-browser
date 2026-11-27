@@ -69,18 +69,18 @@ const CAPTION_TAP = String((arg: { action: string; limit: number; after?: number
     seq: number;
     stop: () => void;
   };
-  const w = window as unknown as { __aeonCaptions?: Tap };
+  const w = window as unknown as { __graftCaptions?: Tap };
   if (arg.action === "read") {
-    const tap = w.__aeonCaptions;
+    const tap = w.__graftCaptions;
     return tap ? { cues: tap.cues.filter((cue) => cue.at > (arg.after ?? 0)), seq: tap.seq } : null;
   }
   if (arg.action === "stop") {
-    const had = Boolean(w.__aeonCaptions);
-    w.__aeonCaptions?.stop();
-    delete w.__aeonCaptions;
+    const had = Boolean(w.__graftCaptions);
+    w.__graftCaptions?.stop();
+    delete w.__graftCaptions;
     return { stopped: had };
   }
-  if (w.__aeonCaptions) return { started: true, already: true };
+  if (w.__graftCaptions) return { started: true, already: true };
   const tap: Tap = { cues: [], seq: 0, stop: () => undefined };
   const last = new Map<string, string>();
   const push = (source: string, text: string, start?: number, end?: number) => {
@@ -131,7 +131,7 @@ const CAPTION_TAP = String((arg: { action: string; limit: number; after?: number
   undo.push(() => observer.disconnect());
   scan();
   tap.stop = () => undo.splice(0).forEach((fn) => fn());
-  w.__aeonCaptions = tap;
+  w.__graftCaptions = tap;
   return { started: true };
 });
 

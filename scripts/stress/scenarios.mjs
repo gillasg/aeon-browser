@@ -1,4 +1,4 @@
-// Deterministic stress, soak, chaos, and fuzz scenario catalog for Aeon's browser engine.
+// Deterministic stress, soak, chaos, and fuzz scenario catalog for Graft's browser engine.
 // Pure data + PRNG helpers so unit tests and dry-runs work with zero Chrome dependency.
 
 export function createRng(seed = 1337) {

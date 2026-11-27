@@ -12,7 +12,7 @@ import { inChat } from "./site-browser.js";
 
 const EXPLORES_PER_DAY = 5;
 const RETRY_AFTER_MS = 7 * 86_400_000;
-const BACKGROUND = "aeon-background";
+const BACKGROUND = "graft-background";
 const MAX_REASON = 200;
 // Search engines, sign-in pages and local pages are used, not worth mapping.
 const SKIP =
@@ -83,7 +83,7 @@ export function exploreForRoutine(text: string): void {
 }
 
 function mappingOff(): boolean {
-  return process.env.AEON_BACKGROUND_MAPPING === "0";
+  return process.env.GRAFT_BACKGROUND_MAPPING === "0";
 }
 
 function recentlyExplored(entry: HostState, now: number): boolean {

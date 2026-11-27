@@ -25,7 +25,7 @@ internal sealed class HostConfiguration
         {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Aeon", "host-config.json");
+                "Graft", "host-config.json");
         }
     }
 
@@ -84,21 +84,21 @@ internal sealed class HostConfiguration
         NodeExecutable = ExistingFile(NodeExecutable);
         DaemonEntrypoint = ExistingEntrypoint(DaemonEntrypoint);
         var localAppData = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
-        var appDataRoot = Path.GetFullPath(Path.Combine(localAppData, "Aeon")) + Path.DirectorySeparatorChar;
+        var appDataRoot = Path.GetFullPath(Path.Combine(localAppData, "Graft")) + Path.DirectorySeparatorChar;
         DataDirectory = Path.GetFullPath(DataDirectory);
         if (!DataDirectory.StartsWith(appDataRoot, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Daemon data must live under the user-local Aeon data directory.");
+            throw new InvalidDataException("Daemon data must live under the user-local Graft data directory.");
         Directory.CreateDirectory(DataDirectory);
     }
 
     public static string PipeName()
     {
-        return "aeon-bootstrap-" + UserHash();
+        return "graft-bootstrap-" + UserHash();
     }
 
     public static string MutexName()
     {
-        return "Global\\Aeon-Daemon-" + UserHash();
+        return "Global\\Graft-Daemon-" + UserHash();
     }
 
     public static SecurityIdentifier CurrentUserSid()

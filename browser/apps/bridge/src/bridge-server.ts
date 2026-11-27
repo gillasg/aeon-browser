@@ -55,7 +55,7 @@ interface Cell {
 }
 
 const PROTOCOL = { major: 1, minor: 6 };
-const EXECUTOR_PATH = "/aeon/v1";
+const EXECUTOR_PATH = "/graft/v1";
 
 export class Bridge {
   private readonly executors = new Map<string, Executor>();

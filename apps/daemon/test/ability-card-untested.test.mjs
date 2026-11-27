@@ -9,7 +9,7 @@ import { abilityCards } from "../dist/management-library.js";
 // A way whose tests were run, then edited, is shown as untested on the Sites/Automations card.
 
 async function home() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-ability-untested-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-ability-untested-"));
   process.env.BROWSERKIT_HOME = join(root, "browserkit");
   process.env.SITE_TO_API_HOME = join(root, "sites");
   const site = join(process.env.SITE_TO_API_HOME, "sites", "example.com");

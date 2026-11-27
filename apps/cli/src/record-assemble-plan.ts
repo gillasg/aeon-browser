@@ -1,4 +1,4 @@
-// `aeon record assemble`, the pure half: which stretches of each take to keep (dead air trimmed
+// `graft record assemble`, the pure half: which stretches of each take to keep (dead air trimmed
 // around real events and marks), where the camera may punch in (never past native pixels), the
 // score on the output clock, and the ffmpeg arguments that render it all in one pass.
 import type { Box, Mark, RecordingEvents, SoundCue, VideoEvent } from "./record-events.js";

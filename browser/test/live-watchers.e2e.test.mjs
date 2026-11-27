@@ -45,7 +45,7 @@ test(
         return;
       }
       response.setHeader("content-type", "text/html");
-      // The page polls a JSON endpoint on its own; Aeon never re-requests it.
+      // The page polls a JSON endpoint on its own; Graft never re-requests it.
       response.end(`<!doctype html><title>Status board</title><div id="rows">-</div>
         <script>setInterval(() => fetch('/api/status').then((r) => r.json()).then((d) => {
           document.getElementById('rows').textContent = d.items.map((i) => i.id).join(',');
@@ -96,7 +96,7 @@ test(
       const firstMs = Date.now() - started;
       assert.match(first.stdout, /FIRED false/);
 
-      // The page adds a row on its own. No Aeon timer tick, no new request from Aeon.
+      // The page adds a row on its own. No Graft timer tick, no new request from Graft.
       payload = {
         items: [
           { id: "a", title: "A" },

@@ -5,29 +5,29 @@
 import type { HandoffMeta } from "@browserkit/protocol";
 import { CURSOR_TOKEN_CSS } from "./cursor-mark.js";
 
-export const HANDOFF_ASK_ID = "aeon-agent-ask";
+export const HANDOFF_ASK_ID = "graft-agent-ask";
 
 // The page's one hand-off card: the same neutral obsidian hairline as the cursor box, the agent's
 // message in bone, `I'm done` as a dark-amber glass pill and a quiet Skip. Amber is the only
-// colour Aeon ever shows, and only on the controls that need your hand.
+// colour Graft ever shows, and only on the controls that need your hand.
 const ASK_CSS =
   ":host{all:initial}.ask{box-sizing:border-box;display:flex;flex-direction:column;gap:10px;width:320px;" +
-  "max-width:calc(100vw - 32px);padding:13px 13px 11px 15px;border-radius:var(--aeon-r-18);" +
-  "background:var(--aeon-island-needs);color:var(--aeon-island-ink);-webkit-font-smoothing:antialiased;" +
-  "font:400 var(--aeon-fs-md)/1.5 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;pointer-events:auto;" +
-  "letter-spacing:-0.011em;box-shadow:var(--aeon-island-edge)}" +
-  ".ask p{margin:0;color:var(--aeon-island-ink);white-space:normal;overflow-wrap:anywhere}" +
-  ".ask input{box-sizing:border-box;width:100%;height:30px;border:0;border-radius:var(--aeon-r-full);padding:0 12px;" +
-  "background:transparent;box-shadow:inset 0 0 0 1px var(--aeon-island-needs-line);" +
-  "color:var(--aeon-island-ink);font:inherit;font-size:var(--aeon-fs-sm);outline:none}" +
-  ".ask input::placeholder{color:var(--aeon-island-faint)}" +
+  "max-width:calc(100vw - 32px);padding:13px 13px 11px 15px;border-radius:var(--graft-r-18);" +
+  "background:var(--graft-island-needs);color:var(--graft-island-ink);-webkit-font-smoothing:antialiased;" +
+  "font:400 var(--graft-fs-md)/1.5 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;pointer-events:auto;" +
+  "letter-spacing:-0.011em;box-shadow:var(--graft-island-edge)}" +
+  ".ask p{margin:0;color:var(--graft-island-ink);white-space:normal;overflow-wrap:anywhere}" +
+  ".ask input{box-sizing:border-box;width:100%;height:30px;border:0;border-radius:var(--graft-r-full);padding:0 12px;" +
+  "background:transparent;box-shadow:inset 0 0 0 1px var(--graft-island-needs-line);" +
+  "color:var(--graft-island-ink);font:inherit;font-size:var(--graft-fs-sm);outline:none}" +
+  ".ask input::placeholder{color:var(--graft-island-faint)}" +
   ".ask .row{display:flex;align-items:center;gap:6px}" +
-  ".ask button{border:0;border-radius:var(--aeon-r-full);padding:5px 12px;cursor:pointer;background:transparent;" +
-  "font:500 var(--aeon-fs-sm)/16px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif}" +
-  ".ask button:hover{background:var(--aeon-island-wash)}" +
-  ".ask button:focus-visible{outline:1px solid var(--aeon-island-focus);outline-offset:1px}" +
-  ".ask button.done{color:var(--aeon-island-needs-ink);background:var(--aeon-island-needs-hot);" +
-  "box-shadow:inset 0 0 0 1px var(--aeon-island-needs-line)}.ask button.cancel{color:var(--aeon-island-muted)}";
+  ".ask button{border:0;border-radius:var(--graft-r-full);padding:5px 12px;cursor:pointer;background:transparent;" +
+  "font:500 var(--graft-fs-sm)/16px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif}" +
+  ".ask button:hover{background:var(--graft-island-wash)}" +
+  ".ask button:focus-visible{outline:1px solid var(--graft-island-focus);outline-offset:1px}" +
+  ".ask button.done{color:var(--graft-island-needs-ink);background:var(--graft-island-needs-hot);" +
+  "box-shadow:inset 0 0 0 1px var(--graft-island-needs-line)}.ask button.cancel{color:var(--graft-island-muted)}";
 
 interface AskDetail {
   style: string;
@@ -76,19 +76,19 @@ export async function hideHandoffAsk(tabId: number): Promise<void> {
 
 /** Runs in the tab's isolated world. Helpers are nested so the serialised function is whole. */
 export function showAsk(detail: AskDetail): void {
-  const id = "aeon-agent-ask";
+  const id = "graft-agent-ask";
   const old = document.getElementById(id);
   if (old) old.remove();
   const host = document.createElement("div");
   host.id = id;
-  host.setAttribute("data-aeon-overlay", "");
+  host.setAttribute("data-graft-overlay", "");
   host.style.cssText = "position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none";
   const root = host.attachShadow({ mode: "closed" });
   function send(value: "done" | "cancelled" | { answer: string }): void {
     chrome.runtime
-      .sendMessage({ kind: "aeon.handoff.answer", tabId: detail.tabId, answer: value })
+      .sendMessage({ kind: "graft.handoff.answer", tabId: detail.tabId, answer: value })
       .catch(() => undefined);
-    host.dispatchEvent(new Event("aeon-ask-remove"));
+    host.dispatchEvent(new Event("graft-ask-remove"));
     host.remove();
   }
   function finish(): void {
@@ -120,7 +120,7 @@ export function showAsk(detail: AskDetail): void {
     place();
   }
   window.addEventListener("cursor-overlay-state", onState);
-  host.addEventListener("aeon-ask-remove", () =>
+  host.addEventListener("graft-ask-remove", () =>
     window.removeEventListener("cursor-overlay-state", onState),
   );
   // 12px below the target's ring (above it, or beside it, when there is no room), never over the
@@ -169,9 +169,9 @@ export function showAsk(detail: AskDetail): void {
   const row = document.createElement("div");
   row.className = "ask";
   row.setAttribute("role", "status");
-  row.setAttribute("aria-label", "Aeon needs you");
+  row.setAttribute("aria-label", "Graft needs you");
   const text = document.createElement("p");
-  text.textContent = String(detail.message || "Aeon needs you in this tab.").slice(0, 300);
+  text.textContent = String(detail.message || "Graft needs you in this tab.").slice(0, 300);
   const actions = document.createElement("div");
   actions.className = "row";
   actions.append(
@@ -186,8 +186,8 @@ export function showAsk(detail: AskDetail): void {
 
 /** Runs in the tab's isolated world: drops the ask without touching anything else. */
 function removeAsk(): void {
-  const ask = document.getElementById("aeon-agent-ask");
+  const ask = document.getElementById("graft-agent-ask");
   if (!ask) return;
-  ask.dispatchEvent(new Event("aeon-ask-remove"));
+  ask.dispatchEvent(new Event("graft-ask-remove"));
   ask.remove();
 }

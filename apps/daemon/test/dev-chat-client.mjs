@@ -5,7 +5,7 @@ import {
   HelloAckSchema,
   HelloSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import WebSocket from "ws";
 
 const TEST_EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";

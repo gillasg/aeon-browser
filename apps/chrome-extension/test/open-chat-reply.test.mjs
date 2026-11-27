@@ -1,4 +1,4 @@
-// aeon open: the extension answers native.chat.open with the chat tab's id, in the shape the daemon reads.
+// graft open: the extension answers native.chat.open with the chat tab's id, in the shape the daemon reads.
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { build } from "esbuild";
-import { NativeChatOpenedSchema } from "@aeon/protocol";
+import { NativeChatOpenedSchema } from "@graft/protocol";
 
 const OWN = "abcdefghijklmnopabcdefghijklmnop";
 const CHAT = "968c135b-a48f-4f5e-9223-dff7f9a10a07";
@@ -35,7 +35,7 @@ globalThis.chrome = withInert({
   windows: withInert({ getLastFocused: async () => ({ id: 1 }) }),
 });
 
-const directory = await mkdtemp(join(tmpdir(), "aeon-open-chat-"));
+const directory = await mkdtemp(join(tmpdir(), "graft-open-chat-"));
 const outfile = join(directory, "bundle.mjs");
 await build({
   entryPoints: [fileURLToPath(new URL("../src/native-worker-open-chat.ts", import.meta.url))],
@@ -48,7 +48,7 @@ await build({
 const { chatOpenedMessage, handleOpenChatMessage } = await import(pathToFileURL(outfile).href);
 await rm(directory, { recursive: true, force: true });
 
-test("aeon open's answer carries the chat tab's id, in the shape the daemon reads", async () => {
+test("graft open's answer carries the chat tab's id, in the shape the daemon reads", async () => {
   const sent = [];
   const socket = { readyState: 1, send: (text) => sent.push(JSON.parse(text)) };
   const request = { kind: "native.chat.open", chatId: CHAT, active: false };

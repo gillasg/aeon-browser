@@ -27,7 +27,7 @@ import type { Command } from "../usage.js";
 
 // Workflows: a saved, declarative sequence an agent or a person can run again. Steps use a small
 // browser vocabulary (goto, click, fill, read, extract, collect, api, ...) with templated
-// arguments, so the same definition works from the bridge, an MCP client or Aeon. Runs are kept
+// arguments, so the same definition works from the bridge, an MCP client or Graft. Runs are kept
 // as JSON beside the definitions, and each run gets an id the UI can follow.
 
 const SESSION = "browserkit-cli";

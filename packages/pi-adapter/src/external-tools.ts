@@ -12,8 +12,8 @@ import { createSiteMapperTool } from "./site-mapper-tool.js";
 import { inChat, sessionChatId } from "./site-browser.js";
 import { fullOutput } from "./site-tool-output.js";
 
-// Tools for agents outside Aeon, through the Aeon MCP server: the same browser_code, crawl and
-// site_mapper a chat gets, so another agent can do in Aeon everything browserkit
+// Tools for agents outside Graft, through the Graft MCP server: the same browser_code, crawl and
+// site_mapper a chat gets, so another agent can do in Graft everything browserkit
 // offers. Each outside session has its own browser runtime, tabs and workspace.
 
 type Tool = ReturnType<typeof defineTool>;
@@ -114,9 +114,9 @@ export async function runExternalTool(
   const tools = toolsFor(options, run, session);
   const tool = name === "browser_tabs" ? tools.browser_code : tools[name];
   if (!tool) throw new Error(`Unknown tool ${name}`);
-  const full = args.__aeonFull === true;
+  const full = args.__graftFull === true;
   const clean = { ...args };
-  delete clean.__aeonFull;
+  delete clean.__graftFull;
   const input = name === "browser_tabs" ? { code: TABS_CODE } : clean;
   const workspace = resolve(
     options.sessionDirectory,

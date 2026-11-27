@@ -1,4 +1,4 @@
-import { inferEffect, type CallEffect, type RoutineWebhook } from "@aeon/domain";
+import { inferEffect, type CallEffect, type RoutineWebhook } from "@graft/domain";
 
 /** Omitted stays undefined. Anything else must be read, write or irreversible. */
 export function parseEffect(value: unknown): CallEffect | undefined {

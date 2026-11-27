@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
-import { HelloRejectionSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import { HelloRejectionSchema, SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol";
 import { ChatService } from "./chat-service.js";
 import { attachDevChatCommands } from "./dev-chat-connection.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
@@ -120,7 +120,7 @@ export async function startDevHandshakeServer(
   if (!address || typeof address === "string")
     throw new Error("The development socket has no TCP address.");
   if (options.printGrant ?? true) {
-    process.stdout.write(`Aeon development grant: ${grant}\n`);
+    process.stdout.write(`Graft development grant: ${grant}\n`);
   }
 
   return {

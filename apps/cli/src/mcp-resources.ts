@@ -1,11 +1,11 @@
-// Learned sites as MCP resources: `aeon://skills/<site>` reads the site's SKILL.md, with a short
+// Learned sites as MCP resources: `graft://skills/<site>` reads the site's SKILL.md, with a short
 // content version so a client can tell when a skill changed. A bundle heal, or any rewrite seen
 // by the poll, sends `notifications/resources/updated`; a site added or removed sends list_changed.
 
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { mcpListResult } from "@aeon/protocol";
+import { mcpListResult } from "@graft/protocol";
 import {
   listSites,
   onBundleHealed,
@@ -27,7 +27,7 @@ export function rpcError(error: unknown): { code: number; message: string } {
   return { code: typeof code === "number" ? code : -32603, message };
 }
 
-export const SKILL_URI_PREFIX = "aeon://skills/";
+export const SKILL_URI_PREFIX = "graft://skills/";
 const SITE_PATTERN = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/;
 
 export interface SkillMeta {
@@ -195,6 +195,6 @@ export function watchSkills(notify: Notify, intervalMs = pollInterval()): () => 
 }
 
 function pollInterval(): number {
-  const ms = Number(process.env.AEON_CATALOG_POLL_MS ?? 5000);
+  const ms = Number(process.env.GRAFT_CATALOG_POLL_MS ?? 5000);
   return Number.isFinite(ms) && ms >= 50 ? ms : 5000;
 }

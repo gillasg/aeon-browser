@@ -1,6 +1,6 @@
 import { modelUnavailable } from "./model-unavailable.js";
 
-// Which model one-off calls use: an explicitly named one, else the person's default, else Aeon's
+// Which model one-off calls use: an explicitly named one, else the person's default, else Graft's
 // preferred model when it is connected, else the first connected model. A choice the person made
 // that is gone is never swapped out silently: the error says which provider to sign in to again.
 

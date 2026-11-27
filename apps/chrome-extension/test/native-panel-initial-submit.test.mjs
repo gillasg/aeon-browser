@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("own side-panel chat without a tab skips the tab-bound handoff safely", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-panel-handoff-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-panel-handoff-"));
   const previousChrome = globalThis.chrome;
   try {
     const id = "npcdopokfkpfmepknhoecppgdgmkmihh";
@@ -49,7 +49,7 @@ test("own side-panel chat without a tab skips the tab-bound handoff safely", asy
 });
 
 test("the orb keeps its page grant when orb.html uses a dynamic url", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-grant-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-orb-grant-"));
   const previousChrome = globalThis.chrome;
   try {
     const id = "npcdopokfkpfmepknhoecppgdgmkmihh";

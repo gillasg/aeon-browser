@@ -5,31 +5,31 @@ import ts from "typescript";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRules = new Map([
-  ["@aeon/protocol", []],
-  ["@aeon/domain", []],
-  ["@aeon/location", []],
-  ["@aeon/store", ["@aeon/domain"]],
+  ["@graft/protocol", []],
+  ["@graft/domain", []],
+  ["@graft/location", []],
+  ["@graft/store", ["@graft/domain"]],
   [
-    "@aeon/daemon",
-    ["@aeon/protocol", "@aeon/domain", "@aeon/location", "@aeon/store", "@aeon/pi-adapter"],
+    "@graft/daemon",
+    ["@graft/protocol", "@graft/domain", "@graft/location", "@graft/store", "@graft/pi-adapter"],
   ],
-  ["@aeon/pi-adapter", ["@aeon/domain", "@aeon/protocol"]],
-  ["@aeon/native-host", []],
-  ["@aeon/cli", ["@aeon/location", "@aeon/protocol", "@aeon/pi-adapter"]],
-  ["@aeon/chrome-extension", ["@aeon/protocol", "@aeon/ui"]],
-  ["@aeon/ui", ["@aeon/protocol"]],
+  ["@graft/pi-adapter", ["@graft/domain", "@graft/protocol"]],
+  ["@graft/native-host", []],
+  ["@graft/cli", ["@graft/location", "@graft/protocol", "@graft/pi-adapter"]],
+  ["@graft/chrome-extension", ["@graft/protocol", "@graft/ui"]],
+  ["@graft/ui", ["@graft/protocol"]],
 ]);
 const packagePaths = new Map([
-  ["@aeon/protocol", "packages/protocol"],
-  ["@aeon/domain", "packages/domain"],
-  ["@aeon/location", "packages/location"],
-  ["@aeon/store", "packages/store"],
-  ["@aeon/daemon", "apps/daemon"],
-  ["@aeon/pi-adapter", "packages/pi-adapter"],
-  ["@aeon/native-host", "apps/native-host"],
-  ["@aeon/cli", "apps/cli"],
-  ["@aeon/chrome-extension", "apps/chrome-extension"],
-  ["@aeon/ui", "packages/ui"],
+  ["@graft/protocol", "packages/protocol"],
+  ["@graft/domain", "packages/domain"],
+  ["@graft/location", "packages/location"],
+  ["@graft/store", "packages/store"],
+  ["@graft/daemon", "apps/daemon"],
+  ["@graft/pi-adapter", "packages/pi-adapter"],
+  ["@graft/native-host", "apps/native-host"],
+  ["@graft/cli", "apps/cli"],
+  ["@graft/chrome-extension", "apps/chrome-extension"],
+  ["@graft/ui", "packages/ui"],
 ]);
 const violations = [];
 
@@ -61,8 +61,8 @@ function moduleSpecifiers(source) {
 }
 
 // Light entry points a package may expose beside its root: a constant a hot path needs without
-// loading the whole package (aeon repl starts ~100 ms faster without the protocol's schemas).
-const LIGHT_ENTRIES = ["@aeon/protocol/version"];
+// loading the whole package (graft repl starts ~100 ms faster without the protocol's schemas).
+const LIGHT_ENTRIES = ["@graft/protocol/version"];
 
 for (const [name, relativePath] of packagePaths) {
   const packageRoot = join(root, relativePath);

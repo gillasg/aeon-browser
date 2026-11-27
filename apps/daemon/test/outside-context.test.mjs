@@ -10,7 +10,7 @@ import {
 } from "../dist/outside-context.js";
 
 async function folder(t) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-outside-context-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-outside-context-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }
@@ -25,7 +25,7 @@ test("open tabs are off until the user turns them on", async (t) => {
   });
   assert.equal(answer.enabled, false);
   assert.deepEqual(answer.tabs, []);
-  assert.match(answer.hint, /Aeon Settings/);
+  assert.match(answer.hint, /Graft Settings/);
   assert.equal(asked, 0, "nothing is read from the browser while it is off");
 });
 
@@ -35,7 +35,7 @@ test("turning it on returns titles and URLs of web tabs only", async (t) => {
   assert.equal(await readOutsideContext(directory), true);
   const answer = await outsideContextAnswer(directory, async () => [
     { title: "Inbox", url: "https://mail.example/", active: true },
-    { title: "Aeon", url: "chrome-extension://abc/sidepanel.html", active: false },
+    { title: "Graft", url: "chrome-extension://abc/sidepanel.html", active: false },
     { title: "New tab", url: "chrome://newtab/", active: false },
   ]);
   assert.equal(answer.enabled, true);
@@ -44,10 +44,10 @@ test("turning it on returns titles and URLs of web tabs only", async (t) => {
 });
 
 test("the daemon answers context and routine as external tools", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-outside-context-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-outside-context-"));
   const { ChatService } = await import("../dist/chat-service.js");
   const { FakePiPort } = await import("./fake-pi-port.mjs");
-  const { openChatStore } = await import("@aeon/store");
+  const { openChatStore } = await import("@graft/store");
   const store = openChatStore(join(directory, "data"));
   const service = new ChatService({
     dataDirectory: join(directory, "data"),

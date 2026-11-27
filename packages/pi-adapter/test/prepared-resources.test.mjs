@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { PreparedSessionResources } from "../dist/prepared-session-resources.js";
 
 test("prepared resources are consumed once, stay workspace-specific, and invalidate changed settings", async () => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-prepared-resources-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-prepared-resources-"));
   const agent = join(root, "agent"),
     first = join(root, "first"),
     second = join(root, "second");

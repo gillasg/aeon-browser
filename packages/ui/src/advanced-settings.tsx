@@ -31,12 +31,12 @@ export function AdvancedSettings({
       </SettingsGroup>
       <SettingsGroup
         title="Command line"
-        footer="The aeon command does everything Manage does, from a terminal or another agent."
+        footer="The graft command does everything Manage does, from a terminal or another agent."
       >
-        <ValueRow label="Run a skill" value={<code>aeon abilities run</code>} />
-        <ValueRow label="Change agent settings" value={<code>aeon settings set</code>} />
-        <ValueRow label="Set up Bitwarden" value={<code>aeon signin setup bitwarden</code>} />
-        <ValueRow label="Set up Proton Pass" value={<code>aeon signin setup proton</code>} />
+        <ValueRow label="Run a skill" value={<code>graft abilities run</code>} />
+        <ValueRow label="Change agent settings" value={<code>graft settings set</code>} />
+        <ValueRow label="Set up Bitwarden" value={<code>graft signin setup bitwarden</code>} />
+        <ValueRow label="Set up Proton Pass" value={<code>graft signin setup proton</code>} />
       </SettingsGroup>
     </div>
   );

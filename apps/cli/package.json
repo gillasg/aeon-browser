@@ -1,18 +1,18 @@
 {
-  "name": "@aeon/cli",
+  "name": "@graft/cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "aeon": "./dist/cli.js"
+    "graft": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
-    "@aeon/location": "workspace:*",
-    "@aeon/pi-adapter": "workspace:*",
-    "@aeon/protocol": "workspace:*",
+    "@graft/location": "workspace:*",
+    "@graft/pi-adapter": "workspace:*",
+    "@graft/protocol": "workspace:*",
     "@browserkit/credentials": "workspace:*",
     "@browserkit/engine": "workspace:*",
     "@browserkit/site-mapper": "workspace:*",

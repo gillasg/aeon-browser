@@ -5,7 +5,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import type { RoutineDraftSeed } from "./routine-draft-route.js";

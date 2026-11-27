@@ -5,8 +5,8 @@ import { join } from "node:path";
 import readline from "node:readline";
 
 const mode = process.env.FAKE_DAEMON_MODE ?? "normal";
-const data = process.env.AEON_NATIVE_DATA_DIR;
-const origin = process.env.AEON_NATIVE_EXTENSION_ORIGIN;
+const data = process.env.GRAFT_NATIVE_DATA_DIR;
+const origin = process.env.GRAFT_NATIVE_EXTENSION_ORIGIN;
 const countPath = join(data ?? ".", "fake-daemon-starts");
 const shutdownPath = join(data ?? ".", "fake-daemon-shutdown");
 
@@ -27,15 +27,15 @@ const watchParent = () => {
 };
 watchParent();
 
-write("AEON_DAEMON_PHASE lock");
-write("AEON_DAEMON_PHASE runtime");
+write("GRAFT_DAEMON_PHASE lock");
+write("GRAFT_DAEMON_PHASE runtime");
 
 if (mode === "exit-immediately") {
-  write("AEON_DAEMON_PHASE initialize");
+  write("GRAFT_DAEMON_PHASE initialize");
   process.exit(2);
 }
 if (mode === "stall") {
-  write("AEON_DAEMON_PHASE initialize");
+  write("GRAFT_DAEMON_PHASE initialize");
   await new Promise(() => {
     const tick = () => setTimeout(tick, 1000);
     tick();
@@ -46,15 +46,15 @@ if (mode === "phase-forever") {
   // but never become ready. Only an overall boot budget can end this.
   let tick = 0;
   const loop = () => {
-    write(`AEON_DAEMON_PHASE loop-${tick++}`);
+    write(`GRAFT_DAEMON_PHASE loop-${tick++}`);
     setTimeout(loop, 50);
   };
   loop();
   await new Promise(() => undefined);
 }
 
-write("AEON_DAEMON_PHASE ready");
-write("AEON_DAEMON_READY");
+write("GRAFT_DAEMON_PHASE ready");
+write("GRAFT_DAEMON_READY");
 
 const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 for await (const line of input) {
@@ -93,7 +93,7 @@ function reply(envelope) {
     kind: "native.bootstrap.result",
     protocolVersion: { major: 1, minor: 1 },
     ok: true,
-    endpoint: "ws://127.0.0.1:1/aeon/v1",
+    endpoint: "ws://127.0.0.1:1/graft/v1",
     connectionGrant: "a".repeat(43),
     expiresAt: 4102444800000,
     daemonProtocolVersion: { major: 1, minor: 1 },

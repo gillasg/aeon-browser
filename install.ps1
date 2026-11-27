@@ -1,12 +1,12 @@
-# Installs Aeon on Windows with one line in PowerShell:
+# Installs Graft on Windows with one line in PowerShell:
 #
 #   irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 | iex
 #
-# Installs Git and Node.js with winget when they are missing, then pnpm, fetches Aeon (or updates
+# Installs Git and Node.js with winget when they are missing, then pnpm, fetches Graft (or updates
 # it), builds it and sets it up. What is left is loading the extension: Chrome opens on
 # chrome://extensions with the folder path on the clipboard.
 $ErrorActionPreference = 'Stop'
-$dir = if ($env:AEON_DIR) { $env:AEON_DIR } else { Join-Path $env:LOCALAPPDATA 'Aeon\aeon-browser' }
+$dir = if ($env:GRAFT_DIR) { $env:GRAFT_DIR } else { Join-Path $env:LOCALAPPDATA 'Graft\graft-browser' }
 $repo = 'https://github.com/gillasg/aeon-browser.git'
 
 function Refresh-Path {
@@ -24,7 +24,7 @@ function Need($command, $package) {
 Need git 'Git.Git'
 Need node 'OpenJS.NodeJS.LTS'
 $major = [int]((node --version).TrimStart('v').Split('.')[0])
-if ($major -lt 22) { throw "Aeon needs Node.js 22 or newer (found $(node --version))." }
+if ($major -lt 22) { throw "Graft needs Node.js 22 or newer (found $(node --version))." }
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
   Write-Host 'Installing pnpm...'
   npm install --global pnpm@11.4.0 --silent | Out-Null
@@ -32,10 +32,10 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 }
 
 if (Test-Path (Join-Path $dir '.git')) {
-  Write-Host "Updating Aeon in $dir..."
+  Write-Host "Updating Graft in $dir..."
   git -C $dir pull --ff-only --quiet
 } else {
-  Write-Host "Fetching Aeon into $dir..."
+  Write-Host "Fetching Graft into $dir..."
   New-Item -ItemType Directory -Force (Split-Path $dir) | Out-Null
   git clone --depth 1 --quiet $repo $dir
 }

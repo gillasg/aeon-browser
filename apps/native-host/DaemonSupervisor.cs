@@ -156,7 +156,7 @@ internal static class DaemonSupervisor
                 if (line == null)
                     throw new InvalidOperationException(
                         "Daemon output closed during " + phase + ", code " + ExitCodeOf(daemon) + ".");
-                if (line == "AEON_DAEMON_READY") return;
+                if (line == "GRAFT_DAEMON_READY") return;
                 var marker = PhaseOf(line);
                 if (marker != null)
                 {
@@ -349,11 +349,11 @@ internal static class DaemonSupervisor
     // answers the line with BOOTSTRAP_UNAVAILABLE, which is also proof it is alive.
     private const int HealthWaitMs = 2500;
 
-    // AEON_PING_KILLS=1 makes a silent core.ping the kill. Unset, the stdout probe still decides.
+    // GRAFT_PING_KILLS=1 makes a silent core.ping the kill. Unset, the stdout probe still decides.
     private static bool PingDecidesKill()
     {
         return string.Equals(
-            Environment.GetEnvironmentVariable("AEON_PING_KILLS"),
+            Environment.GetEnvironmentVariable("GRAFT_PING_KILLS"),
             "1",
             StringComparison.Ordinal);
     }
@@ -365,7 +365,7 @@ internal static class DaemonSupervisor
         SupervisorLog.Write(
             "core.ping " + (ping ? "answered" : "silent") +
             (pingKills
-                ? "; kill uses core.ping (AEON_PING_KILLS=1)."
+                ? "; kill uses core.ping (GRAFT_PING_KILLS=1)."
                 : "; the kill still uses the stdout probe."));
         if (pingKills) return ping;
         if (!AskHealth(daemon)) return false;
@@ -439,7 +439,7 @@ internal static class DaemonSupervisor
 
     private static string PhaseOf(string line)
     {
-        const string marker = "AEON_DAEMON_PHASE ";
+        const string marker = "GRAFT_DAEMON_PHASE ";
         if (line == null || !line.StartsWith(marker, StringComparison.Ordinal)) return null;
         return line.Substring(marker.Length).Trim();
     }
@@ -543,9 +543,9 @@ internal static class DaemonSupervisor
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        start.EnvironmentVariables["AEON_NATIVE_DATA_DIR"] = config.DataDirectory;
-        start.EnvironmentVariables["AEON_NATIVE_EXTENSION_ORIGIN"] = config.ExtensionOrigin;
-        start.EnvironmentVariables["AEON_NATIVE_SUPERVISED"] = "1";
+        start.EnvironmentVariables["GRAFT_NATIVE_DATA_DIR"] = config.DataDirectory;
+        start.EnvironmentVariables["GRAFT_NATIVE_EXTENSION_ORIGIN"] = config.ExtensionOrigin;
+        start.EnvironmentVariables["GRAFT_NATIVE_SUPERVISED"] = "1";
         var process = Process.Start(start);
         if (process == null) throw new InvalidOperationException("The daemon process did not start.");
         return process;

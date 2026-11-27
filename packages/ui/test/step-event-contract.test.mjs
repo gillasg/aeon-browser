@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { actionLine } from "@aeon/protocol";
+import { actionLine } from "@graft/protocol";
 import { applyEvent, cursorSteps, initialRun } from "../dist/run-model.js";
 
 // The model line, the timeline and the ledger all read these strings. labelFor (engine) produces

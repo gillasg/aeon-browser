@@ -17,7 +17,7 @@ export interface BrowserCredentials {
 
 export interface CredentialConfig extends BrowserCredentials {
   /**
-   * A named Chrome profile's own password manager (`aeon browsers name`), e.g. an eval profile
+   * A named Chrome profile's own password manager (`graft browsers name`), e.g. an eval profile
    * on a test vault while the main profile keeps the user's own. Unnamed or unlisted profiles
    * use the top-level choice.
    */

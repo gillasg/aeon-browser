@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { ChatId, EffectivePiResources } from "@aeon/domain";
+import type { ChatId, EffectivePiResources } from "@graft/domain";
 
 export function projectEffectiveResources(
   session: AgentSession,
   chatId: ChatId,
-  mcpServers: readonly import("@aeon/domain").PiMcpServerStatus[],
+  mcpServers: readonly import("@graft/domain").PiMcpServerStatus[],
 ): EffectivePiResources {
   const active = new Set(session.getActiveToolNames());
   const extensions = session.resourceLoader.getExtensions();

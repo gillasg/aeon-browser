@@ -15,7 +15,7 @@ export async function pasteNode(
     () => undefined,
   );
   const swap = (await toOffscreen({
-    target: "aeon-code-offscreen",
+    target: "graft-code-offscreen",
     kind: "clipboardSwap",
     text,
     html,
@@ -55,7 +55,7 @@ export async function pasteNode(
   } finally {
     if (pageWritten) await pageClipboard(debuggee, "restore", backup ?? "");
     else
-      await toOffscreen({ target: "aeon-code-offscreen", kind: "clipboardRestore" }).catch(
+      await toOffscreen({ target: "graft-code-offscreen", kind: "clipboardRestore" }).catch(
         () => undefined,
       );
   }

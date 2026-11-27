@@ -24,7 +24,7 @@ async function load(directory) {
     bundle: true,
     platform: "node",
     format: "esm",
-    define: { __AEON_NATIVE_TRANSPORT__: "true" },
+    define: { __GRAFT_NATIVE_TRANSPORT__: "true" },
   });
   return import(pathToFileURL(outfile).href + "?fresh=" + Math.random());
 }
@@ -56,7 +56,7 @@ function fakeChrome() {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("a dropped link retries, arms a wake alarm, and clears it once reconnected", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-reconnect-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-reconnect-"));
   const previous = globalThis.chrome;
   try {
     globalThis.chrome = fakeChrome();
@@ -67,15 +67,15 @@ test("a dropped link retries, arms a wake alarm, and clears it once reconnected"
       connects++;
     });
     assert.equal(connects, 0, "the retry waits for the backoff timer");
-    assert.equal(globalThis.chrome.alarmsMap.has("aeon-executor-reconnect-now"), true);
-    const armed = globalThis.chrome.alarmsMap.get("aeon-executor-reconnect-now");
+    assert.equal(globalThis.chrome.alarmsMap.has("graft-executor-reconnect-now"), true);
+    const armed = globalThis.chrome.alarmsMap.get("graft-executor-reconnect-now");
     assert.equal(typeof armed.when, "number");
     assert.ok(armed.when >= Date.now() + 29_000, "the wake alarm outlives a sleeping worker");
 
     await delay(400);
     assert.equal(connects, 1, "the fast timer reconnects while the worker is awake");
     noteExecutorConnected();
-    assert.equal(globalThis.chrome.alarmsMap.has("aeon-executor-reconnect-now"), false);
+    assert.equal(globalThis.chrome.alarmsMap.has("graft-executor-reconnect-now"), false);
   } finally {
     globalThis.chrome = previous;
     await rm(directory, { recursive: true, force: true });
@@ -83,7 +83,7 @@ test("a dropped link retries, arms a wake alarm, and clears it once reconnected"
 });
 
 test("the alarm installed at startup wakes a sleeping worker and reconnects", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-reconnect-startup-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-reconnect-startup-"));
   const previous = globalThis.chrome;
   try {
     globalThis.chrome = fakeChrome();
@@ -97,11 +97,11 @@ test("the alarm installed at startup wakes a sleeping worker and reconnects", as
       () => undefined,
     );
     assert.equal(connects, 1, "worker load warms the connection");
-    assert.equal(globalThis.chrome.alarmsMap.has("aeon-executor-reconnect"), true);
+    assert.equal(globalThis.chrome.alarmsMap.has("graft-executor-reconnect"), true);
 
     scheduleExecutorReconnect(async () => undefined);
-    assert.equal(globalThis.chrome.alarmsMap.has("aeon-executor-reconnect-now"), true);
-    globalThis.chrome.fireAlarm("aeon-executor-reconnect-now");
+    assert.equal(globalThis.chrome.alarmsMap.has("graft-executor-reconnect-now"), true);
+    globalThis.chrome.fireAlarm("graft-executor-reconnect-now");
     await Promise.resolve();
     await Promise.resolve();
     assert.equal(connects, 2, "Chrome firing the alarm wakes the worker and reconnects");

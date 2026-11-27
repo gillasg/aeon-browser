@@ -3,7 +3,7 @@ import {
   AuthReplySchema,
   SUPPORTED_PROTOCOL_VERSION,
   type PageGrantScope,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import {
   NativePageGrantRequestSchema,
   NativePageGrantResponseSchema,
@@ -19,7 +19,7 @@ export async function connectNativeUi(scope: PageGrantScope): Promise<UiConnectR
     raw = await withConnectionTimeout(
       chrome.runtime.sendMessage(
         NativePageGrantRequestSchema.parse({
-          kind: "aeon.native.page-grant",
+          kind: "graft.native.page-grant",
           pageInstanceId,
           scope,
         }),
@@ -117,7 +117,7 @@ async function workerCode(code: string): Promise<string> {
 
 function workerHealth(): Promise<{ startupFailures?: string[] } | undefined> {
   return withConnectionTimeout(
-    chrome.runtime.sendMessage({ kind: "aeon.native.health" }) as Promise<{
+    chrome.runtime.sendMessage({ kind: "graft.native.health" }) as Promise<{
       startupFailures?: string[];
     }>,
     2_000,

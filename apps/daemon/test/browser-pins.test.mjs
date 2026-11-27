@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
-import { BrowserInventoryFullSchema } from "@aeon/protocol";
+import { BrowserInventoryFullSchema } from "@graft/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import { BrowserControlService } from "../dist/browser-control-service.js";
 import { BrowserInventoryRegistry } from "../dist/browser-inventory-registry.js";
 import { findBrowser, renamed, sitesOf, summarize } from "../dist/core-browsers.js";
 
-// aeon run --browser: a pinned chat opens and runs in its own Chrome profile only.
+// graft run --browser: a pinned chat opens and runs in its own Chrome profile only.
 const main = "091b9308-1ee9-420e-b71f-a564a5a27701";
 const evalBrowser = "7c2f4b1e-0d5a-4e8b-9a61-3f2b8c9d0e14";
 const pinned = "968c135b-a48f-4f5e-9223-dff7f9a10a07";

@@ -1,15 +1,15 @@
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-// The durable log of routine firings that `aeon mcp` serves as MCP events. The daemon appends;
+// The durable log of routine firings that `graft mcp` serves as MCP events. The daemon appends;
 // any number of MCP servers read. Each record has a monotonic integer cursor, so a reader resumes
 // exactly after the last event it saw, across restarts of either side.
 
-export type AeonEventKind = "watcher" | "listener" | "webhook";
+export type GraftEventKind = "watcher" | "listener" | "webhook";
 
-export interface AeonEventRecord {
+export interface GraftEventRecord {
   cursor: number;
-  kind: AeonEventKind;
+  kind: GraftEventKind;
   routineId: string;
   site: string;
   title: string;
@@ -24,13 +24,13 @@ export function eventLogPath(dataDirectory: string): string {
 }
 
 /** Every record in order; an unreadable or torn line is skipped. */
-export async function readEventLog(dataDirectory: string): Promise<AeonEventRecord[]> {
+export async function readEventLog(dataDirectory: string): Promise<GraftEventRecord[]> {
   const text = await readFile(eventLogPath(dataDirectory), "utf8").catch(() => "");
-  const records: AeonEventRecord[] = [];
+  const records: GraftEventRecord[] = [];
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     try {
-      const record = JSON.parse(line) as AeonEventRecord;
+      const record = JSON.parse(line) as GraftEventRecord;
       if (Number.isSafeInteger(record.cursor)) records.push(record);
     } catch {
       // A partial write at the tail is retried by nobody; skip it.
@@ -44,8 +44,8 @@ let appending: Promise<unknown> = Promise.resolve();
 /** Append one event with the next cursor. Appends from one process are serialised. */
 export function appendEventLog(
   dataDirectory: string,
-  event: Omit<AeonEventRecord, "cursor">,
-): Promise<AeonEventRecord> {
+  event: Omit<GraftEventRecord, "cursor">,
+): Promise<GraftEventRecord> {
   const next = appending.then(() => appendNow(dataDirectory, event));
   appending = next.catch(() => undefined);
   return next;
@@ -53,8 +53,8 @@ export function appendEventLog(
 
 async function appendNow(
   dataDirectory: string,
-  event: Omit<AeonEventRecord, "cursor">,
-): Promise<AeonEventRecord> {
+  event: Omit<GraftEventRecord, "cursor">,
+): Promise<GraftEventRecord> {
   await mkdir(dataDirectory, { recursive: true });
   const existing = await readEventLog(dataDirectory);
   const record = { cursor: (existing.at(-1)?.cursor ?? 0) + 1, ...event };

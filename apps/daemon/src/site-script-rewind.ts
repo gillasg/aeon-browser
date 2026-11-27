@@ -1,5 +1,5 @@
-import type { SiteScriptRecord } from "@aeon/domain";
-import type { Rewind, SiteScriptCommand } from "@aeon/protocol";
+import type { SiteScriptRecord } from "@graft/domain";
+import type { Rewind, SiteScriptCommand } from "@graft/protocol";
 
 /**
  * How to take back a change to a site script: go back to its earlier revision. Only a change

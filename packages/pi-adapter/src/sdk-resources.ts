@@ -20,8 +20,8 @@ import { signInCodeGuard } from "./sign-in-code-guard.js";
 import { leakedToolCallGuard } from "./leaked-tool-call-guard.js";
 import { emptyToolInputGuard } from "./empty-tool-input-guard.js";
 
-/** Skills written for agents outside Aeon (they drive Aeon from a shell). */
-const OUTSIDE_AGENT_SKILLS = new Set(["aeon"]);
+/** Skills written for agents outside Graft (they drive Graft from a shell). */
+const OUTSIDE_AGENT_SKILLS = new Set(["graft"]);
 
 export function withoutOutsideAgentSkills<T extends { name: string }>(skills: readonly T[]): T[] {
   return skills.filter((skill) => !OUTSIDE_AGENT_SKILLS.has(skill.name));
@@ -74,20 +74,20 @@ export function createPiResourceLoader(input: {
   return new DefaultResourceLoader({
     cwd: input.workingDirectory,
     agentDir: input.agentDirectory,
-    // Aeon owns its whole tool surface: the user's own Pi extensions, packages, skills and
-    // prompts (~/.pi/agent) never load. Pi's core tools and Aeon's built-in extensions do.
+    // Graft owns its whole tool surface: the user's own Pi extensions, packages, skills and
+    // prompts (~/.pi/agent) never load. Pi's core tools and Graft's built-in extensions do.
     settingsManager: withoutPackages(input.settingsManager),
     ...builtinOnly(extensionFactories),
     appendSystemPromptOverride: (base) =>
       input.browserGuidance ? [...base, browserRuntimePrimer] : base,
-    // The `aeon` skill teaches other agents to reach Aeon from a shell; Aeon's own agent already
+    // The `graft` skill teaches other agents to reach Graft from a shell; Graft's own agent already
     // has the browser tools, and reading it only costs context and confuses which tool to use.
     skillsOverride: (base) => ({ ...base, skills: withoutOutsideAgentSkills(base.skills) }),
     extensionFactories,
   });
 }
 
-/** Only Aeon's own extensions: the built-in ones still load by name, the user's do not. */
+/** Only Graft's own extensions: the built-in ones still load by name, the user's do not. */
 function builtinOnly(factories: readonly InlineExtension[]) {
   const builtin = factories
     .filter((factory) => typeof factory !== "function" && factory.builtin === true)

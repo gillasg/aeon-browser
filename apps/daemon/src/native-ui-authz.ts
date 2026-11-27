@@ -1,4 +1,4 @@
-import type { DaemonUiRequest } from "@aeon/protocol";
+import type { DaemonUiRequest } from "@graft/protocol";
 import type { GrantContext } from "./grant-authority.js";
 
 type UiRequest = Exclude<DaemonUiRequest, { kind: "ping" }>;

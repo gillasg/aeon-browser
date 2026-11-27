@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { DaemonUiRequestSchema } from "@aeon/protocol";
+import { DaemonUiRequestSchema } from "@graft/protocol";
 import { authorizeNativeUiScope } from "../dist/native-ui-authz.js";
 
 const chatId = randomUUID();

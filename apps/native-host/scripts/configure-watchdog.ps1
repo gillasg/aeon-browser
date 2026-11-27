@@ -1,8 +1,8 @@
 param([ValidateSet('Remove', 'Validate')][string]$Mode = 'Remove')
 $ErrorActionPreference = 'Stop'
-$taskName = 'AeonDaemonWatchdog'
-$description = 'Aeon-owned daemon supervisor: start at login and recover after exit.'
-$hostPath = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Aeon\aeon-native-host.exe'))
+$taskName = 'GraftDaemonWatchdog'
+$description = 'Graft-owned daemon supervisor: start at login and recover after exit.'
+$hostPath = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Graft\graft-native-host.exe'))
 $launcherPath = Join-Path ([IO.Path]::GetDirectoryName($hostPath)) 'watchdog-hidden.vbs'
 $scriptHost = Join-Path $env:SystemRoot 'System32\wscript.exe'
 $launcherArgument = '//B //NoLogo "' + $launcherPath + '"'

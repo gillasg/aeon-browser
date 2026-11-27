@@ -2,7 +2,7 @@
 // offers. Declined offers stay declined. An ours error, a tip, or a check that found nothing
 // is never a card.
 
-import type { RunCard, RunCardItem } from "@aeon/protocol";
+import type { RunCard, RunCardItem } from "@graft/protocol";
 import { missingFileLine } from "./missing-answer-files.js";
 import { unreadLine } from "./unread-quotes.js";
 

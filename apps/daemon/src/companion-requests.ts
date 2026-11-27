@@ -2,14 +2,14 @@ import {
   CompanionRequestSchema,
   type CompanionRequest,
   type CompanionResult,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket } from "ws";
-import { siteMapperRequest } from "@aeon/pi-adapter";
+import { siteMapperRequest } from "@graft/pi-adapter";
 import type { BrowserControlService } from "./browser-control-service.js";
 import type { ChatService } from "./chat-service.js";
 import { answerSiteRequest } from "./site-requests.js";
 
-// Requests other extensions send through Aeon's browser extension (which only passes on ones the
+// Requests other extensions send through Graft's browser extension (which only passes on ones the
 // user allowed): a completion with the user's model, or a task that starts a chat (watching a
 // price, say). Page-derived text is quoted as data in the prompt, never as instructions.
 
@@ -69,7 +69,7 @@ async function complete(data: Record<string, unknown>, deps: Deps): Promise<{ te
   return { text };
 }
 
-// A boost calling a mapped site's API (sb.api): Aeon's site-to-api answers, no model involved.
+// A boost calling a mapped site's API (sb.api): Graft's site-to-api answers, no model involved.
 function callSiteMapper(data: Record<string, unknown>): Promise<unknown> {
   if (typeof data.site !== "string" || typeof data.operation !== "string")
     throw new Error("A site API call needs the site and operation");
@@ -84,7 +84,7 @@ async function answer(request: CompanionRequest, deps: Deps): Promise<unknown> {
   const data = request.data;
   if (request.request === "model.complete") return complete(data, deps);
   if (request.request === "siteMapper") return callSiteMapper(data);
-  // Aeon's own extension never forwards this kind from other extensions.
+  // Graft's own extension never forwards this kind from other extensions.
   if (request.request === "site") return answerSiteRequest(data);
   if (typeof data.url !== "string" && request.request === "watch")
     throw new Error("A watch needs the page address");

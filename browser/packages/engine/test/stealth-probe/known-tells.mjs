@@ -1,4 +1,4 @@
-// Known stealth tells pinned against Aeon's current engine.
+// Known stealth tells pinned against Graft's current engine.
 // Every pin tolerates only that exact signal; any pin that stops firing fails the probe as stale
 // so fixes must remove their pin in the same change.
 
@@ -22,7 +22,7 @@ export const STEALTH_CHECKS = [
   },
   {
     id: "no-cdp-globals",
-    expected: "no automation globals (cdc_*, __webdriver*, __aeon*) on window or document",
+    expected: "no automation globals (cdc_*, __webdriver*, __graft*) on window or document",
     pass: (s) => Array.isArray(s.cdpGlobals) && s.cdpGlobals.length === 0,
   },
   {
@@ -37,7 +37,7 @@ export const STEALTH_CHECKS = [
   },
   {
     id: "no-dom-expandos",
-    expected: "no __aeon* expandos or chrome-extension:// iframes leaked into host DOM",
+    expected: "no __graft* expandos or chrome-extension:// iframes leaked into host DOM",
     pass: (s) => Array.isArray(s.domExpandos) && s.domExpandos.length === 0,
   },
   {
@@ -58,7 +58,7 @@ export const STEALTH_CHECKS = [
   {
     id: "trusted-input",
     expected: "page.fill dispatches trusted input events and sets the field value",
-    pass: (s) => s.allInputsTrusted === true && s.inputValue === "hello aeon",
+    pass: (s) => s.allInputsTrusted === true && s.inputValue === "hello graft",
   },
 ];
 

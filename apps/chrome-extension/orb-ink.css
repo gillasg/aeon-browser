@@ -4,8 +4,9 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(var(--aeon-island-wash-10) 0.75px, transparent 0.75px) 0 0 / 12px 12px;
-  mask: radial-gradient(70% 90% at 100% 0%, var(--aeon-island-ink) 0%, transparent 70%);
+  background: radial-gradient(var(--graft-island-wash-10) 0.75px, transparent 0.75px) 0 0 / 12px
+    12px;
+  mask: radial-gradient(70% 90% at 100% 0%, var(--graft-island-ink) 0%, transparent 70%);
 }
 .island[data-state="answer"],
 .island[data-state="error"] {
@@ -22,8 +23,8 @@
 .ink-dots i {
   width: 3px;
   height: 3px;
-  border-radius: var(--aeon-r-half);
-  background: var(--aeon-island-dot);
+  border-radius: var(--graft-r-half);
+  background: var(--graft-island-dot);
 }
 .ink-dots i:nth-child(1) {
   opacity: 0.95;
@@ -63,16 +64,16 @@
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: var(--aeon-r-full);
+  border-radius: var(--graft-r-full);
   color: var(--muted);
   cursor: pointer;
   transition:
-    background var(--aeon-island-spring),
-    color var(--aeon-island-spring);
+    background var(--graft-island-spring),
+    color var(--graft-island-spring);
 }
 .isl-send[data-ready="true"] {
-  background: var(--aeon-island-ink);
-  color: var(--aeon-island-bg-solid);
+  background: var(--graft-island-ink);
+  color: var(--graft-island-bg-solid);
 }
 .isl-send svg {
   width: 14px;
@@ -102,14 +103,14 @@
   color: var(--faint);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
-  transition: opacity var(--aeon-island-spring);
+  transition: opacity var(--graft-island-spring);
 }
 .island:hover .isl-foot,
 .isl-foot:focus-within {
   opacity: 1;
 }
 .island[data-state="answer"] .isl-input {
-  border-top: 1px solid var(--aeon-island-line);
+  border-top: 1px solid var(--graft-island-line);
   padding-top: 6px;
 }
 @media (prefers-reduced-motion: reduce) {

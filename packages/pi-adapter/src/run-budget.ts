@@ -1,5 +1,5 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { PiRunBudget } from "@aeon/domain";
+import type { PiRunBudget } from "@graft/domain";
 import { markRunAborted, streamRetrySlot } from "./stream-retry.js";
 
 // A run's limits (steps, minutes, cost). A minute budget keeps the smaller of 10% and 30s for a

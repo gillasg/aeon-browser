@@ -6,9 +6,9 @@ import { useEffect, useState, type ReactElement } from "react";
 // It goes for good once any task is sent, picked or typed. Settings can bring it back with
 // "Welcome / Show again".
 
-const KEY = "aeonWelcome";
+const KEY = "graftWelcome";
 /** Fired when any task is sent, so an open welcome hides at once, not on the next load. */
-export const WELCOME_DONE_EVENT = "aeon.welcome.done";
+export const WELCOME_DONE_EVENT = "graft.welcome.done";
 
 export const WELCOME_EXAMPLES = [
   "Tell me when the price on this page drops",
@@ -23,7 +23,7 @@ export function NewUserWelcome({
 }: {
   needsModel: boolean;
   onExample(text: string): void;
-  /** "What can Aeon do?": the Learn page. */
+  /** "What can Graft do?": the Learn page. */
   onLearn?: (() => void) | undefined;
 }): ReactElement | null {
   const [seen, setSeen] = useState(() => {
@@ -46,7 +46,7 @@ export function NewUserWelcome({
     onExample(text);
   };
   return (
-    <section className="new-user-welcome" aria-label="Welcome to Aeon">
+    <section className="new-user-welcome" aria-label="Welcome to Graft">
       {needsModel && <p className="new-user-line">Connect a model below once, then try one:</p>}
       <ul className="new-user-examples">
         {WELCOME_EXAMPLES.map((example) => (
@@ -59,7 +59,7 @@ export function NewUserWelcome({
       </ul>
       {onLearn && (
         <button type="button" className="new-user-learn" onClick={onLearn}>
-          What can Aeon do?
+          What can Graft do?
         </button>
       )}
     </section>

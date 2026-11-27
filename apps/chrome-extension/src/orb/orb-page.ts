@@ -1,15 +1,15 @@
 import { createElement, type ReactNode } from "react";
-import type { PiEntryDto, PiSessionEventDto } from "@aeon/protocol";
+import type { PiEntryDto, PiSessionEventDto } from "@graft/protocol";
 import {
   ORB_REDUCE_MOTION_KEY,
   WRONG_FOLLOW_UP,
   attachFooter,
   logApiWrites,
-  mountAeonUi,
+  mountGraftUi,
   orbFlag,
   runCardOf,
   type AnswerOffer,
-} from "@aeon/ui";
+} from "@graft/ui";
 import { framedInPage } from "../extension-frame.js";
 import { openExtensionChat } from "../ui-connection.js";
 import { watchChatRunState } from "../chat-run-state.js";
@@ -75,8 +75,8 @@ const model: OrbViewModel = {
   running: new Set(),
   needs: new Set(),
 };
-const TAB_CHAT = "aeon-orb-chat:" + tabId;
-const LAST_CHAT = "aeon-orb-chat:last";
+const TAB_CHAT = "graft-orb-chat:" + tabId;
+const LAST_CHAT = "graft-orb-chat:last";
 let run: OrbRun | undefined;
 let userControl = false;
 let lastVisual = "";
@@ -89,7 +89,7 @@ let bootedAt = Number.POSITIVE_INFINITY;
 /** The last message sent from here, for Retry. */
 let lastPrompt = "";
 /** `Type / for Teach, Watch, Fill` shows on the first few summons, then never again. */
-const HINT_KEY = "aeon-orb-hint-shown";
+const HINT_KEY = "graft-orb-hint-shown";
 const HINT_SUMMONS = 3;
 
 const session = new OrbSession(tabId, {
@@ -119,7 +119,7 @@ async function boot(): Promise<void> {
   // Framed by the content script on an http(s) page. A top-level open, or a frame without the
   // one-time nonce for this tab, stays blank.
   if (!framedInPage()) return;
-  const verify: OrbVerify = { kind: "aeon.orb.verify", tabId, nonce: location.hash.slice(1) };
+  const verify: OrbVerify = { kind: "graft.orb.verify", tabId, nonce: location.hash.slice(1) };
   history.replaceState(null, "", location.pathname + location.search);
   const verified = (await chrome.runtime.sendMessage(verify).catch(() => null)) as {
     ok?: boolean;
@@ -136,7 +136,7 @@ async function boot(): Promise<void> {
   void countHint();
   listen();
   sendPrefs();
-  toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
+  toContent({ kind: "graft.orb.visual", state: "listening", label: "Listening" });
   focusPrompt();
   watchChatRunState((state) => {
     model.running = state.running;
@@ -151,9 +151,9 @@ async function boot(): Promise<void> {
     const handed = changes[TAB_CHAT]?.newValue;
     if (typeof handed === "string" && handed && handed !== model.chatId)
       void selectChat(handed, false);
-    if (`aeon-learned:${tabId}` in changes) filmBeat("learned");
-    else if (`aeon-learn:${tabId}` in changes) filmBeat("teach");
-    if (`aeon-learn:${tabId}` in changes || `aeon-learned:${tabId}` in changes)
+    if (`graft-learned:${tabId}` in changes) filmBeat("learned");
+    else if (`graft-learn:${tabId}` in changes) filmBeat("teach");
+    if (`graft-learn:${tabId}` in changes || `graft-learned:${tabId}` in changes)
       void loadLearning(ux);
   });
   const remembered = await rememberedChat();
@@ -181,7 +181,7 @@ function reopened(message: OrbShown): void {
   filmBeat("summon");
   void countHint();
   void loadXray(ux);
-  // Teach may have started while the box was closed (Manage → Sites → Teach Aeon).
+  // Teach may have started while the box was closed (Manage → Sites → Teach Graft).
   void loadLearning(ux);
   focusPrompt();
   if (!borrowed || Date.now() - bootedAt < 1500) return;
@@ -207,7 +207,7 @@ async function selectChat(chatId: string | undefined, store = true): Promise<voi
   if (store) remember(chatId);
   render();
   if (!chatId) {
-    toContent({ kind: "aeon.orb.visual", state: "listening", label: "Listening" });
+    toContent({ kind: "graft.orb.visual", state: "listening", label: "Listening" });
     focusPrompt();
   }
   try {
@@ -248,7 +248,7 @@ function listen(): void {
     if (document.activeElement === document.body || !document.activeElement) focusPrompt();
   });
   addEventListener("keydown", (event) => {
-    if (event.key === "Escape") toContent({ kind: "aeon.orb.hide", keepRunning: true });
+    if (event.key === "Escape") toContent({ kind: "graft.orb.hide", keepRunning: true });
   });
   addEventListener("storage", (event) => {
     if (event.key === ORB_REDUCE_MOTION_KEY) sendPrefs();
@@ -256,7 +256,7 @@ function listen(): void {
   addEventListener("pagehide", () => void setNeeds(tabId, false));
   chrome.runtime.onMessage.addListener(
     (message: { kind?: string; tabId?: number; control?: string }, sender) => {
-      if (message?.kind === "aeon.orb.shown" && message.tabId === tabId)
+      if (message?.kind === "graft.orb.shown" && message.tabId === tabId)
         reopened(message as OrbShown);
       // The cursor's ■ in this tab stops this cursor's chat.
       if (message?.kind === CURSOR_STOP && sender.tab?.id === tabId) void session.stop();
@@ -285,7 +285,7 @@ async function answerOffer(offer: AnswerOffer): Promise<void> {
   if (offer.followUp.trim()) void submit(offer.followUp);
 }
 
-/** "Wrong": Aeon marks the route as wrong (best effort) and is asked to try again. */
+/** "Wrong": Graft marks the route as wrong (best effort) and is asked to try again. */
 async function answerWrong(): Promise<void> {
   const url = (await chrome.tabs.get(tabId).catch(() => undefined))?.url;
   const input = reportWrongInput(url);
@@ -351,7 +351,7 @@ function onSnapshot(entries: readonly PiEntryDto[], runState: string): void {
 async function reconnectSession(): Promise<void> {
   if (reconnecting) return;
   reconnecting = true;
-  notice("Reconnecting to Aeon…");
+  notice("Reconnecting to Graft…");
   for (let attempt = 0; ; attempt += 1) {
     try {
       await session.reconnect();
@@ -427,7 +427,7 @@ function sync(): void {
   visual(state, pillLabel(state, run.label));
   sendNewActions(run);
   if (run.status === "needs" && !userControl)
-    toContent({ kind: "aeon.orb.spotlight", box: spotlightBox(run.actions, tabId) ?? null });
+    toContent({ kind: "graft.orb.spotlight", box: spotlightBox(run.actions, tabId) ?? null });
   changed(state);
 }
 
@@ -452,7 +452,7 @@ function sendNewActions(current: OrbRun): void {
   const fresh = current.actions.slice(sentActions);
   const steps = cursorSteps(fresh, tabId);
   sentActions = current.actions.length;
-  if (steps.length && !userControl) toContent({ kind: "aeon.orb.cursor", steps });
+  if (steps.length && !userControl) toContent({ kind: "graft.orb.cursor", steps });
 }
 
 /** For 6 s after a run ends the minimised pill says its receipt (`0.8 s · via skill`). */
@@ -482,7 +482,7 @@ function visual(state: OrbVisualState, label: string): void {
   const key = state + "|" + label;
   if (key === lastVisual) return;
   lastVisual = key;
-  toContent({ kind: "aeon.orb.visual", state, label });
+  toContent({ kind: "graft.orb.visual", state, label });
 }
 
 /**
@@ -501,7 +501,7 @@ function toSidePanel(): void {
   const chatId = session.chatId;
   if (!chatId) return;
   void openPanel(chatId).then((ok) =>
-    ok ? toContent({ kind: "aeon.orb.hide", keepRunning: true }) : toTab(),
+    ok ? toContent({ kind: "graft.orb.hide", keepRunning: true }) : toTab(),
   );
 }
 
@@ -512,7 +512,7 @@ function toSidePanel(): void {
 function promote(text?: string): void {
   const opened = openPanel(session.chatId);
   void opened.then((ok) => {
-    if (ok) toContent({ kind: "aeon.orb.hide", keepRunning: true });
+    if (ok) toContent({ kind: "graft.orb.hide", keepRunning: true });
     else if (!text) toTab();
   });
   if (text)
@@ -557,7 +557,7 @@ function toTab(): void {
   const chatId = session.chatId;
   if (!chatId) return;
   void openExtensionChat(chatId).catch(() => undefined);
-  toContent({ kind: "aeon.orb.hide", keepRunning: true });
+  toContent({ kind: "graft.orb.hide", keepRunning: true });
 }
 
 /** Open tabs that can be pages for the message (the + list). */
@@ -594,7 +594,7 @@ function view(): ReactNode {
     model: { ...model },
     actions: {
       submit: (text) => void submit(text),
-      minimize: () => toContent({ kind: "aeon.orb.hide", keepRunning: true }),
+      minimize: () => toContent({ kind: "graft.orb.hide", keepRunning: true }),
       selectChat: (chatId) => void selectChat(chatId),
       newChat: () => void selectChat(undefined),
       loadChats: () => void loadChats(),
@@ -611,7 +611,8 @@ function view(): ReactNode {
         removeTarget(ux);
         focusPrompt();
       },
-      hoverTarget: (on) => toContent({ kind: "aeon.orb.target", action: on ? "hover" : "unhover" }),
+      hoverTarget: (on) =>
+        toContent({ kind: "graft.orb.target", action: on ? "hover" : "unhover" }),
       pickTabs: () => void pickTabs(),
       addContext: (id) => void addContext(id),
       removeContext,
@@ -622,7 +623,7 @@ function view(): ReactNode {
 let lastLayout = "";
 function render(): void {
   if (update) update(view());
-  else update = mountAeonUi(root, view());
+  else update = mountGraftUi(root, view());
   // A width change alone may not change the root's height, so say the new layout at once.
   const layout = (model.learning ? "teach" : "") + islandState(model);
   if (layout !== lastLayout) {
@@ -634,7 +635,7 @@ function render(): void {
 function sendPrefs(): void {
   const reduceMotion = orbFlag(ORB_REDUCE_MOTION_KEY);
   document.documentElement.toggleAttribute("data-reduced-motion", reduceMotion);
-  toContent({ kind: "aeon.orb.prefs", reduceMotion });
+  toContent({ kind: "graft.orb.prefs", reduceMotion });
 }
 
 function reportSize(): void {
@@ -643,7 +644,7 @@ function reportSize(): void {
   const wide = state === "answer" || state === "error";
   const layout: OrbLayout = model.learning ? "teach" : wide ? "answer" : "compose";
   toContent({
-    kind: "aeon.orb.panel",
+    kind: "graft.orb.panel",
     width: Math.ceil(box.width),
     height: Math.ceil(box.height),
     layout,

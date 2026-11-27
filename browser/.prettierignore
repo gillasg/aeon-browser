@@ -6,4 +6,4 @@ packages/boosts/build-test/
 packages/engine/test/conformance/golden/
 
 # The L2 contract is kept dense on purpose (a 120-line ceiling is tested).
-packages/engine/contract/aeon-l2-contract.d.ts
+packages/engine/contract/graft-l2-contract.d.ts

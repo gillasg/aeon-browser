@@ -87,12 +87,12 @@ function ChatSettings(): ReactElement {
     <SettingsGroup title="Chats">
       <SwitchRow
         label="Show thinking between steps"
-        detail="Aeon's reasoning sits between its tool calls in a finished answer's work."
+        detail="Graft's reasoning sits between its tool calls in a finished answer's work."
         checked={thinking}
         onChange={setThinking}
       />
       <MenuRow<"followUp" | "steer">
-        label="Messages sent while Aeon answers"
+        label="Messages sent while Graft answers"
         value={mode}
         options={[
           ["followUp", "Wait their turn"],
@@ -105,7 +105,7 @@ function ChatSettings(): ReactElement {
 }
 
 function AgentTabSettings(): ReactElement {
-  // These three switches are relied on by screen recorders (Aeon Recorder); keep them.
+  // These three switches are relied on by screen recorders (Graft Recorder); keep them.
   const [inFront, setInFront] = useAgentFlag(agentInFrontKey);
   const [hideCursor, setHideCursor] = useAgentFlag(hideAgentCursorKey);
   const [record, setRecord] = useAgentFlag(recordAgentTabsKey);
@@ -119,7 +119,7 @@ function AgentTabSettings(): ReactElement {
         onChange={setInFront}
       />
       <SwitchRow
-        label="Hide Aeon's cursor"
+        label="Hide Graft's cursor"
         detail="For screen recorders that draw their own."
         checked={hideCursor}
         onChange={setHideCursor}
@@ -150,7 +150,7 @@ function OutsideAgentsSettings(props: {
       footer={
         <>
           Titles and addresses only, never page contents. Coding agents read them with{" "}
-          <code>aeon context</code>.
+          <code>graft context</code>.
         </>
       }
     >
@@ -168,17 +168,17 @@ function HelperSettings({ connectionLabel }: { connectionLabel: string }): React
   return (
     <SettingsGroup
       title="This computer"
-      footer="Aeon's helper app runs its agent and keeps your chats on this computer."
+      footer="Graft's helper app runs its agent and keeps your chats on this computer."
     >
       <ValueRow
         label="Helper app"
         value={connected ? "Connected" : "Not connected"}
         tone={connected ? "ok" : "needs"}
-        {...(connected ? {} : { detail: "Run Aeon's setup again to repair it." })}
+        {...(connected ? {} : { detail: "Run Graft's setup again to repair it." })}
       />
       <ActionRow
         label="Site customizations"
-        detail="Scripts and styles Aeon adds to sites, and their permissions."
+        detail="Scripts and styles Graft adds to sites, and their permissions."
         action="Open"
         onClick={() => window.open("site-scripts.html", "_blank", "noopener")}
       />

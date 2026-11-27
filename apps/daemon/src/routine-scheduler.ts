@@ -3,16 +3,16 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   PiRoutineRunEvidence,
   PiSessionHandle,
-  AeonProductStore,
+  GraftProductStore,
   RoutineRecord,
   RoutineRunRecord,
   RoutineRunState,
   WebhookDelivery,
-} from "@aeon/domain";
+} from "@graft/domain";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
-import { createAeonHostHandler, siteMapperRequest } from "@aeon/pi-adapter";
+import { createGraftHostHandler, siteMapperRequest } from "@graft/pi-adapter";
 import {
   isListening,
   listenerPass,
@@ -53,7 +53,7 @@ export class RoutineScheduler {
   });
 
   constructor(
-    private readonly store: AeonProductStore,
+    private readonly store: GraftProductStore,
     private readonly chats: ChatService,
     private readonly browser: BrowserControlService,
   ) {}
@@ -125,7 +125,7 @@ export class RoutineScheduler {
       await this.dispatchDueRuns();
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown scheduler error";
-      process.stderr.write(`Aeon routine scheduler: ${message.slice(0, 400)}\n`);
+      process.stderr.write(`Graft routine scheduler: ${message.slice(0, 400)}\n`);
     } finally {
       this.ticking = false;
       if (this.started) {
@@ -347,7 +347,7 @@ This routine's check passed with: ${JSON.stringify(value).slice(0, 4000)}`;
     code: string,
     timeoutMs: number,
   ): Promise<{ met: boolean; value?: unknown; error?: string }> {
-    const host = createAeonHostHandler({
+    const host = createGraftHostHandler({
       source: "routine",
       siteRules: () => ({ blocked: [], only: routine.sites ?? [], allow: [] }),
       siteMapper: (request) => siteMapperRequest(checkRealm(routine.routineId), request),

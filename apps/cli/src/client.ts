@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol/version";
-import { aeonDataDirectory } from "@aeon/location";
+import { SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol/version";
+import { graftDataDirectory } from "@graft/location";
 import WebSocket from "ws";
 import { getSamplingBridge } from "./mcp-sampling.js";
 import { notRunningMessage, readStartFailure } from "./start-failure.js";
 
-// One connection to the running Aeon daemon through its local Core endpoint. The daemon writes
+// One connection to the running Graft daemon through its local Core endpoint. The daemon writes
 // the endpoint and a fresh token to core-connection.json in its data folder each time it starts.
 type Json = Record<string, unknown>;
 
@@ -17,7 +17,7 @@ type Json = Record<string, unknown>;
 const CONNECT_TIMEOUT_MS = 15_000;
 function noReply(what: string): Error {
   return new Error(
-    `Aeon did not answer ${what}. It may be running an older version that ignores this request; update Aeon and retry.`,
+    `Graft did not answer ${what}. It may be running an older version that ignores this request; update Graft and retry.`,
   );
 }
 export interface AttentionChat {
@@ -27,7 +27,7 @@ export interface AttentionChat {
 }
 
 export function dataDirectory(): string {
-  return aeonDataDirectory();
+  return graftDataDirectory();
 }
 
 /**
@@ -38,18 +38,18 @@ export function connectionCloseMessage(code: number, reason: string): string {
   const daemon = /^UPDATE_REQUIRED:(\d+\.\d+)/.exec(reason)?.[1];
   if (daemon && code === 1008)
     return (
-      `This Aeon command speaks protocol ${SUPPORTED_PROTOCOL_VERSION.major}.${SUPPORTED_PROTOCOL_VERSION.minor}; the running daemon speaks ${daemon}. ` +
-      "Update Aeon so the command, the daemon and the extension are the same build, then reload the extension in chrome://extensions and retry the command."
+      `This Graft command speaks protocol ${SUPPORTED_PROTOCOL_VERSION.major}.${SUPPORTED_PROTOCOL_VERSION.minor}; the running daemon speaks ${daemon}. ` +
+      "Update Graft so the command, the daemon and the extension are the same build, then reload the extension in chrome://extensions and retry the command."
     );
   if (reason === "UPDATE_REQUIRED")
     return (
-      `This Aeon command does not match the running daemon. ` +
-      "Update Aeon so the command, the daemon and the extension are the same build, then reload the extension in chrome://extensions and retry the command."
+      `This Graft command does not match the running daemon. ` +
+      "Update Graft so the command, the daemon and the extension are the same build, then reload the extension in chrome://extensions and retry the command."
     );
-  return `Aeon closed the connection (${code} ${reason}).`;
+  return `Graft closed the connection (${code} ${reason}).`;
 }
 
-export class AeonClient {
+export class GraftClient {
   private readonly waiting = new Map<string, (message: Json) => void>();
   private readonly attentionListeners = new Set<(chats: AttentionChat[]) => void>();
   private openWaiters = new Map<string, (reply: Json) => void>();
@@ -60,7 +60,7 @@ export class AeonClient {
     socket.on("message", (raw) => this.receive(JSON.parse(String(raw)) as Json));
   }
 
-  static async connect(): Promise<AeonClient> {
+  static async connect(): Promise<GraftClient> {
     const file = join(dataDirectory(), "core-connection.json");
     let state: { endpoint: string; token: string };
     try {
@@ -71,7 +71,7 @@ export class AeonClient {
     const socket = new WebSocket(state.endpoint);
     await new Promise<void>((resolve, reject) => {
       socket.once("open", () => resolve());
-      socket.once("error", () => reject(new Error("Could not reach the Aeon daemon.")));
+      socket.once("error", () => reject(new Error("Could not reach the Graft daemon.")));
     });
     const ready = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(
@@ -82,7 +82,7 @@ export class AeonClient {
         clearTimeout(timer);
         const message = JSON.parse(String(raw)) as Json;
         if (message.kind === "core.ready") resolve();
-        else reject(new Error("Aeon refused the connection."));
+        else reject(new Error("Graft refused the connection."));
       });
       socket.once("close", (code, reason) => {
         clearTimeout(timer);
@@ -99,7 +99,7 @@ export class AeonClient {
       }),
     );
     await ready;
-    const client = new AeonClient(socket);
+    const client = new GraftClient(socket);
     client.socket.send(JSON.stringify({ kind: "core.attention.watch" }));
     // Liveness: the daemon answers pings, so long waits are never mistaken for a dead daemon.
     client.pinger = setInterval(
@@ -113,16 +113,16 @@ export class AeonClient {
   command(operation: string, payload: Json): Promise<Json> {
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
-      // Aeon drops requests it can't parse (e.g. a limit over 100) without a reply.
+      // Graft drops requests it can't parse (e.g. a limit over 100) without a reply.
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error(`Aeon did not answer ${operation}; check its inputs.`));
+        reject(new Error(`Graft did not answer ${operation}; check its inputs.`));
       }, 30000);
       this.waiting.set(requestId, (message) => {
         clearTimeout(timer);
         if (message.kind === "command.completed") resolve(message.result as Json);
         else if (message.kind === "command.failed" || message.state === "failed")
-          reject(new Error(String(message.message ?? message.code ?? "Aeon command failed")));
+          reject(new Error(String(message.message ?? message.code ?? "Graft command failed")));
         else return;
         clearTimeout(timer);
         this.waiting.delete(requestId);
@@ -131,7 +131,7 @@ export class AeonClient {
     });
   }
 
-  /** Lists Aeon's chat tools for outside agents, or calls one in a named session. */
+  /** Lists Graft's chat tools for outside agents, or calls one in a named session. */
   tool(body: Json, timeoutMs = 11 * 60_000, signal?: AbortSignal): Promise<Json> {
     const requestId = randomUUID();
     const what = `the ${String(body.tool ?? "tool")} request`;
@@ -145,7 +145,7 @@ export class AeonClient {
         finish();
         reject(noReply(what));
       }, timeoutMs);
-      // A 2026-07-28 notifications/cancelled stops the call in Aeon too, so the session's next
+      // A 2026-07-28 notifications/cancelled stops the call in Graft too, so the session's next
       // cell is not queued behind it. The call is not retried.
       const onAbort = () => {
         if (this.waiting.has(requestId))
@@ -171,7 +171,7 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+        reject(new Error("Graft did not answer in time. Update Graft if this keeps happening."));
       }, timeoutMs);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.settings.result") return;
@@ -185,13 +185,13 @@ export class AeonClient {
     });
   }
 
-  /** `aeon record`'s beat bus in every connected Chrome: arm, disarm, read or clear. */
+  /** `graft record`'s beat bus in every connected Chrome: arm, disarm, read or clear. */
   film(action: "arm" | "disarm" | "read" | "clear", timeoutMs = 10_000): Promise<Json> {
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not answer the beat bus in time."));
+        reject(new Error("Graft did not answer the beat bus in time."));
       }, timeoutMs);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.film.result") return;
@@ -215,7 +215,7 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("The browser did not answer in time. Update Aeon and retry."));
+        reject(new Error("The browser did not answer in time. Update Graft and retry."));
       }, wait);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.browser.result") return;
@@ -236,7 +236,7 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not answer the CDP request in time."));
+        reject(new Error("Graft did not answer the CDP request in time."));
       }, timeoutMs);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.cdp.result") return;
@@ -250,7 +250,7 @@ export class AeonClient {
 
   /**
    * One tool-calling completion for the AI commands. In an MCP session that offered sampling (and
-   * has no Aeon model, or asked to prefer the agent's), the calling agent's model answers instead.
+   * has no Graft model, or asked to prefer the agent's), the calling agent's model answers instead.
    */
   modelComplete(
     body: { systemPrompt: string; messages: unknown[]; tools: unknown[] },
@@ -292,7 +292,7 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+        reject(new Error("Graft did not answer in time. Update Graft if this keeps happening."));
       }, timeoutMs);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== replyKind) return;
@@ -341,7 +341,7 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not answer in time. Update Aeon if this keeps happening."));
+        reject(new Error("Graft did not answer in time. Update Graft if this keeps happening."));
       }, 15_000);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.blocked-sites.result") return;
@@ -410,14 +410,14 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not stop the chat in time."));
+        reject(new Error("Graft did not stop the chat in time."));
       }, 30_000);
       this.waiting.set(requestId, (message) => {
         if (message.kind !== "core.chat.stopped") return;
         clearTimeout(timer);
         this.waiting.delete(requestId);
         if (message.stopped !== true)
-          reject(new Error(String(message.error ?? "Aeon could not stop that chat.")));
+          reject(new Error(String(message.error ?? "Graft could not stop that chat.")));
         else resolve(true);
       });
       this.socket.send(JSON.stringify({ kind: "core.chat.stop", requestId, chatId }));
@@ -439,7 +439,7 @@ export class AeonClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiting.delete(requestId);
-        reject(new Error("Aeon did not start the prompt; check the model and try again."));
+        reject(new Error("Graft did not start the prompt; check the model and try again."));
       }, 30_000);
       this.waiting.set(requestId, (message) => {
         const started = message.kind === "command.started";
@@ -450,7 +450,7 @@ export class AeonClient {
         clearTimeout(timer);
         this.waiting.delete(requestId);
         if (failed)
-          reject(new Error(String(message.message ?? message.code ?? "Aeon could not submit.")));
+          reject(new Error(String(message.message ?? message.code ?? "Graft could not submit.")));
         else resolve();
       });
       this.socket.send(

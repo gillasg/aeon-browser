@@ -1,5 +1,5 @@
 import { EmptyChatStart } from "./empty-chat-start.js";
-import type { ChatSummaryDto, PiUiSnapshotDto } from "@aeon/protocol";
+import type { ChatSummaryDto, PiUiSnapshotDto } from "@graft/protocol";
 import { AnnotationProvider } from "./transcript-annotations.js";
 import type { ReactElement } from "react";
 import { invokePiCommand } from "./pi-native-command.js";

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { CapabilityRegistry } from "../dist/capability-registry.js";
 import { CapabilityToolService } from "../dist/capability-tool-service.js";
 import { PiMcpConfigMigration } from "../dist/pi-mcp-config-migration.js";
-import { PiSdkSessionAdapter } from "@aeon/pi-adapter";
+import { PiSdkSessionAdapter } from "@graft/pi-adapter";
 export function isProcessRunning(pid) {
   try {
     process.kill(pid, 0);
@@ -51,17 +51,17 @@ for await (const line of input) {
 }
 
 export async function prepareCutoverFixture() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-production-mcp-cutover-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-production-mcp-cutover-"));
   const workingDirectory = join(root, "project");
   const agentDirectory = join(root, "pi-agent");
   const sessionDirectory = join(root, "pi-sessions");
-  const dataDirectory = join(root, "aeon-data");
+  const dataDirectory = join(root, "graft-data");
   const registryPath = join(dataDirectory, "capabilities.json");
   const piConfigPath = join(agentDirectory, "mcp.json");
   const serverPath = join(root, "fixture-mcp-server.mjs");
   const pidFile = join(root, "fixture-pids.txt");
   const credentialFile = join(root, "fixture-credential.txt");
-  const credentialEnvName = `AEON_MCP_FIXTURE_${randomUUID().replaceAll("-", "").toUpperCase()}`;
+  const credentialEnvName = `GRAFT_MCP_FIXTURE_${randomUUID().replaceAll("-", "").toUpperCase()}`;
   const credentialValue = `fixture-secret-${randomUUID()}`;
   const priorCredential = process.env[credentialEnvName];
   process.env[credentialEnvName] = credentialValue;

@@ -1,4 +1,4 @@
-import type { BrowserStep } from "@aeon/protocol";
+import type { BrowserStep } from "@graft/protocol";
 export function requiresBrowserRuntime(step: BrowserStep): boolean {
   if (
     [

@@ -45,7 +45,7 @@ export async function serveMock(
       if (!sample) continue;
       response.writeHead(sample.status || 200, {
         "content-type": mimeOf(operation, sample.status),
-        "x-aeon-mock": operation.id,
+        "x-graft-mock": operation.id,
       });
       response.end(sample.responseBody ?? "");
       return;

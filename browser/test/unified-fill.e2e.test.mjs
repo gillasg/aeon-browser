@@ -47,7 +47,7 @@ var e1 = await page.locator('#enter').fill('a', {commit: 'enter'});
 var e2 = await page.locator('#blur').nth(0).fill('b', {commit: 'blur'});
 var e3 = await page.locator('#change').fill('c', {commit: 'change'});
 console.log('D ' + JSON.stringify({commits: await page.evaluate(() => window.commits), ok: [e1.committed, e2.committed, e3.committed]}));
-console.log('P ' + (await page.evaluate(() => document.querySelectorAll('[data-aeon-pick]').length)));`;
+console.log('P ' + (await page.evaluate(() => document.querySelectorAll('[data-graft-pick]').length)));`;
 
 test(
   "indexed fill uses the verified path, picks the on-screen copy and commits",

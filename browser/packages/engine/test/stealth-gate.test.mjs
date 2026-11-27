@@ -1,4 +1,4 @@
-// The stealth conformance gate: zero Aeon-specific page tells and zero CDP tells at rest, an honest
+// The stealth conformance gate: zero Graft-specific page tells and zero CDP tells at rest, an honest
 // tap ledger, and no web-accessible resource an extension-ID probe could find.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -69,9 +69,9 @@ test("the cursor never paints through the page's own world", async () => {
     assert.doesNotMatch(await source(path), /window\.(addEventListener|dispatchEvent)\(CURSOR_/);
 });
 
-test("tap names and sources carry nothing that names Aeon", () => {
+test("tap names and sources carry nothing that names Graft", () => {
   for (const tap of [PUSH_TAP, RTC_TAP]) {
-    assert.doesNotMatch(tap.binding + tap.off, /aeon/i);
+    assert.doesNotMatch(tap.binding + tap.off, /graft/i);
     assert.match(tap.binding, /^_[0-9a-z]+$/);
   }
 });

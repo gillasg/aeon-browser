@@ -8,7 +8,7 @@ import test from "node:test";
 import { validateUploadFiles } from "../dist/browser-workspace.js";
 
 test("uploads resolve only to files inside the workspace", async () => {
-  const base = await mkdtemp(join(tmpdir(), "aeon-upload-"));
+  const base = await mkdtemp(join(tmpdir(), "graft-upload-"));
   const ws = join(base, "ws");
   await mkdir(join(ws, "in"), { recursive: true });
   await writeFile(join(ws, "in", "ok.txt"), "ok");

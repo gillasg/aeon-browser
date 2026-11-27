@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
-import { NativeSettingsReplySchema, type AgentSettings } from "@aeon/protocol";
+import { NativeSettingsReplySchema, type AgentSettings } from "@graft/protocol";
 
 type SettingsChange = { [K in keyof AgentSettings]?: AgentSettings[K] | undefined };
 
-// `aeon settings`: the agent settings live in the extension, so Core relays reads and changes to
+// `graft settings`: the agent settings live in the extension, so Core relays reads and changes to
 // every connected Chrome. Screen recorders (Aperture) rely on this; keep it.
 const waiting = new Map<string, (settings: AgentSettings) => void>();
 

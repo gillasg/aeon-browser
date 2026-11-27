@@ -1,4 +1,4 @@
-import type { DaemonUiResponse, PiBrowserContextRecord } from "@aeon/protocol";
+import type { DaemonUiResponse, PiBrowserContextRecord } from "@graft/protocol";
 import { contextAssociationMessage } from "./composer-command.js";
 export function associateComposerContext(
   record: PiBrowserContextRecord,

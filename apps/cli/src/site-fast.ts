@@ -1,10 +1,10 @@
-// `aeon call|find|watch|status` take a lean path: agents call them in loops, and loading the whole
+// `graft call|find|watch|status` take a lean path: agents call them in loops, and loading the whole
 // command line (every command, the MCP server, the agent runtime) cost seconds per call. Each
 // loads only the module that defines it; flags, help, output and exit codes match cli-main.ts.
 import { has, parseArgs } from "browserkit/dist/args.js";
 import { out, printError } from "browserkit/dist/output.js";
 import { commandHelp, type Command } from "browserkit/dist/usage.js";
-import { DaemonHost, installAeonCliHost } from "./host.js";
+import { DaemonHost, installGraftCliHost } from "./host.js";
 
 const EXIT_CODES: Record<string, number> = {
   failed: 1,
@@ -18,7 +18,7 @@ const EXIT_CODES: Record<string, number> = {
 type Loader = (host: DaemonHost) => Promise<Command | undefined>;
 
 // The same command objects cli-main.ts resolves for these names: `watch` and `status` are
-// Aeon's own (a chat, the daemon), `call` and `find` are browserkit's.
+// Graft's own (a chat, the daemon), `call` and `find` are browserkit's.
 const LOADERS: Record<string, Loader> = {
   call: async () => (await import("browserkit/dist/commands/site-use.js")).callCommand,
   find: async () => (await import("browserkit/dist/commands/crawl.js")).findCommand,
@@ -34,7 +34,7 @@ const LOADERS: Record<string, Loader> = {
 
 export const SITE_FAST_COMMANDS: ReadonlySet<string> = new Set(Object.keys(LOADERS));
 
-/** The command `aeon <name>` runs on the lean path, or undefined when it has none. */
+/** The command `graft <name>` runs on the lean path, or undefined when it has none. */
 export function siteFastCommand(name: string, host: DaemonHost): Promise<Command | undefined> {
   return LOADERS[name]?.(host) ?? Promise.resolve(undefined);
 }
@@ -42,13 +42,13 @@ export function siteFastCommand(name: string, host: DaemonHost): Promise<Command
 export async function runSiteFast(argv: string[]): Promise<number> {
   const host = new DaemonHost();
   try {
-    installAeonCliHost(host);
+    installGraftCliHost(host);
     const args = parseArgs(argv);
     const [name = "", ...rest] = args.positional;
     const command = await siteFastCommand(name, host);
     if (!command) throw new Error(`no lean command for ${name}`);
     if (has(args, "help")) {
-      out(commandHelp(command, "aeon"));
+      out(commandHelp(command, "graft"));
       return 0;
     }
     const browser = args.flags.browser;
@@ -64,9 +64,9 @@ export async function runSiteFast(argv: string[]): Promise<number> {
 
 async function reportError(error: unknown): Promise<number> {
   const { errorKind } = await import("@browserkit/tools/site-to-api");
-  // Errors come from browserkit's commands too; in Aeon they must not name another product.
+  // Errors come from browserkit's commands too; in Graft they must not name another product.
   const renamed =
-    error instanceof Error ? new Error(error.message.replace(/\bbrowserkit\b/g, "aeon")) : error;
+    error instanceof Error ? new Error(error.message.replace(/\bbrowserkit\b/g, "graft")) : error;
   if (process.argv.includes("--json")) {
     out(
       JSON.stringify({

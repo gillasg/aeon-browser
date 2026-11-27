@@ -1,5 +1,5 @@
 import { Client, type CallToolResult, type Tool } from "@modelcontextprotocol/client";
-import type { CapabilityDefinition, McpCapability } from "@aeon/domain";
+import type { CapabilityDefinition, McpCapability } from "@graft/domain";
 import type { CapabilityRegistry } from "./capability-registry.js";
 import { McpTransportAdapter, type McpTransport } from "./mcp-transport-adapter.js";
 import {
@@ -269,7 +269,7 @@ export class McpClientManager {
   ): Promise<ManagedClient> {
     const opened: { managed?: ManagedClient } = {};
     const client = new Client(
-      { name: "aeon-mcp-client", version: "1.0.0" },
+      { name: "graft-mcp-client", version: "1.0.0" },
       {
         listChanged: {
           tools: {

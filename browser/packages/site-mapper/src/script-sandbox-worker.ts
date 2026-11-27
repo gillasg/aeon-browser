@@ -87,7 +87,7 @@ async function run(): Promise<string> {
   for (const name of ["URL", "URLSearchParams", "TextEncoder", "TextDecoder", "atob", "btoa"])
     sandbox[name] = (globalThis as Record<string, unknown>)[name];
   const context = vm.createContext(sandbox, {
-    name: "aeon-pack-script",
+    name: "graft-pack-script",
     codeGeneration: { strings: false, wasm: false },
   });
   vm.runInContext(PRELUDE, context);

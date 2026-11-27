@@ -152,7 +152,7 @@ export async function queryNodes(
   query: Query,
   contextId?: number,
 ): Promise<number[]> {
-  const group = `aeon-query-${crypto.randomUUID()}`;
+  const group = `graft-query-${crypto.randomUUID()}`;
   try {
     const evaluated = (await send(
       debuggee,
@@ -308,7 +308,7 @@ export async function fillTextNode(
   id: number,
   value: string,
 ): Promise<{ readback: string; via: FillVia }> {
-  const group = "aeon-fill-" + crypto.randomUUID();
+  const group = "graft-fill-" + crypto.randomUUID();
   try {
     const source = (await send(
       debuggee,

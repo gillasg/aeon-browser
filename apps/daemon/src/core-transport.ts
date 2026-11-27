@@ -10,7 +10,7 @@ import {
   CoreSettingsRequestSchema,
   CoreToolRequestSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
@@ -21,7 +21,7 @@ import { relayAgentSettings } from "./agent-settings.js";
 import { handleCoreFilm } from "./film-relay.js";
 import { handleBlockedSites } from "./core-blocked-sites.js";
 import { handleBrowsers, handleChatPin, pin } from "./core-browsers.js";
-import { sessionChatId } from "@aeon/pi-adapter";
+import { sessionChatId } from "@graft/pi-adapter";
 import { handleBrowserRun } from "./core-browser.js";
 import { handleCdpRequest } from "./core-cdp.js";
 import { handleModelComplete } from "./core-model.js";
@@ -207,7 +207,7 @@ function handleOpenChat(
   return true;
 }
 
-/** `aeon stop`: stop the chat's Pi run and tidy the tabs it left open. */
+/** `graft stop`: stop the chat's Pi run and tidy the tabs it left open. */
 function handleChatStop(
   socket: WebSocket,
   candidate: unknown,
@@ -245,7 +245,7 @@ function handleChatStop(
   );
   return true;
 }
-/** `aeon settings`: read or change the agent settings in every connected Chrome. */
+/** `graft settings`: read or change the agent settings in every connected Chrome. */
 function handleSettings(
   socket: WebSocket,
   candidate: unknown,
@@ -262,7 +262,7 @@ function handleSettings(
 /** External tool calls still running, by request id, so a core.tool.cancel can stop one. */
 const runningTools = new Map<string, AbortController>();
 
-/** The chat tools for agents outside Aeon: listed, or called in a named session. */
+/** The chat tools for agents outside Graft: listed, or called in a named session. */
 function handleToolRequest(
   socket: WebSocket,
   candidate: unknown,

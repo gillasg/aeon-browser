@@ -1,20 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "Aeon",
+  "name": "Graft",
   "version": "0.1.0",
-  "description": "Ask Aeon to do things in your own Chrome, with your tabs and logins, and watch every step it takes.",
+  "description": "Ask Graft to do things in your own Chrome, with your tabs and logins, and watch every step it takes.",
   "minimum_chrome_version": "125",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA89DgbMVu50oH2AAiN0vILGKRKc2ePGR9r1W92yDIiVq9n1rxtqxQZSLsxPKuymvi3wB9hpo0h9vJ3++teaw8fqBllliSeELEAUmPNhauLcvlKe1nhkbgRf2wXilCUVI+zumNinkqw5h85rew1FI894ev8M9wWzSHm90eL9WILlWTrjhdaNTpMs2w9sF8GrsKj+sX1anF9/iUfZ9hbracUa47Z2b4KiviZp5SlF6o+0SwFHbeOVM0Aq2nHMFujmfaOcW7TkxDdPXBns2uRY1CTmRIyi3B1pONLQd8ERteRbOlj2BM9AYIrnGyJScaKAu7OUht0gI4C/NlEhdQruxTfQIDAQAB",
   "background": {
     "service_worker": "service-worker.js"
   },
   "action": {
-    "default_title": "Open Aeon Chat",
+    "default_title": "Open Graft Chat",
     "default_icon": {
-      "16": "aeon-icon-16.png",
-      "32": "aeon-icon-32.png",
-      "48": "aeon-icon-48.png",
-      "128": "aeon-icon-128.png"
+      "16": "graft-icon-16.png",
+      "32": "graft-icon-32.png",
+      "48": "graft-icon-48.png",
+      "128": "graft-icon-128.png"
     }
   },
   "side_panel": {
@@ -49,10 +49,10 @@
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "icons": {
-    "16": "aeon-icon-16.png",
-    "32": "aeon-icon-32.png",
-    "48": "aeon-icon-48.png",
-    "128": "aeon-icon-128.png"
+    "16": "graft-icon-16.png",
+    "32": "graft-icon-32.png",
+    "48": "graft-icon-48.png",
+    "128": "graft-icon-128.png"
   },
   "commands": {
     "summon-orb": {
@@ -60,7 +60,7 @@
         "default": "Alt+Shift+Space",
         "mac": "Alt+Shift+Space"
       },
-      "description": "Ask Aeon on this page"
+      "description": "Ask Graft on this page"
     }
   },
   "content_scripts": [

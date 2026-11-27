@@ -1,5 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { PiEntryCategory, PiEntryProjection, PiMessageProjection } from "@aeon/domain";
+import type { PiEntryCategory, PiEntryProjection, PiMessageProjection } from "@graft/domain";
 import { projectRoutineSettlement, PI_ROUTINE_SETTLEMENT_TYPE } from "./pi-routine.js";
 import { projectCustomMessage, projectMessage } from "./pi-message-projection.js";
 import type { SignInCodes } from "./sign-in-codes.js";

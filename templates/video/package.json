@@ -1,9 +1,9 @@
 {
-  "name": "aeon-video-kit",
+  "name": "graft-video-kit",
   "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Aeon Open Studio: a blank Remotion canvas around a real aeon record take. Not part of Aeon's build.",
+  "description": "Graft Open Studio: a blank Remotion canvas around a real graft record take. Not part of Graft's build.",
   "scripts": {
     "studio": "remotion studio src/Root.tsx",
     "stills": "node scripts/render.mjs Scene --still-ms 0,2000,6000",

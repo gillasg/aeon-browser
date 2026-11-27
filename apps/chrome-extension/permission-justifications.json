@@ -1,10 +1,10 @@
 {
-  "nativeMessaging": "Starts and reaches the local Aeon daemon (native host); every agent run goes through it.",
+  "nativeMessaging": "Starts and reaches the local Graft daemon (native host); every agent run goes through it.",
   "storage": "Chat, run, job and settings state in chrome.storage (local and session), restored when the service worker restarts.",
   "tabs": "Opens, reads, moves and closes the agent's tabs and keeps the tab inventory the daemon sees; runs in the background with no user gesture.",
-  "sidePanel": "The Aeon chat lives in Chrome's side panel (Aeon extension only).",
+  "sidePanel": "The Graft chat lives in Chrome's side panel (Graft extension only).",
   "debugger": "CDP is the browser kernel: input, observation, network capture, screenshots and emulation for every browser_code step.",
-  "contextMenus": "The right-click 'Ask Aeon' entries (Aeon extension only).",
+  "contextMenus": "The right-click 'Ask Graft' entries (Graft extension only).",
   "notifications": "Tells the user when a background run finishes or needs a hand-off.",
   "userScripts": "Site scripts and boosts the user installs run as user scripts in their own world.",
   "scripting": "Injects the cursor box, page reads and CSS into tabs the agent works in.",

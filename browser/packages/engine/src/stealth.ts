@@ -126,7 +126,7 @@ export function judgeStealth(probe: StealthProbe, state: StealthState): StealthR
       signals.push(`a script runs in the page's own world on every document: ${script.label}`);
     else
       diagnostics.push(
-        `an isolated-world helper of Aeon's runs here (page code cannot read it): ${script.label}`,
+        `an isolated-world helper of Graft's runs here (page code cannot read it): ${script.label}`,
       );
   }
   return {

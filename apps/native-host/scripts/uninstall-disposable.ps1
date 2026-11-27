@@ -1,15 +1,15 @@
 $ErrorActionPreference = 'Stop'
-$appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Aeon'))
-$hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
-$hostManifestPath = Join-Path $appRoot 'com.aeon.native_host.json'
+$appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Graft'))
+$hostExecutable = Join-Path $appRoot 'graft-native-host.exe'
+$hostManifestPath = Join-Path $appRoot 'com.graft.native_host.json'
 $hostConfigPath = Join-Path $appRoot 'host-config.json'
-$registrySubKey = 'Software\Google\Chrome\NativeMessagingHosts\com.aeon.native_host'
+$registrySubKey = 'Software\Google\Chrome\NativeMessagingHosts\com.graft.native_host'
 $expectedExtensionId = 'npcdopokfkpfmepknhoecppgdgmkmihh'
 $expectedOrigin = "chrome-extension://$expectedExtensionId/"
 & (Join-Path $PSScriptRoot 'configure-startup.ps1') -Mode Validate
-$appRootPrefix = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Aeon'))
+$appRootPrefix = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Graft'))
 if (-not $appRoot.StartsWith(($appRootPrefix.TrimEnd('\') + '\'), [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'Refusing to operate outside LocalAppData\Aeon.'
+    throw 'Refusing to operate outside LocalAppData\Graft.'
 }
 
 $registryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($registrySubKey, $true)
@@ -30,7 +30,7 @@ if (-not (Test-Path -LiteralPath $hostManifestPath -PathType Leaf) -or
 }
 $manifest = Get-Content -LiteralPath $hostManifestPath -Raw | ConvertFrom-Json
 $config = Get-Content -LiteralPath $hostConfigPath -Raw | ConvertFrom-Json
-if ($manifest.name -cne 'com.aeon.native_host' -or
+if ($manifest.name -cne 'com.graft.native_host' -or
     [IO.Path]::GetFullPath([string]$manifest.path) -ine [IO.Path]::GetFullPath($hostExecutable) -or
     @($manifest.allowed_origins).Count -ne 1 -or $manifest.allowed_origins[0] -cne $expectedOrigin -or
     $config.extensionId -cne $expectedExtensionId -or

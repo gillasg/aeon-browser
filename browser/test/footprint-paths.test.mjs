@@ -3,37 +3,37 @@ import test from "node:test";
 import { createPortable } from "../scripts/footprint-paths.mjs";
 
 test("a Windows checkout path is substituted inside stringified tools", () => {
-  const root = String.raw`C:\Users\dev\AppData\Local\Temp\aeon-footprint-abc123`;
-  const aeon = String.raw`C:\Users\dev\aeon-browser`;
+  const root = String.raw`C:\Users\dev\AppData\Local\Temp\graft-footprint-abc123`;
+  const graft = String.raw`C:\Users\dev\graft-browser`;
   const portable = createPortable([
     [root, "<workspace>"],
-    [aeon, "<aeon>"],
+    [graft, "<graft>"],
   ]);
   const text = JSON.stringify({
     cwd: root + String.raw`\workspace`,
-    repo: aeon,
+    repo: graft,
     note: "keep this",
   });
   const out = portable(text);
   assert.equal(out.includes("C:"), false);
   assert.equal(out.includes(root), false);
-  assert.equal(out.includes(aeon), false);
+  assert.equal(out.includes(graft), false);
   assert.deepEqual(JSON.parse(out), {
     cwd: String.raw`<workspace>\workspace`,
-    repo: "<aeon>",
+    repo: "<graft>",
     note: "keep this",
   });
 });
 
 test("POSIX and plain-text paths keep working", () => {
-  const root = "/tmp/aeon footprint abc";
-  const aeon = "/home/dev/code/aeon/aeon-browser";
+  const root = "/tmp/graft footprint abc";
+  const graft = "/home/dev/code/graft/graft-browser";
   const portable = createPortable([
     [root, "<workspace>"],
-    [aeon, "<aeon>"],
+    [graft, "<graft>"],
   ]);
   assert.equal(
-    portable(`${root}/workspace and ${aeon}/packages/pi-adapter`),
-    "<workspace>/workspace and <aeon>/packages/pi-adapter",
+    portable(`${root}/workspace and ${graft}/packages/pi-adapter`),
+    "<workspace>/workspace and <graft>/packages/pi-adapter",
   );
 });

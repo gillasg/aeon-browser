@@ -23,7 +23,7 @@ export class PageReconnect {
     try {
       await this.connect();
     } catch (error) {
-      this.onFailure(error instanceof Error ? error.message : "Could not connect to Aeon.");
+      this.onFailure(error instanceof Error ? error.message : "Could not connect to Graft.");
       this.schedule();
     } finally {
       this.busy = false;

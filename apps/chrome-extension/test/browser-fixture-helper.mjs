@@ -37,7 +37,7 @@ function chromeArguments(folder) {
 }
 
 export async function browserFixture() {
-  const folder = await mkdtemp(join(tmpdir(), "aeon-browser-fixture-"));
+  const folder = await mkdtemp(join(tmpdir(), "graft-browser-fixture-"));
   // CHROME_PATH first: a worktree has no .slice0-audit folder of its own.
   const chromePath = chromeForTestingPath();
   const child = spawn(chromePath, chromeArguments(folder), { windowsHide: true, stdio: "ignore" });

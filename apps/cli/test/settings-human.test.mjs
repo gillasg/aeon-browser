@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { settingsCommand } from "../dist/settings.js";
 
-test("aeon settings can turn human-like input on for a stealth run", async () => {
+test("graft settings can turn human-like input on for a stealth run", async () => {
   const seen = [];
   const client = {
     settings: async (set) => {
@@ -15,7 +15,7 @@ test("aeon settings can turn human-like input on for a stealth run", async () =>
   assert.deepEqual(seen, [{ humanLikeInput: true }]);
 });
 
-test("aeon settings leaves human-like input off when set false", async () => {
+test("graft settings leaves human-like input off when set false", async () => {
   const seen = [];
   const client = {
     settings: async (set) => {

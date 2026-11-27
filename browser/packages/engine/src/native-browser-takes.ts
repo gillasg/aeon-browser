@@ -13,7 +13,7 @@ import {
 } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
-const OFFSCREEN = "aeon-code-offscreen";
+const OFFSCREEN = "graft-code-offscreen";
 const SLICE = 750_000;
 /** A take nobody saved is dropped this long after its tab closed or its recording stopped. */
 const KEEP_MS = 30 * 60_000;
@@ -29,7 +29,7 @@ async function recordAgentTab(tabId: number): Promise<void> {
   saveRecordings();
   // An idle detach would end the screencast mid-take: keep the debugger on while it records.
   holdBrowserDebugger(tabId, true);
-  // With "Hide agent cursor" off, the take shows Aeon's own cursor and pill (never the glow).
+  // With "Hide agent cursor" off, the take shows Graft's own cursor and pill (never the glow).
   const shown = !(await engineConfig.hideAgentCursor().catch(() => true));
   await startRecording(tabId, { fps: 30, ...(shown ? { cursor: true, pill: true } : {}) }).catch(
     (error: unknown) => {
@@ -42,7 +42,7 @@ async function recordAgentTab(tabId: number): Promise<void> {
 }
 
 /**
- * Records a chat's own tab (Aeon's chat page) as one of the chat's takes, so a screen recorder
+ * Records a chat's own tab (Graft's chat page) as one of the chat's takes, so a screen recorder
  * gets the prompt being typed and the answer alongside the pages. Only while recordAgentTabs is on.
  */
 export async function recordChatTab(tabId: number, chatId: string): Promise<boolean> {

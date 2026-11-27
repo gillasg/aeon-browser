@@ -13,7 +13,7 @@ import type { BrowserIdentity } from "./native-worker-identity.js";
  */
 function log(message: string, data?: Record<string, unknown>): void {
   engineDebug("native-link", message, data);
-  console.info("Aeon native link: " + message, data ?? "");
+  console.info("Graft native link: " + message, data ?? "");
 }
 
 /** Prepare on worker load, browser startup, and wake before a page requests a grant. */
@@ -43,8 +43,8 @@ export function installNativeStartup(connect: () => Promise<unknown>, retry: () 
   warm();
 }
 
-export const RECONNECT_ALARM = "aeon-executor-reconnect";
-export const RECONNECT_NOW_ALARM = "aeon-executor-reconnect-now";
+export const RECONNECT_ALARM = "graft-executor-reconnect";
+export const RECONNECT_NOW_ALARM = "graft-executor-reconnect-now";
 export function logNativeLink(message: string, data?: Record<string, unknown>): void {
   log(message, data);
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildRunCard, speedText } from "../dist/run-card.js";
 import { fillRouteDraft } from "../dist/route-draft.js";
-import { PiSessionEventSchema } from "@aeon/protocol";
+import { PiSessionEventSchema } from "@graft/protocol";
 
 const base = {
   chatId: "chat",

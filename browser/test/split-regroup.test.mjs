@@ -30,10 +30,10 @@ const storage = {
 };
 globalThis.chrome = {
   runtime: {
-    getURL: (path) => `chrome-extension://aeon/${path}`,
+    getURL: (path) => `chrome-extension://graft/${path}`,
     onInstalled: { addListener() {} },
     onStartup: { addListener() {} },
-    id: "aeon",
+    id: "graft",
   },
   alarms: { create() {}, onAlarm: { addListener() {} }, clear: async () => true },
   storage: { session: storage, local: storage, onChanged: { addListener() {} } },
@@ -90,7 +90,7 @@ globalThis.chrome = {
 };
 
 // Every Chrome event the engine listens to: missing ones are stubbed, and onActivated is kept so
-// the test can fire the user's (or Aeon's) tab switches.
+// the test can fire the user's (or Graft's) tab switches.
 const activated = [];
 const stubEvents = (node) => {
   for (const value of Object.values(node))
@@ -123,7 +123,7 @@ const userSwitches = (tabId) => {
   for (const listener of activated) listener({ tabId, windowId: 1 });
 };
 const { configureEngine } = await import("../packages/engine/dist/engine-config.js");
-configureEngine({ tabGroupTitle: () => "Aeon" });
+configureEngine({ tabGroupTitle: () => "Graft" });
 const { trackAgentTab } = await import("../packages/engine/dist/native-browser-tab-cleanup.js");
 const { groupAgentTab, isAgentGroupId } =
   await import("../packages/engine/dist/native-browser-groups.js");
@@ -137,7 +137,7 @@ try {
 
 test("a split-paired agent tab returns to the agent group when the chat moves on", async () => {
   const chatId = "chat-1";
-  tab(1, { url: `chrome-extension://aeon/chat.html?chatId=${chatId}`, active: true });
+  tab(1, { url: `chrome-extension://graft/chat.html?chatId=${chatId}`, active: true });
   tab(2, { url: "https://widgets.example/" });
   tab(3, { url: "https://digital.example/" });
   tab(4, { url: "https://user.example/" });
@@ -162,7 +162,7 @@ test("a split-paired agent tab returns to the agent group when the chat moves on
   assert.equal(tabs.get(4).groupId, -1, "a tab the agent did not open is never grouped");
 });
 
-test("a tab only Aeon showed is not the user's: the run's tidy-up still closes it", async () => {
+test("a tab only Graft showed is not the user's: the run's tidy-up still closes it", async () => {
   const { tidyChatTabs } = await import("../packages/engine/dist/native-browser-tab-cleanup.js");
   const closed = [];
   globalThis.chrome.tabs.remove = async (id) => {
@@ -170,12 +170,12 @@ test("a tab only Aeon showed is not the user's: the run's tidy-up still closes i
     tabs.delete(id);
   };
   const chatId = "chat-2";
-  tab(11, { url: `chrome-extension://aeon/chat.html?chatId=${chatId}`, active: true });
+  tab(11, { url: `chrome-extension://graft/chat.html?chatId=${chatId}`, active: true });
   for (const id of [12, 13, 14]) {
     tab(id, { url: `https://store-${id}.example/` });
     trackAgentTab(id, chatId);
   }
-  // Aeon pairs each tab with the chat in turn; Chrome reports each as activated.
+  // Graft pairs each tab with the chat in turn; Chrome reports each as activated.
   for (const id of [12, 13, 14]) {
     await presentBrowserTask(chatId, id);
     userSwitches(id);
@@ -184,6 +184,6 @@ test("a tab only Aeon showed is not the user's: the run's tidy-up still closes i
   await new Promise((done) => setTimeout(done, 2100));
   userSwitches(13);
   await tidyChatTabs(chatId);
-  assert.ok(closed.includes(12) || closed.includes(14), "an Aeon-only tab was closed");
+  assert.ok(closed.includes(12) || closed.includes(14), "a Graft-only tab was closed");
   assert.ok(!closed.includes(13), "the tab the user switched to stays");
 });

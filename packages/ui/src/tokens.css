@@ -1,375 +1,375 @@
 :root {
   color-scheme: dark;
   /* Layout */
-  --aeon-home-sidebar-width: 250px;
-  --aeon-home-sidebar-collapsed-width: 62px;
-  --aeon-chat-sidebar-width: min(264px, calc(100vw - 35px));
+  --graft-home-sidebar-width: 250px;
+  --graft-home-sidebar-collapsed-width: 62px;
+  --graft-chat-sidebar-width: min(264px, calc(100vw - 35px));
   /* Spacing: 4px scale (s-N = N * 4px) */
-  --aeon-s-0: 0;
-  --aeon-s-1: 4px;
-  --aeon-s-2: 8px;
-  --aeon-s-3: 12px;
-  --aeon-s-4: 16px;
-  --aeon-s-5: 20px;
-  --aeon-s-6: 24px;
-  --aeon-s-7: 28px;
-  --aeon-s-8: 32px;
-  --aeon-s-9: 36px;
-  --aeon-s-10: 40px;
-  --aeon-s-15: 60px;
-  --aeon-s-16: 64px;
+  --graft-s-0: 0;
+  --graft-s-1: 4px;
+  --graft-s-2: 8px;
+  --graft-s-3: 12px;
+  --graft-s-4: 16px;
+  --graft-s-5: 20px;
+  --graft-s-6: 24px;
+  --graft-s-7: 28px;
+  --graft-s-8: 32px;
+  --graft-s-9: 36px;
+  --graft-s-10: 40px;
+  --graft-s-15: 60px;
+  --graft-s-16: 64px;
   /* Type scale */
-  --aeon-font-body: 14px/1.6 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
-  --aeon-fs-xs: 11px;
-  --aeon-fs-sm: 12px;
-  --aeon-fs-md: 13px;
-  --aeon-fs-base: 14px;
-  --aeon-fs-lg: 16px;
-  --aeon-fs-xl: 22px;
-  --aeon-fs-2xl: 28px;
-  --aeon-font-small: var(--aeon-fs-sm);
-  --aeon-font-meta: var(--aeon-fs-md);
+  --graft-font-body: 14px/1.6 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  --graft-fs-xs: 11px;
+  --graft-fs-sm: 12px;
+  --graft-fs-md: 13px;
+  --graft-fs-base: 14px;
+  --graft-fs-lg: 16px;
+  --graft-fs-xl: 22px;
+  --graft-fs-2xl: 28px;
+  --graft-font-small: var(--graft-fs-sm);
+  --graft-font-meta: var(--graft-fs-md);
   /* Radii */
-  --aeon-r-sm: 6px;
-  --aeon-r-md: 10px;
-  --aeon-r-lg: 16px;
-  --aeon-r-xl: 24px;
-  --aeon-r-full: 999px;
+  --graft-r-sm: 6px;
+  --graft-r-md: 10px;
+  --graft-r-lg: 16px;
+  --graft-r-xl: 24px;
+  --graft-r-full: 999px;
   /* Neutral ladder: bg-0 (deepest) .. fg-max (brightest) */
-  --aeon-bg-0: #111111;
-  --aeon-bg-1: #1a1a1a;
-  --aeon-bg-2: #222222;
-  --aeon-bg-3: #292929;
-  --aeon-bg-4: #303030;
-  --aeon-border: #333333;
-  --aeon-border-strong: #444444;
-  --aeon-fg-4: #5a5a5a;
-  --aeon-fg-3: #7a7a7a;
-  --aeon-fg-2: #969696;
-  --aeon-fg-soft: #aaaaaa;
-  --aeon-fg-1: #cccccc;
-  --aeon-fg-0: #ededed;
-  --aeon-fg-max: #ffffff;
+  --graft-bg-0: #111111;
+  --graft-bg-1: #1a1a1a;
+  --graft-bg-2: #222222;
+  --graft-bg-3: #292929;
+  --graft-bg-4: #303030;
+  --graft-border: #333333;
+  --graft-border-strong: #444444;
+  --graft-fg-4: #5a5a5a;
+  --graft-fg-3: #7a7a7a;
+  --graft-fg-2: #969696;
+  --graft-fg-soft: #aaaaaa;
+  --graft-fg-1: #cccccc;
+  --graft-fg-0: #ededed;
+  --graft-fg-max: #ffffff;
   /* Status */
-  --aeon-accent: #d4d4d8;
-  --aeon-accent-wash: color-mix(in srgb, var(--aeon-accent) 14%, transparent);
-  --aeon-danger: #bd716b;
-  --aeon-danger-soft: #e3b2a9;
-  --aeon-danger-bg: #4a3030;
-  --aeon-warm: #b8975f;
-  /* Needs you: the one status colour Aeon's own pages add. */
-  --aeon-needs: #f5a623;
-  --aeon-diff-add: #258647;
-  --aeon-diff-del: #bd3344;
-  --aeon-diff-add-fg: #3fcf8e;
-  --aeon-diff-del-fg: #ff5a78;
+  --graft-accent: #d4d4d8;
+  --graft-accent-wash: color-mix(in srgb, var(--graft-accent) 14%, transparent);
+  --graft-danger: #bd716b;
+  --graft-danger-soft: #e3b2a9;
+  --graft-danger-bg: #4a3030;
+  --graft-warm: #b8975f;
+  /* Needs you: the one status colour Graft's own pages add. */
+  --graft-needs: #f5a623;
+  --graft-diff-add: #258647;
+  --graft-diff-del: #bd3344;
+  --graft-diff-add-fg: #3fcf8e;
+  --graft-diff-del-fg: #ff5a78;
   /* Elevation */
-  --aeon-shadow-sm: #00000033;
-  --aeon-shadow-md: #00000066;
-  --aeon-scrim: #00000099;
-  --aeon-elev-1: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 1px 2px rgb(0 0 0 / 30%);
-  --aeon-elev-2: 0 1px 0 rgb(255 255 255 / 5%) inset, 0 8px 24px rgb(0 0 0 / 35%);
-  --aeon-elev-3: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 48px rgb(0 0 0 / 45%);
-  --aeon-focus-ring:
-    0 0 0 2px var(--aeon-bg-0), 0 0 0 4px color-mix(in srgb, var(--aeon-accent) 70%, transparent);
+  --graft-shadow-sm: #00000033;
+  --graft-shadow-md: #00000066;
+  --graft-scrim: #00000099;
+  --graft-elev-1: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 1px 2px rgb(0 0 0 / 30%);
+  --graft-elev-2: 0 1px 0 rgb(255 255 255 / 5%) inset, 0 8px 24px rgb(0 0 0 / 35%);
+  --graft-elev-3: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 48px rgb(0 0 0 / 45%);
+  --graft-focus-ring:
+    0 0 0 2px var(--graft-bg-0), 0 0 0 4px color-mix(in srgb, var(--graft-accent) 70%, transparent);
   /* Motion */
-  --aeon-ease: cubic-bezier(0.2, 0, 0, 1);
-  --aeon-dur-fast: 120ms;
-  --aeon-dur: 180ms;
+  --graft-ease: cubic-bezier(0.2, 0, 0, 1);
+  --graft-dur-fast: 120ms;
+  --graft-dur: 180ms;
   /* Role aliases */
-  --aeon-canvas: var(--aeon-bg-0);
-  --aeon-surface: var(--aeon-bg-2);
-  --aeon-surface-raised: var(--aeon-bg-3);
-  --aeon-text: var(--aeon-fg-0);
-  --aeon-muted: var(--aeon-fg-2);
-  --aeon-faint: var(--aeon-fg-3);
-  --aeon-line: var(--aeon-border);
-  --aeon-home-canvas: var(--aeon-canvas);
-  --aeon-home-text: var(--aeon-text);
-  --aeon-panel-canvas: var(--aeon-canvas);
-  --aeon-panel-header: var(--aeon-canvas);
-  --aeon-panel-surface: var(--aeon-surface);
-  --aeon-panel-raised: var(--aeon-surface-raised);
-  --aeon-panel-selected: var(--aeon-surface-raised);
-  --aeon-panel-line: var(--aeon-line);
-  --aeon-panel-text: var(--aeon-text);
-  --aeon-panel-muted: var(--aeon-muted);
-  --aeon-panel-faint: var(--aeon-faint);
-  --aeon-panel-accent: var(--aeon-accent);
+  --graft-canvas: var(--graft-bg-0);
+  --graft-surface: var(--graft-bg-2);
+  --graft-surface-raised: var(--graft-bg-3);
+  --graft-text: var(--graft-fg-0);
+  --graft-muted: var(--graft-fg-2);
+  --graft-faint: var(--graft-fg-3);
+  --graft-line: var(--graft-border);
+  --graft-home-canvas: var(--graft-canvas);
+  --graft-home-text: var(--graft-text);
+  --graft-panel-canvas: var(--graft-canvas);
+  --graft-panel-header: var(--graft-canvas);
+  --graft-panel-surface: var(--graft-surface);
+  --graft-panel-raised: var(--graft-surface-raised);
+  --graft-panel-selected: var(--graft-surface-raised);
+  --graft-panel-line: var(--graft-line);
+  --graft-panel-text: var(--graft-text);
+  --graft-panel-muted: var(--graft-muted);
+  --graft-panel-faint: var(--graft-faint);
+  --graft-panel-accent: var(--graft-accent);
 }
 /* Every neutral is themed, so no dark value can leak into light mode. */
 :root[data-theme="light"],
 :root[data-theme="system"] {
   color-scheme: light dark;
-  --aeon-bg-0: light-dark(#f4f4f4, #111111);
-  --aeon-bg-1: light-dark(#ededed, #1a1a1a);
-  --aeon-bg-2: light-dark(#ffffff, #222222);
-  --aeon-bg-3: light-dark(#ebebeb, #292929);
-  --aeon-bg-4: light-dark(#e2e2e2, #303030);
-  --aeon-border: light-dark(#d9d9d9, #333333);
-  --aeon-border-strong: light-dark(#c4c4c4, #444444);
-  --aeon-fg-4: light-dark(#a3a3a3, #5a5a5a);
-  --aeon-fg-3: light-dark(#868686, #7a7a7a);
-  --aeon-fg-2: light-dark(#666666, #969696);
-  --aeon-fg-soft: light-dark(#555555, #aaaaaa);
-  --aeon-fg-1: light-dark(#3a3a3a, #cccccc);
-  --aeon-fg-0: light-dark(#262626, #ededed);
-  --aeon-fg-max: light-dark(#000000, #ffffff);
-  --aeon-accent: light-dark(#3f3f46, #d4d4d8);
-  --aeon-danger: light-dark(#a8463f, #bd716b);
-  --aeon-danger-soft: light-dark(#8f3a33, #e3b2a9);
-  --aeon-danger-bg: light-dark(#f6dedb, #4a3030);
-  --aeon-needs: light-dark(#8a6526, #f5a623);
-  --aeon-diff-add-fg: light-dark(#17803f, #3fcf8e);
-  --aeon-diff-del-fg: light-dark(#c0283f, #ff5a78);
-  --aeon-shadow-sm: light-dark(#0000001a, #00000033);
-  --aeon-shadow-md: light-dark(#0000002e, #00000066);
-  --aeon-elev-1: 0 1px 2px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 30%));
-  --aeon-elev-2: 0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 35%));
-  --aeon-elev-3: 0 16px 48px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 45%));
+  --graft-bg-0: light-dark(#f4f4f4, #111111);
+  --graft-bg-1: light-dark(#ededed, #1a1a1a);
+  --graft-bg-2: light-dark(#ffffff, #222222);
+  --graft-bg-3: light-dark(#ebebeb, #292929);
+  --graft-bg-4: light-dark(#e2e2e2, #303030);
+  --graft-border: light-dark(#d9d9d9, #333333);
+  --graft-border-strong: light-dark(#c4c4c4, #444444);
+  --graft-fg-4: light-dark(#a3a3a3, #5a5a5a);
+  --graft-fg-3: light-dark(#868686, #7a7a7a);
+  --graft-fg-2: light-dark(#666666, #969696);
+  --graft-fg-soft: light-dark(#555555, #aaaaaa);
+  --graft-fg-1: light-dark(#3a3a3a, #cccccc);
+  --graft-fg-0: light-dark(#262626, #ededed);
+  --graft-fg-max: light-dark(#000000, #ffffff);
+  --graft-accent: light-dark(#3f3f46, #d4d4d8);
+  --graft-danger: light-dark(#a8463f, #bd716b);
+  --graft-danger-soft: light-dark(#8f3a33, #e3b2a9);
+  --graft-danger-bg: light-dark(#f6dedb, #4a3030);
+  --graft-needs: light-dark(#8a6526, #f5a623);
+  --graft-diff-add-fg: light-dark(#17803f, #3fcf8e);
+  --graft-diff-del-fg: light-dark(#c0283f, #ff5a78);
+  --graft-shadow-sm: light-dark(#0000001a, #00000033);
+  --graft-shadow-md: light-dark(#0000002e, #00000066);
+  --graft-elev-1: 0 1px 2px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 30%));
+  --graft-elev-2: 0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 35%));
+  --graft-elev-3: 0 16px 48px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 45%));
 }
 :root[data-theme="light"] {
   color-scheme: light;
 }
-[data-aeon-root="true"] {
+[data-graft-root="true"] {
   display: contents;
 }
-/* Established Aeon palette. */
+/* Established Graft palette. */
 :root {
   color-scheme: dark;
-  --aeon-swatch-666666: #666666;
-  --aeon-swatch-c4c4c4: #c4c4c4;
-  --aeon-swatch-e0e0de: #dfdfdf;
-  --aeon-canvas: #111111;
-  --aeon-surface: #222222;
-  --aeon-surface-raised: #282828;
-  --aeon-text: #ededed;
-  --aeon-muted: #969696;
-  --aeon-faint: #777777;
-  --aeon-line: #333333;
-  --aeon-accent: #ff9c00;
-  --aeon-home-canvas: var(--aeon-canvas);
-  --aeon-home-text: var(--aeon-text);
-  --aeon-panel-canvas: var(--aeon-canvas);
-  --aeon-panel-header: var(--aeon-canvas);
-  --aeon-panel-surface: var(--aeon-surface);
-  --aeon-panel-raised: var(--aeon-surface-raised);
-  --aeon-panel-selected: var(--aeon-surface-raised);
-  --aeon-panel-line: var(--aeon-line);
-  --aeon-panel-text: var(--aeon-text);
-  --aeon-panel-muted: var(--aeon-muted);
-  --aeon-panel-faint: var(--aeon-faint);
-  --aeon-panel-accent: var(--aeon-accent);
-  --aeon-swatch-262626: #262626;
-  --aeon-swatch-d4d4cf: #d2d2d2;
-  --aeon-swatch-9f9f99: #9d9d9d;
-  --aeon-swatch-272725: #262626;
-  --aeon-swatch-e4e4df: #e2e2e2;
-  --aeon-swatch-292927: #282828;
-  --aeon-swatch-d8cab3: #d0d0d0;
-  --aeon-swatch-c7c7c1: #c5c5c5;
-  --aeon-swatch-898989: #898989;
-  --aeon-swatch-a0a0a0: #a0a0a0;
-  --aeon-swatch-7e9b79: #7e9b79;
-  --aeon-swatch-bd716b: #bd716b;
-  --aeon-swatch-44443f: #424242;
-  --aeon-swatch-92928d: #909090;
-  --aeon-swatch-b7b7b7: #b7b7b7;
-  --aeon-swatch-929292: #929292;
-  --aeon-swatch-a5a5a5: #a5a5a5;
-  --aeon-swatch-b5b5b5: #b5b5b5;
-  --aeon-swatch-858585: #858585;
-  --aeon-swatch-d0d0d0: #d0d0d0;
-  --aeon-swatch-2c2c2c: #2c2c2c;
-  --aeon-swatch-d5d5d5: #d5d5d5;
-  --aeon-swatch-9b9b95: #999999;
-  --aeon-swatch-c78b84: #c78b84;
-  --aeon-swatch-1b1b1b00: #11111100;
-  --aeon-swatch-3b3b3b: #3b3b3b;
-  --aeon-swatch-2d2d2d: #2d2d2d;
-  --aeon-swatch-555555: #555555;
-  --aeon-swatch-999999: #999999;
-  --aeon-swatch-434343: #434343;
-  --aeon-swatch-a7a7a7: #a7a7a7;
-  --aeon-swatch-9c8969: #898989;
-  --aeon-swatch-f3f3f3: #f3f3f3;
-  --aeon-swatch-232323: #232323;
-  --aeon-swatch-ffffff: #ffffff;
-  --aeon-swatch-94958e: #929292;
-  --aeon-swatch-353833: #353535;
-  --aeon-swatch-1a1c19: #1a1a1a;
-  --aeon-swatch-d7d9d2: #d6d6d6;
-  --aeon-swatch-3b4037: #3b3b3b;
-  --aeon-swatch-b5c2a6: #b5c2a6;
-  --aeon-swatch-a9ada4: #a9a9a9;
-  --aeon-swatch-343832: #353535;
-  --aeon-swatch-a5a89f: #a4a4a4;
-  --aeon-swatch-d2d4cc: #d1d1d1;
-  --aeon-swatch-30302d: #2f2f2f;
-  --aeon-swatch-d4d4ce: #d2d2d2;
-  --aeon-swatch-393936: #383838;
-  --aeon-swatch-333330: #323232;
-  --aeon-swatch-bdbdb7: #bbbbbb;
-  --aeon-swatch-82827c: #808080;
-  --aeon-swatch-deded9: #dcdcdc;
-  --aeon-swatch-777772: #757575;
-  --aeon-swatch-2b2b29: #2a2a2a;
-  --aeon-swatch-e0e0db: #dedede;
-  --aeon-swatch-888882: #868686;
-  --aeon-swatch-7b7b75: #797979;
-  --aeon-swatch-aaa6ae: #aaaaaa;
-  --aeon-swatch-29262d: #292929;
-  --aeon-swatch-ece9ee: #ececec;
-  --aeon-swatch-30302f: #303030;
-  --aeon-swatch-dadada: #dadada;
-  --aeon-swatch-d3d0d6: #d3d3d3;
-  --aeon-swatch-38343c: #383838;
-  --aeon-swatch-262329: #262626;
-  --aeon-swatch-aaa5ae: #aaaaaa;
-  --aeon-swatch-8d8991: #8d8d8d;
-  --aeon-swatch-8e8992: #8e8e8e;
-  --aeon-swatch-89848e: #898989;
-  --aeon-swatch-a0a09a: #9e9e9e;
-  --aeon-swatch-96968f: #949494;
-  --aeon-swatch-858580: #838383;
-  --aeon-swatch-a8a8a2: #a6a6a6;
-  --aeon-swatch-424240: #414141;
-  --aeon-swatch-575753: #565656;
-  --aeon-swatch-f0f0ec: #efefef;
-  --aeon-swatch-a3a39d: #a1a1a1;
-  --aeon-swatch-e3e3df: #e2e2e2;
-  --aeon-swatch-a3a39c: #a1a1a1;
-  --aeon-swatch-3a3a38: #393939;
-  --aeon-swatch-464d4b: #4a4a4a;
-  --aeon-swatch-bdc6c1: #c1c1c1;
-  --aeon-swatch-9a9a94: #989898;
-  --aeon-swatch-3b3b38: #3a3a3a;
-  --aeon-swatch-ededeb: #ececec;
-  --aeon-swatch-999994: #979797;
-  --aeon-swatch-41413e: #404040;
-  --aeon-swatch-ccc: #ccc;
-  --aeon-swatch-a3a39e: #a1a1a1;
-  --aeon-swatch-363634: #353535;
-  --aeon-swatch-989892: #969696;
-  --aeon-swatch-383835: #373737;
-  --aeon-swatch-c7a26f: #c7a26f;
-  --aeon-swatch-55413c: #55413c;
-  --aeon-swatch-2e2422: #272727;
-  --aeon-swatch-e3b2a9: #e3b2a9;
-  --aeon-swatch-0009: #0009;
-  --aeon-swatch-68636d: #686868;
+  --graft-swatch-666666: #666666;
+  --graft-swatch-c4c4c4: #c4c4c4;
+  --graft-swatch-e0e0de: #dfdfdf;
+  --graft-canvas: #111111;
+  --graft-surface: #222222;
+  --graft-surface-raised: #282828;
+  --graft-text: #ededed;
+  --graft-muted: #969696;
+  --graft-faint: #777777;
+  --graft-line: #333333;
+  --graft-accent: #ff9c00;
+  --graft-home-canvas: var(--graft-canvas);
+  --graft-home-text: var(--graft-text);
+  --graft-panel-canvas: var(--graft-canvas);
+  --graft-panel-header: var(--graft-canvas);
+  --graft-panel-surface: var(--graft-surface);
+  --graft-panel-raised: var(--graft-surface-raised);
+  --graft-panel-selected: var(--graft-surface-raised);
+  --graft-panel-line: var(--graft-line);
+  --graft-panel-text: var(--graft-text);
+  --graft-panel-muted: var(--graft-muted);
+  --graft-panel-faint: var(--graft-faint);
+  --graft-panel-accent: var(--graft-accent);
+  --graft-swatch-262626: #262626;
+  --graft-swatch-d4d4cf: #d2d2d2;
+  --graft-swatch-9f9f99: #9d9d9d;
+  --graft-swatch-272725: #262626;
+  --graft-swatch-e4e4df: #e2e2e2;
+  --graft-swatch-292927: #282828;
+  --graft-swatch-d8cab3: #d0d0d0;
+  --graft-swatch-c7c7c1: #c5c5c5;
+  --graft-swatch-898989: #898989;
+  --graft-swatch-a0a0a0: #a0a0a0;
+  --graft-swatch-7e9b79: #7e9b79;
+  --graft-swatch-bd716b: #bd716b;
+  --graft-swatch-44443f: #424242;
+  --graft-swatch-92928d: #909090;
+  --graft-swatch-b7b7b7: #b7b7b7;
+  --graft-swatch-929292: #929292;
+  --graft-swatch-a5a5a5: #a5a5a5;
+  --graft-swatch-b5b5b5: #b5b5b5;
+  --graft-swatch-858585: #858585;
+  --graft-swatch-d0d0d0: #d0d0d0;
+  --graft-swatch-2c2c2c: #2c2c2c;
+  --graft-swatch-d5d5d5: #d5d5d5;
+  --graft-swatch-9b9b95: #999999;
+  --graft-swatch-c78b84: #c78b84;
+  --graft-swatch-1b1b1b00: #11111100;
+  --graft-swatch-3b3b3b: #3b3b3b;
+  --graft-swatch-2d2d2d: #2d2d2d;
+  --graft-swatch-555555: #555555;
+  --graft-swatch-999999: #999999;
+  --graft-swatch-434343: #434343;
+  --graft-swatch-a7a7a7: #a7a7a7;
+  --graft-swatch-9c8969: #898989;
+  --graft-swatch-f3f3f3: #f3f3f3;
+  --graft-swatch-232323: #232323;
+  --graft-swatch-ffffff: #ffffff;
+  --graft-swatch-94958e: #929292;
+  --graft-swatch-353833: #353535;
+  --graft-swatch-1a1c19: #1a1a1a;
+  --graft-swatch-d7d9d2: #d6d6d6;
+  --graft-swatch-3b4037: #3b3b3b;
+  --graft-swatch-b5c2a6: #b5c2a6;
+  --graft-swatch-a9ada4: #a9a9a9;
+  --graft-swatch-343832: #353535;
+  --graft-swatch-a5a89f: #a4a4a4;
+  --graft-swatch-d2d4cc: #d1d1d1;
+  --graft-swatch-30302d: #2f2f2f;
+  --graft-swatch-d4d4ce: #d2d2d2;
+  --graft-swatch-393936: #383838;
+  --graft-swatch-333330: #323232;
+  --graft-swatch-bdbdb7: #bbbbbb;
+  --graft-swatch-82827c: #808080;
+  --graft-swatch-deded9: #dcdcdc;
+  --graft-swatch-777772: #757575;
+  --graft-swatch-2b2b29: #2a2a2a;
+  --graft-swatch-e0e0db: #dedede;
+  --graft-swatch-888882: #868686;
+  --graft-swatch-7b7b75: #797979;
+  --graft-swatch-aaa6ae: #aaaaaa;
+  --graft-swatch-29262d: #292929;
+  --graft-swatch-ece9ee: #ececec;
+  --graft-swatch-30302f: #303030;
+  --graft-swatch-dadada: #dadada;
+  --graft-swatch-d3d0d6: #d3d3d3;
+  --graft-swatch-38343c: #383838;
+  --graft-swatch-262329: #262626;
+  --graft-swatch-aaa5ae: #aaaaaa;
+  --graft-swatch-8d8991: #8d8d8d;
+  --graft-swatch-8e8992: #8e8e8e;
+  --graft-swatch-89848e: #898989;
+  --graft-swatch-a0a09a: #9e9e9e;
+  --graft-swatch-96968f: #949494;
+  --graft-swatch-858580: #838383;
+  --graft-swatch-a8a8a2: #a6a6a6;
+  --graft-swatch-424240: #414141;
+  --graft-swatch-575753: #565656;
+  --graft-swatch-f0f0ec: #efefef;
+  --graft-swatch-a3a39d: #a1a1a1;
+  --graft-swatch-e3e3df: #e2e2e2;
+  --graft-swatch-a3a39c: #a1a1a1;
+  --graft-swatch-3a3a38: #393939;
+  --graft-swatch-464d4b: #4a4a4a;
+  --graft-swatch-bdc6c1: #c1c1c1;
+  --graft-swatch-9a9a94: #989898;
+  --graft-swatch-3b3b38: #3a3a3a;
+  --graft-swatch-ededeb: #ececec;
+  --graft-swatch-999994: #979797;
+  --graft-swatch-41413e: #404040;
+  --graft-swatch-ccc: #ccc;
+  --graft-swatch-a3a39e: #a1a1a1;
+  --graft-swatch-363634: #353535;
+  --graft-swatch-989892: #969696;
+  --graft-swatch-383835: #373737;
+  --graft-swatch-c7a26f: #c7a26f;
+  --graft-swatch-55413c: #55413c;
+  --graft-swatch-2e2422: #272727;
+  --graft-swatch-e3b2a9: #e3b2a9;
+  --graft-swatch-0009: #0009;
+  --graft-swatch-68636d: #686868;
 }
 :root[data-theme="light"],
 :root[data-theme="system"] {
   color-scheme: light dark;
-  --aeon-canvas: light-dark(#f2f2f2, #1b1b1b);
-  --aeon-surface: light-dark(#ffffff, #222222);
-  --aeon-surface-raised: light-dark(#e9e9e9, #303030);
-  --aeon-text: light-dark(#262626, #f0f0f0);
-  --aeon-muted: light-dark(#666666, #969696);
-  --aeon-faint: light-dark(#868686, #777777);
-  --aeon-line: light-dark(#d4d4d4, #393939);
-  --aeon-accent: light-dark(#a95f00, #ff9c00);
-  --aeon-home-canvas: light-dark(#f2f2f2, #111111);
-  --aeon-home-text: light-dark(#292929, #e2e2e2);
-  --aeon-panel-canvas: var(--aeon-canvas);
-  --aeon-panel-header: var(--aeon-canvas);
-  --aeon-panel-surface: var(--aeon-surface);
-  --aeon-panel-raised: var(--aeon-surface-raised);
-  --aeon-panel-selected: var(--aeon-surface-raised);
-  --aeon-panel-line: var(--aeon-line);
-  --aeon-panel-text: var(--aeon-text);
-  --aeon-panel-muted: var(--aeon-muted);
-  --aeon-panel-faint: var(--aeon-faint);
-  --aeon-panel-accent: var(--aeon-accent);
-  --aeon-swatch-30302f: light-dark(#e6e6e6, #303030);
-  --aeon-swatch-262329: light-dark(#efefef, #262626);
-  --aeon-swatch-38343c: light-dark(#dfdfdf, #383838);
-  --aeon-swatch-29262d: light-dark(#e6e6e6, #292929);
-  --aeon-swatch-d3d0d6: light-dark(#303030, #d3d3d3);
-  --aeon-swatch-ece9ee: light-dark(#242424, #ececec);
-  --aeon-swatch-aaa5ae: light-dark(#686868, #aaaaaa);
-  --aeon-swatch-8e8992: light-dark(#777777, #8e8e8e);
-  --aeon-swatch-262626: light-dark(#ebebeb, #262626);
-  --aeon-swatch-b5b5b5: light-dark(#484848, #b5b5b5);
-  --aeon-swatch-a0a0a0: light-dark(#656565, #a0a0a0);
-  --aeon-swatch-929292: light-dark(#727272, #929292);
-  --aeon-swatch-d0d0d0: light-dark(#353535, #d0d0d0);
+  --graft-canvas: light-dark(#f2f2f2, #1b1b1b);
+  --graft-surface: light-dark(#ffffff, #222222);
+  --graft-surface-raised: light-dark(#e9e9e9, #303030);
+  --graft-text: light-dark(#262626, #f0f0f0);
+  --graft-muted: light-dark(#666666, #969696);
+  --graft-faint: light-dark(#868686, #777777);
+  --graft-line: light-dark(#d4d4d4, #393939);
+  --graft-accent: light-dark(#a95f00, #ff9c00);
+  --graft-home-canvas: light-dark(#f2f2f2, #111111);
+  --graft-home-text: light-dark(#292929, #e2e2e2);
+  --graft-panel-canvas: var(--graft-canvas);
+  --graft-panel-header: var(--graft-canvas);
+  --graft-panel-surface: var(--graft-surface);
+  --graft-panel-raised: var(--graft-surface-raised);
+  --graft-panel-selected: var(--graft-surface-raised);
+  --graft-panel-line: var(--graft-line);
+  --graft-panel-text: var(--graft-text);
+  --graft-panel-muted: var(--graft-muted);
+  --graft-panel-faint: var(--graft-faint);
+  --graft-panel-accent: var(--graft-accent);
+  --graft-swatch-30302f: light-dark(#e6e6e6, #303030);
+  --graft-swatch-262329: light-dark(#efefef, #262626);
+  --graft-swatch-38343c: light-dark(#dfdfdf, #383838);
+  --graft-swatch-29262d: light-dark(#e6e6e6, #292929);
+  --graft-swatch-d3d0d6: light-dark(#303030, #d3d3d3);
+  --graft-swatch-ece9ee: light-dark(#242424, #ececec);
+  --graft-swatch-aaa5ae: light-dark(#686868, #aaaaaa);
+  --graft-swatch-8e8992: light-dark(#777777, #8e8e8e);
+  --graft-swatch-262626: light-dark(#ebebeb, #262626);
+  --graft-swatch-b5b5b5: light-dark(#484848, #b5b5b5);
+  --graft-swatch-a0a0a0: light-dark(#656565, #a0a0a0);
+  --graft-swatch-929292: light-dark(#727272, #929292);
+  --graft-swatch-d0d0d0: light-dark(#353535, #d0d0d0);
 }
 :root[data-theme="light"] {
   color-scheme: light;
 }
-[data-aeon-root="true"] {
+[data-graft-root="true"] {
   display: contents;
 }
 :root[data-theme="midnight"] {
   color-scheme: dark;
-  --aeon-canvas: #09090b;
-  --aeon-surface: #111115;
-  --aeon-surface-raised: #1c1c22;
-  --aeon-text: #e4e4e9;
-  --aeon-muted: #909097;
-  --aeon-faint: #67676f;
-  --aeon-line: #24242b;
-  --aeon-accent: #b8afc7;
+  --graft-canvas: #09090b;
+  --graft-surface: #111115;
+  --graft-surface-raised: #1c1c22;
+  --graft-text: #e4e4e9;
+  --graft-muted: #909097;
+  --graft-faint: #67676f;
+  --graft-line: #24242b;
+  --graft-accent: #b8afc7;
 }
 
-/* One material for every Aeon page: true neutral greys, the text colour as the accent (buttons,
-   switches, selection), purple only for Aeon itself (the swarm), ochre only where it needs you. */
+/* One material for every Graft page: true neutral greys, the text colour as the accent (buttons,
+   switches, selection), purple only for Graft itself (the swarm), ochre only where it needs you. */
 :root {
-  --aeon-font: Geist, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
-  --aeon-font-body: 13.5px/1.5 var(--aeon-font);
-  --aeon-r-sm: 8px;
-  --aeon-r-md: 10px;
-  --aeon-r-lg: 14px;
-  --aeon-r-xl: 18px;
-  --aeon-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --aeon-bg-0: #0d0d0d;
-  --aeon-bg-1: #121212;
-  --aeon-bg-2: #171717;
-  --aeon-bg-3: #1f1f1f;
-  --aeon-bg-4: #262626;
-  --aeon-border: #262626;
-  --aeon-border-strong: #333333;
-  --aeon-canvas: #0d0d0d;
-  --aeon-surface: #171717;
-  --aeon-surface-raised: #1f1f1f;
-  --aeon-text: #f2f2f2;
-  --aeon-muted: #9b9b9b;
-  --aeon-faint: #6b6b6b;
-  --aeon-line: #262626;
-  --aeon-accent: #f2f2f2;
-  --aeon-accent-ink: #0d0d0d;
-  --aeon-brand: #a78bfa;
-  --aeon-needs: #f5a623;
-  --aeon-warm: #f5a623;
+  --graft-font: Geist, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  --graft-font-body: 13.5px/1.5 var(--graft-font);
+  --graft-r-sm: 8px;
+  --graft-r-md: 10px;
+  --graft-r-lg: 14px;
+  --graft-r-xl: 18px;
+  --graft-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --graft-bg-0: #0d0d0d;
+  --graft-bg-1: #121212;
+  --graft-bg-2: #171717;
+  --graft-bg-3: #1f1f1f;
+  --graft-bg-4: #262626;
+  --graft-border: #262626;
+  --graft-border-strong: #333333;
+  --graft-canvas: #0d0d0d;
+  --graft-surface: #171717;
+  --graft-surface-raised: #1f1f1f;
+  --graft-text: #f2f2f2;
+  --graft-muted: #9b9b9b;
+  --graft-faint: #6b6b6b;
+  --graft-line: #262626;
+  --graft-accent: #f2f2f2;
+  --graft-accent-ink: #0d0d0d;
+  --graft-brand: #a78bfa;
+  --graft-needs: #f5a623;
+  --graft-warm: #f5a623;
 }
 :root[data-theme="light"],
 :root[data-theme="system"] {
-  --aeon-bg-0: light-dark(#f5f5f5, #0d0d0d);
-  --aeon-bg-1: light-dark(#efefef, #121212);
-  --aeon-bg-2: light-dark(#ffffff, #171717);
-  --aeon-bg-3: light-dark(#efefef, #1f1f1f);
-  --aeon-bg-4: light-dark(#e5e5e5, #262626);
-  --aeon-border: light-dark(#e3e3e3, #262626);
-  --aeon-border-strong: light-dark(#cfcfcf, #333333);
-  --aeon-canvas: light-dark(#f5f5f5, #0d0d0d);
-  --aeon-surface: light-dark(#ffffff, #171717);
-  --aeon-surface-raised: light-dark(#efefef, #1f1f1f);
-  --aeon-text: light-dark(#161616, #f2f2f2);
-  --aeon-muted: light-dark(#6b6b6b, #9b9b9b);
-  --aeon-faint: light-dark(#a3a3a3, #6b6b6b);
-  --aeon-line: light-dark(#e3e3e3, #262626);
-  --aeon-accent: light-dark(#161616, #f2f2f2);
-  --aeon-accent-ink: light-dark(#ffffff, #0d0d0d);
-  --aeon-brand: light-dark(#6d4ce6, #a78bfa);
-  --aeon-needs: light-dark(#8a6526, #f5a623);
-  --aeon-warm: light-dark(#8a6526, #f5a623);
-  --aeon-home-canvas: var(--aeon-canvas);
-  --aeon-home-text: var(--aeon-text);
+  --graft-bg-0: light-dark(#f5f5f5, #0d0d0d);
+  --graft-bg-1: light-dark(#efefef, #121212);
+  --graft-bg-2: light-dark(#ffffff, #171717);
+  --graft-bg-3: light-dark(#efefef, #1f1f1f);
+  --graft-bg-4: light-dark(#e5e5e5, #262626);
+  --graft-border: light-dark(#e3e3e3, #262626);
+  --graft-border-strong: light-dark(#cfcfcf, #333333);
+  --graft-canvas: light-dark(#f5f5f5, #0d0d0d);
+  --graft-surface: light-dark(#ffffff, #171717);
+  --graft-surface-raised: light-dark(#efefef, #1f1f1f);
+  --graft-text: light-dark(#161616, #f2f2f2);
+  --graft-muted: light-dark(#6b6b6b, #9b9b9b);
+  --graft-faint: light-dark(#a3a3a3, #6b6b6b);
+  --graft-line: light-dark(#e3e3e3, #262626);
+  --graft-accent: light-dark(#161616, #f2f2f2);
+  --graft-accent-ink: light-dark(#ffffff, #0d0d0d);
+  --graft-brand: light-dark(#6d4ce6, #a78bfa);
+  --graft-needs: light-dark(#8a6526, #f5a623);
+  --graft-warm: light-dark(#8a6526, #f5a623);
+  --graft-home-canvas: var(--graft-canvas);
+  --graft-home-text: var(--graft-text);
 }
 /* Words for screen readers only, where motion carries the meaning on screen. */
-.aeon-sr {
+.graft-sr {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -382,224 +382,224 @@
    one, so the globe still reads as lit. MiniSwarm reads them from its canvas's color and
    border color. */
 :root {
-  --aeon-swarm-near: light-dark(#5a3ad8, #c4b5fd);
-  --aeon-swarm-far: light-dark(#b8a7f7, #7c5cf0);
-  --aeon-swarm-needs-near: light-dark(#a45f00, #ffe2a8);
-  --aeon-swarm-needs-far: light-dark(#efbd70, #e08a00);
+  --graft-swarm-near: light-dark(#5a3ad8, #c4b5fd);
+  --graft-swarm-far: light-dark(#b8a7f7, #7c5cf0);
+  --graft-swarm-needs-near: light-dark(#a45f00, #ffe2a8);
+  --graft-swarm-needs-far: light-dark(#efbd70, #e08a00);
 }
 .lattice-mark {
   color: light-dark(#141416, #f1eefc);
   border: 0 solid light-dark(#b8a7f7, #7c5cf0);
 }
 .mini-swarm {
-  color: var(--aeon-swarm-near);
-  border: 0 solid var(--aeon-swarm-far);
+  color: var(--graft-swarm-near);
+  border: 0 solid var(--graft-swarm-far);
 }
 .mini-swarm[data-tone="needs"] {
-  color: var(--aeon-swarm-needs-near);
-  border-color: var(--aeon-swarm-needs-far);
+  color: var(--graft-swarm-needs-near);
+  border-color: var(--graft-swarm-needs-far);
 }
 
 /* Fixed extension colours. These do not follow the page theme. */
 :root {
-  --aeon-c-000000: #000000;
-  --aeon-c-000000-14: rgb(0 0 0 / 14%);
-  --aeon-c-000000-28: rgb(0 0 0 / 28%);
-  --aeon-c-000000-45: rgb(0 0 0 / 45%);
-  --aeon-c-000000-50: rgb(0 0 0 / 50%);
-  --aeon-c-000000-60: rgb(0 0 0 / 60%);
-  --aeon-c-00b8e4: #00b8e4;
-  --aeon-c-00c778: #00c778;
-  --aeon-c-00d773: #00d773;
-  --aeon-c-00d783: #00d783;
-  --aeon-c-0a0a0a: #0a0a0a;
-  --aeon-c-0c0c10: #0c0c10;
-  --aeon-c-101b15: #101b15;
-  --aeon-c-111111: #111111;
-  --aeon-c-151521: #151521;
-  --aeon-c-16a34a-15: #16a34a26;
-  --aeon-c-173023: #173023;
-  --aeon-c-1b1b27: #1b1b27;
-  --aeon-c-222d49-25: #222d4940;
-  --aeon-c-24242b: #24242b;
-  --aeon-c-252525: #252525;
-  --aeon-c-258647: #258647;
-  --aeon-c-2a1414: #2a1414;
-  --aeon-c-333333: #333333;
-  --aeon-c-3c1918: #3c1918;
-  --aeon-c-3c6333-20: rgb(60 99 51 / 20%);
-  --aeon-c-4299ff: #4299ff;
-  --aeon-c-4ade80: #4ade80;
-  --aeon-c-5799cb: #5799cb;
-  --aeon-c-5b8cff: #5b8cff;
-  --aeon-c-60a5fa-22: rgb(96 165 250 / 22%);
-  --aeon-c-60a5fa-34: rgb(96 165 250 / 34%);
-  --aeon-c-6b3232-20: rgb(107 50 50 / 20%);
-  --aeon-c-707070: #707070;
-  --aeon-c-7c5cff: #7c5cff;
-  --aeon-c-7c5cff-22: rgb(124 92 255 / 22%);
-  --aeon-c-7c5cff-25: rgb(124 92 255 / 25%);
-  --aeon-c-7c5cff-28: rgb(124 92 255 / 28%);
-  --aeon-c-848490: #848490;
-  --aeon-c-8b4d45: #8b4d45;
-  --aeon-c-8b7bff: #8b7bff;
-  --aeon-c-8f8b9e: #8f8b9e;
-  --aeon-c-949494: #949494;
-  --aeon-c-999999: #999999;
-  --aeon-c-b8d4ad: #b8d4ad;
-  --aeon-c-b9b6bc: #b9b6bc;
-  --aeon-c-bd3344: #bd3344;
-  --aeon-c-dddddd: #dddddd;
-  --aeon-c-e08a00: #e08a00;
-  --aeon-c-e1aaa6: #e1aaa6;
-  --aeon-c-e2b4ae: #e2b4ae;
-  --aeon-c-eeeeee: #eeeeee;
-  --aeon-c-f5f5f5: #f5f5f5;
-  --aeon-c-ff2455: #ff2455;
-  --aeon-c-ff315d: #ff315d;
-  --aeon-c-ff7a59: #ff7a59;
-  --aeon-c-ffb347: #ffb347;
-  --aeon-c-ffd9d4: #ffd9d4;
-  --aeon-c-ffffff: #ffffff;
-  --aeon-c-ffffff-5: rgb(255 255 255 / 5%);
-  --aeon-c-ffffff-8: rgb(255 255 255 / 8%);
-  --aeon-fs-0: 0;
-  --aeon-fs-9: 9px;
-  --aeon-fs-10: 10px;
-  --aeon-fs-15: 15px;
-  --aeon-fs-17: 17px;
-  --aeon-fs-18: 18px;
-  --aeon-fs-20: 20px;
-  --aeon-fs-21: 21px;
-  --aeon-fs-24: 24px;
-  --aeon-fs-25: 25px;
-  --aeon-fs-26: 26px;
-  --aeon-fs-em-09: 0.9em;
-  --aeon-fs-em-112: 1.12em;
-  --aeon-fs-em-13: 1.3em;
-  --aeon-fs-em-15: 1.5em;
-  --aeon-r-0: 0;
-  --aeon-r-2: 2px;
-  --aeon-r-3: 3px;
-  --aeon-r-4: 4px;
-  --aeon-r-5: 5px;
-  --aeon-r-7: 7px;
-  --aeon-r-8: 8px;
-  --aeon-r-9: 9px;
-  --aeon-r-11: 11px;
-  --aeon-r-12: 12px;
-  --aeon-r-14: 14px;
-  --aeon-r-18: 18px;
-  --aeon-r-19: 19px;
-  --aeon-r-25: 25px;
-  --aeon-r-half: 50%;
-  --aeon-drop-1: 0 3px 14px rgb(0 0 0 / 28%);
-  --aeon-drop-2: 0 12px 32px rgb(0 0 0 / 40%);
-  --aeon-drop-3: 0 8px 24px rgb(0 0 0 / 28%);
-  --aeon-drop-4: 0 12px 32px rgb(0 0 0 / 32%);
-  --aeon-drop-5: 0 12px 36px var(--aeon-shadow-md);
-  --aeon-drop-6: 0 2px 6px rgb(0 0 0 / 32%);
-  --aeon-drop-7:
-    0 0 0 2px color-mix(in srgb, var(--aeon-accent) 35%, transparent), var(--aeon-shadow-md);
-  --aeon-drop-8: 0 18px 40px -18px rgb(0 0 0 / 45%);
-  --aeon-drop-9: 0 6px 16px -8px rgb(0 0 0 / 60%);
-  --aeon-drop-10: 0 24px 60px rgb(0 0 0 / 50%);
-  --aeon-drop-11: 0 0 0 1px var(--muted);
-  --aeon-drop-12: 0 10px 35px rgb(0 0 0 / 32%);
-  --aeon-drop-13: 0 1px 0 var(--aeon-line);
-  --aeon-drop-14: 0 1px 2px rgb(0 0 0 / 22%);
-  --aeon-drop-15: 0 0 0 3px color-mix(in srgb, var(--aeon-brand) 22%, transparent);
-  --aeon-drop-16: 0 0 0 3px color-mix(in srgb, var(--aeon-needs) 22%, transparent);
-  --aeon-drop-17: inset 0 0 0 1px var(--aeon-line);
-  --aeon-drop-18: 0 1px 2px rgb(0 0 0 / 32%);
-  --aeon-drop-19: 0 1px 0 rgb(255 255 255 / 12%) inset, 0 1px 2px rgb(0 0 0 / 25%);
-  --aeon-drop-20: 0 16px 36px var(--aeon-swatch-0009);
-  --aeon-drop-switcher: 0 16px 36px -16px var(--aeon-island-shadow-deep);
+  --graft-c-000000: #000000;
+  --graft-c-000000-14: rgb(0 0 0 / 14%);
+  --graft-c-000000-28: rgb(0 0 0 / 28%);
+  --graft-c-000000-45: rgb(0 0 0 / 45%);
+  --graft-c-000000-50: rgb(0 0 0 / 50%);
+  --graft-c-000000-60: rgb(0 0 0 / 60%);
+  --graft-c-00b8e4: #00b8e4;
+  --graft-c-00c778: #00c778;
+  --graft-c-00d773: #00d773;
+  --graft-c-00d783: #00d783;
+  --graft-c-0a0a0a: #0a0a0a;
+  --graft-c-0c0c10: #0c0c10;
+  --graft-c-101b15: #101b15;
+  --graft-c-111111: #111111;
+  --graft-c-151521: #151521;
+  --graft-c-16a34a-15: #16a34a26;
+  --graft-c-173023: #173023;
+  --graft-c-1b1b27: #1b1b27;
+  --graft-c-222d49-25: #222d4940;
+  --graft-c-24242b: #24242b;
+  --graft-c-252525: #252525;
+  --graft-c-258647: #258647;
+  --graft-c-2a1414: #2a1414;
+  --graft-c-333333: #333333;
+  --graft-c-3c1918: #3c1918;
+  --graft-c-3c6333-20: rgb(60 99 51 / 20%);
+  --graft-c-4299ff: #4299ff;
+  --graft-c-4ade80: #4ade80;
+  --graft-c-5799cb: #5799cb;
+  --graft-c-5b8cff: #5b8cff;
+  --graft-c-60a5fa-22: rgb(96 165 250 / 22%);
+  --graft-c-60a5fa-34: rgb(96 165 250 / 34%);
+  --graft-c-6b3232-20: rgb(107 50 50 / 20%);
+  --graft-c-707070: #707070;
+  --graft-c-7c5cff: #7c5cff;
+  --graft-c-7c5cff-22: rgb(124 92 255 / 22%);
+  --graft-c-7c5cff-25: rgb(124 92 255 / 25%);
+  --graft-c-7c5cff-28: rgb(124 92 255 / 28%);
+  --graft-c-848490: #848490;
+  --graft-c-8b4d45: #8b4d45;
+  --graft-c-8b7bff: #8b7bff;
+  --graft-c-8f8b9e: #8f8b9e;
+  --graft-c-949494: #949494;
+  --graft-c-999999: #999999;
+  --graft-c-b8d4ad: #b8d4ad;
+  --graft-c-b9b6bc: #b9b6bc;
+  --graft-c-bd3344: #bd3344;
+  --graft-c-dddddd: #dddddd;
+  --graft-c-e08a00: #e08a00;
+  --graft-c-e1aaa6: #e1aaa6;
+  --graft-c-e2b4ae: #e2b4ae;
+  --graft-c-eeeeee: #eeeeee;
+  --graft-c-f5f5f5: #f5f5f5;
+  --graft-c-ff2455: #ff2455;
+  --graft-c-ff315d: #ff315d;
+  --graft-c-ff7a59: #ff7a59;
+  --graft-c-ffb347: #ffb347;
+  --graft-c-ffd9d4: #ffd9d4;
+  --graft-c-ffffff: #ffffff;
+  --graft-c-ffffff-5: rgb(255 255 255 / 5%);
+  --graft-c-ffffff-8: rgb(255 255 255 / 8%);
+  --graft-fs-0: 0;
+  --graft-fs-9: 9px;
+  --graft-fs-10: 10px;
+  --graft-fs-15: 15px;
+  --graft-fs-17: 17px;
+  --graft-fs-18: 18px;
+  --graft-fs-20: 20px;
+  --graft-fs-21: 21px;
+  --graft-fs-24: 24px;
+  --graft-fs-25: 25px;
+  --graft-fs-26: 26px;
+  --graft-fs-em-09: 0.9em;
+  --graft-fs-em-112: 1.12em;
+  --graft-fs-em-13: 1.3em;
+  --graft-fs-em-15: 1.5em;
+  --graft-r-0: 0;
+  --graft-r-2: 2px;
+  --graft-r-3: 3px;
+  --graft-r-4: 4px;
+  --graft-r-5: 5px;
+  --graft-r-7: 7px;
+  --graft-r-8: 8px;
+  --graft-r-9: 9px;
+  --graft-r-11: 11px;
+  --graft-r-12: 12px;
+  --graft-r-14: 14px;
+  --graft-r-18: 18px;
+  --graft-r-19: 19px;
+  --graft-r-25: 25px;
+  --graft-r-half: 50%;
+  --graft-drop-1: 0 3px 14px rgb(0 0 0 / 28%);
+  --graft-drop-2: 0 12px 32px rgb(0 0 0 / 40%);
+  --graft-drop-3: 0 8px 24px rgb(0 0 0 / 28%);
+  --graft-drop-4: 0 12px 32px rgb(0 0 0 / 32%);
+  --graft-drop-5: 0 12px 36px var(--graft-shadow-md);
+  --graft-drop-6: 0 2px 6px rgb(0 0 0 / 32%);
+  --graft-drop-7:
+    0 0 0 2px color-mix(in srgb, var(--graft-accent) 35%, transparent), var(--graft-shadow-md);
+  --graft-drop-8: 0 18px 40px -18px rgb(0 0 0 / 45%);
+  --graft-drop-9: 0 6px 16px -8px rgb(0 0 0 / 60%);
+  --graft-drop-10: 0 24px 60px rgb(0 0 0 / 50%);
+  --graft-drop-11: 0 0 0 1px var(--muted);
+  --graft-drop-12: 0 10px 35px rgb(0 0 0 / 32%);
+  --graft-drop-13: 0 1px 0 var(--graft-line);
+  --graft-drop-14: 0 1px 2px rgb(0 0 0 / 22%);
+  --graft-drop-15: 0 0 0 3px color-mix(in srgb, var(--graft-brand) 22%, transparent);
+  --graft-drop-16: 0 0 0 3px color-mix(in srgb, var(--graft-needs) 22%, transparent);
+  --graft-drop-17: inset 0 0 0 1px var(--graft-line);
+  --graft-drop-18: 0 1px 2px rgb(0 0 0 / 32%);
+  --graft-drop-19: 0 1px 0 rgb(255 255 255 / 12%) inset, 0 1px 2px rgb(0 0 0 / 25%);
+  --graft-drop-20: 0 16px 36px var(--graft-swatch-0009);
+  --graft-drop-switcher: 0 16px 36px -16px var(--graft-island-shadow-deep);
 }
 /* Cursor and ask box. Always dark on any site. Values match CURSOR_VARS. */
 :root {
-  --aeon-cursor: #000000;
-  --aeon-cursor-stroke: rgb(243 243 241 / 90%);
-  --aeon-cursor-shadow: rgb(0 0 0 / 55%);
-  --aeon-island-edge:
+  --graft-cursor: #000000;
+  --graft-cursor-stroke: rgb(243 243 241 / 90%);
+  --graft-cursor-shadow: rgb(0 0 0 / 55%);
+  --graft-island-edge:
     inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%),
     0 0 0 1px rgb(0 0 0 / 92%);
-  --aeon-island-elev:
+  --graft-island-elev:
     inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%),
     0 0 0 1px rgb(0 0 0 / 92%);
-  --aeon-island-bg:
+  --graft-island-bg:
     radial-gradient(125% 95% at 50% 0%, rgb(255 255 255 / 5.5%) 0%, rgb(255 255 255 / 0%) 56%),
     #000000;
-  --aeon-island-bg-solid: #000000;
-  --aeon-island-surface:
+  --graft-island-bg-solid: #000000;
+  --graft-island-surface:
     radial-gradient(125% 95% at 50% 0%, rgb(255 255 255 / 5.5%) 0%, rgb(255 255 255 / 0%) 56%),
     #000000;
-  --aeon-island-ink: #f3f3f1;
-  --aeon-island-text: #f3f3f1;
-  --aeon-island-raise: #f3f3f1;
-  --aeon-island-chip: rgb(243 243 241 / 56%);
-  --aeon-island-muted: rgb(243 243 241 / 38%);
-  --aeon-island-faint: rgb(243 243 241 / 34%);
-  --aeon-island-line: rgb(255 255 255 / 6.5%);
-  --aeon-island-line-strong: rgb(255 255 255 / 12%);
-  --aeon-island-wash: rgb(255 255 255 / 8%);
-  --aeon-island-wash-5: rgb(255 255 255 / 5%);
-  --aeon-island-wash-10: rgb(255 255 255 / 10%);
-  --aeon-island-wash-strong: rgb(255 255 255 / 16%);
-  --aeon-island-wash-24: rgb(255 255 255 / 24%);
-  --aeon-island-spin: rgb(255 255 255 / 30%);
-  --aeon-island-field: rgb(255 255 255 / 22%);
-  --aeon-island-ink-soft: rgb(255 255 255 / 85%);
-  --aeon-island-focus: rgb(243 243 241 / 60%);
-  --aeon-island-ripple-fill: rgb(236 235 232 / 16%);
-  --aeon-island-needs:
+  --graft-island-ink: #f3f3f1;
+  --graft-island-text: #f3f3f1;
+  --graft-island-raise: #f3f3f1;
+  --graft-island-chip: rgb(243 243 241 / 56%);
+  --graft-island-muted: rgb(243 243 241 / 38%);
+  --graft-island-faint: rgb(243 243 241 / 34%);
+  --graft-island-line: rgb(255 255 255 / 6.5%);
+  --graft-island-line-strong: rgb(255 255 255 / 12%);
+  --graft-island-wash: rgb(255 255 255 / 8%);
+  --graft-island-wash-5: rgb(255 255 255 / 5%);
+  --graft-island-wash-10: rgb(255 255 255 / 10%);
+  --graft-island-wash-strong: rgb(255 255 255 / 16%);
+  --graft-island-wash-24: rgb(255 255 255 / 24%);
+  --graft-island-spin: rgb(255 255 255 / 30%);
+  --graft-island-field: rgb(255 255 255 / 22%);
+  --graft-island-ink-soft: rgb(255 255 255 / 85%);
+  --graft-island-focus: rgb(243 243 241 / 60%);
+  --graft-island-ripple-fill: rgb(236 235 232 / 16%);
+  --graft-island-needs:
     radial-gradient(125% 95% at 50% 0%, rgb(255 255 255 / 5.5%) 0%, rgb(255 255 255 / 0%) 56%),
     #000000;
-  --aeon-island-needs-soft: #f5a623;
-  --aeon-island-needs-hot: rgb(245 166 35 / 14%);
-  --aeon-island-needs-ink: #f5a623;
-  --aeon-island-needs-line: rgb(245 166 35 / 36%);
-  --aeon-island-done:
+  --graft-island-needs-soft: #f5a623;
+  --graft-island-needs-hot: rgb(245 166 35 / 14%);
+  --graft-island-needs-ink: #f5a623;
+  --graft-island-needs-line: rgb(245 166 35 / 36%);
+  --graft-island-done:
     radial-gradient(125% 95% at 50% 0%, rgb(255 255 255 / 5.5%) 0%, rgb(255 255 255 / 0%) 56%),
     #000000;
-  --aeon-island-error:
+  --graft-island-error:
     radial-gradient(125% 95% at 50% 0%, rgb(255 255 255 / 5.5%) 0%, rgb(255 255 255 / 0%) 56%),
     #000000;
-  --aeon-island-shadow: rgb(0 0 0 / 25%);
-  --aeon-island-shadow-deep: rgb(0 0 0 / 60%);
-  --aeon-island-scrim: transparent;
-  --aeon-island-glow: #ecebe8;
-  --aeon-island-glow-line: rgb(236 235 232 / 40%);
-  --aeon-island-glow-mid: rgb(236 235 232 / 14%);
-  --aeon-island-glow-soft: rgb(236 235 232 / 6%);
-  --aeon-island-spot: transparent;
-  --aeon-island-callout:
+  --graft-island-shadow: rgb(0 0 0 / 25%);
+  --graft-island-shadow-deep: rgb(0 0 0 / 60%);
+  --graft-island-scrim: transparent;
+  --graft-island-glow: #ecebe8;
+  --graft-island-glow-line: rgb(236 235 232 / 40%);
+  --graft-island-glow-mid: rgb(236 235 232 / 14%);
+  --graft-island-glow-soft: rgb(236 235 232 / 6%);
+  --graft-island-spot: transparent;
+  --graft-island-callout:
     radial-gradient(125% 95% at 50% 0%, rgb(255 255 255 / 5.5%) 0%, rgb(255 255 255 / 0%) 56%),
     #000000;
-  --aeon-island-callout-shadow: rgb(0 0 0 / 30%);
-  --aeon-island-ripple: rgb(236 235 232 / 40%);
-  --aeon-island-keys: #000000;
-  --aeon-island-ring: rgb(236 235 232 / 55%);
-  --aeon-island-trail: rgb(236 235 232 / 30%);
-  --aeon-island-badge: #f3f3f1;
-  --aeon-island-dot: #f3f3f1;
+  --graft-island-callout-shadow: rgb(0 0 0 / 30%);
+  --graft-island-ripple: rgb(236 235 232 / 40%);
+  --graft-island-keys: #000000;
+  --graft-island-ring: rgb(236 235 232 / 55%);
+  --graft-island-trail: rgb(236 235 232 / 30%);
+  --graft-island-badge: #f3f3f1;
+  --graft-island-dot: #f3f3f1;
   /* Recording (Teach): record red. Never amber, which means "needs you". */
-  --aeon-island-rec: #ecebe8a3;
-  --aeon-island-rim: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%);
-  --aeon-island-spring: 440ms cubic-bezier(0.22, 1, 0.36, 1);
-  --aeon-fs-xs: 11px;
-  --aeon-fs-sm: 12px;
-  --aeon-fs-md: 13px;
-  --aeon-r-8: 8px;
-  --aeon-r-md: 10px;
-  --aeon-r-12: 12px;
-  --aeon-r-14: 14px;
-  --aeon-r-18: 18px;
-  --aeon-r-full: 999px;
-  --aeon-r-half: 50%;
+  --graft-island-rec: #ecebe8a3;
+  --graft-island-rim: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 0 0 1px rgb(255 255 255 / 11%);
+  --graft-island-spring: 440ms cubic-bezier(0.22, 1, 0.36, 1);
+  --graft-fs-xs: 11px;
+  --graft-fs-sm: 12px;
+  --graft-fs-md: 13px;
+  --graft-r-8: 8px;
+  --graft-r-md: 10px;
+  --graft-r-12: 12px;
+  --graft-r-14: 14px;
+  --graft-r-18: 18px;
+  --graft-r-full: 999px;
+  --graft-r-half: 50%;
 }
 
-/* Dynamic Ink: one quiet presence. Wet (a breathing hairline) while Aeon works, dry (static) when
+/* Dynamic Ink: one quiet presence. Wet (a breathing hairline) while Graft works, dry (static) when
    it is done, ochre only on the one control that needs your hand. Never a coloured stripe, dot,
    border or fill: state reads from type, spacing and the hairline alone. */
 :root {
@@ -621,9 +621,9 @@
   --ink-wet-hi: #ffffff33;
   --ink-dry: #ffffff1f;
   /* The only ochre, and the only colour besides bone and obsidian. */
-  --aeon-needs: #f5a623;
+  --graft-needs: #f5a623;
   /* Clay: at most the text of an error, never a dot, stripe or border. */
-  --aeon-error: #c98b7e;
+  --graft-error: #c98b7e;
   --cursor-fill: #000000;
   --cursor-edge: #f3f3f1e6;
   --cursor-halo: #ecebe833;
@@ -644,7 +644,7 @@
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --breathe: 2.4s ease-in-out infinite alternate;
 }
-/* Light pages mirror the ink on Aeon's own surfaces; the in-page glass stays obsidian. */
+/* Light pages mirror the ink on Graft's own surfaces; the in-page glass stays obsidian. */
 :root[data-theme="light"],
 :root[data-theme="system"] {
   --fg-1: light-dark(#1b1b1d, #ecebe8);
@@ -653,8 +653,8 @@
   --ink-wet-lo: light-dark(#00000014, #ffffff14);
   --ink-wet-hi: light-dark(#00000033, #ffffff33);
   --ink-dry: light-dark(#0000001f, #ffffff1f);
-  --aeon-needs: light-dark(#8a6526, #f5a623);
-  --aeon-error: light-dark(#9a5a4c, #c98b7e);
+  --graft-needs: light-dark(#8a6526, #f5a623);
+  --graft-error: light-dark(#9a5a4c, #c98b7e);
 }
 @keyframes ink-breathe {
   from {

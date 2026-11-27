@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setImmediate } from "node:timers";
-import { DaemonUiRequestSchema } from "@aeon/protocol";
+import { DaemonUiRequestSchema } from "@graft/protocol";
 import { createAndSubmitChat } from "../dist/chat-first-submit.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { ChatService } from "../dist/chat-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
@@ -107,7 +107,7 @@ test("stale browser context rejects the new prompt and cleans up its unstarted d
 });
 
 test("first submission projects an actual stored ChatRecord and reaches Pi", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-real-first-submit-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-real-first-submit-"));
   const store = openChatStore(directory),
     pi = new FakePiPort();
   const service = new ChatService({ dataDirectory: directory, store, pi });

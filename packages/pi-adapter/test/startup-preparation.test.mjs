@@ -41,7 +41,7 @@ test("failed refresh retains the usable catalog and cold initialization can retr
   assert.equal(await cache.read(), "ready");
 });
 test("prepared runtime is ready before consumption and belongs to only one session", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-prepared-model-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-prepared-model-"));
   let creations = 0;
   const pool = new PreparedModelRuntime(directory, async (options) => ({
     id: ++creations,

@@ -2,9 +2,9 @@ import { TEACH_SITE, teachSiteInWorker } from "../teach-site.js";
 import { chatUrl, findExistingChat } from "../native-worker-tabs.js";
 import { sidePanelSelectionKey } from "../sidebar-selection.js";
 import { isNeedsKey } from "./orb-control.js";
-import { CURSOR_LOCAL, isAeonTabPage, isCursorPage, summonUpdate } from "./orb-aeon-pages.js";
+import { CURSOR_LOCAL, isGraftTabPage, isCursorPage, summonUpdate } from "./orb-graft-pages.js";
 import { CURSOR_MARK, CURSOR_TOKEN_CSS } from "@browserkit/engine/cursor-mark";
-import { paintCursor } from "aeon:cursor-paint";
+import { paintCursor } from "graft:cursor-paint";
 import {
   CURSOR_INSTALL,
   CURSOR_TRANSCRIPT,
@@ -22,7 +22,7 @@ import {
 
 // The shortcut (a rebindable chrome.commands entry, Alt+Shift+Space by default: ⌥⇧Space on
 // macOS) lives in the service worker and opens the box keyboard-centred. It starts and closes the cursor on web pages and on
-// Aeon's own tabs (Home, a chat tab); pages Chrome keeps extensions out of (chrome://, the Web
+// Graft's own tabs (Home, a chat tab); pages Chrome keeps extensions out of (chrome://, the Web
 // Store, the PDF viewer) get the side panel instead. The worker also keeps
 // the toolbar badge: how many runs need the user, else how many finished results are unread.
 // The orb is a pet: once summoned it is on every web page (its box open where it was summoned,
@@ -58,7 +58,7 @@ function onOrbMessage(
   if (kind === ORB_TO_PANEL) return toPanel(sender.tab, request, sendResponse);
   if (kind === CURSOR_INSTALL) return installFrom(sender.tab, request);
   if (kind === TEACH_SITE) return teachFromManage(request, sendResponse);
-  if (kind !== "aeon.orb.verify") return undefined;
+  if (kind !== "graft.orb.verify") return undefined;
   void verify(request as Partial<OrbVerify>, sender).then(sendResponse, () =>
     sendResponse({ ok: false }),
   );
@@ -106,13 +106,13 @@ function installFrom(tab: chrome.tabs.Tab | undefined, request: unknown): undefi
   const point = request as { x?: unknown; y?: unknown };
   const x = Number(point.x);
   const y = Number(point.y);
-  if (isAeonTabPage(tab.url, chrome.runtime.getURL(""))) void drawOnAeonPage(tab.id, x, y);
+  if (isGraftTabPage(tab.url, chrome.runtime.getURL(""))) void drawOnGraftPage(tab.id, x, y);
   else void installSharedCursor(tab.id, x, y);
   return undefined;
 }
 
-/** chrome.scripting cannot reach Aeon's own pages: they draw the cursor themselves. */
-async function drawOnAeonPage(tabId: number, x: number, y: number): Promise<void> {
+/** chrome.scripting cannot reach Graft's own pages: they draw the cursor themselves. */
+async function drawOnGraftPage(tabId: number, x: number, y: number): Promise<void> {
   const message = {
     kind: CURSOR_LOCAL,
     update: summonUpdate(x, y),
@@ -124,7 +124,7 @@ async function drawOnAeonPage(tabId: number, x: number, y: number): Promise<void
 
 async function installSharedCursor(tabId: number, x: number, y: number): Promise<void> {
   // The painter runs from the worker's own function in the extension's isolated world: no page
-  // listener, no page global and no page-visible expando, so a page can neither paint Aeon's
+  // listener, no page global and no page-visible expando, so a page can neither paint Graft's
   // cursor, read its state, nor fingerprint the profile.
   await chrome.scripting
     .executeScript({
@@ -146,10 +146,10 @@ async function updateBadge(): Promise<void> {
   await chrome.action.setBadgeBackgroundColor({ color: needs ? "#f5a623" : "#000000" });
   await chrome.action.setTitle({
     title: needs
-      ? `Aeon · ${needs} need${needs === 1 ? "s" : ""} you`
+      ? `Graft · ${needs} need${needs === 1 ? "s" : ""} you`
       : unread
-        ? `Aeon · ${unread} new result${unread === 1 ? "" : "s"}`
-        : "Open Aeon Chat",
+        ? `Graft · ${unread} new result${unread === 1 ? "" : "s"}`
+        : "Open Graft Chat",
   });
 }
 
@@ -184,7 +184,7 @@ async function bubbleOpen(tabId: number): Promise<boolean> {
   return (reply as { open?: unknown } | undefined)?.open === true;
 }
 
-/** Web pages and Aeon's own tabs. */
+/** Web pages and Graft's own tabs. */
 async function cursorTabs(): Promise<chrome.tabs.Tab[]> {
   const base = chrome.runtime.getURL("");
   const tabs = await chrome.tabs.query({}).catch(() => [] as chrome.tabs.Tab[]);
@@ -235,7 +235,7 @@ function openTranscript(tab: chrome.tabs.Tab): void {
 }
 
 async function chatForTab(tabId: number): Promise<string | undefined> {
-  const key = "aeon-orb-chat:" + tabId;
+  const key = "graft-orb-chat:" + tabId;
   const values = (await chrome.storage.session.get(key).catch(() => ({}))) as Record<
     string,
     unknown
@@ -255,7 +255,7 @@ async function nonceFor(tabId: number): Promise<string> {
 /** A page that loaded (or woke) while the orb is on asks for it: a fresh nonce for that tab. */
 async function restore(tabId: number | undefined): Promise<OrbToggle | null> {
   if (tabId === undefined || !(await isOn())) return null;
-  return { kind: "aeon.orb.toggle", tabId, nonce: await nonceFor(tabId), open: false };
+  return { kind: "graft.orb.toggle", tabId, nonce: await nonceFor(tabId), open: false };
 }
 
 /**
@@ -268,11 +268,11 @@ export async function presentAsk(chatId: string): Promise<void> {
     .query({ active: true, lastFocusedWindow: true })
     .catch(() => [] as chrome.tabs.Tab[]);
   if (tab?.id === undefined || !isCursorPage(tab.url, chrome.runtime.getURL(""))) return;
-  await chrome.storage.session.set({ ["aeon-orb-chat:" + tab.id]: chatId });
+  await chrome.storage.session.set({ ["graft-orb-chat:" + tab.id]: chatId });
   await present(tab.id, true).catch(() => undefined);
 }
 
-/** Manage → Sites → Teach Aeon: open the site, start Teach, and open the cursor there. */
+/** Manage → Sites → Teach Graft: open the site, start Teach, and open the cursor there. */
 function teachFromManage(
   request: unknown,
   sendResponse: (response?: unknown) => void,
@@ -285,7 +285,7 @@ function teachFromManage(
   }).then(
     () => sendResponse({ ok: true }),
     (error: unknown) => {
-      console.warn("Aeon: Teach Aeon failed to start", error);
+      console.warn("Graft: Teach Graft failed to start", error);
       sendResponse({ ok: false, error: String(error) });
     },
   );
@@ -294,7 +294,7 @@ function teachFromManage(
 
 async function present(tabId: number, open: boolean, keyboard = false): Promise<void> {
   const message: OrbToggle = {
-    kind: "aeon.orb.toggle",
+    kind: "graft.orb.toggle",
     tabId,
     nonce: await nonceFor(tabId),
     open,
@@ -303,7 +303,7 @@ async function present(tabId: number, open: boolean, keyboard = false): Promise<
   try {
     await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
   } catch {
-    // Tabs opened before Aeon loaded have no content script yet.
+    // Tabs opened before Graft loaded have no content script yet.
     await chrome.scripting.executeScript({ target: { tabId }, files: ["orb-content.js"] });
     await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
   }
@@ -322,7 +322,7 @@ async function verify(
 
 /**
  * orb.html, as the content script frames it: on web pages through the dynamic URL Chrome gives
- * web-accessible resources, on Aeon's own pages from the extension's fixed origin.
+ * web-accessible resources, on Graft's own pages from the extension's fixed origin.
  */
 function isOrbFrameUrl(url: string | undefined): boolean {
   if (!url) return false;

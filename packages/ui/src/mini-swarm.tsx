@@ -1,9 +1,9 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import { runVisibleFrames } from "./visible-work.js";
 
-// The orb's swarm, small: Aeon's mark on its own pages (home, running cards, the chat's steps).
+// The orb's swarm, small: Graft's mark on its own pages (home, running cards, the chat's steps).
 // Points spread evenly over a sphere that turns slowly; the near side is lighter, so it reads as
-// a lit globe. The one vivid thing on Aeon's pages. Holds still when motion is reduced.
+// a lit globe. The one vivid thing on Graft's pages. Holds still when motion is reduced.
 
 export type SwarmTone = "idle" | "working" | "needs";
 

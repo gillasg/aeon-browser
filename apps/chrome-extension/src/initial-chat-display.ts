@@ -1,4 +1,4 @@
-import type { ChatComposerProps, ComposerModel, TranscriptRow } from "@aeon/ui";
+import type { ChatComposerProps, ComposerModel, TranscriptRow } from "@graft/ui";
 
 interface InitialDisplay {
   text: string;
@@ -6,18 +6,18 @@ interface InitialDisplay {
   thinkingLevel: string;
 }
 export function saveInitialDisplay(chatId: string, value: InitialDisplay): void {
-  const pages = sessionStorage.getItem("aeon-context-pages:draft");
+  const pages = sessionStorage.getItem("graft-context-pages:draft");
   if (pages) {
-    sessionStorage.setItem("aeon-context-pages:" + chatId, pages);
-    sessionStorage.removeItem("aeon-context-pages:draft");
+    sessionStorage.setItem("graft-context-pages:" + chatId, pages);
+    sessionStorage.removeItem("graft-context-pages:draft");
   }
-  sessionStorage.setItem("aeon-initial-display:" + chatId, JSON.stringify(value));
+  sessionStorage.setItem("graft-initial-display:" + chatId, JSON.stringify(value));
 }
 export class InitialChatDisplay {
   private value: InitialDisplay | null = null;
   constructor(private readonly chatId: string) {
     try {
-      const raw = sessionStorage.getItem("aeon-initial-display:" + chatId);
+      const raw = sessionStorage.getItem("graft-initial-display:" + chatId);
       if (raw) this.value = JSON.parse(raw) as InitialDisplay;
     } catch {
       this.value = null;
@@ -32,7 +32,7 @@ export class InitialChatDisplay {
         return message?.role === "user";
       })
     ) {
-      sessionStorage.removeItem("aeon-initial-display:" + this.chatId);
+      sessionStorage.removeItem("graft-initial-display:" + this.chatId);
       return rows;
     }
     return [

@@ -1,5 +1,5 @@
 // One browser action, as browser_code for clients that prefer discrete calls. Both MCP servers
-// build the same cell from this, so an action means the same thing in browserkit and Aeon.
+// build the same cell from this, so an action means the same thing in browserkit and Graft.
 
 export interface BrowserActionInput {
   action: string;

@@ -34,7 +34,7 @@ async function createOnce(): Promise<void> {
 
 async function answersPing(): Promise<boolean> {
   const reply = (await chrome.runtime
-    .sendMessage({ target: "aeon-code-offscreen", kind: "ping" })
+    .sendMessage({ target: "graft-code-offscreen", kind: "ping" })
     .catch(() => undefined)) as { ok?: unknown } | undefined;
   return reply?.ok === true;
 }

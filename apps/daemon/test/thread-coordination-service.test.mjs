@@ -5,8 +5,8 @@ import { join, resolve, sep } from "node:path";
 import test from "node:test";
 import { ChatService } from "../dist/chat-service.js";
 import { ThreadCoordinationService } from "../dist/thread-coordination-service.js";
-import { PiSdkSessionAdapter } from "@aeon/pi-adapter";
-import { openChatStore } from "@aeon/store";
+import { PiSdkSessionAdapter } from "@graft/pi-adapter";
+import { openChatStore } from "@graft/store";
 
 test("thread tools create chats, deliver idempotently, wait by exact ID, read Pi, title, and fork", async (t) => {
   const runtime = await makeRuntime(t);
@@ -51,7 +51,7 @@ test("a thread can run on its own model and thinking level", async (t) => {
 });
 
 async function makeRuntime(t) {
-  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-coordination-test-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "graft-coordination-test-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
   const dataDirectory = join(root, "data");
   const sessionDirectory = join(dataDirectory, "pi-sessions");

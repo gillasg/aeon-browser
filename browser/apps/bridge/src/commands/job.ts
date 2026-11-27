@@ -45,7 +45,7 @@ async function acrossBrowsers(host: CliHost, code: string): Promise<unknown> {
   const names = browserNames(await host.browsers!());
   if (!names.length)
     throw new Error(
-      "Several browsers are connected. Pick one with --browser <name> (see aeon browsers).",
+      "Several browsers are connected. Pick one with --browser <name> (see graft browsers).",
     );
   const listing = code.includes("browser.job.list()");
   const values: unknown[] = [];

@@ -21,11 +21,11 @@ interface Recording {
   fps: number;
   /** Capture time (s) of the last screencast frame sent to the encoder. */
   lastSent: number;
-  /** Attached for this recording alone (a page no chat drives, like Aeon's own chat tab). */
+  /** Attached for this recording alone (a page no chat drives, like Graft's own chat tab). */
   direct: boolean;
 }
 const recordings = new Map<number, Recording>();
-const STORE = "aeon-recordings";
+const STORE = "graft-recordings";
 
 /**
  * Takes and recordings live in the service worker, which Chrome may restart mid-run; the videos
@@ -88,7 +88,7 @@ export async function stopTake(tabId: number): Promise<TakeTab | undefined> {
 
 export const startRecording = (tabId: number, value: Record<string, unknown>): Promise<unknown> =>
   start(tabId, value);
-const OFFSCREEN = "aeon-code-offscreen";
+const OFFSCREEN = "graft-code-offscreen";
 const SLICE = 750_000;
 
 export async function recordingCall(

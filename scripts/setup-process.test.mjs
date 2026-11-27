@@ -6,9 +6,9 @@ import test from "node:test";
 import { pnpmCommand, runCommand } from "./setup-process.mjs";
 
 test("a setup step runs a path with spaces and metacharacters without a shell", () => {
-  const root = mkdtempSync(join(tmpdir(), "aeon setup-"));
+  const root = mkdtempSync(join(tmpdir(), "graft setup-"));
   try {
-    const folder = join(root, "Application Support", "aeon; touch injected");
+    const folder = join(root, "Application Support", "graft; touch injected");
     mkdirSync(folder, { recursive: true });
     const script = join(folder, "step.mjs");
     writeFileSync(

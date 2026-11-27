@@ -1,6 +1,6 @@
 // Where a recording browser lives: setup-recording-chrome.sh saves each named browser's X display
-// and devicePixelRatio, so `aeon record … --browser recording` needs no exported DISPLAY or
-// AEON_RECORDING_DPR. --display always wins, then the environment, then the saved browser.
+// and devicePixelRatio, so `graft record … --browser recording` needs no exported DISPLAY or
+// GRAFT_RECORDING_DPR. --display always wins, then the environment, then the saved browser.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Args } from "browserkit/dist/args.js";
@@ -31,19 +31,19 @@ export function displayLive(
   return !local || exists(`/tmp/.X11-unix/X${local[1]}`);
 }
 
-/** The DISPLAY and AEON_RECORDING_DPR to record with; only what is missing is filled in. */
+/** The DISPLAY and GRAFT_RECORDING_DPR to record with; only what is missing is filled in. */
 export function recordingEnv(
   flag: string | undefined,
   saved: SavedBrowser | undefined,
   env: NodeJS.ProcessEnv,
   exists: (path: string) => boolean = existsSync,
-): { DISPLAY?: string; AEON_RECORDING_DPR?: string } {
-  const out: { DISPLAY?: string; AEON_RECORDING_DPR?: string } = {};
+): { DISPLAY?: string; GRAFT_RECORDING_DPR?: string } {
+  const out: { DISPLAY?: string; GRAFT_RECORDING_DPR?: string } = {};
   if (flag) out.DISPLAY = flag;
   else if (!env.DISPLAY && saved?.display && displayLive(saved.display, exists))
     out.DISPLAY = saved.display;
-  if (!env.AEON_RECORDING_DPR && saved?.dpr && saved.dpr > 0)
-    out.AEON_RECORDING_DPR = String(saved.dpr);
+  if (!env.GRAFT_RECORDING_DPR && saved?.dpr && saved.dpr > 0)
+    out.GRAFT_RECORDING_DPR = String(saved.dpr);
   return out;
 }
 

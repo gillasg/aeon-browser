@@ -28,7 +28,7 @@ const files = {
 };
 
 async function withHome(run) {
-  const home = await mkdtemp(join(tmpdir(), "aeon-pack-import-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-pack-import-"));
   const prev = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = home;
   try {
@@ -42,7 +42,7 @@ async function withHome(run) {
 for (const shape of ["zip", "folder"]) {
   test(`import installs a site pack given as a ${shape}, with no site asked`, () =>
     withHome(async (home) => {
-      const workspace = await mkdtemp(join(tmpdir(), "aeon-pack-ws-"));
+      const workspace = await mkdtemp(join(tmpdir(), "graft-pack-ws-"));
       if (shape === "zip") {
         const zip = zipSync(
           Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])),

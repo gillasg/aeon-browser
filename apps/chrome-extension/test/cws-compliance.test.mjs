@@ -1,4 +1,4 @@
-// Chrome Web Store rules for both extensions (Aeon and browserkit): MV3, no sandbox pages, no
+// Chrome Web Store rules for both extensions (Graft and browserkit): MV3, no sandbox pages, no
 // unsafe-eval, unsafe-inline or remote origins in the CSP, no code-sandbox artifact in a build,
 // no eval or new Function in a built bundle, and a written reason for every permission.
 import assert from "node:assert/strict";

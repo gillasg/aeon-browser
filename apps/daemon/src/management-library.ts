@@ -177,7 +177,7 @@ const HEALTH_ORDER = ["broken", "signed-out", "drift", "challenged", "skipped", 
 
 type SiteSummary = Awaited<ReturnType<typeof listSites>>[number];
 
-/** Mapped sites, then the sites Aeon has built-in abilities for (AI sites, X). */
+/** Mapped sites, then the sites Graft has built-in abilities for (AI sites, X). */
 async function allSites(): Promise<SiteSummary[]> {
   const sites = await listSites().catch(() => []);
   const known = new Set(sites.map((item) => item.site));

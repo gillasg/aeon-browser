@@ -15,12 +15,12 @@ export interface EngineConfig {
   agentView: (chatId: string) => Promise<"split" | "thumbnails">;
   /**
    * Whether the agent works in the foreground: its tabs open active and switching activates them.
-   * Off by default. Screen recorders (Aeon Recorder) rely on it to film the agent's work; keep it.
+   * Off by default. Screen recorders (Graft Recorder) rely on it to film the agent's work; keep it.
    */
   agentInFront: () => Promise<boolean>;
   /**
    * Whether every tab a chat drives is recorded (native-browser-takes.ts). Off by default. Screen
-   * recorders (Aeon Recorder) switch it on for a run and collect the takes; keep it.
+   * recorders (Graft Recorder) switch it on for a run and collect the takes; keep it.
    */
   recordAgentTabs: () => Promise<boolean>;
   /**
@@ -29,13 +29,13 @@ export interface EngineConfig {
    */
   defaultSpace: (owner: string) => "window" | "tabs";
   /**
-   * Whether to hide the agent cursor and its caption. Off by default. Screen recorders (Aeon Recorder)
+   * Whether to hide the agent cursor and its caption. Off by default. Screen recorders (Graft Recorder)
    * draw their own cursor and rely on this; keep it.
    */
   hideAgentCursor: () => Promise<boolean>;
   /** Whether a tab an agent drives shows the edge glow. Off lets tests and recorders hide it. */
   agentGlow: () => Promise<boolean>;
-  /** CSS colour of the edge glow: neutral here, a product colour in hosts such as Aeon. */
+  /** CSS colour of the edge glow: neutral here, a product colour in hosts such as Graft. */
   agentGlowColor: () => Promise<string>;
   /** Opt-in private/metadata network refusal for agent work. */
   privateNetwork: () => Promise<boolean>;

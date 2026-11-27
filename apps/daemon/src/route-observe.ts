@@ -1,7 +1,7 @@
 // Folds one chat's session events into the facts a route and a run card are built from.
 // A steer while the run is active is a correction. The opening prompt is not.
 
-import type { PiSessionEvent, PiToolStepEvent } from "@aeon/domain";
+import type { PiSessionEvent, PiToolStepEvent } from "@graft/domain";
 import { deterministicWatchCall, savesBoost } from "./run-effects.js";
 
 export interface SeenStep {

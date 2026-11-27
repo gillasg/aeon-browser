@@ -7,7 +7,7 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 import { connectAgents } from "../apps/bridge/dist/connect-agents.js";
 
-const server = { name: "aeon", command: "/usr/bin/aeon", args: ["mcp"] };
+const server = { name: "graft", command: "/usr/bin/graft", args: ["mcp"] };
 const commented = `{
   // keep me
   "mcp": {
@@ -16,8 +16,8 @@ const commented = `{
 }
 `;
 
-test("a commented opencode.json is edited in place and uninstall removes only aeon", async () => {
-  const home = mkdtempSync(join(tmpdir(), "aeon-agents-"));
+test("a commented opencode.json is edited in place and uninstall removes only graft", async () => {
+  const home = mkdtempSync(join(tmpdir(), "graft-agents-"));
   const dir = join(home, ".config", "opencode");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "opencode.json");
@@ -32,7 +32,7 @@ test("a commented opencode.json is edited in place and uninstall removes only ae
     const text = readFileSync(path, "utf8");
     assert.match(text, /\/\/ keep me/);
     assert.match(text, /"other"/);
-    assert.match(text, /"aeon"/);
+    assert.match(text, /"graft"/);
     assert.match(text, /"type": "local"/);
 
     const removed = await connectAgents(server, { home, uninstall: true, agents: ["opencode"] });
@@ -40,7 +40,7 @@ test("a commented opencode.json is edited in place and uninstall removes only ae
     const after = readFileSync(path, "utf8");
     assert.match(after, /\/\/ keep me/);
     assert.match(after, /"other"/);
-    assert.equal(after.includes('"aeon"'), false);
+    assert.equal(after.includes('"graft"'), false);
   } finally {
     process.env.HOME = saved.HOME;
     process.env.PATH = saved.PATH;
@@ -48,7 +48,7 @@ test("a commented opencode.json is edited in place and uninstall removes only ae
 });
 
 test("toml and yaml keep comments, a binary file is refused, and a pipe does not pick", async () => {
-  const home = mkdtempSync(join(tmpdir(), "aeon-agents-"));
+  const home = mkdtempSync(join(tmpdir(), "graft-agents-"));
   mkdirSync(join(home, ".codex"), { recursive: true });
   mkdirSync(join(home, ".hermes"), { recursive: true });
   mkdirSync(join(home, ".config", "opencode"), { recursive: true });
@@ -67,15 +67,15 @@ test("toml and yaml keep comments, a binary file is refused, and a pipe does not
     assert.equal(added.find((result) => result.agent === "Hermes")?.done, true);
     assert.equal(added.find((result) => result.agent === "opencode")?.done, false);
     assert.match(readFileSync(toml, "utf8"), /# keep toml/);
-    assert.match(readFileSync(toml, "utf8"), /\[mcp_servers\.aeon\]/);
+    assert.match(readFileSync(toml, "utf8"), /\[mcp_servers\.graft\]/);
     assert.match(readFileSync(yaml, "utf8"), /# keep yaml/);
-    assert.match(readFileSync(yaml, "utf8"), /aeon:/);
+    assert.match(readFileSync(yaml, "utf8"), /graft:/);
     assert.equal(readFileSync(broken).includes("\0"), true);
 
     await connectAgents(server, { home, agents: ["codex", "hermes"], uninstall: true });
-    assert.equal(readFileSync(toml, "utf8").includes("[mcp_servers.aeon]"), false);
+    assert.equal(readFileSync(toml, "utf8").includes("[mcp_servers.graft]"), false);
     assert.match(readFileSync(toml, "utf8"), /# keep toml/);
-    assert.equal(readFileSync(yaml, "utf8").includes("aeon:"), false);
+    assert.equal(readFileSync(yaml, "utf8").includes("graft:"), false);
     assert.match(readFileSync(yaml, "utf8"), /# keep yaml/);
 
     const input = new PassThrough();

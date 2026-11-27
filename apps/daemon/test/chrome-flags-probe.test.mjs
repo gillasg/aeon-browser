@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CHROME_FLAGS } from "@aeon/protocol";
+import { CHROME_FLAGS } from "@graft/protocol";
 import {
   createChromeFlagsProbe,
   missingFromChromeCommandLines,

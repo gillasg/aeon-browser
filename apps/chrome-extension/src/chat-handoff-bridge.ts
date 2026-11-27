@@ -1,4 +1,4 @@
-import { HANDOFF_EVENT, type HandoffAction } from "@aeon/ui";
+import { HANDOFF_EVENT, type HandoffAction } from "@graft/ui";
 
 /** Carries the chat's hand-off card buttons to the tab and to the waiting cell. */
 export function installHandoffBridge(): void {
@@ -6,7 +6,7 @@ export function installHandoffBridge(): void {
     const { tabId, action } = (event as CustomEvent<{ tabId: number; action: HandoffAction }>)
       .detail;
     if (action === "focus") void focusTab(tabId);
-    else void chrome.runtime.sendMessage({ kind: "aeon.handoff.answer", tabId, answer: action });
+    else void chrome.runtime.sendMessage({ kind: "graft.handoff.answer", tabId, answer: action });
   });
 }
 

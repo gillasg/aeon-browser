@@ -3,11 +3,11 @@ import { out, printJson } from "browserkit/dist/output.js";
 import type { Command } from "browserkit/dist/usage.js";
 import type { DaemonHost } from "./host.js";
 
-// Sites the agent may not use at all, kept in Aeon's own settings (settings → Blocked sites) and
+// Sites the agent may not use at all, kept in Graft's own settings (settings → Blocked sites) and
 // enforced in the browser: no tab can open one, browser.fetch and site API calls refuse it, and a
 // click or redirect inside a working tab cannot reach it either. A site the user names in a
 // request is allowed for that run. Only the user edits this list: no chat tool reaches it.
-// This is separate from `aeon sites`, which lists mapped sites.
+// This is separate from `graft sites`, which lists mapped sites.
 
 /** "hdfcbank.com" from whatever the user typed: a URL, a host, with or without www. */
 export function siteFromInput(value: string): string | undefined {
@@ -31,7 +31,7 @@ function requiredSite(args: Args, usage: string): string {
 }
 
 async function block(host: DaemonHost, args: Args): Promise<number> {
-  const site = requiredSite(args, "Usage: aeon block <site>");
+  const site = requiredSite(args, "Usage: graft block <site>");
   const result = await host.blocked("add", site);
   if (result.error) throw new Error(result.error);
   out(`Blocked ${site}. Agents will not open it, fetch it or call its API.`);
@@ -39,7 +39,7 @@ async function block(host: DaemonHost, args: Args): Promise<number> {
 }
 
 async function unblock(host: DaemonHost, args: Args): Promise<number> {
-  const site = requiredSite(args, "Usage: aeon unblock <site>");
+  const site = requiredSite(args, "Usage: graft unblock <site>");
   const result = await host.blocked("remove", site);
   if (result.error) throw new Error(result.error);
   out(`Unblocked ${site}.`);
@@ -61,12 +61,12 @@ export function blockedCommands(host: DaemonHost): Command[] {
       name: "block",
       group: "Blocked sites",
       summary: "stop every agent from using a site, for good",
-      help: `Usage: aeon block <site>
+      help: `Usage: graft block <site>
 
 Puts the site (and its subdomains) off limits for every agent: no tab opens it, browser.fetch
 and site API calls refuse it, and requests a working tab makes to it (clicks, redirects,
 scripts) are blocked. A site the user names in their own request is allowed for that run only.
-The list is the one settings → Blocked sites shows. \`aeon sites\` lists mapped sites, which is a
+The list is the one settings → Blocked sites shows. \`graft sites\` lists mapped sites, which is a
 different thing.`,
       run: (args) => block(host, args),
     },
@@ -74,16 +74,16 @@ different thing.`,
       name: "unblock",
       group: "Blocked sites",
       summary: "let agents use a site again",
-      help: `Usage: aeon unblock <site>
+      help: `Usage: graft unblock <site>
 
-Removes the site from the list \`aeon blocked\` shows.`,
+Removes the site from the list \`graft blocked\` shows.`,
       run: (args) => unblock(host, args),
     },
     {
       name: "blocked",
       group: "Blocked sites",
       summary: "list the sites agents may not use",
-      help: `Usage: aeon blocked [--json]
+      help: `Usage: graft blocked [--json]
 
   --json   {"blocked": [...]} instead of one site per line`,
       run: (args) => blocked(host, args),

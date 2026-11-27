@@ -307,7 +307,7 @@ test("workspaces save only {title, color, urls} and restore them as groups", asy
     groups: 1,
     tabs: 1,
   });
-  assert.deepEqual(store["aeon-workspaces"][0].groups, [
+  assert.deepEqual(store["graft-workspaces"][0].groups, [
     { title: "Research", color: "green", urls: ["https://a.test/"] },
   ]);
   assert.equal((await workspacesCall(api, { workspaces: "listSaved" })).workspaces[0].name, "day");

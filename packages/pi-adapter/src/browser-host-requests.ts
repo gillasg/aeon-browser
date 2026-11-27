@@ -5,8 +5,8 @@ import {
 } from "@browserkit/tools/host";
 import type { ModelLike } from "@browserkit/tools/site-to-api";
 
-// Aeon's side of the one host handler: credentials, site rules and mapped-site calls are
-// browserkit's; Aeon adds only its own storage (workspace, site skills, saved reads) through
+// Graft's side of the one host handler: credentials, site rules and mapped-site calls are
+// browserkit's; Graft adds only its own storage (workspace, site skills, saved reads) through
 // `extra`. `source` decides whether a typed-user `allow` may lift a block; routines, checks and
 // outside sessions always get `allow: []`.
 
@@ -20,16 +20,16 @@ export interface HostHandlerOptions {
   source: HostRequestContext["source"];
   /** What this run must stay off. Only a chat's answer may carry `allow`. */
   siteRules?: SiteRulesProvider;
-  /** Aeon's mapped-site call path, so its browser calls stay attributed to this chat. */
+  /** Graft's mapped-site call path, so its browser calls stay attributed to this chat. */
   siteMapper?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
   /** The fast model page.observe / page.act use. */
   model?: () => Promise<ModelLike | undefined>;
-  /** Aeon-only requests: workspace files, site skills, saved reads. */
+  /** Graft-only requests: workspace files, site skills, saved reads. */
   extra?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
 }
 
-/** The shared handler with Aeon's provider; the source goes in the context of every call. */
-export function createAeonHostHandler(
+/** The shared handler with Graft's provider; the source goes in the context of every call. */
+export function createGraftHostHandler(
   options: HostHandlerOptions,
 ): (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined {
   const siteRules = options.siteRules;

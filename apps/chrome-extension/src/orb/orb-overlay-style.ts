@@ -8,18 +8,18 @@ const LAYER_STYLE = `
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
 .hit {
   all: unset; position: fixed; left: 0; top: 0; width: 32px; height: 32px;
-  border-radius: var(--aeon-r-full); pointer-events: auto; cursor: grab; will-change: transform;
+  border-radius: var(--graft-r-full); pointer-events: auto; cursor: grab; will-change: transform;
 }
 .hit:active { cursor: grabbing; }
-.hit:focus-visible { outline: 2px solid var(--aeon-island-focus); outline-offset: -4px; }
+.hit:focus-visible { outline: 2px solid var(--graft-island-focus); outline-offset: -4px; }
 .pill {
   position: fixed; left: 0; top: 0; display: flex; align-items: center; gap: 8px;
   max-width: 360px; padding: 5px 5px 5px 12px; box-sizing: border-box;
-  border-radius: var(--aeon-r-full); pointer-events: auto; white-space: nowrap;
-  will-change: transform; font: 500 var(--aeon-fs-md)/17px -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
-  color: var(--aeon-island-ink); background: var(--aeon-island-bg);
+  border-radius: var(--graft-r-full); pointer-events: auto; white-space: nowrap;
+  will-change: transform; font: 500 var(--graft-fs-md)/17px -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  color: var(--graft-island-ink); background: var(--graft-island-bg);
   -webkit-backdrop-filter: none; backdrop-filter: none;
-  box-shadow: var(--aeon-island-elev); transition: opacity .3s ease;
+  box-shadow: var(--graft-island-elev); transition: opacity .3s ease;
 }
 .pill[hidden] { display: none; }
 .pill.fading { opacity: 0; }
@@ -27,8 +27,8 @@ const LAYER_STYLE = `
   all: unset; cursor: pointer; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 .pill .spin {
-  width: 9px; height: 9px; flex: none; border-radius: var(--aeon-r-full); box-sizing: border-box;
-  border: 1px solid var(--aeon-island-ink-soft); animation: ink-breathe 2.4s ease-in-out infinite alternate;
+  width: 9px; height: 9px; flex: none; border-radius: var(--graft-r-full); box-sizing: border-box;
+  border: 1px solid var(--graft-island-ink-soft); animation: ink-breathe 2.4s ease-in-out infinite alternate;
 }
 .pill:not([data-state="thinking"]):not([data-state="working"]) .spin { display: none; }
 .pill:not([data-state="thinking"]):not([data-state="working"]):not([data-state="needs"]) .stop { display: none; }
@@ -36,13 +36,13 @@ const LAYER_STYLE = `
 .pill.hold-layout:not([data-state="thinking"]):not([data-state="working"]):not([data-state="needs"]) .stop { display: grid; visibility: hidden; pointer-events: none; }
 @keyframes ink-breathe { from { opacity: .35; } to { opacity: 1; } }
 .pill .ic {
-  all: unset; width: 24px; height: 24px; flex: none; border-radius: var(--aeon-r-full);
-  display: grid; place-items: center; cursor: pointer; background: var(--aeon-island-line-strong);
-  font: 500 var(--aeon-fs-xs)/1 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif; color: var(--aeon-island-ink);
+  all: unset; width: 24px; height: 24px; flex: none; border-radius: var(--graft-r-full);
+  display: grid; place-items: center; cursor: pointer; background: var(--graft-island-line-strong);
+  font: 500 var(--graft-fs-xs)/1 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif; color: var(--graft-island-ink);
 }
-.pill .ic:hover { background: var(--aeon-island-wash-24); }
+.pill .ic:hover { background: var(--graft-island-wash-24); }
 .pill .ic:focus-visible, .pill .label:focus-visible {
-  outline: 2px solid var(--aeon-island-focus); outline-offset: 2px;
+  outline: 2px solid var(--graft-island-focus); outline-offset: 2px;
 }
 iframe {
   position: fixed; left: 0; top: 0; border: 0; background: transparent;

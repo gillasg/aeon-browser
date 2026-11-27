@@ -1,6 +1,6 @@
 import { storedTraceActions } from "./browser-trace-actions.js";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { PiMessageProjection } from "@aeon/domain";
+import type { PiMessageProjection } from "@graft/domain";
 import { projectContent, resultText, safeJsonObject } from "./pi-content-projection.js";
 import type { SignInCodes } from "./sign-in-codes.js";
 import { maskAnswerBlock } from "./sign-in-codes.js";

@@ -8,7 +8,7 @@ import type { BrowserIdentity } from "./native-worker-identity.js";
 export const jobs = new Map<string, Job>();
 /** Watchdogs for running jobs; a job whose realm is gone is settled by one. */
 export const jobTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const JOB_STORAGE = "aeon-code-jobs";
+const JOB_STORAGE = "graft-code-jobs";
 export const MAX_JOB_ITEM_CHARS = 200_000;
 /** Settled jobs kept, newest first; older ones are dropped from memory and from storage. */
 export const MAX_FINISHED_JOBS = 20;

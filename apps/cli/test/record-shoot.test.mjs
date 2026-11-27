@@ -1,4 +1,4 @@
-// `aeon record shoot` plans and `aeon record ui` routing: parsing, validation, the run order, and
+// `graft record shoot` plans and `graft record ui` routing: parsing, validation, the run order, and
 // that capture always stops when a step fails.
 import assert from "node:assert/strict";
 import { join } from "node:path";
@@ -167,7 +167,7 @@ test("ui actions resolve to real extension pages and shortcuts", () => {
   assert.deepEqual(resolveUiAction("cursor", id), { kind: "keys", chords: ["cursor"] });
   assert.deepEqual(resolveUiAction("sidepanel", id), { kind: "keys", chords: ["cursor", "panel"] });
   assert.deepEqual(resolveUiAction("reload", id), { kind: "reload" });
-  assert.throws(() => resolveUiAction("bogus", id), /Usage: aeon record ui/);
+  assert.throws(() => resolveUiAction("bogus", id), /Usage: graft record ui/);
   assert.equal(UI_ACTIONS.length, 12);
 });
 
@@ -217,7 +217,7 @@ test("performUi opens pages through browser code and presses chords in order", a
   assert.deepEqual(pressed, ["alt+shift+space", "ctrl+Return"]);
 });
 
-test("pageCode reuses one Aeon or blank tab in place and closes the duplicates", async () => {
+test("pageCode reuses one Graft or blank tab in place and closes the duplicates", async () => {
   const url = "chrome-extension://id/home.html?view=sites";
   const play = async (tabs) => {
     const log = [];
@@ -234,8 +234,8 @@ test("pageCode reuses one Aeon or blank tab in place and closes the duplicates",
   };
   const web = { id: 1, url: "https://example.com/", active: false };
   const blank = { id: 2, url: "about:blank", active: false };
-  const aeon = { id: 3, url: "chrome-extension://id/chat.html", active: true };
-  assert.deepEqual(await play([web, blank, aeon]), {
+  const graft = { id: 3, url: "chrome-extension://id/chat.html", active: true };
+  assert.deepEqual(await play([web, blank, graft]), {
     id: 3,
     log: [
       ["close", 2],

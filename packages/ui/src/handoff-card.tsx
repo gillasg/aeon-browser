@@ -11,7 +11,7 @@ export interface PendingHandoff {
 
 export type HandoffAction = "focus" | "done" | "cancelled";
 /** Hosts listen for this window event and carry the answer to the browser. */
-export const HANDOFF_EVENT = "aeon:handoff";
+export const HANDOFF_EVENT = "graft:handoff";
 
 export function pendingHandoff(rows: readonly TranscriptRow[]): PendingHandoff | null {
   for (let index = rows.length - 1; index >= 0; index--) {
@@ -60,8 +60,8 @@ export function HandoffCard({ handoff }: { handoff: PendingHandoff }): ReactElem
     );
   };
   return (
-    <section className="handoff-card" role="status" aria-label="Aeon needs you">
-      <p>{handoff.message || "Aeon needs you in this tab."}</p>
+    <section className="handoff-card" role="status" aria-label="Graft needs you">
+      <p>{handoff.message || "Graft needs you in this tab."}</p>
       <div className="handoff-actions">
         <button
           type="button"

@@ -12,7 +12,7 @@ import {
   type BrowserExecutorResult,
   type BrowserStep,
   type BrowserTargetKey,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { executeBrowserBatch } from "./browser-batch.js";
 import { isWriteStep } from "./browser-step-write.js";
 import { BrowserCodeCells, type BrowserCodeCellInput } from "./browser-code-cells.js";
@@ -42,7 +42,7 @@ export class BrowserControlService {
   private readonly pending = new Map<string, BrowserPending>();
   private readonly associations = new Map<string, Map<string, Association>>();
   private readonly claims = new Map<string, string>();
-  /** aeon run --browser: chat id → the one browser (clientInstanceId) the chat may use. */
+  /** graft run --browser: chat id → the one browser (clientInstanceId) the chat may use. */
   private readonly pins = new Map<string, string>();
   private claimGeneration = 0;
   private scripts: SiteScriptService | undefined;
@@ -73,7 +73,7 @@ export class BrowserControlService {
   useDefaultSpaces(lookup: (chatId: string) => "window" | "tabs" | undefined): void {
     this.spaceForChat = lookup;
   }
-  /** Browser-code cells that have not finished. `aeon update` waits for these. */
+  /** Browser-code cells that have not finished. `graft update` waits for these. */
   activeCellCount(): number {
     return this.cells.activeCount();
   }
@@ -108,7 +108,7 @@ export class BrowserControlService {
     );
     return used.size === 1 ? [...used][0] : undefined;
   }
-  /** Pins a chat to the browser it was typed in, unless it already has one (aeon run --browser). */
+  /** Pins a chat to the browser it was typed in, unless it already has one (graft run --browser). */
   claimChat(chatId: string, clientInstanceId: string): void {
     if (!this.pins.has(chatId)) this.pins.set(chatId, clientInstanceId);
   }
@@ -339,8 +339,8 @@ export class BrowserControlService {
     return JSON.stringify({
       error: available.length ? "AMBIGUOUS_BROWSER" : "BROWSER_OFFLINE",
       detail: available.length
-        ? "Several browsers are connected: pick one (aeon tool/repl --browser <name>, names from aeon browsers), or attach a tab from the intended browser first."
-        : "No connected browser can run browser_code. Reload Aeon in chrome://extensions.",
+        ? "Several browsers are connected: pick one (graft tool/repl --browser <name>, names from graft browsers), or attach a tab from the intended browser first."
+        : "No connected browser can run browser_code. Reload Graft in chrome://extensions.",
     });
   }
   private namedCell(chatId: string, input: BrowserCodeCellInput): BrowserCodeCellInput {
@@ -419,7 +419,7 @@ export class BrowserControlService {
     (result: { ok: boolean; recording?: boolean; error?: string }) => void
   >();
   /**
-   * aeon run --typed: one browser opens the chat's tab and types the prompt into its composer;
+   * graft run --typed: one browser opens the chat's tab and types the prompt into its composer;
    * resolves once it is typed (the caller then submits it, so it never counts as the user typing).
    */
   openTypedChat(
@@ -463,7 +463,7 @@ export class BrowserControlService {
   }
   private opening = new Map<string, (tabId: number | undefined) => void>();
   /**
-   * aeon open: asks the chat's browsers to show its tab, and waits briefly for the tab id the first
+   * graft open: asks the chat's browsers to show its tab, and waits briefly for the tab id the first
    * one answers with. A browser that never answers still counts, just without an id.
    */
   openChatAndWait(chatId: string, active = false): Promise<{ browsers: number; tabId?: number }> {
@@ -550,13 +550,13 @@ export class BrowserControlService {
     if (!this.runtimeAvailable(step))
       return {
         code: "UNSUPPORTED",
-        detail: "Reload Aeon in chrome://extensions to load the new browser runtime.",
+        detail: "Reload Graft in chrome://extensions to load the new browser runtime.",
       };
     if (requiresBrowserActions(step) && !this.actionClients.get(step.target.clientInstanceId))
       return {
         code: "UNSUPPORTED",
         detail:
-          "The extension still has the older browser executor loaded. Reload Aeon in chrome://extensions, then retry this browser task.",
+          "The extension still has the older browser executor loaded. Reload Graft in chrome://extensions, then retry this browser task.",
       };
     return undefined;
   }

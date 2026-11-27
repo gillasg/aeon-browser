@@ -10,8 +10,8 @@ import { serviceState, startService } from "./service-state.mjs";
 import { runSupervisor } from "./supervisor.mjs";
 
 const ENTRY = fileURLToPath(new URL("./native-host.mjs", import.meta.url));
-const CONNECT_ATTEMPTS = numberEnv("AEON_CONNECT_ATTEMPTS", 80);
-const CONNECT_WAIT_MS = numberEnv("AEON_CONNECT_WAIT_MS", 200);
+const CONNECT_ATTEMPTS = numberEnv("GRAFT_CONNECT_ATTEMPTS", 80);
+const CONNECT_WAIT_MS = numberEnv("GRAFT_CONNECT_WAIT_MS", 200);
 const REPLY_TIMEOUT_MS = 10_000;
 
 function numberEnv(name, fallback) {
@@ -102,9 +102,9 @@ export function ensureSupervisor(config, log, options = {}) {
   const state = (options.serviceState ?? serviceState)();
   if (state === "active") return "service";
   if (state === "inactive") {
-    log.write("The Aeon service is installed but not running; asking it to start.");
+    log.write("The Graft service is installed but not running; asking it to start.");
     if ((options.startService ?? startService)({ log })) return "service";
-    log.write("The Aeon service did not start; running a supervisor directly.");
+    log.write("The Graft service did not start; running a supervisor directly.");
   }
   spawnSupervisor(config, log, options.spawn);
   return "manual";

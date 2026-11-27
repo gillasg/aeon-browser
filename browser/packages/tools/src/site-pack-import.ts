@@ -2,9 +2,9 @@ import { resolve } from "node:path";
 import { installSitePack, isSitePack, readSitePack } from "@browserkit/site-mapper";
 import { assertSiteAllowed } from "./web-gate.js";
 
-// site_mapper import of a site pack (a .zip from `aeon pack export`, or the folder it was
+// site_mapper import of a site pack (a .zip from `graft pack export`, or the folder it was
 // extracted into): the pack names its own site, so none is asked for. Its skills and boosts run in
-// the user's browser and are left out here; `aeon pack import` saves them disabled for review.
+// the user's browser and are left out here; `graft pack import` saves them disabled for review.
 
 /** The packs among files (resolved in the workspace), or none when any file is not a pack. */
 export async function sitePackPaths(files: string[], workspace: string): Promise<string[]> {
@@ -26,7 +26,7 @@ export async function importSitePacks(paths: string[]): Promise<unknown> {
       files: installed.written,
       ...(pack.skills.length || pack.boosts.length
         ? {
-            skipped: `${pack.skills.length} skill(s) and ${pack.boosts.length} boost(s): the user imports those with aeon pack import`,
+            skipped: `${pack.skills.length} skill(s) and ${pack.boosts.length} boost(s): the user imports those with graft pack import`,
           }
         : {}),
     });

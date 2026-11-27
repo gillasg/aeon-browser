@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { ChatEventMessageSchema, PiSessionEventSchema } from "@aeon/protocol";
+import { ChatEventMessageSchema, PiSessionEventSchema } from "@graft/protocol";
 import { inputStepEffect } from "@browserkit/engine/native-browser-effect";
 import { stepEventFrom } from "@browserkit/engine/evidence/step-record";
 import { storedTraceActions, traceActions } from "../dist/browser-trace-actions.js";
 
-// The trace a chat keeps (and `aeon trace --json` prints) carries each input step's closed
+// The trace a chat keeps (and `graft trace --json` prints) carries each input step's closed
 // effect and its evidence, so an eval row can tell a suspected no-op from a confirmed change.
 
 test("an input step's effect and evidence reach its trace row", () => {

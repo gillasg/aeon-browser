@@ -6,8 +6,8 @@ import {
   type ThreadCoordinationStore,
   type CreateThreadForkInput,
   type ThreadForkIntent,
-} from "@aeon/domain";
-import type { ThreadToolHost } from "@aeon/pi-adapter";
+} from "@graft/domain";
+import type { ThreadToolHost } from "@graft/pi-adapter";
 import { ChatService } from "./chat-service.js";
 import {
   hash,

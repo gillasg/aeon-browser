@@ -4,7 +4,7 @@
  * - `env:<VAR>`: an HTTP server gets `Authorization: Bearer <value>`; a stdio server gets `VAR`.
  * - `header:<Name>=env:<VAR>`: an HTTP server gets `<Name>: <value>`; a stdio server gets `VAR`.
  *   Several header references may be joined with commas.
- * - `external-config-only` / `external:<id>`: bound outside Aeon; nothing is resolved here.
+ * - `external-config-only` / `external:<id>`: bound outside Graft; nothing is resolved here.
  */
 export interface CredentialBinding {
   /** The header to send, or undefined for the bearer form. */

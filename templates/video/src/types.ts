@@ -1,4 +1,4 @@
-// The recording's data model: exactly what `aeon record` writes to events.json (see EVENTS.md).
+// The recording's data model: exactly what `graft record` writes to events.json (see EVENTS.md).
 // Every time below is milliseconds on the clip clock.
 
 export type Point = { x: number; y: number };
@@ -82,7 +82,7 @@ export type TerminalCast = {
 };
 export type RecordingEvents = {
   version: 1;
-  recorder: "aeon";
+  recorder: "graft";
   clock: "clip";
   clip: ClipMeta;
   clips?: ClipMeta[];

@@ -1,5 +1,5 @@
 import type { PrivacySettingsProps } from "./privacy-settings.js";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import type { ManagementActionName, ManagementSection } from "./management-types.js";
 
 export interface ManagementSurfaceProps {

@@ -1,12 +1,12 @@
-// Aeon's own tabs (Home in the new tab, a chat in a tab, the viewer, site scripts) get the cursor
+// Graft's own tabs (Home in the new tab, a chat in a tab, the viewer, site scripts) get the cursor
 // box too, from the same shortcut. Chrome keeps content scripts and chrome.scripting out of
 // extension pages, so these pages load orb-content.js themselves, and the worker hands them the
 // shared cursor's shape to draw (CURSOR_LOCAL) instead of injecting it.
 
-const AEON_TAB_PAGES = new Set(["/home.html", "/chat.html", "/viewer.html", "/site-scripts.html"]);
+const GRAFT_TAB_PAGES = new Set(["/home.html", "/chat.html", "/viewer.html", "/site-scripts.html"]);
 
-/** Service worker → an Aeon page: draw the shared page cursor here. */
-export const CURSOR_LOCAL = "aeon.cursor.local";
+/** Service worker → a Graft page: draw the shared page cursor here. */
+export const CURSOR_LOCAL = "graft.cursor.local";
 
 export interface CursorLocal {
   kind: typeof CURSOR_LOCAL;
@@ -15,19 +15,19 @@ export interface CursorLocal {
   mark: object;
 }
 
-/** A top-level Aeon page the cursor can be summoned on. `base` is chrome.runtime.getURL(""). */
-export function isAeonTabPage(url: string | undefined, base: string): boolean {
+/** A top-level Graft page the cursor can be summoned on. `base` is chrome.runtime.getURL(""). */
+export function isGraftTabPage(url: string | undefined, base: string): boolean {
   if (!url?.startsWith(base)) return false;
   try {
-    return AEON_TAB_PAGES.has(new URL(url).pathname);
+    return GRAFT_TAB_PAGES.has(new URL(url).pathname);
   } catch {
     return false;
   }
 }
 
-/** Web pages and Aeon's own tabs: everywhere the cursor can be. */
+/** Web pages and Graft's own tabs: everywhere the cursor can be. */
 export function isCursorPage(url: string | undefined, base: string): boolean {
-  return /^https?:/.test(url ?? "") || isAeonTabPage(url, base);
+  return /^https?:/.test(url ?? "") || isGraftTabPage(url, base);
 }
 
 /** The chat a chat tab shows, so the cursor box there follows that chat. */
@@ -69,7 +69,7 @@ export function isCursorLocal(value: unknown): value is CursorLocal {
 
 type CursorPage = { __cursorPaint?: (next: object, css: string, cursor: object) => void };
 
-/** On an Aeon page: load the shared page cursor from the extension and draw it. */
+/** On a Graft page: load the shared page cursor from the extension and draw it. */
 export async function drawLocalCursor(message: CursorLocal): Promise<void> {
   const page = globalThis as CursorPage;
   if (!page.__cursorPaint) await loadScript(chrome.runtime.getURL("cursor-page.js"));

@@ -1,5 +1,5 @@
-import { blockedSitesKey } from "@aeon/ui";
-import type { DaemonUiResponse } from "@aeon/protocol";
+import { blockedSitesKey } from "@graft/ui";
+import type { DaemonUiResponse } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 // Blocked sites now live in browserkit's site-rules.json, behind the daemon. Home reads and

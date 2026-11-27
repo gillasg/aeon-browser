@@ -1,12 +1,12 @@
 // The Agent tabs settings live in page localStorage (where the settings UI keeps its choices);
 // the worker cannot read that, so extension pages mirror them into chrome.storage.local.
-// On/off agent settings, off by default. Screen recorders (Aeon Recorder) rely on them; keep them.
-export const AGENT_IN_FRONT_KEY = "aeonAgentInFront";
-export const HIDE_AGENT_CURSOR_KEY = "aeonHideAgentCursor";
-// Record every tab a chat drives, for screen recorders (Aeon Recorder) that build takes; keep it.
-export const RECORD_AGENT_TABS_KEY = "aeonRecordAgentTabs";
-/** Same key the engine reads. Off until Settings or `aeon settings` stores true. */
-export const HUMAN_LIKE_INPUT_KEY = "aeonHumanLikeInput";
+// On/off agent settings, off by default. Screen recorders (Graft Recorder) rely on them; keep them.
+export const AGENT_IN_FRONT_KEY = "graftAgentInFront";
+export const HIDE_AGENT_CURSOR_KEY = "graftHideAgentCursor";
+// Record every tab a chat drives, for screen recorders (Graft Recorder) that build takes; keep it.
+export const RECORD_AGENT_TABS_KEY = "graftRecordAgentTabs";
+/** Same key the engine reads. Off until Settings or `graft settings` stores true. */
+export const HUMAN_LIKE_INPUT_KEY = "graftHumanLikeInput";
 const FLAGS = [
   AGENT_IN_FRONT_KEY,
   HIDE_AGENT_CURSOR_KEY,
@@ -16,7 +16,7 @@ const FLAGS = [
 
 // The Blocked sites setting: a JSON list in page localStorage, read by the browser engine from
 // chrome.storage.local under "blocked-sites".
-const BLOCKED_SITES_KEY = "aeonBlockedSites";
+const BLOCKED_SITES_KEY = "graftBlockedSites";
 const ENGINE_BLOCKED_SITES_KEY = "blocked-sites";
 
 function mirrorBlockedSites(): void {
@@ -54,7 +54,7 @@ function mirrorBlockedSites(): void {
     if (event.key === BLOCKED_SITES_KEY) push();
   });
   window.addEventListener(BLOCKED_SITES_KEY, push);
-  // `aeon block|unblock` changes the list in chrome.storage from the worker: show it in settings.
+  // `graft block|unblock` changes the list in chrome.storage from the worker: show it in settings.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || changes[ENGINE_BLOCKED_SITES_KEY] === undefined) return;
     const value = changes[ENGINE_BLOCKED_SITES_KEY].newValue;
@@ -83,7 +83,7 @@ export function mirrorAgentTabView(): void {
     }
     void chrome.storage.local.set(flags).catch(() => undefined);
   };
-  // Settings changed outside this page (`aeon settings` from the CLI) win over the page's copy.
+  // Settings changed outside this page (`graft settings` from the CLI) win over the page's copy.
   void adoptStored().then(push, push);
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local") adopt(changes);

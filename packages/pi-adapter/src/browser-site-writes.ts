@@ -2,7 +2,7 @@
 // per operation so the step can say what it changed: the Activity log lists them, with the
 // items, and the orb shows them on the result.
 
-import type { Rewind } from "@aeon/protocol";
+import type { Rewind } from "@graft/protocol";
 
 /** Says how a write can be taken back, when the site's opposite action is known. */
 export type RewindLookup = (site: string, operation: string) => Promise<Rewind | undefined>;

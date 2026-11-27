@@ -1,4 +1,4 @@
-// Aeon's messages, on top of the browser engine's own (re-exported here).
+// Graft's messages, on top of the browser engine's own (re-exported here).
 export * from "@browserkit/protocol";
 export {
   ClientRoleSchema,

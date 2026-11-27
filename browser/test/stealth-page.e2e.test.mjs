@@ -1,4 +1,4 @@
-// What a page can see of Aeon when it is not driving it, and while it is: no page globals, the
+// What a page can see of Graft when it is not driving it, and while it is: no page globals, the
 // settle probe's observer kept in its own world, and nothing of ours on the page but the cursor.
 // Run alone: node --test test/stealth-page.e2e.test.mjs
 import test from "node:test";
@@ -26,7 +26,7 @@ const pageHtml = `<title>Quiet</title>
 <button id="go" onclick="document.title='continued'">Go</button>`;
 
 test(
-  "a page carries no agent globals or overlays until Aeon drives it, and the settle probe stays out of its world",
+  "a page carries no agent globals or overlays until Graft drives it, and the settle probe stays out of its world",
   { skip: !process.env.REQUIRE_E2E && !existsSync(chromePath) },
   async () => {
     const home = await mkdtemp(join(tmpdir(), "bue-stealth-page-"));
@@ -45,7 +45,7 @@ test(
       chrome = spawn(chromePath, chromeArgs(profile), { stdio: "ignore" });
       const port = await connectExtension(profile, env);
 
-      // A tab Aeon never drove: the page's own world carries nothing of ours.
+      // A tab Graft never drove: the page's own world carries nothing of ours.
       const idle = await untouchPage(port, url);
       assert.deepEqual(idle.globals, [], "a page global was left on an idle page");
       assert.deepEqual(idle.overlays, [], "an overlay was left on an idle page");
@@ -104,15 +104,15 @@ function repl(url) {
     await page.waitForTimeout(300);
     const report = await page.stealthCheck();
     const main = await page.evaluate(() => ({
-      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit)/.test(name)),
-      overlays: [...document.querySelectorAll('[id^="aeon-"],[data-aeon-overlay],#aeon-agent-cursor')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase()),
+      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit)/.test(name)),
+      overlays: [...document.querySelectorAll('[id^="graft-"],[data-graft-overlay],#graft-agent-cursor')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase()),
       cursorShown: [...document.documentElement.children].some((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict"),
-      pageCanFindCursor: !!document.querySelector('#aeon-agent-cursor, [data-aeon-overlay], [id^="aeon-"][data-aeon-cursor]')
+      pageCanFindCursor: !!document.querySelector('#graft-agent-cursor, [data-graft-overlay], [id^="graft-"][data-graft-cursor]')
     }));
     console.log("STEALTH " + JSON.stringify({report, main}));`;
 }
 
-/** A tab opened outside Aeon: no debugger, no glow, nothing of the extension in it. */
+/** A tab opened outside Graft: no debugger, no glow, nothing of the extension in it. */
 async function untouchPage(port, url) {
   const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json());
   const browser = connect(version.webSocketDebuggerUrl);
@@ -136,8 +136,8 @@ async function untouchPage(port, url) {
   });
   const dom = await page.send("Runtime.evaluate", {
     expression: `(() => ({
-      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit)/.test(name)),
-      overlays: [...document.querySelectorAll('[id^="aeon-"],[id^="browserkit-"],[data-aeon-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase())
+      globals: Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit)/.test(name)),
+      overlays: [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-graft-overlay]')].map((node) => node.id ? '#' + node.id : node.tagName.toLowerCase())
     }))()`,
     returnByValue: true,
   });

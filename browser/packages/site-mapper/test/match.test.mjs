@@ -19,7 +19,7 @@ test("hosts named in the prompt are candidates", () => {
 });
 
 test("matchAbilities lists the top ability and drops the near miss", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-match-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-match-"));
   const previous = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = home;
   try {

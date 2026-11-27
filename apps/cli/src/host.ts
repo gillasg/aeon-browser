@@ -6,25 +6,25 @@ import {
   type ModelLike,
 } from "@browserkit/tools/site-to-api";
 import { configureCliHost } from "browserkit/dist/host.js";
-import { AeonClient } from "./client.js";
+import { GraftClient } from "./client.js";
 import { cellErrorMessage, journalPath, offline, runCellOn, type BrowserCell } from "./cell-run.js";
 
-// What browserkit's commands need from Aeon: the browser is the user's Chrome, reached through
-// the daemon's executor (the same runtime browser_code uses), and the model is Aeon's default.
-// Both connect only when a command actually needs them, so `aeon sites`, `aeon call --transport
-// direct` and plain-HTTP reads work with Aeon closed, exactly like browserkit's own command line.
+// What browserkit's commands need from Graft: the browser is the user's Chrome, reached through
+// the daemon's executor (the same runtime browser_code uses), and the model is Graft's default.
+// Both connect only when a command actually needs them, so `graft sites`, `graft call --transport
+// direct` and plain-HTTP reads work with Graft closed, exactly like browserkit's own command line.
 
 type Json = Record<string, unknown>;
 export type { BrowserCell } from "./cell-run.js";
 
 export class DaemonHost {
-  private client: AeonClient | undefined;
-  private connecting: Promise<AeonClient> | undefined;
+  private client: GraftClient | undefined;
+  private connecting: Promise<GraftClient> | undefined;
   private browserUsed = false;
   /** `--browser <name>` on any command: every cell it runs goes to that Chrome profile. */
   private pinnedBrowser: string | undefined;
 
-  /** Sends cells without their own `browser` to the named profile (a name from aeon browsers). */
+  /** Sends cells without their own `browser` to the named profile (a name from graft browsers). */
   pinBrowser(name: string | undefined): void {
     this.pinnedBrowser = name || undefined;
   }
@@ -33,9 +33,9 @@ export class DaemonHost {
     return this.pinnedBrowser;
   }
 
-  connect(): Promise<AeonClient> {
+  connect(): Promise<GraftClient> {
     if (this.client) return Promise.resolve(this.client);
-    this.connecting ??= AeonClient.connect().then(
+    this.connecting ??= GraftClient.connect().then(
       (client) => {
         this.client = client;
         return client;
@@ -74,7 +74,7 @@ export class DaemonHost {
     return result;
   }
 
-  /** Aeon's default model, as site-to-api and browser-crawl expect one. */
+  /** Graft's default model, as site-to-api and browser-crawl expect one. */
   model(): ModelLike {
     return {
       complete: (async (context: {
@@ -120,7 +120,7 @@ export class DaemonHost {
 function browserError(result: BrowserCell): Error {
   const message = cellErrorMessage(result);
   if (!offline(result)) return new Error(message);
-  // The site-to-api class carries the browser-offline exit code; the message says how Aeon recovers.
+  // The site-to-api class carries the browser-offline exit code; the message says how Graft recovers.
   const error = new BrowserNotConnected(message);
   error.message = message;
   return error;
@@ -135,8 +135,8 @@ export function daemonBridge(host: DaemonHost): Bridge {
   };
 }
 
-/** Routes every browser call in this process through Aeon, and installs the CLI host. */
-export function installAeonCliHost(host: DaemonHost): void {
+/** Routes every browser call in this process through Graft, and installs the CLI host. */
+export function installGraftCliHost(host: DaemonHost): void {
   useBrowser(daemonBridge(host));
   configureCliHost({
     runInBrowser: (code, options) => host.runInBrowser(code, options ?? {}),

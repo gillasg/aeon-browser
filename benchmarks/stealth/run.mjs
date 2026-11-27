@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Stealth bench: what sites see when Aeon drives the user's Chrome. No model is called.
+// Stealth bench: what sites see when Graft drives the user's Chrome. No model is called.
 //
-// 1. The local probe (probe.html on 127.0.0.1) records the tells a page can read while Aeon moves
+// 1. The local probe (probe.html on 127.0.0.1) records the tells a page can read while Graft moves
 //    the mouse, clicks and types: screen vs client coordinates, empty coalesced events, untrusted
 //    events, input timing, window vs worker navigator values, patched natives, automation globals,
 //    the Runtime.enable console tell, focus and visibility.
 // 2. Public detector pages (sannysoft, BrowserScan, CreepJS, rebrowser, deviceandbrowserinfo,
 //    pixelscan, fingerprint's playground, a reCAPTCHA v3 score page): a best-effort verdict each.
-// 3. The sweep: popular sites opened one by one, each reported as open, a bot wall (Aeon's own
+// 3. The sweep: popular sites opened one by one, each reported as open, a bot wall (Graft's own
 //    challenge check) or an error. `--sweep-file` takes a JSON list of URLs.
 //
 //   node benchmarks/stealth/run.mjs --browser eval [--probe-only | --sites-only | --sweep-only]
@@ -123,7 +123,7 @@ export const SWEEP = [
   "https://www.tripadvisor.com/",
 ];
 
-/** One cell through Aeon's CLI; the cell prints `RESULT <json>`, warnings come back with it. */
+/** One cell through Graft's CLI; the cell prints `RESULT <json>`, warnings come back with it. */
 export function cell(
   code,
   { browser, session, timeoutSeconds = 120, cli = path.join(root, "apps/cli/dist/cli.js") },

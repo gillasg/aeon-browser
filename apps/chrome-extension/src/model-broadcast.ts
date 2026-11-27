@@ -1,6 +1,6 @@
-// Every open Aeon view (Home, chats, the side panel) hears about a sign-in, sign-out or default
+// Every open Graft view (Home, chats, the side panel) hears about a sign-in, sign-out or default
 // change the moment it happens, instead of waiting for its next look at the catalog.
-const CHANNEL = "aeon-models";
+const CHANNEL = "graft-models";
 
 export function announceModelsChanged(): void {
   try {
@@ -36,7 +36,7 @@ export function modelsPageUrl(base: string, from?: number | "panel"): string {
   return url.href;
 }
 
-/** Where "Return to Aeon" goes, read back from the Models page address. */
+/** Where "Return to Graft" goes, read back from the Models page address. */
 export function returnTarget(href: string | undefined): number | "panel" | undefined {
   if (!href) return undefined;
   const value = new URL(href).searchParams.get("return");

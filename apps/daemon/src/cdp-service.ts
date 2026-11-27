@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { CdpServer, type CdpTab } from "@browserkit/cdp";
 
 // The daemon's own CDP endpoint. It uses the same server and adapter contract as browserkit's
-// bridge, but every call travels to the extension through the executor socket Aeon already has.
+// bridge, but every call travels to the extension through the executor socket Graft already has.
 // Tabs opened by a CDP client belong to that client and close with it.
 
 export interface CdpInfo {

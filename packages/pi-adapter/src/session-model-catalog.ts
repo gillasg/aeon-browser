@@ -6,10 +6,10 @@ import {
   type ModelThinkingLevel,
 } from "@earendil-works/pi-ai";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import type { PiModelCatalog, PiModelOption } from "@aeon/domain";
+import type { PiModelCatalog, PiModelOption } from "@graft/domain";
 import { createLocalFixtureModel } from "./fixture-model.js";
 import { BackgroundCache } from "./background-cache.js";
-import { createAeonModelRuntime, refreshInBackground } from "./live-models.js";
+import { createGraftModelRuntime, refreshInBackground } from "./live-models.js";
 
 interface ModelCatalogOptions {
   sessionDirectory: string;
@@ -22,7 +22,7 @@ export async function readPiModelCatalog(options: ModelCatalogOptions): Promise<
   if (options.testModel && options.agentDirectory)
     return readFixtureCatalog(options.agentDirectory);
 
-  const runtime = await createAeonModelRuntime({
+  const runtime = await createGraftModelRuntime({
     ...(options.agentDirectory ? { agentDirectory: options.agentDirectory } : {}),
   });
   // The picker is the one place a stale list is visible; refresh it while the user reads.

@@ -196,7 +196,7 @@ function createRoutineTools(
         "fire: async (page) => { await page.getByRole('button', {name: 'Book'}).click(); return 'clicked'; }, " +
         "done: async (page, result) => result === 'clicked', wait: true}). " +
         "It fires with no model call and its result wakes you; the options are exactly at, url, prepare, fire, done, wait (help('snipe')). " +
-        "webhook {url, secret?} POSTs {routineId, title, value, firedAt} when the check passes (HMAC-SHA256 in X-Aeon-Signature when secret is set). webhookOnly delivers that and does not wake you. effect is read, write or irreversible (inferred when omitted).",
+        "webhook {url, secret?} POSTs {routineId, title, value, firedAt} when the check passes (HMAC-SHA256 in X-Graft-Signature when secret is set). webhookOnly delivers that and does not wake you. effect is read, write or irreversible (inferred when omitted).",
       routineCreate,
     ),
     tool(

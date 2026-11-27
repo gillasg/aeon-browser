@@ -14,7 +14,7 @@ import {
   type Route,
   type RouteHit,
 } from "@browserkit/site-mapper";
-import type { PiBrowserContextRecord, PiSessionEvent, PiSessionInput } from "@aeon/domain";
+import type { PiBrowserContextRecord, PiSessionEvent, PiSessionInput } from "@graft/domain";
 
 /** A word score below this stays with the model. */
 export const RUNG0_MIN_SCORE = 0.8;

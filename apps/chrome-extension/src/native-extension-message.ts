@@ -4,11 +4,11 @@ import {
   PageGrantScopeSchema,
   ProtocolVersionSchema,
   PiAttachmentSchema,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 export const NativePageGrantRequestSchema = z
   .object({
-    kind: z.literal("aeon.native.page-grant"),
+    kind: z.literal("graft.native.page-grant"),
     pageInstanceId: z.string().uuid(),
     scope: PageGrantScopeSchema,
   })
@@ -47,7 +47,7 @@ export const NativePageGrantResponseSchema = z.discriminatedUnion("ok", [
 
 export const NativeOpenChatRequestSchema = z
   .object({
-    kind: z.literal("aeon.native.open-chat"),
+    kind: z.literal("graft.native.open-chat"),
     chatId: ChatIdSchema,
     targetWindowId: z.number().int().nonnegative().optional(),
     reuseCurrentTab: z.boolean().optional(),
@@ -68,14 +68,14 @@ export const NativeOpenChatRequestSchema = z
 
 export const NativeTakeInitialSubmitRequestSchema = z
   .object({
-    kind: z.literal("aeon.native.take-initial-submit"),
+    kind: z.literal("graft.native.take-initial-submit"),
     chatId: ChatIdSchema,
   })
   .strict();
 
 export const NativeClaimBrowserContextSubmitRequestSchema = z
   .object({
-    kind: z.literal("aeon.native.claim-browser-context-submit"),
+    kind: z.literal("graft.native.claim-browser-context-submit"),
     chatId: ChatIdSchema,
     invocationId: z.string().uuid(),
   })
@@ -118,12 +118,12 @@ export const NativeOpenChatResponseSchema = z.discriminatedUnion("ok", [
 ]);
 
 export const NativeExtensionRequestSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("aeon.native.current-page") }).strict(),
-  z.object({ kind: z.literal("aeon.native.health") }).strict(),
-  z.object({ kind: z.literal("aeon.native.list-context-tabs") }).strict(),
+  z.object({ kind: z.literal("graft.native.current-page") }).strict(),
+  z.object({ kind: z.literal("graft.native.health") }).strict(),
+  z.object({ kind: z.literal("graft.native.list-context-tabs") }).strict(),
   z
     .object({
-      kind: z.literal("aeon.native.capture-page"),
+      kind: z.literal("graft.native.capture-page"),
       tabId: z.number().int().nonnegative(),
     })
     .strict(),
@@ -137,20 +137,20 @@ export const NativeExtensionRequestSchema = z.discriminatedUnion("kind", [
 export function pageGrantErrorMessage(code: string): string {
   switch (code) {
     case "WORKER_UNREACHABLE":
-      return "Aeon's background worker isn't running. Open chrome://extensions and click Reload on Aeon; its Errors button shows why it stopped.";
+      return "Graft's background worker isn't running. Open chrome://extensions and click Reload on Graft; its Errors button shows why it stopped.";
     case "WORKER_DEGRADED":
-      return "Part of Aeon's background worker failed to start. Open chrome://extensions and click Reload on Aeon; its Errors button shows what failed.";
+      return "Part of Graft's background worker failed to start. Open chrome://extensions and click Reload on Graft; its Errors button shows what failed.";
     case "HOST_MISSING":
-      return "Aeon's native host isn't installed, so Chrome can't reach the daemon. Run Aeon's setup again.";
+      return "Graft's native host isn't installed, so Chrome can't reach the daemon. Run Graft's setup again.";
     case "HOST_CONFIG_INVALID":
-      return "Aeon's native host registration is broken. Run Aeon's setup again to repair it.";
+      return "Graft's native host registration is broken. Run Graft's setup again to repair it.";
     case "DAEMON_OFFLINE":
-      return "Aeon's daemon hasn't answered for a minute. Run start-daemon.ps1 in %LOCALAPPDATA%\\Aeon to start it. Retrying…";
+      return "Graft's daemon hasn't answered for a minute. Run start-daemon.ps1 in %LOCALAPPDATA%\\Graft to start it. Retrying…";
     case "CONNECTION_TIMEOUT":
-      return "Aeon's daemon is starting or busy and didn't answer in time. Retrying…";
+      return "Graft's daemon is starting or busy and didn't answer in time. Retrying…";
     case "UPDATE_REQUIRED":
-      return "Aeon and its daemon are different versions. Update Aeon, then reload it in chrome://extensions.";
+      return "Graft and its daemon are different versions. Update Graft, then reload it in chrome://extensions.";
     default:
-      return "Aeon couldn't connect to its daemon. Retrying…";
+      return "Graft couldn't connect to its daemon. Retrying…";
   }
 }

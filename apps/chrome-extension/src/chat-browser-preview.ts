@@ -5,7 +5,7 @@
 // morphs it to the full width with the tab's title and a Jump to tab, and it melts away when the
 // work there ends.
 interface PreviewMessage {
-  kind: "aeon.browser.preview";
+  kind: "graft.browser.preview";
   chatId: string;
   tabId: number;
   view?: "split" | "thumbnails";
@@ -25,12 +25,12 @@ export function installBrowserPreview(
   const current = typeof chatId === "function" ? chatId : () => chatId;
   if (typeof chatId !== "function" && !chatId) return;
   const strip = document.createElement("div");
-  strip.className = "aeon-browser-previews";
+  strip.className = "graft-browser-previews";
   mount.append(strip);
   const cards = new Map<number, HTMLDivElement>();
   chrome.runtime.onMessage.addListener((message: PreviewMessage) => {
     const id = current();
-    if (message?.kind !== "aeon.browser.preview" || !id || message.chatId !== id) return;
+    if (message?.kind !== "graft.browser.preview" || !id || message.chatId !== id) return;
     strip.dataset.view = message.view ?? "split";
     if (!message.image) return melt(cards, message.tabId);
     show(cardFor(cards, message.tabId, id, strip), cards, message);
@@ -61,7 +61,7 @@ function show(
   if (message.latest) for (const other of cards.values()) other.classList.remove("latest");
   card.classList.toggle("latest", Boolean(message.latest));
   (card.querySelector("img") as HTMLImageElement).src = message.image ?? "";
-  (card.querySelector(".aeon-preview-title") as HTMLSpanElement).textContent =
+  (card.querySelector(".graft-preview-title") as HTMLSpanElement).textContent =
     message.title || hostOf(message.url) || "Working in another tab";
 }
 
@@ -76,14 +76,14 @@ function melt(cards: Map<number, HTMLDivElement>, tabId: number): void {
 
 function createCard(tabId: number, chatId: string, strip: HTMLElement): HTMLDivElement {
   const card = document.createElement("div");
-  card.className = "aeon-browser-preview";
+  card.className = "graft-browser-preview";
   card.innerHTML =
-    '<button type="button" class="aeon-preview-thumb" aria-expanded="false">' +
+    '<button type="button" class="graft-preview-thumb" aria-expanded="false">' +
     '<img alt="" /></button>' +
-    '<div class="aeon-preview-meta"><span class="aeon-preview-title"></span>' +
-    '<button type="button" class="aeon-preview-jump">Jump to tab</button></div>';
-  const thumb = card.querySelector(".aeon-preview-thumb") as HTMLButtonElement;
-  thumb.title = "Show what Aeon is doing in the other tab";
+    '<div class="graft-preview-meta"><span class="graft-preview-title"></span>' +
+    '<button type="button" class="graft-preview-jump">Jump to tab</button></div>';
+  const thumb = card.querySelector(".graft-preview-thumb") as HTMLButtonElement;
+  thumb.title = "Show what Graft is doing in the other tab";
   thumb.addEventListener("click", () => {
     const open = !card.classList.contains("expanded");
     for (const other of strip.children) other.classList.remove("expanded");
@@ -91,10 +91,10 @@ function createCard(tabId: number, chatId: string, strip: HTMLElement): HTMLDivE
     strip.classList.toggle("expanded", open);
     thumb.setAttribute("aria-expanded", String(open));
   });
-  card.querySelector(".aeon-preview-jump")?.addEventListener("click", () => {
+  card.querySelector(".graft-preview-jump")?.addEventListener("click", () => {
     if (card.dataset.view === "thumbnails")
       void chrome.runtime
-        .sendMessage({ kind: "aeon.browser.expand", chatId, tabId })
+        .sendMessage({ kind: "graft.browser.expand", chatId, tabId })
         .catch(() => undefined);
     else void jump(tabId);
   });

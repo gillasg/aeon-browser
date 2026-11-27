@@ -38,10 +38,10 @@ test("a webhook is signed, retried, then recorded", async () => {
   const body = calls[0].init.body;
   assert.deepEqual(Object.keys(JSON.parse(body)), ["routineId", "title", "value", "firedAt"]);
   assert.equal(
-    calls[0].init.headers["X-Aeon-Signature"],
+    calls[0].init.headers["X-Graft-Signature"],
     "sha256=" + createHmac("sha256", "s3cret").update(body).digest("hex"),
   );
-  assert.equal(calls[0].init.headers["X-Aeon-Signature"], signWebhook("s3cret", body));
+  assert.equal(calls[0].init.headers["X-Graft-Signature"], signWebhook("s3cret", body));
   assert.equal(calls[0].init.headers["content-type"], "application/json");
 });
 
@@ -55,7 +55,7 @@ test("three failures stay failed and an unsigned webhook has no signature", asyn
         slept.push(ms);
       },
       fetch: async (_url, init) => {
-        assert.equal(init.headers["X-Aeon-Signature"], undefined);
+        assert.equal(init.headers["X-Graft-Signature"], undefined);
         return { ok: false, status: 502 };
       },
     },
@@ -116,7 +116,7 @@ test("a passing check posts the webhook and can skip the agent", async () => {
     request.on("end", () => {
       posted.push({
         body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
-        signature: request.headers["x-aeon-signature"],
+        signature: request.headers["x-graft-signature"],
       });
       response.writeHead(204);
       response.end();

@@ -107,11 +107,11 @@ test("a build directory launches main.js and release fields survive", async () =
   }
 });
 
-test("a data directory chosen by AEON_DATA_DIR is accepted by the service", async () => {
+test("a data directory chosen by GRAFT_DATA_DIR is accepted by the service", async () => {
   const sandbox = createSandbox();
   try {
-    const custom = join(sandbox.root, "aeon-data");
-    sandbox.env.AEON_DATA_DIR = custom;
+    const custom = join(sandbox.root, "graft-data");
+    sandbox.env.GRAFT_DATA_DIR = custom;
     writeConfig(sandbox, { dataDirectory: custom });
     const loaded = await loadConfig(sandbox.config, options(sandbox));
     assert.equal(loaded.dataDirectory, custom);

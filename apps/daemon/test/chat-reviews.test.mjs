@@ -8,7 +8,7 @@ import { ChatReviews } from "../dist/chat-reviews.js";
 const parse = (result) => JSON.parse(result.content[0].text);
 
 test("chat reviews: marked chats leave the unreviewed list until they are used again", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-reviews-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-reviews-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const chats = [
     { chatId: "a", title: "A", updatedAt: "2026-10-15T10:00:00.000Z" },

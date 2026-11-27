@@ -1,4 +1,4 @@
-import { type ActivationId, type ChatId, type ChatOrigin, type ChatRecord } from "@aeon/domain";
+import { type ActivationId, type ChatId, type ChatOrigin, type ChatRecord } from "@graft/domain";
 
 export interface ChatRow {
   chat_id: string;

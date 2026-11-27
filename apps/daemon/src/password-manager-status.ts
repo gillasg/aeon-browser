@@ -1,7 +1,7 @@
 import { activeProvider, providerFor, readConfig } from "@browserkit/credentials";
 import { bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 
-// Which password manager answers Aeon's sign-in requests, and whether it is unlocked. Only the
+// Which password manager answers Graft's sign-in requests, and whether it is unlocked. Only the
 // provider's name and state leave this module: never a session key, a password or an item.
 
 export type PasswordManagerState = "unlocked" | "locked" | "not_set_up" | "unavailable";

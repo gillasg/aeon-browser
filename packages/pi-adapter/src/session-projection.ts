@@ -15,8 +15,8 @@ import {
   type PiSessionHandle,
   type PiSessionReference,
   type PiToolStepEvent,
-} from "@aeon/domain";
-import { RewindSchema, StepEventSchema, type Rewind, type StepEvent } from "@aeon/protocol";
+} from "@graft/domain";
+import { RewindSchema, StepEventSchema, type Rewind, type StepEvent } from "@graft/protocol";
 import { resultText, safeJsonObject } from "./pi-content-projection.js";
 import { submitToPi, createSessionControls } from "./session-controls.js";
 import { createPiThreadDelivery } from "./pi-thread-delivery.js";
@@ -37,7 +37,7 @@ export function wrapPiSession(
   reference: PiSessionReference,
   chatId: ChatId,
   extensionUi: ExtensionUiBridge,
-  getMcpServers: () => readonly import("@aeon/domain").PiMcpServerStatus[],
+  getMcpServers: () => readonly import("@graft/domain").PiMcpServerStatus[],
 ): PiSessionHandle {
   const threadDelivery = createPiThreadDelivery(session, manager);
   const routineSupport: PiRoutinePort = createPiRoutineSupport(session, manager, chatId);

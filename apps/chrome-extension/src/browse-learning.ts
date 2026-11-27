@@ -7,10 +7,10 @@ import { askCore } from "./companion-requests.js";
 // finished for that long), every 20 seconds as a fallback, and on each page load. Never on for
 // every tab: one switch, one tab, until it is turned off or the tab closes.
 
-const KEY = (tabId: number) => `aeon-learn:${tabId}`;
+const KEY = (tabId: number) => `graft-learn:${tabId}`;
 /** The last session's result, so an orb that only sees learning end (the user closed Chrome's
  * debugger bar) can still say what was learned. */
-const DONE_KEY = (tabId: number) => `aeon-learned:${tabId}`;
+const DONE_KEY = (tabId: number) => `graft-learned:${tabId}`;
 
 /**
  * What a teaching tab started from, per site it visited, so the count is the APIs this session
@@ -29,18 +29,18 @@ const timers = new Map<number, number>();
 const idleTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
 export type BrowseLearning =
-  | { kind: "aeon.learn.set"; tabId: number; on: boolean }
-  | { kind: "aeon.learn.get"; tabId: number };
+  | { kind: "graft.learn.set"; tabId: number; on: boolean }
+  | { kind: "graft.learn.get"; tabId: number };
 
 export function installBrowseLearning(): void {
   chrome.runtime.onMessage.addListener((request: unknown, sender, sendResponse) => {
     const message = request as BrowseLearning | null;
     if (sender.id !== chrome.runtime.id || typeof message?.tabId !== "number") return;
-    if (message.kind === "aeon.learn.get") {
+    if (message.kind === "graft.learn.get") {
       void isLearning(message.tabId).then(sendResponse);
       return true;
     }
-    if (message.kind !== "aeon.learn.set") return;
+    if (message.kind !== "graft.learn.set") return;
     const change = message.on
       ? start(message.tabId).then(() => ({ found: 0 }))
       : stop(message.tabId);
@@ -141,7 +141,7 @@ async function tabSite(tabId: number): Promise<string> {
   return tab?.url && /^https?:/.test(tab.url) ? new URL(tab.url).hostname : "";
 }
 
-/** Starts Teach on a tab from the worker itself (Manage → Sites → Teach Aeon). */
+/** Starts Teach on a tab from the worker itself (Manage → Sites → Teach Graft). */
 export function startTeaching(tabId: number): Promise<void> {
   return start(tabId);
 }

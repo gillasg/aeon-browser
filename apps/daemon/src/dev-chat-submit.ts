@@ -1,5 +1,5 @@
-import { asChatId } from "@aeon/domain";
-import type { DaemonUiRequest } from "@aeon/protocol";
+import { asChatId } from "@graft/domain";
+import type { DaemonUiRequest } from "@graft/protocol";
 import { ChatService } from "./chat-service.js";
 import { sendDevChatMessage } from "./dev-chat-send.js";
 import { type WebSocket } from "ws";

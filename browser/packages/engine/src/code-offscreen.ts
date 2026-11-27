@@ -3,7 +3,7 @@ import { parseGoogleResults } from "./google-results.js";
 
 // The offscreen document does only what needs a document: tab recording (MediaRecorder), the
 // clipboard swap a paste uses, and HTML parsing with the browser's own parser. browser_code
-// realms run in the local Aeon process, never here: the extension evaluates no code.
+// realms run in the local Graft process, never here: the extension evaluates no code.
 
 let clipboardBackup: { text: string; html: string } | undefined;
 let clipboardBusy = false;
@@ -41,7 +41,7 @@ async function clipboardRestore(): Promise<Record<string, unknown>> {
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (message?.target !== "aeon-code-offscreen" || sender.id !== chrome.runtime.id) return;
+  if (message?.target !== "graft-code-offscreen" || sender.id !== chrome.runtime.id) return;
   if (message.kind === "ping") {
     reply({ ok: true });
     return;

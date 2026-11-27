@@ -13,7 +13,7 @@ import { createLocalFixtureModel } from "../dist/fixture-model.js";
 import { ExtensionUiBridge } from "../dist/extension-ui-bridge.js";
 import { performance } from "node:perf_hooks";
 test("a connecting MCP server does not impose a ten-second wait on a local first prompt", async () => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-mcp-startup-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-mcp-startup-"));
   const agentDir = join(root, "agent"),
     server = join(root, "waiting.mjs");
   await mkdir(agentDir);

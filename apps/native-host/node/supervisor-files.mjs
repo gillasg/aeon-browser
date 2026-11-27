@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 
 const MAX_LOG_BYTES = 262144;
 const MESSAGE_LIMIT = 2000;
-const FAILURE_PREFIX = "AEON_DAEMON_FAILED ";
+const FAILURE_PREFIX = "GRAFT_DAEMON_FAILED ";
 
 /** The daemon's own start failure. Any other supervisor line is not a cause. */
 export function startupFailureMessage(line) {

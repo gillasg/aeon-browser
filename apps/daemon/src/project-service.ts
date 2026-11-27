@@ -1,5 +1,5 @@
-import { SqliteProjectStore } from "@aeon/store";
-import type { ProjectDto } from "@aeon/protocol";
+import { SqliteProjectStore } from "@graft/store";
+import type { ProjectDto } from "@graft/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";

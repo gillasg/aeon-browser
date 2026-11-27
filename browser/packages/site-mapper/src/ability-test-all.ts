@@ -1,4 +1,4 @@
-// `aeon abilities test --all`. Dry mode checks stored cases without calling a site, so unit
+// `graft abilities test --all`. Dry mode checks stored cases without calling a site, so unit
 // tests and a machine with no browser can still run it.
 
 import { readdir } from "node:fs/promises";

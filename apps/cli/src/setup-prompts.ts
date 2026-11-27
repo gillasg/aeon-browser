@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import type { FlagResult } from "./chrome-flags.js";
 
-// Three opt-in questions at the end of `aeon setup`. They only run on a terminal without --yes, so
+// Three opt-in questions at the end of `graft setup`. They only run on a terminal without --yes, so
 // CI and scripted installs never wait on input.
 
 export interface PromptDeps {
@@ -37,19 +37,19 @@ export async function setupPrompts(deps: PromptDeps): Promise<string[]> {
   ) {
     const result = deps.applyFlags();
     deps.say(
-      `${result.done ? "Done" : "Skipped"}: ${result.detail}. Undo with \`aeon setup --undo-flags\`.`,
+      `${result.done ? "Done" : "Skipped"}: ${result.detail}. Undo with \`graft setup --undo-flags\`.`,
     );
   }
   const agents = await deps.detectAgents().catch(() => []);
   if (
     agents.length &&
-    (await question(`Connect Aeon MCP to your coding agents (${agents.join(", ")})?`, true))
+    (await question(`Connect Graft MCP to your coding agents (${agents.join(", ")})?`, true))
   )
     await deps.connectAgents();
   const models = await deps.connectedModels().catch(() => undefined);
   if (models === 0) {
     if (await question("Sign in to an AI model now?", true)) await deps.login();
-    else deps.say("Later: connect an AI model with `aeon login`.");
+    else deps.say("Later: connect an AI model with `graft login`.");
   }
   return asked;
 }

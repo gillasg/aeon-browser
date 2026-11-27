@@ -1,16 +1,16 @@
 # `events.json` — the recording log
 
-Every folder `aeon record start` creates gets an `events.json`. It is the contract between Aeon's
-recording and any editor: it says what Aeon did, when, and what clip it happened in. Times are
+Every folder `graft record start` creates gets an `events.json`. It is the contract between Graft's
+recording and any editor: it says what Graft did, when, and what clip it happened in. Times are
 milliseconds. `t` is on the **clip clock**: `t = 0` is the clip's first frame, so an editor can draw
 a zoom or a cursor at `t` and it lands on the right frame. `at` is the wall-clock (epoch ms) from
-Aeon's trace, for auditing. Points are page CSS px unless named `window` (pixels in the captured
+Graft's trace, for auditing. Points are page CSS px unless named `window` (pixels in the captured
 window image, when the window was calibrated).
 
 ```json
 {
   "version": 1,
-  "recorder": "aeon",
+  "recorder": "graft",
   "clock": "clip",
   "clip": {
     "file": "clip.mp4",
@@ -57,10 +57,10 @@ window image, when the window was calibrated).
   ],
   "terminal": {
     "version": 1,
-    "command": "aeon tool browser_code ...",
+    "command": "graft tool browser_code ...",
     "startedAt": 1731000002000,
     "events": [
-      { "t": 2000, "kind": "in", "text": "aeon tool browser_code ..." },
+      { "t": 2000, "kind": "in", "text": "graft tool browser_code ..." },
       { "t": 2400, "kind": "out", "text": "done\\n" }
     ]
   },
@@ -73,9 +73,9 @@ window image, when the window was calibrated).
 - `clip`: size (`width`×`height` in captured px), `fps`, `startedAt` (epoch ms of frame t=0), `durationMs`,
   `frames`, and `file` (`clip.mp4`, or `takes/` with `--tabs`). `source` is `window`, `screen` or
   `tabs`. With `--tabs`, `clips[]` lists one entry per recorded tab (`tabId` on each). When the
-  capture DPR is known (`AEON_RECORDING_DPR`, set by `setup-recording-chrome.sh`), `dpr`,
+  capture DPR is known (`GRAFT_RECORDING_DPR`, set by `setup-recording-chrome.sh`), `dpr`,
   `logicalWidth` and `logicalHeight` are present: `width = logicalWidth × dpr`.
-- `events[]`: each thing Aeon did:
+- `events[]`: each thing Graft did:
   - `kind`: `click`, `type`, `press`, `scroll`, `navigate`, `tab-switch`.
   - `t`: ms from clip t=0; `at`: epoch ms of the same moment.
   - `tabId`: the tab it happened in.
@@ -92,15 +92,15 @@ window image, when the window was calibrated).
 - `soundCues` (optional): `{t, kind}` with `kind` `key`, `trigger`, `start`, `needs-you`, `done`,
   `arrive` or `shutter`, derived from real events: one `key` per typed character, a `trigger` on
   each click and on Enter, plus the `--cue` of each mark.
-- `marks` (optional): beats a script named with `aeon record mark <name>`, as
+- `marks` (optional): beats a script named with `graft record mark <name>`, as
   `{name, t, label?, box?, windowBox?, cue?}`. `t` is on the clip clock. `--selector` records the
   element's `box` (page CSS px) and `windowBox` (clip px: toolbar offset added, scaled by DPR);
-  `--box x,y,w,h` gives a `windowBox` directly. `aeon record wait --for selector|url|idle|chat`
-  blocks on the real condition between marks, and `aeon record run "<prompt>"` records one prompt
+  `--box x,y,w,h` gives a `windowBox` directly. `graft record wait --for selector|url|idle|chat`
+  blocks on the real condition between marks, and `graft record run "<prompt>"` records one prompt
   start to finish in one command.
 - `note`: present when the action list is incomplete (e.g. no trace was attached at start). The clip
   metadata and frames are still valid.
-- `terminal`: optional asciinema-style cast from `aeon record terminal --out dir --run "<command>"`.
+- `terminal`: optional asciinema-style cast from `graft record terminal --out dir --run "<command>"`.
   `command` is what ran, `startedAt` is its wall clock, and `events[]` are `{t, kind, text}` with
   `kind` `in` (the command), `out` or `err`. `t` is on the same clip clock. The kit draws this as a
   pane beside the tab. It shows only what the command printed.
@@ -109,7 +109,7 @@ window image, when the window was calibrated).
 
 - Zooms, speed-ups and the drawn cursor are derived **only** from `events[]`. Do not invent an
   action, a location or a speed-up that is not in the log.
-- A speed-up must carry a visible label (`4×`). Never compress an action Aeon actually took
+- A speed-up must carry a visible label (`4×`). Never compress an action Graft actually took
   time over without saying so.
 - On a real-window recording the real pointer is already in the frames: draw no second cursor.
 - Which tab shows when is an edit decision (a timeline over `clips[]`), never a re-recording.

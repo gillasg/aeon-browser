@@ -6,13 +6,13 @@ import test from "node:test";
 import { createBrowserCodeTool } from "../dist/browser-code-tool.js";
 
 // A password manager's answer goes from the machine to the browser engine, which types it into
-// the page. It must never be recorded by Aeon: not in the tool result the model rereads, not in
+// the page. It must never be recorded by Graft: not in the tool result the model rereads, not in
 // its details (the trace's steps), and not in a progress update.
 
 const PASSWORD = "hunter2-credential-secret";
 
 async function fakeBitwarden(t) {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-bw-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-bw-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const outputs = join(dir, "outputs.json");
   await writeFile(
@@ -63,7 +63,7 @@ async function withPath(dir, work) {
 
 test("a credential or site-rules answer never lands in a result, step or progress update", async (t) => {
   const toolDirectory = await fakeBitwarden(t);
-  const dataDirectory = await mkdtemp(join(tmpdir(), "aeon-signin-"));
+  const dataDirectory = await mkdtemp(join(tmpdir(), "graft-signin-"));
   t.after(() => rm(dataDirectory, { recursive: true, force: true }));
   const previousHome = process.env.BROWSERKIT_HOME;
   process.env.BROWSERKIT_HOME = dataDirectory;
@@ -116,7 +116,7 @@ test("a credential or site-rules answer never lands in a result, step or progres
   assert.deepEqual(siteRules, rules);
   assert.ok(updates.length > 0, "the cell reported progress");
 
-  // ...and Aeon kept none of it.
+  // ...and Graft kept none of it.
   const recorded = JSON.stringify([result.content, result.details, updates]);
   assert.ok(!recorded.includes(PASSWORD), "the password is not recorded");
   assert.doesNotMatch(recorded, /bank\.example|blocked\.example|test-session/);

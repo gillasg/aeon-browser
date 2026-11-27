@@ -1,5 +1,5 @@
-import { DaemonUiRequestSchema } from "@aeon/protocol";
-import type { ChatSurfaceProps, LoadedResourcesState } from "@aeon/ui";
+import { DaemonUiRequestSchema } from "@graft/protocol";
+import type { ChatSurfaceProps, LoadedResourcesState } from "@graft/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 export class ChatResourcesController {

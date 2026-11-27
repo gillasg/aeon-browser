@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { isChatOrigin, type ChatListFilter } from "@aeon/domain";
+import { isChatOrigin, type ChatListFilter } from "@graft/domain";
 
 // Marks which chats have been reviewed (their traces and tool calls read), with the findings saved
 // next to the mark. A chat used again after its review counts as unreviewed again.
@@ -20,10 +20,10 @@ type Content = { content: { type: "text"; text: string }[]; isError: boolean };
 export const CHAT_REVIEW_TOOL = {
   name: "chat_review",
   description: [
-    "Track which Aeon chats have been reviewed (trace and tool calls read).",
+    "Track which Graft chats have been reviewed (trace and tool calls read).",
     "action=list: of the 100 most recent chats, those not reviewed yet, or used again since their review (newest first; limit, default 20; all=true lists reviewed ones too).",
     "Narrow the list with origin (user, cli, mcp, companion, agent, routine, unknown) and since/until (YYYY-MM-DD, by creation day).",
-    "action=mark: mark chatId reviewed; note is saved as the findings (reviews/<chatId>.md in Aeon's data folder).",
+    "action=mark: mark chatId reviewed; note is saved as the findings (reviews/<chatId>.md in Graft's data folder).",
     "action=get: the review for chatId. action=unmark: clear it.",
   ].join("\n"),
   inputSchema: {

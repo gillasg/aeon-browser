@@ -1,4 +1,4 @@
-// The real wiring of `aeon record shoot` and `aeon record ui`: plan steps become the same
+// The real wiring of `graft record shoot` and `graft record ui`: plan steps become the same
 // start/stop/mark/wait/run calls a hand-written recording script would make, in one process.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -15,7 +15,7 @@ import { parsePlan, shoot, SHOOT_USAGE, shootTarget, type ShootDeps } from "./re
 import { attachTerminal, readRecording, runTerminal } from "./record-terminal.js";
 import { liveUiDeps, performUi, uiCommand } from "./record-ui.js";
 
-const SESSION = "aeon-record";
+const SESSION = "graft-record";
 const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 function flags(args: Args, extra: Record<string, string | true>): Args {
@@ -144,7 +144,7 @@ function directorDeps(
   };
 }
 
-/** `aeon record shoot <plan.json>`. */
+/** `graft record shoot <plan.json>`. */
 export async function shootCommand(
   host: DaemonHost,
   steps: RecordSteps,
@@ -180,7 +180,7 @@ export async function shootCommand(
   return 0;
 }
 
-/** `aeon record ui <action>`; --mark records a mark in the active recording at the beat. */
+/** `graft record ui <action>`; --mark records a mark in the active recording at the beat. */
 export function recordUi(host: DaemonHost, steps: RecordSteps, args: Args): Promise<number> {
   const name = typeof args.flags.mark === "string" ? args.flags.mark : undefined;
   return uiCommand(

@@ -3,7 +3,7 @@ import {
   type ChatId,
   type ThreadCoordinationStore,
   type ThreadDeliveryState,
-} from "@aeon/domain";
+} from "@graft/domain";
 import { ChatService } from "./chat-service.js";
 import { integer, record, requiredString } from "./thread-coordination-utils.js";
 

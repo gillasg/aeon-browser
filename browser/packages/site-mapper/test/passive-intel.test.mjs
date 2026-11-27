@@ -91,7 +91,7 @@ test("calls on a fixed clock lose their page step; user-driven calls keep it", (
   assert.equal(items[0].exchange.step, 'click "Buy"', "inputs are not mutated");
 });
 
-test("x-aeon-observations reports per-field presence over the samples", () => {
+test("x-graft-observations reports per-field presence over the samples", () => {
   const samples = [
     { responseBody: JSON.stringify({ id: 1, name: "a", tags: [{ k: 1 }] }) },
     { responseBody: JSON.stringify({ id: 2, tags: [] }) },
@@ -158,16 +158,16 @@ async function writeHar(dir) {
   return path;
 }
 
-test("OpenAPI exports carry x-aeon-observations from the capture", async (t) => {
+test("OpenAPI exports carry x-graft-observations from the capture", async (t) => {
   const dir = await tempHome(t);
   const model = await modelFromCapture(await writeHar(dir));
   const doc = toOpenApi(model);
   const op = Object.values(doc.paths["/api/products/{productId}"])[0];
-  assert.equal(op["x-aeon-observations"].sampleCount, 3);
-  assert.equal(op["x-aeon-observations"].fields["/price"].presentCount, 2);
+  assert.equal(op["x-graft-observations"].sampleCount, 3);
+  assert.equal(op["x-graft-observations"].fields["/price"].presentCount, 2);
 });
 
-test("aeon re har --emit client writes a zero-dependency typed client that works", async (t) => {
+test("graft re har --emit client writes a zero-dependency typed client that works", async (t) => {
   const dir = await tempHome(t);
   const file = await writeHar(dir);
   const out = join(dir, "client");
@@ -195,21 +195,21 @@ test("aeon re har --emit client writes a zero-dependency typed client that works
   assert.deepEqual(JSON.parse(stdout.trim()), { id: 1002, name: "Desk" });
 });
 
-test("aeon re har --emit mock replays recorded responses and never forwards", async (t) => {
+test("graft re har --emit mock replays recorded responses and never forwards", async (t) => {
   const dir = await tempHome(t);
   const result = await emitFromHar(await writeHar(dir), { emit: "mock" });
   t.after(() => result.server.close());
   const one = await fetch(`${result.server.url}/api/products/1003`);
   assert.equal(one.status, 200);
   assert.equal((await one.json()).name, "Chair");
-  assert.ok(one.headers.get("x-aeon-mock"));
+  assert.ok(one.headers.get("x-graft-mock"));
   const fallback = await fetch(`${result.server.url}/api/products/9999`);
   assert.equal(fallback.status, 200, "an unseen id answers with a recorded sample");
   const miss = await fetch(`${result.server.url}/api/unknown`);
   assert.equal(miss.status, 404);
 });
 
-test("aeon re har --emit pack writes a site pack whose OpenAPI has observations", async (t) => {
+test("graft re har --emit pack writes a site pack whose OpenAPI has observations", async (t) => {
   const dir = await tempHome(t);
   const out = join(dir, "shop.zip");
   const result = await emitFromHar(await writeHar(dir), { emit: "pack", out });
@@ -219,5 +219,5 @@ test("aeon re har --emit pack writes a site pack whose OpenAPI has observations"
   const files = unzipSync(await readFile(out));
   const name = Object.keys(files).find((path) => /openapi\.json$/.test(path));
   assert.ok(name, Object.keys(files).join(","));
-  assert.match(strFromU8(files[name]), /x-aeon-observations/);
+  assert.match(strFromU8(files[name]), /x-graft-observations/);
 });

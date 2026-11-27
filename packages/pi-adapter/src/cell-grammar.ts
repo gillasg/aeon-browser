@@ -1,4 +1,4 @@
-import { actionLine, StepEventSchema } from "@aeon/protocol";
+import { actionLine, StepEventSchema } from "@graft/protocol";
 import { partialListLine } from "@browserkit/engine/read-guards";
 import { rateLimitWarning } from "@browserkit/engine/rate-limit";
 import { formatCellNow } from "./first-turn.js";
@@ -197,7 +197,7 @@ function present(line: string): boolean {
 }
 
 function clockLine(body: CellText, now: Date): string {
-  const zone = process.env.AEON_SURFACE_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const zone = process.env.GRAFT_SURFACE_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const mine = body.tabStats?.mine?.length ?? 0;
   const total = body.tabStats?.total && body.tabStats.total > 0 ? body.tabStats.total : 8;
   const elapsed = body.startedAt === undefined ? 0 : Math.max(0, now.getTime() - body.startedAt);

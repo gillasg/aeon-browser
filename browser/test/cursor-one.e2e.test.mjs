@@ -23,8 +23,8 @@ const run = promisify(execFile);
 const pageHtml = `<title>Forge</title>
 <button id="go" onclick="document.title='continued'">Go</button>
 <script>
-  window.dispatchEvent(new Event("aeon-cursor-stop"));
-  window.dispatchEvent(new Event("aeon-cursor-transcript"));
+  window.dispatchEvent(new Event("graft-cursor-stop"));
+  window.dispatchEvent(new Event("graft-cursor-transcript"));
   document.documentElement.dataset.forged = "1";
 </script>`;
 
@@ -91,7 +91,7 @@ function repl(url) {
       const path = hosts[0] && hosts[0].__s && hosts[0].__s.markPath ? hosts[0].__s.markPath.slice(0, 9) : "";
       return hosts.length + " " + path;
     })));
-    console.log("HIDDEN " + (await page.evaluate(() => !document.querySelector("#aeon-agent-cursor"))));`;
+    console.log("HIDDEN " + (await page.evaluate(() => !document.querySelector("#graft-agent-cursor"))));`;
 }
 
 function chromeArgs(profile) {

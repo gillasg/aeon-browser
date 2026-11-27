@@ -167,7 +167,7 @@ export function jsonServerValue(server: McpServer): { command: string; args: str
   return { command: server.command, args: server.args };
 }
 
-/** OpenCode's local server object. `mcp` is a map of names, which is the shape Aeon already writes. */
+/** OpenCode's local server object. `mcp` is a map of names, which is the shape Graft already writes. */
 export function opencodeValue(server: McpServer): {
   type: "local";
   command: string[];

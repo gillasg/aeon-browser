@@ -3,7 +3,7 @@
 //   into the toolbar badge, and every island shows the total.
 // - A result seen in the island marks the chat read, so Chrome doesn't also notify about it.
 
-const NEEDS_PREFIX = "aeon-orb-needs:";
+const NEEDS_PREFIX = "graft-orb-needs:";
 
 export function needsKey(tabId: number): string {
   return NEEDS_PREFIX + tabId;
@@ -22,7 +22,7 @@ export function isNeedsKey(key: string): boolean {
 /** Tells Core the result was seen here, the way chat tabs do, so no notification follows. */
 export async function markSeen(chatId: string, viewId: string): Promise<void> {
   if (document.visibilityState !== "visible") return;
-  const key = "aeon-completion-id-" + chatId;
+  const key = "graft-completion-id-" + chatId;
   const completionId = ((await chrome.storage.session.get(key))[key] as string | undefined) ?? null;
   await chrome.runtime
     .sendMessage({ kind: "core.attention.read", chatId, completionId, viewId, visible: true })

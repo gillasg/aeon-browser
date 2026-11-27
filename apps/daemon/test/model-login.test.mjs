@@ -6,13 +6,13 @@ import test from "node:test";
 import { openModelLogin } from "../dist/model-login.js";
 
 test("the Models page service starts once, answers its API with the token, and serves no page", async (t) => {
-  const agentDir = mkdtempSync(join(tmpdir(), "aeon-pi-"));
+  const agentDir = mkdtempSync(join(tmpdir(), "graft-pi-"));
   const url = await openModelLogin(agentDir, () => undefined);
   const token = new URL(url).hash.slice("#token=".length);
   const api = (path, init = {}) =>
     fetch(new URL(path, url), {
       ...init,
-      headers: { "x-aeon-login-token": token, ...(init.headers ?? {}) },
+      headers: { "x-graft-login-token": token, ...(init.headers ?? {}) },
     });
   t.after(async () => {
     await api("/api/done", { method: "POST" }).catch(() => undefined);

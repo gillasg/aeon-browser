@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { hashRoute } from "./manage-route.js";
 import { EmptyState } from "./empty-state.js";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { SiteFacts } from "./ability-source.js";
 import { ActionNote } from "./management-automations.js";
@@ -10,9 +10,9 @@ import { Segmented } from "./segmented.js";
 import { SiteActions, SiteAbilities, SiteRunForm, formatWhen } from "./management-sites.js";
 import { SessionActions } from "./management-sessions.js";
 
-// Sites: one page per site Aeon knows (mapped, signed in, watched, or with a rule). Each has four
+// Sites: one page per site Graft knows (mapped, signed in, watched, or with a rule). Each has four
 // tabs: its Site APIs (calls with no page), its Replays (recorded steps and scripts), its Boosts,
-// and the account it uses with the user's rules, plus Teach Aeon. Absorbs the old Skills, Site
+// and the account it uses with the user's rules, plus Teach Graft. Absorbs the old Skills, Site
 // sessions and Blocked sites pages.
 
 type Site = NonNullable<ManagementSnapshotDto["sites"]>[number];
@@ -162,7 +162,7 @@ function entriesOf(props: ManagementSurfaceProps): SiteEntry[] {
 function SiteSearch({ query, onQuery }: { query: string; onQuery(value: string): void }) {
   return (
     <input
-      className="aeon-search"
+      className="graft-search"
       type="search"
       value={query}
       placeholder="Search sites"
@@ -198,8 +198,8 @@ function SiteList({
   if (!entries.length)
     return (
       <EmptyState
-        text="Aeon learns a site as it works there, and gets faster each time."
-        action="Teach Aeon a site"
+        text="Graft learns a site as it works there, and gets faster each time."
+        action="Teach Graft a site"
         {...(onSuggest ? { onAction: () => onSuggest("Learn how to search on ") } : {})}
       />
     );
@@ -259,23 +259,23 @@ function SiteDetail({
   return (
     <section className="site-detail" aria-label={entry.host}>
       <header className="site-detail-head">
-        <button type="button" className="aeon-button" onClick={onBack}>
+        <button type="button" className="graft-button" onClick={onBack}>
           ← Sites
         </button>
         <h2>{entry.host}</h2>
         {props.onTeachSite && (
           <button
             type="button"
-            className="site-teach aeon-button"
+            className="site-teach graft-button"
             data-tone="primary"
             onClick={() => props.onTeachSite?.(entry.host)}
           >
-            Teach Aeon
+            Teach Graft
           </button>
         )}
       </header>
       <nav
-        className="site-tabs aeon-segmented"
+        className="site-tabs graft-segmented"
         role="tablist"
         aria-label={`${entry.host} sections`}
       >
@@ -358,7 +358,7 @@ function CanDo({
       <SiteAbilities site={shown} onTry={tryAbility(host, suggest)} />
     ) : (
       <p className="management-empty">
-        No replays yet. Teach Aeon, or let it work here, and the steps it repeats become one.
+        No replays yet. Teach Graft, or let it work here, and the steps it repeats become one.
       </p>
     );
   return (
@@ -369,7 +369,7 @@ function CanDo({
           <span className="management-subtle"> · updated {formatWhen(site.updatedAt)}</span>
         </p>
       ) : (
-        <p className="management-subtle">Comes with Aeon: these work on your own account.</p>
+        <p className="management-subtle">Comes with Graft: these work on your own account.</p>
       )}
       {shown.abilities.length > 0 && (
         <SiteAbilities site={shown} onTry={tryAbility(host, suggest)} />
@@ -417,7 +417,7 @@ function NotLearned({
   return (
     <>
       <p className="management-empty">
-        Aeon hasn&rsquo;t learned this site yet. It learns as it works here; learning it now takes
+        Graft hasn&rsquo;t learned this site yet. It learns as it works here; learning it now takes
         about two minutes in a background tab, and makes the next task a few seconds.
       </p>
       {suggest && (

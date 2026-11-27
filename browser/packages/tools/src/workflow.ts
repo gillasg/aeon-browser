@@ -2,7 +2,7 @@
 // retries and recorded results. The engine is host-agnostic: a host supplies the action
 // vocabulary (browser steps, site API calls, file writes) and the engine handles arguments,
 // variables, repetition, conditions, delays and the run record. Nothing in here touches a
-// browser or the network, so it can run in the bridge, in Aeon's daemon, or in a test.
+// browser or the network, so it can run in the bridge, in Graft's daemon, or in a test.
 
 export type WorkflowValue =
   string | number | boolean | null | WorkflowValue[] | { [key: string]: WorkflowValue };

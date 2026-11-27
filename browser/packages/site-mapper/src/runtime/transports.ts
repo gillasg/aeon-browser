@@ -157,7 +157,7 @@ if (__tab) { try { if ((await __tab.inspect(() => location.origin)) !== ${JSON.s
 if (!__tab) {
   // The user's own open tab of this origin first (the active one if several): no cold start, no new tab.
   try {
-    const __same = (await browser.tabs()).filter((t) => { try { return !t.heldByOther && !t.aeonUi && new URL(t.url).origin === ${JSON.stringify(origin)}; } catch { return false; } });
+    const __same = (await browser.tabs()).filter((t) => { try { return !t.heldByOther && !t.graftUi && new URL(t.url).origin === ${JSON.stringify(origin)}; } catch { return false; } });
     const __own = __same.find((t) => t.active) || __same[0];
     if (__own) { await browser.attachTab(__own.target); __tab = __own; }
   } catch { __tab = undefined; }
@@ -204,7 +204,7 @@ ${borrow}await __tab.inspect(${run})`;
  * Chrome's, and a site that sees a Chrome UA on a non-Chrome handshake treats it as a forged
  * client (429s, walls). A call that needs to look like the browser goes through the page.
  */
-export const DIRECT_USER_AGENT = "aeon/0.2";
+export const DIRECT_USER_AGENT = "graft/0.2";
 
 /** Plain HTTP from Node, with the user's exported cookies and an honest user agent. */
 export class DirectTransport implements Transport {

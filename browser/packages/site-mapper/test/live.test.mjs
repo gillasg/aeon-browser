@@ -305,7 +305,7 @@ test("a plain 418 is not a rate limit", async () => {
   assert.equal(plain.sent(), 1);
 });
 
-test("after mapping, one runnable aeon call line with the observed params", async () => {
+test("after mapping, one runnable graft call line with the observed params", async () => {
   const { firstCallLine } = await import("../dist/index.js");
   const op = (id, role, bucket, extra = {}) => ({ id, role, bucket, params: [], ...extra });
   const line = firstCallLine("shop.test", [
@@ -321,6 +321,6 @@ test("after mapping, one runnable aeon call line with the observed params", asyn
       graphql: { variables: [{ name: "limit", examples: [5] }] },
     }),
   ]);
-  assert.equal(line, `aeon call shop.test searchProducts '{"q":"lamp'\\''s","limit":5}'`);
+  assert.equal(line, `graft call shop.test searchProducts '{"q":"lamp'\\''s","limit":5}'`);
   assert.equal(firstCallLine("shop.test", [op("buy", "action", "high")]), undefined);
 });

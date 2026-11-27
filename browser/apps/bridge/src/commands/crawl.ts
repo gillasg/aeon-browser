@@ -362,7 +362,7 @@ export const crawlCommand: Command = {
   --exclude <patterns>   never these
   --formats <list>       markdown (default), fitMarkdown, text, links, metadata, tables, pageData
   --render <mode>        auto (default), static, browser
-  --browser <name>       Chrome profile to render in (see aeon browsers)
+  --browser <name>       Chrome profile to render in (see graft browsers)
   --query <text>         rank pages and keep the relevant parts
   --site                 start from the site's root instead of this page
   --api <site>:<op>      read a mapped site's operation instead of pages

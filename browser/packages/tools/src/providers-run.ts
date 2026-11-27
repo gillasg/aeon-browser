@@ -1,4 +1,4 @@
-// Provider and media calls through a host's code runner: browserkit's bridge, Aeon's daemon, or
+// Provider and media calls through a host's code runner: browserkit's bridge, Graft's daemon, or
 // any other host that can run one browser_code cell. The transport logic stays in providers.ts;
 // this layer only supplies the cells and unwraps their answers.
 

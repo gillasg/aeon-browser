@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { ChatService } from "./chat-service.js";
-import { PiSdkSessionAdapter } from "@aeon/pi-adapter";
-import { openChatStore } from "@aeon/store";
+import { PiSdkSessionAdapter } from "@graft/pi-adapter";
+import { openChatStore } from "@graft/store";
 import { ThreadCoordinationService } from "./thread-coordination-service.js";
 import { backfillChatOrigins } from "./chat-origin-backfill.js";
 

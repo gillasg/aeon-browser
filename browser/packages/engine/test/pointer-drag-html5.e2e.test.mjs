@@ -47,7 +47,7 @@ test(
   "an HTML5 sortable list reorders through an intercepted drag",
   { skip: !process.env.REQUIRE_E2E && !(chromePath && existsSync(chromePath)) },
   async () => {
-    const profile = await mkdtemp(join(tmpdir(), "aeon-html5-drag-"));
+    const profile = await mkdtemp(join(tmpdir(), "graft-html5-drag-"));
     const chrome = spawn(
       chromePath,
       [

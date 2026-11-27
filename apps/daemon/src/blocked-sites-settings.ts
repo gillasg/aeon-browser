@@ -8,7 +8,7 @@ import {
 
 // The one blocked-sites list, in browserkit's home (site-rules.json). The CLI and Settings both
 // go through the daemon to it; agent code and tools never reach this module. `local` is the list
-// an older Aeon kept in the extension: it is merged once, then the file is the only copy.
+// an older Graft kept in the extension: it is merged once, then the file is the only copy.
 
 export interface BlockedSitesChange {
   action: "read" | "add" | "remove";

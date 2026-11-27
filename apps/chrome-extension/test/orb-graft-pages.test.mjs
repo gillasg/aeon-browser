@@ -10,10 +10,10 @@ const app = fileURLToPath(new URL("../", import.meta.url));
 const base = "chrome-extension://abc/";
 
 async function load() {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-pages-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-orb-pages-"));
   const outfile = join(directory, "bundle.mjs");
   await build({
-    entryPoints: [join(app, "src/orb/orb-aeon-pages.ts")],
+    entryPoints: [join(app, "src/orb/orb-graft-pages.ts")],
     outfile,
     bundle: true,
     platform: "node",
@@ -24,7 +24,7 @@ async function load() {
   return module;
 }
 
-test("the cursor goes on web pages and Aeon's own tabs, never on its frames or chrome://", async () => {
+test("the cursor goes on web pages and Graft's own tabs, never on its frames or chrome://", async () => {
   const pages = await load();
   assert.equal(pages.isCursorPage("https://example.com/", base), true);
   assert.equal(pages.isCursorPage(base + "home.html", base), true);
@@ -42,7 +42,7 @@ test("a chat tab's cursor box follows that chat; the side panel's framed chat do
   assert.equal(pages.pageChatId(base + "home.html"), undefined);
 });
 
-test("every Aeon tab page loads the cursor's content script itself", async () => {
+test("every Graft tab page loads the cursor's content script itself", async () => {
   for (const page of ["home", "chat", "viewer", "site-scripts"]) {
     const html = await readFile(join(app, page + ".html"), "utf8");
     assert.match(html, /<script src="orb-content\.js"><\/script>/, page);

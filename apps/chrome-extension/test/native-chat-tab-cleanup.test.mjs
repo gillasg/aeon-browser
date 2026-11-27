@@ -7,8 +7,8 @@ import test from "node:test";
 const ext = fileURLToPath(new URL("../src/", import.meta.url));
 const engine = fileURLToPath(new URL("../../../browser/packages/engine/src/", import.meta.url));
 
-// Eval runs leave one chat tab per task: Core opens a chat tab for each `aeon run`, and the
-// harness stops the chat but never has a tab id for that view. If Aeon does not track it, no
+// Eval runs leave one chat tab per task: Core opens a chat tab for each `graft run`, and the
+// harness stops the chat but never has a tab id for that view. If Graft does not track it, no
 // cleanup path can close it and the background pages pile up.
 
 test("chat tabs opened for a run are registered with the agent tab tracker", async () => {
@@ -22,7 +22,7 @@ test("chat tabs opened for a run are registered with the agent tab tracker", asy
   assert.match(
     source,
     /if \(active\) expectNextAgentActivation/,
-    "a shown chat tab's own activation is Aeon's",
+    "a shown chat tab's own activation is Graft's",
   );
   assert.match(
     source,

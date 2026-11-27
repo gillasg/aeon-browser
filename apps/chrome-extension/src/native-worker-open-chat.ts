@@ -1,4 +1,4 @@
-import { NativeOpenChatSchema } from "@aeon/protocol";
+import { NativeOpenChatSchema } from "@graft/protocol";
 import {
   expectAgentActivation,
   expectNextAgentActivation,
@@ -7,7 +7,7 @@ import {
 import { recordChatTab } from "@browserkit/engine/native-browser-takes";
 import { chatUrl, findExistingChat } from "./native-worker-tabs.js";
 
-// The Aeon CLI/MCP starts chats through Core; Core asks the extension to show each one as a tab
+// The Graft CLI/MCP starts chats through Core; Core asks the extension to show each one as a tab
 // so the user can watch it work. Background by default; an open tab is reused, never duplicated.
 export function handleOpenChatMessage(candidate: unknown, socket: WebSocket): boolean {
   const message = NativeOpenChatSchema.safeParse(candidate);
@@ -25,7 +25,7 @@ export function handleOpenChatMessage(candidate: unknown, socket: WebSocket): bo
     );
     return true;
   }
-  // The chat's tab id goes back, so `aeon open` can print it.
+  // The chat's tab id goes back, so `graft open` can print it.
   void openChat(chatId, active).then(
     (tabId) => replyOpened(socket, chatId, tabId),
     () => replyOpened(socket, chatId, undefined),
@@ -54,7 +54,7 @@ function replyOpened(socket: WebSocket, chatId: string, tabId: number | undefine
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * aeon run --typed: open the chat's tab in the background, record it as one of the chat's takes
+ * graft run --typed: open the chat's tab in the background, record it as one of the chat's takes
  * (when recordAgentTabs is on), and have the page type the prompt into its own composer. The
  * prompt is sent by the caller afterwards, so it never counts as the user typing.
  */
@@ -68,7 +68,7 @@ async function typeIntoChat(chatId: string, text: string): Promise<{ recording: 
   for (let attempt = 0; ; attempt++) {
     try {
       const answer = (await chrome.runtime.sendMessage({
-        kind: "aeon.chat.type",
+        kind: "graft.chat.type",
         chatId,
         text,
       })) as { typed?: boolean } | undefined;
@@ -109,9 +109,9 @@ async function openChat(chatId: string, active: boolean): Promise<number | undef
     active,
     ...(window?.id !== undefined ? { windowId: window.id } : {}),
   });
-  // A chat tab is opened by Aeon for its own run, whether it is shown or in the background. Track
+  // A chat tab is opened by Graft for its own run, whether it is shown or in the background. Track
   // both: otherwise a batch shown in front leaves one live chat page per task, and the idle sweep
-  // cannot close a tab it does not know about. Aeon's own activation does not mark it as seen, so
+  // cannot close a tab it does not know about. Graft's own activation does not mark it as seen, so
   // a tab the user later clicks is still kept; only the user's own attention protects a chat tab.
   if (created.id !== undefined) {
     if (active) expectAgentActivation(created.id);

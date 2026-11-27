@@ -5,10 +5,10 @@ import { closeSharedBridge, errorKind } from "@browserkit/tools/site-to-api";
 import { has, parseArgs } from "browserkit/dist/args.js";
 import { out, printError } from "browserkit/dist/output.js";
 import { commandHelp, usageText, type Command } from "browserkit/dist/usage.js";
-import { aeonCommands } from "./commands.js";
-import { DaemonHost, installAeonCliHost } from "./host.js";
+import { graftCommands } from "./commands.js";
+import { DaemonHost, installGraftCliHost } from "./host.js";
 
-// The full command line: the chat commands, and everything browserkit's command line can do, through Aeon's daemon
+// The full command line: the chat commands, and everything browserkit's command line can do, through Graft's daemon
 // and the user's own Chrome. Exit codes match browserkit's: 2 needs input, 3 signed out, 4 no
 // browser, 5 the API failed, 6 a bot wall answered.
 
@@ -30,29 +30,29 @@ function printVersion(): number {
   ) as {
     version?: string;
   };
-  out(`aeon ${manifest.version ?? "unknown"}`);
+  out(`graft ${manifest.version ?? "unknown"}`);
   return 0;
 }
 const host = new DaemonHost();
 
 async function main(argv: string[]): Promise<number> {
-  installAeonCliHost(host);
-  const commands = aeonCommands(host);
+  installGraftCliHost(host);
+  const commands = graftCommands(host);
   if (VERSION.has(argv[0] ?? "")) return printVersion();
   if (HELP.has(argv[0] ?? "")) return printHelp(commands, argv.slice(1));
   const args = parseArgs(argv);
   const [name, ...rest] = args.positional;
   if (!name) {
-    out(usageText(commands, "aeon"));
+    out(usageText(commands, "graft"));
     return 0;
   }
   const command = commands.find((item) => item.name === name);
   if (!command) {
-    out(usageText(commands, "aeon"));
+    out(usageText(commands, "graft"));
     return 1;
   }
   if (has(args, "help")) {
-    out(commandHelp(command, "aeon"));
+    out(commandHelp(command, "graft"));
     return 0;
   }
   // `--browser <name>` works on every command that reaches Chrome (boosts, map, cookies, record
@@ -66,7 +66,7 @@ async function main(argv: string[]): Promise<number> {
 function printHelp(commands: Command[], rest: string[]): number {
   const name = rest[0];
   const command = name ? commands.find((item) => item.name === name) : undefined;
-  out(command ? commandHelp(command, "aeon") : usageText(commands, "aeon"));
+  out(command ? commandHelp(command, "graft") : usageText(commands, "graft"));
   return command || !name ? 0 : 1;
 }
 
@@ -81,9 +81,9 @@ main(process.argv.slice(2)).then(
     await exitAfterFlush(code);
   },
   async (error: unknown) => {
-    // Errors come from browserkit's commands too; in Aeon they must not name another product.
+    // Errors come from browserkit's commands too; in Graft they must not name another product.
     const renamed =
-      error instanceof Error ? new Error(error.message.replace(/\bbrowserkit\b/g, "aeon")) : error;
+      error instanceof Error ? new Error(error.message.replace(/\bbrowserkit\b/g, "graft")) : error;
     if (process.argv.includes("--json")) {
       out(
         JSON.stringify({

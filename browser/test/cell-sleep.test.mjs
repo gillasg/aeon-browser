@@ -15,12 +15,12 @@ function realm(settleMs) {
       return { data: { settled: true } };
     },
   });
-  vm.runInContext(browserSleepApi, context, { filename: "aeon-api.js" });
+  vm.runInContext(browserSleepApi, context, { filename: "graft-api.js" });
   return {
     cell: (code) =>
-      vm.runInContext(`(async () => { ${code} })()`, context, { filename: "aeon-cell.js" }),
+      vm.runInContext(`(async () => { ${code} })()`, context, { filename: "graft-cell.js" }),
     api: (code) =>
-      vm.runInContext(`(async () => { ${code} })()`, context, { filename: "aeon-api.js" }),
+      vm.runInContext(`(async () => { ${code} })()`, context, { filename: "graft-api.js" }),
     report: () => vm.runInContext("__sleepReport()", context),
   };
 }
@@ -61,11 +61,11 @@ test("sleep(ms) waits the full time and never longer than 60s", async () => {
     console,
     __step: async () => ({ data: { settled: false } }),
   });
-  vm.runInContext(browserSleepApi, context, { filename: "aeon-api.js" });
+  vm.runInContext(browserSleepApi, context, { filename: "graft-api.js" });
   await vm.runInContext(
     `(async () => { await sleep(3000); await sleep(120000); await sleep(-5); await sleep("20"); })()`,
     context,
-    { filename: "aeon-cell.js" },
+    { filename: "graft-cell.js" },
   );
   assert.deepEqual(delays, [3000, 60000, 0, 20]);
 });

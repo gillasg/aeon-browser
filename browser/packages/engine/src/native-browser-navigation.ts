@@ -208,7 +208,7 @@ function sendOpts(label: string, method: string, params: unknown): { label: stri
 }
 
 // The settle probe keeps its observer in its own world, not the page's: the page cannot list a
-// world it does not own, so no `__aeon*` global (and no observer) shows up in a check. One world
+// world it does not own, so no `__graft*` global (and no observer) shows up in a check. One world
 // per document: a navigation drops the context and the next probe makes another.
 const QUIET_WORLD = "browserkit-quiet";
 interface QuietWorld {
@@ -317,12 +317,12 @@ async function probeOnce(debuggee: chrome.debugger.Debuggee): Promise<PageProbe 
 function domQuietProbe() {
   // Runs in the tab's own isolated world (or, on a page that has none, its own window). The
   // observer and its state never touch the page's globals in the normal case.
-  // Aeon's own layers (labels, annotations, the agent cursor) are not the page changing.
-  const OVERLAY = "[data-aeon-overlay],[data-browserkit-overlay]";
+  // Graft's own layers (labels, annotations, the agent cursor) are not the page changing.
+  const OVERLAY = "[data-graft-overlay],[data-browserkit-overlay]";
   const host = window as unknown as {
-    __aeonQuiet?: { last: number; changes: number; document: string; observer: MutationObserver };
+    __graftQuiet?: { last: number; changes: number; document: string; observer: MutationObserver };
   };
-  if (!host.__aeonQuiet) {
+  if (!host.__graftQuiet) {
     const state = {
       last: performance.now(),
       changes: 0,
@@ -366,14 +366,14 @@ function domQuietProbe() {
       },
       true,
     );
-    host.__aeonQuiet = state;
+    host.__graftQuiet = state;
   }
   return {
     ready: document.readyState,
-    idle: performance.now() - host.__aeonQuiet.last,
+    idle: performance.now() - host.__graftQuiet.last,
     url: location.href,
-    document: host.__aeonQuiet.document,
-    changes: host.__aeonQuiet.changes,
+    document: host.__graftQuiet.document,
+    changes: host.__graftQuiet.changes,
   };
   function blurCommit(target: EventTarget | null) {
     return (

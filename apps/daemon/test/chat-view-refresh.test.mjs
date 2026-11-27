@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ChatService, closeProjectServices } from "./chat-service-fixture.mjs";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 test("native branch replacement reaches all subscribers with a fresh cursor", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-view-refresh-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-view-refresh-"));
   const store = openChatStore(directory);
   try {
     const service = new ChatService({ dataDirectory: directory, store, pi: new FakePiPort() });

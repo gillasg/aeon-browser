@@ -10,13 +10,13 @@ test("a failed daemon start is reported, and status does not invent a session", 
     chromeCommandLines: [],
     modelSignedIn: true,
     loginTask: true,
-    dirs: [{ name: "Aeon", path: "/tmp/aeon", writable: true }],
-    startError: "Refusing /tmp/aeon: it is owned by uid 65534, not 1000.",
+    dirs: [{ name: "Graft", path: "/tmp/graft", writable: true }],
+    startError: "Refusing /tmp/graft: it is owned by uid 65534, not 1000.",
   });
   const daemon = checks.find((check) => check.name === "daemon");
   assert.equal(daemon.status, "fail");
   assert.match(daemon.detail, /owned by uid 65534/);
-  assert.match(daemon.fix, /Chrome with Aeon/);
+  assert.match(daemon.fix, /Chrome with Graft/);
   assert.equal(startFailureOf({ state: "ready", error: "old cause" }), undefined);
   assert.equal(startFailureOf({ state: "restarting", error: "  " }), undefined);
   assert.match(notRunningMessage("owned by uid 65534"), /Last start failed: owned by uid 65534/);

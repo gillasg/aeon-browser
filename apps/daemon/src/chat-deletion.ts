@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import type { ChatId, ChatRecord, ChatStore, PiSessionHandle } from "@aeon/domain";
+import type { ChatId, ChatRecord, ChatStore, PiSessionHandle } from "@graft/domain";
 import type { ChatCommandGate } from "./chat-command-gate.js";
 export async function deleteStoredChat(
   store: ChatStore,
@@ -27,7 +27,7 @@ export async function deleteStoredChat(
 
 /**
  * A deleted chat's own files go with it: its workspace folder and its Pi session file. Only
- * folders Aeon made for this chat (`workspaces/<chatId>`) are removed, never a project folder the
+ * folders Graft made for this chat (`workspaces/<chatId>`) are removed, never a project folder the
  * user pointed a chat at, and a session file another chat still uses stays.
  */
 export async function removeChatFiles(

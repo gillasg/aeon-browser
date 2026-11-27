@@ -15,7 +15,7 @@ import {
 import { CHROME_FLAGS } from "../dist/doctor-checks.js";
 import { setupPrompts, yes } from "../dist/setup-prompts.js";
 
-const temp = () => mkdtempSync(join(tmpdir(), "aeon-flags-"));
+const temp = () => mkdtempSync(join(tmpdir(), "graft-flags-"));
 const count = (text, flag) => text.split(flag).length - 1;
 
 const DESKTOP = `[Desktop Entry]
@@ -59,13 +59,13 @@ test("patchDesktop is idempotent", () => {
   assert.equal(patchDesktop(once), once);
 });
 
-test("macOS: creates Aeon Chrome.app with the flags and undo removes it", () => {
+test("macOS: creates Graft Chrome.app with the flags and undo removes it", () => {
   const home = temp();
   const env = { platform: "darwin", home, data: home };
   applyChromeFlags(env);
   const app = macApp(env);
-  const exe = join(app, "Contents", "MacOS", "aeon-chrome");
-  assert.match(readFileSync(join(app, "Contents", "Info.plist"), "utf8"), /aeon-chrome/);
+  const exe = join(app, "Contents", "MacOS", "graft-chrome");
+  assert.match(readFileSync(join(app, "Contents", "Info.plist"), "utf8"), /graft-chrome/);
   const script = readFileSync(exe, "utf8");
   for (const flag of CHROME_FLAGS) assert.equal(count(script, flag), 1);
   if (process.platform !== "win32") assert.ok(statSync(exe).mode & 0o100);

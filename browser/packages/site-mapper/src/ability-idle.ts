@@ -1,4 +1,4 @@
-// While Aeon is idle, saved abilities are checked a few at a time in the background. Reads run
+// While Graft is idle, saved abilities are checked a few at a time in the background. Reads run
 // their small stored cases; writes get a read-only rehearsal and never reach the site. A failure
 // caused by the site changing (drift) is re-learned with the existing build path and saved as a new
 // version, with the old one kept in history for restore. Sign-outs, bot walls and rate limits are

@@ -9,7 +9,7 @@ test(
   "a core lock left by a killed daemon does not block the next start",
   { skip: process.platform === "win32" ? "Unix socket file" : false },
   async () => {
-    const directory = mkdtempSync(join(tmpdir(), "aeon-core-lock-"));
+    const directory = mkdtempSync(join(tmpdir(), "graft-core-lock-"));
     const socket = join(directory, "core-owner.sock");
     try {
       writeFileSync(socket, "stale");

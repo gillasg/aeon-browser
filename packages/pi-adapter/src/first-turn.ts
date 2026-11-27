@@ -1,6 +1,6 @@
-import type { PiSessionInput } from "@aeon/domain";
+import type { PiSessionInput } from "@graft/domain";
 
-// The first model turn. Same lines a chat sends and aeon-eval's path-choice d8 turn expects.
+// The first model turn. Same lines a chat sends and graft-eval's path-choice d8 turn expects.
 
 export interface AbilityMatch {
   site: string;

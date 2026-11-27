@@ -1,6 +1,6 @@
 import type { CoreAttention } from "./core-attention.js";
 import { attachAttentionSocket, handleAttentionMessage } from "./core-attention-socket.js";
-import { asChatId } from "@aeon/domain";
+import { asChatId } from "@graft/domain";
 import {
   BrowserExecutorHeartbeatReplySchema,
   BrowserExecutorHeartbeatSchema,
@@ -12,7 +12,7 @@ import {
   PageGrantIssueResponseSchema,
   SUPPORTED_PROTOCOL_VERSION,
   type PageGrantIssueRequest,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket, type RawData } from "ws";
 import { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 import { ChatService } from "./chat-service.js";
@@ -36,11 +36,11 @@ export function attachNativeExecutor(
 ): void {
   if (attention) attachAttentionSocket(socket, attention);
   process.stderr.write(
-    `[aeon-native] executor authenticated: instance=${executor.clientInstanceId} run=${executor.browserRunId}\n`,
+    `[graft-native] executor authenticated: instance=${executor.clientInstanceId} run=${executor.browserRunId}\n`,
   );
   socket.once("close", (code, reason) =>
     process.stderr.write(
-      `[aeon-native] executor link closed: code=${code} reason=${String(reason)}\n`,
+      `[graft-native] executor link closed: code=${code} reason=${String(reason)}\n`,
     ),
   );
   const state = { inventoryReady: false };

@@ -2,12 +2,12 @@ import { useEffect, useState, type ReactElement } from "react";
 
 export function SidebarResizer(props: { open: boolean; onCollapse(): void }): ReactElement | null {
   const [width, setWidth] = useState(() => {
-    const saved = Number(localStorage.getItem("aeon-sidebar-width"));
+    const saved = Number(localStorage.getItem("graft-sidebar-width"));
     return saved >= 180 && saved <= 480 ? saved : 264;
   });
   useEffect(() => {
-    document.documentElement.style.setProperty("--aeon-sidebar-width", width + "px");
-    localStorage.setItem("aeon-sidebar-width", String(width));
+    document.documentElement.style.setProperty("--graft-sidebar-width", width + "px");
+    localStorage.setItem("graft-sidebar-width", String(width));
   }, [width]);
   if (!props.open) return null;
   const resize = (value: number): void => {

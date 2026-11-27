@@ -1,9 +1,9 @@
-import { CoreModelCompleteRequestSchema, CoreModelCompleteResultSchema } from "@aeon/protocol";
+import { CoreModelCompleteRequestSchema, CoreModelCompleteResultSchema } from "@graft/protocol";
 import { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import { messageOf } from "./core-browser.js";
 
-// The CLI's AI commands (describe, edit, name, find, map --explore) use Aeon's own model: the
+// The CLI's AI commands (describe, edit, name, find, map --explore) use Graft's own model: the
 // same default the next chat would use, with tool calls, so they do the work instead of asking
 // the caller for a model the way a standalone command line has to.
 

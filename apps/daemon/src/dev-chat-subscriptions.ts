@@ -1,4 +1,4 @@
-import { asChatId, PiSessionUnavailableError, type ChatId } from "@aeon/domain";
+import { asChatId, PiSessionUnavailableError, type ChatId } from "@graft/domain";
 import {
   ChatCloseViewRequestSchema,
   ChatEventMessageSchema,
@@ -7,7 +7,7 @@ import {
   ChatSubscriptionFailedMessageSchema,
   ChatViewClosedMessageSchema,
   type DaemonUiRequest,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket } from "ws";
 import { ChatService } from "./chat-service.js";
 import { type PublishedChatEvent } from "./chat-event-hub.js";
@@ -217,7 +217,7 @@ function logRepaired(chatId: string, kind: string, issues: readonly ParseIssue[]
     ),
   ];
   process.stderr.write(
-    `Aeon daemon: dropped unknown fields from a ${kind} chat event for ${chatId}: ${fields.slice(0, 5).join(", ")}\n`,
+    `Graft daemon: dropped unknown fields from a ${kind} chat event for ${chatId}: ${fields.slice(0, 5).join(", ")}\n`,
   );
 }
 
@@ -225,7 +225,7 @@ function logDropped(chatId: string, kind: string, issues: readonly ParseIssue[])
   const issue = issues[0];
   const detail = issue ? `${issue.path.join(".") || "event"}: ${issue.message}` : "invalid event";
   process.stderr.write(
-    `Aeon daemon: dropped a ${kind} chat event for ${chatId}: ${detail.slice(0, 300)}\n`,
+    `Graft daemon: dropped a ${kind} chat event for ${chatId}: ${detail.slice(0, 300)}\n`,
   );
 }
 

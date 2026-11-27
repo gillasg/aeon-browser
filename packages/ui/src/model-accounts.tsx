@@ -20,15 +20,15 @@ export function ModelAccounts(props: ModelAccountsProps): ReactElement {
     return () => props.onHide();
   }, []);
   return (
-    <section className="aeon-page model-accounts" aria-labelledby="models-heading">
-      <header className="aeon-page-head">
+    <section className="graft-page model-accounts" aria-labelledby="models-heading">
+      <header className="graft-page-head">
         <h2 id="models-heading">Models</h2>
         <p>
-          Sign in once. Aeon, the Pi CLI and other Pi apps on this computer share the same logins.
+          Sign in once. Graft, the Pi CLI and other Pi apps on this computer share the same logins.
         </p>
       </header>
       {props.error && (
-        <p className="aeon-page-error" role="status">
+        <p className="graft-page-error" role="status">
           {props.error}
         </p>
       )}
@@ -37,7 +37,7 @@ export function ModelAccounts(props: ModelAccountsProps): ReactElement {
       ) : props.state ? (
         <AccountLists {...props} state={props.state} />
       ) : (
-        <p className="aeon-page-empty">Loading providers…</p>
+        <p className="graft-page-empty">Loading providers…</p>
       )}
     </section>
   );
@@ -55,9 +55,9 @@ function AccountLists(props: ModelAccountsProps & { state: ModelAccountsState })
         />
       )}
       {connected.length > 0 && (
-        <section className="aeon-page-section" aria-labelledby="models-connected">
+        <section className="graft-page-section" aria-labelledby="models-connected">
           <h2 id="models-connected">Connected</h2>
-          <ul className="aeon-rows">
+          <ul className="graft-rows">
             {connected.map((provider) => (
               <ConnectedRow key={provider.id} provider={provider} onSignOut={props.onSignOut} />
             ))}
@@ -88,9 +88,9 @@ function ReadyBanner({
     <div className="model-ready" role="status">
       <span>
         <strong>You're ready.</strong>{" "}
-        {model ? `Aeon uses ${model} by default.` : "Pick a model in any chat."}
+        {model ? `Graft uses ${model} by default.` : "Pick a model in any chat."}
       </span>
-      <button type="button" className="aeon-primary-button" onClick={onStartChat}>
+      <button type="button" className="graft-primary-button" onClick={onStartChat}>
         {label ?? "Start chatting"}
       </button>
     </div>
@@ -116,16 +116,16 @@ function ConnectedRow({
   onSignOut(provider: ModelProvider): void;
 }): ReactElement {
   return (
-    <li className="aeon-row">
+    <li className="graft-row">
       <ProviderIcon provider={provider.id} />
-      <span className="aeon-row-main">
+      <span className="graft-row-main">
         <strong>
           {provider.name} <Badge text={connectionBadge(provider)} />
         </strong>
         <span>{connectionText(provider)}</span>
       </span>
       {provider.connection?.stored && (
-        <button type="button" className="aeon-quiet-button" onClick={() => onSignOut(provider)}>
+        <button type="button" className="graft-quiet-button" onClick={() => onSignOut(provider)}>
           Sign out
         </button>
       )}
@@ -148,12 +148,12 @@ function DefaultModel({
     ? `${state.defaultModel.provider}/${state.defaultModel.model}`
     : "";
   return (
-    <section className="aeon-page-section" aria-labelledby="models-default">
+    <section className="graft-page-section" aria-labelledby="models-default">
       <h2 id="models-default">Default model</h2>
-      <label className="aeon-field-row">
+      <label className="graft-field-row">
         <span>Used when nothing else is chosen: other extensions, the CLI and helpers.</span>
         <select
-          className="aeon-select"
+          className="graft-select"
           value={chosen}
           onChange={(event) => {
             const value = event.target.value;
@@ -198,7 +198,7 @@ function Subscriptions({
     );
   if (!oauth.length) return null;
   return (
-    <section className="aeon-page-section" aria-labelledby="models-subscriptions">
+    <section className="graft-page-section" aria-labelledby="models-subscriptions">
       <h2 id="models-subscriptions">Sign in with an account</h2>
       <div className="model-tiles">
         {oauth.map(({ provider, method }) => (
@@ -235,12 +235,12 @@ function ApiKeys({
   );
   const shown = filterKeyProviders(withKeys, query, popularOnly);
   return (
-    <section className="aeon-page-section" aria-labelledby="models-keys">
+    <section className="graft-page-section" aria-labelledby="models-keys">
       <h2 id="models-keys">API keys</h2>
       <div className="model-key-tools">
         <input
           type="search"
-          className="aeon-search"
+          className="graft-search"
           placeholder={`Search ${withKeys.length} providers`}
           aria-label="Search providers"
           value={query}
@@ -255,14 +255,14 @@ function ApiKeys({
           </button>
         </div>
       </div>
-      <ul className="aeon-rows">
+      <ul className="graft-rows">
         {shown.map((provider) => (
           <KeyRow key={provider.id} provider={provider} onStart={onStart} />
         ))}
-        {!shown.length && <li className="aeon-page-empty">No provider matches that search.</li>}
+        {!shown.length && <li className="graft-page-empty">No provider matches that search.</li>}
       </ul>
       {popularOnly && !query.trim() && (
-        <button type="button" className="aeon-link-button" onClick={() => setPopularOnly(false)}>
+        <button type="button" className="graft-link-button" onClick={() => setPopularOnly(false)}>
           Show all {withKeys.length} providers
         </button>
       )}
@@ -299,9 +299,9 @@ function KeyRow({
 }): ReactElement {
   const saved = provider.connection?.type === "api_key" && provider.connection.stored;
   return (
-    <li className="aeon-row">
+    <li className="graft-row">
       <ProviderIcon provider={provider.id} />
-      <span className="aeon-row-main">
+      <span className="graft-row-main">
         <strong>
           {provider.name}{" "}
           <Badge text={POPULAR_PROVIDERS.includes(provider.id) ? "Popular" : undefined} />
@@ -317,7 +317,7 @@ function KeyRow({
       </span>
       <button
         type="button"
-        className="aeon-quiet-button"
+        className="graft-quiet-button"
         onClick={() => onStart(provider, "api_key")}
       >
         {saved ? "Replace key" : "Add key"}

@@ -121,7 +121,7 @@ test(
     writeConfig(exiting);
     const first = await startSupervisor(exiting, {
       FAKE_DAEMON_MODE: "exit-immediately",
-      AEON_PHASE_TIMEOUT_MS: "1500",
+      GRAFT_PHASE_TIMEOUT_MS: "1500",
     });
     try {
       await waitFor(() => starts(exiting) >= 2, 10_000);
@@ -135,7 +135,7 @@ test(
     writeConfig(stalling);
     const second = await startSupervisor(stalling, {
       FAKE_DAEMON_MODE: "stall",
-      AEON_PHASE_TIMEOUT_MS: "300",
+      GRAFT_PHASE_TIMEOUT_MS: "300",
     });
     try {
       await waitFor(() => starts(stalling) >= 2, 10_000);
@@ -155,8 +155,8 @@ test(
     writeConfig(sandbox);
     const supervisor = await startSupervisor(sandbox, {
       FAKE_DAEMON_MODE: "phase-forever",
-      AEON_PHASE_TIMEOUT_MS: "5000", // per-phase never fires: lines keep resetting it
-      AEON_BOOT_TIMEOUT_MS: "400",
+      GRAFT_PHASE_TIMEOUT_MS: "5000", // per-phase never fires: lines keep resetting it
+      GRAFT_BOOT_TIMEOUT_MS: "400",
     });
     try {
       await waitFor(() => starts(sandbox) >= 2, 10_000);

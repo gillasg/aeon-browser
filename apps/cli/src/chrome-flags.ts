@@ -2,14 +2,14 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { CHROME_FLAGS, mergeChromeFlags } from "@aeon/protocol";
+import { CHROME_FLAGS, mergeChromeFlags } from "@graft/protocol";
 
 // Opt-in, reversible Chrome launch flags. Linux: a user copy of google-chrome.desktop with the flags
 // on every Exec= line. Windows: the user's Chrome shortcuts get the flags appended, old arguments
-// saved for undo. macOS: Chrome.app is never touched (codesigning); a small "Aeon Chrome.app"
+// saved for undo. macOS: Chrome.app is never touched (codesigning); a small "Graft Chrome.app"
 // launcher in ~/Applications starts Chrome with the flags instead.
 
-export const MANAGED_MARK = "# managed-by: aeon-chrome-flags";
+export const MANAGED_MARK = "# managed-by: graft-chrome-flags";
 const LINUX_SOURCES = [
   "/usr/share/applications/google-chrome.desktop",
   "/var/lib/snapd/desktop/applications/google-chrome.desktop",
@@ -18,7 +18,7 @@ const LINUX_SOURCES = [
 export interface FlagEnv {
   platform: NodeJS.Platform;
   home: string;
-  /** Aeon's data directory, for the Windows undo record. */
+  /** Graft's data directory, for the Windows undo record. */
   data: string;
   linuxSources?: string[];
   /** Runs a PowerShell script; returns stdout. */
@@ -52,7 +52,7 @@ export function patchDesktop(text: string, flags: readonly string[] = CHROME_FLA
 
 const linuxTarget = (env: FlagEnv) =>
   join(env.home, ".local", "share", "applications", "google-chrome.desktop");
-export const macApp = (env: FlagEnv): string => join(env.home, "Applications", "Aeon Chrome.app");
+export const macApp = (env: FlagEnv): string => join(env.home, "Applications", "Graft Chrome.app");
 const windowsState = (env: FlagEnv) => join(env.data, "chrome-shortcuts.json");
 
 function applyLinux(env: FlagEnv): FlagResult {
@@ -81,9 +81,9 @@ export function macLauncherScript(flags: readonly string[] = CHROME_FLAGS): stri
 const MAC_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Aeon Chrome</string>
-<key>CFBundleIdentifier</key><string>com.aeon.chrome-launcher</string>
-<key>CFBundleExecutable</key><string>aeon-chrome</string>
+<key>CFBundleName</key><string>Graft Chrome</string>
+<key>CFBundleIdentifier</key><string>com.graft.chrome-launcher</string>
+<key>CFBundleExecutable</key><string>graft-chrome</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 </dict></plist>
 `;
@@ -93,10 +93,10 @@ function applyMac(env: FlagEnv): FlagResult {
   const contents = join(app, "Contents");
   mkdirSync(join(contents, "MacOS"), { recursive: true });
   writeFileSync(join(contents, "Info.plist"), MAC_PLIST);
-  const exe = join(contents, "MacOS", "aeon-chrome");
+  const exe = join(contents, "MacOS", "graft-chrome");
   writeFileSync(exe, macLauncherScript());
   chmodSync(exe, 0o755);
-  return { done: true, detail: `created ${app}; open Chrome with "Aeon Chrome" from Spotlight` };
+  return { done: true, detail: `created ${app}; open Chrome with "Graft Chrome" from Spotlight` };
 }
 
 function undoMac(env: FlagEnv): FlagResult {

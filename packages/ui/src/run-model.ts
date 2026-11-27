@@ -1,8 +1,8 @@
-import type { PiMessageDto, PiSessionEventDto } from "@aeon/protocol";
+import type { PiMessageDto, PiSessionEventDto } from "@graft/protocol";
 import type { AnswerFooter } from "./answer-lines.js";
 import { failureTitle } from "./failure-title.js";
 
-// One agent run, built only from the chat stream in @aeon/protocol. The orb's island and the
+// One agent run, built only from the chat stream in @graft/protocol. The orb's island and the
 // shared run cards (step timeline, approval, result) all read it.
 //
 // A tool-end without a path uses the tool name (inferPath). A tool-end without durationMs uses

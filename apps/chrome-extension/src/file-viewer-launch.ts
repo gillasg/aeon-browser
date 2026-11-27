@@ -17,7 +17,7 @@ const Detail = z
   })
   .strict();
 export function installFileViewerLinks(chatId: string, currentPath?: () => string): void {
-  window.addEventListener("aeon.open-file", (event) => {
+  window.addEventListener("graft.open-file", (event) => {
     if (!(event instanceof CustomEvent)) return;
     const detail = Detail.safeParse(event.detail);
     if (!detail.success) return;
@@ -34,7 +34,7 @@ async function launch(chatId: string, detail: z.infer<typeof Detail>): Promise<v
   let diff: string | undefined;
   if (detail.original !== undefined && detail.modified !== undefined) {
     diff = crypto.randomUUID();
-    await chrome.storage.session.set({ ["aeon-viewer-" + diff]: { ...detail, chatId } });
+    await chrome.storage.session.set({ ["graft-viewer-" + diff]: { ...detail, chatId } });
   }
   const target = {
     chatId,

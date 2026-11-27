@@ -3,8 +3,8 @@ import {
   DaemonUiRequestSchema,
   type DaemonUiResponse,
   type PiBrowserContextRecord,
-} from "@aeon/protocol";
-import type { ComposerAttachment } from "@aeon/ui";
+} from "@graft/protocol";
+import type { ComposerAttachment } from "@graft/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 interface SubmitComposerMessageInput {
@@ -16,7 +16,7 @@ interface SubmitComposerMessageInput {
   wasRunning: boolean;
   attachments: readonly ComposerAttachment[];
   browserContext: PiBrowserContextRecord | null;
-  /** False for a prompt Aeon built itself (a page summary request), which cannot lift a block. */
+  /** False for a prompt Graft built itself (a page summary request), which cannot lift a block. */
   typedByUser: boolean;
   onError(message: string): void;
 }

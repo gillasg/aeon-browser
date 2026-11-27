@@ -1,4 +1,4 @@
-import type { PrivacySettingsProps, PrivacyState } from "@aeon/ui";
+import type { PrivacySettingsProps, PrivacyState } from "@graft/ui";
 
 // Settings → Privacy. The engine reads these keys from the extension's own storage on every
 // check, so the page reads and writes them directly.

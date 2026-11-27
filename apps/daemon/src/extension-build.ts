@@ -11,7 +11,7 @@ const installed = fileURLToPath(
 
 export async function installedExtensionBuild(): Promise<string | undefined> {
   try {
-    return (await readFile(process.env.AEON_EXTENSION_BUILD_INFO ?? installed, "utf8")).trim();
+    return (await readFile(process.env.GRAFT_EXTENSION_BUILD_INFO ?? installed, "utf8")).trim();
   } catch {
     return undefined;
   }

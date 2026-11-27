@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { RoutineEditor } from "./management-routine-editor.js";
@@ -140,7 +140,7 @@ function NewAutomation({
 }): ReactElement {
   return (
     <details className="new-automation">
-      <summary className="aeon-button" data-tone="primary" aria-disabled={disabled}>
+      <summary className="graft-button" data-tone="primary" aria-disabled={disabled}>
         New automation
       </summary>
       <div className="new-automation-list" role="menu">
@@ -214,7 +214,7 @@ function RoutineList({
   onSelect(routineId: string): void;
 }): ReactElement {
   if (!routines.length) {
-    if (props.loading) return <p className="aeon-sr">Loading automations</p>;
+    if (props.loading) return <p className="graft-sr">Loading automations</p>;
     if (props.snapshot?.routines.length)
       return <p className="management-empty">No automations match this view.</p>;
     return (

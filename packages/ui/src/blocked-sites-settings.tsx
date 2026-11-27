@@ -3,7 +3,7 @@ import { ActionRow, AddRow, SettingsGroup } from "./settings-list.js";
 
 // Sites the agent must never touch. Kept in page localStorage like the other agent settings; the
 // extension mirrors it into chrome.storage, where the browser engine reads it at every step.
-export const blockedSitesKey = "aeonBlockedSites";
+export const blockedSitesKey = "graftBlockedSites";
 
 export function readBlockedSites(): string[] {
   try {
@@ -72,11 +72,11 @@ export function BlockedSitesSettings({
     <div className="settings-groups">
       <SettingsGroup
         title="Blocked sites"
-        footer="Aeon never opens, reads or calls these sites or their subdomains, even if a page tells it to. Naming one in your own message lets that run use it."
+        footer="Graft never opens, reads or calls these sites or their subdomains, even if a page tells it to. Naming one in your own message lets that run use it."
       >
         {sites.length === 0 && (
           <li className="settings-row settings-row-text">
-            <span>Nothing blocked: Aeon may use any site you are signed in to.</span>
+            <span>Nothing blocked: Graft may use any site you are signed in to.</span>
           </li>
         )}
         {sites.map((site) => (

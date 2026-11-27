@@ -10,16 +10,16 @@ test("doctor names an attacker-owned data directory and the one change that fixe
     loginTask: true,
     dirs: [
       {
-        name: "Aeon",
+        name: "Graft",
         path: "/tmp/stolen",
         writable: true,
         trustError: "Refusing /tmp/stolen: it is owned by uid 65534, not 1000.",
-        trustFix: "Set AEON_DATA_DIR to a directory you own with mode 700.",
+        trustFix: "Set GRAFT_DATA_DIR to a directory you own with mode 700.",
       },
     ],
   });
   const data = checks.find((check) => check.name === "data");
   assert.equal(data.status, "fail");
   assert.match(data.detail, /owned by uid 65534/);
-  assert.match(data.fix, /AEON_DATA_DIR/);
+  assert.match(data.fix, /GRAFT_DATA_DIR/);
 });

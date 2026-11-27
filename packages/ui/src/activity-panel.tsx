@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import type { ActivityEntry } from "./activity-log.js";
 
-// Activity: only the things Aeon changed on sites, newest first, grouped by day. Undo appears
+// Activity: only the things Graft changed on sites, newest first, grouped by day. Undo appears
 // only where the site lets the change be reversed.
 
 export function ActivityPanel({
@@ -16,7 +16,7 @@ export function ActivityPanel({
   return (
     <section className="activity-page" aria-label="Activity">
       <p className="activity-lede">
-        What Aeon changed on sites for you: forms sent, orders, messages, bookings.
+        What Graft changed on sites for you: forms sent, orders, messages, bookings.
       </p>
       {entries.length ? (
         days(entries).map(([day, items]) => (
@@ -34,7 +34,7 @@ export function ActivityPanel({
         ))
       ) : (
         <p className="management-empty">
-          Nothing yet. When Aeon types into a site or sends something, it shows here.
+          Nothing yet. When Graft types into a site or sends something, it shows here.
         </p>
       )}
     </section>

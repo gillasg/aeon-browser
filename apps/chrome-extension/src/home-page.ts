@@ -14,16 +14,16 @@ import {
   type PiModelCatalogDto,
   PiModelCatalogSchema,
   PiAttachmentSchema,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import {
-  mountAeonUi,
+  mountGraftUi,
   NewTabHome,
   seedHomeQuery,
   type ComposerModel,
   type ComposerAttachment,
-} from "@aeon/ui";
+} from "@graft/ui";
 import { followPrivacy } from "./home-privacy.js";
-import { markActivityUndone, type ActivityEntry } from "@aeon/ui";
+import { markActivityUndone, type ActivityEntry } from "@graft/ui";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { sendComposerCommand } from "./composer-command.js";
 import { ModelSignIn } from "./model-sign-in.js";
@@ -42,7 +42,7 @@ import { createManagementClient } from "./management-client.js";
 const root = requiredElement("root");
 const inPanel = new URL(location.href).searchParams.get("host") === "panel";
 if (inPanel) document.body.dataset.host = "panel";
-const PANEL_SEED_KEY = "aeonPanelSeed";
+const PANEL_SEED_KEY = "graftPanelSeed";
 void applyStoredTheme();
 let client: UiClient | undefined;
 const privacy = followPrivacy(() => render());
@@ -77,7 +77,7 @@ const management = new HomeManagementController(
   () => client,
   () => render(),
   (chatId) => void openChat(chatId),
-  createManagementClient(__AEON_NATIVE_TRANSPORT__, () => client),
+  createManagementClient(__GRAFT_NATIVE_TRANSPORT__, () => client),
 );
 const blockedSites = new HomeBlockedSites({
   client: () => client,
@@ -102,7 +102,7 @@ async function undoActivity(entry: ActivityEntry): Promise<void> {
   try {
     for (const params of undo.params) {
       const reply = (await chrome.runtime.sendMessage({
-        kind: "aeon.site.undo",
+        kind: "graft.site.undo",
         site: undo.site,
         operation: undo.operation,
         params,
@@ -117,7 +117,7 @@ async function undoActivity(entry: ActivityEntry): Promise<void> {
 
 function createView() {
   return createElement(NewTabHome, {
-    developmentFixture: !__AEON_NATIVE_TRANSPORT__,
+    developmentFixture: !__GRAFT_NATIVE_TRANSPORT__,
     connectionLabel,
     connected: client?.socket.readyState === WebSocket.OPEN && connectionLabel === "Connected",
     missingChromeFlags: client?.missingChromeFlags,
@@ -142,7 +142,7 @@ function createView() {
       model: ComposerModel,
       thinkingLevel: string,
       attachments?: readonly ComposerAttachment[],
-    ) => void askAeon(query, model, thinkingLevel, attachments),
+    ) => void askGraft(query, model, thinkingLevel, attachments),
     onReadAttachments: (files: readonly File[]) => Promise.all(files.map(readComposerAttachment)),
     onNewChat: () => (inPanel ? openNewChat() : void showInPanel("")),
     onOpenChat: (chatId: string) => void openChat(chatId),
@@ -173,7 +173,7 @@ function createView() {
 
 function render(): void {
   if (updateUi) updateUi(createView());
-  else updateUi = mountAeonUi(root, createView());
+  else updateUi = mountGraftUi(root, createView());
 }
 
 if (new URL(location.href).searchParams.get("embedded") === "1")
@@ -223,7 +223,7 @@ async function refreshHome(): Promise<void> {
   render();
 }
 
-async function askAeon(
+async function askGraft(
   text: string,
   model: ComposerModel,
   thinkingLevel: string,
@@ -258,7 +258,7 @@ async function openChat(chatId: string): Promise<void> {
 /** The panel's idle canvas swaps itself for the chat; Manage shows the chat in the side panel. */
 async function openChatInCurrentTab(chatId: string): Promise<void> {
   if (inPanel) {
-    window.parent.postMessage({ kind: "aeon.select-chat", chatId }, location.origin);
+    window.parent.postMessage({ kind: "graft.select-chat", chatId }, location.origin);
     return;
   }
   await showInPanel(chatId);
@@ -313,7 +313,7 @@ async function loadModelCatalog(): Promise<void> {
     if (response.kind !== "command.completed" || response.result.kind !== "chat.model-catalog")
       throw new Error("Pi did not return its model catalog.");
     modelCatalog = response.result.catalog;
-    void chrome.storage.local.set({ aeonModelCatalog: modelCatalog });
+    void chrome.storage.local.set({ graftModelCatalog: modelCatalog });
     render();
   } catch (error) {
     showError(`Pi model settings unavailable · ${toMessage(error)}`);
@@ -340,8 +340,8 @@ async function getOpenChatIds(): Promise<Set<string>> {
 
 // The worker mirrors each chat's working state into session storage (completion-notifications);
 // orbs record the chat that is waiting for the user (orb-control).
-const WORKING_PREFIX = "aeon-chat-working-";
-const NEEDS_PREFIX = "aeon-orb-needs:";
+const WORKING_PREFIX = "graft-chat-working-";
+const NEEDS_PREFIX = "graft-orb-needs:";
 async function watchRunningChats(): Promise<void> {
   const read = async () => {
     const values = await chrome.storage.session.get(null);
@@ -394,9 +394,9 @@ function requiredElement(id: string): HTMLElement {
 
 async function restoreModelCatalog(): Promise<void> {
   try {
-    const stored = await chrome.storage.local.get("aeonModelCatalog");
-    if (!modelCatalog && stored.aeonModelCatalog) {
-      const parsed = PiModelCatalogSchema.safeParse(stored.aeonModelCatalog);
+    const stored = await chrome.storage.local.get("graftModelCatalog");
+    if (!modelCatalog && stored.graftModelCatalog) {
+      const parsed = PiModelCatalogSchema.safeParse(stored.graftModelCatalog);
       if (parsed.success) {
         modelCatalog = parsed.data;
         render();

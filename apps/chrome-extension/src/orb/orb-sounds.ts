@@ -1,4 +1,4 @@
-import { ORB_SOUNDS_KEY, orbFlag } from "@aeon/ui";
+import { ORB_SOUNDS_KEY, orbFlag } from "@graft/ui";
 import { filmBeat } from "./orb-film.js";
 
 // Optional, off by default: a soft tone when a run starts, when it needs you, and when it's done.
@@ -15,7 +15,7 @@ export const NOTES: Record<OrbSound, number[]> = {
 let audio: AudioContext | undefined;
 
 export function playSound(sound: OrbSound): void {
-  // Ahead of the mute check: a recording scores the sound Aeon would play, even when muted.
+  // Ahead of the mute check: a recording scores the sound Graft would play, even when muted.
   filmBeat("sound", { cue: sound });
   if (!orbFlag(ORB_SOUNDS_KEY)) return;
   try {

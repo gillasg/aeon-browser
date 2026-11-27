@@ -47,8 +47,8 @@ function workerContext(manifest, granted, failures) {
   const chrome = {};
   for (const name of granted) chrome[name] = api(name);
   chrome.runtime = Object.assign(api("runtime"), {
-    id: "aeon-test",
-    getURL: (path = "") => "chrome-extension://aeon-test/" + String(path).replace(/^\//, ""),
+    id: "graft-test",
+    getURL: (path = "") => "chrome-extension://graft-test/" + String(path).replace(/^\//, ""),
     getManifest: () => manifest,
     lastError: undefined,
   });
@@ -87,7 +87,7 @@ function workerContext(manifest, granted, failures) {
     },
     addEventListener() {},
     removeEventListener() {},
-    location: { href: "chrome-extension://aeon-test/service-worker.js" },
+    location: { href: "chrome-extension://graft-test/service-worker.js" },
     stopTimers: () => timers.forEach((timer) => clearTimeout(timer)),
   };
   context.self = context;

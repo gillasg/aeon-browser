@@ -23,11 +23,11 @@ const render = () =>
 
 test("the welcome shows until a task is sent, then stays gone until Settings resets it", () => {
   store.clear();
-  assert.match(render(), /Welcome to Aeon/);
+  assert.match(render(), /Welcome to Graft/);
   markWelcomeDone();
   assert.equal(render(), "");
   resetWelcome();
-  assert.match(render(), /Welcome to Aeon/);
+  assert.match(render(), /Welcome to Graft/);
 });
 
 test("sending any task hides an open welcome at once, not only an example pick", () => {
@@ -56,12 +56,12 @@ test("the readiness strip shows only what needs the user, with a copyable relaun
   });
   assert.match(flags, /open -na &quot;Google Chrome&quot; --args --silent-debugger-extension-api/);
   assert.match(flags, /Dismiss/);
-  store.set("aeonFlagsNoticeDismissed", "--silent-debugger-extension-api");
+  store.set("graftFlagsNoticeDismissed", "--silent-debugger-extension-api");
   assert.equal(
     strip({ connected: true, missingChromeFlags: ["--silent-debugger-extension-api"] }),
     "",
   );
-  assert.match(strip({ connected: false, offlineDelayMs: 0 }), /aeon doctor/);
+  assert.match(strip({ connected: false, offlineDelayMs: 0 }), /graft doctor/);
   assert.equal(strip({ connected: false }), "");
 });
 

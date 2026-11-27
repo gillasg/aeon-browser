@@ -1,5 +1,5 @@
 import { WebSocket } from "ws";
-import type { BrowserExecutorResult, BrowserStep, BrowserTargetKey } from "@aeon/protocol";
+import type { BrowserExecutorResult, BrowserStep, BrowserTargetKey } from "@graft/protocol";
 import type { BrowserInventoryRegistry } from "./browser-inventory-registry.js";
 
 export function listBrowserTabs(
@@ -24,9 +24,9 @@ export function safeUrl(value: string): boolean {
     return false;
   }
 }
-/** A tab the agent may use: a web page or one of Aeon's own pages (the engine marks them). */
-export function drivableTab(tab: { url: string; aeonUi?: boolean | undefined }): boolean {
-  return tab.aeonUi === true || safeUrl(tab.url);
+/** A tab the agent may use: a web page or one of Graft's own pages (the engine marks them). */
+export function drivableTab(tab: { url: string; graftUi?: boolean | undefined }): boolean {
+  return tab.graftUi === true || safeUrl(tab.url);
 }
 export function normalizedUrl(value: string): string {
   return new URL(value).href;

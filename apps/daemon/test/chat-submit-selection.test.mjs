@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { DaemonUiRequestSchema } from "@aeon/protocol";
+import { DaemonUiRequestSchema } from "@graft/protocol";
 import { beginSubmit } from "../dist/dev-chat-submit.js";
 
 test("a first prompt can carry the model and thinking level the caller chose", async () => {
@@ -22,7 +22,7 @@ test("a first prompt can carry the model and thinking level the caller chose", a
     payload: {
       chatId: randomUUID(),
       text: "Find the price",
-      selection: { model: { provider: "aeon-fixture", id: "model-one" }, thinkingLevel: "low" },
+      selection: { model: { provider: "graft-fixture", id: "model-one" }, thinkingLevel: "low" },
     },
   });
   beginSubmit(socket, service, request);

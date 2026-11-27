@@ -6,7 +6,7 @@
 
 import { readFile, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { ensurePrivateDir } from "@aeon/location";
+import { ensurePrivateDir } from "@graft/location";
 
 export type SessionHealth = "healthy" | "expiring" | "expired" | "unknown";
 

@@ -6,7 +6,7 @@ import {
   type BrowserTab,
   type BrowserTargetKey,
   type BrowserWindow,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 interface Snapshot {
   browserRunId: string;

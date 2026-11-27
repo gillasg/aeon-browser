@@ -17,7 +17,7 @@ async function chooseFolder(): Promise<string | null> {
     "Add-Type -AssemblyName System.Windows.Forms",
     "[System.Windows.Forms.Application]::EnableVisualStyles()",
     "$owner = New-Object System.Windows.Forms.Form",
-    "$owner.Text = 'Aeon — choose project folder'",
+    "$owner.Text = 'Graft — choose project folder'",
     "$owner.TopMost = $true",
     "$owner.ShowInTaskbar = $false",
     "$owner.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen",

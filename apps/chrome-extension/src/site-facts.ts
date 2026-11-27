@@ -1,5 +1,5 @@
-import { DaemonUiRequestSchema } from "@aeon/protocol";
-import { countsFor, siteKey, type SiteCounts } from "@aeon/ui";
+import { DaemonUiRequestSchema } from "@graft/protocol";
+import { countsFor, siteKey, type SiteCounts } from "@graft/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 // Site facts for the cursor and the side panel: saved APIs and active watches come from the
@@ -24,7 +24,7 @@ export type SiteRows = readonly { site: string; apis: number; watches: number }[
 
 export async function boostsOn(url: string): Promise<number> {
   const reply = (await chrome.runtime
-    .sendMessage({ kind: "aeon.site.boosts", url })
+    .sendMessage({ kind: "graft.site.boosts", url })
     .catch(() => null)) as { boosts?: number } | null;
   return Number(reply?.boosts ?? 0) || 0;
 }

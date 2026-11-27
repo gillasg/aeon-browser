@@ -154,7 +154,7 @@ export function rebindBrowserCodeSocket(socket: WebSocket): void {
 const RESET_ANSWER_MS = 15_000;
 
 /**
- * Drops one chat's REPL realm (session closed or runtime reset). The local Aeon process hosts a
+ * Drops one chat's REPL realm (session closed or runtime reset). The local Graft process hosts a
  * realm per chat, and its `reset` handler removes only this chat's realms. A host that is merely
  * busy still answers, and the other chats keep running. Only a host that cannot answer for
  * RESET_ANSWER_MS is restarted: its thread is blocked by a synchronous loop, so every chat in it
@@ -280,7 +280,7 @@ function finalize(cell: Cell, result: CellOutcome): void {
 }
 
 // The realm host relays calls from a cell's realm. Only frames on the extension's own link to the
-// local Aeon process reach this; the answer has the shape the realm's __call expects.
+// local Graft process reach this; the answer has the shape the realm's __call expects.
 async function realmEvent(message: Record<string, unknown>): Promise<unknown> {
   if (message.kind === "jobDone" || message.kind === "jobLost") {
     (message.kind === "jobDone" ? finishJob : loseJob)(message);

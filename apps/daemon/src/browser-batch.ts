@@ -4,7 +4,7 @@ import {
   INPUT_MAY_HAVE_LANDED_NOTE,
   type BrowserStep,
   type BrowserExecutorResult,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 // A click, type, press or fill that was sent and then failed or timed out may already have landed.
 const WRITE_OPS = new Set(["click", "fill", "paste", "type", "press", "select", "check", "upload"]);

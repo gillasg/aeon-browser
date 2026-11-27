@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { scrubSecrets } from "@aeon/protocol";
+import { scrubSecrets } from "@graft/protocol";
 
 // MCP Tasks (io.modelcontextprotocol/tasks): a long tool call or a watch runs as a durable task.
 // working -> input_required (a confirmation or sign-in the agent must answer) -> completed,

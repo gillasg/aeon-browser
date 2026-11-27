@@ -54,7 +54,7 @@ export function serializeAnnotations(records: readonly ResponseAnnotation[]): st
         .join("\n\n"),
     )
     .join("\n\n");
-  return `[Aeon annotations v1]\n\n${body}\n\n[/Aeon annotations v1]`;
+  return `[Graft annotations v1]\n\n${body}\n\n[/Graft annotations v1]`;
 }
 // Pending annotations: one chip in the attachment row; hovering lists them, each editable.
 export function AnnotationChips(): ReactElement | null {
@@ -165,9 +165,9 @@ function useAnnotationHighlights(records: readonly ResponseAnnotation[]): void {
     };
     if (!browser.Highlight || !browser.CSS.highlights) return;
     const ranges = records.flatMap((record) => (record.range ? [record.range] : []));
-    browser.CSS.highlights.set("aeon-annotations", new browser.Highlight(...ranges));
+    browser.CSS.highlights.set("graft-annotations", new browser.Highlight(...ranges));
     return () => {
-      browser.CSS.highlights?.delete("aeon-annotations");
+      browser.CSS.highlights?.delete("graft-annotations");
     };
   }, [records]);
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CorePingResultSchema } from "@aeon/protocol";
+import { CorePingResultSchema } from "@graft/protocol";
 import { handleCorePing } from "../src/core-health.ts";
 
 test("core.ping is answered on this turn, without the extension", () => {

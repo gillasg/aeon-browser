@@ -176,7 +176,7 @@ function useSelectionAnchor(
       CSS: typeof CSS & { highlights?: Map<string, unknown> };
     };
     if (browser.Highlight)
-      browser.CSS.highlights?.set("aeon-selection", new browser.Highlight(quote.range));
+      browser.CSS.highlights?.set("graft-selection", new browser.Highlight(quote.range));
     let frame = 0;
     const reposition = () => {
       cancelAnimationFrame(frame);
@@ -205,7 +205,7 @@ function useSelectionAnchor(
       cancelAnimationFrame(frame);
       document.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
-      browser.CSS.highlights?.delete("aeon-selection");
+      browser.CSS.highlights?.delete("graft-selection");
     };
   }, [quote, setQuote]);
 }

@@ -1,6 +1,6 @@
 import { writeSync } from "node:fs";
 
-const FAILURE_PREFIX = "AEON_DAEMON_FAILED ";
+const FAILURE_PREFIX = "GRAFT_DAEMON_FAILED ";
 
 /** One line the supervisor stores as the cause. Newlines would split the protocol. */
 export function managedFailureLine(message: string): string {

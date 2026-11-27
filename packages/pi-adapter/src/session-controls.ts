@@ -11,7 +11,7 @@ import type {
   PiBrowserContextRecord,
   PiModelOption,
   PiSessionHandle,
-} from "@aeon/domain";
+} from "@graft/domain";
 import { decodePiInput } from "./pi-input.js";
 import { browserContextPrompt, PI_BROWSER_CONTEXT_CUSTOM_TYPE } from "./browser-context-message.js";
 import { liveFirstTurn } from "./first-turn-live.js";
@@ -101,7 +101,7 @@ export function sendQueuedAfterStop(
   if (!queued.length) return undefined;
   const text = queued.join("\n\n");
   void session.prompt(text).catch((error: unknown) => {
-    log("Aeon: could not send the queued message after a stop: " + String(error));
+    log("Graft: could not send the queued message after a stop: " + String(error));
   });
   return text;
 }

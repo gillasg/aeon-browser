@@ -1,7 +1,7 @@
-// `aeon record qualify <clip.json> --runs 3`: the grammar's precondition for filming. The clip's
+// `graft record qualify <clip.json> --runs 3`: the grammar's precondition for filming. The clip's
 // scenes run N times in a row as raw tab takes (each scene's `prepare` resets the site first),
 // every run is checked against the clip's `expect`, and qualify.json records the plan hash, the
-// day and each run. `aeon film` refuses a plan without a same-day N/N on the same hash.
+// day and each run. `graft film` refuses a plan without a same-day N/N on the same hash.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -103,7 +103,7 @@ export function qualified(
   now = Date.now(),
   runs = QUALIFY_RUNS,
 ): { ok: boolean; why?: string } {
-  if (!file) return { ok: false, why: "no qualify.json: run `aeon record qualify <clip.json>`" };
+  if (!file) return { ok: false, why: "no qualify.json: run `graft record qualify <clip.json>`" };
   if (file.planHash !== hash) return { ok: false, why: "the plan changed since it qualified" };
   if (file.date !== today(now)) return { ok: false, why: `qualified on ${file.date}, not today` };
   const passed = file.runs.filter((r) => r.ok).length;
@@ -163,7 +163,7 @@ export async function qualifyCommand(
   args: Args,
 ): Promise<number> {
   const file = args.positional[1];
-  if (!file) throw new Error("Usage: aeon record qualify <clip.json> [--runs 3]");
+  if (!file) throw new Error("Usage: graft record qualify <clip.json> [--runs 3]");
   const clip = parseClip(JSON.parse(readFileSync(file, "utf8")));
   const runs = Number(typeof args.flags.runs === "string" ? args.flags.runs : QUALIFY_RUNS);
   const dir = join(dirname(resolve(file)), `qualify-${Date.now()}`);

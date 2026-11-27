@@ -15,9 +15,9 @@ import { applyChromeFlags, defaultFlagEnv, undoChromeFlags, type FlagEnv } from 
 import { login, modelLoginStatus } from "./model-login-cmd.js";
 import { setupPrompts, terminalAsk } from "./setup-prompts.js";
 
-// `aeon setup` installs the shim and the skill, then guides the user through the only manual step:
+// `graft setup` installs the shim and the skill, then guides the user through the only manual step:
 // loading the unpacked extension in Chrome. The script opens chrome://extensions, copies the folder
-// and polls `aeon doctor` until the extension pairs. `aeon doctor` says what is still missing.
+// and polls `graft doctor` until the extension pairs. `graft doctor` says what is still missing.
 
 type Status = "ok" | "warn" | "fail";
 
@@ -37,7 +37,7 @@ async function setup(host: DaemonHost, args: Args): Promise<number> {
   if (has(args, "undo-flags") || has(args, "quiet-bar")) return flagsOnly(args, flagEnv);
   const script = join(root, "scripts", "setup.mjs");
   if (!existsSync(script)) {
-    say(`Aeon setup script not found at ${script}.`);
+    say(`Graft setup script not found at ${script}.`);
     return 1;
   }
   const flags = [
@@ -49,7 +49,7 @@ async function setup(host: DaemonHost, args: Args): Promise<number> {
     const code = await install();
     if (code !== 0) return code;
     if (has(args, "no-register"))
-      say("The native host is registered by Aeon's installer; nothing to skip.");
+      say("The native host is registered by Graft's installer; nothing to skip.");
   }
   execFileSync(process.execPath, [script, ...flags], { cwd: root, stdio: "inherit" });
   await finishSetup(host, args, root, flagEnv);
@@ -95,7 +95,7 @@ async function finishSetup(
       };
       const cli = join(root, "apps", "cli", "dist", "cli.js");
       for (const row of await connectAgents({
-        name: "aeon",
+        name: "graft",
         command: process.execPath,
         args: [cli, "mcp"],
       }))
@@ -106,7 +106,7 @@ async function finishSetup(
   });
   // Chats need a model; say how to connect one instead of letting the first chat fail.
   if (!interactive && (await connectedModels().catch(() => undefined)) === 0)
-    say("Next: connect an AI model with `aeon login` (or Settings → Models in Aeon).");
+    say("Next: connect an AI model with `graft login` (or Settings → Models in Graft).");
 }
 
 async function doctor(host: DaemonHost): Promise<number> {
@@ -143,7 +143,7 @@ async function daemonCheck(data: string): Promise<Check> {
   return {
     status: present ? "ok" : "fail",
     label: "daemon",
-    message: present ? state : "not running; open Chrome with Aeon loaded",
+    message: present ? state : "not running; open Chrome with Graft loaded",
   };
 }
 
@@ -156,7 +156,7 @@ async function browserCheck(host: DaemonHost): Promise<Check> {
       label: "browser connection",
       message: browsers.length
         ? `${browsers.length} browser${browsers.length === 1 ? "" : "s"} connected`
-        : "no browser connected yet; it reconnects after a restart, otherwise reload Aeon at chrome://extensions",
+        : "no browser connected yet; it reconnects after a restart, otherwise reload Graft at chrome://extensions",
     };
   } catch (error) {
     return {
@@ -184,7 +184,7 @@ async function modelCheck(): Promise<Check> {
     label: "AI model",
     message: names.length
       ? `${names.join(", ")}${status?.defaultModel ? `; default ${status.defaultModel}` : ""}`
-      : "none connected; run `aeon login`",
+      : "none connected; run `graft login`",
   };
 }
 
@@ -194,7 +194,7 @@ async function signInCheck(): Promise<Check> {
   return {
     status: state === "unlocked" ? "ok" : "warn",
     label: "password manager",
-    message: provider ? `${provider.name}: ${state}` : "none; run `aeon signin setup bitwarden`",
+    message: provider ? `${provider.name}: ${state}` : "none; run `graft signin setup bitwarden`",
   };
 }
 
@@ -204,13 +204,13 @@ function report(checks: Check[]): number {
     : checks.some((item) => item.status === "warn")
       ? "warn"
       : "ok";
-  process.stdout.write("aeon doctor\n");
+  process.stdout.write("graft doctor\n");
   process.stdout.write(`Status: ${status}\n`);
   for (const item of checks)
     process.stdout.write(`[${item.status}] ${item.label}: ${item.message}\n`);
   if (status !== "ok")
     process.stdout.write(
-      "Next: open Chrome with Aeon loaded (or reload it at chrome://extensions), then try `aeon status`.\n",
+      "Next: open Chrome with Graft loaded (or reload it at chrome://extensions), then try `graft status`.\n",
     );
   return status === "fail" ? 1 : 0;
 }
@@ -220,23 +220,23 @@ export function setupCommands(host: DaemonHost): Command[] {
     {
       name: "setup",
       group: "Browser",
-      summary: "finish setup by loading the Aeon extension in Chrome",
-      help: `Usage: aeon setup [--no-register] [--again] [--yes] [--no-wait] [--quiet-bar] [--undo-flags]
+      summary: "finish setup by loading the Graft extension in Chrome",
+      help: `Usage: graft setup [--no-register] [--again] [--yes] [--no-wait] [--quiet-bar] [--undo-flags]
 
-Installs the aeon command and the Aeon skill, opens chrome://extensions, puts the extension
-folder on your clipboard, prints the three clicks and waits until Aeon connects. No Chrome
+Installs the graft command and the Graft skill, opens chrome://extensions, puts the extension
+folder on your clipboard, prints the three clicks and waits until Graft connects. No Chrome
 flags are needed. --again repeats any missing install step (native host, service, extension).
 --no-wait prints the clicks without waiting; --yes is the short, non-interactive wait for CI.
 On a terminal it then offers three opt-ins: Chrome launch flags, coding-agent MCP, model sign-in.
 --quiet-bar adds the optional Chrome flags to your Chrome launcher (Linux .desktop, Windows
-shortcuts, macOS "Aeon Chrome" app); --undo-flags removes them again.`,
+shortcuts, macOS "Graft Chrome" app); --undo-flags removes them again.`,
       run: (args) => setup(host, args),
     },
     {
       name: "doctor",
       group: "Browser",
       summary: "check the install, the daemon and the browser connection",
-      help: `Usage: aeon doctor`,
+      help: `Usage: graft doctor`,
       run: () => doctor(host),
     },
   ];

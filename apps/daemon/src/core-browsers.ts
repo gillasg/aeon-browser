@@ -6,12 +6,12 @@ import {
   CoreChatPinRequestSchema,
   CoreChatPinnedSchema,
   type CoreBrowserSummary,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { messageOf } from "./core-browser.js";
 
-// `aeon browsers` and `aeon run --browser <name>`. Each Chrome profile running Aeon is one
+// `graft browsers` and `graft run --browser <name>`. Each Chrome profile running Graft is one
 // browser with a stable id; the user names one ("eval") so a run stays in that profile. Names
 // live in browser-names.json in the data folder, keyed by that id.
 
@@ -171,7 +171,7 @@ export async function pin(
     if (!named || Date.now() >= deadline) {
       const known = browsers.map((item) => item.name).filter(Boolean);
       const hint = known.length ? ` Connected: ${known.join(", ")}.` : "";
-      throw new Error(`No connected browser is named ${name}.${hint} See aeon browsers.`);
+      throw new Error(`No connected browser is named ${name}.${hint} See graft browsers.`);
     }
     await new Promise((resolve) => setTimeout(resolve, PIN_POLL_MS));
   }

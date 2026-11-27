@@ -1,4 +1,4 @@
-// `aeon record stop --tabs`: the hidden tab takes Aeon's engine recorded, copied into the
+// `graft record stop --tabs`: the hidden tab takes Graft's engine recorded, copied into the
 // recording folder as takes/<tabId>.webm (or .mp4) with their real size, start and length.
 // The engine's browser.saveTake() writes into a chat workspace, which a CLI cell does not have,
 // so the take is streamed back here with the same stop/read/drop calls saveTake makes.

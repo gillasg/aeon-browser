@@ -1,4 +1,4 @@
-import type { BrowserExecutorRequest, BrowserExecutorResult } from "@aeon/protocol";
+import type { BrowserExecutorRequest, BrowserExecutorResult } from "@graft/protocol";
 import type { WebSocket } from "ws";
 export interface BrowserPending {
   chatId: string;

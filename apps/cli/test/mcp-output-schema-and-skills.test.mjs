@@ -35,7 +35,7 @@ function har(origin) {
   return JSON.stringify({
     log: {
       version: "1.2",
-      creator: { name: "aeon-test", version: "1" },
+      creator: { name: "graft-test", version: "1" },
       entries: [entry("/api/items?q=lamp", ITEM), entry("/api/tags", TAGS)],
     },
   });
@@ -57,9 +57,9 @@ function mcp(home) {
   const child = spawn(process.execPath, [cli, "mcp", "--surface", "full"], {
     env: {
       ...process.env,
-      AEON_DATA_DIR: join(home, "data"),
+      GRAFT_DATA_DIR: join(home, "data"),
       SITE_TO_API_HOME: join(home, "site-to-api"),
-      AEON_CATALOG_POLL_MS: "100",
+      GRAFT_CATALOG_POLL_MS: "100",
     },
   });
   let buffer = "";
@@ -100,8 +100,8 @@ async function until(check, ms = 8000) {
   return false;
 }
 
-test("aeon mcp: outputSchema + structuredContent on mapped ops, skills as resources", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-mcp-skills-"));
+test("graft mcp: outputSchema + structuredContent on mapped ops, skills as resources", async (t) => {
+  const home = await mkdtemp(join(tmpdir(), "graft-mcp-skills-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
@@ -143,7 +143,7 @@ test("aeon mcp: outputSchema + structuredContent on mapped ops, skills as resour
   const listed = (await client.request("resources/list")).result.resources;
   assert.equal(listed.length, 1);
   const [skill] = listed;
-  assert.equal(skill.uri, "aeon://skills/127.0.0.1");
+  assert.equal(skill.uri, "graft://skills/127.0.0.1");
   assert.equal(skill.mimeType, "text/markdown");
   assert.match(skill._meta.version, /^[0-9a-f]{12}$/);
   const again = (await client.request("resources/list")).result.resources[0];
@@ -154,11 +154,15 @@ test("aeon mcp: outputSchema + structuredContent on mapped ops, skills as resour
   assert.equal(read.result.contents[0].text, await readFile(skillPath, "utf8"));
   assert.equal(read.result.contents[0]._meta.version, skill._meta.version);
 
-  for (const uri of ["aeon://skills/../../etc/passwd", "aeon://skills/a/b", "aeon://skills/x\\y"]) {
+  for (const uri of [
+    "graft://skills/../../etc/passwd",
+    "graft://skills/a/b",
+    "graft://skills/x\\y",
+  ]) {
     const bad = await client.request("resources/read", { uri });
     assert.equal(bad.error?.code, -32602, uri);
   }
-  const missing = await client.request("resources/read", { uri: "aeon://skills/nope.example" });
+  const missing = await client.request("resources/read", { uri: "graft://skills/nope.example" });
   assert.equal(missing.error?.code, -32602);
 
   await writeFile(skillPath, (await readFile(skillPath, "utf8")) + "\nhealed\n");

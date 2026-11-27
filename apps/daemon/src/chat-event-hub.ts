@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type ChatEventCursor, type ChatId, type PiSessionEvent } from "@aeon/domain";
+import { type ChatEventCursor, type ChatId, type PiSessionEvent } from "@graft/domain";
 
 const MAX_EVENTS_PER_CHAT = 256;
 

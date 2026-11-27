@@ -1,9 +1,9 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { type AeonClient, dataDirectory } from "./client.js";
+import { type GraftClient, dataDirectory } from "./client.js";
 
 // Running one browser cell through the daemon and keeping it in the CLI journal. Light on purpose:
-// `aeon repl` loads only this and the client (see repl-fast.ts).
+// `graft repl` loads only this and the client (see repl-fast.ts).
 
 export interface BrowserCell {
   value?: unknown;
@@ -22,7 +22,7 @@ export const journalPath = (): string => join(dataDirectory(), "cli-journal.json
 
 /** Runs the cell and journals it; the cell's own error stays in the result. */
 export async function runCellOn(
-  client: AeonClient,
+  client: GraftClient,
   code: string,
   options: CellOptions = {},
 ): Promise<BrowserCell> {
@@ -41,13 +41,13 @@ export async function runCellOn(
 export const offline = (result: BrowserCell): boolean =>
   result.error === "BROWSER_OFFLINE" || result.error === "AMBIGUOUS_BROWSER";
 
-/** What a failed cell says, and for a missing browser how Aeon recovers. */
+/** What a failed cell says, and for a missing browser how Graft recovers. */
 export function cellErrorMessage(result: BrowserCell): string {
   const code = result.error ?? "INTERNAL";
   if (code === "AMBIGUOUS_BROWSER")
-    return "Several browsers are connected. Pick one with --browser <name> (see aeon browsers).";
+    return "Several browsers are connected. Pick one with --browser <name> (see graft browsers).";
   if (code === "BROWSER_OFFLINE")
-    return "Aeon's browser is not connected. Open Chrome with Aeon loaded, then retry.";
+    return "Graft's browser is not connected. Open Chrome with Graft loaded, then retry.";
   return result.detail ? `${code}: ${result.detail}` : code;
 }
 

@@ -1,4 +1,4 @@
-// The messages the Aeon CLI uses: browser code, the default model, and the blocked-sites list.
+// The messages the Graft CLI uses: browser code, the default model, and the blocked-sites list.
 // A fake extension executor answers them, so the daemon's side is checked without Chrome.
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -8,8 +8,8 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { WebSocket } from "ws";
-import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
-import { openChatStore } from "@aeon/store";
+import { SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol";
+import { openChatStore } from "@graft/store";
 import { startCoreTransport } from "../dist/core-transport.js";
 import { startNativeTransport } from "../dist/native-transport.js";
 import { CoreAttention } from "../dist/core-attention.js";
@@ -21,7 +21,7 @@ import { connectCore, until } from "./core-client-helper.mjs";
 const ORIGIN = "chrome-extension://npcdopokfkpfmepknhoecppgdgmkmihh";
 
 test("browser code, the model and the blocked-sites list answer over Core", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-core-cli-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-core-cli-"));
   const previousHome = process.env.BROWSERKIT_HOME;
   process.env.BROWSERKIT_HOME = join(directory, "browserkit");
   const store = openChatStore(directory);

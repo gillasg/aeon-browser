@@ -19,7 +19,7 @@ test("Pi CLI bridge reads explicit registrations and preserves argv boundaries",
 });
 
 async function prepareCliMcpBridgeCase1Stage1() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-cli-bridge-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-cli-bridge-"));
   const registryPath = join(root, "capabilities.json");
   const fixturePath = join(root, "fixture-cli.mjs");
   const bridgePath = fileURLToPath(new URL("../dist/cli-mcp-bridge.js", import.meta.url));
@@ -95,7 +95,7 @@ async function verifyCliMcpBridgeCase1Stage3(child, responses) {
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     });
   const initialized = await request(1, "initialize", { protocolVersion: "2025-06-18" });
-  assert.equal(initialized.result.serverInfo.name, "aeon-cli");
+  assert.equal(initialized.result.serverInfo.name, "graft-cli");
   child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
   const catalog = await request(2, "tools/call", {
     name: "cli_catalog",
@@ -139,7 +139,7 @@ test("the CLI bridge speaks 2026-07-28 discover and _meta without breaking initi
   const discovered = (await wait(101)).result;
   assert.equal(discovered.resultType, "complete");
   assert.match(discovered.supportedVersions.join(","), /2026-07-28/);
-  assert.equal(discovered._meta["io.modelcontextprotocol/serverInfo"].name, "aeon-cli");
+  assert.equal(discovered._meta["io.modelcontextprotocol/serverInfo"].name, "graft-cli");
 
   const modern = { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } };
   send(102, "tools/list", modern);
@@ -156,14 +156,14 @@ test("the CLI bridge speaks 2026-07-28 discover and _meta without breaking initi
   // An old client still initializes and gets the old shape (no resultType).
   send(1, "initialize", { protocolVersion: "2025-06-18" });
   const initialized = await wait(1);
-  assert.equal(initialized.result.serverInfo.name, "aeon-cli");
+  assert.equal(initialized.result.serverInfo.name, "graft-cli");
   send(104, "tools/list", {});
   const oldListed = (await wait(104)).result;
   assert.equal(oldListed.resultType, undefined, "older clients keep the old result shape");
 });
 
 test("notifications/cancelled aborts a running call and sends no reply", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-cli-cancel-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-cli-cancel-"));
   // A long-running CLI: cancellation must stop it, and no result may be written for the request.
   await writeFile(join(root, "sleep.mjs"), `setInterval(() => {}, 1000);\n`, "utf8");
   const registryPath = join(root, "capabilities.json");

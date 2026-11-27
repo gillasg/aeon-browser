@@ -21,7 +21,7 @@ test("a wrapped Pi session carries the routine port", () => {
   const handle = wrapPiSession(
     session,
     manager,
-    { sessionFile: "/tmp/aeon-routine-support-test.jsonl" },
+    { sessionFile: "/tmp/graft-routine-support-test.jsonl" },
     "chat-routine",
     extensionUi,
     () => [],

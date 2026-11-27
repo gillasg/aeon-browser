@@ -1,11 +1,11 @@
-import { asChatId } from "@aeon/domain";
+import { asChatId } from "@graft/domain";
 import {
   ChatSummarySchema,
   ChatViewSnapshotSchema,
   PiAttachmentSchema,
   PiUiSnapshotSchema,
   type DaemonUiResponse,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";

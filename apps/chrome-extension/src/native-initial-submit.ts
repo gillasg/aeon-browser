@@ -1,8 +1,8 @@
-import { ChatIdSchema, PiAttachmentSchema, type PiAttachmentDto } from "@aeon/protocol";
+import { ChatIdSchema, PiAttachmentSchema, type PiAttachmentDto } from "@graft/protocol";
 import { z } from "zod";
 
 const HANDOFF_TTL_MS = 2 * 60 * 1000;
-const PREFIX = "aeon.initial-submit.";
+const PREFIX = "graft.initial-submit.";
 
 interface InitialSubmit {
   requestId: string;

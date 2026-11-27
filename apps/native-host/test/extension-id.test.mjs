@@ -52,12 +52,12 @@ test("setup never generates or pins a per-install extension key", () => {
 });
 
 test("the built folder keeps the manifest byte-for-byte, so its id cannot drift", async () => {
-  const base = await mkdtemp(join(tmpdir(), "aeon-stable-folder-"));
+  const base = await mkdtemp(join(tmpdir(), "graft-stable-folder-"));
   const source = join(base, "native-dist");
   const target = join(base, "stable");
   try {
     mkdirSync(source, { recursive: true });
-    const manifest = JSON.stringify({ name: "Aeon", key: FIXED_KEY }, null, 2);
+    const manifest = JSON.stringify({ name: "Graft", key: FIXED_KEY }, null, 2);
     writeFileSync(join(source, "manifest.json"), manifest);
     mkdirSync(join(source, "nested"));
     writeFileSync(join(source, "nested", "worker.js"), "console.log(1)");

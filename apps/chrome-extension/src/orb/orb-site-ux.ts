@@ -1,4 +1,4 @@
-import type { AnswerFooter, AnswerReceipt } from "@aeon/ui";
+import type { AnswerFooter, AnswerReceipt } from "@graft/ui";
 import { siteFacts } from "../site-facts.js";
 import { ORB_SUMMON_INFO, type OrbToContent } from "./orb-messages.js";
 import type { OrbSession } from "./orb-session.js";
@@ -43,7 +43,7 @@ function followLearning(ux: SiteUx): void {
   clearInterval(poll);
   if (!ux.model.learning) return;
   poll = window.setInterval(() => {
-    void learnMessage({ kind: "aeon.learn.get", tabId: ux.tabId }).then((reply) => {
+    void learnMessage({ kind: "graft.learn.get", tabId: ux.tabId }).then((reply) => {
       if (!reply) return clearInterval(poll);
       if (!reply.on) {
         // Learning ended outside the orb (Chrome's debugger bar was closed): still say what
@@ -64,7 +64,7 @@ function followLearning(ux: SiteUx): void {
 }
 
 export async function loadLearning(ux: SiteUx): Promise<void> {
-  const reply = await learnMessage({ kind: "aeon.learn.get", tabId: ux.tabId });
+  const reply = await learnMessage({ kind: "graft.learn.get", tabId: ux.tabId });
   ux.model.learning = reply?.on === true;
   ux.model.learnFound = reply?.found ?? 0;
   ux.render();
@@ -74,7 +74,7 @@ export async function loadLearning(ux: SiteUx): Promise<void> {
 /** Teach starts recording; Stop or Done ends it, says what was learned, and refreshes X-Ray. */
 export async function toggleLearning(ux: SiteUx): Promise<void> {
   const on = !ux.model.learning;
-  const reply = await learnMessage({ kind: "aeon.learn.set", tabId: ux.tabId, on });
+  const reply = await learnMessage({ kind: "graft.learn.set", tabId: ux.tabId, on });
   if (!reply?.ok) {
     ux.notice("Couldn't start teaching this site" + (reply?.error ? " · " + reply.error : ""));
     return;
@@ -117,7 +117,7 @@ export function applySummon(ux: SiteUx, info: SummonInfo | undefined): void {
 export function removeTarget(ux: SiteUx): void {
   ux.session.target = undefined;
   delete ux.model.target;
-  ux.toContent({ kind: "aeon.orb.target", action: "drop" });
+  ux.toContent({ kind: "graft.orb.target", action: "drop" });
   ux.render();
 }
 

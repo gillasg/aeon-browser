@@ -76,11 +76,11 @@ test("the API-key list starts on popular and connected providers; a search cover
 
 test("with a model ready, the Models page offers the way back to work", () => {
   const html = renderToStaticMarkup(
-    createElement(ModelAccounts, props({ onStartChat: noop, startChatLabel: "Return to Aeon" })),
+    createElement(ModelAccounts, props({ onStartChat: noop, startChatLabel: "Return to Graft" })),
   );
   assert.match(html, /You&#x27;re ready\./);
-  assert.match(html, /Aeon uses Claude Opus 5\.5 by default/);
-  assert.match(html, /Return to Aeon<\/button>/);
+  assert.match(html, /Graft uses Claude Opus 5\.5 by default/);
+  assert.match(html, /Return to Graft<\/button>/);
   assert.match(html, /model-badge">Subscription/);
   assert.match(html, /model-badge">Environment/);
   assert.match(html, /Already set by GROQ_API_KEY/);
@@ -94,7 +94,7 @@ test("a finished sign-in confirms the default model and offers Start chatting", 
     createElement(ModelSignInPanel, { ...props({ onStartChat: noop }), flow }),
   );
   assert.match(html, /Connected to Anthropic\./);
-  assert.match(html, /Aeon will use Claude Opus 5\.5/);
+  assert.match(html, /Graft will use Claude Opus 5\.5/);
   assert.match(html, /Start chatting<\/button>/);
   assert.match(html, /Connect another<\/button>/);
   const plain = renderToStaticMarkup(createElement(ModelSignInPanel, { ...props(), flow }));

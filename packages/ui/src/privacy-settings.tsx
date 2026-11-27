@@ -34,7 +34,7 @@ function TabPlacementSettings(props: PrivacySettingsProps): ReactElement | null 
   return (
     <SettingsGroup
       title="Background tabs"
-      footer="Off opens them, inactive, in this window's Aeon tab group. Aeon never takes over the tab you are on."
+      footer="Off opens them, inactive, in this window's Graft tab group. Graft never takes over the tab you are on."
     >
       <SwitchRow
         label="Open background tabs in a separate window"
@@ -52,10 +52,10 @@ export function PrivacySettings(props: PrivacySettingsProps): ReactElement {
       <TabPlacementSettings {...props} />
       <SettingsGroup
         title="Privacy"
-        footer="Stops a web page from steering Aeon into your router or local apps. Allow the ports you use for local development."
+        footer="Stops a web page from steering Graft into your router or local apps. Allow the ports you use for local development."
       >
         <SwitchRow
-          label="Keep Aeon off this computer and your local network"
+          label="Keep Graft off this computer and your local network"
           checked={state.privateNetwork}
           onChange={props.onPrivateNetwork}
         />

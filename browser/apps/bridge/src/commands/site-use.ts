@@ -101,7 +101,7 @@ async function call(args: Args): Promise<number> {
   return 0;
 }
 
-/** `0.4 s`, `34 s`: the same rounding as Aeon's answer receipt. */
+/** `0.4 s`, `34 s`: the same rounding as Graft's answer receipt. */
 function receiptSeconds(ms: number): string {
   const seconds = ms / 1000;
   return `${seconds < 10 ? (Math.round(seconds * 10) / 10).toFixed(1) : String(Math.round(seconds))} s`;

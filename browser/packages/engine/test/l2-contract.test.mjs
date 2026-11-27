@@ -1,4 +1,4 @@
-// The L2 contract: aeon-l2-contract.d.ts type-checks under --strict with a realistic cell and
+// The L2 contract: graft-l2-contract.d.ts type-checks under --strict with a realistic cell and
 // stays short, and the realm carries what it promises: human.*, site.*, page.ref, page.wire,
 // help(topic) and tab-qualified refs (t<tab>:e<id>) that never act on another tab.
 import assert from "node:assert/strict";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { ERRORS } from "@browserkit/protocol";
 import { BrowserRealmServer } from "../dist/code-realm-server.js";
 
-const contract = fileURLToPath(new URL("../contract/aeon-l2-contract.d.ts", import.meta.url));
+const contract = fileURLToPath(new URL("../contract/graft-l2-contract.d.ts", import.meta.url));
 const usage = fileURLToPath(new URL("../contract/l2-usage.ts", import.meta.url));
 const ts = createRequire(import.meta.url)("typescript");
 
@@ -52,7 +52,7 @@ test("the contract rejects misuse: a bare ref string is not a Ref, and handoff k
 
 test("the contract stays at or under 120 lines", () => {
   const lines = readFileSync(contract, "utf8").trimEnd().split("\n").length;
-  assert.ok(lines <= 120, `aeon-l2-contract.d.ts is ${lines} lines`);
+  assert.ok(lines <= 120, `graft-l2-contract.d.ts is ${lines} lines`);
 });
 
 test("WRONG_TAB belongs to the closed error set with a model owner and a hint", () => {

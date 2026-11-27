@@ -17,7 +17,7 @@ import {
 } from "@browserkit/tools/providers-run";
 import type { DaemonHost } from "./host.js";
 
-// Providers and Gemini media through Aeon's daemon: the same adapter and fallback browserkit uses,
+// Providers and Gemini media through Graft's daemon: the same adapter and fallback browserkit uses,
 // with the browser_code cells run by this chat runtime instead of the native bridge.
 
 function runner(host: DaemonHost): CodeRunner {
@@ -32,7 +32,8 @@ async function promptFrom(args: Args): Promise<string> {
   const given = flag(args, "prompt");
   if (given) return given;
   const words = args.positional.slice(1);
-  if (!words.length) throw new Error('Usage: aeon ask <provider> "<prompt>" [--model name] [--ui]');
+  if (!words.length)
+    throw new Error('Usage: graft ask <provider> "<prompt>" [--model name] [--ui]');
   const joined = words.join(" ");
   if (joined.startsWith("@")) return readFile(joined.slice(1), "utf8");
   return joined;
@@ -40,7 +41,7 @@ async function promptFrom(args: Args): Promise<string> {
 
 async function ask(host: DaemonHost, args: Args): Promise<number> {
   const providerId = args.positional[0];
-  if (!providerId) throw new Error(`Usage: aeon ask <${PROVIDER_IDS.join("|")}> "<prompt>"`);
+  if (!providerId) throw new Error(`Usage: graft ask <${PROVIDER_IDS.join("|")}> "<prompt>"`);
   if (!isProviderId(providerId))
     throw new Error(`PROVIDER_UNKNOWN: ${providerId} (${PROVIDER_IDS.join(", ")})`);
   const prompt = await promptFrom(args);
@@ -87,7 +88,7 @@ async function providers(args: Args): Promise<number> {
 async function mediaImage(host: DaemonHost, args: Args): Promise<number> {
   const prompt = args.positional.slice(1).join(" ");
   if (!prompt)
-    throw new Error('Usage: aeon media image "<prompt>" [--image file] [--out name.png]');
+    throw new Error('Usage: graft media image "<prompt>" [--image file] [--out name.png]');
   const images = flag(args, "image")
     ? String(flag(args, "image"))
         .split(",")
@@ -107,7 +108,7 @@ async function mediaImage(host: DaemonHost, args: Args): Promise<number> {
 
 async function mediaYoutube(host: DaemonHost, args: Args): Promise<number> {
   const url = args.positional[1];
-  if (!url) throw new Error('Usage: aeon media youtube <url> [--ask "question"] [--json]');
+  if (!url) throw new Error('Usage: graft media youtube <url> [--ask "question"] [--json]');
   const question = String(
     flag(args, "ask") ?? "Summarise the video with timestamps for the key points.",
   );
@@ -124,7 +125,7 @@ async function media(host: DaemonHost, args: Args): Promise<number> {
   const action = args.positional[0] ?? "image";
   if (action === "image") return mediaImage(host, args);
   if (action === "youtube") return mediaYoutube(host, args);
-  throw new Error("Usage: aeon media image|youtube ...");
+  throw new Error("Usage: graft media image|youtube ...");
 }
 export function providerCommands(host: DaemonHost): Command[] {
   return [
@@ -132,8 +133,8 @@ export function providerCommands(host: DaemonHost): Command[] {
       name: "ask",
       group: "Browser",
       summary: "ask ChatGPT, Gemini, Perplexity, Grok or Kimi with the user's session",
-      help: `Usage: aeon ask <provider> "<prompt>" [--model name] [--ui|--direct] [--timeout ms] [--json]
-       aeon providers [--json]
+      help: `Usage: graft ask <provider> "<prompt>" [--model name] [--ui|--direct] [--timeout ms] [--json]
+       graft providers [--json]
 
 Providers: chatgpt, gemini, perplexity, grok, kimi. The direct transport uses the session already
 in Chrome; when it fails the provider's page is opened, the prompt typed and the answer read.
@@ -144,7 +145,7 @@ in Chrome; when it fails the provider's page is opened, the prompt typed and the
       name: "providers",
       group: "Browser",
       summary: "list chat providers, their models and transports",
-      help: `Usage: aeon providers [--json]
+      help: `Usage: graft providers [--json]
 
 Each provider has a direct transport and a page fallback. An unknown model is accepted with a
 warning instead of rejected, because providers rename models.`,
@@ -154,8 +155,8 @@ warning instead of rejected, because providers rename models.`,
       name: "media",
       group: "Browser",
       summary: "generate or edit an image, or analyse a YouTube video, with Gemini",
-      help: `Usage: aeon media image "<prompt>" [--image workspace.png|url] [--out name.png] [--json]
-       aeon media youtube <url> [--ask "question"] [--json]
+      help: `Usage: graft media image "<prompt>" [--image workspace.png|url] [--out name.png] [--json]
+       graft media youtube <url> [--ask "question"] [--json]
 
 Images are saved in the workspace. YouTube analysis sends the video link to Gemini and returns
 its answer. The primitive path is page.upload + page.saveMedia on gemini.google.com/app.`,

@@ -302,7 +302,7 @@ export function waitMs(options: Record<string, unknown>): number {
   return Number.isFinite(ms) && ms >= 0 ? Math.min(ms, WAIT_MAX) : 30_000;
 }
 
-/** A per-worker random page name: a tap's binding and switch carry nothing that names Aeon. */
+/** A per-worker random page name: a tap's binding and switch carry nothing that names Graft. */
 export function tapName(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return "_" + Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("");

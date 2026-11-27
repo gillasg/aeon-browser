@@ -1,5 +1,5 @@
-// `aeon record start|stop`, plus the browserkit `record gif|video|trace` the command overrides.
-// start leaves a real-window/screen capture running (or switches on Aeon's hidden tab takes); stop
+// `graft record start|stop`, plus the browserkit `record gif|video|trace` the command overrides.
+// start leaves a real-window/screen capture running (or switches on Graft's hidden tab takes); stop
 // writes the final events.json in the folder. The folder is self-contained: frames, clip.mp4 and a
 // log an editor can trust.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -119,17 +119,17 @@ async function start(host: DaemonHost, args: Args): Promise<number> {
   const terminal = keptTerminal(folder);
   await writeEvents(folder, {
     version: 1,
-    recorder: "aeon",
+    recorder: "graft",
     clock: "clip",
     clip,
     events: [],
     ...(terminal ? { terminal } : {}),
-    note: "Recording in progress; run `aeon record stop` to finish the log.",
+    note: "Recording in progress; run `graft record stop` to finish the log.",
   });
   await armBeats((action) => host.film(action), true);
   log(`Recording ${state.source} into ${folder}`);
-  if (state.source === "tabs") log("Aeon's hidden tab takes are on; they are collected at stop.");
-  else log("Keep the window unminimized. Run `aeon record stop` when done.");
+  if (state.source === "tabs") log("Graft's hidden tab takes are on; they are collected at stop.");
+  else log("Keep the window unminimized. Run `graft record stop` when done.");
   return 0;
 }
 
@@ -219,7 +219,7 @@ function baseClip(
     startedAt: state.startedAt,
     durationMs,
     frames: state.frames,
-    ...clipScale(size, Number(process.env.AEON_RECORDING_DPR) || undefined),
+    ...clipScale(size, Number(process.env.GRAFT_RECORDING_DPR) || undefined),
     ...(state.dropped === undefined ? {} : { dropped: state.dropped }),
     ...(state.dup === undefined ? {} : { dup: state.dup }),
   };
@@ -233,7 +233,7 @@ async function clipsForStop(
 ): Promise<ClipMeta[]> {
   if (state.source !== "tabs") return [];
   const recorded = await recordedTabIds(
-    (code) => host.runInBrowser(code, { session: "aeon-record", timeoutMs: 8_000 }),
+    (code) => host.runInBrowser(code, { session: "graft-record", timeoutMs: 8_000 }),
     state.chatId,
     state.startedAt,
   );
@@ -244,13 +244,13 @@ async function clipsForStop(
     ]),
   ];
   const takes = await saveTabTakes(
-    (code) => host.runInBrowser(code, { session: "aeon-record", timeoutMs: 60_000 }),
+    (code) => host.runInBrowser(code, { session: "graft-record", timeoutMs: 60_000 }),
     state.folder,
     tabIds,
   ).catch(() => new Map<number, SavedTake>());
   if (tabIds.length && !takes.size)
     log(
-      "No tab takes could be copied (is Chrome open with Aeon?); clips keep the recording's clock.",
+      "No tab takes could be copied (is Chrome open with Graft?); clips keep the recording's clock.",
     );
   return tabClips(events, clip, recorded, takes);
 }
@@ -270,8 +270,8 @@ async function releaseTabTakes(host: DaemonHost, state: RecordState): Promise<vo
 export function traceNote(chatId: string | undefined, traced: boolean): string | undefined {
   if (traced) return undefined;
   if (chatId)
-    return `The trace of chat ${chatId} could not be read (is it a chat id from \`aeon run\` or \`aeon chats\`?); the clip metadata and frames are still recorded.`;
-  return "No chat was named (use --chat <id> at start or stop to log Aeon's actions); the clip metadata and frames are still recorded.";
+    return `The trace of chat ${chatId} could not be read (is it a chat id from \`graft run\` or \`graft chats\`?); the clip metadata and frames are still recorded.`;
+  return "No chat was named (use --chat <id> at start or stop to log Graft's actions); the clip metadata and frames are still recorded.";
 }
 
 export function stopRecording(
@@ -285,7 +285,7 @@ export function stopRecording(
   const cues = withMarkCues(events.length ? soundCuesFromEvents(events) : [], marks);
   return {
     version: 1,
-    recorder: "aeon",
+    recorder: "graft",
     clock: "clip",
     clip: clips[0] ?? clip,
     ...(clips.length > 0 ? { clips } : {}),
@@ -348,13 +348,13 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
 /** Record one shell command into the folder's events.json. Run it after start and before stop. */
 async function terminal(_host: DaemonHost, args: Args): Promise<number> {
   const command = typeof args.flags?.run === "string" ? args.flags.run : "";
-  if (!command) throw new Error('Usage: aeon record terminal --out <dir> --run "<command>"');
+  if (!command) throw new Error('Usage: graft record terminal --out <dir> --run "<command>"');
   const out = typeof args.flags?.out === "string" ? args.flags.out : undefined;
   let folder: string;
   try {
     folder = out ? defaultFolder(out) : remembered();
   } catch {
-    throw new Error('Usage: aeon record terminal --out <dir> --run "<command>"');
+    throw new Error('Usage: graft record terminal --out <dir> --run "<command>"');
   }
   mkdirSync(folder, { recursive: true });
   const { code, cast } = await runTerminal(command);
@@ -363,7 +363,7 @@ async function terminal(_host: DaemonHost, args: Args): Promise<number> {
   return code;
 }
 
-/** `aeon record`: start/stop are ours; gif/video/trace stay the browserkit command's. */
+/** `graft record`: start/stop are ours; gif/video/trace stay the browserkit command's. */
 /** start/stop/folder/log wired to this host: what shoot, qualify and film drive. */
 export function recordSteps(host: DaemonHost): RecordSteps {
   return {
@@ -380,24 +380,24 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     name: "record",
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
-    help: `Usage: aeon record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>] [--display :N]
-       aeon record stop [--out <dir>] [--chat <id>] [--defer-clip]
-       aeon record qualify <clip.json> [--runs 3]
-       aeon record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
-       aeon record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
-       aeon record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--display :N] [--background]
-       aeon record terminal --out <dir> --run "<command>"
-       aeon record ui cursor|sidepanel|home|chat|manage|chats|automations|sites|settings|models|learn|reload [--mark <name>] [--out <dir>] [--display :N]
-       aeon record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>] [--browser <name>] [--display :N]
-       aeon record assemble <dir...> [--out <file.mp4>] [--width 1920] [--height 1080] [--fps 30] [--max-idle <ms>] [--zoom] [--sound] [--end-cmd "<cmd>"] [--end-repo "<url>"] [--ffmpeg <bin>]
-       aeon record gif|video|trace …   (the original screen recordings)
+    help: `Usage: graft record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>] [--display :N]
+       graft record stop [--out <dir>] [--chat <id>] [--defer-clip]
+       graft record qualify <clip.json> [--runs 3]
+       graft record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
+       graft record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
+       graft record run "<prompt>" [--url <url>] [--out <dir>] [--window chrome|--tabs] [--no-mouse] [--tail 2.5] [--browser <name>] [--display :N] [--background]
+       graft record terminal --out <dir> --run "<command>"
+       graft record ui cursor|sidepanel|home|chat|manage|chats|automations|sites|settings|models|learn|reload [--mark <name>] [--out <dir>] [--display :N]
+       graft record shoot <plan.json> [--out <dir-or-mp4>] [--assemble] [--no-mouse] [--fps 30] [--zoom] [--sound] [--max-idle <ms>] [--browser <name>] [--display :N]
+       graft record assemble <dir...> [--out <file.mp4>] [--width 1920] [--height 1080] [--fps 30] [--max-idle <ms>] [--zoom] [--sound] [--end-cmd "<cmd>"] [--end-repo "<url>"] [--ffmpeg <bin>]
+       graft record gif|video|trace …   (the original screen recordings)
 
 start captures the real window (x11grab on Linux, avfoundation on macOS, gdigrab on
 Windows) into a folder with frames, clip.mp4 and events.json. --tabs records every tab
 the chat drives, including one opened mid-run, and stop writes one clip per tab.
 terminal records a command and its output into that folder's events.json; the video
 kit draws it beside the tab. Run it after start and before stop.
---no-mouse keeps the OS pointer out of the frames (only Aeon's cursor is on camera). mark names a
+--no-mouse keeps the OS pointer out of the frames (only Graft's cursor is on camera). mark names a
 beat on the clip clock; --selector also records the element's box (page CSS px) and windowBox
 (clip px), read without any automation glow; stop merges marks (and their --cue sounds) into
 events.json. wait blocks on a real condition, never a sleep: an element, a URL, a loaded page, or
@@ -408,7 +408,7 @@ run turns Work in front on for the take (restored after) so the agent's tabs are
 --browser picks one connected Chrome profile; mark, wait and stop follow the one start used. On
 Linux a browser set up by setup-recording-chrome.sh brings its own X display and DPR; --display
 overrides DISPLAY for capture, xdotool and xwininfo.
-ui drives Aeon's own surfaces on camera: cursor summons the cursor box (Alt+Shift+Space),
+ui drives Graft's own surfaces on camera: cursor summons the cursor box (Alt+Shift+Space),
 sidepanel opens the side panel from the cursor box, home|chat open the new-chat canvas (home.html?host=panel),
 manage opens Manage, chats|automations|sites|settings|models|learn open that Manage page, all in one
 reused tab (never a new grouped tab), reload reloads the active tab; --mark marks
@@ -423,7 +423,7 @@ order with hard cuts, --max-idle trims stillness longer than that between beats 
 arrivals and receipts stay), --zoom punches in on marked boxes but never past native pixels (a
 2560x1440 master allows 1.33x into 1080p), --sound scores keys, triggers and arrival chords, and
 --end-cmd/--end-repo add a plain end card. Default to shoot + assemble for walkthroughs; the
-Remotion kit (\`aeon video kit\`) is for short flagship launch cuts.`,
+Remotion kit (\`graft video kit\`) is for short flagship launch cuts.`,
     run: async (args: Args) => {
       const action = args.positional[0];
       useRecordingBrowser(args, host.browser);
@@ -443,18 +443,18 @@ Remotion kit (\`aeon video kit\`) is for short flagship launch cuts.`,
         return (await import("./record-shoot-cmd.js")).recordUi(host, steps, args);
       if (original) return original.run({ ...args, positional: args.positional.slice(1) });
       throw new Error(
-        "Usage: aeon record start|stop|mark|wait|run|terminal|ui|shoot|qualify|assemble|gif|video|trace",
+        "Usage: graft record start|stop|mark|wait|run|terminal|ui|shoot|qualify|assemble|gif|video|trace",
       );
     },
   };
 }
 
-/** `aeon video kit <dir>` copies the Remotion starter kit (templates are not built into Aeon). */
+/** `graft video kit <dir>` copies the Remotion starter kit (templates are not built into Graft). */
 export async function videoCommand(args: Args): Promise<number> {
   const action = args.positional[0];
-  if (action !== "kit") throw new Error("Usage: aeon video kit <dir>");
+  if (action !== "kit") throw new Error("Usage: graft video kit <dir>");
   const dir = args.positional[1];
-  if (!dir) throw new Error("Usage: aeon video kit <dir>");
+  if (!dir) throw new Error("Usage: graft video kit <dir>");
   const { copyKit } = await import("./video-kit.js");
   const target = await copyKit(dir);
   log(

@@ -59,7 +59,7 @@ export interface AccountDeps {
 export type AccountAction = "save" | "switch" | "list" | "current" | "remove";
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const STORAGE_KEY = "aeon.accountJars";
+const STORAGE_KEY = "graft.accountJars";
 
 /** The origin a jar belongs to: scheme and host (and port), never a path. */
 export function jarOrigin(input: string): string {

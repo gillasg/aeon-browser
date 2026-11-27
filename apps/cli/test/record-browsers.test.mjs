@@ -13,16 +13,16 @@ test("--display wins; the saved display fills in a missing DISPLAY when its sock
   const saved = { display: ":120", dpr: 2 };
   assert.deepEqual(recordingEnv(":7", saved, { DISPLAY: ":20" }, live), {
     DISPLAY: ":7",
-    AEON_RECORDING_DPR: "2",
+    GRAFT_RECORDING_DPR: "2",
   });
   assert.deepEqual(recordingEnv(undefined, saved, {}, live), {
     DISPLAY: ":120",
-    AEON_RECORDING_DPR: "2",
+    GRAFT_RECORDING_DPR: "2",
   });
   assert.deepEqual(recordingEnv(undefined, saved, { DISPLAY: ":20" }, live), {
-    AEON_RECORDING_DPR: "2",
+    GRAFT_RECORDING_DPR: "2",
   });
-  assert.deepEqual(recordingEnv(undefined, saved, { AEON_RECORDING_DPR: "3" }, dead), {});
+  assert.deepEqual(recordingEnv(undefined, saved, { GRAFT_RECORDING_DPR: "3" }, dead), {});
   assert.deepEqual(recordingEnv(undefined, undefined, {}, live), {});
 });
 
@@ -38,7 +38,7 @@ test("a local display is live by its X socket; a remote one is trusted", () => {
 });
 
 test("browsers.json is read per name and tolerates a missing or broken file", () => {
-  const dir = mkdtempSync(join(tmpdir(), "aeon-browsers-"));
+  const dir = mkdtempSync(join(tmpdir(), "graft-browsers-"));
   const file = join(dir, "browsers.json");
   assert.equal(savedBrowser("recording", file), undefined);
   writeFileSync(file, "{oops");

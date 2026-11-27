@@ -4,8 +4,8 @@ $ErrorActionPreference = 'Stop'
 $taskService = New-Object -ComObject 'Schedule.Service'
 $taskService.Connect()
 $taskFolder = $taskService.GetFolder('\')
-$taskName = 'Aeon-Core-Login'
-$description = 'Aeon owned login startup: ' + $StartupScript
+$taskName = 'Graft-Core-Login'
+$description = 'Graft owned login startup: ' + $StartupScript
 $powerShellArguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $StartupScript + '"'
 # conhost --headless gives PowerShell no console at all; -WindowStyle Hidden alone still flashes.
 $hostPath = Join-Path $env:WINDIR 'System32\conhost.exe'

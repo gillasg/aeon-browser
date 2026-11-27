@@ -1,5 +1,5 @@
-import type { BrowserTraceAction } from "@aeon/domain";
-import type { BrowserTraceActionDto } from "@aeon/protocol";
+import type { BrowserTraceAction } from "@graft/domain";
+import type { BrowserTraceActionDto } from "@graft/protocol";
 
 // The daemon parses these actions with the protocol DTO before a view sees them. A field this
 // projection can emit that the DTO lacks would fail that parse and drop the whole tool message,
@@ -15,7 +15,7 @@ export type BrowserTraceActionFieldsMatchProtocol = Assert<
 >;
 
 // The timed actions of one browser_code call, from the steps the browser recorded: kept in the
-// tool result's details (not shown to the model) and surfaced by `aeon trace`. Screen recorders
+// tool result's details (not shown to the model) and surfaced by `graft trace`. Screen recorders
 // (Aperture) rely on them to zoom on each action; keep the shape.
 const MAX_ACTIONS = 500;
 

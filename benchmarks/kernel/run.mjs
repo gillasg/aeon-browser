@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Kernel bench: how fast and how steady Aeon's browser layer is, with no model. Eight everyday jobs
+// Kernel bench: how fast and how steady Graft's browser layer is, with no model. Eight everyday jobs
 // (open, snapshot, read, click, fill, lazy list, three tabs, fetch), each run a few times through
-// `aeon repl`; medians, successes and output size (what an agent would read) per job.
+// `graft repl`; medians, successes and output size (what an agent would read) per job.
 //
 //   node benchmarks/kernel/run.mjs --browser eval [--reps 3] [--only id,id] [--save-baseline]
 //
@@ -35,7 +35,7 @@ new IntersectionObserver(async (e, io) => { if (!e[0].isIntersecting || n >= 5) 
   "/c": `<!doctype html><title>Page C</title><p>C</p>`,
 };
 
-/** The jobs, as Aeon browser code against a local server at `base`. Each ends with a value. */
+/** The jobs, as Graft browser code against a local server at `base`. Each ends with a value. */
 export function jobs(base) {
   const at = (p) => JSON.stringify(base + p);
   return [
@@ -82,7 +82,7 @@ export function jobs(base) {
   ];
 }
 
-/** One `aeon repl` cell: wall time, success against `expect`, and how much it printed. */
+/** One `graft repl` cell: wall time, success against `expect`, and how much it printed. */
 export function cell(
   code,
   { browser, session = "kernel", cli = path.join(root, "apps/cli/dist/cli.js") },

@@ -6,8 +6,8 @@ import {
   CoreAttentionSnapshotSchema,
   type CoreAttentionAlert,
   type CoreAttentionRequest,
-} from "@aeon/protocol";
-import type { ChatId, PiMessageProjection, PiSessionEvent } from "@aeon/domain";
+} from "@graft/protocol";
+import type { ChatId, PiMessageProjection, PiSessionEvent } from "@graft/domain";
 import type { ChatService } from "./chat-service.js";
 
 interface AttentionRecord {

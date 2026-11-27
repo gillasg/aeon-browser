@@ -25,11 +25,11 @@ export async function waitUntilDaemonIdle(
   for (;;) {
     const reply = await readProbe(options.probe);
     if (!reply) {
-      options.write("Aeon is not running, so this update will not interrupt a chat.\n");
+      options.write("Graft is not running, so this update will not interrupt a chat.\n");
       return "down";
     }
     if (reply.idle) {
-      if (waited) options.write("Aeon is idle. Updating.\n");
+      if (waited) options.write("Graft is idle. Updating.\n");
       return "idle";
     }
     waited = true;
@@ -63,8 +63,8 @@ export function mergeActivity(
 
 /** Null when nothing is listening. A failed activity read falls back to the attention snapshot. */
 export async function probeDaemonActivity(): Promise<ActivityReply | null> {
-  const { AeonClient } = await import("./client.js");
-  const client = await AeonClient.connect().catch(() => undefined);
+  const { GraftClient } = await import("./client.js");
+  const client = await GraftClient.connect().catch(() => undefined);
   if (!client) return null;
   try {
     return await client.activity();
@@ -87,5 +87,5 @@ async function readProbe(
 
 function waitingLine(busy: string[]): string {
   const why = busy.length ? busy.join("; ") : "work is still running";
-  return `Waiting for Aeon to finish (${why}). The update has not started; Ctrl+C leaves that work running.\n`;
+  return `Waiting for Graft to finish (${why}). The update has not started; Ctrl+C leaves that work running.\n`;
 }

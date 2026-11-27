@@ -227,7 +227,7 @@ export interface PiMessageProjection {
 
 /**
  * One browser action inside a tool call: what ran, in which tab, when its input reached the page
- * and where (viewport CSS pixels). Screen recorders (Aeon Recorder) read these through `aeon trace`;
+ * and where (viewport CSS pixels). Screen recorders (Graft Recorder) read these through `graft trace`;
  * keep the shape.
  */
 export interface BrowserTraceAction {
@@ -356,7 +356,7 @@ export interface PiSessionPort {
     messages: Record<string, unknown>[];
     tools: Record<string, unknown>[];
   }): Promise<Record<string, unknown>>;
-  /** Chat tools for agents outside Aeon: definitions, and one call in a named session. */
+  /** Chat tools for agents outside Graft: definitions, and one call in a named session. */
   externalTools?(): unknown[];
   callExternalTool?(
     name: string,

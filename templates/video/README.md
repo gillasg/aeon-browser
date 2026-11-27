@@ -1,12 +1,12 @@
-# Aeon Open Studio
+# Graft Open Studio
 
-A blank Remotion canvas around a real `aeon record` take. The camera is fixed: real Chrome,
+A blank Remotion canvas around a real `graft record` take. The camera is fixed: real Chrome,
 real frames, real timestamps. The edit is not: every video's `src/Scene.tsx` is written from
-scratch around its footage. Get the kit with `aeon video kit <dir>`; it is not part of Aeon's build.
+scratch around its footage. Get the kit with `graft video kit <dir>`; it is not part of Graft's build.
 
 ## The loop
 
-1. **Capture.** `aeon film clip.json --out shoot/` (or `aeon record start` / `stop`) writes
+1. **Capture.** `graft film clip.json --out shoot/` (or `graft record start` / `stop`) writes
    `take/frames/*.jpg`, `take/events.json` (see [EVENTS.md](EVENTS.md)), `contact.png` and
    `take.json`. `scripts/setup-recording-chrome.sh` starts the clean recording Chrome.
 2. **Stage.** `cp take/events.json src/recording.json`; frames are staged by `--frames-dir`.
@@ -19,12 +19,12 @@ scratch around its footage. Get the kit with `aeon video kit <dir>`; it is not p
 5. **Render.** `node scripts/render.mjs Scene --out out/film.mp4` writes the MP4 and
    `out/film.mp4.json` (composition, size, fps, frames, elapsedMs).
 
-`aeon film render --kit <dir> --take <take> [--stills ...] [--out file]` runs steps 2, 4 and 5.
+`graft film render --kit <dir> --take <take> [--stills ...] [--out file]` runs steps 2, 4 and 5.
 
 ## Compositions
 
 - `Scene`: yours, 1920x1080 at 60 fps by default; starts as the raw take full-bleed.
 - `RecordingRaw`: the unedited proof, frames edge to edge, nothing added.
 
-Bundles are cached per kit hash in `out/.bundle-<hash>`. Honesty rule: never show Aeon doing
+Bundles are cached per kit hash in `out/.bundle-<hash>`. Honesty rule: never show Graft doing
 anything it did not do; label every speed change.

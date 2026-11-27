@@ -1,4 +1,4 @@
-// What Aeon can do, in the user's words, for the Learn page. Each entry has an example that
+// What Graft can do, in the user's words, for the Learn page. Each entry has an example that
 // "Try it" puts in the ask box. Kept in step with the feature list: a new user-visible feature
 // that someone would ask for gets an entry here in the same change.
 import { summonShortcut } from "./platform.js";
@@ -24,7 +24,7 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "browse",
     title: "Work in your own Chrome",
-    body: "Aeon uses your real tabs, signed in as you. No copy-pasting between apps.",
+    body: "Graft uses your real tabs, signed in as you. No copy-pasting between apps.",
     example: "Find my unread LinkedIn messages and draft a short reply to each",
   },
   {
@@ -49,7 +49,7 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "browse",
     title: "Research in the background",
-    body: "Aeon opens its own tabs out of your way and closes them when it's done.",
+    body: "Graft opens its own tabs out of your way and closes them when it's done.",
     example: "Compare the five most popular note-taking apps: price, offline support and sharing",
   },
   {
@@ -86,7 +86,7 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "browse",
     title: "Fills in your details",
-    body: "Name, address and other details go into forms from a profile kept on this computer; the AI never reads them. Anything missing, Aeon asks you and can keep.",
+    body: "Name, address and other details go into forms from a profile kept on this computer; the AI never reads them. Anything missing, Graft asks you and can keep.",
     example: "Fill in the sign-up form I have open with my details",
   },
   {
@@ -104,7 +104,7 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "watch",
     title: "Tell me when it changes",
-    body: "Aeon checks a page for you and only tells you about what's new.",
+    body: "Graft checks a page for you and only tells you about what's new.",
     example: "Tell me when a new apartment under $2,000 is listed on Zillow in Mission District",
   },
   {
@@ -122,44 +122,44 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "watch",
     title: "Repeat a chore without AI",
-    body: "Once Aeon knows the steps, a routine runs them with no model calls at all.",
+    body: "Once Graft knows the steps, a routine runs them with no model calls at all.",
     example: "Fill in my timesheet every Friday at 5pm",
   },
   {
     topic: "watch",
     title: "Grab it the moment it opens",
-    body: "Aeon gets the page ready early and acts the second a slot, drop or sign-up opens.",
+    body: "Graft gets the page ready early and acts the second a slot, drop or sign-up opens.",
     example: "Book the 7am spin class the moment booking opens at 9:00 tomorrow",
   },
   {
     topic: "watch",
     title: "A table that fills itself",
-    body: "Give it a list and the columns you want; Aeon fills them from the web and keeps them current.",
+    body: "Give it a list and the columns you want; Graft fills them from the web and keeps them current.",
     example:
       "Make a table of these startups with their latest funding round and refresh it every week: ",
   },
   {
     topic: "sites",
     title: "Gets faster on sites you use",
-    body: "Aeon learns a site's own data calls as it works, so the next time takes seconds.",
+    body: "Graft learns a site's own data calls as it works, so the next time takes seconds.",
     example: "Get my last 50 Amazon orders as a table",
   },
   {
     topic: "sites",
     title: "Make a one-tap ability",
-    body: "Describe it once and Aeon builds and tests an ability you can run any time.",
+    body: "Describe it once and Graft builds and tests an ability you can run any time.",
     example: "Make me a 'prescription ready?' check for my pharmacy",
   },
   {
     topic: "sites",
     title: "Show it once",
-    body: "Do a task by hand while Aeon watches, then let it do the rest.",
+    body: "Do a task by hand while Graft watches, then let it do the rest.",
     example: "Watch me file one expense report, then file the other nine",
   },
   {
     topic: "sites",
     title: "Signs in for you",
-    body: "Your password manager fills the form, codes included. Aeon never sees the password.",
+    body: "Your password manager fills the form, codes included. Graft never sees the password.",
     example: "Sign in to my electricity account and download the latest bill",
   },
   {
@@ -172,19 +172,19 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   {
     topic: "sites",
     title: "Ask several shops at once",
-    body: "One question to the sites Aeon knows, one answer showing where each part came from.",
+    body: "One question to the sites Graft knows, one answer showing where each part came from.",
     example: "Which of Amazon, Flipkart and Croma has the Sony WH-1000XM5 cheapest right now?",
   },
   {
     topic: "sites",
     title: "Use a site from your other apps",
-    body: "Any site Aeon knows can become an API or an MCP server that other tools call, signed in as you.",
+    body: "Any site Graft knows can become an API or an MCP server that other tools call, signed in as you.",
     example: "Turn Goodreads into an MCP server I can use from Claude Desktop",
   },
   {
     topic: "shortcuts",
-    title: "Call Aeon on any page",
-    body: `${summonShortcut} opens Aeon with the page you're on as context.`,
+    title: "Call Graft on any page",
+    body: `${summonShortcut} opens Graft with the page you're on as context.`,
     example: "Summarise the page I have open in five bullets",
   },
   {
@@ -201,28 +201,28 @@ export const LEARN_ITEMS: readonly LearnItem[] = [
   },
   {
     topic: "shortcuts",
-    title: "Change how Aeon works",
+    title: "Change how Graft works",
     body: "Ask in chat to change its tab view, cursor or tab groups, and it sticks.",
     example: "From now on, show the agent's tabs in split view next to the chat",
   },
   {
     topic: "shortcuts",
     title: "Record what it does",
-    body: "A clean video of the run, with no Aeon controls in the shot.",
+    body: "A clean video of the run, with no Graft controls in the shot.",
     example:
       "Book a table for two on OpenTable and record it as a video, stopping before you confirm",
   },
   {
     topic: "shortcuts",
     title: "Use it from the terminal",
-    body: "aeon run starts a chat from any shell; coding agents use it too.",
+    body: "graft run starts a chat from any shell; coding agents use it too.",
     example: "Find my last Uber receipt",
   },
   {
     topic: "shortcuts",
-    title: "Use Aeon from other agents",
-    body: "aeon mcp gives Claude Code, Codex or any MCP client Aeon's own browser tools, or a whole task.",
-    example: "Show me how to add Aeon to my coding agent as an MCP server",
+    title: "Use Graft from other agents",
+    body: "graft mcp gives Claude Code, Codex or any MCP client Graft's own browser tools, or a whole task.",
+    example: "Show me how to add Graft to my coding agent as an MCP server",
   },
   {
     topic: "shortcuts",

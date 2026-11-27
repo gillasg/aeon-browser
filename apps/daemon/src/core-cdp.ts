@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 
-// `aeon cdp`: the daemon's Core endpoint starts, reports or stops the local DevTools endpoint.
+// `graft cdp`: the daemon's Core endpoint starts, reports or stops the local DevTools endpoint.
 // The server itself lives in @browserkit/cdp; this command only reaches the browser control
 // service, which sends every page command down the executor socket the extension already uses.
 export function handleCdpRequest(

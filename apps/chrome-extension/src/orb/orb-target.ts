@@ -36,11 +36,11 @@ let pointer: { x: number; y: number } | undefined;
 let latest: { x: number; y: number } | undefined;
 let pending = false;
 let element: Element | undefined;
-const aeonHosts = new Set<Element>();
+const graftHosts = new Set<Element>();
 
-/** Aeon's own layers that carry no marker of their own (the page must not find them). */
+/** Graft's own layers that carry no marker of their own (the page must not find them). */
 export function skipHost(host: Element): void {
-  aeonHosts.add(host);
+  graftHosts.add(host);
 }
 
 export function trackPointer(): void {
@@ -100,7 +100,7 @@ function pointedTarget(): SummonTarget | undefined {
   if (!pointer) return undefined;
   const stack = document
     .elementsFromPoint(pointer.x, pointer.y)
-    .filter((node) => !aeonHosts.has(node)) as unknown as TargetNode[];
+    .filter((node) => !graftHosts.has(node)) as unknown as TargetNode[];
   const viewport = { width: innerWidth, height: innerHeight };
   const hit = pickTarget(stack, viewport) as unknown as Element | undefined;
   if (!hit) return undefined;
@@ -142,7 +142,7 @@ let fadeTimer = 0;
 const OUTLINE_STYLE =
   CURSOR_TOKEN_CSS +
   ".box{position:fixed;pointer-events:none;box-sizing:border-box;border-radius:4px;" +
-  "outline:1.5px solid var(--aeon-island-ring);outline-offset:1px;opacity:1;" +
+  "outline:1.5px solid var(--graft-island-ring);outline-offset:1px;opacity:1;" +
   "transition:opacity 180ms cubic-bezier(.2,0,0,1)}.box.fade{opacity:0}" +
   "@media (prefers-reduced-motion: reduce){.box{transition:none}}";
 
@@ -150,7 +150,7 @@ function outlineLayer(): { host: HTMLElement; box: HTMLElement } {
   if (outline) return outline;
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;inset:0;z-index:2147483646;pointer-events:none";
-  host.setAttribute("data-aeon-overlay", "");
+  host.setAttribute("data-graft-overlay", "");
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = OUTLINE_STYLE;

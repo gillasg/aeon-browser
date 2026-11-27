@@ -17,8 +17,8 @@ test("each observable signal is named", () => {
   const report = judgeStealth(
     {
       webdriver: true,
-      globals: ["__aeonDemo"],
-      overlays: ["#aeon-handoff"],
+      globals: ["__graftDemo"],
+      overlays: ["#graft-handoff"],
       wrapped: ["window.open"],
       geolocationShim: true,
     },
@@ -28,8 +28,8 @@ test("each observable signal is named", () => {
   assert.equal(report.signals.length, 7);
   assert.match(report.signals.join("\n"), /navigator\.webdriver/);
   assert.match(report.signals.join("\n"), /Runtime domain/);
-  assert.match(report.signals.join("\n"), /__aeonDemo/);
-  assert.match(report.signals.join("\n"), /#aeon-handoff/);
+  assert.match(report.signals.join("\n"), /__graftDemo/);
+  assert.match(report.signals.join("\n"), /#graft-handoff/);
   assert.match(report.signals.join("\n"), /window\.open/);
   assert.match(report.signals.join("\n"), /quiet tab/);
   assert.deepEqual(report.diagnostics, []);

@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-// Saved reads: the last text Aeon read from each page (page.markdown, page.data, page.table in
+// Saved reads: the last text Graft read from each page (page.markdown, page.data, page.table in
 // browser code). When the user comes back to one of those pages, the page shows what changed
 // since then ("2 changes since Tue") and the snapshot moves on to what they saw. Only pages
-// Aeon has read are kept; the user's other browsing is never stored.
+// Graft has read are kept; the user's other browsing is never stored.
 
 export interface SavedRead {
   url: string;
@@ -62,7 +62,7 @@ export async function putSavedRead(
   text: string,
   options: { onlyIfKnown?: boolean } = {},
 ): Promise<boolean> {
-  if (!/^(https?|aeon-api):/i.test(url)) return false;
+  if (!/^(https?|graft-api):/i.test(url)) return false;
   if (options.onlyIfKnown && !(await getSavedRead(root, url))) return false;
   const lines = readLines(text);
   if (!lines.length) return false;

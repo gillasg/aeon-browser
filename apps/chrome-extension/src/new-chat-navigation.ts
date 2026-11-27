@@ -4,7 +4,7 @@ export function openNewChat(projectId?: unknown): void {
   const project = typeof projectId === "string" && projectId ? projectId : undefined;
   const panel = document.body.dataset.host === "panel";
   if (panel) {
-    window.parent.postMessage({ kind: "aeon.new-chat", projectId: project }, location.origin);
+    window.parent.postMessage({ kind: "graft.new-chat", projectId: project }, location.origin);
     return;
   }
   const url = new URL(chrome.runtime.getURL("home.html"));

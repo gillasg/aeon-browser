@@ -2,27 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { launchAgent, serviceEnvironment, systemdUnit } from "../scripts/service-files.mjs";
 
-const paths = { node: "/usr/bin/node", hostEntry: "/opt/Aeon Support/native-host.mjs" };
+const paths = { node: "/usr/bin/node", hostEntry: "/opt/Graft Support/native-host.mjs" };
 
 test("the install's data locations travel with the login service", () => {
   assert.deepEqual(serviceEnvironment({}), []);
-  const env = { XDG_DATA_HOME: "/mnt/data", AEON_DATA_DIR: "/srv/aeon data" };
+  const env = { XDG_DATA_HOME: "/mnt/data", GRAFT_DATA_DIR: "/srv/graft data" };
   assert.deepEqual(serviceEnvironment(env), [
     ["XDG_DATA_HOME", "/mnt/data"],
-    ["AEON_DATA_DIR", "/srv/aeon data"],
+    ["GRAFT_DATA_DIR", "/srv/graft data"],
   ]);
 
   const unit = systemdUnit({ ...paths, env });
   assert.match(unit, /Environment="XDG_DATA_HOME=\/mnt\/data"/);
-  assert.match(unit, /Environment="AEON_DATA_DIR=\/srv\/aeon data"/);
-  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/opt\/Aeon Support\/native-host.mjs"/);
+  assert.match(unit, /Environment="GRAFT_DATA_DIR=\/srv\/graft data"/);
+  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/opt\/Graft Support\/native-host.mjs"/);
 
-  const plist = launchAgent({ ...paths, root: "/home/user/Library/Application Support/Aeon", env });
+  const plist = launchAgent({
+    ...paths,
+    root: "/home/user/Library/Application Support/Graft",
+    env,
+  });
   assert.match(
     plist,
     /<key>EnvironmentVariables<\/key>\s*<dict>\s*<key>XDG_DATA_HOME<\/key><string>\/mnt\/data<\/string>/,
   );
-  assert.match(plist, /<key>AEON_DATA_DIR<\/key><string>\/srv\/aeon data<\/string>/);
+  assert.match(plist, /<key>GRAFT_DATA_DIR<\/key><string>\/srv\/graft data<\/string>/);
 });
 
 test("a service without custom data locations carries no environment block", () => {
@@ -35,7 +39,7 @@ test("a service without custom data locations carries no environment block", () 
 test("unit values escape quotes, backslashes and percent signs", () => {
   const unit = systemdUnit({
     ...paths,
-    env: { AEON_DATA_DIR: '/srv/a\\b"c%h' },
+    env: { GRAFT_DATA_DIR: '/srv/a\\b"c%h' },
   });
-  assert.ok(unit.includes('Environment="AEON_DATA_DIR=/srv/a\\\\b\\"c%%h"'), unit);
+  assert.ok(unit.includes('Environment="GRAFT_DATA_DIR=/srv/a\\\\b\\"c%%h"'), unit);
 });

@@ -15,7 +15,7 @@ export function SettingsGroup({
   return (
     <section className="settings-group">
       <h2>{title}</h2>
-      <ul className="aeon-list settings-list">{children}</ul>
+      <ul className="graft-list settings-list">{children}</ul>
       {footer && <p className="settings-footnote">{footer}</p>}
     </section>
   );
@@ -48,7 +48,7 @@ export function SwitchRow({
         <input
           type="checkbox"
           role="switch"
-          className="aeon-switch"
+          className="graft-switch"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
         />
@@ -74,7 +74,7 @@ export function MenuRow<Value extends string>({
     <li className="settings-row">
       <label>
         <RowText label={label} detail={detail} />
-        <span className="aeon-menu">
+        <span className="graft-menu">
           <select value={value} onChange={(event) => onChange(event.target.value as Value)}>
             {options.map(([option, text]) => (
               <option key={option} value={option}>
@@ -109,7 +109,7 @@ export function ActionRow({
     <li className="settings-row" data-tone={tone}>
       <div>
         <RowText label={label} detail={detail} />
-        <button type="button" className="aeon-button" onClick={onClick}>
+        <button type="button" className="graft-button" onClick={onClick}>
           {action}
         </button>
       </div>
@@ -173,7 +173,7 @@ export function AddRow({
           {...(inputMode ? { inputMode } : {})}
           onChange={(event) => setDraft(event.target.value)}
         />
-        <button type="submit" className="aeon-button" disabled={!valid(draft)}>
+        <button type="submit" className="graft-button" disabled={!valid(draft)}>
           {action}
         </button>
       </form>

@@ -1,17 +1,17 @@
 # A stranger's install, on a machine that has nothing but the runner image.
 #
-# The Aeon steps below are the README commands verbatim: the one-line installer does the clone,
+# The Graft steps below are the README commands verbatim: the one-line installer does the clone,
 # dependency install, build, native-host/service registration and CLI install. There is no
 # pnpm/action-setup, no `pnpm install`, no `pnpm build` and no repo-internal setup call.
 #
-# Three things are runner aids, not Aeon shortcuts, and are called out in the report:
+# Three things are runner aids, not Graft shortcuts, and are called out in the report:
 #  1. actions/checkout + a git insteadOf rule point the installer's clone at the commit under test
 #     (a stranger's clone comes from main; CI must test the branch).
 #  2. The installer script is served from that checkout over loopback HTTP so the exact
 #     `curl ... | sh` / `irm ... | iex` shape is exercised.
 #  3. Chrome for Testing loads the *unpacked* extension with --load-extension in a private profile.
 #     Branded Chrome ignores that switch and a runner has no human to do the three clicks in
-#     chrome://extensions, so the guided path is exercised as output by `aeon setup --yes
+#     chrome://extensions, so the guided path is exercised as output by `graft setup --yes
 #     --no-wait` below. Native messaging is still real: the documented per-profile manifest
 #     copy from README "Local connections" is done before Chrome starts.
 name: Clean install
@@ -102,7 +102,7 @@ jobs:
           echo "Chrome for Testing: $posix_bin"
 
       # Runner aids: a display and Chrome's shared libraries. A normal desktop already has them;
-      # they are not part of Aeon's install.
+      # they are not part of Graft's install.
       - name: Runner aids (Linux display and Chrome libraries)
         if: runner.os == 'Linux'
         shell: bash
@@ -130,22 +130,22 @@ jobs:
             tmp="$(cygpath -u "$RUNNER_TEMP")"
             localappdata="$(cygpath -u "$LOCALAPPDATA")"
             appdata="$(cygpath -u "$APPDATA")"
-            echo "EXTENSION_FOLDER=$localappdata/Aeon/data/extension" >> "$GITHUB_ENV"
-            echo "MANIFEST_SRC=$localappdata/Aeon/com.aeon.native_host.json" >> "$GITHUB_ENV"
-            echo "AEON_BIN_DIR=$appdata/npm" >> "$GITHUB_ENV"
+            echo "EXTENSION_FOLDER=$localappdata/Graft/data/extension" >> "$GITHUB_ENV"
+            echo "MANIFEST_SRC=$localappdata/Graft/com.graft.native_host.json" >> "$GITHUB_ENV"
+            echo "GRAFT_BIN_DIR=$appdata/npm" >> "$GITHUB_ENV"
           elif [ "$RUNNER_OS" = "macOS" ]; then
-            echo "EXTENSION_FOLDER=$HOME/Library/Application Support/Aeon/data/extension" >> "$GITHUB_ENV"
-            echo "MANIFEST_SRC=$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.aeon.native_host.json" >> "$GITHUB_ENV"
-            echo "AEON_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
+            echo "EXTENSION_FOLDER=$HOME/Library/Application Support/Graft/data/extension" >> "$GITHUB_ENV"
+            echo "MANIFEST_SRC=$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.graft.native_host.json" >> "$GITHUB_ENV"
+            echo "GRAFT_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
           else
-            echo "EXTENSION_FOLDER=${XDG_DATA_HOME:-$HOME/.local/share}/aeon/data/extension" >> "$GITHUB_ENV"
-            echo "MANIFEST_SRC=${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome-for-testing/NativeMessagingHosts/com.aeon.native_host.json" >> "$GITHUB_ENV"
-            echo "AEON_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
+            echo "EXTENSION_FOLDER=${XDG_DATA_HOME:-$HOME/.local/share}/graft/data/extension" >> "$GITHUB_ENV"
+            echo "MANIFEST_SRC=${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome-for-testing/NativeMessagingHosts/com.graft.native_host.json" >> "$GITHUB_ENV"
+            echo "GRAFT_BIN_DIR=$HOME/.local/bin" >> "$GITHUB_ENV"
           fi
-          echo "CHROME_PROFILE=$tmp/aeon-chrome-profile" >> "$GITHUB_ENV"
-          echo "MARKER=$tmp/aeon-extension-loaded" >> "$GITHUB_ENV"
-          echo "LOADER_LOG=$tmp/aeon-loader.log" >> "$GITHUB_ENV"
-          echo "CHROME_LOG=$tmp/aeon-chrome.log" >> "$GITHUB_ENV"
+          echo "CHROME_PROFILE=$tmp/graft-chrome-profile" >> "$GITHUB_ENV"
+          echo "MARKER=$tmp/graft-extension-loaded" >> "$GITHUB_ENV"
+          echo "LOADER_LOG=$tmp/graft-loader.log" >> "$GITHUB_ENV"
+          echo "CHROME_LOG=$tmp/graft-chrome.log" >> "$GITHUB_ENV"
 
       # CI-only: serve the installer from the checkout over loopback, so the README's pipe-to-shell
       # command is what actually runs.
@@ -173,7 +173,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          helper="$RUNNER_TEMP/aeon-load-extension.sh"
+          helper="$RUNNER_TEMP/graft-load-extension.sh"
           cat > "$helper" <<'EOS'
           #!/usr/bin/env bash
           set -euo pipefail
@@ -187,9 +187,9 @@ jobs:
             sleep 1
           done
           mkdir -p "$CHROME_PROFILE/NativeMessagingHosts"
-          cp "$MANIFEST_SRC" "$CHROME_PROFILE/NativeMessagingHosts/com.aeon.native_host.json"
+          cp "$MANIFEST_SRC" "$CHROME_PROFILE/NativeMessagingHosts/com.graft.native_host.json"
           # GitHub's Ubuntu image disables unprivileged user namespaces, so Chrome needs
-          # --no-sandbox there. A desktop install does not; this flag never changes Aeon.
+          # --no-sandbox there. A desktop install does not; this flag never changes Graft.
           if [ "$(uname -s)" = "Linux" ]; then SANDBOX_FLAG=--no-sandbox; else SANDBOX_FLAG=; fi
           "$CHROME_PATH" \
             --user-data-dir="$CHROME_PROFILE" \
@@ -213,15 +213,15 @@ jobs:
 
       # The README install steps, verbatim. The interactive wait at the end of setup.mjs is
       # satisfied by the loader above; a stranger does the same wait with three Chrome clicks.
-      - name: Install Aeon (README one-liner, Linux/macOS)
+      - name: Install Graft (README one-liner, Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
         timeout-minutes: 15
         run: |
           set -eo pipefail
-          curl -fsSL "http://127.0.0.1:$SERVE_PORT/install.sh" | sh 2>&1 | tee "$RUNNER_TEMP/aeon-install.log"
+          curl -fsSL "http://127.0.0.1:$SERVE_PORT/install.sh" | sh 2>&1 | tee "$RUNNER_TEMP/graft-install.log"
 
-      - name: Install Aeon (README one-liner, Windows)
+      - name: Install Graft (README one-liner, Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         timeout-minutes: 15
@@ -243,19 +243,19 @@ jobs:
           [ -f "$EXTENSION_FOLDER/manifest.json" ] || { echo "No installed extension" >&2; exit 1; }
           echo "Extension folder: $EXTENSION_FOLDER"
 
-      # The installed `aeon` command, not apps/cli/dist/cli.js from the checkout.
-      - name: Put the installed aeon command on PATH
+      # The installed `graft` command, not apps/cli/dist/cli.js from the checkout.
+      - name: Put the installed graft command on PATH
         shell: bash
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = "Windows" ]; then
-            # aeon install picks %APPDATA%\npm when that is already on PATH, else ~/.local/bin.
+            # graft install picks %APPDATA%\npm when that is already on PATH, else ~/.local/bin.
             printf '%s\n' "$HOME/.local/bin" "$(cygpath -u "$APPDATA")/npm" >> "$GITHUB_PATH"
           else
-            printf '%s\n' "$AEON_BIN_DIR" >> "$GITHUB_PATH"
+            printf '%s\n' "$GRAFT_BIN_DIR" >> "$GITHUB_PATH"
           fi
-          echo "aeon command directories added to PATH"
-          command -v aeon || command -v aeon.cmd || true
+          echo "graft command directories added to PATH"
+          command -v graft || command -v graft.cmd || true
 
       # The guided path, driven non-interactively: --yes shortens the wait and skips opening a
       # first-run tab; --no-wait prints the three clicks even though the loader already paired.
@@ -264,15 +264,15 @@ jobs:
         timeout-minutes: 5
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
-          "$AEON" setup --yes --no-wait > "$RUNNER_TEMP/aeon-guided.txt" 2>&1
-          cat "$RUNNER_TEMP/aeon-guided.txt"
-          grep -q 'Developer mode' "$RUNNER_TEMP/aeon-guided.txt"
-          grep -q 'Load unpacked' "$RUNNER_TEMP/aeon-guided.txt"
+          if [ "$RUNNER_OS" = "Windows" ]; then GRAFT=graft.cmd; else GRAFT=graft; fi
+          "$GRAFT" setup --yes --no-wait > "$RUNNER_TEMP/graft-guided.txt" 2>&1
+          cat "$RUNNER_TEMP/graft-guided.txt"
+          grep -q 'Developer mode' "$RUNNER_TEMP/graft-guided.txt"
+          grep -q 'Load unpacked' "$RUNNER_TEMP/graft-guided.txt"
           folder="$EXTENSION_FOLDER"
           if [ "$RUNNER_OS" = "Windows" ]; then folder="$(cygpath -w "$folder")"; fi
-          grep -Fi "$folder" "$RUNNER_TEMP/aeon-guided.txt"
-          grep -q 'no special flags' "$RUNNER_TEMP/aeon-guided.txt"
+          grep -Fi "$folder" "$RUNNER_TEMP/graft-guided.txt"
+          grep -q 'no special flags' "$RUNNER_TEMP/graft-guided.txt"
           echo "Guided setup printed the three clicks and the extension folder."
 
       - name: Doctor (every check but the model check must be ok)
@@ -280,9 +280,9 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
-          "$AEON" doctor --json > "$RUNNER_TEMP/doctor.json" 2>&1 || true
-          echo "--- aeon doctor --json ---"; cat "$RUNNER_TEMP/doctor.json"
+          if [ "$RUNNER_OS" = "Windows" ]; then GRAFT=graft.cmd; else GRAFT=graft; fi
+          "$GRAFT" doctor --json > "$RUNNER_TEMP/doctor.json" 2>&1 || true
+          echo "--- graft doctor --json ---"; cat "$RUNNER_TEMP/doctor.json"
           node -e '
             const fs = require("node:fs");
             const text = fs.readFileSync(process.argv[1], "utf8");
@@ -312,17 +312,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          fixture="$RUNNER_TEMP/aeon-fixture"
+          fixture="$RUNNER_TEMP/graft-fixture"
           mkdir -p "$fixture"
           cat > "$fixture/index.html" <<'EOF'
           <!doctype html>
-          <html><head><title>Aeon clean install fixture</title></head>
+          <html><head><title>Graft clean install fixture</title></head>
           <body><h1>Hello from a clean install</h1></body></html>
           EOF
           nohup "${{ matrix.python }}" -m http.server "$FIXTURE_PORT" --bind 127.0.0.1 --directory "$fixture" > "$RUNNER_TEMP/fixture.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/fixture.pid"
           for i in $(seq 1 30); do
-            if curl -fsS "http://127.0.0.1:$FIXTURE_PORT/" | grep -q "Aeon clean install fixture"; then
+            if curl -fsS "http://127.0.0.1:$FIXTURE_PORT/" | grep -q "Graft clean install fixture"; then
               echo "Fixture page served"
               exit 0
             fi
@@ -330,13 +330,13 @@ jobs:
           done
           exit 1
 
-      # Model-free: browser_code through aeon repl, no chat and no model key.
+      # Model-free: browser_code through graft repl, no chat and no model key.
       - name: Browser action (repl opens, reads and closes the page)
         shell: bash
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then GRAFT=graft.cmd; else GRAFT=graft; fi
           cell="$RUNNER_TEMP/clean-install-check.js"
           cat > "$cell" <<EOF
           const page = await browser.openTab("http://127.0.0.1:$FIXTURE_PORT/");
@@ -345,23 +345,23 @@ jobs:
           await page.close();
           return title;
           EOF
-          out="$("$AEON" repl --session clean-install --timeout 90 "@$cell")"
+          out="$("$GRAFT" repl --session clean-install --timeout 90 "@$cell")"
           printf '%s\n' "$out"
-          printf '%s\n' "$out" | grep -q "FIXTURE_TITLE: Aeon clean install fixture"
+          printf '%s\n' "$out" | grep -q "FIXTURE_TITLE: Graft clean install fixture"
           echo "A clean install opened, read and closed a page without a model."
 
-      - name: aeon --help and aeon tools print
+      - name: graft --help and graft tools print
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then AEON=aeon.cmd; else AEON=aeon; fi
-          "$AEON" --help > "$RUNNER_TEMP/aeon-help.txt"
-          head -30 "$RUNNER_TEMP/aeon-help.txt"
-          grep -q 'aeon <command>' "$RUNNER_TEMP/aeon-help.txt"
-          "$AEON" tools > "$RUNNER_TEMP/aeon-tools.txt"
-          head -30 "$RUNNER_TEMP/aeon-tools.txt"
-          grep -q '[^[:space:]]' "$RUNNER_TEMP/aeon-tools.txt" || { echo "aeon tools printed nothing" >&2; exit 1; }
-          echo "aeon --help and aeon tools both print."
+          if [ "$RUNNER_OS" = "Windows" ]; then GRAFT=graft.cmd; else GRAFT=graft; fi
+          "$GRAFT" --help > "$RUNNER_TEMP/graft-help.txt"
+          head -30 "$RUNNER_TEMP/graft-help.txt"
+          grep -q 'graft <command>' "$RUNNER_TEMP/graft-help.txt"
+          "$GRAFT" tools > "$RUNNER_TEMP/graft-tools.txt"
+          head -30 "$RUNNER_TEMP/graft-tools.txt"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/graft-tools.txt" || { echo "graft tools printed nothing" >&2; exit 1; }
+          echo "graft --help and graft tools both print."
 
       - name: Collect logs on failure
         if: failure()
@@ -369,13 +369,13 @@ jobs:
         with:
           name: clean-install-logs-${{ matrix.os }}
           path: |
-            ${{ runner.temp }}/aeon-install.log
-            ${{ runner.temp }}/aeon-loader.log
-            ${{ runner.temp }}/aeon-chrome.log
+            ${{ runner.temp }}/graft-install.log
+            ${{ runner.temp }}/graft-loader.log
+            ${{ runner.temp }}/graft-chrome.log
             ${{ runner.temp }}/doctor.json
             ${{ runner.temp }}/fixture.log
-            ${{ runner.temp }}/aeon-guided.txt
-            ${{ runner.temp }}/aeon-help.txt
-            ${{ runner.temp }}/aeon-tools.txt
+            ${{ runner.temp }}/graft-guided.txt
+            ${{ runner.temp }}/graft-help.txt
+            ${{ runner.temp }}/graft-tools.txt
           if-no-files-found: ignore
           retention-days: 7

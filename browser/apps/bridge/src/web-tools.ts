@@ -14,7 +14,7 @@ import {
 import { SITE_TOOL_HELP } from "@browserkit/tools/site-to-api";
 import { dataDirectory } from "./paths.js";
 
-// browserkit's MCP tools are built from the same definitions Aeon uses. The host only chooses
+// browserkit's MCP tools are built from the same definitions Graft uses. The host only chooses
 // which actions are exposed and where mapped-site captures live.
 
 type Json = Record<string, unknown>;

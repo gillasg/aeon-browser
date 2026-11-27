@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { buildAgentSurface, type AgentSurface, type AgentSurfaceTool } from "@aeon/pi-adapter";
+import { buildAgentSurface, type AgentSurface, type AgentSurfaceTool } from "@graft/pi-adapter";
 import { dataDirectory } from "./client.js";
 
 export async function runAgentSurface(json: boolean): Promise<number> {

@@ -1,4 +1,4 @@
-import type { RoutineListen, RoutineRecord } from "@aeon/domain";
+import type { RoutineListen, RoutineRecord } from "@graft/domain";
 
 // The shared definition of a live watcher: parsing, matching, the timer fallback and the code a
 // listening routine runs in the browser. The browser code reuses page.waitForResponse (CDP Network
@@ -125,13 +125,13 @@ export function liveWaitCode(listen: RoutineListen): string {
   const type = listen.type ?? "";
   if (STREAM_TYPES.has(type)) {
     const kind = type === "stream" ? "" : `kind: ${JSON.stringify(type)}, `;
-    return `__aeonLivePage.streams.waitFor({url: ${url}, ${kind}direction: "received"}, 55000)`;
+    return `__graftLivePage.streams.waitFor({url: ${url}, ${kind}direction: "received"}, 55000)`;
   }
   if (PUSH_TYPES.has(type)) {
     const kind = type === "notifications" ? "" : `, kind: ${JSON.stringify(type)}`;
-    return `__aeonLivePage.notifications.waitFor({${kind.slice(2)}}, 55000)`;
+    return `__graftLivePage.notifications.waitFor({${kind.slice(2)}}, 55000)`;
   }
-  return `__aeonLivePage.waitForResponse(${url}, {${type ? `type: ${JSON.stringify(type)}, ` : ""}timeoutMs: 55000})`;
+  return `__graftLivePage.waitForResponse(${url}, {${type ? `type: ${JSON.stringify(type)}, ` : ""}timeoutMs: 55000})`;
 }
 
 /**
@@ -147,12 +147,12 @@ export function liveCheckCode(check: string, listen: RoutineListen, sites: strin
      return ${hosts}.some(function(s){ return h === s || h.endsWith('.' + s); });`
     : `return u.includes(${JSON.stringify(listen.url)});`;
   // Names are prefixed so they cannot shadow the engine's internal realm globals (e.g. __tabs).
-  return `var __aeonLiveTabs = await browser.tabs();
-var __aeonLiveTab = __aeonLiveTabs.find(function(t){ var u = String(t.url || ''); ${tabTest} });
-if (!__aeonLiveTab) return {__liveIdle: true};
-var __aeonLivePage = await browser.tab(__aeonLiveTab.id ?? __aeonLiveTab.tabId ?? __aeonLiveTab);
-var __aeonLiveFound = await ${liveWaitCode(listen)};
-if (!__aeonLiveFound) return {__liveIdle: true};
-var response = __aeonLiveFound;
+  return `var __graftLiveTabs = await browser.tabs();
+var __graftLiveTab = __graftLiveTabs.find(function(t){ var u = String(t.url || ''); ${tabTest} });
+if (!__graftLiveTab) return {__liveIdle: true};
+var __graftLivePage = await browser.tab(__graftLiveTab.id ?? __graftLiveTab.tabId ?? __graftLiveTab);
+var __graftLiveFound = await ${liveWaitCode(listen)};
+if (!__graftLiveFound) return {__liveIdle: true};
+var response = __graftLiveFound;
 ${check}`;
 }

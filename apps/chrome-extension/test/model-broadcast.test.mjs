@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 async function load(t) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-model-broadcast-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-model-broadcast-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const outfile = join(directory, "broadcast.mjs");
   await build({

@@ -42,7 +42,7 @@ import {
 } from "@browserkit/site-mapper";
 
 // One answer for what a browser cell asks the machine: a login from the password manager, the
-// sites this run must stay off, and a mapped site's API. Every host (the bridge, Aeon's chats,
+// sites this run must stay off, and a mapped site's API. Every host (the bridge, Graft's chats,
 // routine checks and outside MCP sessions) goes through this handler and adds only its own
 // storage (workspace files, saved reads, site skills) through `extra`.
 //
@@ -50,7 +50,7 @@ import {
 // `{credential}` call from a cell and only sends one while it is filling a sign-in form. This
 // handler answers that request and nothing else; no caller puts the answer in a step or result.
 //
-// `allow` lifts a block for one run and comes only from Aeon's typed-user-message source. A
+// `allow` lifts a block for one run and comes only from Graft's typed-user-message source. A
 // routine, a check, an external session and the bridge always get `allow: []`, whatever their
 // siteRules provider says.
 
@@ -68,7 +68,7 @@ export interface HostRequestContext {
   scope: string;
   /** The host's workspace for this request, when it serves workspace files. */
   workspace?: string;
-  /** The named Chrome profile the run is in (Aeon's `aeon browsers name`), when it has one. */
+  /** The named Chrome profile the run is in (Graft's `graft browsers name`), when it has one. */
   browser?: string;
 }
 
@@ -76,7 +76,7 @@ export interface HostHandlerOptions {
   /** browserkit's home (BROWSERKIT_HOME); default: the shared browserkit data folder. */
   dataDirectory?: string;
   siteRules?: (context: HostRequestContext) => HostSiteRules | Promise<HostSiteRules>;
-  /** A host's own mapped-site call path (Aeon attributes it to a chat); default: the shared one. */
+  /** A host's own mapped-site call path (Graft attributes it to a chat); default: the shared one. */
   siteMapper?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
   /** The small fast model page.observe / page.act use, when the host has one. */
   model?: () => Promise<ModelLike | undefined>;
@@ -149,7 +149,7 @@ export async function removeBlockedSite(
 
 /**
  * The machine's answer to a host request, or undefined when it is not one of these. `allow` is
- * forced empty outside a chat: only Aeon's typed-user-message answer may lift a block.
+ * forced empty outside a chat: only Graft's typed-user-message answer may lift a block.
  */
 export function createHostHandler(
   options: HostHandlerOptions = {},

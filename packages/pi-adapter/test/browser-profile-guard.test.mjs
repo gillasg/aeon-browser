@@ -39,7 +39,7 @@ test("shell and file calls into a browser's profile folder are refused", () => {
     assert.equal(touchesBrowserProfile(tool, input), true, JSON.stringify(input));
 });
 
-test("ordinary shell work and Aeon's own browser tools pass", () => {
+test("ordinary shell work and Graft's own browser tools pass", () => {
   assert.equal(touchesBrowserProfile("bash", { command: "ls workspace && cat notes.md" }), false);
   assert.equal(
     touchesBrowserProfile("write", { path: "report.md", content: "Chrome is a browser" }),

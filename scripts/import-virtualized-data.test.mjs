@@ -10,14 +10,14 @@ const Database = createRequire(new URL("../packages/store/package.json", import.
   "better-sqlite3",
 );
 test("redirected data import is additive and idempotent and preserves existing workspace files", () => {
-  const root = mkdtempSync(join(tmpdir(), "aeon-import-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-import-"));
   const source = join(root, "source"),
     target = join(root, "target");
   try {
     for (const directory of [source, target]) {
       mkdirSync(join(directory, "workspaces"), { recursive: true });
       const database = new Database(
-        join(directory, directory === source ? "pippin.sqlite" : "aeon.sqlite"),
+        join(directory, directory === source ? "pippin.sqlite" : "graft.sqlite"),
       );
       database.exec(
         "CREATE TABLE chats(id TEXT PRIMARY KEY, value TEXT); INSERT INTO chats VALUES ('shared','original');",
@@ -40,7 +40,7 @@ test("redirected data import is additive and idempotent and preserves existing w
       );
       assert.equal(result.status, 0, result.stderr);
     }
-    const database = new Database(join(target, "aeon.sqlite"));
+    const database = new Database(join(target, "graft.sqlite"));
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM chats").get().count, 3);
     database.close();
     assert.equal(readFileSync(join(target, "workspaces", "shared.txt"), "utf8"), "existing");

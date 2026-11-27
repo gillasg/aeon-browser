@@ -16,9 +16,9 @@ there, so hand off when it is the wrong account). You never see the password or 
 signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`, `CHOOSE_ACCOUNT`
 (call again with `account`), `NEEDS_CODE` (a code by SMS or email), `CAPTCHA`,
 `SAVED_LOGIN_REJECTED` (the saved login looks stale: the site refused it; do not retry it, offer a
-password reset, or hand off so the user signs in and Aeon saves the new password), or
+password reset, or hand off so the user signs in and Graft saves the new password), or
 `PAGE_SCRIPTS` (a boost or site script runs on the page; hand off). `PASSWORD_MANAGER_LOCKED` or
-`PASSWORD_MANAGER_FAILED`: hand off with "Your password manager is locked: unlock it (`aeon signin setup
+`PASSWORD_MANAGER_FAILED`: hand off with "Your password manager is locked: unlock it (`graft signin setup
 bitwarden`, or `pass-cli login` for Proton) and click Done, or sign in here yourself", then call
 `bu.signIn()` again if the form is still there. A login the user types during a hand-off is saved to
 the password manager like one you made. Never write a password or a one-time code into your
@@ -32,7 +32,7 @@ The password manager is set up once by the user: `browserkit signin setup bitwar
 
 A password you type yourself (a new account), by fill or keyboard, is saved to that manager once
 the form goes through, and the submitting click's `[ok]` line says so: saved, being saved, or (with
-none set up) whether the user clicked Save in Chrome's prompt when Aeon asked. That line is the
+none set up) whether the user clicked Save in Chrome's prompt when Graft asked. That line is the
 answer: never log out, reopen the form or look for the login elsewhere to check it. If the user did
 not confirm Chrome's prompt, say in your answer that the login may not be saved.
 

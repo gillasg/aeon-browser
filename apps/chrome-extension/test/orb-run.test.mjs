@@ -9,7 +9,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 async function loadRun() {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-orb-run-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-orb-run-"));
   const outfile = join(directory, "orb-run.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL("../src/orb/orb-run.ts", import.meta.url))],
@@ -186,7 +186,7 @@ test("an assistant error ends the run as an error", () => {
   ]);
   assert.equal(run.status, "error");
   assert.equal(run.error, "No model");
-  assert.equal(run.label, "Aeon broke");
+  assert.equal(run.label, "Graft broke");
 });
 
 async function loadModule(source) {

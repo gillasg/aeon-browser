@@ -1,5 +1,5 @@
-import type { DaemonUiResponse } from "@aeon/protocol";
-import type { FormField } from "@aeon/ui";
+import type { DaemonUiResponse } from "@graft/protocol";
+import type { FormField } from "@graft/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 // Settings → Forms: the form profile lives in browserkit's data folder, behind the daemon. Home

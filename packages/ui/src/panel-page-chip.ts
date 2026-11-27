@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@aeon/protocol";
+import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@graft/protocol";
 export function usePanelPage(): { record: PiBrowserContextRecord | null; remove(): void } {
   const [record, setRecord] = useState<PiBrowserContextRecord | null>(null);
   useEffect(() => {
@@ -9,13 +9,13 @@ export function usePanelPage(): { record: PiBrowserContextRecord | null; remove(
       try {
         const response = await new Promise<unknown>((resolve, reject) =>
           window.dispatchEvent(
-            new CustomEvent("aeon.panel-current-page", { detail: { resolve, reject } }),
+            new CustomEvent("graft.panel-current-page", { detail: { resolve, reject } }),
           ),
         );
         const parsed = PiBrowserContextRecordSchema.safeParse(response);
         if (!active || !parsed.success) return;
         setRecord(parsed.data);
-        sessionStorage.setItem("aeon-panel-page", JSON.stringify(parsed.data));
+        sessionStorage.setItem("graft-panel-page", JSON.stringify(parsed.data));
       } catch {
         /* The page may be restricted or the extension may be reloading. */
       }
@@ -29,7 +29,7 @@ export function usePanelPage(): { record: PiBrowserContextRecord | null; remove(
     record,
     remove: () => {
       setRecord(null);
-      sessionStorage.removeItem("aeon-panel-page");
+      sessionStorage.removeItem("graft-panel-page");
     },
   };
 }

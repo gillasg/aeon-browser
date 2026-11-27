@@ -1,4 +1,4 @@
-// `aeon repl` cells write workspace files and upload them like a chat's cells: the daemon answers
+// `graft repl` cells write workspace files and upload them like a chat's cells: the daemon answers
 // artifact() writes and validateUpload with the session's own workspace, string or array alike.
 import assert from "node:assert/strict";
 import { mkdtemp, realpath } from "node:fs/promises";
@@ -8,7 +8,7 @@ import test from "node:test";
 import { cliCall } from "../dist/core-browser.js";
 
 test("a CLI cell's artifact is uploadable from its workspace", async () => {
-  const root = join(await mkdtemp(join(tmpdir(), "aeon-cli-ws-")), "workspaces", "s");
+  const root = join(await mkdtemp(join(tmpdir(), "graft-cli-ws-")), "workspaces", "s");
   const call = cliCall("external:s", root);
   await call({ workspace: "artifact", name: "a.txt", value: "x" });
   const real = await realpath(join(root, "a.txt"));

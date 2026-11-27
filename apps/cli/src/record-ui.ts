@@ -1,11 +1,11 @@
-// `aeon record ui <action>`: drive Aeon's own surfaces on camera without coordinate hacks. Pages
+// `graft record ui <action>`: drive Graft's own surfaces on camera without coordinate hacks. Pages
 // open by their real extension URL (home.html?host=panel, home.html?view=…) in one reused tab; the
 // cursor is summoned with its real shortcut (Alt+Shift+Space), sent as a trusted OS keystroke to
 // the focused Chrome window; the side panel opens the way a person opens it from the cursor box
 // (Ctrl+Enter, Cmd+Enter on macOS), since Chrome only opens a side panel on a user gesture.
 import { spawnSync } from "node:child_process";
 import type { Args } from "browserkit/dist/args.js";
-import { aeonExtensionId, extensionUrl } from "./extension-url.js";
+import { graftExtensionId, extensionUrl } from "./extension-url.js";
 import type { DaemonHost } from "./host.js";
 import { findChromeWindow } from "./record-capture.js";
 import { ACTIVE } from "./record-script.js";
@@ -28,7 +28,7 @@ export type Chord = "cursor" | "panel";
 export type UiStep =
   { kind: "page"; url: string } | { kind: "keys"; chords: Chord[] } | { kind: "reload" };
 
-export const UI_USAGE = `Usage: aeon record ui ${UI_ACTIONS.join("|")} [--browser <name>] [--display :N] [--out <dir>] [--mark <name>]`;
+export const UI_USAGE = `Usage: graft record ui ${UI_ACTIONS.join("|")} [--browser <name>] [--display :N] [--out <dir>] [--mark <name>]`;
 
 export function isUiAction(action: string | undefined): action is UiAction {
   return (UI_ACTIONS as readonly string[]).includes(action ?? "");
@@ -48,8 +48,8 @@ export function pageUrl(extensionId: string, action: (typeof PAGE_ACTIONS)[numbe
 }
 
 /**
- * Navigates one tab in place: the active Aeon page or blank tab, else any, else the active tab.
- * Other Aeon and blank tabs close, so switching pages never piles tabs up. Opening a new tab would
+ * Navigates one tab in place: the active Graft page or blank tab, else any, else the active tab.
+ * Other Graft and blank tabs close, so switching pages never piles tabs up. Opening a new tab would
  * put it in the session's tab group, which the camera must never see.
  */
 export function pageCode(url: string): string {
@@ -61,7 +61,7 @@ const tab = tabs.find((t) => t.active && spare(t)) ?? tabs.find(spare) ?? tabs.f
 if (!tab) throw new Error("No tab is open");
 for (const t of tabs) if (t.id !== tab.id && spare(t)) await browser.closeTab(t.id).catch(() => undefined);
 // The tab on camera moves by a raw Page.navigate: page.navigate waits for a settled load it cannot
-// see on an Aeon page, then stops the load mid-way, leaving a blank page. A tab behind others is
+// see on a Graft page, then stops the load mid-way, leaving a blank page. A tab behind others is
 // brought forward by page.navigate, which presents it.
 if (!tab.active) await browser.page(tab.id).navigate(url);
 else if (tab.url !== url) await browser.page(tab.id).cdp("Page.navigate", { url });
@@ -139,14 +139,14 @@ function isPage(action: string | undefined): boolean {
 function execOrThrow(command: Command): void {
   const run = spawnSync(command.cmd, command.args, { encoding: "utf8" });
   if (run.error)
-    throw new Error(`${command.cmd} is needed to press Aeon's shortcut: ${run.error.message}`);
+    throw new Error(`${command.cmd} is needed to press Graft's shortcut: ${run.error.message}`);
   if (run.status !== 0) throw new Error(`${command.cmd} failed: ${(run.stderr ?? "").trim()}`);
 }
 
 export function liveUiDeps(host: DaemonHost): UiDeps {
   return {
-    extensionId: () => aeonExtensionId(),
-    run: (code) => host.runInBrowser(code, { session: "aeon-record", timeoutMs: 20_000 }),
+    extensionId: () => graftExtensionId(),
+    run: (code) => host.runInBrowser(code, { session: "graft-record", timeoutMs: 20_000 }),
     exec: execOrThrow,
     chromeWindow: () => {
       try {
@@ -160,7 +160,7 @@ export function liveUiDeps(host: DaemonHost): UiDeps {
   };
 }
 
-/** `aeon record ui <action> [--mark <name>]`: the action, then (if recording) a mark at its beat. */
+/** `graft record ui <action> [--mark <name>]`: the action, then (if recording) a mark at its beat. */
 export async function uiCommand(
   args: Args,
   deps: UiDeps,

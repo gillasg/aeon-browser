@@ -3,11 +3,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { readEventLog } from "@aeon/location";
+import { readEventLog } from "@graft/location";
 import { recordRoutineEvent, routineEventKind } from "../dist/routine-events.js";
 
 test("a fired routine is logged with a monotonic cursor and scrubbed before disk", async (t) => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-routine-events-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-routine-events-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const routine = { routineId: "r1", title: "Price", sites: ["shop.test"], check: "price" };
   const first = await recordRoutineEvent(dir, routine, { price: 9, otp: "551234" });

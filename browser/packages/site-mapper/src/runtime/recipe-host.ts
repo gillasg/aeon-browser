@@ -17,7 +17,7 @@ import { siteMapper } from "./site-mapper.js";
 export interface RecipeHostOptions {
   session?: string;
   transport?: "page" | "direct";
-  /** Reuses an already-open bridge (Aeon, tests). */
+  /** Reuses an already-open bridge (Graft, tests). */
   bridge?: Bridge;
 }
 

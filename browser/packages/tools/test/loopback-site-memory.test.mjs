@@ -6,7 +6,7 @@ import test from "node:test";
 import { createHostHandler } from "../dist/host.js";
 
 test("siteNotes on loopback URLs are isolated by host:port", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-loopback-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-loopback-"));
   const prev = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = home;
   const handle = createHostHandler({ dataDirectory: home });

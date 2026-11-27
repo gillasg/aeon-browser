@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { aeonDataDirectory } from "@aeon/location";
+import { graftDataDirectory } from "@graft/location";
 
-// MCP sampling: when an outside agent declares the sampling capability, Aeon can answer its own
-// model calls with that agent's model. No Aeon model key is needed. The CLI's MCP server owns the
-// one bridge in this process, so every AeonClient (the MCP server's and the CLI host's) sees it.
+// MCP sampling: when an outside agent declares the sampling capability, Graft can answer its own
+// model calls with that agent's model. No Graft model key is needed. The CLI's MCP server owns the
+// one bridge in this process, so every GraftClient (the MCP server's and the CLI host's) sees it.
 
 export type Json = Record<string, unknown>;
 
@@ -25,7 +25,7 @@ export interface ModelResult {
   [key: string]: unknown;
 }
 
-/** Plain and short: an outside agent's refusal is never dressed up as an Aeon model failure. */
+/** Plain and short: an outside agent's refusal is never dressed up as a Graft model failure. */
 export const DECLINED = "your agent declined the model request";
 const CANCELLED = "MCP_REQUEST_CANCELLED: the model request was cancelled.";
 const MAX_TOKENS = 8192;
@@ -204,7 +204,7 @@ export class SamplingBridge {
     const withTools = (context.tools?.length ?? 0) > 0 && this.supportsTools;
     if (!withTools && (context.tools?.length ?? 0) > 0 && !this.warnedNoTools) {
       this.warnedNoTools = true;
-      process.stderr.write("Aeon: your agent's model cannot call tools here; using text only.\n");
+      process.stderr.write("Graft: your agent's model cannot call tools here; using text only.\n");
     }
     const id = randomUUID();
     const request: Json = {
@@ -260,10 +260,10 @@ export class SamplingBridge {
 }
 
 const CONFIG_FILE = "mcp-sampling.json";
-const ENV_OVERRIDE = "AEON_MCP_USE_CLIENT_MODEL";
+const ENV_OVERRIDE = "GRAFT_MCP_USE_CLIENT_MODEL";
 
 export function samplingConfigPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(aeonDataDirectory({ env }), CONFIG_FILE);
+  return join(graftDataDirectory({ env }), CONFIG_FILE);
 }
 
 export async function readUseClientModel(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {

@@ -1,4 +1,4 @@
-// Launches one real Chrome for a whole conformance sweep and connects Aeon's real engine to it:
+// Launches one real Chrome for a whole conformance sweep and connects Graft's real engine to it:
 // the built bridge, the built extension and a browser_code session per scenario. Ground truth that
 // does not come through the engine (the real tab list) is read straight from Chrome's own CDP.
 import { spawn } from "node:child_process";
@@ -126,7 +126,7 @@ function nativeBootstrap(env) {
  */
 export async function launchHarness() {
   const chromePath = findChrome();
-  const home = await mkdtemp(join(tmpdir(), "aeon-conformance-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-conformance-"));
   const profile = join(home, "chrome-profile");
   const env = { ...process.env, BROWSERKIT_HOME: home, SITE_TO_API_HOME: join(home, "s2a") };
   // The policy scenario navigates to a site the user blocked; the rule is set before the bridge starts.

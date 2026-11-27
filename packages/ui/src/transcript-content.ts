@@ -1,4 +1,4 @@
-import type { PiContentBlockDto } from "@aeon/protocol";
+import type { PiContentBlockDto } from "@graft/protocol";
 export function timestampMs(value: string): number | undefined {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : undefined;

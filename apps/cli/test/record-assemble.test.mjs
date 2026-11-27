@@ -1,4 +1,4 @@
-// `aeon record assemble`: idle-trim math, the native-pixel zoom clamp, the filtergraph, multi-take
+// `graft record assemble`: idle-trim math, the native-pixel zoom clamp, the filtergraph, multi-take
 // concat args, the WAV score, and a run end to end against a fake ffmpeg.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -42,7 +42,7 @@ const take = (durationMs, events = [], marks = [], extra = {}) => ({
   clip: "/takes/a/clip.mp4",
   recording: {
     version: 1,
-    recorder: "aeon",
+    recorder: "graft",
     clock: "clip",
     clip: clip(durationMs),
     events,
@@ -211,7 +211,7 @@ test("sound and end card join the graph", () => {
     audio: "score.wav",
     drawtext: true,
     endMs: 2000,
-    end: { cmd: "npx aeon", textFiles: { cmd: "C:\\tmp\\cmd.txt" } },
+    end: { cmd: "npx graft", textFiles: { cmd: "C:\\tmp\\cmd.txt" } },
   });
   const graph = args[args.indexOf("-filter_complex") + 1];
   assert.match(graph, /zoompan=/);
@@ -298,7 +298,7 @@ test("flags become assemble options", () => {
       "max-idle": "1500",
       zoom: true,
       sound: true,
-      "end-cmd": "npx aeon",
+      "end-cmd": "npx graft",
       width: "1280",
       height: "720",
     },
@@ -310,12 +310,12 @@ test("flags become assemble options", () => {
     maxIdleMs: 1500,
     zoom: true,
     sound: true,
-    end: { cmd: "npx aeon" },
+    end: { cmd: "npx graft" },
   });
 });
 
 test("assemble reads folders, writes the score and runs ffmpeg once", async () => {
-  const root = mkdtempSync(join(tmpdir(), "aeon-assemble-test-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-assemble-test-"));
   try {
     const dirs = ["a", "b"].map((name, i) => {
       const dir = join(root, name);
@@ -342,7 +342,7 @@ test("assemble reads folders, writes the score and runs ffmpeg once", async () =
       ...OUT,
       fps: 30,
       sound: true,
-      end: { cmd: "npx aeon" },
+      end: { cmd: "npx graft" },
       ffmpeg: "ffmpeg-x",
       log: (l) => lines.push(l),
       runner,
@@ -374,7 +374,7 @@ test("assemble reads folders, writes the score and runs ffmpeg once", async () =
 });
 
 test("a missing clip is a clear error", () => {
-  const root = mkdtempSync(join(tmpdir(), "aeon-assemble-test-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-assemble-test-"));
   try {
     assert.throws(() => readTake(root), /no clip\.mp4/);
     writeFileSync(join(root, "clip.mp4"), "");

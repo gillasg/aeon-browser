@@ -38,7 +38,7 @@ import {
   type ThreadForkIntent,
   type PiForkEntryCheck,
   PiSessionUnavailableError,
-} from "@aeon/domain";
+} from "@graft/domain";
 import { ChatCommandGate } from "./chat-command-gate.js";
 import { ChatThreadSupport } from "./chat-thread-support.js";
 import { ChatMetadataService } from "./chat-metadata-service.js";
@@ -212,7 +212,7 @@ export class ChatService {
     messages: Record<string, unknown>[];
     tools: Record<string, unknown>[];
   }): Promise<Record<string, unknown>> => {
-    if (!this.pi.completeTools) throw new Error("Aeon's model is not available");
+    if (!this.pi.completeTools) throw new Error("Graft's model is not available");
     return this.pi.completeTools(context);
   };
   externalTools = (): unknown[] => [
@@ -225,7 +225,7 @@ export class ChatService {
   setExternalContextReader(reader: (() => Promise<unknown>) | undefined): void {
     this.externalContextReader = reader;
   }
-  /** Resolves `aeon automation create --browser <name>` to a connected profile. */
+  /** Resolves `graft automation create --browser <name>` to a connected profile. */
   setBrowserResolver(
     resolver: ((name: string, chatId: ChatId) => Promise<string>) | undefined,
   ): void {
@@ -265,7 +265,7 @@ export class ChatService {
         content: [{ type: "text", text: JSON.stringify(value, null, 1) }],
         isError: false,
       }));
-    if (!this.pi.callExternalTool) throw new Error("Aeon's tools are not available");
+    if (!this.pi.callExternalTool) throw new Error("Graft's tools are not available");
     return this.pi.callExternalTool(name, session, args, signal);
   };
   async searchChats(
@@ -304,7 +304,7 @@ export class ChatService {
       cursor: this.eventHub.cursor(chatId),
     };
   }
-  getEffectiveResources(chatId: ChatId): Promise<import("@aeon/domain").EffectivePiResources> {
+  getEffectiveResources(chatId: ChatId): Promise<import("@graft/domain").EffectivePiResources> {
     return readEffectiveResources(this, chatId);
   }
   async refreshViews(chatId: ChatId): Promise<Awaited<ReturnType<ChatService["getChatView"]>>> {

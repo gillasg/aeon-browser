@@ -30,7 +30,7 @@ const MAX_WAIT_MS = 30 * 60_000;
 const answers = new Map<number, "done" | "cancelled">();
 onEngineInstall(() => {
   chrome.runtime.onMessage.addListener((message, sender) => {
-    if (sender.id !== chrome.runtime.id || message?.kind !== "aeon.handoff.answer") return;
+    if (sender.id !== chrome.runtime.id || message?.kind !== "graft.handoff.answer") return;
     // The ask includes its tab; the chat's hand-off card names the target too. Only fall back to
     // the sender's tab when the message carries none (a card in a chat tab must not answer for
     // the chat tab itself).
@@ -70,7 +70,7 @@ export function answeredHandoff(
 }
 
 /**
- * Whether Aeon's side panel is open in this window. The panel's own hand-off card then owns the
+ * Whether Graft's side panel is open in this window. The panel's own hand-off card then owns the
  * controls, so the page draws only the ring (one owner per state).
  */
 export async function sidePanelOpen(windowId: number): Promise<boolean> {
@@ -167,7 +167,7 @@ async function waitOnUser(
     await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
   });
   engineDebug("handoff", "focused", { tab: tabId });
-  const notification = "aeon-handoff-" + tabId;
+  const notification = "graft-handoff-" + tabId;
   const seen = await userSees(tabId, tab.windowId);
   engineDebug("handoff", "visibility", { tab: tabId, seen });
   if (!seen)
@@ -226,8 +226,8 @@ async function waitOnUser(
 
 onEngineInstall(() => {
   chrome.notifications.onClicked.addListener((id) => {
-    if (!id.startsWith("aeon-handoff-")) return;
-    const tabId = Number(id.slice("aeon-handoff-".length));
+    if (!id.startsWith("graft-handoff-")) return;
+    const tabId = Number(id.slice("graft-handoff-".length));
     void chrome.tabs.get(tabId).then(
       (tab) =>
         Promise.all([

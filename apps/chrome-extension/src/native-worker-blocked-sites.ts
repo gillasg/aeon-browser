@@ -1,6 +1,6 @@
-import { NativeBlockedSitesRequestSchema } from "@aeon/protocol";
+import { NativeBlockedSitesRequestSchema } from "@graft/protocol";
 
-// `aeon block|unblock|blocked` from the CLI. The list is the user's own (settings → Blocked
+// `graft block|unblock|blocked` from the CLI. The list is the user's own (settings → Blocked
 // sites), mirrored from page localStorage into chrome.storage.local under "blocked-sites", where
 // the engine reads it at every step. Changing it here is the same change the settings page makes;
 // open pages follow through chrome.storage.onChanged. No chat tool reaches this message.

@@ -14,7 +14,7 @@ import { operationEffect } from "../dist/effect.js";
 import { withDeadline } from "../dist/deadline.js";
 
 const SHA = "3f6c1d0b8a9e4f27c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8";
-const SEALED = "aeon-sealed:abc123def456";
+const SEALED = "graft-sealed:abc123def456";
 
 function entry(method, url, { headers = {}, post, body = '{"items":[{"id":1}]}' } = {}) {
   return {

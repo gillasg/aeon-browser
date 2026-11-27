@@ -1,12 +1,12 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { aeonDataDirectory } from "@aeon/location";
+import { graftDataDirectory } from "@graft/location";
 
-// Per-client revocable tokens for `aeon mcp --http` and `aeon rest`. Only a SHA-256 of each token
-// is kept, in a 0600 file in Aeon's data directory; the token itself is printed once at creation.
+// Per-client revocable tokens for `graft mcp --http` and `graft rest`. Only a SHA-256 of each token
+// is kept, in a 0600 file in Graft's data directory; the token itself is printed once at creation.
 
-export const TOKEN_PREFIX = "aeon_mcp_";
+export const TOKEN_PREFIX = "graft_mcp_";
 
 export interface TokenRecord {
   name: string;
@@ -15,7 +15,7 @@ export interface TokenRecord {
   lastUsedAt?: string;
 }
 
-function tokensPath(directory = aeonDataDirectory()): string {
+function tokensPath(directory = graftDataDirectory()): string {
   return join(directory, "mcp-tokens.json");
 }
 
@@ -71,8 +71,8 @@ export async function verifyToken(token: string, directory?: string): Promise<st
   return undefined;
 }
 
-/** The token a request carries: `Authorization: Bearer …` or `x-aeon-token`. */
+/** The token a request carries: `Authorization: Bearer …` or `x-graft-token`. */
 export function requestToken(headers: Record<string, string | string[] | undefined>): string {
   const bearer = /^Bearer\s+(\S+)$/i.exec(String(headers.authorization ?? ""))?.[1];
-  return String(bearer ?? headers["x-aeon-token"] ?? "");
+  return String(bearer ?? headers["x-graft-token"] ?? "");
 }

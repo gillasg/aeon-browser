@@ -6,7 +6,7 @@ import {
   type AnswerOffer,
   type BoxLine,
   type SiteCounts,
-} from "@aeon/ui";
+} from "@graft/ui";
 import { AnswerInPlace, answerFits } from "./orb-answer.js";
 import {
   ErrorCard,
@@ -45,7 +45,7 @@ export interface OrbViewModel {
   learnFound?: number;
   /** `Learned 4 APIs on flipkart.com`, for a few seconds after Done. */
   learned?: string;
-  /** What Aeon knows about this site, from the registry; absent until read. Not shown in the box. */
+  /** What Graft knows about this site, from the registry; absent until read. Not shown in the box. */
   xray?: SiteCounts;
   /** The first few summons with no page signal show `Type / for Teach, Watch, Fill`. */
   hint?: boolean;
@@ -240,7 +240,7 @@ function Compose({
           id="prompt"
           rows={1}
           placeholder={promptPlaceholder(model)}
-          aria-label="Ask Aeon"
+          aria-label="Ask Graft"
           disabled={model.busy}
           onKeyDown={keys.keyDown}
           onInput={(event) => {
@@ -326,7 +326,7 @@ function Trail({ model, actions }: { model: OrbViewModel; actions: OrbViewAction
 function promptPlaceholder(model: OrbViewModel): string {
   if (model.ask) return "Type the answer here…";
   if (model.chatId) return "Reply…";
-  // Aeon's own pages are never page context. Never an inventory count here.
+  // Graft's own pages are never page context. Never an inventory count here.
   const host = model.context[0]?.host || model.host;
   return model.context.length && host ? `Ask about ${host}` : "Ask…";
 }

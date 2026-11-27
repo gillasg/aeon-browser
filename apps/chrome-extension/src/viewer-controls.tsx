@@ -33,8 +33,8 @@ export function ViewerControls({
       <CopyPathButton path={path} />
       <button
         type="button"
-        aria-label="Ask Aeon in this chat"
-        title="Ask Aeon in this chat"
+        aria-label="Ask Graft in this chat"
+        title="Ask Graft in this chat"
         onClick={() => void openChat(chatId)}
       >
         <ControlIcon path="M4 5h16v11H9l-5 4z" />

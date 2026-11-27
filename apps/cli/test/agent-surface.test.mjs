@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { aeonCommands } from "../dist/commands.js";
+import { graftCommands } from "../dist/commands.js";
 import { formatAgentSurface } from "../dist/agent-surface.js";
 
-test("aeon agent-surface is a command and prints the hash, prompt, tools and first turn", () => {
-  const command = aeonCommands({}).find((item) => item.name === "agent-surface");
+test("graft agent-surface is a command and prints the hash, prompt, tools and first turn", () => {
+  const command = graftCommands({}).find((item) => item.name === "agent-surface");
   assert.ok(command);
   assert.match(command.help, /--json/);
   assert.match(command.help, /offline/);

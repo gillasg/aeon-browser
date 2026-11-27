@@ -52,7 +52,7 @@ import {
   SUPPORTED_PROTOCOL_VERSION,
   type PageGrantIssueResponse,
   type PageGrantScope,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import {
   NativeExtensionRequestSchema,
   NativeOpenChatResponseSchema,
@@ -81,7 +81,7 @@ import {
 import { extensionBuild } from "./extension-build.js";
 import { reportLink } from "./link-state.js";
 
-const NATIVE_HOST = "com.aeon.native_host";
+const NATIVE_HOST = "com.graft.native_host";
 const GRANT_WAIT_MS = 5000;
 interface PendingGrant {
   resolve(response: PageGrantIssueResponse | undefined): void;
@@ -102,11 +102,11 @@ let linkDownTimer: number | undefined;
 const startupFailures: string[] = [];
 
 configureEngine({
-  controllingTitle: (chatId) => "Aeon is controlling this tab · " + chatId,
-  idleTitle: "Open Aeon Chat",
+  controllingTitle: (chatId) => "Graft is controlling this tab · " + chatId,
+  idleTitle: "Open Graft Chat",
   notificationIcon: "completion-icon.png",
-  // The shared group is simply "Aeon"; a chat's own group carries its title.
-  tabGroupTitle: (owner, title) => (owner.startsWith("shared") ? "Aeon" : (title ?? "Aeon")),
+  // The shared group is simply "Graft"; a chat's own group carries its title.
+  tabGroupTitle: (owner, title) => (owner.startsWith("shared") ? "Graft" : (title ?? "Graft")),
   // Chats live in the side panel: the agent's tabs show as live thumbnails, never split screen.
   agentView: () => Promise.resolve("thumbnails"),
   agentInFront: () => readAgentFlag(AGENT_IN_FRONT_KEY),
@@ -115,7 +115,7 @@ configureEngine({
   agentGlow: () => Promise.resolve(true),
   agentGlowColor: () => Promise.resolve("#7c5cff"),
 });
-// Aeon's own view settings, beside the engine's, for browser.settings() when the user asks.
+// Graft's own view settings, beside the engine's, for browser.settings() when the user asks.
 registerSetting("agentInFront", {
   about: "Open the agent's tabs in front and switch to them as it works (for filming it)",
   values: [true, false],
@@ -135,13 +135,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) =>
 );
 // Pages that can't connect ask which part of the worker failed to start.
 chrome.runtime.onMessage.addListener((request: { kind?: unknown } | null, sender, reply) => {
-  if (request?.kind !== "aeon.native.health" || sender.id !== chrome.runtime.id) return;
+  if (request?.kind !== "graft.native.health" || sender.id !== chrome.runtime.id) return;
   reply({ startupFailures });
 });
 // A clicked thumbnail on a Chat page opens that agent tab in Split View beside the Chat.
 chrome.runtime.onMessage.addListener((request: unknown, sender) => {
   const message = request as { kind?: unknown; chatId?: unknown; tabId?: unknown } | null;
-  if (message?.kind !== "aeon.browser.expand" || sender.id !== chrome.runtime.id) return;
+  if (message?.kind !== "graft.browser.expand" || sender.id !== chrome.runtime.id) return;
   if (!sender.url?.startsWith(chrome.runtime.getURL("chat.html"))) return;
   if (typeof message.chatId !== "string" || !Number.isSafeInteger(message.tabId)) return;
   void presentBrowserTask(message.chatId, message.tabId as number, true);
@@ -155,7 +155,7 @@ attempt("storage migration", () => void migrateLegacyChromeStorage());
 // Saved boosts (browser.boosts) apply in every tab, without Site Boosts installed.
 attempt("boosts", () =>
   installBoosts(undefined, {
-    // Boost scripts call mapped site APIs (sb.api) through Aeon's own site-to-api.
+    // Boost scripts call mapped site APIs (sb.api) through Graft's own site-to-api.
     siteMapper: (site, operation, params) => askCore("siteMapper", { site, operation, params }),
   }),
 );
@@ -182,7 +182,7 @@ function attempt(name: string, install: () => void): void {
     install();
   } catch (error) {
     startupFailures.push(name);
-    console.error("Aeon: " + name + " failed to start", error);
+    console.error("Graft: " + name + " failed to start", error);
   }
 }
 
@@ -195,14 +195,14 @@ function handleRuntimeMessage(
     return true;
   const request = NativeExtensionRequestSchema.safeParse(candidate);
   if (!request.success || sender.id !== chrome.runtime.id) return;
-  if (request.data.kind === "aeon.native.current-page") {
+  if (request.data.kind === "graft.native.current-page") {
     if (!sender.url?.startsWith(chrome.runtime.getURL(""))) return;
     void captureCurrentPage(() => ensureInventoryExecutor()).then(sendResponse, () =>
       sendResponse(null),
     );
     return true;
   }
-  if (request.data.kind === "aeon.native.page-grant") {
+  if (request.data.kind === "graft.native.page-grant") {
     void getPageGrant(sender, request.data.pageInstanceId, request.data.scope).then(
       sendResponse,
       (error: unknown) =>
@@ -212,17 +212,17 @@ function handleRuntimeMessage(
     );
     return true;
   }
-  if (request.data.kind === "aeon.native.take-initial-submit") {
+  if (request.data.kind === "graft.native.take-initial-submit") {
     void takeNativeInitialSubmit(sender, request.data.chatId).then(sendResponse);
     return true;
   }
-  if (request.data.kind === "aeon.native.claim-browser-context-submit") {
+  if (request.data.kind === "graft.native.claim-browser-context-submit") {
     void claimBrowserContextSubmit(sender, request.data.chatId, request.data.invocationId).then(
       sendResponse,
     );
     return true;
   }
-  if (request.data.kind !== "aeon.native.open-chat" || !isOpenChatSender(sender)) return;
+  if (request.data.kind !== "graft.native.open-chat" || !isOpenChatSender(sender)) return;
   void openNativeChat(sender, request.data)
     .then(sendResponse)
     .catch(() =>
@@ -403,7 +403,7 @@ function handleNativeSettings(candidate: unknown, socket: WebSocket): boolean {
   );
 }
 
-const SELF_RELOAD_KEY = "aeon-last-self-reload";
+const SELF_RELOAD_KEY = "graft-last-self-reload";
 const SELF_RELOAD_GAP_MS = 10 * 60_000;
 
 // At most one self-reload per 10 minutes: an extension loaded from another folder never matches

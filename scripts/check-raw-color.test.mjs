@@ -7,7 +7,7 @@ test("a raw colour fails and a comment or bare rgb() does not", () => {
     "#fff",
     "rgb(0",
   ]);
-  assert.deepEqual(rawColorHits("/* #abc */\n// #def\na { color: var(--aeon-text); }"), []);
+  assert.deepEqual(rawColorHits("/* #abc */\n// #def\na { color: var(--graft-text); }"), []);
   assert.deepEqual(rawColorHits('note rgb() and "rgba(" + value'), []);
   assert.deepEqual(allowlistEntries("# note\n\napps/example.css\n"), ["apps/example.css"]);
 });

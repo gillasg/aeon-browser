@@ -11,8 +11,8 @@ test("a page key drops the fragment and tracking parameters", () => {
     "https://example.com/p?id=2",
   );
   assert.equal(
-    readKey("aeon-api://shop.example/list?%5B%5D"),
-    "aeon-api://shop.example/list?%5B%5D",
+    readKey("graft-api://shop.example/list?%5B%5D"),
+    "graft-api://shop.example/list?%5B%5D",
   );
 });
 
@@ -22,8 +22,8 @@ test("a read keeps its lines, trimmed and bounded", () => {
   assert.equal(lines[2].length, 300);
 });
 
-test("only pages Aeon has read are kept and updated", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-reads-"));
+test("only pages Graft has read are kept and updated", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "graft-reads-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   assert.equal(
     await putSavedRead(root, "https://shop.example/item", "₹2,999", { onlyIfKnown: true }),

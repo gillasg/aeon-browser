@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RewindSchema } from "@aeon/protocol";
+import { RewindSchema } from "@graft/protocol";
 import { siteScriptRewind } from "../dist/site-script-rewind.js";
 
 const script = (history) => ({

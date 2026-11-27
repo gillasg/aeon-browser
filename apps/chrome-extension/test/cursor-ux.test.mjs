@@ -8,7 +8,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // One bundle of the cursor's pure parts: target rules, in-place answers, view rows, Manage tab
-// reuse, site facts and offer actions. @aeon/ui is the real package.
+// reuse, site facts and offer actions. @graft/ui is the real package.
 async function load() {
   const directory = await mkdtemp(fileURLToPath(new URL("./.cursor-ux-", import.meta.url)));
   const entry = join(directory, "entry.ts");
@@ -86,14 +86,14 @@ test("interactive and content elements are accepted; page structure is not", () 
   assert.equal(ux.pickTarget([heading], viewport), heading);
 });
 
-test("plain wrappers, huge, tiny, iframes and Aeon's overlay are rejected", () => {
+test("plain wrappers, huge, tiny, iframes and Graft's overlay are rejected", () => {
   const div = node("DIV");
   assert.equal(ux.acceptable(div, viewport), false);
   assert.equal(ux.acceptable(node("DIV", { attrs: { role: "button" } }), viewport), true);
   assert.equal(ux.acceptable(node("LI", { box: { width: 900, height: 700 } }), viewport), false);
   assert.equal(ux.acceptable(node("BUTTON", { box: { width: 3, height: 10 } }), viewport), false);
   assert.equal(ux.acceptable(node("IFRAME"), viewport), false);
-  const overlay = node("BUTTON", { attrs: { "data-aeon-overlay": "" }, text: "Stop" });
+  const overlay = node("BUTTON", { attrs: { "data-graft-overlay": "" }, text: "Stop" });
   const under = node("A", { attrs: { href: "/x" }, text: "Deal" });
   assert.equal(ux.pickTarget([overlay, under], viewport), under);
 });
@@ -253,8 +253,8 @@ test("boost helpers count only enabled boosts and pick the latest change", () =>
 
 test("Copy MCP copies a server entry for the site", () => {
   const [add, config] = ux.mcpSnippet("shop.com").split("\n\n");
-  assert.equal(add, "claude mcp add shop.com -- aeon mcp shop.com");
+  assert.equal(add, "claude mcp add shop.com -- graft mcp shop.com");
   assert.deepEqual(JSON.parse(config), {
-    mcpServers: { "shop.com": { command: "aeon", args: ["mcp", "shop.com"] } },
+    mcpServers: { "shop.com": { command: "graft", args: ["mcp", "shop.com"] } },
   });
 });

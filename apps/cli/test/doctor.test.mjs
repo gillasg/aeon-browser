@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { ENGINE_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import { ENGINE_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol";
 import {
   CHROME_FLAGS,
   chromeFlagsCommand,
@@ -45,7 +45,7 @@ function facts(overrides = {}) {
     chromeCommandLines: [`chrome.exe ${flags}`],
     modelSignedIn: true,
     loginTask: true,
-    dirs: [{ name: "Aeon", path: "C:\\Aeon\\data", writable: true }],
+    dirs: [{ name: "Graft", path: "C:\\Graft\\data", writable: true }],
     ...overrides,
   };
 }
@@ -72,23 +72,23 @@ test("each failed check names the one fix", () => {
       chromeCommandLines: ["chrome.exe --silent-debugger-extension-api"],
       modelSignedIn: false,
       loginTask: false,
-      dirs: [{ name: "Aeon", path: "C:\\Aeon\\data", writable: false }],
+      dirs: [{ name: "Graft", path: "C:\\Graft\\data", writable: false }],
     }),
   );
   const byName = Object.fromEntries(checks.map((check) => [check.name, check]));
   assert.equal(byName.daemon.status, "fail");
-  assert.match(byName.daemon.fix, /Open Chrome with Aeon loaded/);
+  assert.match(byName.daemon.fix, /Open Chrome with Graft loaded/);
   assert.equal(byName.protocol.status, "fail");
   assert.equal(byName.extension.status, "fail");
-  assert.match(byName.extension.fix, /Aeon extension loaded/);
+  assert.match(byName.extension.fix, /Graft extension loaded/);
   assert.equal(byName.flags.status, "ok");
   assert.match(byName.flags.detail, /normal Chrome launch/);
   assert.match(byName.flags.fix, /Optional: quit Chrome, then relaunch/);
   assert.match(byName.model.fix, /Sign in to a model/);
   assert.match(byName.supervisor.detail, /is not running\./);
-  assert.match(byName.supervisor.fix, /Aeon/);
-  assert.match(byName.data.fix, /C:\\Aeon\\data/);
-  assert.match(formatDoctor(checks, false), /Fix: Open Chrome with Aeon loaded/);
+  assert.match(byName.supervisor.fix, /Graft/);
+  assert.match(byName.data.fix, /C:\\Graft\\data/);
+  assert.match(formatDoctor(checks, false), /Fix: Open Chrome with Graft loaded/);
 });
 
 test("a daemon that answers still fails protocol and engine when those disagree", () => {
@@ -109,7 +109,7 @@ test("a daemon that answers still fails protocol and engine when those disagree"
   assert.match(protocol.detail, /does not match/);
   assert.match(protocol.fix, /same build/);
   assert.equal(extension.status, "fail");
-  assert.match(extension.fix, /Reload the Aeon extension/);
+  assert.match(extension.fix, /Reload the Graft extension/);
 });
 
 test("an engine protocol other than this build fails the protocol check", () => {
@@ -130,10 +130,10 @@ test("an engine protocol other than this build fails the protocol check", () => 
 });
 
 test("the supervisor check follows the service manager, not the unit file", async () => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-doctor-service-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-doctor-service-"));
   const home = join(root, "home");
   const env = { XDG_CONFIG_HOME: join(home, ".config") };
-  const unit = join(env.XDG_CONFIG_HOME, "systemd", "user", "aeon-daemon.service");
+  const unit = join(env.XDG_CONFIG_HOME, "systemd", "user", "graft-daemon.service");
   try {
     assert.equal(
       await supervisorServiceActive({
@@ -162,14 +162,14 @@ test("the supervisor check follows the service manager, not the unit file", asyn
       true,
     );
     assert.deepEqual(calls, [
-      ["systemctl", "--user", "is-active", "--quiet", "aeon-daemon.service"],
+      ["systemctl", "--user", "is-active", "--quiet", "graft-daemon.service"],
     ]);
     assert.equal(
       await supervisorServiceActive({ platform: "linux", home, env, exec: async () => false }),
       false,
     );
 
-    const plist = join(home, "Library", "LaunchAgents", "com.aeon.daemon.plist");
+    const plist = join(home, "Library", "LaunchAgents", "com.graft.daemon.plist");
     await mkdir(dirname(plist), { recursive: true });
     await writeFile(plist, "plist");
     const macCalls = [];
@@ -186,14 +186,14 @@ test("the supervisor check follows the service manager, not the unit file", asyn
       }),
       true,
     );
-    assert.deepEqual(macCalls, [["launchctl", "print", "gui/42/com.aeon.daemon"]]);
+    assert.deepEqual(macCalls, [["launchctl", "print", "gui/42/com.graft.daemon"]]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
 test("a model credential is signed in, and a writable folder is", async () => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-doctor-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-doctor-"));
   const auth = join(root, "auth.json");
   await writeFile(auth, JSON.stringify({ anthropic: { type: "api_key", key: "secret" } }));
   assert.equal(await modelSignedIn(auth), true);
@@ -219,7 +219,7 @@ test("runDoctor exits 1 and prints json when the daemon is down", async () => {
       chromeCommandLines: async () => [],
       modelSignedIn: async () => false,
       loginTask: async () => false,
-      dataDirs: async () => [{ name: "Aeon", path: "x", writable: false }],
+      dataDirs: async () => [{ name: "Graft", path: "x", writable: false }],
     });
     assert.equal(code, 1);
     const parsed = JSON.parse(written);

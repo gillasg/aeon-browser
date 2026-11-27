@@ -65,7 +65,7 @@ export interface FetchOptions {
   handoff?: boolean;
   /** How long a page waits for the user before it is kept as is. Default 5 minutes. */
   handoffTimeoutMs?: number;
-  /** Chrome profile to render in (a name from `aeon browsers`), when more than one is connected. */
+  /** Chrome profile to render in (a name from `graft browsers`), when more than one is connected. */
   browser?: string;
 }
 

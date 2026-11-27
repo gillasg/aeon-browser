@@ -454,7 +454,7 @@ async function collectPage(
     readPageScan(debuggee).catch(() => emptyScan()),
     overlayBackendIds(debuggee),
   ]);
-  // Aeon's own overlay is not the page: its nodes are left out of the state the agent reads.
+  // Graft's own overlay is not the page: its nodes are left out of the state the agent reads.
   const ax = all.filter((node) => !overlay.has(node.backendDOMNodeId ?? -1));
   const clickables =
     ax.length > CLICKABLE_NODE_LIMIT

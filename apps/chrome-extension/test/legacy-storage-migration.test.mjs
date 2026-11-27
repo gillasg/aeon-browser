@@ -45,8 +45,8 @@ async function runMigration(outfile, areas, store) {
   }
 }
 
-test("legacy extension storage moves to the Aeon keys without overwriting newer values", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-storage-migration-"));
+test("legacy extension storage moves to the Graft keys without overwriting newer values", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "graft-storage-migration-"));
   try {
     const outfile = join(directory, "migration.mjs");
     await build({
@@ -67,31 +67,31 @@ test("legacy extension storage moves to the Aeon keys without overwriting newer 
     const local = fakeArea({
       "pippin-client-instance-id": "id-1",
       pippinModelCatalog: { models: [] },
-      "aeon-client-instance-id": "id-2",
+      "graft-client-instance-id": "id-2",
     });
     const session = fakeArea({ "pippin.initial-submit.7": { text: "hi" }, other: 1 });
     const store = new Map([
       ["pippin-wallpaper", "{}"],
       ["pippinMessageSendMode", "steer"],
-      ["aeon-sidebar-expanded", "true"],
+      ["graft-sidebar-expanded", "true"],
     ]);
     await runMigration(outfile, { sync, local, session }, store);
     assert.deepEqual(Object.fromEntries(sync.values), {
-      "aeon-theme": "light",
-      "aeon-chat-sidebar-open": true,
+      "graft-theme": "light",
+      "graft-chat-sidebar-open": true,
     });
     assert.deepEqual(Object.fromEntries(local.values), {
-      "aeon-client-instance-id": "id-2",
-      aeonModelCatalog: { models: [] },
+      "graft-client-instance-id": "id-2",
+      graftModelCatalog: { models: [] },
     });
     assert.deepEqual(Object.fromEntries(session.values), {
-      "aeon.initial-submit.7": { text: "hi" },
+      "graft.initial-submit.7": { text: "hi" },
       other: 1,
     });
     assert.deepEqual(Object.fromEntries(store), {
-      "aeon-sidebar-expanded": "true",
-      "aeon-wallpaper": "{}",
-      aeonMessageSendMode: "steer",
+      "graft-sidebar-expanded": "true",
+      "graft-wallpaper": "{}",
+      graftMessageSendMode: "steer",
     });
   } finally {
     await rm(directory, { recursive: true, force: true });

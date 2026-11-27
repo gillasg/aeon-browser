@@ -6,8 +6,8 @@ import { join } from "node:path";
 // The login service may exist as a file yet not be running: stopped by the user, failed past its
 // start limit, or never started after a boot. A file is not a supervisor, so ask the manager.
 
-export const DAEMON_UNIT = "aeon-daemon.service";
-export const DAEMON_LABEL = "com.aeon.daemon";
+export const DAEMON_UNIT = "graft-daemon.service";
+export const DAEMON_LABEL = "com.graft.daemon";
 
 export function serviceFile(options = {}) {
   const platform = options.platform ?? process.platform;
@@ -51,7 +51,7 @@ export function startService(options = {}) {
 function startLaunchAgent(exec, options, file) {
   if (answered(exec, "launchctl", ["kickstart", "-k", darwinTarget(options)])) return true;
   if (answered(exec, "launchctl", ["bootstrap", darwinUser(options), file])) return true;
-  options.log?.write("Could not start the Aeon LaunchAgent.");
+  options.log?.write("Could not start the Graft LaunchAgent.");
   return false;
 }
 
@@ -59,7 +59,7 @@ function startSystemdUser(exec, options) {
   // A unit past StartLimitBurst stays refused until the failure counter is cleared.
   answered(exec, "systemctl", ["--user", "reset-failed", DAEMON_UNIT]);
   if (answered(exec, "systemctl", ["--user", "start", DAEMON_UNIT])) return true;
-  options.log?.write("Could not start the Aeon user service.");
+  options.log?.write("Could not start the Graft user service.");
   return false;
 }
 

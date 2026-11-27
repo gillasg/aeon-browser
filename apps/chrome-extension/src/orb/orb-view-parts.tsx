@@ -2,7 +2,7 @@ import { type ReactElement, type ReactNode } from "react";
 
 // The cursor box's quiet parts: the `/` palette (Developer options), Teach's pill,
 // the working pill, the answer's receipt row and the error card. Bone and ash on obsidian; the
-// only colour Aeon ever adds on the page is the ochre `I'm done` of a hand-off.
+// only colour Graft ever adds on the page is the ochre `I'm done` of a hand-off.
 
 export interface PaletteVerb {
   verb: "teach" | "watch" | "fill";
@@ -10,9 +10,9 @@ export interface PaletteVerb {
   hint: string;
 }
 
-/** Exactly three verbs: things Aeon does. Going to the panel is the fixed ⌘↵ footer instead. */
+/** Exactly three verbs: things Graft does. Going to the panel is the fixed ⌘↵ footer instead. */
 export const PALETTE: readonly PaletteVerb[] = [
-  { verb: "teach", label: "/teach", hint: "Show Aeon how this site works" },
+  { verb: "teach", label: "/teach", hint: "Show Graft how this site works" },
   { verb: "watch", label: "/watch", hint: "Tell me when something changes" },
   { verb: "fill", label: "/fill", hint: "Fill this form from my details" },
 ];

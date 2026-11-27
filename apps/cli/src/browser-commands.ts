@@ -10,10 +10,10 @@ import { readJournal } from "./host.js";
 import { repl } from "./repl.js";
 import { handoffLine, statusHandoffLines, type HandoffTab } from "./handoff-lines.js";
 
-// The browser itself, as Aeon sees it: the daemon and the user's Chrome. These replace the
+// The browser itself, as Graft sees it: the daemon and the user's Chrome. These replace the
 // bridge-only commands (status, tabs, repl, journal, serve) browserkit's own command line has.
 
-const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url, aeonUi: tab.aeonUi === true, ...(tab.handoff ? { handoff: tab.handoff } : {}) }))`;
+const TABS = `(await browser.tabs()).map((tab) => ({ target: tab.target, title: tab.title, url: tab.url, graftUi: tab.graftUi === true, ...(tab.handoff ? { handoff: tab.handoff } : {}) }))`;
 
 async function status(host: DaemonHost, args: Args): Promise<number> {
   const client = await host.connect();
@@ -24,8 +24,8 @@ async function status(host: DaemonHost, args: Args): Promise<number> {
   }
   out(
     browsers.length
-      ? `Aeon is running; ${browsers.length} browser(s) connected.`
-      : "Aeon is running; no browser connected yet. It reconnects on its own after a restart; if it stays this way, load Aeon in Chrome.",
+      ? `Graft is running; ${browsers.length} browser(s) connected.`
+      : "Graft is running; no browser connected yet. It reconnects on its own after a restart; if it stays this way, load Graft in Chrome.",
   );
   if (browsers.length) {
     const list = ((await host.runInBrowser(TABS, { session: "cli" }).catch(() => [])) ??
@@ -38,7 +38,7 @@ async function status(host: DaemonHost, args: Args): Promise<number> {
 async function tabs(host: DaemonHost, args: Args): Promise<number> {
   const list = ((await host.runInBrowser(TABS, { session: "cli" })) ?? []) as (HandoffTab & {
     url?: string;
-    aeonUi?: boolean;
+    graftUi?: boolean;
   })[];
   if (has(args, "json")) {
     printJson(list);
@@ -46,7 +46,7 @@ async function tabs(host: DaemonHost, args: Args): Promise<number> {
   }
   for (const tab of list) {
     printRows([
-      [tab.target?.tabId, tab.aeonUi ? `${tab.title ?? ""} (Aeon UI)` : tab.title, tab.url],
+      [tab.target?.tabId, tab.graftUi ? `${tab.title ?? ""} (Graft UI)` : tab.title, tab.url],
     ]);
     if (tab.handoff) out(handoffLine(tab.handoff));
   }
@@ -76,12 +76,12 @@ async function serve(host: DaemonHost, args: Args): Promise<number> {
     };
   } catch {
     throw new Error(
-      "Aeon is not running. Open Chrome with Aeon loaded (the daemon starts with it), then retry.",
+      "Graft is not running. Open Chrome with Graft loaded (the daemon starts with it), then retry.",
     );
   }
   if (has(args, "json")) printJson(state);
   else {
-    out(`Aeon's daemon answers at ${state.endpoint ?? "?"} (pid ${state.pid ?? "?"}).`);
+    out(`Graft's daemon answers at ${state.endpoint ?? "?"} (pid ${state.pid ?? "?"}).`);
     out("Connected. Press Ctrl+C to stop watching.");
   }
   await host.connect();
@@ -97,15 +97,15 @@ export function browserCommands(host: DaemonHost): Command[] {
     {
       name: "status",
       group: "Browser",
-      summary: "show whether Aeon and a browser are connected",
-      help: `Usage: aeon status [--json]`,
+      summary: "show whether Graft and a browser are connected",
+      help: `Usage: graft status [--json]`,
       run: (args) => status(host, args),
     },
     {
       name: "tabs",
       group: "Browser",
       summary: "list the browser's open tabs",
-      help: `Usage: aeon tabs [--json]
+      help: `Usage: graft tabs [--json]
 
 Prints tab id, title and URL, one tab per line; --json prints the browser's own entries.`,
       run: (args) => tabs(host, args),
@@ -114,12 +114,12 @@ Prints tab id, title and URL, one tab per line; --json prints the browser's own 
       name: "repl",
       group: "Browser",
       summary: "run a browser_code cell",
-      help: `Usage: aeon repl "<code>" | @file.js | - [--session name] [--browser name] [--timeout s] [--quiet]
+      help: `Usage: graft repl "<code>" | @file.js | - [--session name] [--browser name] [--timeout s] [--quiet]
 
 The last expression is returned. Variables and tabs persist per session. @file.js runs code from
 a file and - reads it from stdin, so long cells need no quoting. --timeout is in seconds (30,
 500ms and 2s also work); a timed-out cell closes the session's own tabs and jobs. --browser keeps
-the session in one Chrome profile (a name from aeon browsers). --quiet prints only errors (on
+the session in one Chrome profile (a name from graft browsers). --quiet prints only errors (on
 stderr) and keeps the exit code.`,
       run: (args) => repl(host, args),
     },
@@ -127,14 +127,14 @@ stderr) and keeps the exit code.`,
       name: "journal",
       group: "Browser",
       summary: "show the last cells a session ran",
-      help: `Usage: aeon journal [session] [--limit n] [--json]`,
+      help: `Usage: graft journal [session] [--limit n] [--json]`,
       run: journal,
     },
     {
       name: "serve",
       group: "Browser",
       summary: "watch the daemon's Core endpoint in the foreground",
-      help: `Usage: aeon serve
+      help: `Usage: graft serve
 
 Usually the daemon starts with Chrome; this keeps a process attached to watch it.`,
       run: (args) => serve(host, args),

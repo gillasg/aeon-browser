@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { CoreAttention } from "../dist/core-attention.js";
 
 test("completion is shared, claimed once, read by completion identity, and persisted", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-attention-test-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-attention-test-"));
   let publish;
   const service = {
     getChat: () => ({}),
@@ -53,7 +53,7 @@ test("completion is shared, claimed once, read by completion identity, and persi
 });
 
 test("invalid completion metadata cannot prevent Core startup", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-attention-corrupt-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-attention-corrupt-"));
   try {
     await writeFile(join(directory, "core-attention.json"), "{broken");
     const attention = new CoreAttention(directory, {
@@ -68,7 +68,7 @@ test("invalid completion metadata cannot prevent Core startup", async () => {
 });
 
 test("attention stays bounded: old records are dropped and a refused claim is never re-decided", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-attention-bounded-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-attention-bounded-"));
   let publish;
   let lookups = 0;
   const service = {

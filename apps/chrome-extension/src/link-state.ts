@@ -1,18 +1,18 @@
 // The browser link's state, for a last-resort banner. The extension heals the link itself; this
-// event exists so a surface can say "Aeon's browser link is down" only when waiting is not enough.
+// event exists so a surface can say "Graft's browser link is down" only when waiting is not enough.
 
 export type LinkState = "up" | "reconnecting" | "down";
 
 export interface LinkEvent {
-  kind: "aeon.link";
+  kind: "graft.link";
   state: LinkState;
   reason: string;
 }
 
-const STORAGE_KEY = "aeon-link";
+const STORAGE_KEY = "graft-link";
 
 export function reportLink(state: LinkState, reason: string): void {
-  const event: LinkEvent = { kind: "aeon.link", state, reason };
+  const event: LinkEvent = { kind: "graft.link", state, reason };
   void chrome.storage.local.set({ [STORAGE_KEY]: event }).catch(() => undefined);
   void chrome.runtime.sendMessage(event).catch(() => undefined);
 }

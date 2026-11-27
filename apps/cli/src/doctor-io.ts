@@ -3,8 +3,8 @@ import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { CoreHealthResultSchema } from "@aeon/protocol";
-import { aeonDataDirectory, ensurePrivateDir, UntrustedDirError } from "@aeon/location";
+import { CoreHealthResultSchema } from "@graft/protocol";
+import { graftDataDirectory, ensurePrivateDir, UntrustedDirError } from "@graft/location";
 import type { DaemonHost } from "./host.js";
 import type { DataDir, HealthView } from "./doctor-checks.js";
 import type { StealthFacts } from "./doctor-stealth-checks.js";
@@ -20,9 +20,9 @@ export interface DoctorIo {
   dataDirs(): Promise<DataDir[]>;
   /** Optional so existing fakes stay valid. Absent means no remembered start cause. */
   startFailure?(): Promise<string | undefined>;
-  /** Only used by `aeon doctor --stealth`; opens and closes one hidden tab. */
+  /** Only used by `graft doctor --stealth`; opens and closes one hidden tab. */
   stealthFacts?(): Promise<StealthFacts>;
-  /** Optional so existing fakes stay valid; absent means Aeon does not prefer the agent's model. */
+  /** Optional so existing fakes stay valid; absent means Graft does not prefer the agent's model. */
   mcpUsesClientModel?(): Promise<boolean>;
 }
 
@@ -50,7 +50,7 @@ export function dataDirPaths(
         ? join(home, "Library", "Application Support")
         : env.XDG_DATA_HOME || join(home, ".local", "share");
   return [
-    { name: "Aeon", path: aeonDataDirectory({ env }) },
+    { name: "Graft", path: graftDataDirectory({ env }) },
     { name: "browserkit", path: env.BROWSERKIT_HOME ?? join(local, "browserkit") },
     { name: "site-to-api", path: env.SITE_TO_API_HOME ?? join(home, ".site-to-api") },
   ];
@@ -73,7 +73,7 @@ export async function modelSignedIn(path: string): Promise<boolean> {
 }
 
 export async function directoryWritable(path: string): Promise<boolean> {
-  const probe = join(path, `.aeon-doctor-${process.pid}-${Date.now()}`);
+  const probe = join(path, `.graft-doctor-${process.pid}-${Date.now()}`);
   try {
     await mkdir(path, { recursive: true });
     await writeFile(probe, "ok", { flag: "wx" });
@@ -147,13 +147,13 @@ export function serviceFilePath(options: ServiceProbeOptions = {}): string | und
   const platform = options.platform ?? process.platform;
   const home = options.home ?? homedir();
   const env = options.env ?? process.env;
-  if (platform === "darwin") return join(home, "Library", "LaunchAgents", "com.aeon.daemon.plist");
+  if (platform === "darwin") return join(home, "Library", "LaunchAgents", "com.graft.daemon.plist");
   if (platform === "linux")
     return join(
       env.XDG_CONFIG_HOME || join(home, ".config"),
       "systemd",
       "user",
-      "aeon-daemon.service",
+      "graft-daemon.service",
     );
   return undefined;
 }
@@ -165,9 +165,9 @@ export async function supervisorServiceActive(options: ServiceProbeOptions = {})
   const exec = options.exec ?? commandAnswered;
   if ((options.platform ?? process.platform) === "darwin") {
     const uid = options.uid ?? process.getuid?.() ?? 501;
-    return exec("launchctl", ["print", `gui/${uid}/com.aeon.daemon`]);
+    return exec("launchctl", ["print", `gui/${uid}/com.graft.daemon`]);
   }
-  return exec("systemctl", ["--user", "is-active", "--quiet", "aeon-daemon.service"]);
+  return exec("systemctl", ["--user", "is-active", "--quiet", "graft-daemon.service"]);
 }
 
 function commandAnswered(file: string, args: string[]): Promise<boolean> {
@@ -181,7 +181,7 @@ function loginTaskPresent(): Promise<boolean> {
   return new Promise((resolve) => {
     execFile(
       "schtasks.exe",
-      ["/Query", "/TN", "Aeon-Core-Login"],
+      ["/Query", "/TN", "Graft-Core-Login"],
       { timeout: 8000, windowsHide: true },
       (error) => resolve(!error),
     );
@@ -210,7 +210,7 @@ async function inspectDataDir(dir: { name: string; path: string }): Promise<Data
 function trustFix(name: string): string {
   if (name === "browserkit") return "Set BROWSERKIT_HOME to a directory you own with mode 700.";
   if (name === "site-to-api") return "Set SITE_TO_API_HOME to a directory you own with mode 700.";
-  return "Set AEON_DATA_DIR to a directory you own with mode 700.";
+  return "Set GRAFT_DATA_DIR to a directory you own with mode 700.";
 }
 
 function execLines(file: string, args: string[]): Promise<string[]> {

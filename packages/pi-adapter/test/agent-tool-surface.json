@@ -114,7 +114,7 @@
         "browser": {
           "type": "string",
           "maxLength": 80,
-          "description": "Chrome profile name (aeon browsers) to render pages in."
+          "description": "Chrome profile name (graft browsers) to render pages in."
         },
         "readiness": {
           "type": "boolean",

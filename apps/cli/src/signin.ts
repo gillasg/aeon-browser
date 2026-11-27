@@ -12,14 +12,14 @@ import {
 import { bridgeDataDirectory } from "@browserkit/tools/site-to-api";
 import { spawn } from "node:child_process";
 
-// `aeon signin setup bitwarden|proton` picks the password manager Aeon signs in with;
-// `aeon signin status` says which one answers. The agent then calls bu.signIn() on a sign-in
+// `graft signin setup bitwarden|proton` picks the password manager Graft signs in with;
+// `graft signin status` says which one answers. The agent then calls bu.signIn() on a sign-in
 // page: the password goes from the password manager into the page, never through the agent.
-// `--browser <name>` (a name from `aeon browsers`) gives one Chrome profile its own choice, such
+// `--browser <name>` (a name from `graft browsers`) gives one Chrome profile its own choice, such
 // as an eval profile on a test vault while every other profile keeps the main one.
 
-export const signinUsage = `  signin setup <provider> [--browser name]   bitwarden or proton: the password manager Aeon signs in with
-                                             (--browser: only for that Chrome profile, see aeon browsers)
+export const signinUsage = `  signin setup <provider> [--browser name]   bitwarden or proton: the password manager Graft signs in with
+                                             (--browser: only for that Chrome profile, see graft browsers)
   signin status [--browser name]             show which password manager answers`;
 
 export async function signinCommand(args: string[], browser?: string): Promise<number> {
@@ -36,7 +36,7 @@ async function status(browser?: string): Promise<number> {
   const flag = browser ? ` --browser ${browser}` : "";
   if (!provider) {
     process.stdout.write(
-      `No password manager answers${browser ? ` for ${browser}` : ""}. Run \`aeon signin setup bitwarden${flag}\` or \`aeon signin setup proton${flag}\`.\n`,
+      `No password manager answers${browser ? ` for ${browser}` : ""}. Run \`graft signin setup bitwarden${flag}\` or \`graft signin setup proton${flag}\`.\n`,
     );
     return 1;
   }
@@ -68,7 +68,7 @@ async function setup(name: ProviderName, browser?: string): Promise<number> {
   await saveConfig(directory, withChoice(config, choice, browser));
   const where = browser ? ` in the ${browser} profile` : "";
   process.stdout.write(
-    `Aeon now signs in with ${name}${where}. Saved to ${configPath(directory)}\n`,
+    `Graft now signs in with ${name}${where}. Saved to ${configPath(directory)}\n`,
   );
   return 0;
 }

@@ -38,8 +38,8 @@ export const BrowserTabSchema = z
     control: z.enum(["agent", "user"]).optional(),
     /** True when another chat is driving this tab; browser.activeTab() skips it. */
     heldByOther: z.boolean().optional(),
-    /** One of Aeon's own pages (home, chat, side panel): listed and drivable, marked as Aeon UI. */
-    aeonUi: z.boolean().optional(),
+    /** One of Graft's own pages (home, chat, side panel): listed and drivable, marked as Graft UI. */
+    graftUi: z.boolean().optional(),
     /** A pending hand-off: the agent is waiting on the user in this tab since startedAt. */
     handoff: z
       .object({ message: z.string().max(2000), startedAt: z.number().int().nonnegative() })

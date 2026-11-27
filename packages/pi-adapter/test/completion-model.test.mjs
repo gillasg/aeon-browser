@@ -29,14 +29,14 @@ test("a stored default that is gone fails instead of using another one", () => {
   );
 });
 
-test("Aeon's preferred model that is gone falls back to the first connected model", () => {
+test("Graft's preferred model that is gone falls back to the first connected model", () => {
   assert.deepEqual(
     chooseCompletionModel(models, defaults(), {}, { provider: "opencode-go", id: "gone" }),
     models[0],
   );
 });
 
-test("the person's stored default wins over Aeon's preferred model", () => {
+test("the person's stored default wins over Graft's preferred model", () => {
   assert.deepEqual(
     chooseCompletionModel(models, defaults("anthropic", "claude-sonnet"), {}, preferred),
     models[0],

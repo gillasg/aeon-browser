@@ -10,7 +10,7 @@ import { SITE_TOOL_HELP, type ModelLike } from "@browserkit/tools/site-to-api";
 import { inChat } from "./site-browser.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
-// site_mapper: the actions and parameters come from browserkit's definition. Aeon adds chat
+// site_mapper: the actions and parameters come from browserkit's definition. Graft adds chat
 // context, the chat workspace, a model and bounded previews; its allow-list keeps every browserkit
 // action that is not listed here off.
 

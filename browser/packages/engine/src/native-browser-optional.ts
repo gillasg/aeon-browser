@@ -12,6 +12,6 @@ export async function needPermission(permission: OptionalPermission): Promise<vo
   if (await api.contains(wanted).catch(() => true)) return;
   if (await api.request(wanted).catch(() => false)) return;
   throw new Error(
-    `PERMISSION_NEEDED: allow "${permission}" for Aeon in chrome://extensions → Details → Permissions`,
+    `PERMISSION_NEEDED: allow "${permission}" for Graft in chrome://extensions → Details → Permissions`,
   );
 }

@@ -1,4 +1,4 @@
-import { ChatIdSchema, DaemonUiRequestSchema } from "@aeon/protocol";
+import { ChatIdSchema, DaemonUiRequestSchema } from "@graft/protocol";
 import { connectPage } from "./ui-connection.js";
 import { openNewChat } from "./new-chat-navigation.js";
 import type { UiClient } from "./ui-client-core.js";
@@ -21,11 +21,11 @@ async function projectClient(): Promise<UiClient> {
   });
   return connection;
 }
-window.addEventListener("aeon.project-request", (event) => {
+window.addEventListener("graft.project-request", (event) => {
   const detail = (event as CustomEvent).detail;
   void projectRequest(detail.operation, detail.payload).then(detail.resolve, detail.reject);
 });
-window.addEventListener("aeon.project-new-chat", (event) =>
+window.addEventListener("graft.project-new-chat", (event) =>
   openNewChat((event as CustomEvent<string>).detail),
 );
 async function projectRequest(operation: string, payload: unknown): Promise<unknown> {
@@ -49,18 +49,18 @@ export function projectDraftPayload(): { projectId?: string } {
   return projectId && ChatIdSchema.safeParse(projectId).success ? { projectId } : {};
 }
 
-window.addEventListener("aeon.panel-current-page", (event) => {
+window.addEventListener("graft.panel-current-page", (event) => {
   const detail = (event as CustomEvent).detail;
   void chrome.runtime
-    .sendMessage({ kind: "aeon.native.current-page" })
+    .sendMessage({ kind: "graft.native.current-page" })
     .then(detail.resolve, detail.reject);
 });
 
-window.addEventListener("aeon.context-picker", (event) => {
+window.addEventListener("graft.context-picker", (event) => {
   const detail = (event as CustomEvent).detail;
   const message =
     detail.kind === "list"
-      ? { kind: "aeon.native.list-context-tabs" }
-      : { kind: "aeon.native.capture-page", tabId: detail.tabId };
+      ? { kind: "graft.native.list-context-tabs" }
+      : { kind: "graft.native.capture-page", tabId: detail.tabId };
   void chrome.runtime.sendMessage(message).then(detail.resolve, detail.reject);
 });

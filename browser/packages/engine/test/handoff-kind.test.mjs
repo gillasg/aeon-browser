@@ -78,7 +78,7 @@ assert.ok(messageListeners.length > 0, "the hand-off answer listener is installe
 
 function answer(tabId, value) {
   for (const listener of messageListeners)
-    listener({ kind: "aeon.handoff.answer", tabId, answer: value }, { id: "ext" });
+    listener({ kind: "graft.handoff.answer", tabId, answer: value }, { id: "ext" });
 }
 
 test("a kind and an action label are kept, and an unknown kind is refused", () => {

@@ -84,14 +84,14 @@ test("teaching survives a sleeping service worker: detach and page loads read th
   const learning = await load("../src/browse-learning.ts");
   learning.installBrowseLearning();
   // The worker woke up with no timers: only the session record says tab 5 is teaching.
-  store.set("aeon-learn:5", { site: "example.com", baseline: [], found: 0 });
+  store.set("graft-learn:5", { site: "example.com", baseline: [], found: 0 });
   listeners.updated(5, { status: "complete" });
   await settle();
   assert.deepEqual(globalThis.__learnCalls.at(-1), ["network", 5, "take"]);
   listeners.detach({ tabId: 5 });
   await settle();
   assert.ok(globalThis.__learnCalls.some((call) => call.join() === "learn,5,false"));
-  assert.equal(store.has("aeon-learn:5"), false);
+  assert.equal(store.has("graft-learn:5"), false);
   // A tab that never taught is left alone.
   const before = globalThis.__learnCalls.length;
   listeners.detach({ tabId: 6 });
@@ -142,18 +142,18 @@ test("Teach counts the APIs learned on the site browsed to, and keeps the result
   try {
     // Teach starts on a page of another host, then the user browses to example.com.
     fakeChrome.url = "https://start.test/";
-    await ask({ kind: "aeon.learn.set", tabId: 9, on: true });
+    await ask({ kind: "graft.learn.set", tabId: 9, on: true });
     fakeChrome.url = "https://example.com/orders";
-    const stopped = await ask({ kind: "aeon.learn.set", tabId: 9, on: false });
+    const stopped = await ask({ kind: "graft.learn.set", tabId: 9, on: false });
     assert.equal(stopped.found, 1);
     assert.equal(stopped.site, "example.com");
     // An orb that only sees learning end still reads what was learned.
-    assert.deepEqual(await ask({ kind: "aeon.learn.get", tabId: 9 }), {
+    assert.deepEqual(await ask({ kind: "graft.learn.get", tabId: 9 }), {
       on: false,
       found: 1,
       site: "example.com",
     });
-    assert.equal(store.has("aeon-learn:9"), false);
+    assert.equal(store.has("graft-learn:9"), false);
   } finally {
     delete globalThis.__harEntries;
     delete globalThis.__askCore;
@@ -177,7 +177,7 @@ test("Teach flushes once the page goes quiet, not on every finished request", as
   try {
     globalThis.__askCore = () => [];
     fakeChrome.url = "https://example.com/";
-    await ask({ kind: "aeon.learn.set", tabId: 11, on: true });
+    await ask({ kind: "graft.learn.set", tabId: 11, on: true });
     const started = takes();
     // A burst of finished requests, each 100 ms apart, pushes the flush back: none lands mid-burst.
     for (let i = 0; i < 4; i++) {
@@ -191,7 +191,7 @@ test("Teach flushes once the page goes quiet, not on every finished request", as
     // Quiet for 1.5 s: exactly one flush for the whole burst.
     await new Promise((resolve) => setTimeout(resolve, 1_700));
     assert.equal(takes(), started + 1);
-    await ask({ kind: "aeon.learn.set", tabId: 11, on: false });
+    await ask({ kind: "graft.learn.set", tabId: 11, on: false });
   } finally {
     delete globalThis.__askCore;
     delete fakeChrome.url;

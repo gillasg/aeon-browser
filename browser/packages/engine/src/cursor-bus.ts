@@ -1,5 +1,5 @@
 // The cursor's host is a plain, unlabelled element with a closed shadow root. Page scripts cannot
-// select it (no id, class or data-aeon-* attribute) and cannot read inside the shadow root. The
+// select it (no id, class or data-graft-* attribute) and cannot read inside the shadow root. The
 // painter and the orb share the extension's isolated world, and state crosses between them on an
 // EventTarget that lives only in that world: nothing is dispatched on the page's window.
 

@@ -1,19 +1,19 @@
 param([ValidateSet('Install', 'Remove', 'Validate')][string]$Mode = 'Install')
 $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Validate
-$appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Aeon'))
+$appRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Graft'))
 $startupScript = Join-Path $appRoot 'start-daemon.ps1'
-$hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
+$hostExecutable = Join-Path $appRoot 'graft-native-host.exe'
 $runKeyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
-$runName = 'AeonDaemon'
+$runName = 'GraftDaemon'
 $powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $command = '"' + $powershellPath + '" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $startupScript + '"'
 $scriptContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'daemon-launcher.ps1') -Raw
 # Installs that only ever started the daemon once are still ours and get replaced.
 $legacyScriptContent = @'
-# Aeon-owned daemon login launcher.
+# Graft-owned daemon login launcher.
 $ErrorActionPreference = 'Stop'
-$hostExecutable = Join-Path $PSScriptRoot 'aeon-native-host.exe'
+$hostExecutable = Join-Path $PSScriptRoot 'graft-native-host.exe'
 if (Test-Path -LiteralPath $hostExecutable -PathType Leaf) {
     Start-Process -FilePath $hostExecutable -ArgumentList '--daemon-supervisor' -WindowStyle Hidden
 }
@@ -32,7 +32,7 @@ try {
     & (Join-Path $PSScriptRoot 'configure-login-task.ps1') -Mode Validate -PowerShellPath $powershellPath -StartupScript $startupScript
     $existing = if ($null -ne $runKey) { [string]$runKey.GetValue($runName, '') } else { '' }
     if ($existing -and $existing -cne $command) {
-        throw 'The Aeon login entry belongs to another installation; it was preserved.'
+        throw 'The Graft login entry belongs to another installation; it was preserved.'
     }
     if ($Mode -eq 'Validate') { return }
     if ($Mode -eq 'Install') {
@@ -43,7 +43,7 @@ try {
         & (Join-Path $PSScriptRoot 'configure-login-task.ps1') -Mode Install -PowerShellPath $powershellPath -StartupScript $startupScript
         if ($existing) { $runKey.DeleteValue($runName, $false) }
         & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Remove
-        Write-Output 'Aeon keeps one hidden daemon running from login; routines can run without Chrome.'
+        Write-Output 'Graft keeps one hidden daemon running from login; routines can run without Chrome.'
     } else {
         & (Join-Path $PSScriptRoot 'configure-login-task.ps1') -Mode Remove -PowerShellPath $powershellPath -StartupScript $startupScript
         if ($existing) { $runKey.DeleteValue($runName, $false) }
@@ -52,6 +52,6 @@ try {
             Remove-Item -LiteralPath $startupScript -Force
         }
         & (Join-Path $PSScriptRoot 'configure-watchdog.ps1') -Mode Remove
-        Write-Output 'Removed the owned Aeon daemon login entry.'
+        Write-Output 'Removed the owned Graft daemon login entry.'
     }
 } finally { if ($null -ne $runKey) { $runKey.Dispose() } }

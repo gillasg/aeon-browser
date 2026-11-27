@@ -1,10 +1,10 @@
-// Recording beat hooks. When `aeon record` arms a take (session key `aeon-film-armed`), Aeon's own
+// Recording beat hooks. When `graft record` arms a take (session key `graft-film-armed`), Graft's own
 // UI writes its story beats (summon, send, receipt, learned, handoff, sound…) to the session
 // store, where the recorder reads them onto the clip clock. Unarmed, every call is one boolean
 // check: no storage writes, no DOM reads and nothing visible changes.
 
-export const FILM_ARMED_KEY = "aeon-film-armed";
-export const FILM_BEATS_KEY = "aeon-film-beats";
+export const FILM_ARMED_KEY = "graft-film-armed";
+export const FILM_BEATS_KEY = "graft-film-beats";
 const MAX_BEATS = 2000;
 
 export type FilmBeat =

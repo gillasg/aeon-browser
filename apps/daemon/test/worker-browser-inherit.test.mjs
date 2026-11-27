@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
-import { BrowserInventoryFullSchema } from "@aeon/protocol";
-import { aeonBridge, inChat, sessionChatId } from "@aeon/pi-adapter";
+import { BrowserInventoryFullSchema } from "@graft/protocol";
+import { graftBridge, inChat, sessionChatId } from "@graft/pi-adapter";
 import { WebSocket, WebSocketServer } from "ws";
 import { BrowserControlService } from "../dist/browser-control-service.js";
 import { BrowserInventoryRegistry } from "../dist/browser-inventory-registry.js";
@@ -97,7 +97,7 @@ test("a worker chat of a parent bound to one browser runs there, not AMBIGUOUS_B
     assert.equal(harness.service.attachContext(parent, tabOf(browserA), url), "attached");
     assert.equal(harness.service.browserOf(parent), undefined, "two browsers, no pin");
     const seen = [];
-    const bridge = aeonBridge(runner(harness.service, seen));
+    const bridge = graftBridge(runner(harness.service, seen));
     currentParent = parent;
     await inChat(parent, () => bridge.run("1 + 1", { session: "site-to-api-map" }));
     assert.deepEqual(seen[0].browsers, [browserA]);
@@ -112,7 +112,7 @@ test("a parent pinned to a browser passes the pin to its crawl workers", async (
   try {
     harness.service.pinChat(parent, browserB);
     const seen = [];
-    const bridge = aeonBridge(runner(harness.service, seen));
+    const bridge = graftBridge(runner(harness.service, seen));
     currentParent = parent;
     await inChat(parent, () => bridge.run("1", { session: "crawl-1" }));
     assert.deepEqual(seen[0].browsers, [browserB]);
@@ -125,7 +125,7 @@ test("a parent with no browser of its own still has an ambiguous worker", async 
   const harness = await twoBrowsers();
   try {
     const seen = [];
-    const bridge = aeonBridge(runner(harness.service, seen));
+    const bridge = graftBridge(runner(harness.service, seen));
     currentParent = parent;
     await inChat(parent, () => bridge.run("1", { session: "crawl-1" }));
     assert.deepEqual(seen[0].browsers.sort(), [browserA, browserB].sort());

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 test("an ability asked for by name without a site is found on the site that has it", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-ability-any-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-ability-any-"));
   const prev = process.env.SITE_TO_API_HOME;
   process.env.SITE_TO_API_HOME = home;
   try {

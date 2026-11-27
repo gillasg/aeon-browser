@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { readHealLog, saveAbility, siteDir } from "@browserkit/site-mapper";
 import { AbilityIdleWorker, abilityOperations, cellBridge } from "../dist/ability-idle-worker.js";
 import { rung0Card, rung0Eligible, rung0Sites, tryRung0 } from "../dist/rung0-replay.js";

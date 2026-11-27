@@ -20,7 +20,7 @@ if (!compiler) throw new Error("The Windows .NET Framework C# compiler (csc.exe)
 
 const output = join(root, "dist");
 await mkdir(output, { recursive: true });
-const executable = join(output, "aeon-native-host.exe");
+const executable = join(output, "graft-native-host.exe");
 const source = [
   "Program.cs",
   "HostConfiguration.cs",

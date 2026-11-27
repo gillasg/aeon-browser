@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { ChatService } from "../dist/chat-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
@@ -25,7 +25,7 @@ class FlakyPiPort extends FakePiPort {
 }
 
 test("a Chat that failed to start retries controls and reports the model error", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-controls-recovery-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-controls-recovery-"));
   const store = openChatStore(directory);
   const port = new FlakyPiPort(2);
   const service = new ChatService({ dataDirectory: directory, store, pi: port });

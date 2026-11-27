@@ -110,7 +110,7 @@ globalThis.chrome = {
     onInstalled: sink(),
     onStartup: sink(),
     onMessage: sink(),
-    getURL: (path) => `chrome-extension://aeon/${path}`,
+    getURL: (path) => `chrome-extension://graft/${path}`,
     sendMessage: async () => undefined,
   },
   scripting: { executeScript: async () => [] },

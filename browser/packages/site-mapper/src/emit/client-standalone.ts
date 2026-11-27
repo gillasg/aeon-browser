@@ -3,7 +3,7 @@ import { itemsSchema } from "../runtime/model-helpers.js";
 import { pascal, paramsType, propertyName, responseType, tsType } from "./client.js";
 
 // A zero-dependency typed client for one mapped site. It imports nothing: its transport is plain
-// fetch against the local REST server (`aeon rest`, 127.0.0.1 only) with a per-client bearer
+// fetch against the local REST server (`graft rest`, 127.0.0.1 only) with a per-client bearer
 // token, paginated operations are async iterators, and a write the page has not yet proven
 // throws NOT_PROVEN instead of going out.
 
@@ -63,9 +63,9 @@ function declarations(model: SiteModel, typeName: string): string[] {
     `}`,
     "",
     `export interface ${typeName}Options {`,
-    `  /** Default http://127.0.0.1:4791 (aeon rest). */`,
+    `  /** Default http://127.0.0.1:4791 (graft rest). */`,
     `  baseUrl?: string;`,
-    `  /** A token from \`aeon mcp token create\`; default process.env.AEON_TOKEN. */`,
+    `  /** A token from \`graft mcp token create\`; default process.env.GRAFT_TOKEN. */`,
     `  token?: string;`,
     `}`,
     "",
@@ -129,8 +129,8 @@ function runtimeFor(model: SiteModel, typeName: string): string[] {
     "",
     `export function create${typeName}(options: ${typeName}Options = {}): ${typeName} {`,
     `  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};`,
-    `  const baseUrl = (options.baseUrl ?? env.AEON_REST_URL ?? "http://127.0.0.1:4791").replace(/\\/$/, "");`,
-    `  const token = options.token ?? env.AEON_TOKEN ?? "";`,
+    `  const baseUrl = (options.baseUrl ?? env.GRAFT_REST_URL ?? "http://127.0.0.1:4791").replace(/\\/$/, "");`,
+    `  const token = options.token ?? env.GRAFT_TOKEN ?? "";`,
     `  async function call(id: string, params: Json = {}): Promise<unknown> {`,
     `    if (NOT_PROVEN.has(id)) throw new Error("NOT_PROVEN: do it once in the page, then rebuild (" + id + ")");`,
     `    const response = await fetch(baseUrl + "/sites/" + encodeURIComponent(SITE) + "/ops/" + encodeURIComponent(id), {`,
@@ -173,7 +173,7 @@ export function generateStandaloneClient(model: SiteModel): StandaloneClient {
   const typeName = pascal(model.site.replace(/\./g, " ")) + "Api";
   const header = [
     `// Typed client for ${model.site}. Zero dependencies: it calls the local REST server`,
-    `// (aeon rest) with a token from \`aeon mcp token create\`. Regenerate with aeon compile.`,
+    `// (graft rest) with a token from \`graft mcp token create\`. Regenerate with graft compile.`,
     "",
   ];
   const types = declarations(model, typeName);

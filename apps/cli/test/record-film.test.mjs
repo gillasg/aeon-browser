@@ -1,4 +1,4 @@
-// Clock and frame truth, the beat bus, director steps, the scanline join, qualify and `aeon film`.
+// Clock and frame truth, the beat bus, director steps, the scanline join, qualify and `graft film`.
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -149,10 +149,10 @@ test("align: provenance first, exact text second, aligned false otherwise", () =
   const box = { x: 10, y: 20, width: 100, height: 18 };
   const terminal = {
     version: 1,
-    command: "aeon call",
+    command: "graft call",
     startedAt: 0,
     events: [
-      { t: 0, kind: "in", text: "aeon call" },
+      { t: 0, kind: "in", text: "graft call" },
       { t: 5, kind: "out", text: '\u001b[32m{\n  "title": "Sony"\n}\u001b[0m\n' },
     ],
   };
@@ -191,11 +191,11 @@ test("assemble output is stamped house false", () => {
 const clipJson = {
   scenes: [{ name: "boost", steps: [{ open: "https://news.ycombinator.com" }] }],
   expect: { receipt: "Boost on", maxSeconds: 1 },
-  end: { command: "aeon boosts", repo: "github.com/gillasg/aeon-browser" },
+  end: { command: "graft boosts", repo: "github.com/gillasg/aeon-browser" },
 };
 const take = (text, clean = true) => ({
   version: 1,
-  recorder: "aeon",
+  recorder: "graft",
   clock: "clip",
   clip: { clean },
   events: [{ beat: "receipt", text }],
@@ -250,8 +250,8 @@ const qualifyFile = (dir, clip) =>
     }),
   );
 
-test("aeon film: camera only, no kit: qualify, shoot, raw contact sheet, take.json", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "aeon-film-"));
+test("graft film: camera only, no kit: qualify, shoot, raw contact sheet, take.json", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "graft-film-"));
   try {
     const clipPath = join(dir, "clip.json");
     writeFileSync(clipPath, JSON.stringify(clipJson));
@@ -283,8 +283,8 @@ test("aeon film: camera only, no kit: qualify, shoot, raw contact sheet, take.js
   }
 });
 
-test("aeon film --kit stages the take and renders Scene, forwarding stills", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "aeon-film-"));
+test("graft film --kit stages the take and renders Scene, forwarding stills", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "graft-film-"));
   try {
     const clipPath = join(dir, "clip.json");
     writeFileSync(clipPath, JSON.stringify(clipJson));

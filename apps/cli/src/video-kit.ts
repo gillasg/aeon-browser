@@ -1,5 +1,5 @@
-// `aeon video kit <dir>`: copy the Remotion starter kit out of Aeon's templates into a folder the
-// agent can install and render. The kit is plain files — Aeon never bundles Remotion or renders.
+// `graft video kit <dir>`: copy the Remotion starter kit out of Graft's templates into a folder the
+// agent can install and render. The kit is plain files — Graft never bundles Remotion or renders.
 import { cp, mkdir, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,7 +15,7 @@ export function kitSource(): string {
   ];
   const found = candidates.find((path) => existsSync(path));
   if (!found)
-    throw new Error("The video starter kit is missing from this Aeon install (templates/video)");
+    throw new Error("The video starter kit is missing from this Graft install (templates/video)");
   return found;
 }
 

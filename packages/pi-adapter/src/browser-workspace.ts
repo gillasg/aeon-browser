@@ -336,7 +336,7 @@ export async function validateUploadFiles(files: string[], root: string): Promis
 }
 
 /**
- * Workspace files and upload checks for a cell with no chat around it (`aeon repl`, CLI
+ * Workspace files and upload checks for a cell with no chat around it (`graft repl`, CLI
  * commands): the same answers a chat's cells get, rooted in `root`. Undefined when the request
  * is neither, so the caller can try its other handlers.
  */

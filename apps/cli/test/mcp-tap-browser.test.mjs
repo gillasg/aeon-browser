@@ -6,7 +6,7 @@ import test from "node:test";
 import { EventHub } from "../dist/mcp-events.js";
 import { BrowserTapSource } from "../dist/mcp-tap-browser.js";
 
-// aeon/tap wired to the browser source: a fake connected browser answers the cells the source
+// graft/tap wired to the browser source: a fake connected browser answers the cells the source
 // sends, the way the engine's page.streams would (a ring with seq numbers and a waitFor).
 
 function fakeBrowser(activeTab = 9) {
@@ -39,7 +39,7 @@ function fakeBrowser(activeTab = 9) {
 }
 
 async function hub(source) {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-tap-live-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-tap-live-"));
   const sent = [];
   const events = new EventHub({
     dataDirectory: dir,
@@ -56,7 +56,7 @@ test("live tap: arms the active tab, delivers filtered and scrubbed frames, disa
   const browser = fakeBrowser();
   const { events, sent, done } = await hub(new BrowserTapSource(browser.run));
   const { subscriptionId } = await events.subscribe({
-    name: "aeon/tap",
+    name: "graft/tap",
     filter: { kind: "ws", dir: "in", where: { key: "type", equals: "tick" } },
   });
   assert.deepEqual(browser.state.started.get(9), { webrtc: false });
@@ -92,8 +92,8 @@ test("live tap: arms the active tab, delivers filtered and scrubbed frames, disa
 test("live tap: webrtc arms the page script; hub close always stops the tap", async () => {
   const browser = fakeBrowser();
   const { events, done } = await hub(new BrowserTapSource(browser.run));
-  await events.subscribe({ name: "aeon/tap", filter: { tab: "t4", kind: "ws" } });
-  const rtc = await events.subscribe({ name: "aeon/tap", filter: { tab: "t4", kind: "webrtc" } });
+  await events.subscribe({ name: "graft/tap", filter: { tab: "t4", kind: "ws" } });
+  const rtc = await events.subscribe({ name: "graft/tap", filter: { tab: "t4", kind: "webrtc" } });
   assert.deepEqual(browser.state.started.get(4), { webrtc: true });
   await events.unsubscribe({ subscriptionId: rtc.subscriptionId });
   assert.deepEqual(browser.state.started.get(4), { webrtc: false });

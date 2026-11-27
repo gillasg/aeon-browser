@@ -21,7 +21,7 @@ function steps() {
 }
 
 test("a run log collects tabs, hosts, files and jobs, and the run's end closes it", async () => {
-  const workspace = await mkdtemp(join(tmpdir(), "aeon-runlog-"));
+  const workspace = await mkdtemp(join(tmpdir(), "graft-runlog-"));
   try {
     startRunLog("chat-one", 1_700_000_000_000);
     const name = tallyCell("chat-one", {
@@ -54,7 +54,7 @@ test("a run log collects tabs, hosts, files and jobs, and the run's end closes i
 });
 
 test("a whole run writes runs/<time>.json through the session lifecycle", async () => {
-  const workspace = await mkdtemp(join(tmpdir(), "aeon-runlog-life-"));
+  const workspace = await mkdtemp(join(tmpdir(), "graft-runlog-life-"));
   let listener;
   const session = {
     subscribe(fn) {
@@ -82,7 +82,7 @@ test("a whole run writes runs/<time>.json through the session lifecycle", async 
 });
 
 test("closing the session while a run-log write is pending writes nothing afterwards", async () => {
-  const workspace = await mkdtemp(join(tmpdir(), "aeon-runlog-close-"));
+  const workspace = await mkdtemp(join(tmpdir(), "graft-runlog-close-"));
   let releaseHold = () => undefined;
   const holdRunLog = new Promise((done) => {
     releaseHold = () => {

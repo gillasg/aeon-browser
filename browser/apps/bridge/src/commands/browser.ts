@@ -178,7 +178,7 @@ async function register(args: Args): Promise<number> {
       green(`✔ Connected in ${seconds}s.`) +
         ' Try: browserkit repl "(await browser.tabs()).length"',
     );
-    // Aeon's extension has a Manage page to land on; browserkit's own does not.
+    // Graft's extension has a Manage page to land on; browserkit's own does not.
     if (existsSync(join(folder, "home.html")))
       openFirstRunPage("browser" in shown ? shown.browser : undefined);
     return 0;

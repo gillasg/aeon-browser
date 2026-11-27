@@ -30,7 +30,7 @@ test("new runtime operations fail immediately on an older extension instead of t
   ]) {
     const result = JSON.parse(await service.execute(chatId, "upgrade", { steps: [step] }));
     assert.equal(result.steps[0].code, "UNSUPPORTED");
-    assert.match(result.steps[0].detail, /Reload Aeon/);
+    assert.match(result.steps[0].detail, /Reload Graft/);
   }
 });
 test("old browser executors reject new commands immediately with update guidance", async () => {
@@ -55,7 +55,7 @@ test("old browser executors reject new commands immediately with update guidance
     }),
   );
   assert.equal(result.steps[0].code, "UNSUPPORTED");
-  assert.match(result.steps[0].detail, /Reload Aeon/);
+  assert.match(result.steps[0].detail, /Reload Graft/);
 });
 test("new executor failures preserve specific action errors and their recovery detail", async () => {
   const service = new BrowserControlService();

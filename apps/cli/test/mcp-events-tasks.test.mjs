@@ -6,10 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { appendEventLog } from "@aeon/location";
+import { appendEventLog } from "@graft/location";
 import { buildSiteModel, parseCapture, saveModel } from "@browserkit/tools/site-to-api";
 
-// A real `aeon mcp` child over stdio, a fixture site, and the durable event log: no model, no
+// A real `graft mcp` child over stdio, a fixture site, and the durable event log: no model, no
 // browser, no daemon. Covers tool discovery, events with cursor resume, tasks and scrubbing.
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
@@ -18,7 +18,7 @@ function har(origin) {
   return JSON.stringify({
     log: {
       version: "1.2",
-      creator: { name: "aeon-test", version: "1" },
+      creator: { name: "graft-test", version: "1" },
       entries: [
         {
           startedDateTime: new Date().toISOString(),
@@ -55,10 +55,10 @@ function mcp(home) {
   const child = spawn(process.execPath, [cli, "mcp", "--surface", "full"], {
     env: {
       ...process.env,
-      AEON_DATA_DIR: join(home, "data"),
+      GRAFT_DATA_DIR: join(home, "data"),
       SITE_TO_API_HOME: join(home, "site-to-api"),
-      AEON_CATALOG_POLL_MS: "100000",
-      AEON_EVENTS_POLL_MS: "50",
+      GRAFT_CATALOG_POLL_MS: "100000",
+      GRAFT_EVENTS_POLL_MS: "50",
     },
   });
   let buffer = "";
@@ -102,7 +102,7 @@ async function until(check, what) {
 }
 
 async function fixture(t) {
-  const home = await mkdtemp(join(tmpdir(), "aeon-mcp-ext-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-mcp-ext-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
@@ -156,8 +156,8 @@ test("tool discovery and a 0-LLM compiled site tool call", async (t) => {
 test("events: subscribe, push, poll with cursor resume, and scrubbed payloads", async (t) => {
   const { client, data } = await fixture(t);
   const { events } = await client.call("events/list");
-  assert.ok(events.some((event) => event.name === "aeon/watcher.fired"));
-  const sub = await client.call("events/subscribe", { name: "aeon/routine.fired" });
+  assert.ok(events.some((event) => event.name === "graft/watcher.fired"));
+  const sub = await client.call("events/subscribe", { name: "graft/routine.fired" });
   assert.equal(sub.cursor, "0");
   await appendEventLog(data, {
     kind: "watcher",
@@ -187,7 +187,7 @@ test("events: subscribe, push, poll with cursor resume, and scrubbed payloads", 
   );
   assert.ok(pushed);
   const first = await client.call("events/poll", {
-    name: "aeon/routine.fired",
+    name: "graft/routine.fired",
     cursor: "0",
     limit: 1,
   });
@@ -205,7 +205,7 @@ test("events: subscribe, push, poll with cursor resume, and scrubbed payloads", 
   assert.equal(payload.routineId, "r1");
   assert.equal(payload.value.price, 30);
   const resumed = await client.call("events/poll", {
-    name: "aeon/routine.fired",
+    name: "graft/routine.fired",
     cursor: first.cursor,
   });
   assert.equal(resumed.events.length, 1);
@@ -221,7 +221,7 @@ test("events: subscribe, push, poll with cursor resume, and scrubbed payloads", 
     "eyJa.eyJb",
   ])
     assert.ok(!wire.includes(secret), `leaked ${secret}`);
-  const webhooks = await client.call("events/poll", { name: "aeon/webhook.fired", cursor: "0" });
+  const webhooks = await client.call("events/poll", { name: "graft/webhook.fired", cursor: "0" });
   assert.deepEqual(
     webhooks.events.map((event) => event.data.routineId),
     ["r2"],
@@ -259,7 +259,7 @@ test("tasks: an irreversible call goes working -> input_required -> completed", 
 test("tasks: a watch task completes on the next event and can be cancelled", async (t) => {
   const { client, data } = await fixture(t);
   const watch = await client.call("tasks/create", {
-    name: "aeon_watch",
+    name: "graft_watch",
     arguments: { cursor: "0" },
   });
   await appendEventLog(data, {
@@ -273,7 +273,7 @@ test("tasks: a watch task completes on the next event and can be cancelled", asy
   const fired = await client.call("tasks/result", { taskId: watch.task.taskId });
   assert.equal(fired.structuredContent.data.routineId, "r9");
   const idle = await client.call("tasks/create", {
-    name: "aeon_watch",
+    name: "graft_watch",
     arguments: { cursor: "1" },
   });
   const cancelled = await client.call("tasks/cancel", { taskId: idle.task.taskId });

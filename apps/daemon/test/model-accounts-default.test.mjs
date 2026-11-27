@@ -30,7 +30,7 @@ test("a first default prefers the provider just connected, on Pi's own default f
 });
 
 function serviceWith(available, t) {
-  const agentDir = mkdtempSync(join(tmpdir(), "aeon-default-"));
+  const agentDir = mkdtempSync(join(tmpdir(), "graft-default-"));
   t.after(() => rmSync(agentDir, { recursive: true, force: true }));
   const models = {
     getAvailable: async () => available,
@@ -74,7 +74,7 @@ test("a default that still works is left alone; one that stopped working is repl
 });
 
 test("every caller of the sign-in service hears its changes, not only the first", async (t) => {
-  const agentDir = mkdtempSync(join(tmpdir(), "aeon-pi-"));
+  const agentDir = mkdtempSync(join(tmpdir(), "graft-pi-"));
   let first = 0;
   let second = 0;
   const url = await openModelLogin(agentDir, () => first++);
@@ -87,7 +87,7 @@ test("every caller of the sign-in service hears its changes, not only the first"
   const post = (path, body) =>
     fetch(new URL(path, url), {
       method: "POST",
-      headers: { "x-aeon-login-token": token, "content-type": "application/json" },
+      headers: { "x-graft-login-token": token, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
   t.after(async () => {

@@ -1,7 +1,7 @@
-import { NativeFilmRequestSchema, type FilmAction } from "@aeon/protocol";
+import { NativeFilmRequestSchema, type FilmAction } from "@graft/protocol";
 import { FILM_ARMED_KEY, FILM_BEATS_KEY } from "./orb/orb-film.js";
 
-// `aeon record`'s beat bus, answered from the worker: only extension contexts can reach
+// `graft record`'s beat bus, answered from the worker: only extension contexts can reach
 // chrome.storage.session, where the orb writes its story beats while a take is armed.
 type SessionStore = Pick<chrome.storage.StorageArea, "get" | "set">;
 

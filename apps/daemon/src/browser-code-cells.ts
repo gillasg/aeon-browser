@@ -10,7 +10,7 @@ import {
   type BrowserCodeResult,
   type BrowserCodeStage,
   type BrowserTargetKey,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 export interface BrowserCodeCellInput {
   code: string;

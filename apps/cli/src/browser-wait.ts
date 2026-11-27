@@ -1,4 +1,4 @@
-// After the daemon (or Aeon) restarts, the extension takes a moment to pair again. A status
+// After the daemon (or Graft) restarts, the extension takes a moment to pair again. A status
 // reply that reports "no browser" immediately is a dead end, so wait briefly for a browser that
 // is on its way back. The wait is bounded and only happens when there is no browser at all.
 

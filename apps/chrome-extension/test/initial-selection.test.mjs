@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test from "node:test";
 
 test("first prompt waits for native Pi setup and applies model before effort", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-initial-selection-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-initial-selection-"));
   try {
     const outfile = join(directory, "selection.mjs");
     await build({

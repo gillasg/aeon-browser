@@ -4,7 +4,7 @@ import {
   CorePingRequestSchema,
   CorePingResultSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import type { HealthReport } from "./health-ping.js";
@@ -26,7 +26,7 @@ export function handleCorePing(socket: WebSocket, candidate: unknown): boolean {
   return true;
 }
 
-/** `aeon doctor` and any other core client: the same ping the supervisor sends. */
+/** `graft doctor` and any other core client: the same ping the supervisor sends. */
 export function handleCoreHealth(
   socket: WebSocket,
   candidate: unknown,

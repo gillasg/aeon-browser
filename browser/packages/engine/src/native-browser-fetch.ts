@@ -130,7 +130,7 @@ const CROSS_ORIGIN_DROP = ["authorization", "cookie", "proxy-authorization"];
 
 export interface Fetched {
   response: Response;
-  /** "worker": the extension's own request; "tab": re-issued in an Aeon tab on that origin. */
+  /** "worker": the extension's own request; "tab": re-issued in a Graft tab on that origin. */
   via: "worker" | "tab";
   finalUrl?: string;
   redirected?: boolean;
@@ -140,7 +140,7 @@ export interface Fetched {
  * Follows redirects one hop at a time, so each next address passes the network check and the
  * site policy before any request is sent to it. A 302 to a blocked or private site never reaches
  * it, and a hop to another origin drops the caller's credentials headers. Where the runtime hides
- * the redirect (an MV3 worker's opaqueredirect), the request moves into an Aeon tab on that
+ * the redirect (an MV3 worker's opaqueredirect), the request moves into a Graft tab on that
  * origin and the final address is checked before the body is read; with no such tab it is refused.
  */
 export async function followGuarded(

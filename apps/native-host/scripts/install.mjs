@@ -16,7 +16,7 @@ import { appRoot, dataDirectory, hostPaths } from "../node/paths.mjs";
 import { stopSupervisor } from "../node/host.mjs";
 import { launchAgent, systemdUnit } from "./service-files.mjs";
 
-// Installs the Mac/Linux half of Aeon: the Node native host wrapper, its Chrome manifests, the
+// Installs the Mac/Linux half of Graft: the Node native host wrapper, its Chrome manifests, the
 // host configuration and the login service that keeps one daemon supervisor running.
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -43,7 +43,7 @@ if (process.platform === "win32") {
 const root = appRoot();
 const data = dataDirectory();
 const node = realpathSync(process.execPath);
-const launcher = join(root, "aeon-native-host");
+const launcher = join(root, "graft-native-host");
 
 checkBuild();
 await stopExisting();
@@ -58,14 +58,14 @@ writeJson(join(root, "host-config.json"), {
 });
 writeManifests();
 installService();
-say(`Registered com.aeon.native_host for chrome-extension://${EXTENSION_ID}/`);
+say(`Registered com.graft.native_host for chrome-extension://${EXTENSION_ID}/`);
 say(`Browser extension: ${dirname(extensionManifest)}`);
 say(`Daemon data: ${data}`);
 say(`Service: ${servicePath()}`);
 
 function checkBuild() {
   if (!existsSync(hostEntry) || !existsSync(daemonEntry))
-    throw new Error("Build Aeon first with pnpm build.");
+    throw new Error("Build Graft first with pnpm build.");
   if (existsSync(extensionManifest)) {
     const manifest = JSON.parse(readFileSync(extensionManifest, "utf8"));
     if (manifest.key !== EXTENSION_KEY)
@@ -76,7 +76,7 @@ function checkBuild() {
 async function stopExisting() {
   if (process.platform === "linux") {
     try {
-      execFileSync("systemctl", ["--user", "stop", "aeon-daemon.service"], {
+      execFileSync("systemctl", ["--user", "stop", "graft-daemon.service"], {
         stdio: "ignore",
       });
     } catch {
@@ -100,15 +100,15 @@ function writeLauncher() {
 
 function writeManifests() {
   const manifest = {
-    name: "com.aeon.native_host",
-    description: "Aeon native messaging host",
+    name: "com.graft.native_host",
+    description: "Graft native messaging host",
     path: launcher,
     type: "stdio",
     allowed_origins: [`chrome-extension://${EXTENSION_ID}/`],
   };
   for (const folder of nativeMessagingFolders()) {
     mkdirSync(folder, { recursive: true, mode: 0o700 });
-    writeJson(join(folder, "com.aeon.native_host.json"), manifest);
+    writeJson(join(folder, "com.graft.native_host.json"), manifest);
   }
 }
 
@@ -137,12 +137,12 @@ function installSystemdUserService() {
   writeFileSync(path, systemdUnit({ node, hostEntry }));
   run("systemctl", ["--user", "daemon-reload"]);
   try {
-    run("systemctl", ["--user", "reset-failed", "aeon-daemon.service"]);
+    run("systemctl", ["--user", "reset-failed", "graft-daemon.service"]);
   } catch {
     // No failed unit to reset.
   }
-  run("systemctl", ["--user", "enable", "--now", "aeon-daemon.service"]);
-  run("systemctl", ["--user", "restart", "aeon-daemon.service"]);
+  run("systemctl", ["--user", "enable", "--now", "graft-daemon.service"]);
+  run("systemctl", ["--user", "restart", "graft-daemon.service"]);
   enableLinger();
 }
 
@@ -159,9 +159,9 @@ function enableLinger() {
   }
   try {
     execFileSync("sudo", ["-n", "loginctl", "enable-linger", user], { stdio: "ignore" });
-    say(`Enabled lingering for ${user}, so Aeon runs without a login session.`);
+    say(`Enabled lingering for ${user}, so Graft runs without a login session.`);
   } catch {
-    say(`Run this once so Aeon runs before you log in: sudo loginctl enable-linger ${user}`);
+    say(`Run this once so Graft runs before you log in: sudo loginctl enable-linger ${user}`);
   }
 }
 
@@ -171,7 +171,7 @@ function installLaunchAgent() {
   writeFileSync(path, launchAgent({ node, hostEntry, root }));
   const uid = process.getuid();
   try {
-    execFileSync("launchctl", ["bootout", `gui/${uid}/com.aeon.daemon`], { stdio: "ignore" });
+    execFileSync("launchctl", ["bootout", `gui/${uid}/com.graft.daemon`], { stdio: "ignore" });
   } catch {
     // Not loaded yet.
   }
@@ -184,9 +184,9 @@ function installLaunchAgent() {
 
 function servicePath() {
   if (process.platform === "darwin")
-    return join(homedir(), "Library", "LaunchAgents", "com.aeon.daemon.plist");
+    return join(homedir(), "Library", "LaunchAgents", "com.graft.daemon.plist");
   const config = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  return join(config, "systemd", "user", "aeon-daemon.service");
+  return join(config, "systemd", "user", "graft-daemon.service");
 }
 
 function writeJson(path, value) {

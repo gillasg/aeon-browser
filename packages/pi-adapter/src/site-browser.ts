@@ -8,11 +8,11 @@ import {
   type Bridge,
 } from "@browserkit/tools/site-to-api";
 import type { BrowserToolRunner } from "./browser-tool.js";
-import { clampTimeoutMs, RewindSchema, type Rewind } from "@aeon/protocol";
+import { clampTimeoutMs, RewindSchema, type Rewind } from "@graft/protocol";
 import { cellTimeoutMs } from "./run-budget.js";
-import { createAeonHostHandler } from "./browser-host-requests.js";
+import { createGraftHostHandler } from "./browser-host-requests.js";
 
-// site-to-api and browser-crawl run small pieces of browser code in named sessions. In Aeon they
+// site-to-api and browser-crawl run small pieces of browser code in named sessions. In Graft they
 // run in the user's Chrome through the same executor as browser_code: each (chat, session) pair
 // gets its own runtime, so a crawl's parallel tabs and an API call never share variables with the
 // agent's own browser_code cells.
@@ -20,7 +20,7 @@ import { createAeonHostHandler } from "./browser-host-requests.js";
 const chats = new AsyncLocalStorage<{ chatId: string }>();
 /** A crawl worker chat that must run in a named browser, set for the duration of bridge.run. */
 const namedBrowser = new Map<string, string>();
-const BACKGROUND = "aeon-background";
+const BACKGROUND = "graft-background";
 const MIN_TIMEOUT_MS = 1_000;
 const MAX_TIMEOUT_MS = 600_000;
 
@@ -55,13 +55,13 @@ export function browserNamedFor(chatId: string): string | undefined {
   return namedBrowser.get(chatId);
 }
 
-export function aeonBridge(run: BrowserToolRunner): Bridge {
+export function graftBridge(run: BrowserToolRunner): Bridge {
   return {
     async run(code, options = {}) {
       const chatId = chats.getStore()?.chatId ?? BACKGROUND;
       const timeoutMs = boundedCellTimeout(chatId, options.timeoutMs);
       const child = sessionChatId(chatId, options.session ?? "default");
-      const host = createAeonHostHandler({
+      const host = createGraftHostHandler({
         source: "external",
         siteMapper: (request) => siteMapperRequest(chatId, request),
       });
@@ -87,7 +87,7 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
         });
         const cell = JSON.parse(output) as CellOutput;
         if (cell.error === "BROWSER_OFFLINE")
-          throw new BrowserNotConnected("Aeon's browser is not connected.");
+          throw new BrowserNotConnected("Graft's browser is not connected.");
         if (cell.error) throw new Error(cell.detail ? `${cell.error}: ${cell.detail}` : cell.error);
         return cell.value;
       } finally {
@@ -99,9 +99,9 @@ export function aeonBridge(run: BrowserToolRunner): Bridge {
   };
 }
 
-/** Routes every site-to-api and browser-crawl browser call through Aeon's executor. */
-export function installAeonBrowser(run: BrowserToolRunner | undefined): void {
-  if (run) useBrowser(aeonBridge(run));
+/** Routes every site-to-api and browser-crawl browser call through Graft's executor. */
+export function installGraftBrowser(run: BrowserToolRunner | undefined): void {
+  if (run) useBrowser(graftBridge(run));
 }
 
 /** Runs tool work with browser calls attributed to this chat. */

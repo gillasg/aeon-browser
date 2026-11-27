@@ -17,7 +17,7 @@ import type { DaemonHost } from "./host.js";
 import { install } from "./install.js";
 import { mcpCommands } from "./mcp-commands.js";
 import { inspect, runTasks, type RunOptions } from "./run.js";
-import { nextDay, searchAeon } from "./search.js";
+import { nextDay, searchGraft } from "./search.js";
 import type { ChatResult } from "./results.js";
 import { settingsCommand } from "./settings.js";
 import { signinCommand } from "./signin.js";
@@ -33,12 +33,12 @@ import { probeDaemonActivity, runUpdateWhenIdle } from "./update-idle.js";
 import { filmEntry } from "./film-entry.js";
 import { recordCommand, videoCommand } from "./record-cmd.js";
 
-// Every command Aeon has: its own chat commands, then browserkit's commands in the same groups,
-// with the few that are about a bridge or a password-manager folder replaced by Aeon's own.
+// Every command Graft has: its own chat commands, then browserkit's commands in the same groups,
+// with the few that are about a bridge or a password-manager folder replaced by Graft's own.
 
 async function run(host: DaemonHost, args: Args): Promise<number> {
   const prompts = await readPrompts(args);
-  if (!prompts.length) throw new Error('Usage: aeon run "<task>" or aeon run --file tasks.txt');
+  if (!prompts.length) throw new Error('Usage: graft run "<task>" or graft run --file tasks.txt');
   const options = runOptions(args);
   const client = await host.connect();
   process.stderr.write(
@@ -231,9 +231,9 @@ async function searchChats(host: DaemonHost, args: Args): Promise<number> {
   const text = args.positional.join(" ").trim();
   if (!text)
     throw new Error(
-      'Usage: aeon search "<text>" [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]',
+      'Usage: graft search "<text>" [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]',
     );
-  const result = await searchAeon(
+  const result = await searchGraft(
     await host.connect(),
     text,
     chatFilter(args),
@@ -262,12 +262,12 @@ function routinePayload(args: Args): Record<string, unknown> {
   const action = args.positional[0];
   if (!action || !ROUTINE_ACTIONS.has(action))
     throw new Error(
-      'Usage: aeon routine create "<instruction>" [--schedule "every 15 minutes"] [--title t] [--check code] [--sites a,b] | list | pause <id> | delete <id>',
+      'Usage: graft routine create "<instruction>" [--schedule "every 15 minutes"] [--title t] [--check code] [--sites a,b] | list | pause <id> | delete <id>',
     );
   if (action === "create") return { action, ...routineCreateFields(args) };
   if (action === "list") return { action };
   const routineId = args.positional[1];
-  if (!routineId) throw new Error(`Usage: aeon routine ${action} <routineId>`);
+  if (!routineId) throw new Error(`Usage: graft routine ${action} <routineId>`);
   return { action, routineId };
 }
 
@@ -300,7 +300,7 @@ function routineCreateFields(args: Args): Record<string, unknown> {
 }
 
 async function routineCommand(host: DaemonHost, args: Args): Promise<number> {
-  const value = await callAeonTool(host, "routine", routinePayload(args), "routine");
+  const value = await callGraftTool(host, "routine", routinePayload(args), "routine");
   if (has(args, "json")) process.stdout.write(JSON.stringify(value, null, 2) + "\n");
   else
     for (const item of Array.isArray(value) ? value : [value])
@@ -308,7 +308,7 @@ async function routineCommand(host: DaemonHost, args: Args): Promise<number> {
   return 0;
 }
 
-async function callAeonTool(
+async function callGraftTool(
   host: DaemonHost,
   tool: string,
   input: Record<string, unknown>,
@@ -344,7 +344,7 @@ function routineLine(value: unknown): string {
 }
 
 async function contextCommand(host: DaemonHost, args: Args): Promise<number> {
-  const value = (await callAeonTool(host, "context", {}, "context")) as {
+  const value = (await callGraftTool(host, "context", {}, "context")) as {
     enabled?: boolean;
     tabs?: { title?: string; url?: string; active?: boolean }[];
     hint?: string;
@@ -374,7 +374,7 @@ async function review(host: DaemonHost, [action, value, note]: string[]): Promis
   const client = await host.connect();
   const payload: Record<string, unknown> =
     action === "list" ? { action, limit: Number(value) } : { action, chatId: value };
-  if (!value) throw new Error("Usage: aeon review <chatId> [note | @file.md]");
+  if (!value) throw new Error("Usage: graft review <chatId> [note | @file.md]");
   if (action === "mark" && note)
     payload.note = note.startsWith("@") ? await readFile(note.slice(1), "utf8") : note;
   const reply = await client.tool({
@@ -393,21 +393,21 @@ async function review(host: DaemonHost, [action, value, note]: string[]): Promis
   return 0;
 }
 
-/** Automations are routines in the code; `aeon routine` stays as the same command. */
+/** Automations are routines in the code; `graft routine` stays as the same command. */
 function automationCommand(host: DaemonHost, name: string): Command {
   return {
     name,
-    group: "Aeon",
+    group: "Graft",
     summary: "create, list, pause or delete automations (routines)",
-    help: `Usage: aeon automation create "<instruction>" [--schedule "every 15 minutes"] [--title t]
+    help: `Usage: graft automation create "<instruction>" [--schedule "every 15 minutes"] [--title t]
          [--check "<browser code>"] [--sites a.com,b.com] [--chat <chatId>] [--browser <name>]
          [--webhook <url> [--webhook-secret <secret>] [--webhook-only]] [--effect read|write|irreversible]
-       aeon automation list [--json] | pause <routineId> | delete <routineId>
+       graft automation list [--json] | pause <routineId> | delete <routineId>
 
 Creates the automation in a new chat (or --chat, one this CLI created). --browser pins a connected
 Chrome profile. --webhook POSTs {routineId, title, value, firedAt} when the check passes
-(X-Aeon-Signature when a secret is set). --webhook-only does not wake the agent.
-\`aeon routine\` is the same command.`,
+(X-Graft-Signature when a secret is set). --webhook-only does not wake the agent.
+\`graft routine\` is the same command.`,
     run: (args) => routineCommand(host, args),
   };
 }
@@ -418,26 +418,26 @@ function outsideAgentCommands(host: DaemonHost): Command[] {
     { ...automationCommand(host, "routine"), hidden: true },
     {
       name: "context",
-      group: "Aeon",
+      group: "Graft",
       summary: "the user's open tabs, when they allowed it",
-      help: `Usage: aeon context [--json]
+      help: `Usage: graft context [--json]
 
 Returns tab titles and URLs and which is active, only after the user turns on
-"Let outside agents see my open tabs" in Aeon Settings. Never page contents.`,
+"Let outside agents see my open tabs" in Graft Settings. Never page contents.`,
       run: (args) => contextCommand(host, args),
     },
     {
       name: "pack",
       group: "Use sites",
       summary: "export or import a site with its flows, skills and boosts",
-      help: `Usage: aeon pack export <site> --out <file.zip> [--no-boosts] [--json]
-       aeon pack import <file.zip> [--json]
-       aeon pack enable <site> [--json]
+      help: `Usage: graft pack export <site> --out <file.zip> [--no-boosts] [--json]
+       graft pack import <file.zip> [--json]
+       graft pack enable <site> [--json]
 
 A pack holds a mapped site's model, OpenAPI, client and recorded flows, plus the site skills and
 boosts written for it. Export strips sessions, cookies and credential-bearing request headers and
 bodies. Import writes the site, then saves skills and boosts DISABLED and prints their code; enable
-them with "aeon pack enable" after reviewing it.`,
+them with "graft pack enable" after reviewing it.`,
       run: (args) => packCommand(host, args),
     },
   ];
@@ -446,9 +446,9 @@ them with "aeon pack enable" after reviewing it.`,
 function agentSurfaceCommand(): Command {
   return {
     name: "agent-surface",
-    group: "Aeon",
+    group: "Graft",
     summary: "the system prompt, tools and first-turn context a new chat sends",
-    help: `Usage: aeon agent-surface [--json]
+    help: `Usage: graft agent-surface [--json]
 
 Prints the system prompt, the tool definitions a new chat sends to the model, and the
 first-turn page-context template. Same functions the daemon uses to start a chat. Works
@@ -463,14 +463,14 @@ offline, with no daemon. --json prints those fields plus a stable hash.`,
 function stopCommand(host: DaemonHost): Command {
   return {
     name: "stop",
-    group: "Aeon",
+    group: "Graft",
     summary: "stop a running chat",
-    help: `Usage: aeon stop <chatId>
+    help: `Usage: graft stop <chatId>
 
 Stops the chat's current run and closes the agent tabs it no longer needs.`,
     run: async (args) => {
       const chatId = args.positional[0];
-      if (!chatId) throw new Error("Usage: aeon stop <chatId>");
+      if (!chatId) throw new Error("Usage: graft stop <chatId>");
       await (await host.connect()).stop(chatId);
       process.stdout.write("Stopped.\n");
       return 0;
@@ -478,7 +478,7 @@ Stops the chat's current run and closes the agent tabs it no longer needs.`,
   };
 }
 
-function aeonOnlyCommands(host: DaemonHost): Command[] {
+function graftOnlyCommands(host: DaemonHost): Command[] {
   return [
     doctorCommand(host),
     agentSurfaceCommand(),
@@ -486,13 +486,13 @@ function aeonOnlyCommands(host: DaemonHost): Command[] {
     reCommand(),
     {
       name: "run",
-      group: "Aeon",
-      summary: "run tasks as Aeon chats",
-      help: `Usage: aeon run "<task>" ["<task>" ...] [--file tasks.txt|json] [--parallel 5]
+      group: "Graft",
+      summary: "run tasks as Graft chats",
+      help: `Usage: graft run "<task>" ["<task>" ...] [--file tasks.txt|json] [--parallel 5]
        [--quiet] [--model provider/id] [--thinking level] [--timeout 20] [--json]
        [--max-steps n] [--max-minutes m] [--max-cost usd] [--typed] [--browser name]
 
---browser keeps each chat in one Chrome profile, named with \`aeon browsers name\`: its tab
+--browser keeps each chat in one Chrome profile, named with \`graft browsers name\`: its tab
 opens and its steps run only there (other connected profiles never see it).
 
 --typed types each prompt into its chat's composer on camera before sending it (for screen
@@ -504,17 +504,17 @@ with what it has.`,
     },
     {
       name: "chats",
-      group: "Aeon",
+      group: "Graft",
       summary: "recent chats, or the ones not reviewed yet",
-      help: `Usage: aeon chats [--limit 20] [--unreviewed] [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
+      help: `Usage: graft chats [--limit 20] [--unreviewed] [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--json]
        origin: user | cli | mcp | companion | agent | routine | unknown`,
       run: (args) => listChats(host, args),
     },
     {
       name: "search",
-      group: "Aeon",
+      group: "Graft",
       summary: "search chats and saved answers",
-      help: `Usage: aeon search "<text>" [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--limit 20] [--json]
+      help: `Usage: graft search "<text>" [--from origin] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--limit 20] [--json]
        origin: user | cli | mcp | companion | agent | routine | unknown`,
       run: (args) => searchChats(host, args),
     },
@@ -522,14 +522,14 @@ with what it has.`,
     ...chatToolCommands(host),
     {
       name: "video",
-      group: "Aeon",
+      group: "Graft",
       summary: "copy the Open Studio Remotion kit for editing a recording",
-      help: `Usage: aeon video kit <dir>
+      help: `Usage: graft video kit <dir>
 
 Copies the Open Studio Remotion kit into <dir>: a blank src/Scene.tsx that plays the raw
 take full-bleed and is rewritten from scratch for each video, RecordingRaw for unedited
-proof, src/recording.ts timing helpers over events.json from \`aeon record\`, and
-scripts/render.mjs (MP4 or --stills PNGs for review). Aeon records; Remotion renders.
+proof, src/recording.ts timing helpers over events.json from \`graft record\`, and
+scripts/render.mjs (MP4 or --stills PNGs for review). Graft records; Remotion renders.
 See the kit's README.`,
       run: (args) => videoCommand(args),
     },
@@ -544,37 +544,37 @@ function chatToolCommands(host: DaemonHost): Command[] {
     ...converseCommands(host),
     {
       name: "review",
-      group: "Aeon",
+      group: "Graft",
       summary: "mark a chat reviewed, with findings",
-      help: `Usage: aeon review <chatId> [note | @file.md]`,
+      help: `Usage: graft review <chatId> [note | @file.md]`,
       run: (args) => review(host, ["mark", ...args.positional]),
     },
     {
       name: "result",
-      group: "Aeon",
+      group: "Graft",
       summary: "a chat's final answer",
-      help: `Usage: aeon result <chatId>`,
+      help: `Usage: graft result <chatId>`,
       run: (args) => inspectChat(host, "result", args),
     },
     {
       name: "trace",
-      group: "Aeon",
+      group: "Graft",
       summary: "a chat's tool calls, results and errors",
-      help: `Usage: aeon trace <chatId> [--json]`,
+      help: `Usage: graft trace <chatId> [--json]`,
       run: (args) => inspectChat(host, "trace", args),
     },
     {
       name: "open",
-      group: "Aeon",
+      group: "Graft",
       summary: "show a chat as a tab in Chrome",
-      help: `Usage: aeon open <chatId>`,
+      help: `Usage: graft open <chatId>`,
       run: async (args) => {
         const client = await host.connect();
         const chatId = args.positional[0];
-        if (!chatId) throw new Error("Usage: aeon open <chatId>");
+        if (!chatId) throw new Error("Usage: graft open <chatId>");
         const { browsers, tabId } = await client.openChat(chatId, true);
         if (!browsers) {
-          process.stdout.write("No connected Chrome has Aeon loaded.\n");
+          process.stdout.write("No connected Chrome has Graft loaded.\n");
           return 1;
         }
         process.stdout.write(tabId === undefined ? "Opened.\n" : `Opened tab ${tabId}.\n`);
@@ -583,9 +583,9 @@ function chatToolCommands(host: DaemonHost): Command[] {
     },
     {
       name: "tools",
-      group: "Aeon",
+      group: "Graft",
       summary: "the browser tools and their full guidance",
-      help: `Usage: aeon tools [--find <topic>] [--json]
+      help: `Usage: graft tools [--find <topic>] [--json]
 
 Searches every tool's name, guidance and input schema, so "what can you do about media" is one
 call instead of 40 KB of prose. --json prints the matching tools.`,
@@ -593,12 +593,12 @@ call instead of 40 KB of prose. --json prints the matching tools.`,
     },
     {
       name: "tool",
-      group: "Aeon",
+      group: "Graft",
       summary: "run one chat tool",
-      help: `Usage: aeon tool <browser_code|browser_tabs|crawl|site_mapper|extract> '<json>'
+      help: `Usage: graft tool <browser_code|browser_tabs|crawl|site_mapper|extract> '<json>'
        [--session name] [--browser name] [--json] [--no-color]
 
---browser keeps the session in one Chrome profile (a name from aeon browsers), needed when more
+--browser keeps the session in one Chrome profile (a name from graft browsers), needed when more
 than one is connected. --json prints one machine-readable envelope (no ANSI); output is plain automatically when stdout
 is not a terminal.`,
       run: async (args) => {
@@ -615,16 +615,16 @@ is not a terminal.`,
     },
     {
       name: "settings",
-      group: "Aeon",
+      group: "Graft",
       summary: "the agent settings in the connected Chrome",
-      help: `Usage: aeon settings [get]\n       aeon settings set agentInFront=true hideAgentCursor=true humanLikeInput=true agentTabView=auto|split|thumbnails mcpUseClientModel=true\n\nhumanLikeInput (Human-like mouse and typing) is off by default. Set it true for a stealth run; AEON_HUMAN_INPUT=1 does the same for a process that loads the engine. mcpUseClientModel prefers the calling agent's model for Aeon's own calls over MCP.`,
+      help: `Usage: graft settings [get]\n       graft settings set agentInFront=true hideAgentCursor=true humanLikeInput=true agentTabView=auto|split|thumbnails mcpUseClientModel=true\n\nhumanLikeInput (Human-like mouse and typing) is off by default. Set it true for a stealth run; GRAFT_HUMAN_INPUT=1 does the same for a process that loads the engine. mcpUseClientModel prefers the calling agent's model for Graft's own calls over MCP.`,
       run: async (args) => settingsCommand(await host.connect(), args.positional),
     },
     {
       name: "install",
-      group: "Aeon",
-      summary: "put the aeon command on the PATH and link the Aeon skill",
-      help: `Usage: aeon install`,
+      group: "Graft",
+      summary: "put the graft command on the PATH and link the Graft skill",
+      help: `Usage: graft install`,
       run: () => install(),
     },
   ];
@@ -636,7 +636,7 @@ async function inspectChat(
   args: Args,
 ): Promise<number> {
   const chatId = args.positional[0];
-  if (!chatId) throw new Error(`Usage: aeon ${kind} <chatId>`);
+  if (!chatId) throw new Error(`Usage: graft ${kind} <chatId>`);
   const result = await inspect(await host.connect(), chatId);
   process.stdout.write(
     (kind === "result"
@@ -665,7 +665,7 @@ async function cdp(host: DaemonHost, args: Args): Promise<number> {
     return reply.running ? 0 : 1;
   }
   if (!reply.running) {
-    process.stdout.write("The CDP endpoint is not running. Start it: aeon cdp\n");
+    process.stdout.write("The CDP endpoint is not running. Start it: graft cdp\n");
     return 1;
   }
   process.stdout.write(`CDP endpoint: ${String(reply.connectUrl ?? reply.url)}\n`);
@@ -676,7 +676,7 @@ async function cdp(host: DaemonHost, args: Args): Promise<number> {
   return 0;
 }
 
-export function aeonCommands(host: DaemonHost): Command[] {
+export function graftCommands(host: DaemonHost): Command[] {
   const overrides = new Map<string, Command>();
   for (const command of [
     ...setupCommands(host),
@@ -689,9 +689,9 @@ export function aeonCommands(host: DaemonHost): Command[] {
   overrides.set("signin", {
     name: "signin",
     group: "Sign in",
-    summary: "choose the password manager Aeon signs in with, or check it",
-    help: `Usage: aeon signin setup <bitwarden|proton>
-       aeon signin status
+    summary: "choose the password manager Graft signs in with, or check it",
+    help: `Usage: graft signin setup <bitwarden|proton>
+       graft signin status
 
   setup bitwarden   unlock Bitwarden with \`bw\` and save a session key only you can read
   setup proton      use Proton Pass through its \`pass-cli\` (it keeps its own session)
@@ -704,9 +704,9 @@ export function aeonCommands(host: DaemonHost): Command[] {
     name: "cdp",
     group: "Browser",
     summary: "local DevTools Protocol endpoint for Playwright and Puppeteer",
-    help: `Usage: aeon cdp [--port 9333] [--status] [--stop] [--json]
+    help: `Usage: graft cdp [--port 9333] [--status] [--stop] [--json]
 
-Starts a 127.0.0.1-only CDP endpoint over Aeon's agent tabs, through the running daemon. The
+Starts a 127.0.0.1-only CDP endpoint over Graft's agent tabs, through the running daemon. The
 printed URL carries a token. Playwright: chromium.connectOverCDP(url). Puppeteer:
 connect({browserURL: url}). Tabs opened through the endpoint close when the client disconnects.`,
     run: (args) => cdp(host, args),
@@ -714,32 +714,32 @@ connect({browserURL: url}). Tabs opened through the endpoint close when the clie
   overrides.set("update", {
     name: "update",
     group: "Browser",
-    summary: "update Aeon and browserkit, rebuild, and set everything up again",
-    help: `Usage: aeon update
+    summary: "update Graft and browserkit, rebuild, and set everything up again",
+    help: `Usage: graft update
 
 Waits until no chat, ability, or routine is running, then runs scripts/setup.mjs in this checkout
 after pulling it (fast-forward only). A chat that is still working is left running; Ctrl+C stops
-only the update. If Aeon is not running, the update starts at once. Setup pulls and builds
-browserkit, rebuilds Aeon, updates the native host and waits for the extension to reconnect
+only the update. If Graft is not running, the update starts at once. Setup pulls and builds
+browserkit, rebuilds Graft, updates the native host and waits for the extension to reconnect
 (reload it in chrome://extensions).`,
-    run: () => updateAeon(),
+    run: () => updateGraft(),
   });
   const abilities = BROWSERKIT_COMMANDS.find((command) => command.name === "abilities");
   if (abilities) overrides.set("abilities", abilitiesCommand(abilities));
-  // Aeon owns `record start|stop`; the original gif/video/trace commands stay available.
+  // Graft owns `record start|stop`; the original gif/video/trace commands stay available.
   const originalRecord = BROWSERKIT_COMMANDS.find((command) => command.name === "record");
   overrides.set("record", recordCommand(originalRecord, host));
   // Their cells run through the host, so `--browser <name>` (pinned in cli-main) reaches them too.
   for (const command of BROWSERKIT_COMMANDS.filter((item) => SCOPED.has(item.name)))
     if (!overrides.has(command.name))
       overrides.set(command.name, { ...command, help: `${command.help}\n\n${BROWSER_NOTE}` });
-  const own = [...aeonOnlyCommands(host), ...browsersCommands(host), fetchCommand(host)];
-  // A command Aeon defines itself (pack) replaces browserkit's; help lists each name once.
+  const own = [...graftOnlyCommands(host), ...browsersCommands(host), fetchCommand(host)];
+  // A command Graft defines itself (pack) replaces browserkit's; help lists each name once.
   const taken = new Set(own.map((command) => command.name));
   const commands = BROWSERKIT_COMMANDS.filter((command) => !taken.has(command.name)).map(
     (command) => overrides.get(command.name) ?? command,
   );
-  // An override browserkit has no command for (login) is Aeon's own; keep it rather than drop it.
+  // An override browserkit has no command for (login) is Graft's own; keep it rather than drop it.
   const known = new Set([...taken, ...BROWSERKIT_COMMANDS.map((command) => command.name)]);
   const extra = [...overrides.values()].filter((command) => !known.has(command.name));
   return [...own, ...extra, ...commands];
@@ -747,10 +747,10 @@ browserkit, rebuilds Aeon, updates the native host and waits for the extension t
 
 const SCOPED = new Set(["boosts", "map", "cookies"]);
 const BROWSER_NOTE =
-  "--browser <name> runs it in one connected Chrome profile (a name from aeon browsers).";
+  "--browser <name> runs it in one connected Chrome profile (a name from graft browsers).";
 
-/** aeon update: wait until nothing is running, then pull and run the one-command setup again. */
-function updateAeon(): Promise<number> {
+/** graft update: wait until nothing is running, then pull and run the one-command setup again. */
+function updateGraft(): Promise<number> {
   return runUpdateWhenIdle({
     probe: probeDaemonActivity,
     update: rebuildCheckout,

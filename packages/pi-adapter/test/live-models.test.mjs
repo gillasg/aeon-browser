@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { InMemoryModelsStore } from "@earendil-works/pi-ai";
-import { createAeonModelRuntime, createLiveModels } from "../dist/index.js";
+import { createGraftModelRuntime, createLiveModels } from "../dist/index.js";
 
 const SECRET = "sk-live-models-test-secret-never-log";
 const NEW_MODEL = "test-live-only";
@@ -59,7 +59,7 @@ function credentialStore(key = SECRET) {
 }
 
 async function withAgentDirectory(run) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-live-models-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-live-models-"));
   await writeFile(
     join(directory, "auth.json"),
     JSON.stringify({ "opencode-go": { type: "api_key", key: SECRET } }),
@@ -165,7 +165,7 @@ test("the cache feeds an offline start, and a failed refresh keeps it", async ()
 test("Pi's runtime restores the live cache and picks up the new model on refresh", async () => {
   await withAgentDirectory(async (agentDirectory) => {
     const store = new InMemoryModelsStore();
-    const runtime = await createAeonModelRuntime({
+    const runtime = await createGraftModelRuntime({
       agentDirectory,
       modelsStore: store,
       fetch: async () => respond(catalog()),
@@ -180,7 +180,7 @@ test("Pi's runtime restores the live cache and picks up the new model on refresh
     assert.ok(available.some((model) => model.id === NEW_MODEL));
 
     // A fresh runtime (a restart) sees the stored model before any network call.
-    const restarted = await createAeonModelRuntime({
+    const restarted = await createGraftModelRuntime({
       agentDirectory,
       modelsStore: store,
       fetch: async () => {
@@ -194,7 +194,7 @@ test("Pi's runtime restores the live cache and picks up the new model on refresh
 test("the API key never appears in refresh errors", async () => {
   await withAgentDirectory(async (agentDirectory) => {
     let sent = "";
-    const runtime = await createAeonModelRuntime({
+    const runtime = await createGraftModelRuntime({
       agentDirectory,
       modelsStore: new InMemoryModelsStore(),
       fetch: async (_url, init) => {

@@ -144,7 +144,7 @@ const ChatSubmitRequestSchema = z
         attachments: AttachmentsSchema,
         browserContext: PiBrowserContextRecordSchema.optional(),
         browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
-        /** True only when a person typed this in Aeon's own UI: never page or agent text. */
+        /** True only when a person typed this in Graft's own UI: never page or agent text. */
         typedByUser: z.boolean().optional(),
         budget: z
           .object({
@@ -198,7 +198,7 @@ const ChatQueueRequestSchema = z
         attachments: AttachmentsSchema,
         browserContext: PiBrowserContextRecordSchema.optional(),
         browserContexts: z.array(PiBrowserContextRecordSchema).max(8).optional(),
-        /** True only when a person typed this in Aeon's own UI: never page or agent text. */
+        /** True only when a person typed this in Graft's own UI: never page or agent text. */
         typedByUser: z.boolean().optional(),
       })
       .strict(),

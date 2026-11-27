@@ -1,7 +1,7 @@
 // Last-resort banner: shown only when the browser link stays down after self-healing gave up.
-// The worker records the link state in chrome.storage.local ("aeon-link", see link-state.ts).
+// The worker records the link state in chrome.storage.local ("graft-link", see link-state.ts).
 
-const KEY = "aeon-link";
+const KEY = "graft-link";
 
 export function installLinkBanner(): void {
   const banner = document.createElement("div");
@@ -9,10 +9,10 @@ export function installLinkBanner(): void {
   banner.hidden = true;
   banner.setAttribute("role", "alert");
   const text = document.createElement("span");
-  text.textContent = "Aeon lost its browser link and couldn't reconnect.";
+  text.textContent = "Graft lost its browser link and couldn't reconnect.";
   const reload = document.createElement("button");
   reload.type = "button";
-  reload.textContent = "Reload Aeon";
+  reload.textContent = "Reload Graft";
   reload.addEventListener("click", () => chrome.runtime.reload());
   banner.append(text, reload);
   document.body.append(banner);

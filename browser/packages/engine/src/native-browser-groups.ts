@@ -4,11 +4,11 @@ import { onEngineInstall } from "./native-engine-install.js";
 import { settleAgentGroups } from "./native-browser-group-placement.js";
 
 // Tabs an agent opens are kept together in tab groups, so the user can see, collapse or close
-// agents' work at once: by default one shared group per window for every agent ("Aeon · 3"), or
+// agents' work at once: by default one shared group per window for every agent ("Graft · 3"), or
 // one group per chat, or none (browser.settings tabGroups). Grouping is presentation only: it never fails a
 // step. The owner-group map is persisted in session storage because the MV3 worker sleeps; when
 // it is gone, the invisible owner marker in the group title lets a later tab rejoin its group
-// instead of making one more "Aeon" group.
+// instead of making one more "Graft" group.
 //
 // Only a tab the agent asked for (openTab, a job's own tab) belongs in the group. Chrome copies a
 // group on its own in places we do not control (a link from a grouped tab, window.open, a new tab
@@ -89,7 +89,7 @@ export async function groupMode(): Promise<"shared" | "chat"> {
   return stored?.[GROUP_MODE_KEY] === "chat" ? "chat" : "shared";
 }
 
-/** "Aeon · 3": the host's name and how many agents have tabs in the shared group. */
+/** "Graft · 3": the host's name and how many agents have tabs in the shared group. */
 function sharedTitle(): string {
   const base = engineConfig.tabGroupTitle(SHARED, undefined);
   const owners = new Set(sharedMembers.values()).size;

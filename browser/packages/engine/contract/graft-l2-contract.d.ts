@@ -1,6 +1,6 @@
 // The always-visible L2 grammar inside browser_code. Everything else: help(topic).
 // Laws: (1) a Playwright name carries Playwright semantics; different semantics get a different name.
-// (2) success returns a structured result or Receipt; failure throws AeonError from the closed set.
+// (2) success returns a structured result or Receipt; failure throws GraftError from the closed set.
 // (3) secrets cross the realm only as Sealed handles.
 type Ref = `t${number}:e${number}`; // printed by page.state(); valid only on its own tab (else WRONG_TAB)
 type Target = Ref | string | Locator; // ref | CSS/text selector | Playwright locator
@@ -10,7 +10,7 @@ interface Changed {
   diff?: string;
 }
 interface Receipt { did: string; changed: Changed; ms: number }
-interface AeonError extends Error { // code and owner from protocol/src/errors.ts
+interface GraftError extends Error { // code and owner from protocol/src/errors.ts
   code: string; owner: "model" | "page" | "user" | "ours"; hint: string;
 }
 interface Sealed<K extends "session" | "cookie" | "bearer" | "csrf" = "session" | "cookie" | "bearer" | "csrf"> {
@@ -42,7 +42,7 @@ interface Page { // Playwright, verbatim, down to screenshot()
   waitForEvent(e: "download" | "popup"): Promise<Download | Page>;
   evaluate<R, A = undefined>(fn: (arg: A) => R, arg?: A): Promise<R>; // the page's own world
   screenshot(o?: { fullPage?: boolean; path?: string }): Promise<string>;
-  state(o?: { query?: string; frames?: boolean }): Promise<string>; // Aeon from here: numbered view
+  state(o?: { query?: string; frames?: boolean }): Promise<string>; // Graft from here: numbered view
   read(): Promise<{ url: string; title: string; text: string; markdown: string; lists: List[] }>;
   extract<T>(schema: object, o?: { instruction?: string }): Promise<T>;
   act(step: string): Promise<Receipt>; // one step in plain words

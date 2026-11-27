@@ -3,7 +3,7 @@ import { browserEmulationShims, browserInputFieldHelpers } from "./code-api-help
 // The browser_code page API, evaluated once in each chat's realm. Browser steps go through __call.
 
 /**
- * The realm runs in the local Aeon process and has no network of its own. Route plain fetch
+ * The realm runs in the local Graft process and has no network of its own. Route plain fetch
  * through browser.fetch (the extension's host permissions and the user's cookies), so a check or
  * a cell reads the same URLs the agent could, and hand back a real Response.
  */
@@ -167,8 +167,8 @@ var browser = Object.freeze({
   },
   // The tab the user is looking at: the active tab of the window they last focused, as a page.
   activeTab: async () => {
-    // A web page: Aeon's own pages and about:blank are listed and drivable, but they are not what the user is looking at.
-    var tabs = (await browser.tabs()).filter(tab => !tab.heldByOther && !tab.aeonUi && !/^about:/.test(String(tab.url || '')));
+    // A web page: Graft's own pages and about:blank are listed and drivable, but they are not what the user is looking at.
+    var tabs = (await browser.tabs()).filter(tab => !tab.heldByOther && !tab.graftUi && !/^about:/.test(String(tab.url || '')));
     var tab = tabs.find(listed => listed.active && (__focusedWindowId === undefined || listed.windowId === __focusedWindowId))
       || tabs.find(listed => listed.active);
     if (!tab) throw Error('TARGET_LOST: the active tab is not one this chat can use (it is a new tab, a browser page, or a tab another chat is driving). browser.openTab(url) opens in the background: keep the page it returns (const p = await browser.openTab(url)) instead of calling browser.activeTab()');

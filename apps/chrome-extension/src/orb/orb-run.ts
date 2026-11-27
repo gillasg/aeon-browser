@@ -1,4 +1,4 @@
-// The orb's run model is the shared one in @aeon/ui (run-model.ts), so the island, the side panel
+// The orb's run model is the shared one in @graft/ui (run-model.ts), so the island, the side panel
 // and the chat transcript describe a run the same way. The orb keeps its own names for it.
 
 export {
@@ -11,7 +11,7 @@ export {
   initialRun,
   spotlightBox,
   summarize,
-} from "@aeon/ui";
+} from "@graft/ui";
 export type {
   BoxLine,
   AgentRun as OrbRun,
@@ -21,4 +21,4 @@ export type {
   RunPath as OrbPath,
   RunStatus as OrbStatus,
   RunStep as OrbStep,
-} from "@aeon/ui";
+} from "@graft/ui";

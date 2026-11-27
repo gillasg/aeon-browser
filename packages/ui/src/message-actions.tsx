@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import type { PiEntryDto, PiMessageDto } from "@aeon/protocol";
+import type { PiEntryDto, PiMessageDto } from "@graft/protocol";
 import { copyTextToClipboard } from "./clipboard.js";
 
 export interface MessageActionProps {

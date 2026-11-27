@@ -105,7 +105,7 @@ test(
   "registered sites live in a private file",
   { skip: process.platform === "win32" },
   async (t) => {
-    const dir = join(await mkdtemp(join(tmpdir(), "aeon-keepalive-")), "data");
+    const dir = join(await mkdtemp(join(tmpdir(), "graft-keepalive-")), "data");
     t.after(() => rm(dir, { recursive: true, force: true }));
     await writeKeepaliveSites(dir, [site]);
     assert.deepEqual(await readKeepaliveSites(dir), [site]);

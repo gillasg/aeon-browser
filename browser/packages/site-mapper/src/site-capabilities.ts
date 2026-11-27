@@ -53,9 +53,9 @@ export interface SiteCapabilities {
   site: string;
   /** Reads first, then writes. */
   abilities: SiteAbilitySummary[];
-  /** Reads: things Aeon can look up. */
+  /** Reads: things Graft can look up. */
   lookups: SiteAbilitySummary[];
-  /** Writes: things Aeon can change. */
+  /** Writes: things Graft can change. */
   changes: SiteAbilitySummary[];
   operations: SiteOperationSummary[];
   notes: string;

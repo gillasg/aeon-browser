@@ -6,7 +6,7 @@ import test from "node:test";
 import { rollbackRelease, runRollback } from "../dist/rollback.js";
 
 async function layout() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-rollback-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-rollback-"));
   const current = "0.2.0-bbbbbbb";
   const previous = "0.1.0-aaaaaaa";
   await mkdir(join(root, "builds", current), { recursive: true });
@@ -65,7 +65,7 @@ test("rollback refuses a previous build whose daemon file is gone", async () => 
   await assert.rejects(rollbackRelease({ root, hostConfig }), /no daemon/);
 });
 
-test("rollback refuses a build id that leaves the Aeon folder", async () => {
+test("rollback refuses a build id that leaves the Graft folder", async () => {
   const { root, hostConfig } = await layout();
   await writeFile(
     join(root, "release.json"),
@@ -74,7 +74,7 @@ test("rollback refuses a build id that leaves the Aeon folder", async () => {
   await assert.rejects(rollbackRelease({ root, hostConfig }), /<version>-<sha>/);
 });
 
-test("aeon rollback --json reports the switch without touching another install", async () => {
+test("graft rollback --json reports the switch without touching another install", async () => {
   const { root, hostConfig, previous } = await layout();
   let written = "";
   const write = process.stdout.write;

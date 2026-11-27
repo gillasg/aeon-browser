@@ -1,4 +1,4 @@
-// Host plumbing for the Aeon UI: control hand-back, space windows and privacy settings. The
+// Host plumbing for the Graft UI: control hand-back, space windows and privacy settings. The
 // extension speaks these as browser.host.* messages over the executor socket; responses are
 // browser.host.result with the same requestId so the daemon can await one without touching code
 // cells.

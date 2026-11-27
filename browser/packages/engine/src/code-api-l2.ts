@@ -1,4 +1,4 @@
-// The L2 grammar of aeon-l2-contract.d.ts, evaluated in the browser_code realm after every other
+// The L2 grammar of graft-l2-contract.d.ts, evaluated in the browser_code realm after every other
 // part: human.* (the user, when only a person can do a step), site.ops/call/watch/write beside
 // site.run, page.ref and page.wire, tab-qualified refs (t<tab>:e<id>) and help topics for them.
 // Each name delegates to the capability that already exists (bu.*, siteMapper.*, page.rules),

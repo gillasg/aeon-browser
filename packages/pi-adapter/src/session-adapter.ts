@@ -24,7 +24,7 @@ import {
   type PiTranscriptMatch,
   PiForkUnsupportedEntryError,
   type PiForkEntryCheck,
-} from "@aeon/domain";
+} from "@graft/domain";
 import type { ThreadToolHost } from "./thread-tools.js";
 import { createChatTools } from "./chat-tools.js";
 import { gatedBashTool, startShellGate } from "./shell-gate.js";
@@ -45,7 +45,7 @@ import {
   completeWithDefaultModelTools,
   siteToolModel,
 } from "./text-completion.js";
-import { installAeonBrowser } from "./site-browser.js";
+import { installGraftBrowser } from "./site-browser.js";
 import { installSiteMapping } from "./site-mapping.js";
 import { externalToolDefinitions, runExternalTool } from "./external-tools.js";
 import {
@@ -102,7 +102,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     this.fixtureToolAllowlist = options.fixtureToolAllowlist ?? true;
     this.preferredInitialModel = options.preferredInitialModel;
     this.browserTool = options.browserTool;
-    installAeonBrowser(this.browserTool);
+    installGraftBrowser(this.browserTool);
     if (this.browserTool && !options.testModel)
       installSiteMapping(
         resolve(this.sessionDirectory, "..", "site-mapping.json"),
@@ -144,7 +144,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     return this.agentDirectory;
   }
 
-  /** browser_code, browser_tabs, crawl and site_mapper for agents outside Aeon (the Aeon MCP). */
+  /** browser_code, browser_tabs, crawl and site_mapper for agents outside Graft (the Graft MCP). */
   externalTools(): unknown[] {
     return externalToolDefinitions(this.completionOptions(), this.browserTool);
   }
@@ -245,7 +245,7 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     reference: PiSessionReference;
     workingDirectory: string;
     entryId: string;
-    targetChatId: import("@aeon/domain").ChatId;
+    targetChatId: import("@graft/domain").ChatId;
   }): Promise<PiSessionReference> {
     const check = this.inspectForkEntry(input);
     if (!check.supported && check.reason === "entry_not_found")
@@ -284,8 +284,8 @@ export class PiSdkSessionAdapter implements PiSessionPort {
     sourceReference: PiSessionReference;
     workingDirectory: string;
     entryId: string;
-    targetChatId: import("@aeon/domain").ChatId;
-  }): import("@aeon/domain").PiDetachedForkEvidence {
+    targetChatId: import("@graft/domain").ChatId;
+  }): import("@graft/domain").PiDetachedForkEvidence {
     return findDetachedFork(this.sessionDirectory, input);
   }
 

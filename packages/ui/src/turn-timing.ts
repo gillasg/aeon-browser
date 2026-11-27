@@ -1,4 +1,4 @@
-import type { PiSessionEventDto, PiMessageDto } from "@aeon/protocol";
+import type { PiSessionEventDto, PiMessageDto } from "@graft/protocol";
 import type { TranscriptRow } from "./transcript-model.js";
 export interface TurnTiming {
   startedAt: number;

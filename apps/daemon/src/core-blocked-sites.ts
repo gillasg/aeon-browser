@@ -4,7 +4,7 @@ import {
   CoreBlockedSitesResultSchema,
   NativeBlockedSitesReplySchema,
   NativeBlockedSitesRequestSchema,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket } from "ws";
 import {
   addBlockedSite,
@@ -15,7 +15,7 @@ import {
 import type { BrowserControlService } from "./browser-control-service.js";
 import { messageOf } from "./core-browser.js";
 
-// `aeon block|unblock|blocked`: one list, in browserkit's home (site-rules.json), owned by this
+// `graft block|unblock|blocked`: one list, in browserkit's home (site-rules.json), owned by this
 // daemon. Changes are pushed to every connected Chrome so the engine's own chrome.storage
 // fallback stays the same list. Only the user runs these commands; no chat tool reaches this.
 // A site the user names in a request does not lift a block here: browserkit has no such lift.

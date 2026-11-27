@@ -1,4 +1,4 @@
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 import { summarize, type TraceStep } from "./results.js";
 import { chooseModel } from "./run.js";
 
@@ -39,7 +39,7 @@ interface Dialog {
   expiresAt: string;
 }
 
-export async function questions(client: AeonClient, chatId: string): Promise<Question[]> {
+export async function questions(client: GraftClient, chatId: string): Promise<Question[]> {
   const result = await client.command("chat.pi-ui", { chatId });
   const dialogs = ((result.piUi as { extensionDialogs?: Dialog[] } | undefined)?.extensionDialogs ??
     []) as Dialog[];
@@ -56,7 +56,7 @@ export async function questions(client: AeonClient, chatId: string): Promise<Que
 
 /** Answers the agent's question (the only one, or `questionId`); yes/no for confirm, a choice or its number for select. */
 export async function answer(
-  client: AeonClient,
+  client: GraftClient,
   chatId: string,
   reply: string,
   questionId?: string,
@@ -76,7 +76,7 @@ export async function answer(
     value,
   });
   if (result.accepted === false)
-    throw new Error("Aeon did not accept the answer (it may have expired).");
+    throw new Error("Graft did not accept the answer (it may have expired).");
   return { answered: String(value), question: question.question };
 }
 
@@ -103,7 +103,7 @@ function answerValue(question: Question, reply: string): string | boolean {
  * steers the current turn); when idle, it starts a new turn with the chat's own model.
  */
 export async function send(
-  client: AeonClient,
+  client: GraftClient,
   chatId: string,
   text: string,
   options: { steer?: boolean } = {},
@@ -130,7 +130,11 @@ export async function send(
 }
 
 /** The chat now: whether it works, its steps after `since`, its questions and its answer. */
-export async function chatState(client: AeonClient, chatId: string, since = 0): Promise<ChatState> {
+export async function chatState(
+  client: GraftClient,
+  chatId: string,
+  since = 0,
+): Promise<ChatState> {
   const [view, pending] = await Promise.all([
     client.command("chat.get", { chatId }),
     questions(client, chatId),
@@ -155,7 +159,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Returns at once when one already holds, and with `changed: false` after the timeout.
  */
 export async function waitForChange(
-  client: AeonClient,
+  client: GraftClient,
   chatId: string,
   options: { since?: number; timeoutMs: number },
 ): Promise<ChatState & { changed: boolean }> {

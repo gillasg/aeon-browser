@@ -1,4 +1,4 @@
-import type { ChatId } from "@aeon/domain";
+import type { ChatId } from "@graft/domain";
 import type { ManagementActionName } from "./management-actions.js";
 
 export class ChatManagementCommands {

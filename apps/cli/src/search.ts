@@ -1,6 +1,6 @@
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 
-// Read-only search over what Aeon already knows: chat titles and messages (the daemon's catalog
+// Read-only search over what Graft already knows: chat titles and messages (the daemon's catalog
 // search) and the answers kept on home (pins). Nothing here starts a run or changes a chat.
 
 export interface SearchFilters {
@@ -37,14 +37,14 @@ export interface SearchResult {
   pins: PinHit[];
 }
 
-export async function searchAeon(
-  client: AeonClient,
+export async function searchGraft(
+  client: GraftClient,
   text: string,
   filters: SearchFilters = {},
   limit = 20,
 ): Promise<SearchResult> {
   const query = text.trim();
-  if (!query) throw new Error('Usage: aeon search "<text>"');
+  if (!query) throw new Error('Usage: graft search "<text>"');
   const listed = await client.command("chat.list", {
     limit: Math.min(100, Math.max(1, limit)),
     includeArchived: true,

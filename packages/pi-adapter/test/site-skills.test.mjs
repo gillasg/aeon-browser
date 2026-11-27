@@ -14,7 +14,7 @@ import {
 const previousHome = process.env.SITE_TO_API_HOME;
 let home;
 test.beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "aeon-skills-home-"));
+  home = await mkdtemp(join(tmpdir(), "graft-skills-home-"));
   process.env.SITE_TO_API_HOME = home;
 });
 test.afterEach(async () => {
@@ -24,7 +24,7 @@ test.afterEach(async () => {
 });
 
 test("imported skills are enabled", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-skills-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-skills-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const imported = await importSiteSkills(directory, [
     { name: "search", domains: ["shop.example"], description: "Search", code: "const x = 1;" },
@@ -61,7 +61,7 @@ test("imported skills are enabled", async (t) => {
 });
 
 test("loopback site skills isolate by host:port", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-skills-loopback-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-skills-loopback-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await importSiteSkills(directory, [
     { name: "app-a", domains: ["127.0.0.1:4100"], description: "App A", code: "const a = 1;" },

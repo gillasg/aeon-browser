@@ -1,8 +1,8 @@
-// One-time move of extension storage written before the rename to Aeon. Old keys
+// One-time move of extension storage written before the rename to Graft. Old keys
 // that began with the previous product name are copied to the matching new key
 // when the new key is absent, then removed. Safe to run repeatedly and concurrently.
 const LEGACY_PREFIX = "pippin";
-const CURRENT_PREFIX = "aeon";
+const CURRENT_PREFIX = "graft";
 
 function currentKey(legacyKey: string): string {
   return CURRENT_PREFIX + legacyKey.slice(LEGACY_PREFIX.length);

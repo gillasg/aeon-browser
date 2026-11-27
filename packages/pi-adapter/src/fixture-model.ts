@@ -10,7 +10,7 @@ import {
 import type { TranscriptContext } from "@earendil-works/pi-ai/utils/transcript";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
-const FIXTURE_PROVIDER = "aeon-local-fixture";
+const FIXTURE_PROVIDER = "graft-local-fixture";
 const FIXTURE_MODEL = "read-only-stream";
 const FIXTURE_RESPONSES = 64;
 const DEFAULT_TOKENS_PER_SECOND = 35;
@@ -56,11 +56,11 @@ export async function createLocalFixtureModel(agentDirectory: string): Promise<{
   });
   const fixture = fauxProvider({
     provider: FIXTURE_PROVIDER,
-    api: "aeon-local-faux",
+    api: "graft-local-faux",
     models: [
       {
         id: FIXTURE_MODEL,
-        name: "Aeon local fixture",
+        name: "Graft local fixture",
         reasoning: false,
         input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -92,10 +92,10 @@ export async function createLocalFixtureModel(agentDirectory: string): Promise<{
 
 function fixtureTokensPerSecond(): number {
   const raw =
-    process.env.AEON_FIXTURE_TOKENS_PER_SECOND ?? process.env.PIPPIN_FIXTURE_TOKENS_PER_SECOND;
+    process.env.GRAFT_FIXTURE_TOKENS_PER_SECOND ?? process.env.PIPPIN_FIXTURE_TOKENS_PER_SECOND;
   const configured = Number(raw);
   const value = raw ? configured : DEFAULT_TOKENS_PER_SECOND;
   if (!Number.isFinite(value) || value < 1 || value > 100)
-    throw new Error("AEON_FIXTURE_TOKENS_PER_SECOND must be between 1 and 100.");
+    throw new Error("GRAFT_FIXTURE_TOKENS_PER_SECOND must be between 1 and 100.");
   return value;
 }

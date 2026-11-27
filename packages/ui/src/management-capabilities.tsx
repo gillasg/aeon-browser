@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import type { ManagementActionName } from "./management-types.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 import { CapabilityEditor } from "./capability-editor.js";
@@ -113,7 +113,7 @@ function CapabilityFacts({ item }: { item: Capability }): ReactElement {
         <p className="credential-binding-guidance" role="note">
           Pi needs this MCP credential in its own server configuration. Add the credential setting
           required by this server to <code>~/.pi/agent/mcp.json</code> or this project’s{" "}
-          <code>.pi/mcp.json</code>, then reload the Pi session. Aeon does not store or display the
+          <code>.pi/mcp.json</code>, then reload the Pi session. Graft does not store or display the
           secret.
         </p>
       )}

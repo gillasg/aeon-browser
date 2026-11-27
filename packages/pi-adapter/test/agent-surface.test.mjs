@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
-import { asActivationId, asChatId } from "@aeon/domain";
+import { asActivationId, asChatId } from "@graft/domain";
 import {
   getCurrentSystemPrompt,
   getCurrentTools,
@@ -81,10 +81,10 @@ async function captureFirstRequest(paths) {
   const stop = captureFixtureModelRequest((context) => {
     first ??= context;
   });
-  const previousNow = process.env.AEON_SURFACE_NOW;
-  const previousZone = process.env.AEON_SURFACE_ZONE;
-  process.env.AEON_SURFACE_NOW = "2026-11-10T09:02:00.000Z";
-  process.env.AEON_SURFACE_ZONE = "Asia/Kolkata";
+  const previousNow = process.env.GRAFT_SURFACE_NOW;
+  const previousZone = process.env.GRAFT_SURFACE_ZONE;
+  process.env.GRAFT_SURFACE_NOW = "2026-11-10T09:02:00.000Z";
+  process.env.GRAFT_SURFACE_ZONE = "Asia/Kolkata";
   const adapter = new PiSdkSessionAdapter({
     sessionDirectory: paths.sessionDirectory,
     agentDirectory: paths.agentDirectory,
@@ -104,10 +104,10 @@ async function captureFirstRequest(paths) {
   } finally {
     stop();
     await adapter.closeAll();
-    if (previousNow === undefined) delete process.env.AEON_SURFACE_NOW;
-    else process.env.AEON_SURFACE_NOW = previousNow;
-    if (previousZone === undefined) delete process.env.AEON_SURFACE_ZONE;
-    else process.env.AEON_SURFACE_ZONE = previousZone;
+    if (previousNow === undefined) delete process.env.GRAFT_SURFACE_NOW;
+    else process.env.GRAFT_SURFACE_NOW = previousNow;
+    if (previousZone === undefined) delete process.env.GRAFT_SURFACE_ZONE;
+    else process.env.GRAFT_SURFACE_ZONE = previousZone;
   }
   assert.ok(first, "the fixture model received the first request");
   return first;
@@ -141,7 +141,7 @@ function declaredTools(messages) {
 }
 
 async function sandbox(t) {
-  const root = resolve(await mkdtemp(join(tmpdir(), "aeon-agent-surface-")));
+  const root = resolve(await mkdtemp(join(tmpdir(), "graft-agent-surface-")));
   assert.ok(root.startsWith(`${resolve(tmpdir())}${sep}`));
   const paths = {
     root,

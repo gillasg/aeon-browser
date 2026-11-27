@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type ReactElement,
 } from "react";
-import type { ChatSummaryDto } from "@aeon/protocol";
+import type { ChatSummaryDto } from "@graft/protocol";
 
 // A pill that opens a searchable list of chats: those waiting for the user first, then working
 // ones (with their dot), then the most recent. Used beside Home and New chat on a chat page, and
@@ -28,7 +28,7 @@ export interface ChatSwitcherProps {
   label?: string;
   /** A round icon button (the chat page's corner) instead of a text pill (the orb). */
   icon?: boolean;
-  /** The cursor's way to the Manage tab: the list's last row, "Manage Aeon ↗", pinned under the list. */
+  /** The cursor's way to the Manage tab: the list's last row, "Manage Graft ↗", pinned under the list. */
   onManage?: (() => void) | undefined;
 }
 
@@ -191,7 +191,7 @@ function ManageRow(props: { onClose(): void; onManage(): void }): ReactElement {
         props.onManage();
       }}
     >
-      Manage Aeon <span aria-hidden="true">↗</span>
+      Manage Graft <span aria-hidden="true">↗</span>
     </button>
   );
 }

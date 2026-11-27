@@ -7,7 +7,7 @@ import {
   CoreHealthResultSchema,
   ENGINE_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { BrowserControlService } from "../dist/browser-control-service.js";
 import { HealthPings, isSupervisorHealthLine, supervisorHealthLine } from "../dist/health-ping.js";
 

@@ -6,11 +6,11 @@ export async function initializeChatPreferences(
   sidePanel: boolean,
 ): Promise<void> {
   await applyStoredTheme();
-  const persisted = localStorage.getItem("aeon-sidebar-expanded");
+  const persisted = localStorage.getItem("graft-sidebar-expanded");
   if (!sidePanel && persisted !== null) {
     sidebar.setOpen(persisted === "true");
     return;
   }
-  const values = await chrome.storage.sync.get("aeon-chat-sidebar-open");
-  if (!sidePanel && values["aeon-chat-sidebar-open"] === true) sidebar.setOpen(true);
+  const values = await chrome.storage.sync.get("graft-chat-sidebar-open");
+  if (!sidePanel && values["graft-chat-sidebar-open"] === true) sidebar.setOpen(true);
 }

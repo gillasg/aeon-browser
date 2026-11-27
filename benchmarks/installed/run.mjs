@@ -99,7 +99,7 @@ async function networkScenario({ sandbox }) {
 }
 
 async function updateScenario({ sandbox }) {
-  // `aeon update` waits for the daemon to be idle. While a cell is in flight the update must wait,
+  // `graft update` waits for the daemon to be idle. While a cell is in flight the update must wait,
   // and it must still run once after the cell settles — never interrupt the running cell.
   let busy = true;
   const events = [];

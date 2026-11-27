@@ -9,7 +9,7 @@ import { removeChatFiles } from "../dist/chat-deletion.js";
 const chatId = "11111111-1111-4111-8111-111111111111";
 
 async function layout() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-delete-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-delete-"));
   const workspace = join(root, "workspaces", chatId);
   const sessions = join(root, "pi-sessions");
   await mkdir(workspace, { recursive: true });

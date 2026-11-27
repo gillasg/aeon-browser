@@ -1,5 +1,5 @@
 // browser.fetch through a tab: an MV3 service worker sees every redirect as an opaque one with no
-// Location, so it cannot check the next hop before following it. When Aeon already owns a tab on
+// Location, so it cannot check the next hop before following it. When Graft already owns a tab on
 // the request's origin, the request is re-issued in that tab, where the browser follows the
 // redirect under its own same-origin and CORS rules, and the final address is checked before
 // any of the body is returned.
@@ -7,7 +7,7 @@ import { assertBrowserNetwork } from "./native-browser-dns.js";
 
 const MAX_TAB_BYTES = 16_000_000;
 
-/** Which tabs Aeon owns (set by the tab tracker; tests set their own). */
+/** Which tabs Graft owns (set by the tab tracker; tests set their own). */
 let ownsTab: (tabId: number) => boolean = () => false;
 
 export function setFetchTabOwner(owner: (tabId: number) => boolean): void {
@@ -23,7 +23,7 @@ export interface TabFetchReply {
   tooLarge?: boolean;
 }
 
-/** An Aeon tab whose page is on `origin`, if there is one. */
+/** A Graft tab whose page is on `origin`, if there is one. */
 export async function ownedTabOn(origin: string): Promise<number | undefined> {
   if (!chrome.tabs?.query) return undefined;
   const tabs = await chrome.tabs.query({}).catch(() => [] as chrome.tabs.Tab[]);

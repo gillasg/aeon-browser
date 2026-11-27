@@ -3,7 +3,7 @@ import {
   DaemonUiResponseSchema,
   type DaemonUiRequest,
   type DaemonUiResponse,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 export type UiConnectResult =
   { kind: "connected"; client: UiClient } | { kind: "failed"; code: string };

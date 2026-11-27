@@ -17,10 +17,10 @@ function sleep(ms) {
 }
 var __acted = {at: 0, target: null}, __sleepSaved = 0, __sleepCut = 0, __cancelledTimers = new Set();
 function __noteActed(target) { if (target) { __acted.at = Date.now(); __acted.target = target; } }
-// Only timers set directly by the cell's code: the cell is evaluated as aeon-cell.js.
+// Only timers set directly by the cell's code: the cell is evaluated as graft-cell.js.
 function __fromCell() {
   var frames = String(new Error().stack || '').split(String.fromCharCode(10));
-  return /aeon-cell\\.js/.test(frames[3] || '');
+  return /graft-cell\\.js/.test(frames[3] || '');
 }
 function __settledSleep(fn, delay, args) {
   var started = Date.now(), fired = false, target = __acted.target, id;

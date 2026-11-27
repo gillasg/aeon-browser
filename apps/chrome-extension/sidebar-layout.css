@@ -56,7 +56,7 @@
   text-overflow: clip;
   mask-image: linear-gradient(
     to right,
-    var(--aeon-c-000000) calc(100% - 104px),
+    var(--graft-c-000000) calc(100% - 104px),
     transparent calc(100% - 74px)
   );
 }
@@ -82,7 +82,7 @@
 .sidebar-project-row {
   position: relative;
   min-height: 36px;
-  border-radius: var(--aeon-r-md);
+  border-radius: var(--graft-r-md);
 }
 .sidebar-project-row:hover,
 .sidebar-project-row:focus-within,
@@ -124,7 +124,7 @@
 .sidebar-project-row:focus-within > button:first-child span {
   mask-image: linear-gradient(
     to right,
-    var(--aeon-c-000000) calc(100% - 76px),
+    var(--graft-c-000000) calc(100% - 76px),
     transparent calc(100% - 48px)
   );
 }
@@ -140,7 +140,7 @@
 .project-row-actions > button:hover {
   color: var(--muted);
   background: var(--surface-raised);
-  border-radius: var(--aeon-r-sm);
+  border-radius: var(--graft-r-sm);
 }
 .sidebar-recents-heading .sidebar-section-toggle {
   width: auto;
@@ -186,20 +186,20 @@
   height: 16px;
   display: grid;
   place-items: center;
-  color: var(--aeon-c-848490);
+  color: var(--graft-c-848490);
   pointer-events: none;
 }
 .sidebar-working-spinner {
   width: 16px;
   height: 16px;
-  animation: aeon-sidebar-spin 1.2s linear infinite;
+  animation: graft-sidebar-spin 1.2s linear infinite;
 }
 .sidebar-completion-dot {
   position: absolute;
   width: 5px;
   height: 5px;
-  border-radius: var(--aeon-r-half);
-  background: var(--aeon-c-4299ff);
+  border-radius: var(--graft-r-half);
+  background: var(--graft-c-4299ff);
 }
 .sidebar-chat-item:has(.sidebar-chat-status) .sidebar-chat-row > span {
   padding-right: 20px;
@@ -209,7 +209,7 @@
 .sidebar-chat-item:has(:popover-open) .sidebar-chat-status {
   opacity: 0;
 }
-@keyframes aeon-sidebar-spin {
+@keyframes graft-sidebar-spin {
   to {
     transform: rotate(360deg);
   }

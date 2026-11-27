@@ -50,7 +50,7 @@ test("a compiled API run carries its receipt and the command that serves the sit
     assert.equal(run.via, "api");
     assert.equal(run.compiled, true);
     assert.equal(typeof run.elapsedMs, "number");
-    assert.equal(run.mcpCommand, "aeon mcp example.com");
+    assert.equal(run.mcpCommand, "graft mcp example.com");
     assert.match(run.receipt, /^\d+(\.\d)?s · no model · API$/);
   });
 });
@@ -70,13 +70,13 @@ test("a run served by the page is not marked compiled", async () => {
 });
 
 test("the receipt helpers", () => {
-  assert.equal(mcpCommandForSite("https://www.Example.com/x"), "aeon mcp example.com");
+  assert.equal(mcpCommandForSite("https://www.Example.com/x"), "graft mcp example.com");
   assert.equal(elapsedLabel(420), "0.4s");
   assert.equal(elapsedLabel(12_400), "12s");
   assert.deepEqual(runReceipt("example.com", "api", 380.4), {
     compiled: true,
     elapsedMs: 380,
-    mcpCommand: "aeon mcp example.com",
+    mcpCommand: "graft mcp example.com",
     receipt: "0.4s · no model · API",
   });
 });

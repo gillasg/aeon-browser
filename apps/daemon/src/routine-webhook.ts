@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import type { RoutineRecord, WebhookDelivery } from "@aeon/domain";
+import type { RoutineRecord, WebhookDelivery } from "@graft/domain";
 
 const ATTEMPTS = 3;
 const BACKOFF_MS = [200, 800];
@@ -25,7 +25,7 @@ export async function deliverRoutineWebhook(
     firedAt: (deps.now ?? (() => new Date()))().toISOString(),
   });
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (webhook.secret) headers["X-Aeon-Signature"] = signWebhook(webhook.secret, body);
+  if (webhook.secret) headers["X-Graft-Signature"] = signWebhook(webhook.secret, body);
   return postUntilDelivered(webhook.url, headers, body, deps);
 }
 

@@ -315,7 +315,7 @@ export class LibraryActions {
     const flagged = result.findings.length;
     const note =
       flagged > 0
-        ? ` (${flagged} review note(s): see \`aeon abilities publish ${site} <name>\`)`
+        ? ` (${flagged} review note(s): see \`graft abilities publish ${site} <name>\`)`
         : "";
     noteAction(true, `Exported ${site} to ${path}${note}`);
   }
@@ -553,7 +553,7 @@ export class LibraryActions {
       resolve(homedir()),
     ];
     if (!allowedRoots.some((root) => isInside(candidate, root)))
-      throw new Error("Import path must be inside your home or Aeon data directory.");
+      throw new Error("Import path must be inside your home or Graft data directory.");
     return candidate;
   }
 

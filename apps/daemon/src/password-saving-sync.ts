@@ -5,8 +5,8 @@ import { BrowserControlService } from "./browser-control-service.js";
 import { readBrowserNames } from "./core-browsers.js";
 
 // Chrome offers its own "Save password?" on every submitted password, whatever saved it. A profile
-// whose password manager is Bitwarden or Proton Pass already keeps the logins Aeon makes, so the
-// moment that profile connects Aeon tells it to switch Chrome's offer off (as those managers'
+// whose password manager is Bitwarden or Proton Pass already keeps the logins Graft makes, so the
+// moment that profile connects Graft tells it to switch Chrome's offer off (as those managers'
 // extensions do); a profile with none gets the user's own Chrome setting back, since Chrome's
 // prompt is then the only way to keep a login. Only the manager's name is used, never a secret.
 

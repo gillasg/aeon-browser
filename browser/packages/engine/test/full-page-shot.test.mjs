@@ -26,7 +26,7 @@ test("the inner-scroller fixture is stitched and a scrolling document is not", (
   assert.equal(scrollsForShot("auto"), true);
   assert.equal(scrollsForShot("visible"), false);
   assert.match(pageScrollerProbe.toString(), /overflowY === "visible"/);
-  assert.match(pageScrollerProbe.toString(), /data-aeon-shot/);
+  assert.match(pageScrollerProbe.toString(), /data-graft-shot/);
 
   const scrollHeight = declared("scroll-height");
   const clientHeight = declared("client-height");
@@ -38,7 +38,7 @@ test("the inner-scroller fixture is stitched and a scrolling document is not", (
     viewportHeight: clientHeight,
     scrollers: [
       {
-        selector: '[data-aeon-shot="0"]',
+        selector: '[data-graft-shot="0"]',
         scrollHeight,
         clientHeight,
         top: 0,
@@ -48,7 +48,7 @@ test("the inner-scroller fixture is stitched and a scrolling document is not", (
         overflow: 200,
       },
       {
-        selector: '[data-aeon-shot="1"]',
+        selector: '[data-graft-shot="1"]',
         scrollHeight,
         clientHeight,
         top: 0,
@@ -61,7 +61,7 @@ test("the inner-scroller fixture is stitched and a scrolling document is not", (
   };
   const plan = planFullPage(probe);
   assert.equal(plan.mode, "inner");
-  assert.equal(plan.selector, '[data-aeon-shot="1"]');
+  assert.equal(plan.selector, '[data-graft-shot="1"]');
   assert.deepEqual(plan.offsets, [0, 600, 1200, 1800]);
   assert.deepEqual(stitchOffsets(2500, 600), [0, 600, 1200, 1800, 1900]);
 

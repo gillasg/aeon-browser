@@ -10,15 +10,15 @@ export function installProcessGuard(
 ): void {
   const recent: number[] = [];
   process.on("unhandledRejection", (reason) => {
-    log("Aeon daemon: unhandled rejection kept running: " + describe(reason));
+    log("Graft daemon: unhandled rejection kept running: " + describe(reason));
   });
   process.on("uncaughtException", (error) => {
     const now = Date.now();
     recent.push(now);
     while (recent.length && (recent[0] ?? now) < now - BURST_WINDOW_MS) recent.shift();
-    log("Aeon daemon: uncaught exception: " + describe(error));
+    log("Graft daemon: uncaught exception: " + describe(error));
     if (recent.length >= BURST_LIMIT) {
-      log("Aeon daemon: repeated uncaught exceptions; restarting.");
+      log("Graft daemon: repeated uncaught exceptions; restarting.");
       exit(1);
     }
   });

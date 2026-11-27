@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { ChatService } from "../dist/chat-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 test("a question a running turn waits on can be read and answered while the turn holds the chat", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-open-session-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-open-session-"));
   const store = openChatStore(directory),
     pi = new FakePiPort();
   const service = new ChatService({ dataDirectory: directory, store, pi });

@@ -31,8 +31,8 @@ const call = (fn: string, arg: unknown) => `(${fn})(${JSON.stringify(arg ?? null
 // Runs in the page: canvases with their size, box and context kind (never creates a context).
 const CANVAS_LIST = String((arg: { selector?: string; digest?: boolean }) => {
   const tap = (
-    window as unknown as { __aeonCanvasTap?: { kinds?: WeakMap<HTMLCanvasElement, string> } }
-  ).__aeonCanvasTap;
+    window as unknown as { __graftCanvasTap?: { kinds?: WeakMap<HTMLCanvasElement, string> } }
+  ).__graftCanvasTap;
   // Never probe via canvas.getContext(): calling getContext('2d') on an untouched canvas locks
   // its context type and permanently breaks a page's later WebGL initialization.
   const kindOf = (canvas: HTMLCanvasElement) => tap?.kinds?.get(canvas) ?? "untouched";
@@ -68,20 +68,20 @@ const CANVAS_LIST = String((arg: { selector?: string; digest?: boolean }) => {
 // the tap runs, fillText/strokeText calls into a bounded buffer. stop() puts the originals back.
 const TEXT_TAP = String((arg: { action: string; limit?: number }) => {
   const w = window as unknown as {
-    __aeonCanvasTap?: {
+    __graftCanvasTap?: {
       texts: unknown[];
       kinds: WeakMap<HTMLCanvasElement, string>;
       restore: () => void;
     };
   };
-  if (arg.action === "list") return w.__aeonCanvasTap ? w.__aeonCanvasTap.texts.slice() : null;
+  if (arg.action === "list") return w.__graftCanvasTap ? w.__graftCanvasTap.texts.slice() : null;
   if (arg.action === "stop") {
-    const had = Boolean(w.__aeonCanvasTap);
-    w.__aeonCanvasTap?.restore();
-    delete w.__aeonCanvasTap;
+    const had = Boolean(w.__graftCanvasTap);
+    w.__graftCanvasTap?.restore();
+    delete w.__graftCanvasTap;
     return { stopped: had };
   }
-  if (w.__aeonCanvasTap) return { started: true, already: true };
+  if (w.__graftCanvasTap) return { started: true, already: true };
   const proto = CanvasRenderingContext2D.prototype;
   const fill = proto.fillText;
   const stroke = proto.strokeText;
@@ -108,7 +108,7 @@ const TEXT_TAP = String((arg: { action: string; limit?: number }) => {
     kinds.set(this, kind);
     return getContext.apply(this, arguments as never);
   } as typeof getContext;
-  w.__aeonCanvasTap = {
+  w.__graftCanvasTap = {
     texts,
     kinds,
     restore: () => {

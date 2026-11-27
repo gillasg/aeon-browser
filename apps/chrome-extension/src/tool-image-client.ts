@@ -1,4 +1,4 @@
-import { decodeImageAsset, MAX_IMAGE_ASSET_BYTES, type DaemonUiResponse } from "@aeon/protocol";
+import { decodeImageAsset, MAX_IMAGE_ASSET_BYTES, type DaemonUiResponse } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 export function createToolImageLoader(
   getClient: () => UiClient | undefined,
@@ -8,7 +8,7 @@ export function createToolImageLoader(
     const client = getClient();
     return client
       ? loadToolImage(client, { chatId, toolCallId, index })
-      : Promise.reject(new Error("Aeon is disconnected"));
+      : Promise.reject(new Error("Graft is disconnected"));
   };
 }
 
@@ -21,7 +21,7 @@ export function createWorkspaceImageLoader(
     const client = getClient();
     return client
       ? loadToolImage(client, { chatId, path })
-      : Promise.reject(new Error("Aeon is disconnected"));
+      : Promise.reject(new Error("Graft is disconnected"));
   };
 }
 

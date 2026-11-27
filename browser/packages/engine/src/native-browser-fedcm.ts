@@ -1,6 +1,6 @@
 // Chrome's own "Sign in with Google" dialog (FedCM) is browser UI, not page content: the agent can
 // neither see nor click it, so sign-ups through "Continue with Google" stalled at it. Through the
-// DevTools FedCm domain Aeon answers it the way a person would:
+// DevTools FedCm domain Graft answers it the way a person would:
 // - after the agent clicked in the tab (it asked for this sign-in) and one account is offered,
 //   pick that account; with several, leave it open and tell the agent which call picks one;
 // - a dialog the page opened by itself (One Tap) is dismissed: no site is signed into unasked.
@@ -67,7 +67,7 @@ export function forgetFedCm(tabId: number): void {
   fedcmFlight.delete(tabId);
 }
 
-/** What Aeon did with a sign-in dialog since the last step, once. */
+/** What Graft did with a sign-in dialog since the last step, once. */
 export function takeFedCmNote(tabId: number): string | undefined {
   const note = notes.get(tabId);
   notes.delete(tabId);
@@ -102,7 +102,7 @@ export async function answerDialog(tabId: number, dialog: DialogShown): Promise<
   const label = (account: FedCmAccount | undefined) => account?.email ?? account?.name ?? "?";
   if (!asked(tabId)) {
     await command(tabId, "FedCm.dismissDialog", { dialogId: dialog.dialogId }, "answerDialog");
-    notes.set(tabId, "The page opened Chrome's own sign-in prompt by itself; Aeon dismissed it.");
+    notes.set(tabId, "The page opened Chrome's own sign-in prompt by itself; Graft dismissed it.");
     return;
   }
   if (dialog.dialogType === "AccountChooser" && accounts.length === 1) {
@@ -114,7 +114,7 @@ export async function answerDialog(tabId: number, dialog: DialogShown): Promise<
     );
     notes.set(
       tabId,
-      `Chrome's own sign-in dialog opened (${dialog.title ?? "sign in"}); Aeon chose its only account, ${label(accounts[0])}. Wait for the page to finish signing in.`,
+      `Chrome's own sign-in dialog opened (${dialog.title ?? "sign in"}); Graft chose its only account, ${label(accounts[0])}. Wait for the page to finish signing in.`,
     );
     return;
   }
@@ -127,7 +127,7 @@ export async function answerDialog(tabId: number, dialog: DialogShown): Promise<
     );
     notes.set(
       tabId,
-      "Chrome's sign-in dialog asked to sign in to the provider first; Aeon continued.",
+      "Chrome's sign-in dialog asked to sign in to the provider first; Graft continued.",
     );
     return;
   }
@@ -140,7 +140,7 @@ export async function answerDialog(tabId: number, dialog: DialogShown): Promise<
     return;
   }
   await command(tabId, "FedCm.dismissDialog", { dialogId: dialog.dialogId }, "answerDialog");
-  notes.set(tabId, `Chrome's sign-in dialog showed "${dialog.dialogType}"; Aeon closed it.`);
+  notes.set(tabId, `Chrome's sign-in dialog showed "${dialog.dialogType}"; Graft closed it.`);
 }
 
 onEngineInstall(() => {

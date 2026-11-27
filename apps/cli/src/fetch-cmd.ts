@@ -2,23 +2,23 @@ import { readFile, writeFile } from "node:fs/promises";
 import type { Command } from "browserkit/dist/usage.js";
 import type { DaemonHost } from "./host.js";
 
-// `aeon fetch <url>`: one HTTP request through the user's signed-in Chrome, with curl's flags.
+// `graft fetch <url>`: one HTTP request through the user's signed-in Chrome, with curl's flags.
 // It is a single browser cell (browser.fetch, or page.request from a tab of that origin with
 // --page), so the engine's per-hop redirect, private-network and site-rule checks apply. No model
 // is called and no debugger is attached. The body goes to stdout; a one-line receipt to stderr.
 
-export const FETCH_HELP = `Usage: aeon fetch [options] <url>
+export const FETCH_HELP = `Usage: graft fetch [options] <url>
 
 Makes one request with your signed-in Chrome's cookies, for sites with no public API:
-  aeon fetch https://substack.com/api/v1/inbox | jq .
-  aeon fetch -X POST --json '{"read":true}' https://substack.com/api/v1/inbox/mark
+  graft fetch https://substack.com/api/v1/inbox | jq .
+  graft fetch -X POST --json '{"read":true}' https://substack.com/api/v1/inbox/mark
 
   -X, --method <METHOD>   request method (GET; POST when a body is given)
   -H, --header <N: V>     add a header (repeatable)
   -d, --data <s|@file>    request body, or read it from a file
       --json <json>       JSON body; sets Content-Type: application/json
       --page              send from an open tab of that origin (the page's own request)
-      --browser <name>    which connected Chrome profile to use (see aeon browsers)
+      --browser <name>    which connected Chrome profile to use (see graft browsers)
   -i, --include           print the status line and headers first (auth headers redacted)
   -f, --fail              exit 22 when the status is 400 or above
   -o, --output <path>     write the body to a file instead of stdout
@@ -194,7 +194,7 @@ export function checkFetchUrl(url: string): URL {
     throw new Error(`Not a URL: ${url}`);
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
-    throw new Error(`aeon fetch only supports http and https URLs, not ${parsed.protocol}`);
+    throw new Error(`graft fetch only supports http and https URLs, not ${parsed.protocol}`);
   return parsed;
 }
 
@@ -270,7 +270,7 @@ export async function runFetch(argv: string[], deps: FetchDeps): Promise<number>
   try {
     response = await send(options, deps);
   } catch (error) {
-    deps.stderr(`aeon fetch: ${message(error)}\n`);
+    deps.stderr(`graft fetch: ${message(error)}\n`);
     return 1;
   }
   await print(options, response, deps);
