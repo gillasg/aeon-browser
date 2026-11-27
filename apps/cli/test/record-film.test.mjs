@@ -191,7 +191,7 @@ test("assemble output is stamped house false", () => {
 const clipJson = {
   scenes: [{ name: "boost", steps: [{ open: "https://news.ycombinator.com" }] }],
   expect: { receipt: "Boost on", maxSeconds: 1 },
-  end: { command: "graft boosts", repo: "github.com/gillasg/aeon-browser" },
+  end: { command: "graft boosts", repo: "github.com/gillasg/graft" },
 };
 const take = (text, clean = true) => ({
   version: 1,

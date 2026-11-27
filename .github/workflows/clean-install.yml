@@ -72,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           url="file://$(printf '%s' "$GITHUB_WORKSPACE" | tr '\\' '/')"
-          git config --global "url.$url.insteadof" "https://github.com/gillasg/aeon-browser.git"
+          git config --global "url.$url.insteadof" "https://github.com/gillasg/graft.git"
           git config --global --get-regexp 'url\..*insteadof'
           echo "Installer clone redirected to $url"
 
