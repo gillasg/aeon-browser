@@ -49,7 +49,8 @@ test("the live viewer listens on loopback only and serves a self-contained page"
     const page = await fetch(view.url);
     assert.match(page.headers.get("content-type"), /text\/html/);
     const html = await page.text();
-    assert.match(html, /EventSource\("events"\)/);
+    assert.match(html, /EventSource\("events\?t="/);
+    assert.equal(view.viewerUrl, `${view.url}#t=${view.token}`);
     assert.match(html, /Issues &#60;live&#62;/, "the title is escaped");
     assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+href=|https?:\/\//, "no external loads");
   } finally {
@@ -79,7 +80,9 @@ test("pushing needs the token and a loopback or extension origin", async () => {
       { "x-graft-view-token": view.token, origin: "chrome-extension://abc" },
     );
     assert.equal(other.status, 200);
-    const state = await (await fetch(view.url + "state")).json();
+    const state = await (
+      await fetch(view.url + "state", { headers: { authorization: `Bearer ${view.token}` } })
+    ).json();
     assert.equal(state.title, "T");
     assert.deepEqual(state.rows, [{ a: 1 }]);
     assert.deepEqual(state.frames, [{ n: 1 }]);
@@ -94,7 +97,7 @@ test("/events replays the buffered state, then streams rows and tap frames live"
   try {
     view.pushRows([{ id: 1 }]);
     view.pushFrame({ type: "ws", data: "a" });
-    const reading = readEvents(view.eventsUrl, 4);
+    const reading = readEvents(`${view.eventsUrl}?t=${view.token}`, 4);
     await new Promise((done) => setTimeout(done, 100));
     let feed;
     const stop = pipeTapToLiveView(view, (onFrame) => {

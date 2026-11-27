@@ -42,7 +42,8 @@ function apply(state) {
   if (state.updatedAt) $("updated").textContent = "updated " + new Date(state.updatedAt).toLocaleTimeString();
   $("empty").hidden = rows.length > 0 || frames.length > 0;
 }
-const source = new EventSource("events");
+const viewToken = new URLSearchParams(location.hash.slice(1)).get("t") || "";
+const source = new EventSource("events?t=" + encodeURIComponent(viewToken));
 source.addEventListener("open", () => { $("status").textContent = "live"; $("status").className = "live"; });
 source.addEventListener("error", () => { $("status").textContent = "reconnecting"; $("status").className = ""; });
 for (const name of ["snapshot", "rows", "frame"]) source.addEventListener(name, (e) => apply(JSON.parse(e.data)));

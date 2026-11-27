@@ -112,7 +112,7 @@ function parts(
     wire: asArray(raw.wire),
     widgets: asArray(raw.widgets),
     js: asString(raw.js),
-    jsWorld: raw.jsWorld === "isolated" ? "isolated" : raw.js ? "page" : undefined,
+    jsWorld: raw.jsWorld === "page" ? "page" : raw.js ? "isolated" : undefined,
     runAt: asString(raw.runAt) as Boost["runAt"],
     allFrames: raw.allFrames === true,
     source: asString(raw.source),

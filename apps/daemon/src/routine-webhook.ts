@@ -1,16 +1,33 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { graftDataDirectory } from "@graft/location";
 import type { RoutineRecord, WebhookDelivery } from "@graft/domain";
+import { postPinned, resolveWebhook, type Resolve } from "./webhook-guard.js";
+import {
+  WebhookQueue,
+  type Outcome,
+  type QueueClock,
+  type QueuedDelivery,
+} from "./webhook-queue.js";
 
-const ATTEMPTS = 3;
-const BACKOFF_MS = [200, 800];
+/** One try waits at most this long; the routine run never waits at all. */
+export const WEBHOOK_TIMEOUT_MS = 5_000;
 
 export interface WebhookDeps {
-  fetch?: typeof fetch;
-  sleep?: (ms: number) => Promise<void>;
+  queue?: WebhookQueue;
   now?: () => Date;
 }
 
-/** POST `{routineId, title, value, firedAt}` when a check passes. A secret signs the raw body. */
+export interface SendDeps {
+  resolve?: Resolve;
+  timeoutMs?: number;
+  now?: () => number;
+}
+
+/**
+ * Queues `{id, routineId, title, value, firedAt}` for a passing check and returns at once.
+ * Delivery, retries and their outcome happen in the queue; a run never waits on a receiver.
+ */
 export async function deliverRoutineWebhook(
   routine: Pick<RoutineRecord, "routineId" | "title" | "webhook">,
   value: unknown,
@@ -18,62 +35,70 @@ export async function deliverRoutineWebhook(
 ): Promise<WebhookDelivery | undefined> {
   const webhook = routine.webhook;
   if (!webhook?.url) return undefined;
+  const id = randomUUID();
   const body = JSON.stringify({
+    id,
     routineId: routine.routineId,
     title: routine.title,
     value,
     firedAt: (deps.now ?? (() => new Date()))().toISOString(),
   });
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (webhook.secret) headers["X-Graft-Signature"] = signWebhook(webhook.secret, body);
-  return postUntilDelivered(webhook.url, headers, body, deps);
+  (deps.queue ?? sharedQueue()).add({ id, url: webhook.url, secret: webhook.secret ?? null, body });
+  return undefined;
 }
 
-async function postUntilDelivered(
-  url: string,
-  headers: Record<string, string>,
-  body: string,
-  deps: WebhookDeps,
-): Promise<WebhookDelivery> {
-  const fetchImpl = deps.fetch ?? fetch;
-  const sleep = deps.sleep ?? delay;
-  let lastError = "delivery failed";
-  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-    const posted = await postOnce(fetchImpl, url, headers, body);
-    if (posted.delivered) return { status: "delivered", attempts: attempt };
-    lastError = posted.error;
-    if (attempt < ATTEMPTS) await sleep(BACKOFF_MS[attempt - 1] ?? 800);
-  }
-  return { status: "failed", attempts: ATTEMPTS, error: lastError };
+/** The headers one try carries: a fresh timestamp signed together with the body. */
+export function webhookHeaders(
+  item: Pick<QueuedDelivery, "id" | "secret" | "body">,
+  unixSeconds: number,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "X-Graft-Delivery": item.id,
+  };
+  if (item.secret) headers["X-Graft-Signature"] = signWebhook(item.secret, item.body, unixSeconds);
+  return headers;
 }
 
-const WEBHOOK_TIMEOUT_MS = 15_000;
-
-async function postOnce(
-  fetchImpl: typeof fetch,
-  url: string,
-  headers: Record<string, string>,
-  body: string,
-): Promise<{ delivered: true } | { delivered: false; error: string }> {
+/** One try: resolve and check the address now, connect to exactly that address, never redirect. */
+export async function sendWebhookOnce(item: QueuedDelivery, deps: SendDeps = {}): Promise<Outcome> {
   try {
-    const response = await fetchImpl(url, {
-      method: "POST",
-      headers,
-      body,
-      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
-    });
-    if (response.ok) return { delivered: true };
-    return { delivered: false, error: `HTTP ${response.status}`.slice(0, 500) };
+    const pinned = await resolveWebhook(item.url, deps.resolve);
+    const seconds = Math.floor((deps.now ?? Date.now)() / 1000);
+    const result = await postPinned(
+      pinned,
+      webhookHeaders(item, seconds),
+      item.body,
+      deps.timeoutMs ?? WEBHOOK_TIMEOUT_MS,
+    );
+    if (result.status >= 200 && result.status < 300) return { delivered: true };
+    if (result.status >= 300 && result.status < 400)
+      return {
+        delivered: false,
+        error: `HTTP ${result.status} redirect to ${result.location || "nowhere"} was not followed`,
+      };
+    return { delivered: false, error: `HTTP ${result.status}` };
   } catch (error) {
     const message = error instanceof Error ? error.message : "delivery failed";
     return { delivered: false, error: message.slice(0, 500) };
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** `t=<unix>,v1=<hex hmac of "t.body">`: a receiver rejects old `t` values and seen ids. */
+export function signWebhook(secret: string, body: string, unixSeconds: number): string {
+  const mac = createHmac("sha256", secret).update(`${unixSeconds}.${body}`).digest("hex");
+  return `t=${unixSeconds},v1=${mac}`;
 }
 
-export function signWebhook(secret: string, body: string): string {
-  return `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+let shared: WebhookQueue | undefined;
+
+/** The daemon's queue, opened on first use; anything left from before a restart resumes. */
+export function sharedQueue(clock?: QueueClock): WebhookQueue {
+  shared ??= new WebhookQueue(
+    join(graftDataDirectory(), "graft-webhooks.sqlite"),
+    (item) => sendWebhookOnce(item),
+    clock,
+    (line) => console.error(`[graft] ${line}`),
+  );
+  return shared;
 }

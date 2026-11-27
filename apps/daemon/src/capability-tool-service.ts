@@ -76,7 +76,7 @@ export class CapabilityToolService implements CapabilityToolHost {
     const actor = chatId as ChatId;
     const args = asRecord(input);
     const result = isRoutineTool(toolName)
-      ? this.routineTools.execute(toolName, args, actor)
+      ? await this.routineTools.execute(toolName, args, actor)
       : await this.executeCapabilityTool(toolName, args, actor, signal);
     return JSON.stringify(result) ?? "null";
   }

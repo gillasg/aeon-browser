@@ -214,13 +214,27 @@ export async function runXhr(args: XhrArgs, emit: Emit, signal: AbortSignal): Pr
   }
 }
 
-/** Whether a script may reach a URL: its @connect list, its own page's host, or anything for boosts. */
+/** Whether `host` is the one an @connect entry names (`self` is the page's own host). */
+export function connectRuleMatches(host: string, rule: string, pageHost: string): boolean {
+  const entry = rule.trim().toLowerCase();
+  if (entry === "*") return true;
+  if (entry === "self") return host === pageHost;
+  if (entry === "localhost")
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  return host === entry || host.endsWith("." + entry.replace(/^\*\./, ""));
+}
+
+/**
+ * Whether a script may reach a URL: its own page's host, then its @connect list. With no @connect
+ * list it may reach its own `sites` hosts; only a trusted isolated-world boost passes neither and
+ * may reach any host.
+ */
 export function mayConnect(
   url: string,
   pageUrl: string | undefined,
   connect: string[] | undefined,
+  sites?: string[],
 ): boolean {
-  if (connect === undefined) return true;
   let host: string;
   try {
     host = new URL(url).hostname;
@@ -229,12 +243,7 @@ export function mayConnect(
   }
   const pageHost = pageUrl ? new URL(pageUrl).hostname : "";
   if (host === pageHost) return true;
-  return connect.some((entry) => {
-    const rule = entry.trim().toLowerCase();
-    if (rule === "*") return true;
-    if (rule === "self") return host === pageHost;
-    if (rule === "localhost")
-      return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
-    return host === rule || host.endsWith("." + rule.replace(/^\*\./, ""));
-  });
+  const rules = connect?.length ? connect : (sites ?? connect);
+  if (rules === undefined) return true;
+  return rules.some((rule) => connectRuleMatches(host, rule, pageHost));
 }

@@ -1,4 +1,10 @@
 import { inferEffect, type CallEffect, type RoutineWebhook } from "@graft/domain";
+import {
+  resolveWebhook,
+  UnresolvedWebhookHost,
+  webhookUrlRefusal,
+  type Resolve,
+} from "./webhook-guard.js";
 
 /** Omitted stays undefined. Anything else must be read, write or irreversible. */
 export function parseEffect(value: unknown): CallEffect | undefined {
@@ -71,54 +77,19 @@ function secretText(value: unknown): string | undefined {
 function assertWebhookUrl(url: string): string {
   if (!url || url.length > 2000)
     throw new Error("webhook url must be an http(s) URL of at most 2000 characters.");
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("webhook url must be an http(s) URL.");
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
-    throw new Error("webhook url must be an http(s) URL.");
-  if (isBlockedWebhookHost(parsed.hostname))
-    throw new Error(
-      "webhook url must target a public host, not a local or private network address.",
-    );
+  const refused = webhookUrlRefusal(url);
+  if (refused) throw new Error(refused);
   return url;
 }
 
-function isBlockedWebhookHost(rawHost: string): boolean {
-  const host = rawHost.toLowerCase().replace(/^\[|\]$/g, "");
-  if (
-    !host ||
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal")
-  )
-    return true;
-  if (
-    host === "::" ||
-    host === "::1" ||
-    host.startsWith("fe80:") ||
-    /^f[cd][0-9a-f]{2}:/.test(host)
-  )
-    return true;
-  if (host.startsWith("::ffff:")) return isBlockedIpv4(host.slice(7));
-  return isBlockedIpv4(host);
-}
-
-const BLOCKED_IPV4_FIRST_OCTETS = new Set([0, 10, 127]);
-
-function isBlockedIpv4(host: string): boolean {
-  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (!match) return false;
-  const a = Number(match[1]);
-  const b = Number(match[2]);
-  if (BLOCKED_IPV4_FIRST_OCTETS.has(a)) return true;
-  return (
-    (a === 169 && b === 254) ||
-    (a === 192 && b === 168) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 100 && b >= 64 && b <= 127)
-  );
+/**
+ * The create-time half of the send-time check: resolves a webhook's host and refuses it when any
+ * address is private. Run before parseWebhook wherever a webhook is set.
+ */
+export async function assertWebhookResolves(value: unknown, resolve?: Resolve): Promise<void> {
+  if (value === undefined || value === null) return;
+  const url = typeof value === "string" ? value.trim() : urlOf(value);
+  await resolveWebhook(assertWebhookUrl(url), resolve).catch((error: unknown) => {
+    if (!(error instanceof UnresolvedWebhookHost)) throw error;
+  });
 }
