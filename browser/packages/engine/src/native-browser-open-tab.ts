@@ -29,6 +29,7 @@ import { settleOpenedTab } from "./native-browser-tab-replaced.js";
 import { noteAgentNavigation, setAgentOpenedTab } from "./evidence/dialogs.js";
 import { captureFromTabStart } from "./native-browser-network.js";
 import { placementSpace } from "./native-browser-placement.js";
+import { matchWindowViewport } from "./native-browser-window-viewport.js";
 import type { BrowserIdentity } from "./native-worker-identity.js";
 import {
   ensureSpacesRestored,
@@ -66,7 +67,13 @@ export async function openTab(
     step.ownerTitle ?? ownerTitle(request.chatId),
   );
   if (step.quiet) await enableQuietTab(created.id, { ads: step.ads === true });
-  const navigation = await navigateOpenedTab(created.id, step.url, step.timeoutMs, step.referer);
+  const navigation = await navigateOpenedTab(
+    created.id,
+    step.url,
+    step.timeoutMs,
+    step.referer,
+    step.window,
+  );
   assertRequestActive(request);
   const { id, tab } = await settleOpenedTab(created.id, refreshInventoryTab);
   if (!tab || !sameIdentity(tab.target, identity)) throw new Error("TARGET_LOST");
@@ -89,11 +96,13 @@ async function navigateOpenedTab(
   url: string,
   timeoutMs?: number,
   referer?: string,
+  window?: { width: number; height: number },
 ): Promise<string | undefined> {
   try {
     noteAgentNavigation(tabId);
     return await withBrowserDebugger(tabId, async () => {
       await captureFromTabStart(tabId);
+      if (window) await matchWindowViewport(tabId, window).catch(() => undefined);
       return navigationFailure(await navigateReady(tabId, url, timeoutMs, referer));
     });
   } catch (error) {

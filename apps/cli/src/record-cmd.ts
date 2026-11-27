@@ -37,7 +37,7 @@ import { useRecordingBrowser } from "./record-browsers.js";
 import { mark, readMarks, run, wait, withMarkCues, type RecordSteps } from "./record-script.js";
 import { saveTabTakes, type SavedTake } from "./record-takes.js";
 import { attachTerminal, keptTerminal, readRecording, runTerminal } from "./record-terminal.js";
-import { frameTruthError } from "./record-truth.js";
+import { stutterVerdict } from "./record-truth.js";
 import { armBeats, readBeats, withBeats, type FilmAction } from "./record-beats.js";
 
 export const log = (line: string): boolean => process.stdout.write(line + "\n");
@@ -337,12 +337,9 @@ async function stop(host: DaemonHost, args: Args): Promise<number> {
   });
   log(`Stopped. ${state.frames} frames, ${events.length} action(s). Folder: ${folder}`);
   if (state.encodePid) log("clip.mp4 is encoding in the background (--defer-clip).");
-  const refused = frameTruthError(clip);
-  if (refused) {
-    log(refused);
-    return 1;
-  }
-  return 0;
+  const verdict = stutterVerdict(clip, args.flags?.["allow-stutter"] === true);
+  if (verdict.message) log(verdict.message);
+  return verdict.code;
 }
 
 /** Record one shell command into the folder's events.json. Run it after start and before stop. */
@@ -381,7 +378,7 @@ export function recordCommand(original: Command | undefined, host: DaemonHost): 
     group: original?.group ?? "Browser",
     summary: "record the real Chrome window or screen into an editable folder",
     help: `Usage: graft record start [--window chrome|--screen|--tabs] [--out <dir>] [--fps 30] [--chat <id>] [--no-mouse] [--browser <name>] [--display :N]
-       graft record stop [--out <dir>] [--chat <id>] [--defer-clip]
+       graft record stop [--out <dir>] [--chat <id>] [--defer-clip] [--allow-stutter]
        graft record qualify <clip.json> [--runs 3]
        graft record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter] [--out <dir>]
        graft record wait --for selector|url|idle|chat [--selector "<css>"] [--url "<text>"] [--chat <id>] [--timeout <ms>]
@@ -397,6 +394,8 @@ Windows) into a folder with frames, clip.mp4 and events.json. --tabs records eve
 the chat drives, including one opened mid-run, and stop writes one clip per tab.
 terminal records a command and its output into that folder's events.json; the video
 kit draws it beside the tab. Run it after start and before stop.
+stop refuses (exit 1) a take where ffmpeg dropped or duplicated over 0.5% of frames;
+--allow-stutter keeps it with a warning, for quick review clips on a busy machine.
 --no-mouse keeps the OS pointer out of the frames (only Graft's cursor is on camera). mark names a
 beat on the clip clock; --selector also records the element's box (page CSS px) and windowBox
 (clip px), read without any automation glow; stop merges marks (and their --cue sounds) into

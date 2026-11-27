@@ -79,6 +79,24 @@ export function frameTruthError(clip: {
   return `ffmpeg dropped ${clip.dropped ?? 0} and duplicated ${clip.dup ?? 0} of ${clip.frames} frames (${(share * 100).toFixed(2)}% > 0.5%): the picture stutters, so the take is refused. Lower --fps or DPR, or close other work.`;
 }
 
+/**
+ * The exit code for a stopped take: a stuttering take fails by default (polished films stay
+ * honest); with allowStutter (quick review clips on a busy machine) it is kept with a warning.
+ */
+export function stutterVerdict(
+  clip: { frames: number; dropped?: number; dup?: number },
+  allowStutter: boolean,
+): { code: number; message?: string } {
+  const refused = frameTruthError(clip);
+  if (!refused) return { code: 0 };
+  if (!allowStutter) return { code: 1, message: refused };
+  const kept = refused.replace("so the take is refused", "kept anyway (--allow-stutter)");
+  return {
+    code: 0,
+    message: `Warning: ${kept.split(". Lower")[0]}. Fine for review, not for a polished film.`,
+  };
+}
+
 /** Encode clip.mp4 in the background at nice 19, so stop returns at once. */
 export function deferEncode(ffmpeg: string, args: string[]): number | undefined {
   const nice = process.platform === "linux" && existsSync("/usr/bin/nice");
