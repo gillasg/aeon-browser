@@ -38,6 +38,7 @@ const COST = {
   "evaluate-timeout.e2e.test.mjs": 12,
   "hold.e2e.test.mjs": 11,
   "frame-input.e2e.test.mjs": 10,
+  "signin-shadow-iframe.e2e.test.mjs": 80,
 };
 const DEFAULT_COST = 8;
 

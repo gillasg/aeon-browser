@@ -494,6 +494,7 @@ var browser = Object.freeze({
           ...(navTimeout ? {timeoutMs: Math.max(500, Math.min(Number(navTimeout) || 0, 120000))} : {})});
         __lastErrors.delete(__key(target));
         if (result && result.data && result.data.note) console.log(result.data.note);
+        __throwIfStuck(result, destination);
         if (!(result && result.data && result.data.timedOut)) await __noteChallenge(target, destination);
         return result;
       } catch (error) {

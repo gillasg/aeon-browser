@@ -45,6 +45,20 @@ function __noteNavError(target, url, stage, error) {
   var message = String(error && error.message || error);
   __lastErrors.set(__key(target), { code: message.split(':')[0] || 'NAVIGATION_FAILED', url: String(url || ''), stage, message, at: new Date().toISOString() });
 }
+// A navigation that timed out before it left the page it started on did not happen: the tab still
+// shows the old page, so reading it would read the wrong site. That is a TIMEOUT, not a result.
+function __throwIfStuck(result, destination) {
+  var data = result && result.data;
+  if (!data || !data.timedOut || !/^still showing /.test(String(data.note || ''))) return;
+  var showing = String(data.url || '');
+  if (showing && showing.split('#')[0] === String(destination).split('#')[0]) return;
+  throw new Error('TIMEOUT: ' + String(destination) + ' did not load in time; the tab still shows ' + showing + '. Retry with a longer timeout, or check the site');
+}
+// The HTTP status the tab's main document was served with; null when unknown (a file, an error page).
+async function __mainStatus(target) {
+  var status = await browser.page(target).status().catch(() => null);
+  return typeof status === 'number' && status > 0 ? status : null;
+}
 // A bare tab id from browser.tabs() or a step line stands for that tab's full target.
 // Printed tabs show what an agent reads (id, title, url, active); the rest stays usable but
 // leaves printouts and JSON, so listing many tabs costs little context.

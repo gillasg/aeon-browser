@@ -15,6 +15,7 @@ import { browserRecordingApi } from "./code-api-recording.js";
 import { browserSitesApi } from "./code-api-sites.js";
 import { browserContextApi } from "./code-api-context.js";
 import { browserSnipeApi } from "./code-api-snipe.js";
+import { browserChangesApi } from "./code-api-changes-store.js";
 import { browserProfilesApi } from "./code-api-profiles.js";
 import { browserTimingApi } from "./code-api-timing.js";
 import { browserTablesApi } from "./code-api-tables.js";
@@ -55,6 +56,7 @@ export function realmRuntimeSource(evaluate: (source: string) => unknown): void 
       browserLiveViewApi,
       browserContextApi,
       browserSnipeApi,
+      browserChangesApi,
       browserProfilesApi,
       browserTablesApi,
       browserHelpApi,

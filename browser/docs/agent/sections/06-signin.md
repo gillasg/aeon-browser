@@ -7,7 +7,8 @@ await bu.signIn(); // {signedIn, site, provider, account, reason}
 await bu.signIn({ account: "me@example.com" });
 ```
 
-It fills the username, password and the one-time code (the password manager's, else one the site
+It finds the form in the page, inside web components (open shadow roots) and inside frames of the
+same site, and fills the username, password and the one-time code (the password manager's, else one the site
 just sent to the user's Gmail or Google Messages), across
 multi-step forms, and past an account chooser (a list of remembered accounts): it clicks `account`, or
 the only one listed. With no external manager, or no login saved in it for the site, it uses the
@@ -16,7 +17,10 @@ there, so hand off when it is the wrong account). You never see the password or 
 signs in. `reason` says why it stopped: `NO_PASSWORD_MANAGER`, `NO_SAVED_LOGIN`, `CHOOSE_ACCOUNT`
 (call again with `account`), `NEEDS_CODE` (a code by SMS or email), `CAPTCHA`,
 `SAVED_LOGIN_REJECTED` (the saved login looks stale: the site refused it; do not retry it, offer a
-password reset, or hand off so the user signs in and Graft saves the new password), or
+password reset, or hand off so the user signs in and Graft saves the new password),
+`SUBMIT_NO_EFFECT` (the form didn't react: no new page, address or error; look for a captcha or a
+disabled button, then hand off; the login itself was not refused), `FOREIGN_FORM` (the form, or the
+frame it sits in, belongs to another site; nothing was typed), or
 `PAGE_SCRIPTS` (a boost or site script runs on the page; hand off). `PASSWORD_MANAGER_LOCKED` or
 `PASSWORD_MANAGER_FAILED`: hand off with "Your password manager is locked: unlock it (`graft signin setup
 bitwarden`, or `pass-cli login` for Proton) and click Done, or sign in here yourself", then call
@@ -25,7 +29,8 @@ the password manager like one you made. Never write a password or a one-time cod
 answer, a file or a message, even one you made: say whether it was saved.
 
 A page that holds a password you did not type (bu.signIn's, Chrome's autofill or the user's) still
-takes navigation, reads and clicks. The password value is hidden from you. `page.reload()` clears it.
+takes navigation, reads and clicks. After a failed `bu.signIn()` the same `page` keeps working, and
+the email stays in its field (only the password is cleared). The password value is hidden from you. `page.reload()` clears it.
 
 The password manager is set up once by the user: `browserkit signin setup bitwarden` (Bitwarden's
 `bw` CLI) or `signin setup proton` (Proton Pass's `pass-cli`).

@@ -12,7 +12,7 @@ import type {
 import type { ChatService } from "./chat-service.js";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { collectDueSlots } from "./routine-schedule.js";
-import { createGraftHostHandler, siteMapperRequest } from "@graft/pi-adapter";
+import { changeSetsRequest, createGraftHostHandler, siteMapperRequest } from "@graft/pi-adapter";
 import {
   isListening,
   listenerPass,
@@ -363,10 +363,13 @@ This routine's check passed with: ${JSON.stringify(value).slice(0, 4000)}`;
         // answers are the machine's and never reach the check's code. Site API calls work;
         // workspace files stay with the chat. A check never lifts a block.
         onCall: async (request: unknown) => {
-          const answer = host(request, {
-            source: "routine",
-            scope: checkRealm(routine.routineId),
-          });
+          // browser.changes() sets belong to the routine, so they outlive its realm and restarts.
+          const answer =
+            changeSetsRequest(request, `routine:${routine.routineId}`) ??
+            host(request, {
+              source: "routine",
+              scope: checkRealm(routine.routineId),
+            });
           if (answer) return answer;
           throw new Error("Workspace calls are unavailable in routine checks");
         },

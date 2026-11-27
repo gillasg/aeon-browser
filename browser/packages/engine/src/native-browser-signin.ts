@@ -13,6 +13,12 @@ import { finishSignIn, markVaultFill, prepareSignIn } from "./native-browser-pas
 import { messagesSnapshot, waitForInboxCode } from "./native-browser-inbox-code.js";
 import { chromeFill, inFront } from "./native-browser-signin-chrome.js";
 import { chooserShown, passAccountChooser } from "./native-browser-signin-chooser.js";
+import {
+  forgetFormFrame,
+  markSubmit,
+  submitReacted,
+  type SubmitMark,
+} from "./native-browser-signin-find.js";
 
 // bu.signIn(): sign in to the page the agent is on with a login from the user's password
 // manager. The machine looks the login up by the tab's real address; the engine types it into
@@ -37,6 +43,8 @@ export interface SignInResult {
     | "CAPTCHA"
     /** The site refused the saved login: it looks stale (changed or reset elsewhere). */
     | "SAVED_LOGIN_REJECTED"
+    /** The form did not react to the submit: no new page, address or error (a captcha, a disabled button). */
+    | "SUBMIT_NO_EFFECT"
     /** The form posts the login to another site: nothing was typed. */
     | "FOREIGN_FORM"
     /** The site wants approval on the user's phone or app, and none came within a minute. */
@@ -77,6 +85,18 @@ const MAX_STAGES = 4;
 const APPROVE_WAIT_MS = 60_000;
 
 export async function signInToPage(
+  tabId: number,
+  options: { account?: unknown },
+  ask: Ask,
+): Promise<SignInResult> {
+  try {
+    return await signInOnce(tabId, options, ask);
+  } finally {
+    forgetFormFrame(tabId);
+  }
+}
+
+async function signInOnce(
   tabId: number,
   options: { account?: unknown },
   ask: Ask,
@@ -196,7 +216,9 @@ async function fill(tabId: number, attempt: Attempt, base: Base): Promise<SignIn
   let fields: SignInFields | undefined = opened;
   if (fields.foreign)
     return { ...base, signedIn: false, reason: "FOREIGN_FORM", detail: fields.foreign };
+  let mark: SubmitMark | undefined;
   for (let stage = 0; stage < MAX_STAGES && fields; stage++) {
+    mark = await markSubmit(tabId);
     const stop = attempt.login
       ? await step(tabId, fields, attempt, attempt.login)
       : await chromeStep(tabId, fields, attempt, base);
@@ -207,7 +229,7 @@ async function fill(tabId: number, attempt: Attempt, base: Base): Promise<SignIn
     if (!next || sameForm(fields, next)) break;
     fields = next;
   }
-  return outcome(tabId, fields, base);
+  return outcome(tabId, fields, base, mark);
 }
 
 /** One screen of a sign-in: username, then password, then a one-time code, as the site asks. */
@@ -280,20 +302,38 @@ async function enterCode(
   return undefined;
 }
 
+const NO_EFFECT = "the form didn't react; check for a captcha or a disabled button";
+
 async function outcome(
   tabId: number,
   last: SignInFields | undefined,
   base: Base,
+  mark: SubmitMark | undefined,
 ): Promise<SignInResult> {
   const now = (await scanFields(tabId)) ?? last;
   if (now?.captcha) return { ...base, signedIn: false, reason: "CAPTCHA" };
   if (now?.approve) return { ...base, signedIn: false, reason: "APPROVE_ON_DEVICE" };
   if (now?.code) return { ...base, signedIn: false, reason: "NEEDS_CODE" };
   if (now?.password) {
+    const reacted = !mark || (await submitReacted(tabId, mark));
     await clearPasswords(tabId);
-    return { ...base, signedIn: false, reason: "SAVED_LOGIN_REJECTED" };
+    await keepEmail(tabId, now.userValue);
+    return reacted
+      ? { ...base, signedIn: false, reason: "SAVED_LOGIN_REJECTED" }
+      : { ...base, signedIn: false, reason: "SUBMIT_NO_EFFECT", detail: NO_EFFECT };
   }
   return { ...base, signedIn: true };
+}
+
+/**
+ * After a failed sign-in the page is reloaded (it may still hold the password in memory), and the
+ * email it showed goes back in its field: only the password is ever cleared.
+ */
+async function keepEmail(tabId: number, email: string): Promise<void> {
+  await finishSignIn(tabId);
+  if (!email) return;
+  const fields = await scanFields(tabId);
+  if (fields?.user && !fields.userValue) await typeInto(tabId, "user", email);
 }
 
 function sameForm(a: SignInFields, b: SignInFields): boolean {
