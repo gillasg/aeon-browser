@@ -12,7 +12,7 @@ const PROBE_HTML = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Aeon Stealth Probe</title>
+    <title>Graft Stealth Probe</title>
   </head>
   <body>
     <main>
@@ -60,7 +60,7 @@ const SNAPSHOT_JS = `(() => {
       /^__pw/,
       /^__playwright/,
       /^__puppeteer/,
-      /^__aeon/,
+      /^__graft/,
     ];
     const hits = [];
     for (const key of Object.getOwnPropertyNames(window)) {
@@ -97,7 +97,7 @@ const SNAPSHOT_JS = `(() => {
     const nodes = document.querySelectorAll("*");
     for (const el of nodes) {
       for (const key of Object.getOwnPropertyNames(el)) {
-        if (/^(__aeon|__webdriver|__cdp|cdc_)/.test(key)) hits.push(el.tagName + "." + key);
+        if (/^(__graft|__webdriver|__cdp|cdc_)/.test(key)) hits.push(el.tagName + "." + key);
       }
       if (el.tagName === "IFRAME" && String(el.src || "").startsWith("chrome-extension://")) {
         hits.push("iframe:" + el.src);

@@ -52,8 +52,8 @@ export function safePage(value: string): boolean {
   }
 }
 
-/** One of Aeon's own extension pages (home, chat, side panel): the agent drives it like any tab. */
-export function aeonUiPage(value: string): boolean {
+/** One of Graft's own extension pages (home, chat, side panel): the agent drives it like any tab. */
+export function graftUiPage(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "chrome-extension:" && url.hostname === chrome.runtime.id;
@@ -63,11 +63,11 @@ export function aeonUiPage(value: string): boolean {
 }
 
 /**
- * A tab the agent can list, attach and act on: the web or Aeon's own pages. about:blank stays out:
+ * A tab the agent can list, attach and act on: the web or Graft's own pages. about:blank stays out:
  * a fresh window's blank tab must not join the agent's tabs or count as the page the user is on.
  */
 export function drivablePage(value: string): boolean {
-  return safePage(value) || aeonUiPage(value);
+  return safePage(value) || graftUiPage(value);
 }
 
 /**
@@ -78,7 +78,7 @@ export function assertOpenable(url: string): void {
   if (drivablePage(url)) return;
   if (/^(chrome|chrome-extension):/i.test(url))
     throw new Error(
-      "PROTECTED_UI: Chrome's own pages and other extensions' pages are not open to the agent; open a web page or one of Aeon's own pages (home, chat)",
+      "PROTECTED_UI: Chrome's own pages and other extensions' pages are not open to the agent; open a web page or one of Graft's own pages (home, chat)",
     );
   throw new Error("INVALID_TARGET");
 }

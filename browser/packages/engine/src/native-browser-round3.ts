@@ -209,7 +209,7 @@ export function workersOf(infos: TargetInfo[], origin: string): TargetInfo[] {
 /** Page side: wrap WebAssembly.instantiate/instantiateStreaming to record module metadata (idempotent). */
 export function wasmTapInstall(): { installed: boolean } {
   const w = window as unknown as Record<string, unknown>;
-  if (w.__aeonWasmTap) return { installed: true };
+  if (w.__graftWasmTap) return { installed: true };
   const wasm = WebAssembly as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
   const log: Record<string, unknown>[] = [];
   const original = {
@@ -250,24 +250,24 @@ export function wasmTapInstall(): { installed: boolean } {
     };
   if (original.instantiate) wasm.instantiate = tap("instantiate");
   if (original.instantiateStreaming) wasm.instantiateStreaming = tap("instantiateStreaming");
-  w.__aeonWasmTap = { log, original };
+  w.__graftWasmTap = { log, original };
   return { installed: true };
 }
 
 /** Page side: the recorded modules. */
 export function wasmTapList(): Record<string, unknown>[] {
   const tap = (window as unknown as Record<string, { log: Record<string, unknown>[] } | undefined>)
-    .__aeonWasmTap;
+    .__graftWasmTap;
   return tap ? tap.log.slice() : [];
 }
 
 /** Page side: put the original functions back and forget the log. */
 export function wasmTapRemove(): { removed: boolean } {
   const w = window as unknown as Record<string, unknown>;
-  const tap = w.__aeonWasmTap as { original: Record<string, unknown> } | undefined;
+  const tap = w.__graftWasmTap as { original: Record<string, unknown> } | undefined;
   if (!tap) return { removed: false };
   Object.assign(WebAssembly, Object.fromEntries(Object.entries(tap.original).filter(([, v]) => v)));
-  delete w.__aeonWasmTap;
+  delete w.__graftWasmTap;
   return { removed: true };
 }
 

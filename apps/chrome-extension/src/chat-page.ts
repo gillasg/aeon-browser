@@ -17,17 +17,17 @@ import {
   type ChatViewSnapshotDto,
   type DaemonUiResponse,
   DaemonUiRequestSchema,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import {
   ChatSurface,
   invokePiCommand,
   logApiWrites,
-  mountAeonUi,
+  mountGraftUi,
   TranscriptModel,
   UI_BUILTIN_COMMANDS,
   WRONG_FOLLOW_UP,
   type AnswerOffer,
-} from "@aeon/ui";
+} from "@graft/ui";
 import {
   latestAnswerText,
   reportWrongInput,
@@ -59,7 +59,7 @@ import { initializeChatPreferences } from "./chat-preferences.js";
 import { ChatPiUiController } from "./chat-pi-ui-controller.js";
 if (!framedByExtension()) {
   document.documentElement.replaceChildren();
-  throw new Error("Aeon chat cannot be framed by this page.");
+  throw new Error("Graft chat cannot be framed by this page.");
 }
 
 const { root, chatId, initialDisplay } = initializeChatPage();
@@ -85,10 +85,10 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
   userControl = control === "user" && typeof tabId === "number" ? { tabId } : null;
   render();
 });
-// aeon run --typed: the worker asks this page to type the prompt into its composer on camera.
+// graft run --typed: the worker asks this page to type the prompt into its composer on camera.
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   const request = message as { kind?: string; chatId?: string; text?: unknown } | null;
-  if (request?.kind !== "aeon.chat.type" || request.chatId !== chatId) return;
+  if (request?.kind !== "graft.chat.type" || request.chatId !== chatId) return;
   if (typeof request.text !== "string") return;
   cameraColumn();
   void composer.typeForCamera(request.text).then(
@@ -135,7 +135,7 @@ const connectAndSubscribe = connectionSingleFlight(establishChatConnection, (mes
 let isClosing = false;
 let connection = initialChatConnection();
 let notice = chatId ? "" : "This Chat link does not include a valid Chat ID.";
-let title = "Chat · Aeon";
+let title = "Chat · Graft";
 const pendingSubmits = new Set<string>();
 const attemptedContextSubmits = new Set<string>();
 let initialSubmitAttempted = false;
@@ -192,7 +192,7 @@ const piUi = new ChatPiUiController(
 const applyBrowserContextDraft = createBrowserContextDraftHandler({
   chatId,
   composer,
-  nativeTransport: __AEON_NATIVE_TRANSPORT__,
+  nativeTransport: __GRAFT_NATIVE_TRANSPORT__,
   attemptedInvocations: attemptedContextSubmits,
   showError,
   readRuntimeState: () => ({
@@ -203,7 +203,7 @@ const applyBrowserContextDraft = createBrowserContextDraftHandler({
 });
 function createView() {
   return createElement(ChatSurface, {
-    developmentFixture: !__AEON_NATIVE_TRANSPORT__,
+    developmentFixture: !__GRAFT_NATIVE_TRANSPORT__,
     compact: document.body.dataset.host === "orb",
     chatId,
     title,
@@ -277,12 +277,12 @@ async function wrongAnswer(): Promise<void> {
   ).catch((error: unknown) => showError(error instanceof Error ? error.message : "Couldn't send."));
 }
 
-/** One management action through this chat's grant; throws when Aeon refuses it. */
+/** One management action through this chat's grant; throws when Graft refuses it. */
 async function managementAction(
   action: "report_wrong",
   input: Record<string, unknown>,
 ): Promise<void> {
-  if (!client) throw new Error("Aeon is not connected.");
+  if (!client) throw new Error("Graft is not connected.");
   const requestId = crypto.randomUUID();
   const after = client.send(
     DaemonUiRequestSchema.parse({
@@ -303,7 +303,7 @@ async function managementAction(
 
 function render(): void {
   if (updateUi) updateUi(createView());
-  else updateUi = mountAeonUi(root, createView());
+  else updateUi = mountGraftUi(root, createView());
 }
 installFileViewerLinks(chatId);
 render();
@@ -387,9 +387,9 @@ function attachChatClientListeners(activeClient: UiClient): void {
   );
 }
 async function submitFirstPrompt(): Promise<void> {
-  if (!__AEON_NATIVE_TRANSPORT__ || initialSubmitAttempted || !client) return;
+  if (!__GRAFT_NATIVE_TRANSPORT__ || initialSubmitAttempted || !client) return;
   initialSubmitAttempted = true;
-  await submitInitialPrompt(chatId, client, __AEON_NATIVE_TRANSPORT__);
+  await submitInitialPrompt(chatId, client, __GRAFT_NATIVE_TRANSPORT__);
   void composer.refreshControls();
 }
 function handleDaemonMessage(message: DaemonUiResponse): void {
@@ -435,7 +435,7 @@ function handleChatEvent(message: Extract<DaemonUiResponse, { kind: "chat.event"
     contextUsage = message.event.event.contextUsage;
   }
   if (message.event.event.kind === "chat-metadata") {
-    document.title = `${message.event.event.title} · Aeon`;
+    document.title = `${message.event.event.title} · Graft`;
     title = document.title;
     render();
     return;
@@ -443,7 +443,7 @@ function handleChatEvent(message: Extract<DaemonUiResponse, { kind: "chat.event"
   if (message.event.event.kind === "context-usage") contextUsage = message.event.event.contextUsage;
   if (message.event.event.kind.startsWith("extension-ui-")) piUi.applyEvent(message.event.event);
   transcript.apply(message.event.event);
-  logApiWrites(message.event.event, { chatId, task: title.replace(/ · Aeon$/, "") });
+  logApiWrites(message.event.event, { chatId, task: title.replace(/ · Graft$/, "") });
   if (message.event.event.kind === "run-state") runState = message.event.event.state;
   render();
 }
@@ -459,7 +459,7 @@ function applySnapshot(
   runState = snapshot.runState;
   contextUsage = snapshot.contextUsage;
   transcript.setSnapshot(snapshot.entries);
-  document.title = `${snapshot.chat.title} · Aeon`;
+  document.title = `${snapshot.chat.title} · Graft`;
   title = document.title;
   if (snapshot.omittedEntryCount > 0 && !omittedNoticeDismissed)
     showError(`${snapshot.omittedEntryCount} earlier Pi entries are outside this view.`);

@@ -1,11 +1,11 @@
 import type Database from "better-sqlite3";
-import { asChatId, type ChatId, type ChatRecord } from "@aeon/domain";
+import { asChatId, type ChatId, type ChatRecord } from "@graft/domain";
 import type {
   CreateThreadDeliveryInput,
   ThreadCreationIntent,
   ThreadDeliveryPatch,
   ThreadDeliveryRecord,
-} from "@aeon/domain";
+} from "@graft/domain";
 
 interface ThreadDeliveryRow {
   delivery_id: string;

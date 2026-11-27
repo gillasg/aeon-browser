@@ -1,4 +1,4 @@
-import { type ChatCatalogItemDto, type DaemonUiResponse } from "@aeon/protocol";
+import { type ChatCatalogItemDto, type DaemonUiResponse } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 interface HomeCatalogOptions {
@@ -22,7 +22,7 @@ export class HomeCatalogController {
 
   show(): void {
     this.open = true;
-    document.title = "Chats · Aeon";
+    document.title = "Chats · Graft";
     this.options.onChange();
     void this.refresh();
   }
@@ -30,7 +30,7 @@ export class HomeCatalogController {
   hide(): void {
     if (!this.open) return;
     this.open = false;
-    document.title = "Aeon · Manage";
+    document.title = "Graft · Manage";
     this.options.onChange();
   }
 

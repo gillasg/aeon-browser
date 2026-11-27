@@ -1,5 +1,5 @@
-import { DaemonUiRequestSchema, type ManagementSnapshotDto } from "@aeon/protocol";
-import type { ManagementActionName, NewTabHomeProps } from "@aeon/ui";
+import { DaemonUiRequestSchema, type ManagementSnapshotDto } from "@graft/protocol";
+import type { ManagementActionName, NewTabHomeProps } from "@graft/ui";
 import type { UiClient } from "./ui-client-core.js";
 
 type Theme = "dark" | "midnight" | "light" | "system";
@@ -57,8 +57,8 @@ export class HomeManagementController {
   }
 
   async readPreferences(): Promise<void> {
-    const values = await chrome.storage.sync.get(["aeon-theme"]);
-    const savedTheme = values["aeon-theme"];
+    const values = await chrome.storage.sync.get(["graft-theme"]);
+    const savedTheme = values["graft-theme"];
     if (savedTheme === "light" || savedTheme === "system" || savedTheme === "midnight")
       this.theme = savedTheme;
     if (savedTheme === "atmosphere") this.theme = "light";
@@ -101,7 +101,7 @@ export class HomeManagementController {
       if (generation !== this.requestGeneration) return;
       if (response.kind === "command.failed") throw new Error(response.message);
       if (response.kind !== "command.completed" || response.result.kind !== "management.snapshot")
-        throw new Error("Aeon returned an invalid management snapshot.");
+        throw new Error("Graft returned an invalid management snapshot.");
       this.snapshot = response.result.snapshot;
       loadDefaultChatResources = this.chooseDefaultChat(chooseDefaultChat);
     } catch (error) {
@@ -142,7 +142,7 @@ export class HomeManagementController {
       if (generation !== this.requestGeneration) return;
       if (response.kind === "command.failed") throw new Error(response.message);
       if (response.kind !== "command.completed" || response.result.kind !== "management.snapshot")
-        throw new Error("Aeon returned an invalid management action response.");
+        throw new Error("Graft returned an invalid management action response.");
       this.snapshot = response.result.snapshot;
     } catch (error) {
       if (generation === this.requestGeneration) this.error = toMessage(error);
@@ -170,7 +170,7 @@ export class HomeManagementController {
   private async saveTheme(value: Theme): Promise<void> {
     this.theme = value;
     document.documentElement.dataset.theme = value;
-    await chrome.storage.sync.set({ "aeon-theme": value });
+    await chrome.storage.sync.set({ "graft-theme": value });
     this.onChange();
   }
 }

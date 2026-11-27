@@ -16,7 +16,7 @@ export function refusedCdp(
     try {
       assertOpenable(String(params.url ?? ""));
     } catch {
-      return "Page.navigate may open only http(s) pages or Aeon's own pages; use page.goto instead";
+      return "Page.navigate may open only http(s) pages or Graft's own pages; use page.goto instead";
     }
   }
   if (method === "Network.clearBrowserCookies" || method === "Network.clearBrowserCache")

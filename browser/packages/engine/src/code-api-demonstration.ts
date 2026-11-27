@@ -5,9 +5,9 @@
 export const browserDemonstrationApi = `
 function __demoInstall(options) {
   try {
-    if (window.__aeonDemoCleanup) window.__aeonDemoCleanup();
+    if (window.__graftDemoCleanup) window.__graftDemoCleanup();
     var state = { id: options.id, steps: [] };
-    window.__aeonDemo = state;
+    window.__graftDemo = state;
     function cssPath(element) {
       var id = element.getAttribute('id');
       if (id) return '#' + CSS.escape(id);
@@ -94,23 +94,23 @@ function __demoInstall(options) {
     document.addEventListener('change', onChange, true);
     window.addEventListener('popstate', onNavigate);
     window.addEventListener('hashchange', onNavigate);
-    window.__aeonDemoCleanup = function () {
+    window.__graftDemoCleanup = function () {
       document.removeEventListener('click', onClick, true);
       document.removeEventListener('input', onInput, true);
       document.removeEventListener('change', onChange, true);
       window.removeEventListener('popstate', onNavigate);
       window.removeEventListener('hashchange', onNavigate);
-      if (window.__aeonDemo === state) delete window.__aeonDemo;
-      delete window.__aeonDemoCleanup;
+      if (window.__graftDemo === state) delete window.__graftDemo;
+      delete window.__graftDemoCleanup;
     };
   } catch (error) {}
 }
 function __demoDrain() {
-  var state = window.__aeonDemo;
+  var state = window.__graftDemo;
   return state ? state.steps.splice(0, state.steps.length) : null;
 }
 function __demoUninstall(options) {
-  if (window.__aeonDemo && window.__aeonDemo.id === options.id && window.__aeonDemoCleanup) window.__aeonDemoCleanup();
+  if (window.__graftDemo && window.__graftDemo.id === options.id && window.__graftDemoCleanup) window.__graftDemoCleanup();
 }
 function __demoFormat(steps, startedUrl) {
   var host = '';

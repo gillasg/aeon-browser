@@ -7,7 +7,7 @@ import { ensureSupervisor } from "../node/host.mjs";
 import { serviceFile, serviceState, startService } from "../node/service-state.mjs";
 
 function sandbox(platform = "linux") {
-  const root = mkdtempSync(join(tmpdir(), "aeon-service-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-service-"));
   const home = join(root, "home");
   const env = { XDG_CONFIG_HOME: join(home, ".config") };
   const options = { platform, home, env, uid: 501 };
@@ -135,7 +135,7 @@ test("the state probe asks systemd whether the unit is active", () => {
     });
     assert.equal(state, "active");
     assert.deepEqual(calls, [
-      ["systemctl", "--user", "is-active", "--quiet", "aeon-daemon.service"],
+      ["systemctl", "--user", "is-active", "--quiet", "graft-daemon.service"],
     ]);
     const stopped = serviceState({
       ...box.options,
@@ -160,8 +160,8 @@ test("starting clears a start limit first, and macOS kickstarts the agent", () =
     });
     assert.equal(started, true);
     assert.deepEqual(calls, [
-      ["systemctl", "--user", "reset-failed", "aeon-daemon.service"],
-      ["systemctl", "--user", "start", "aeon-daemon.service"],
+      ["systemctl", "--user", "reset-failed", "graft-daemon.service"],
+      ["systemctl", "--user", "start", "graft-daemon.service"],
     ]);
   } finally {
     linux.cleanup();
@@ -179,14 +179,14 @@ test("starting clears a start limit first, and macOS kickstarts the agent", () =
       },
     });
     assert.equal(state, "inactive");
-    assert.deepEqual(stateCalls, [["launchctl", "print", "gui/501/com.aeon.daemon"]]);
+    assert.deepEqual(stateCalls, [["launchctl", "print", "gui/501/com.graft.daemon"]]);
     const startCalls = [];
     const started = startService({
       ...mac.options,
       exec: (file, args) => startCalls.push([file, ...args]),
     });
     assert.equal(started, true);
-    assert.deepEqual(startCalls, [["launchctl", "kickstart", "-k", "gui/501/com.aeon.daemon"]]);
+    assert.deepEqual(startCalls, [["launchctl", "kickstart", "-k", "gui/501/com.graft.daemon"]]);
   } finally {
     mac.cleanup();
   }

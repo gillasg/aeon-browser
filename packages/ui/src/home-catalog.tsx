@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactElement, type RefObject } from "react";
-import type { ChatCatalogItemDto } from "@aeon/protocol";
+import type { ChatCatalogItemDto } from "@graft/protocol";
 import type { NewTabHomeProps } from "./home-surface.js";
 import { SidebarIcon } from "./sidebar-icons.js";
 
@@ -59,7 +59,7 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
         {props.catalogPending ? (
           <p className="catalog-empty">Searching…</p>
         ) : rows.length ? (
-          <ul className="aeon-list catalog-list">
+          <ul className="graft-list catalog-list">
             {rows.map((chat) => (
               <CatalogRow
                 key={chat.chatId}
@@ -84,10 +84,10 @@ export function HomeCatalog(props: HomeCatalogProps): ReactElement {
 function CatalogEmpty({ searching, onNew }: { searching: boolean; onNew(): void }): ReactElement {
   if (searching) return <p className="catalog-empty">No chats match that search.</p>;
   return (
-    <div className="aeon-empty">
+    <div className="graft-empty">
       <p>Your chats will appear here, even after their tab closes.</p>
-      <button type="button" className="aeon-button" data-tone="primary" onClick={onNew}>
-        Ask Aeon something
+      <button type="button" className="graft-button" data-tone="primary" onClick={onNew}>
+        Ask Graft something
       </button>
     </div>
   );

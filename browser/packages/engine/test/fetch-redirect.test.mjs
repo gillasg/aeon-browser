@@ -1,4 +1,4 @@
-// browser.fetch in an MV3 worker: every redirect is opaque. With an Aeon tab on the origin the
+// browser.fetch in an MV3 worker: every redirect is opaque. With a Graft tab on the origin the
 // request moves into it and the final address is checked before the body is returned; with no
 // tab it is refused with the way out.
 import assert from "node:assert/strict";
@@ -34,7 +34,7 @@ async function server(handler) {
   return { http, port: http.address().port, base: `http://127.0.0.1:${http.address().port}` };
 }
 
-test("with no Aeon tab on the origin the redirect is refused with the way out", async () => {
+test("with no Graft tab on the origin the redirect is refused with the way out", async () => {
   const site = await server((req, res) =>
     req.url === "/a" ? res.writeHead(302, { location: "/b" }).end() : res.end("B"),
   );
@@ -51,7 +51,7 @@ test("with no Aeon tab on the origin the redirect is refused with the way out", 
   }
 });
 
-test("with an Aeon tab on the origin the request follows inside it", async () => {
+test("with a Graft tab on the origin the request follows inside it", async () => {
   const site = await server((req, res) =>
     req.url === "/a" ? res.writeHead(302, { location: "/b" }).end() : res.end('{"page":"b"}'),
   );

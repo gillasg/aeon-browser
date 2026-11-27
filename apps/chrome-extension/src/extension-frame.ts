@@ -1,4 +1,4 @@
-/** A top-level Aeon page, or one framed by another page of this extension. */
+/** A top-level Graft page, or one framed by another page of this extension. */
 export function framedByExtension(): boolean {
   if (window.parent === window) return true;
   try {

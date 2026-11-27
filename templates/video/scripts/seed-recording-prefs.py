@@ -37,12 +37,12 @@ if commands.get(old_key, {}).get("command_name") == "summon-orb":
 key = "linux:Alt+Shift+Space"
 if key not in commands:
     commands[key] = {"command_name": "summon-orb", "extension": ext_id, "global": False}
-# Chrome 157 draws a New Tab Page footer ("Aeon" + "Customize Chrome") under extension pages.
+# Chrome 157 draws a New Tab Page footer ("Graft" + "Customize Chrome") under extension pages.
 d.setdefault("ntp_footer", {}).setdefault("settings", {}).update(
     extension_attribution=False, management_notice=False)
 # A killed Chrome leaves exit_type "Crashed", and the next start films a "Restore pages?" bubble.
 d.setdefault("profile", {}).update(exit_type="Normal", exited_cleanly=True)
-# Saved tab groups are pinned to the bookmarks bar, which then films ~40 px of chips ("Aeon1a2b3c4d",
+# Saved tab groups are pinned to the bookmarks bar, which then films ~40 px of chips ("Graft1a2b3c4d",
 # old prompts) above every frame. Hide the bar and never auto-pin a group.
 d.setdefault("bookmark_bar", {})["show_on_all_tabs"] = False
 d.setdefault("tab_groups", {})["auto_pin_new_tab_groups"] = False

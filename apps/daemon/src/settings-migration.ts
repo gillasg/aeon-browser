@@ -3,11 +3,11 @@ import { join } from "node:path";
 import { readConfig, saveConfig } from "@browserkit/credentials";
 import { browserkitHome, readBlockedSites, saveBlockedSites } from "@browserkit/tools/host";
 
-// Aeon used to keep its own password-manager.json and blocked list in its data folder. Both now
+// Graft used to keep its own password-manager.json and blocked list in its data folder. Both now
 // live in browserkit's home, shared with browserkit. Merge the old copies once at startup; the
 // old files are left in place (never deleted) and are not read again after this.
 
-export async function migrateAeonSettings(dataDirectory: string): Promise<void> {
+export async function migrateGraftSettings(dataDirectory: string): Promise<void> {
   const home = browserkitHome();
   await migratePasswordManager(dataDirectory, home);
   await migrateSiteRules(dataDirectory, home);

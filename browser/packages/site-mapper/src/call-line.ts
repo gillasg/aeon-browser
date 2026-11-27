@@ -21,7 +21,7 @@ function observedParams(op: Operation): Record<string, unknown> {
 }
 
 /**
- * The one runnable line printed after mapping: `aeon call <site> <firstRead> '<observed params>'`,
+ * The one runnable line printed after mapping: `graft call <site> <firstRead> '<observed params>'`,
  * filled with values seen in the recording. Undefined when the site has no read to call.
  */
 export function firstCallLine(site: string, operations: Operation[]): string | undefined {
@@ -29,5 +29,5 @@ export function firstCallLine(site: string, operations: Operation[]): string | u
   const op = reads.find((item) => item.bucket === "high") ?? reads[0];
   if (!op) return undefined;
   const json = JSON.stringify(observedParams(op)).replace(/'/g, "'\\''");
-  return `aeon call ${site} ${op.id} '${json}'`;
+  return `graft call ${site} ${op.id} '${json}'`;
 }

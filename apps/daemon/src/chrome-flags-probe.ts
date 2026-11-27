@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { missingChromeFlags } from "@aeon/protocol";
+import { missingChromeFlags } from "@graft/protocol";
 
 const REFRESH_MS = 30_000;
 const EXEC_TIMEOUT_MS = 2_000;

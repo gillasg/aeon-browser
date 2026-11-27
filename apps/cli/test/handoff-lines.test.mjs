@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { handoffLine, statusHandoffLines } from "../src/handoff-lines.ts";
 
-test("aeon tabs prints the pending hand-off under its tab row", () => {
+test("graft tabs prints the pending hand-off under its tab row", () => {
   assert.equal(
     handoffLine({ message: "Enter the 2FA code", startedAt: 0 }, 130_000),
     "  waiting on you: Enter the 2FA code · 2m 10s",
@@ -16,7 +16,7 @@ test("the message is clipped to 80 characters", () => {
   assert.ok(message.endsWith("…"));
 });
 
-test("aeon status lists only tabs that wait on the user", () => {
+test("graft status lists only tabs that wait on the user", () => {
   const lines = statusHandoffLines(
     [
       { target: { tabId: 7 }, title: "Bank", handoff: { message: "Sign in", startedAt: 0 } },

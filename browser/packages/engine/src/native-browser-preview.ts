@@ -97,7 +97,7 @@ function publish(
 ) {
   void chrome.runtime
     .sendMessage({
-      kind: "aeon.browser.preview",
+      kind: "graft.browser.preview",
       chatId,
       tabId: preview.tabId,
       view: preview.view,

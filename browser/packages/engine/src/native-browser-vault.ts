@@ -32,11 +32,11 @@ export interface VaultCandidate extends VaultForm {
 export type VaultAsk = (request: unknown) => Promise<unknown>;
 
 // Kept across service worker restarts, so a login made just before one is still saved.
-const candidates = new SessionMap<VaultCandidate>("aeon-vault-candidates");
+const candidates = new SessionMap<VaultCandidate>("graft-vault-candidates");
 const MAX_AGE = 15 * 60_000;
 const NEVER_SAVE = "vault-never-save";
 
-/** Sites the user told Aeon never to save passwords for. */
+/** Sites the user told Graft never to save passwords for. */
 export async function vaultNeverSaveSites(): Promise<string[]> {
   const saved = (await chrome.storage.local.get(NEVER_SAVE).catch(() => ({}))) as Record<
     string,
@@ -189,7 +189,7 @@ interface Identity {
 // The email or username the agent last typed per tab. Sign-ups that ask for it on one screen
 // and the password on the next (X, Google) show no username beside the password, and a login
 // saved without one cannot sign in later.
-const identities = new SessionMap<Identity & { at: number }>("aeon-vault-identities");
+const identities = new SessionMap<Identity & { at: number }>("graft-vault-identities");
 
 function identityInfo(this: HTMLInputElement): Identity | null {
   if (!["text", "email", "tel", ""].includes(this.type) || !this.value) return null;
@@ -289,14 +289,14 @@ export function vaultSubmissionSucceeded(after: VaultForm | undefined): boolean 
 export type VaultOutcome = "saved" | "unsaved" | "skipped" | "failed";
 
 // Logins a password manager failed to save (locked, or its CLI did not answer), kept until the
-// user unlocks it and Aeon saves them again. Chrome's own prompt is off while a manager is set up,
+// user unlocks it and Graft saves them again. Chrome's own prompt is off while a manager is set up,
 // so without this the login would be lost with no way for the user to keep it.
-const retries = new SessionMap<VaultCandidate & { provider: string }>("aeon-vault-retries");
+const retries = new SessionMap<VaultCandidate & { provider: string }>("graft-vault-retries");
 
 /** What the kernel asks when the manager could not save: unlock it, then Done saves it. */
 export function unlockToSave(provider: string): string {
-  const command = /proton/i.test(provider) ? "pass-cli login" : "aeon signin setup bitwarden";
-  return `Aeon could not save this login to ${provider}: it is locked or not answering. Unlock it (in a terminal: ${command}), then click Done and Aeon saves it. Cancel leaves it unsaved.`;
+  const command = /proton/i.test(provider) ? "pass-cli login" : "graft signin setup bitwarden";
+  return `Graft could not save this login to ${provider}: it is locked or not answering. Unlock it (in a terminal: ${command}), then click Done and Graft saves it. Cancel leaves it unsaved.`;
 }
 export const SAVED_AFTER_UNLOCK =
   "the password manager was locked; the user unlocked it and the login was saved; nothing to check";
@@ -327,7 +327,7 @@ export async function noteUserLogin(tabId: number): Promise<void> {
 
 /** What the kernel asks the user when no password manager saved a login the agent made. */
 export const SAVE_IN_CHROME =
-  "Aeon made a login no password manager saved. Click Save in Chrome's password prompt (the key icon in the address bar reopens it), then Done.";
+  "Graft made a login no password manager saved. Click Save in Chrome's password prompt (the key icon in the address bar reopens it), then Done.";
 export const VAULT_SAVED =
   "the login (the password you typed) was saved to the user's password manager; nothing to check";
 export const UNSAVED_LOGIN_SAVED =

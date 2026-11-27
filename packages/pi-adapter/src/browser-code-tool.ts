@@ -8,7 +8,7 @@ import {
   readableSchemaError,
   StepEventSchema,
   type StepEvent,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { ModelLike } from "@browserkit/tools/site-to-api";
 import { isCredentialRequest } from "@browserkit/credentials";
 import { traceActions } from "./browser-trace-actions.js";
@@ -38,7 +38,7 @@ import { cellTimeoutMs } from "./run-budget.js";
 import { cellSleepMs, cellSleepRefusal, sleepsPastDeadline } from "./cell-sleep-guard.js";
 import { openUserWait, STEERED_NOTE } from "./user-waits.js";
 import {
-  createAeonHostHandler,
+  createGraftHostHandler,
   type HostRequestContext,
   type SiteRulesProvider,
 } from "./browser-host-requests.js";
@@ -435,7 +435,7 @@ function resultDetails(
 }
 
 // What a running cell may ask this side for. Credentials and site rules go through browserkit's
-// one host handler; Aeon adds its own storage through extra. No answer there is a step or a log.
+// one host handler; Graft adds its own storage through extra. No answer there is a step or a log.
 function cellCall(context: {
   chatId: string;
   source: "chat" | "external";
@@ -452,7 +452,7 @@ function cellCall(context: {
   steps: () => Record<string, unknown>[];
   report: (progress: ToolProgress) => void;
 }): (request: unknown) => Promise<unknown> {
-  const host = createAeonHostHandler({
+  const host = createGraftHostHandler({
     source: context.source,
     ...(context.siteRules ? { siteRules: context.siteRules } : {}),
     siteMapper: (request) => siteMapperRequest(context.chatId, request),
@@ -761,5 +761,5 @@ function apiReadKey(site: string, operation: string, params: unknown): string {
           left.localeCompare(right),
         )
       : [];
-  return `aeon-api://${site}/${operation}?${encodeURIComponent(JSON.stringify(entries))}`;
+  return `graft-api://${site}/${operation}?${encodeURIComponent(JSON.stringify(entries))}`;
 }

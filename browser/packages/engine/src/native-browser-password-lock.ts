@@ -16,20 +16,20 @@ import { SessionMap } from "./native-session-map.js";
 
 // Kept across service worker restarts: forgetting them locked the agent out of its own sign-up.
 const typed = new SessionMap<Set<string>>(
-  "aeon-agent-typed",
+  "graft-agent-typed",
   (values) => [...values],
   (values) => new Set(Array.isArray(values) ? values.map(String) : []),
 );
 const planted = new SessionMap<Set<string>>(
-  "aeon-planted-scripts",
+  "graft-planted-scripts",
   (ids) => [...ids],
   (ids) => new Set(Array.isArray(ids) ? ids.map(String) : []),
 );
-// Tabs where a password manager (Aeon's vault, or Chrome's saved passwords) just filled a password.
+// Tabs where a password manager (Graft's vault, or Chrome's saved passwords) just filled a password.
 // While that password still sits in a field, no agent code runs in the page: literal redaction
 // cannot catch a value read back reversed, chunked or encoded, so the read itself is refused.
 const vaultFilled = new SessionMap<boolean>(
-  "aeon-vault-filled",
+  "graft-vault-filled",
   (value) => value,
   (value) => value === true,
 );
@@ -136,11 +136,11 @@ function probe(
     return any;
   };
   const filledNow = filled(document);
-  if (mark || filledNow) page.__aeonPasswordPage = true;
-  const ran = page.__aeonAgentCode === true;
-  if (agent) page.__aeonAgentCode = true;
+  if (mark || filledNow) page.__graftPasswordPage = true;
+  const ran = page.__graftAgentCode === true;
+  if (agent) page.__graftAgentCode = true;
   return {
-    password: page.__aeonPasswordPage === true,
+    password: page.__graftPasswordPage === true,
     agent: ran,
     filled: filledNow,
     secrets,
@@ -282,7 +282,7 @@ export function showsErrorPage(message: string): boolean {
 }
 
 /**
- * The probe, once more after a moment when the page was being replaced. A page Aeon still
+ * The probe, once more after a moment when the page was being replaced. A page Graft still
  * cannot check runs no code either way; only the reason differs.
  */
 function unansweredPage(): BrowserActionError {

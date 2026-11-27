@@ -2,7 +2,7 @@ import { useState, type ReactElement } from "react";
 import { LEARN_ITEMS, LEARN_TOPICS, type LearnItem, type LearnTopic } from "./learn-catalog.js";
 import { Segmented } from "./segmented.js";
 
-// Learn: everything Aeon can do, as grouped lists by topic, each row with an example. "Try it"
+// Learn: everything Graft can do, as grouped lists by topic, each row with an example. "Try it"
 // puts the example in Home's ask box, so nothing runs until the user sends it.
 
 export function LearnPage({ onTry }: { onTry(example: string): void }): ReactElement {
@@ -13,8 +13,8 @@ export function LearnPage({ onTry }: { onTry(example: string): void }): ReactEle
       : [],
   );
   return (
-    <div className="aeon-page learn-page">
-      <header className="aeon-page-head">
+    <div className="graft-page learn-page">
+      <header className="graft-page-head">
         <h1 id="learn-heading">Learn</h1>
         <Segmented<LearnTopic | "all">
           label="Topics"
@@ -26,7 +26,7 @@ export function LearnPage({ onTry }: { onTry(example: string): void }): ReactEle
       {groups.map((group) => (
         <section key={group.id} className="settings-group learn-group">
           <h2>{group.label}</h2>
-          <ul className="aeon-list">
+          <ul className="graft-list">
             {group.items.map((item) => (
               <LearnRow key={item.title} item={item} onTry={onTry} />
             ))}
@@ -51,7 +51,7 @@ function LearnRow({
         <span>{item.body}</span>
         <small>“{item.example.trim()}”</small>
       </span>
-      <button type="button" className="aeon-button" onClick={() => onTry(item.example)}>
+      <button type="button" className="graft-button" onClick={() => onTry(item.example)}>
         Try it
       </button>
     </li>
@@ -62,7 +62,7 @@ function LearnRow({
 export function seedHomeQuery(text: string): void {
   requestAnimationFrame(() =>
     requestAnimationFrame(() =>
-      window.dispatchEvent(new CustomEvent("aeon.home.seed", { detail: text })),
+      window.dispatchEvent(new CustomEvent("graft.home.seed", { detail: text })),
     ),
   );
 }

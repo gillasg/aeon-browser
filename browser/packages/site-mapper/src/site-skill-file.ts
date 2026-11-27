@@ -8,8 +8,8 @@ import { siteDir, siteName, writeAtomic } from "./registry.js";
 import { readOpsFile, type SiteOp } from "./site-ops-file.js";
 
 export const SKILL_FILE = "SKILL.md";
-const USER_OPEN = "<!-- aeon:user -->";
-const USER_CLOSE = "<!-- /aeon:user -->";
+const USER_OPEN = "<!-- graft:user -->";
+const USER_CLOSE = "<!-- /graft:user -->";
 const FACTS = "## Facts";
 
 export interface RawFact {
@@ -62,7 +62,7 @@ export function renderSkillDoc(site: string, doc: SkillDoc, ops: readonly SiteOp
   const parts = [
     `# ${site}`,
     "",
-    "Your notes go between the markers below; Aeon keeps them as written.",
+    "Your notes go between the markers below; Graft keeps them as written.",
     "",
     USER_OPEN,
     doc.user.trim(),

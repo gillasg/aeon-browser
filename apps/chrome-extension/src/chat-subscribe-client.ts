@@ -2,7 +2,7 @@ import {
   DaemonUiRequestSchema,
   type ChatEventCursorDto,
   type DaemonUiResponse,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 export async function subscribeSavedChat(
   client: UiClient,

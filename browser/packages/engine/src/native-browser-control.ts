@@ -142,7 +142,7 @@ export function forgetControl(tabId: number): void {
 }
 
 function notify(tabId: number, control: "agent" | "user"): void {
-  // Hosts (Aeon) can show a line about it; the chatId routes it to that chat only.
+  // Hosts (Graft) can show a line about it; the chatId routes it to that chat only.
   const chatId = browserSessionOwner(tabId);
   void chrome.runtime
     .sendMessage({ kind: "browserkit.control", tabId, control, ...(chatId ? { chatId } : {}) })
@@ -202,8 +202,8 @@ function watchUserInput(): void {
         (node) =>
           node &&
           typeof (node as unknown as { hasAttribute?: unknown }).hasAttribute === "function" &&
-          // Aeon's own layers: the control banner, and the cursor's pill (☰, ■, an ask's field).
-          ["data-browserkit-overlay", "data-aeon-overlay"].some((name) =>
+          // Graft's own layers: the control banner, and the cursor's pill (☰, ■, an ask's field).
+          ["data-browserkit-overlay", "data-graft-overlay"].some((name) =>
             (node as unknown as { hasAttribute(name: string): boolean }).hasAttribute(name),
           ),
       )

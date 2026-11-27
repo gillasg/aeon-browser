@@ -29,7 +29,7 @@ async function buildOrb() {
       ...shared,
       entryPoints: [join(appRoot, "src/orb/orb-page.ts")],
       outfile: join(output, "orb.js"),
-      define: { __AEON_NATIVE_TRANSPORT__: "true" },
+      define: { __GRAFT_NATIVE_TRANSPORT__: "true" },
     }),
     ...["orb.html", "orb.css", "orb-ink.css"].map((file) =>
       copyFile(join(appRoot, file), join(output, file)),

@@ -1,6 +1,6 @@
 import { additionalPages, attachAdditionalPages } from "./additional-page-context.js";
 import { readChatContext, removeChatContext } from "./browser-context-storage.js";
-import { DaemonUiRequestSchema } from "@aeon/protocol";
+import { DaemonUiRequestSchema } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { takeNativeInitialSubmit } from "./ui-connection.js";
 import { applyInitialChatSelection } from "./initial-chat-selection.js";
@@ -11,11 +11,11 @@ export async function submitInitialPrompt(
   nativeTransport: boolean,
 ): Promise<boolean> {
   if (!nativeTransport || !client) return false;
-  const staged = sessionStorage.getItem("aeon-panel-initial:" + chatId);
+  const staged = sessionStorage.getItem("graft-panel-initial:" + chatId);
   const initialSubmit = staged
     ? (JSON.parse(staged) as NonNullable<Awaited<ReturnType<typeof takeNativeInitialSubmit>>>)
     : await takeNativeInitialSubmit(chatId);
-  if (staged) sessionStorage.removeItem("aeon-panel-initial:" + chatId);
+  if (staged) sessionStorage.removeItem("graft-panel-initial:" + chatId);
   const context = await readChatContext(chatId);
   if (!initialSubmit) return false;
   await applyInitialChatSelection(client, chatId, {

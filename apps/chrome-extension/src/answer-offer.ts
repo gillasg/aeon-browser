@@ -1,4 +1,4 @@
-import type { AnswerOffer, TranscriptRow } from "@aeon/ui";
+import type { AnswerOffer, TranscriptRow } from "@graft/ui";
 import { submitComposerMessage } from "./chat-composer-submit.js";
 import type { UiClient } from "./ui-client-core.js";
 import { localOfferAction } from "./offer-actions.js";

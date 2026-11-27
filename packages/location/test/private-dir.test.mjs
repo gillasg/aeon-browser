@@ -7,7 +7,7 @@ import test from "node:test";
 import { ensurePrivateDir, foreignSocket } from "../src/private-dir.ts";
 
 const posix = process.platform !== "win32";
-const fix = "Set AEON_DATA_DIR to a directory you own with mode 700.";
+const fix = "Set GRAFT_DATA_DIR to a directory you own with mode 700.";
 
 function sudo(args) {
   try {
@@ -28,7 +28,7 @@ test(
   "a private directory is created at mode 700 and a loose one we own is tightened",
   { skip: !posix },
   async () => {
-    const root = mkdtempSync(join(tmpdir(), "aeon-private-"));
+    const root = mkdtempSync(join(tmpdir(), "graft-private-"));
     const dir = join(root, "data");
     const lines = [];
     const write = process.stderr.write;
@@ -62,13 +62,13 @@ test(
 );
 
 test(
-  "a second local user cannot pre-create Aeon's data directory",
+  "a second local user cannot pre-create Graft's data directory",
   { skip: skipAttacker() },
   async () => {
     // os.tmpdir() is the runner's private T folder on macOS, which nobody cannot traverse, so the
-    // second user could never create the directory and the test would fail before testing Aeon.
+    // second user could never create the directory and the test would fail before testing Graft.
     // /tmp is world-traversable on every supported OS.
-    const parent = mkdtempSync(join("/tmp", "aeon-attacker-"));
+    const parent = mkdtempSync(join("/tmp", "graft-attacker-"));
     chmodSync(parent, 0o1777);
     const dir = join(parent, "data");
     try {

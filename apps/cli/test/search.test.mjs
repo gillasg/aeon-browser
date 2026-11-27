@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { searchAeon } from "../dist/search.js";
+import { searchGraft } from "../dist/search.js";
 
 test("search reads chats through the catalog and filters saved answers", async () => {
   const calls = [];
@@ -41,7 +41,7 @@ test("search reads chats through the catalog and filters saved answers", async (
     },
   };
 
-  const result = await searchAeon(
+  const result = await searchGraft(
     client,
     "lamp",
     { origin: "user", since: "2026-10-01", until: "2026-10-02" },

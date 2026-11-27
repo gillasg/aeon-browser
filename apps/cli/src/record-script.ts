@@ -1,4 +1,4 @@
-// Scripted recordings: `aeon record mark|wait|run`. A mark names a beat on the clip clock (with the
+// Scripted recordings: `graft record mark|wait|run`. A mark names a beat on the clip clock (with the
 // bounds of an element, read without any automation glow); wait blocks on a real condition (an
 // element, a URL, a loaded page or a finished chat) instead of sleeps or frame diffing; run records
 // one real prompt from start to stop in a single command.
@@ -7,21 +7,21 @@ import { join } from "node:path";
 import type { Args } from "browserkit/dist/args.js";
 import type { AttentionChat } from "./client.js";
 import type { DaemonHost } from "./host.js";
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 import { loadState, type RecordState } from "./record-capture.js";
 import type { Box, Mark, SoundCue } from "./record-events.js";
 
 const MARKS = "marks.json";
-// The tab on camera: the active tab, whatever it shows (a site, an Aeon page, about:blank), read in
-// place. browser.activeTab() refuses Aeon's pages and a tab another session holds; reads need no
+// The tab on camera: the active tab, whatever it shows (a site, a Graft page, about:blank), read in
+// place. browser.activeTab() refuses Graft's pages and a tab another session holds; reads need no
 // attaching.
 export const ACTIVE =
   "const tabs = await browser.tabs(); const tab = tabs.find((t) => t.active) ?? tabs[0]; if (!tab) throw new Error('No tab is open');";
-// Page code cannot run in Aeon's own pages (Chrome refuses scripting there, so the engine's password
+// Page code cannot run in Graft's own pages (Chrome refuses scripting there, so the engine's password
 // check fails first): say so plainly instead of the engine's PASSWORD_PAGE text.
-const READABLE = `${ACTIVE} if (tab.aeonUi) throw new Error("The active tab is an Aeon page, which page code cannot read: mark it with --box x,y,w,h, or read a web page");`;
+const READABLE = `${ACTIVE} if (tab.graftUi) throw new Error("The active tab is a Graft page, which page code cannot read: mark it with --box x,y,w,h, or read a web page");`;
 const CUES = new Set(["key", "trigger", "arrive", "shutter"]);
-const SESSION = "aeon-record";
+const SESSION = "graft-record";
 
 export type RecordSteps = {
   start(args: Args): Promise<number>;
@@ -172,7 +172,7 @@ function followBrowser(host: DaemonHost, state: RecordState): void {
 export async function mark(host: DaemonHost, steps: RecordSteps, args: Args): Promise<number> {
   const name = args.positional[1];
   const usage =
-    'Usage: aeon record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter]';
+    'Usage: graft record mark <name> [--label "…"] [--selector "<css>"] [--box x,y,w,h] [--cue key|trigger|arrive|shutter]';
   if (!name) throw new Error(usage);
   const state = activeState(steps, args);
   const t = Date.now() - state.startedAt;
@@ -267,7 +267,7 @@ export async function wait(host: DaemonHost, steps: RecordSteps, args: Args): Pr
   const kind = text(args, "for");
   const timeoutMs = Number(text(args, "timeout") ?? 60_000);
   const usage =
-    "Usage: aeon record wait --for selector|url|idle|chat [--selector <css>] [--url <text>] [--chat <id>] [--timeout ms]";
+    "Usage: graft record wait --for selector|url|idle|chat [--selector <css>] [--url <text>] [--chat <id>] [--timeout ms]";
   try {
     followBrowser(host, activeState(steps, args));
   } catch {
@@ -337,7 +337,7 @@ export async function run(host: DaemonHost, steps: RecordSteps, args: Args): Pro
   const prompt = args.positional[1];
   if (!prompt)
     throw new Error(
-      'Usage: aeon record run "<prompt>" [--url <url>] [--browser name] [--out dir] [--window chrome|--tabs] [--no-mouse] [--tail s] [--background]',
+      'Usage: graft record run "<prompt>" [--url <url>] [--browser name] [--out dir] [--window chrome|--tabs] [--no-mouse] [--tail s] [--background]',
     );
   const started = Date.now();
   await openUrl(host, text(args, "url"));
@@ -386,7 +386,7 @@ export async function runPrompt(
 }
 
 /** Turns Work in front on; true when it was off (so the take restores it). */
-async function workInFront(client: AeonClient): Promise<boolean> {
+async function workInFront(client: GraftClient): Promise<boolean> {
   const browsers = await client.settings(undefined).catch(() => [] as unknown[]);
   const off = browsers.some(
     (browser) => (browser as { agentInFront?: unknown } | null)?.agentInFront !== true,
@@ -397,7 +397,7 @@ async function workInFront(client: AeonClient): Promise<boolean> {
 }
 
 async function promptTake(
-  client: AeonClient,
+  client: GraftClient,
   runTasks: typeof import("./run.js").runTasks,
   host: DaemonHost,
   steps: RecordSteps,

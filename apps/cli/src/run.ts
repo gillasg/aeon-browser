@@ -1,7 +1,7 @@
-import type { AeonClient, AttentionChat } from "./client.js";
+import type { GraftClient, AttentionChat } from "./client.js";
 import { summarize, type ChatResult } from "./results.js";
 
-// Runs tasks as real Aeon chats, a batch at a time. Each chat opens as a background tab in the
+// Runs tasks as real Graft chats, a batch at a time. Each chat opens as a background tab in the
 // connected Chrome, quiet or not: a chat can stop to ask the user (a hand-off, a question), and
 // the user can only answer one they can find. It finishes when Core reports it idle.
 export interface RunOptions {
@@ -11,7 +11,7 @@ export interface RunOptions {
   origin: "cli" | "mcp";
   /** Type each prompt into its chat's composer on camera before sending it (screen recordings). */
   typed?: boolean;
-  /** The named browser (`aeon browsers`) each chat opens and runs in; else any connected one. */
+  /** The named browser (`graft browsers`) each chat opens and runs in; else any connected one. */
   browser?: string;
   model?: { provider: string; id: string };
   thinkingLevel?: string;
@@ -28,7 +28,7 @@ interface Selection {
 }
 
 export async function runTasks(
-  client: AeonClient,
+  client: GraftClient,
   prompts: string[],
   options: RunOptions,
 ): Promise<ChatResult[]> {
@@ -46,7 +46,7 @@ export async function runTasks(
 }
 
 export async function chooseModel(
-  client: AeonClient,
+  client: GraftClient,
   options: Pick<RunOptions, "model" | "thinkingLevel">,
 ): Promise<Selection> {
   const result = await client.command("chat.model-catalog", {});
@@ -79,7 +79,7 @@ export async function chooseModel(
 }
 
 async function runOne(
-  client: AeonClient,
+  client: GraftClient,
   prompt: string,
   selection: Selection,
   options: RunOptions,
@@ -113,7 +113,7 @@ async function runOne(
 }
 
 /** A chat's answer and trace as it stands now. */
-export async function inspect(client: AeonClient, chatId: string): Promise<ChatResult> {
+export async function inspect(client: GraftClient, chatId: string): Promise<ChatResult> {
   const view = await client.command("chat.get", { chatId });
   return summarize(chatId, "", view.snapshot, 0, "finished");
 }
@@ -121,7 +121,7 @@ export async function inspect(client: AeonClient, chatId: string): Promise<ChatR
 // Core's attention feed reports each chat's working flag; a chat is done once it has been seen
 // working and then stops, or it times out.
 function waitForIdle(
-  client: AeonClient,
+  client: GraftClient,
   timeoutMs: number,
 ): { track(chatId: string): void; done: Promise<"finished" | "timeout"> } {
   let chatId: string | undefined;

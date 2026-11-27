@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mergeActivity, runUpdateWhenIdle } from "../src/update-idle.ts";
 
-test("aeon update waits while a chat is running and never starts the rebuild", async () => {
+test("graft update waits while a chat is running and never starts the rebuild", async () => {
   const lines = [];
   const probes = [
     { idle: false, busy: ["1 chat working"] },
@@ -31,7 +31,7 @@ test("aeon update waits while a chat is running and never starts the rebuild", a
   assert.doesNotMatch(lines.join("\n"), /kill/i);
 });
 
-test("aeon update proceeds when the daemon is not running", async () => {
+test("graft update proceeds when the daemon is not running", async () => {
   const lines = [];
   let updates = 0;
   const code = await runUpdateWhenIdle({

@@ -102,8 +102,8 @@ await t('X5', async () => { await page.getByRole('textbox', {name: 'Secret code'
 await t('X3', async () => { await page.locator('x-secret input').fill('closed-v'); return 'filled'; });
 await t('X4', async () => page.evaluate(() => ({sent: document.querySelector('x-secret').dataset.sent ?? null, root: document.querySelector('x-secret').shadowRoot})));
 await t('F', async () => { var frames = await page.frames(); var out = {}; for (var [k, part] of [['same', '/inner'], ['cross', '/outer']]) { var f = frames.find((x) => String(x.url).includes(part)); if (!f) { out[k] = 'missing'; continue; } await f.fill('#fi', k + '-v'); await f.click('#fb'); out[k] = await f.evaluate(() => document.getElementById('fo').textContent); } return out; });
-await t('U', async () => { await artifact('aeon-upload.txt', 'hello from aeon'); await page.upload('#file', ['aeon-upload.txt']); for (var i = 0; i < 25 && !(await text('#file-read')); i++) await new Promise((r) => setTimeout(r, 200)); return await page.evaluate(() => ({read: document.getElementById('file-read').textContent, name: document.getElementById('file').files[0]?.name ?? null})); });
-await t('W', async () => { await page.downloads.start(); await page.locator('#dl').click(); var d = await page.downloads.waitFor('aeon-report.csv', 15000); await page.downloads.stop(); return {name: d.suggestedFilename, state: d.state, bytes: d.totalBytes, url: d.url.split('/').pop()}; });`;
+await t('U', async () => { await artifact('graft-upload.txt', 'hello from graft'); await page.upload('#file', ['graft-upload.txt']); for (var i = 0; i < 25 && !(await text('#file-read')); i++) await new Promise((r) => setTimeout(r, 200)); return await page.evaluate(() => ({read: document.getElementById('file-read').textContent, name: document.getElementById('file').files[0]?.name ?? null})); });
+await t('W', async () => { await page.downloads.start(); await page.locator('#dl').click(); var d = await page.downloads.waitFor('graft-report.csv', 15000); await page.downloads.stop(); return {name: d.suggestedFilename, state: d.state, bytes: d.totalBytes, url: d.url.split('/').pop()}; });`;
 
 test(
   "hostile form widgets work in real Chrome against local fixtures",
@@ -124,8 +124,8 @@ test(
     const site = createServer((request, response) => {
       if (request.url === "/report.csv") {
         response.setHeader("content-type", "text/csv");
-        response.setHeader("content-disposition", 'attachment; filename="aeon-report.csv"');
-        return response.end("name,score\naeon,10\n");
+        response.setHeader("content-disposition", 'attachment; filename="graft-report.csv"');
+        return response.end("name,score\ngraft,10\n");
       }
       response.setHeader("content-type", "text/html");
       response.end(request.url === "/inner" ? FRAME("Same") : PAGE(other));
@@ -210,22 +210,25 @@ test(
       // 9. Upload: the page sees the file name and reads its contents.
       assert.deepEqual(
         line("U"),
-        { name: "aeon-upload.txt", read: "aeon-upload.txt:hello from aeon" },
+        { name: "graft-upload.txt", read: "graft-upload.txt:hello from graft" },
         out,
       );
       // 10. Download: tracked to completion and saved with its attachment name.
       assert.deepEqual(
         line("W"),
-        { name: "aeon-report.csv", state: "completed", bytes: 19, url: "report.csv" },
+        { name: "graft-report.csv", state: "completed", bytes: 19, url: "report.csv" },
         out,
       );
       const files = await waitFor(async () => {
         const names = await readdir(saved);
-        if (!names.includes("aeon-report.csv")) throw new Error(names.join());
+        if (!names.includes("graft-report.csv")) throw new Error(names.join());
         return names;
       }, 5000);
-      assert.ok(files.includes("aeon-report.csv"), out);
-      assert.equal(await readFile(join(saved, "aeon-report.csv"), "utf8"), "name,score\naeon,10\n");
+      assert.ok(files.includes("graft-report.csv"), out);
+      assert.equal(
+        await readFile(join(saved, "graft-report.csv"), "utf8"),
+        "name,score\ngraft,10\n",
+      );
     } finally {
       chrome?.kill();
       bridge.kill();

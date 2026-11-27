@@ -235,7 +235,7 @@ function __pickInPage(found, a) {
     var rect = shown.getBoundingClientRect();
     var x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
     if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) { offscreen++; continue; }
-    if (a.nonce) el.setAttribute('data-aeon-pick', a.nonce);
+    if (a.nonce) el.setAttribute('data-graft-pick', a.nonce);
     return {x, y};
   }
   return {hidden: true, offscreen: offscreen > 0};
@@ -262,9 +262,9 @@ async function __fillIndexed(target, element, index, value, options) {
   var nonce = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   try {
     await __pickIndexed(target, element, index, nonce);
-    return await __locator(target, {kind: 'query', by: 'css', value: '[data-aeon-pick="' + nonce + '"]'}).fill(value, options);
+    return await __locator(target, {kind: 'query', by: 'css', value: '[data-graft-pick="' + nonce + '"]'}).fill(value, options);
   } finally {
-    await browser.page(target).inspect('document.querySelectorAll(' + JSON.stringify('[data-aeon-pick="' + nonce + '"]') + ').forEach((el) => el.removeAttribute("data-aeon-pick"))').catch(() => {});
+    await browser.page(target).inspect('document.querySelectorAll(' + JSON.stringify('[data-graft-pick="' + nonce + '"]') + ').forEach((el) => el.removeAttribute("data-graft-pick"))').catch(() => {});
   }
 }
 // fill's receipt: the step result plus {value, via, committed}. commit: 'enter' presses Enter (a

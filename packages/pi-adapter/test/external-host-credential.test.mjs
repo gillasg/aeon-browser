@@ -10,7 +10,7 @@ import { runExternalTool } from "../dist/external-tools.js";
 const PASSWORD = "external-host-credential-secret";
 
 async function fakeBitwarden(t) {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-ext-bw-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-ext-bw-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const outputs = join(dir, "outputs.json");
   await writeFile(
@@ -60,7 +60,7 @@ async function withPath(dir, work) {
 }
 
 test("an external session's result never carries the credential", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-ext-home-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-ext-home-"));
   t.after(() => rm(home, { recursive: true, force: true }));
   const previous = process.env.BROWSERKIT_HOME;
   process.env.BROWSERKIT_HOME = home;

@@ -8,7 +8,7 @@ import {
   HomeAttachmentList,
 } from "./home-attachments.js";
 import { useState, type FormEvent, type ReactElement, useEffect } from "react";
-import type { PiModelCatalogDto } from "@aeon/protocol";
+import type { PiModelCatalogDto } from "@graft/protocol";
 import type { ComposerModel } from "./chat-composer.js";
 import { PiModelPicker, PiThinkingPicker, modelKey } from "./pi-model-picker.js";
 import { ConnectModelCard, type ModelLoginState } from "./connect-model-card.js";
@@ -24,13 +24,13 @@ type HomeStartProps = Pick<
 > & {
   projectName?: string | null;
   projectId?: string | null;
-  browserContext?: import("@aeon/protocol").PiBrowserContextRecord | null;
+  browserContext?: import("@graft/protocol").PiBrowserContextRecord | null;
   onRemoveContext?(): void;
   chatId?: string;
   connected?: boolean;
   /** Optional Chrome flags the daemon saw missing; drives the quiet relaunch notice. */
   missingChromeFlags?: readonly string[] | undefined;
-  /** "What can Aeon do?": the Learn page. */
+  /** "What can Graft do?": the Learn page. */
   onLearn?(): void;
 };
 
@@ -50,7 +50,7 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
   };
   const needsModel = needsModelConnect(props);
   return (
-    <section className="home-start" aria-label="Ask Aeon">
+    <section className="home-start" aria-label="Ask Graft">
       <p className="home-idle-line">Do anything on {pageHost(panelPage.record?.url)}</p>
       <NewUserWelcome needsModel={needsModel} onExample={tryExample} onLearn={props.onLearn} />
       <ProjectChip name={props.projectName} projectId={props.projectId} />
@@ -93,14 +93,14 @@ export function HomeStart({ props }: { props: HomeStartProps }): ReactElement {
 }
 
 function useHomeSeed(setQuery: (value: string) => void): void {
-  // The ⌘K palette puts a site action in the ask box ("aeon.home.seed").
+  // The ⌘K palette puts a site action in the ask box ("graft.home.seed").
   useEffect(() => {
     const seed = (event: Event): void => {
       setQuery(String((event as CustomEvent<string>).detail ?? ""));
       focusQuery();
     };
-    window.addEventListener("aeon.home.seed", seed);
-    return () => window.removeEventListener("aeon.home.seed", seed);
+    window.addEventListener("graft.home.seed", seed);
+    return () => window.removeEventListener("graft.home.seed", seed);
   }, []);
 }
 
@@ -169,8 +169,8 @@ function HomePrompt({
         // The Manage tab never takes the keyboard on load; the side panel's start page does.
         autoFocus={inPanel()}
         value={query}
-        placeholder="Ask Aeon to do anything"
-        ariaLabel="Ask Aeon anything"
+        placeholder="Ask Graft to do anything"
+        ariaLabel="Ask Graft anything"
         onChange={onQuery}
         onFiles={onFiles}
         onEnter={send}
@@ -178,7 +178,7 @@ function HomePrompt({
       <button
         className="home-send-button"
         type="submit"
-        aria-label="Ask Aeon"
+        aria-label="Ask Graft"
         disabled={!query.trim() || !canSubmit}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -212,7 +212,7 @@ function HomeModelControls({
   if (connected === false)
     return (
       <div className="home-model-controls" role="status">
-        <span className="aeon-sr">Connecting…</span>
+        <span className="graft-sr">Connecting…</span>
       </div>
     );
   if (catalog && !catalog.models.length && onConnectModel)
@@ -288,7 +288,7 @@ function inPanel(): boolean {
   return new URLSearchParams(globalThis.location?.search ?? "").get("host") === "panel";
 }
 
-/** `www.steam.com/app/1` → `steam.com`; a page Aeon can't read is "the web". */
+/** `www.steam.com/app/1` → `steam.com`; a page Graft can't read is "the web". */
 function pageHost(url: string | undefined): string {
   try {
     const host = new URL(url ?? "").hostname.replace(/^www\./, "");

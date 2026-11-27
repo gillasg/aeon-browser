@@ -7,7 +7,7 @@ import { flag, type Args } from "../args.js";
 import { out } from "../output.js";
 import type { Command } from "../usage.js";
 
-// A browser profile Aeon owns: a fresh user-data directory, its own DNS-over-HTTPS setting, no
+// A browser profile Graft owns: a fresh user-data directory, its own DNS-over-HTTPS setting, no
 // extensions, and a launcher that keeps it away from the user's own Chrome. Codecs are a property
 // of the browser binary, not the profile: a Chrome for Testing build has no proprietary codecs;
 // point CHROME_PATH at branded Chrome when a site needs them.
@@ -95,7 +95,7 @@ async function profile(args: Args): Promise<number> {
 export const profileCommand: Command = {
   name: "profile",
   group: "Browser",
-  summary: "a browser profile Aeon owns: fresh, DoH, no extensions",
+  summary: "a browser profile Graft owns: fresh, DoH, no extensions",
   help: `Usage: browserkit profile path
        browserkit profile install
        browserkit profile launch [--url <url>]

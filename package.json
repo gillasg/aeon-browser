@@ -1,5 +1,5 @@
 {
-  "name": "aeon",
+  "name": "graft",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -8,9 +8,9 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "pnpm build:core && pnpm exec tsc -b packages/ui && pnpm --filter @aeon/chrome-extension build",
-    "build:core": "pnpm exec tsc -b packages/domain packages/location --pretty false && pnpm build:browser && pnpm exec tsc -b packages/protocol packages/store packages/pi-adapter apps/daemon apps/cli --pretty false && pnpm --filter @aeon/native-host build",
-    "build:native-host": "pnpm --filter @aeon/native-host build",
+    "build": "pnpm build:core && pnpm exec tsc -b packages/ui && pnpm --filter @graft/chrome-extension build",
+    "build:core": "pnpm exec tsc -b packages/domain packages/location --pretty false && pnpm build:browser && pnpm exec tsc -b packages/protocol packages/store packages/pi-adapter apps/daemon apps/cli --pretty false && pnpm --filter @graft/native-host build",
+    "build:native-host": "pnpm --filter @graft/native-host build",
     "typecheck": "pnpm exec tsc -b packages/domain packages/location packages/protocol apps/daemon packages/pi-adapter packages/store apps/cli packages/ui --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
     "lint": "eslint apps packages scripts --max-warnings=0 && eslint -c browser/packages/engine/eslint.config.mjs browser/packages/engine/src --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs && node scripts/check-raw-color.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,mjs,json,html,css}\" \"packages/**/*.{ts,tsx,mjs,json,css}\" \"scripts/**/*.{mjs,json}\" \".github/**/*.yml\" \"*.{json,mjs,yaml}\"",
@@ -26,7 +26,7 @@
     "dev:handshake": "pnpm build:core && node apps/daemon/dist/main.js --dev-handshake",
     "dev:chat": "pnpm build:core && node apps/daemon/dist/main.js --dev-chat",
     "start": "node apps/daemon/dist/main.js --core",
-    "aeon": "node apps/cli/dist/cli.js",
+    "graft": "node apps/cli/dist/cli.js",
     "test:browser": "node scripts/run-tests.mjs --browser \"apps/*/test/*.test.mjs\" \"packages/*/test/*.test.mjs\" \"scripts/**/*.test.mjs\" \"benchmarks/*.test.mjs\" \"templates/video/test/*.test.mjs\"",
     "test:conformance": "pnpm --dir browser run test:conformance",
     "test:stealth-probe": "pnpm --dir browser run test:stealth-probe",

@@ -1,8 +1,8 @@
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 import { cellErrorMessage, runCellOn } from "./cell-run.js";
 import type { TapFrame, TapKind, TapSource } from "./mcp-tap-stream.js";
 
-// The live browser behind aeon/tap: the engine's own page.streams tap in the connected Chrome,
+// The live browser behind graft/tap: the engine's own page.streams tap in the connected Chrome,
 // driven over the daemon. Installing a tab starts its tap (WebRTC only when asked); a pump waits
 // on the engine's ring and forwards new frames; removing the last kind stops the tap, which
 // restores the page's originals and turns Runtime off when nothing else on the tab needs it.
@@ -28,9 +28,9 @@ interface EngineFrame {
   json?: unknown;
 }
 
-export function cellRunner(aeon: () => Promise<AeonClient>, session = "mcp-tap"): CellRunner {
+export function cellRunner(graft: () => Promise<GraftClient>, session = "mcp-tap"): CellRunner {
   return async (code, timeoutMs) => {
-    const result = await runCellOn(await aeon(), code, { session, timeoutMs });
+    const result = await runCellOn(await graft(), code, { session, timeoutMs });
     if (result.error) throw new Error(cellErrorMessage(result));
     return result.value;
   };
@@ -45,7 +45,7 @@ export class BrowserTapSource implements TapSource {
   async resolveTab(ref: number | undefined): Promise<number> {
     if (ref !== undefined) return ref;
     const id = Number(await this.run("return (await browser.activeTab()).id;", 10_000));
-    if (!Number.isInteger(id)) throw new Error("aeon/tap: no active tab to watch.");
+    if (!Number.isInteger(id)) throw new Error("graft/tap: no active tab to watch.");
     return id;
   }
 

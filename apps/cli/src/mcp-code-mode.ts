@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
 
-// The default `aeon mcp` surface: five fixed tools, whatever the number of mapped sites.
+// The default `graft mcp` surface: five fixed tools, whatever the number of mapped sites.
 //   browser_code  run JS in the persistent browser realm (done | paused | error)
-//   aeon_find     search refs, or read one ref's .d.ts signature
-//   aeon_call     run a mapped operation or ability by ref, no JS
-//   aeon_resume   continue a parked cell or an aeon_run chat
-//   aeon_run      hand a whole task to Aeon's own agent
+//   graft_find     search refs, or read one ref's .d.ts signature
+//   graft_call     run a mapped operation or ability by ref, no JS
+//   graft_resume   continue a parked cell or a graft_run chat
+//   graft_run      hand a whole task to Graft's own agent
 // A cell that blocks on human.handoff / bu.handoff (a passkey, a fingerprint, a code) is parked:
 // it stays an unresolved await in the daemon realm, and the caller gets a handle to resume.
 
@@ -15,7 +15,7 @@ export const CODE_SURFACE_TOOLS = [
   {
     name: "browser_code",
     description:
-      "Run JavaScript in the user's real Chrome, in a persistent realm: browser.*, page.*, site.*, human.*, mcp.* and help(topic). Variables survive between calls. Returns done, error, or paused when the user must act in Chrome (then aeon_resume).",
+      "Run JavaScript in the user's real Chrome, in a persistent realm: browser.*, page.*, site.*, human.*, mcp.* and help(topic). Variables survive between calls. Returns done, error, or paused when the user must act in Chrome (then graft_resume).",
     inputSchema: {
       type: "object",
       properties: {
@@ -27,7 +27,7 @@ export const CODE_SURFACE_TOOLS = [
     },
   },
   {
-    name: "aeon_find",
+    name: "graft_find",
     description:
       "{query}: up to 8 refs (mapped site operations, abilities, compiled clients). {ref}: its .d.ts, effect and an example; site:<site> gives the whole typed client.",
     inputSchema: {
@@ -41,7 +41,7 @@ export const CODE_SURFACE_TOOLS = [
     annotations: { readOnlyHint: true, destructiveHint: false },
   },
   {
-    name: "aeon_call",
+    name: "graft_call",
     description:
       "Run a mapped operation or ability by ref with params, with the user's logins and no model.",
     inputSchema: {
@@ -52,9 +52,9 @@ export const CODE_SURFACE_TOOLS = [
     },
   },
   {
-    name: "aeon_resume",
+    name: "graft_resume",
     description:
-      "Continue a paused browser_code cell or an aeon_run chat by handle. reply answers a run's question. Waits up to waitSeconds (max 50).",
+      "Continue a paused browser_code cell or a graft_run chat by handle. reply answers a run's question. Waits up to waitSeconds (max 50).",
     inputSchema: {
       type: "object",
       properties: {
@@ -67,9 +67,9 @@ export const CODE_SURFACE_TOOLS = [
     },
   },
   {
-    name: "aeon_run",
+    name: "graft_run",
     description:
-      "Hand a whole task to Aeon's own agent, as a chat in a background Chrome tab. Returns a handle for aeon_resume.",
+      "Hand a whole task to Graft's own agent, as a chat in a background Chrome tab. Returns a handle for graft_resume.",
     inputSchema: {
       type: "object",
       properties: {
@@ -102,7 +102,7 @@ export interface Paused {
   kind: string;
   where: { tab: string; title: string };
   expiresAt: string;
-  resumeWith: "aeon_resume";
+  resumeWith: "graft_resume";
 }
 
 const PARK_MS = 10 * 60_000;
@@ -144,7 +144,7 @@ export class ParkingLot {
       kind: handoff.kind ?? "handoff",
       where: { tab: handoff.tab ?? "", title: handoff.title ?? "" },
       expiresAt: new Date(now + PARK_MS).toISOString(),
-      resumeWith: "aeon_resume",
+      resumeWith: "graft_resume",
     };
     const parked: Parked = { outcome, paused, createdAt: now };
     outcome.then(

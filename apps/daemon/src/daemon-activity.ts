@@ -4,7 +4,7 @@ import {
   CoreActivityResultSchema,
   handoffStatusLine,
   type HandoffStatus,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 export interface ActivityCounts {
   workingChats: number;

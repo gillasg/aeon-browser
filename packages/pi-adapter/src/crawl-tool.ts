@@ -14,7 +14,7 @@ import { runCheck } from "./crawl-check.js";
 import { boundedResult, errorResult, textResult, type ToolText } from "./site-tool-output.js";
 
 // crawl: read pages and whole sites as Markdown and data. The actions and parameters come from
-// browserkit's definition; Aeon only saves results, scopes the browser call to the chat, and
+// browserkit's definition; Graft only saves results, scopes the browser call to the chat, and
 // keeps check's workspace evidence.
 
 export const CRAWL_ACTIONS = AGENT_CRAWL_ACTIONS;

@@ -8,8 +8,8 @@ if (!source || !destination || source === destination) throw Error("Invalid impo
 const backup = join(destination, "repair-backups", new Date().toISOString().replaceAll(":", "-"));
 await mkdir(backup, { recursive: true });
 for (const [name, legacyName] of [
-  ["aeon.sqlite", "pippin.sqlite"],
-  ["aeon-site-scripts.sqlite", "aeon-site-scripts.sqlite"],
+  ["graft.sqlite", "pippin.sqlite"],
+  ["graft-site-scripts.sqlite", "graft-site-scripts.sqlite"],
 ]) {
   const target = join(destination, name);
   let origin = join(source, name);

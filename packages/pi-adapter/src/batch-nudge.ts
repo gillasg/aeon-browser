@@ -4,7 +4,7 @@
 // for the next steps to share a cell; every third after that says it again. A cell that did
 // several steps, or a pause of over a minute, starts the count again. It is advice only: it never
 // rides on an error, and a cell with no browser work (help(), maths) neither counts nor breaks a
-// run. The same idea as Cua Driver's batch_nudge.rs, sized for Aeon's per-chat chat tool.
+// run. The same idea as Cua Driver's batch_nudge.rs, sized for Graft's per-chat chat tool.
 
 /** The live hint, on the third tiny cell in a row. One line, so it costs few tokens. */
 export const BATCH_NUDGE =

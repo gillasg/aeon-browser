@@ -63,7 +63,7 @@ export function attachTerminal(
   if (recording) return { ...recording, terminal };
   return {
     version: 1,
-    recorder: "aeon",
+    recorder: "graft",
     clock: "clip",
     clip: {
       file: "clip.mp4",
@@ -77,7 +77,7 @@ export function attachTerminal(
     },
     events: [],
     terminal,
-    note: "Terminal cast only. Run `aeon record start` for a tab or window clip.",
+    note: "Terminal cast only. Run `graft record start` for a tab or window clip.",
   };
 }
 

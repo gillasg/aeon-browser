@@ -10,7 +10,7 @@ import type { SiteModel } from "./types.js";
 import { importCaptures, rebuild } from "./workflow.js";
 
 // One saved HAR (or mitmproxy) file, turned into something usable without a browser:
-// a standalone typed client, a site pack whose OpenAPI carries x-aeon-observations, or a local
+// a standalone typed client, a site pack whose OpenAPI carries x-graft-observations, or a local
 // replay-only mock server.
 
 export type HarEmit = "client" | "pack" | "mock";

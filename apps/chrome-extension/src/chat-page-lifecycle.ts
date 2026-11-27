@@ -1,6 +1,6 @@
-import { ChatIdSchema } from "@aeon/protocol";
+import { ChatIdSchema } from "@graft/protocol";
 import { InitialChatDisplay } from "./initial-chat-display.js";
-import { DaemonUiRequestSchema } from "@aeon/protocol";
+import { DaemonUiRequestSchema } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 interface ChatPageCloseState {

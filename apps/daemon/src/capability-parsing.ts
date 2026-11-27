@@ -2,7 +2,7 @@ import type {
   CapabilityDefinition,
   CapabilityRegistryFile,
   CapabilityVerification,
-} from "@aeon/domain";
+} from "@graft/domain";
 import { isValidCredentialReference } from "./mcp-credentials.js";
 
 export const REGISTRY_SCHEMA_VERSION = 1;
@@ -92,7 +92,7 @@ function parseMcpCapability(
 
 /**
  * `onSkip` makes reading tolerant: an invalid entry is skipped and reported instead of failing the
- * whole file, so one bad hand-edited line never stops Aeon from starting. Writes stay strict.
+ * whole file, so one bad hand-edited line never stops Graft from starting. Writes stay strict.
  */
 export function parseRegistry(
   raw: string,

@@ -8,7 +8,7 @@ import { buildRunCard } from "../dist/run-card.js";
 import { RouteRecorder } from "../dist/route-recorder.js";
 
 test("a missing link is named once and an existing file is not", () => {
-  const workspace = mkdtempSync(join(tmpdir(), "aeon-missing-"));
+  const workspace = mkdtempSync(join(tmpdir(), "graft-missing-"));
   mkdirSync(join(workspace, "downloads"));
   writeFileSync(join(workspace, "report.md"), "# ok\n");
   writeFileSync(join(workspace, "downloads", "orders.csv"), "id\n");
@@ -28,8 +28,8 @@ test("a missing link is named once and an existing file is not", () => {
 });
 
 test("files in a folder the answer names by absolute path are not missing", () => {
-  const workspace = mkdtempSync(join(tmpdir(), "aeon-missing-"));
-  const notes = mkdtempSync(join(tmpdir(), "aeon-notes-"));
+  const workspace = mkdtempSync(join(tmpdir(), "graft-missing-"));
+  const notes = mkdtempSync(join(tmpdir(), "graft-notes-"));
   writeFileSync(join(notes, "hn-a-perfect-simcity.md"), "# ok\n");
   const answer = `Wrote one note per story into \`${notes}\`:\n- \`hn-a-perfect-simcity.md\`\n- \`gone.md\``;
   assert.deepEqual(missingAnswerFiles(answer, [workspace]), ["gone.md"]);
@@ -57,10 +57,10 @@ test("the run card shows one notice for a missing file and none when the list is
 });
 
 test("a finished run names a file that is not in the workspace", async () => {
-  const workspace = mkdtempSync(join(tmpdir(), "aeon-card-"));
+  const workspace = mkdtempSync(join(tmpdir(), "graft-card-"));
   writeFileSync(join(workspace, "report.md"), "# ok\n");
   const previous = process.env.SITE_TO_API_HOME;
-  process.env.SITE_TO_API_HOME = mkdtempSync(join(tmpdir(), "aeon-routes-"));
+  process.env.SITE_TO_API_HOME = mkdtempSync(join(tmpdir(), "graft-routes-"));
   const cards = [];
   const recorder = new RouteRecorder(
     { publish: (_chat, event) => cards.push(event) },

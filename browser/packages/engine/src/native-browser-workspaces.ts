@@ -7,7 +7,7 @@ import type { Cdp } from "./native-browser-visual-claws.js";
 type Value = Record<string, unknown>;
 type Tab = chrome.tabs.Tab;
 const COLORS = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
-const STORE_KEY = "aeon-workspaces";
+const STORE_KEY = "graft-workspaces";
 const MAX_WORKSPACES = 50;
 const MAX_URLS = 100;
 

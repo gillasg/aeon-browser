@@ -8,9 +8,9 @@ export function SidebarChatStatus({ chatId }: { chatId: string }): ReactElement 
       if (detail?.chatId === chatId)
         setStatus({ working: detail.working === true, unread: detail.unread === true });
     };
-    window.addEventListener("aeon.chat-status", receive);
-    window.dispatchEvent(new CustomEvent("aeon.chat-status-request", { detail: { chatId } }));
-    return () => window.removeEventListener("aeon.chat-status", receive);
+    window.addEventListener("graft.chat-status", receive);
+    window.dispatchEvent(new CustomEvent("graft.chat-status-request", { detail: { chatId } }));
+    return () => window.removeEventListener("graft.chat-status", receive);
   }, [chatId]);
   if (!status.working && !status.unread) return null;
   return (

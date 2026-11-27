@@ -19,7 +19,7 @@ function cleanFacts(overrides = {}) {
       mimeTypes: 5,
       signals: [],
       diagnostics: [
-        "an isolated-world helper of Aeon's runs here (page code cannot read it): browserkit-helper",
+        "an isolated-world helper of Graft's runs here (page code cannot read it): browserkit-helper",
       ],
     },
     ...overrides,
@@ -142,7 +142,7 @@ test("webdriver, headless, zero screen, missing plugins and stealthCheck signals
   }
   assert.match(tells.fix, /real display/);
   assert.match(tells.fix, /default profile/);
-  assert.match(tells.fix, /update Aeon/i);
+  assert.match(tells.fix, /update Graft/i);
 });
 
 test("parseStealthFacts reads the trace, ICE, navigator and stealth report without altering them", () => {

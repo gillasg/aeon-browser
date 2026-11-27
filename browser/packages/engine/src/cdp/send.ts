@@ -62,7 +62,7 @@ const flights = new Set<Flight>();
 const records: CallRecord[] = [];
 const failures = new Map<string, number>();
 
-/** Swallowed and thrown CDP failures, per label, for `aeon doctor`. */
+/** Swallowed and thrown CDP failures, per label, for `graft doctor`. */
 export function cdpFailures(): { label: string; count: number }[] {
   return [...failures]
     .map(([label, count]) => ({ label, count }))

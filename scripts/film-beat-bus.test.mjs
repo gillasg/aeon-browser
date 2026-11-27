@@ -36,7 +36,7 @@ function sessionStore() {
 }
 
 async function bundle(t, entries) {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-film-bus-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-film-bus-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const out = {};
   for (const [name, src] of Object.entries(entries)) {
@@ -119,5 +119,5 @@ test("record arms, reads and disarms the orb's beats through Core and the extens
   assert.equal(await armBeats(bus, false), true);
   await settle();
   assert.equal(orb.filmArmed(), false);
-  assert.equal(store.data["aeon-film-armed"], false);
+  assert.equal(store.data["graft-film-armed"], false);
 });

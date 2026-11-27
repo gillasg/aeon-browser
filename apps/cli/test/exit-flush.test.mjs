@@ -5,7 +5,7 @@ import test from "node:test";
 
 const exitModule = fileURLToPath(new URL("../dist/exit.js", import.meta.url));
 
-// An agent reads `aeon repl` through a pipe. process.exit() used to drop what the pipe still held,
+// An agent reads `graft repl` through a pipe. process.exit() used to drop what the pipe still held,
 // so a large result arrived cut off mid-JSON.
 test("a large result written just before exit reaches a pipe whole", async () => {
   const size = 1_000_000;

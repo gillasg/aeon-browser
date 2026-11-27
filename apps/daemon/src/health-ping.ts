@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { SUPPORTED_PROTOCOL_VERSION, type ProtocolVersion } from "@aeon/protocol";
+import { SUPPORTED_PROTOCOL_VERSION, type ProtocolVersion } from "@graft/protocol";
 
 // One health check for doctor and the supervisor. The daemon's event loop asks the extension;
 // the engine answers on its next turn, so a stuck loop cannot look healthy. Two seconds.

@@ -35,8 +35,8 @@ interface TabPush {
   unread: number | null;
 }
 
-export const PUSH_EVENT = "Aeon.pushEvent";
-/** The tap's binding and its restore switch: random per worker, so neither names Aeon. */
+export const PUSH_EVENT = "Graft.pushEvent";
+/** The tap's binding and its restore switch: random per worker, so neither names Graft. */
 export const PUSH_TAP: TapSpec = {
   label: "notifications tap",
   binding: tapName(),

@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { WebSocket } from "ws";
-import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
-import { openChatStore } from "@aeon/store";
+import { SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol";
+import { openChatStore } from "@graft/store";
 import { startCoreTransport } from "../dist/core-transport.js";
 import { startNativeTransport } from "../dist/native-transport.js";
 import { acquireCoreLock } from "../dist/core-startup.js";
@@ -180,7 +180,7 @@ async function nativeClient(endpoint, origin, hello) {
 }
 
 async function createFixture(withEvents = false) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-core-test-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-core-test-"));
   const store = openChatStore(directory),
     pi = withEvents ? new EventPiPort() : new FakePiPort();
   const service = new ChatService({ dataDirectory: directory, store, pi });

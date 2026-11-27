@@ -1,4 +1,4 @@
-import type { ComposerAttachment } from "@aeon/ui";
+import type { ComposerAttachment } from "@graft/ui";
 
 export async function readComposerAttachment(file: File): Promise<ComposerAttachment> {
   const mimeType = mimeFor(file);

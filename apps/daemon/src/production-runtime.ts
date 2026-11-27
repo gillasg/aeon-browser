@@ -10,14 +10,14 @@ import { ChatService } from "./chat-service.js";
 import {
   browserNamedFor,
   browserParentChat,
-  createAeonHostHandler,
+  createGraftHostHandler,
   PiSdkSessionAdapter,
   resolvePiAgentDirectory,
   sessionChatId,
   siteMapperRequest,
   siteToolModel,
-} from "@aeon/pi-adapter";
-import { openChatStore } from "@aeon/store";
+} from "@graft/pi-adapter";
+import { openChatStore } from "@graft/store";
 import { SiteScriptService } from "./site-script-service.js";
 import { browserControlFor } from "./password-saving-sync.js";
 import { BrowserControlService } from "./browser-control-service.js";
@@ -42,7 +42,7 @@ import { PiMcpConfigMigration } from "./pi-mcp-config-migration.js";
 import { piMcpServerName } from "./mcp-registry-mapping.js";
 import { readEnvironment } from "./environment.js";
 import { backfillChatOrigins } from "./chat-origin-backfill.js";
-import { migrateAeonSettings } from "./settings-migration.js";
+import { migrateGraftSettings } from "./settings-migration.js";
 import { outsideContextAnswer, type OutsideTab } from "./outside-context.js";
 import { listSites, migrateAllAbilities } from "@browserkit/site-mapper";
 import { siteCounts } from "./site-counts.js";
@@ -56,7 +56,7 @@ export function createProductionRuntime(dataDirectory: string): {
   threadCoordination: ThreadCoordinationService;
   browserControl: BrowserControlService;
   ready: Promise<void>;
-  /** Chats, routines, cells and abilities still running. `aeon update` polls this. */
+  /** Chats, routines, cells and abilities still running. `graft update` polls this. */
   activity(): ActivityCounts;
   /** Warms the next chat's resources once the daemon answers (see warmAfterReady). */
   warm(): void;
@@ -81,7 +81,7 @@ export function createProductionRuntime(dataDirectory: string): {
   const siteScripts = attachSiteScripts(dataRoot, browserControl);
   const pi = createPiAdapter(dataRoot, piAgentDirectory, browserControl);
   // browser_code reaches the chat's connected MCP tools through this bridge: sandbox -> daemon ->
-  // McpClientManager.callMcpTool. Only MCP capabilities are listed, never Aeon's own browser tools.
+  // McpClientManager.callMcpTool. Only MCP capabilities are listed, never Graft's own browser tools.
   pi.setMcpBridge(new McpCodeBridge(new McpClientManager(registry)));
   warmModels(pi);
   const siteRules = new BrowserSiteRules();
@@ -182,7 +182,7 @@ function bindChatLabels(
 }
 
 function ownerTitle(store: ReturnType<typeof openChatStore>, chatId: string): string | undefined {
-  const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
+  const chat = store.getChat(chatId as import("@graft/domain").ChatId);
   if (!chat) return undefined;
   const title = chat.title.trim().slice(0, 80) || "Chat";
   return chat.origin === "routine" ? `Routine · ${title}` : title;
@@ -190,7 +190,7 @@ function ownerTitle(store: ReturnType<typeof openChatStore>, chatId: string): st
 
 /** Agent chats stay in the user's window. Routines and outside sessions get their own window. */
 function defaultSpace(store: ReturnType<typeof openChatStore>, chatId: string): "window" | "tabs" {
-  const chat = store.getChat(chatId as import("@aeon/domain").ChatId);
+  const chat = store.getChat(chatId as import("@graft/domain").ChatId);
   if (!chat) return "window";
   return ["user", "agent", "cli", "mcp"].includes(chat.origin) ? "tabs" : "window";
 }
@@ -223,7 +223,7 @@ async function readManagementSnapshot(
   capabilityTools: CapabilityToolService,
   pins: PinnedResults,
   dataDirectory: string,
-  selectedChatId?: import("@aeon/domain").ChatId,
+  selectedChatId?: import("@graft/domain").ChatId,
 ): Promise<unknown> {
   let resources = null;
   let resourceError: string | null = null;
@@ -307,7 +307,7 @@ async function initializeRuntime(
   store: ReturnType<typeof openChatStore>,
   dataRoot: string,
 ): Promise<void> {
-  await migrateAeonSettings(dataRoot);
+  await migrateGraftSettings(dataRoot);
   await backfillChatOrigins(store, dataRoot);
   await registry.initialize();
   await migration.migrate(await registry.snapshot());
@@ -367,7 +367,7 @@ function warmModels(pi: PiSdkSessionAdapter): void {
         }) + "\n",
       ),
     )
-    .catch((error) => process.stderr.write("Aeon model warmup failed: " + String(error) + "\n"));
+    .catch((error) => process.stderr.write("Graft model warmup failed: " + String(error) + "\n"));
 }
 
 function closeRuntimeStores(service: ChatService, store: ReturnType<typeof openChatStore>): void {
@@ -405,7 +405,7 @@ function createPiAdapter(
     agentDirectory: piAgentDirectory,
     preferredInitialModel: {
       provider:
-        process.env.AEON_INITIAL_MODEL_PROVIDER ||
+        process.env.GRAFT_INITIAL_MODEL_PROVIDER ||
         process.env.PIPPIN_INITIAL_MODEL_PROVIDER ||
         "opencode-go",
       id: readEnvironment("INITIAL_MODEL_ID") || "deepseek-v4.1-flash",
@@ -459,7 +459,7 @@ function installAbilityIdle(options: {
     activity: () => readDaemonActivity(attention, routines, siteRules, browserControl),
     cell: async (code) => {
       const chatId = sessionChatId("external", IDLE_SESSION);
-      const host = createAeonHostHandler({
+      const host = createGraftHostHandler({
         source: "external",
         siteRules: () => siteRules.answer(chatId),
         siteMapper: (request) => siteMapperRequest(chatId, request),
@@ -501,7 +501,7 @@ function installManagementActions(
   const library = new LibraryActions(async (code, options = {}) => {
     const session = options.session ?? "management";
     const chatId = sessionChatId("external", session);
-    const host = createAeonHostHandler({
+    const host = createGraftHostHandler({
       source: "external",
       siteMapper: (request) => siteMapperRequest(chatId, request),
     });

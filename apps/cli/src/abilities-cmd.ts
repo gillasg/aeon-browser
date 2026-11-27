@@ -1,4 +1,4 @@
-// aeon abilities keeps browserkit's abilities command and adds test --all, rename, forget,
+// graft abilities keeps browserkit's abilities command and adds test --all, rename, forget,
 // versions/restore and the publish tools.
 
 import {

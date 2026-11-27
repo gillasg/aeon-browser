@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
-import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@aeon/protocol";
+import { PiBrowserContextRecordSchema, type PiBrowserContextRecord } from "@graft/protocol";
 import { BrowserContextChip } from "./browser-context-view.js";
 export function PageContextTray(props: {
   chatId?: string | undefined;
@@ -13,15 +13,15 @@ export function PageContextTray(props: {
     const update = (event: Event): void => {
       if ((event as CustomEvent).detail.id === id) setPages(readPages(id));
     };
-    window.addEventListener("aeon.context-added", update);
-    return () => window.removeEventListener("aeon.context-added", update);
+    window.addEventListener("graft.context-added", update);
+    return () => window.removeEventListener("graft.context-added", update);
   }, [id]);
   const visible = pages.filter((page) => page.target.tabId !== props.primary?.target.tabId);
   if (!props.primary && !visible.length) return null;
   const remove = (contextId: string): void => {
     const next = pages.filter((page) => page.contextId !== contextId);
     setPages(next);
-    sessionStorage.setItem("aeon-context-pages:" + id, JSON.stringify(next));
+    sessionStorage.setItem("graft-context-pages:" + id, JSON.stringify(next));
   };
   return (
     <div className="composer-context-slot page-context-tray">
@@ -43,7 +43,7 @@ export function PageContextTray(props: {
 }
 function readPages(id: string): PiBrowserContextRecord[] {
   try {
-    const value: unknown = JSON.parse(sessionStorage.getItem("aeon-context-pages:" + id) ?? "[]");
+    const value: unknown = JSON.parse(sessionStorage.getItem("graft-context-pages:" + id) ?? "[]");
     return Array.isArray(value)
       ? value
           .flatMap((item) => {

@@ -24,8 +24,8 @@ type Tracked = {
 };
 type Stats = { opened: number; closed: number; popups: number };
 
-const STORAGE_KEY = "aeon-agent-tab-cleanup";
-const ALARM = "aeon-agent-tab-cleanup";
+const STORAGE_KEY = "graft-agent-tab-cleanup";
+const ALARM = "graft-agent-tab-cleanup";
 const DEFAULT_IDLE_MINUTES = 10;
 const MAX_CHAT_TABS = 6;
 // A tab used this recently is still part of the work (parallel reads, a page it will return to).
@@ -113,15 +113,15 @@ export function keepStepsTabs(chatId: string, steps: readonly Record<string, unk
   keepAgentTabs(chatId, targets);
 }
 
-// Activations Aeon causes itself (pairing a tab with the chat in Split View, working in front)
+// Activations Graft causes itself (pairing a tab with the chat in Split View, working in front)
 // fire the same Chrome event as the user's own clicks. They must not count as the user looking:
-// a tab only Aeon showed is still the agent's, grouped while kept and closed at the run's end.
+// a tab only Graft showed is still the agent's, grouped while kept and closed at the run's end.
 const SELF_ACTIVATION_MS = 2_000;
 const selfActivated = new Map<number, number>();
 /** A tab Core opens in front activates before its id is known; suppress that first activation. */
 let expectNextActivation = 0;
 
-/** Aeon is about to activate (or show in Split View) these tabs itself. */
+/** Graft is about to activate (or show in Split View) these tabs itself. */
 export function expectAgentActivation(...tabIds: (number | undefined)[]): void {
   const now = Date.now();
   for (const id of tabIds) if (id !== undefined) selfActivated.set(id, now);
@@ -132,7 +132,7 @@ export function expectNextAgentActivation(): void {
   expectNextActivation = Date.now() + SELF_ACTIVATION_MS;
 }
 
-function activatedByAeon(tabId: number): boolean {
+function activatedByGraft(tabId: number): boolean {
   if (expectNextActivation > Date.now()) {
     expectNextActivation = 0;
     return true;
@@ -149,7 +149,7 @@ function activatedByAeon(tabId: number): boolean {
 /** The user switched to the tab: they may want it after the run, so the run's tidy-up keeps it. */
 function seeAgentTab(tabId: number): void {
   const entry = tracked.get(tabId);
-  if (!entry || activatedByAeon(tabId)) return;
+  if (!entry || activatedByGraft(tabId)) return;
   entry.seen = true;
   entry.touched = Date.now();
   save();
@@ -334,7 +334,7 @@ export async function cleanupAgentTabs(options: { minutes?: number } = {}): Prom
     const tab = tabs[i];
     return !tab || isAgentGroupId(tab.groupId) || windows.has(tab.windowId);
   };
-  // A tab outside any agent group (grouping off, or a profile Aeon never grouped in) is still the
+  // A tab outside any agent group (grouping off, or a profile Graft never grouped in) is still the
   // agent's while the user has not looked at it; without this every finished chat left one open.
   const loose = stale.filter((_, i) => !placed(i));
   return [

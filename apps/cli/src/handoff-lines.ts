@@ -1,6 +1,6 @@
-import { clipHandoffMessage, elapsedLabel } from "@aeon/protocol";
+import { clipHandoffMessage, elapsedLabel } from "@graft/protocol";
 
-/** A tab row as `aeon tabs` and `aeon status` read it. */
+/** A tab row as `graft tabs` and `graft status` read it. */
 export interface HandoffTab {
   target?: { tabId?: number };
   title?: string;
@@ -15,7 +15,7 @@ export function handoffLine(
   return `  waiting on you: ${clipHandoffMessage(handoff.message)} · ${elapsedLabel(now - handoff.startedAt)}`;
 }
 
-/** One line per pending hand-off, naming its tab, for `aeon status`. */
+/** One line per pending hand-off, naming its tab, for `graft status`. */
 export function statusHandoffLines(tabs: HandoffTab[], now = Date.now()): string[] {
   return tabs.flatMap((tab) =>
     tab.handoff

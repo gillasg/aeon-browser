@@ -6,8 +6,8 @@ import type {
   CapabilityRegistryFile,
   CapabilityVerification,
   ChatId,
-  AeonProductStore,
-} from "@aeon/domain";
+  GraftProductStore,
+} from "@graft/domain";
 import { atomicWrite, withRegistryLock } from "./capability-registry-file.js";
 import {
   isRecord,
@@ -23,7 +23,7 @@ export class CapabilityRegistry {
 
   constructor(
     private readonly filePath: string,
-    private readonly store: AeonProductStore,
+    private readonly store: GraftProductStore,
   ) {}
 
   async initialize(): Promise<void> {

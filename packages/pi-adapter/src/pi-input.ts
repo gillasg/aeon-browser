@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import type { PiSessionInput } from "@aeon/domain";
+import type { PiSessionInput } from "@graft/domain";
 import { fitModelImages } from "./model-image.js";
 
 export async function decodePiInput(input: PiSessionInput): Promise<{

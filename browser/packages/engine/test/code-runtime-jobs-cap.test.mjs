@@ -35,7 +35,7 @@ test("30 settled jobs with large results keep only the newest and fit the budget
   assert.ok(jobs.size <= MAX_FINISHED_JOBS + 1, `kept ${jobs.size}`);
   assert.ok(jobs.has("running"));
   assert.ok(jobs.has("job-29") && !jobs.has("job-0"));
-  const saved = stored["aeon-code-jobs"];
+  const saved = stored["graft-code-jobs"];
   assert.equal(saved.length, jobs.size);
   assert.ok(JSON.stringify(saved).length <= SAVED_JOBS_BUDGET + 200_000);
   // The newest keep their results; older ones say why theirs are gone.

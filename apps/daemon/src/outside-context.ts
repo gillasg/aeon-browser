@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 // Whether outside agents (MCP, the CLI) may see the user's open tabs. Off by default; the user
-// turns it on in Aeon Settings. Only titles and URLs leave the browser, never page contents.
+// turns it on in Graft Settings. Only titles and URLs leave the browser, never page contents.
 
 export interface OutsideTab {
   title: string;
@@ -13,7 +13,7 @@ export interface OutsideTab {
 export const CONTEXT_TOOL = {
   name: "context",
   description:
-    "The user's open tabs (title, URL) and which is active, when they allowed it in Aeon Settings. Titles and URLs only, never page contents. When it is off, returns how to turn it on.",
+    "The user's open tabs (title, URL) and which is active, when they allowed it in Graft Settings. Titles and URLs only, never page contents. When it is off, returns how to turn it on.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
 };
 
@@ -44,7 +44,7 @@ export async function outsideContextAnswer(
     return {
       enabled: false,
       tabs: [],
-      hint: 'The user has not let outside agents see their tabs. Ask them to turn on "Let outside agents see my open tabs" in Aeon Settings.',
+      hint: 'The user has not let outside agents see their tabs. Ask them to turn on "Let outside agents see my open tabs" in Graft Settings.',
     };
   const open = (await tabs())
     .map((tab) => ({

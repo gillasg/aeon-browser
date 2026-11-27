@@ -16,7 +16,7 @@ interface Owner {
   chatId: string;
   target: BrowserTargetKey;
 }
-const key = "aeon-download-owners",
+const key = "graft-download-owners",
   owners = new Map<number, Owner>();
 let loading: Promise<void> | undefined,
   writes: Promise<unknown> = Promise.resolve();

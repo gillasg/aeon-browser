@@ -1,17 +1,17 @@
-// Aeon's own overlay (the cursor, the orb, the hand-off card, labelled-screenshot marks) is painted
+// Graft's own overlay (the cursor, the orb, the hand-off card, labelled-screenshot marks) is painted
 // on the page, but it is not the page. Its accessibility nodes stay out of the state the agent
-// reads. Most overlay hosts carry data-aeon-overlay. The cursor's host has no attribute (a page must
+// reads. Most overlay hosts carry data-graft-overlay. The cursor's host has no attribute (a page must
 // not be able to select it, and the painter's expandos live in the isolated world), so it is found
 // by its fixed inline style.
 import { send } from "./cdp/send.js";
 import { CURSOR_HOST_TEST } from "./cursor-bus.js";
 import { queryNodes, subtreeBackendIds } from "./native-browser-dom.js";
 
-const OVERLAY_SELECTOR = "[data-aeon-overlay]";
+const OVERLAY_SELECTOR = "[data-graft-overlay]";
 const CURSOR_HOST = `([...(document.documentElement || document.body).children].find((n) => ${CURSOR_HOST_TEST}) || null)`;
 
 /**
- * Backend node ids inside Aeon's overlay, each host's whole subtree included (shadow roots too).
+ * Backend node ids inside Graft's overlay, each host's whole subtree included (shadow roots too).
  * Never throws: when the page has no overlay, or a read fails, the set is simply smaller.
  */
 export async function overlayBackendIds(debuggee: chrome.debugger.Debuggee): Promise<Set<number>> {

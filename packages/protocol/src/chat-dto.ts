@@ -159,7 +159,7 @@ const PiContentBlockSchema = z.discriminatedUnion("type", [
 ]);
 
 // One browser action inside a tool call: what ran, in which tab, when its input reached the page
-// and where (viewport CSS pixels). Screen recorders (Aperture) read these through `aeon trace`;
+// and where (viewport CSS pixels). Screen recorders (Aperture) read these through `graft trace`;
 // keep the shape.
 const BrowserTraceActionSchema = z
   .object({

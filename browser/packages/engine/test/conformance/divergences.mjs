@@ -1,4 +1,4 @@
-// Known divergences between what Aeon's engine does today and what the sweep expects. Each pin
+// Known divergences between what Graft's engine does today and what the sweep expects. Each pin
 // names one failing leaf exactly: {scenario, step, pointer} plus its kind ('Bug' for an engine
 // bug to fix, 'Unsupported' for something the engine deliberately does not do), the behaviour
 // the sweep expects and a note. A pin only tolerates that exact failure, and a pin that no

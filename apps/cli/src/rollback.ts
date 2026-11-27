@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { appendFile, copyFile, readFile, stat, unlink, writeFile } from "node:fs/promises";
-import { aeonAppRoot } from "@aeon/location";
+import { graftAppRoot } from "@graft/location";
 import { join, relative, resolve, sep } from "node:path";
 import type { Args } from "browserkit/dist/args.js";
 import { has } from "browserkit/dist/args.js";
@@ -28,27 +28,27 @@ interface ReleaseFile {
 export function rollbackCommand(): Command {
   return {
     name: "rollback",
-    group: "Aeon",
+    group: "Graft",
     summary: "switch the daemon to the previous build",
-    help: `Usage: aeon rollback [--json]
+    help: `Usage: graft rollback [--json]
 
-Points the daemon entrypoint at the previous versioned build under Aeon's builds folder
-(Aeon's app folder, then builds/<version>-<sha>/main.js) and records the swap in release.json.
-Restart Aeon to run that build. Other host-config.json fields stay as they are.`,
+Points the daemon entrypoint at the previous versioned build under Graft's builds folder
+(Graft's app folder, then builds/<version>-<sha>/main.js) and records the swap in release.json.
+Restart Graft to run that build. Other host-config.json fields stay as they are.`,
     run: (args: Args) => runRollback(has(args, "json")),
   };
 }
 
 export function releasePaths(env: NodeJS.ProcessEnv = process.env): ReleasePaths {
-  const root = env.AEON_HOME ?? aeonAppRoot({ env });
-  return { root, hostConfig: env.AEON_HOST_CONFIG ?? join(root, "host-config.json") };
+  const root = env.GRAFT_HOME ?? graftAppRoot({ env });
+  return { root, hostConfig: env.GRAFT_HOST_CONFIG ?? join(root, "host-config.json") };
 }
 
 export function buildMain(root: string, id: string): string {
   assertBuildId(id);
   const file = resolve(root, "builds", id, "main.js");
   const builds = resolve(root, "builds") + sep;
-  if (!samePrefix(file, builds)) throw new Error(`Build ${id} is outside the Aeon builds folder.`);
+  if (!samePrefix(file, builds)) throw new Error(`Build ${id} is outside the Graft builds folder.`);
   return file;
 }
 
@@ -92,7 +92,7 @@ export async function runRollback(json: boolean, paths = releasePaths()): Promis
 }
 
 const NO_PREVIOUS =
-  "No previous build to roll back to. Fix: record the last build as previous in release.json under the Aeon folder.";
+  "No previous build to roll back to. Fix: record the last build as previous in release.json under the Graft folder.";
 const NO_CURRENT =
   "The current build is not recorded. Fix: set current in release.json to the running <version>-<sha>.";
 const ALREADY =
@@ -102,7 +102,7 @@ function rollbackText(result: RollbackResult): string {
   return [
     `Rolled back from ${result.from} to ${result.to}.`,
     `Daemon entrypoint: ${result.entrypoint}`,
-    "Restart Aeon to run that build.",
+    "Restart Graft to run that build.",
     "",
   ].join("\n");
 }
@@ -138,12 +138,12 @@ async function readConfig(path: string): Promise<Record<string, unknown>> {
     parsed = JSON.parse(await readFile(path, "utf8"));
   } catch (error) {
     if (!isMissing(error)) throw error;
-    throw new Error("host-config.json is missing. Fix: install Aeon before rolling back.", {
+    throw new Error("host-config.json is missing. Fix: install Graft before rolling back.", {
       cause: error,
     });
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    throw new Error("host-config.json is not an object. Fix: reinstall Aeon.");
+    throw new Error("host-config.json is not an object. Fix: reinstall Graft.");
   return parsed as Record<string, unknown>;
 }
 

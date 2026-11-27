@@ -56,7 +56,7 @@ async function waitForExit(pidFile) {
 }
 
 async function fixture(t) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-mcp-cache-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-mcp-cache-"));
   const serverPath = join(directory, "server.mjs");
   const counter = join(directory, "lists");
   const pidFile = join(directory, "pid");

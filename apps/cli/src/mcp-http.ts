@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { MCP_SESSION_META } from "@aeon/protocol";
+import { MCP_SESSION_META } from "@graft/protocol";
 import { allowedHost } from "@browserkit/tools/site-to-api";
 import { requestToken, verifyToken } from "./mcp-tokens.js";
 
-// Streamable HTTP for `aeon mcp --http`: POST /mcp takes one JSON-RPC message and answers it as
+// Streamable HTTP for `graft mcp --http`: POST /mcp takes one JSON-RPC message and answers it as
 // JSON; GET /mcp opens the event stream that carries notifications, task status and our own
 // sampling requests. 127.0.0.1 only, with the loopback Host/Origin guard against DNS rebinding,
-// and every request needs a per-client token from `aeon mcp token create`.
+// and every request needs a per-client token from `graft mcp token create`.
 
 type Json = Record<string, unknown>;
 type Send = (message: Json) => void;
@@ -254,7 +254,7 @@ export function sessionBindings(
 /** Open event streams per session, and which session owns each event subscription. */
 function sessionRouter() {
   const streams = new Map<string, Set<ServerResponse>>();
-  // Which session subscribed to an event stream (aeon/tap included): its frames go there only.
+  // Which session subscribed to an event stream (graft/tap included): its frames go there only.
   const owners = new Map<string, string>();
   const write = (stream: ServerResponse, message: Json) =>
     stream.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`);

@@ -1,6 +1,6 @@
-import type { DaemonUiResponse, ChatViewSnapshotDto } from "@aeon/protocol";
+import type { DaemonUiResponse, ChatViewSnapshotDto } from "@graft/protocol";
 import { showStatusForChat } from "./status-favicon.js";
-const key = "aeon-tab-status-" + crypto.randomUUID();
+const key = "graft-tab-status-" + crypto.randomUUID();
 let activeChatId = "";
 let status: "idle" | "working" = "idle";
 window.addEventListener(
@@ -19,13 +19,13 @@ export function observeChatTabStatus(
   const acknowledge = () => {
     const visible = document.visibilityState === "visible" && document.hasFocus();
     void chrome.storage.session
-      .get("aeon-completion-id-" + chatId)
+      .get("graft-completion-id-" + chatId)
       .then((values) =>
         chrome.runtime.sendMessage({
           kind: "core.attention.read",
           chatId,
-          completionId: values["aeon-completion-id-" + chatId] ?? null,
-          viewId: key.slice("aeon-tab-status-".length),
+          completionId: values["graft-completion-id-" + chatId] ?? null,
+          viewId: key.slice("graft-tab-status-".length),
           visible,
         }),
       )
@@ -37,7 +37,7 @@ export function observeChatTabStatus(
   const presence = window.setInterval(acknowledge, 10000);
   window.addEventListener("pagehide", () => clearInterval(presence), { once: true });
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "session" && changes["aeon-completion-id-" + chatId]) acknowledge();
+    if (area === "session" && changes["graft-completion-id-" + chatId]) acknowledge();
   });
   acknowledge();
   client.subscribe((message) => {
@@ -59,5 +59,5 @@ function applyState(state: ChatViewSnapshotDto["runState"]): void {
 function publish(next: typeof status): void {
   if (status === next) return;
   status = next;
-  void chrome.storage.session.set({ [key]: next, ["aeon-chat-working-" + activeChatId]: next });
+  void chrome.storage.session.set({ [key]: next, ["graft-chat-working-" + activeChatId]: next });
 }

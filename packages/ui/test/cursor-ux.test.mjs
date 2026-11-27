@@ -126,7 +126,7 @@ test("the welcome has three quiet examples and the Learn link", () => {
   const html = renderToStaticMarkup(
     createElement(NewUserWelcome, { needsModel: false, onExample() {}, onLearn() {} }),
   );
-  assert.match(html, /What can Aeon do\?/);
+  assert.match(html, /What can Graft do\?/);
 });
 
 test("the side panel header is the switcher and New chat; Manage ends the switcher menu", () => {
@@ -142,7 +142,7 @@ test("the side panel header is the switcher and New chat; Manage ends the switch
     onManage() {},
   };
   const html = renderToStaticMarkup(createElement(SidePanel, props));
-  assert.match(html, /id="selected-chat-title">Aeon</);
+  assert.match(html, /id="selected-chat-title">Graft</);
   assert.match(html, /id="panel-new-chat"/);
   assert.doesNotMatch(html, /open-full|panel-manage|panel-xray|Open in a tab/);
   const chats = [{ chatId: "c1", title: "New Chat", updatedAt: new Date().toISOString() }];
@@ -152,5 +152,5 @@ test("the side panel header is the switcher and New chat; Manage ends the switch
     createElement(SidePanel, { ...props, chats, selectedChatId: "c1", pickerOpen: true }),
   );
   assert.match(chosen, /id="selected-chat-title">New chat</);
-  assert.match(chosen, /Manage Aeon/);
+  assert.match(chosen, /Manage Graft/);
 });

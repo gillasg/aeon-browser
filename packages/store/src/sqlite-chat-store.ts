@@ -17,8 +17,8 @@ import {
   type ThreadForkIntent,
   type CreateThreadDeliveryInput,
   type CreateThreadForkInput,
-  type AeonProductStore,
-} from "@aeon/domain";
+  type GraftProductStore,
+} from "@graft/domain";
 import { type ChatRow, toChatRecord } from "./chat-row.js";
 import { migrate } from "./migrations.js";
 import { SqliteThreadStore } from "./sqlite-thread-store.js";
@@ -27,10 +27,10 @@ import { SqliteProductStore } from "./sqlite-product-store.js";
 
 export function openChatStore(
   dataDirectory: string,
-): ChatStore & ThreadCoordinationStore & AeonProductStore {
+): ChatStore & ThreadCoordinationStore & GraftProductStore {
   const appData = resolve(dataDirectory);
   mkdirSync(appData, { recursive: true });
-  const database = new Database(join(appData, "aeon.sqlite"));
+  const database = new Database(join(appData, "graft.sqlite"));
   database.pragma("journal_mode = WAL");
   database.pragma("foreign_keys = ON");
   database.pragma("busy_timeout = 5000");

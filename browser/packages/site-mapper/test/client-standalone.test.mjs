@@ -1,4 +1,4 @@
-// aeon compile's output: a zero-dependency typed client that calls the local REST server with a
+// graft compile's output: a zero-dependency typed client that calls the local REST server with a
 // client token, pages with async iterators, and refuses writes the page has not proven.
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -19,7 +19,7 @@ import {
 import { startFixtureSite } from "./fixture-site.mjs";
 import { browseShop, tempHome } from "./helpers.mjs";
 
-test("the standalone client imports nothing, types its ops, and calls aeon rest", async (t) => {
+test("the standalone client imports nothing, types its ops, and calls graft rest", async (t) => {
   await tempHome(t);
   const site = await startFixtureSite();
   t.after(() => site.close());
@@ -53,7 +53,7 @@ test("the standalone client imports nothing, types its ops, and calls aeon rest"
   const server = await serve({
     transport: "direct",
     session: false,
-    authorize: (token) => token === "aeon_mcp_client",
+    authorize: (token) => token === "graft_mcp_client",
   });
   t.after(() => server.close());
   const dir = await mkdtemp(join(tmpdir(), "standalone-client-"));
@@ -65,11 +65,11 @@ test("the standalone client imports nothing, types its ops, and calls aeon rest"
   await writeFile(file, js);
   const module = await import(pathToFileURL(file).href);
   const create = Object.values(module).find((value) => typeof value === "function");
-  const api = create({ baseUrl: server.url, token: "aeon_mcp_client" });
+  const api = create({ baseUrl: server.url, token: "graft_mcp_client" });
   const list = await api.listProducts({ limit: 2 });
   assert.equal(list.items.length, 2);
   await assert.rejects(api.deleteAll({}), /NOT_PROVEN/);
-  const denied = create({ baseUrl: server.url, token: "aeon_mcp_wrong" });
+  const denied = create({ baseUrl: server.url, token: "graft_mcp_wrong" });
   await assert.rejects(denied.listProducts({ limit: 1 }), /x-site-to-api-token|401/);
   if (api.paginate.listProducts) {
     const seen = [];

@@ -619,7 +619,7 @@ const PRESS_SETTLE_MS = 120;
 
 // Compare with the page's own hit test rather than a CDP backend id: piercing open shadow roots
 // via shadowRoot.elementFromPoint works inside a frame's own session, crosses shadow boundaries,
-// and ignores pointer-events:none elements (so Aeon's cursor overlay is never mistaken for a hit).
+// and ignores pointer-events:none elements (so Graft's cursor overlay is never mistaken for a hit).
 const PRESS_HIT_FUNCTION = `function (x, y) {
   var el = document.elementFromPoint(x, y);
   while (el && el.shadowRoot && typeof el.shadowRoot.elementFromPoint === "function") {

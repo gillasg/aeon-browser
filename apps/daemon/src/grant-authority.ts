@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import type { AuthHello, PageGrantScope } from "@aeon/protocol";
+import type { AuthHello, PageGrantScope } from "@graft/protocol";
 
 export type GrantRole = "extension-executor" | "ui";
 export interface GrantContext {

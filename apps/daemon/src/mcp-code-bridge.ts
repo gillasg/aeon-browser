@@ -1,4 +1,4 @@
-import type { McpBridge } from "@aeon/pi-adapter";
+import type { McpBridge } from "@graft/pi-adapter";
 import type { McpClientManager } from "./mcp-client-manager.js";
 import {
   indexServers,
@@ -21,7 +21,7 @@ type CallResult = {
 /**
  * The daemon's side of `mcp.<server>.<tool>(args)` inside browser_code. The manager owns the
  * real connections (and their 30 s discovery cache); this bridge owns the slug names, the capped
- * list, search, JSON in/out, error text, per-call timeout and cancellation. No Aeon (browser) tool
+ * list, search, JSON in/out, error text, per-call timeout and cancellation. No Graft (browser) tool
  * is ever in the list, so mcp cannot recurse. `<server>` is the slug from the server's display
  * name (`notion`) or, as before, its capability id (`cap_...`).
  */

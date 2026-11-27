@@ -11,7 +11,7 @@ import { build } from "esbuild";
 async function load(source, directory) {
   const outfile = join(directory, source + ".mjs");
   await build({
-    // Aeon's own modules live in src; browser modules come from the engine package.
+    // Graft's own modules live in src; browser modules come from the engine package.
     entryPoints: [
       [
         new URL("../src/" + source + ".ts", import.meta.url),
@@ -24,12 +24,12 @@ async function load(source, directory) {
     bundle: true,
     platform: "node",
     format: "esm",
-    define: { __AEON_NATIVE_TRANSPORT__: "true" },
+    define: { __GRAFT_NATIVE_TRANSPORT__: "true" },
   });
   return import(pathToFileURL(outfile).href);
 }
 test("home first prompt uses one command with its project, files, and selected pages", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-home-submit-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-home-submit-"));
   const previous = {
     window: globalThis.window,
     location: globalThis.location,
@@ -78,7 +78,7 @@ test("home first prompt uses one command with its project, files, and selected p
   }
 });
 test("extension prepares on worker load and on Chrome startup or activation", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-native-startup-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-native-startup-"));
   const previous = globalThis.chrome;
   const listeners = {},
     event = (name) => ({

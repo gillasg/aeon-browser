@@ -10,7 +10,7 @@ import { workflowCards } from "../dist/management-library.js";
 // real folders, the code runner is a stub that records what it was asked to run.
 
 async function home() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-library-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-library-"));
   process.env.BROWSERKIT_HOME = join(root, "browserkit");
   process.env.SITE_TO_API_HOME = join(root, "sites");
   return root;

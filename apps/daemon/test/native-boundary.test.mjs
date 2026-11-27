@@ -8,7 +8,7 @@ import {
   DaemonUiRequestSchema,
   NativeBootstrapResponseSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { BrowserInventoryRegistry } from "../dist/browser-inventory-registry.js";
 import { GrantAuthority } from "../dist/grant-authority.js";
 import { fullInventoryAction } from "../dist/native-executor-messages.js";
@@ -31,16 +31,16 @@ test("bootstrap endpoints require an explicit bounded loopback port and fixed pa
     daemonProtocolVersion: SUPPORTED_PROTOCOL_VERSION,
   });
   assert.equal(
-    NativeBootstrapResponseSchema.safeParse(response("ws://127.0.0.1:49152/aeon/v1")).success,
+    NativeBootstrapResponseSchema.safeParse(response("ws://127.0.0.1:49152/graft/v1")).success,
     true,
   );
   for (const endpoint of [
-    "ws://127.0.0.1/aeon/v1",
-    "ws://127.0.0.1:0/aeon/v1",
-    "ws://127.0.0.1:65536/aeon/v1",
-    "ws://user@127.0.0.1:49152/aeon/v1",
-    "ws://127.0.0.1:49152/aeon/v1?grant=secret",
-    "ws://localhost:49152/aeon/v1",
+    "ws://127.0.0.1/graft/v1",
+    "ws://127.0.0.1:0/graft/v1",
+    "ws://127.0.0.1:65536/graft/v1",
+    "ws://user@127.0.0.1:49152/graft/v1",
+    "ws://127.0.0.1:49152/graft/v1?grant=secret",
+    "ws://localhost:49152/graft/v1",
   ])
     assert.equal(
       NativeBootstrapResponseSchema.safeParse(response(endpoint)).success,

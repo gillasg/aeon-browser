@@ -58,7 +58,7 @@ function sendCommand(_debuggee, method, params) {
     return Promise.resolve({ result: { value: nodeAtPoint(params).backendNodeId === 42 } });
   if (method === "Runtime.evaluate") {
     const expression = String(params?.expression ?? "");
-    if (expression.includes("__aeonQuiet")) {
+    if (expression.includes("__graftQuiet")) {
       return Promise.resolve({
         result: {
           value: {
@@ -120,7 +120,7 @@ globalThis.chrome = {
       set: async (items) => Object.assign(local, items),
     },
   },
-  runtime: { getURL: (path) => `chrome-extension://aeon/${path}` },
+  runtime: { getURL: (path) => `chrome-extension://graft/${path}` },
   scripting: { executeScript: async () => [] },
 };
 

@@ -379,7 +379,7 @@ async function quietCall(
 async function resetCall(cell: Cell): Promise<unknown> {
   cancelJobs(cell.run.chatId);
   await toOffscreen({
-    target: "aeon-code-offscreen",
+    target: "graft-code-offscreen",
     kind: "stopJobs",
     chatId: cell.run.chatId,
   }).catch(() => undefined);

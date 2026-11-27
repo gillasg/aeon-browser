@@ -38,7 +38,7 @@ function fakeManager() {
   return { manager, state };
 }
 
-test("list returns counts and one-line refs under a slug, never Aeon's own tools", async () => {
+test("list returns counts and one-line refs under a slug, never Graft's own tools", async () => {
   const { manager } = fakeManager();
   const bridge = new McpCodeBridge(manager);
   const listed = await bridge.list();

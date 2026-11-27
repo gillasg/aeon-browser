@@ -6,7 +6,7 @@
 // keep running a cached service worker after the folder was rebuilt, and that worker would read
 // the new file, match the daemon and never reload.
 
-const embedded = typeof __AEON_BUILD_INFO__ === "string" ? __AEON_BUILD_INFO__.trim() : undefined;
+const embedded = typeof __GRAFT_BUILD_INFO__ === "string" ? __GRAFT_BUILD_INFO__.trim() : undefined;
 
 export function extensionBuild(): string | undefined {
   return embedded || undefined;

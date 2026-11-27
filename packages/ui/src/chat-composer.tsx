@@ -7,7 +7,7 @@ import { PromptField } from "./prompt-field.js";
 import { markWelcomeDone } from "./new-user-welcome.js";
 import { ComposerPanels, AttachmentList } from "./composer-panels.js";
 import { PageContextTray } from "./page-context-tray.js";
-import type { PiBrowserContextRecord } from "@aeon/protocol";
+import type { PiBrowserContextRecord } from "@graft/protocol";
 
 export interface ComposerAttachment {
   name: string;
@@ -148,7 +148,7 @@ function ComposerEntry(
         multiline
         value={text}
         placeholder="Reply, @ for context"
-        ariaLabel="Message Aeon"
+        ariaLabel="Message Graft"
         onChange={setText}
         onFiles={(files) => props.onAttach(props.chatId, files)}
         onEnter={() => void send()}

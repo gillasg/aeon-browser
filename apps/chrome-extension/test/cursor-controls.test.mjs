@@ -10,7 +10,7 @@ const app = fileURLToPath(new URL("../", import.meta.url));
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 
 async function load(entry) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-cursor-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-cursor-"));
   const outfile = join(directory, "bundle.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL(entry, import.meta.url))],
@@ -28,9 +28,9 @@ test("an untrusted cursor click is ignored and a huge hit box is rejected", asyn
   const controls = await load("../src/orb/cursor-controls.ts");
   assert.equal(controls.acceptCursorClick({ isTrusted: false }), false);
   assert.equal(controls.acceptCursorClick({ isTrusted: true }), true);
-  assert.equal(controls.controlKind("transcript", true), "aeon.cursor.transcript");
-  assert.equal(controls.controlKind("stop", true), "aeon.cursor.stop");
-  assert.equal(controls.controlKind("stop", false), "aeon.cursor.transcript");
+  assert.equal(controls.controlKind("transcript", true), "graft.cursor.transcript");
+  assert.equal(controls.controlKind("stop", true), "graft.cursor.stop");
+  assert.equal(controls.controlKind("stop", false), "graft.cursor.transcript");
   const raw = JSON.stringify({
     tr: { x: 1, y: 2, w: 24, h: 24 },
     stop: { x: 0, y: 0, w: 400, h: 400 },
@@ -51,7 +51,7 @@ test("chat stays in the extension and orb.html is the only dynamic web resource"
   assert.equal(resources[0].use_dynamic_url, true);
   assert.equal(JSON.stringify(resources).includes("chat.html"), false);
   const frame = await load("../src/extension-frame.ts");
-  const page = { location: { origin: "chrome-extension://aeon" } };
+  const page = { location: { origin: "chrome-extension://graft" } };
   page.parent = page;
   globalThis.window = page;
   assert.equal(frame.framedByExtension(), true);
@@ -70,16 +70,16 @@ test("the page cursor publishes button boxes over a neutral event and has no pag
   assert.match(overlay, /state\.controls = \{ tr: first\("\.tr"\), stop: first\("\.stop"\) \}/);
   assert.match(overlay, /\.p\.on \.tr,\.p\.on \.stop\{pointer-events:none\}/);
   assert.match(overlay, /new CustomEvent\(STATE_EVENT/);
-  assert.equal(overlay.includes("dataset.aeonControls"), false);
-  assert.equal(overlay.includes('id = "aeon-agent-cursor"'), false);
-  assert.equal(overlay.includes("aeon-cursor-stop"), false);
-  assert.equal(overlay.includes("aeon-cursor-transcript"), false);
+  assert.equal(overlay.includes("dataset.graftControls"), false);
+  assert.equal(overlay.includes('id = "graft-agent-cursor"'), false);
+  assert.equal(overlay.includes("graft-cursor-stop"), false);
+  assert.equal(overlay.includes("graft-cursor-transcript"), false);
 });
 
 test("the shared cursor is injected as a function, never as a page listener", async () => {
   const build = await readFile(join(app, "scripts/build-extension.mjs"), "utf8");
   assert.equal(
-    build.includes("aeon:cursor:paint"),
+    build.includes("graft:cursor:paint"),
     false,
     "the builder still installs a page listener",
   );
@@ -88,7 +88,7 @@ test("the shared cursor is injected as a function, never as a page listener", as
   assert.match(worker, /func: paintCursor/);
   assert.equal(worker.includes("CustomEvent"), false);
   const overlay = await readFile(join(repo, "browser/packages/engine/src/cursor-page.ts"), "utf8");
-  assert.equal(overlay.includes("aeon:cursor:paint"), false);
+  assert.equal(overlay.includes("graft:cursor:paint"), false);
 });
 
 test("the buttons mount only while the pill shows them, then leave the page", async () => {
@@ -116,15 +116,15 @@ test("the buttons mount only while the pill shows them, then leave the page", as
   assert.equal(host.shadow.children.length, 3);
   const [style, transcript, stop] = host.shadow.children;
   assert.equal(style.tagName, "STYLE");
-  // Aeon's own controls are not page content for the agent's page state (see cursor-controls.ts).
-  assert.equal(transcript.getAttribute("data-aeon-overlay"), "");
+  // Graft's own controls are not page content for the agent's page state (see cursor-controls.ts).
+  assert.equal(transcript.getAttribute("data-graft-overlay"), "");
   assert.equal(transcript.getAttribute("aria-hidden"), null);
-  assert.equal(stop.getAttribute("data-aeon-overlay"), "");
+  assert.equal(stop.getAttribute("data-graft-overlay"), "");
   assert.equal(transcript.hidden, false);
   assert.equal(transcript.style.left, "4px");
   assert.equal(stop.hidden, true);
   transcript.listeners.click({ isTrusted: true, preventDefault() {}, stopPropagation() {} });
-  assert.deepEqual(sent, ["aeon.cursor.transcript"]);
+  assert.deepEqual(sent, ["graft.cursor.transcript"]);
 
   dom.publish({ tr: null, stop: null });
   assert.deepEqual(controlHosts(), [], "the buttons stayed after the pill went away");

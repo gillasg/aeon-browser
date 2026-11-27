@@ -72,7 +72,7 @@ async function pairChat(
   const front =
     force || chat.active || target.active || (await engineConfig.agentInFront().catch(() => false));
   await alignTabs(tabs, chat, target);
-  // Pairing and bringing the pair forward activate the agent's tab: that is Aeon, not the user.
+  // Pairing and bringing the pair forward activate the agent's tab: that is Graft, not the user.
   expectAgentActivation(target.id);
   const splitId = await tabs.createSplit?.([chat.id, target.id]);
   if (splitId !== undefined) pairs.set(chatId, { targetId: target.id, splitId });

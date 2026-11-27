@@ -129,8 +129,8 @@ const challengeTabs = new Set<number>();
 let enabled = false;
 let generatorUsers = 0;
 
-/** chrome.storage key. Off unless this is true. Settings, `aeon settings` and browser.settings write it. */
-export const HUMAN_LIKE_INPUT_KEY = "aeonHumanLikeInput";
+/** chrome.storage key. Off unless this is true. Settings, `graft settings` and browser.settings write it. */
+export const HUMAN_LIKE_INPUT_KEY = "graftHumanLikeInput";
 
 /** A bot check or challenge was seen in this tab: switch human-like timing on for it alone. */
 export function noteChallengeSeen(tabId: number | undefined): void {
@@ -144,10 +144,10 @@ export function humanOn(tabId: number | undefined): boolean {
 
 function stealthEnv(): string | undefined {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
-  return proc?.env?.AEON_HUMAN_INPUT;
+  return proc?.env?.GRAFT_HUMAN_INPUT;
 }
 
-/** True when the stored setting is on, or AEON_HUMAN_INPUT=1 for a stealth run in this process. */
+/** True when the stored setting is on, or GRAFT_HUMAN_INPUT=1 for a stealth run in this process. */
 export function humanLikeInputOn(stored: unknown, env: string | undefined = stealthEnv()): boolean {
   if (env === "1" || env === "true") return true;
   return stored === true;

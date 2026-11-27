@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { CoreBrowserRunRequestSchema } from "@aeon/protocol";
+import { CoreBrowserRunRequestSchema } from "@graft/protocol";
 import { WebSocket } from "ws";
 import { handleBrowserRun } from "../dist/core-browser.js";
 

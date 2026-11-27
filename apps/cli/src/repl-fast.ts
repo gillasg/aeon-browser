@@ -2,17 +2,17 @@ import { parseArgs } from "browserkit/dist/args.js";
 import { out, printError } from "browserkit/dist/output.js";
 import { errorKind } from "@browserkit/tools/site-to-api";
 import { cellErrorMessage, runCellOn, type BrowserCell, type CellOptions } from "./cell-run.js";
-import { AeonClient } from "./client.js";
+import { GraftClient } from "./client.js";
 import { repl } from "./repl.js";
 
-// `aeon repl` without the rest of the command line: only the daemon connection and the cell
+// `graft repl` without the rest of the command line: only the daemon connection and the cell
 // runner load, so each cell starts in a fraction of the full CLI's time. Agents run it in loops.
 
 class LeanRunner {
-  private client: Promise<AeonClient> | undefined;
+  private client: Promise<GraftClient> | undefined;
 
   async runCell(code: string, options: CellOptions = {}): Promise<BrowserCell> {
-    this.client ??= AeonClient.connect();
+    this.client ??= GraftClient.connect();
     const result = await runCellOn(await this.client, code, options);
     if (result.error)
       throw Object.assign(new Error(cellErrorMessage(result)), { output: result.output });
@@ -31,7 +31,7 @@ class LeanRunner {
 const SHORT_FLAGS: Record<string, string> = { "-q": "--quiet" };
 
 /**
- * repl's arguments: flags work before or after the code (`aeon repl "1+1" -q`), and `--` ends
+ * repl's arguments: flags work before or after the code (`graft repl "1+1" -q`), and `--` ends
  * them, so everything after it is code even when it looks like a flag.
  */
 export function replArgs(argv: string[]): ReturnType<typeof parseArgs> {

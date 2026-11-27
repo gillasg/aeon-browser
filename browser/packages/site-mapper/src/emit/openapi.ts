@@ -103,7 +103,7 @@ function tag(operation: { path: string }): string {
 /** Per-field sample counts, so a reader can weigh a field seen once against one seen always. */
 function evidence(operation: Operation): Doc {
   const observed = observations(operation.samples);
-  return observed ? { "x-aeon-observations": observed } : {};
+  return observed ? { "x-graft-observations": observed } : {};
 }
 
 function extensions(operation: Operation, redactor: Redactor): Doc {

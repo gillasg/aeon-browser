@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { SiteScriptRecord, SiteScriptRevision } from "@aeon/domain";
-import { SqliteSiteScriptStore } from "@aeon/store";
+import type { SiteScriptRecord, SiteScriptRevision } from "@graft/domain";
+import { SqliteSiteScriptStore } from "@graft/store";
 import {
   SiteScriptCommandSchema,
   SiteScriptDefinitionSchema,
   type SiteScriptCommand,
   type BrowserTargetKey,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { WebSocket } from "ws";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { siteScriptRewind } from "./site-script-rewind.js";
@@ -285,7 +285,7 @@ export class SiteScriptService {
         );
     }
   }
-  private definition(script: SiteScriptRecord): import("@aeon/protocol").SiteScriptDefinition {
+  private definition(script: SiteScriptRecord): import("@graft/protocol").SiteScriptDefinition {
     return {
       scriptId: script.scriptId,
       revision: script.revision,

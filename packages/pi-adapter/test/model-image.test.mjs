@@ -47,7 +47,7 @@ test("a 4000 px capture arrives at 2048 and the saved file stays the original", 
   const png = widePng(4000, 2);
   const original = Buffer.from(png);
   const data = png.toString("base64");
-  const workspace = await mkdtemp(join(tmpdir(), "aeon-model-image-"));
+  const workspace = await mkdtemp(join(tmpdir(), "graft-model-image-"));
   const artifact = join(workspace, "capture.png");
   await writeFile(artifact, png);
   try {

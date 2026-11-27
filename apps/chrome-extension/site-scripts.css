@@ -4,10 +4,10 @@
 }
 body {
   margin: 0;
-  background: var(--aeon-canvas);
-  color: var(--aeon-text);
+  background: var(--graft-canvas);
+  color: var(--graft-text);
   font:
-    var(--aeon-fs-15)/1.6 Geist,
+    var(--graft-fs-15)/1.6 Geist,
     system-ui,
     sans-serif;
   color-scheme: light dark;
@@ -18,23 +18,23 @@ main {
   padding: 0 24px;
 }
 h1 {
-  font-size: var(--aeon-fs-24);
+  font-size: var(--graft-fs-24);
 }
 h2 {
-  font-size: var(--aeon-fs-17);
+  font-size: var(--graft-fs-17);
 }
 section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--aeon-line);
-  border-radius: var(--aeon-r-14);
+  border: 1px solid var(--graft-line);
+  border-radius: var(--graft-r-14);
 }
 button {
   font: inherit;
   padding: 6px 12px;
-  border-radius: var(--aeon-r-8);
-  border: 1px solid var(--aeon-line);
-  background: var(--aeon-surface);
+  border-radius: var(--graft-r-8);
+  border: 1px solid var(--graft-line);
+  background: var(--graft-surface);
   color: inherit;
   cursor: pointer;
   margin-right: 8px;
@@ -44,7 +44,7 @@ button:hover {
 }
 .script-row {
   padding: 12px 0;
-  border-bottom: 1px solid var(--aeon-line);
+  border-bottom: 1px solid var(--graft-line);
 }
 .script-detail {
   display: block;

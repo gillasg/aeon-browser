@@ -2,12 +2,12 @@ import {
   DaemonUiRequestSchema,
   PiBrowserContextRecordSchema,
   type PiBrowserContextRecord,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 export function additionalPages(chatId: string): PiBrowserContextRecord[] {
   try {
     const data: unknown = JSON.parse(
-      sessionStorage.getItem("aeon-context-pages:" + chatId) ?? "[]",
+      sessionStorage.getItem("graft-context-pages:" + chatId) ?? "[]",
     );
     return Array.isArray(data)
       ? data

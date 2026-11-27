@@ -3,10 +3,10 @@ import type { PrivacySettingsProps } from "./privacy-settings.js";
 import type { ModelLoginState } from "./connect-model-card.js";
 import { useEffect, useState, type ReactElement, type ReactNode, useMemo } from "react";
 import { usePageTitle } from "./page-title.js";
-import type { ChatCatalogItemDto } from "@aeon/protocol";
+import type { ChatCatalogItemDto } from "@graft/protocol";
 import { HomeCatalog } from "./home-catalog.js";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
-import type { PiModelCatalogDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
+import type { PiModelCatalogDto } from "@graft/protocol";
 import type { ComposerModel, ComposerAttachment } from "./chat-composer.js";
 import { HomeStart } from "./home-start.js";
 import { ManagementSurface } from "./management-surface.js";
@@ -59,7 +59,7 @@ export interface NewTabHomeProps {
   onOpenChat(chatId: string): void;
   /** Puts an example in the side panel's ask box (Manage has no composer of its own). */
   onSuggest?(example: string): void;
-  /** Manage → Sites → Teach Aeon: opens the site and starts the Teach recorder there. */
+  /** Manage → Sites → Teach Graft: opens the site and starts the Teach recorder there. */
   onTeachSite?(host: string): void;
   /** Reverses an API write from the Activity page, when the site knows the reverse. */
   onUndoActivity?(entry: ActivityEntry): void;
@@ -186,8 +186,8 @@ function ManageSidebar({
   onView(view: ManageView): void;
 }): ReactElement {
   return (
-    <nav className="manage-sidebar" aria-label="Manage Aeon">
-      <p className="manage-sidebar-title">Aeon</p>
+    <nav className="manage-sidebar" aria-label="Manage Graft">
+      <p className="manage-sidebar-title">Graft</p>
       {MANAGE_NAV.map((item) => (
         <div key={item.view} className="manage-sidebar-slot">
           {item.divided && <hr className="manage-sidebar-divider" />}
@@ -249,7 +249,7 @@ function ManagePage({
   return <SettingsPage props={props} />;
 }
 
-/** Chats and Activity (what Aeon changed on sites) share one page, reached from ⌘K. */
+/** Chats and Activity (what Graft changed on sites) share one page, reached from ⌘K. */
 function ChatsPage({
   view,
   props,
@@ -262,8 +262,8 @@ function ChatsPage({
   onView(view: ManageView): void;
 }): ReactElement {
   return (
-    <div className="aeon-page">
-      <header className="aeon-page-head">
+    <div className="graft-page">
+      <header className="graft-page-head">
         <h1 id="catalog-heading">{view === "chats" ? "Chats" : "Activity"}</h1>
         <Segmented
           label="Chats or activity"
@@ -288,7 +288,7 @@ function ChatsPage({
   );
 }
 
-/** My Details: the personal fields Aeon fills forms with, and nothing else. */
+/** My Details: the personal fields Graft fills forms with, and nothing else. */
 function DetailsPage({ props }: { props: NewTabHomeProps }): ReactElement {
   return (
     <SectionPage title="My Details">
@@ -302,7 +302,7 @@ function DetailsPage({ props }: { props: NewTabHomeProps }): ReactElement {
   );
 }
 
-/** Sign-in: a password manager signs Aeon in (the model never sees a password); you otherwise. */
+/** Sign-in: a password manager signs Graft in (the model never sees a password); you otherwise. */
 function SignInPage({ props }: { props: NewTabHomeProps }): ReactElement {
   return (
     <SectionPage title="Sign-in">
@@ -314,7 +314,7 @@ function SignInPage({ props }: { props: NewTabHomeProps }): ReactElement {
   );
 }
 
-/** Settings: one page heading, the models Aeon thinks with, then everything general. */
+/** Settings: one page heading, the models Graft thinks with, then everything general. */
 function SettingsPage({ props }: { props: NewTabHomeProps }): ReactElement {
   return (
     <SectionPage title="Settings">
@@ -401,7 +401,7 @@ function usePaletteItems(props: NewTabHomeProps, go: (view: ManageView) => void)
     const pages: PaletteItem[] = [
       ...MANAGE_NAV.map(({ view, label }) => ({ view, label })),
       { view: "chats" as const, label: "Chats" },
-      { view: "activity" as const, label: "What Aeon changed" },
+      { view: "activity" as const, label: "What Graft changed" },
     ].map(({ view, label }) => ({ id: "page:" + view, label, hint: "Go", run: () => go(view) }));
     const chats: PaletteItem[] = props.chats
       .filter((chat) => !chat.archived)
@@ -413,7 +413,7 @@ function usePaletteItems(props: NewTabHomeProps, go: (view: ManageView) => void)
         run: () => props.onOpenChat(chat.chatId),
       }));
     return [
-      { id: "new", label: "New chat", hint: "Ask Aeon", run: () => props.onNewChat() },
+      { id: "new", label: "New chat", hint: "Ask Graft", run: () => props.onNewChat() },
       ...pages,
       ...chats,
     ];

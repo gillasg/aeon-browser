@@ -7,7 +7,7 @@ import { externalToolDefinitions, runExternalTool } from "../dist/external-tools
 import { sessionChatId } from "../dist/site-browser.js";
 
 test("outside agents get the chat tools, each session in its own runtime and workspace", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-external-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-external-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const sessions = { sessionDirectory: join(root, "pi-sessions"), agentDirectory: undefined };
   const calls = [];

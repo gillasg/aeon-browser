@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { RoutineRecord } from "@aeon/domain";
-import { siteMapperRequest } from "@aeon/pi-adapter";
+import type { RoutineRecord } from "@graft/domain";
+import { siteMapperRequest } from "@graft/pi-adapter";
 
 // Pinned results: answers the user wants to keep on the new-tab home, with their history. A pin
 // backed by a site API call refreshes itself with no model; a watcher (a routine with a check)
@@ -92,7 +92,7 @@ export class PinnedResults {
   async refresh(pinId: string): Promise<void> {
     const pin = (await this.load()).find((item) => item.pinId === pinId);
     if (!pin || pin.source !== "api" || !pin.site || !pin.operation) return;
-    const pending = siteMapperRequest("aeon-pins", {
+    const pending = siteMapperRequest("graft-pins", {
       siteMapper: "call",
       site: pin.site,
       operation: pin.operation,
@@ -100,7 +100,7 @@ export class PinnedResults {
     });
     const now = new Date().toISOString();
     try {
-      if (!pending) throw new Error("Aeon's browser is not connected");
+      if (!pending) throw new Error("Graft's browser is not connected");
       const value = pinValue(await pending);
       await this.replace({
         ...pin,

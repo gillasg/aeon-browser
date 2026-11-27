@@ -24,11 +24,11 @@ import {
   watch,
 } from "@browserkit/site-mapper";
 
-// The crawl and site_mapper tools as data. Every host (browserkit's bridge/MCP/CLI and Aeon)
+// The crawl and site_mapper tools as data. Every host (browserkit's bridge/MCP/CLI and Graft)
 // builds its own exposure from this file: same actions, same parameters, same handlers. A host
 // chooses an allow-list of actions and may wrap the result (workspace files, bounded text).
 
-// What every agent host exposes, so browserkit's MCP and Aeon's tools offer the same actions.
+// What every agent host exposes, so browserkit's MCP and Graft's tools offer the same actions.
 // Add or drop an action here, never in a host.
 export const AGENT_CRAWL_ACTIONS = ["scrape", "crawl", "map", "search", "find", "check"] as const;
 export const AGENT_SITE_MAPPER_ACTIONS = [
@@ -105,7 +105,7 @@ export type CrawlToolInput = {
   readiness?: boolean;
   /** For search: auto (default), web (keyless providers) or google (the user's browser). */
   engine?: "auto" | "web" | "google";
-  /** Chrome profile to render in when more than one is connected (a name from `aeon browsers`). */
+  /** Chrome profile to render in when more than one is connected (a name from `graft browsers`). */
   browser?: string;
   api?: { site: string; operation: string; params?: Record<string, unknown>; maxItems?: number };
 };
@@ -174,7 +174,7 @@ const crawlParameters: JsonObjectSchema = {
     browser: {
       type: "string",
       maxLength: 80,
-      description: "Chrome profile name (aeon browsers) to render pages in.",
+      description: "Chrome profile name (graft browsers) to render pages in.",
     },
     readiness: {
       type: "boolean",

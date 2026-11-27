@@ -53,8 +53,8 @@ test("stop requests, health lines and progress markers are recognized", () => {
   assert.equal(isStopRequest({ kind: "supervisor.stop" }), true);
   assert.equal(isStopRequest({ kind: "supervisor.stop", extra: 1 }), false);
   assert.equal(isStopRequest({ kind: "supervisor.health" }), false);
-  assert.equal(phaseOf("AEON_DAEMON_PHASE runtime"), "runtime");
-  assert.equal(phaseOf("AEON_DAEMON_READY"), undefined);
+  assert.equal(phaseOf("GRAFT_DAEMON_PHASE runtime"), "runtime");
+  assert.equal(phaseOf("GRAFT_DAEMON_READY"), undefined);
   assert.equal(isBase64(Buffer.from("x").toString("base64")), true);
   assert.equal(isBase64("not base64"), false);
   const health = Buffer.from('{"kind":"supervisor.health.result"}').toString("base64");

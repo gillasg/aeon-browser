@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { serveMcpHttp, sessionBindings } from "../dist/mcp-http.js";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
-const auth = { authorization: "Bearer aeon_mcp_good" };
+const auth = { authorization: "Bearer graft_mcp_good" };
 
 function post(port, session, message) {
   return new Promise((resolve, reject) => {
@@ -56,12 +56,12 @@ function openStream(port, session) {
   });
 }
 
-test("HTTP: a session's aeon/tap frames reach only that session; global ones reach all", async (t) => {
+test("HTTP: a session's graft/tap frames reach only that session; global ones reach all", async (t) => {
   let next = 0;
   const server = await serveMcpHttp({
     port: 0,
     audit: () => undefined,
-    verify: async (token) => (token === "aeon_mcp_good" ? "tester" : undefined),
+    verify: async (token) => (token === "graft_mcp_good" ? "tester" : undefined),
     receive: async (message, send) => {
       if (message.method === "events/subscribe")
         send({ jsonrpc: "2.0", id: message.id, result: { subscriptionId: `sub-${++next}` } });
@@ -76,19 +76,19 @@ test("HTTP: a session's aeon/tap frames reach only that session; global ones rea
     jsonrpc: "2.0",
     id: 1,
     method: "events/subscribe",
-    params: { name: "aeon/tap" },
+    params: { name: "graft/tap" },
   };
   const { result } = await post(port, "session-a", subscribe);
   const tap = (subscriptionId) => ({
     jsonrpc: "2.0",
     method: "notifications/events/emitted",
-    params: { subscriptionId, name: "aeon/tap", payload: { data: "secret" } },
+    params: { subscriptionId, name: "graft/tap", payload: { data: "secret" } },
   });
   server.broadcast(tap(result.subscriptionId));
   server.broadcast(tap("sub-unknown"));
   server.broadcast({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
   await new Promise((resolve) => setTimeout(resolve, 100));
-  const taps = (frames) => frames.filter((frame) => frame.params?.name === "aeon/tap");
+  const taps = (frames) => frames.filter((frame) => frame.params?.name === "graft/tap");
   assert.equal(taps(a.frames).length, 1);
   assert.equal(taps(a.frames)[0].params.subscriptionId, result.subscriptionId);
   assert.equal(taps(b.frames).length, 0);
@@ -101,8 +101,8 @@ test("stdio: malformed JSON gets JSON-RPC -32700 Parse error", async () => {
     stdio: ["pipe", "pipe", "ignore"],
     env: {
       ...process.env,
-      AEON_DATA_DIR: join(tmpdir(), "aeon-mcp-parse-" + process.pid),
-      SITE_TO_API_HOME: join(tmpdir(), "aeon-mcp-parse-sites-" + process.pid),
+      GRAFT_DATA_DIR: join(tmpdir(), "graft-mcp-parse-" + process.pid),
+      SITE_TO_API_HOME: join(tmpdir(), "graft-mcp-parse-sites-" + process.pid),
     },
   });
   const line = await new Promise((resolve, reject) => {

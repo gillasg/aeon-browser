@@ -11,7 +11,7 @@ import { startNativeTransport } from "./native-transport.js";
 import { readEnvironment } from "./environment.js";
 import { installProcessGuard } from "./process-guard.js";
 import { watchStalls } from "./stall-watch.js";
-import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import { NativeBootstrapResponseSchema, SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol";
 import type { BrowserControlService } from "./browser-control-service.js";
 import { isSupervisorHealthLine, supervisorHealthLine } from "./health-ping.js";
 import { reportManagedFailure } from "./start-report.js";
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   try {
     if (mode === "--dev-handshake") {
       const harness = await startDevHandshakeServer();
-      process.stdout.write(`Aeon development handshake listening at ${harness.url}\n`);
+      process.stdout.write(`Graft development handshake listening at ${harness.url}\n`);
       return;
     }
     if (mode === "--managed-daemon") {
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown startup error.";
     if (mode === "--managed-daemon") reportManagedFailure(message);
-    process.stderr.write(`Aeon development mode failed: ${message}\n`);
+    process.stderr.write(`Graft development mode failed: ${message}\n`);
     process.exitCode = 1;
   }
 }
@@ -66,7 +66,7 @@ async function runManagedDaemon(): Promise<void> {
 
   // The supervisor replaces a daemon stuck inside one phase, so a cold start that keeps
   // moving is never mistaken for a hang.
-  const phase = (name: string) => writeReply(`AEON_DAEMON_PHASE ${name}\n`);
+  const phase = (name: string) => writeReply(`GRAFT_DAEMON_PHASE ${name}\n`);
   phase("lock");
   const unlock = await acquireCoreLock(dataDirectory);
   let runtime: ReturnType<typeof createProductionRuntime> | undefined;
@@ -97,7 +97,7 @@ async function runManagedDaemon(): Promise<void> {
       activity,
     );
     phase("ready");
-    writeReply("AEON_DAEMON_READY\n");
+    writeReply("GRAFT_DAEMON_READY\n");
     runtime.warm();
     input = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of input) {
@@ -142,16 +142,16 @@ async function handleSupervisorLine(
 
 async function runLocalFixture(): Promise<void> {
   const dataDirectory =
-    process.env.AEON_DEV_DATA_DIR ??
+    process.env.GRAFT_DEV_DATA_DIR ??
     process.env.PIPPIN_DEV_DATA_DIR ??
-    join(tmpdir(), "aeon-slice1-dev-chat");
+    join(tmpdir(), "graft-slice1-dev-chat");
   const runtime = createLocalFixtureRuntime(dataDirectory);
   await runtime.ready;
   const harness = await startDevHandshakeServer({
     chatService: runtime.service,
     threadCoordination: runtime.threadCoordination,
   });
-  process.stdout.write(`Aeon local faux-model Chat fixture listening at ${harness.url}\n`);
+  process.stdout.write(`Graft local faux-model Chat fixture listening at ${harness.url}\n`);
   process.stdout.write(`Development data directory: ${dataDirectory}\n`);
   await new Promise<void>((resolve) => {
     let stopping = false;

@@ -4,7 +4,7 @@ import { checkSites, type SiteCheck } from "@browserkit/tools/browser-crawl";
 import { crawlTool, type CrawlToolInput } from "@browserkit/tools/definitions";
 import { boundedResult, type ToolText } from "./site-tool-output.js";
 
-// crawl action=check: Aeon's override around the shared check handler is only the workspace
+// crawl action=check: Graft's override around the shared check handler is only the workspace
 // evidence bundle; reading the input file and running the checks lives in browserkit.
 
 type CheckInput = Pick<CrawlToolInput, "urls" | "file" | "limit" | "via" | "paths" | "expect">;

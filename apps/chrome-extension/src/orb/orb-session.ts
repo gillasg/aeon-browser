@@ -6,7 +6,7 @@ import {
   type PiEntryDto,
   type PiModelCatalogDto,
   type PiSessionEventDto,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { subscribeSavedChat } from "../chat-subscribe-client.js";
 import type { UiClient } from "../ui-client-core.js";
 import { connectPage, connectionErrorMessage } from "../ui-connection.js";
@@ -197,14 +197,14 @@ export class OrbSession {
 
   private async page(tabId = this.tabId): Promise<PiBrowserContextRecord | undefined> {
     const raw: unknown = await chrome.runtime
-      .sendMessage({ kind: "aeon.native.capture-page", tabId })
+      .sendMessage({ kind: "graft.native.capture-page", tabId })
       .catch(() => null);
     const parsed = PiBrowserContextRecordSchema.safeParse(raw);
     return parsed.success ? parsed.data : undefined;
   }
 
   private requireCatalog(): UiClient {
-    if (!this.catalog) throw new Error("Aeon is not connected.");
+    if (!this.catalog) throw new Error("Graft is not connected.");
     return this.catalog;
   }
 }
@@ -246,7 +246,7 @@ export function pickModel(catalog: PiModelCatalogDto): {
       (model) =>
         model.provider === catalog.defaultModel?.provider && model.id === catalog.defaultModel?.id,
     ) ?? catalog.models[0];
-  if (!chosen) throw new Error("Sign in to a model in Aeon first.");
+  if (!chosen) throw new Error("Sign in to a model in Graft first.");
   return {
     model: { provider: chosen.provider, id: chosen.id },
     thinkingLevel: chosen.defaultThinkingLevel,

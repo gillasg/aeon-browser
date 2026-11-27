@@ -15,7 +15,7 @@ import { chromeForTestingPath } from "./browser-fixture-helper.mjs";
 const chromePath = chromeForTestingPath();
 const extension = resolve("apps/chrome-extension/native-dist");
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-const debug = process.env.AEON_TEST_DEBUG
+const debug = process.env.GRAFT_TEST_DEBUG
   ? (...parts) => process.stderr.write("RECONNECT " + parts.join(" ") + "\n")
   : () => {};
 
@@ -30,7 +30,7 @@ test(
   },
   async () => {
     const cores = [];
-    const profile = await mkdtemp(join(tmpdir(), "aeon-reconnect-e2e-"));
+    const profile = await mkdtemp(join(tmpdir(), "graft-reconnect-e2e-"));
     const chrome = spawn(
       chromePath,
       [
@@ -64,7 +64,7 @@ test(
         core,
       ) => `chrome.runtime.sendNativeMessage = (_host, request, callback) => callback({
         kind: "native.bootstrap.result", protocolVersion: request.protocolVersion, ok: true,
-        endpoint: "ws://127.0.0.1:${core.port}/aeon/v1", connectionGrant: "${"A".repeat(43)}",
+        endpoint: "ws://127.0.0.1:${core.port}/graft/v1", connectionGrant: "${"A".repeat(43)}",
         expiresAt: Date.now() + 600000, daemonProtocolVersion: request.protocolVersion });`;
 
       const first = await fakeCore();
@@ -89,7 +89,7 @@ test(
       // restart, no new tab, no manual nudge — this is the path the fix relies on.
       await cdp("Runtime.evaluate", {
         expression:
-          "chrome.alarms.create('aeon-executor-reconnect-now', { when: Date.now() + 50 })",
+          "chrome.alarms.create('graft-executor-reconnect-now', { when: Date.now() + 50 })",
         awaitPromise: true,
       });
       await withTimeout(second.connected, 20_000, "reconnect after daemon restart");
@@ -115,7 +115,7 @@ test(
     timeout: 120_000,
   },
   async () => {
-    const profile = await mkdtemp(join(tmpdir(), "aeon-drop-heal-e2e-"));
+    const profile = await mkdtemp(join(tmpdir(), "graft-drop-heal-e2e-"));
     const chrome = spawn(
       chromePath,
       [
@@ -150,7 +150,7 @@ test(
       await cdp("Runtime.evaluate", {
         expression: `chrome.runtime.sendNativeMessage = (_host, request, callback) => callback({
           kind: "native.bootstrap.result", protocolVersion: request.protocolVersion, ok: true,
-          endpoint: "ws://127.0.0.1:${core.port}/aeon/v1", connectionGrant: "${"A".repeat(43)}",
+          endpoint: "ws://127.0.0.1:${core.port}/graft/v1", connectionGrant: "${"A".repeat(43)}",
           expiresAt: Date.now() + 600000, daemonProtocolVersion: request.protocolVersion });`,
       });
       const browserCdp = await connect(
@@ -189,7 +189,7 @@ function withTimeout(promise, ms, label) {
 }
 
 async function fakeCore() {
-  const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/aeon/v1" });
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/graft/v1" });
   await new Promise((done) => server.once("listening", done));
   let socket;
   let connections = 0;

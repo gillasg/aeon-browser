@@ -1,4 +1,4 @@
-// The extension's end of browser_code realms. The realms run in the local Aeon process (no code
+// The extension's end of browser_code realms. The realms run in the local Graft process (no code
 // is evaluated inside the extension); this sends them operations over the socket the extension
 // already holds to that process, and serves the browser effects their cells ask for.
 import { REALM_EVENT, REALM_EVENT_REPLY, REALM_OP, REALM_OP_REPLY } from "./code-realm-frames.js";
@@ -15,7 +15,7 @@ const pending = new Map<string, Waiter>();
 let socket: WebSocket | undefined;
 let sequence = 0;
 
-/** The socket realm operations go on: the latest link to the local Aeon process. */
+/** The socket realm operations go on: the latest link to the local Graft process. */
 export function bindRealmSocket(next: WebSocket): void {
   socket = next;
 }
@@ -29,7 +29,7 @@ export function realmLinked(): boolean {
 export function toRealm(op: Record<string, unknown>, maxMs = OP_MAX_MS): Promise<unknown> {
   const link = socket;
   if (!link || link.readyState !== WebSocket.OPEN)
-    return Promise.reject(new Error("BROWSER_OFFLINE: the local Aeon runtime is not connected"));
+    return Promise.reject(new Error("BROWSER_OFFLINE: the local Graft runtime is not connected"));
   const opId = `${Date.now().toString(36)}-${++sequence}`;
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {

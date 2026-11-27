@@ -1,4 +1,4 @@
-import type { ChatId } from "@aeon/domain";
+import type { ChatId } from "@graft/domain";
 
 export class ChatCommandGate {
   private readonly tails = new Map<ChatId, Promise<void>>();

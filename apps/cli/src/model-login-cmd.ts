@@ -1,16 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createAeonModelRuntime, resolvePiAgentDirectory } from "@aeon/pi-adapter";
+import { createGraftModelRuntime, resolvePiAgentDirectory } from "@graft/pi-adapter";
 import { has, type Args } from "browserkit/dist/args.js";
 import type { Command } from "browserkit/dist/usage.js";
-import { aeonExtensionId, extensionIdFromKey, extensionUrl } from "./extension-url.js";
+import { graftExtensionId, extensionIdFromKey, extensionUrl } from "./extension-url.js";
 import type { DaemonHost } from "./host.js";
 
 export { extensionIdFromKey };
 
-// `aeon login` connects an AI model the same way the extension does: it opens Aeon's Models page
+// `graft login` connects an AI model the same way the extension does: it opens Graft's Models page
 // (Settings → Models) in the connected Chrome and waits until a model answers. Logins land in Pi's
-// auth.json, so chats, this CLI and the Pi CLI all see them. `aeon login status` only reports.
+// auth.json, so chats, this CLI and the Pi CLI all see them. `graft login status` only reports.
 
 export interface ModelLoginStatus {
   connected: { id: string; name: string; source?: string }[];
@@ -20,7 +20,7 @@ export interface ModelLoginStatus {
 /** Which providers answer and the default model, read from Pi's own files. */
 export async function modelLoginStatus(agentDirectory?: string): Promise<ModelLoginStatus> {
   const directory = agentDirectory ?? resolvePiAgentDirectory();
-  const models = await createAeonModelRuntime({ agentDirectory: directory });
+  const models = await createGraftModelRuntime({ agentDirectory: directory });
   const connected: ModelLoginStatus["connected"] = [];
   for (const provider of models.getProviders()) {
     const check = await models.checkAuth(provider.id).catch(() => undefined);
@@ -42,7 +42,7 @@ export async function modelLoginStatus(agentDirectory?: string): Promise<ModelLo
 
 export function describeStatus(status: ModelLoginStatus): string {
   if (!status.connected.length)
-    return "No AI model is connected yet. Run `aeon login` to sign in from Aeon's Models page.\n";
+    return "No AI model is connected yet. Run `graft login` to sign in from Graft's Models page.\n";
   const lines = status.connected.map(
     (provider) => `  ${provider.name}${provider.source ? ` (from ${provider.source})` : ""}`,
   );
@@ -51,7 +51,7 @@ export function describeStatus(status: ModelLoginStatus): string {
 }
 
 async function modelsPageUrl(): Promise<string> {
-  return extensionUrl(await aeonExtensionId(), "home.html?view=models");
+  return extensionUrl(await graftExtensionId(), "home.html?view=models");
 }
 
 const WAIT_MS = 10 * 60_000;
@@ -74,10 +74,12 @@ export async function login(host: DaemonHost, args: Args): Promise<number> {
       `await browser.keepPage(${JSON.stringify(url)}, { foreground: true }); "opened"`,
       { session: "cli-login", timeoutMs: 20_000 },
     );
-    process.stdout.write("Opened Aeon's Models page in Chrome. Sign in or add an API key there.\n");
+    process.stdout.write(
+      "Opened Graft's Models page in Chrome. Sign in or add an API key there.\n",
+    );
   } catch {
     process.stdout.write(
-      `Could not reach Chrome. Open Chrome with Aeon loaded, then go to Settings → Models\n(${url}).\n`,
+      `Could not reach Chrome. Open Chrome with Graft loaded, then go to Settings → Models\n(${url}).\n`,
     );
     return before.connected.length ? 0 : 1;
   }
@@ -95,14 +97,14 @@ export async function login(host: DaemonHost, args: Args): Promise<number> {
       return 0;
     }
   }
-  process.stdout.write("Still no new model. Run `aeon login status` once you have signed in.\n");
+  process.stdout.write("Still no new model. Run `graft login status` once you have signed in.\n");
   return before.connected.length ? 0 : 1;
 }
 
-export const loginUsage = `Usage: aeon login [--no-wait]
-       aeon login status
+export const loginUsage = `Usage: graft login [--no-wait]
+       graft login status
 
-Connects an AI model: opens Aeon's Models page in Chrome (subscriptions such as Claude, ChatGPT
+Connects an AI model: opens Graft's Models page in Chrome (subscriptions such as Claude, ChatGPT
 or GitHub Copilot, or an API key for 40+ providers) and waits until the new model answers. The
 first model connected becomes the default. status lists the connected providers and the default.`;
 
@@ -110,8 +112,8 @@ export function loginCommands(host: DaemonHost): Command[] {
   return [
     {
       name: "login",
-      group: "Aeon",
-      summary: "connect an AI model (opens Aeon's Models page)",
+      group: "Graft",
+      summary: "connect an AI model (opens Graft's Models page)",
       help: loginUsage,
       run: (args) => login(host, args),
     },

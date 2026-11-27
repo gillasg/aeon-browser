@@ -13,7 +13,7 @@ export function Segmented<Value extends string>({
   onChange(value: Value): void;
 }): ReactElement {
   return (
-    <div className="aeon-segmented" role="tablist" aria-label={label}>
+    <div className="graft-segmented" role="tablist" aria-label={label}>
       {options.map(([option, text]) => (
         <button
           key={option}

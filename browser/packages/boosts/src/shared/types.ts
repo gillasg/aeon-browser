@@ -104,7 +104,7 @@ export interface HtmlPart {
 
 /**
  * A declarative network rewrite on the boost's sites, applied by a host that drives DevTools
- * Fetch (Aeon's engine): block, edit JSON fields, response headers or HTML. Pure data, no code.
+ * Fetch (Graft's engine): block, edit JSON fields, response headers or HTML. Pure data, no code.
  */
 export interface WireRule {
   match: string;

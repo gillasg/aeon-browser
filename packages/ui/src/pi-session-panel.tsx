@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import { UI_BUILTIN_COMMANDS } from "./pi-native-command.js";
-import type { PiUiSnapshotDto } from "@aeon/protocol";
+import type { PiUiSnapshotDto } from "@graft/protocol";
 
 export interface PiSessionPanelProps {
   snapshot: PiUiSnapshotDto | null;

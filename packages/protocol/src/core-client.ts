@@ -79,13 +79,13 @@ export type CoreAttentionAlert = z.infer<typeof CoreAttentionAlertSchema>;
 export type CoreDiscovery = z.infer<typeof CoreDiscoverySchema>;
 export type CoreAttentionRequest = z.infer<typeof CoreAttentionRequestSchema>;
 
-/** A local client (the Aeon CLI/MCP) asks Core to show a chat as a tab in the connected Chrome. */
+/** A local client (the Graft CLI/MCP) asks Core to show a chat as a tab in the connected Chrome. */
 export const CoreOpenChatRequestSchema = z
   .object({
     kind: z.literal("core.chat.open"),
     chatId: z.string().uuid(),
     active: z.boolean().optional(),
-    /** Type this prompt into the chat's composer on camera before it is sent (aeon run --typed). */
+    /** Type this prompt into the chat's composer on camera before it is sent (graft run --typed). */
     typed: z.string().min(1).max(8000).optional(),
   })
   .strict();
@@ -94,7 +94,7 @@ export const CoreOpenChatReplySchema = z
     kind: z.literal("core.chat.opened"),
     chatId: z.string().uuid(),
     browsers: z.number().int().nonnegative(),
-    /** The chat's tab in the browser that showed it, when Chrome gave one (aeon open prints it). */
+    /** The chat's tab in the browser that showed it, when Chrome gave one (graft open prints it). */
     tabId: z.number().int().nonnegative().optional(),
     /** typed: whether the prompt was typed into the chat's composer, and why not. */
     typed: z.boolean().optional(),
@@ -102,7 +102,7 @@ export const CoreOpenChatReplySchema = z
     error: z.string().max(2000).optional(),
   })
   .strict();
-/** A local client (the Aeon CLI/MCP) stops a running chat. */
+/** A local client (the Graft CLI/MCP) stops a running chat. */
 export const CoreChatStopRequestSchema = z
   .object({
     kind: z.literal("core.chat.stop"),
@@ -148,7 +148,7 @@ export const NativeChatTypedSchema = z
   })
   .strict();
 
-/** A local client (the Aeon MCP) lists or calls the chat tools (browser_code, crawl, ...). */
+/** A local client (the Graft MCP) lists or calls the chat tools (browser_code, crawl, ...). */
 export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("core.tool.list"), requestId: z.string().uuid() }).strict(),
   z
@@ -166,7 +166,7 @@ export const CoreToolRequestSchema = z.discriminatedUnion("kind", [
       ]),
       session: z.string().min(1).max(100),
       arguments: z.record(z.string(), z.unknown()),
-      /** A name from `aeon browsers`: the session's browser work runs only in that Chrome profile. */
+      /** A name from `graft browsers`: the session's browser work runs only in that Chrome profile. */
       browser: z.string().min(1).max(40).optional(),
     })
     .strict(),
@@ -180,7 +180,7 @@ export const CORE_BROWSER_CODE_MAX = 65536;
 /** The longest a client cell may run, in milliseconds. */
 export const CORE_BROWSER_TIMEOUT_MAX = 600000;
 
-/** A local client (the Aeon CLI) runs browser code in the user's Chrome, through Core. */
+/** A local client (the Graft CLI) runs browser code in the user's Chrome, through Core. */
 export const CoreBrowserRunRequestSchema = z
   .object({
     kind: z.literal("core.browser.run"),
@@ -188,7 +188,7 @@ export const CoreBrowserRunRequestSchema = z
     code: z.string().min(1).max(CORE_BROWSER_CODE_MAX),
     session: z.string().min(1).max(100),
     timeoutMs: z.number().int().min(1000).max(CORE_BROWSER_TIMEOUT_MAX).optional(),
-    /** A name from `aeon browsers`: the session runs only in that Chrome profile. */
+    /** A name from `graft browsers`: the session runs only in that Chrome profile. */
     browser: z.string().min(1).max(40).optional(),
   })
   .strict();
@@ -205,7 +205,7 @@ export const CoreBrowserRunResultSchema = z
 export type CoreBrowserRunRequest = z.infer<typeof CoreBrowserRunRequestSchema>;
 export type CoreBrowserRunResult = z.infer<typeof CoreBrowserRunResultSchema>;
 
-/** A local client (the Aeon CLI) uses the user's default model for a tool-calling completion. */
+/** A local client (the Graft CLI) uses the user's default model for a tool-calling completion. */
 export const CoreModelCompleteRequestSchema = z
   .object({
     kind: z.literal("core.model.complete"),
@@ -226,7 +226,7 @@ export const CoreModelCompleteResultSchema = z
 export type CoreModelCompleteRequest = z.infer<typeof CoreModelCompleteRequestSchema>;
 export type CoreModelCompleteResult = z.infer<typeof CoreModelCompleteResultSchema>;
 
-/** A local client (the Aeon CLI) reads or changes the sites agents may not use. */
+/** A local client (the Graft CLI) reads or changes the sites agents may not use. */
 export const CoreBlockedSitesRequestSchema = z
   .object({
     kind: z.literal("core.blocked-sites"),
@@ -266,8 +266,8 @@ export const NativeBlockedSitesReplySchema = z
   .strict();
 
 /**
- * Aeon's agent settings, read or changed from outside the settings page (the Aeon CLI). Screen
- * recorders (Aeon Recorder) switch these on for a recording and restore them after; keep the names.
+ * Graft's agent settings, read or changed from outside the settings page (the Graft CLI). Screen
+ * recorders (Graft Recorder) switch these on for a recording and restore them after; keep the names.
  */
 export const AgentSettingsSchema = z
   .object({
@@ -304,7 +304,7 @@ export const NativeSettingsReplySchema = z
   })
   .strict();
 
-/** `aeon record`: arm, read or clear the beat bus (chrome.storage.session) in every connected Chrome. */
+/** `graft record`: arm, read or clear the beat bus (chrome.storage.session) in every connected Chrome. */
 export const FilmActionSchema = z.enum(["arm", "disarm", "read", "clear"]);
 export type FilmAction = z.infer<typeof FilmActionSchema>;
 export const CoreFilmRequestSchema = z
@@ -327,8 +327,8 @@ export const NativeFilmReplySchema = z
   .strict();
 
 /**
- * A local client (`aeon browsers`) lists the connected browsers (one per Chrome profile) and can
- * name one. A name is how `aeon run --browser <name>` keeps a chat in that one browser.
+ * A local client (`graft browsers`) lists the connected browsers (one per Chrome profile) and can
+ * name one. A name is how `graft run --browser <name>` keeps a chat in that one browser.
  */
 export const CoreBrowsersRequestSchema = z
   .object({
@@ -420,7 +420,7 @@ export const CorePingResultSchema = z
     ok: z.literal(true),
   })
   .strict();
-/** Whether a chat, ability, or routine is running. `aeon update` waits while this is busy. */
+/** Whether a chat, ability, or routine is running. `graft update` waits while this is busy. */
 export const CoreActivityRequestSchema = z
   .object({
     kind: z.literal("core.activity"),

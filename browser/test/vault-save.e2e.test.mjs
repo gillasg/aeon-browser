@@ -31,7 +31,7 @@ let workerCdp;
 // What a page says about the hand-off and the cursor, read from its own main world.
 const PROBE = `(() => {
   const cursor = [...document.documentElement.children].find((n) => n.style.zIndex === "2147483647" && n.style.contain === "strict");
-  const ask = document.getElementById("aeon-agent-ask");
+  const ask = document.getElementById("graft-agent-ask");
   return {
     url: location.href,
     title: document.title,
@@ -71,7 +71,7 @@ const WORKER_STATE = `(async () => {
       type: target.type,
       url: target.url,
     })),
-    engineLog: typeof globalThis.__aeonEngineDebug === "function" ? globalThis.__aeonEngineDebug() : [],
+    engineLog: typeof globalThis.__graftEngineDebug === "function" ? globalThis.__graftEngineDebug() : [],
   };
 })()`;
 
@@ -443,7 +443,7 @@ function findButton(node, inCursor) {
     const index = attributes.indexOf(name);
     return index >= 0 ? attributes[index + 1] : undefined;
   };
-  const here = inCursor || pair("id") === "aeon-agent-ask";
+  const here = inCursor || pair("id") === "graft-agent-ask";
   if (here && node.nodeName === "BUTTON" && (pair("class") ?? "").split(/\s+/).includes("done"))
     return node;
   for (const child of node.children ?? []) {

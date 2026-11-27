@@ -30,21 +30,21 @@ if (-not $node -or -not (Test-Path -LiteralPath $node -PathType Leaf)) {
     throw 'A permanent Node executable could not be resolved.'
 }
 $nodeFull = [IO.Path]::GetFullPath($node.Trim())
-$nativeOutput = Join-Path $repoRoot 'apps\native-host\dist\aeon-native-host.exe'
+$nativeOutput = Join-Path $repoRoot 'apps\native-host\dist\graft-native-host.exe'
 $daemonEntry = Join-Path $repoRoot 'apps\daemon\dist\main.js'
 $extensionManifest = if ($BrowserRoot) { Join-Path ([IO.Path]::GetFullPath($BrowserRoot)) 'apps\chrome-extension\native-dist\manifest.json' } else { $null }
-$appRoot = Join-Path $env:LOCALAPPDATA 'Aeon'
-$hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
-$hostManifestPath = Join-Path $appRoot 'com.aeon.native_host.json'
+$appRoot = Join-Path $env:LOCALAPPDATA 'Graft'
+$hostExecutable = Join-Path $appRoot 'graft-native-host.exe'
+$hostManifestPath = Join-Path $appRoot 'com.graft.native_host.json'
 $hostConfigPath = Join-Path $appRoot 'host-config.json'
-$registrySubKey = 'Software\Google\Chrome\NativeMessagingHosts\com.aeon.native_host'
+$registrySubKey = 'Software\Google\Chrome\NativeMessagingHosts\com.graft.native_host'
 $expectedExtensionId = 'npcdopokfkpfmepknhoecppgdgmkmihh'
 $expectedPublicKey = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA89DgbMVu50oH2AAiN0vILGKRKc2ePGR9r1W92yDIiVq9n1rxtqxQZSLsxPKuymvi3wB9hpo0h9vJ3++teaw8fqBllliSeELEAUmPNhauLcvlKe1nhkbgRf2wXilCUVI+zumNinkqw5h85rew1FI894ev8M9wWzSHm90eL9WILlWTrjhdaNTpMs2w9sF8GrsKj+sX1anF9/iUfZ9hbracUa47Z2b4KiviZp5SlF6o+0SwFHbeOVM0Aq2nHMFujmfaOcW7TkxDdPXBns2uRY1CTmRIyi3B1pONLQd8ERteRbOlj2BM9AYIrnGyJScaKAu7OUht0gI4C/NlEhdQruxTfQIDAQAB'
 
 if (-not (Test-Path -LiteralPath $nativeOutput -PathType Leaf) -or
     -not (Test-Path -LiteralPath $daemonEntry -PathType Leaf) -or
     ($extensionManifest -and -not (Test-Path -LiteralPath $extensionManifest -PathType Leaf))) {
-    throw 'Build Aeon first with pnpm build.'
+    throw 'Build Graft first with pnpm build.'
 }
 if ($extensionManifest) {
     $manifest = Get-Content -LiteralPath $extensionManifest -Raw | ConvertFrom-Json
@@ -88,7 +88,7 @@ if ($null -ne $registration) {
     } while ([DateTime]::UtcNow -lt $deadline)
 if ($running.Count) { throw 'Supervisor did not stop; files were preserved.' }
 }
-if ($ImportDataFrom -and ((Test-Path -LiteralPath (Join-Path $ImportDataFrom 'aeon.sqlite')) -or (Test-Path -LiteralPath (Join-Path $ImportDataFrom 'pippin.sqlite')))) {
+if ($ImportDataFrom -and ((Test-Path -LiteralPath (Join-Path $ImportDataFrom 'graft.sqlite')) -or (Test-Path -LiteralPath (Join-Path $ImportDataFrom 'pippin.sqlite')))) {
     & $nodeFull (Join-Path $repoRoot 'scripts/import-virtualized-data.mjs') $ImportDataFrom (Join-Path $appRoot 'data')
     if ($LASTEXITCODE -ne 0) { throw 'Could not recover the redirected data; originals preserved.' }
 }
@@ -103,8 +103,8 @@ $daemonFull = [IO.Path]::GetFullPath($daemonEntry)
 New-Item -ItemType Directory -Path $appRootFull -Force | Out-Null
 Copy-Item -LiteralPath $nativeOutput -Destination $hostExecutable
 $hostManifest = [ordered]@{
-    name = 'com.aeon.native_host'
-    description = 'Disposable Aeon Slice 3 native messaging host'
+    name = 'com.graft.native_host'
+    description = 'Disposable Graft Slice 3 native messaging host'
     path = $hostExecutable
     type = 'stdio'
     allowed_origins = @("chrome-extension://$expectedExtensionId/")
@@ -121,8 +121,8 @@ $registryKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($registrySub
 try { $registryKey.SetValue('', $hostManifestPath, [Microsoft.Win32.RegistryValueKind]::String) }
 finally { $registryKey.Dispose() }
 & (Join-Path $PSScriptRoot 'configure-startup.ps1') -Mode Install
-# The aeon command and the Aeon skill, so agents on this machine know how to use Aeon.
-try { & $nodeFull (Join-Path $repoRoot 'apps\cli\dist\cli.js') install } catch { Write-Warning "aeon install failed: $_" }
+# The graft command and the Graft skill, so agents on this machine know how to use Graft.
+try { & $nodeFull (Join-Path $repoRoot 'apps\cli\dist\cli.js') install } catch { Write-Warning "graft install failed: $_" }
 Write-Output "Registered the disposable host for chrome-extension://$expectedExtensionId/."
 if ($extensionManifest) { Write-Output "Browser extension: $(Split-Path $extensionManifest)" }
 Write-Output "Daemon data will be stored outside the repository at: $((Join-Path $appRootFull 'data'))"

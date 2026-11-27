@@ -10,7 +10,7 @@ test("a chat page has no chat list: home and new chat, no title bar", () => {
   assert.match(html, /id="chat-home"/);
   assert.match(html, /aria-label="New Chat"/);
   assert.doesNotMatch(html, /sidebar-toggle|Open Chat list/);
-  assert.doesNotMatch(html, /<header|Connected|Aeon/);
+  assert.doesNotMatch(html, /<header|Connected|Graft/);
 });
 
 const homeProps = {
@@ -29,7 +29,7 @@ test("Manage is one sidebar and a page: no landing, no top bar, no composer", ()
   globalThis.location = { search: "", hash: "" };
   const html = renderToStaticMarkup(createElement(NewTabHome, homeProps));
   assert.match(html, /class="manage-sidebar"/);
-  assert.doesNotMatch(html, /home-top-bar|home-core|placeholder="Ask Aeon to do anything"/);
+  assert.doesNotMatch(html, /home-top-bar|home-core|placeholder="Ask Graft to do anything"/);
   for (const page of ["Automations", "Sites", "My Details", "Sign-in", "Settings", "Advanced"])
     assert.match(html, new RegExp(`>${page}</button>`));
   assert.match(html, /aria-current="page"[^>]*>Sites</);
@@ -43,7 +43,7 @@ test("the side panel's idle canvas is one quiet line, three examples and the com
   const html = renderToStaticMarkup(createElement(NewTabHome, homeProps));
   assert.doesNotMatch(html, /manage-sidebar/);
   assert.match(html, /Do anything on the web/);
-  assert.match(html, /placeholder="Ask Aeon to do anything"/);
+  assert.match(html, /placeholder="Ask Graft to do anything"/);
   assert.match(html, /Fill this form with my details/);
   assert.doesNotMatch(html, /role="dialog"|tour-actions|Turn this site into an API/);
   delete globalThis.localStorage;

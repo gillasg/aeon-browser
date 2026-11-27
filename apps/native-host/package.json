@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/native-host",
+  "name": "@graft/native-host",
   "version": "0.0.0",
   "private": true,
   "type": "module",

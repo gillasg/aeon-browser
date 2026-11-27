@@ -1,4 +1,4 @@
-import type { DaemonUiResponse } from "@aeon/protocol";
+import type { DaemonUiResponse } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 
 // On/off settings owned by the daemon ("Let outside agents see my open tabs", "Load my Pi

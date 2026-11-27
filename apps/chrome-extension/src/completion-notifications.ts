@@ -7,7 +7,7 @@ import {
   CoreAttentionSnapshotSchema,
   CoreAttentionRequestSchema,
   type CoreAttentionRequest,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 let send: ((request: CoreAttentionRequest) => void) | undefined;
 let pending = Promise.resolve();
 // Each completion is claimed once. Every snapshot lists every unread chat, so re-claiming on each
@@ -40,14 +40,14 @@ async function mirror(
   const values: Record<string, string> = {};
   for (const chat of snapshot.chats) {
     if (chat.asking) {
-      values["aeon-asking-" + chat.chatId] = chat.asking;
-      if (existing["aeon-asking-" + chat.chatId] !== chat.asking) void presentAsk(chat.chatId);
+      values["graft-asking-" + chat.chatId] = chat.asking;
+      if (existing["graft-asking-" + chat.chatId] !== chat.asking) void presentAsk(chat.chatId);
     }
     // The turn is over: the agent cursor leaves its tabs.
-    if (!chat.working && existing["aeon-chat-working-" + chat.chatId] === "working")
+    if (!chat.working && existing["graft-chat-working-" + chat.chatId] === "working")
       void clearAgentCursors(chat.chatId);
-    values["aeon-chat-working-" + chat.chatId] = chat.working ? "working" : "idle";
-    if (chat.completionId) values["aeon-completion-id-" + chat.chatId] = chat.completionId;
+    values["graft-chat-working-" + chat.chatId] = chat.working ? "working" : "idle";
+    if (chat.completionId) values["graft-completion-id-" + chat.chatId] = chat.completionId;
     if (chat.unread && chat.completionId) {
       values["piper-unread-" + chat.chatId] = "done";
       claimOnce(chat.chatId, chat.completionId);
@@ -55,7 +55,7 @@ async function mirror(
   }
   const stale = Object.keys(existing).filter(
     (key) =>
-      ["aeon-chat-working-", "piper-unread-", "aeon-completion-id-", "aeon-asking-"].some(
+      ["graft-chat-working-", "piper-unread-", "graft-completion-id-", "graft-asking-"].some(
         (prefix) => key.startsWith(prefix),
       ) && !(key in values),
   );
@@ -77,7 +77,7 @@ async function notify(chatId: string, title?: string, summary?: string): Promise
   await chrome.notifications.create("piper-done-" + chatId, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("completion-icon.png"),
-    title: title || "Aeon finished",
+    title: title || "Graft finished",
     message: summary || "Done. Click to open the chat.",
   });
 }
@@ -86,12 +86,12 @@ async function showAlert(alert: CoreAttentionAlert): Promise<void> {
   await chrome.notifications.create(ALERT_PREFIX + alert.chatId + ":" + alert.alertId, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("completion-icon.png"),
-    title: alert.title || "Aeon watcher",
+    title: alert.title || "Graft watcher",
     message: alert.message || "Its check passed. Click to open the chat.",
     priority: 2,
   });
 }
-const ALERT_PREFIX = "aeon-alert-";
+const ALERT_PREFIX = "graft-alert-";
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith("piper-done-")) void openCompletedChat(id.slice("piper-done-".length));
   if (id.startsWith(ALERT_PREFIX)) {

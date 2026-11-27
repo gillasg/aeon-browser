@@ -1,4 +1,4 @@
-// One source for the platform-aware label of the shortcut that summons Aeon. Chrome UI text must
+// One source for the platform-aware label of the shortcut that summons Graft. Chrome UI text must
 // never disagree about ⌥ on macOS versus Alt elsewhere. The default is a rebindable
 // chrome.commands entry (manifest.native.json).
 

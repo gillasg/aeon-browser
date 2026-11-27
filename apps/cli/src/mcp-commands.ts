@@ -15,8 +15,8 @@ import { serveMcpHttp } from "./mcp-http.js";
 import { MCP_SERVER_ACTIONS, MCP_SERVERS_HELP, mcpServersCommand } from "./mcp-servers-cmd.js";
 import { createToken, readTokens, revokeToken, verifyToken } from "./mcp-tokens.js";
 
-// `aeon mcp` (stdio or Streamable HTTP, code or full surface), its per-client tokens,
-// `aeon rest` (the local REST server, on the same tokens) and `aeon compile`.
+// `graft mcp` (stdio or Streamable HTTP, code or full surface), its per-client tokens,
+// `graft rest` (the local REST server, on the same tokens) and `graft compile`.
 
 const out = (line: string) => process.stdout.write(`${line}\n`);
 
@@ -30,9 +30,9 @@ async function tokenCommand(args: Args): Promise<number> {
   const [, action, positionalName] = args.positional;
   const name = flag(args, "name") ?? positionalName;
   if (action === "create") {
-    if (!name) throw new Error("Usage: aeon mcp token create --name <client>");
+    if (!name) throw new Error("Usage: graft mcp token create --name <client>");
     out(await createToken(name));
-    process.stderr.write(`Token for ${name}. It is shown once; Aeon keeps only its hash.\n`);
+    process.stderr.write(`Token for ${name}. It is shown once; Graft keeps only its hash.\n`);
     return 0;
   }
   if (action === "list") {
@@ -45,17 +45,17 @@ async function tokenCommand(args: Args): Promise<number> {
           2,
         ),
       );
-    else if (!tokens.length) out("No tokens. Create one: aeon mcp token create --name <client>");
+    else if (!tokens.length) out("No tokens. Create one: graft mcp token create --name <client>");
     else for (const token of tokens) out(`${token.name}\t${token.createdAt}`);
     return 0;
   }
   if (action === "revoke") {
-    if (!name) throw new Error("Usage: aeon mcp token revoke --name <client>");
+    if (!name) throw new Error("Usage: graft mcp token revoke --name <client>");
     const revoked = await revokeToken(name);
     out(revoked ? `Revoked ${name}.` : `No token named ${name}.`);
     return revoked ? 0 : 1;
   }
-  throw new Error("Usage: aeon mcp token create|list|revoke [--name <client>]");
+  throw new Error("Usage: graft mcp token create|list|revoke [--name <client>]");
 }
 
 async function mcpCommand(args: Args): Promise<number> {
@@ -82,7 +82,7 @@ async function mcpCommand(args: Args): Promise<number> {
   out(
     tokens.length
       ? `Clients send Authorization: Bearer <token>; tokens: ${tokens.map((token) => token.name).join(", ")}`
-      : "No client tokens yet. Create one: aeon mcp token create --name <client>",
+      : "No client tokens yet. Create one: graft mcp token create --name <client>",
   );
   await waitForSignal();
   await server.close();
@@ -104,7 +104,7 @@ async function restCommand(args: Args): Promise<number> {
       : `Serving every mapped site at ${server.url}/#token=${server.token}`,
   );
   out(`Calls need the header x-site-to-api-token: ${server.token}`);
-  out("Or Authorization: Bearer <token> with a client token from aeon mcp token create.");
+  out("Or Authorization: Bearer <token> with a client token from graft mcp token create.");
   await waitForSignal();
   await server.close();
   return 0;
@@ -113,11 +113,11 @@ async function restCommand(args: Args): Promise<number> {
 /** Learn (when not mapped yet) → model-free build → a standalone typed client in the repo. */
 async function compileCommand(args: Args, map: Command | undefined): Promise<number> {
   const input = args.positional[0];
-  if (!input) throw new Error("Usage: aeon compile <url|site> [--out src/gen]");
+  if (!input) throw new Error("Usage: graft compile <url|site> [--out src/gen]");
   const site = siteName(input);
   let model = await loadModel(site);
   if (!model && !(await loadFlows(site)).exchanges.length) {
-    if (!map) throw new Error(`${site} is not mapped. Map it first: aeon map ${input}`);
+    if (!map) throw new Error(`${site} is not mapped. Map it first: graft map ${input}`);
     process.stderr.write(`Learning ${site}: use the page, recording stops when it goes quiet.\n`);
     const url = /^https?:\/\//.test(input) ? input : `https://${input}`;
     const code = await map.run({
@@ -135,12 +135,12 @@ async function compileCommand(args: Args, map: Command | undefined): Promise<num
   await writeFile(join(dir, `${base}.d.ts`), client.declarations);
   process.stderr.write(
     `Wrote ${join(dir, `${base}.ts`)} and ${base}.d.ts (${model.operations.length} operations). ` +
-      "It calls aeon rest with AEON_TOKEN from aeon mcp token create.\n",
+      "It calls graft rest with GRAFT_TOKEN from graft mcp token create.\n",
   );
   out(
     client.firstRead
-      ? `aeon call ${site} ${client.firstRead} '{}'`
-      : `aeon_find {"ref":"site:${site}"}`,
+      ? `graft call ${site} ${client.firstRead} '{}'`
+      : `graft_find {"ref":"site:${site}"}`,
   );
   return 0;
 }
@@ -158,13 +158,13 @@ export function mcpCommands(map: Command | undefined): Command[] {
       name: "mcp",
       group: "Browser",
       summary:
-        "MCP server (stdio or HTTP), or add/list/remove the MCP servers Aeon's chats can call",
-      help: `Usage: aeon mcp [site] [--surface code|full]
-       aeon mcp --http [--port 4790] [--surface code|full]
-       aeon mcp token create|list|revoke --name <client>
+        "MCP server (stdio or HTTP), or add/list/remove the MCP servers Graft's chats can call",
+      help: `Usage: graft mcp [site] [--surface code|full]
+       graft mcp --http [--port 4790] [--surface code|full]
+       graft mcp token create|list|revoke --name <client>
 
-Without a site: Aeon for another agent. The default surface is five fixed tools (browser_code,
-aeon_find, aeon_call, aeon_resume, aeon_run); --surface full lists every tool, one per mapped
+Without a site: Graft for another agent. The default surface is five fixed tools (browser_code,
+graft_find, graft_call, graft_resume, graft_run); --surface full lists every tool, one per mapped
 operation too. With a site: that site's operations as MCP tools. --http serves Streamable HTTP
 on 127.0.0.1 only; each client sends its own revocable token as Authorization: Bearer.
 
@@ -175,23 +175,23 @@ ${MCP_SERVERS_HELP}`,
       name: "rest",
       group: "Browser",
       summary: "local REST API for every mapped site, on 127.0.0.1, with client tokens",
-      help: `Usage: aeon rest [site] [--port <n>]
+      help: `Usage: graft rest [site] [--port <n>]
 
 POST /sites/<site>/ops/<operationId> calls an operation as the user. Calls need the token it
-prints (header x-site-to-api-token) or a client token from aeon mcp token create (Authorization:
-Bearer). Clients from aeon compile call http://127.0.0.1:4791 by default: aeon rest --port 4791.`,
+prints (header x-site-to-api-token) or a client token from graft mcp token create (Authorization:
+Bearer). Clients from graft compile call http://127.0.0.1:4791 by default: graft rest --port 4791.`,
       run: restCommand,
     },
     {
       name: "compile",
       group: "Browser",
       summary: "turn a site into a zero-dependency typed client in your repo",
-      help: `Usage: aeon compile <url|site> [--out src/gen] [--rebuild] [--until-idle <s>]
+      help: `Usage: graft compile <url|site> [--out src/gen] [--rebuild] [--until-idle <s>]
 
-Learns the site when it is not mapped yet (you use the page while Aeon records), builds it
+Learns the site when it is not mapped yet (you use the page while Graft records), builds it
 with no model, and writes <site>.ts and <site>.d.ts: typed methods, async iterators for
 paginated operations, and NOT_PROVEN for writes the page has not proven. The client calls
-aeon rest (--port 4791, or AEON_REST_URL) with AEON_TOKEN. Prints one runnable next line.`,
+graft rest (--port 4791, or GRAFT_REST_URL) with GRAFT_TOKEN. Prints one runnable next line.`,
       run: (args) => compileCommand(args, map),
     },
   ];

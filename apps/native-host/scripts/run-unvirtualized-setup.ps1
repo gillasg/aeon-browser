@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class AeonPackageIdentity {
+public static class GraftPackageIdentity {
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetCurrentPackageFullName(ref uint length, IntPtr name);
 }
@@ -11,14 +11,14 @@ public static class AeonPackageIdentity {
 [uint32]$taskLength = 0
 # Some packaged desktop hosts redirect AppData writes from child processes that
 # have no package identity of their own. Detect that with a probe instead of trusting identity.
-$probeName = 'aeon-virtualization-probe-' + [Guid]::NewGuid().ToString('N')
+$probeName = 'graft-virtualization-probe-' + [Guid]::NewGuid().ToString('N')
 $probe = Join-Path $env:LOCALAPPDATA $probeName
 [IO.File]::WriteAllText($probe, '')
 $redirected = @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Packages') -Directory -ErrorAction SilentlyContinue |
     Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName ('LocalCacheLocal' + $probeName)) })
 Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
 if (-not $env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY -and $redirected.Count -eq 0 -and
-    [AeonPackageIdentity]::GetCurrentPackageFullName([ref]$taskLength, [IntPtr]::Zero) -eq 15700) {
+    [GraftPackageIdentity]::GetCurrentPackageFullName([ref]$taskLength, [IntPtr]::Zero) -eq 15700) {
     return $false
 }
 # Windows launches this one-time task outside an MSIX parent's filesystem/registry virtualization.
@@ -35,8 +35,8 @@ if ($BrowserRoot) { $taskArgs += ' -BrowserRoot ' + (Quote-SetupLiteral $Browser
 if ($Update) { $taskArgs += ' -Update' }
 $families = @($redirected | ForEach-Object { $_.Name }) + @($env:CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY | Where-Object { $_ })
 foreach ($family in $families) {
-    $redirectedData = Join-Path $env:LOCALAPPDATA ('Packages/' + $family + '/LocalCache/Local/Aeon/data')
-    if (Test-Path -LiteralPath (Join-Path $redirectedData 'aeon.sqlite')) {
+    $redirectedData = Join-Path $env:LOCALAPPDATA ('Packages/' + $family + '/LocalCache/Local/Graft/data')
+    if (Test-Path -LiteralPath (Join-Path $redirectedData 'graft.sqlite')) {
         $taskArgs += ' -ImportDataFrom ' + (Quote-SetupLiteral $redirectedData)
     }
 }
@@ -54,7 +54,7 @@ try {
 $taskService = New-Object -ComObject 'Schedule.Service'
 $taskService.Connect()
 $taskFolder = $taskService.GetFolder('\')
-$taskName = 'Aeon-Setup-' + [Guid]::NewGuid().ToString('N')
+$taskName = 'Graft-Setup-' + [Guid]::NewGuid().ToString('N')
 $taskDefinition = $taskService.NewTask(0)
 $taskDefinition.Settings.Hidden = $true
 $taskDefinition.Settings.DisallowStartIfOnBatteries = $false

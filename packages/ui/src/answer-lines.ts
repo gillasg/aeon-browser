@@ -49,7 +49,7 @@ const OFFER_LABEL: Record<string, string> = {
   fresh: "Do it fresh",
   "get-all": "Get all",
   "do-rest": "Do the rest",
-  "learn-site": "Teach Aeon this site",
+  "learn-site": "Teach Graft this site",
   "save-ability": "Save as a skill",
   "save-file": "Save as file",
   watch: "Tell me when",

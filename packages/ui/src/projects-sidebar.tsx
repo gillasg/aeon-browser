@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
-import type { ChatSummaryDto, ProjectDto } from "@aeon/protocol";
+import type { ChatSummaryDto, ProjectDto } from "@graft/protocol";
 import { SidebarChatItem } from "./sidebar-chat-item.js";
 import { SidebarSectionHeading } from "./sidebar-section-heading.js";
 import { ProjectRowActions } from "./project-row-actions.js";

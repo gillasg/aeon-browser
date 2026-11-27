@@ -39,9 +39,9 @@ test("while signing in, the card says so and offers to reopen the page", () => {
 
 test("a sign-in error is shown on the card", () => {
   const html = home({
-    modelLogin: { waiting: false, error: "Aeon could not open the sign-in page." },
+    modelLogin: { waiting: false, error: "Graft could not open the sign-in page." },
   });
-  assert.match(html, /role="alert"[^>]*>Aeon could not open the sign-in page\./);
+  assert.match(html, /role="alert"[^>]*>Graft could not open the sign-in page\./);
 });
 
 test("a chat with no models shows the same card in the composer", () => {
@@ -84,13 +84,13 @@ test("a failed sign-in from the model picker is shown next to it", () => {
     createElement(ComposerPanels, {
       connected: true,
       controls,
-      modelLogin: { waiting: false, error: "Aeon could not open the sign-in page." },
+      modelLogin: { waiting: false, error: "Graft could not open the sign-in page." },
       attachments: [],
       onManageModels() {},
     }),
   );
   assert.match(html, /role="alert"/);
-  assert.match(html, /Aeon could not open the sign-in page\./);
+  assert.match(html, /Graft could not open the sign-in page\./);
   assert.match(html, /id="model-picker"/);
 });
 
@@ -131,9 +131,9 @@ test("a rate limit or timeout never offers Sign in again: one Retry instead", ()
 test("a failed sign-in from the home picker is shown there too", () => {
   const html = home({
     modelCatalog: { defaultModel: model, models: [model] },
-    modelLogin: { waiting: false, error: "Aeon could not open the sign-in page." },
+    modelLogin: { waiting: false, error: "Graft could not open the sign-in page." },
   });
   assert.match(html, /role="alert"/);
-  assert.match(html, /Aeon could not open the sign-in page\./);
+  assert.match(html, /Graft could not open the sign-in page\./);
   assert.match(html, /id="home-model-picker"/);
 });

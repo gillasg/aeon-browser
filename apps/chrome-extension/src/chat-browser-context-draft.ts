@@ -1,4 +1,4 @@
-import { BrowserContextDraftSchema, type PiBrowserContextRecord } from "@aeon/protocol";
+import { BrowserContextDraftSchema, type PiBrowserContextRecord } from "@graft/protocol";
 import { NativeClaimBrowserContextSubmitResponseSchema } from "./native-extension-message.js";
 
 interface BrowserContextComposer {
@@ -44,13 +44,13 @@ export async function applyBrowserContextDraft(
   input.attemptedInvocations.add(draft.invocationId);
   const response = NativeClaimBrowserContextSubmitResponseSchema.safeParse(
     await chrome.runtime.sendMessage({
-      kind: "aeon.native.claim-browser-context-submit",
+      kind: "graft.native.claim-browser-context-submit",
       chatId: input.chatId,
       invocationId: draft.invocationId,
     }),
   );
   if (response.success && response.data.ok) await input.composer.sendPrompt(response.data.prompt);
-  else if (!response.success) input.showError("Aeon could not claim the page summary request.");
+  else if (!response.success) input.showError("Graft could not claim the page summary request.");
 }
 
 function canSubmitContext(input: ApplyBrowserContextDraftInput, invocationId: string): boolean {

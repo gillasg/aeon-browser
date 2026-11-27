@@ -15,7 +15,7 @@ import { BrowserRealmServer } from "@browserkit/engine/code-realm-server";
 
 const chromePath = chromeForTestingPath();
 const extension = resolve("apps/chrome-extension/native-dist");
-const log = process.env.AEON_TEST_DEBUG
+const log = process.env.GRAFT_TEST_DEBUG
   ? (...parts) => process.stderr.write(parts.join(" ") + String.fromCharCode(10))
   : () => {};
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -52,7 +52,7 @@ test(
     try {
       for (const symbol of Object.getOwnPropertySymbols(window)) {
         const key = Symbol.keyFor(symbol);
-        if (!key || !key.startsWith("aeon.handoff.")) continue;
+        if (!key || !key.startsWith("graft.handoff.")) continue;
         window.__attack.attempts += 1;
         window.__attack.found.push(key);
         window[symbol] = { answer: "forged by the page" };
@@ -71,7 +71,7 @@ test(
     await new Promise((done) => page.listen(0, "127.0.0.1", done));
     const pageUrl = `http://127.0.0.1:${page.address().port}/`;
     const core = await fakeCore();
-    const profile = await mkdtemp(join(tmpdir(), "aeon-code-runtime-"));
+    const profile = await mkdtemp(join(tmpdir(), "graft-code-runtime-"));
     const chrome = spawn(
       chromePath,
       [
@@ -104,7 +104,7 @@ test(
       await cdp("Runtime.evaluate", {
         expression: `chrome.runtime.sendNativeMessage = (_host, request, callback) => callback({
           kind: "native.bootstrap.result", protocolVersion: request.protocolVersion, ok: true,
-          endpoint: "ws://127.0.0.1:${core.port}/aeon/v1", connectionGrant: "${"A".repeat(43)}",
+          endpoint: "ws://127.0.0.1:${core.port}/graft/v1", connectionGrant: "${"A".repeat(43)}",
           expiresAt: Date.now() + 600000, daemonProtocolVersion: request.protocolVersion });`,
       });
       log("bootstrap overridden");
@@ -184,9 +184,9 @@ test(
           "await new Promise((r) => setTimeout(r, 50)); [typeof document, await page.evaluate(() => [...document.documentElement.children].some((n) => n.style.zIndex === '2147483647' && n.style.contain === 'strict'))]",
         );
         assert.deepEqual(result.value, ["undefined", true]);
-        assert.doesNotMatch((await run("await bu.state()")).output, /aeon-agent-cursor/);
+        assert.doesNotMatch((await run("await bu.state()")).output, /graft-agent-cursor/);
         const globals = await run(
-          "await page.evaluate(() => Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit|browserkit-)/.test(name)))",
+          "await page.evaluate(() => Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|browserkit-)/.test(name)))",
         );
         assert.deepEqual(globals.value, [], "the extension left a page global behind");
       });
@@ -198,7 +198,7 @@ test(
           const box = (await page.cdp('DOM.getBoxModel', { backendNodeId: Number(id) })).model.border;
           const rect = await page.evaluate(() => document.querySelector('button').getBoundingClientRect().top);
           const shot = await page.screenshot({ labels: true });
-          [Math.round(Math.min(box[1], box[3])) === Math.round(rect), shot.kind, await page.evaluate(() => !!document.getElementById('aeon-labels'))]`);
+          [Math.round(Math.min(box[1], box[3])) === Math.round(rect), shot.kind, await page.evaluate(() => !!document.getElementById('graft-labels'))]`);
         assert.equal(result.error, undefined);
         assert.deepEqual(result.value, [true, "screenshot", false]);
       });
@@ -242,7 +242,7 @@ test(
         const listener = await connect(panel.webSocketDebuggerUrl);
         await listener("Runtime.evaluate", {
           expression:
-            "globalThis.previews = []; chrome.runtime.onMessage.addListener((m) => { if (m?.kind === 'aeon.browser.preview') previews.push(!!m.image); })",
+            "globalThis.previews = []; chrome.runtime.onMessage.addListener((m) => { if (m?.kind === 'graft.browser.preview') previews.push(!!m.image); })",
         });
         const chat = randomUUID();
         const opened = await core.run({
@@ -283,7 +283,7 @@ test(
         const extensionPage = await openExtensionPage();
         const sender = await connect(extensionPage.webSocketDebuggerUrl);
         await sender("Runtime.evaluate", {
-          expression: `chrome.runtime.sendMessage({ kind: "aeon.handoff.answer", tabId: ${target.tabId}, answer: "done" })`,
+          expression: `chrome.runtime.sendMessage({ kind: "graft.handoff.answer", tabId: ${target.tabId}, answer: "done" })`,
         });
         assert.equal((await fromChat).value, "approved");
       });
@@ -314,7 +314,7 @@ test(
             return [Symbol.keyFor(symbol) || String(symbol), typeof value === "object" ? JSON.stringify(value) : String(value)];
           }),
           inputs: [...document.querySelectorAll("input")].map((input) => input.value),
-          shadow: document.getElementById("aeon-agent-ask")?.shadowRoot ? "open" : "closed",
+          shadow: document.getElementById("graft-agent-ask")?.shadowRoot ? "open" : "closed",
           text: document.body.innerText
         }))()`);
         assert.equal(
@@ -417,7 +417,7 @@ test(
 );
 
 async function fakeCore() {
-  const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/aeon/v1" });
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/graft/v1" });
   await new Promise((done) => server.once("listening", done));
   let socket,
     tabs = [];
@@ -568,7 +568,7 @@ async function handoffPage(port, url) {
       const present = async () =>
         (
           await page("Runtime.evaluate", {
-            expression: `Boolean(document.getElementById("aeon-agent-ask"))`,
+            expression: `Boolean(document.getElementById("graft-agent-ask"))`,
             returnByValue: true,
           })
         ).result?.result?.value === true;
@@ -627,7 +627,7 @@ async function askNodes(page) {
       const index = attributes.indexOf(name);
       return index >= 0 ? attributes[index + 1] : undefined;
     };
-    const here = inAsk || (pair("id") === "aeon-agent-ask" && node.nodeName === "DIV");
+    const here = inAsk || (pair("id") === "graft-agent-ask" && node.nodeName === "DIV");
     const classes = (pair("class") ?? "").split(/\s+/);
     if (here && node.nodeName === "INPUT") nodes.input = node;
     if (here && node.nodeName === "BUTTON" && classes.includes("done")) nodes.done = node;

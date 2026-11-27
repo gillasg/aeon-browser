@@ -28,11 +28,11 @@ test("the catalog covers browser profiles, keychains and credential stores on ea
     "/Users/u/Library/Keychains",
     "/Users/u/.ssh",
     "/Users/u/.aws",
-    "/Users/u/Library/Application Support/Aeon/data/core-connection.json",
+    "/Users/u/Library/Application Support/Graft/data/core-connection.json",
   ])
     assert.ok(mac.includes(path), path);
   assert.ok(
-    !mac.includes("/Users/u/Library/Application Support/Aeon/data"),
+    !mac.includes("/Users/u/Library/Application Support/Graft/data"),
     "workspaces stay open",
   );
   const linux = sensitivePaths("/home/u", "linux", { env: {} });
@@ -121,7 +121,7 @@ test("the shell environment loses secrets and keeps path, home and proxy", () =>
 });
 
 test("file tools cannot reach a profile or key through a symlink; normal files pass", (t) => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "aeon-sandbox-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "graft-sandbox-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const profile = join(root, "home", "Google", "Chrome", "User Data");
   const ssh = join(root, "home", ".ssh");
@@ -146,7 +146,7 @@ test("file tools cannot reach a profile or key through a symlink; normal files p
 });
 
 test("protected roots given through a symlinked parent still catch symlinked targets", (t) => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "aeon-sandbox-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "graft-sandbox-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const dirLink = process.platform === "win32" ? "junction" : "dir";
   const profile = join(root, "home", "Google", "Chrome", "User Data");
@@ -193,18 +193,18 @@ test("bash, read, write and edit stay on: everyday calls pass the guard", () => 
   assert.equal(gatedBashTool(tmpdir(), settings).name, "bash");
 });
 
-test("AEON_OS_SANDBOX=0 turns the kernel sandbox off", () => {
-  assert.deepEqual(detectSandboxBackend({ env: { AEON_OS_SANDBOX: "0" } }), {
+test("GRAFT_OS_SANDBOX=0 turns the kernel sandbox off", () => {
+  assert.deepEqual(detectSandboxBackend({ env: { GRAFT_OS_SANDBOX: "0" } }), {
     backend: "guard-only",
     active: false,
-    reason: "AEON_OS_SANDBOX=0",
+    reason: "GRAFT_OS_SANDBOX=0",
   });
 });
 
 test("a real sandboxed command runs and cannot read a masked folder", (t) => {
   const status = sandboxStatus();
   if (!status.active) return t.skip(`no kernel sandbox here: ${status.reason}`);
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "aeon-sandbox-real-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "graft-sandbox-real-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const hidden = join(root, "secret");
   mkdirSync(hidden);

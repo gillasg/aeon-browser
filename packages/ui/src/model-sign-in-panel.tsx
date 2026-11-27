@@ -26,7 +26,7 @@ export function ModelSignInPanel(props: PanelProps): ReactElement {
             <button
               key={link.url}
               type="button"
-              className="aeon-link-button"
+              className="graft-link-button"
               onClick={() => props.onOpenUrl(link.url)}
             >
               {link.label ?? link.url}
@@ -58,7 +58,7 @@ function AuthUrlStep({
       <div className="model-flow-actions">
         <button
           type="button"
-          className="aeon-primary-button"
+          className="graft-primary-button"
           onClick={() => onOpenUrl(authUrl.url)}
         >
           Open sign-in page
@@ -80,7 +80,7 @@ function DeviceCodeStep({
       <div className="model-flow-actions">
         <button
           type="button"
-          className="aeon-primary-button"
+          className="graft-primary-button"
           onClick={() => onOpenUrl(deviceCode.verificationUri)}
         >
           Open the page
@@ -128,7 +128,7 @@ function PromptStep({
       <label>
         <p>{prompt.message}</p>
         <input
-          className="aeon-input"
+          className="graft-input"
           type={prompt.kind === "secret" ? "password" : "text"}
           placeholder={
             prompt.placeholder ??
@@ -142,7 +142,7 @@ function PromptStep({
         />
       </label>
       <div className="model-flow-actions">
-        <button type="submit" className="aeon-primary-button" disabled={!value.trim()}>
+        <button type="submit" className="graft-primary-button" disabled={!value.trim()}>
           Continue
         </button>
       </div>
@@ -163,7 +163,7 @@ function FlowFooter(props: PanelProps): ReactElement {
             {flow.progress ?? "Waiting for the provider…"}
           </span>
         )}
-        <button type="button" className="aeon-quiet-button" onClick={onCancel}>
+        <button type="button" className="graft-quiet-button" onClick={onCancel}>
           Cancel
         </button>
       </footer>
@@ -173,14 +173,14 @@ function FlowFooter(props: PanelProps): ReactElement {
   return (
     <footer className="model-flow-foot" data-result={result.kind}>
       <span className="model-flow-result">{message}</span>
-      <button type="button" className="aeon-quiet-button" onClick={onCloseFlow}>
+      <button type="button" className="graft-quiet-button" onClick={onCloseFlow}>
         Back
       </button>
     </footer>
   );
 }
 
-/** The sign-in worked: say which model Aeon will use, and go straight back to work. */
+/** The sign-in worked: say which model Graft will use, and go straight back to work. */
 function SignedIn({
   flow,
   state,
@@ -193,15 +193,15 @@ function SignedIn({
     <footer className="model-flow-foot model-flow-success" data-result="done" role="status">
       <span className="model-flow-result">
         <strong>Connected to {flow.provider.name}.</strong>
-        {model && <span> Aeon will use {model} unless you pick another model.</span>}
+        {model && <span> Graft will use {model} unless you pick another model.</span>}
       </span>
       <div className="model-flow-actions">
         {onStartChat && (
-          <button type="button" className="aeon-primary-button" onClick={onStartChat}>
+          <button type="button" className="graft-primary-button" onClick={onStartChat}>
             {startChatLabel ?? "Start chatting"}
           </button>
         )}
-        <button type="button" className="aeon-quiet-button" onClick={onCloseFlow}>
+        <button type="button" className="graft-quiet-button" onClick={onCloseFlow}>
           {onStartChat ? "Connect another" : "Done"}
         </button>
       </div>
@@ -214,7 +214,7 @@ function CopyButton({ text, label }: { text: string; label: string }): ReactElem
   return (
     <button
       type="button"
-      className="aeon-quiet-button"
+      className="graft-quiet-button"
       onClick={() =>
         void navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);

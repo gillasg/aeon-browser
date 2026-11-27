@@ -1,9 +1,9 @@
-# Aeon-owned daemon launcher. The login task runs it at login and then every minute: it
+# Graft-owned daemon launcher. The login task runs it at login and then every minute: it
 # returns while the daemon is healthy, starts a supervisor when none is running, and replaces
 # a supervisor that stopped making progress while holding the single-instance lock.
 $ErrorActionPreference = 'SilentlyContinue'
 $appRoot = $PSScriptRoot
-$hostExecutable = Join-Path $appRoot 'aeon-native-host.exe'
+$hostExecutable = Join-Path $appRoot 'graft-native-host.exe'
 $statusPath = Join-Path $appRoot 'daemon-supervisor-status.json'
 $statePath = Join-Path $appRoot 'daemon-launcher-state.json'
 
@@ -74,7 +74,7 @@ function Set-PingBudget([Net.Sockets.TcpClient]$Client, [DateTime]$Deadline) {
 
 function Get-Supervisors {
     $expected = [IO.Path]::GetFullPath($hostExecutable)
-    return @(Get-CimInstance Win32_Process -Filter "Name = 'aeon-native-host.exe'" | Where-Object {
+    return @(Get-CimInstance Win32_Process -Filter "Name = 'graft-native-host.exe'" | Where-Object {
         if (-not $_.CommandLine -or -not $_.CommandLine.Contains('--daemon-supervisor')) { return $false }
         if ($_.ExecutablePath) { return [IO.Path]::GetFullPath($_.ExecutablePath) -eq $expected }
         return $_.CommandLine.Contains($appRoot)

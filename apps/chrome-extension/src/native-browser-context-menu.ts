@@ -3,7 +3,7 @@ import {
   PiBrowserContextRecordSchema,
   type BrowserTargetKey,
   type PiBrowserContextRecord,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import {
   currentInventoryTabs,
   refreshInventoryTab,
@@ -12,7 +12,7 @@ import { handoffKey, clearAutoPrompt, readChatContext } from "./browser-context-
 import { NativeClaimBrowserContextSubmitResponseSchema } from "./native-extension-message.js";
 import { isPageScopeAllowed } from "./native-worker-tabs.js";
 
-const MENU_ADD_CONTEXT = "aeon.add-page-context";
+const MENU_ADD_CONTEXT = "graft.add-page-context";
 
 export function installNativeBrowserContextMenus(ensureExecutor: () => Promise<unknown>): void {
   chrome.contextMenus.onClicked.addListener((info, tab) =>
@@ -110,7 +110,7 @@ function registerMenus(): void {
   void chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_ADD_CONTEXT,
-      title: "Add to Aeon Chat",
+      title: "Add to Graft Chat",
       contexts: ["page", "selection"],
     });
   });

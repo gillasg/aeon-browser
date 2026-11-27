@@ -22,7 +22,7 @@ const skipOnWindows =
     : false;
 
 function sandbox(options = {}) {
-  const root = mkdtempSync(join(tmpdir(), "aeon-install-sh-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-install-sh-"));
   const home = join(root, "home");
   // install.sh's refresh_path prepends $HOME/.local/bin ahead of homebrew and /usr/local/bin.
   // Put the fakes there so they win over a real node/git/pnpm on the CI runner: the test must not
@@ -35,12 +35,12 @@ function sandbox(options = {}) {
     ...process.env,
     HOME: home,
     PATH: `${bin}:/usr/bin:/bin`,
-    AEON_DIR: checkout,
+    GRAFT_DIR: checkout,
     SANDBOX: root,
   };
   delete env.XDG_DATA_HOME;
-  delete env.AEON_DATA_HOME;
-  delete env.AEON_DATA_DIR;
+  delete env.GRAFT_DATA_HOME;
+  delete env.GRAFT_DATA_DIR;
   Object.assign(env, options.env);
   return {
     root,
@@ -135,7 +135,7 @@ test("a failed pnpm install says why and stops", { skip: skipOnWindows }, () => 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /EACCES|npm ERR!/);
     assert.match(result.stderr, /pnpm/);
-    assert.match(result.stderr, /Aeon:/);
+    assert.match(result.stderr, /Graft:/);
     assert.equal(existsSync(join(box.root, "setup-ran")), false);
   } finally {
     box.cleanup();

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
-// ⌘K / Ctrl+K: one box for everything Aeon can do, in plain verbs. Pages, recent chats, and
+// ⌘K / Ctrl+K: one box for everything Graft can do, in plain verbs. Pages, recent chats, and
 // what each site can do. Picking a site action puts it in the ask box so the user sees what runs.
 
 export interface PaletteItem {
@@ -105,7 +105,7 @@ function PaletteList({
           </button>
         </li>
       ))}
-      {!items.length && <li className="palette-hint">Nothing matches. Ask Aeon instead.</li>}
+      {!items.length && <li className="palette-hint">Nothing matches. Ask Graft instead.</li>}
     </ul>
   );
 }

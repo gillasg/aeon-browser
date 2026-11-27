@@ -6,21 +6,21 @@ import { boostToTurnOff, enabledBoostCount, type BoostRow } from "./site-facts.j
 // engine, so no model and no daemon is involved.
 
 type FactsMessage =
-  | { kind: "aeon.site.boosts"; url: string }
-  | { kind: "aeon.boost.off"; url: string; boostId?: string; mode: "undo" | "off" };
+  | { kind: "graft.site.boosts"; url: string }
+  | { kind: "graft.boost.off"; url: string; boostId?: string; mode: "undo" | "off" };
 
 export function installSiteFacts(): void {
   chrome.runtime.onMessage.addListener((request: unknown, sender, sendResponse) => {
     const message = request as FactsMessage | null;
     if (sender.id !== chrome.runtime.id || typeof message?.url !== "string") return;
-    if (message.kind === "aeon.site.boosts") {
+    if (message.kind === "graft.site.boosts") {
       void listBoosts(message.url).then(
         (rows) => sendResponse({ ok: true, boosts: enabledBoostCount(rows) }),
         () => sendResponse({ ok: false, boosts: 0 }),
       );
       return true;
     }
-    if (message.kind !== "aeon.boost.off") return;
+    if (message.kind !== "graft.boost.off") return;
     void turnOff(message).then(
       (done) => sendResponse({ ok: true, ...done }),
       (error: unknown) => sendResponse({ ok: false, error: String(error) }),
@@ -40,7 +40,7 @@ async function listBoosts(url: string): Promise<BoostRow[]> {
  * all of them at once and stays saved.
  */
 async function turnOff(
-  message: Extract<FactsMessage, { kind: "aeon.boost.off" }>,
+  message: Extract<FactsMessage, { kind: "graft.boost.off" }>,
 ): Promise<{ boostId: string; removed: boolean }> {
   const rows = message.boostId ? [] : await listBoosts(message.url);
   const boostId = message.boostId ?? boostToTurnOff(rows)?.id;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import { runVisibleFrames } from "./visible-work.js";
 
-// Aeon's mark on home: a globe drawn as dotted latitude and longitude lines. It turns very slowly
+// Graft's mark on home: a globe drawn as dotted latitude and longitude lines. It turns very slowly
 // at rest and faster while agents work. The orb on web pages stays the nebula swarm.
 
 type Point = readonly [number, number, number];

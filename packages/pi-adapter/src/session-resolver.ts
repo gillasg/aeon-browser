@@ -5,7 +5,7 @@ import {
   type OpenPiSessionInput,
   type PiSessionReference,
   PiSessionUnavailableError,
-} from "@aeon/domain";
+} from "@graft/domain";
 
 export function resolvePiSessionManager(
   input: OpenPiSessionInput,
@@ -80,8 +80,8 @@ export function assertOwnedSessionPath(sessionDirectory: string, sessionFile: st
   if (!path.toLowerCase().endsWith(".jsonl") || !pathIsInside(root, path)) {
     throw new Error(
       existsSync(path)
-        ? "Pi session file resolves outside Aeon's Pi session directory."
-        : "Stored Pi session path is outside Aeon's Pi session directory.",
+        ? "Pi session file resolves outside Graft's Pi session directory."
+        : "Stored Pi session path is outside Graft's Pi session directory.",
     );
   }
   return path;

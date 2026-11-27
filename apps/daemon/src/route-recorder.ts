@@ -2,8 +2,8 @@
 // starts at rung 1: this process has no page host, so an exact route is handed over as a draft
 // instead of being replayed. Replay itself lives in the engine and runs when a host is passed.
 
-import type { ChatId, PiSessionEvent } from "@aeon/domain";
-import type { RunCard } from "@aeon/protocol";
+import type { ChatId, PiSessionEvent } from "@graft/domain";
+import type { RunCard } from "@graft/protocol";
 import {
   autoSaveAbility,
   cancelPending,

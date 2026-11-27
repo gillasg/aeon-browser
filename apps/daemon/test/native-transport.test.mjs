@@ -9,7 +9,7 @@ import {
   NativeSupervisorBootstrapEnvelopeSchema,
   PageGrantIssueRequestSchema,
   SUPPORTED_PROTOCOL_VERSION,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { WebSocket } from "ws";
 import { startNativeTransport } from "../dist/native-transport.js";
 

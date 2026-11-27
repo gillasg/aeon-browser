@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import type { CapabilityRegistryFile, McpCapability } from "@aeon/domain";
+import type { CapabilityRegistryFile, McpCapability } from "@graft/domain";
 import {
   mapMcpCapabilityToPi,
   mapRegisteredCliBridge,
@@ -293,7 +293,7 @@ function reconcileExistingServer(
   if (prior.owned !== false && currentHash !== prior.configHash) {
     if (prior.configHash !== nextHash)
       throw new Error(
-        `Pi MCP server '${server.name}' was edited in Pi; reconcile that change before updating its Aeon registration.`,
+        `Pi MCP server '${server.name}' was edited in Pi; reconcile that change before updating its Graft registration.`,
       );
     owned = false;
   } else if (prior.owned === false && currentHash !== nextHash) {

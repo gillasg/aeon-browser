@@ -5,7 +5,7 @@ import { posix, win32 } from "node:path";
 
 // The bash tool stays on for every run. What it may touch is narrowed instead: secrets leave its
 // environment, and where the OS offers a kernel sandbox (Seatbelt on macOS, bubblewrap on Linux)
-// the user's browser profiles, keychains, credential stores and Aeon's own token files are walled
+// the user's browser profiles, keychains, credential stores and Graft's own token files are walled
 // off below the shell, so no quoting, symlink or interpreter trick reaches them. Elsewhere the
 // path guard in browser-profile-guard.ts is the line of defence.
 
@@ -83,21 +83,21 @@ export function sensitivePaths(
       at(".local", "share", "keyrings"),
     );
   }
-  list.push(...aeonSecretFiles(homeDir, platform, env));
+  list.push(...graftSecretFiles(homeDir, platform, env));
   return [...new Set(list)];
 }
 
-/** Aeon's token-bearing files only: the data folder also holds chat workspaces, left open. */
-function aeonSecretFiles(home: string, platform: NodeJS.Platform, env: NodeJS.ProcessEnv) {
+/** Graft's token-bearing files only: the data folder also holds chat workspaces, left open. */
+function graftSecretFiles(home: string, platform: NodeJS.Platform, env: NodeJS.ProcessEnv) {
   const path = platform === "win32" ? win32 : posix;
   const expand = (value: string) => path.resolve(value.replace(/^~(?=$|[\\/])/, home));
   const appRoot =
     platform === "win32"
-      ? path.join(env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), "Aeon")
+      ? path.join(env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), "Graft")
       : platform === "darwin"
-        ? path.join(home, "Library", "Application Support", "Aeon")
-        : path.join(env.XDG_DATA_HOME || path.join(home, ".local", "share"), "aeon");
-  const data = env.AEON_DATA_DIR ? expand(env.AEON_DATA_DIR) : path.join(appRoot, "data");
+        ? path.join(home, "Library", "Application Support", "Graft")
+        : path.join(env.XDG_DATA_HOME || path.join(home, ".local", "share"), "graft");
+  const data = env.GRAFT_DATA_DIR ? expand(env.GRAFT_DATA_DIR) : path.join(appRoot, "data");
   const agent = env.PI_CODING_AGENT_DIR
     ? expand(env.PI_CODING_AGENT_DIR)
     : path.join(home, ".pi", "agent");
@@ -120,7 +120,7 @@ const SECRET_EXACT = new Set([
   "NPM_TOKEN",
   "NODE_AUTH_TOKEN",
   "GOOGLE_APPLICATION_CREDENTIALS",
-  "AEON_DAEMON_TOKEN",
+  "GRAFT_DAEMON_TOKEN",
 ]);
 const KEEP = new Set(["PATH", "HOME", "USER", "TMPDIR", "LANG", "TERM", "SHELL"]);
 
@@ -191,8 +191,8 @@ export function detectSandboxBackend(
 ): SandboxStatus {
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
-  if (env.AEON_OS_SANDBOX === "0")
-    return { backend: "guard-only", active: false, reason: "AEON_OS_SANDBOX=0" };
+  if (env.GRAFT_OS_SANDBOX === "0")
+    return { backend: "guard-only", active: false, reason: "GRAFT_OS_SANDBOX=0" };
   if (detected && !options.refresh) return detected;
   if (platform === "darwin") {
     const failed = existsSync(SEATBELT)

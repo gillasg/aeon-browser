@@ -28,7 +28,7 @@ function itemsHar(origin) {
   return JSON.stringify({
     log: {
       version: "1.2",
-      creator: { name: "aeon-test", version: "1" },
+      creator: { name: "graft-test", version: "1" },
       entries: [entry("/api/items?q=lamp", { items: [{ id: 1, name: "lamp", price: 40 }] })],
     },
   });
@@ -50,9 +50,9 @@ function mcp(home) {
   const child = spawn(process.execPath, [cli, "mcp", "--surface", "full"], {
     env: {
       ...process.env,
-      AEON_DATA_DIR: join(home, "data"),
+      GRAFT_DATA_DIR: join(home, "data"),
       SITE_TO_API_HOME: join(home, "site-to-api"),
-      AEON_CATALOG_POLL_MS: "200",
+      GRAFT_CATALOG_POLL_MS: "200",
     },
   });
   let buffer = "";
@@ -84,8 +84,8 @@ function mcp(home) {
   };
 }
 
-test("aeon mcp lists a fixture operation, calls it, and notices a catalog change", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-catalog-mcp-"));
+test("graft mcp lists a fixture operation, calls it, and notices a catalog change", async (t) => {
+  const home = await mkdtemp(join(tmpdir(), "graft-catalog-mcp-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();

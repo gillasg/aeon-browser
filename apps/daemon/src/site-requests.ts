@@ -1,12 +1,12 @@
 import { join } from "node:path";
-import { getSavedRead, putSavedRead, siteMapperRequest } from "@aeon/pi-adapter";
+import { getSavedRead, putSavedRead, siteMapperRequest } from "@graft/pi-adapter";
 
-// Requests from Aeon's own extension (never forwarded from other extensions) about the site in
+// Requests from Graft's own extension (never forwarded from other extensions) about the site in
 // a tab: the operations a site learned (the orb's chips), learning while the user browses a tab
 // they switched on, a write repeated for Undo, and saved reads for "changed since you last
 // looked". No model is involved in any of them.
 
-const SESSION = "aeon-browsing";
+const SESSION = "graft-browsing";
 let savedReads: string | undefined;
 
 /** Where saved reads live: beside site skills, in the data folder. */

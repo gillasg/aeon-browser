@@ -6,7 +6,7 @@ import {
   SUPPORTED_PROTOCOL_VERSION,
   type HelloRejection,
   type ProtocolHandshakeMessage,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 export type HandshakeDecision =
   | { accepted: true; response: ProtocolHandshakeMessage }

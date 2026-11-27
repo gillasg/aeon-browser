@@ -252,7 +252,7 @@ export interface AbilityRunResult {
   compiled?: boolean;
   /** How long the run took. */
   elapsedMs?: number;
-  /** `aeon mcp <site>`: the one line that serves this site's tools to another agent. */
+  /** `graft mcp <site>`: the one line that serves this site's tools to another agent. */
   mcpCommand?: string;
   /** `0.4s · no model · API` */
   receipt?: string;
@@ -314,7 +314,7 @@ export async function listAbilities(site: string): Promise<Ability[]> {
   const abilities = (
     await Promise.all(files.map((file) => readAbilityFile(join(folder, file))))
   ).filter((ability): ability is Ability => !!ability);
-  // Built-in abilities come with Aeon; a stored one of the same name replaces it.
+  // Built-in abilities come with Graft; a stored one of the same name replaces it.
   const stored = new Set(abilities.map((ability) => ability.name));
   return [
     ...abilities,

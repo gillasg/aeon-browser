@@ -1,4 +1,4 @@
-import type { PageGrantScope } from "@aeon/protocol";
+import type { PageGrantScope } from "@graft/protocol";
 import { isOrbPath } from "./extension-frame.js";
 import {
   NativeExtensionRequestSchema,
@@ -16,7 +16,7 @@ const OWN_PAGES = ["/home.html", "/sidepanel.html", "/chat.html", "/viewer.html"
 const OPEN_PAGES = ["/home.html", "/sidepanel.html", "/chat.html", "/orb.html"];
 type OpenRequest = Extract<
   ReturnType<typeof NativeExtensionRequestSchema.parse>,
-  { kind: "aeon.native.open-chat" }
+  { kind: "graft.native.open-chat" }
 >;
 
 export function isPageScopeAllowed(

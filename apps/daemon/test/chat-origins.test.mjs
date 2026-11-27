@@ -4,15 +4,15 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { asActivationId, asChatId } from "@aeon/domain";
-import { openChatStore } from "@aeon/store";
+import { asActivationId, asChatId } from "@graft/domain";
+import { openChatStore } from "@graft/store";
 import { ChatService } from "../dist/chat-service.js";
 import { backfillChatOrigins } from "../dist/chat-origin-backfill.js";
 import { ThreadCoordinationService } from "../dist/thread-coordination-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 async function runtime(t) {
-  const root = await mkdtemp(join(tmpdir(), "aeon-origin-test-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-origin-test-"));
   const dataDirectory = join(root, "data");
   await mkdir(dataDirectory, { recursive: true });
   const store = openChatStore(dataDirectory);

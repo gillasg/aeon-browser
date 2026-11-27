@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import test, { mock } from "node:test";
 
 async function loadClient() {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-ui-liveness-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-ui-liveness-"));
   const outfile = join(directory, "client.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL("../src/ui-client-core.ts", import.meta.url))],

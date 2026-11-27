@@ -28,7 +28,7 @@ test("history keeps the changes, not every check", () => {
 });
 
 test("every watcher check updates its pin, passed or not", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-pins-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-pins-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const pins = new PinnedResults(root);
   const routine = {

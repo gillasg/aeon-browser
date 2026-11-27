@@ -6,20 +6,20 @@
 }
 :root {
   color-scheme: dark;
-  font: var(--aeon-font-body);
+  font: var(--graft-font-body);
   background: var(--ink-void);
-  color: var(--aeon-island-ink);
+  color: var(--graft-island-ink);
   font-synthesis: none;
   --panel-bg: var(--ink-void);
   --panel-header: var(--ink-void);
-  --panel-surface: var(--aeon-panel-surface);
-  --panel-raised: var(--aeon-panel-raised);
-  --panel-selected: var(--aeon-panel-selected);
+  --panel-surface: var(--graft-panel-surface);
+  --panel-raised: var(--graft-panel-raised);
+  --panel-selected: var(--graft-panel-selected);
   --panel-line: var(--ink-panel-line);
-  --panel-text: var(--aeon-island-ink);
-  --panel-muted: var(--aeon-panel-muted);
-  --panel-faint: var(--aeon-panel-faint);
-  --panel-accent: var(--aeon-panel-accent);
+  --panel-text: var(--graft-island-ink);
+  --panel-muted: var(--graft-panel-muted);
+  --panel-faint: var(--graft-panel-faint);
+  --panel-accent: var(--graft-panel-accent);
 }
 
 * {
@@ -49,9 +49,9 @@ body {
 .panel-header {
   display: flex;
   align-items: center;
-  gap: var(--aeon-s-2);
+  gap: var(--graft-s-2);
   min-height: 44px;
-  padding: var(--aeon-s-2) var(--aeon-s-3);
+  padding: var(--graft-s-2) var(--graft-s-3);
   background: var(--panel-header);
 }
 
@@ -64,17 +64,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--aeon-s-2);
+  gap: var(--graft-s-2);
   width: 100%;
   min-width: 0;
   height: 30px;
-  padding: 0 var(--aeon-s-2);
+  padding: 0 var(--graft-s-2);
   color: var(--panel-text);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--aeon-r-sm);
+  border-radius: var(--graft-r-sm);
   text-align: left;
-  font-size: var(--aeon-fs-base);
+  font-size: var(--graft-fs-base);
   font-weight: 560;
 }
 #chat-picker-trigger:hover,
@@ -99,11 +99,11 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--aeon-s-2);
+  padding: var(--graft-s-2);
   border: 1px solid var(--panel-line);
-  border-radius: var(--aeon-r-md);
+  border-radius: var(--graft-r-md);
   background: var(--panel-surface);
-  box-shadow: var(--aeon-drop-20);
+  box-shadow: var(--graft-drop-20);
 }
 .picker-menu[hidden] {
   display: none;
@@ -113,19 +113,19 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   min-height: 0;
-  padding: var(--aeon-s-1) 0;
+  padding: var(--graft-s-1) 0;
   border-block: 1px solid var(--panel-line);
 }
 .picker-chat-group + .picker-chat-group {
-  margin-top: var(--aeon-s-1);
-  padding-top: var(--aeon-s-1);
+  margin-top: var(--graft-s-1);
+  padding-top: var(--graft-s-1);
   border-top: 1px solid var(--panel-line);
 }
 .picker-chat-group h3 {
   margin: 0;
-  padding: var(--aeon-s-2) var(--aeon-s-2) var(--aeon-s-1);
+  padding: var(--graft-s-2) var(--graft-s-2) var(--graft-s-1);
   color: var(--panel-muted);
-  font-size: var(--aeon-fs-sm);
+  font-size: var(--graft-fs-sm);
   font-weight: 550;
 }
 .picker-chat-row {
@@ -134,7 +134,7 @@ body {
   justify-content: space-between;
   width: 100%;
   height: 32px;
-  padding: 0 var(--aeon-s-2);
+  padding: 0 var(--graft-s-2);
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -156,25 +156,25 @@ body {
 }
 .picker-empty {
   margin: 0;
-  padding: var(--aeon-s-3) var(--aeon-s-2);
+  padding: var(--graft-s-3) var(--graft-s-2);
   color: var(--panel-faint);
-  font-size: var(--aeon-fs-sm);
+  font-size: var(--graft-fs-sm);
 }
 button {
   height: 36px;
-  padding: 0 var(--aeon-s-2);
+  padding: 0 var(--graft-s-2);
   border: 1px solid var(--panel-line);
-  border-radius: var(--aeon-r-md);
+  border-radius: var(--graft-r-md);
   background: var(--panel-surface);
   color: var(--panel-text);
   font: inherit;
-  font-size: var(--aeon-fs-sm);
+  font-size: var(--graft-fs-sm);
   white-space: nowrap;
   cursor: pointer;
 }
 button:hover:not(:disabled) {
   background: var(--panel-raised);
-  border-color: var(--aeon-swatch-68636d);
+  border-color: var(--graft-swatch-68636d);
 }
 button:disabled {
   opacity: 0.42;
@@ -182,9 +182,9 @@ button:disabled {
 }
 #panel-status {
   margin: 0;
-  padding: var(--aeon-s-1) var(--aeon-s-3);
+  padding: var(--graft-s-1) var(--graft-s-3);
   color: var(--panel-faint);
-  font-size: var(--aeon-fs-xs);
+  font-size: var(--graft-fs-xs);
 }
 #panel-status:empty {
   display: none;
@@ -194,7 +194,7 @@ button:disabled {
   display: grid;
   align-content: center;
   justify-items: center;
-  padding: var(--aeon-s-7) var(--aeon-s-7);
+  padding: var(--graft-s-7) var(--graft-s-7);
   text-align: center;
 }
 .panel-empty[hidden],
@@ -206,24 +206,24 @@ iframe[hidden] {
   place-items: center;
   flex: 0 0 27px;
   border: 1px solid var(--panel-line);
-  border-radius: var(--aeon-r-md);
+  border-radius: var(--graft-r-md);
   color: var(--panel-accent);
   font-weight: 650;
   width: 39px;
   height: 39px;
   flex-basis: 39px;
-  font-size: var(--aeon-fs-lg);
+  font-size: var(--graft-fs-lg);
 }
 .panel-empty h1 {
-  margin: var(--aeon-s-4) 0 var(--aeon-s-2);
-  font-size: var(--aeon-fs-lg);
+  margin: var(--graft-s-4) 0 var(--graft-s-2);
+  font-size: var(--graft-fs-lg);
   font-weight: 550;
 }
 .panel-empty p {
   max-width: 280px;
   margin: 0;
   color: var(--panel-muted);
-  font-size: var(--aeon-fs-sm);
+  font-size: var(--graft-fs-sm);
   line-height: 1.6;
 }
 iframe {
@@ -240,12 +240,12 @@ iframe {
   height: 28px;
   padding: 0;
   border-color: transparent;
-  border-radius: var(--aeon-r-sm);
+  border-radius: var(--graft-r-sm);
   background: transparent;
   color: var(--panel-muted);
   transition:
-    background 160ms var(--aeon-spring),
-    color 160ms var(--aeon-spring);
+    background 160ms var(--graft-spring),
+    color 160ms var(--graft-spring);
 }
 .panel-icon-button svg {
   width: 16px;
@@ -261,7 +261,7 @@ iframe {
 }
 @media (max-width: 370px) {
   .panel-header {
-    padding-inline: var(--aeon-s-2);
+    padding-inline: var(--graft-s-2);
   }
 }
 
@@ -274,7 +274,7 @@ iframe {
 /* The switcher's pinned footer: Manage, under one hairline. */
 .picker-divider {
   flex: none;
-  margin: var(--aeon-s-1) 0;
+  margin: var(--graft-s-1) 0;
   border: 0;
   border-top: var(--hair) solid var(--ink-dry);
 }
@@ -285,7 +285,7 @@ iframe {
   justify-content: space-between;
   width: 100%;
   height: 32px;
-  padding: 0 var(--aeon-s-2);
+  padding: 0 var(--graft-s-2);
   border-color: transparent;
   background: transparent;
   color: var(--fg-2);

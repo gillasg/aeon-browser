@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { PiSessionUnavailableError, type ChatId, type EffectivePiResources } from "@aeon/domain";
+import { PiSessionUnavailableError, type ChatId, type EffectivePiResources } from "@graft/domain";
 import type { ChatService } from "./chat-service.js";
 
 export function readEffectiveResources(

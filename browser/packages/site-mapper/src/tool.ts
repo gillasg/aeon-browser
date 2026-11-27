@@ -20,7 +20,7 @@ import type { ModelLike } from "./agent.js";
 import { loadFlows, rebuild } from "./workflow.js";
 
 // The site_mapper actions beyond sites/operations/call/watch/learn/explore, shared by every host
-// (this package's MCP server, browserkit's MCP tools, Aeon's site_mapper tool).
+// (this package's MCP server, browserkit's MCP tools, Graft's site_mapper tool).
 
 export const SITE_TOOL_ACTIONS = [
   "docs",

@@ -94,7 +94,7 @@ test("cross-origin fetch, goto and fill refuse sealed and raw secrets", () => {
   assert.throws(() => vault.release(`${evil}?t=${JWT}`, evil, "goto"), /SECRET_EGRESS/);
   assert.throws(() => vault.release(handle, "https://evil.example.org", "fill"), /SECRET_EGRESS/);
   assert.throws(
-    () => vault.release("aeon-sealed:000000000000", "https://example.com", "fetch"),
+    () => vault.release("graft-sealed:000000000000", "https://example.com", "fetch"),
     /SECRET_EGRESS/,
   );
 });
@@ -128,7 +128,7 @@ test("DOM control descriptors keep their element token; real tokens still seal",
   const vault = new SealVault();
   const control = { token: "ctrl-1", kind: "select", label: "Country" };
   assert.deepEqual(vault.sealValue(control, "example.com"), control);
-  const found = { frame: 0, token: "ff12", selector: '[data-aeon-t="ff12"]', control: {} };
+  const found = { frame: 0, token: "ff12", selector: '[data-graft-t="ff12"]', control: {} };
   assert.deepEqual(vault.sealValue(found, "example.com"), found);
   const secrets = vault.sealValue(
     {

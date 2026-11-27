@@ -1,6 +1,6 @@
 // The 2026-07-28 MCP revision: no initialize handshake, a per-request _meta envelope, and a
 // resultType on every result. A client that sends initialize keeps the older result shapes, so an
-// old client keeps working. Shared by Aeon's two stdio MCP servers.
+// old client keeps working. Shared by Graft's two stdio MCP servers.
 
 export const MCP_MODERN_VERSION = "2026-07-28";
 export const MCP_META_VERSION = "io.modelcontextprotocol/protocolVersion";

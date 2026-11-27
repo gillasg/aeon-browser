@@ -6,7 +6,7 @@ import type { Ability } from "./abilities.js";
 import { publicAbility } from "./ability-publish.js";
 import { createRedactor } from "./redact.js";
 
-/** The model Aeon already uses for one-off work (the companion request path). */
+/** The model Graft already uses for one-off work (the companion request path). */
 export const REVIEW_MODEL = "opencode-go/deepseek-v4.1-flash";
 
 export interface ReviewFinding {

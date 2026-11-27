@@ -1,6 +1,6 @@
-# How Aeon is measured
+# How Graft is measured
 
-Aeon is checked against a private eval suite before each release. This page reports the latest run as it came out, including what failed.
+Graft is checked against a private eval suite before each release. This page reports the latest run as it came out, including what failed.
 
 ## How grading works
 
@@ -25,7 +25,7 @@ Failures:
 | i2: tell me when the price drops | It created a 5-minute watcher, but the price flipped before the first check. |
 | Two tasks over budget | They finished correctly but went over their step or minute budget, so they count as not passed. |
 
-All three real failures come from one cause. For timing-critical watches, the agent doesn't yet pick a fast, model-free watcher on its own. That's the next fix. The same three tasks fail on DeepSeek V4.1 Flash too, so the cause is in Aeon's guidance, not the model.
+All three real failures come from one cause. For timing-critical watches, the agent doesn't yet pick a fast, model-free watcher on its own. That's the next fix. The same three tasks fail on DeepSeek V4.1 Flash too, so the cause is in Graft's guidance, not the model.
 
 ### Bot detectors
 
@@ -48,7 +48,7 @@ All three real failures come from one cause. For timing-critical watches, the ag
 
 ## Hill-climb log
 
-Each change to Aeon's guidance or tools is measured against the suite before it is kept.
+Each change to Graft's guidance or tools is measured against the suite before it is kept.
 
 | Date | Change | Measured on | Before | After | Kept? |
 | --- | --- | --- | --- | --- | --- |

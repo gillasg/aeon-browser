@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AbilitiesPanel, SiteFacts, SitesPage, siteEntries, siteSummary } from "@aeon/ui";
+import { AbilitiesPanel, SiteFacts, SitesPage, siteEntries, siteSummary } from "@graft/ui";
 
 // A real render of the two management pages: server-rendered React with a fixture snapshot, so a
 // broken prop, a missing import or a template that throws fails here, not only in the browser.
@@ -103,7 +103,7 @@ test("the Abilities list renders abilities, inputs, how often they worked and Ru
   assert.match(html, /Exported to \/tmp\/x\.json/);
 });
 
-test("the Sites page lists every site with what Aeon can do, the account and rules", () => {
+test("the Sites page lists every site with what Graft can do, the account and rules", () => {
   const html = renderToStaticMarkup(
     createElement(SitesPage, { ...props, section: "sites", blockedSites: ["bad.example"] }),
   );

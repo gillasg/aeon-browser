@@ -1,5 +1,5 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { OpenPiSessionInput, PiSessionHandle } from "@aeon/domain";
+import type { OpenPiSessionInput, PiSessionHandle } from "@graft/domain";
 export function verifyCachedHandle(
   handle: PiSessionHandle,
   input: OpenPiSessionInput,
@@ -14,7 +14,7 @@ export async function setInitialModel(
   preferred: { provider: string; id: string } | undefined,
   fixture: unknown,
 ): Promise<void> {
-  // Aeon's preferred model only fills in when the person has not chosen a default, and only when
+  // Graft's preferred model only fills in when the person has not chosen a default, and only when
   // it is connected; otherwise Pi's own choice (their default, else the first connected) stands.
   if (input.reference || !preferred || fixture) return;
   const settings = session.settingsManager;

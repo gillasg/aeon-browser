@@ -3,8 +3,8 @@ import { createRoot, type Root } from "react-dom/client";
 
 const roots = new WeakMap<Element, Root>();
 
-export function mountAeonUi(rootElement: Element, view: ReactNode): (next: ReactNode) => void {
-  if (roots.has(rootElement)) throw new Error("This Aeon UI host already has a React root.");
+export function mountGraftUi(rootElement: Element, view: ReactNode): (next: ReactNode) => void {
+  if (roots.has(rootElement)) throw new Error("This Graft UI host already has a React root.");
   const root = createRoot(rootElement);
   roots.set(rootElement, root);
   root.render(createElement(HostRoot, { children: view }));
@@ -12,5 +12,5 @@ export function mountAeonUi(rootElement: Element, view: ReactNode): (next: React
 }
 
 function HostRoot({ children }: { children: ReactNode }) {
-  return <div data-aeon-root="true">{children}</div>;
+  return <div data-graft-root="true">{children}</div>;
 }

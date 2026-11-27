@@ -10,7 +10,7 @@ const load = (p) => import(pathToFileURL(join(kit, p)).href);
 
 const json = {
   version: 1,
-  recorder: "aeon",
+  recorder: "graft",
   clock: "clip",
   clip: {
     file: "clip.mp4",

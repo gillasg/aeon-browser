@@ -37,7 +37,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:artifact-gate
 
-  # The fast lane (no browser) on every OS Aeon ships to, built once.
+  # The fast lane (no browser) on every OS Graft ships to, built once.
   unit:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -58,7 +58,7 @@ jobs:
       - run: pnpm build
       - run: pnpm --dir browser run test && pnpm test
       # The Claw & Primitive contract: deterministic, zero-LLM, loopback-only, Node alone (no
-      # Chrome, no model calls), on every OS Aeon ships to.
+      # Chrome, no model calls), on every OS Graft ships to.
       - name: Claw & Primitive contract
         run: pnpm test:claws
       # On main the Mac session reuses these built outputs instead of rebuilding from scratch.
@@ -68,7 +68,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'macOS' && success()
         uses: actions/upload-artifact@v4
         with:
-          name: aeon-macos-build-${{ github.sha }}
+          name: graft-macos-build-${{ github.sha }}
           path: |
             apps/daemon/dist
             apps/cli/dist
@@ -284,7 +284,7 @@ jobs:
         run: xvfb-run -a pnpm test:browser
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-      # The real-Chrome conformance sweep: Aeon's engine through the built bridge and extension
+      # The real-Chrome conformance sweep: Graft's engine through the built bridge and extension
       # against the two-origin fixture site, judged against golden transcripts and pinned
       # divergences. A missing Chrome fails it. Windows reports without blocking until it has a
       # run of green builds.
@@ -293,23 +293,23 @@ jobs:
         run: pnpm test:conformance
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-          AEON_CONFORMANCE_REQUIRE: chrome
-          AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
+          GRAFT_CONFORMANCE_REQUIRE: chrome
+          GRAFT_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
       - name: Conformance sweep
         if: matrix.sweeps && runner.os == 'Linux'
         run: xvfb-run -a pnpm test:conformance
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-          AEON_CONFORMANCE_REQUIRE: chrome
-          AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
+          GRAFT_CONFORMANCE_REQUIRE: chrome
+          GRAFT_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
       - name: Conformance sweep (informational)
         if: matrix.sweeps && runner.os == 'Windows'
         continue-on-error: true
         run: pnpm test:conformance
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-          AEON_CONFORMANCE_REQUIRE: chrome
-          AEON_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
+          GRAFT_CONFORMANCE_REQUIRE: chrome
+          GRAFT_CONFORMANCE_OUT: ${{ github.workspace }}/conformance-output
       - name: Keep conformance output
         if: always() && matrix.sweeps
         uses: actions/upload-artifact@v4
@@ -323,23 +323,23 @@ jobs:
         run: pnpm test:stealth-probe
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-          AEON_STEALTH_REQUIRE: chrome
-          AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
+          GRAFT_STEALTH_REQUIRE: chrome
+          GRAFT_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
       - name: Stealth probe
         if: matrix.sweeps && runner.os == 'Linux'
         run: xvfb-run -a pnpm test:stealth-probe
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-          AEON_STEALTH_REQUIRE: chrome
-          AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
+          GRAFT_STEALTH_REQUIRE: chrome
+          GRAFT_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
       - name: Stealth probe (informational)
         if: matrix.sweeps && runner.os == 'Windows'
         continue-on-error: true
         run: pnpm test:stealth-probe
         env:
           CHROME_PATH: ${{ github.workspace }}/.slice0-audit/chrome-for-testing-157.0.8103.78/${{ matrix.chrome-binary }}
-          AEON_STEALTH_REQUIRE: chrome
-          AEON_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
+          GRAFT_STEALTH_REQUIRE: chrome
+          GRAFT_STEALTH_PROBE_OUT: ${{ github.workspace }}/stealth-probe-output/report.json
       - name: Keep stealth probe output
         if: always() && matrix.sweeps
         uses: actions/upload-artifact@v4

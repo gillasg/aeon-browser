@@ -1,5 +1,5 @@
 // browser_context: the user's browsing context in one call, for requests that name a site, a
-// page or "my" anything without saying where it is. Both MCP servers and Aeon's agent build the
+// page or "my" anything without saying where it is. Both MCP servers and Graft's agent build the
 // same cell from this, so the tool means the same thing everywhere.
 
 export interface BrowserContextInput {

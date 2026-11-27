@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
-import { asChatId } from "@aeon/domain";
+import { asChatId } from "@graft/domain";
 import {
   encodeImageAsset,
   ImageAssetHeaderSchema,
   MAX_IMAGE_ASSET_BYTES,
   type DaemonUiRequest,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import { IMAGE_TYPES, workspacePath } from "./workspace-file-command.js";

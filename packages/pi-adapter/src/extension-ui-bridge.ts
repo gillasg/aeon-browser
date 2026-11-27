@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import type { PiExtensionUiNotice, PiExtensionUiRequest, PiSessionEvent } from "@aeon/domain";
+import type { PiExtensionUiNotice, PiExtensionUiRequest, PiSessionEvent } from "@graft/domain";
 
 type DialogValue = string | boolean | null;
 interface PendingDialog {
@@ -152,7 +152,7 @@ export class ExtensionUiBridge {
 
   private unsupported(): undefined {
     this.notify(
-      "This extension requested custom terminal UI. Aeon supports select, confirm, input, and editor dialogs.",
+      "This extension requested custom terminal UI. Graft supports select, confirm, input, and editor dialogs.",
       "warning",
     );
     return undefined;

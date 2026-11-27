@@ -32,7 +32,7 @@ function fakeBrowser(takes) {
 }
 
 test("stop --tabs copies each recorded take into takes/ with its real metadata", async () => {
-  const folder = await mkdtemp(join(tmpdir(), "aeon-takes-"));
+  const folder = await mkdtemp(join(tmpdir(), "graft-takes-"));
   try {
     const data = Buffer.from("0123456789");
     const { run, calls } = fakeBrowser({
@@ -84,7 +84,7 @@ test("stop --tabs copies each recorded take into takes/ with its real metadata",
 });
 
 test("a take that cannot be read whole is not left half-written", async () => {
-  const folder = await mkdtemp(join(tmpdir(), "aeon-takes-"));
+  const folder = await mkdtemp(join(tmpdir(), "graft-takes-"));
   try {
     const { run } = fakeBrowser({
       3: { data: Buffer.from("abc"), stopped: { bytes: 10, mimeType: "video/webm" } },
@@ -103,7 +103,7 @@ test("gdigrab uses desktop or an exact title=, never window_exe", () => {
   assert.equal(gdigrabInput("window", "Inbox - Google Chrome"), "title=Inbox - Google Chrome");
   assert.equal(gdigrabInput("window", undefined), "desktop");
   assert.equal(
-    windowsChromeTitle({ AEON_CHROME_TITLE: " Docs - Google Chrome " }),
+    windowsChromeTitle({ GRAFT_CHROME_TITLE: " Docs - Google Chrome " }),
     "Docs - Google Chrome",
   );
   const state = {
@@ -123,7 +123,7 @@ test("gdigrab uses desktop or an exact title=, never window_exe", () => {
   assert.equal(screen[screen.indexOf("-i") + 1], "desktop");
 });
 
-test("avfoundation finds the screen device or honors AEON_MAC_SCREEN_DEVICE", () => {
+test("avfoundation finds the screen device or honors GRAFT_MAC_SCREEN_DEVICE", () => {
   const listing = [
     "[AVFoundation indev @ 0x1] AVFoundation video devices:",
     "[AVFoundation indev @ 0x1] [0] FaceTime HD Camera",
@@ -131,8 +131,8 @@ test("avfoundation finds the screen device or honors AEON_MAC_SCREEN_DEVICE", ()
   ].join("\n");
   assert.equal(avfoundationScreenIndex(listing), "2");
   assert.equal(avfoundationScreenIndex("[0] FaceTime HD Camera"), undefined);
-  assert.equal(macScreenDevice("ffmpeg", { AEON_MAC_SCREEN_DEVICE: "3" }), "3:none");
-  assert.equal(macScreenDevice("ffmpeg", { AEON_MAC_SCREEN_DEVICE: "4:0" }), "4:0");
+  assert.equal(macScreenDevice("ffmpeg", { GRAFT_MAC_SCREEN_DEVICE: "3" }), "3:none");
+  assert.equal(macScreenDevice("ffmpeg", { GRAFT_MAC_SCREEN_DEVICE: "4:0" }), "4:0");
   const state = {
     version: 1,
     source: "screen",

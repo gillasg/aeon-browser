@@ -9,7 +9,7 @@ import test from "node:test";
 import { TextDecoder } from "node:util";
 
 async function loadModule() {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-model-accounts-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-model-accounts-"));
   const outfile = join(directory, "accounts.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL("../src/home-model-accounts.ts", import.meta.url))],
@@ -27,7 +27,7 @@ function fakeService(token) {
   let connected = false;
   const server = createServer((request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
-    const given = request.headers["x-aeon-login-token"] ?? url.searchParams.get("token");
+    const given = request.headers["x-graft-login-token"] ?? url.searchParams.get("token");
     response.setHeader("access-control-allow-origin", "*");
     if (given !== token) return void response.writeHead(401).end("{}");
     const json = (body) =>

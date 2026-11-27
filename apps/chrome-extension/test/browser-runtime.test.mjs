@@ -182,7 +182,7 @@ const cases = [
       api.noteDialogAct(1);
       assert.equal(await answered(evaluate, "confirm('Proceed with fixture?')"), true);
       api.noteDialogAct(1);
-      assert.equal(await answered(evaluate, "prompt('Name','Aeon')"), "Aeon");
+      assert.equal(await answered(evaluate, "prompt('Name','Graft')"), "Graft");
       const recorded = api
         .readDiagnostics(1)
         .console.map((row) => row.text)

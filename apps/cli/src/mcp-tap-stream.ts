@@ -1,15 +1,15 @@
-import { assertNoSealedSecrets, REDACTED, scrubSecrets } from "@aeon/protocol";
+import { assertNoSealedSecrets, REDACTED, scrubSecrets } from "@graft/protocol";
 import { SealVault, siteOf } from "@browserkit/engine/native-browser-seal";
 import { globToRegExp, whereHolds, type JsonWhere } from "@browserkit/engine/native-browser-wire";
 import { armTap, disarmTap } from "@browserkit/engine/stealth";
 
-// The aeon/tap event family: live WebSocket, server-sent event and data-channel frames of one tab,
+// The graft/tap event family: live WebSocket, server-sent event and data-channel frames of one tab,
 // pushed to an MCP client. Every subscription arms its tap in the stealth ledger and the last one
 // to end disarms it. Frames are filtered here, before anything wakes the client, then sealed,
 // scrubbed, capped and paced (one notification per window, a drop-oldest ring behind it).
 
 type Json = Record<string, unknown>;
-export const TAP_EVENT = "aeon/tap";
+export const TAP_EVENT = "graft/tap";
 export type TapKind = "ws" | "sse" | "webrtc";
 export type TapDir = "in" | "out";
 export const TAP_RING = 256;
@@ -25,7 +25,7 @@ const WRAPS: Record<TapKind, string[]> = {
     "RTCDataChannel.prototype.onmessage",
   ],
 };
-const SEALED = /aeon-sealed:[a-z0-9]{12}/g;
+const SEALED = /graft-sealed:[a-z0-9]{12}/g;
 
 /** One frame as the browser side reports it. */
 export interface TapFrame {
@@ -110,7 +110,7 @@ export class TapStreams {
 
   async subscribe(subscriptionId: string, raw: unknown): Promise<void> {
     const source = this.source;
-    if (!source) throw new Error("aeon/tap needs a connected browser: none is attached.");
+    if (!source) throw new Error("graft/tap needs a connected browser: none is attached.");
     const filter = await readTapFilter(raw, source);
     const subscription: TapSubscription = { filter, ring: [], dropped: 0, last: 0 };
     this.subscriptions.set(subscriptionId, subscription);

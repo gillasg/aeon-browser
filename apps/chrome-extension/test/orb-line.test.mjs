@@ -17,7 +17,7 @@ async function view() {
       'import { createElement } from "react";',
       "export function ChatSwitcher() { return null; }",
       "export function xrayParts() { return []; }",
-      'export const piSlashCommandsKey = "aeonPiSlashCommands";',
+      'export const piSlashCommandsKey = "graftPiSlashCommands";',
       "export function useAgentFlag() { return [false, () => {}]; }",
       "export function AnswerLines(props) {",
       "  if (!props.footer) return null;",
@@ -36,7 +36,7 @@ async function view() {
     format: "esm",
     jsx: "automatic",
     external: ["react", "react-dom", "react/jsx-runtime"],
-    alias: { "@aeon/ui": stub },
+    alias: { "@graft/ui": stub },
   });
   try {
     return await import(pathToFileURL(outfile).href);

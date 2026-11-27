@@ -18,7 +18,7 @@ function parseAnnotations(text: string): {
   annotations: Array<{ quote: string; comment: string }>;
 } | null {
   // Messages sent before the rename carry the old Pippin tag.
-  const tag = ["Aeon", "Pippin"].find((name) => text.endsWith(`\n\n[/${name} annotations v1]`));
+  const tag = ["Graft", "Pippin"].find((name) => text.endsWith(`\n\n[/${name} annotations v1]`));
   if (!tag) return null;
   const opening = `[${tag} annotations v1]\n\n`;
   const closing = `\n\n[/${tag} annotations v1]`;

@@ -23,8 +23,8 @@ const run = promisify(execFile);
 const pageHtml = `<title>Forge</title>
 <button id="go" onclick="document.title='continued'">Go</button>
 <script>
-  window.dispatchEvent(new Event("aeon-cursor-stop"));
-  window.dispatchEvent(new Event("aeon-cursor-transcript"));
+  window.dispatchEvent(new Event("graft-cursor-stop"));
+  window.dispatchEvent(new Event("graft-cursor-transcript"));
   document.documentElement.dataset.forged = "1";
 </script>`;
 

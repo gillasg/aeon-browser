@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { aeonCommands } from "../dist/commands.js";
+import { graftCommands } from "../dist/commands.js";
 import { formatBrowser } from "../dist/browsers.js";
 
-test("aeon browsers is a command, and run documents --browser", () => {
-  const commands = aeonCommands({});
+test("graft browsers is a command, and run documents --browser", () => {
+  const commands = graftCommands({});
   assert.ok(commands.some((command) => command.name === "browsers"));
   assert.match(commands.find((command) => command.name === "run").help, /--browser name/);
 });
@@ -23,9 +23,9 @@ test("--browser pins every cell a command runs (boosts, map, cookies, record) to
   const { mkdtemp, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const dir = await mkdtemp(join(tmpdir(), "aeon-pin-"));
-  const was = process.env.AEON_DATA_DIR;
-  process.env.AEON_DATA_DIR = dir;
+  const dir = await mkdtemp(join(tmpdir(), "graft-pin-"));
+  const was = process.env.GRAFT_DATA_DIR;
+  process.env.GRAFT_DATA_DIR = dir;
   try {
     const { DaemonHost } = await import("../dist/host.js");
     const sent = [];
@@ -42,14 +42,14 @@ test("--browser pins every cell a command runs (boosts, map, cookies, record) to
     assert.equal(sent[2].browser, "eval");
     assert.equal(host.browser, "recording");
   } finally {
-    if (was === undefined) delete process.env.AEON_DATA_DIR;
-    else process.env.AEON_DATA_DIR = was;
+    if (was === undefined) delete process.env.GRAFT_DATA_DIR;
+    else process.env.GRAFT_DATA_DIR = was;
     await rm(dir, { recursive: true, force: true });
   }
 });
 
 test("boosts, map, cookies and record document --browser", () => {
-  const commands = aeonCommands({});
+  const commands = graftCommands({});
   for (const name of ["boosts", "map", "cookies", "record"]) {
     const command = commands.find((item) => item.name === name);
     assert.ok(command, name);

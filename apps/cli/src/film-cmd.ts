@@ -1,5 +1,5 @@
-// `aeon film`: camera first. Preflight → qualify check → shoot (clip.mp4 deferred) → contact
-// sheet from the raw frames → take.json, ready for any editor. With --kit (or `aeon film render`)
+// `graft film`: camera first. Preflight → qualify check → shoot (clip.mp4 deferred) → contact
+// sheet from the raw frames → take.json, ready for any editor. With --kit (or `graft film render`)
 // it also stages the take into an Open Studio kit and renders its Scene (or just --stills).
 import { spawnSync } from "node:child_process";
 import {
@@ -15,9 +15,9 @@ import type { Args } from "browserkit/dist/args.js";
 import type { DaemonHost } from "./host.js";
 import { parseClip, planHash, qualified, readQualify, type ClipFile } from "./record-qualify.js";
 
-export const FILM_USAGE = `Usage: aeon film [capture] <clip.json> [--out <dir>] [--kit <dir>] [--skip-qualify]
+export const FILM_USAGE = `Usage: graft film [capture] <clip.json> [--out <dir>] [--kit <dir>] [--skip-qualify]
        [--stills 0,120] [--still-ms 0,2000] [--ffmpeg <bin>]
-       aeon film render --kit <dir> --take <take dir> [--stills ...] [--still-ms ...] [--out <file>]`;
+       graft film render --kit <dir> --take <take dir> [--stills ...] [--still-ms ...] [--out <file>]`;
 export const FILM_STAGES = [
   "preflight",
   "qualify",

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { AeonClient } from "../dist/client.js";
+import { GraftClient } from "../dist/client.js";
 import { doctorChecks } from "../dist/doctor-checks.js";
 import { DaemonHost } from "../dist/host.js";
 import {
@@ -17,7 +17,7 @@ import {
   toSamplingMessages,
   writeUseClientModel,
 } from "../dist/mcp-sampling.js";
-import { SUPPORTED_PROTOCOL_VERSION } from "@aeon/protocol";
+import { SUPPORTED_PROTOCOL_VERSION } from "@graft/protocol";
 
 const context = () => ({
   systemPrompt: "do the task",
@@ -25,9 +25,9 @@ const context = () => ({
   tools: [{ name: "read", description: "read a page", parameters: { type: "object" } }],
 });
 
-/** An AeonClient whose socket is a fake daemon, so no WebSocket or daemon is needed. */
+/** A GraftClient whose socket is a fake daemon, so no WebSocket or daemon is needed. */
 function fakeClient(daemonReply) {
-  const client = Object.create(AeonClient.prototype);
+  const client = Object.create(GraftClient.prototype);
   client.waiting = new Map();
   client.sent = [];
   client.socket = {
@@ -81,7 +81,7 @@ test("messages become sampling text, and tool results keep their output", () => 
   ]);
 });
 
-test("sampling tool_use maps back to an Aeon tool call", () => {
+test("sampling tool_use maps back to a Graft tool call", () => {
   const result = fromSamplingResult({
     content: [
       { type: "text", text: "thinking" },
@@ -112,7 +112,7 @@ test("a fake MCP client that supports sampling answers a model call", async () =
     const reply = await client.modelComplete(context());
     assert.equal(reply.message.content[0].text, "the answer");
     assert.equal(reply.message.stopReason, "endTurn");
-    assert.equal(client.sent.length, 0, "the call went to the agent, not the Aeon daemon");
+    assert.equal(client.sent.length, 0, "the call went to the agent, not the Graft daemon");
     assert.equal(request.method, "sampling/createMessage");
     assert.equal(request.params.maxTokens > 0, true);
     assert.equal(request.params.tools.length, 1, "tools are offered when the agent supports them");
@@ -133,10 +133,10 @@ test("without sampling, a model call gets the normal sign-in error", async () =>
   const host = new DaemonHost();
   host.connect = async () => client;
   await assert.rejects(() => host.model().complete(context()), /Sign in/);
-  assert.equal(client.sent[0].kind, "core.model.complete", "a normal client uses Aeon's model");
+  assert.equal(client.sent[0].kind, "core.model.complete", "a normal client uses Graft's model");
 });
 
-test("a client refusal becomes a clear Aeon error", async () => {
+test("a client refusal becomes a clear Graft error", async () => {
   const bridge = samplingBridge();
   bridge.setSender((request) =>
     bridge.receive(request.id, { error: { code: -32000, message: "user said no" } }),
@@ -204,14 +204,14 @@ test("tools are omitted when the agent cannot use them in sampling", async () =>
   }
 });
 
-test("mcpUseClientModel is stored in Aeon's data folder and can be overridden", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-sampling-"));
-  const env = { AEON_DATA_DIR: dir };
+test("mcpUseClientModel is stored in Graft's data folder and can be overridden", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "graft-sampling-"));
+  const env = { GRAFT_DATA_DIR: dir };
   try {
     assert.equal(await readUseClientModel(env), false);
     await writeUseClientModel(true, env);
     assert.equal(await readUseClientModel(env), true);
-    assert.equal(await readUseClientModel({ ...env, AEON_MCP_USE_CLIENT_MODEL: "1" }), true);
+    assert.equal(await readUseClientModel({ ...env, GRAFT_MCP_USE_CLIENT_MODEL: "1" }), true);
     await writeUseClientModel(false, env);
     assert.equal(await readUseClientModel(env), false);
   } finally {
@@ -219,7 +219,7 @@ test("mcpUseClientModel is stored in Aeon's data folder and can be overridden", 
   }
 });
 
-test("doctor names the agent's model when that is how Aeon works", () => {
+test("doctor names the agent's model when that is how Graft works", () => {
   const facts = {
     daemon: {
       ok: true,

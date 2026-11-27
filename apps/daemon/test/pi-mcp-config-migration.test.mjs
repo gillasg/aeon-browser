@@ -118,7 +118,7 @@ test("Pi MCP migration registers one dynamic bridge for explicitly registered CL
     ...paths.input,
     cliBridge: {
       command: "C:/runtime/node.exe",
-      scriptPath: "C:/aeon/cli-mcp-bridge.js",
+      scriptPath: "C:/graft/cli-mcp-bridge.js",
       registryPath: paths.registryPath,
     },
   });
@@ -144,9 +144,9 @@ test("Pi MCP migration registers one dynamic bridge for explicitly registered CL
   assert.deepEqual(configured.mcpServers.pippin_cli, {
     type: "stdio",
     command: "C:/runtime/node.exe",
-    args: ["C:/aeon/cli-mcp-bridge.js", "--registry", paths.registryPath],
-    cwd: "C:\\aeon",
-    description: "The command-line tools the user registered in Aeon.",
+    args: ["C:/graft/cli-mcp-bridge.js", "--registry", paths.registryPath],
+    cwd: "C:\\graft",
+    description: "The command-line tools the user registered in Graft.",
     enabled: true,
     exposure: "codemode",
   });
@@ -171,9 +171,9 @@ test("Pi MCP migration rejects a server-name collision without changing the sour
 });
 
 async function makePaths(t) {
-  const root = await mkdtemp(join(tmpdir(), "aeon-mcp-migration-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-mcp-migration-"));
   const piAgentDirectory = join(root, "pi-agent");
-  const dataDirectory = join(root, "aeon-data");
+  const dataDirectory = join(root, "graft-data");
   await Promise.all([
     mkdir(piAgentDirectory, { recursive: true }),
     mkdir(dataDirectory, { recursive: true }),
@@ -188,7 +188,7 @@ async function makePaths(t) {
       dataDirectory,
       legacyRegistryPath: join(dataDirectory, "capabilities.json"),
       piAgentDirectory,
-      defaultWorkingDirectory: "C:/aeon",
+      defaultWorkingDirectory: "C:/graft",
     },
   };
 }
@@ -258,7 +258,7 @@ async function verifyPiMcpConfigMigrationCase1Stage2(
     type: "stdio",
     command: "docs-mcp",
     args: ["--read-only"],
-    cwd: "C:\\aeon",
+    cwd: "C:\\graft",
     env: { DOCS_TOKEN: "${DOCS_TOKEN}" },
     description: "Documentation: Read local docs.",
     enabled: true,

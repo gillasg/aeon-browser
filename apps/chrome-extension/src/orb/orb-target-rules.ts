@@ -1,6 +1,6 @@
 // What the user pointed at when they summoned the cursor. Pure rules over a small element shape,
 // so they can be tested without a page: the selection first, else the element under the pointer
-// (skipping Aeon's own overlay, climbing at most 3 ancestors), else nothing.
+// (skipping Graft's own overlay, climbing at most 3 ancestors), else nothing.
 
 export interface TargetRect {
   width: number;
@@ -62,7 +62,7 @@ export function ownText(node: TargetNode): string {
 
 export function isOverlay(node: TargetNode | null): boolean {
   for (let current = node; current; current = current.parentElement)
-    if (current.hasAttribute("data-aeon-overlay")) return true;
+    if (current.hasAttribute("data-graft-overlay")) return true;
   return false;
 }
 

@@ -5,7 +5,7 @@
 // (chrome.storage.session survives a service worker restart, never touches disk and is closed to
 // pages and the sandbox), so a value read back an hour later is still removed.
 
-const KEY = "aeon-secrets";
+const KEY = "graft-secrets";
 const MAX = 200;
 const secrets = new Set<string>();
 let loaded: Promise<void> | undefined;

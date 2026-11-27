@@ -3,7 +3,7 @@ import test from "node:test";
 import { buildRunCard, receiptFor } from "../dist/run-card.js";
 import { boostEffect, deterministicWatchCall } from "../dist/run-effects.js";
 import { siteCountKey, siteCounts } from "../dist/site-counts.js";
-import { RunCardSchema } from "@aeon/protocol";
+import { RunCardSchema } from "@graft/protocol";
 
 const base = { chatId: "chat", runId: "run", site: "shop.test", task: "orders" };
 
@@ -299,8 +299,8 @@ test("security guards block SSRF webhooks, overbroad chat management actions, an
   assert.throws(() => parseWebhook("http://192.168.1.10/hook", undefined, null), /public host/i);
   assert.throws(() => parseWebhook("http://[::1]/hook", undefined, null), /public host/i);
   assert.equal(
-    parseWebhook("https://hooks.example.com/aeon", undefined, null)?.url,
-    "https://hooks.example.com/aeon",
+    parseWebhook("https://hooks.example.com/graft", undefined, null)?.url,
+    "https://hooks.example.com/graft",
   );
 
   const chatGrant = { role: "ui", scope: { kind: "chat", chatId: "chat-1" } };

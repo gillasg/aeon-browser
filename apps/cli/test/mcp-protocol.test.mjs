@@ -12,7 +12,7 @@ import {
   mcpListResult,
   mcpResult,
   mcpSessionFromMeta,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 test("2026-07-28 is detected from _meta, and server/discover probes the modern era", () => {
   assert.equal(
@@ -28,7 +28,7 @@ test("2026-07-28 is detected from _meta, and server/discover probes the modern e
 });
 
 test("server/discover reports supported versions, capabilities and the server in _meta", () => {
-  const result = mcpDiscoverResult({ name: "aeon", version: "0.1.0" }, undefined, {
+  const result = mcpDiscoverResult({ name: "graft", version: "0.1.0" }, undefined, {
     tools: { listChanged: false },
   });
   assert.equal(result.resultType, "complete");
@@ -37,7 +37,7 @@ test("server/discover reports supported versions, capabilities and the server in
   assert.equal(result.ttlMs, 0);
   assert.equal(result.cacheScope, "private");
   assert.equal(result.capabilities.tools.listChanged, false);
-  assert.equal(result._meta["io.modelcontextprotocol/serverInfo"].name, "aeon");
+  assert.equal(result._meta["io.modelcontextprotocol/serverInfo"].name, "graft");
 });
 
 test("modern list and call results carry resultType; older ones do not", () => {

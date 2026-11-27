@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
-import { CoreFilmRequestSchema, NativeFilmReplySchema, type FilmAction } from "@aeon/protocol";
+import { CoreFilmRequestSchema, NativeFilmReplySchema, type FilmAction } from "@graft/protocol";
 
-// `aeon record`: the beat bus lives in each Chrome's chrome.storage.session, which only the
+// `graft record`: the beat bus lives in each Chrome's chrome.storage.session, which only the
 // extension's own pages and worker can reach. Core relays arm/read/clear to every connected
 // Chrome and merges what comes back.
 type FilmReply = { ok: boolean; beats: Record<string, unknown>[] };

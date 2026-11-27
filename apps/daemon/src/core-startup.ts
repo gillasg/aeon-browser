@@ -4,23 +4,23 @@ import { existsSync } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
-  aeonDataDirectory,
+  graftDataDirectory,
   ensurePrivateDir,
   foreignSocket,
   UntrustedDirError,
-} from "@aeon/location";
+} from "@graft/location";
 import { createProductionRuntime } from "./production-runtime.js";
 import { startCoreTransport } from "./core-transport.js";
 import { startSessionKeepalive, type SessionKeepalive } from "./session-keepalive.js";
 
 export async function acquireCoreLock(directory: string): Promise<() => Promise<void>> {
-  const fix = "Set AEON_DATA_DIR to a directory you own with mode 700.";
+  const fix = "Set GRAFT_DATA_DIR to a directory you own with mode 700.";
   if (process.platform === "win32") await mkdir(directory, { recursive: true });
   else await ensurePrivateDir(directory, { fix });
   const identity = createHash("sha256").update(resolve(directory).toLowerCase()).digest("hex");
   const address =
     process.platform === "win32"
-      ? "\\\\.\\pipe\\aeon-core-owner-" + identity
+      ? "\\\\.\\pipe\\graft-core-owner-" + identity
       : join(directory, "core-owner.sock");
   if (process.platform !== "win32") await claimCoreSocket(address, fix);
   const server = createServer((socket) => socket.destroy());
@@ -51,7 +51,7 @@ async function clearStaleCoreSocket(address: string): Promise<void> {
   if (!existsSync(address)) return;
   if (await acceptsConnections(address))
     throw Object.assign(
-      new Error("Another Aeon core already owns the data directory (EADDRINUSE)."),
+      new Error("Another Graft core already owns the data directory (EADDRINUSE)."),
       { code: "EADDRINUSE" },
     );
   await unlink(address).catch(() => undefined);
@@ -79,7 +79,7 @@ function acceptsConnections(address: string): Promise<boolean> {
 }
 
 export async function startStandaloneCore(): Promise<void> {
-  const directory = resolve(process.env.AEON_CORE_DATA_DIR ?? aeonDataDirectory());
+  const directory = resolve(process.env.GRAFT_CORE_DATA_DIR ?? graftDataDirectory());
   const unlock = await acquireCoreLock(directory);
   let runtime: ReturnType<typeof createProductionRuntime> | undefined;
   let core: Awaited<ReturnType<typeof startCoreTransport>> | undefined;
@@ -96,10 +96,10 @@ export async function startStandaloneCore(): Promise<void> {
       runtime.attention,
       activity,
     );
-    const origin = process.env.AEON_BROWSER_ORIGIN;
+    const origin = process.env.GRAFT_BROWSER_ORIGIN;
     if (origin)
       throw new Error(
-        "Browser bootstrap requires the installed native supervisor; omit AEON_BROWSER_ORIGIN.",
+        "Browser bootstrap requires the installed native supervisor; omit GRAFT_BROWSER_ORIGIN.",
       );
     process.stdout.write("Core ready. Native clients can discover it in the data directory.\n");
     runtime.warm();

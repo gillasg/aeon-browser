@@ -18,14 +18,14 @@ async function samePath(actual, expected) {
 }
 
 test("screenshot paths stay inside the session or the temp directory", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-shot-"));
-  const other = await mkdtemp(join(tmpdir(), "aeon-shot-tmp-"));
-  const denied = "/workspace-denied/aeon-w61/full.png";
+  const root = await mkdtemp(join(tmpdir(), "graft-shot-"));
+  const other = await mkdtemp(join(tmpdir(), "graft-shot-tmp-"));
+  const denied = "/workspace-denied/graft-w61/full.png";
   t.after(async () => {
     await rm(root, { recursive: true, force: true });
     await rm(other, { recursive: true, force: true });
-    await rm("/workspace-denied/aeon-w61", { recursive: true, force: true });
-    await rm("/workspace-denied/aeon-w61-out", { recursive: true, force: true });
+    await rm("/workspace-denied/graft-w61", { recursive: true, force: true });
+    await rm("/workspace-denied/graft-w61-out", { recursive: true, force: true });
   });
 
   const relative = await workspaceCall(root, shot("r0.png"));
@@ -61,13 +61,13 @@ test("screenshot paths stay inside the session or the temp directory", async (t)
 });
 
 test("a screenshot through a symlink that leaves the temp directory is refused", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-shot-link-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-shot-link-"));
   t.after(async () => {
     await rm(root, { recursive: true, force: true });
-    await rm("/workspace-denied/aeon-w61-out", { recursive: true, force: true });
+    await rm("/workspace-denied/graft-w61-out", { recursive: true, force: true });
   });
   try {
-    await symlink("/workspace-denied/aeon-w61-out", join(root, "escape"));
+    await symlink("/workspace-denied/graft-w61-out", join(root, "escape"));
   } catch (error) {
     if (error.code === "EPERM" || error.code === "ENOTSUP") {
       t.skip("this machine cannot create symlinks");
@@ -79,11 +79,11 @@ test("a screenshot through a symlink that leaves the temp directory is refused",
     () => workspaceCall(root, shot(join(root, "escape", "full.png"))),
     /Workspace symlink escapes its root/,
   );
-  await assert.rejects(stat("/workspace-denied/aeon-w61-out/full.png"));
+  await assert.rejects(stat("/workspace-denied/graft-w61-out/full.png"));
 });
 
 test("screenshot chunks append and the cell says where the file went", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-shot-chunk-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-shot-chunk-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const file = join(root, "keep", "chunks.bin");
   const first = await workspaceCall(root, shot(file, "YWI="));

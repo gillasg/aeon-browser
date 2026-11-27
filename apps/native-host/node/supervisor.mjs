@@ -19,14 +19,14 @@ import {
   restartDelay,
 } from "./protocol.mjs";
 
-const PHASE_TIMEOUT_MS = numberEnv("AEON_PHASE_TIMEOUT_MS", 90_000);
+const PHASE_TIMEOUT_MS = numberEnv("GRAFT_PHASE_TIMEOUT_MS", 90_000);
 // A per-phase deadline is not enough: a daemon that keeps emitting phase lines (or a loop of
 // them) resets it forever and the supervisor never leaves "starting". This overall budget bounds
 // the whole boot no matter how many phases it reports.
-const BOOT_TIMEOUT_MS = numberEnv("AEON_BOOT_TIMEOUT_MS", 180_000);
+const BOOT_TIMEOUT_MS = numberEnv("GRAFT_BOOT_TIMEOUT_MS", 180_000);
 const SPAWN_TIMEOUT_MS = 90_000;
-const HEALTH_WAIT_MS = numberEnv("AEON_HEALTH_WAIT_MS", 2500);
-const BOOTSTRAP_REPLY_MS = numberEnv("AEON_BOOTSTRAP_REPLY_MS", 15_000);
+const HEALTH_WAIT_MS = numberEnv("GRAFT_HEALTH_WAIT_MS", 2500);
+const BOOTSTRAP_REPLY_MS = numberEnv("GRAFT_BOOTSTRAP_REPLY_MS", 15_000);
 const CLIENT_READ_MS = 5000;
 const SHUTDOWN_WAIT_MS = 5000;
 
@@ -187,9 +187,9 @@ class Supervisor {
         cwd: this.config.dataDirectory,
         env: {
           ...process.env,
-          AEON_NATIVE_DATA_DIR: this.config.dataDirectory,
-          AEON_NATIVE_EXTENSION_ORIGIN: this.config.extensionOrigin,
-          AEON_NATIVE_SUPERVISED: "1",
+          GRAFT_NATIVE_DATA_DIR: this.config.dataDirectory,
+          GRAFT_NATIVE_EXTENSION_ORIGIN: this.config.extensionOrigin,
+          GRAFT_NATIVE_SUPERVISED: "1",
         },
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -228,7 +228,7 @@ class Supervisor {
         );
       const result = await this.waitOrStop(lines.next(Math.max(0, deadline - Date.now())));
       if (result.kind === "line") {
-        if (result.line === "AEON_DAEMON_READY") return;
+        if (result.line === "GRAFT_DAEMON_READY") return;
         const failed = startupFailureMessage(result.line);
         if (failed) throw named("startup-failed", failed);
         const next = phaseOf(result.line);
@@ -364,9 +364,9 @@ class Supervisor {
 
   async resynced(session) {
     const ping = await corePing(this.config.dataDirectory);
-    const pingKills = process.env.AEON_PING_KILLS === "1";
+    const pingKills = process.env.GRAFT_PING_KILLS === "1";
     this.log.write(
-      `core.ping ${ping ? "answered" : "silent"}${pingKills ? "; kill uses core.ping (AEON_PING_KILLS=1)." : "; the kill still uses the stdout probe."}`,
+      `core.ping ${ping ? "answered" : "silent"}${pingKills ? "; kill uses core.ping (GRAFT_PING_KILLS=1)." : "; the kill still uses the stdout probe."}`,
     );
     if (pingKills) return ping;
     if (!this.askHealth(session.child)) return false;

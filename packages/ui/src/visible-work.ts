@@ -1,4 +1,4 @@
-// Continuous work on Aeon's pages is only worth doing while someone can see it. The side panel,
+// Continuous work on Graft's pages is only worth doing while someone can see it. The side panel,
 // chat tabs and the home page stay mounted (and the eval keeps many chat tabs open), so an
 // uncapped 60 fps canvas loop in each one burns a core even when nothing is on screen. Every loop
 // in this package goes through these two gates: they stop on visibilitychange and when the element

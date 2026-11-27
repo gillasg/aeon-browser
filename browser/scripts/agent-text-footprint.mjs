@@ -13,10 +13,10 @@ import { spawnSync } from "node:child_process";
 import { createPortable } from "./footprint-paths.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const aeonRepo = resolve(repo, "..");
+const graftRepo = resolve(repo, "..");
 const baselinePath = join(repo, "docs", "agent", "footprint-baseline.json");
 const bump = process.argv.includes("--bump");
-const piAdapter = join(aeonRepo, "packages", "pi-adapter");
+const piAdapter = join(graftRepo, "packages", "pi-adapter");
 
 const measured = await measure();
 const tokens = Math.ceil(measured.total / 4);
@@ -48,7 +48,7 @@ async function measure() {
     const out = join(temp, "out");
     // Run TypeScript's own entry through Node: node_modules/.bin/tsc is a .cmd shim on Windows,
     // which spawnSync cannot start without a shell.
-    const tsc = join(aeonRepo, "node_modules", "typescript", "bin", "tsc");
+    const tsc = join(graftRepo, "node_modules", "typescript", "bin", "tsc");
     const compiled = spawnSync(
       process.execPath,
       [
@@ -62,7 +62,7 @@ async function measure() {
         "--pretty",
         "false",
       ],
-      { encoding: "utf8", cwd: aeonRepo },
+      { encoding: "utf8", cwd: graftRepo },
     );
     if (compiled.status !== 0) {
       throw new Error(
@@ -70,7 +70,7 @@ async function measure() {
       );
     }
     const { buildAgentSurface } = await import(pathToFileURL(join(out, "agent-surface.js")).href);
-    scratch = await mkdtemp(join(tmpdir(), "aeon-footprint-"));
+    scratch = await mkdtemp(join(tmpdir(), "graft-footprint-"));
     const surface = await buildAgentSurface({
       workingDirectory: join(scratch, "workspace"),
       agentDirectory: join(scratch, "agent"),
@@ -82,7 +82,7 @@ async function measure() {
     const portable = createPortable([
       [scratch, "<workspace>"],
       [temp, "<surface>"],
-      [aeonRepo, "<aeon>"],
+      [graftRepo, "<graft>"],
     ]);
     const systemPrompt = Buffer.byteLength(portable(surface.systemPrompt));
     const tools = Buffer.byteLength(portable(JSON.stringify(surface.tools)));

@@ -1,10 +1,10 @@
-import { AeonWordmark } from "./aeon-wordmark.js";
+import { GraftWordmark } from "./graft-wordmark.js";
 import { ProjectsSidebar } from "./projects-sidebar.js";
 import { useEffect, useRef, type ReactElement, type RefObject } from "react";
 import { SidebarChatItem, SidebarRecents } from "./sidebar-chat-item.js";
 import { SidebarManagementLinks } from "./sidebar-management-links.js";
 import type { ManagementSection } from "./management-types.js";
-import type { ChatSummaryDto } from "@aeon/protocol";
+import type { ChatSummaryDto } from "@graft/protocol";
 
 export interface ChatSidebarProps {
   developmentFixture: boolean;
@@ -73,10 +73,10 @@ function SidebarDialog(
       role="dialog"
       aria-modal={props.open && props.modal}
       hidden={!props.open}
-      aria-label="Aeon Chats"
+      aria-label="Graft Chats"
     >
       <div className="sidebar-top">
-        <AeonWordmark />
+        <GraftWordmark />
       </div>
       {props.onManagement && (
         <SidebarManagementLinks onSelect={props.onManagement} selected={props.managementSection} />

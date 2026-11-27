@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   "@earendil-works/pi-ai@1.6.0": aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb
-  "@earendil-works/pi-coding-agent@1.6.0": fbfbfdf267217354a76d68c0624457d316bb8b6c166f2eec44206cc5c5c6bc52
+  "@earendil-works/pi-coding-agent@1.6.0": 5864e0f133374bc80eb580aea135f13cf4d15e30c9ae82a9e19ad05d6bf2067b
 
 importers:
   .:
@@ -32,15 +32,15 @@ importers:
 
   apps/chrome-extension:
     dependencies:
-      "@aeon/protocol":
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      "@aeon/ui":
-        specifier: workspace:*
-        version: link:../../packages/ui
       "@browserkit/engine":
         specifier: workspace:*
         version: link:../../browser/packages/engine
+      "@graft/protocol":
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      "@graft/ui":
+        specifier: workspace:*
+        version: link:../../packages/ui
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -72,15 +72,6 @@ importers:
 
   apps/cli:
     dependencies:
-      "@aeon/location":
-        specifier: workspace:*
-        version: link:../../packages/location
-      "@aeon/pi-adapter":
-        specifier: workspace:*
-        version: link:../../packages/pi-adapter
-      "@aeon/protocol":
-        specifier: workspace:*
-        version: link:../../packages/protocol
       "@browserkit/credentials":
         specifier: workspace:*
         version: link:../../browser/packages/credentials
@@ -93,6 +84,15 @@ importers:
       "@browserkit/tools":
         specifier: workspace:*
         version: link:../../browser/packages/tools
+      "@graft/location":
+        specifier: workspace:*
+        version: link:../../packages/location
+      "@graft/pi-adapter":
+        specifier: workspace:*
+        version: link:../../packages/pi-adapter
+      "@graft/protocol":
+        specifier: workspace:*
+        version: link:../../packages/protocol
       browserkit:
         specifier: workspace:*
         version: link:../../browser/apps/bridge
@@ -109,21 +109,6 @@ importers:
 
   apps/daemon:
     dependencies:
-      "@aeon/domain":
-        specifier: workspace:*
-        version: link:../../packages/domain
-      "@aeon/location":
-        specifier: workspace:*
-        version: link:../../packages/location
-      "@aeon/pi-adapter":
-        specifier: workspace:*
-        version: link:../../packages/pi-adapter
-      "@aeon/protocol":
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      "@aeon/store":
-        specifier: workspace:*
-        version: link:../../packages/store
       "@browserkit/cdp":
         specifier: workspace:*
         version: link:../../browser/packages/cdp
@@ -142,6 +127,21 @@ importers:
       "@earendil-works/pi-ai":
         specifier: 1.6.0
         version: 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
+      "@graft/domain":
+        specifier: workspace:*
+        version: link:../../packages/domain
+      "@graft/location":
+        specifier: workspace:*
+        version: link:../../packages/location
+      "@graft/pi-adapter":
+        specifier: workspace:*
+        version: link:../../packages/pi-adapter
+      "@graft/protocol":
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      "@graft/store":
+        specifier: workspace:*
+        version: link:../../packages/store
       "@modelcontextprotocol/client":
         specifier: 2.2.0
         version: 2.2.0
@@ -275,7 +275,7 @@ importers:
 
   browser/packages/crawl:
     dependencies:
-      "@aeon/location":
+      "@graft/location":
         specifier: workspace:*
         version: link:../../../packages/location
       "@mozilla/readability":
@@ -370,12 +370,12 @@ importers:
 
   browser/packages/site-mapper:
     dependencies:
-      "@aeon/location":
-        specifier: workspace:*
-        version: link:../../../packages/location
       "@browserkit/protocol":
         specifier: workspace:*
         version: link:../protocol
+      "@graft/location":
+        specifier: workspace:*
+        version: link:../../../packages/location
       acorn:
         specifier: 8.18.0
         version: 8.18.0
@@ -433,12 +433,6 @@ importers:
 
   packages/pi-adapter:
     dependencies:
-      "@aeon/domain":
-        specifier: workspace:*
-        version: link:../domain
-      "@aeon/protocol":
-        specifier: workspace:*
-        version: link:../protocol
       "@browserkit/credentials":
         specifier: workspace:*
         version: link:../../browser/packages/credentials
@@ -453,7 +447,13 @@ importers:
         version: 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
       "@earendil-works/pi-coding-agent":
         specifier: 1.6.0
-        version: 1.6.0(patch_hash=fbfbfdf267217354a76d68c0624457d316bb8b6c166f2eec44206cc5c5c6bc52)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.5)
+        version: 1.6.0(patch_hash=5864e0f133374bc80eb580aea135f13cf4d15e30c9ae82a9e19ad05d6bf2067b)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.5)
+      "@graft/domain":
+        specifier: workspace:*
+        version: link:../domain
+      "@graft/protocol":
+        specifier: workspace:*
+        version: link:../protocol
       typebox:
         specifier: 1.3.27
         version: 1.3.27
@@ -469,7 +469,7 @@ importers:
 
   packages/store:
     dependencies:
-      "@aeon/domain":
+      "@graft/domain":
         specifier: workspace:*
         version: link:../domain
       better-sqlite3:
@@ -485,7 +485,7 @@ importers:
 
   packages/ui:
     dependencies:
-      "@aeon/protocol":
+      "@graft/protocol":
         specifier: workspace:*
         version: link:../protocol
       react:
@@ -4697,7 +4697,7 @@ snapshots:
     dependencies:
       quickjs-wasi: 3.6.2
 
-  "@earendil-works/pi-coding-agent@1.6.0(patch_hash=fbfbfdf267217354a76d68c0624457d316bb8b6c166f2eec44206cc5c5c6bc52)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.5)":
+  "@earendil-works/pi-coding-agent@1.6.0(patch_hash=5864e0f133374bc80eb580aea135f13cf4d15e30c9ae82a9e19ad05d6bf2067b)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.5)":
     dependencies:
       "@earendil-works/pi-agent-core": 1.6.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)
       "@earendil-works/pi-ai": 1.6.0(patch_hash=aaacc98cc41ce5f149be069a14791995ef73095277b07878a97cd4d807722ddb)(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@8.12.4)(ws@8.22.0)(zod@4.6.5)

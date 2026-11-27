@@ -1,11 +1,11 @@
-import { aeonDataDirectory } from "@aeon/location";
+import { graftDataDirectory } from "@graft/location";
 import { EVENTS_EXTENSION, EventHub, nextEvent } from "./mcp-events.js";
 import { TASKS_EXTENSION, TaskManager, type TaskContext } from "./mcp-tasks.js";
 import type { CatalogTool } from "./catalog.js";
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 import { BrowserTapSource, cellRunner } from "./mcp-tap-browser.js";
 
-// The events/* and tasks/* methods of `aeon mcp`, and the task runner behind them.
+// The events/* and tasks/* methods of `graft mcp`, and the task runner behind them.
 
 type Json = Record<string, unknown>;
 export type CallTool = (
@@ -14,7 +14,7 @@ export type CallTool = (
   signal: AbortSignal,
   context?: TaskContext,
 ) => Promise<unknown>;
-export const WATCH_TASK = "aeon_watch";
+export const WATCH_TASK = "graft_watch";
 
 export interface McpExtensions {
   events: EventHub;
@@ -26,16 +26,16 @@ export function createExtensions(
   notify: (method: string, params: Json) => void,
   callTool: CallTool,
   catalog: () => readonly CatalogTool[],
-  /** The daemon behind the live aeon/tap streams of the connected browser. */
-  aeon?: () => Promise<AeonClient>,
+  /** The daemon behind the live graft/tap streams of the connected browser. */
+  graft?: () => Promise<GraftClient>,
 ): McpExtensions {
-  const dataDirectory = aeonDataDirectory();
-  const pollMs = Number(process.env.AEON_EVENTS_POLL_MS ?? 1000);
+  const dataDirectory = graftDataDirectory();
+  const pollMs = Number(process.env.GRAFT_EVENTS_POLL_MS ?? 1000);
   const events = new EventHub({
     dataDirectory,
     notify,
     pollMs: Number.isFinite(pollMs) && pollMs >= 20 ? pollMs : 1000,
-    ...(aeon ? { tap: new BrowserTapSource(cellRunner(aeon)) } : {}),
+    ...(graft ? { tap: new BrowserTapSource(cellRunner(graft)) } : {}),
   });
   const tasks = new TaskManager({
     dataDirectory,

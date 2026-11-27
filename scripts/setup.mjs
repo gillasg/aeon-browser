@@ -1,13 +1,13 @@
-// Sets Aeon up from a fresh clone in one command (install.ps1 and install.sh run it): builds Aeon,
-// installs the native host and the background service for this OS, puts the `aeon` command and
-// skill in place, adds Aeon's MCP server to the coding agents on this machine, then installs the
+// Sets Graft up from a fresh clone in one command (install.ps1 and install.sh run it): builds Graft,
+// installs the native host and the background service for this OS, puts the `graft` command and
+// skill in place, adds Graft's MCP server to the coding agents on this machine, then installs the
 // extension and waits for it.
 //
 //   node scripts/setup.mjs              everything
 //   node scripts/setup.mjs --no-agents  leave coding agents' configs alone
 //   node scripts/setup.mjs --no-wait    do not wait for the extension
 //   node scripts/setup.mjs --again      repeat only the pieces that are missing or broken
-//   node scripts/setup.mjs --extension  guided extension step only (used by `aeon setup`)
+//   node scripts/setup.mjs --extension  guided extension step only (used by `graft setup`)
 //   node scripts/setup.mjs --yes        non-interactive: short wait, no first-run tab (CI)
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -35,7 +35,7 @@ const summonShortcut = mac ? "Cmd+Shift+Space" : "Ctrl+Shift+Space";
 const pasteKey = mac ? "Cmd+V" : "Ctrl+V";
 
 if (!windows && !mac && !linux) {
-  say(`Aeon does not support ${process.platform} yet.`);
+  say(`Graft does not support ${process.platform} yet.`);
   process.exit(1);
 }
 
@@ -49,7 +49,7 @@ const built = () =>
 
 if (!extensionOnly) {
   if (!again || !built()) {
-    say("1/4 Building Aeon…");
+    say("1/4 Building Graft…");
     run(pnpmCommand(), ["install", "--ignore-scripts"]);
     run(pnpmCommand(), ["build"]);
   } else say("1/4 Build is already in place.");
@@ -58,15 +58,15 @@ if (!extensionOnly) {
   if (windows) installWindowsHost();
   else run(process.execPath, [join("apps", "native-host", "scripts", "install.mjs")]);
 
-  say("3/4 Installing the aeon command and skill…");
+  say("3/4 Installing the graft command and skill…");
   if (!again || !commandInstalled()) run(process.execPath, [cli, "install"]);
   if (!again) await connectAgents();
   else say("Coding agents are already configured.");
 }
 
-say(extensionOnly ? "Loading the Aeon extension" : "4/4 The extension");
+say(extensionOnly ? "Loading the Graft extension" : "4/4 The extension");
 if (!existsSync(cli)) {
-  say("Aeon is not built in this folder. Run the one-line installer first, then `aeon setup`.");
+  say("Graft is not built in this folder. Run the one-line installer first, then `graft setup`.");
   process.exit(1);
 }
 if ((await extensionConnected()) && !args.has("--no-wait")) {
@@ -78,7 +78,7 @@ if (!existsSync(join(extension, "manifest.json"))) throw new Error("The extensio
 await presentExtension(extension);
 say(loadInstructions());
 if (args.has("--no-wait")) process.exit(0);
-say("Waiting for Aeon to connect (Ctrl+C to stop)…");
+say("Waiting for Graft to connect (Ctrl+C to stop)…");
 const waitMs = yes ? 90_000 : 10 * 60_000;
 for (let waited = 0; waited < waitMs; waited += 3000) {
   await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -89,7 +89,7 @@ for (let waited = 0; waited < waitMs; waited += 3000) {
   }
 }
 say(
-  `Chrome did not connect within ${Math.round(waitMs / 60_000)} minutes. Load ${extension} in chrome://extensions, then run \`aeon setup --again\`. Aeon needs no Chrome flags: a normal Chrome launch works.`,
+  `Chrome did not connect within ${Math.round(waitMs / 60_000)} minutes. Load ${extension} in chrome://extensions, then run \`graft setup --again\`. Graft needs no Chrome flags: a normal Chrome launch works.`,
 );
 process.exit(1);
 
@@ -98,7 +98,7 @@ function installWindowsHost() {
     try {
       execFileSync(
         "reg.exe",
-        ["query", "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.aeon.native_host"],
+        ["query", "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.graft.native_host"],
         { stdio: "ignore" },
       );
       return true;
@@ -123,7 +123,7 @@ async function connectAgents() {
   const { connectAgents: connect } = await import(
     pathToFileURL(join(bridge, "connect-agents.js")).href
   );
-  const results = await connect({ name: "aeon", command: process.execPath, args: [cli, "mcp"] });
+  const results = await connect({ name: "graft", command: process.execPath, args: [cli, "mcp"] });
   for (const result of results)
     say(`   ${result.done ? "Connected" : "Could not connect"} ${result.agent} (${result.detail})`);
 }
@@ -136,24 +136,24 @@ function loadInstructions() {
     "  2. Click Load unpacked.",
     `  3. Paste the folder (${pasteKey}) and choose it.`,
     "The folder is on your clipboard: " + extension,
-    "A normal Chrome launch is fine; Aeon needs no special flags.",
+    "A normal Chrome launch is fine; Graft needs no special flags.",
   ].join("\n");
 }
 
-/** `aeon install` picks npm's folder only when it is already on PATH, else ~/.local/bin. */
+/** `graft install` picks npm's folder only when it is already on PATH, else ~/.local/bin. */
 function commandInstalled() {
   const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
   const candidates = windows
-    ? [join(process.env.APPDATA ?? "", "npm", "aeon.cmd"), join(home, ".local", "bin", "aeon")]
-    : [join(home, ".local", "bin", "aeon")];
+    ? [join(process.env.APPDATA ?? "", "npm", "graft.cmd"), join(home, ".local", "bin", "graft")]
+    : [join(home, ".local", "bin", "graft")];
   return candidates.some(existsSync);
 }
 
 function connectedMessage() {
-  return `Aeon is connected. Open its Chat from the toolbar, or press ${summonShortcut} on any page.`;
+  return `Graft is connected. Open its Chat from the toolbar, or press ${summonShortcut} on any page.`;
 }
 
-/** Show the new user Aeon's Chat as soon as the extension pairs, not chrome://extensions. */
+/** Show the new user Graft's Chat as soon as the extension pairs, not chrome://extensions. */
 async function openFirstRun() {
   const bridge = join(root, "browser", "apps", "bridge", "dist");
   const { openFirstRunPage } = await import(pathToFileURL(join(bridge, "setup-extension.js")).href);

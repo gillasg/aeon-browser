@@ -61,7 +61,7 @@ test(
       const result = await repl(env, cell(url));
       const out = `${result.stdout}\n${result.stderr}`;
       assert.match(out, /FILL ok/, out);
-      assert.match(out, /SENT "aeon-closed-ok"/, out);
+      assert.match(out, /SENT "graft-closed-ok"/, out);
     } finally {
       chrome?.kill();
       bridge.kill();
@@ -81,7 +81,7 @@ test(
 function cell(url) {
   return `const page = await browser.openTab(${JSON.stringify(url)});
 let status = "ok";
-try { await page.getByLabel("Secret code").fill("aeon-closed-ok"); }
+try { await page.getByLabel("Secret code").fill("graft-closed-ok"); }
 catch (error) { status = "ERR " + String(error && error.message || error).split("\\n")[0]; }
 console.log("FILL " + status);
 await page.getByRole("button", {name: "Unlock"}).click();

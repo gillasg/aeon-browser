@@ -14,7 +14,7 @@ import { dataDirectory } from "./paths.js";
 
 const RELEASES = "https://api.github.com/repos/gillasg/aeon-browser/releases/latest";
 
-/** Built extension folders in a source checkout, best first: Aeon's own, then browserkit's. */
+/** Built extension folders in a source checkout, best first: Graft's own, then browserkit's. */
 export function sourceBuilds(base: string = import.meta.url): string[] {
   return [
     // browser/apps/bridge/dist -> the monorepo's apps/chrome-extension.
@@ -34,10 +34,10 @@ export function resolveExtensionFolder(
 
 type Asset = { name: string; browser_download_url: string };
 
-// Release names over time: Aeon's extension zip first, then the older browserkit one.
+// Release names over time: Graft's extension zip first, then the older browserkit one.
 const ASSET_PATTERNS = [
-  /^aeon-extension-.*\.zip$/,
-  /^aeon-browser-extension-.*\.zip$/,
+  /^graft-extension-.*\.zip$/,
+  /^graft-browser-extension-.*\.zip$/,
   /^browserkit-.*\.zip$/,
 ];
 
@@ -58,7 +58,7 @@ export async function extensionFolder(
   if (built) return built;
   const folder = join(dataDirectory(), "extension");
   if (!options.fresh && existsSync(join(folder, "manifest.json"))) return folder;
-  log("Downloading the Aeon extension from the latest release…");
+  log("Downloading the Graft extension from the latest release…");
   const release = (await (
     await fetch(RELEASES, { headers: { accept: "application/vnd.github+json" } })
   ).json()) as { tag_name?: string; assets?: Asset[] };
@@ -273,16 +273,16 @@ export function presentExtension(folder: string): {
   return { ...clip, ...(browser ? { browser } : {}) };
 }
 
-export const AEON_EXTENSION_ID = "npcdopokfkpfmepknhoecppgdgmkmihh";
+export const GRAFT_EXTENSION_ID = "npcdopokfkpfmepknhoecppgdgmkmihh";
 
 /**
- * After the extension connects, show the new user Aeon's Manage page (home.html; the extension no
+ * After the extension connects, show the new user Graft's Manage page (home.html; the extension no
  * longer overrides the New Tab page) rather than leaving them on chrome://extensions.
  */
 export function openFirstRunPage(
   browser: InstalledBrowser | undefined = detectBrowsers()[0],
 ): void {
-  openPage(browser, `chrome-extension://${AEON_EXTENSION_ID}/home.html`);
+  openPage(browser, `chrome-extension://${GRAFT_EXTENSION_ID}/home.html`);
 }
 
 function openPage(browser: InstalledBrowser | undefined, page: string): void {

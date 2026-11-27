@@ -1,7 +1,7 @@
-import type { ModelLoginState } from "@aeon/ui";
+import type { ModelLoginState } from "@graft/ui";
 import { modelsPageUrl, onModelsChanged } from "./model-broadcast.js";
 
-// "Connect a model" / "Add or manage models…": opens Aeon's Models page (Settings → Models) in a
+// "Connect a model" / "Add or manage models…": opens Graft's Models page (Settings → Models) in a
 // new tab that knows how to send the user back here, and this view picks up the new models the
 // moment the page announces them, when the user comes back, or on a slow poll as a last resort.
 // No terminal, no restart.

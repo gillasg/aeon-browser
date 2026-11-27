@@ -63,7 +63,7 @@ function evaluateValue(text) {
       username: "",
       signup: false,
     };
-  if (text.includes("aeon.handoff")) return "waiting";
+  if (text.includes("graft.handoff")) return "waiting";
   return true;
 }
 

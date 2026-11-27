@@ -1,9 +1,9 @@
 import { associateComposerContext } from "./composer-context-association.js";
 import { editComposerQueue, sendComposerCommand, messageOf } from "./composer-command.js";
-import { type DaemonUiResponse } from "@aeon/protocol";
-import type { PiBrowserContextRecord } from "@aeon/protocol";
-import type { ChatComposerProps, ComposerAttachment, ComposerControls } from "@aeon/ui";
-import type { PiAttachmentDto } from "@aeon/protocol";
+import { type DaemonUiResponse } from "@graft/protocol";
+import type { PiBrowserContextRecord } from "@graft/protocol";
+import type { ChatComposerProps, ComposerAttachment, ComposerControls } from "@graft/ui";
+import type { PiAttachmentDto } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { readComposerAttachment } from "./chat-composer-attachments.js";
 import { submitComposerMessage } from "./chat-composer-submit.js";
@@ -152,20 +152,20 @@ export class ChatComposerController {
   }
 
   sendPrompt(text: string): Promise<boolean> {
-    // A prompt Aeon built from a page (a summary request) is not the user typing: it never
+    // A prompt Graft built from a page (a summary request) is not the user typing: it never
     // lifts a block.
     return this.sendMessage(text, "followUp", false);
   }
 
   /**
-   * aeon run --typed: types a prompt into the composer at a person's pace, for screen recordings,
+   * graft run --typed: types a prompt into the composer at a person's pace, for screen recordings,
    * then clears it as if sent. It never submits: the caller sends the prompt itself, so a typed
    * prompt never counts as the user's own.
    */
   async typeForCamera(text: string): Promise<void> {
     const show = (value: string) => {
-      // An empty chat shows the start box (its "aeon.home.seed" event), a running one the composer.
-      window.dispatchEvent(new CustomEvent("aeon.home.seed", { detail: value }));
+      // An empty chat shows the start box (its "graft.home.seed" event), a running one the composer.
+      window.dispatchEvent(new CustomEvent("graft.home.seed", { detail: value }));
       this.editDraftInsertion = { id: ++this.editDraftId, text: value };
       this.onChange();
     };

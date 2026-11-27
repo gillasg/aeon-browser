@@ -1,8 +1,8 @@
 // Which chats are working and which wait for the user, from the session-storage mirrors the
-// worker (aeon-chat-working-<chatId>) and orbs (aeon-orb-needs:<tabId> → chatId) keep. For the
+// worker (graft-chat-working-<chatId>) and orbs (graft-orb-needs:<tabId> → chatId) keep. For the
 // chat switcher's dots and the orb's swarm.
-const WORKING_PREFIX = "aeon-chat-working-";
-const NEEDS_PREFIX = "aeon-orb-needs:";
+const WORKING_PREFIX = "graft-chat-working-";
+const NEEDS_PREFIX = "graft-orb-needs:";
 
 export interface ChatRunState {
   running: ReadonlySet<string>;

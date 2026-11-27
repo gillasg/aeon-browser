@@ -2,14 +2,14 @@ import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { CliCapability } from "@aeon/domain";
+import type { CliCapability } from "@graft/domain";
 import {
   MCP_PROTOCOLS,
   isModernMcp,
   mcpDiscoverResult,
   mcpListResult,
   mcpResult,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { parseRegistry } from "./capability-parsing.js";
 import {
   HELP_TIMEOUT_MS,
@@ -25,7 +25,7 @@ const VERSION = "1.0.0";
 const TOOL_DEFINITIONS = [
   {
     name: "cli_catalog",
-    description: "List only the CLI capabilities explicitly registered in Aeon.",
+    description: "List only the CLI capabilities explicitly registered in Graft.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -276,10 +276,10 @@ async function dispatchRequest(
     result = {
       protocolVersion: version,
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "aeon-cli", version: VERSION },
+      serverInfo: { name: "graft-cli", version: VERSION },
     };
   } else if (message.method === "server/discover") {
-    result = mcpDiscoverResult({ name: "aeon-cli", version: VERSION }, undefined, {
+    result = mcpDiscoverResult({ name: "graft-cli", version: VERSION }, undefined, {
       tools: { listChanged: false },
     });
   } else if (message.method === "ping") {

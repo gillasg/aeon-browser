@@ -1,7 +1,7 @@
 import { ViewerControls } from "./viewer-controls.js";
 import { createElement, useEffect, useRef, useState, type ReactElement } from "react";
-import { ChatMarkdown, mountAeonUi } from "@aeon/ui";
-import { ChatIdSchema } from "@aeon/protocol";
+import { ChatMarkdown, mountGraftUi } from "@graft/ui";
+import { ChatIdSchema } from "@graft/protocol";
 import { z } from "zod";
 import { connectPage, connectionErrorMessage } from "./ui-connection.js";
 import { applyStoredTheme } from "./theme-preferences.js";
@@ -36,11 +36,11 @@ installFileViewerLinks(chatId, () => displayedPath);
 // A deep link opened directly (not through a chat click) still joins the recent strip.
 const opened = parseViewerHref(location.href);
 if (opened) void rememberRecent(opened).catch(() => undefined);
-const update = mountAeonUi(root, createElement(Viewer, { data: null, error: "" }));
+const update = mountGraftUi(root, createElement(Viewer, { data: null, error: "" }));
 void load()
   .then((data) => {
     displayedPath = data.path;
-    document.title = fileName(data.path) + " · Aeon";
+    document.title = fileName(data.path) + " · Graft";
     update(createElement(Viewer, { data, error: "" }));
   })
   .catch((error: unknown) =>
@@ -56,7 +56,7 @@ async function load(): Promise<FileData> {
   ChatIdSchema.parse(chatId);
   const diffId = params.get("diff");
   if (diffId) {
-    const key = "aeon-viewer-" + diffId;
+    const key = "graft-viewer-" + diffId;
     const values = await chrome.storage.session.get(key);
     const diff = z
       .object({
@@ -77,7 +77,7 @@ async function load(): Promise<FileData> {
     };
   }
   const connection = await connectPage(
-    __AEON_NATIVE_TRANSPORT__ ? { kind: "chat", chatId } : { kind: "catalog" },
+    __GRAFT_NATIVE_TRANSPORT__ ? { kind: "chat", chatId } : { kind: "catalog" },
   );
   if (connection.kind !== "connected") throw new Error(connectionErrorMessage(connection.code));
   const client = connection.client;

@@ -2,7 +2,7 @@ import { askCore } from "../companion-requests.js";
 
 // The worker's side of what the orb and pages know about a site, all answered by core with no
 // model: the operations a site learned (the orb's chips) and saved reads (what changed on a page
-// since Aeon last read it, and moving that baseline to what the user just saw).
+// since Graft last read it, and moving that baseline to what the user just saw).
 
 export interface SiteOperation {
   id: string;
@@ -18,32 +18,32 @@ export interface SavedReadReply {
 }
 
 type SiteMessage =
-  | { kind: "aeon.site.operations"; host: string }
-  | { kind: "aeon.site.undo"; site: string; operation: string; params?: Record<string, unknown> }
-  | { kind: "aeon.page.saved"; url: string }
-  | { kind: "aeon.page.seen"; url: string; text: string };
+  | { kind: "graft.site.operations"; host: string }
+  | { kind: "graft.site.undo"; site: string; operation: string; params?: Record<string, unknown> }
+  | { kind: "graft.page.saved"; url: string }
+  | { kind: "graft.page.seen"; url: string; text: string };
 
 function isSiteMessage(value: unknown): value is SiteMessage {
   const kind = (value as { kind?: unknown } | null)?.kind;
   return (
-    kind === "aeon.site.operations" ||
-    kind === "aeon.site.undo" ||
-    kind === "aeon.page.saved" ||
-    kind === "aeon.page.seen"
+    kind === "graft.site.operations" ||
+    kind === "graft.site.undo" ||
+    kind === "graft.page.saved" ||
+    kind === "graft.page.seen"
   );
 }
 
 function answer(message: SiteMessage): Promise<unknown> {
-  if (message.kind === "aeon.site.operations")
+  if (message.kind === "graft.site.operations")
     return askCore("site", { action: "operations", site: message.host });
-  if (message.kind === "aeon.site.undo")
+  if (message.kind === "graft.site.undo")
     return askCore("site", {
       action: "undo",
       site: message.site,
       operation: message.operation,
       params: message.params ?? {},
     });
-  if (message.kind === "aeon.page.saved")
+  if (message.kind === "graft.page.saved")
     return askCore("site", { action: "read.get", url: message.url });
   return askCore("site", {
     action: "read.seen",
@@ -57,7 +57,7 @@ export function installSiteAnswers(): void {
     if (!isSiteMessage(request) || sender.id !== chrome.runtime.id) return;
     // Pages only ask about themselves; the orb and Activity (extension pages) ask for their site.
     const extensionPage =
-      request.kind === "aeon.site.operations" || request.kind === "aeon.site.undo";
+      request.kind === "graft.site.operations" || request.kind === "graft.site.undo";
     const tabUrl = sender.tab?.url;
     if (extensionPage && !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
     if (!extensionPage && (!tabUrl || pageKey(tabUrl) !== pageKey(request.url))) return;

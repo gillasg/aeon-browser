@@ -1,4 +1,4 @@
-// The code a job realm runs, written where the realm runs (the local Aeon process): the item
+// The code a job realm runs, written where the realm runs (the local Graft process): the item
 // function for browser.job, or the generated sweep. The extension sends only the job's spec.
 import { jobCode, type JobOptions } from "./code-job-code.js";
 import { sweepCode, type SweepOptions } from "./code-sweep-code.js";

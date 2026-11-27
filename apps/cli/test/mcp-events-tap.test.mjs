@@ -6,7 +6,7 @@ import test from "node:test";
 import { activeTaps } from "@browserkit/engine/stealth";
 import { EventHub } from "../dist/mcp-events.js";
 
-// aeon/tap over EventHub with a fake browser side: no Chrome, no model. The tap ledger is the
+// graft/tap over EventHub with a fake browser side: no Chrome, no model. The tap ledger is the
 // engine's real one, so these tests see exactly what page.stealthCheck() would report.
 
 function fakeSource(activeTab = 7) {
@@ -29,7 +29,7 @@ function fakeSource(activeTab = 7) {
 }
 
 async function hub(source) {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-tap-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-tap-"));
   const sent = [];
   const events = new EventHub({
     dataDirectory: dir,
@@ -43,14 +43,14 @@ async function hub(source) {
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 const labels = (tab) => activeTaps(tab).map((tap) => tap.label);
 
-test("aeon/tap: listed, subscribe arms, frames emit, unsubscribe disarms", async () => {
+test("graft/tap: listed, subscribe arms, frames emit, unsubscribe disarms", async () => {
   const source = fakeSource();
   const { events, sent, done } = await hub(source);
   const names = events.list().events.map((event) => event.name);
   assert.equal(names.length, 5);
-  assert.ok(names.includes("aeon/tap") && names.includes("aeon/routine.fired"));
+  assert.ok(names.includes("graft/tap") && names.includes("graft/routine.fired"));
 
-  const result = await events.subscribe({ name: "aeon/tap", filter: { tab: "t3", kind: "ws" } });
+  const result = await events.subscribe({ name: "graft/tap", filter: { tab: "t3", kind: "ws" } });
   assert.ok(result.subscriptionId && result.cursor === "0");
   assert.deepEqual(labels(3), ["MCP live tap (ws)"]);
   source.emit({ tab: 3, kind: "ws", dir: "in", url: "wss://x.test/feed", data: '{"a":1}' });
@@ -58,7 +58,7 @@ test("aeon/tap: listed, subscribe arms, frames emit, unsubscribe disarms", async
   assert.equal(sent.length, 1);
   const { name, payload, subscriptionId } = sent[0].params;
   assert.equal(sent[0].method, "notifications/events/emitted");
-  assert.equal(name, "aeon/tap");
+  assert.equal(name, "graft/tap");
   assert.equal(subscriptionId, result.subscriptionId);
   assert.equal(payload.tab, "t3");
   assert.equal(payload.dropped, 0);
@@ -75,25 +75,25 @@ test("aeon/tap: listed, subscribe arms, frames emit, unsubscribe disarms", async
   await done();
 });
 
-test("aeon/tap: numeric and default tab refs, kind all arms every kind", async () => {
+test("graft/tap: numeric and default tab refs, kind all arms every kind", async () => {
   const source = fakeSource(11);
   const { events, done } = await hub(source);
-  const a = await events.subscribe({ name: "aeon/tap", filter: { tab: 12, kind: "sse" } });
-  const b = await events.subscribe({ name: "aeon/tap" });
+  const a = await events.subscribe({ name: "graft/tap", filter: { tab: 12, kind: "sse" } });
+  const b = await events.subscribe({ name: "graft/tap" });
   assert.deepEqual(labels(12), ["MCP live tap (sse)"]);
   assert.equal(labels(11).length, 3);
-  await assert.rejects(events.subscribe({ name: "aeon/tap", filter: { kind: "x" } }), /kind/);
+  await assert.rejects(events.subscribe({ name: "graft/tap", filter: { kind: "x" } }), /kind/);
   await events.unsubscribe({ subscriptionId: a.subscriptionId });
   await events.unsubscribe({ subscriptionId: b.subscriptionId });
   assert.equal(labels(11).length + labels(12).length, 0);
   await done();
 });
 
-test("aeon/tap: zero-model filtering never wakes the client for non-matching frames", async () => {
+test("graft/tap: zero-model filtering never wakes the client for non-matching frames", async () => {
   const source = fakeSource();
   const { events, sent, done } = await hub(source);
   await events.subscribe({
-    name: "aeon/tap",
+    name: "graft/tap",
     filter: {
       tab: 7,
       kind: "ws",
@@ -117,10 +117,10 @@ test("aeon/tap: zero-model filtering never wakes the client for non-matching fra
   await done();
 });
 
-test("aeon/tap: glob match on the url", async () => {
+test("graft/tap: glob match on the url", async () => {
   const source = fakeSource();
   const { events, sent, done } = await hub(source);
-  await events.subscribe({ name: "aeon/tap", filter: { kind: "ws", match: "wss://a.test/*" } });
+  await events.subscribe({ name: "graft/tap", filter: { kind: "ws", match: "wss://a.test/*" } });
   source.emit({ tab: 7, kind: "ws", dir: "in", url: "wss://b.test/x", data: "1" });
   source.emit({ tab: 7, kind: "ws", dir: "in", url: "wss://a.test/x", data: "2" });
   await wait(30);
@@ -132,10 +132,10 @@ test("aeon/tap: glob match on the url", async () => {
   await done();
 });
 
-test("aeon/tap: <=10 msgs/s, drop-oldest ring of 256 and dropped counter", async () => {
+test("graft/tap: <=10 msgs/s, drop-oldest ring of 256 and dropped counter", async () => {
   const source = fakeSource();
   const { events, sent, done } = await hub(source);
-  await events.subscribe({ name: "aeon/tap", filter: { kind: "ws" } });
+  await events.subscribe({ name: "graft/tap", filter: { kind: "ws" } });
   for (let index = 0; index < 300; index++)
     source.emit({ tab: 7, kind: "ws", dir: "in", data: String(index) });
   await wait(1050);
@@ -154,10 +154,10 @@ test("aeon/tap: <=10 msgs/s, drop-oldest ring of 256 and dropped counter", async
   await done();
 });
 
-test("aeon/tap: payloads over 4 KB are truncated and flagged", async () => {
+test("graft/tap: payloads over 4 KB are truncated and flagged", async () => {
   const source = fakeSource();
   const { events, sent, done } = await hub(source);
-  await events.subscribe({ name: "aeon/tap", filter: { kind: "sse" } });
+  await events.subscribe({ name: "graft/tap", filter: { kind: "sse" } });
   source.emit({ tab: 7, kind: "sse", dir: "in", data: "é".repeat(5000) });
   source.emit({ tab: 7, kind: "sse", dir: "in", data: { list: "x".repeat(9000) } });
   await wait(250);
@@ -170,10 +170,10 @@ test("aeon/tap: payloads over 4 KB are truncated and flagged", async () => {
   await done();
 });
 
-test("aeon/tap: headers are sealed, bodies scrubbed and canary-checked", async () => {
+test("graft/tap: headers are sealed, bodies scrubbed and canary-checked", async () => {
   const source = fakeSource();
   const { events, sent, done } = await hub(source);
-  await events.subscribe({ name: "aeon/tap", filter: { kind: "ws" } });
+  await events.subscribe({ name: "graft/tap", filter: { kind: "ws" } });
   const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.c2lnbmF0dXJlLXBhcnQ";
   source.emit({
     tab: 7,
@@ -181,14 +181,14 @@ test("aeon/tap: headers are sealed, bodies scrubbed and canary-checked", async (
     dir: "out",
     url: "wss://x.test/s",
     headers: { authorization: "Bearer abcdefghijklmnopqrstuvwxyz", cookie: "sid=secret-value" },
-    data: { token: "tok-123456", note: `auth ${jwt}`, handle: "aeon-sealed:abcdefghijkl" },
+    data: { token: "tok-123456", note: `auth ${jwt}`, handle: "graft-sealed:abcdefghijkl" },
   });
   await wait(30);
   const { payload } = sent[0].params;
   for (const value of Object.values(payload.headers))
-    assert.match(value, /^aeon-sealed:[a-z0-9]{12}$/);
+    assert.match(value, /^graft-sealed:[a-z0-9]{12}$/);
   const text = JSON.stringify(payload.data);
-  assert.ok(!text.includes("tok-123456") && !text.includes(jwt) && !text.includes("aeon-sealed:"));
+  assert.ok(!text.includes("tok-123456") && !text.includes(jwt) && !text.includes("graft-sealed:"));
   assert.ok(!JSON.stringify(payload).includes("secret-value"));
   await events.close();
   await done();
@@ -197,9 +197,9 @@ test("aeon/tap: headers are sealed, bodies scrubbed and canary-checked", async (
 test("ST-3 invariant: ref-counted disarm, and close disarms every tap", async () => {
   const source = fakeSource();
   const { events, done } = await hub(source);
-  const one = await events.subscribe({ name: "aeon/tap", filter: { tab: 20, kind: "webrtc" } });
-  const two = await events.subscribe({ name: "aeon/tap", filter: { tab: 20, kind: "webrtc" } });
-  await events.subscribe({ name: "aeon/tap", filter: { tab: 21 } });
+  const one = await events.subscribe({ name: "graft/tap", filter: { tab: 20, kind: "webrtc" } });
+  const two = await events.subscribe({ name: "graft/tap", filter: { tab: 20, kind: "webrtc" } });
+  await events.subscribe({ name: "graft/tap", filter: { tab: 21 } });
   assert.equal(source.calls.filter((call) => call[0] === "install" && call[1] === 20).length, 1);
   assert.deepEqual(labels(20), ["MCP live tap (webrtc)"]);
 
@@ -221,9 +221,9 @@ test("ST-3 invariant: ref-counted disarm, and close disarms every tap", async ()
   await done();
 });
 
-test("aeon/tap without a browser source fails cleanly and arms nothing", async () => {
+test("graft/tap without a browser source fails cleanly and arms nothing", async () => {
   const { events, done } = await hub(undefined);
-  await assert.rejects(events.subscribe({ name: "aeon/tap", filter: { tab: 30 } }), /browser/);
+  await assert.rejects(events.subscribe({ name: "graft/tap", filter: { tab: 30 } }), /browser/);
   assert.deepEqual(labels(30), []);
   await done();
 });

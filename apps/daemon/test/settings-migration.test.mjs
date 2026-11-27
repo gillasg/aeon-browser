@@ -3,12 +3,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { migrateAeonSettings } from "../dist/settings-migration.js";
+import { migrateGraftSettings } from "../dist/settings-migration.js";
 
-test("Aeon's old settings merge into browserkit's home and stay in place", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-settings-migration-"));
+test("Graft's old settings merge into browserkit's home and stay in place", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "graft-settings-migration-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const data = join(root, "aeon");
+  const data = join(root, "graft");
   const home = join(root, "browserkit");
   await mkdir(data, { recursive: true });
   await writeFile(
@@ -26,7 +26,7 @@ test("Aeon's old settings merge into browserkit's home and stay in place", async
     else process.env.BROWSERKIT_HOME = previous;
   });
 
-  await migrateAeonSettings(data);
+  await migrateGraftSettings(data);
 
   assert.deepEqual(JSON.parse(await readFile(join(home, "password-manager.json"), "utf8")), {
     provider: "bitwarden",

@@ -42,7 +42,7 @@ async function fetchResults(query: string, value: Record<string, unknown>) {
 /** HTML the realm needs read as a document: the offscreen document has the browser's parser. */
 export async function parseInOffscreen(value: Record<string, unknown>): Promise<unknown> {
   const parsed = (await toOffscreen({
-    target: "aeon-code-offscreen",
+    target: "graft-code-offscreen",
     kind: "parseGoogle",
     html: String(value.html ?? ""),
     limit: Number(value.limit) || 10,

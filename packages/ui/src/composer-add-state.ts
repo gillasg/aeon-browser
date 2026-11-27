@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { PiBrowserContextRecordSchema } from "@aeon/protocol";
+import { PiBrowserContextRecordSchema } from "@graft/protocol";
 export interface ContextTab {
   tabId: number;
   title: string;
@@ -22,7 +22,7 @@ interface AddState {
 function request(kind: string, tabId?: number): Promise<unknown> {
   return new Promise((resolve, reject) =>
     window.dispatchEvent(
-      new CustomEvent("aeon.context-picker", { detail: { kind, tabId, resolve, reject } }),
+      new CustomEvent("graft.context-picker", { detail: { kind, tabId, resolve, reject } }),
     ),
   );
 }
@@ -81,7 +81,7 @@ async function chooseContextTab(
   setError("");
   try {
     const record = PiBrowserContextRecordSchema.parse(await request("capture", tabId));
-    const key = "aeon-context-pages:" + contextId;
+    const key = "graft-context-pages:" + contextId;
     const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? "[]");
     const pages = Array.isArray(value)
       ? value.flatMap((item) => {
@@ -92,7 +92,7 @@ async function chooseContextTab(
     if (!pages.some((page) => page.target.tabId === tabId)) {
       if (pages.length >= 8) throw new Error("Attach up to eight tabs.");
       sessionStorage.setItem(key, JSON.stringify([...pages, record]));
-      window.dispatchEvent(new CustomEvent("aeon.context-added", { detail: { id: contextId } }));
+      window.dispatchEvent(new CustomEvent("graft.context-added", { detail: { id: contextId } }));
     }
     close();
   } catch (cause) {

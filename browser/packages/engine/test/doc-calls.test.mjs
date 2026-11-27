@@ -228,7 +228,7 @@ function read(path) {
 function corpus() {
   const docs = join(browserRoot, "docs", "agent");
   const sections = join(docs, "sections");
-  const parts = join(repo, "skills", "aeon", "parts");
+  const parts = join(repo, "skills", "graft", "parts");
   const packs = join(docs, "packs");
   const files = [
     { path: "browser/docs/agent/guidance.md", path: join(docs, "guidance.md") },
@@ -240,7 +240,7 @@ function corpus() {
   ];
   for (const [prefix, folder] of [
     ["browser/docs/agent/sections", sections],
-    ["skills/aeon/parts", parts],
+    ["skills/graft/parts", parts],
     ["browser/docs/agent/packs", packs],
   ]) {
     if (!existsSync(folder)) continue;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readEventLog, type AeonEventKind, type AeonEventRecord } from "@aeon/location";
-import { scrubSecrets } from "@aeon/protocol";
+import { readEventLog, type GraftEventKind, type GraftEventRecord } from "@graft/location";
+import { scrubSecrets } from "@graft/protocol";
 import { TAP_EVENT, TAP_STREAM_INFO, TapStreams, type TapSource } from "./mcp-tap-stream.js";
 
 // MCP Events (io.modelcontextprotocol/events): routine firings as subscribable streams. A
@@ -9,21 +9,21 @@ import { TAP_EVENT, TAP_STREAM_INFO, TapStreams, type TapSource } from "./mcp-ta
 
 type Json = Record<string, unknown>;
 export const EVENTS_EXTENSION = "io.modelcontextprotocol/events";
-const ALL = "aeon/routine.fired";
-const STREAMS: { name: string; kind?: AeonEventKind; description: string }[] = [
+const ALL = "graft/routine.fired";
+const STREAMS: { name: string; kind?: GraftEventKind; description: string }[] = [
   { name: ALL, description: "Any routine whose check passed: watcher, listener or webhook." },
   {
-    name: "aeon/watcher.fired",
+    name: "graft/watcher.fired",
     kind: "watcher",
     description: "A scheduled watcher's check passed.",
   },
   {
-    name: "aeon/listener.fired",
+    name: "graft/listener.fired",
     kind: "listener",
     description: "A response-listener routine heard a matching response.",
   },
   {
-    name: "aeon/webhook.fired",
+    name: "graft/webhook.fired",
     kind: "webhook",
     description: "A routine with a webhook trigger fired (the POST is sent as well).",
   },
@@ -55,7 +55,7 @@ export interface EventHubOptions {
   dataDirectory: string;
   notify: (method: string, params: Json) => void;
   pollMs?: number;
-  /** Live frames for the aeon/tap family; without one, subscribing to it fails. */
+  /** Live frames for the graft/tap family; without one, subscribing to it fails. */
   tap?: TapSource;
 }
 
@@ -127,7 +127,7 @@ export class EventHub {
 
   private subscriptionFor(params: Json): Subscription | undefined {
     if (typeof params.subscriptionId !== "string") return undefined;
-    if (this.taps.has(params.subscriptionId)) throw new Error("aeon/tap is push-only: no poll");
+    if (this.taps.has(params.subscriptionId)) throw new Error("graft/tap is push-only: no poll");
     const subscription = this.subscriptions.get(params.subscriptionId);
     if (!subscription) throw new Error(`Unknown subscriptionId ${params.subscriptionId}`);
     return subscription;
@@ -175,7 +175,7 @@ export class EventHub {
     return (await this.read()).at(-1)?.cursor ?? 0;
   }
 
-  private read(): Promise<AeonEventRecord[]> {
+  private read(): Promise<GraftEventRecord[]> {
     return readEventLog(this.options.dataDirectory);
   }
 }
@@ -198,7 +198,7 @@ export async function nextEvent(
   return undefined;
 }
 
-function toEvent(name: string, record: AeonEventRecord): Json {
+function toEvent(name: string, record: GraftEventRecord): Json {
   const cursor = String(record.cursor);
   return {
     name,
@@ -214,7 +214,7 @@ function toEvent(name: string, record: AeonEventRecord): Json {
   };
 }
 
-function matches(query: Subscription, record: AeonEventRecord): boolean {
+function matches(query: Subscription, record: GraftEventRecord): boolean {
   const kind = STREAMS.find((stream) => stream.name === query.name)?.kind;
   if (kind && record.kind !== kind) return false;
   if (query.filter.routineId && record.routineId !== query.filter.routineId) return false;

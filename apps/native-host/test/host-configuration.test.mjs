@@ -14,7 +14,7 @@ test(
     skip: process.platform === "win32" ? false : "Windows-only (C# host)",
   },
   () => {
-    const directory = mkdtempSync(join(tmpdir(), "aeon-host-config-"));
+    const directory = mkdtempSync(join(tmpdir(), "graft-host-config-"));
     const root = fileURLToPath(new URL("../", import.meta.url));
     try {
       const executable = join(directory, "probe.exe");

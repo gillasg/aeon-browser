@@ -8,7 +8,7 @@ import type {
   PiEntryDto,
   PiMessageDto,
   PiSessionEventDto,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 
 export interface ToolStep {
   key: string;

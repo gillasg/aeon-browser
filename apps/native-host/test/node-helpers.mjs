@@ -12,7 +12,7 @@ export const EXTENSION_ID = "a".repeat(32);
 export const ORIGIN = "chrome-extension://" + EXTENSION_ID;
 
 export function createSandbox() {
-  const root = mkdtempSync(join(tmpdir(), "aeon-node-host-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-node-host-"));
   const home = join(root, "home");
   mkdirSync(home, { recursive: true });
   const env = envFor(home);
@@ -38,13 +38,13 @@ export function envFor(home, extra = {}) {
     XDG_DATA_HOME: join(home, ".local", "share"),
     XDG_CONFIG_HOME: join(home, ".config"),
     LOCALAPPDATA: join(home, "AppData", "Local"),
-    AEON_PHASE_TIMEOUT_MS: "1500",
-    AEON_BOOTSTRAP_REPLY_MS: "400",
-    AEON_HEALTH_WAIT_MS: "500",
+    GRAFT_PHASE_TIMEOUT_MS: "1500",
+    GRAFT_BOOTSTRAP_REPLY_MS: "400",
+    GRAFT_HEALTH_WAIT_MS: "500",
     ...extra,
   };
-  delete env.AEON_DATA_DIR;
-  delete env.AEON_CORE_DATA_DIR;
+  delete env.GRAFT_DATA_DIR;
+  delete env.GRAFT_CORE_DATA_DIR;
   return env;
 }
 

@@ -64,7 +64,7 @@ test(
   "locators pierce open shadow roots and custom-element hosts",
   { skip: !process.env.REQUIRE_E2E && !(chromePath && existsSync(chromePath)) },
   async () => {
-    const profile = await mkdtemp(join(tmpdir(), "aeon-shadow-locators-"));
+    const profile = await mkdtemp(join(tmpdir(), "graft-shadow-locators-"));
     const chrome = spawn(
       chromePath,
       [

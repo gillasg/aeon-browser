@@ -17,12 +17,12 @@ import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 // Pi keeps its own model list current by refreshing provider catalogs into a file-backed
-// ModelsStore and merging the result over the built-in catalog. Aeon reuses the same machinery:
+// ModelsStore and merging the result over the built-in catalog. Graft reuses the same machinery:
 // a background Models.refresh(), the same store format, and one provider wrapper for the live
 // list OpenCode Go serves, which no shipped catalog covers on release day.
 
-/** Aeon's catalog cache, beside Pi's own `models-store.json` in the shared agent directory. */
-export const LIVE_MODELS_STORE_FILE = "aeon-models-store.json";
+/** Graft's catalog cache, beside Pi's own `models-store.json` in the shared agent directory. */
+export const LIVE_MODELS_STORE_FILE = "graft-models-store.json";
 
 /** OpenCode Go's own list, the one its app and site show. */
 export const OPENCODE_GO_MODELS_URL = "https://opencode.ai/zen/go/v1/models";
@@ -34,11 +34,11 @@ export const LIVE_MODELS_REFRESH_MS = 60 * 60 * 1000;
 const BACKGROUND_REFRESH_MS = 4 * 60 * 60 * 1000;
 
 /** The agent directory's cache file. ModelRuntime and LoginService both write it. */
-export function aeonModelsStorePath(agentDirectory: string): string {
+export function graftModelsStorePath(agentDirectory: string): string {
   return join(agentDirectory, LIVE_MODELS_STORE_FILE);
 }
 
-export interface AeonModelRuntimeOptions {
+export interface GraftModelRuntimeOptions {
   /** Pi's agent directory (`~/.pi/agent` by default). */
   agentDirectory?: string;
   /** Test seam: replaces the on-disk store. */
@@ -51,8 +51,8 @@ export interface AeonModelRuntimeOptions {
  * A `ModelRuntime` with every provider Pi ships, plus OpenCode Go's live list. Restores the
  * cache; callers schedule `refreshInBackground` when they show a model list.
  */
-export async function createAeonModelRuntime(
-  options: AeonModelRuntimeOptions = {},
+export async function createGraftModelRuntime(
+  options: GraftModelRuntimeOptions = {},
 ): Promise<ModelRuntime> {
   const agentDirectory = options.agentDirectory;
   const runtime = await ModelRuntime.create({
@@ -60,7 +60,7 @@ export async function createAeonModelRuntime(
       ? {
           authPath: join(agentDirectory, "auth.json"),
           modelsPath: join(agentDirectory, "models.json"),
-          modelsStorePath: aeonModelsStorePath(agentDirectory),
+          modelsStorePath: graftModelsStorePath(agentDirectory),
         }
       : {}),
     ...(options.modelsStore ? { modelsStore: options.modelsStore } : {}),

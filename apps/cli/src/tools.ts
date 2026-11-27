@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AeonClient, dataDirectory } from "./client.js";
+import { GraftClient, dataDirectory } from "./client.js";
 
-// aeon tool / aeon tools: the chat tools (browser_code, browser_tabs, crawl, site_mapper, extract)
+// graft tool / graft tools: the chat tools (browser_code, browser_tabs, crawl, site_mapper, extract)
 // from a shell, one call at a time, so an agent can use them in the same session without MCP.
 
 type Json = Record<string, unknown>;
@@ -19,7 +19,7 @@ const TOOL_NAMES = [
 
 /** Every tool with its full guidance, as the daemon describes it; --find narrows to a topic. */
 export async function listTools(
-  client: AeonClient,
+  client: GraftClient,
   asJson: boolean,
   find?: string,
 ): Promise<number> {
@@ -151,7 +151,7 @@ async function invocationOf(rest: string[]): Promise<ToolInvocation> {
   const [name, ...others] = rest;
   if (!name || !TOOL_NAMES.includes(name))
     throw new Error(
-      `Usage: aeon tool <${TOOL_NAMES.join("|")}> '<json>' [--session name] [--browser name] [--json]`,
+      `Usage: graft tool <${TOOL_NAMES.join("|")}> '<json>' [--session name] [--browser name] [--json]`,
     );
   const valueOf = (flag: string) => {
     const index = others.indexOf(flag);
@@ -175,14 +175,14 @@ async function invocationOf(rest: string[]): Promise<ToolInvocation> {
   };
 }
 
-/** aeon tool <name> [json | @file | - | key=value ...] [--session s] [--json] [--no-color] */
-export async function runTool(client: AeonClient, rest: string[]): Promise<number> {
+/** graft tool <name> [json | @file | - | key=value ...] [--session s] [--json] [--no-color] */
+export async function runTool(client: GraftClient, rest: string[]): Promise<number> {
   const call = await invocationOf(rest);
   const reply = await client.tool({
     kind: "core.tool.call",
     tool: call.name,
     session: call.session,
-    arguments: { ...call.input, ...(call.asJson ? { __aeonFull: true } : {}) },
+    arguments: { ...call.input, ...(call.asJson ? { __graftFull: true } : {}) },
     ...(call.browser ? { browser: call.browser } : {}),
   });
   const content = (reply.content as Content[] | undefined) ?? [];

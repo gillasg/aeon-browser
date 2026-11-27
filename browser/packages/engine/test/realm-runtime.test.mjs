@@ -1,4 +1,4 @@
-// browser_code realms run in the local Aeon process (a vm context in a worker thread), reached
+// browser_code realms run in the local Graft process (a vm context in a worker thread), reached
 // over the extension's socket. They keep the sandbox page's semantics and see nothing of Node.
 import assert from "node:assert/strict";
 import test from "node:test";

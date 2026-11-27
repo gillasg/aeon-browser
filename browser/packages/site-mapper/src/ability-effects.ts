@@ -1,7 +1,7 @@
 // What a way changes on the site, as an inventory for the model and the UI: `explicit` writes
 // (a non-GET request, a commit step, a script that calls write) and `suspected` ones (a step
 // whose words or path name a delete, logout or submit). It is never a permission gate: nothing
-// reads this list before a run, and Aeon still never asks.
+// reads this list before a run, and Graft still never asks.
 
 import type {
   Ability,

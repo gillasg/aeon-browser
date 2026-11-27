@@ -15,8 +15,8 @@ test(
   "a log written outside the installer is 0600 in a 0700 folder",
   { skip: process.platform === "win32" ? "POSIX modes" : false },
   () => {
-    const root = mkdtempSync(join(tmpdir(), "aeon-supervisor-files-"));
-    const app = join(root, "Aeon");
+    const root = mkdtempSync(join(tmpdir(), "graft-supervisor-files-"));
+    const app = join(root, "Graft");
     const path = join(app, "daemon-supervisor.log");
     try {
       const log = new SupervisorLog(path);
@@ -32,14 +32,14 @@ test(
       new SupervisorStatus(statusPath).setReady(42);
       assert.equal(statSync(statusPath).mode & 0o777, 0o600);
       const failed = new SupervisorStatus(statusPath);
-      failed.setRestarting("startup-failed", "Refusing /tmp/aeon: it is owned by uid 65534.");
-      assert.equal(failed.read().error, "Refusing /tmp/aeon: it is owned by uid 65534.");
+      failed.setRestarting("startup-failed", "Refusing /tmp/graft: it is owned by uid 65534.");
+      assert.equal(failed.read().error, "Refusing /tmp/graft: it is owned by uid 65534.");
       assert.equal(failed.read().state, "restarting");
       assert.equal(
-        startupFailureMessage("AEON_DAEMON_FAILED Refusing /tmp/aeon: it is owned by uid 65534."),
-        "Refusing /tmp/aeon: it is owned by uid 65534.",
+        startupFailureMessage("GRAFT_DAEMON_FAILED Refusing /tmp/graft: it is owned by uid 65534."),
+        "Refusing /tmp/graft: it is owned by uid 65534.",
       );
-      assert.equal(startupFailureMessage("AEON_DAEMON_PHASE lock"), undefined);
+      assert.equal(startupFailureMessage("GRAFT_DAEMON_PHASE lock"), undefined);
       failed.setReady(7);
       assert.equal(failed.read().error, undefined);
       assert.equal(failed.read().state, "ready");

@@ -1,10 +1,10 @@
-// The recorder's side of the beat bus: arm Aeon's UI hooks for a take, read the beats it wrote,
+// The recorder's side of the beat bus: arm Graft's UI hooks for a take, read the beats it wrote,
 // and turn them into events on the clip clock. Best effort: a Chrome without the hook yields none.
 // The bus is `chrome.storage.session`, reachable only from the extension, so it goes through Core.
 import { eventsFromTrace, type TraceAction, type VideoEvent } from "./record-events.js";
 
-export const FILM_ARMED_KEY = "aeon-film-armed";
-export const FILM_BEATS_KEY = "aeon-film-beats";
+export const FILM_ARMED_KEY = "graft-film-armed";
+export const FILM_BEATS_KEY = "graft-film-beats";
 
 export type FilmAction = "arm" | "disarm" | "read" | "clear";
 /** One trip over the beat bus: Core relays it to the extension worker in every connected Chrome. */

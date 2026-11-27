@@ -36,11 +36,11 @@ function __contextRecent(items) {
   }
   return hosts.slice(0, 15);
 }
-// Aeon's own pages (chats, Manage) are not the user's browsing: another chat's tab is titled with
+// Graft's own pages (chats, Manage) are not the user's browsing: another chat's tab is titled with
 // that chat's prompt, and reading it as context steers this task into someone else's.
 function __contextTabs(all) {
   if (!Array.isArray(all)) return {openTabs: all};
-  var tabs = all.filter((tab) => tab.aeonUi !== true);
+  var tabs = all.filter((tab) => tab.graftUi !== true);
   var active = tabs.find((tab) => tab.active && (__focusedWindowId === undefined || tab.windowId === __focusedWindowId)) || tabs.find((tab) => tab.active);
   return {
     activeTab: active ? {id: active.id, title: active.title, url: active.url} : null,

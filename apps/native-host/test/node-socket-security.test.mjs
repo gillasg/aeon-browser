@@ -21,9 +21,9 @@ import {
 const posix = process.platform !== "win32";
 
 test("the socket directory is 0700 and a foreign or loose one is refused", { skip: !posix }, () => {
-  const root = mkdtempSync(join(tmpdir(), "aeon-socket-dir-"));
+  const root = mkdtempSync(join(tmpdir(), "graft-socket-dir-"));
   const uid = process.getuid();
-  const directory = join(root, "aeon");
+  const directory = join(root, "graft");
   try {
     ensureSocketDirectory(directory, { uid });
     assert.equal(lstatSync(directory).mode & 0o777, 0o700);
@@ -43,7 +43,7 @@ test(
   "the host refuses a socket owned by another uid before connecting",
   { skip: !posix },
   async () => {
-    const root = mkdtempSync(join(tmpdir(), "aeon-socket-foreign-"));
+    const root = mkdtempSync(join(tmpdir(), "graft-socket-foreign-"));
     const path = join(root, "bootstrap.sock");
     const server = net.createServer((socket) => socket.destroy());
     await new Promise((done) => server.listen(path, done));
@@ -72,11 +72,11 @@ test(
     writeConfig(sandbox);
     // A world-writable runtime root like /tmp: the other user creates the per-user socket
     // directory first and listens inside it. The victim must refuse the directory, not trust it.
-    const runtime = mkdtempSync(join("/tmp", "aeon-runtime-"));
+    const runtime = mkdtempSync(join("/tmp", "graft-runtime-"));
     chmodSync(runtime, 0o777);
-    // AEON_RUNTIME_DIR points every POSIX OS at this world-writable parent; macOS otherwise uses
+    // GRAFT_RUNTIME_DIR points every POSIX OS at this world-writable parent; macOS otherwise uses
     // a private per-user temp dir the other user cannot traverse.
-    const env = { ...sandbox.env, XDG_RUNTIME_DIR: runtime, AEON_RUNTIME_DIR: runtime };
+    const env = { ...sandbox.env, XDG_RUNTIME_DIR: runtime, GRAFT_RUNTIME_DIR: runtime };
     const directory = runtimeDirectory({ env, home: sandbox.home });
     const path = socketPath({
       env,
@@ -102,9 +102,9 @@ test(
       const { result } = await nativeBootstrap(sandbox, bootstrapRequest(), {
         env: {
           XDG_RUNTIME_DIR: runtime,
-          AEON_RUNTIME_DIR: runtime,
-          AEON_CONNECT_ATTEMPTS: "1",
-          AEON_CONNECT_WAIT_MS: "10",
+          GRAFT_RUNTIME_DIR: runtime,
+          GRAFT_CONNECT_ATTEMPTS: "1",
+          GRAFT_CONNECT_WAIT_MS: "10",
         },
         timeoutMs: 10_000,
       });
@@ -152,7 +152,7 @@ function sudo(args) {
 /** Runs the other user's listener; the file it writes counts the bytes it received. */
 function attackSocket(directory, path) {
   // The attacker (nobody) must be able to write this file; os.tmpdir() is private on macOS.
-  const countFile = join("/tmp", "aeon-attack-" + process.pid + "-" + Date.now());
+  const countFile = join("/tmp", "graft-attack-" + process.pid + "-" + Date.now());
   const script = [
     "import os, socket, sys, time",
     "path, count = sys.argv[1], sys.argv[2]",

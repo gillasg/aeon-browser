@@ -6,7 +6,7 @@ import { handleApi } from "./api.js";
 import { HttpError, sameToken, sendJson } from "./http.js";
 import { LoginError, LoginService, type ModelAccountOptions } from "./service.js";
 
-// The API behind Aeon's Models page, on 127.0.0.1: providers, sign-ins, API keys and the default
+// The API behind Graft's Models page, on 127.0.0.1: providers, sign-ins, API keys and the default
 // model. The extension page talks to it with the token in the address core hands it, and opens
 // providers' sign-in pages as Chrome tabs itself.
 
@@ -15,7 +15,7 @@ export interface LoginServer {
   readonly url: string;
   readonly origin: string;
   readonly port: number;
-  /** Required by every API call, as the `x-aeon-login-token` header or `?token=`. */
+  /** Required by every API call, as the `x-graft-login-token` header or `?token=`. */
   readonly token: string;
   readonly service: LoginService;
   /** "closed" once no page has followed the service for a few seconds. */
@@ -41,7 +41,7 @@ export async function startLoginServer(options: ModelAccountOptions = {}): Promi
     if (!url.pathname.startsWith("/api/")) throw new HttpError(404, "Not found");
     const crossOrigin = checkOrigin(request, response);
     if (request.method === "OPTIONS" && crossOrigin) return void response.writeHead(204).end();
-    const given = request.headers["x-aeon-login-token"] ?? url.searchParams.get("token");
+    const given = request.headers["x-graft-login-token"] ?? url.searchParams.get("token");
     if (!sameToken(typeof given === "string" ? given : undefined, token))
       throw new HttpError(401, "Missing or wrong token");
     await handleApi(context, request, response, url.pathname);
@@ -81,7 +81,7 @@ function checkOrigin(request: IncomingMessage, response: ServerResponse): boolea
   if (!from) return false;
   if (!from.startsWith("chrome-extension://")) throw new HttpError(403, "Origin not allowed");
   response.setHeader("access-control-allow-origin", from);
-  response.setHeader("access-control-allow-headers", "content-type, x-aeon-login-token");
+  response.setHeader("access-control-allow-headers", "content-type, x-graft-login-token");
   response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
   response.setHeader("vary", "origin");
   return true;

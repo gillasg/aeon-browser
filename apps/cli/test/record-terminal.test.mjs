@@ -13,10 +13,10 @@ import { alignCast, attachTerminal, terminalCast } from "../dist/record-terminal
 const run = promisify(execFile);
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
-async function aeon(home, args) {
+async function graft(home, args) {
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, ...args], {
-      env: { ...process.env, AEON_DATA_DIR: join(home, "data") },
+      env: { ...process.env, GRAFT_DATA_DIR: join(home, "data") },
     });
     return { code: 0, stdout, stderr };
   } catch (error) {
@@ -25,12 +25,12 @@ async function aeon(home, args) {
 }
 
 test("a terminal cast is timestamped, ordered, and aligned to the clip clock", () => {
-  const cast = terminalCast("aeon tool", 5_000, [
+  const cast = terminalCast("graft tool", 5_000, [
     { at: 5_040, kind: "out", text: "hello-term\n" },
     { at: 5_010, kind: "err", text: "warn\n" },
   ]);
   assert.equal(cast.events[0].kind, "in");
-  assert.equal(cast.events[0].text, "aeon tool");
+  assert.equal(cast.events[0].text, "graft tool");
   assert.deepEqual(
     cast.events.map((event) => event.t),
     [0, 40, 40],
@@ -44,18 +44,18 @@ test("a terminal cast is timestamped, ordered, and aligned to the clip clock", (
   assert.equal(aligned.events[2].kind, "err");
   assert.equal(aligned.events[2].text, "warn\n");
   const bare = attachTerminal(undefined, cast);
-  assert.equal(bare.terminal.command, "aeon tool");
+  assert.equal(bare.terminal.command, "graft tool");
   assert.equal(bare.version, 1);
 });
 
-test("aeon record terminal writes the command and stop keeps it", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-term-"));
+test("graft record terminal writes the command and stop keeps it", async () => {
+  const home = await mkdtemp(join(tmpdir(), "graft-term-"));
   try {
     const folder = join(home, "demo");
-    const start = await aeon(home, ["record", "start", "--tabs", "--out", folder]);
+    const start = await graft(home, ["record", "start", "--tabs", "--out", folder]);
     assert.equal(start.code, 0, start.stderr);
     const command = `node -e "console.log('hello-term')"`;
-    const recorded = await aeon(home, ["record", "terminal", "--out", folder, "--run", command]);
+    const recorded = await graft(home, ["record", "terminal", "--out", folder, "--run", command]);
     assert.equal(recorded.code, 0, recorded.stderr);
     assert.match(recorded.stdout, /Recorded the terminal/);
     const during = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
@@ -71,7 +71,7 @@ test("aeon record terminal writes the command and stop keeps it", async () => {
       assert.ok(event.t >= last);
       last = event.t;
     }
-    const stopped = await aeon(home, ["record", "stop", "--out", folder]);
+    const stopped = await graft(home, ["record", "stop", "--out", folder]);
     assert.equal(stopped.code, 0, stopped.stderr);
     const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
     assert.equal(events.clip.source, "tabs");

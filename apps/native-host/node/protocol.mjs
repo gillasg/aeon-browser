@@ -81,7 +81,7 @@ export function healthRequestLine() {
 
 /** A line the daemon wrote itself: a base64 reply, a known progress marker, or something stray. */
 export function phaseOf(line) {
-  const marker = "AEON_DAEMON_PHASE ";
+  const marker = "GRAFT_DAEMON_PHASE ";
   if (typeof line !== "string" || !line.startsWith(marker)) return undefined;
   return line.slice(marker.length).trim();
 }

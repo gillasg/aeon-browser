@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import type { ManagementActionName } from "./management-types.js";
 
 // Browser accounts, on the Models page: the chat products the user is signed in to in Chrome,
@@ -29,7 +29,7 @@ export function BrowserAccounts({
             there; nothing is signed in from this page.
           </p>
         </div>
-        <button type="button" className="aeon-button" onClick={check}>
+        <button type="button" className="graft-button" onClick={check}>
           Check accounts
         </button>
       </header>

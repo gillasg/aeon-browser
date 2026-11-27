@@ -1,4 +1,4 @@
-// Abilities Aeon ships with, on sites everyone uses: ask an AI site on the user's own account,
+// Abilities Graft ships with, on sites everyone uses: ask an AI site on the user's own account,
 // make or edit an image with Gemini, ask Gemini about a video, read an X thread, research X.
 // They are ordinary abilities (listed, run with site.run, shown on the site page); their code is
 // written for each call from the inputs, so a prompt is never spliced into code by hand. A

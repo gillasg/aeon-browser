@@ -5,21 +5,21 @@ import { browserContextApi } from "../dist/code-api-context.js";
 // Another chat's tab is titled with that chat's prompt. browser.context() once listed it as the
 // user's open tab, and a repair task followed it into a different task's site.
 
-test("browser.context leaves Aeon's own chat and Manage tabs out of the user's tabs", async () => {
+test("browser.context leaves Graft's own chat and Manage tabs out of the user's tabs", async () => {
   const browser = {
     tabs: async () => [
       {
         id: 1,
         active: true,
-        aeonUi: true,
-        title: "how many lamps · Aeon",
+        graftUi: true,
+        title: "how many lamps · Graft",
         url: "chrome-extension://x/chat.html",
       },
       {
         id: 2,
         active: false,
-        aeonUi: true,
-        title: "Aeon · Manage",
+        graftUi: true,
+        title: "Graft · Manage",
         url: "chrome-extension://x/home.html",
       },
       { id: 3, active: true, title: "Shop", url: "http://127.0.0.1:8790/shop/" },

@@ -5,7 +5,7 @@ import {
   type ChatStore,
   type ChatSummary,
   type PiSessionPort,
-} from "@aeon/domain";
+} from "@graft/domain";
 
 export async function searchChats(
   store: ChatStore,

@@ -38,15 +38,15 @@ async function withHome(root, run) {
 }
 
 test("install removes a linked browserkit skill and leaves a real folder alone", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-install-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-install-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const skill = join(root, "skills", "aeon");
+  const skill = join(root, "skills", "graft");
   await mkdir(skill, { recursive: true });
-  await writeFile(join(skill, "SKILL.md"), "---\nname: aeon\ndescription: Aeon\n---\n");
+  await writeFile(join(skill, "SKILL.md"), "---\nname: graft\ndescription: Graft\n---\n");
   const shared = join(root, ".agents", "skills");
   await mkdir(shared, { recursive: true });
 
-  // A link to browserkit's skill is replaced by Aeon's (never a real folder).
+  // A link to browserkit's skill is replaced by Graft's (never a real folder).
   const linked = await browserkitSkill(join(root, "one"));
   await symlink(
     linked,
@@ -55,7 +55,7 @@ test("install removes a linked browserkit skill and leaves a real folder alone",
   );
   await withHome(root, () => install(skill));
   await assert.rejects(() => lstat(join(shared, "browserkit")), /ENOENT/);
-  assert.equal((await lstat(join(shared, "aeon"))).isSymbolicLink(), true);
+  assert.equal((await lstat(join(shared, "graft"))).isSymbolicLink(), true);
 
   // A real browserkit folder is somebody's work: install must not delete it.
   const real = join(root, "two", ".agents", "skills", "browserkit");
@@ -70,14 +70,14 @@ test("install removes a linked browserkit skill and leaves a real folder alone",
 });
 
 test(
-  "install puts the aeon command on the shell PATH once (POSIX)",
+  "install puts the graft command on the shell PATH once (POSIX)",
   { skip: process.platform === "win32" },
   async (t) => {
-    const root = await mkdtemp(join(tmpdir(), "aeon-install-path-"));
+    const root = await mkdtemp(join(tmpdir(), "graft-install-path-"));
     t.after(() => rm(root, { recursive: true, force: true }));
-    const skill = join(root, "skills", "aeon");
+    const skill = join(root, "skills", "graft");
     await mkdir(skill, { recursive: true });
-    await writeFile(join(skill, "SKILL.md"), "---\nname: aeon\ndescription: Aeon\n---\n");
+    await writeFile(join(skill, "SKILL.md"), "---\nname: graft\ndescription: Graft\n---\n");
     const profile = join(root, process.platform === "darwin" ? ".zprofile" : ".profile");
     await withHome(root, async () => {
       await install(skill);
@@ -94,11 +94,11 @@ test(
   "install leaves the shell profile alone when the folder is already on PATH",
   { skip: process.platform === "win32" },
   async (t) => {
-    const root = await mkdtemp(join(tmpdir(), "aeon-install-onpath-"));
+    const root = await mkdtemp(join(tmpdir(), "graft-install-onpath-"));
     t.after(() => rm(root, { recursive: true, force: true }));
-    const skill = join(root, "skills", "aeon");
+    const skill = join(root, "skills", "graft");
     await mkdir(skill, { recursive: true });
-    await writeFile(join(skill, "SKILL.md"), "---\nname: aeon\ndescription: Aeon\n---\n");
+    await writeFile(join(skill, "SKILL.md"), "---\nname: graft\ndescription: Graft\n---\n");
     const profile = join(root, process.platform === "darwin" ? ".zprofile" : ".profile");
     const before = process.env.PATH;
     process.env.PATH = `${join(root, ".local", "bin")}:${before}`;

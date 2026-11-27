@@ -14,13 +14,13 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// aeon install: puts an `aeon` command on the PATH and links the Aeon skill where agents look for
+// graft install: puts an `graft` command on the PATH and links the Graft skill where agents look for
 // skills (~/.agents/skills, and ~/.claude/skills unless it already links there), so every agent on
-// this machine knows Aeon exists and how to use it. A browserkit skill link is removed (Aeon
+// this machine knows Graft exists and how to use it. A browserkit skill link is removed (Graft
 // covers the same browser), never a real folder. Safe to run again.
 
 const cli = fileURLToPath(new URL("./cli.js", import.meta.url));
-const skill = resolve(dirname(cli), "..", "..", "..", "skills", "aeon");
+const skill = resolve(dirname(cli), "..", "..", "..", "skills", "graft");
 
 function binDirectory(): string {
   if (process.platform === "win32" && process.env.APPDATA) {
@@ -35,8 +35,8 @@ async function installCommand(): Promise<string> {
   await mkdir(folder, { recursive: true });
   const node = process.execPath;
   if (process.platform === "win32")
-    await writeFile(join(folder, "aeon.cmd"), `@"${node}" "${cli}" %*\r\n`);
-  const shell = join(folder, "aeon");
+    await writeFile(join(folder, "graft.cmd"), `@"${node}" "${cli}" %*\r\n`);
+  const shell = join(folder, "graft");
   await writeFile(
     shell,
     `#!/bin/sh\nexec "${node.replace(/\\/g, "/")}" "${cli.replace(/\\/g, "/")}" "$@"\n`,
@@ -104,7 +104,7 @@ async function addToShellProfile(folder: string): Promise<string | undefined> {
   for (const { name, text } of texts) {
     if (text === undefined) continue;
     try {
-      await appendFile(join(homedir(), name), `\n# Aeon command\n${line}\n`, { mode: 0o600 });
+      await appendFile(join(homedir(), name), `\n# Graft command\n${line}\n`, { mode: 0o600 });
       return `Added ${folder} to ~/${name}.`;
     } catch {
       // Try the next startup file the user's shell reads.
@@ -132,12 +132,12 @@ function linkTarget(path: string): string | undefined {
   }
 }
 
-/** Links folder/aeon to source, replacing an older link (never a real folder someone made). */
+/** Links folder/graft to source, replacing an older link (never a real folder someone made). */
 async function linkSkill(folder: string, source: string): Promise<string | undefined> {
   // A skills folder that is itself a link (to ~/.agents/skills) already has the skill.
   const own = linkTarget(folder);
   if (own !== undefined && own !== folder) return undefined;
-  const target = join(folder, "aeon");
+  const target = join(folder, "graft");
   const current = linkTarget(target);
   if (current !== undefined && current !== target) await unlink(target).catch(() => rmdir(target));
   else if (current === target)
@@ -169,26 +169,26 @@ async function isBrowserkitSkill(path: string): Promise<boolean> {
 export async function install(skillDirectory = skill): Promise<number> {
   const hasSkill = existsSync(join(skillDirectory, "SKILL.md"));
   const bin = await installCommand();
-  process.stdout.write(`Installed the aeon command in ${bin}\n`);
+  process.stdout.write(`Installed the graft command in ${bin}\n`);
   const pathNote = await addToPath(bin);
-  if (pathNote) process.stdout.write(`${pathNote} Open a new terminal for aeon to be found.\n`);
+  if (pathNote) process.stdout.write(`${pathNote} Open a new terminal for graft to be found.\n`);
   if (!hasSkill) {
     process.stdout.write(
-      `The Aeon skill is not in this checkout (${skillDirectory}); the command is installed without it.\n`,
+      `The Graft skill is not in this checkout (${skillDirectory}); the command is installed without it.\n`,
     );
     return 0;
   }
   const shared = join(homedir(), ".agents", "skills");
   const agents = await linkSkill(shared, skillDirectory);
   // Claude Code reads ~/.claude/skills: link it to the shared copy.
-  const claude = await linkSkill(join(homedir(), ".claude", "skills"), join(shared, "aeon"));
+  const claude = await linkSkill(join(homedir(), ".claude", "skills"), join(shared, "graft"));
   for (const path of [agents, claude])
-    if (path) process.stdout.write(`Linked the Aeon skill at ${path}\n`);
-  // browserkit's skill duplicates what Aeon does; a link to it would show both. Only links go.
+    if (path) process.stdout.write(`Linked the Graft skill at ${path}\n`);
+  // browserkit's skill duplicates what Graft does; a link to it would show both. Only links go.
   for (const folder of [shared, join(homedir(), ".claude", "skills")]) {
     const removed = await removeBrowserkitSkill(folder);
     if (removed) process.stdout.write(`Removed the browserkit skill link at ${removed}\n`);
   }
-  process.stdout.write("Agents started from now on see the skill. Try: aeon tools\n");
+  process.stdout.write("Agents started from now on see the skill. Try: graft tools\n");
   return 0;
 }

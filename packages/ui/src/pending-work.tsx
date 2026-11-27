@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { MiniSwarm } from "./mini-swarm.js";
 import { runVisibleInterval } from "./visible-work.js";
 
-// Motion, not status text: while Aeon connects or starts, the swarm says so; the words stay for
+// Motion, not status text: while Graft connects or starts, the swarm says so; the words stay for
 // screen readers. Once work has started, the elapsed time is real information, so it shows.
 export function PendingWork({
   connecting = false,
@@ -24,7 +24,7 @@ export function PendingWork({
     <div className="activity-card pending-work" role="status" data-waiting={String(waiting)}>
       <MiniSwarm size={18} tone="working" />
       {waiting ? (
-        <span className="aeon-sr">{connecting ? "Connecting…" : "Starting…"}</span>
+        <span className="graft-sr">{connecting ? "Connecting…" : "Starting…"}</span>
       ) : (
         <span>{`Working for ${Math.floor((now - start) / 1000)}s`}</span>
       )}
@@ -37,7 +37,7 @@ export function QuietWait({ label }: { label: string }): ReactElement {
   return (
     <span className="model-loading quiet-wait" role="status">
       <MiniSwarm size={16} tone="working" />
-      <span className="aeon-sr">{label}</span>
+      <span className="graft-sr">{label}</span>
     </span>
   );
 }

@@ -9,7 +9,7 @@ import {
   type BrowserInventoryDeltaMessage,
 } from "@browserkit/protocol";
 import type { BrowserIdentity } from "./native-worker-identity.js";
-import { aeonUiPage } from "./native-browser-common.js";
+import { graftUiPage } from "./native-browser-common.js";
 import { handoffFor } from "./native-browser-handoff-state.js";
 
 export type TabIdentity = { tabIncarnation: string; documentEpoch: number };
@@ -44,8 +44,8 @@ export function toInventoryTab(
     pinned: tab.pinned,
     groupId: tab.groupId ?? -1,
     documentEpoch: state.documentEpoch,
-    // The daemon lists and gates Aeon's own pages by this mark: only the engine knows its own id.
-    ...(aeonUiPage(tab.url ?? "") ? { aeonUi: true } : {}),
+    // The daemon lists and gates Graft's own pages by this mark: only the engine knows its own id.
+    ...(graftUiPage(tab.url ?? "") ? { graftUi: true } : {}),
     // A pending hand-off rides the inventory, so the daemon's status can say "Waiting on you".
     ...handoffField(tab.id),
   });
@@ -62,8 +62,8 @@ export function inventoryIdentity(identity: BrowserIdentity): BrowserIdentity {
   return { clientInstanceId: identity.clientInstanceId, browserRunId: identity.browserRunId };
 }
 
-const GENERATION_KEY = "aeon-inventory-generation";
-const TAB_MAP_KEY = "aeon-tab-incarnations";
+const GENERATION_KEY = "graft-inventory-generation";
+const TAB_MAP_KEY = "graft-tab-incarnations";
 type Change = () => Promise<void>;
 interface InventorySession extends BrowserIdentity {
   socket: WebSocket;

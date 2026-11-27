@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import { runMcpServer as runSiteMcpServer, siteName } from "@browserkit/tools/site-to-api";
-import { AeonClient } from "./client.js";
+import { GraftClient } from "./client.js";
 import {
   browserActionCode,
   browserActionDescription,
@@ -9,7 +9,7 @@ import {
 } from "@browserkit/tools/action";
 import { inspect, runTasks, type RunOptions } from "./run.js";
 import type { ChatResult } from "./results.js";
-import { searchAeon } from "./search.js";
+import { searchGraft } from "./search.js";
 import { answer, questions, send, waitForChange } from "./converse.js";
 import {
   MCP_PROTOCOLS,
@@ -19,7 +19,7 @@ import {
   mcpListResult,
   mcpResult,
   mcpSessionFromMeta,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import { modelAuthPath, modelSignedIn } from "./doctor-io.js";
 import { SamplingBridge, readUseClientModel, setSamplingBridge } from "./mcp-sampling.js";
 import {
@@ -42,8 +42,8 @@ import { codeSurfaceCall } from "./mcp-code-tools.js";
 import { RESOURCES, resourceRequest, watchSkills } from "./mcp-resources.js";
 import { reply, text, withoutTrace } from "./mcp-reply.js";
 
-// The Aeon MCP server (stdio). Another agent can hand Aeon tasks, watch them run as Chrome tabs,
-// and read the answers and traces; or drive the browser itself with the tools Aeon's chats use
+// The Graft MCP server (stdio). Another agent can hand Graft tasks, watch them run as Chrome tabs,
+// and read the answers and traces; or drive the browser itself with the tools Graft's chats use
 // (browser_code, browser_tabs, crawl, site_mapper, extract), as with browserkit. Runs start in the background and are polled, because a
 // browser task can take far longer than an MCP client waits for one call.
 type Json = Record<string, unknown>;
@@ -56,9 +56,9 @@ export interface Run {
 
 const tools = [
   {
-    name: "aeon_run",
+    name: "graft_run",
     description:
-      "Run tasks as Aeon chats. Each task becomes a full Aeon chat with browser control, opened as a background tab in the user's Chrome. Returns a runId at once; poll aeon_run_status for answers.",
+      "Run tasks as Graft chats. Each task becomes a full Graft chat with browser control, opened as a background tab in the user's Chrome. Returns a runId at once; poll graft_run_status for answers.",
     inputSchema: {
       type: "object",
       properties: {
@@ -95,9 +95,9 @@ const tools = [
     },
   },
   {
-    name: "aeon_run_status",
+    name: "graft_run_status",
     description:
-      "Progress of an aeon_run: chat ids so far, and each task's answer and stats once done.",
+      "Progress of a graft_run: chat ids so far, and each task's answer and stats once done.",
     inputSchema: {
       type: "object",
       properties: { runId: { type: "string" } },
@@ -106,9 +106,9 @@ const tools = [
     },
   },
   {
-    name: "aeon_send",
+    name: "graft_send",
     description:
-      "Send another message into an existing Aeon chat. While the chat works, it waits as a follow-up (steer: true changes the current turn instead); when idle, it starts a new turn. Then use aeon_wait.",
+      "Send another message into an existing Graft chat. While the chat works, it waits as a follow-up (steer: true changes the current turn instead); when idle, it starts a new turn. Then use graft_wait.",
     inputSchema: {
       type: "object",
       properties: {
@@ -121,9 +121,9 @@ const tools = [
     },
   },
   {
-    name: "aeon_answer",
+    name: "graft_answer",
     description:
-      "Answer the question an Aeon chat's agent is waiting on (aeon_wait and aeon_run_status list them). confirm: yes or no; select: one of its choices or its number; input: any text.",
+      "Answer the question a Graft chat's agent is waiting on (graft_wait and graft_run_status list them). confirm: yes or no; select: one of its choices or its number; input: any text.",
     inputSchema: {
       type: "object",
       properties: {
@@ -136,9 +136,9 @@ const tools = [
     },
   },
   {
-    name: "aeon_wait",
+    name: "graft_wait",
     description:
-      "Wait until an Aeon chat changes: new steps after `since`, a question for you, or it finishes (then its answer). Returns steps (pass back as since), newSteps, questions, working and answer; changed is false on timeout.",
+      "Wait until a Graft chat changes: new steps after `since`, a question for you, or it finishes (then its answer). Returns steps (pass back as since), newSteps, questions, working and answer; changed is false on timeout.",
     inputSchema: {
       type: "object",
       properties: {
@@ -151,23 +151,23 @@ const tools = [
     },
   },
   {
-    name: "aeon_result",
+    name: "graft_result",
     description: "A chat's final answer and stats (tool calls, errors, tabs opened).",
     inputSchema: chatIdSchema(),
   },
   {
-    name: "aeon_stop",
-    description: "Stop a running Aeon chat and tidy the agent tabs it left open.",
+    name: "graft_stop",
+    description: "Stop a running Graft chat and tidy the agent tabs it left open.",
     inputSchema: chatIdSchema(),
   },
   {
-    name: "aeon_trace",
+    name: "graft_trace",
     description: "A chat's tool calls with the start of each result, in order, marking errors.",
     inputSchema: chatIdSchema(),
   },
   {
-    name: "aeon_chats",
-    description: "Recent Aeon chats (id and title).",
+    name: "graft_chats",
+    description: "Recent Graft chats (id and title).",
     inputSchema: {
       type: "object",
       properties: { limit: { type: "integer", minimum: 1, maximum: 100 } },
@@ -175,8 +175,8 @@ const tools = [
     },
   },
   {
-    name: "aeon_search",
-    description: "Search Aeon chats (titles and messages) and the answers kept on home. Read-only.",
+    name: "graft_search",
+    description: "Search Graft chats (titles, messages) and the answers kept on home. Read-only.",
     inputSchema: {
       type: "object",
       properties: {
@@ -194,15 +194,15 @@ const tools = [
     },
   },
   {
-    name: "aeon_context",
+    name: "graft_context",
     description:
-      "The user's open tabs (title, URL) and which is active, when they allowed it in Aeon Settings. Titles and URLs only, never page contents. When it is off, returns how to turn it on.",
+      "The user's open tabs (title, URL) and which is active, when they allowed it in Graft Settings. Titles and URLs only, never page contents. When it is off, returns how to turn it on.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
-    name: "aeon_routine",
+    name: "graft_routine",
     description:
-      "Create, list, pause or delete an Aeon routine (a scheduled agent task). Its alerts appear in Aeon, not here. Only routines this origin created are listed or changed.",
+      "Create, list, pause or delete a Graft routine (a scheduled agent task). Its alerts appear in Graft, not here. Only routines this origin created are listed or changed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -256,10 +256,10 @@ const CHAT_TOOLS = new Set([
   "browser_action",
 ]);
 
-/** The chat tools, described by the daemon itself; none while Aeon is not running. */
-async function chatTools(aeon: () => Promise<AeonClient>): Promise<unknown[]> {
+/** The chat tools, described by the daemon itself; none while Graft is not running. */
+async function chatTools(graft: () => Promise<GraftClient>): Promise<unknown[]> {
   try {
-    const reply = await (await aeon()).tool({ kind: "core.tool.list" }, 10_000);
+    const reply = await (await graft()).tool({ kind: "core.tool.list" }, 10_000);
     return Array.isArray(reply.tools) ? reply.tools : [];
   } catch {
     return [];
@@ -267,7 +267,7 @@ async function chatTools(aeon: () => Promise<AeonClient>): Promise<unknown[]> {
 }
 
 async function callChatTool(
-  client: AeonClient,
+  client: GraftClient,
   name: string,
   args: Json = {},
   defaultSession = "mcp",
@@ -308,9 +308,9 @@ function chatIdSchema() {
   };
 }
 
-/** aeon_search: chats, messages and saved answers, read-only. */
-function searchTool(client: AeonClient, args: Json): Promise<unknown> {
-  return searchAeon(
+/** graft_search: chats, messages and saved answers, read-only. */
+function searchTool(client: GraftClient, args: Json): Promise<unknown> {
+  return searchGraft(
     client,
     String(args.text ?? ""),
     {
@@ -334,7 +334,7 @@ let notifySend: Send = stdoutSend;
 let surface: McpSurface = "code";
 let parking = new ParkingLot();
 interface McpDeps {
-  aeon: () => Promise<AeonClient>;
+  graft: () => Promise<GraftClient>;
   runs: Map<string, Run>;
   pending: Map<string, AbortController>;
   conn: McpConnection;
@@ -380,7 +380,7 @@ async function answerCall(
   const key = String(id);
   deps.pending.set(key, controller);
   try {
-    const result = await handle(message, deps.aeon, deps.runs, modern, session, controller.signal);
+    const result = await handle(message, deps.graft, deps.runs, modern, session, controller.signal);
     if (!controller.signal.aborted) send(reply(id, mcpResult(result as Json, modern)));
   } catch (error) {
     if (!controller.signal.aborted)
@@ -399,7 +399,7 @@ async function answerRequest(
   send: Send,
 ): Promise<void> {
   try {
-    const result = await handle(message, deps.aeon, deps.runs, modern, session);
+    const result = await handle(message, deps.graft, deps.runs, modern, session);
     send(reply(id, mcpResult(result as Json, modern)));
   } catch (error) {
     send(reply(id, undefined, error));
@@ -441,18 +441,18 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
   surface = options.surface ?? "code";
   notifySend = notify;
   parking = new ParkingLot();
-  let client: AeonClient | undefined;
+  let client: GraftClient | undefined;
   catalogState = { tools: [], fingerprint: "", primed: false };
   const stopCatalog = watchCatalog();
   void catalogReady();
   const stopSkills = watchSkills((message) => notifySend(message));
   const deps: McpDeps = {
-    aeon: async () => (client ??= await AeonClient.connect()),
+    graft: async () => (client ??= await GraftClient.connect()),
     runs: new Map<string, Run>(),
     pending: new Map<string, AbortController>(),
     conn: { modern: false },
   };
-  // Sampling goes to the agent when it offered it and Aeon has no model, or the user prefers it.
+  // Sampling goes to the agent when it offered it and Graft has no model, or the user prefers it.
   const sampler = new SamplingBridge();
   sampler.setSender((request) => notifySend(request as Json));
   sampler.setUseClientModel(
@@ -462,9 +462,9 @@ export async function startMcpServer(options: McpServerOptions, notify: Send): P
   extensions = createExtensions(
     (method, params) => notifySend({ jsonrpc: "2.0", method, params }),
     (name, args, signal, context) =>
-      callToolResult({ name, arguments: args }, deps.aeon, deps.runs, undefined, signal, context),
+      callToolResult({ name, arguments: args }, deps.graft, deps.runs, undefined, signal, context),
     () => catalogState.tools,
-    deps.aeon,
+    deps.graft,
   );
   return {
     receive: (message, send) => processMcpMessage(message, deps, sampler, send),
@@ -511,28 +511,28 @@ function initializeResult(params: Json): Json {
   return {
     protocolVersion: version,
     capabilities: { tools: { listChanged: true }, ...RESOURCES, ...extensionCapabilities() },
-    serverInfo: { name: "aeon", version: "0.1.0" },
+    serverInfo: { name: "graft", version: "0.1.0" },
   };
 }
 
 function codeCall(
   params: { name: string; arguments?: Json },
-  aeon: () => Promise<AeonClient>,
+  graft: () => Promise<GraftClient>,
   runs: Map<string, Run>,
   session: string | undefined,
   signal: AbortSignal | undefined,
   context: TaskContext | undefined,
 ): Promise<unknown> {
   return codeSurfaceCall(params.name, params.arguments ?? {}, {
-    aeon,
+    graft,
     parking,
     catalog: () => catalogState.tools,
     catalogReady,
     session: session ?? "mcp",
-    startRun: async (args) => startRun(await aeon(), args, runs),
+    startRun: async (args) => startRun(await graft(), args, runs),
     runs,
     callChat: async (name, args, cellSignal) =>
-      callChatTool(await aeon(), name, args, session, cellSignal),
+      callChatTool(await graft(), name, args, session, cellSignal),
     ...(signal ? { signal } : {}),
     ...(context ? { context } : {}),
   });
@@ -540,14 +540,14 @@ function codeCall(
 
 async function callToolResult(
   params: { name: string; arguments?: Json },
-  aeon: () => Promise<AeonClient>,
+  graft: () => Promise<GraftClient>,
   runs: Map<string, Run>,
   session: string | undefined,
   signal: AbortSignal | undefined,
   context?: TaskContext,
 ): Promise<unknown> {
   if (surface === "code" && CODE_SURFACE_NAMES.has(params.name))
-    return codeCall(params, aeon, runs, session, signal, context);
+    return codeCall(params, graft, runs, session, signal, context);
   if (params.name === "catalog_search" || params.name.startsWith("site__")) {
     try {
       return await callCatalogResult(params.name, params.arguments ?? {}, catalogState.tools);
@@ -556,9 +556,9 @@ async function callToolResult(
     }
   }
   if (CHAT_TOOLS.has(params.name))
-    return callChatTool(await aeon(), params.name, params.arguments, session, signal);
+    return callChatTool(await graft(), params.name, params.arguments, session, signal);
   try {
-    return text(await callTool(params.name, params.arguments ?? {}, aeon, runs, session, signal));
+    return text(await callTool(params.name, params.arguments ?? {}, graft, runs, session, signal));
   } catch (error) {
     return { ...text(error instanceof Error ? error.message : String(error)), isError: true };
   }
@@ -566,7 +566,7 @@ async function callToolResult(
 
 async function handle(
   message: Json,
-  aeon: () => Promise<AeonClient>,
+  graft: () => Promise<GraftClient>,
   runs: Map<string, Run>,
   modern = false,
   session?: string,
@@ -574,12 +574,12 @@ async function handle(
 ): Promise<unknown> {
   const method = String(message.method ?? "");
   if (method === "initialize") return initializeResult(mcpParams(message));
-  if (method === "server/discover") return mcpDiscoverResult({ name: "aeon", version: "0.1.0" });
+  if (method === "server/discover") return mcpDiscoverResult({ name: "graft", version: "0.1.0" });
   if (method === "tools/list") {
     if (surface === "code") return mcpListResult({ tools: CODE_SURFACE_TOOLS }, modern);
     const listed = await refreshCatalog(false);
     return mcpListResult(
-      { tools: [...tools, ...listed.map(catalogMcpTool), ...(await chatTools(aeon))] },
+      { tools: [...tools, ...listed.map(catalogMcpTool), ...(await chatTools(graft))] },
       modern,
     );
   }
@@ -592,7 +592,7 @@ async function handle(
     throw Object.assign(new Error(`Method not found: ${method}`), { code: -32601 });
   return callToolResult(
     message.params as { name: string; arguments?: Json },
-    aeon,
+    graft,
     runs,
     session,
     signal,
@@ -609,28 +609,28 @@ function extensionRequest(method: string, params: Json): Promise<Json> | undefin
 async function callTool(
   name: string,
   args: Json,
-  aeon: () => Promise<AeonClient>,
+  graft: () => Promise<GraftClient>,
   runs: Map<string, Run>,
   defaultSession?: string,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  const client = await aeon();
-  if (name === "aeon_stop") return { stopped: await client.stop(String(args.chatId)) };
-  if (name === "aeon_run" || name === "aeon_run_status") return runTool(client, name, args, runs);
-  if (["aeon_send", "aeon_answer", "aeon_wait"].includes(name))
+  const client = await graft();
+  if (name === "graft_stop") return { stopped: await client.stop(String(args.chatId)) };
+  if (name === "graft_run" || name === "graft_run_status") return runTool(client, name, args, runs);
+  if (["graft_send", "graft_answer", "graft_wait"].includes(name))
     return converseTool(client, name, args);
-  if (["aeon_chats", "aeon_search", "aeon_context", "aeon_routine"].includes(name))
+  if (["graft_chats", "graft_search", "graft_context", "graft_routine"].includes(name))
     return chatTool(client, name, args, defaultSession, signal);
   return inspectTool(client, name, args);
 }
 
 async function runTool(
-  client: AeonClient,
+  client: GraftClient,
   name: string,
   args: Json,
   runs: Map<string, Run>,
 ): Promise<{ runId: string } | Record<string, unknown>> {
-  if (name === "aeon_run") return startRun(client, args, runs);
+  if (name === "graft_run") return startRun(client, args, runs);
   const run = runs.get(String(args.runId));
   if (!run) throw new Error("Unknown runId");
   if (run.results) return { done: true, results: run.results.map(withoutTrace) };
@@ -644,8 +644,8 @@ async function runTool(
   };
 }
 
-/** The run's chats whose agent is waiting on a question, with the questions (answer with aeon_answer). */
-async function waitingChats(client: AeonClient, chats: (string | undefined)[]): Promise<Json[]> {
+/** The run's chats whose agent is waiting on a question, with the questions (answer with graft_answer). */
+async function waitingChats(client: GraftClient, chats: (string | undefined)[]): Promise<Json[]> {
   const asked = await Promise.all(
     chats
       .filter((chatId): chatId is string => !!chatId)
@@ -657,11 +657,11 @@ async function waitingChats(client: AeonClient, chats: (string | undefined)[]): 
   return asked.filter((item) => item.questions.length > 0);
 }
 
-async function converseTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
+async function converseTool(client: GraftClient, name: string, args: Json): Promise<unknown> {
   const chatId = String(args.chatId);
-  if (name === "aeon_send")
+  if (name === "graft_send")
     return send(client, chatId, String(args.message), { steer: args.steer === true });
-  if (name === "aeon_answer")
+  if (name === "graft_answer")
     return answer(
       client,
       chatId,
@@ -675,22 +675,22 @@ async function converseTool(client: AeonClient, name: string, args: Json): Promi
 }
 
 async function chatTool(
-  client: AeonClient,
+  client: GraftClient,
   name: string,
   args: Json,
   defaultSession?: string,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  if (name === "aeon_chats")
+  if (name === "graft_chats")
     return (await client.command("chat.list", { limit: Number(args.limit ?? 20) })).chats;
-  if (name === "aeon_search") return searchTool(client, args);
-  if (name === "aeon_context")
+  if (name === "graft_search") return searchTool(client, args);
+  if (name === "graft_context")
     return toolValue(client, "context", {}, "context", defaultSession, signal);
   return toolValue(client, "routine", args, "routine", defaultSession, signal);
 }
 
 async function toolValue(
-  client: AeonClient,
+  client: GraftClient,
   tool: string,
   args: Json,
   label: string,
@@ -714,17 +714,17 @@ async function toolValue(
   return JSON.parse(output || "null") as unknown;
 }
 
-async function inspectTool(client: AeonClient, name: string, args: Json): Promise<unknown> {
+async function inspectTool(client: GraftClient, name: string, args: Json): Promise<unknown> {
   // Fail fast: anything else is not a tool, and must not wait on a chat lookup.
-  if (name !== "aeon_trace" && name !== "aeon_result") throw new Error("Unknown tool " + name);
+  if (name !== "graft_trace" && name !== "graft_result") throw new Error("Unknown tool " + name);
   const result = await inspect(client, String(args.chatId));
-  if (name === "aeon_trace") return result.trace;
-  if (name === "aeon_result") return withoutTrace(result);
+  if (name === "graft_trace") return result.trace;
+  if (name === "graft_result") return withoutTrace(result);
   throw new Error("Unknown tool " + name);
 }
 
 export function startRun(
-  client: AeonClient,
+  client: GraftClient,
   args: Json,
   runs: Map<string, Run>,
 ): { runId: string } {
@@ -761,7 +761,7 @@ let extensions: McpExtensions | undefined;
 let catalogState: CatalogState = { tools: [], fingerprint: "", primed: false };
 
 function watchCatalog(): () => void {
-  const ms = Number(process.env.AEON_CATALOG_POLL_MS ?? 5000);
+  const ms = Number(process.env.GRAFT_CATALOG_POLL_MS ?? 5000);
   const interval = Number.isFinite(ms) && ms >= 50 ? ms : 5000;
   const timer = setInterval(() => void refreshCatalog(true).catch(() => undefined), interval);
   timer.unref();
@@ -786,7 +786,7 @@ async function catalogReady(): Promise<void> {
 async function refreshCatalog(notify: boolean): Promise<CatalogTool[]> {
   const next = await loadCatalog();
   const fingerprint = catalogFingerprint(next);
-  // The code surface is fixed: a new mapped site is found through aeon_find, not a new tool.
+  // The code surface is fixed: a new mapped site is found through graft_find, not a new tool.
   if (
     surface === "full" &&
     notify &&

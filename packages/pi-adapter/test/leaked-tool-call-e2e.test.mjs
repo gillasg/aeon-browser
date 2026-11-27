@@ -19,7 +19,7 @@ import { Type } from "typebox";
 import { leakedToolCallGuard } from "../dist/leaked-tool-call-guard.js";
 
 test("a leaked DSML tool call runs as a real tool call through Pi", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-leak-guard-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-leak-guard-"));
   const cwd = join(root, "project");
   const agentDir = join(root, "agent");
   await Promise.all([mkdir(cwd, { recursive: true }), mkdir(agentDir, { recursive: true })]);

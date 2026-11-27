@@ -1,10 +1,10 @@
-// The extension folder the guided install presents to Chrome. It lives in Aeon's data dir, so every
+// The extension folder the guided install presents to Chrome. It lives in Graft's data dir, so every
 // update writes into the same path: Chrome keeps the extension (and its fixed id) across updates and
 // only needs the three "Load unpacked" steps once.
 //
 // Linux could force-install from a local file:// update_url with a managed policy, but that needs a
 // signing key kept on this machine, which would give each install its own extension id. Other parts
-// of Aeon (notably Site Boosts' companion list) trust the fixed id npcdopokfkpfmepknhoecppgdgmkmihh,
+// of Graft (notably Site Boosts' companion list) trust the fixed id npcdopokfkpfmepknhoecppgdgmkmihh,
 // so Linux uses the same guided flow as macOS and Windows rather than changing the id.
 
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";

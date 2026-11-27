@@ -1,6 +1,6 @@
 /**
  * End to end: the built extension's Chat page, a fake Core, and real Chrome. Clicking
- * "Add or manage models…" opens Aeon's Models page in a new tab.
+ * "Add or manage models…" opens Graft's Models page in a new tab.
  */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -36,7 +36,7 @@ test(
         : "Chrome for Testing or the built extension is missing",
   },
   async () => {
-    const profile = await mkdtemp(join(tmpdir(), "aeon-model-sign-in-"));
+    const profile = await mkdtemp(join(tmpdir(), "graft-model-sign-in-"));
     const page = await signInPage();
     const core = await fakeCore(page.url);
     const chrome = spawn(
@@ -61,12 +61,12 @@ test(
       const { browser, sessionId } = await openChatPage(
         port,
         extensionId,
-        `ws://127.0.0.1:${core.port}/aeon/v1`,
+        `ws://127.0.0.1:${core.port}/graft/v1`,
       );
       await clickManageModels(browser, sessionId);
       const models = `chrome-extension://${extensionId}/home.html?view=models`;
       const opened = await waitForTarget(port, (item) => item.url.startsWith(models));
-      // The page remembers the Chat's tab, so "Return to Aeon" can go back to it.
+      // The page remembers the Chat's tab, so "Return to Graft" can go back to it.
       assert.match(
         opened.url,
         /^chrome-extension:\/\/[a-p]{32}\/home\.html\?view=models&return=\d+$/,
@@ -105,7 +105,7 @@ function signInPage() {
 }
 
 async function fakeCore(signInUrl) {
-  const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/aeon/v1" });
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: "/graft/v1" });
   await once(server, "listening");
   let loginSeen;
   const loginSeenPromise = new Promise((done) => (loginSeen = done));
@@ -212,13 +212,13 @@ function snapshot(requestId) {
 
 function bootstrap(endpoint) {
   return `
-    globalThis.__aeonTestErrors = [];
+    globalThis.__graftTestErrors = [];
     addEventListener("error", (event) =>
-      globalThis.__aeonTestErrors.push(String(event.error?.stack ?? event.message)));
+      globalThis.__graftTestErrors.push(String(event.error?.stack ?? event.message)));
     addEventListener("unhandledrejection", (event) =>
-      globalThis.__aeonTestErrors.push(String(event.reason?.stack ?? event.reason)));
+      globalThis.__graftTestErrors.push(String(event.reason?.stack ?? event.reason)));
     globalThis.chrome.runtime.sendMessage = async (message) => {
-      if (message?.kind === "aeon.native.page-grant") return {
+      if (message?.kind === "graft.native.page-grant") return {
         ok: true,
         endpoint: ${JSON.stringify(endpoint)},
         connectionGrant: "${"A".repeat(43)}",
@@ -229,7 +229,7 @@ function bootstrap(endpoint) {
         pageInstanceId: message.pageInstanceId,
         scope: message.scope,
       };
-      if (message?.kind === "aeon.native.take-initial-submit")
+      if (message?.kind === "graft.native.take-initial-submit")
         return { ok: false, code: "INITIAL_SUBMIT_UNAVAILABLE" };
       return {};
     };
@@ -289,7 +289,7 @@ async function waitFor(browser, sessionId, expression, timeoutMs = 35_000) {
   const state = await evaluate(
     browser,
     sessionId,
-    "JSON.stringify({url: location.href, title: document.title, text: document.body?.innerText?.slice(0, 500), connection: document.getElementById('connection-state')?.innerText, errors: globalThis.__aeonTestErrors})",
+    "JSON.stringify({url: location.href, title: document.title, text: document.body?.innerText?.slice(0, 500), connection: document.getElementById('connection-state')?.innerText, errors: globalThis.__graftTestErrors})",
   ).catch((error) => String(error));
   throw new Error("Chat page did not reach the expected state: " + state);
 }

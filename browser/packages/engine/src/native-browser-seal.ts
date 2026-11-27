@@ -1,15 +1,15 @@
 // Secret sealing and the egress canary. Agent code never holds more secret power than a script
 // running on that origin: cookies, auth headers, CSRF tokens, bearer and JWT strings that a step
 // answers with (cookies, page.tokens(), network.get/list/har/curl, storage reads) reach the agent
-// as opaque handles (`aeon-sealed:<id>`), never as raw text. A handle is a plain string, so
+// as opaque handles (`graft-sealed:<id>`), never as raw text. A handle is a plain string, so
 // JSON.stringify, toString, logs and error messages can only ever print the handle.
 //
 // A handle still works where it came from: a fetch, navigation or fill to the same site gets the
 // raw value swapped back in by the host. Anything bound for another site that carries a handle
 // or a raw sealed value is refused (SECRET_EGRESS). Non-secret egress is never asked about.
 
-export const SEAL_PREFIX = "aeon-sealed:";
-export const SEALED_RE = /aeon-sealed:[a-z0-9]{12}/g;
+export const SEAL_PREFIX = "graft-sealed:";
+export const SEALED_RE = /graft-sealed:[a-z0-9]{12}/g;
 
 const SECRET_KEY =
   /^(set-)?cookies?$|authori[sz]ation|^x-[\w-]*(token|csrf|xsrf|auth|key)[\w-]*$|csrf|xsrf|(^|[-_])token$|^token|access[-_]?token|refresh[-_]?token|id[-_]?token|api[-_]?key|secret|session[-_]?id|^sid$|password/i;

@@ -1,4 +1,4 @@
-// `aeon record mark|wait|run` helpers, --no-mouse, the fast encode, and marks merged at stop.
+// `graft record mark|wait|run` helpers, --no-mouse, the fast encode, and marks merged at stop.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
@@ -26,7 +26,7 @@ import {
   windowBoxOf,
   withMarkCues,
 } from "../dist/record-script.js";
-import { aeonCommands } from "../dist/commands.js";
+import { graftCommands } from "../dist/commands.js";
 
 const run = promisify(execFile);
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
@@ -143,7 +143,7 @@ test("the frame falls back to the captured window when outerHeight is 0 (Xvfb/op
   assert.deepEqual(markOf("m", 5, { bounds }).windowBox, { x: 20, y: 1374, width: 40, height: 66 });
 });
 
-test("the tab on camera is the active one, Aeon pages and about:blank included", async () => {
+test("the tab on camera is the active one, Graft pages and about:blank included", async () => {
   const pick = (tabs) =>
     new Function("browser", `return (async () => { ${ACTIVE} return tab.id; })();`)({
       tabs: async () => tabs,
@@ -224,7 +224,7 @@ test("until polls a real condition and times out with what it waited for", async
 });
 
 test("record help documents mark, wait, run, --no-mouse and --browser", () => {
-  const help = aeonCommands({}).find((command) => command.name === "record").help;
+  const help = graftCommands({}).find((command) => command.name === "record").help;
   for (const word of [
     "record mark",
     "record wait",
@@ -240,21 +240,21 @@ test(
   "record start --no-mouse, mark and stop merge marks and their cues into events.json",
   { skip: process.platform === "win32" ? "the fake ffmpeg is a /bin/sh script" : false },
   async () => {
-    const home = await mkdtemp(join(tmpdir(), "aeon-record-mark-"));
+    const home = await mkdtemp(join(tmpdir(), "graft-record-mark-"));
     try {
       const { ffmpeg, ffprobe } = fakeFfmpeg(home);
       const folder = join(home, "rec");
       const env = {
         ...process.env,
-        AEON_DATA_DIR: join(home, "data"),
-        AEON_FFMPEG: ffmpeg,
-        AEON_FFPROBE: ffprobe,
+        GRAFT_DATA_DIR: join(home, "data"),
+        GRAFT_FFMPEG: ffmpeg,
+        GRAFT_FFPROBE: ffprobe,
       };
-      const aeon = (args) => run(process.execPath, [cli, ...args], { env });
-      await aeon(["record", "start", "--screen", "--no-mouse", "--out", folder]);
+      const graft = (args) => run(process.execPath, [cli, ...args], { env });
+      await graft(["record", "start", "--screen", "--no-mouse", "--out", folder]);
       const state = JSON.parse(readFileSync(join(folder, ".recording.json"), "utf8"));
       assert.equal(state.noMouse, true);
-      const marked = await aeon([
+      const marked = await graft([
         "record",
         "mark",
         "hero",
@@ -268,8 +268,8 @@ test(
         folder,
       ]);
       assert.match(marked.stdout, /Marked hero at/);
-      await aeon(["record", "mark", "end", "--out", folder]);
-      await aeon(["record", "stop", "--out", folder]);
+      await graft(["record", "mark", "end", "--out", folder]);
+      await graft(["record", "stop", "--out", folder]);
       const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
       assert.deepEqual(
         events.marks.map((m) => m.name),
@@ -280,7 +280,7 @@ test(
       assert.ok(events.marks[1].t >= events.marks[0].t);
       assert.deepEqual(events.soundCues, [{ t: events.marks[0].t, kind: "shutter" }]);
       await assert.rejects(
-        aeon(["record", "mark", "late", "--out", folder]),
+        graft(["record", "mark", "late", "--out", folder]),
         /No active recording/,
       );
     } finally {

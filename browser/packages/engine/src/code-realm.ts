@@ -1,4 +1,4 @@
-// One chat's browser_code realm, run by the local Aeon process in an isolated vm context. No
+// One chat's browser_code realm, run by the local Graft process in an isolated vm context. No
 // extension API and no Node API is inside; every browser or workspace request is posted to the
 // host, which relays it to the extension (browser effects) or answers it itself.
 import vm from "node:vm";
@@ -93,7 +93,7 @@ export class CodeRealm {
     clearRealmTimers(this.timers);
   }
 
-  private evaluate(source: string, filename = "aeon-runtime.js", timeout?: number): unknown {
+  private evaluate(source: string, filename = "graft-runtime.js", timeout?: number): unknown {
     return vm.runInContext(source, this.context, {
       filename,
       ...(timeout ? { timeout } : {}),
@@ -194,7 +194,7 @@ export class CodeRealm {
     }
     // Named, so a timer the cell's own code sets can be told from the runtime's (code-api-sleep).
     const syncMs = Number(message.timeoutMs) > 0 ? Number(message.timeoutMs) : CELL_SYNC_MS;
-    let value = await this.evaluate(toReplScript(code), "aeon-cell.js", syncMs);
+    let value = await this.evaluate(toReplScript(code), "graft-cell.js", syncMs);
     const delivered = this.evaluate("__hasDelivered ? {value: __deliveryValue} : null") as {
       value: unknown;
     } | null;

@@ -26,7 +26,7 @@ import {
 import { serveMcpHttp } from "../dist/mcp-http.js";
 
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
-const FIVE = ["browser_code", "aeon_find", "aeon_call", "aeon_resume", "aeon_run"];
+const FIVE = ["browser_code", "graft_find", "graft_call", "graft_resume", "graft_run"];
 const BUDGET = 3.5 * 1024;
 
 function listTools(args) {
@@ -35,8 +35,8 @@ function listTools(args) {
       stdio: ["pipe", "pipe", "inherit"],
       env: {
         ...process.env,
-        AEON_DATA_DIR: join(tmpdir(), "aeon-code-mcp-" + process.pid),
-        SITE_TO_API_HOME: join(tmpdir(), "aeon-code-mcp-sites-" + process.pid),
+        GRAFT_DATA_DIR: join(tmpdir(), "graft-code-mcp-" + process.pid),
+        SITE_TO_API_HOME: join(tmpdir(), "graft-code-mcp-sites-" + process.pid),
       },
     });
     let buffer = "";
@@ -65,7 +65,7 @@ test("default tools/list is exactly the five code tools, within 3.5 KB", async (
 
 test("--surface full keeps the expanded list", async () => {
   const names = (await listTools(["--surface", "full"])).map((tool) => tool.name);
-  assert.ok(names.includes("aeon_run_status"));
+  assert.ok(names.includes("graft_run_status"));
   assert.ok(names.includes("catalog_search"));
   assert.ok(names.length > FIVE.length);
 });
@@ -76,7 +76,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-test("a cell blocked on a hand-off returns Paused; aeon_resume returns its value", async () => {
+test("a cell blocked on a hand-off returns Paused; graft_resume returns its value", async () => {
   const lot = new ParkingLot();
   const cell = deferred();
   const result = await runParkableCell(lot, {
@@ -170,10 +170,10 @@ test("a hand-off counts by ownership first: another client's never pauses this c
 });
 
 test("client tokens: hashed at rest in a 0600 file, verified, revoked", async (t) => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-tokens-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-tokens-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const token = await createToken("agent-one", dir);
-  assert.match(token, /^aeon_mcp_/);
+  assert.match(token, /^graft_mcp_/);
   const saved = await readTokens(dir);
   assert.equal(saved.length, 1);
   assert.ok(!JSON.stringify(saved).includes(token), "the token itself is never stored");
@@ -184,7 +184,7 @@ test("client tokens: hashed at rest in a 0600 file, verified, revoked", async (t
   assert.equal(await verifyToken(token + "x", dir), undefined);
   assert.equal(await verifyToken("nope", dir), undefined);
   assert.equal(requestToken({ authorization: `Bearer ${token}` }), token);
-  assert.equal(requestToken({ "x-aeon-token": token }), token);
+  assert.equal(requestToken({ "x-graft-token": token }), token);
   assert.equal(await revokeToken("agent-one", dir), true);
   assert.equal(await verifyToken(token, dir), undefined);
 });
@@ -193,7 +193,7 @@ test("Streamable HTTP: loopback Host only, token required, JSON-RPC answered", a
   const lines = [];
   const server = await serveMcpHttp({
     port: 0,
-    verify: async (token) => (token === "aeon_mcp_good" ? "tester" : undefined),
+    verify: async (token) => (token === "graft_mcp_good" ? "tester" : undefined),
     receive: async (message, send) => {
       if (message.id !== undefined) send({ jsonrpc: "2.0", id: message.id, result: { ok: true } });
     },
@@ -210,16 +210,16 @@ test("Streamable HTTP: loopback Host only, token required, JSON-RPC answered", a
       body,
     );
   assert.equal(
-    (await post({ host: "evil.example:80", authorization: "Bearer aeon_mcp_good" })).status,
+    (await post({ host: "evil.example:80", authorization: "Bearer graft_mcp_good" })).status,
     403,
   );
   assert.equal(
-    (await post({ origin: "https://evil.example", authorization: "Bearer aeon_mcp_good" })).status,
+    (await post({ origin: "https://evil.example", authorization: "Bearer graft_mcp_good" })).status,
     403,
   );
   assert.equal((await post({})).status, 401);
-  assert.equal((await post({ authorization: "Bearer aeon_mcp_bad" })).status, 401);
-  const ok = await post({ authorization: "Bearer aeon_mcp_good" });
+  assert.equal((await post({ authorization: "Bearer graft_mcp_bad" })).status, 401);
+  const ok = await post({ authorization: "Bearer graft_mcp_good" });
   assert.equal(ok.status, 200);
   assert.deepEqual(JSON.parse(ok.body).result, { ok: true });
   assert.ok(ok.headers["mcp-session-id"]);

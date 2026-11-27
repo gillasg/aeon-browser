@@ -22,7 +22,7 @@ export async function runNativeHost(): Promise<void> {
       kind: "native.bootstrap.result",
       protocolVersion: version,
       ok: true,
-      endpoint: `ws://127.0.0.1:${state.port}/aeon/v1`,
+      endpoint: `ws://127.0.0.1:${state.port}/graft/v1`,
       connectionGrant: state.token,
       expiresAt: Date.now() + 10 * 60_000,
       daemonProtocolVersion: version,

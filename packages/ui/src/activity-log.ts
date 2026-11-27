@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import type { PiSessionEventDto } from "@aeon/protocol";
+import type { PiSessionEventDto } from "@graft/protocol";
 
 // Actions that matter (orders, messages, bookings, deletes, site changes), newest first, in the
-// extension's localStorage, which every Aeon page shares. Writes sent through a site's API come
+// extension's localStorage, which every Graft page shares. Writes sent through a site's API come
 // from Core on the step that sent them, with every item; runs that typed into or submitted a
 // page are logged by the orb. Undo stays off until a tool reports how to reverse what it did.
 
@@ -26,7 +26,7 @@ export interface ActivityEntry {
   items?: string[];
 }
 
-export const ACTIVITY_LOG_KEY = "aeonActivityLog";
+export const ACTIVITY_LOG_KEY = "graftActivityLog";
 const MAX_ENTRIES = 200;
 
 export function readActivityLog(): ActivityEntry[] {

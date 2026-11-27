@@ -28,7 +28,7 @@ window.seen = [];
 function note(event) {
   seen.push({type: event.type, button: event.button, buttons: event.buttons,
     alt: event.altKey, ctrl: event.ctrlKey, meta: event.metaKey, shift: event.shiftKey});
-  if (event.button >= 3) sessionStorage.setItem("aeon-button", String(event.button));
+  if (event.button >= 3) sessionStorage.setItem("graft-button", String(event.button));
 }
 for (const type of ["mousemove", "mousedown", "mouseup", "click", "auxclick", "dblclick", "contextmenu"])
   document.addEventListener(type, note, true);
@@ -150,7 +150,7 @@ async function hit(label, run) {
   try {
     await page.evaluate(() => {
       if (typeof seen !== "undefined") seen.length = 0;
-      sessionStorage.removeItem("aeon-button");
+      sessionStorage.removeItem("graft-button");
     });
   } catch { /* a back click may have left the document */ }
   let status = "ok";
@@ -160,7 +160,7 @@ async function hit(label, run) {
   try {
     hits = await page.evaluate(() => ({
       events: typeof seen === "undefined" ? [] : seen.slice(),
-      stored: sessionStorage.getItem("aeon-button"),
+      stored: sessionStorage.getItem("graft-button"),
       href: location.href,
     }));
   } catch (error) {

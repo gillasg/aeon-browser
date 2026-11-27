@@ -1,7 +1,7 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { aeonModelsStorePath, createAeonModelRuntime } from "./live-models.js";
+import { graftModelsStorePath, createGraftModelRuntime } from "./live-models.js";
 
 /** One unbound runtime, never shared by two live sessions or extension registries. */
 export class PreparedModelRuntime {
@@ -11,7 +11,7 @@ export class PreparedModelRuntime {
   private readonly timer: ReturnType<typeof setInterval>;
   constructor(
     private readonly agentDirectory: string,
-    private readonly create = createAeonModelRuntime,
+    private readonly create = createGraftModelRuntime,
   ) {
     this.timer = setInterval(() => this.prepare(), 30_000);
     this.timer.unref();
@@ -48,7 +48,7 @@ export class PreparedModelRuntime {
     return [
       join(this.agentDirectory, "auth.json"),
       join(this.agentDirectory, "models.json"),
-      aeonModelsStorePath(this.agentDirectory),
+      graftModelsStorePath(this.agentDirectory),
     ]
       .map((file) => {
         try {

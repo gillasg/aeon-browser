@@ -4,13 +4,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { ChatService } from "../dist/chat-service.js";
 import { runExternalRoutine } from "../dist/external-routine-tool.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), "aeon-external-routine-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-external-routine-"));
   const store = openChatStore(join(root, "data"));
   const chats = new ChatService({ dataDirectory: join(root, "data"), store, pi: new FakePiPort() });
   t.after(async () => {
@@ -84,7 +84,7 @@ test("an outside agent creates, lists, pauses and deletes only its own routines"
       instruction: "Submit it.",
       schedule: "every 15 minutes",
       check: "return { ok: true }",
-      webhook: "https://example.com/hooks/aeon",
+      webhook: "https://example.com/hooks/graft",
       webhookSecret: "top-secret",
       webhookOnly: true,
       browser: "Work",
@@ -95,7 +95,7 @@ test("an outside agent creates, lists, pauses and deletes only its own routines"
       return "22222222-2222-4222-8222-222222222222";
     },
   });
-  assert.equal(pinned.webhook, "https://example.com/hooks/aeon");
+  assert.equal(pinned.webhook, "https://example.com/hooks/graft");
   assert.equal(pinned.webhookOnly, true);
   assert.equal(pinned.effect, "irreversible");
   assert.equal(pinned.requiredBrowserInstanceId, "22222222-2222-4222-8222-222222222222");

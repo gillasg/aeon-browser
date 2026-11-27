@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ChatId, AeonProductStore, RoutineRecord } from "@aeon/domain";
+import type { ChatId, GraftProductStore, RoutineRecord } from "@graft/domain";
 import {
   inferRoutineEffect,
   optionalBoolean,
@@ -9,7 +9,7 @@ import {
 import { optionalListen } from "./routine-listen.js";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 import type { RoutineScheduler } from "./routine-scheduler.js";
-import { exploreForRoutine } from "@aeon/pi-adapter";
+import { exploreForRoutine } from "@graft/pi-adapter";
 
 const ROUTINE_TOOLS = new Set([
   "create_routine",
@@ -26,7 +26,7 @@ export function isRoutineTool(name: string): boolean {
 
 export class RoutineManagementTools {
   constructor(
-    private readonly store: AeonProductStore,
+    private readonly store: GraftProductStore,
     private readonly routines: RoutineScheduler,
   ) {}
 

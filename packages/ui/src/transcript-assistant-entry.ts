@@ -1,4 +1,4 @@
-import type { PiEntryDto, PiMessageDto } from "@aeon/protocol";
+import type { PiEntryDto, PiMessageDto } from "@graft/protocol";
 import type { TranscriptRow } from "./transcript-model.js";
 export function separatesToolBatch(message: PiMessageDto): boolean {
   return message.content.some(

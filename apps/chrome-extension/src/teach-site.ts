@@ -1,10 +1,10 @@
-// Manage → Sites → Teach Aeon. The page only asks; the worker opens the site in front, starts the
+// Manage → Sites → Teach Graft. The page only asks; the worker opens the site in front, starts the
 // same Teach recorder the cursor's pill drives, and opens the cursor there so its Teach pill shows.
 // (Done in the page, the work died with the Manage tab before the recorder started.)
 
 import { startTeaching } from "./browse-learning.js";
 
-export const TEACH_SITE = "aeon.teach.site";
+export const TEACH_SITE = "graft.teach.site";
 const LOAD_MS = 15_000;
 
 /** In the Manage page: hand the request to the worker. */

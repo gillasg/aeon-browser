@@ -2,7 +2,7 @@
   "name": "site-boosts",
   "version": "0.1.0",
   "private": true,
-  "description": "The boost engine Aeon's extension embeds: styles, zaps, actions, network rules and userscripts that keep a site behaving your way.",
+  "description": "The boost engine Graft's extension embeds: styles, zaps, actions, network rules and userscripts that keep a site behaving your way.",
   "type": "module",
   "license": "MIT",
   "packageManager": "pnpm@11.4.0",

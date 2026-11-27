@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CoreActivityResultSchema } from "@aeon/protocol";
+import { CoreActivityResultSchema } from "@graft/protocol";
 import { activityBusy, countBusyRoutines, handleCoreActivity } from "../src/daemon-activity.ts";
 
 const requestId = "11111111-1111-4111-8111-111111111111";

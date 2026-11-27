@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { aeonAppRoot } from "@aeon/location";
+import { graftAppRoot } from "@graft/location";
 
 /** The supervisor's remembered cause, absent once the daemon is ready or the text is empty. */
 export function startFailureOf(record: unknown): string | undefined {
@@ -14,7 +14,7 @@ export function startFailureOf(record: unknown): string | undefined {
 
 export async function readStartFailure(): Promise<string | undefined> {
   try {
-    const text = await readFile(join(aeonAppRoot(), "daemon-supervisor-status.json"), "utf8");
+    const text = await readFile(join(graftAppRoot(), "daemon-supervisor-status.json"), "utf8");
     return startFailureOf(JSON.parse(text) as unknown);
   } catch {
     return undefined;
@@ -23,6 +23,6 @@ export async function readStartFailure(): Promise<string | undefined> {
 
 export function notRunningMessage(startError: string | undefined): string {
   const base =
-    "Aeon is not running. Open Chrome with Aeon loaded (the daemon starts with it), then retry.";
+    "Graft is not running. Open Chrome with Graft loaded (the daemon starts with it), then retry.";
   return startError ? `${base} Last start failed: ${startError}` : base;
 }

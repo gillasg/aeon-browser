@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 test("regular-chat browser work pairs tabs automatically and side-panel work keeps its layout", async () => {
-  const folder = await mkdtemp(join(tmpdir(), "aeon-layout-")),
+  const folder = await mkdtemp(join(tmpdir(), "graft-layout-")),
     old = globalThis.chrome;
   try {
     const outfile = join(folder, "layout.mjs");
@@ -82,7 +82,7 @@ function layoutChrome() {
   return {
     rows,
     splits: () => count,
-    chrome: { tabs, runtime: { getURL: (path) => "chrome-extension://aeon/" + path } },
+    chrome: { tabs, runtime: { getURL: (path) => "chrome-extension://graft/" + path } },
   };
 }
 
@@ -98,7 +98,7 @@ function initialTabs() {
         pinned: true,
         active: true,
         splitViewId: -1,
-        url: "chrome-extension://aeon/chat.html?chatId=test",
+        url: "chrome-extension://graft/chat.html?chatId=test",
       },
     ],
     [
@@ -118,7 +118,7 @@ function initialTabs() {
 }
 
 test("the chat stays out of the agent group, and thumbnail view never splits on its own", async () => {
-  const folder = await mkdtemp(join(tmpdir(), "aeon-layout-")),
+  const folder = await mkdtemp(join(tmpdir(), "graft-layout-")),
     old = globalThis.chrome;
   try {
     const engine = new URL("../node_modules/@browserkit/engine/src/", import.meta.url);

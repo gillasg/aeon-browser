@@ -115,7 +115,7 @@ export function showAgentCaption(debuggee: chrome.debugger.Debuggee, caption: st
 
 // Tabs being recorded on video: nothing of ours is drawn, or only the cursor when asked for.
 const recording = new Map<number, { cursor: boolean; pill?: boolean }>();
-/** cursor: Aeon's cursor shows in the recording; pill: its pill, callouts and keys too (no glow). */
+/** cursor: Graft's cursor shows in the recording; pill: its pill, callouts and keys too (no glow). */
 export function setTabRecording(
   tabId: number,
   state: { cursor: boolean; pill?: boolean } | undefined,

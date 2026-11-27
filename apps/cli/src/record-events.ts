@@ -1,5 +1,5 @@
-// The recording log. Every folder Aeon records gets an events.json: the clip's metadata, and the
-// things Aeon did while it recorded, on the same clock as the clip. An editor reads this to zoom
+// The recording log. Every folder Graft records gets an events.json: the clip's metadata, and the
+// things Graft did while it recorded, on the same clock as the clip. An editor reads this to zoom
 // and place the cursor honestly: it never invents an action that is not in this file.
 // Times are milliseconds from the clip's t=0 (the first captured frame), `at` is the wall clock
 // (epoch ms) for correlating with a run trace, and points are page CSS px unless named `window`.
@@ -14,7 +14,7 @@ export type Box = { x: number; y: number; width: number; height: number };
 
 /**
  * The one beat vocabulary (mirrored in templates/video/src/types.ts). The first ten are emitted by
- * Aeon itself while a recording is armed (the beat bus); the rest are director tags.
+ * Graft itself while a recording is armed (the beat bus); the rest are director tags.
  */
 export const STORY_BEATS = [
   "summon",
@@ -48,7 +48,7 @@ export type SoundCueKind =
 /** A sound the edit may score at clip time `t` (ms). Derived from real events only. */
 export type SoundCue = { t: number; kind: SoundCueKind };
 
-/** One thing Aeon did. `page` is viewport CSS px; `window` is px in the captured window image. */
+/** One thing Graft did. `page` is viewport CSS px; `window` is px in the captured window image. */
 export type VideoEvent = {
   id: string;
   kind: VideoEventKind;
@@ -67,13 +67,13 @@ export type VideoEvent = {
   /** The same bounds in captured-window px, when the window was calibrated. */
   windowBox?: Box;
   beat?: Beat;
-  /** `sound` beats: which of Aeon's sounds fired (even when muted). */
+  /** `sound` beats: which of Graft's sounds fired (even when muted). */
   cue?: string;
   /** `teach` beats: the TeachPill count. */
   count?: number;
   /** `provenance` beats: the JSON path the page value came from (page.why). */
   jsonPath?: string;
-  /** Who acted: unset is Aeon; "director" is a scripted stand-in for a person. */
+  /** Who acted: unset is Graft; "director" is a scripted stand-in for a person. */
   actor?: "director";
 };
 
@@ -106,7 +106,7 @@ export const MAX_DUP_DROP = 0.005;
 export const dupDropShare = (clip: Pick<ClipMeta, "frames" | "dropped" | "dup">): number =>
   ((clip.dropped ?? 0) + (clip.dup ?? 0)) / Math.max(1, clip.frames);
 
-/** A beat the script named (`aeon record mark`): `box` is page CSS px, `windowBox` clip px. */
+/** A beat the script named (`graft record mark`): `box` is page CSS px, `windowBox` clip px. */
 export type Mark = {
   name: string;
   t: number;
@@ -129,7 +129,7 @@ export type TerminalCast = {
 
 export type RecordingEvents = {
   version: 1;
-  recorder: "aeon";
+  recorder: "graft";
   /** `t` is ms from clip t=0; the clip's frames use the same origin. */
   clock: "clip";
   clip: ClipMeta;
@@ -138,7 +138,7 @@ export type RecordingEvents = {
   events: VideoEvent[];
   /** A terminal session recorded beside the tab. The kit draws it as a pane. */
   terminal?: TerminalCast;
-  /** Beats named with `aeon record mark` while recording, on the clip clock. */
+  /** Beats named with `graft record mark` while recording, on the clip clock. */
   marks?: Mark[];
   /** Foley cues on the clip clock, derived from `events` (keys while typing, a trigger on Enter or click). */
   soundCues?: SoundCue[];
@@ -212,7 +212,7 @@ export async function writeEvents(
   return target;
 }
 
-/** A trace action as Aeon's engine emits it (subset of the trace schema we need). */
+/** A trace action as Graft's engine emits it (subset of the trace schema we need). */
 export type TraceAction = {
   kind: string;
   tabId?: number;
@@ -294,7 +294,7 @@ function oneEvent(
   });
 }
 
-/** A beat-bus action: Aeon's own UI said a story beat happened, with its text and box. */
+/** A beat-bus action: Graft's own UI said a story beat happened, with its text and box. */
 function filmEvent(
   a: TraceAction,
   t: number,
@@ -336,8 +336,8 @@ const SOUND_CUE: Record<string, SoundCueKind> = {
 
 /**
  * Foley cues from real events. Real keystrokes (`key` beats) score one key each at their own time;
- * a fill with no key beats falls back to ~55 ms per character. Aeon's own `sound` beats score the
- * sound it played. Nothing is scored that Aeon did not do.
+ * a fill with no key beats falls back to ~55 ms per character. Graft's own `sound` beats score the
+ * sound it played. Nothing is scored that Graft did not do.
  */
 export function soundCuesFromEvents(events: VideoEvent[]): SoundCue[] {
   const realKeys = events.some((e) => e.kind === "beat" && e.beat === "key");
@@ -366,7 +366,7 @@ function cuesOf(e: VideoEvent, realKeys: boolean): SoundCue[] {
 }
 
 /**
- * Turn Aeon's timed trace into honest events. `t0` is the clip's wall-clock start, so every event
+ * Turn Graft's timed trace into honest events. `t0` is the clip's wall-clock start, so every event
  * lands on the clip's clock. `windowOffset`/`scale` place page coordinates into window-space when
  * a window capture was calibrated; page coordinates are kept either way.
  */

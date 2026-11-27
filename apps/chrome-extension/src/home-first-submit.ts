@@ -1,4 +1,4 @@
-import { PiBrowserContextRecordSchema, type PiAttachmentDto } from "@aeon/protocol";
+import { PiBrowserContextRecordSchema, type PiAttachmentDto } from "@graft/protocol";
 import type { UiClient } from "./ui-client-core.js";
 import { additionalPages } from "./additional-page-context.js";
 import { projectDraftPayload } from "./project-bridge.js";
@@ -36,7 +36,7 @@ export async function startHomePrompt(
 
 function homePages() {
   const pages = additionalPages("draft");
-  const raw = sessionStorage.getItem("aeon-panel-page");
+  const raw = sessionStorage.getItem("graft-panel-page");
   if (raw) {
     try {
       const parsed = PiBrowserContextRecordSchema.safeParse(JSON.parse(raw));

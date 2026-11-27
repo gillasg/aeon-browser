@@ -4,11 +4,11 @@ import { assertNoSealedSecrets } from "../dist/index.js";
 
 test("mcp.call args with a sealed handle are refused", () => {
   assert.throws(
-    () => assertNoSealedSecrets({ text: "aeon-sealed:abc123def456" }, "mcp.call notes.add"),
+    () => assertNoSealedSecrets({ text: "graft-sealed:abc123def456" }, "mcp.call notes.add"),
     /SECRET_EGRESS: mcp\.call notes\.add carries a sealed secret/,
   );
   assert.throws(
-    () => assertNoSealedSecrets({ nested: [{ "aeon-sealed:abc123def456": 1 }] }, "mcp.call x.y"),
+    () => assertNoSealedSecrets({ nested: [{ "graft-sealed:abc123def456": 1 }] }, "mcp.call x.y"),
     /SECRET_EGRESS/,
   );
 });

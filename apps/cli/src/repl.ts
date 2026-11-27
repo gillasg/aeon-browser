@@ -3,7 +3,7 @@ import { flag, has, type Args } from "browserkit/dist/args.js";
 import { out } from "browserkit/dist/output.js";
 import type { BrowserCell, CellOptions } from "./cell-run.js";
 
-// `aeon repl`: one cell of browser code in the user's Chrome. Any runner works: the full CLI's
+// `graft repl`: one cell of browser code in the user's Chrome. Any runner works: the full CLI's
 // daemon host, or repl-fast.ts's lean one.
 
 export interface CellRunner {
@@ -11,7 +11,7 @@ export interface CellRunner {
   runInBrowser(code: string, options?: CellOptions): Promise<unknown>;
 }
 
-/** What `aeon repl` prints: the cell's log, then its value. */
+/** What `graft repl` prints: the cell's log, then its value. */
 export function replText(cell: { output?: string; value?: unknown }): string {
   const output = cell.output?.trimEnd();
   // bu.state() logs its text and returns it; print it once.
@@ -39,7 +39,7 @@ async function replCode(args: Args): Promise<string> {
         : given;
   if (!code.trim())
     throw new Error(
-      'Usage: aeon repl "<code>" | @file.js | - [--session name] [--browser name] [--timeout s] [--quiet]',
+      'Usage: graft repl "<code>" | @file.js | - [--session name] [--browser name] [--timeout s] [--quiet]',
     );
   return code;
 }

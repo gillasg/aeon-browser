@@ -1,4 +1,4 @@
-// Secret scrubbing for anything Aeon hands to another agent (MCP events, task results). A key that
+// Secret scrubbing for anything Graft hands to another agent (MCP events, task results). A key that
 // names a secret loses its value; strings lose tokens, card numbers and one-time codes.
 
 const SECRET_KEY =
@@ -50,7 +50,7 @@ function luhn(digits: string): boolean {
 }
 
 /** A sealed-secret handle as the browser engine hands it to agent code. */
-export const SEALED_HANDLE = /aeon-sealed:[a-z0-9]{12}/;
+export const SEALED_HANDLE = /graft-sealed:[a-z0-9]{12}/;
 
 /**
  * Throws SECRET_EGRESS when a value bound for an outside tool (an MCP server) carries a sealed

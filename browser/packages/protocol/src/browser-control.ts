@@ -330,7 +330,7 @@ export const BrowserExecutorResultSchema = z.discriminatedUnion("kind", [
       evidence: z.string().max(240),
       /** Words for this step, from labelFor. A value typed into a field is never included. */
       label: z.string().max(200).optional(),
-      /** Dialogs the page opened and Aeon answered while this input was in flight. */
+      /** Dialogs the page opened and Graft answered while this input was in flight. */
       dialogs: z
         .array(
           z

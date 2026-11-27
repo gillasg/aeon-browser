@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import { SettingsGroup } from "./settings-list.js";
 
-// Settings → Forms: the form profile Aeon fills forms from. The agent never reads these values;
+// Settings → Forms: the form profile Graft fills forms from. The agent never reads these values;
 // it fills them into pages through the engine, and when a form asks for something new it asks
 // the user and adds the answer here. Fields fall into sections by name, so the profile grows
 // into Name, Contact, Address, Work and Other as the agent meets new forms.
@@ -90,7 +90,7 @@ export function FormsSettings({
         footer={
           refused
             ? `Not kept: ${refused}.`
-            : "Aeon fills forms from these without the model ever seeing them. When a form asks for something new, Aeon asks you and adds it here. Passwords and card numbers belong in your password manager."
+            : "Graft fills forms from these without the model ever seeing them. When a form asks for something new, Graft asks you and adds it here. Passwords and card numbers belong in your password manager."
         }
       >
         <NewFieldRow onSave={onSave} />
@@ -133,7 +133,7 @@ function FieldRow({
           {...(field.value ? {} : { placeholder: "Not set" })}
         />
         {onRemove && (
-          <button type="button" className="aeon-button" onClick={() => onRemove(field.name)}>
+          <button type="button" className="graft-button" onClick={() => onRemove(field.name)}>
             Remove
           </button>
         )}
@@ -173,7 +173,7 @@ function NewFieldRow({ onSave }: { onSave(field: string, value: string): void })
           value={value}
           onChange={(event) => setValue(event.target.value)}
         />
-        <button type="submit" className="aeon-button" disabled={!ready}>
+        <button type="submit" className="graft-button" disabled={!ready}>
           Add
         </button>
       </form>

@@ -1,5 +1,5 @@
 // "Waiting on you: <msg>" — one wording for a pending hand-off wherever it is shown: the tab
-// list, `aeon tabs`, `aeon status`, the daemon's activity line and the cursor box.
+// list, `graft tabs`, `graft status`, the daemon's activity line and the cursor box.
 
 export interface HandoffStatus {
   message: string;

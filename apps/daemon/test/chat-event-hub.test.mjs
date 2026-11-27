@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { asChatId } from "@aeon/domain";
+import { asChatId } from "@graft/domain";
 import { ChatEventHub } from "../dist/chat-event-hub.js";
 
 const chatId = asChatId(randomUUID());

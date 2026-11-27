@@ -1,4 +1,4 @@
-// The one list of Chrome launch flags Aeon asks for. Setup, the launchers, `aeon doctor` and the
+// The one list of Chrome launch flags Graft asks for. Setup, the launchers, `graft doctor` and the
 // side panel's notice all read it, so they never drift. None is a stealth tell: no --test-type,
 // no --no-sandbox, no fingerprint flags. All are optional; a normal Chrome launch runs every tool.
 
@@ -7,11 +7,11 @@ export const CHROME_FEATURE_FLAG = "CalculateNativeWinOcclusion";
 export const CHROME_LAUNCH_FLAGS = [
   {
     flag: "--extensions-on-chrome-urls",
-    purpose: "lets Aeon work on chrome:// pages",
+    purpose: "lets Graft work on chrome:// pages",
   },
   {
     flag: "--silent-debugger-extension-api",
-    purpose: "hides Chrome's debugger bar while Aeon drives a page",
+    purpose: "hides Chrome's debugger bar while Graft drives a page",
   },
   {
     flag: "--disable-renderer-backgrounding",

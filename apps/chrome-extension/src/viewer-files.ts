@@ -13,7 +13,7 @@ export interface RecentFile extends ViewerTarget {
   openedAt: number;
 }
 
-export const RECENT_KEY = "aeon-viewer-recent";
+export const RECENT_KEY = "graft-viewer-recent";
 export const RECENT_MAX = 8;
 
 /** The deep link for one file: viewer.html?chatId=…&path=…&line=…&diff=… */

@@ -1,6 +1,6 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import type { McpCapability } from "@aeon/domain";
+import type { McpCapability } from "@graft/domain";
 import { resolveCredentials } from "./mcp-credentials.js";
 
 export type McpTransport = StdioClientTransport | StreamableHTTPClientTransport;

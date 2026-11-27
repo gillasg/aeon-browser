@@ -9,7 +9,7 @@ import test from "node:test";
 const wing = "M 1.8 1.8 L 1.8 18.2 L 6.3 13.9 L 13.4 13.9 Z";
 
 async function load(entry) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-mark-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-mark-"));
   const outfile = join(directory, "bundle.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL(entry, import.meta.url))],
@@ -50,8 +50,8 @@ test("the page painter is the one cursor and dispatches only neutral state event
   const source = page.cursorExpression({});
   assert.match(source, /M 1\.8 1\.8/);
   assert.match(source, /\.p\.on \.tr,\.p\.on \.stop\{pointer-events:none\}/);
-  assert.equal(source.includes("aeon-cursor-stop"), false);
-  assert.equal(source.includes("aeon-cursor-transcript"), false);
+  assert.equal(source.includes("graft-cursor-stop"), false);
+  assert.equal(source.includes("graft-cursor-transcript"), false);
   assert.match(source, /new CustomEvent\(STATE_EVENT/);
 });
 
@@ -62,7 +62,7 @@ test("cursor token values are the last ones in tokens.css", async () => {
     "utf8",
   );
   const values = new Map();
-  for (const match of css.matchAll(/(--aeon-[\w-]+)\s*:\s*([^;]+);/g))
+  for (const match of css.matchAll(/(--graft-[\w-]+)\s*:\s*([^;]+);/g))
     values.set(match[1], match[2].replace(/\s+/g, " ").trim());
   for (const [name, value] of Object.entries(mark.CURSOR_VARS))
     assert.equal(values.get(name), value, name);

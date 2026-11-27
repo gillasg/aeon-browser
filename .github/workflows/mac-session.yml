@@ -13,8 +13,8 @@ on:
         required: false
         default: false
         type: boolean
-      aeon:
-        description: Restore or build Aeon, install the native host and pre-launch Chrome with the extension
+      graft:
+        description: Restore or build Graft, install the native host and pre-launch Chrome with the extension
         required: false
         default: true
         type: boolean
@@ -67,7 +67,7 @@ jobs:
           sudo sed -i '' -E 's/^[# ]*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config
           sudo sed -i '' -E 's/^[# ]*ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
           sudo sed -i '' -E 's/^[# ]*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-          sudo tee /etc/ssh/sshd_config.d/99-aeon-key-only.conf >/dev/null <<'EOF'
+          sudo tee /etc/ssh/sshd_config.d/99-graft-key-only.conf >/dev/null <<'EOF'
           PasswordAuthentication no
           KbdInteractiveAuthentication no
           ChallengeResponseAuthentication no
@@ -96,7 +96,7 @@ jobs:
           # added, tried over loopback and removed again. The secret key itself is never logged.
           self_key="$RUNNER_TEMP/self-check-key"
           rm -f "$self_key" "$self_key.pub"
-          ssh-keygen -q -t ed25519 -N '' -C aeon-self-check -f "$self_key"
+          ssh-keygen -q -t ed25519 -N '' -C graft-self-check -f "$self_key"
           cat "$self_key.pub" >> "$HOME/.ssh/authorized_keys"
           if ! ssh -i "$self_key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no \
                -o ConnectTimeout=10 "$(whoami)@127.0.0.1" 'echo SSH_LOCAL_OK'; then
@@ -158,7 +158,7 @@ jobs:
             printf '#!/bin/bash\nexec %q local 22 --to %s --port %s >>/tmp/bore.log 2>&1\n' \
               "$bore_bin" "$host" "$candidate" > "$RUNNER_TEMP/run-bore.sh"
             chmod +x "$RUNNER_TEMP/run-bore.sh"
-            start_agent com.aeon.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
+            start_agent com.graft.bore "$RUNNER_TEMP/run-bore.sh" /tmp/bore.log
             for _ in $(seq 1 30); do
               if grep -q "listening at ${host}:${candidate}" /tmp/bore.log; then
                 port=$candidate
@@ -225,7 +225,7 @@ jobs:
             browser/node_modules
             browser/apps/**/node_modules
             browser/packages/**/node_modules
-          key: aeon-pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: graft-pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
       # Same key as ci.yml, so a green CI run on main warms this cache for the session.
       - name: Cache Chrome for Testing
         uses: actions/cache@v4
@@ -233,7 +233,7 @@ jobs:
           path: .slice0-audit/chrome-for-testing-157.0.8103.78
           key: chrome-for-testing-157.0.8103.78-mac-arm64
       - name: Install dependencies
-        if: ${{ inputs.aeon }}
+        if: ${{ inputs.graft }}
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install Chrome for Testing
         run: |
@@ -249,13 +249,13 @@ jobs:
           chmod +x "$bin"
           xattr -dr com.apple.quarantine "$dir/chrome-mac-arm64/Google Chrome for Testing.app" || true
           echo "CHROME_PATH=$(pwd)/$bin" >> "$GITHUB_STEP_SUMMARY"
-      - name: Download prebuilt Aeon
-        if: ${{ inputs.aeon }}
+      - name: Download prebuilt Graft
+        if: ${{ inputs.graft }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          name="aeon-macos-build-${{ github.sha }}"
+          name="graft-macos-build-${{ github.sha }}"
           echo "Looking for artifact ${name}"
           artifact="$(
             gh api "repos/${{ github.repository }}/actions/artifacts?name=${name}&per_page=100" \
@@ -264,16 +264,16 @@ jobs:
           )"
           if [ -n "$artifact" ] && [ "$artifact" != "0" ]; then
             gh run download "$artifact" -n "$name" -D .
-            echo "Restored prebuilt Aeon from run ${artifact}"
+            echo "Restored prebuilt Graft from run ${artifact}"
           else
-            echo "No prebuilt Aeon for ${{ github.sha }}; building from source."
+            echo "No prebuilt Graft for ${{ github.sha }}; building from source."
             echo "need_build=1" >> "$GITHUB_ENV"
           fi
-      - name: Build Aeon
-        if: ${{ inputs.aeon && env.need_build == '1' }}
+      - name: Build Graft
+        if: ${{ inputs.graft && env.need_build == '1' }}
         run: pnpm build
       - name: Install native host and pre-launch Chrome
-        if: ${{ inputs.aeon }}
+        if: ${{ inputs.graft }}
         run: |
           set -euo pipefail
           # Registers the native host, its Chrome manifests and the launchd daemon service.
@@ -281,9 +281,9 @@ jobs:
 
           # A custom --user-data-dir makes Chrome read NativeMessagingHosts from the profile,
           # not from ~/Library/Application Support, so copy the manifest into the profile.
-          profile="$RUNNER_TEMP/aeon-chrome-profile"
+          profile="$RUNNER_TEMP/graft-chrome-profile"
           mkdir -p "$profile/NativeMessagingHosts"
-          manifest="$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.aeon.native_host.json"
+          manifest="$HOME/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/com.graft.native_host.json"
           if [ ! -f "$manifest" ]; then
             echo "Native messaging manifest missing at $manifest"
             exit 1
@@ -298,26 +298,26 @@ jobs:
             --disable-extensions-except="$extension" \
             --no-first-run --no-default-browser-check \
             --remote-debugging-port=9222 \
-            about:blank > "$RUNNER_TEMP/aeon-chrome.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/aeon-chrome.pid"
+            about:blank > "$RUNNER_TEMP/graft-chrome.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/graft-chrome.pid"
 
           # The daemon is a launchd agent; wait until it is actually running, and until Chrome's
           # debug port answers. Report honestly if either stays down.
           uid=$(id -u)
           for _ in $(seq 1 30); do
-            if launchctl print "gui/${uid}/com.aeon.daemon" 2>/dev/null | grep -q 'state = running'; then
-              echo "Aeon daemon is running"
+            if launchctl print "gui/${uid}/com.graft.daemon" 2>/dev/null | grep -q 'state = running'; then
+              echo "Graft daemon is running"
               break
             fi
             sleep 1
           done
-          launchctl print "gui/${uid}/com.aeon.daemon" 2>/dev/null | grep -E 'state =|path =' || true
+          launchctl print "gui/${uid}/com.graft.daemon" 2>/dev/null | grep -E 'state =|path =' || true
           for _ in $(seq 1 30); do
             if nc -z 127.0.0.1 9222; then break; fi
             sleep 1
           done
           nc -z 127.0.0.1 9222
-          echo "Chrome launched with the Aeon extension; CDP on port 9222."
+          echo "Chrome launched with the Graft extension; CDP on port 9222."
       - name: Grant screen capture and verify
         if: ${{ inputs['screen-capture'] }}
         run: |
@@ -555,9 +555,9 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          mkdir -p "$HOME/.aeon-ci"
+          mkdir -p "$HOME/.graft-ci"
           # Read only inside a session command (never printed); empty when the secret is unset.
-          printf '%s' "${OPENCODE_API_KEY:-}" > "$HOME/.aeon-ci/opencode-key"
+          printf '%s' "${OPENCODE_API_KEY:-}" > "$HOME/.graft-ci/opencode-key"
       - name: Video capture help
         run: |
           set -euo pipefail

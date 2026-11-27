@@ -1,10 +1,10 @@
-const prefix = "aeon-tab-status-";
+const prefix = "graft-tab-status-";
 const statuses = new Map<string, string>();
 const canvas = document.createElement("canvas");
 canvas.width = canvas.height = 32;
 const context = canvas.getContext("2d");
 const orbit = new Image();
-orbit.src = "aeon-icon-32.png";
+orbit.src = "graft-icon-32.png";
 orbit.onload = () => draw();
 const icon = document.createElement("link");
 icon.rel = "icon";
@@ -14,7 +14,7 @@ let timer = 0;
 let frame = 0;
 let working = false;
 let chatFilter = "";
-// Tab icons: the lattice (Aeon's mark) at rest, a turning violet nebula while the chat works, and
+// Tab icons: the lattice (Graft's mark) at rest, a turning violet nebula while the chat works, and
 // a still blue nebula once it finished unseen. Frames are drawn once and stepped evenly, so the
 // turn stays smooth when timers jitter.
 const FRAMES = 24;
@@ -34,7 +34,9 @@ export function showStatusForChat(chatId: string): void {
 }
 function relevant(key: string): boolean {
   return (
-    !chatFilter || key === "aeon-chat-working-" + chatFilter || key === "piper-unread-" + chatFilter
+    !chatFilter ||
+    key === "graft-chat-working-" + chatFilter ||
+    key === "piper-unread-" + chatFilter
   );
 }
 let done = false;
@@ -45,7 +47,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (
       key.startsWith(prefix) ||
       key.startsWith("piper-unread-") ||
-      key.startsWith("aeon-chat-working-")
+      key.startsWith("graft-chat-working-")
     ) {
       touchedKeys.add(key);
       if (typeof change.newValue === "string") statuses.set(key, change.newValue);
@@ -62,7 +64,7 @@ void chrome.storage.session.get(null).then((values) => {
     if (
       (key.startsWith(prefix) ||
         key.startsWith("piper-unread-") ||
-        key.startsWith("aeon-chat-working-")) &&
+        key.startsWith("graft-chat-working-")) &&
       !touchedKeys.has(key) &&
       typeof value === "string"
     )
@@ -75,7 +77,7 @@ void chrome.storage.session.get(null).then((values) => {
 });
 function refresh(): void {
   const values = [...statuses].filter(([key]) => relevant(key)).map(([, value]) => value);
-  // Only a chat's own tab spins or turns blue; home and other Aeon pages always show the lattice.
+  // Only a chat's own tab spins or turns blue; home and other Graft pages always show the lattice.
   working = Boolean(chatFilter) && values.includes("working");
   done = Boolean(chatFilter) && !working && values.includes("done");
   // A finished chat's tab stays mounted; painting a favicon 50 times a second in one that is
@@ -152,21 +154,21 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => stopSpinner(), { once: true });
 draw();
 
-window.addEventListener("aeon.chat-status-request", (event) => {
+window.addEventListener("graft.chat-status-request", (event) => {
   const chatId = (event as CustomEvent).detail?.chatId;
   if (typeof chatId === "string") publishChatStatus(chatId);
 });
 function statusChatId(key: string): string | undefined {
-  for (const prefix of ["aeon-chat-working-", "piper-unread-"])
+  for (const prefix of ["graft-chat-working-", "piper-unread-"])
     if (key.startsWith(prefix)) return key.slice(prefix.length);
   return undefined;
 }
 function publishChatStatus(chatId: string): void {
   window.dispatchEvent(
-    new CustomEvent("aeon.chat-status", {
+    new CustomEvent("graft.chat-status", {
       detail: {
         chatId,
-        working: statuses.get("aeon-chat-working-" + chatId) === "working",
+        working: statuses.get("graft-chat-working-" + chatId) === "working",
         unread: statuses.get("piper-unread-" + chatId) === "done",
       },
     }),

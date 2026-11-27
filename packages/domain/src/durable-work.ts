@@ -63,7 +63,7 @@ export interface RoutineRecord {
   schedule: RoutineSchedule;
   nextDueAt: string | null;
   requiredBrowserInstanceId: string | null;
-  /** POST this when the check passes. Null means the routine only wakes Aeon. */
+  /** POST this when the check passes. Null means the routine only wakes Graft. */
   webhook: RoutineWebhook | null;
   /** The check still runs; a pass does not start the agent. */
   webhookOnly: boolean;
@@ -213,7 +213,7 @@ export interface CapabilityAuditRecord {
   result: string;
 }
 
-export interface AeonProductStore {
+export interface GraftProductStore {
   createRoutine(record: RoutineRecord): RoutineRecord;
   getRoutine(routineId: string): RoutineRecord | undefined;
   listRoutines(chatId?: ChatId): readonly RoutineRecord[];

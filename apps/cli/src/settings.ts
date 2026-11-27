@@ -1,11 +1,11 @@
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 import { readUseClientModel, writeUseClientModel } from "./mcp-sampling.js";
 
-// `aeon settings`: read or change Aeon's agent settings in the connected Chrome. Screen recorders
-// (Aeon Recorder) switch these on for a recording and restore them after; keep the names.
+// `graft settings`: read or change Graft's agent settings in the connected Chrome. Screen recorders
+// (Graft Recorder) switch these on for a recording and restore them after; keep the names.
 const FLAGS = ["agentInFront", "hideAgentCursor", "recordAgentTabs", "humanLikeInput"];
 const VIEWS = ["auto", "split", "thumbnails"];
-// mcpUseClientModel is Aeon's own setting, stored next to its data (no Chrome needed).
+// mcpUseClientModel is Graft's own setting, stored next to its data (no Chrome needed).
 const LOCAL_FLAGS = ["mcpUseClientModel"];
 type Setting = boolean | string;
 
@@ -15,10 +15,10 @@ export const settingsUsage = `  settings [get]                the agent settings
                                  humanLikeInput=true|false
                                  agentTabView=auto|split|thumbnails
                                  mcpUseClientModel=true|false
-humanLikeInput is off by default (faster). Set it true, or AEON_HUMAN_INPUT=1, for a stealth run.
-mcpUseClientModel prefers the calling agent's model for Aeon's own calls over MCP.`;
+humanLikeInput is off by default (faster). Set it true, or GRAFT_HUMAN_INPUT=1, for a stealth run.
+mcpUseClientModel prefers the calling agent's model for Graft's own calls over MCP.`;
 
-export async function settingsCommand(client: AeonClient, rest: string[]): Promise<number> {
+export async function settingsCommand(client: GraftClient, rest: string[]): Promise<number> {
   const [action = "get", ...pairs] = rest;
   if (action !== "get" && action !== "set") throw new Error(settingsUsage);
   const set = action === "set" ? parsePairs(pairs) : {};
@@ -46,12 +46,12 @@ async function storeLocal(local: Record<string, Setting>): Promise<void> {
 }
 
 async function sendExtension(
-  client: AeonClient,
+  client: GraftClient,
   extension: Record<string, Setting>,
 ): Promise<boolean> {
   const browsers = await client.settings(Object.keys(extension).length ? extension : undefined);
   if (!browsers.length) {
-    process.stderr.write("No connected Chrome has Aeon loaded.\n");
+    process.stderr.write("No connected Chrome has Graft loaded.\n");
     return false;
   }
   process.stdout.write(JSON.stringify(browsers.length === 1 ? browsers[0] : browsers, null, 2));

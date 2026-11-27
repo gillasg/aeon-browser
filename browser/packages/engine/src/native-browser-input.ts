@@ -134,7 +134,7 @@ export async function fillNode(
   options: { vault?: boolean } = {},
 ): Promise<{ readback?: string; via: FillVia }> {
   // A control's focus handler runs only while its document is the focused one, and a combobox
-  // can move focus into a replacement input there. Aeon fills tabs the user is not looking at,
+  // can move focus into a replacement input there. Graft fills tabs the user is not looking at,
   // so emulate focus for the fill or the value lands in an input we never measured.
   return withFocusEmulation(debuggee.tabId, async () => {
     // A page script that refills a credential field on focus can make a planted value look like one

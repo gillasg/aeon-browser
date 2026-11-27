@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactElement } from "react";
-import type { ManagementSnapshotDto } from "@aeon/protocol";
+import type { ManagementSnapshotDto } from "@graft/protocol";
 import { AbilitySource, CodeBadge, wayLabel } from "./ability-source.js";
 import type { ManagementSurfaceProps } from "./management-surface-props.js";
 
-// Abilities: every ability Aeon has saved across sites, with how it runs (api, steps, script,
+// Abilities: every ability Graft has saved across sites, with how it runs (api, steps, script,
 // page), its inputs and how often it worked. The agent saves, repairs and prunes these itself;
 // the user only runs them. Running happens in the daemon with the same engine as the CLI.
 
@@ -23,7 +23,7 @@ export function AbilitiesPanel(props: ManagementSurfaceProps): ReactElement {
     <section className="settings-group management-automations">
       <ActionNote note={props.snapshot?.lastAction} />
       {abilities.length ? (
-        <ul className="aeon-list ability-list">
+        <ul className="graft-list ability-list">
           {abilities.map((ability) => (
             <AbilityRow
               key={`${ability.site}:${ability.name}`}
@@ -39,10 +39,10 @@ export function AbilitiesPanel(props: ManagementSurfaceProps): ReactElement {
           ))}
         </ul>
       ) : (
-        <p className="management-empty">No skills yet. Aeon saves one each time a task works.</p>
+        <p className="management-empty">No skills yet. Graft saves one each time a task works.</p>
       )}
       <p className="settings-footnote">
-        Things Aeon learned to do on a site. It saves one when a task works, fixes it when the site
+        Things Graft learned to do on a site. It saves one when a task works, fixes it when the site
         changes and drops it when it keeps failing.
       </p>
     </section>
@@ -96,7 +96,7 @@ function AbilityRow({
         {ability.running ? (
           <span className="management-run-running">Running</span>
         ) : (
-          <button type="button" className="aeon-button" onClick={() => setOpen((value) => !value)}>
+          <button type="button" className="graft-button" onClick={() => setOpen((value) => !value)}>
             {open ? "Cancel" : "Run"}
           </button>
         )}
@@ -165,7 +165,7 @@ function RunForm({
           }
         />
       ))}
-      <button type="submit" className="aeon-button" data-tone="primary">
+      <button type="submit" className="graft-button" data-tone="primary">
         Start
       </button>
     </form>

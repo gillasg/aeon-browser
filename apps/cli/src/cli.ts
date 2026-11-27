@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// aeon. `aeon repl` takes a lean path (repl-fast.ts) because agents call it once per step; every
-// `aeon record` scripted actions likewise (record-fast.ts), and `aeon call|find|watch|status`
+// graft. `graft repl` takes a lean path (repl-fast.ts) because agents call it once per step; every
+// `graft record` scripted actions likewise (record-fast.ts), and `graft call|find|watch|status`
 // (site-fast.ts). `--version` reads package.json and nothing else. Every other command, and
 // repl's --help, loads the full command line (cli-main.ts).
 const argv = process.argv.slice(2);
@@ -13,7 +13,7 @@ if (["version", "--version", "-v", "-V"].includes(argv[0] ?? "")) {
   ) as {
     version?: string;
   };
-  process.stdout.write(`aeon ${manifest.version ?? "unknown"}\n`);
+  process.stdout.write(`graft ${manifest.version ?? "unknown"}\n`);
 } else if (argv[0] === "repl" && !help) {
   const { runRepl } = await import("./repl-fast.js");
   const { exitAfterFlush } = await import("./exit.js");

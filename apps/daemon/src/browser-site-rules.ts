@@ -1,4 +1,4 @@
-import type { SiteRulesAnswer } from "@aeon/pi-adapter";
+import type { SiteRulesAnswer } from "@graft/pi-adapter";
 
 // What a chat's runs must stay off, answered to the extension once per cell. The block list
 // itself lives in the extension's settings and is merged in there, so this only says:

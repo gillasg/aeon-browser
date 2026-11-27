@@ -2,8 +2,8 @@ import { mirrorAgentTabView } from "./agent-tab-view.js";
 import "./status-favicon.js";
 import { PageReconnect } from "./page-reconnect.js";
 import { createElement } from "react";
-import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@aeon/protocol";
-import { mountAeonUi, SidePanel, type SidePanelProps } from "@aeon/ui";
+import { ChatIdSchema, DaemonUiRequestSchema, type DaemonUiResponse } from "@graft/protocol";
+import { mountGraftUi, SidePanel, type SidePanelProps } from "@graft/ui";
 import type { UiClient } from "./ui-client-core.js";
 import { connectPage, connectionErrorMessage } from "./ui-connection.js";
 import { handoffKey, pendingHandoffs, saveChatContext } from "./browser-context-storage.js";
@@ -14,13 +14,13 @@ import { openManage } from "./manage-tab.js";
 
 const root = requiredElement("root");
 
-// Opening the side panel dismisses the orb on the page beside it: one Aeon at a time.
+// Opening the side panel dismisses the orb on the page beside it: one Graft at a time.
 void chrome.tabs
   .query({ active: true, currentWindow: true })
   .then(([tab]) =>
     tab?.id === undefined
       ? undefined
-      : chrome.tabs.sendMessage(tab.id, { kind: "aeon.orb.hide", keepRunning: false }),
+      : chrome.tabs.sendMessage(tab.id, { kind: "graft.orb.hide", keepRunning: false }),
   )
   .catch(() => undefined);
 let client: UiClient | undefined;
@@ -39,7 +39,7 @@ window.addEventListener("message", (event) => {
     event.source !== document.querySelector<HTMLIFrameElement>("#chat-frame")?.contentWindow
   )
     return;
-  if (event.data?.kind === "aeon.new-chat") {
+  if (event.data?.kind === "graft.new-chat") {
     void selectChat("").then(() => {
       draftProjectId = ChatIdSchema.safeParse(event.data.projectId).success
         ? event.data.projectId
@@ -48,7 +48,10 @@ window.addEventListener("message", (event) => {
     });
     return;
   }
-  if (event.data?.kind !== "aeon.select-chat" || !ChatIdSchema.safeParse(event.data.chatId).success)
+  if (
+    event.data?.kind !== "graft.select-chat" ||
+    !ChatIdSchema.safeParse(event.data.chatId).success
+  )
     return;
   void refreshChats().then(() => selectChat(event.data.chatId));
 });
@@ -78,7 +81,7 @@ function createView() {
 
 function render(): void {
   if (updateUi) updateUi(createView());
-  else updateUi = mountAeonUi(root, createView());
+  else updateUi = mountGraftUi(root, createView());
 }
 function setPickerOpen(open: boolean): void {
   pickerOpen = open;
@@ -137,7 +140,7 @@ async function start(): Promise<void> {
     await routePendingContext();
     if (!selectedChatId) render();
   } catch (error) {
-    status = `Aeon is unavailable · ${messageOf(error)}`;
+    status = `Graft is unavailable · ${messageOf(error)}`;
     render();
     throw error;
   }

@@ -23,7 +23,7 @@ export function watchStalls(
     Atomics.add(beat, 0, 1);
     if (late >= REPORT_MS)
       log(
-        `Aeon daemon: event loop blocked ${late} ms (heap ${Math.round(process.memoryUsage().heapUsed / 1e6)} MB)`,
+        `Graft daemon: event loop blocked ${late} ms (heap ${Math.round(process.memoryUsage().heapUsed / 1e6)} MB)`,
       );
   }, TICK_MS);
   timer.unref();
@@ -63,7 +63,7 @@ session.on("Debugger.paused", (event) => {
     const url = (frame.url || "").replace(/^.*[\\\\/]node_modules[\\\\/]/, "nm/").replace(/^.*[\\\\/](apps|packages|browser)[\\\\/]/, "$1/");
     return "  at " + (frame.functionName || "(anonymous)") + " " + url + ":" + (frame.location.lineNumber + 1);
   });
-  parentPort.postMessage("Aeon daemon: event loop blocked for " + (Date.now() - since) + " ms so far, main thread is at:\\n" + frames.join("\\n"));
+  parentPort.postMessage("Graft daemon: event loop blocked for " + (Date.now() - since) + " ms so far, main thread is at:\\n" + frames.join("\\n"));
   session.post("Debugger.resume");
   session.post("Debugger.disable");
 });

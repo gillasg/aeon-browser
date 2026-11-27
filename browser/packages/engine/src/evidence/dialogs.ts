@@ -283,12 +283,12 @@ function dismiss(type: string, message: string, warn?: string): DialogDecision {
 
 function unaskedWarn(type: string, message: string): string {
   const text = clip(message, 160);
-  return `[warn] the page opened a ${type} ("${text}") on its own; Aeon dismissed it. To answer the next one, await page.dialog.expect("accept") or page.dialog.expect("the text") first.`;
+  return `[warn] the page opened a ${type} ("${text}") on its own; Graft dismissed it. To answer the next one, await page.dialog.expect("accept") or page.dialog.expect("the text") first.`;
 }
 
 function leaveWarn(message: string): string {
   const text = clip(message, 160);
-  return `[warn] the page asked to leave ("${text}"); Aeon stayed because this is the user's tab or you did not start the navigation. To leave, await page.dialog.expect("accept") first.`;
+  return `[warn] the page asked to leave ("${text}"); Graft stayed because this is the user's tab or you did not start the navigation. To leave, await page.dialog.expect("accept") first.`;
 }
 
 function actionWarn(

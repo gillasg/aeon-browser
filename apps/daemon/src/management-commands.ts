@@ -1,9 +1,9 @@
-import { asChatId } from "@aeon/domain";
+import { asChatId } from "@graft/domain";
 import {
   HomeManagementSnapshotSchema,
   ManagementSnapshotSchema,
   type DaemonUiResponse,
-} from "@aeon/protocol";
+} from "@graft/protocol";
 import type { WebSocket } from "ws";
 import type { ChatService } from "./chat-service.js";
 import type { CommandRequest, ManagementActionCommand } from "./dev-chat-command-types.js";

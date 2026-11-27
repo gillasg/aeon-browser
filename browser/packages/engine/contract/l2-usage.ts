@@ -1,4 +1,4 @@
-// A realistic browser_code cell, type-checked against aeon-l2-contract.d.ts under --strict.
+// A realistic browser_code cell, type-checked against graft-l2-contract.d.ts under --strict.
 export async function sample(): Promise<string> {
   const page = await browser.activeTab();
   await page.goto("https://example.com/cart", { waitUntil: "domcontentloaded" });
@@ -37,7 +37,7 @@ export async function sample(): Promise<string> {
   try {
     await page.press("t999:e1", "Enter");
   } catch (error) {
-    if ((error as AeonError).code !== "WRONG_TAB") throw error;
+    if ((error as GraftError).code !== "WRONG_TAB") throw error;
   }
   return [view, hit.url, answer, issues.length, titles.join(","), res.status, help("human")].join(
     "\n",

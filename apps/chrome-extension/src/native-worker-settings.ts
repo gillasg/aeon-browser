@@ -1,4 +1,4 @@
-import { NativeSettingsRequestSchema, type AgentSettings } from "@aeon/protocol";
+import { NativeSettingsRequestSchema, type AgentSettings } from "@graft/protocol";
 import {
   applyHumanLikeInput,
   humanLikeInputOn,
@@ -11,8 +11,8 @@ import {
   readAgentFlag,
 } from "./agent-tab-view.js";
 
-// `aeon settings` from the CLI: Core asks for the agent settings, changing them first if asked.
-// Open settings and chat pages follow through chrome.storage. Screen recorders (Aeon Recorder) rely
+// `graft settings` from the CLI: Core asks for the agent settings, changing them first if asked.
+// Open settings and chat pages follow through chrome.storage. Screen recorders (Graft Recorder) rely
 // on this to switch settings for a recording; keep it.
 export function handleSettingsMessage(candidate: unknown, socket: WebSocket): boolean {
   const request = NativeSettingsRequestSchema.safeParse(candidate);

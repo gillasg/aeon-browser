@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactElement, type RefObject } from "react";
-import type { ChatCatalogItemDto } from "@aeon/protocol";
+import type { ChatCatalogItemDto } from "@graft/protocol";
 import { PickerChevron } from "./picker-chevron.js";
 import { SidebarIcon } from "./sidebar-icons.js";
 
@@ -17,7 +17,7 @@ export interface SidePanelProps {
 }
 
 /**
- * The switcher's name: `Aeon` on a clean install, `New chat` with history but nothing chosen, and
+ * The switcher's name: `Graft` on a clean install, `New chat` with history but nothing chosen, and
  * the chat's title only once it has one of its own (never a phantom title on an idle panel).
  */
 export function switcherLabel(
@@ -26,7 +26,7 @@ export function switcherLabel(
 ): string {
   const title = selected?.title.trim();
   if (title && !/^new chat$/i.test(title)) return title;
-  return chats.length ? "New chat" : "Aeon";
+  return chats.length ? "New chat" : "Graft";
 }
 
 export function SidePanel(props: SidePanelProps): ReactElement {
@@ -135,7 +135,7 @@ function PickerMenu({ props }: { props: SidePanelProps }): ReactElement {
       />
       <hr className="picker-divider" />
       <button id="picker-manage" className="picker-manage" type="button" onClick={props.onManage}>
-        Manage Aeon <span aria-hidden="true">↗</span>
+        Manage Graft <span aria-hidden="true">↗</span>
       </button>
     </div>
   );
@@ -215,7 +215,7 @@ function groupChatsByRecency(
 }
 
 function ChatFrame({ chatId, src }: { chatId: string; src: string }): ReactElement {
-  return <iframe key={chatId} id="chat-frame" title="Selected Aeon Chat" src={src} />;
+  return <iframe key={chatId} id="chat-frame" title="Selected Graft Chat" src={src} />;
 }
 
 function PanelEmpty(): ReactElement {

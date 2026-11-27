@@ -6,7 +6,7 @@ index 7178a02..3186906 100644
      extensionCacheGeneration++;
  }
  function useExtensionCacheCwd(cwd) {
-+    // Aeon: cached entries are module factories keyed by absolute path; every session still
++    // Graft: cached entries are module factories keyed by absolute path; every session still
 +    // creates fresh extension instances, so a daemon serving many working directories keeps
 +    // the cache instead of re-importing every extension whenever the directory changes.
      const resolvedCwd = resolvePath(cwd);
@@ -36,7 +36,7 @@ index d616902..5a728e4 100644
      // Check if session has existing data to restore
      const existingSession = sessionManager.buildSessionContext();
 -    const hasExistingSession = existingSession.messages.length > 0;
-+    // Aeon considers the initial model/thinking entries to be a materialized
++    // Graft considers the initial model/thinking entries to be a materialized
 +    // session, even before the first user or assistant message exists.
 +    const hasExistingSession = sessionManager.getEntries().length > 0;
      const hasThinkingEntry = sessionManager.getBranch().some((entry) => entry.type === "thinking_level_change");

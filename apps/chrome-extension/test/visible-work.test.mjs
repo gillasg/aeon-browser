@@ -11,7 +11,7 @@ import test from "node:test";
 // This invariant fails if a hidden page schedules frames or timers after it is hidden.
 
 async function loadVisibleWork() {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-visible-work-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-visible-work-"));
   const outfile = join(directory, "visible-work.mjs");
   await build({
     entryPoints: [

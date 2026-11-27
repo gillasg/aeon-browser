@@ -23,11 +23,11 @@ function runtimeSource() {
     .join("\n");
 }
 
-/** What the agent reads: shared sections, tool guidance, primer, Aeon-only parts, help topics. */
+/** What the agent reads: shared sections, tool guidance, primer, Graft-only parts, help topics. */
 function agentText() {
   const docs = join(browserRoot, "docs", "agent");
   const sections = join(docs, "sections");
-  const parts = join(repo, "skills", "aeon", "parts");
+  const parts = join(repo, "skills", "graft", "parts");
   return [
     ...readdirSync(sections).map((name) => read(join(sections, name))),
     read(join(docs, "guidance.md")),
@@ -111,9 +111,9 @@ test("every error code named in the agent text is one the engine can raise", () 
   );
 });
 
-// Outside agents read the skill sections; Aeon's own agent reads guidance.md, its extra text and
-// help(). Whatever the skill teaches must reach Aeon's agent too, by one of those.
-test("every call the skill teaches reaches Aeon's own agent (guidance or help)", () => {
+// Outside agents read the skill sections; Graft's own agent reads guidance.md, its extra text and
+// help(). Whatever the skill teaches must reach Graft's agent too, by one of those.
+test("every call the skill teaches reaches Graft's own agent (guidance or help)", () => {
   const docs = join(browserRoot, "docs", "agent");
   const sections = join(docs, "sections");
   const skill = readdirSync(sections)
@@ -126,7 +126,7 @@ test("every call the skill teaches reaches Aeon's own agent (guidance or help)",
     packText(),
   ].join("\n");
   const missing = [...namedCalls(skill).keys()].filter((call) => !own.includes(call));
-  assert.deepEqual(missing, [], `the skill teaches calls Aeon's agent never hears of: ${missing}`);
+  assert.deepEqual(missing, [], `the skill teaches calls Graft's agent never hears of: ${missing}`);
 });
 
 // help(topic) names in the agent text are real topics (or aliases), and the topic list the tool
@@ -155,6 +155,6 @@ test("help('video') is present and teaches the recording, kit and honesty rule",
   assert.ok(HELP_TOPICS.video, "the video topic exists");
   assert.match(HELP_TOPICS.video, /events\.json/);
   assert.match(HELP_TOPICS.video, /Remotion/);
-  assert.match(HELP_TOPICS.video, /never show Aeon doing anything it did not do/);
+  assert.match(HELP_TOPICS.video, /never show Graft doing anything it did not do/);
   assert.match(HELP_TOPICS.video, /record terminal/);
 });

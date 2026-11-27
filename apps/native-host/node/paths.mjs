@@ -3,7 +3,7 @@ import { chmodSync, lstatSync, mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { posix, win32 } from "node:path";
 
-// The same app root the daemon and the CLI resolve (see @aeon/location). Paths are computed here
+// The same app root the daemon and the CLI resolve (see @graft/location). Paths are computed here
 // too because the native host runs before/without the TypeScript build.
 
 export function appRoot(options = {}) {
@@ -12,16 +12,16 @@ export function appRoot(options = {}) {
   const home = options.home ?? homedir();
   const path = platform === "win32" ? win32 : posix;
   if (platform === "win32")
-    return path.join(env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), "Aeon");
-  if (platform === "darwin") return path.join(home, "Library", "Application Support", "Aeon");
-  return path.join(env.XDG_DATA_HOME || path.join(home, ".local", "share"), "aeon");
+    return path.join(env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), "Graft");
+  if (platform === "darwin") return path.join(home, "Library", "Application Support", "Graft");
+  return path.join(env.XDG_DATA_HOME || path.join(home, ".local", "share"), "graft");
 }
 
 export function dataDirectory(options = {}) {
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const path = platform === "win32" ? win32 : posix;
-  const configured = env.AEON_DATA_DIR;
+  const configured = env.GRAFT_DATA_DIR;
   if (configured)
     return path.resolve(configured.replace(/^~(?=$|[\\/])/, options.home ?? homedir()));
   return path.join(appRoot(options), "data");
@@ -42,23 +42,23 @@ export function runtimeDirectory(options = {}) {
 
 /** An explicit parent wins on every POSIX OS; the same ownership checks apply inside it. */
 function posixRuntimeDirectory(platform, env, uid) {
-  if (env.AEON_RUNTIME_DIR) return posix.join(env.AEON_RUNTIME_DIR, "aeon");
-  if (platform === "linux" && env.XDG_RUNTIME_DIR) return posix.join(env.XDG_RUNTIME_DIR, "aeon");
+  if (env.GRAFT_RUNTIME_DIR) return posix.join(env.GRAFT_RUNTIME_DIR, "graft");
+  if (platform === "linux" && env.XDG_RUNTIME_DIR) return posix.join(env.XDG_RUNTIME_DIR, "graft");
   if (platform === "darwin") {
     const mac = macRuntimeDirectory(env, uid);
     if (mac) return mac;
   }
-  return posix.join("/tmp", `aeon-${uid ?? "user"}`);
+  return posix.join("/tmp", `graft-${uid ?? "user"}`);
 }
 
 /**
  * macOS gives each user a private temp dir (confstr _CS_DARWIN_USER_TEMP_DIR), exposed by Node as
  * os.tmpdir()/$TMPDIR. The Chrome-launched host and the launchd supervisor resolve the same path,
- * so they agree on the socket. A shared /tmp is not good enough; fall back to /tmp/aeon-<uid>.
+ * so they agree on the socket. A shared /tmp is not good enough; fall back to /tmp/graft-<uid>.
  */
 function macRuntimeDirectory(env, uid) {
   const base = env.TMPDIR ?? tmpdir();
-  return privateTempDir(base, uid) ? posix.join(base, "aeon") : undefined;
+  return privateTempDir(base, uid) ? posix.join(base, "graft") : undefined;
 }
 
 /** True when `base` is this user's own temp dir and safe to hold the socket directory. */
@@ -138,7 +138,7 @@ export function verifySocketOwner(path, options = {}) {
 
 /**
  * Unix socket paths are limited to ~104 bytes, so the socket is short and per-user: under
- * $XDG_RUNTIME_DIR on Linux, else /tmp/aeon-<uid> (created 0700 and owner-checked). 0600 keeps
+ * $XDG_RUNTIME_DIR on Linux, else /tmp/graft-<uid> (created 0700 and owner-checked). 0600 keeps
  * the bound socket owner-only; the directory keeps another user from pre-binding the path.
  */
 export function socketPath(options = {}) {
@@ -149,12 +149,12 @@ export function socketPath(options = {}) {
   const user = uid ?? "user";
   const directory = runtimeDirectory({ ...options, uid });
   // Windows keeps the legacy short name: named pipes are not files another user can pre-create.
-  if (!directory) return path.join("/tmp", `aeon-${user}-${hash}.sock`);
+  if (!directory) return path.join("/tmp", `graft-${user}-${hash}.sock`);
   const socket = path.join(directory, `${hash}.sock`);
   // A pathological $XDG_RUNTIME_DIR must not push the socket over the ~104-byte limit: fall back
   // to the private per-user directory in /tmp instead.
   if (socket.length < 104) return socket;
-  return path.join("/tmp", `aeon-${user}`, `${hash}.sock`);
+  return path.join("/tmp", `graft-${user}`, `${hash}.sock`);
 }
 
 export function hostPaths(options = {}) {
@@ -166,7 +166,7 @@ export function hostPaths(options = {}) {
     log: path.join(root, "daemon-supervisor.log"),
     status: path.join(root, "daemon-supervisor-status.json"),
     socket: socketPath(options),
-    launcher: path.join(root, "aeon-native-host"),
+    launcher: path.join(root, "graft-native-host"),
     data: dataDirectory(options),
   };
 }

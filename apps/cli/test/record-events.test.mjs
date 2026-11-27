@@ -13,11 +13,11 @@ import {
 } from "../dist/record-events.js";
 
 test("writeEvents writes an atomic, readable events.json", async () => {
-  const folder = await mkdtemp(join(tmpdir(), "aeon-events-"));
+  const folder = await mkdtemp(join(tmpdir(), "graft-events-"));
   try {
     const events = {
       version: 1,
-      recorder: "aeon",
+      recorder: "graft",
       clock: "clip",
       clip: {
         file: "clip.mp4",

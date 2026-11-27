@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Api, AssistantMessage, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { chooseCompletionModel } from "./completion-model.js";
-import { createAeonModelRuntime } from "./live-models.js";
+import { createGraftModelRuntime } from "./live-models.js";
 
 // One plain completion with the model a new chat would use: the same runtime (auth.json and
 // models.json, so custom providers work) and the same default as the model picker.
@@ -25,7 +25,7 @@ export async function defaultModel(
   options: CompletionOptions,
   choice: CompletionChoice,
 ): Promise<{ runtime: ModelRuntime; model: Model<Api> }> {
-  const runtime = await createAeonModelRuntime({
+  const runtime = await createGraftModelRuntime({
     ...(options.agentDirectory ? { agentDirectory: options.agentDirectory } : {}),
   });
   const models = await runtime.getAvailable();

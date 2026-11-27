@@ -14,7 +14,7 @@ const CLEAN_SNAPSHOT = {
   clickCount: 1,
   allClicksTrusted: true,
   clicksHaveCoords: true,
-  inputValue: "hello aeon",
+  inputValue: "hello graft",
   allInputsTrusted: true,
 };
 

@@ -6,7 +6,7 @@ import test from "node:test";
 import { startDevHandshakeServer } from "../dist/dev-harness.js";
 import { ChatService, closeProjectServices } from "./chat-service-fixture.mjs";
 import { connectDevUi, requestId } from "./dev-chat-client.mjs";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 
 const DEV_GRANT = "A".repeat(43);
 
@@ -71,7 +71,7 @@ function createControllablePort() {
 }
 
 async function startChat(t) {
-  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "aeon-event-drop-")));
+  const dataDirectory = resolve(await mkdtemp(join(tmpdir(), "graft-event-drop-")));
   assert.ok(dataDirectory.startsWith(`${resolve(tmpdir())}${sep}`));
   const store = openChatStore(dataDirectory);
   const controllable = createControllablePort();

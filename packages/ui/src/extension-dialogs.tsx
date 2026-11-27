@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactElement } from "react";
-import type { PiUiSnapshotDto } from "@aeon/protocol";
+import type { PiUiSnapshotDto } from "@graft/protocol";
 import { ApprovalCard } from "./run-cards.js";
 
 type ExtensionDialog = PiUiSnapshotDto["extensionDialogs"][number];

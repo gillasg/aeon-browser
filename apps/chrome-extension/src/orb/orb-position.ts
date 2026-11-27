@@ -6,7 +6,7 @@ export interface OrbPosition {
   bottom: number;
 }
 
-export const ORB_POSITION_KEY = "aeon-orb-position";
+export const ORB_POSITION_KEY = "graft-orb-position";
 export const DEFAULT_ORB_POSITION: OrbPosition = { left: 56, bottom: 56 };
 
 export function parseOrbPosition(value: unknown): OrbPosition {

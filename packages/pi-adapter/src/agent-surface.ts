@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
-import { asActivationId, asChatId, type PiBrowserContextRecord } from "@aeon/domain";
+import { asActivationId, asChatId, type PiBrowserContextRecord } from "@graft/domain";
 import {
   getCurrentSystemPrompt,
   getCurrentTools,
@@ -33,7 +33,7 @@ export const AGENT_SURFACE_PAGE: PiBrowserContextRecord = {
 
 const NEW_CHAT_PROMPT = "New chat.";
 
-/** The production first turn for the fixed page, so aeon-eval can rebuild it. */
+/** The production first turn for the fixed page, so graft-eval can rebuild it. */
 export function exampleFirstTurn(prompt = NEW_CHAT_PROMPT): string {
   return buildFirstTurn({
     prompt,
@@ -101,10 +101,10 @@ async function captureNewChat(paths: AgentSurfacePaths): Promise<TranscriptConte
   const stop = captureFixtureModelRequest((context) => {
     first ??= context;
   });
-  const previousNow = process.env.AEON_SURFACE_NOW;
-  const previousZone = process.env.AEON_SURFACE_ZONE;
-  process.env.AEON_SURFACE_NOW = SURFACE_NOW;
-  process.env.AEON_SURFACE_ZONE = SURFACE_ZONE;
+  const previousNow = process.env.GRAFT_SURFACE_NOW;
+  const previousZone = process.env.GRAFT_SURFACE_ZONE;
+  process.env.GRAFT_SURFACE_NOW = SURFACE_NOW;
+  process.env.GRAFT_SURFACE_ZONE = SURFACE_ZONE;
   const adapter = new PiSdkSessionAdapter({
     sessionDirectory: paths.sessionDirectory,
     agentDirectory: paths.agentDirectory,
@@ -128,8 +128,8 @@ async function captureNewChat(paths: AgentSurfacePaths): Promise<TranscriptConte
   } finally {
     stop();
     await adapter.closeAll();
-    restoreEnv("AEON_SURFACE_NOW", previousNow);
-    restoreEnv("AEON_SURFACE_ZONE", previousZone);
+    restoreEnv("GRAFT_SURFACE_NOW", previousNow);
+    restoreEnv("GRAFT_SURFACE_ZONE", previousZone);
   }
   if (!first) throw new Error("The fixture model did not receive a request.");
   return first;
@@ -195,7 +195,7 @@ function stableJson(value: unknown): string {
 }
 
 function restoreEnv(
-  name: "AEON_SURFACE_NOW" | "AEON_SURFACE_ZONE",
+  name: "GRAFT_SURFACE_NOW" | "GRAFT_SURFACE_ZONE",
   previous: string | undefined,
 ): void {
   if (previous === undefined) delete process.env[name];

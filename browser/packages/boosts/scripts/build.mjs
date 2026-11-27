@@ -1,4 +1,4 @@
-// Boosts ship inside Aeon's extension (see embed-build.mjs). This builds only the pure modules
+// Boosts ship inside Graft's extension (see embed-build.mjs). This builds only the pure modules
 // (no chrome.* at import time) the unit tests import.
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";

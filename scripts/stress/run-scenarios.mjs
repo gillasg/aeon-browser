@@ -1,4 +1,4 @@
-// CLI runner for Aeon's real-Chrome stress, soak, chaos, and fuzz scenarios.
+// CLI runner for Graft's real-Chrome stress, soak, chaos, and fuzz scenarios.
 // Usage: node scripts/stress/run-scenarios.mjs [--dry-run] [--seed=42] [--soak-ms=0] [--scenarios=a,b]
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -36,7 +36,7 @@ async function startStressSite() {
       return;
     }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end("<!doctype html><title>Aeon Stress</title><input id='fuzz' type='text'>");
+    res.end("<!doctype html><title>Graft Stress</title><input id='fuzz' type='text'>");
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);

@@ -4,7 +4,7 @@ import {
   generateStandaloneClient,
   searchCatalog,
 } from "@browserkit/tools/site-to-api";
-import type { AeonClient } from "./client.js";
+import type { GraftClient } from "./client.js";
 import { callCatalogResult, type CatalogTool } from "./catalog.js";
 import { answer, questions } from "./converse.js";
 import type { TaskContext } from "./mcp-tasks.js";
@@ -24,7 +24,7 @@ const RUN_HANDLE = "h_run_";
 const HANDOFF_SESSION = "mcp-handoff-watch";
 
 export interface CodeToolDeps {
-  aeon: () => Promise<AeonClient>;
+  graft: () => Promise<GraftClient>;
   parking: ParkingLot;
   catalog: () => readonly CatalogTool[];
   /** Resolves once the first catalog load has finished (or a bounded wait ran out). */
@@ -53,10 +53,10 @@ export async function codeSurfaceCall(
 ): Promise<unknown> {
   try {
     if (name === "browser_code") return await browserCode(args, deps);
-    if (name === "aeon_find") return text(await find(args, deps));
-    if (name === "aeon_call") return await call(args, deps);
-    if (name === "aeon_resume") return await resume(args, deps);
-    if (name === "aeon_run") return await run(args, deps);
+    if (name === "graft_find") return text(await find(args, deps));
+    if (name === "graft_call") return await call(args, deps);
+    if (name === "graft_resume") return await resume(args, deps);
+    if (name === "graft_run") return await run(args, deps);
     return errorResult(new Error(`Unknown tool ${name}`));
   } catch (error) {
     return errorResult(error);
@@ -67,7 +67,7 @@ function browserCode(args: Json, deps: CodeToolDeps): Promise<unknown> {
   const listTabs = async () =>
     (
       await (
-        await deps.aeon()
+        await deps.graft()
       ).browserRun({
         code: HANDOFF_TABS_CODE,
         session: HANDOFF_SESSION,
@@ -109,12 +109,12 @@ async function find(args: Json, deps: CodeToolDeps): Promise<unknown> {
   const ref = typeof args.ref === "string" ? args.ref.trim() : "";
   if (ref.startsWith("site:")) {
     const model = await loadModel(ref.slice(5));
-    if (!model) throw new Error(`${ref.slice(5)} is not mapped. Learn it: aeon compile <url>`);
+    if (!model) throw new Error(`${ref.slice(5)} is not mapped. Learn it: graft compile <url>`);
     return generateStandaloneClient(model).declarations;
   }
   if (ref) {
     const tool = findTool(tools, ref);
-    if (!tool) throw new Error(`Unknown ref ${ref}; search with aeon_find {query}`);
+    if (!tool) throw new Error(`Unknown ref ${ref}; search with graft_find {query}`);
     const model = tool.kind === "operation" ? await loadModel(tool.site) : undefined;
     const signature = model ? operationDeclaration(model, tool.id) : undefined;
     return {
@@ -123,7 +123,7 @@ async function find(args: Json, deps: CodeToolDeps): Promise<unknown> {
       dts:
         signature ??
         `declare function ${tool.id}(params: ${JSON.stringify(tool.inputSchema)}): Promise<unknown>;`,
-      example: { tool: "aeon_call", arguments: { ref: `${tool.site}/${tool.id}`, params: {} } },
+      example: { tool: "graft_call", arguments: { ref: `${tool.site}/${tool.id}`, params: {} } },
     };
   }
   const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -148,7 +148,7 @@ async function run(args: Json, deps: CodeToolDeps): Promise<unknown> {
     ...(typeof args.model === "string" ? { model: args.model } : {}),
     ...(args.quiet === true ? { quiet: true } : {}),
   });
-  return text({ status: "working", handle: `${RUN_HANDLE}${runId}`, resumeWith: "aeon_resume" });
+  return text({ status: "working", handle: `${RUN_HANDLE}${runId}`, resumeWith: "graft_resume" });
 }
 
 async function resume(args: Json, deps: CodeToolDeps): Promise<unknown> {
@@ -175,7 +175,7 @@ async function resumeRun(
 ): Promise<unknown> {
   const record = deps.runs.get(handle.slice(RUN_HANDLE.length));
   if (!record) throw new Error(`Unknown handle ${handle}`);
-  const client = await deps.aeon();
+  const client = await deps.graft();
   const chatId = record.chats[0];
   if (typeof args.reply === "string" && chatId) await answer(client, chatId, args.reply);
   const deadline = Date.now() + waitMs;
@@ -184,9 +184,9 @@ async function resumeRun(
     if (record.error) return errorResult(new Error(record.error));
     const asked = chatId ? await questions(client, chatId).catch(() => []) : [];
     if (asked.length)
-      return text({ status: "paused", handle, questions: asked, resumeWith: "aeon_resume" });
+      return text({ status: "paused", handle, questions: asked, resumeWith: "graft_resume" });
     if (Date.now() >= deadline)
-      return text({ status: "working", handle, chatId, resumeWith: "aeon_resume" });
+      return text({ status: "working", handle, chatId, resumeWith: "graft_resume" });
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }

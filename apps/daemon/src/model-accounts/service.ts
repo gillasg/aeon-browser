@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import type { AuthType, Models, ModelsStore } from "@earendil-works/pi-ai";
-import { createAeonModelRuntime, refreshInBackground } from "@aeon/pi-adapter";
+import { createGraftModelRuntime, refreshInBackground } from "@graft/pi-adapter";
 import {
   availableModels,
   providerStatuses,
@@ -50,7 +50,7 @@ export class LoginService extends EventEmitter {
     this.runtime =
       options.models !== undefined
         ? Promise.resolve(options.models)
-        : createAeonModelRuntime({
+        : createGraftModelRuntime({
             agentDirectory: this.agentDir,
             ...(options.modelsStore ? { modelsStore: options.modelsStore } : {}),
             ...(options.fetch ? { fetch: options.fetch } : {}),

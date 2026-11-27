@@ -7,7 +7,7 @@ import { send } from "./cdp/send.js";
 import { withBrowserDebugger } from "./native-browser-session.js";
 import { onEngineInstall } from "./native-engine-install.js";
 
-export const SCRIPT_KEY = "aeon-site-scripts";
+export const SCRIPT_KEY = "graft-site-scripts";
 export function readScripts(value: unknown): SiteScriptDefinition[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -17,19 +17,19 @@ export function readScripts(value: unknown): SiteScriptDefinition[] {
 }
 
 const bootstrap = `
-const previous = globalThis.__aeonSiteScript;
+const previous = globalThis.__graftSiteScript;
 if (previous && previous.revision === revision && !previous.failed) return {alreadyApplied:true};
 previous?.dispose();
 const cleanups = [], controller = new AbortController();
 const state = {revision, failed:false, completed:false, url:location.href, startedAt:Date.now(), value:null, error:null, dispose: () => {
   controller.abort();
   for (const cleanup of cleanups.splice(0).reverse()) {try {cleanup();} catch {}}
-  delete globalThis.__aeonSiteScript;
+  delete globalThis.__graftSiteScript;
 }};
-globalThis.__aeonSiteScript = state;
+globalThis.__graftSiteScript = state;
 const report = (error) => {
   state.failed = true; state.error = String(error?.message || error).slice(0,1000);
-  globalThis.chrome?.runtime?.sendMessage?.({kind:'aeon.script.report', scriptId, revision,
+  globalThis.chrome?.runtime?.sendMessage?.({kind:'graft.script.report', scriptId, revision,
     error:String(error?.message || error).slice(0,1000)})?.catch(() => {});
 };
 const guarded = (fn) => {try {Promise.resolve(fn()).catch(report);} catch(error) {report(error);}};
@@ -38,7 +38,7 @@ const style = (text) => {
   element.textContent = text; (document.head || document.documentElement).append(element);
   cleanups.push(() => element.remove()); return element;
 };
-const aeon = Object.freeze({signal:controller.signal, style,
+const graft = Object.freeze({signal:controller.signal, style,
   cleanup: (fn) => {if(typeof fn !== 'function') throw Error('cleanup needs a function'); cleanups.push(fn);},
   hide: (selector) => style(selector + '{display:none!important}'),
   onChange: (fn) => {
@@ -70,22 +70,22 @@ try {
 } catch(error) {report(error); return {applied:false, error:String(error?.message || error).slice(0,1000)};}
 })()`;
 }
-export const siteScriptCleanup = "globalThis.__aeonSiteScript?.dispose(); ({removed:true})";
+export const siteScriptCleanup = "globalThis.__graftSiteScript?.dispose(); ({removed:true})";
 
 export async function inspectSiteScript(tabId: number, scriptId?: string): Promise<unknown> {
   if (!scriptId) throw new Error("Provide scriptId for status.");
-  const stored = await chrome.storage.local.get([SCRIPT_KEY, "aeon-site-script-errors"]);
+  const stored = await chrome.storage.local.get([SCRIPT_KEY, "graft-site-script-errors"]);
   const saved = readScripts(stored[SCRIPT_KEY]).find((script) => script.scriptId === scriptId);
   const tab = await chrome.tabs.get(tabId);
   try {
-    const registered = await chrome.userScripts.getScripts({ ids: ["aeon-site-" + scriptId] });
+    const registered = await chrome.userScripts.getScripts({ ids: ["graft-site-" + scriptId] });
     const results = await chrome.userScripts.execute({
       target: { tabId },
       world: "USER_SCRIPT",
-      worldId: "aeon-site-" + scriptId,
+      worldId: "graft-site-" + scriptId,
       js: [
         {
-          code: `(() => {const s = globalThis.__aeonSiteScript; return s ? {revision:s.revision,
+          code: `(() => {const s = globalThis.__graftSiteScript; return s ? {revision:s.revision,
         completed:s.completed === true, failed:s.failed, error:s.error, startedAt:s.startedAt,
         url:location.href, value:s.value} : {executed:false,url:location.href};})()`,
         },
@@ -100,7 +100,7 @@ export async function inspectSiteScript(tabId: number, scriptId?: string): Promi
       execution: first?.result ?? null,
       error: first?.error ? String(first.error) : undefined,
       lastError:
-        (stored["aeon-site-script-errors"] as Record<string, unknown> | undefined)?.[scriptId] ??
+        (stored["graft-site-script-errors"] as Record<string, unknown> | undefined)?.[scriptId] ??
         null,
     };
   } catch (error) {
@@ -200,8 +200,8 @@ async function boundedPreview<T>(operation: Promise<T>): Promise<T> {
   }
 }
 
-const PENDING_KEY = "aeon-site-script-access";
-const PREFIX = "aeon-site-";
+const PENDING_KEY = "graft-site-script-access";
+const PREFIX = "graft-site-";
 let chain: Promise<unknown> = Promise.resolve();
 
 export function handleScriptSync(candidate: unknown): boolean {
@@ -349,17 +349,17 @@ function matchesSite(script: SiteScriptDefinition, url: string): boolean {
   );
 }
 async function recordError(id: string, error: string): Promise<void> {
-  const stored = await chrome.storage.local.get("aeon-site-script-errors");
-  const previous = stored["aeon-site-script-errors"] ?? {};
+  const stored = await chrome.storage.local.get("graft-site-script-errors");
+  const previous = stored["graft-site-script-errors"] ?? {};
   await chrome.storage.local.set({
-    "aeon-site-script-errors": { ...previous, [id]: error.slice(0, 1000) },
+    "graft-site-script-errors": { ...previous, [id]: error.slice(0, 1000) },
   });
 }
 onEngineInstall(() => {
   chrome.runtime.onUserScriptMessage.addListener((message, sender) => {
     if (
       sender.id !== chrome.runtime.id ||
-      message?.kind !== "aeon.script.report" ||
+      message?.kind !== "graft.script.report" ||
       typeof message.scriptId !== "string" ||
       typeof message.error !== "string"
     )

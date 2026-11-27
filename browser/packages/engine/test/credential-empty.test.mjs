@@ -1,4 +1,4 @@
-// A credential field the page refilled must be empty before Aeon types into it: a letterless mask
+// A credential field the page refilled must be empty before Graft types into it: a letterless mask
 // still counts as empty, a value with letters does not.
 import assert from "node:assert/strict";
 import test from "node:test";

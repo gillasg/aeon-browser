@@ -1,6 +1,6 @@
-import type { RoutineRecord } from "@aeon/domain";
-import { appendEventLog, type AeonEventKind, type AeonEventRecord } from "@aeon/location";
-import { scrubSecrets } from "@aeon/protocol";
+import type { RoutineRecord } from "@graft/domain";
+import { appendEventLog, type GraftEventKind, type GraftEventRecord } from "@graft/location";
+import { scrubSecrets } from "@graft/protocol";
 import { isListening } from "./routine-listeners.js";
 import { isLive } from "./routine-listen.js";
 
@@ -10,18 +10,18 @@ type FiredRoutine = Pick<
 >;
 
 /** What fired: a response listener, a webhook routine, or a plain watcher check. */
-export function routineEventKind(routine: FiredRoutine): AeonEventKind {
+export function routineEventKind(routine: FiredRoutine): GraftEventKind {
   if (isListening(routine) || isLive(routine)) return "listener";
   return routine.webhook?.url ? "webhook" : "watcher";
 }
 
-/** Record a passed check for `aeon mcp` subscribers, scrubbed before it touches disk. */
+/** Record a passed check for `graft mcp` subscribers, scrubbed before it touches disk. */
 export function recordRoutineEvent(
   dataDirectory: string,
   routine: FiredRoutine,
   value: unknown,
   now: () => Date = () => new Date(),
-): Promise<AeonEventRecord> {
+): Promise<GraftEventRecord> {
   return appendEventLog(dataDirectory, {
     kind: routineEventKind(routine),
     routineId: routine.routineId,

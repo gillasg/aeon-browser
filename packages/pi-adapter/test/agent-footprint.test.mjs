@@ -15,7 +15,7 @@ const bytes = (value) =>
   Buffer.byteLength(typeof value === "string" ? value : JSON.stringify(value));
 
 test("the always-on footprint stays under its ceilings", { timeout: 120_000 }, async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-footprint-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-footprint-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const surface = await buildAgentSurface({
     workingDirectory: join(root, "workspace"),

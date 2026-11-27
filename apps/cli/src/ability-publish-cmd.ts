@@ -1,10 +1,10 @@
-// `aeon abilities publish|review`: the shareable definition and its deterministic checks, plus an
+// `graft abilities publish|review`: the shareable definition and its deterministic checks, plus an
 // optional model review as a separate command. Nothing here runs on a save or a run.
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { completeWithDefaultModel } from "@aeon/pi-adapter";
+import { completeWithDefaultModel } from "@graft/pi-adapter";
 import {
   createRedactor,
   formatFinding,
@@ -71,7 +71,7 @@ export async function reviewAbility(site: string, name: string, args: Args): Pro
 }
 
 async function completeReview(ability: Ability): Promise<string> {
-  const session = await mkdtemp(join(tmpdir(), "aeon-ability-review-"));
+  const session = await mkdtemp(join(tmpdir(), "graft-ability-review-"));
   try {
     return await completeWithDefaultModel(
       {

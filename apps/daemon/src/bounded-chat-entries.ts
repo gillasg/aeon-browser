@@ -1,4 +1,4 @@
-import type { ChatViewSnapshot, PiSessionHandle } from "@aeon/domain";
+import type { ChatViewSnapshot, PiSessionHandle } from "@graft/domain";
 export function boundedChatEntries(all: ChatViewSnapshot["entries"]): {
   entries: ChatViewSnapshot["entries"];
   omittedEntryCount: number;

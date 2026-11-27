@@ -9,9 +9,9 @@ export const STEALTH_TRACE_URL = "https://www.cloudflare.com/cdn-cgi/trace";
 export const WEBRTC_FLAG = "--webrtc-ip-handling-policy=disable_non_proxied_udp";
 export const WEBRTC_FIX = `Restart Chrome with ${WEBRTC_FLAG} (Chrome's WebRTC IP handling policy), then retry.`;
 export const STABLE_FIX =
-  "Run the stable, branded Google Chrome on a real display with its default profile, then update Aeon if a tell remains.";
+  "Run the stable, branded Google Chrome on a real display with its default profile, then update Graft if a tell remains.";
 
-const OPEN_AEON = "Open Chrome with Aeon loaded so the stealth tab can run.";
+const OPEN_GRAFT = "Open Chrome with Graft loaded so the stealth tab can run.";
 const TRACE_FIX = `Make sure Chrome can reach ${STEALTH_TRACE_URL} through its normal route, then retry.`;
 
 /** One gathered ICE candidate, as the page saw it. */
@@ -59,9 +59,9 @@ export function stealthChecks(facts: StealthFacts): Check[] {
   if (facts.error) {
     const detail = `Not checked: ${facts.error}`;
     return [
-      check("webrtc", "fail", detail, OPEN_AEON),
-      check("geo", "fail", detail, OPEN_AEON),
-      check("tells", "fail", detail, OPEN_AEON),
+      check("webrtc", "fail", detail, OPEN_GRAFT),
+      check("geo", "fail", detail, OPEN_GRAFT),
+      check("tells", "fail", detail, OPEN_GRAFT),
     ];
   }
   return [webrtcCheck(facts.webrtc), geoCheck(facts.geo), tellsCheck(facts.page)];
@@ -179,7 +179,7 @@ interface TellSink {
 }
 
 function tellsCheck(page: StealthFacts["page"]): Check {
-  if (!page) return check("tells", "fail", "The page tell probe did not run.", OPEN_AEON);
+  if (!page) return check("tells", "fail", "The page tell probe did not run.", OPEN_GRAFT);
   const { issues, fixes } = collectTells(page);
   if (!issues.length) return check("tells", "ok", okDetail(page), STABLE_FIX);
   return check(
@@ -201,7 +201,7 @@ function collectTells(page: NonNullable<StealthFacts["page"]>): {
     if (!fixes.includes(fix)) fixes.push(fix);
   };
   addBrowserTells(page, add);
-  for (const signal of page.signals ?? []) add(signal, "update Aeon, then run the stable Chrome");
+  for (const signal of page.signals ?? []) add(signal, "update Graft, then run the stable Chrome");
   return { issues, fixes };
 }
 

@@ -10,7 +10,7 @@ import { abilityCards, lastActionNote } from "../dist/management-library.js";
 // The versions/restore management actions without a browser: real ability files in a temp home.
 
 async function home() {
-  const root = await mkdtemp(join(tmpdir(), "aeon-ability-versions-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-ability-versions-"));
   process.env.BROWSERKIT_HOME = join(root, "browserkit");
   process.env.SITE_TO_API_HOME = join(root, "sites");
   return root;

@@ -370,7 +370,7 @@ export async function restoreBrowserSessionOwners(): Promise<void> {
   await restoreBrowserOwners(owners);
 }
 
-const key = "aeon-browser-owners";
+const key = "graft-browser-owners";
 let writes: Promise<unknown> = Promise.resolve();
 export function persistBrowserOwners(owners: Map<number, string>): void {
   if (!chrome.storage?.session) return;

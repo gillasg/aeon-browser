@@ -1,4 +1,4 @@
-import type { PiBrowserContextRecord } from "@aeon/domain";
+import type { PiBrowserContextRecord } from "@graft/domain";
 import { hostsNamed, matchAbilities, siteCapabilities } from "@browserkit/tools/site-to-api";
 import { buildFirstTurn, hostOf, type FirstTurnInput } from "./first-turn.js";
 
@@ -21,9 +21,9 @@ export async function liveFirstTurn(
   records: PiBrowserContextRecord[],
   routeDraft?: FirstTurnInput["routeDraft"],
 ): Promise<string> {
-  const now = process.env.AEON_SURFACE_NOW ? new Date(process.env.AEON_SURFACE_NOW) : new Date();
+  const now = process.env.GRAFT_SURFACE_NOW ? new Date(process.env.GRAFT_SURFACE_NOW) : new Date();
   const timeZone =
-    process.env.AEON_SURFACE_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    process.env.GRAFT_SURFACE_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const active = records[0];
   const hosts = uniqueHosts([
     ...hostsNamed(prompt),

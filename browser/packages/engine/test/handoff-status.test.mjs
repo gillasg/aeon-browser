@@ -78,7 +78,7 @@ test("continue: the user's done clears the record", async () => {
   await pendingSoon(1);
   assert.equal(handoffFor(1).message, "Sign in to continue");
   assert.equal(typeof handoffFor(1).startedAt, "number");
-  onMessage.fire({ kind: "aeon.handoff.answer", tabId: 1, answer: "done" }, { id: "self" });
+  onMessage.fire({ kind: "graft.handoff.answer", tabId: 1, answer: "done" }, { id: "self" });
   assert.equal(await run, "done");
   assert.equal(handoffFor(1), undefined);
 });
@@ -86,7 +86,7 @@ test("continue: the user's done clears the record", async () => {
 test("cancel: Skip or a stopped chat clears the record", async () => {
   const run = handOffToUser(2, "Pick a plan", () => true);
   await pendingSoon(2);
-  onMessage.fire({ kind: "aeon.handoff.answer", tabId: 2, answer: "cancelled" }, { id: "self" });
+  onMessage.fire({ kind: "graft.handoff.answer", tabId: 2, answer: "cancelled" }, { id: "self" });
   assert.equal(await run, "cancelled");
   assert.equal(handoffFor(2), undefined);
   let live = true;
@@ -154,7 +154,7 @@ test("the tab list and the inventory row carry the pending hand-off", async () =
     { tabIncarnation: "33333333-3333-4333-8333-333333333333", documentEpoch: 0 },
   );
   assert.equal(row.handoff.message, "Confirm the transfer");
-  onMessage.fire({ kind: "aeon.handoff.answer", tabId: 1, answer: "done" }, { id: "self" });
+  onMessage.fire({ kind: "graft.handoff.answer", tabId: 1, answer: "done" }, { id: "self" });
   await run;
   assert.equal(tabStatus(1).handoff, undefined);
 });

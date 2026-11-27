@@ -16,7 +16,7 @@ export function observePanelFrameTitle(
       const chatId = url.searchParams.get("chatId");
       if (url.origin !== location.origin || url.pathname !== "/chat.html") return;
       if (!chatId || chatId !== selectedChat()) return;
-      const title = doc.title.replace(/ · (?:Pippin|Piper|Aeon)$/, "").trim();
+      const title = doc.title.replace(/ · (?:Pippin|Piper|Graft)$/, "").trim();
       if (title && title.length <= 120) update(chatId, title);
     };
     observer = new MutationObserver(apply);

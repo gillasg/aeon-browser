@@ -209,7 +209,7 @@ async function __d8PipeSource(step) {
 async function __d8PipeView(view, rows) {
   var target = pipeViewTarget(view);
   var headers = {'content-type': 'application/json'};
-  if (target.token) { headers.authorization = 'Bearer ' + target.token; headers['x-aeon-view-token'] = target.token; }
+  if (target.token) { headers.authorization = 'Bearer ' + target.token; headers['x-graft-view-token'] = target.token; }
   var response = await fetch(target.url, {method: 'POST', headers, body: JSON.stringify({rows, title: target.title})});
   if (!response.ok) throw Error('UPSTREAM: site.pipe view push answered ' + response.status);
 }

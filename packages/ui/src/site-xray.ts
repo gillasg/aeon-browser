@@ -1,4 +1,4 @@
-// What Aeon knows about a site, in one line: `4 APIs · 1 boost · 1 watch`. Every number comes
+// What Graft knows about a site, in one line: `4 APIs · 1 boost · 1 watch`. Every number comes
 // from the site registry, the boost engine or the routines, never from a model. A count of 0 is
 // left out, and with nothing to say there is no line at all.
 

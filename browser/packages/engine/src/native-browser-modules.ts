@@ -30,7 +30,7 @@ function mdChunkNames(win: any): string[] {
 /** Pushes the probe chunk and returns __webpack_require__, or null. The entry is spliced back out. */
 function mdRequire(arr: any): any {
   let req: any = null;
-  const probe = ["__aeon_probe_" + Math.random().toString(36).slice(2)];
+  const probe = ["__graft_probe_" + Math.random().toString(36).slice(2)];
   const entry = [
     probe,
     {},

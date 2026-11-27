@@ -24,7 +24,7 @@ function browser(list) {
 }
 
 test("pin waits when the name is known and the browser is briefly disconnected", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-pin-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-pin-"));
   const id = "7c2f4b1e-0d5a-4e8b-9a61-3f2b8c9d0e14";
   await writeFile(join(dir, "browser-names.json"), JSON.stringify({ [id]: "recording" }));
   let connected = false;
@@ -38,7 +38,7 @@ test("pin waits when the name is known and the browser is briefly disconnected",
 });
 
 test("an unknown browser name fails without waiting out the reconnect gap", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-pin-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-pin-"));
   const control = browser(() => []);
   const started = Date.now();
   await assert.rejects(

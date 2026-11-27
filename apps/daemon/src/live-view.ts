@@ -1,4 +1,4 @@
-// A live third-screen viewer on 127.0.0.1: site.pipe runs and aeon/tap streams push rows and
+// A live third-screen viewer on 127.0.0.1: site.pipe runs and graft/tap streams push rows and
 // frames, any number of browser tabs watch them arrive over Server-Sent Events. Only loopback
 // listens, and only a holder of the random token may push.
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -49,7 +49,7 @@ function originAllowed(origin: string | undefined): boolean {
 function tokenOf(req: IncomingMessage): string {
   const header = req.headers.authorization ?? "";
   if (header.startsWith("Bearer ")) return header.slice(7).trim();
-  const own = req.headers["x-aeon-view-token"];
+  const own = req.headers["x-graft-view-token"];
   return typeof own === "string" ? own : "";
 }
 
@@ -99,7 +99,7 @@ export async function startLiveView(options: LiveViewOptions = {}): Promise<Live
   const maxEvents = options.maxEvents ?? 500;
   const token = randomBytes(24).toString("base64url");
   const state: LiveViewState = {
-    title: options.title ?? "Aeon live",
+    title: options.title ?? "Graft live",
     updatedAt: null,
     rows: [],
     frames: [],
@@ -194,7 +194,7 @@ async function route(req: IncomingMessage, res: ServerResponse, ctx: Route): Pro
   send(res, 404, { error: "not found" });
 }
 
-/** Feeds aeon/tap frames into a viewer. `subscribe` returns its own unsubscribe. */
+/** Feeds graft/tap frames into a viewer. `subscribe` returns its own unsubscribe. */
 export function pipeTapToLiveView(
   view: Pick<LiveView, "pushFrame">,
   subscribe: (onFrame: (frame: unknown) => void) => (() => void) | { unsubscribe(): void },

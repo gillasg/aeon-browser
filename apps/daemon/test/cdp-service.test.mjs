@@ -10,7 +10,7 @@ import { CdpService } from "../dist/cdp-service.js";
 // the daemon adapter: a raw CDP client opens a tab, attaches, runs a page command and closes it,
 // with every hop using the executor messages the extension already answers.
 test("the daemon CDP adapter round-trips targets, sessions and commands", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-cdp-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-cdp-"));
   const sent = [];
   const service = new CdpService((body) => {
     sent.push(body);

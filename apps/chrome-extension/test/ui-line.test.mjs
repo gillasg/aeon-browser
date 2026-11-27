@@ -11,7 +11,7 @@ const protocol = fileURLToPath(
 );
 
 async function load(entry) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-ui-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-ui-"));
   const outfile = join(directory, "bundle.mjs");
   await build({
     entryPoints: [fileURLToPath(new URL(entry, import.meta.url))],
@@ -19,7 +19,7 @@ async function load(entry) {
     bundle: true,
     platform: "node",
     format: "esm",
-    alias: { "@aeon/protocol": protocol },
+    alias: { "@graft/protocol": protocol },
   });
   const module = await import(pathToFileURL(outfile).href);
   await rm(directory, { recursive: true, force: true });
@@ -31,9 +31,9 @@ test("a failure title follows the owner, and an unknown code is ours", async () 
   assert.equal(titles.failureTitle("TARGET_BLOCKED: covered"), "The site blocked this");
   assert.equal(titles.failureTitle("DEBUGGER_DETACHED: cancelled"), "I need you for one step");
   assert.equal(titles.failureTitle("TARGET_NOT_FOUND: missing"), "That was my mistake");
-  assert.equal(titles.failureTitle("INPUT_FAILED: missed"), "Aeon broke");
-  assert.equal(titles.failureTitle("No model"), "Aeon broke");
-  assert.equal(titles.failureTitle("NOPE"), "Aeon broke");
+  assert.equal(titles.failureTitle("INPUT_FAILED: missed"), "Graft broke");
+  assert.equal(titles.failureTitle("No model"), "Graft broke");
+  assert.equal(titles.failureTitle("NOPE"), "Graft broke");
 });
 
 test("the box line is the step while running and the answer when it ends", async () => {
@@ -47,7 +47,7 @@ test("the box line is the step while running and the answer when it ends", async
     more: false,
   });
   assert.deepEqual(lines.boxLine({ status: "error", label: "old", error: "No model" }), {
-    title: "Aeon broke",
+    title: "Graft broke",
     text: "No model",
     more: true,
   });
@@ -69,5 +69,5 @@ test("an errored run keeps the owner title on its label", async () => {
   );
   assert.equal(run.status, "error");
   assert.equal(run.error, "No model");
-  assert.equal(run.label, "Aeon broke");
+  assert.equal(run.label, "Graft broke");
 });

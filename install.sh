@@ -1,24 +1,24 @@
 #!/bin/sh
-# Installs Aeon on macOS and Linux with one line:
+# Installs Graft on macOS and Linux with one line:
 #
 #   curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
 #
-# Installs Git, Node.js and pnpm when they are missing, fetches Aeon (or updates it), builds it,
+# Installs Git, Node.js and pnpm when they are missing, fetches Graft (or updates it), builds it,
 # installs the native host, the Chrome manifests and the login service, then presents the
 # extension. Windows uses install.ps1.
 set -eu
 
-REPO="${AEON_REPO:-https://github.com/gillasg/aeon-browser.git}"
-if [ -n "${AEON_DIR:-}" ]; then
-  DIR="$AEON_DIR"
+REPO="${GRAFT_REPO:-https://github.com/gillasg/aeon-browser.git}"
+if [ -n "${GRAFT_DIR:-}" ]; then
+  DIR="$GRAFT_DIR"
 elif [ "$(uname -s)" = "Darwin" ]; then
-  DIR="$HOME/Library/Application Support/Aeon/aeon-browser"
+  DIR="$HOME/Library/Application Support/Graft/graft-browser"
 else
-  DIR="${XDG_DATA_HOME:-$HOME/.local/share}/aeon/aeon-browser"
+  DIR="${XDG_DATA_HOME:-$HOME/.local/share}/graft/graft-browser"
 fi
 
 say() { printf '%s\n' "$*"; }
-die() { printf 'Aeon: %s\n' "$*" >&2; exit 1; }
+die() { printf 'Graft: %s\n' "$*" >&2; exit 1; }
 
 refresh_path() {
   PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -55,7 +55,7 @@ if ! command -v node >/dev/null 2>&1; then
   fi
 fi
 major=$(node --version | sed 's/^v//' | cut -d. -f1)
-[ "$major" -ge 22 ] || die "Aeon needs Node.js 22 or newer (found $(node --version))."
+[ "$major" -ge 22 ] || die "Graft needs Node.js 22 or newer (found $(node --version))."
 if ! command -v pnpm >/dev/null 2>&1; then
   say "Installing pnpm into $HOME/.local..."
   # npm's global prefix is root-owned when Node came from NodeSource, so install where the user
@@ -68,10 +68,10 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 if [ -d "$DIR/.git" ]; then
-  say "Updating Aeon in $DIR..."
+  say "Updating Graft in $DIR..."
   git -C "$DIR" pull --ff-only --quiet
 else
-  say "Fetching Aeon into $DIR..."
+  say "Fetching Graft into $DIR..."
   mkdir -p "$(dirname "$DIR")"
   git clone --depth 1 --quiet "$REPO" "$DIR"
 fi

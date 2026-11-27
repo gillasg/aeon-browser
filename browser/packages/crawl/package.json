@@ -45,7 +45,7 @@
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test"
   },
   "dependencies": {
-    "@aeon/location": "workspace:*",
+    "@graft/location": "workspace:*",
     "@mozilla/readability": "0.6.0",
     "exceljs": "4.4.0",
     "linkedom": "0.18.13",

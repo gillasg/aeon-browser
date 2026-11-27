@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { boundedResult, cutAtBoundary, fullOutput } from "../dist/site-tool-output.js";
-import { aeonBridge, browserNamedFor, browserParentChat, inChat } from "../dist/site-browser.js";
+import { graftBridge, browserNamedFor, browserParentChat, inChat } from "../dist/site-browser.js";
 
 function openString(text) {
   let inside = false;
@@ -29,7 +29,7 @@ test("a preview never ends inside a JSON string", () => {
 });
 
 test("a large result prints its path first, and --json keeps the whole value", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-out-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-out-"));
   const value = { jobs: "j".repeat(13_000) };
   const preview = await boundedResult(value, dir, "crawls", "jobs");
   const text = preview.content[0].text;
@@ -46,7 +46,7 @@ test("a large result prints its path first, and --json keeps the whole value", a
 test("a named browser is visible to the worker chat for the whole call", async () => {
   let seen;
   let parent;
-  const bridge = aeonBridge(async (chatId) => {
+  const bridge = graftBridge(async (chatId) => {
     seen = browserNamedFor(chatId);
     parent = browserParentChat();
     return JSON.stringify({ value: 1 });

@@ -1,7 +1,7 @@
-import { CompanionResultSchema, type CompanionRequest } from "@aeon/protocol";
+import { CompanionResultSchema, type CompanionRequest } from "@graft/protocol";
 
-// Site Boosts (and other extensions the user allows) can use Aeon: write boosts with the user's
-// model, or hand Aeon a task such as watching a price. Each extension is allowed once by the user;
+// Site Boosts (and other extensions the user allows) can use Graft: write boosts with the user's
+// model, or hand Graft a task such as watching a price. Each extension is allowed once by the user;
 // requests go to core over the executor connection.
 
 const ALLOWED_KEY = "companionExtensions";
@@ -31,7 +31,7 @@ export function handleCompanionResult(candidate: unknown): boolean {
   done?.(
     result.data.ok
       ? { ok: true, value: result.data.value }
-      : { ok: false, error: result.data.error ?? "Aeon could not do that" },
+      : { ok: false, error: result.data.error ?? "Graft could not do that" },
   );
   return true;
 }
@@ -55,9 +55,9 @@ function askUser(id: string): Promise<boolean> {
     chrome.notifications.onClosed.addListener(onClosed);
     chrome.notifications.create(notificationId, {
       type: "basic",
-      iconUrl: chrome.runtime.getURL("aeon-icon-128.png"),
-      title: "Let another extension use Aeon?",
-      message: "An extension wants to use your AI model and ask Aeon to do tasks for you.",
+      iconUrl: chrome.runtime.getURL("graft-icon-128.png"),
+      title: "Let another extension use Graft?",
+      message: "An extension wants to use your AI model and ask Graft to do tasks for you.",
       buttons: [{ title: "Allow" }, { title: "Don't allow" }],
       requireInteraction: true,
     });
@@ -79,7 +79,7 @@ function forward(socket: Socket, request: CompanionRequest): Promise<Reply> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       waiting.delete(request.requestId);
-      resolve({ ok: false, error: "Aeon did not answer in time" });
+      resolve({ ok: false, error: "Graft did not answer in time" });
     }, REQUEST_TIMEOUT_MS);
     waiting.set(request.requestId, (reply) => {
       clearTimeout(timer);
@@ -97,12 +97,12 @@ async function handle(
   if (message.kind === "ping")
     return {
       ok: true,
-      value: { name: "Aeon", features: ["model", "watch", "task", "siteMapper"] },
+      value: { name: "Graft", features: ["model", "watch", "task", "siteMapper"] },
     };
   if (!FORWARDED.has(String(message.kind)))
     return { ok: false, error: `Unsupported request: ${String(message.kind)}` };
   if (!(await permitted(senderId)))
-    return { ok: false, error: "The user did not allow this extension to use Aeon" };
+    return { ok: false, error: "The user did not allow this extension to use Graft" };
   const socket = await connect();
   return forward(socket, {
     kind: "companion.request",
@@ -114,12 +114,12 @@ async function handle(
 }
 
 let coreConnection: (() => Promise<Socket>) | undefined;
-/** A request from Aeon itself (its built-in boosts), sent to core without asking the user. */
+/** A request from Graft itself (its built-in boosts), sent to core without asking the user. */
 export async function askCore(
   kind: CompanionRequest["request"],
   data: Record<string, unknown>,
 ): Promise<unknown> {
-  if (!coreConnection) throw new Error("Aeon is not connected");
+  if (!coreConnection) throw new Error("Graft is not connected");
   const reply = await forward(await coreConnection(), {
     kind: "companion.request",
     requestId: crypto.randomUUID(),

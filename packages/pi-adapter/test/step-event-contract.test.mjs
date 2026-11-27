@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { actionLine } from "@aeon/protocol";
+import { actionLine } from "@graft/protocol";
 import { formatStepLine } from "../dist/browser-code-tool.js";
 
 const event = {

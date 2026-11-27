@@ -106,7 +106,7 @@ export function useHostSiteMapper(handler: SiteMapperHandler): void {
 }
 
 /** A mapped site's operation: through the host, else the site-to-api server in the settings,
- * else a companion extension that has site APIs (Aeon does). */
+ * else a companion extension that has site APIs (Graft does). */
 export async function callSiteMapper(
   site: string,
   operation: string,

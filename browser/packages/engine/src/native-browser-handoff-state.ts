@@ -1,6 +1,6 @@
 import type { HandoffStatus } from "@browserkit/protocol";
 
-// Pending hand-offs by tab, so the tab list, `aeon tabs`, `aeon status` and the cursor box can
+// Pending hand-offs by tab, so the tab list, `graft tabs`, `graft status` and the cursor box can
 // all say "Waiting on you: <msg>". No Chrome calls here: readers import it without side effects.
 
 const pending = new Map<number, HandoffStatus>();

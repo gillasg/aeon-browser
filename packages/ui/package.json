@@ -1,5 +1,5 @@
 {
-  "name": "@aeon/ui",
+  "name": "@graft/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@aeon/protocol": "workspace:*",
+    "@graft/protocol": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",

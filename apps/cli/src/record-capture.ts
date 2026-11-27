@@ -1,7 +1,7 @@
-// Real-window / screen capture for `aeon record`. Ported from the Aeon Recorder: ffmpeg x11grab
+// Real-window / screen capture for `graft record`. Ported from the Graft Recorder: ffmpeg x11grab
 // on Linux (the real X cursor is in frame), avfoundation on macOS, gdigrab on Windows. Frames are
 // written as constant-rate JPEGs so a stop never loses a half-finalised container; a clip.mp4 is
-// encoded from them at stop. --tabs uses Aeon's own hidden tab takes instead of the screen.
+// encoded from them at stop. --tabs uses Graft's own hidden tab takes instead of the screen.
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,7 +23,7 @@ export type RecordOptions = {
   ffprobe?: string;
   /** Skip X11 checks (used by tests with a fake ffmpeg). */
   testMode?: boolean;
-  /** Leave the OS pointer out of the frames, so only Aeon's own cursor is on camera. */
+  /** Leave the OS pointer out of the frames, so only Graft's own cursor is on camera. */
   noMouse?: boolean;
   log?: (line: string) => void;
   /** Encode clip.mp4 in the background (nice 19) instead of blocking stop. */
@@ -67,10 +67,10 @@ const DEFAULT_FPS = 30;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function ffmpegBinary(opts: Pick<RecordOptions, "ffmpeg">): string {
-  return opts.ffmpeg ?? process.env.AEON_FFMPEG ?? "ffmpeg";
+  return opts.ffmpeg ?? process.env.GRAFT_FFMPEG ?? "ffmpeg";
 }
 export function ffprobeBinary(opts: Pick<RecordOptions, "ffprobe">): string {
-  return opts.ffprobe ?? process.env.AEON_FFPROBE ?? "ffprobe";
+  return opts.ffprobe ?? process.env.GRAFT_FFPROBE ?? "ffprobe";
 }
 
 /** The X display to grab: DISPLAY when it is live; ":0" only in test mode. */
@@ -124,9 +124,9 @@ export function windowGeometry(
   return { x: x || 0, y: y || 0, w: Math.max(2, w - (w % 2)), h: Math.max(2, h - (h % 2)) };
 }
 
-/** Find the frontmost Chrome window by X11 class (or AEON_CHROME_CLASS override). */
+/** Find the frontmost Chrome window by X11 class (or GRAFT_CHROME_CLASS override). */
 export function findChromeWindow(testMode = false): string {
-  const klass = process.env.AEON_CHROME_CLASS ?? "[Gg]oogle-[Cc]hrome|[Cc]hromium";
+  const klass = process.env.GRAFT_CHROME_CLASS ?? "[Gg]oogle-[Cc]hrome|[Cc]hromium";
   const ids = tool("xdotool", ["search", "--onlyvisible", "--class", klass], testMode)
     .split("\n")
     .map((s) => s.trim())
@@ -156,7 +156,7 @@ export function screenSize(testMode = false): { w: number; h: number } {
 
 /**
  * gdigrab's input: `desktop` for the screen, `title=<exact window title>` for a window. Chrome's
- * title is "<page> - Google Chrome", so it is looked up at start (AEON_CHROME_TITLE overrides);
+ * title is "<page> - Google Chrome", so it is looked up at start (GRAFT_CHROME_TITLE overrides);
  * without a match the whole desktop is recorded and the caller says so.
  */
 export function gdigrabInput(source: Source, chromeTitle: string | undefined): string {
@@ -170,7 +170,7 @@ export function windowsChromeTitle(
   env: NodeJS.ProcessEnv = process.env,
   testMode = false,
 ): string | undefined {
-  if (env.AEON_CHROME_TITLE?.trim()) return env.AEON_CHROME_TITLE.trim();
+  if (env.GRAFT_CHROME_TITLE?.trim()) return env.GRAFT_CHROME_TITLE.trim();
   if (testMode) return undefined;
   try {
     const out = execFileSync(
@@ -197,14 +197,14 @@ export function avfoundationScreenIndex(listing: string): string | undefined {
   return /\[(\d+)\]\s+Capture screen \d+/.exec(listing)?.[1];
 }
 
-/** avfoundation's input: AEON_MAC_SCREEN_DEVICE, else the first screen ffmpeg lists. It records a
+/** avfoundation's input: GRAFT_MAC_SCREEN_DEVICE, else the first screen ffmpeg lists. It records a
  * whole screen; a single window cannot be selected, so `window` records the screen Chrome is on. */
 export function macScreenDevice(
   ffmpeg: string,
   env: NodeJS.ProcessEnv = process.env,
   testMode = false,
 ): string {
-  const override = env.AEON_MAC_SCREEN_DEVICE?.trim();
+  const override = env.GRAFT_MAC_SCREEN_DEVICE?.trim();
   if (override) return override.includes(":") ? override : `${override}:none`;
   if (testMode) return "1:none";
   let listing = "";
@@ -225,7 +225,7 @@ export function macScreenDevice(
   const index = avfoundationScreenIndex(listing);
   if (!index)
     throw new Error(
-      "No screen capture device found. Allow Screen Recording for your terminal in System Settings, or set AEON_MAC_SCREEN_DEVICE.",
+      "No screen capture device found. Allow Screen Recording for your terminal in System Settings, or set GRAFT_MAC_SCREEN_DEVICE.",
     );
   return `${index}:none`;
 }
@@ -322,7 +322,7 @@ export function loadState(folder: string): RecordState {
   try {
     return JSON.parse(readFileSync(join(folder, STATE), "utf8")) as RecordState;
   } catch {
-    throw new Error(`No active recording in ${folder}. Run \`aeon record start\` first.`);
+    throw new Error(`No active recording in ${folder}. Run \`graft record start\` first.`);
   }
 }
 export function saveState(folder: string, state: RecordState): void {
@@ -338,7 +338,7 @@ function tabsState(folder: string, opts: RecordOptions): RecordState {
     fps: opts.fps ?? DEFAULT_FPS,
     startedAt: Date.now(),
     ffmpeg: "",
-    tabSession: `aeon-record-${Date.now()}`,
+    tabSession: `graft-record-${Date.now()}`,
     frames: 0,
   };
 }
@@ -361,7 +361,7 @@ function captureInput(opts: RecordOptions, ffmpeg: string, testMode: boolean): s
     const input = gdigrabInput(opts.source, windowsChromeTitle(process.env, testMode));
     if (opts.source === "window" && input === "desktop")
       opts.log?.(
-        "No Chrome window title found; recording the whole desktop. Set AEON_CHROME_TITLE to the exact window title to record only Chrome.",
+        "No Chrome window title found; recording the whole desktop. Set GRAFT_CHROME_TITLE to the exact window title to record only Chrome.",
       );
     return input;
   }
@@ -406,11 +406,11 @@ export async function startCapture(folder: string, opts: RecordOptions): Promise
     saveState(folder, state);
     return state;
   }
-  const testMode = opts.testMode ?? !!(opts.ffmpeg ?? process.env.AEON_FFMPEG);
+  const testMode = opts.testMode ?? !!(opts.ffmpeg ?? process.env.GRAFT_FFMPEG);
   const d = display(testMode);
   if (isLinux && !d)
     throw new Error(
-      "No X display. Start Xvfb and set DISPLAY, or record with --tabs (Aeon's hidden tab takes).",
+      "No X display. Start Xvfb and set DISPLAY, or record with --tabs (Graft's hidden tab takes).",
     );
   const geometry = sourceGeometry(opts, testMode);
   mkdirSync(join(folder, "frames"), { recursive: true });

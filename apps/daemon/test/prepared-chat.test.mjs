@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openChatStore } from "@aeon/store";
+import { openChatStore } from "@graft/store";
 import { ChatService } from "../dist/chat-service.js";
 import { FakePiPort } from "./fake-pi-port.mjs";
 
 test("startup prepares a whole session invisibly and the first chat adopts its exact identity", async () => {
-  const root = await mkdtemp(join(tmpdir(), "aeon-prepared-chat-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-prepared-chat-"));
   const store = openChatStore(root),
     pi = new FakePiPort(),
     resources = [];

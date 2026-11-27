@@ -17,7 +17,7 @@ import {
   type PiSessionHandle,
   type ThreadCreationIntent,
   type ThreadForkIntent,
-} from "@aeon/domain";
+} from "@graft/domain";
 
 export class ChatThreadSupport {
   private readonly dataDirectory: string;

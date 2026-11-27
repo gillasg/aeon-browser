@@ -4,7 +4,7 @@ import type { IceCandidate, StealthFacts } from "./doctor-stealth-checks.js";
 // The one browser cell the stealth doctor runs. It opens one background, un-presented tab
 // (no cursor, no overlay, no focus change), reads what a page can see through Chrome's own
 // route, and closes the tab in `finally`. It never patches or spoofs anything: WebRTC ICE
-// gathering uses the browser's standard public STUN (part of WebRTC itself, not a new Aeon
+// gathering uses the browser's standard public STUN (part of WebRTC itself, not a new Graft
 // service); the only new page fetched is the Cloudflare trace.
 const STEALTH_CELL = `
 const TRACE = "https://www.cloudflare.com/cdn-cgi/trace";
@@ -43,7 +43,7 @@ try {
       pc.onicegatheringstatechange = () => {
         if (pc && pc.iceGatheringState === "complete") finish();
       };
-      pc.createDataChannel("aeon-stealth-probe");
+      pc.createDataChannel("graft-stealth-probe");
       pc.createOffer()
         .then((offer) => pc.setLocalDescription(offer))
         .catch(finish);

@@ -17,7 +17,7 @@ export interface ModelProvider {
     type: "oauth" | "api_key";
     /** Where an outside login comes from: "ANTHROPIC_API_KEY", "~/.aws/credentials"… */
     source?: string;
-    /** True when the login is saved by Aeon and can be signed out here. */
+    /** True when the login is saved by Graft and can be signed out here. */
     stored: boolean;
   };
 }
@@ -67,7 +67,7 @@ export interface ModelAccountsProps {
    * Shown after a sign-in and whenever a model is ready.
    */
   onStartChat?: (() => void) | undefined;
-  /** "Return to chat" when another Aeon view sent the user here, else "Start chatting". */
+  /** "Return to chat" when another Graft view sent the user here, else "Start chatting". */
   startChatLabel?: string | undefined;
 }
 

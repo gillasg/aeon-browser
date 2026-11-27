@@ -4,7 +4,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { aeonBridge, inChat, sessionChatId } from "../dist/site-browser.js";
+import { graftBridge, inChat, sessionChatId } from "../dist/site-browser.js";
 import { createSiteMapperTool } from "../dist/site-mapper-tool.js";
 import { createCrawlTool } from "../dist/crawl-tool.js";
 
@@ -33,7 +33,7 @@ async function site(t) {
 }
 
 async function home(t) {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-site-tools-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-site-tools-"));
   const previous = { api: process.env.SITE_TO_API_HOME, crawl: process.env.BROWSER_CRAWL_HOME };
   process.env.SITE_TO_API_HOME = join(dir, "api");
   process.env.BROWSER_CRAWL_HOME = join(dir, "crawl");
@@ -49,7 +49,7 @@ const text = (result) => result.content[0].text;
 
 test("browser calls from site tools run in a runtime of their own per chat and session", async () => {
   const calls = [];
-  const bridge = aeonBridge(async (chatId, toolCallId, input) => {
+  const bridge = graftBridge(async (chatId, toolCallId, input) => {
     calls.push({ chatId, toolCallId, input });
     return JSON.stringify(
       input.codeCell.code === "fail" ? { error: "BROWSER_OFFLINE" } : { value: 42 },

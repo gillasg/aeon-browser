@@ -62,7 +62,7 @@ class Recorder {
   async call(code) {
     const started = Date.now();
     const reply = await bounded(this.cell(code), STEP_TIMEOUT, "step");
-    if (process.env.AEON_CONFORMANCE_TRACE)
+    if (process.env.GRAFT_CONFORMANCE_TRACE)
       process.stdout.write(
         `    [${this.scenario}] ${Date.now() - started} ms ${code.slice(0, 60).replaceAll("\n", " ")}\n`,
       );
@@ -199,7 +199,7 @@ export async function runScenarios(
   list,
   harness,
   site,
-  { concurrency = Number(process.env.AEON_CONFORMANCE_CONCURRENCY) || 3, context },
+  { concurrency = Number(process.env.GRAFT_CONFORMANCE_CONCURRENCY) || 3, context },
 ) {
   const ordered = list.filter((scenario) => !scenario.last);
   const results = [];
@@ -240,7 +240,7 @@ export function judge({ results, goldens, divergences, slowMs = SLOW_SCENARIO })
       problems.push({
         scenario: result.scenario,
         kind: "golden",
-        message: "no golden transcript (AEON_CONFORMANCE_UPDATE=1 writes it)",
+        message: "no golden transcript (GRAFT_CONFORMANCE_UPDATE=1 writes it)",
       });
       continue;
     }
@@ -312,7 +312,7 @@ export async function writeGoldens(results) {
     );
 }
 
-/** AEON_CONFORMANCE_OUT: transcripts, per-step results, a log and diff.json. */
+/** GRAFT_CONFORMANCE_OUT: transcripts, per-step results, a log and diff.json. */
 export async function writeOutput(dir, { results, verdict, log, meta }) {
   await mkdir(join(dir, "transcripts"), { recursive: true });
   for (const result of results) {

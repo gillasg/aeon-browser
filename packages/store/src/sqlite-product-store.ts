@@ -3,15 +3,15 @@ import type {
   CapabilityAuditRecord,
   ChatId,
   ClaimRoutineSlotsInput,
-  AeonProductStore,
+  GraftProductStore,
   RoutineRecord,
   RoutineRunPatch,
   RoutineRunRecord,
-} from "@aeon/domain";
+} from "@graft/domain";
 import { SqliteCapabilityAuditStore } from "./sqlite-capability-audit-store.js";
 import { SqliteRoutineStore } from "./sqlite-routine-store.js";
 
-export class SqliteProductStore implements AeonProductStore {
+export class SqliteProductStore implements GraftProductStore {
   private readonly routines: SqliteRoutineStore;
   private readonly audit: SqliteCapabilityAuditStore;
 
@@ -28,7 +28,7 @@ export class SqliteProductStore implements AeonProductStore {
   updateRoutine = (
     routineId: string,
     expectedRevision: number,
-    patch: Parameters<AeonProductStore["updateRoutine"]>[2],
+    patch: Parameters<GraftProductStore["updateRoutine"]>[2],
     updatedAt: string,
   ): RoutineRecord => this.routines.updateRoutine(routineId, expectedRevision, patch, updatedAt);
   deleteRoutine = (routineId: string, expectedRevision: number, deletedAt: string): RoutineRecord =>
@@ -36,7 +36,7 @@ export class SqliteProductStore implements AeonProductStore {
   claimDueRoutineSlots = (input: ClaimRoutineSlotsInput): readonly RoutineRunRecord[] =>
     this.routines.claimDueRoutineSlots(input);
   createManualRoutineRun = (
-    input: Parameters<AeonProductStore["createManualRoutineRun"]>[0],
+    input: Parameters<GraftProductStore["createManualRoutineRun"]>[0],
   ): RoutineRunRecord => this.routines.createManualRoutineRun(input);
   getRoutineRun = (runId: string): RoutineRunRecord | undefined =>
     this.routines.getRoutineRun(runId);

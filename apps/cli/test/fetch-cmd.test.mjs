@@ -1,4 +1,4 @@
-// aeon fetch: curl-style flags, body to stdout, receipt to stderr, redacted headers, exit codes.
+// graft fetch: curl-style flags, body to stdout, receipt to stderr, redacted headers, exit codes.
 // The browser is a stub, so nothing here opens Chrome.
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -77,7 +77,7 @@ test("a body without -X makes a POST; --json sets the content type and is valida
 });
 
 test("-d @file reads the body from the file", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-fetch-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-fetch-"));
   try {
     const file = join(dir, "body.txt");
     await writeFile(file, "from file");
@@ -134,7 +134,7 @@ test("-f exits non-zero on 404 and 500; without it the body still prints and exi
 });
 
 test("-o writes the body to a file", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "aeon-fetch-"));
+  const dir = await mkdtemp(join(tmpdir(), "graft-fetch-"));
   try {
     const file = join(dir, "out.json");
     const { io, deps } = harness();

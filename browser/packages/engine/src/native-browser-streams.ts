@@ -59,8 +59,8 @@ interface TabStreams {
   open: Set<string>;
 }
 
-export const STREAM_EVENT = "Aeon.streamFrame";
-/** The WebRTC tap's binding and restore switch: random per worker, so neither names Aeon. */
+export const STREAM_EVENT = "Graft.streamFrame";
+/** The WebRTC tap's binding and restore switch: random per worker, so neither names Graft. */
 export const RTC_TAP: TapSpec = {
   label: "WebRTC data-channel tap",
   binding: tapName(),

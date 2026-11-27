@@ -31,7 +31,7 @@ function sessionFor(chatId) {
   const handle = wrapPiSession(
     session,
     manager,
-    { sessionFile: `/tmp/aeon-code-stream-${chatId}.jsonl` },
+    { sessionFile: `/tmp/graft-code-stream-${chatId}.jsonl` },
     chatId,
     extensionUi,
     () => [],

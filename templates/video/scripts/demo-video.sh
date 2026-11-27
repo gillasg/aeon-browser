@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# One command: record the dedicated recording-Chrome window (1280x720 at DPR 3, a 3840x2160 master), run an Aeon task
+# One command: record the dedicated recording-Chrome window (1280x720 at DPR 3, a 3840x2160 master), run a Graft task
 # in that browser, stop the take, and render src/Scene.tsx (1920x1080) around the real frames.
 # Usage: scripts/demo-video.sh "<task>" [--out file.mp4] [--fps 30] [--max-minutes N]
 set -euo pipefail
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BROWSER="${AEON_RECORDING_BROWSER:-recording}"
-DISPLAY_NUM="${AEON_RECORDING_DISPLAY:-:120}"
-MAX_MINUTES="${AEON_VIDEO_MAX_MINUTES:-}"
-export AEON_RECORDING_DPR="${AEON_RECORDING_DPR:-3}"
+BROWSER="${GRAFT_RECORDING_BROWSER:-recording}"
+DISPLAY_NUM="${GRAFT_RECORDING_DISPLAY:-:120}"
+MAX_MINUTES="${GRAFT_VIDEO_MAX_MINUTES:-}"
+export GRAFT_RECORDING_DPR="${GRAFT_RECORDING_DPR:-3}"
 
 usage() { sed -n '2,3p' "$0" | sed 's/^# //'; exit 1; }
 TASK=""
@@ -28,23 +28,23 @@ mkdir -p "$(dirname "$OUT")" "$KIT_DIR/out"
 
 "$KIT_DIR/scripts/setup-recording-chrome.sh"
 
-WORK="$(mktemp -d /tmp/aeon-demo.XXXXXX)"
+WORK="$(mktemp -d /tmp/graft-demo.XXXXXX)"
 echo "Recording folder: $WORK/recording" >&2
 
 export DISPLAY="$DISPLAY_NUM"
-# Park the real X pointer outside the window: the only visible cursor is Aeon's own cursor.
+# Park the real X pointer outside the window: the only visible cursor is Graft's own cursor.
 SCREEN="$(xdotool getdisplaygeometry)"
 xdotool mousemove "$(( ${SCREEN%% *} - 5 ))" "$(( ${SCREEN##* } - 5 ))"
 
-aeon record start --window chrome --out "$WORK/recording" --fps "$FPS"
+graft record start --window chrome --out "$WORK/recording" --fps "$FPS"
 
 set +e
-aeon run --browser "$BROWSER"${MAX_MINUTES:+ --max-minutes $MAX_MINUTES} --json "$TASK" \
+graft run --browser "$BROWSER"${MAX_MINUTES:+ --max-minutes $MAX_MINUTES} --json "$TASK" \
   >"$WORK/run.json" 2>"$WORK/run.err"
 RUN_RC=$?
 set -e
 if [ "$RUN_RC" -ne 0 ]; then
-  echo "Aeon task returned $RUN_RC; rendering what was captured." >&2
+  echo "Graft task returned $RUN_RC; rendering what was captured." >&2
   tail -5 "$WORK/run.err" >&2
 fi
 
@@ -61,7 +61,7 @@ PY
 )"
 STOP_ARGS=(--out "$WORK/recording")
 [ -n "$CHAT_ID" ] && STOP_ARGS+=(--chat "$CHAT_ID")
-aeon record stop "${STOP_ARGS[@]}"
+graft record stop "${STOP_ARGS[@]}"
 
 # Import every frame of the take (hardlinks when on one disk); the edit spans the whole clip.
 mkdir -p "$KIT_DIR/public/frames"

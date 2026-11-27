@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactElement } from "react";
-import { chromeFlagPurpose, chromeRelaunchCommand } from "@aeon/protocol";
+import { chromeFlagPurpose, chromeRelaunchCommand } from "@graft/protocol";
 
 // One quiet line under the cursor box when something needs the user: the daemon link stays
-// offline, or Chrome runs without Aeon's optional flags. Nothing shows when all is ready; no tour.
+// offline, or Chrome runs without Graft's optional flags. Nothing shows when all is ready; no tour.
 // The model nudge is the Connect model card below the box, so it is not repeated here.
 
-const DISMISS_KEY = "aeonFlagsNoticeDismissed";
+const DISMISS_KEY = "graftFlagsNoticeDismissed";
 /** The daemon gets this long to answer before the hint shows; a normal connect is faster. */
 export const OFFLINE_HINT_DELAY_MS = 4000;
 
@@ -23,8 +23,8 @@ export function ReadinessStrip(props: {
   if (offline)
     return (
       <p className="readiness-strip" role="status">
-        Aeon's daemon isn't answering. In a terminal run <code>aeon doctor</code>, or{" "}
-        <code>aeon setup --again</code> if it was never set up.
+        Graft's daemon isn't answering. In a terminal run <code>graft doctor</code>, or{" "}
+        <code>graft setup --again</code> if it was never set up.
       </p>
     );
   if (!missing.length || dismissed) return null;

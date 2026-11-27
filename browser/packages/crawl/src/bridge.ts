@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ensurePrivateDir } from "@aeon/location";
+import { ensurePrivateDir } from "@graft/location";
 
 // The connection to the user's browser: browserkit's local bridge. Each call
 // runs a small piece of browser code in a named session; tabs and variables persist per session.

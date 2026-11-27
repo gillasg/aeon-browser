@@ -1,18 +1,18 @@
-import type { AnswerOffer } from "@aeon/ui";
+import type { AnswerOffer } from "@graft/ui";
 
 // Offers that act right here instead of sending a follow-up to the model: copying a site's MCP
 // server, and the boost receipt's Undo / Turn off (the boost engine lives in this extension).
 
-/** The MCP server entry that serves a mapped site's API (`aeon mcp <site>`). */
+/** The MCP server entry that serves a mapped site's API (`graft mcp <site>`). */
 export function mcpSnippet(site: string): string {
   const name = site.replace(/[^a-z0-9.-]/gi, "-");
   // A one-line add command first, then the config entry for clients that read a JSON file.
   const config = JSON.stringify(
-    { mcpServers: { [name]: { command: "aeon", args: ["mcp", site] } } },
+    { mcpServers: { [name]: { command: "graft", args: ["mcp", site] } } },
     null,
     2,
   );
-  return `claude mcp add ${name} -- aeon mcp ${site}\n\n${config}`;
+  return `claude mcp add ${name} -- graft mcp ${site}\n\n${config}`;
 }
 
 function text(value: unknown): string {
@@ -33,7 +33,7 @@ function boostRequest(offer: AnswerOffer, url: string | undefined): object | und
   const page = text(offer.args?.url) || (url ?? "");
   if (!boostId && !page) return undefined;
   const mode = offer.action === "undo-boost" ? "undo" : "off";
-  return { kind: "aeon.boost.off", url: page, mode, ...(boostId ? { boostId } : {}) };
+  return { kind: "graft.boost.off", url: page, mode, ...(boostId ? { boostId } : {}) };
 }
 
 async function boostOff(offer: AnswerOffer, url: string | undefined): Promise<LocalOutcome> {

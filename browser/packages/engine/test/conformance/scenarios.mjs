@@ -1,5 +1,5 @@
 // The conformance scenarios. Each one opens its own foreground tabs in its own browser_code
-// session, drives Aeon's real engine against the fixture site and records every step. Cells
+// session, drives Graft's real engine against the fixture site and records every step. Cells
 // project the facts that matter (outcome, text, status) so transcripts stay exact and readable.
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";

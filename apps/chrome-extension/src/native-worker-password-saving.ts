@@ -1,8 +1,8 @@
 // The daemon says, when this profile connects, whether a password manager (Bitwarden, Proton
-// Pass) keeps the logins Aeon makes here. If one does, Chrome's own "Save password?" offer is
+// Pass) keeps the logins Graft makes here. If one does, Chrome's own "Save password?" offer is
 // switched off, as those managers' extensions do, so it never pops up over a sign-up; saved Chrome
 // logins still fill. With none, the user's own Chrome setting comes back: Chrome's prompt is then
-// the only way to keep a login, and Aeon asks the user to click Save.
+// the only way to keep a login, and Graft asks the user to click Save.
 
 export function handlePasswordSavingMessage(candidate: unknown): boolean {
   const message = candidate as { kind?: unknown; managed?: unknown } | null;

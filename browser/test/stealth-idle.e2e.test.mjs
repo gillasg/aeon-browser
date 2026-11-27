@@ -1,4 +1,4 @@
-// What a page can see of Aeon when nothing is happening on it: no page globals, no overlay
+// What a page can see of Graft when nothing is happening on it: no page globals, no overlay
 // nodes, no marker attributes, no injected extension scripts. The active cursor may draw while
 // the agent works; once it leaves, nothing of ours stays in the page's own world.
 // Run alone: node --test test/stealth-idle.e2e.test.mjs
@@ -18,7 +18,7 @@ const chromePath =
   process.env.CHROME_PATH ??
   resolve("../.slice0-audit/chrome-for-testing-157.0.8103.78/chrome-win64/chrome.exe");
 const extension = resolve("apps/extension/build");
-const aeonCursor = resolve("../apps/chrome-extension/native-dist/cursor-page.js");
+const graftCursor = resolve("../apps/chrome-extension/native-dist/cursor-page.js");
 const cli = resolve("apps/bridge/dist/cli.js");
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const run = promisify(execFile);
@@ -28,7 +28,7 @@ const pageHtml = `<title>Quiet</title>
 <button id="go" onclick="document.title='continued'">Go</button>`;
 
 test(
-  "a page is free of Aeon globals, overlays and markers whenever the agent is idle",
+  "a page is free of Graft globals, overlays and markers whenever the agent is idle",
   { skip: !process.env.REQUIRE_E2E && !existsSync(chromePath) },
   async () => {
     const home = await mkdtemp(join(tmpdir(), "bue-stealth-idle-"));
@@ -47,14 +47,14 @@ test(
       chrome = spawn(chromePath, chromeArgs(profile), { stdio: "ignore" });
       const port = await connectExtension(profile, env);
 
-      // A tab Aeon never drove: nothing of ours in its world.
+      // A tab Graft never drove: nothing of ours in its world.
       assert.deepEqual(
         await tellOn(await untouchPage(port, url)),
         emptyTells(),
-        "a fresh page carries Aeon",
+        "a fresh page carries Graft",
       );
 
-      // Aeon drives the page, then goes idle: the cursor leaves and the page is clean again.
+      // Graft drives the page, then goes idle: the cursor leaves and the page is clean again.
       const result = await run(
         process.execPath,
         [cli, "repl", "--session", "stealth-idle", repl(url)],
@@ -78,7 +78,7 @@ test(
           throw new Error("cursor still there");
         return tells;
       }, 8000);
-      assert.deepEqual(idleTells, emptyTells(), "the driven page kept something of Aeon");
+      assert.deepEqual(idleTells, emptyTells(), "the driven page kept something of Graft");
 
       // The cursor is an injected function, not a page listener: a page cannot paint it by
       // dispatching the old event, and the script leaves no listener or global behind.
@@ -100,15 +100,15 @@ test(
 );
 
 async function assertNoPagePaint(page) {
-  const cursorScript = await readFile(aeonCursor, "utf8");
+  const cursorScript = await readFile(graftCursor, "utf8");
   assert.equal(
-    cursorScript.includes("aeon:cursor:paint"),
+    cursorScript.includes("graft:cursor:paint"),
     false,
     "the built cursor listens for a page event",
   );
   const painted = await evalValue(
     page,
-    `${cursorScript}\nwindow.dispatchEvent(new CustomEvent("aeon:cursor:paint", { detail: ${JSON.stringify(
+    `${cursorScript}\nwindow.dispatchEvent(new CustomEvent("graft:cursor:paint", { detail: ${JSON.stringify(
       {
         update: { x: 20, y: 30, summon: true, place: true },
         css: "",
@@ -123,7 +123,7 @@ async function assertNoPagePaint(page) {
       "!![...document.documentElement.children].find((n) => n.style.zIndex === '2147483647' && n.style.contain === 'strict')",
     ),
     false,
-    "a page event painted Aeon's cursor",
+    "a page event painted Graft's cursor",
   );
   assert.deepEqual(await evalValue(page, globalsOnly), [], "the cursor left a page global");
   assert.deepEqual(await tellOn(page), emptyTells(), "a page event left marks on an idle page");
@@ -135,17 +135,17 @@ function repl(url) {
     await page.waitForTimeout(500);`;
 }
 
-const globalsOnly = `Object.getOwnPropertyNames(window).filter((name) => /^(__aeon|__browserkit|browserkit-)/.test(name))`;
+const globalsOnly = `Object.getOwnPropertyNames(window).filter((name) => /^(__graft|__browserkit|browserkit-)/.test(name))`;
 
 // The one list of what an idle page must not carry, kept as source for Runtime.evaluate.
 const tellsFn = `() => ({
   globals: ${globalsOnly},
-  symbols: Object.getOwnPropertySymbols(window).map((key) => Symbol.keyFor(key) || String(key)).filter((name) => /aeon|browserkit/i.test(name)),
-  overlays: [...document.querySelectorAll('[id^="aeon-"],[id^="browserkit-"],[data-aeon-overlay],[data-browserkit-overlay]')].map((node) => node.id ? "#" + node.id : node.tagName.toLowerCase()),
-  markers: [...document.querySelectorAll("*")].flatMap((node) => [...node.attributes].map((attr) => attr.name)).filter((name) => /aeon|browserkit/i.test(name)),
-  rootMarkers: [...document.documentElement.attributes, ...(document.body ? [...document.body.attributes] : [])].map((attr) => attr.name).filter((name) => /aeon|browserkit/i.test(name)),
+  symbols: Object.getOwnPropertySymbols(window).map((key) => Symbol.keyFor(key) || String(key)).filter((name) => /graft|browserkit/i.test(name)),
+  overlays: [...document.querySelectorAll('[id^="graft-"],[id^="browserkit-"],[data-graft-overlay],[data-browserkit-overlay]')].map((node) => node.id ? "#" + node.id : node.tagName.toLowerCase()),
+  markers: [...document.querySelectorAll("*")].flatMap((node) => [...node.attributes].map((attr) => attr.name)).filter((name) => /graft|browserkit/i.test(name)),
+  rootMarkers: [...document.documentElement.attributes, ...(document.body ? [...document.body.attributes] : [])].map((attr) => attr.name).filter((name) => /graft|browserkit/i.test(name)),
   scripts: [...document.querySelectorAll("script[src]")].map((node) => node.src).filter((src) => /^chrome-extension:/.test(src)),
-  styles: [...document.querySelectorAll("style")].map((node) => node.textContent || "").filter((text) => /aeon|browserkit/i.test(text))
+  styles: [...document.querySelectorAll("style")].map((node) => node.textContent || "").filter((text) => /graft|browserkit/i.test(text))
 })`;
 
 function emptyTells() {
@@ -177,7 +177,7 @@ async function evalValue(page, expression) {
   return result.result.result.value;
 }
 
-/** A tab opened outside Aeon: no debugger, no cursor, nothing of the extension in it. */
+/** A tab opened outside Graft: no debugger, no cursor, nothing of the extension in it. */
 async function untouchPage(port, url) {
   const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json());
   const browser = connect(version.webSocketDebuggerUrl);
@@ -192,7 +192,7 @@ async function untouchPage(port, url) {
   return page;
 }
 
-/** The page target for a URL, or a target id opened outside Aeon. */
+/** The page target for a URL, or a target id opened outside Graft. */
 async function attachPage(port, url, targetId) {
   const target = await waitFor(async () => {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());

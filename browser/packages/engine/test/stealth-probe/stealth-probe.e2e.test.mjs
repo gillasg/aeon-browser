@@ -1,4 +1,4 @@
-// Hermetic real-Chrome stealth probe: drives Aeon's built engine, bridge, and extension against
+// Hermetic real-Chrome stealth probe: drives Graft's built engine, bridge, and extension against
 // a local loopback detector page and fails on any unpinned automation/CDP tell or stale pin.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -9,7 +9,7 @@ import { evaluateStealthSnapshot, knownTells } from "./known-tells.mjs";
 import { startProbeServer } from "./site.mjs";
 
 const missing = missingPrerequisite();
-const required = process.env.AEON_STEALTH_REQUIRE === "chrome";
+const required = process.env.GRAFT_STEALTH_REQUIRE === "chrome";
 
 test("hermetic real-Chrome stealth probe", { timeout: 120_000 }, async (t) => {
   if (missing) {
@@ -24,7 +24,7 @@ test("hermetic real-Chrome stealth probe", { timeout: 120_000 }, async (t) => {
     const code = `
       const page = await browser.openTab(${JSON.stringify(server.url)});
       await page.click("#target-btn");
-      await page.fill("#target-input", "hello aeon");
+      await page.fill("#target-input", "hello graft");
       return await page.evaluate(() => window.__probeSnapshot());
     `;
     const reply = await harness.run(code, "stealth-probe");
@@ -33,7 +33,7 @@ test("hermetic real-Chrome stealth probe", { timeout: 120_000 }, async (t) => {
     assert.ok(snapshot && typeof snapshot === "object", "missing probe snapshot");
 
     const verdict = evaluateStealthSnapshot(snapshot, knownTells);
-    const outPath = process.env.AEON_STEALTH_PROBE_OUT;
+    const outPath = process.env.GRAFT_STEALTH_PROBE_OUT;
     if (outPath) {
       await mkdir(dirname(outPath), { recursive: true });
       await writeFile(

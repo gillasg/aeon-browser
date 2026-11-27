@@ -2,7 +2,7 @@
 // The point is that "the click was delivered" and "the click did something" stop being mixed:
 // confirmed needs readable evidence (a value read back, a navigation, a DOM change), a step that
 // ran without evidence is unverifiable, and a bounded unchanged state is a suspected no-op rather
-// than a failure. Cua Driver's ActionResult.effect, adapted to what Aeon can see in one step.
+// than a failure. Cua Driver's ActionResult.effect, adapted to what Graft can see in one step.
 import {
   effectNext,
   INPUT_MAY_HAVE_LANDED_NOTE,

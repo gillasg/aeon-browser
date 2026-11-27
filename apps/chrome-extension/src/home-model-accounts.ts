@@ -1,10 +1,10 @@
-import type { DaemonUiResponse } from "@aeon/protocol";
+import type { DaemonUiResponse } from "@graft/protocol";
 import type {
   ModelAccountsProps,
   ModelAccountsState,
   ModelProvider,
   ModelSignInFlow,
-} from "@aeon/ui";
+} from "@graft/ui";
 import { announceModelsChanged, returnTarget } from "./model-broadcast.js";
 
 // The Models tab. Core runs the sign-in service on 127.0.0.1 (the same one Pi apps use) and hands
@@ -49,7 +49,7 @@ export class HomeModelAccounts {
       onDefaultModel: (choice) => void this.call("default-model", choice ?? {}),
       onOpenUrl: (url) => void chrome.tabs.create({ url }),
       onStartChat: () => void this.startChat(),
-      startChatLabel: this.returnTo() === undefined ? "Start chatting" : "Return to Aeon",
+      startChatLabel: this.returnTo() === undefined ? "Start chatting" : "Return to Graft",
     };
   }
 
@@ -76,7 +76,7 @@ export class HomeModelAccounts {
     location.assign(chrome.runtime.getURL("home.html"));
   }
 
-  /** The pickers on this page and every other open Aeon view catch up right away. */
+  /** The pickers on this page and every other open Graft view catch up right away. */
   private modelsChanged(): void {
     this.onModelsChanged();
     announceModelsChanged();
@@ -170,7 +170,7 @@ export class HomeModelAccounts {
   }
 
   private async signOut(provider: ModelProvider): Promise<void> {
-    if (!confirm(`Sign out of ${provider.name}? Aeon and other Pi apps will stop using it.`))
+    if (!confirm(`Sign out of ${provider.name}? Graft and other Pi apps will stop using it.`))
       return;
     await this.call("logout", { provider: provider.id });
   }
@@ -199,7 +199,7 @@ export class HomeModelAccounts {
   private async request(endpoint: Endpoint, path: string, body?: unknown): Promise<unknown> {
     const response = await fetch(`${endpoint.origin}/api/${path}`, {
       method: body === undefined ? "GET" : "POST",
-      headers: { "content-type": "application/json", "x-aeon-login-token": endpoint.token },
+      headers: { "content-type": "application/json", "x-graft-login-token": endpoint.token },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const data = (await response.json().catch(() => ({}))) as { error?: string };
@@ -211,7 +211,7 @@ export class HomeModelAccounts {
     if (this.endpoint) return this.endpoint;
     const response = await this.command({ operation: "chat.model-login", payload: {} });
     if (response.kind !== "command.completed" || response.result.kind !== "chat.model-login")
-      throw new Error("Aeon could not start sign-in. Is Aeon running?");
+      throw new Error("Graft could not start sign-in. Is Graft running?");
     this.endpoint = endpointFrom(response.result.url);
     return this.endpoint;
   }
@@ -220,7 +220,7 @@ export class HomeModelAccounts {
 export function endpointFrom(url: string): Endpoint {
   const parsed = new URL(url);
   const token = new URLSearchParams(parsed.hash.slice(1)).get("token");
-  if (!token) throw new Error("Aeon's sign-in service sent no token.");
+  if (!token) throw new Error("Graft's sign-in service sent no token.");
   return { origin: parsed.origin, token };
 }
 

@@ -14,7 +14,7 @@ import { printJson } from "browserkit/dist/output.js";
 import { dataDirectory } from "./client.js";
 import type { DaemonHost } from "./host.js";
 
-// Site packs for Aeon: a mapped site plus the site skills and boosts written for it. Export strips
+// Site packs for Graft: a mapped site plus the site skills and boosts written for it. Export strips
 // sessions, cookies and credential-bearing bodies/headers. Import writes the site, saves skills and
 // boosts DISABLED (site tools too), and prints their code; the user enables them explicitly.
 
@@ -99,7 +99,7 @@ async function siteBoosts(host: DaemonHost, site: string): Promise<PackBoost[]> 
 
 async function exportPack(host: DaemonHost, args: Args): Promise<number> {
   const site = args.positional[1];
-  if (!site) throw new Error("Usage: aeon pack export <site> --out <file.zip>");
+  if (!site) throw new Error("Usage: graft pack export <site> --out <file.zip>");
   const out = (flag(args, "out") ?? `${site}.zip`) as string;
   let boosts: PackBoost[] = [];
   let warning: string | undefined;
@@ -132,7 +132,7 @@ async function exportPack(host: DaemonHost, args: Args): Promise<number> {
 
 async function importPack(host: DaemonHost, args: Args): Promise<number> {
   const file = args.positional[1];
-  if (!file) throw new Error("Usage: aeon pack import <file.zip>");
+  if (!file) throw new Error("Usage: graft pack import <file.zip>");
   const pack = await readSitePack(file);
   const installed = await installSitePack(pack);
   const skills = await importSkills(pack.skills);
@@ -152,7 +152,7 @@ async function importPack(host: DaemonHost, args: Args): Promise<number> {
   );
   printImportedCode(skills, pack.boosts);
   process.stdout.write(
-    `\nReview the code above, then enable with: aeon pack enable ${installed.site}\n`,
+    `\nReview the code above, then enable with: graft pack enable ${installed.site}\n`,
   );
   if (warning) process.stderr.write(warning + "\n");
   return 0;
@@ -172,7 +172,7 @@ async function saveImportedBoosts(
   } catch (error) {
     return {
       boosts: [],
-      warning: `Boosts not saved (open Aeon and import again): ${error instanceof Error ? error.message : String(error)}`,
+      warning: `Boosts not saved (open Graft and import again): ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
@@ -194,7 +194,7 @@ function printImportedCode(
 
 async function enablePack(host: DaemonHost, args: Args): Promise<number> {
   const site = args.positional[1];
-  if (!site) throw new Error("Usage: aeon pack enable <site>");
+  if (!site) throw new Error("Usage: graft pack enable <site>");
   const skills = await enableSkills(site);
   const tools = await setSiteToolsEnabled(site, "all", undefined, true);
   let boosts: { id?: string; name?: string }[] = [];
@@ -226,6 +226,6 @@ export async function packCommand(host: DaemonHost, args: Args): Promise<number>
   if (action === "import") return importPack(host, args);
   if (action === "enable") return enablePack(host, args);
   throw new Error(
-    "Usage: aeon pack export <site> --out file.zip | import <file.zip> | enable <site>",
+    "Usage: graft pack export <site> --out file.zip | import <file.zip> | enable <site>",
   );
 }

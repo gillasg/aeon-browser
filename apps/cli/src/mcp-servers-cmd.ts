@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { aeonDataDirectory } from "@aeon/location";
+import { graftDataDirectory } from "@graft/location";
 
-// `aeon mcp add|list|remove`: one-line registration of an inbound MCP server into Aeon's
+// `graft mcp add|list|remove`: one-line registration of an inbound MCP server into Graft's
 // capability registry (capabilities.json in the data directory). The daemon reads that file on
 // every listing, so a server added here is callable at once from browser_code as
 // mcp.<name>.<tool>(args) and found by mcp.search(query). Only references to secrets are stored.
 
-export const MCP_SERVERS_HELP = `Usage: aeon mcp add <name> -- <command> [args...]
-       aeon mcp add <name> --url <url> [--header <Name>=env:<VAR>]... [--bearer-env <VAR>]
-       aeon mcp list [--json]
-       aeon mcp remove <name>
+export const MCP_SERVERS_HELP = `Usage: graft mcp add <name> -- <command> [args...]
+       graft mcp add <name> --url <url> [--header <Name>=env:<VAR>]... [--bearer-env <VAR>]
+       graft mcp list [--json]
+       graft mcp remove <name>
 
   add       register a stdio server (after --) or a Streamable HTTP server (--url)
   --header  send <Name> with the value of environment variable <VAR> (repeatable)
@@ -44,7 +44,7 @@ export interface McpAddRequest {
   description?: string;
 }
 
-/** Parses the words after `aeon mcp add`; everything after `--` is the server's command line. */
+/** Parses the words after `graft mcp add`; everything after `--` is the server's command line. */
 export function parseMcpAdd(argv: string[]): McpAddRequest {
   const dash = argv.indexOf("--");
   const own = dash < 0 ? argv : argv.slice(0, dash);
@@ -66,7 +66,7 @@ export function parseMcpAdd(argv: string[]): McpAddRequest {
 }
 
 function finishAdd(request: McpAddRequest, command: string[]): McpAddRequest {
-  if (!request.name) throw new Error("a server name is required: aeon mcp add <name> ...");
+  if (!request.name) throw new Error("a server name is required: graft mcp add <name> ...");
   if (command.length) [request.command, ...request.args] = command as [string, ...string[]];
   if (!request.command === !request.url)
     throw new Error("give either -- <command> [args...] (stdio) or --url <url> (HTTP)");
@@ -130,7 +130,7 @@ export function buildCapability(request: McpAddRequest, cwd: string): Json {
     kind: "mcp",
     displayName: request.name.slice(0, 120),
     description: (request.description ?? `MCP server ${request.name}`).slice(0, 1000),
-    configReference: "aeon mcp add",
+    configReference: "graft mcp add",
     credentialReference: credential,
     relatedSkillIds: [],
     verification: { state: "needs_check", checkedAt: null, summary: null },
@@ -158,7 +158,7 @@ function checkUrl(value: string): void {
 }
 
 export function registryPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(aeonDataDirectory({ env }), "capabilities.json");
+  return join(graftDataDirectory({ env }), "capabilities.json");
 }
 
 async function readRegistry(path: string): Promise<Registry> {
@@ -245,7 +245,7 @@ function describe(item: Json): string {
   return `${String(item.displayName)}  ${String(item.id)}  ${String(item.transport)}  ${target}${auth}`;
 }
 
-/** Runs `aeon mcp add|list|remove`; `argv` is the words after `mcp`. */
+/** Runs `graft mcp add|list|remove`; `argv` is the words after `mcp`. */
 export async function mcpServersCommand(
   argv: string[],
   write: (line: string) => void = (line) => process.stdout.write(`${line}\n`),
@@ -262,7 +262,7 @@ export async function mcpServersCommand(
   }
   if (action === "remove") {
     const name = rest[0];
-    if (!name) throw new Error("usage: aeon mcp remove <name>");
+    if (!name) throw new Error("usage: graft mcp remove <name>");
     if (!(await removeMcpServer(name, path))) {
       write(`No MCP server named '${name}'.`);
       return 1;
@@ -273,7 +273,7 @@ export async function mcpServersCommand(
   const servers = await listMcpServers(path);
   if (rest.includes("--json")) write(JSON.stringify(servers, null, 2));
   else if (!servers.length)
-    write("No MCP servers registered. Add one with aeon mcp add <name> -- <command>.");
+    write("No MCP servers registered. Add one with graft mcp add <name> -- <command>.");
   else for (const item of servers) write(describe(item));
   return 0;
 }

@@ -24,9 +24,9 @@ const VIA_LABEL: Record<AbilityVia, string> = {
   steps: "steps",
 };
 
-/** `aeon mcp example.com`: the one line that gives another agent this site's tools. */
+/** `graft mcp example.com`: the one line that gives another agent this site's tools. */
 export function mcpCommandForSite(site: string): string {
-  return `aeon mcp ${siteName(site)}`;
+  return `graft mcp ${siteName(site)}`;
 }
 
 /** `0.4s` under ten seconds, whole seconds after. */

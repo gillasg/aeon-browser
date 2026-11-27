@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { AeonProductStore, ChatId, RoutineRecord } from "@aeon/domain";
-import { exploreForRoutine } from "@aeon/pi-adapter";
+import type { GraftProductStore, ChatId, RoutineRecord } from "@graft/domain";
+import { exploreForRoutine } from "@graft/pi-adapter";
 import {
   inferRoutineEffect,
   optionalBoolean,
@@ -11,14 +11,14 @@ import { optionalListen } from "./routine-listen.js";
 import { nextRoutineOccurrence, parseRoutineSchedule } from "./routine-schedule.js";
 
 // Routines for outside agents (the CLI and MCP). A routine created this way lives in a chat that
-// the same caller created (origin cli or mcp); its alerts go to Aeon's UI only, never back to the
+// the same caller created (origin cli or mcp); its alerts go to Graft's UI only, never back to the
 // caller. Pause and delete are limited to routines whose chat has the caller's own origin, so an
-// outside agent cannot manage the user's routines. The user can always manage everything in Aeon.
+// outside agent cannot manage the user's routines. The user can always manage everything in Graft.
 
 export const EXTERNAL_ROUTINE_TOOL = {
   name: "routine",
   description:
-    "Create, list, pause or delete an Aeon routine (a scheduled agent task). Its alerts appear in Aeon, not in this session. Only routines whose chat this origin created are listed or changed.",
+    "Create, list, pause or delete a Graft routine (a scheduled agent task). Its alerts appear in Graft, not in this session. Only routines whose chat this origin created are listed or changed.",
   inputSchema: {
     type: "object",
     properties: {
@@ -62,7 +62,7 @@ export const EXTERNAL_ROUTINE_TOOL = {
       webhookSecret: {
         type: "string",
         maxLength: 200,
-        description: "Signs the body as HMAC-SHA256 in X-Aeon-Signature.",
+        description: "Signs the body as HMAC-SHA256 in X-Graft-Signature.",
       },
       webhookOnly: {
         type: "boolean",
@@ -84,7 +84,7 @@ type Origin = "cli" | "mcp";
 
 export interface ExternalRoutineOptions {
   store: Pick<
-    AeonProductStore,
+    GraftProductStore,
     "createRoutine" | "listRoutines" | "getRoutine" | "updateRoutine" | "deleteRoutine"
   >;
   createChat(title: string, origin: Origin): Promise<{ chatId: ChatId }>;
@@ -173,7 +173,7 @@ async function chatFor(options: ExternalRoutineOptions, origin: Origin): Promise
   if (!chat) throw new Error(`No chat ${given}`);
   if (chat.origin !== origin)
     throw new Error(
-      `Chat ${given} was not created by ${origin}; create the routine in a new chat (omit chatId) or let the user add it in Aeon.`,
+      `Chat ${given} was not created by ${origin}; create the routine in a new chat (omit chatId) or let the user add it in Graft.`,
     );
   return chatId;
 }
@@ -224,7 +224,7 @@ function owned(options: ExternalRoutineOptions, origin: Origin): RoutineRecord {
   if (!routine || routine.deletedAt) throw new Error(`No routine ${routineId}`);
   if (options.getChat(routine.chatId)?.origin !== origin)
     throw new Error(
-      `Routine ${routineId} was not created by ${origin}; the user manages it in Aeon Settings.`,
+      `Routine ${routineId} was not created by ${origin}; the user manages it in Graft Settings.`,
     );
   return routine;
 }

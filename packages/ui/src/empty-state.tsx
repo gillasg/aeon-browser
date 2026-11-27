@@ -11,10 +11,10 @@ export function EmptyState({
   onAction?(): void;
 }): ReactElement {
   return (
-    <div className="aeon-empty">
+    <div className="graft-empty">
       <p>{text}</p>
       {action && onAction && (
-        <button type="button" className="aeon-button" data-tone="primary" onClick={onAction}>
+        <button type="button" className="graft-button" data-tone="primary" onClick={onAction}>
           {action}
         </button>
       )}

@@ -11,7 +11,7 @@ export const SECRET_KEYS =
   /^(password|passwd|pwd|pass|secret|client_secret|token|access_?token|refresh_?token|id_?token|api_?key|apikey|authorization|auth|session(_?id)?|sid|ssn|card_?number|cc_?number|cvv|cvc|otp|pin|private_?key|csrf(_?token)?|xsrf(_?token)?|authenticity_token)$/i;
 // Every repeat is bounded and every match starts only where the last run of its characters
 // begins, so redaction is linear in the input. The old unbounded email pattern was quadratic: a
-// few hundred KB of request body (analytics payloads) held Aeon's daemon for 35 s, and its
+// few hundred KB of request body (analytics payloads) held Graft's daemon for 35 s, and its
 // supervisor killed it with every running chat.
 const JWT = /\beyJ[\w-]{6,4096}\.[\w-]{6,8192}\.[\w-]{6,4096}\b/g;
 const EMAIL = /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}\b/g;

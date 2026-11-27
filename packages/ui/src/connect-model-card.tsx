@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 export interface ModelLoginState {
-  /** The sign-in page is open; Aeon refreshes its models when the user comes back. */
+  /** The sign-in page is open; Graft refreshes its models when the user comes back. */
   waiting: boolean;
   error?: string | undefined;
 }
@@ -29,7 +29,7 @@ export function ConnectModelCard({
         <strong>{state.waiting ? "Finish signing in" : "Connect an AI model to start"}</strong>
         <p>
           {state.waiting
-            ? "Complete the sign-in on the page that just opened. Aeon picks it up automatically."
+            ? "Complete the sign-in on the page that just opened. Graft picks it up automatically."
             : "Sign in with Claude, ChatGPT or GitHub Copilot, or add an API key from 40+ providers. You only do this once."}
         </p>
         {state.error && (

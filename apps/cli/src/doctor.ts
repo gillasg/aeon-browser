@@ -8,9 +8,9 @@ import type { DaemonHost } from "./host.js";
 export function doctorCommand(host: DaemonHost): Command {
   return {
     name: "doctor",
-    group: "Aeon",
-    summary: "check that Aeon can run",
-    help: `Usage: aeon doctor [--json] [--stealth]
+    group: "Graft",
+    summary: "check that Graft can run",
+    help: `Usage: graft doctor [--json] [--stealth]
 
 Checks the daemon health ping, protocol versions, the extension and engine, a normal Chrome
 launch (extra Chrome flags are optional), a signed-in model, the login task, and that data

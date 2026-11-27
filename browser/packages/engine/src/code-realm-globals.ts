@@ -1,4 +1,4 @@
-// The globals a browser_code realm gets in the local Aeon process: the Web and JS platform a cell
+// The globals a browser_code realm gets in the local Graft process: the Web and JS platform a cell
 // relied on in the browser (timers, URL, encoding, crypto, fetch types), and nothing of Node.
 // No process, require, module, Buffer or file and child-process access is ever placed in a realm.
 import vm from "node:vm";
@@ -121,7 +121,7 @@ export function createRealmContext(owned: RealmTimers): vm.Context {
   sandbox.performance = { now: () => performance.now(), timeOrigin: performance.timeOrigin };
   timers(sandbox, owned);
   const context = vm.createContext(sandbox, {
-    name: "aeon-browser-code",
+    name: "graft-browser-code",
     codeGeneration: { strings: false, wasm: false },
   });
   // The realm's own name for its global, as a page realm has; set from inside the realm so it
@@ -133,7 +133,7 @@ export function createRealmContext(owned: RealmTimers): vm.Context {
   // would, and never in the host realm.
   Object.defineProperty(sandbox, "__realmEval", {
     value: (source: unknown) =>
-      vm.runInContext(String(source), context, { filename: "aeon-cell-script.js" }),
+      vm.runInContext(String(source), context, { filename: "graft-cell-script.js" }),
     writable: false,
     configurable: false,
     enumerable: false,

@@ -14,16 +14,16 @@ async function skill(root, name) {
   );
 }
 
-test("Aeon's own agent never sees outside-agent or personal Pi skills and extensions", async () => {
+test("Graft's own agent never sees outside-agent or personal Pi skills and extensions", async () => {
   assert.deepEqual(
-    withoutOutsideAgentSkills([{ name: "aeon" }, { name: "pdf" }]).map((item) => item.name),
+    withoutOutsideAgentSkills([{ name: "graft" }, { name: "pdf" }]).map((item) => item.name),
     ["pdf"],
   );
-  const root = await mkdtemp(join(tmpdir(), "aeon-outside-skills-"));
+  const root = await mkdtemp(join(tmpdir(), "graft-outside-skills-"));
   const agent = join(root, "agent"),
     cwd = join(root, "work");
   try {
-    await skill(join(agent, "skills"), "aeon");
+    await skill(join(agent, "skills"), "graft");
     await skill(join(agent, "skills"), "notes");
     await mkdir(cwd, { recursive: true });
     await mkdir(join(agent, "extensions"), { recursive: true });
@@ -31,7 +31,7 @@ test("Aeon's own agent never sees outside-agent or personal Pi skills and extens
       join(agent, "extensions", "personal.ts"),
       'export default (pi) => pi.registerTool({ name: "personal_tool" });\n',
     );
-    // Aeon owns its tool surface: the user's own Pi skills and extensions never load.
+    // Graft owns its tool surface: the user's own Pi skills and extensions never load.
     const loader = createPiResourceLoader({
       workingDirectory: cwd,
       agentDirectory: agent,

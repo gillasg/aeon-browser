@@ -93,39 +93,39 @@ test("a chat that ended in an error is reported as failed with the error", () =>
   assert.equal(result.answer, "Model quota exceeded");
 });
 
-test("the MCP server lists its tools without a running Aeon", async () => {
+test("the MCP server lists its tools without a running Graft", async () => {
   const replies = await mcp([
     { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } },
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
   ]);
-  assert.equal(replies[0].result.serverInfo.name, "aeon");
+  assert.equal(replies[0].result.serverInfo.name, "graft");
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
     [
-      "aeon_run",
-      "aeon_run_status",
-      "aeon_send",
-      "aeon_answer",
-      "aeon_wait",
-      "aeon_result",
-      "aeon_stop",
-      "aeon_trace",
-      "aeon_chats",
-      "aeon_search",
-      "aeon_context",
-      "aeon_routine",
+      "graft_run",
+      "graft_run_status",
+      "graft_send",
+      "graft_answer",
+      "graft_wait",
+      "graft_result",
+      "graft_stop",
+      "graft_trace",
+      "graft_chats",
+      "graft_search",
+      "graft_context",
+      "graft_routine",
       "catalog_search",
       "browser_action",
     ],
   );
 });
 
-test("the CLI says plainly when Aeon is not running", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-cli-"));
+test("the CLI says plainly when Graft is not running", async () => {
+  const home = await mkdtemp(join(tmpdir(), "graft-cli-"));
   try {
-    const { code, stderr } = await runCli(["chats"], { AEON_DATA_DIR: home });
+    const { code, stderr } = await runCli(["chats"], { GRAFT_DATA_DIR: home });
     assert.equal(code, 1);
-    assert.match(stderr, /Aeon is not running/);
+    assert.match(stderr, /Graft is not running/);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
@@ -151,14 +151,14 @@ test("tool --json carries the cell value and screenshot paths", async () => {
 });
 
 test("--json prints errors as JSON on stdout, not plain text on stderr", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-cli-json-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-cli-json-"));
   try {
-    const { code, stdout, stderr } = await runCli(["chats", "--json"], { AEON_DATA_DIR: home });
+    const { code, stdout, stderr } = await runCli(["chats", "--json"], { GRAFT_DATA_DIR: home });
     assert.equal(code, 1);
     assert.equal(stderr, "");
     const parsed = JSON.parse(stdout.trim());
     assert.equal(parsed.ok, false);
-    assert.match(parsed.error.message, /Aeon is not running/);
+    assert.match(parsed.error.message, /Graft is not running/);
     assert.equal(typeof parsed.error.kind, "string");
   } finally {
     await rm(home, { recursive: true, force: true });
@@ -178,7 +178,7 @@ test("a quiet run still opens its chat as a tab, so the user can answer it, and 
     {
       chatId: "chat-1",
       text: "Find the price",
-      selection: { model: { provider: "aeon-fixture", id: "model-one" }, thinkingLevel: "low" },
+      selection: { model: { provider: "graft-fixture", id: "model-one" }, thinkingLevel: "low" },
     },
   ]);
   assert.equal(
@@ -214,10 +214,10 @@ function fakeClient() {
       if (operation === "chat.model-catalog")
         return {
           catalog: {
-            defaultModel: { provider: "aeon-fixture", id: "model-one" },
+            defaultModel: { provider: "graft-fixture", id: "model-one" },
             models: [
               {
-                provider: "aeon-fixture",
+                provider: "graft-fixture",
                 id: "model-one",
                 name: "Model One",
                 defaultThinkingLevel: "low",
@@ -260,13 +260,13 @@ function fakeClient() {
 
 function mcp(messages) {
   return new Promise((resolve, reject) => {
-    // An empty data folder, so an Aeon running on this machine does not add its tools.
+    // An empty data folder, so a Graft running on this machine does not add its tools.
     const child = spawn(process.execPath, [cli, "mcp", "--surface", "full"], {
       stdio: ["pipe", "pipe", "inherit"],
       env: {
         ...process.env,
-        AEON_DATA_DIR: join(tmpdir(), "aeon-cli-mcp-" + process.pid),
-        SITE_TO_API_HOME: join(tmpdir(), "aeon-cli-mcp-sites-" + process.pid),
+        GRAFT_DATA_DIR: join(tmpdir(), "graft-cli-mcp-" + process.pid),
+        SITE_TO_API_HOME: join(tmpdir(), "graft-cli-mcp-sites-" + process.pid),
       },
     });
     let buffer = "";

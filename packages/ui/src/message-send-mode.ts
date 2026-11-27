@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 export type MessageSendMode = "followUp" | "steer";
-const key = "aeonMessageSendMode";
+const key = "graftMessageSendMode";
 export function useMessageSendMode(): [MessageSendMode, (mode: MessageSendMode) => void] {
   const [mode, setMode] = useState<MessageSendMode>("followUp");
   useEffect(() => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Chaos suite: Aeon under load and faults, in the user's Chrome. No model is called.
+// Chaos suite: Graft under load and faults, in the user's Chrome. No model is called.
 //
 // 1. concurrent: N sessions at once, each opening a local page, reading it and closing the tab.
 // 2. leak: the browser's tab count before and after; every tab a cell opened must be gone.
@@ -22,7 +22,7 @@ const here = import.meta.dirname;
 const root = path.resolve(here, "../..");
 const cli = path.join(root, "apps/cli/dist/cli.js");
 
-/** One `aeon repl` cell, asynchronously so several run at once. */
+/** One `graft repl` cell, asynchronously so several run at once. */
 export function cell(code, { browser, session, timeoutSeconds = 60 }) {
   const started = Date.now();
   return new Promise((resolve) => {

@@ -1,11 +1,11 @@
 // The conformance sweep end to end: one Chrome, the fixture site, every scenario, then the
 // verdict against the golden transcripts and the pinned divergences.
-//   AEON_CONFORMANCE_ONLY=a,b      run only these scenarios (baseline is kept for leak_canary)
-//   AEON_CONFORMANCE_UPDATE=1      rewrite golden/*.json from this run
-//   AEON_CONFORMANCE_REQUIRE=chrome  fail instead of skipping when Chrome is missing
-//   AEON_CONFORMANCE_OUT=<dir>     write transcripts, per-step results, a log and diff.json
-//   AEON_CONFORMANCE_CONCURRENCY=n scenarios at once (3 by default; they share one engine)
-//   AEON_CONFORMANCE_TRACE=1       print each cell's duration
+//   GRAFT_CONFORMANCE_ONLY=a,b      run only these scenarios (baseline is kept for leak_canary)
+//   GRAFT_CONFORMANCE_UPDATE=1      rewrite golden/*.json from this run
+//   GRAFT_CONFORMANCE_REQUIRE=chrome  fail instead of skipping when Chrome is missing
+//   GRAFT_CONFORMANCE_OUT=<dir>     write transcripts, per-step results, a log and diff.json
+//   GRAFT_CONFORMANCE_CONCURRENCY=n scenarios at once (3 by default; they share one engine)
+//   GRAFT_CONFORMANCE_TRACE=1       print each cell's duration
 import { pathToFileURL } from "node:url";
 import { divergences, TESTED_WITH } from "./divergences.mjs";
 import { launchHarness, missingPrerequisite } from "./harness.mjs";
@@ -13,7 +13,7 @@ import { judge, readGoldens, runScenarios, writeGoldens, writeOutput } from "./r
 import { scenarios } from "./scenarios.mjs";
 import { startSites } from "./sites.mjs";
 
-export function selectScenarios(only = process.env.AEON_CONFORMANCE_ONLY) {
+export function selectScenarios(only = process.env.GRAFT_CONFORMANCE_ONLY) {
   if (!only) return scenarios;
   const names = new Set(
     only
@@ -32,8 +32,8 @@ export function selectScenarios(only = process.env.AEON_CONFORMANCE_ONLY) {
 /** Why the sweep should skip here (undefined: run it). Throws when Chrome is required. */
 export function skipReason() {
   const missing = missingPrerequisite();
-  if (missing && process.env.AEON_CONFORMANCE_REQUIRE === "chrome")
-    throw new Error(`AEON_CONFORMANCE_REQUIRE=chrome but ${missing}`);
+  if (missing && process.env.GRAFT_CONFORMANCE_REQUIRE === "chrome")
+    throw new Error(`GRAFT_CONFORMANCE_REQUIRE=chrome but ${missing}`);
   return missing;
 }
 
@@ -60,7 +60,7 @@ export async function runSweep({ log = (line) => process.stdout.write(line + "\n
     say(
       `  ${result.scenario}: ${result.transcript.steps.length} steps in ${result.ms} ms${result.crash ? ` CRASH ${result.crash}` : ""}`,
     );
-  const update = process.env.AEON_CONFORMANCE_UPDATE === "1";
+  const update = process.env.GRAFT_CONFORMANCE_UPDATE === "1";
   if (update) await writeGoldens(results);
   const goldens = await readGoldens(results.map((result) => result.scenario));
   const verdict = judge({
@@ -73,8 +73,8 @@ export async function runSweep({ log = (line) => process.stdout.write(line + "\n
     `conformance: ${results.length} scenarios, ${verdict.observed.length} pinned or failing leaves, ${verdict.problems.length} problems, ${ms} ms`,
   );
   for (const problem of verdict.problems) say(`  PROBLEM ${JSON.stringify(problem)}`);
-  if (process.env.AEON_CONFORMANCE_OUT)
-    await writeOutput(process.env.AEON_CONFORMANCE_OUT, {
+  if (process.env.GRAFT_CONFORMANCE_OUT)
+    await writeOutput(process.env.GRAFT_CONFORMANCE_OUT, {
       results,
       verdict,
       log: lines,

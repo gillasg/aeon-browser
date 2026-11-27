@@ -7,11 +7,11 @@ migrateLegacyLocalStorage();
 
 export async function applyStoredTheme(): Promise<void> {
   await migrateLegacyChromeStorage();
-  const values = await chrome.storage.sync.get("aeon-theme");
-  const value = values["aeon-theme"];
+  const values = await chrome.storage.sync.get("graft-theme");
+  const value = values["graft-theme"];
   if (value === "atmosphere") {
-    localStorage.setItem("aeon-wallpaper", JSON.stringify({ enabled: true }));
-    await chrome.storage.sync.set({ "aeon-theme": "light" });
+    localStorage.setItem("graft-wallpaper", JSON.stringify({ enabled: true }));
+    await chrome.storage.sync.set({ "graft-theme": "light" });
   }
   // The orb's chat sits on other people's pages, so it is always dark like the orb.
   if (new URLSearchParams(location.search).get("host") === "orb") {
@@ -26,5 +26,5 @@ export async function applyStoredTheme(): Promise<void> {
         : "dark";
 }
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "sync" && changes["aeon-theme"]) void applyStoredTheme();
+  if (area === "sync" && changes["graft-theme"]) void applyStoredTheme();
 });

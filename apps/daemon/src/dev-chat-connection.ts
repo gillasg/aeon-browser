@@ -1,4 +1,8 @@
-import { DaemonUiRequestSchema, type BrowserTargetKey, type DaemonUiRequest } from "@aeon/protocol";
+import {
+  DaemonUiRequestSchema,
+  type BrowserTargetKey,
+  type DaemonUiRequest,
+} from "@graft/protocol";
 import { WebSocket, type RawData } from "ws";
 import { ChatService } from "./chat-service.js";
 import type { ThreadCoordinationService } from "./thread-coordination-service.js";
@@ -47,7 +51,7 @@ export function attachDevChatCommands(
     }
     const request = parseRequest(data, isBinary);
     if (!request) {
-      socket.close(1008, "Invalid closed Aeon command schema");
+      socket.close(1008, "Invalid closed Graft command schema");
       return;
     }
     if (request.kind === "ping") {

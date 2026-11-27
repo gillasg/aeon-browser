@@ -560,7 +560,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
       for (const selector of list) {
         let found;
         try { found = [...document.querySelectorAll(selector)].find(shown); } catch { continue; }
-        if (found) { document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer")); found.setAttribute("data-aeon-composer", ""); return true; }
+        if (found) { document.querySelectorAll("[data-graft-composer]").forEach((el) => el.removeAttribute("data-graft-composer")); found.setAttribute("data-graft-composer", ""); return true; }
       }
       return false;
     }, composers);
@@ -568,7 +568,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
   }
   if (!marked) throw new Error("PROVIDER_UI: no message box on the page; the user may be signed out, or the page changed");
   try {
-    const box = page.locator("[data-aeon-composer]").first();
+    const box = page.locator("[data-graft-composer]").first();
     await box.click();
     // Some sites keep an unsent draft in the box: clear it so only this prompt is sent.
     await page.keyboard("Control+a");
@@ -577,7 +577,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
     await page.waitForTimeout(400);
     await box.press("Enter");
     await page.waitForTimeout(1500);
-    const left = () => page.evaluate(() => { const el = document.querySelector("[data-aeon-composer]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
+    const left = () => page.evaluate(() => { const el = document.querySelector("[data-graft-composer]"); return el ? String(el.innerText || el.value || "").trim().length : 0; });
     if (await left()) {
       for (const selector of ${JSON.stringify(definition.ui.send)}) {
         const send = page.locator(selector).first();
@@ -589,7 +589,7 @@ function sendPromptCode(definition: ProviderDefinition, prompt: string): string 
   } finally {
     // Any throw after the marker is set (a re-render, a navigation, a refused key) must not leave
     // the marker on the page for the rest of the tab's life.
-    await page.evaluate(() => document.querySelectorAll("[data-aeon-composer]").forEach((el) => el.removeAttribute("data-aeon-composer"))).catch(() => {});
+    await page.evaluate(() => document.querySelectorAll("[data-graft-composer]").forEach((el) => el.removeAttribute("data-graft-composer"))).catch(() => {});
   }
 `;
 }
@@ -683,13 +683,13 @@ export function imageScript(
   const deadline = Date.now() + ${Math.min(options.timeoutMs ?? 180000, 300000)};
   ${files ? `await page.upload("input[type=file]", ${files});` : ""}
   // Images already on the page (avatar, uploads, older answers) are never the answer.
-  await page.evaluate(() => document.querySelectorAll("img").forEach((img) => img.setAttribute("data-aeon-old", "")));
+  await page.evaluate(() => document.querySelectorAll("img").forEach((img) => img.setAttribute("data-graft-old", "")));
   try {
     ${sendPromptCode(PROVIDERS.gemini, prompt)}
     while (Date.now() < deadline) {
       await page.waitForTimeout(1000);
       const found = await page.evaluate(() => {
-        const fresh = [...document.querySelectorAll("img:not([data-aeon-old])")].filter((img) => {
+        const fresh = [...document.querySelectorAll("img:not([data-graft-old])")].filter((img) => {
           const box = img.getBoundingClientRect();
           return img.complete && img.naturalWidth >= 256 && box.width >= 150 && box.height >= 150;
         });
@@ -708,7 +708,7 @@ export function imageScript(
     }
     throw new Error("PROVIDER_TIMEOUT: Gemini returned no image; the page may have changed");
   } finally {
-    await page.evaluate(() => document.querySelectorAll("img[data-aeon-old]").forEach((img) => img.removeAttribute("data-aeon-old"))).catch(() => {});
+    await page.evaluate(() => document.querySelectorAll("img[data-graft-old]").forEach((img) => img.removeAttribute("data-graft-old"))).catch(() => {});
   }
 })()`;
 }

@@ -15,12 +15,12 @@ import { buildSiteModel, parseCapture, saveModel } from "@browserkit/tools/site-
 const run = promisify(execFile);
 const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
-async function aeon(home, args, options = {}) {
+async function graft(home, args, options = {}) {
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, ...args], {
       env: {
         ...process.env,
-        AEON_DATA_DIR: join(home, "data"),
+        GRAFT_DATA_DIR: join(home, "data"),
         SITE_TO_API_HOME: join(home, "site-to-api"),
       },
       ...options,
@@ -50,7 +50,7 @@ function itemsHar(origin) {
   return JSON.stringify({
     log: {
       version: "1.2",
-      creator: { name: "aeon-test", version: "1" },
+      creator: { name: "graft-test", version: "1" },
       entries: [
         entry("/api/items?q=lamp", { items: [{ id: 1, name: "lamp", price: 40 }] }),
         entry("/api/items/7", { id: 7, name: "shade", price: 20 }),
@@ -87,19 +87,19 @@ async function mapped(home, origin) {
   return model;
 }
 
-test("every browserkit command has an aeon command", async () => {
+test("every browserkit command has a graft command", async () => {
   const commands = await run(process.execPath, [cli, "--help"]).then(({ stdout }) => stdout);
   for (const command of COMMANDS.filter((item) => !item.hidden))
     assert.match(commands, new RegExp(`\\b${command.name}\\b`), `${command.name} is missing`);
 });
 
 test("help groups commands like browserkit, and every command has its own help", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-cli-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-cli-"));
   try {
-    const usage = await aeon(home, ["--help"]);
+    const usage = await graft(home, ["--help"]);
     assert.equal(usage.code, 0, usage.stderr);
     for (const group of [
-      "Aeon",
+      "Graft",
       "Browser",
       "Read the web",
       "Map a site",
@@ -110,27 +110,27 @@ test("help groups commands like browserkit, and every command has its own help",
       "Change sites",
     ])
       assert.match(usage.stdout, new RegExp(`^${group}$`, "m"), `${group} in the help`);
-    const single = await aeon(home, ["call", "--help"]);
+    const single = await graft(home, ["call", "--help"]);
     assert.equal(single.code, 0);
-    assert.match(single.stdout, /Usage: aeon call/);
-    const unknown = await aeon(home, ["nonsense"]);
+    assert.match(single.stdout, /Usage: graft call/);
+    const unknown = await graft(home, ["nonsense"]);
     assert.equal(unknown.code, 1);
-    assert.match(unknown.stdout, /aeon <command>/);
+    assert.match(unknown.stdout, /graft <command>/);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
 });
 
 test("chat listings reject an unknown origin or a malformed day", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-cli-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-cli-"));
   try {
-    const origin = await aeon(home, ["chats", "--from", "robot"]);
+    const origin = await graft(home, ["chats", "--from", "robot"]);
     assert.equal(origin.code, 1);
     assert.match(origin.stderr, /--from must be one of/);
-    const day = await aeon(home, ["chats", "--since", "2026/10/01"]);
+    const day = await graft(home, ["chats", "--since", "2026/10/01"]);
     assert.equal(day.code, 1);
     assert.match(day.stderr, /--since must be YYYY-MM-DD/);
-    const until = await aeon(home, ["chats", "--until", "yesterday"]);
+    const until = await graft(home, ["chats", "--until", "yesterday"]);
     assert.equal(until.code, 1);
     assert.match(until.stderr, /--until must be YYYY-MM-DD/);
   } finally {
@@ -139,7 +139,7 @@ test("chat listings reject an unknown origin or a malformed day", async () => {
 });
 
 test("a mapped site is callable over direct transport, and its operations are listed", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-call-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-call-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
@@ -149,7 +149,7 @@ test("a mapped site is callable over direct transport, and its operations are li
   const operation = model.operations.find((item) => item.path === "/api/items");
   assert.ok(operation, model.operations.map((item) => item.path).join(", "));
 
-  const called = await aeon(home, [
+  const called = await graft(home, [
     "call",
     "127.0.0.1",
     operation.id,
@@ -162,7 +162,7 @@ test("a mapped site is callable over direct transport, and its operations are li
   // One receipt line on stderr; stdout stays the bare JSON answer.
   assert.match(called.stderr, /^\d+(\.\d)? s · site API · no model$/m, called.stderr);
 
-  const quiet = await aeon(home, [
+  const quiet = await graft(home, [
     "call",
     "127.0.0.1",
     operation.id,
@@ -175,26 +175,26 @@ test("a mapped site is callable over direct transport, and its operations are li
   assert.equal(JSON.parse(quiet.stdout).items[0].name, "lamp");
   assert.doesNotMatch(quiet.stderr, /site API/);
 
-  const ops = await aeon(home, ["ops", "127.0.0.1", "--json"]);
+  const ops = await graft(home, ["ops", "127.0.0.1", "--json"]);
   assert.equal(ops.code, 0, ops.stderr);
   const listed = JSON.parse(ops.stdout).operations.find((item) => item.id === operation.id);
   assert.ok(Array.isArray(listed.capabilities), JSON.stringify(listed));
 
-  const sites = await aeon(home, ["sites", "--json"]);
+  const sites = await graft(home, ["sites", "--json"]);
   assert.equal(sites.code, 0, sites.stderr);
   assert.equal(JSON.parse(sites.stdout)[0].site, "127.0.0.1");
 
   // A path input nothing produces cannot be filled in: exit code 2, not a generic failure.
   const detail = model.operations.find((item) => item.path.includes("{"));
   if (detail) {
-    const missing = await aeon(home, ["call", "127.0.0.1", detail.id, "--transport", "direct"]);
+    const missing = await graft(home, ["call", "127.0.0.1", detail.id, "--transport", "direct"]);
     assert.equal(missing.code, 2, missing.stderr);
     assert.match(missing.stderr, /needs:/);
   }
 });
 
 test("export and diff work on a mapped site without a browser", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-export-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-export-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
@@ -202,21 +202,21 @@ test("export and diff work on a mapped site without a browser", async (t) => {
   });
   await mapped(home, site.origin);
   const out = join(home, "api");
-  const exported = await aeon(home, ["export", "127.0.0.1", "--out", out]);
+  const exported = await graft(home, ["export", "127.0.0.1", "--out", out]);
   assert.equal(exported.code, 0, exported.stderr);
   assert.match(exported.stdout, /Exported to/);
-  const diff = await aeon(home, ["diff", "127.0.0.1", "--json"]);
+  const diff = await graft(home, ["diff", "127.0.0.1", "--json"]);
   assert.equal(diff.code, 0, diff.stderr);
 });
 
 test("crawl reads a page over plain HTTP", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-crawl-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-crawl-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
     await rm(home, { recursive: true, force: true });
   });
-  const result = await aeon(home, [
+  const result = await graft(home, [
     "scrape",
     site.origin,
     "--formats",
@@ -230,7 +230,7 @@ test("crawl reads a page over plain HTTP", async (t) => {
   assert.equal(page.status, 200);
   assert.match(page.text, /Lamps and shades/);
 
-  const scraped = await aeon(home, [
+  const scraped = await graft(home, [
     "crawl",
     "scrape",
     site.origin,
@@ -244,25 +244,25 @@ test("crawl reads a page over plain HTTP", async (t) => {
   assert.match(JSON.parse(scraped.stdout).markdown, /# Shop/);
 });
 
-test("blocked sites say Aeon is not running, and a non-site is refused before that", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-block-"));
+test("blocked sites say Graft is not running, and a non-site is refused before that", async () => {
+  const home = await mkdtemp(join(tmpdir(), "graft-block-"));
   try {
-    const refused = await aeon(home, ["block", "not a site"]);
+    const refused = await graft(home, ["block", "not a site"]);
     assert.equal(refused.code, 1);
     assert.match(refused.stderr, /Not a site/);
-    const usage = await aeon(home, ["unblock"]);
+    const usage = await graft(home, ["unblock"]);
     assert.equal(usage.code, 1);
-    assert.match(usage.stderr, /Usage: aeon unblock/);
-    const blocked = await aeon(home, ["blocked"]);
+    assert.match(usage.stderr, /Usage: graft unblock/);
+    const blocked = await graft(home, ["blocked"]);
     assert.equal(blocked.code, 1);
-    assert.match(blocked.stderr, /Aeon is not running/);
+    assert.match(blocked.stderr, /Graft is not running/);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
 });
 
 test("the journal keeps what this command line ran", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-journal-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-journal-"));
   try {
     const { mkdir } = await import("node:fs/promises");
     await mkdir(join(home, "data"), { recursive: true });
@@ -276,7 +276,7 @@ test("the journal keeps what this command line ran", async () => {
         resultPreview: "ok",
       }) + "\n",
     );
-    const listed = await aeon(home, ["journal", "--json"]);
+    const listed = await graft(home, ["journal", "--json"]);
     assert.equal(listed.code, 0, listed.stderr);
     assert.equal(JSON.parse(listed.stdout)[0].resultPreview, "ok");
   } finally {
@@ -285,7 +285,7 @@ test("the journal keeps what this command line ran", async () => {
 });
 
 test("mcp serves one mapped site as its own tools", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-mcp-site-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-mcp-site-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
@@ -309,7 +309,7 @@ test("mcp serves one mapped site as its own tools", async (t) => {
 });
 
 test("rest serves one mapped site with docs and a token", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-rest-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-rest-"));
   const site = await startSite();
   t.after(async () => {
     site.server.close();
@@ -319,7 +319,7 @@ test("rest serves one mapped site with docs and a token", async (t) => {
   const child = spawn(process.execPath, [cli, "rest", "127.0.0.1"], {
     env: {
       ...process.env,
-      AEON_DATA_DIR: join(home, "data"),
+      GRAFT_DATA_DIR: join(home, "data"),
       SITE_TO_API_HOME: join(home, "site-to-api"),
     },
   });
@@ -344,7 +344,7 @@ function mcp(home, args, messages) {
       stdio: ["pipe", "pipe", "inherit"],
       env: {
         ...process.env,
-        AEON_DATA_DIR: join(home, "data"),
+        GRAFT_DATA_DIR: join(home, "data"),
         SITE_TO_API_HOME: join(home, "site-to-api"),
       },
     });
@@ -383,7 +383,7 @@ function banner(child) {
   });
 }
 
-// Found comparing Aeon with another agent browser: repl printed the value and dropped every log line.
+// Found comparing Graft with another agent browser: repl printed the value and dropped every log line.
 test("repl prints what the cell logged, then its value", async () => {
   const { replText } = await import("../dist/repl.js");
   assert.equal(replText({ output: "hi\nthere\n", value: 2 }), "hi\nthere\n2");

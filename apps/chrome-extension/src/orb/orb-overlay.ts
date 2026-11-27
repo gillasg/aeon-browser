@@ -179,17 +179,17 @@ export class OrbOverlay {
 
   apply(message: OrbToContent): void {
     this.wake();
-    if (message.kind === "aeon.orb.visual") this.setVisual(message.state, message.label);
-    else if (message.kind === "aeon.orb.cursor") this.streamTo(message.steps);
-    else if (message.kind === "aeon.orb.spotlight") this.spotlight(message.box);
-    else if (message.kind === "aeon.orb.panel") {
+    if (message.kind === "graft.orb.visual") this.setVisual(message.state, message.label);
+    else if (message.kind === "graft.orb.cursor") this.streamTo(message.steps);
+    else if (message.kind === "graft.orb.spotlight") this.spotlight(message.box);
+    else if (message.kind === "graft.orb.panel") {
       this.layout = message.layout ?? "compose";
       this.panel = {
         width: boxWidth(this.layout, this.keyboard),
         // The reported height includes the frame's padding; the panel is the box itself.
         height: clampSize(message.height - FRAME_PAD * 2, 32, innerHeight - EDGE * 2),
       };
-    } else if (message.kind === "aeon.orb.prefs") this.setReducedMotion(message.reduceMotion);
+    } else if (message.kind === "graft.orb.prefs") this.setReducedMotion(message.reduceMotion);
   }
 
   /** A recording hides the pill and the box. The shared glyph follows the engine's own rule. */
@@ -221,7 +221,7 @@ export class OrbOverlay {
     this.pill.classList.remove("hold-layout");
   }
 
-  /** The setting in Aeon adds to the system's reduce-motion; it never turns that off. */
+  /** The setting in Graft adds to the system's reduce-motion; it never turns that off. */
   private setReducedMotion(on: boolean): void {
     this.reducedMotion = on || this.systemReducedMotion;
     this.host.toggleAttribute("data-reduced-motion", this.reducedMotion);
@@ -254,24 +254,24 @@ export class OrbOverlay {
     layer.className = "layer";
     this.hit.className = "hit";
     this.hit.type = "button";
-    this.hit.title = "Aeon · click to ask, drag to move";
-    this.hit.setAttribute("aria-label", "Aeon");
+    this.hit.title = "Graft · click to ask, drag to move";
+    this.hit.setAttribute("aria-label", "Graft");
     this.hit.addEventListener("pointerdown", this.dragStart);
     const url = new URL(chrome.runtime.getURL("orb.html"));
     url.searchParams.set("tabId", String(this.tabId));
     url.hash = nonce;
     this.frame.src = url.href;
-    this.frame.title = "Aeon";
+    this.frame.title = "Graft";
     this.frame.className = "off";
     this.frame.setAttribute("allowtransparency", "true");
     this.buildPill();
     layer.append(this.hit, this.pill, this.frame);
     shadow.append(style, layer);
     // An extension reload leaves the old script's cursor on the page with nothing driving it.
-    for (const stale of document.querySelectorAll("[data-aeon-orb]")) stale.remove();
-    this.host.setAttribute("data-aeon-orb", "");
-    // The engine leaves every data-aeon-overlay subtree out of the page state the agent reads.
-    this.host.setAttribute("data-aeon-overlay", "");
+    for (const stale of document.querySelectorAll("[data-graft-orb]")) stale.remove();
+    this.host.setAttribute("data-graft-orb", "");
+    // The engine leaves every data-graft-overlay subtree out of the page state the agent reads.
+    this.host.setAttribute("data-graft-overlay", "");
     document.documentElement.append(this.host);
   }
 

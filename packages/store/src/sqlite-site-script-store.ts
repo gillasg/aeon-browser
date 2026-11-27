@@ -1,12 +1,12 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { SiteScriptRecord } from "@aeon/domain";
+import type { SiteScriptRecord } from "@graft/domain";
 export class SqliteSiteScriptStore {
   private readonly database: Database.Database;
   constructor(directory: string) {
     mkdirSync(directory, { recursive: true });
-    this.database = new Database(join(directory, "aeon-site-scripts.sqlite"));
+    this.database = new Database(join(directory, "graft-site-scripts.sqlite"));
     this.database.pragma("journal_mode = WAL");
     this.database.exec(
       "CREATE TABLE IF NOT EXISTS scripts (id TEXT PRIMARY KEY, record TEXT NOT NULL)",

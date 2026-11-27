@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "recorder": "aeon",
+  "recorder": "graft",
   "clock": "clip",
   "clip": {
     "file": "clip.mp4",
@@ -53,10 +53,10 @@
   ],
   "terminal": {
     "version": 1,
-    "command": "aeon mcp shop.example",
+    "command": "graft mcp shop.example",
     "startedAt": 1763823722450,
     "events": [
-      { "t": 2450, "kind": "in", "text": "aeon tool search_price '{\"q\":\"wh-1000xm5\"}'" },
+      { "t": 2450, "kind": "in", "text": "graft tool search_price '{\"q\":\"wh-1000xm5\"}'" },
       {
         "t": 2900,
         "kind": "out",

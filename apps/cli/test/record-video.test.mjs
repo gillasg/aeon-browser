@@ -1,4 +1,4 @@
-// `aeon record start|stop` on a fake ffmpeg, and `aeon video kit` copying plain template files.
+// `graft record start|stop` on a fake ffmpeg, and `graft video kit` copying plain template files.
 // No display and no real encoder are needed: the fake writes a few frames and answers signals.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
@@ -39,10 +39,10 @@ exit 0
   return { ffmpeg: file, ffprobe: probe };
 }
 
-async function aeon(home, args, env = {}) {
+async function graft(home, args, env = {}) {
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, ...args], {
-      env: { ...process.env, AEON_DATA_DIR: join(home, "data"), ...env },
+      env: { ...process.env, GRAFT_DATA_DIR: join(home, "data"), ...env },
     });
     return { code: 0, stdout, stderr };
   } catch (error) {
@@ -51,16 +51,16 @@ async function aeon(home, args, env = {}) {
 }
 
 test(
-  "aeon record start/stop writes frames, a clip and an honest events.json on a fake ffmpeg",
+  "graft record start/stop writes frames, a clip and an honest events.json on a fake ffmpeg",
   // The fake ffmpeg is a POSIX shell script; Windows cannot run it as a program.
   { skip: process.platform === "win32" ? "the fake ffmpeg is a /bin/sh script" : false },
   async () => {
-    const home = await mkdtemp(join(tmpdir(), "aeon-record-"));
+    const home = await mkdtemp(join(tmpdir(), "graft-record-"));
     try {
       const { ffmpeg, ffprobe } = fakeFfmpeg(home);
       const folder = join(home, "recording");
-      const env = { AEON_FFMPEG: ffmpeg, AEON_FFPROBE: ffprobe };
-      const start = await aeon(
+      const env = { GRAFT_FFMPEG: ffmpeg, GRAFT_FFPROBE: ffprobe };
+      const start = await graft(
         home,
         ["record", "start", "--screen", "--out", folder, "--fps", "30"],
         env,
@@ -71,12 +71,12 @@ test(
       assert.equal(initial.clip.source, "screen");
       assert.ok(initial.note, "an in-progress log says so");
 
-      const stopped = await aeon(home, ["record", "stop", "--out", folder], env);
+      const stopped = await graft(home, ["record", "stop", "--out", folder], env);
       assert.equal(stopped.code, 0, stopped.stderr);
       assert.match(stopped.stdout, /Stopped/);
       const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
       assert.equal(events.version, 1);
-      assert.equal(events.recorder, "aeon");
+      assert.equal(events.recorder, "graft");
       assert.equal(events.clock, "clip");
       assert.equal(events.clip.fps, 30);
       assert.equal(events.clip.width, 1280);
@@ -97,17 +97,17 @@ test(
   },
 );
 
-test("aeon record start --tabs records the folder and stop finishes it without a display", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-record-tabs-"));
+test("graft record start --tabs records the folder and stop finishes it without a display", async () => {
+  const home = await mkdtemp(join(tmpdir(), "graft-record-tabs-"));
   try {
     const folder = join(home, "tabs-recording");
-    const start = await aeon(home, ["record", "start", "--tabs", "--out", folder]);
+    const start = await graft(home, ["record", "start", "--tabs", "--out", folder]);
     assert.equal(start.code, 0, start.stderr);
     assert.match(start.stdout, /Recording tabs/);
     const initial = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
     assert.equal(initial.clip.source, "tabs");
     assert.equal(initial.clip.file, "takes/");
-    const stopped = await aeon(home, ["record", "stop", "--out", folder]);
+    const stopped = await graft(home, ["record", "stop", "--out", folder]);
     assert.equal(stopped.code, 0, stopped.stderr);
     const events = JSON.parse(readFileSync(join(folder, "events.json"), "utf8"));
     assert.equal(events.clip.source, "tabs");
@@ -117,11 +117,11 @@ test("aeon record start --tabs records the folder and stop finishes it without a
   }
 });
 
-test("aeon video kit copies the Remotion starter kit without adding a dependency to Aeon", async () => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-kit-"));
+test("graft video kit copies the Remotion starter kit without adding a dependency to Graft", async () => {
+  const home = await mkdtemp(join(tmpdir(), "graft-kit-"));
   try {
     const target = join(home, "my-video");
-    const result = await aeon(home, ["video", "kit", target]);
+    const result = await graft(home, ["video", "kit", target]);
     assert.equal(result.code, 0, result.stderr);
     assert.match(result.stdout, /Starter kit copied/);
     for (const file of [
@@ -141,10 +141,10 @@ test("aeon video kit copies the Remotion starter kit without adding a dependency
     assert.match(readme, /Scene\.tsx/);
     assert.match(readme, /--stills/);
     assert.ok(!existsSync(join(target, "src/DirectorCut.tsx")));
-    const aeonPackage = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"));
+    const graftPackage = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"));
     assert.ok(
-      !aeonPackage.dependencies?.remotion && !aeonPackage.devDependencies?.remotion,
-      "Aeon has no Remotion dependency",
+      !graftPackage.dependencies?.remotion && !graftPackage.devDependencies?.remotion,
+      "Graft has no Remotion dependency",
     );
   } finally {
     await rm(home, { recursive: true, force: true });

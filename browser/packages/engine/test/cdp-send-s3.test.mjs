@@ -85,7 +85,7 @@ globalThis.chrome = stub({
   runtime: stub({
     id: "test",
     sendMessage: async (message) => {
-      if (message?.kind !== "aeon.browser.preview") return;
+      if (message?.kind !== "graft.browser.preview") return;
       previewDone = true;
       previewResolve();
     },
@@ -151,7 +151,7 @@ function pageResult(text) {
 
 function groupResult(method, params) {
   const group = String(params?.objectGroup ?? "");
-  if (method === "Runtime.callFunctionOn" && group.startsWith("aeon-fill"))
+  if (method === "Runtime.callFunctionOn" && group.startsWith("graft-fill"))
     return { result: { objectId: "selected" } };
   if (group) return { result: { objectId: "list" } };
   return undefined;

@@ -14,7 +14,7 @@ async function render(): Promise<void> {
   } catch {
     if (status) status.textContent = "Open extension details and switch on Allow User Scripts.";
   }
-  const stored = await chrome.storage.local.get([SCRIPT_KEY, "aeon-site-script-errors"]);
+  const stored = await chrome.storage.local.get([SCRIPT_KEY, "graft-site-script-errors"]);
   await renderAccess();
   renderScripts(stored);
 }
@@ -42,7 +42,7 @@ function renderScripts(stored: Record<string, unknown>): void {
     detail.className = "script-detail";
     detail.textContent = `${script.enabled ? "Enabled" : "Disabled"} · revision ${script.revision} · ${script.matches.join(", ")} · ${script.scriptId}`;
     row.append(name, detail);
-    const error = (stored["aeon-site-script-errors"] as Record<string, unknown> | undefined)?.[
+    const error = (stored["graft-site-script-errors"] as Record<string, unknown> | undefined)?.[
       script.scriptId
     ];
     if (error) {

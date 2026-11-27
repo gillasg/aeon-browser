@@ -76,7 +76,7 @@ test("pushing needs the token and a loopback or extension origin", async () => {
     const other = await post(
       view.pushUrl,
       { frame: { n: 1 } },
-      { "x-aeon-view-token": view.token, origin: "chrome-extension://abc" },
+      { "x-graft-view-token": view.token, origin: "chrome-extension://abc" },
     );
     assert.equal(other.status, 200);
     const state = await (await fetch(view.url + "state")).json();

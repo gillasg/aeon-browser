@@ -6,7 +6,7 @@ import test from "node:test";
 import { applyBlockedSites } from "../dist/blocked-sites-settings.js";
 
 test("the daemon keeps one blocked list and merges the extension's old one once", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "aeon-blocked-"));
+  const home = await mkdtemp(join(tmpdir(), "graft-blocked-"));
   t.after(() => rm(home, { recursive: true, force: true }));
   const previous = process.env.BROWSERKIT_HOME;
   process.env.BROWSERKIT_HOME = home;

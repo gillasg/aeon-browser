@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { LoginServer } from "./model-accounts/server.js";
 
-// The sign-in service behind Aeon's Models page: every provider Pi supports. Aeon's page talks to
+// The sign-in service behind Graft's Models page: every provider Pi supports. Graft's page talks to
 // it on 127.0.0.1 with the token in the returned address and opens providers' sign-in pages as
 // Chrome tabs itself. Logins land in Pi's own auth.json, so chats, the Pi CLI and other Pi apps
 // all see them.

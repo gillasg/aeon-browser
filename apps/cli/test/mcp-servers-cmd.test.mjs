@@ -6,7 +6,7 @@ import test from "node:test";
 import { mcpServersCommand, parseMcpAdd } from "../dist/mcp-servers-cmd.js";
 
 async function registry(t) {
-  const directory = await mkdtemp(join(tmpdir(), "aeon-mcp-add-"));
+  const directory = await mkdtemp(join(tmpdir(), "graft-mcp-add-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "capabilities.json");
   const lines = [];
@@ -15,7 +15,7 @@ async function registry(t) {
   return { run, read, lines, directory };
 }
 
-test("aeon mcp add <name> -- <cmd> registers a stdio server with its own flags intact", async (t) => {
+test("graft mcp add <name> -- <cmd> registers a stdio server with its own flags intact", async (t) => {
   const { run, read, directory } = await registry(t);
   assert.equal(await run(["add", "notion", "--", "npx", "-y", "notion-mcp", "--stdio"]), 0);
   const file = await read();
@@ -25,7 +25,7 @@ test("aeon mcp add <name> -- <cmd> registers a stdio server with its own flags i
     kind: "mcp",
     displayName: "notion",
     description: "MCP server notion",
-    configReference: "aeon mcp add",
+    configReference: "graft mcp add",
     credentialReference: null,
     relatedSkillIds: [],
     verification: { state: "needs_check", checkedAt: null, summary: null },
@@ -38,7 +38,7 @@ test("aeon mcp add <name> -- <cmd> registers a stdio server with its own flags i
   await assert.rejects(run(["add", "notion", "--", "x"]), /already registered/);
 });
 
-test("aeon mcp add <name> --url with repeated --header stores only env references", async (t) => {
+test("graft mcp add <name> --url with repeated --header stores only env references", async (t) => {
   const { run, read, lines } = await registry(t);
   await run([
     "add",
@@ -65,7 +65,7 @@ test("aeon mcp add <name> --url with repeated --header stores only env reference
   assert.equal(await run(["remove", "Acme API"]), 1);
 });
 
-test("aeon mcp add refuses bad input before writing anything", () => {
+test("graft mcp add refuses bad input before writing anything", () => {
   assert.throws(() => parseMcpAdd(["x"]), /either -- <command>/);
   assert.throws(() => parseMcpAdd(["x", "--url", "u", "--", "cmd"]), /either/);
   assert.throws(() => parseMcpAdd(["x", "--bogus", "1", "--", "cmd"]), /unknown option/);

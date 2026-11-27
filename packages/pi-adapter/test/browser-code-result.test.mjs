@@ -18,7 +18,7 @@ async function runCell(cell, workspace) {
 }
 
 test("a cell with a workspace names the run log it keeps", async () => {
-  const workspace = await mkdtemp(join(tmpdir(), "aeon-cell-run-"));
+  const workspace = await mkdtemp(join(tmpdir(), "graft-cell-run-"));
   try {
     const result = await runCell(
       {

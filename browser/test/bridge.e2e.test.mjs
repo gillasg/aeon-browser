@@ -233,7 +233,7 @@ test(
       await t.test("the native host answers the extension with the bridge endpoint", async () => {
         const reply = await nativeBootstrap(env);
         assert.equal(reply.ok, true);
-        assert.equal(reply.endpoint, `ws://127.0.0.1:${state.port}/aeon/v1`);
+        assert.equal(reply.endpoint, `ws://127.0.0.1:${state.port}/graft/v1`);
         assert.equal(reply.connectionGrant, state.token);
       });
 
@@ -1391,7 +1391,7 @@ test(
           assert.deepEqual(result.bodyQuery, { q: "phone" });
           assert.deepEqual(result.replayed, ["laptop", 2, null, "sig-1"]);
           // The echoed CSRF token is a secret: the agent only ever sees its sealed handle.
-          assert.match(result.csrf, /^aeon-sealed:[a-z0-9]{12}$/);
+          assert.match(result.csrf, /^graft-sealed:[a-z0-9]{12}$/);
           assert.equal(result.harEntries, true);
           assert.equal(result.jsonLd, "Phone");
           assert.equal(result.next, "Phone");
