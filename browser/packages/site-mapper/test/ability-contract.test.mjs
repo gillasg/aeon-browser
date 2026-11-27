@@ -426,7 +426,8 @@ test("a page-script ability runs in the shared browser when no host is given", a
       );
       const run = await runAbility("example.com", "find book", { title: "Sharp Objects" });
       assert.equal(run.result[0].title, "Sharp Objects");
-      assert.match(cells[0], /hostname\.endsWith\("example\.com"\)/);
+      assert.match(cells[0], /const __origin = "https:\/\/example\.com"/);
+      assert.match(cells[0], /origin === __origin/);
       assert.match(cells[0], /browser\.openTab\("https:\/\/example\.com\/"/);
     } finally {
       useBrowser(undefined);

@@ -1,10 +1,10 @@
 // The failure the engine sends back: the shared code, and the one call to run next when one is safe.
 import {
   BrowserOperationResultSchema,
-  errorNextCall,
+  failureNextCall,
+  wireErrorCode,
   type BrowserExecutorRequest,
 } from "@browserkit/protocol";
-import { isKernelErrorCode } from "./kernel-errors.js";
 import { completeBrowserRequest } from "./native-browser-session.js";
 
 export function sendFailure(
@@ -15,8 +15,9 @@ export function sendFailure(
 ): void {
   completeBrowserRequest(request);
   if (socket.readyState !== WebSocket.OPEN) return;
-  const safe = isKernelErrorCode(code) ? code : "CHROME_ERROR";
-  const next = errorNextCall(safe);
+  // The real code travels with its own hint and next step; only a code no one knows is Chrome's.
+  const safe = wireErrorCode(code);
+  const next = failureNextCall(safe, detail);
   socket.send(
     JSON.stringify(
       BrowserOperationResultSchema.parse({

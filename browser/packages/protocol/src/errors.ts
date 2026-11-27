@@ -147,6 +147,34 @@ export const ERRORS = {
     "ours",
     "this host cannot run that way of the ability: run it where a browser is attached",
   ],
+  ABILITY_FAILED: [
+    "page",
+    "every way of the saved ability failed; the message says why for each: fix that cause, or re-record it with site_mapper heal",
+  ],
+  ABILITY_INPUT: [
+    "model",
+    "an input does not match the inputs the ability declares; nothing was sent: fix that input and call again",
+  ],
+  ABILITY_DRIFT: [
+    "page",
+    "the page no longer has a control a saved step uses (the closest ones are listed): re-record it with site_mapper heal",
+  ],
+  WRITE_UNCERTAIN: [
+    "page",
+    "this write may already have reached the site: read the site back, and call again with a new key only if the change is absent",
+  ],
+  PERSISTED_QUERY_MISS: [
+    "page",
+    "the site no longer knows the saved query id: open the page once in a tab so the current one is captured, then call again",
+  ],
+  NOT_PROVEN: [
+    "model",
+    "that write was never seen working in the page: do it once in the page, then save the ability again",
+  ],
+  NO_PAGINATION: [
+    "model",
+    "this list has no next-page parameter: read one page, or open the page and scroll it",
+  ],
   RATE_LIMITED: [
     "page",
     "this page is a throttle interstitial, not the site: retry after a pause and open fewer tabs in parallel",
@@ -235,14 +263,38 @@ export function describeError(code: string, detail = "", ctx?: ErrorContext): st
     ? ABILITY_REPAIR_HINT
     : learn
       ? `no learned API yet. Fastest learn: ${learn} (search, product, price, link; one site). Until then, read the page.`
-      : errorHint(code);
-  const next = repair || learn || errorNextCall(code, ctx);
+      : protectedPageHint(code, detail) || errorHint(code);
+  const next = repair || learn || protectedPageNext(code, detail) || errorNextCall(code, ctx);
   return [
     head,
     ...formatCandidateLines(ctx?.candidates),
     ...(hint ? [`Hint: ${hint}`] : []),
     ...(next ? [`Next: ${next}`] : []),
   ].join("\n");
+}
+
+const CHROME_PAGE = /\bchrome:\/\//i;
+
+/** Chrome's own pages (chrome://settings, chrome://extensions) refuse every extension. */
+function protectedPageHint(code: string, detail: string): string {
+  if (code !== "PROTECTED_UI" || !CHROME_PAGE.test(detail)) return "";
+  return "Chrome's own pages (chrome://...) cannot be read or driven by any extension: ask the user to make that change themselves";
+}
+
+function protectedPageNext(code: string, detail: string): string {
+  if (code !== "PROTECTED_UI" || !CHROME_PAGE.test(detail)) return "";
+  return "ask_user: That is a Chrome settings page, which I cannot open or change. Could you make that change yourself?";
+}
+
+/** The code a failure is sent with: its own when the catalog knows it, else its shared one, else CHROME_ERROR. */
+export function wireErrorCode(code: string): ErrorCode {
+  if (isErrorCode(code)) return code;
+  return leadingCode(code) ?? "CHROME_ERROR";
+}
+
+/** The next call sent with a failure: the code's own, with the detail it was raised with. */
+export function failureNextCall(code: string, detail = "", ctx?: ErrorContext): string {
+  return abilityRepairCall(detail) || protectedPageNext(code, detail) || errorNextCall(code, ctx);
 }
 
 const TIMEOUT_MIN_MS = 1000;
@@ -362,6 +414,23 @@ export const ERROR_ALIASES: Readonly<Record<string, ErrorCode>> = {
   COOKIES_SET: "CHROME_ERROR",
   COOKIES_REMOVE: "CHROME_ERROR",
   CLIPBOARD_BUSY: "TIMEOUT",
+  // Mapped sites' and abilities' narrower codes.
+  ABILITY_UNKNOWN: "NOT_MAPPED",
+  SITE_TOOL_UNKNOWN: "NOT_MAPPED",
+  SITE_PAGE_TOOL_UNKNOWN: "NOT_MAPPED",
+  ABILITY_EXISTS: "INVALID_INPUT",
+  ABILITY_BAD_WAY: "INVALID_INPUT",
+  ABILITY_BAD_SCRIPT: "INVALID_INPUT",
+  ABILITY_NO_WAYS: "INVALID_INPUT",
+  ABILITY_INPUT_UNUSED: "INVALID_INPUT",
+  ABILITY_CONTRACT_WEAKENED: "INVALID_INPUT",
+  ABILITY_BAD_CURSOR: "INVALID_INPUT",
+  ABILITY_TEST_WRITE: "INVALID_INPUT",
+  ABILITY_READ_ONLY: "INVALID_INPUT",
+  INVALID_ABILITY_NAME: "INVALID_INPUT",
+  ABILITY_TIMEOUT: "TIMEOUT",
+  PROVIDER_TIMEOUT: "TIMEOUT",
+  PROVIDER_NOT_SENT: "SIGNED_OUT",
 };
 
 /** The shared code a message leads with ("TARGET_BLOCKED: covered by …"), aliases included. */
@@ -426,7 +495,7 @@ const NAMED: ReadonlyArray<[RegExp, ErrorCode]> = [
   // A schema refusing a request we built (a zod issue list) is ours, never the model's.
   [/^\[\s*\{\s*"(origin|code|expected)"/, "INTERNAL"],
   // Browser and runtime failures that arrive without a code.
-  [/different extension|Cannot access a chrome-extension/i, "PROTECTED_UI"],
+  [/different extension|Cannot access a chrome(-extension|:\/\/)/i, "PROTECTED_UI"],
   [/Detached while handling command/i, "TARGET_LOST"],
   [/did not respond/i, "INTERNAL"],
   [/runtime reset|workflow cancelled|cell is no longer active/i, "RUN_RESET"],

@@ -143,7 +143,8 @@ export function errorCode(error: unknown): string {
   if (shared && isKernelErrorCode(shared)) return shared;
   const lower = value.toLowerCase();
   if (lower.includes("detached while handling command")) return "TARGET_LOST";
-  if (/different extension|cannot access a chrome-extension/.test(lower)) return "PROTECTED_UI";
+  if (/different extension|cannot access a chrome(-extension|:\/\/)/.test(lower))
+    return "PROTECTED_UI";
   if (/no tab with id|tab was closed|tab has been closed|no target with given id/.test(lower))
     return "TAB_DEAD";
   if (lower.includes("detached") || lower.includes("not attached")) return "DEBUGGER_DETACHED";

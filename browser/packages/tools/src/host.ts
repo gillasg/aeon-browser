@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { learnAbout, readLearned, learnedHint } from "@browserkit/site-mapper";
+import { abilityHostFor, learnAbout, readLearned, learnedHint } from "@browserkit/site-mapper";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { handleCredentialRequest, isCredentialRequest } from "@browserkit/credentials";
 import { handleProfileRequest, isProfileRequest } from "./profile.js";
@@ -211,6 +211,8 @@ interface AbilityRunRequest {
     test?: unknown;
     /** Only say how to run it (in the cell, for page code), without running it. */
     plan?: unknown;
+    /** The calling cell's tab: page work uses it when it is on the ability's site. */
+    tab?: unknown;
   };
 }
 
@@ -294,6 +296,7 @@ function answerAbilityRun(request: AbilityRunRequest): Promise<unknown> {
       run.via ? (run.via as AbilityVia) : undefined,
     );
   return runAbility(site, name, (run.inputs ?? {}) as Record<string, unknown>, {
+    host: abilityHostFor(site, typeof run.tab === "number" ? { callerTab: run.tab } : {}),
     ...(run.via ? { via: run.via as AbilityVia } : {}),
     ...(typeof run.key === "string" ? { key: run.key } : {}),
     ...(typeof run.limit === "number" ? { limit: run.limit } : {}),

@@ -111,8 +111,9 @@ export async function executeWrite(
   try {
     return await runWrite(ability, inputs, host, options, key, record);
   } catch (error) {
-    if (key && error instanceof AbilityWriteError && !error.outcome.possible_commit)
-      await releaseWriteKey(ability, key);
+    // Anything that failed before the commit step frees the key, so the same key can retry.
+    const possible = error instanceof AbilityWriteError && error.outcome.possible_commit;
+    if (key && !possible) await releaseWriteKey(ability, key);
     throw error;
   }
 }

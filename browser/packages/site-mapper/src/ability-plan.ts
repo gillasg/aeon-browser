@@ -42,7 +42,7 @@ export async function abilityPlan(
     local: true,
     code,
     host: siteName(site),
-    input: { inputs, ...extra },
+    input: { ...extra, ...inputs },
     opensOwnTab: ability.createdBy === "builtin",
   };
 }

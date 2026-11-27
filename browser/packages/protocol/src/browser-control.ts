@@ -3,6 +3,14 @@ import { browserExtraSteps } from "./browser-extra-steps.js";
 import { browserCapabilitySteps, pointerGesture } from "./browser-capability-steps.js";
 import { BrowserTabSchema, BrowserTargetKeySchema } from "./browser-inventory.js";
 import { OpenUrlSchema } from "./browser-url.js";
+import { ERROR_CODES } from "./errors.js";
+
+/** The failure codes a browser result may carry: the whole catalog, so none is renamed on the way. */
+const WIRE_ERROR_CODES: [string, ...string[]] = [
+  "OPERATION_FAILED",
+  "POLICY_BLOCKED",
+  ...ERROR_CODES,
+];
 
 export { BrowserElementTargetSchema, type BrowserElementTarget } from "./browser-elements.js";
 import { BrowserElementTargetSchema, SemanticTargetSchema } from "./browser-elements.js";
@@ -443,32 +451,8 @@ export const BrowserOperationResultSchema = z.discriminatedUnion("ok", [
       detail: z.string().max(2000).optional(),
       /** The one call to run next, when one is safe. */
       next: z.string().max(300).optional(),
-      code: z.enum([
-        "TARGET_LOST",
-        "AMBIGUOUS_TARGET",
-        "TARGET_NOT_FOUND",
-        "TARGET_HIDDEN",
-        "TARGET_DISABLED",
-        "FILE_INPUT",
-        "TARGET_BLOCKED",
-        "NOT_EDITABLE",
-        "INPUT_FAILED",
-        "STALE_REF",
-        "CLAIM_CONFLICT",
-        "UNSUPPORTED",
-        "INVALID_TARGET",
-        "TIMEOUT",
-        "BROWSER_OFFLINE",
-        "DAEMON_OFFLINE",
-        "OPERATION_FAILED",
-        "TAB_DEAD",
-        "DEBUGGER_DETACHED",
-        "USER_HAS_CONTROL",
-        "RUN_RESET",
-        "SITE_BLOCKED",
-        "POLICY_BLOCKED",
-        "CHROME_ERROR",
-      ]),
+      /** Every code in the shared catalog (errors.ts), plus the old engine-only names. */
+      code: z.enum(WIRE_ERROR_CODES),
     })
     .strict(),
 ]);

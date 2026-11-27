@@ -127,6 +127,14 @@ export const ERROR_NEXT: Record<ErrorCode, NextFn | null> = {
   SITE_BROKEN: readState,
   NETWORK: readState,
   ABILITY_NEEDS: tabs,
+  ABILITY_FAILED: readPage,
+  ABILITY_INPUT: help,
+  ABILITY_DRIFT: readState,
+  // The write may have applied. A repeat could apply it twice.
+  WRITE_UNCERTAIN: null,
+  PERSISTED_QUERY_MISS: readPage,
+  NOT_PROVEN: readPage,
+  NO_PAGINATION: readPage,
   // A retry right now repeats the limit. Wait, then open fewer tabs.
   RATE_LIMITED: null,
   // An unexpected failure is a bug. Repeating the same call repeats it.
@@ -140,6 +148,8 @@ export const NO_NEXT_REASON: Partial<Record<ErrorCode, string>> = {
   SITE_BLOCKED: "the user blocked this site; another route would ignore that choice",
   UNSUPPORTED: "this browser cannot do that here, and no one read replaces it",
   CHROME_ERROR: "Chrome refused the step; repeating the same call repeats it",
+  WRITE_UNCERTAIN:
+    "the write may already have reached the site; repeating it could apply it twice, so read the site back first",
   RATE_LIMITED: "a retry right now repeats the limit; wait, then open fewer tabs in parallel",
   REPLAY_ORIGIN:
     "the message names the page to open; a fixed next call would open the wrong origin",
@@ -150,15 +160,16 @@ function contextOf(ctx: ErrorContext | undefined): ErrorContext {
   return ctx && typeof ctx === "object" ? ctx : {};
 }
 
-const ABILITY_DRIFT = /unverified:|recorded shape|\bdrift\b|HTTP [45]\d\d/;
+const ABILITY_DRIFT = /unverified:|recorded shape|\bdrift\b|ABILITY_DRIFT|HTTP [45]\d\d/;
 
 export const ABILITY_REPAIR_HINT =
   "the saved ability no longer matches the site: site_mapper heal re-records it; site_mapper edit changes it in words";
 
 /** The repair call when a saved ability failed because the site no longer matches. Empty otherwise. */
 export function abilityRepairCall(detail: string): string {
-  if (!/ABILITY_FAILED\b/.test(detail) || !ABILITY_DRIFT.test(detail)) return "";
-  const site = /ABILITY_FAILED:\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/.exec(detail)?.[1] ?? "";
+  if (!/ABILITY_(FAILED|DRIFT)\b/.test(detail) || !ABILITY_DRIFT.test(detail)) return "";
+  const site =
+    /ABILITY_(?:FAILED|DRIFT):\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/.exec(detail)?.[1] ?? "";
   const where = site && site.length <= 80 ? `,site:${JSON.stringify(site)}` : "";
   return `site_mapper({action:"heal"${where},repair:true}) or site_mapper({action:"edit"${where},change:"what no longer matches"})`;
 }
