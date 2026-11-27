@@ -85,9 +85,8 @@ test(
       assert.equal(hydrate.detail.status, "ok", out);
       assert.equal(hydrate.detail.went, 1, out);
       const nav = readHit(out, "NAV");
-      assert.equal(nav.detail.status, "ok", out);
-      assert.equal(nav.detail.landed?.data?.timedOut, true, out);
-      assert.match(nav.detail.landed?.data?.note ?? "", /still showing/, out);
+      assert.match(nav.detail.status, /^ERR TIMEOUT:/, out);
+      assert.match(nav.detail.status, /still shows/, out);
       assert.match(nav.detail.text, /HOME/, out);
       assert.equal(nav.detail.text.includes("HUNG-PAGE"), false, out);
       const reload = readHit(out, "RELOAD");

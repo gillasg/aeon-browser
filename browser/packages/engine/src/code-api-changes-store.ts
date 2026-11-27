@@ -39,20 +39,33 @@ async function __changesSkip(options) {
   var status = await __changesStatus(options);
   return typeof status === 'number' && status >= 400 ? 'the page answered HTTP ' + status : '';
 }
-async function __changesRun(name, now, options) {
+async function __changesRun(name, now, options, memBefore) {
   var skip = await __changesSkip(options);
-  if (skip) return {skipped: true, reason: skip + '; the last set is kept', first: false, new: [], changed: [], gone: [], count: now.size};
-  var before = __changeSets.get(name) || await __changesStored(name);
-  __changeSets.set(name, now);
+  if (skip) {
+    if (__changeSets.get(name) === now) {
+      if (memBefore) __changeSets.set(name, memBefore);
+      else __changeSets.delete(name);
+    }
+    return {skipped: true, reason: skip + '; the last set is kept', first: false, new: [], changed: [], gone: [], count: now.size};
+  }
+  var before = memBefore || await __changesStored(name);
+  if (!__changeSets.has(name)) __changeSets.set(name, now);
   await __call({changeSets: 'save', name, entries: [...now]}).catch(() => undefined);
   return __changesDiff(before, now);
 }
 function __changes(name, items, options = {}) {
+  var key = String(name);
+  var opts = options || {};
   var list = Array.isArray(items) ? items : items && Array.isArray(items.items) ? items.items : [items];
-  var keyOf = __changesKeyOf(options || {});
+  var keyOf = __changesKeyOf(opts);
   var now = new Map(list.map((item) => [keyOf(item), item]));
-  var result = __changesRun(String(name), now, options || {});
+  var memBefore = __changeSets.get(key);
+  var syncDiff = opts.failed === true
+    ? {skipped: true, reason: 'the read failed; the last set is kept', first: false, new: [], changed: [], gone: [], count: now.size}
+    : __changesDiff(memBefore, now);
+  if (opts.failed !== true) __changeSets.set(key, now);
+  var result = __changesRun(key, now, opts, memBefore);
   // Old checks read the answer without await: they keep this runtime's own comparison.
-  return Object.assign(result, __changesDiff(__changeSets.get(String(name)), now));
+  return Object.assign(result, syncDiff);
 }
 `;

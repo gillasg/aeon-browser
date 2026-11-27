@@ -75,9 +75,39 @@ test("a page that answered HTTP 400 or more is skipped", async () => {
 test("a check written without await still gets this runtime's comparison", async () => {
   const { changes } = runtime(new Map());
   changes("sync", [{ id: 1 }]);
-  await new Promise((resolve) => setTimeout(resolve, 0));
   const answer = changes("sync", [{ id: 1 }, { id: 2 }]);
   assert.equal(typeof answer.then, "function");
   assert.equal(answer.first, false);
   assert.deepEqual(plain(answer.new), [{ id: 2 }]);
+  await answer;
+});
+
+test("an HTTP 400+ skip in the same runtime restores the in-memory baseline", async () => {
+  const store = new Map();
+  let status = 200;
+  const context = vm.createContext({
+    __lastTarget: { tabId: 1 },
+    __mainStatus: async () => status,
+    __call: async (request) => {
+      if (request.changeSets === "load") {
+        const entries = store.get(request.name);
+        return entries ? { entries } : null;
+      }
+      if (request.changeSets === "save") {
+        store.set(request.name, JSON.parse(JSON.stringify(request.entries)));
+        return { saved: true };
+      }
+      throw new Error("unexpected call");
+    },
+  });
+  vm.runInContext(browserChangesApi, context);
+  const changes = vm.runInContext("__changes", context);
+  await changes("same", [{ id: 1 }]);
+  status = 503;
+  const skipped = await changes("same", []);
+  assert.equal(skipped.skipped, true);
+  status = 200;
+  const next = await changes("same", [{ id: 1 }, { id: 2 }]);
+  assert.deepEqual(plain(next.new), [{ id: 2 }]);
+  assert.deepEqual(plain(next.gone), []);
 });
