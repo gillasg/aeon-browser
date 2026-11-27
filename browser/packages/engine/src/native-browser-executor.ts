@@ -703,6 +703,17 @@ function sendResult(
     ),
   );
 }
+/**
+ * The tab as the inventory sees it now. A step stamped with a cached document epoch that a
+ * navigation had just replaced was refused as TARGET_LOST (a title read right after a submit
+ * that navigated a few seconds later), though the agent asked about the tab, not the old page.
+ */
+async function liveInventoryTab(target: BrowserTargetKey) {
+  const cached = currentInventoryTabs().find((tab) => sameTarget(tab.target, target));
+  if (!cached) return undefined;
+  const fresh = await refreshInventoryTab(target.tabId).catch(() => undefined);
+  return fresh && sameTarget(fresh.target, target) ? fresh : cached;
+}
 /** Runs one browser_code step inside the extension: same queueing, claims and target checks, no socket. */
 export async function executeLocalBrowserStep(
   identity: BrowserIdentity,
@@ -712,7 +723,7 @@ export async function executeLocalBrowserStep(
   step: BrowserStep,
 ): Promise<BrowserExecutorResult> {
   const target = isTargetStep(step) ? step.target : undefined;
-  const known = target && currentInventoryTabs().find((tab) => sameTarget(tab.target, target));
+  const known = target && (await liveInventoryTab(target));
   if (target && !known) throw new Error("TARGET_LOST");
   const key = target && targetIdentity(target);
   const write = isWriteStep(step);

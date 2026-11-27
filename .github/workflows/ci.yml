@@ -228,15 +228,17 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y xvfb
           deps=".slice0-audit/chrome-for-testing-157.0.8103.78/chrome-linux64/deb.deps"
+          # One resolver pass for every dependency instead of one apt run per line.
+          wanted=()
           while IFS= read -r pkg || [ -n "$pkg" ]; do
             pkg="${pkg%%#*}"
             pkg="$(printf '%s' "$pkg" | xargs)"
-            [ -z "$pkg" ] && continue
-            sudo apt-get satisfy -y --no-install-recommends "$pkg"
+            [ -n "$pkg" ] && wanted+=("$pkg")
           done < "$deps"
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+          sudo apt-get satisfy -y --no-install-recommends "${wanted[@]}"
       - run: pnpm build
       - name: Canary
         if: matrix.canary && runner.os != 'Linux'

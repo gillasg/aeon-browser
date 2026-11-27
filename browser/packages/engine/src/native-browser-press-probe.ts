@@ -98,6 +98,7 @@ export async function armPressProbe(
 }
 
 const HOLD_PRESS_TRIES = 3;
+const OFF_PAGE = { x: -1, y: -1 };
 
 /**
  * Send the hold's mousePressed and, when the target is known, confirm the page received it. A
@@ -111,19 +112,21 @@ export async function pressConfirmed(
   target: { debuggee: chrome.debugger.Debuggee; backendNodeId: number } | undefined,
 ): Promise<void> {
   const probe = target ? await armPressProbe(target.debuggee, target.backendNodeId) : undefined;
-  const press = (type: "mousePressed" | "mouseReleased") =>
+  const press = (type: "mousePressed" | "mouseReleased", point = at) =>
     send(
       debuggee,
       "Input.dispatchMouseEvent",
-      { type, ...at, button: "left", clickCount: 1, buttons: type === "mousePressed" ? 1 : 0 },
+      { type, ...point, button: "left", clickCount: 1, buttons: type === "mousePressed" ? 1 : 0 },
       { label: "holdAt" },
     );
   for (let attempt = 1; ; attempt++) {
     await press("mousePressed");
     const last = attempt >= HOLD_PRESS_TRIES;
     if (!probe || (await probe.seen(last)) !== false) return;
-    // The browser counts the button as down; release it before the next press.
-    await press("mouseReleased");
+    // The browser counts the button as down; release it before the next press. The page never
+    // saw that mousedown, so the release goes off the page: released on the target, it reached
+    // the control as a stray mouseup (one press, two releases) once the renderer caught up.
+    await press("mouseReleased", OFF_PAGE);
     if (last)
       throw new Error("TARGET_LOST: the page never received the press; the hold was not held");
   }

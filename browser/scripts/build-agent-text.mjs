@@ -221,8 +221,11 @@ async function hostFailures(built) {
 function evalTaskDir() {
   const fromEnv = process.env.GRAFT_EVAL_TASKS;
   if (fromEnv && existsSync(fromEnv)) return fromEnv;
-  const sibling = resolve(graftRepo, "../aeon-eval/tasks");
-  return existsSync(sibling) ? sibling : "";
+  // The eval checkout sits beside this repo as eval/ (aeon-eval/ before the rename).
+  const sibling = ["../eval/tasks", "../aeon-eval/tasks"]
+    .map((dir) => resolve(graftRepo, dir))
+    .find((dir) => existsSync(dir));
+  return sibling ?? "";
 }
 
 async function alwaysOnFiles() {
