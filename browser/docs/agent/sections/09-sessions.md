@@ -11,6 +11,9 @@ or another session's; actions in one tab queue, reads run in parallel.
 - **Ask the user to point:** `await page.pick({prompt: "Click the price"})` lets them click
   elements (with optional notes) and returns `{status, picks: [{selector, role, name, text, note}]}`;
   use it before a boost, watcher, ability or site action that needs "this element".
+- **Ability page scripts:** a saved `{kind: "script", runtime: "page"}` way runs as browser code,
+  `(page, bu, inputs) => …`, with `page` bound to the site's tab (yours when it is on that site)
+  and `inputs` the run's inputs. There is no `document`: use `page.evaluate(fn, arg)` for the DOM.
 - **Placement and locks:** a new tab opens where your tabs are now (the user may drag them);
   `{windowOf: tab}` opens beside a tab. `{readOnly: true}` blocks clicks and typing in that tab
   (`TAB_READ_ONLY`); `{allowedOrigins: [origin]}` keeps it on those origins (`TAB_ORIGIN_BLOCKED`).

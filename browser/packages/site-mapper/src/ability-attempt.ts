@@ -3,7 +3,7 @@
 
 import { runNodeScript } from "./ability-node.js";
 import { refuseUnsettled } from "./ability-writes.js";
-import { matchControl, type FallbackTarget } from "./step-fallbacks.js";
+import { closestControls, resolveControl, type FallbackTarget } from "./step-fallbacks.js";
 import type {
   Ability,
   AbilityApiStep,
@@ -14,7 +14,8 @@ import type {
   AbilityWayScript,
   AbilityWaySteps,
 } from "./abilities.js";
-import { siteHome, siteName } from "./registry.js";
+export { defaultHost, readOnlyHost } from "./ability-host.js";
+import { handleCall } from "./ability-host.js";
 
 export async function attemptWay(
   ability: Ability,
@@ -128,13 +129,12 @@ async function replaySaved(
   progress?: { reachedCommit: boolean },
 ): Promise<unknown> {
   const act = host.act;
-  if (!act || !host.controls) throw new Error("No step replay is attached");
+  if (!act || !host.controls) throw new Error("ABILITY_NEEDS: no step replay is attached");
   const steps = savedSteps(way);
   const commit = Math.min(way.commit ?? steps.length - 1, Math.max(steps.length - 1, 0));
   let last: unknown;
   for (const [index, step] of steps.entries()) {
-    const target = fillTarget(step.target, inputs);
-    await assertCurrent(step, target, host);
+    const target = await currentTarget(step, fillTarget(step.target, inputs), host);
     if (progress && index >= commit && !step.settings) progress.reachedCommit = true;
     last = await act({
       kind: step.kind,
@@ -146,17 +146,34 @@ async function replaySaved(
   return last;
 }
 
-async function assertCurrent(
+/** The control a saved step acts on now: the saved one, or one renamed control (reported as adapted). */
+async function currentTarget(
   step: SavedStep,
   target: FallbackTarget | undefined,
   host: AbilityHost,
-): Promise<void> {
+): Promise<FallbackTarget | undefined> {
   const page = step.onPageType && host.pageType ? await host.pageType() : undefined;
   if (step.onPageType && page && page !== step.onPageType)
-    throw new Error(`page type ${page} is not ${step.onPageType}`);
-  if (!target || !host.controls) return;
-  if (!matchControl(target, await host.controls()))
-    throw new Error(`target did not resolve: ${target.role ?? ""} ${target.name ?? ""}`.trim());
+    throw new Error(`ABILITY_DRIFT: page type ${page} is not ${step.onPageType}`);
+  if (!target || !host.controls) return target;
+  const controls = await host.controls();
+  const hit = resolveControl(target, controls);
+  if (!hit) throw new Error(driftMessage(target, closestControls(target, controls)));
+  if (hit.adapted) host.noteAdapted?.({ from: pick(target), to: pick(hit.control) });
+  return { ...target, ...pick(hit.control) };
+}
+
+function pick(control: FallbackTarget): { role?: string; name?: string } {
+  return {
+    ...(control.role ? { role: control.role } : {}),
+    ...(control.name ? { name: control.name } : {}),
+  };
+}
+
+function driftMessage(target: FallbackTarget, closest: FallbackTarget[]): string {
+  const wanted = `${target.role ?? "control"} ${JSON.stringify(target.name ?? target.text ?? target.css ?? "")}`;
+  const near = closest.map((item) => `${item.role ?? "?"} ${JSON.stringify(item.name ?? "")}`);
+  return `ABILITY_DRIFT: no ${wanted} on the page now${near.length ? `; closest: ${near.join(", ")}` : ""}`;
 }
 
 function fillTarget(
@@ -203,7 +220,14 @@ async function attemptScript(
   if (way.runtime === "page") {
     if (!host.script) throw new Error("No browser is attached for a page script");
     if (progress) progress.reachedCommit = true;
-    return runPageScript(way, inputs, host);
+    try {
+      return await runPageScript(way, inputs, host);
+    } catch (error) {
+      // A script that threw before it touched the page cannot have committed anything.
+      if (progress && (error as { pageUntouched?: boolean }).pageUntouched)
+        progress.reachedCommit = false;
+      throw error;
+    }
   }
   if (progress) progress.reachedCommit = true;
   return runNodeScript(
@@ -227,64 +251,8 @@ async function runPageScript(
     string,
     unknown
   >;
-  return host.script(code, { inputs, ...extra });
-}
-
-async function handleCall(
-  site: string,
-  operation: string,
-  params: Record<string, unknown>,
-): Promise<unknown> {
-  const { handleSiteMapperRequest } = await import("./requests.js");
-  return handleSiteMapperRequest({ siteMapper: "call", site, operation, params });
-}
-
-/** Site calls through the mapped runtime; page ways and page scripts in a browser tab on the site. */
-export function defaultHost(site: string): AbilityHost {
-  const browser = once(async () => {
-    const { browserRecipeHost } = await import("./runtime/recipe-host.js");
-    return browserRecipeHost(site, { session: `ability-${siteName(site)}` });
-  });
-  return {
-    call: (operation, params) => handleCall(site, operation, params),
-    write: (operation, params) => handleCall(site, operation, params),
-    open: async (url) => required(await browser(), "open")(url),
-    collect: async (input) => required(await browser(), "collect")(input),
-    script: async (code, input) => required(await browser(), "script")(onSite(site, code), input),
-  };
-}
-
-/** The default host with every write refused: for background checks that must never change a site. */
-export function readOnlyHost(site: string): AbilityHost {
-  const host = defaultHost(site);
-  const refuse = (): Promise<never> =>
-    Promise.reject(new Error("ABILITY_READ_ONLY: a background check never writes"));
-  return { ...host, write: refuse };
-}
-
-/** Wraps a page script so it runs on a tab of its own site, opening one in the background if needed. */
-function onSite(site: string, code: string): string {
-  const host = siteName(site);
-  return `async (page, bu, inputs) => {
-  let tab = page;
-  try { if (!tab || !new URL(await tab.url()).hostname.endsWith(${JSON.stringify(host)})) tab = undefined; } catch { tab = undefined; }
-  tab ??= await browser.openTab(${JSON.stringify(siteHome(host))}, { active: false });
-  return await (${code})(tab, bu, inputs);
-}`;
-}
-
-function required<K extends "open" | "collect" | "script">(
-  host: AbilityHost,
-  name: K,
-): NonNullable<AbilityHost[K]> {
-  const run = host[name];
-  if (!run) throw new Error(`ABILITY_NEEDS: the browser host has no ${name}`);
-  return run as NonNullable<AbilityHost[K]>;
-}
-
-function once<T>(make: () => Promise<T>): () => Promise<T> {
-  let value: Promise<T> | undefined;
-  return () => (value ??= make());
+  // The script gets the inputs themselves (flat), over the way's own defaults.
+  return host.script(code, { ...extra, ...inputs });
 }
 
 /** Fills `{{inputs.x}}` and `{{last.field}}` in a way's params. */

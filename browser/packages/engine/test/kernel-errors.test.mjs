@@ -9,7 +9,7 @@ test("every failure is a kernel code, never a bare one", () => {
     "Debugger is not attached to the tab with id: 5.": "DEBUGGER_DETACHED",
     "Detached while handling command.": "TARGET_LOST",
     "Cannot access a chrome-extension:// URL of different extension": "PROTECTED_UI",
-    "Cannot access a chrome:// URL; debugger refused": "UNSUPPORTED",
+    "Cannot access a chrome:// URL; debugger refused": "PROTECTED_UI",
     "Something nobody planned for": "CHROME_ERROR",
     STALE_REF: "STALE_REF",
   };

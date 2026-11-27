@@ -8,6 +8,7 @@ import {
   reportWrongResult,
 } from "./route-api.js";
 import {
+  abilityHostFor,
   browserRecipeHost,
   rebuild,
   RecordingSession,
@@ -283,7 +284,7 @@ export class LibraryActions {
   private async runSiteAbility(input: Record<string, unknown>): Promise<void> {
     const site = required(input, "site");
     const name = required(input, "name");
-    const host = await browserRecipeHost(site, {
+    const host = abilityHostFor(site, {
       session: SESSION,
       bridge: {
         run: (code, options) => this.run(code, options),
@@ -292,14 +293,7 @@ export class LibraryActions {
       },
     });
     const answer = await runAbility(site, name, (input.params as Record<string, unknown>) ?? {}, {
-      host: {
-        call: host.call,
-        ...(host.write ? { write: host.write } : {}),
-        ...(host.open ? { open: host.open } : {}),
-        ...(host.collect ? { collect: host.collect } : {}),
-        ...(host.script ? { script: host.script } : {}),
-        ...(host.resolveOperation ? { resolveOperation: host.resolveOperation } : {}),
-      },
+      host,
     });
     const healed = answer.healed ? ` · fixed itself (v${answer.healed.toVersion})` : "";
     const timing = answer.receipt ? ` (${answer.receipt})` : ` via ${answer.via}`;

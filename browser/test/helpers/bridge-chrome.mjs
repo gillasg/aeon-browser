@@ -45,7 +45,7 @@ export async function startBridgeChrome(name) {
     chrome = spawn(chromePath, chromeArgs(profile), { stdio: "ignore" });
     const { port, browser } = await connectExtension(profile, env);
     const repl = (code, timeout = 120000) => replIn(env, name, code, timeout);
-    return { repl, browser, port, stop };
+    return { repl, browser, port, stop, env, cli };
   } catch (error) {
     await stop();
     throw error;

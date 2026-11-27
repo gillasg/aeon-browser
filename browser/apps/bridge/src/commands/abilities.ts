@@ -1,9 +1,12 @@
 import { cliModel } from "../host.js";
 import {
-  browserRecipeHost,
+  abilityHostFor,
   buildAbility,
+  listAbilityVersions,
+  restoreAbility,
   listAbilities,
   listSites,
+  registryRoot,
   readAbility,
   runAbility,
   siteName,
@@ -15,6 +18,7 @@ import {
 import { flag, has, jsonValue, type Args } from "../args.js";
 import { out, printJson } from "../output.js";
 import type { Command } from "../usage.js";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDirectory } from "../paths.js";
 
@@ -28,7 +32,11 @@ async function abilities(args: Args): Promise<number> {
   if (action === "test") return test(args);
   if (action === "build") return build(args);
   if (action === "delete") return remove(args);
-  throw new Error("Usage: browserkit abilities <list|show|run|test|build|delete|migrate>");
+  if (action === "versions") return versions(args);
+  if (action === "restore") return restore(args);
+  throw new Error(
+    "Usage: browserkit abilities <list|show|run|test|build|delete|versions|restore|migrate>",
+  );
 }
 
 async function build(args: Args): Promise<number> {
@@ -62,8 +70,7 @@ async function test(args: Args): Promise<number> {
   const site = args.positional[1];
   const name = args.positional[2];
   if (!site || !name) throw new Error("Usage: browserkit abilities test <site> <name>");
-  const recipe = await browserRecipeHost(siteName(site));
-  const report = await testAbility(siteName(site), name, { host: recipe });
+  const report = await testAbility(siteName(site), name, { host: abilityHostFor(siteName(site)) });
   if (has(args, "json")) printJson(report);
   else {
     for (const item of report.cases)
@@ -86,8 +93,8 @@ async function list(args: Args): Promise<number> {
       }))
     : (
         await Promise.all(
-          (await listSites()).map(async (item) =>
-            (await listAbilities(item.site)).map((ability) => ({ ...ability, site: item.site })),
+          (await abilitySites()).map(async (item) =>
+            (await listAbilities(item)).map((ability) => ({ ...ability, site: item })),
           ),
         )
       ).flat();
@@ -189,23 +196,53 @@ async function run(args: Args): Promise<number> {
   const key = flag(args, "key");
   const limit = flag(args, "limit");
   const cursor = flag(args, "cursor");
-  const recipe = await browserRecipeHost(siteName(site));
   const answer = await runAbility(siteName(site), name, inputs as Record<string, unknown>, {
     ...(via ? { via } : {}),
     ...(key ? { key } : {}),
     ...(limit ? { limit: Number(limit) } : {}),
     ...(cursor ? { cursor } : {}),
-    host: {
-      call: recipe.call,
-      ...(recipe.write ? { write: recipe.write } : {}),
-      ...(recipe.open ? { open: recipe.open } : {}),
-      ...(recipe.collect ? { collect: recipe.collect } : {}),
-      ...(recipe.script ? { script: recipe.script } : {}),
-      ...(recipe.resolveOperation ? { resolveOperation: recipe.resolveOperation } : {}),
-    },
+    host: abilityHostFor(siteName(site)),
   });
   if (has(args, "json")) printJson(answer);
   else printJson(answer.result);
+  return 0;
+}
+
+/** Every site with stored abilities, mapped or not. */
+async function abilitySites(): Promise<string[]> {
+  const root = join(registryRoot(), "sites");
+  // A site folder is named for its host, with a port's colon written as "_".
+  const names = (await readdir(root).catch(() => [] as string[])).map((name) =>
+    name.replace(/_(\d+)$/, ":$1"),
+  );
+  const mapped = (await listSites()).map((item) => item.site);
+  return [...new Set([...mapped, ...names])].sort();
+}
+
+async function versions(args: Args): Promise<number> {
+  const site = args.positional[1];
+  const name = args.positional[2];
+  if (!site || !name) throw new Error("Usage: browserkit abilities versions <site> <name>");
+  const list = await listAbilityVersions(siteName(site), name);
+  if (has(args, "json")) printJson(list);
+  else if (!list.length) out(`${name} on ${siteName(site)} has no earlier versions.`);
+  else
+    for (const item of list)
+      out(`${item.at}\t${item.kind}\t${item.ways.join("+")}\t${item.updatedAt ?? ""}`);
+  return 0;
+}
+
+async function restore(args: Args): Promise<number> {
+  const site = args.positional[1];
+  const name = args.positional[2];
+  const at = args.positional[3];
+  if (!site || !name || !at)
+    throw new Error("Usage: browserkit abilities restore <site> <name> <version> [--breaking]");
+  const restored = await restoreAbility(siteName(site), name, at, {
+    ...(has(args, "breaking") ? { breaking: true } : {}),
+  });
+  if (has(args, "json")) printJson(restored);
+  else out(`Restored ${name} on ${siteName(site)} to version ${at}.`);
   return 0;
 }
 
@@ -248,7 +285,7 @@ export const abilitiesCommand: Command = {
   name: "abilities",
   group: "Use a site",
   summary: "the named things a site can do (`actions` is the same command)",
-  help: `Usage: browserkit abilities <list|show|run|test|build|delete|migrate> [site] [name]
+  help: `Usage: browserkit abilities <list|show|run|test|build|delete|versions|restore|migrate> [site] [name]
 
   list [site] [--json]          abilities, with kind, ways and description
   show <site> <name> [--json]   full definition and run stats
@@ -260,6 +297,8 @@ export const abilitiesCommand: Command = {
                                 an agent does the task in a background tab (writes in dry
                                 run) and saves a tested ability for it, or says why not
   delete <site> <name>          move it to trash/ instead of hard-deleting
+  versions <site> <name> [--json]  earlier saved versions, newest first
+  restore <site> <name> <version> [--breaking]  put an earlier version back
   migrate [--dry-run] [--json]  convert every old site store into abilities + notes
 
 In code and the agent tools too (saveAbility, site_mapper ability_*). \`browserkit actions\` is

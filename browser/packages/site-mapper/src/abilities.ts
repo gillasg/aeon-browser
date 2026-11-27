@@ -5,6 +5,7 @@
 import { mkdir, readdir, readFile, rename } from "node:fs/promises";
 import { withResultAsserts, type AbilityAssert } from "./ability-assert.js";
 import { defaultHost } from "./ability-attempt.js";
+import { checkAbilityInputs } from "./ability-inputs.js";
 import { testedAbility, withTested, type AbilityTested } from "./ability-digest.js";
 import { abilityDirectory, abilitySlug } from "./ability-files.js";
 import { syncSiteOps } from "./site-ops-sync.js";
@@ -20,7 +21,6 @@ import {
   contractBreaks,
   contractWarnings,
   testAbilityCases,
-  unknownInputMessage,
   unusedInputs,
   type AbilityTest,
   type AbilityTestReport,
@@ -235,6 +235,8 @@ export interface AbilityRunResult {
   tried: { via: AbilityVia; error: string }[];
   /** Writes: how the call left the site, and the key it ran under. */
   write?: Partial<WriteOutcome> & { key?: string; replayed?: boolean };
+  /** Steps that ran on a renamed control (the page drifted, the match was still unique). */
+  adapted?: AdaptedStep[];
   /** Writes with readBack: whether the site shows the change. */
   readBack?: { ok: boolean; missing: string[] };
   /** The way that ran only had part of the contract. */
@@ -275,6 +277,12 @@ export interface AbilityRunOptions {
   onWay?: (way: string) => void;
 }
 
+/** A saved step that ran on a renamed control: the saved target, and the control it used. */
+export interface AdaptedStep {
+  from: { role?: string; name?: string };
+  to: { role?: string; name?: string };
+}
+
 export interface AbilityHost {
   call?: (operation: string, params: Record<string, unknown>) => Promise<unknown>;
   write?: (operation: string, params: Record<string, unknown>) => Promise<unknown>;
@@ -293,6 +301,8 @@ export interface AbilityHost {
   pageType?: () => Promise<string | undefined>;
   /** Steps ways: the controls on the page, so fallbacks can resolve. */
   controls?: () => Promise<{ role?: string; name?: string; css?: string; text?: string }[]>;
+  /** Steps ways: told when a step matched a renamed control instead of its saved one. */
+  noteAdapted?: (step: AdaptedStep) => void;
   /** Steps ways: act on the control a fallback resolved. */
   act?: (step: {
     kind: string;
@@ -603,15 +613,19 @@ export async function maintainAbilities(
 export async function runAbility(
   site: string,
   name: string,
-  inputs: Record<string, unknown> = {},
+  given: Record<string, unknown> = {},
   options: AbilityRunOptions = {},
 ): Promise<AbilityRunResult> {
-  const ability = withBuiltinWay(await readAbility(site, name), inputs);
+  const ability = withBuiltinWay(await readAbility(site, name), given);
   if (!ability) throw new Error(`ABILITY_UNKNOWN: ${siteName(site)} has no ability ${name}`);
-  const unknown = unknownInputMessage(ability, inputs);
-  if (unknown) throw new Error(unknown);
+  // Checked before any way runs or any write key is claimed.
+  const inputs = checkAbilityInputs(ability, given);
   const started = Date.now();
-  const host = options.host ?? defaultHost(site);
+  const adapted: AdaptedStep[] = [];
+  const host: AbilityHost = {
+    ...(options.host ?? defaultHost(site)),
+    noteAdapted: (step) => adapted.push(step),
+  };
   const blocked = await preconditionError(ability, host);
   if (blocked) throw new Error(blocked);
   const record: RunRecorder = (ok, notes, differ) => recordAbilityRun(ability, ok, notes, differ);
@@ -619,7 +633,11 @@ export async function runAbility(
     ability.kind === "write"
       ? await executeWrite(ability, inputs, host, options, record)
       : await executeRead(ability, inputs, host, options, record);
-  return { ...run, ...(await runExtras(ability, inputs, run, Date.now() - started)) };
+  return {
+    ...run,
+    ...(adapted.length ? { adapted } : {}),
+    ...(await runExtras(ability, inputs, run, Date.now() - started)),
+  };
 }
 
 /** What a finished run adds: the receipt, a repair since the last run, and how to undo a write. */

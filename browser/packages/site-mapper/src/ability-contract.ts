@@ -39,7 +39,7 @@ export function unknownInputMessage(
     const list = declared.length ? declared.join(", ") : "none";
     const near = closestName(name, declared);
     const hint = near ? ` Did you mean "${near}"?` : "";
-    return `Unknown input "${name}". Declared: ${list}.${hint}`;
+    return `ABILITY_INPUT: Unknown input "${name}". Declared: ${list}.${hint}`;
   }
   return undefined;
 }

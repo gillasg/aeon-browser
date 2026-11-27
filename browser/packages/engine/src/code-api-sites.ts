@@ -227,7 +227,8 @@ var __siteAbilities = {
     // Page code (built-in abilities, page-script reads) runs right here, in this cell's tabs.
     var plan = await __call({abilityRun: {site: host, name, inputs, plan: true, ...(options.via ? {via: options.via} : {})}});
     if (plan && plan.local) return __abilityOutcome(name, {result: await __runPageAbility(plan), via: 'script', tried: []}, host);
-    return __abilityOutcome(name, await __call({abilityRun: {site: host, name, inputs, ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {}), ...(options.complete ? {complete: true} : {})}}), host);
+    var tab = globalThis.page && globalThis.page.target ? globalThis.page.target.tabId : undefined;
+    return __abilityOutcome(name, await __call({abilityRun: {site: host, name, inputs, ...(typeof tab === 'number' ? {tab} : {}), ...(options.via ? {via: options.via} : {}), ...(options.key ? {key: String(options.key)} : {}), ...(options.limit ? {limit: Number(options.limit)} : {}), ...(options.cursor ? {cursor: String(options.cursor)} : {}), ...(options.complete ? {complete: true} : {})}}), host);
   },
   test: async (name, site) => __call({abilityRun: {site: await __siteHostName(site), name, test: true}}),
   // Moves an ability to the site's trash/ (nothing is hard-deleted); returns {removed}.

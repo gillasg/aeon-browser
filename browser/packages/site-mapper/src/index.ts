@@ -69,6 +69,8 @@ export {
   type AbilityVersion,
 } from "./ability-versions.js";
 export { restoreAbility, type RestoreAbilityOptions } from "./ability-restore.js";
+export { abilityHostFor, type AbilityHostOptions } from "./ability-host.js";
+export { checkAbilityInputs } from "./ability-inputs.js";
 export {
   formatFinding,
   lintPublicAbility,
