@@ -518,7 +518,7 @@ export function __readWindowScroll(options) {
   var page = document.scrollingElement || document.documentElement;
   var start = page.scrollTop;
   var began = Date.now();
-  var budget = Math.max(300, Number(options.budgetMs) || 4000);
+  var budget = Math.max(300, Math.min(5500, Number(options.budgetMs) || 4000));
   var stable = 0,
     rounds = 0;
   return new Promise((done) => {
@@ -528,22 +528,22 @@ export function __readWindowScroll(options) {
       done({ complete, rounds, height: page.scrollHeight });
     };
     var round = () => {
-      if (Date.now() - began > budget) return finish(false);
+      if (Date.now() - began >= budget) return finish(false);
       rounds += 1;
       var height = page.scrollHeight;
       page.scrollTop = height;
       window.dispatchEvent(new Event("scroll"));
-      var waited = 0;
+      var pollStart = Date.now();
       var poll = () => {
         if (page.scrollHeight > height) {
           stable = 0;
           return setTimeout(round, 0);
         }
-        if (waited < 400) {
-          waited += 50;
+        if (Date.now() - pollStart < 400 && Date.now() - began < budget) {
           return setTimeout(poll, 50);
         }
         if (++stable >= 2) return finish(true);
+        if (Date.now() - began >= budget) return finish(false);
         setTimeout(round, 0);
       };
       setTimeout(poll, 50);
