@@ -60,7 +60,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm build
-      - name: Format, lint, typecheck, agent text, artifact gate
+      - name: Format, lint, artifact gate (parallel)
         shell: bash
         run: |
           set -uo pipefail
@@ -70,9 +70,6 @@ jobs:
             "pnpm --dir browser run lint"
             "pnpm format:check"
             "pnpm lint"
-            "pnpm agent-text:check"
-            # Both rebuild or read the same tsc outputs, so they stay in one sequence.
-            "pnpm --dir browser run typecheck && pnpm typecheck"
             "pnpm test:artifact-gate"
           )
           pids=()
@@ -89,6 +86,11 @@ jobs:
             [ "$status" = FAILED ] && echo "::error::${checks[$i]} failed"
           done
           exit "$failed"
+      - name: Typecheck and agent text
+        run: |
+          pnpm --dir browser run typecheck
+          pnpm typecheck
+          pnpm agent-text:check
 
   # The fast lane (no browser) on every OS Graft ships to, built once.
   unit:
