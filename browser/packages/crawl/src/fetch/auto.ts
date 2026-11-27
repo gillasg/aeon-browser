@@ -159,9 +159,9 @@ export class AutoFetcher {
     if (options.render === "static" || fetched.notModified) return fetched;
     const reason = needsBrowser(fetched);
     if (!reason) return fetched;
-    // A whole site that needs JavaScript or checks for bots goes to the browser from now on;
-    // one page behind a login only needs it for that page.
-    if (!/^HTTP 40[137]$/.test(reason)) await this.markBrowserHost(new URL(url).host);
+    // A bot wall covers the whole site, so that host goes to the browser from now on. A login or a
+    // JavaScript shell is one page's problem: the rest of the site stays on fast plain HTTP.
+    if (reason === "bot check") await this.markBrowserHost(new URL(url).host);
     try {
       return await this.browser.fetch(url, options);
     } catch {

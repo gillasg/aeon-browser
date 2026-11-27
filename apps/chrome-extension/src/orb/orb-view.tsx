@@ -13,6 +13,7 @@ import {
   Palette,
   AnswerFoot,
   InkDots,
+  RunTabPills,
   SendButton,
   TargetChip,
   TeachPill,
@@ -21,6 +22,7 @@ import {
   verbPrefill,
   type OrbTargetChip,
   type PaletteVerb,
+  type RunTab,
 } from "./orb-view-parts.js";
 
 export type { OrbTargetChip } from "./orb-view-parts.js";
@@ -70,6 +72,8 @@ export interface OrbViewModel {
   line?: BoxLine;
   /** Learned line, speed line and offers under a finished answer. */
   footer?: AnswerFooter;
+  /** Tabs the finished run left open in the background, one click away. */
+  runTabs?: RunTab[];
 }
 
 export interface OrbTab {
@@ -106,6 +110,8 @@ export interface OrbViewActions {
   removeTarget(): void;
   /** Shows the pointed-at element's outline on the page again, while the chip is hovered. */
   hoverTarget(on: boolean): void;
+  /** Switches to a tab the run opened in the background. */
+  jumpToTab(tabId: number): void;
 }
 
 export function OrbBox({
@@ -341,7 +347,7 @@ function RunningLine({
   const state = islandState(model);
   const line = model.line;
   if (!line || state === "compose") return null;
-  if (state === "working") return <WorkingPill text={line.text} />;
+  if (state === "working") return <WorkingPill text={line.text} startedAt={model.startedAt} />;
   if (state === "error")
     return (
       <ErrorCard
@@ -370,6 +376,7 @@ function RunningLine({
           </button>
         </div>
       )}
+      <RunTabPills tabs={model.runTabs ?? []} onJump={actions.jumpToTab} />
       <AnswerFoot time={finishedAt(model)} onCopy={actions.copyAnswer} />
     </>
   );

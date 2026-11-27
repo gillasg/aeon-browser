@@ -58,6 +58,10 @@ export const ORB_OFF = "graft.orb.off";
 export const CURSOR_TRANSCRIPT = "graft.cursor.transcript";
 /** orb.html → service worker: open the side panel on this chat (⌘↵, Open in panel). The worker
  * opens it, the same path the cursor's ☰ takes, so the click's gesture reaches sidePanel.open. */
+/** Page → worker: the tabs a chat's run left open, other than the asking tab. */
+export const ORB_RUN_TABS = "graft.orb.run-tabs";
+/** Page → worker: switch to one of those tabs (and focus its window). */
+export const ORB_JUMP_TAB = "graft.orb.jump-tab";
 export const ORB_TO_PANEL = "graft.orb.to-panel";
 /** Service worker → content script: is the box open in this tab? The shortcut's one source of truth. */
 export const ORB_BUBBLE_STATE = "graft.orb.bubble-state";

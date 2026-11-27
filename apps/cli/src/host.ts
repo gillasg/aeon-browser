@@ -1,10 +1,7 @@
 import { readFile } from "node:fs/promises";
-import {
-  BrowserNotConnected,
-  useBrowser,
-  type Bridge,
-  type ModelLike,
-} from "@browserkit/tools/site-to-api";
+// Types only at load: the site-to-api module costs most of a second to import, and lean commands
+// like `graft status` never need it.
+import type { Bridge, ModelLike } from "@browserkit/tools/site-to-api";
 import { configureCliHost } from "browserkit/dist/host.js";
 import { GraftClient } from "./client.js";
 import { cellErrorMessage, journalPath, offline, runCellOn, type BrowserCell } from "./cell-run.js";
@@ -70,7 +67,7 @@ export class DaemonHost {
       ...options,
       ...(browser ? { browser } : {}),
     });
-    if (result.error) throw Object.assign(browserError(result), { output: result.output });
+    if (result.error) throw Object.assign(await browserError(result), { output: result.output });
     return result;
   }
 
@@ -111,15 +108,22 @@ export class DaemonHost {
   }
 
   close(): void {
+    // A connection still opening when the command ends would keep the process alive.
+    if (!this.client)
+      void this.connecting?.then(
+        (client) => client.close(),
+        () => undefined,
+      );
     this.client?.close();
     this.client = undefined;
     this.connecting = undefined;
   }
 }
 
-function browserError(result: BrowserCell): Error {
+async function browserError(result: BrowserCell): Promise<Error> {
   const message = cellErrorMessage(result);
   if (!offline(result)) return new Error(message);
+  const { BrowserNotConnected } = await import("@browserkit/tools/site-to-api");
   // The site-to-api class carries the browser-offline exit code; the message says how Graft recovers.
   const error = new BrowserNotConnected(message);
   error.message = message;
@@ -144,8 +148,14 @@ export function daemonBridge(host: DaemonHost): Bridge {
 }
 
 /** Routes every browser call in this process through Graft, and installs the CLI host. */
-export function installGraftCliHost(host: DaemonHost): void {
+export async function installGraftCliHost(host: DaemonHost): Promise<void> {
+  const { useBrowser } = await import("@browserkit/tools/site-to-api");
   useBrowser(daemonBridge(host));
+  installCliHostOnly(host);
+}
+
+/** The CLI host alone, for commands that never reach site-to-api or the crawler. */
+export function installCliHostOnly(host: DaemonHost): void {
   configureCliHost({
     runInBrowser: (code, options) => host.runInBrowser(code, options ?? {}),
     browsers: () => host.browsers(),

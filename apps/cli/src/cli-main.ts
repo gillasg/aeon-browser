@@ -36,7 +36,7 @@ function printVersion(): number {
 const host = new DaemonHost();
 
 async function main(argv: string[]): Promise<number> {
-  installGraftCliHost(host);
+  await installGraftCliHost(host);
   const commands = graftCommands(host);
   if (VERSION.has(argv[0] ?? "")) return printVersion();
   if (HELP.has(argv[0] ?? "")) return printHelp(commands, argv.slice(1));

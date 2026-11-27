@@ -18,6 +18,8 @@ import { markSeen, setNeeds } from "./orb-control.js";
 import { filmBeat, watchFilm } from "./orb-film.js";
 import {
   CURSOR_STOP,
+  ORB_JUMP_TAB,
+  ORB_RUN_TABS,
   ORB_TO_PANEL,
   type OrbToContent,
   type OrbVerify,
@@ -412,13 +414,32 @@ function syncBox(current: OrbRun): void {
   else delete model.line;
   if (current.footer) model.footer = current.footer;
   else delete model.footer;
-  if (current.status === "done" && model.startedAt !== undefined && model.durationMs === undefined)
+  if (
+    current.status === "done" &&
+    model.startedAt !== undefined &&
+    model.durationMs === undefined
+  ) {
     model.durationMs = Date.now() - model.startedAt;
+    void loadRunTabs();
+  }
+  if (current.status !== "done") delete model.runTabs;
   render();
   if (ask) focusPrompt();
 }
 
 /** Pushes the run to the overlay: the swarm's state, where the agent acts, what needs the user. */
+/** The tabs this run opened and kept in the background, as one-click pills under the answer. */
+async function loadRunTabs(): Promise<void> {
+  const chatId = session.chatId;
+  if (!chatId) return;
+  const tabs = (await chrome.runtime
+    .sendMessage({ kind: ORB_RUN_TABS, chatId })
+    .catch(() => [])) as OrbViewModel["runTabs"];
+  if (session.chatId !== chatId || !Array.isArray(tabs)) return;
+  model.runTabs = tabs;
+  render();
+}
+
 function sync(): void {
   if (!run) return;
   const state = visualState(run);
@@ -616,6 +637,8 @@ function view(): ReactNode {
       pickTabs: () => void pickTabs(),
       addContext: (id) => void addContext(id),
       removeContext,
+      jumpToTab: (tabId) =>
+        void chrome.runtime.sendMessage({ kind: ORB_JUMP_TAB, tabId }).catch(() => undefined),
     },
   });
 }

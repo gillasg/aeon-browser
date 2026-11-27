@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "pnpm build:core && pnpm exec tsc -b packages/ui && pnpm --filter @graft/chrome-extension build",
-    "build:core": "pnpm exec tsc -b packages/domain packages/location --pretty false && pnpm build:browser && pnpm exec tsc -b packages/protocol packages/store packages/pi-adapter apps/daemon apps/cli --pretty false && pnpm --filter @graft/native-host build",
+    "build:core": "pnpm exec tsc -b packages/domain packages/location --pretty false && pnpm build:browser && pnpm exec tsc -b packages/protocol packages/store packages/pi-adapter apps/daemon apps/cli --pretty false && node apps/cli/dist/help-write.js && pnpm --filter @graft/native-host build",
     "build:native-host": "pnpm --filter @graft/native-host build",
     "typecheck": "pnpm exec tsc -b packages/domain packages/location packages/protocol apps/daemon packages/pi-adapter packages/store apps/cli packages/ui --pretty false && pnpm exec tsc --noEmit -p apps/chrome-extension/tsconfig.json",
     "lint": "eslint apps packages scripts --max-warnings=0 && eslint -c browser/packages/engine/eslint.config.mjs browser/packages/engine/src --max-warnings=0 && node scripts/check-boundaries.mjs && node scripts/check-source-limits.mjs && node scripts/check-raw-color.mjs",

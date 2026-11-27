@@ -37,24 +37,71 @@ export function handleBrowserRun(
   const timeoutMs = request.data.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const chatId = sessionChatId("external", session);
   const named = request.data.browser;
+  const controller = new AbortController();
+  const done = track(socket, browser, chatId, controller);
   void (named ? pin(browser, directory, chatId, named) : Promise.resolve())
     .then(() =>
-      browser.execute(chatId, `cli-${randomUUID()}`, {
-        codeCell: {
-          code,
-          timeoutMs,
-          ownerTitle: "Session · " + session,
-          space: "window",
-          onCall: cliCall(chatId, join(directory, "workspaces", chatId)),
-          onProgress: () => undefined,
+      browser.execute(
+        chatId,
+        `cli-${randomUUID()}`,
+        {
+          codeCell: {
+            code,
+            timeoutMs,
+            ownerTitle: "Session · " + session,
+            space: "window",
+            onCall: cliCall(chatId, join(directory, "workspaces", chatId)),
+            onProgress: () => undefined,
+          },
         },
-      }),
+        controller.signal,
+      ),
     )
     .then(
       (output) => reply(socket, requestId, parseCell(output)),
       (error: unknown) => reply(socket, requestId, { error: messageOf(error) }),
-    );
+    )
+    .finally(done);
   return true;
+}
+
+type Running = { chatId: string; controller: AbortController };
+const running = new WeakMap<WebSocket, Set<Running>>();
+
+/**
+ * A cell runs only while its client is connected. When `graft repl` is cancelled or its socket
+ * drops mid-cell, the cell is cancelled, its realm reset and the session's tabs closed, as a timed-out
+ * cell does, instead of driving Chrome for another minute and leaving its tabs open.
+ */
+function track(
+  socket: WebSocket,
+  browser: BrowserControlService,
+  chatId: string,
+  controller: AbortController,
+): () => void {
+  let cells = running.get(socket);
+  if (!cells) {
+    const set = new Set<Running>();
+    cells = set;
+    running.set(socket, set);
+    socket.once("close", () => abandon(browser, set));
+  }
+  const entry = { chatId, controller };
+  cells.add(entry);
+  return () => void running.get(socket)?.delete(entry);
+}
+
+function abandon(browser: BrowserControlService, cells: Set<Running>): void {
+  const chats = new Set<string>();
+  for (const cell of cells) {
+    cell.controller.abort();
+    chats.add(cell.chatId);
+  }
+  cells.clear();
+  for (const chatId of chats)
+    void browser
+      .execute(chatId, `cli-release-${randomUUID()}`, { release: true, reset: true, tidy: true })
+      .catch(() => undefined);
 }
 
 // A run request the schema refuses still gets an answer naming what was wrong, so the client

@@ -60,6 +60,10 @@ export class Crawl extends EventEmitter {
   private readonly throttle: HostThrottle;
   private readonly cache: PageCache;
   private readonly saturation?: Saturation;
+  /** Each URL is fetched once per crawl: redirects and repeats reuse the first answer. */
+  private readonly fetches = new Map<string, Promise<PageResult>>();
+  /** Canonical URLs of the pages kept so far; a second copy of one is dropped. */
+  private readonly canonicals = new Set<string>();
   private scope!: Scope;
   private fetched = 0;
   private active = 0;
@@ -320,7 +324,8 @@ export class Crawl extends EventEmitter {
     )
       return this.skip(item, "not modified since " + this.options.modifiedSince);
     try {
-      const result = await this.fetchPage(item, options);
+      const result = await this.fetchOnce(item, options);
+      if (this.duplicate(item, result)) return this.skip(item, "same page as its canonical URL");
       await this.record(item, result);
     } catch (error) {
       await this.record(item, this.failure(item, error));
@@ -393,6 +398,43 @@ export class Crawl extends EventEmitter {
       );
       if (!RETRYABLE.has(fetched.status) || attempt >= retries) return fetched;
     }
+  }
+
+  /** One network fetch per normalized URL during this crawl, including redirect targets. */
+  private async fetchOnce(item: FrontierItem, options: CrawlOptions): Promise<PageResult> {
+    const known = this.fetches.get(item.url);
+    if (known) return { ...(await known), url: item.url, depth: item.depth };
+    const pending = this.fetchPage(item, options);
+    this.fetches.set(item.url, pending);
+    const result = await pending;
+    const final = this.normalized(result.finalUrl);
+    if (final && final !== item.url) {
+      this.fetches.set(final, pending);
+      this.frontier.markSeen(final);
+    }
+    return result;
+  }
+
+  private normalized(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    try {
+      return normalizeUrl(url, this.options.ignoreQuery);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Whether a page with the same canonical URL (or that URL itself) was already kept. */
+  private duplicate(item: FrontierItem, result: PageResult): boolean {
+    if (result.error || result.status >= 400) return false;
+    const canonical = result.metadata?.canonical;
+    const key =
+      (typeof canonical === "string" ? this.normalized(canonical) : undefined) ??
+      this.normalized(result.finalUrl) ??
+      item.url;
+    if (this.canonicals.has(key)) return true;
+    this.canonicals.add(key);
+    return false;
   }
 
   /** Fetches with retries and the host's throttle; serves fresh cached copies. */
