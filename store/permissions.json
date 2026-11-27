@@ -1,0 +1,45 @@
+{
+  "$comment": "Locked copy of what Graft asks Chrome for (apps/chrome-extension/manifest.native.json). Any permission change must update this file and the reviewer text in store/listing.md in the same change; pnpm test:artifact-gate fails otherwise.",
+  "permissions": [
+    "nativeMessaging",
+    "storage",
+    "tabs",
+    "sidePanel",
+    "debugger",
+    "contextMenus",
+    "notifications",
+    "userScripts",
+    "scripting",
+    "webNavigation",
+    "downloads",
+    "offscreen",
+    "tabGroups",
+    "alarms",
+    "cookies",
+    "declarativeNetRequest",
+    "clipboardWrite"
+  ],
+  "optional_permissions": [
+    "tabCapture",
+    "history",
+    "bookmarks",
+    "contentSettings",
+    "privacy",
+    "clipboardRead"
+  ],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["orb-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["orb.html"],
+      "matches": ["http://*/*", "https://*/*"],
+      "use_dynamic_url": true
+    }
+  ]
+}
