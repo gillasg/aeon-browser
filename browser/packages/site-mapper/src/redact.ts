@@ -26,6 +26,23 @@ export interface Redactor {
   body(body: string | undefined): string | undefined;
 }
 
+/**
+ * A redaction rule too slow for one value hides the whole value: never leaks it, never aborts
+ * the export. A pattern that is invalid or over-long still says so.
+ */
+function redactWith(pattern: string, value: string): string {
+  try {
+    return boundedReplace(pattern, value, "<redacted>", {
+      flags: "g",
+      inputLimit: TEXT_CAP,
+      label: "redact pattern",
+    });
+  } catch (error) {
+    if (/took too long|regex budget/.test(String(error))) return "<redacted>";
+    throw error;
+  }
+}
+
 export function createRedactor(rules: Overrides["redact"] = {}): Redactor {
   const extraHeaders = (rules.headers ?? []).map((h) => h.toLowerCase());
   const extraKeys = new Set((rules.keys ?? []).map((k) => k.toLowerCase()));
@@ -39,12 +56,7 @@ export function createRedactor(rules: Overrides["redact"] = {}): Redactor {
         ? "<phone>"
         : match,
     );
-    for (const pattern of patterns)
-      out = boundedReplace(pattern, out, "<redacted>", {
-        flags: "g",
-        inputLimit: TEXT_CAP,
-        label: "redact pattern",
-      });
+    for (const pattern of patterns) out = redactWith(pattern, out);
     return out;
   };
   const json = <T>(value: T): T =>

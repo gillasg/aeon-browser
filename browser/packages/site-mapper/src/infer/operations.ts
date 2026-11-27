@@ -17,6 +17,7 @@ import {
 import { bodyConstants } from "./body-constants.js";
 import { inferSchema, shapeKey, similarity } from "./schema.js";
 import { camel, singular, templatePaths, type SegmentKind } from "./templates.js";
+import { undoubled } from "../sealed.js";
 
 // Groups exchanges into operations: one per method and path template, split further by GraphQL
 // operation, JSON-RPC method, action field, or a response shape that differs by a parameter.
@@ -269,9 +270,10 @@ function params(group: Group, skipQuery: Set<string>): Param[] {
   const headers = collectParams(
     "header",
     group.members.map((m) =>
-      Object.entries(m.exchange.requestHeaders).filter(
-        ([key]) => !STANDARD_HEADERS.test(key) && !isTelemetryHeader(key),
-      ),
+      Object.entries(m.exchange.requestHeaders)
+        .filter(([key]) => !STANDARD_HEADERS.test(key) && !isTelemetryHeader(key))
+        // Early and late capture can both record a header ("web, web"): keep one copy.
+        .map(([key, value]) => [key, undoubled(value)] as [string, string]),
     ),
     total,
   );

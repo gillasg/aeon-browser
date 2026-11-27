@@ -228,10 +228,18 @@ function analyticsHost(url: URL): boolean {
   );
 }
 
+// A pattern that is invalid or too slow on one odd URL (a localhost capture, a huge query) is no
+// match for that URL: one exchange never aborts a whole site rebuild.
+const safeTest = (pattern: string, href: string) => {
+  try {
+    return boundedTest(pattern, href, { flags: "i", label: "url pattern" });
+  } catch {
+    return false;
+  }
+};
+
 const matchesAny = (patterns: string[] | undefined, url: URL) =>
-  !!patterns?.some((pattern) =>
-    boundedTest(pattern, url.href, { flags: "i", label: "url pattern" }),
-  );
+  !!patterns?.some((pattern) => safeTest(pattern, url.href));
 
 function transportReason(exchange: Exchange): string | undefined {
   if (exchange.method === "OPTIONS") return "CORS preflight";

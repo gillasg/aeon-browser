@@ -56,9 +56,17 @@ export async function compileSiteOps(site: string): Promise<SiteOpsFile> {
   return file;
 }
 
-/** The compiled ops, compiling once when the site has no `api.json` yet. */
+/**
+ * The compiled ops. `model.json` is the source of truth: `api.json` is compiled when missing,
+ * and again when the model was rebuilt after it (a live learn, an inference refresh).
+ */
 export async function readSiteOps(site: string): Promise<SiteOpsFile> {
-  return (await readOpsFile(site)) ?? compileSiteOps(site);
+  const [file, model] = await Promise.all([
+    readOpsFile(site),
+    loadModel(siteName(site)).catch(() => undefined),
+  ]);
+  if (file && !(model && Date.parse(model.generatedAt) > Date.parse(file.compiledAt))) return file;
+  return compileSiteOps(site);
 }
 
 export function abilityOp(ability: Ability): SiteOp {

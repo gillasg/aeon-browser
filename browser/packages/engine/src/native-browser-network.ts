@@ -26,6 +26,7 @@ import { failuresOf, pathOf } from "./native-browser-network-failures.js";
 export { failuresOf } from "./native-browser-network-failures.js";
 import { describeWait, waitMatcher, type Waitable } from "./native-browser-network-wait.js";
 import { isTrackerUrl, takeLearned } from "./native-browser-network-learn.js";
+import { keepClosedTab } from "./native-browser-network-closed.js";
 import { rememberSessionHeaders, sessionHeadersFor } from "./native-browser-session-headers.js";
 import { hideSecrets } from "./native-browser-secrets.js";
 import { recordGlobalEntry } from "./network-store.js";
@@ -443,6 +444,7 @@ onEngineInstall(() => {
   chrome.tabs.onRemoved.addListener((tabId) => {
     const recorder = recorders.get(tabId) ?? stopped.get(tabId);
     if (recorder) cancelWaiters(recorder);
+    keepClosedTab(tabId, recorder);
     setCaptureActive(tabId, false);
     recorders.delete(tabId);
     stopped.delete(tabId);

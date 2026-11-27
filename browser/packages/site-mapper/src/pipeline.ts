@@ -55,9 +55,16 @@ async function save(workDir: string | undefined, stage: Stage, value: unknown): 
   await writeFile(join(workDir, `${index}-${stage}.json`), JSON.stringify(value, null, 2));
 }
 
+/**
+ * The inference rules' version. Raise it when a rule change should reach saved sites: a model
+ * built by older rules rebuilds itself from its stored flows the next time it is opened.
+ */
+export const INFERENCE_VERSION = 2;
+
 function emptyModel(options: BuildOptions, exchanges: Exchange[]): SiteModel {
   return {
     version: 1,
+    inferenceVersion: INFERENCE_VERSION,
     site: options.site,
     title: options.title ?? options.site,
     generatedAt: new Date().toISOString(),

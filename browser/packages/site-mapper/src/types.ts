@@ -277,6 +277,8 @@ export interface NoiseReport {
 
 export interface SiteModel {
   version: 1;
+  /** The inference rules that built it (INFERENCE_VERSION); older models rebuild from flows. */
+  inferenceVersion?: number;
   site: string;
   title: string;
   generatedAt: string;

@@ -14,6 +14,7 @@ import { sessionHeadersFor } from "./native-browser-session-headers.js";
 import { resetChatTabs, reapChatPopups } from "./native-browser-tab-cleanup.js";
 import { disableQuietTab, enableQuietTab } from "./native-browser-quiet.js";
 import { networkCall } from "./native-browser-network.js";
+import { takeClosedTabs } from "./native-browser-network-closed.js";
 import { streamsCall } from "./native-browser-streams.js";
 import { pushCall } from "./native-browser-push.js";
 import { pageGuard } from "./page-guard.js";
@@ -200,6 +201,13 @@ function tabEffects(host: EffectHost): Effect<Cell>[] {
       match: named("recording"),
       tab: target,
       run: (_, value, tabId = 0) => recordingCall(tabId, value),
+    },
+    {
+      // A closed tab cannot be authorized any more: only ids this cell names are handed over.
+      name: "net.closed",
+      match: (value) => value.network === "take-closed",
+      run: async (_, value) =>
+        takeClosedTabs(Array.isArray(value.tabs) ? value.tabs.filter(Number.isSafeInteger) : []),
     },
     {
       name: "net.capture",
