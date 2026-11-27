@@ -138,8 +138,30 @@ export async function callWithBundleHeal(
   throw failure;
 }
 
+/** What the agent sees of a heal: the old and new target and when, as a plain field. */
+export interface HealedReceipt {
+  from: string;
+  to: string;
+  at: string;
+}
+
+/**
+ * The answer with `healed` on it, so the receipt survives JSON over the bridge and MCP. A list
+ * or a plain value is wrapped as `{data, healed}`. The full receipt stays as a hidden
+ * `bundleHeal`.
+ */
 function withReceipt(result: unknown, bundleHeal: BundleHealReceipt | undefined): unknown {
-  if (!bundleHeal || !result || typeof result !== "object" || Array.isArray(result)) return result;
-  Object.defineProperty(result, "bundleHeal", { value: bundleHeal, enumerable: false });
-  return result;
+  if (!bundleHeal) return result;
+  const healed: HealedReceipt = {
+    from: bundleHeal.oldTarget,
+    to: bundleHeal.newTarget,
+    at: new Date().toISOString(),
+  };
+  const answer =
+    result && typeof result === "object" && !Array.isArray(result)
+      ? (result as Record<string, unknown>)
+      : { data: result };
+  answer.healed = healed;
+  Object.defineProperty(answer, "bundleHeal", { value: bundleHeal, enumerable: false });
+  return answer;
 }

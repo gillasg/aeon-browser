@@ -5,6 +5,7 @@ import { coverage } from "./coverage.js";
 import { formatDiff, diffModels } from "./diff.js";
 import { checkHealth, repair } from "./health.js";
 import { runMcpServer } from "./mcp.js";
+import { healingCall } from "./heal-call.js";
 import { operationInputs } from "./params.js";
 import { STAGES, type Stage } from "./pipeline.js";
 import { PassiveRecorder, RecordingSession } from "./record.js";
@@ -183,10 +184,23 @@ async function call(args: Args): Promise<void> {
     out(JSON.stringify(items, null, 2));
     return;
   }
-  const result = api.pageEndpoint(operation)
-    ? await api.fetchPage(operation, params as Record<string, string>)
-    : await api.call(operation, params);
+  const result = await callOnce(api, operation, params, transport);
+  const healed = (result as { healed?: { from: string; to: string } } | null)?.healed;
+  if (healed) process.stderr.write(`healed ${operation}: ${healed.from} → ${healed.to}\n`);
   out(typeof result === "string" ? result : JSON.stringify(result, null, 2));
+}
+
+/** A page endpoint, a pinned-transport call, or a call that heals a rotated endpoint. */
+function callOnce(
+  api: Awaited<ReturnType<typeof siteMapper>>,
+  operation: string,
+  params: ReturnType<typeof callParams>,
+  transport: string | undefined,
+): Promise<unknown> {
+  if (api.pageEndpoint(operation))
+    return api.fetchPage(operation, params as Record<string, string>);
+  if (transport) return api.call(operation, params);
+  return healingCall(api.site, operation, params);
 }
 
 async function watchCommand(args: Args, site: string): Promise<void> {

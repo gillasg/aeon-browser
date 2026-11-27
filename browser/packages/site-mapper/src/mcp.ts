@@ -2,11 +2,14 @@ import { createInterface } from "node:readline";
 import { explore } from "./explore.js";
 import { readDocs } from "./docs.js";
 import { watch } from "./watch.js";
-import { listSites, loadModel, readOverrides, siteName } from "./registry.js";
+import { listSites, readOverrides, siteName } from "./registry.js";
+import { loadCurrentModel } from "./model-refresh.js";
 import { siteMapper, type SiteMapper, type SiteMapperOptions } from "./runtime/site-mapper.js";
 import type { SiteAction } from "./runtime/actions.js";
 import type { ChannelOptions } from "./runtime/channels.js";
-import { isDerived } from "./params.js";
+import { describeOperation, paramDescription, paramRequired, visibleParams } from "./op-catalog.js";
+import { healingCall } from "./heal-call.js";
+import { provenWrites, writeLive } from "./live.js";
 import { listAbilities, runAbility, type Ability } from "./abilities.js";
 import { contentDigest } from "./ability-digest.js";
 import { abilityEffect, effectAnnotations, inferEffect, operationEffect } from "./effect.js";
@@ -18,16 +21,12 @@ import type { JsonSchema, Operation, PageEndpoint, Param, SiteModel } from "./ty
 type Json = Record<string, unknown>;
 const LIMIT = 60_000;
 
-function hiddenParam(param: Param): boolean {
-  return Boolean(param.constant) || Boolean(param.generated) || isDerived(param);
-}
-
-function paramProperty(param: Param): JsonSchema {
-  const example = param.examples?.[0];
-  return {
-    ...param.schema,
-    description: `${param.in} parameter${example ? `, e.g. ${example.slice(0, 60)}` : ""}`,
-  };
+function paramProperty(
+  model: Pick<SiteModel, "operations">,
+  op: Operation,
+  param: Param,
+): JsonSchema {
+  return { ...param.schema, description: paramDescription(model, op, param) };
 }
 
 function bodyProperties(operation: Operation): Record<string, JsonSchema> {
@@ -36,17 +35,29 @@ function bodyProperties(operation: Operation): Record<string, JsonSchema> {
     return { variables: properties.variables ?? { type: "object" } };
   // A body field that was the same in every recording is filled in on replay, not asked for.
   const constants = operation.requestBody?.constants ?? {};
-  return Object.fromEntries(Object.entries(properties).filter(([name]) => !(name in constants)));
+  const defaults = operation.requestBody?.defaults ?? {};
+  return Object.fromEntries(
+    Object.entries(properties)
+      .filter(([name]) => !(name in constants))
+      .map(([name, schema]) =>
+        name in defaults
+          ? [name, { ...schema, description: `optional, defaults to ${String(defaults[name])}` }]
+          : [name, schema],
+      ),
+  );
 }
 
-export function operationInputSchema(operation: Operation): Json {
-  return inputSchema(operation);
+export function operationInputSchema(
+  operation: Operation,
+  model: Pick<SiteModel, "operations"> = { operations: [operation] },
+): Json {
+  return inputSchema(operation, model);
 }
 
-function inputSchema(operation: Operation): Json {
+function inputSchema(operation: Operation, model: Pick<SiteModel, "operations">): Json {
   const properties: Record<string, JsonSchema> = {};
-  const visible = operation.params.filter((param) => !hiddenParam(param));
-  for (const param of visible) properties[param.name] = paramProperty(param);
+  const visible = visibleParams(operation);
+  for (const param of visible) properties[param.name] = paramProperty(model, operation, param);
   for (const [name, schema] of Object.entries(bodyProperties(operation)))
     properties[name] ??= schema;
   if (operation.pagination)
@@ -54,9 +65,19 @@ function inputSchema(operation: Operation): Json {
       type: "integer",
       description: "Fetch every page, up to this many items",
     };
-  const required = visible.filter((param) => param.in === "path").map((param) => param.name);
+  const required = visible.filter(paramRequired).map((param) => param.name);
   return { type: "object", properties, ...(required.length ? { required } : {}) };
 }
+
+/** The tool text: what it does, and for a write the page has not proven yet, how to unlock it. */
+function toolDescription(op: Operation, proven: ReadonlySet<string> | undefined): string {
+  const text = describeOperation(op);
+  const sentence = /[.!?]$/.test(text) ? text : `${text}.`;
+  if (op.role !== "action" || proven?.has(op.id)) return sentence;
+  return `${sentence} ${PROOF_NOTE}`;
+}
+
+export const PROOF_NOTE = "Do it once in the page; after that this tool repeats it.";
 
 function toolName(id: string): string {
   return id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
@@ -106,12 +127,19 @@ export function siteTools(
   model: SiteModel,
   saved: Record<string, SiteAction> = {},
   abilities: readonly Ability[] = [],
+  proven?: ReadonlySet<string>,
 ): Json[] {
   const ops = model.operations.map((op) => ({
     name: toolName(op.id),
-    description: `${op.summary ?? op.description ?? op.id}: ${op.method} ${op.path} on ${model.site} (${op.role}, ${op.bucket} confidence${op.capabilities?.length ? `, ${op.capabilities.join("/")}` : ""}).`,
-    inputSchema: inputSchema(op),
-    annotations: effectAnnotations(operationEffect(op)),
+    description: toolDescription(op, proven),
+    inputSchema: inputSchema(op, model),
+    annotations: {
+      ...effectAnnotations(operationEffect(op)),
+      method: op.method,
+      path: op.path,
+      host: model.site,
+      confidence: op.bucket,
+    },
   }));
   const pages = model.pages.map((page: PageEndpoint) => ({
     name: toolName(page.id),
@@ -268,13 +296,11 @@ const GENERAL_TOOLS: Json[] = [
 async function callTool(api: SiteMapper, operation: string, params: Json): Promise<unknown> {
   if (api.pageEndpoint(operation))
     return api.fetchPage(operation, params as Record<string, string>);
-  const { maxItems, ...rest } = params;
-  if (typeof maxItems === "number") {
-    const items: unknown[] = [];
-    for await (const item of api.paginate(operation, rest, { maxItems })) items.push(item);
-    return items;
-  }
-  return api.call(operation, rest);
+  const op = api.operation(operation);
+  // A write goes through the proof gate: proven once in the page, then repeated here.
+  if (op.role === "action") return writeLive(api.site, operation, params);
+  // maxItems pages through (or answers NO_PAGINATION) inside the call; a heal answers in the same call.
+  return healingCall(api.site, operation, params);
 }
 
 function watchTool(args: Json): Promise<unknown> {
@@ -290,7 +316,7 @@ function generalDispatch(
   return {
     list_sites: () => listSites(),
     list_operations: async (args) => {
-      const found = await loadModel(String(args.site));
+      const found = await loadCurrentModel(String(args.site));
       if (!found) throw new Error(`${String(args.site)} is not mapped`);
       return listOperations(
         found,
@@ -347,10 +373,11 @@ export async function runMcpServer(site?: string, options: SiteMapperOptions = {
     if (!apis.has(key)) apis.set(key, siteMapper(key, options));
     return apis.get(key) as Promise<SiteMapper>;
   };
-  const model = site ? await loadModel(site) : undefined;
+  const model = site ? await loadCurrentModel(site) : undefined;
   if (site && !model) throw new Error(`${siteName(site)} is not mapped yet.`);
   const saved = model ? ((await readOverrides(model.site)).actions ?? {}) : {};
   const abilities = model ? await listAbilities(model.site).catch(() => []) : [];
+  const proven = async () => (model ? await provenWrites(model.site) : new Set<string>());
   const siteTool = async (current: SiteModel, name: unknown, args: Json): Promise<unknown> => {
     const ids = [...current.operations.map((op) => op.id), ...current.pages.map((p) => p.id)];
     const id = ids.find((item) => toolName(item) === name);
@@ -372,7 +399,7 @@ export async function runMcpServer(site?: string, options: SiteMapperOptions = {
     if (message.method === "initialize") return initializeResult(params, model);
     if (message.method === "ping") return {};
     if (message.method === "tools/list")
-      return { tools: model ? siteTools(model, saved, abilities) : GENERAL_TOOLS };
+      return { tools: model ? siteTools(model, saved, abilities, await proven()) : GENERAL_TOOLS };
     if (message.method !== "tools/call")
       throw new Error(`Unsupported method: ${String(message.method)}`);
     const args = (params.arguments ?? {}) as Json;

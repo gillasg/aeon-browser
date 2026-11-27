@@ -130,3 +130,44 @@ export async function* paginate(
     sets = { ...sets, ...next };
   }
 }
+
+/** maxItems on an operation that was not learned with pages: say so instead of one page. */
+export class NoPagination extends Error {
+  readonly code = "NO_PAGINATION";
+  constructor(operationId: string) {
+    super(
+      `NO_PAGINATION: ${operationId} has no learned pages, so maxItems cannot be honoured. Call it without maxItems for its one page.`,
+    );
+    this.name = "NoPagination";
+  }
+}
+
+/**
+ * Splits `maxItems` off a call's params. Undefined when it was not passed (or the operation has
+ * a real input of that name); throws NO_PAGINATION when the operation has no pages.
+ */
+export function takeMaxItems(
+  operation: Operation,
+  params: Params,
+): { maxItems: number; rest: Params } | undefined {
+  if (!("maxItems" in params) || operation.params.some((param) => param.name === "maxItems"))
+    return undefined;
+  const { maxItems, ...rest } = params;
+  if (!operation.pagination) throw new NoPagination(operation.id);
+  const count = Number(maxItems);
+  if (!Number.isFinite(count) || count < 1)
+    throw new Error(`${operation.id}: maxItems must be a positive number`);
+  return { maxItems: Math.floor(count), rest };
+}
+
+/** Every page up to `maxItems` items, as one list. */
+export async function collectPages(
+  caller: Caller,
+  operation: Operation,
+  params: Params,
+  maxItems: number,
+): Promise<unknown[]> {
+  const items: unknown[] = [];
+  for await (const item of paginate(caller, operation, params, { maxItems })) items.push(item);
+  return items;
+}

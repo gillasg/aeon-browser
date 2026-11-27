@@ -1,3 +1,4 @@
+import { mergeRotated } from "./rotated-merge.js";
 import { appendFile, chmod, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -196,10 +197,12 @@ export interface SaveResult {
 }
 
 /** Writes the model and everything generated from it; a new version only when the API changed. */
-export async function saveModel(model: SiteModel, overrides: Overrides = {}): Promise<SaveResult> {
-  const dir = siteDir(model.site);
+export async function saveModel(given: SiteModel, overrides: Overrides = {}): Promise<SaveResult> {
+  const dir = siteDir(given.site);
   await mkdir(join(dir, "versions"), { recursive: true });
-  const previous = await loadModel(model.site);
+  const previous = await loadModel(given.site);
+  // A same-name GraphQL operation under a new hash replaces the old one (merge on re-learn).
+  const model = mergeRotated(given, previous);
   const diff = diffModels(previous, model);
   const index = (await readJson<VersionEntry[]>(join(dir, "versions", "index.json"))) ?? [];
   const changed = !previous || !isEmptyDiff(diff);

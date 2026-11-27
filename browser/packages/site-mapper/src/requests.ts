@@ -1,15 +1,17 @@
-import { code } from "./code.js";
 import { sourceMaps } from "./sourcemap-read.js";
 import { operationEffect } from "./effect.js";
 import { formatPace, paceExpectedMs, setBatchRate } from "./pace.js";
-import { listSites, loadModel, readOverrides, saveModel, siteName } from "./registry.js";
+import { listSites, siteName } from "./registry.js";
+import { loadCurrentModel } from "./model-refresh.js";
+import { liveHealDeps, healingCall } from "./heal-call.js";
+import { describeOperation, filledDefaults, paramRequired, visibleParams } from "./op-catalog.js";
+import { code } from "./code.js";
 import { HEAL_TIMEOUT, healDeadlineMs, withDeadline } from "./deadline.js";
-import { callWithBundleHeal, healOpFromBundle, type BundleHealDeps } from "./bundle-heal-run.js";
-import type { SiteModel } from "./types.js";
+import { healOpFromBundle } from "./bundle-heal-run.js";
 import type { Params } from "./runtime/request.js";
 import { siteMapper } from "./runtime/site-mapper.js";
 import { watch } from "./watch.js";
-import { learnLive, undoLive, writeLive } from "./live.js";
+import { learnBlocked, learnLive, undoLive, writeLive } from "./live.js";
 import { rewindForOperation } from "./rewind.js";
 
 // Requests from browser code (the `siteMapper` global in browserkit's runtime): a
@@ -61,28 +63,31 @@ function required(value: unknown, what: string): string {
 }
 
 async function operations(site: string): Promise<unknown> {
-  const model = await loadModel(site);
-  if (!model) throw new Error(`${site} is not mapped yet`);
-  return model.operations.map((op) => ({
-    id: op.id,
-    what: op.summary,
-    method: op.method,
-    path: op.path,
-    effect: operationEffect(op),
-    ...(op.role === "action" ? { writes: true } : {}),
-    ...(op.steps?.[0] ? { sentBy: op.steps[0] } : {}),
-    params: op.params.filter((p) => !p.constant && !p.generated).map((p) => p.name),
-  }));
+  const model = await loadCurrentModel(site);
+  if (!model) throw new Error((await learnBlocked(site)) ?? `${site} is not mapped yet`);
+  return model.operations.map((op) => {
+    const defaults = filledDefaults(op);
+    return {
+      id: op.id,
+      what: describeOperation(op),
+      method: op.method,
+      path: op.path,
+      effect: operationEffect(op),
+      ...(op.role === "action" ? { writes: true } : {}),
+      ...(op.steps?.[0] ? { sentBy: op.steps[0] } : {}),
+      params: visibleParams(op).map((p) => p.name),
+      ...(visibleParams(op).some((p) => !paramRequired(p))
+        ? {
+            optional: visibleParams(op)
+              .filter((p) => !paramRequired(p))
+              .map((p) => p.name),
+          }
+        : {}),
+      ...(defaults.length ? { defaults } : {}),
+      ...(op.pagination ? { paginated: true } : {}),
+    };
+  });
 }
-
-/** Bundle repair against the saved model, the live bundles and the mapped runtime. */
-const liveHealDeps: BundleHealDeps = {
-  loadModel,
-  saveModel: async (model: SiteModel) => saveModel(model, await readOverrides(model.site)),
-  bundle: async (site, op) => (await code(op.origin || site, { bundle: true })).bundle,
-  call: async (site, id, params, model) =>
-    (await siteMapper(site, model ? { model } : {})).call(id, params),
-};
 
 type Handler = (site: string, request: SiteMapperRequest) => Promise<unknown>;
 
@@ -110,12 +115,7 @@ const HANDLERS: Record<
   rewind: async (site, request) =>
     (await rewindForOperation(site, required(request.operation, "operation"))) ?? null,
   call: (site, request) =>
-    callWithBundleHeal(
-      site,
-      required(request.operation, "operation"),
-      request.params ?? {},
-      liveHealDeps,
-    ),
+    healingCall(site, required(request.operation, "operation"), request.params ?? {}),
   heal: (site, request) =>
     withDeadline(
       healOpFromBundle(

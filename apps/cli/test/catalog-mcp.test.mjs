@@ -128,7 +128,8 @@ test("graft mcp lists a fixture operation, calls it, and notices a catalog chang
   assert.ok(opTool, names.filter((name) => name.startsWith("site__")).join(", "));
   assert.equal(opTool.annotations.readOnlyHint, true);
   assert.equal(opTool.annotations.destructiveHint, false);
-  assert.match(opTool.description, /Returns the operation/);
+  assert.match(opTool.description, /returns items \(read\)/);
+  assert.doesNotMatch(opTool.description, /\bGET\b|127\.0\.0\.1/);
   const ability = tools.find((tool) => tool.name === "site__127_0_0_1__listSaved");
   assert.ok(ability);
   assert.match(ability.description, /Returns \{result, via\}/);
