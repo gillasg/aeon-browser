@@ -16,7 +16,7 @@ export {
   waitForIdleUntil,
   type IdleResult,
 };
-import type { BrowserExecutorRequest } from "@browserkit/protocol";
+import { chromeNetErrorCode, type BrowserExecutorRequest } from "@browserkit/protocol";
 import { BrowserActionError } from "./native-browser-common.js";
 import { withContextRetry } from "./cdp/context-retry.js";
 import { callClass, send } from "./cdp/send.js";
@@ -504,7 +504,10 @@ export async function navigateReady(
           clean();
           reject(
             policyBlockedError(event.error, event.url || url) ??
-              new BrowserActionError("CHROME_ERROR", "navigation failed: " + event.error),
+              new BrowserActionError(
+                chromeNetErrorCode(event.error) ?? "CHROME_ERROR",
+                "navigation failed: " + event.error,
+              ),
           );
         }
       };

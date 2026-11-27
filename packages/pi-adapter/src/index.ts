@@ -39,6 +39,9 @@ export {
   type SiteRulesAnswer,
   type SiteRulesProvider,
   useLiveViews,
+  useChangeSets,
+  changeSetsRequest,
+  type ChangeSetsStore,
 } from "./browser-host-requests.js";
 export { exploreForRoutine } from "./site-mapping.js";
 export { cellWorkspaceCall } from "./browser-workspace.js";

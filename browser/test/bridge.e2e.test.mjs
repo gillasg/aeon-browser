@@ -566,7 +566,7 @@ test(
           await artifact("hello.txt", "from the workspace");
           const read = await browser.workspace.read("hello.txt");
           const listed = await browser.workspace.list("");
-          const slow = await page.navigate(${JSON.stringify(siteUrl + "slow")}, { timeoutMs: 900 });
+          const slow = await page.navigate(${JSON.stringify(siteUrl + "slow")}, { timeoutMs: 900 }).catch((error) => ({ error: String(error && error.message || error) }));
           console.log("SURFACES " + JSON.stringify({
             manifest,
             funcs: funcs.filter((fn) => fn.name === "publicFunction"),
@@ -593,7 +593,12 @@ test(
           );
           assert.equal(value.read, "from the workspace", stdout);
           assert.ok(value.listed.includes("hello.txt"), stdout);
-          assert.ok(value.slow?.timedOut === true || value.slow?.data?.timedOut === true, stdout);
+          assert.ok(
+            value.slow?.timedOut === true ||
+              value.slow?.data?.timedOut === true ||
+              /TIMEOUT:.*still shows/.test(value.slow?.error ?? ""),
+            stdout,
+          );
 
           const kept = await cell(
             `page = await browser.keepPage(${JSON.stringify(siteUrl + "?kept-warm")}); page.target.tabId`,

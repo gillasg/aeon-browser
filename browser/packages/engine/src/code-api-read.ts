@@ -78,9 +78,24 @@ async function __pageRead(base, target, options) {
   return __readFinish(base, target, options, {batch, more, max, deadline, timedOut, readKey});
 }
 
+// A short page (an old portal laid out with tables or frames) has little but its menus and side
+// text, so dropping "boilerplate" leaves almost nothing. When the main-content read kept under
+// half of a short page's visible text, read the whole page instead.
+async function __keepShortPage(base, options, batch, max, timedOut) {
+  if (options.selector || options.mainOnly !== undefined || timedOut()) return null;
+  var bodyChars = Number(batch.probe && batch.probe.bodyChars) || 0;
+  var kept = String(batch.markdown.markdown || '').replace(/\\]\\([^)]*\\)/g, ']').replace(/\\s+/g, ' ').trim().length;
+  if (bodyChars < 80 || bodyChars > 4000 || kept >= bodyChars * 0.5) return null;
+  var whole = await base.inspect('(' + __compact(__readMarkdown) + ')(' + JSON.stringify({...options, max, mainOnly: false}) + ')').catch(() => null);
+  var wholeText = whole && String(whole.markdown || '').replace(/\\]\\([^)]*\\)/g, ']').replace(/\\s+/g, ' ').trim();
+  return wholeText && wholeText.length > kept + 40 ? whole : null;
+}
+
 async function __readFinish(base, target, options, run) {
   var {batch, more, max, deadline, timedOut, readKey} = run;
   var markdown = batch.markdown, fallbackNote;
+  var whole = await __keepShortPage(base, options, batch, max, timedOut);
+  if (whole) { markdown = whole; fallbackNote = 'short page: kept its navigation and side text'; }
   var mdBody = String(markdown.markdown || '').replace(/^#\\s+.*$/m, '').replace(/\\s+/g, ' ').trim();
   // Near-empty Markdown on a page with more text: fall back to the accessibility summary.
   if (mdBody.length < 40 && batch.probe.bodyChars > mdBody.length + 40 && !timedOut()) {

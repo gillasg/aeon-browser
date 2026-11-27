@@ -263,7 +263,7 @@ export function describeError(code: string, detail = "", ctx?: ErrorContext): st
     ? ABILITY_REPAIR_HINT
     : learn
       ? `no learned API yet. Fastest learn: ${learn} (search, product, price, link; one site). Until then, read the page.`
-      : protectedPageHint(code, detail) || errorHint(code);
+      : protectedPageHint(code, detail) || networkHint(code, detail) || errorHint(code);
   const next = repair || learn || protectedPageNext(code, detail) || errorNextCall(code, ctx);
   return [
     head,
@@ -284,6 +284,33 @@ function protectedPageHint(code: string, detail: string): string {
 function protectedPageNext(code: string, detail: string): string {
   if (code !== "PROTECTED_UI" || !CHROME_PAGE.test(detail)) return "";
   return "ask_user: That is a Chrome settings page, which I cannot open or change. Could you make that change yourself?";
+}
+
+// Chrome's own connection failures: the proxy, the TLS certificate, or the route to the site. None
+// of them is Chrome refusing the step, so they are NETWORK, each with what actually went wrong.
+const NET_ERROR: ReadonlyArray<[RegExp, string]> = [
+  [
+    /net::ERR_(SOCKS|PROXY|TUNNEL)_\w+/,
+    "the proxy between this browser and the site failed: retry once; if it keeps failing, the proxy is down, so tell the user",
+  ],
+  [
+    /net::ERR_(CERT|SSL)_\w+|net::ERR_BAD_SSL_CLIENT_AUTH_CERT/,
+    "the site's security certificate was refused (expired, wrong name or untrusted): do not retry; report it",
+  ],
+  [
+    /net::ERR_(NAME_NOT_RESOLVED|NAME_RESOLUTION_FAILED|CONNECTION_\w+|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|NETWORK_CHANGED|TIMED_OUT|EMPTY_RESPONSE)/,
+    "the site could not be reached: retry once, then report it",
+  ],
+];
+
+/** NETWORK for Chrome's net::ERR_* connection, proxy and certificate failures; else undefined. */
+export function chromeNetErrorCode(message: string): "NETWORK" | undefined {
+  return NET_ERROR.some(([pattern]) => pattern.test(message)) ? "NETWORK" : undefined;
+}
+
+function networkHint(code: string, detail: string): string {
+  if (code !== "NETWORK") return "";
+  return NET_ERROR.find(([pattern]) => pattern.test(detail))?.[1] ?? "";
 }
 
 /** The code a failure is sent with: its own when the catalog knows it, else its shared one, else CHROME_ERROR. */
@@ -356,6 +383,8 @@ export const ERROR_ALIASES: Readonly<Record<string, ErrorCode>> = {
   ACT_REPLAY_PARTIAL: "EXPECTATION_FAILED",
   NEEDS_MODEL: "UNSUPPORTED",
   MODEL_FAILED: "NETWORK",
+  // bu.signIn(): the form did not react to the submit (a captcha or a disabled button).
+  SUBMIT_NO_EFFECT: "SITE_BROKEN",
   INVALID_PERMISSION: "INVALID_INPUT",
   INVALID_CDP_COMMAND: "INVALID_INPUT",
   INVALID_QUERY: "INVALID_INPUT",
@@ -504,6 +533,10 @@ const NAMED: ReadonlyArray<[RegExp, ErrorCode]> = [
   [/^No page is open yet/, "INVALID_TARGET"],
   [/before using an id/, "STALE_REF"],
   [/^Failed to fetch$/, "NETWORK"],
+  [
+    /net::ERR_(SOCKS|PROXY|TUNNEL|CERT|SSL|NAME_NOT_RESOLVED|CONNECTION|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|TIMED_OUT)/,
+    "NETWORK",
+  ],
   // Mapped sites' and abilities' own codes.
   [
     /^(SITE_TOOL_(INVALID|PARAMS)|SITE_TOOLS_TOO_LARGE|INVALID_ABILITY_NAME|INVALID_ARGUMENT|MODEL_REQUIRED|YOUTUBE_URL|ABILITY_(EXISTS|BAD_WAY|BAD_SCRIPT|NO_WAYS|INPUT_UNUSED|CONTRACT_WEAKENED|BAD_CURSOR|TEST_WRITE))\b/,

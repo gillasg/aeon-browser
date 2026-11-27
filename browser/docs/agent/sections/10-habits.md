@@ -34,6 +34,16 @@
   location everywhere. Say per store what you saw (price, stock, delivery, location shown), and
   which store did not have it and why.
 
+## Watching for changes
+
+`await browser.changes(name, items, {key})` answers `{first, new, changed, gone, count}` against the
+last call with that name. A watcher's sets are kept by Graft per watcher (per chat outside one), so
+a check still compares against its last run after Graft or the browser restarts. When the read
+failed, pass `{failed: true}`; when the page answered HTTP 400 or more (`await page.status()`), the
+call answers `{skipped: true}` on its own. Either way the last set is kept, so an error page never
+reports every item as gone. A check only sees the state at each run: a value that goes A → B → A
+between two checks is never reported, so check as often as the change matters.
+
 ## Finishing
 
 Check every part of the request (each site, field, filter, count and format) against what you saw;

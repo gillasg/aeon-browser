@@ -1,3 +1,4 @@
+import { onChallengePage } from "./native-browser-challenge-page.js";
 import { assertTabLocks } from "./native-browser-tab-locks.js";
 import { tier0Step } from "./native-browser-tier0-step.js";
 import { armVendorKinematics } from "./antibot-vendors.js";
@@ -277,8 +278,11 @@ export async function performExtra(
       await revalidate(request, tabId);
       if (step.op === "settle") {
         const settle = await settleBrowserPage(debuggee, step.timeoutMs, Date.now(), step.quietMs);
+        // A bot check is quiet while it works: a sleep waits it out in full.
+        const challenge = settle.why === "quiet" && (await onChallengePage(debuggee));
         return {
-          settled: settle.why === "quiet",
+          settled: settle.why === "quiet" && !challenge,
+          ...(challenge ? { challenge: true } : {}),
           why: settle.why,
           waitedMs: settle.ms,
           pending: settle.pending,
@@ -619,11 +623,12 @@ async function afterSettle<T>(debuggee: chrome.debugger.Debuggee, run: () => Pro
   return value;
 }
 async function dispatchStep(
-  request: BrowserExecutorRequest,
+  given: BrowserExecutorRequest,
   step: BrowserStep,
   tab: chrome.tabs.Tab,
 ): Promise<BrowserExecutorResult> {
-  await guardPageCode(step);
+  // The guard's own reload gives the tab a new document: the step stays bound to the same tab.
+  const request = (await guardPageCode(step)) ? await rebound(given, step) : given;
   if (step.op === "dialog") return dialogExpectResult(step);
   if (isCapabilityStep(step)) return performCapability({ ...request, step }, revalidateTarget);
   if (step.op === "observe" || step.op === "navigate")
@@ -638,6 +643,16 @@ async function dispatchStep(
   if (isPageAction(step)) return performAction({ ...request, step }, revalidateTarget);
   if (isExtraStep(step)) return performExtra({ ...request, step }, revalidateTarget);
   throw new Error("UNSUPPORTED");
+}
+async function rebound(
+  request: BrowserExecutorRequest,
+  step: BrowserStep,
+): Promise<BrowserExecutorRequest> {
+  if (!isTargetStep(step)) return request;
+  const fresh = await refreshInventoryTab(step.target.tabId).catch(() => undefined);
+  return fresh && sameTarget(fresh.target, step.target)
+    ? { ...request, expectedDocumentEpoch: fresh.documentEpoch }
+    : request;
 }
 // Chrome reports activation only for a focused window: ask each window at list time.
 async function assertTarget(request: BrowserExecutorRequest): Promise<chrome.tabs.Tab> {

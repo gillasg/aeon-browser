@@ -246,10 +246,10 @@ function hidePasswordValues(state: ProbeState): void {
 /**
  * Hides a password the agent did not type, then lets the step run. Once no field holds one any
  * more (the sign-in went through, often without a new document), the page is reloaded, which
- * clears what it kept in memory, and the step runs.
+ * clears what it kept in memory, and the step runs. True when it reloaded the page.
  */
-export async function guardPageCode(step: BrowserStep): Promise<void> {
-  if (!runsPageCode(step) || !("target" in step)) return;
+export async function guardPageCode(step: BrowserStep): Promise<boolean> {
+  if (!runsPageCode(step) || !("target" in step)) return false;
   const tabId = step.target.tabId;
   await typed.ready;
   await vaultFilled.ready;
@@ -264,9 +264,10 @@ export async function guardPageCode(step: BrowserStep): Promise<void> {
     // The field was emptied or the document replaced: the page is open to code again.
     vaultFilled.delete(tabId);
   }
-  if (!state.password || state.filled) return;
+  if (!state.password || state.filled) return false;
   await reload(tabId);
   hidePasswordValues(await checkedProbe(tabId));
+  return true;
 }
 
 /** Chrome's answer when the page's document went away mid-check (it navigated, reloaded or was discarded). */

@@ -20,7 +20,8 @@ import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
 import { handleCoreFilm } from "./film-relay.js";
 import { handleCoreLive, liveViewCall, liveViews } from "./live-view-route.js";
-import { useLiveViews } from "@graft/pi-adapter";
+import { useChangeSets, useLiveViews } from "@graft/pi-adapter";
+import { SqliteChangeSetsStore } from "@graft/store";
 import { handleBlockedSites } from "./core-blocked-sites.js";
 import { handleBrowsers, handleChatPin, pin } from "./core-browsers.js";
 import { sessionChatId } from "@graft/pi-adapter";
@@ -42,6 +43,8 @@ export async function startCoreTransport(
 ): Promise<{ close(): Promise<void> }> {
   const token = randomBytes(32).toString("base64url");
   useLiveViews(liveViewCall);
+  const changeSets = new SqliteChangeSetsStore(directory);
+  useChangeSets(changeSets);
   const server = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -80,6 +83,8 @@ export async function startCoreTransport(
       await unlink(path).catch(() => undefined);
       // Viewers belong to this daemon: they close with it.
       await liveViews.closeAll();
+      useChangeSets(undefined);
+      changeSets.close();
       for (const socket of server.clients) socket.terminate();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
