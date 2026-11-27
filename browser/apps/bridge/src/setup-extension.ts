@@ -12,7 +12,7 @@ import { dataDirectory } from "./paths.js";
 // Chromium browser that is installed, with the folder's path on the clipboard, and three numbered
 // steps say what to click while setup waits for the extension to connect.
 
-const RELEASES = "https://api.github.com/repos/gillasg/aeon-browser/releases/latest";
+const RELEASES = "https://api.github.com/repos/gillasg/graft/releases/latest";
 
 /** Built extension folders in a source checkout, best first: Graft's own, then browserkit's. */
 export function sourceBuilds(base: string = import.meta.url): string[] {

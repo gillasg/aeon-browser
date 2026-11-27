@@ -38,10 +38,10 @@ The MCP server exposes `browser_code`, `browser_tabs`, `browser_context`, `crawl
 
 ## Install
 
-| OS                   | One-line install                                                                          |
-| -------------------- | ----------------------------------------------------------------------------------------- |
-| Windows (PowerShell) | `irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 \| iex`      |
-| macOS / Linux        | `curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh \| sh` |
+| OS                   | One-line install                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| Windows (PowerShell) | `irm https://raw.githubusercontent.com/gillasg/graft/main/install.ps1 \| iex`      |
+| macOS / Linux        | `curl -fsSL https://raw.githubusercontent.com/gillasg/graft/main/install.sh \| sh` |
 
 The installer builds Graft, installs the background service and the `graft` command, then runs `graft setup`, which opens `chrome://extensions` with the extension folder on your clipboard. Chrome requires three clicks, once:
 

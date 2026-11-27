@@ -36,7 +36,7 @@ What Graft can do:
   computer, has no server and no tracking, and asks before using extra permissions.
 
 Graft needs its free companion program on your computer. Setup steps:
-https://github.com/gillasg/aeon-browser
+https://github.com/gillasg/graft
 
 ## Single purpose
 
@@ -204,4 +204,4 @@ and connects, directly from their computer, to carry out the task they asked for
 ## Privacy policy URL
 
 Use the public link to `store/privacy-policy.md` on the default branch:
-https://github.com/gillasg/aeon-browser/blob/main/store/privacy-policy.md
+https://github.com/gillasg/graft/blob/main/store/privacy-policy.md

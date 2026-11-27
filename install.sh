@@ -1,14 +1,14 @@
 #!/bin/sh
 # Installs Graft on macOS and Linux with one line:
 #
-#   curl -fsSL https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/gillasg/graft/main/install.sh | sh
 #
 # Installs Git, Node.js and pnpm when they are missing, fetches Graft (or updates it), builds it,
 # installs the native host, the Chrome manifests and the login service, then presents the
 # extension. Windows uses install.ps1.
 set -eu
 
-REPO="${GRAFT_REPO:-https://github.com/gillasg/aeon-browser.git}"
+REPO="${GRAFT_REPO:-https://github.com/gillasg/graft.git}"
 if [ -n "${GRAFT_DIR:-}" ]; then
   DIR="$GRAFT_DIR"
 elif [ "$(uname -s)" = "Darwin" ]; then

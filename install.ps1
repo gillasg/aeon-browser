@@ -1,13 +1,13 @@
 # Installs Graft on Windows with one line in PowerShell:
 #
-#   irm https://raw.githubusercontent.com/gillasg/aeon-browser/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/gillasg/graft/main/install.ps1 | iex
 #
 # Installs Git and Node.js with winget when they are missing, then pnpm, fetches Graft (or updates
 # it), builds it and sets it up. What is left is loading the extension: Chrome opens on
 # chrome://extensions with the folder path on the clipboard.
 $ErrorActionPreference = 'Stop'
 $dir = if ($env:GRAFT_DIR) { $env:GRAFT_DIR } else { Join-Path $env:LOCALAPPDATA 'Graft\graft-browser' }
-$repo = 'https://github.com/gillasg/aeon-browser.git'
+$repo = 'https://github.com/gillasg/graft.git'
 
 function Refresh-Path {
   $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')

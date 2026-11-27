@@ -27,7 +27,7 @@ const page = await scrape("https://shop.example/p/lamp", { formats: ["markdown",
 ## Requirements
 
 - Node.js 22.19 or newer.
-- For browser fetching: Chrome or Edge with [Graft](https://github.com/gillasg/aeon-browser) installed. Without it, everything runs over plain HTTP. Apps that already drive a browser can use theirs instead: `useBrowser({ run, status, close })`, where `run(code, { session, timeoutMs })` runs browser code.
+- For browser fetching: Chrome or Edge with [Graft](https://github.com/gillasg/graft) installed. Without it, everything runs over plain HTTP. Apps that already drive a browser can use theirs instead: `useBrowser({ run, status, close })`, where `run(code, { session, timeoutMs })` runs browser code.
 
 ## Commands
 
@@ -37,7 +37,7 @@ const page = await scrape("https://shop.example/p/lamp", { formats: ["markdown",
 | `map <url>`                      | A fast list of a site's URLs from its sitemaps and links. `--search` ranks them by a phrase.                           |
 | `crawl <url>`                    | A whole site, or the part you choose. Ctrl+C pauses; `--resume` continues.                                             |
 | `crawl --prompt "<request>"`     | Describe the crawl in plain English (needs a model).                                                                   |
-| `crawl --api <site>:<operation>` | Every item of a paginated operation of a site Graft has mapped (needs a host that installs the adapter).                |
+| `crawl --api <site>:<operation>` | Every item of a paginated operation of a site Graft has mapped (needs a host that installs the adapter).               |
 | `sync <url> <folder>`            | A Markdown mirror that only re-fetches pages that changed and removes pages that are gone.                             |
 | `search "<query>"`               | Google in your browser (your region and language). `--scrape` reads the results too.                                   |
 | `find "<query>"`                 | Build a list: search, keep results that meet `--criteria`, fill `--columns name,founded=year founded` (needs a model). |
