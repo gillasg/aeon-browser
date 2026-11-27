@@ -37,6 +37,7 @@ import { browserDemoClawsApi } from "./code-api-demo-claws.js";
 import { browserPosthocNetApi } from "./code-api-posthoc-net.js";
 import { browserCauseApi } from "./code-api-cause.js";
 import { browserPickApi } from "./code-api-pick.js";
+import { browserLiveViewApi } from "./code-api-live-view.js";
 
 /** The whole runtime, evaluated into each fresh realm before its first cell. */
 export function realmRuntimeSource(evaluate: (source: string) => unknown): void {
@@ -49,6 +50,7 @@ export function realmRuntimeSource(evaluate: (source: string) => unknown): void 
       browserTimingApi,
       browserCodeApi,
       browserSitesApi,
+      browserLiveViewApi,
       browserContextApi,
       browserSnipeApi,
       browserProfilesApi,

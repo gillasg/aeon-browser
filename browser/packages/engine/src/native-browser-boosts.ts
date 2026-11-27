@@ -26,7 +26,7 @@ export function isBoostsRequest(value: Request | null): boolean {
 export async function boostsCall(value: Request): Promise<unknown> {
   const result = await boostsCallOnce(value);
   // Wire rules follow every change at once, so an undo stops the interception too.
-  if (value.boosts !== "list" && value.boosts !== "get")
+  if (!["list", "get", "viewAdd", "viewRemove"].includes(String(value.boosts)))
     await syncAllWireTabs().catch(() => undefined);
   return result;
 }
@@ -40,6 +40,12 @@ async function boostsCallOnce(value: Request): Promise<unknown> {
   if (value.boosts === "save") {
     const boost = (value.boost ?? {}) as Request;
     return withScriptWarning(await engine.save(boost), boost);
+  }
+  // A live viewer browser.liveView.start opened: boosts push to it, its token stays here.
+  if (value.boosts === "viewAdd") return engine.rememberView((value.view ?? {}) as Request);
+  if (value.boosts === "viewRemove") {
+    await engine.forgetView(id);
+    return { forgotten: id };
   }
   if (value.boosts === "remove") {
     await engine.remove(id);
@@ -59,14 +65,25 @@ async function boostsCallOnce(value: Request): Promise<unknown> {
 
 // Boost scripts run as user scripts, which Chrome only allows once the user switches on "Allow
 // User Scripts" for this extension. Without it a saved script silently never runs, so say so.
-async function withScriptWarning(saved: unknown, boost: Request): Promise<unknown> {
-  if (typeof boost.js !== "string" || !boost.js.trim() || (await userScriptsAllowed()))
-    return saved;
-  const warning =
-    "USER_SCRIPTS_OFF: the boost was saved, but its js will not run until the user turns on " +
-    '"Allow User Scripts" for this extension (chrome://extensions > Details). Its css, zaps, ' +
-    "actions and network rules apply already. Tell the user.";
-  return saved && typeof saved === "object" ? { ...saved, warning } : { saved, warning };
+// Every save-time finding is in `warnings` ({code, message}); `warning` joins their messages.
+async function withScriptWarning(
+  saved: { warnings?: { code: string; message: string }[] },
+  boost: Request,
+): Promise<unknown> {
+  const warnings = [...(saved.warnings ?? [])];
+  if (typeof boost.js === "string" && boost.js.trim() && !(await userScriptsAllowed()))
+    warnings.unshift({
+      code: "USER_SCRIPTS_OFF",
+      message:
+        "USER_SCRIPTS_OFF: the boost was saved, but its js will not run until the user turns on " +
+        '"Allow User Scripts" for this extension (chrome://extensions > Details). Its css, zaps, ' +
+        "actions and network rules apply already. Tell the user.",
+    });
+  const { warnings: _old, ...rest } = saved;
+  void _old;
+  return warnings.length
+    ? { ...rest, warnings, warning: warnings.map((w) => w.message).join("\n") }
+    : { ...rest, warnings };
 }
 async function userScriptsAllowed(): Promise<boolean> {
   try {

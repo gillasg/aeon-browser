@@ -19,6 +19,8 @@ import { attachDevChatCommands } from "./dev-chat-connection.js";
 import { watchSocketHealth } from "./socket-health.js";
 import { relayAgentSettings } from "./agent-settings.js";
 import { handleCoreFilm } from "./film-relay.js";
+import { handleCoreLive, liveViewCall, liveViews } from "./live-view-route.js";
+import { useLiveViews } from "@graft/pi-adapter";
 import { handleBlockedSites } from "./core-blocked-sites.js";
 import { handleBrowsers, handleChatPin, pin } from "./core-browsers.js";
 import { sessionChatId } from "@graft/pi-adapter";
@@ -39,6 +41,7 @@ export async function startCoreTransport(
   activity: () => ActivityCounts = idleActivity,
 ): Promise<{ close(): Promise<void> }> {
   const token = randomBytes(32).toString("base64url");
+  useLiveViews(liveViewCall);
   const server = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -75,6 +78,8 @@ export async function startCoreTransport(
   return {
     close: async () => {
       await unlink(path).catch(() => undefined);
+      // Viewers belong to this daemon: they close with it.
+      await liveViews.closeAll();
       for (const socket of server.clients) socket.terminate();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
@@ -152,6 +157,7 @@ function routeAuthenticated(
     () => handleChatStop(socket, candidate, service, browser),
     () => handleSettings(socket, candidate, browser),
     () => handleCoreFilm(socket, candidate, () => browser.executorSockets()),
+    () => handleCoreLive(socket, candidate),
     () => handleBrowserRun(socket, candidate, browser, directory),
     () => handleCdpRequest(socket, candidate, browser, directory),
     () => handleModelComplete(socket, candidate, service),

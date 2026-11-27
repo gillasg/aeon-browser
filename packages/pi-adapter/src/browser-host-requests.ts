@@ -28,15 +28,32 @@ export interface HostHandlerOptions {
   extra?: (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined;
 }
 
+type LiveViews = (request: { liveView: string } & Record<string, unknown>) => Promise<unknown>;
+let liveViews: LiveViews | undefined;
+
+/** The daemon's live viewers: `{liveView: 'start'|'stop'|'list'}` from any browser code run. */
+export function useLiveViews(handler: LiveViews | undefined): void {
+  liveViews = handler;
+}
+
+function liveViewRequest(request: unknown): Promise<unknown> | undefined {
+  const value = request as ({ liveView?: unknown } & Record<string, unknown>) | null;
+  if (typeof value?.liveView !== "string") return undefined;
+  if (!liveViews)
+    return Promise.reject(new Error("UNSUPPORTED: live viewers run in the Graft daemon"));
+  return liveViews(value as { liveView: string } & Record<string, unknown>);
+}
+
 /** The shared handler with Graft's provider; the source goes in the context of every call. */
 export function createGraftHostHandler(
   options: HostHandlerOptions,
 ): (request: unknown, context: HostRequestContext) => Promise<unknown> | undefined {
   const siteRules = options.siteRules;
+  const extra = options.extra;
   return createHostHandler({
     ...(siteRules ? { siteRules: (context: HostRequestContext) => siteRules(context.scope) } : {}),
     ...(options.siteMapper ? { siteMapper: options.siteMapper } : {}),
-    ...(options.extra ? { extra: options.extra } : {}),
+    extra: (request, context) => liveViewRequest(request) ?? extra?.(request, context),
     ...(options.model ? { model: options.model } : {}),
   });
 }

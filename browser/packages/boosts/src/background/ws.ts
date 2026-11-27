@@ -24,6 +24,15 @@ export type SocketData = string | { kind: "bytes"; base64: string };
 
 /** The most sockets one running script may hold open at once. */
 export const MAX_SOCKETS = 8;
+/** The most sockets all scripts together may hold open. */
+export const MAX_TOTAL_SOCKETS = 32;
+/** How often an open socket keeps the service worker awake (it idles out after 30 s). */
+export const KEEP_ALIVE_MS = 20_000;
+
+/** Any extension call resets the service worker's idle timer; a quiet socket would not. */
+const defaultKeepAlive = (): void => {
+  void globalThis.chrome?.runtime?.getPlatformInfo?.().catch(() => undefined);
+};
 
 interface Open {
   socket: WebSocket;
@@ -86,10 +95,36 @@ export interface SocketHub {
   /** Closes every socket a script holds (its page went away or it stopped). */
   release(key: object): void;
   count(key: object): number;
+  /** Every socket open across all scripts. */
+  total(): number;
 }
 
-export function socketHub(limit = MAX_SOCKETS): SocketHub {
+export interface HubOptions {
+  limit?: number;
+  totalLimit?: number;
+  keepAliveMs?: number;
+  keepAlive?: () => void;
+}
+
+export function socketHub(options: HubOptions | number = {}): SocketHub {
+  const settings = typeof options === "number" ? { limit: options } : options;
+  const limit = settings.limit ?? MAX_SOCKETS;
+  const totalLimit = settings.totalLimit ?? MAX_TOTAL_SOCKETS;
   const owners = new Map<object, Map<string, Open>>();
+  const total = (): number => [...owners.values()].reduce((sum, list) => sum + list.size, 0);
+  let pinger: ReturnType<typeof setInterval> | undefined;
+  // While any socket is open, ping the extension every 20 s so Chrome keeps the worker alive.
+  const keepAwake = (): void => {
+    if (total() === 0) {
+      if (pinger) clearInterval(pinger);
+      pinger = undefined;
+      return;
+    }
+    pinger ??= setInterval(() => {
+      if (total() === 0) return keepAwake();
+      (settings.keepAlive ?? defaultKeepAlive)();
+    }, settings.keepAliveMs ?? KEEP_ALIVE_MS);
+  };
   const listFor = (key: object): Map<string, Open> => {
     const list = owners.get(key) ?? new Map<string, Open>();
     owners.set(key, list);
@@ -106,6 +141,11 @@ export function socketHub(limit = MAX_SOCKETS): SocketHub {
       if (refusal) return fail(emit, refusal);
       const list = listFor(key);
       if (list.size >= limit) return fail(emit, `A script may hold at most ${limit} sockets open`);
+      if (total() >= totalLimit)
+        return fail(
+          emit,
+          `All boosts together may hold at most ${totalLimit} sockets open; close one first`,
+        );
       let socket: WebSocket;
       try {
         socket = new WebSocket(args.url, args.protocols);
@@ -113,7 +153,11 @@ export function socketHub(limit = MAX_SOCKETS): SocketHub {
         return fail(emit, error instanceof Error ? error.message : String(error));
       }
       list.set(args.sid, { socket, emit });
-      wire(socket, emit, () => list.delete(args.sid));
+      wire(socket, emit, () => {
+        list.delete(args.sid);
+        keepAwake();
+      });
+      keepAwake();
     },
     send(key: object, sid: string, data: SocketData): void {
       const open = owners.get(key)?.get(sid);
@@ -132,9 +176,11 @@ export function socketHub(limit = MAX_SOCKETS): SocketHub {
       const list = owners.get(key);
       owners.delete(key);
       for (const { socket } of list?.values() ?? []) socket.close(1000, "The script stopped");
+      keepAwake();
     },
     count(key: object): number {
       return owners.get(key)?.size ?? 0;
     },
+    total,
   };
 }

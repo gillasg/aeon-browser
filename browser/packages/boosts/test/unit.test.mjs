@@ -35,6 +35,11 @@ import {
   toBundle,
   toZip,
   unifiedDiff,
+  selectorProblem,
+  selectorWarnings,
+  siteRuleProblem,
+  siteRuleWarnings,
+  matchPatternProblem,
 } from "../build-test/lib.mjs";
 import { startSite } from "./fixture-site.mjs";
 
@@ -463,4 +468,46 @@ test("widgets mount in a closed shadow root, follow re-renders and unmount witho
   assert.equal(widgets.count(), 0);
   h1.remove();
   assert.equal(document.body.innerHTML, before, "unmount leaves zero DOM residue");
+});
+
+test("save-time checks: site rules that can never match and selectors that do not parse", () => {
+  for (const rule of [
+    { type: "domain", value: "example.com" },
+    { type: "domain", value: "localhost" },
+    { type: "match", value: "https://*.example.org/a/*" },
+    { type: "match", value: "http://localhost:8080/*" },
+    { type: "glob", value: "http://localhost:*/spa/deep*" },
+    { type: "prefix", value: "https://x.test/p" },
+    { type: "regex", value: "^https://a\\.test/" },
+    { type: "all" },
+  ])
+    assert.equal(siteRuleProblem(rule), undefined, JSON.stringify(rule));
+  assert.match(siteRuleProblem({ type: "match", value: "htps://local host" }), /scheme/);
+  assert.match(matchPatternProblem("https://local host/*"), /host name/);
+  assert.match(matchPatternProblem("example.com"), /scheme and a host/);
+  assert.match(siteRuleProblem({ type: "domain", value: "local host" }), /host name/);
+  assert.match(siteRuleProblem({ type: "regex", value: "(" }), /./);
+  assert.match(siteRuleProblem({ type: "prefix", value: "x.test/p" }), /full URL/);
+  const warned = siteRuleWarnings({ sites: [{ type: "match", value: "htps://local host" }] });
+  assert.equal(warned[0].code, "BAD_SITE_RULE");
+
+  for (const selector of [
+    "div",
+    "a[href^='x']",
+    "ul > li:nth-child(2n+1)",
+    "x-y::part(a), .b ~ .c",
+    '[data-a="]"]',
+  ])
+    assert.equal(selectorProblem(selector), undefined, selector);
+  for (const selector of ["div[[[", "a)", "a[b", "a >", "a,,b", "> a", "'x", "", "a > > b", "[]"])
+    assert.ok(selectorProblem(selector), selector);
+  const boost = normalizeBoost({
+    name: "z",
+    sites: ["a.test"],
+    zaps: [{ selector: "div[[[" }, { selector: ".ok" }],
+  });
+  assert.deepEqual(
+    selectorWarnings(boost).map((w) => w.code),
+    ["BAD_SELECTOR"],
+  );
 });

@@ -1,10 +1,11 @@
 import type { Boost, HealthReport } from "../shared/types.js";
 import { errorText } from "../shared/messages.js";
 import { callCompanion, callSiteMapper } from "./integrations.js";
-import { recordHealth } from "./health.js";
+import { recordError, recordHealth, recordRun } from "./health.js";
+import { pushToView } from "./live.js";
 import { copyToClipboard } from "./offscreen.js";
 import { syncSoon } from "./scripts.js";
-import { getBoost, getValues, log, setValues } from "./store.js";
+import { getBoost, getValues, log, noteCsp, setValues } from "./store.js";
 import { socketHub, type SocketArgs, type SocketData } from "./ws.js";
 import { mayConnect, runXhr, type XhrArgs } from "./xhr.js";
 
@@ -45,6 +46,7 @@ const NEEDS: Record<string, string[]> = {
   "tabs.list": ["getTabs"],
   "audio.mute": ["audio"],
   "audio.state": ["audio"],
+  "liveView.push": ["liveView"],
 };
 
 function granted(boost: Boost, op: string): boolean {
@@ -55,6 +57,8 @@ function granted(boost: Boost, op: string): boolean {
 }
 
 const ports = new Map<string, Set<chrome.runtime.Port>>();
+/** Ports whose script is running now (not paused by its site rules on this URL). */
+const running = new Set<chrome.runtime.Port>();
 const streams = new Map<string, AbortController>();
 const tabStore = new Map<string, Map<number, unknown>>();
 const opened = new Map<number, chrome.runtime.Port>();
@@ -103,7 +107,7 @@ async function changeValues(
   change(values);
   await setValues(ctx.boost.id, values);
   broadcastValue(ctx.boost.id, push, ctx.port);
-  syncSoon();
+  syncSoon(ctx.boost.id);
 }
 
 function notify(args: Record<string, unknown>): Promise<boolean> {
@@ -155,7 +159,32 @@ function cookieTarget(ctx: Ctx, args: Record<string, unknown>): { url: string } 
 type Handler = (ctx: Ctx, args: Record<string, unknown>) => Promise<unknown> | unknown;
 
 const handlers: Record<string, Handler> = {
-  started: () => undefined,
+  started: (ctx, { url }) => {
+    running.add(ctx.port);
+    return recordRun(ctx.boost.id, typeof url === "string" ? url : (ctx.url ?? ""));
+  },
+  stopped: (ctx) => void running.delete(ctx.port),
+  error: (ctx, { message, stack }) => {
+    const text = String(message);
+    log({
+      level: "error",
+      boostId: ctx.boost.id,
+      url: ctx.url,
+      message: text + (typeof stack === "string" ? `\n${stack}` : ""),
+    });
+    return recordError(
+      ctx.boost.id,
+      { message: text, stack: typeof stack === "string" ? stack : undefined },
+      ctx.url ?? "",
+    );
+  },
+  // A fresh copy at start: the registered snapshot can be older than the last write.
+  "values.get": (ctx) => getValues(ctx.boost.id),
+  "liveView.push": (_ctx, args) => pushToView(args),
+  csp: (ctx, { directive }) => {
+    const host = ctx.url ? new URL(ctx.url).hostname : "";
+    return host ? noteCsp(host, String(directive).slice(0, 200)) : undefined;
+  },
   "values.set": (ctx, { key, value }) =>
     changeValues(ctx, (v) => (v[String(key)] = value), { key, value }),
   "values.delete": (ctx, { key }) =>
@@ -356,6 +385,7 @@ export function listenToScripts(): void {
     });
     port.onDisconnect.addListener(() => {
       set.delete(port);
+      running.delete(port);
       sockets.release(port);
       for (const list of menus.values())
         for (const [key, command] of list) if (command.port === port) list.delete(key);
@@ -372,6 +402,27 @@ export function listenToScripts(): void {
       /* gone */
     }
   });
+}
+
+/** Stops every running copy of a boost's script (disabled or removed): it cleans up after itself. */
+export function stopScripts(boostId: string): number {
+  let stopped = 0;
+  for (const port of ports.get(boostId) ?? [])
+    try {
+      port.postMessage({ t: "push", event: "stop", data: { reason: "disabled" } });
+      stopped++;
+    } catch {
+      /* the page went away */
+    }
+  return stopped;
+}
+
+/** The tabs a boost's script is running in right now. */
+export function scriptTabs(boostId: string): number[] {
+  const tabs = new Set<number>();
+  for (const port of ports.get(boostId) ?? [])
+    if (running.has(port) && port.sender?.tab?.id !== undefined) tabs.add(port.sender.tab.id);
+  return [...tabs];
 }
 
 /** Pushes a value change made outside the scripts (the storage editor). */

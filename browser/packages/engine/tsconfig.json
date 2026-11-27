@@ -11,6 +11,7 @@
     "src/code-realm-globals.ts",
     "src/code-realm-host.ts",
     "src/code-realm-worker.ts",
-    "src/code-realm-server.ts"
+    "src/code-realm-server.ts",
+    "src/code-realm-boost-check.ts"
   ]
 }

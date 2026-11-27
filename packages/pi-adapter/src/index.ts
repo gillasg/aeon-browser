@@ -38,6 +38,7 @@ export {
   createGraftHostHandler,
   type SiteRulesAnswer,
   type SiteRulesProvider,
+  useLiveViews,
 } from "./browser-host-requests.js";
 export { exploreForRoutine } from "./site-mapping.js";
 export { cellWorkspaceCall } from "./browser-workspace.js";

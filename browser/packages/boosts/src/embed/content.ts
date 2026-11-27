@@ -70,4 +70,13 @@ setInterval(() => {
   void refresh();
 }, 400);
 addEventListener("load", scheduleHealth, { once: true });
+
+// A strict CSP the page enforces, noted for save-time warnings on page-world scripts.
+const STRICT = /^(style-src|script-src|require-trusted-types-for|trusted-types)/;
+let cspNoted = false;
+document.addEventListener("securitypolicyviolation", (event) => {
+  if (cspNoted || !isTop || !STRICT.test(event.effectiveDirective)) return;
+  cspNoted = true;
+  void send("page.csp", { directive: event.effectiveDirective }).catch(() => undefined);
+});
 void refresh();
