@@ -110,3 +110,27 @@ test("a server connected after the first listing is found by one fresh listing",
   assert.equal(state.lists, 2);
   await assert.rejects(bridge.call("cap_none", "echo", {}), /no MCP tool named cap_none\.echo/);
 });
+
+test("a JSON result with a warning block stays a JSON object, the warning in its own field", async () => {
+  const manager = {
+    async listMcpTools() {
+      return {
+        servers: [{ serverId: "cap_wiki", displayName: "Wiki", tools: [{ name: "echo" }] }],
+      };
+    },
+    async callMcpTool() {
+      return {
+        isError: false,
+        content: [
+          { type: "text", text: JSON.stringify({ rows: [1, 2], next: "c2" }) },
+          { type: "text", text: "Warning: results limited to 2" },
+        ],
+      };
+    },
+  };
+  const value = await new McpCodeBridge(manager).call("cap_wiki", "echo", {});
+  assert.equal(typeof value, "object");
+  assert.deepEqual(value.rows, [1, 2]);
+  assert.equal(value.next, "c2");
+  assert.deepEqual(value.warnings, ["Warning: results limited to 2"]);
+});

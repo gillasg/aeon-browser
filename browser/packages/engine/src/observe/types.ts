@@ -46,6 +46,10 @@ export interface TreeNode {
   container?: boolean;
   /** Collected from the cursor/click scan, not from the accessibility tree. */
   clickable?: boolean;
+  /** A table's column names, printed once on the table line. */
+  columns?: string[];
+  /** The header row of a table whose columns are printed on the table line: not printed again. */
+  columnRow?: boolean;
   /** Icon, image, attribute or row clue. Never copied into the accessible name. */
   hint?: string;
 }

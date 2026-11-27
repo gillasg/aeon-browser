@@ -694,8 +694,10 @@ var browser = Object.freeze({
       var result = await browser.page(target).evaluate(async ({url, init}) => {
         var response = await fetch(url, {credentials: 'include', ...init});
         var text = await response.text();
-        try { return {status: response.status, data: JSON.parse(text)}; } catch { return {status: response.status, text: text.slice(0, 200000)}; }
+        try { return {status: response.status, data: JSON.parse(text)}; } catch { return text.length > 200000 ? {status: response.status, tooLarge: text.length} : {status: response.status, text}; }
       }, {url, init});
+      // Never hand back cut text: a script saving it would write a corrupt file without knowing.
+      if (result.tooLarge) throw Error('TOO_LARGE: ' + url + ' returned ' + result.tooLarge + ' characters of non-JSON text, over the 200000 limit. Read it in slices in the page: page.evaluate(async () => (await (await fetch(url)).text()).slice(0, 200000)), then .slice(200000, 400000), and so on.');
       if (result.status >= 400) throw Error('HTTP ' + result.status + ' from ' + url + ': ' + JSON.stringify(result.data ?? result.text).slice(0, 300));
       return result.data ?? result.text;
     },

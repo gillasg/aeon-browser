@@ -245,7 +245,7 @@ function recount(line: Line, all: readonly Line[], keys: Set<string>): Line {
   if (!line.table) return line;
   const rows = all.filter((item) => item.row && item.parentKey === line.key);
   const shown = rows.filter((item) => keys.has(item.key)).length;
-  return { ...line, text: tableText(line.bareName, rows.length, shown) };
+  return { ...line, text: tableText(line.bareName, rows.length, shown) + (line.columns ?? "") };
 }
 
 function cutNotes(all: readonly Line[], keys: Set<string>): Line[] {

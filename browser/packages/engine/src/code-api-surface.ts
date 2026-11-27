@@ -156,6 +156,13 @@ function __collectRows(spec) {
     }, 350);
   });
 }
+// Chrome's screenshot clip is in page coordinates, not viewport ones: a box read with
+// getBoundingClientRect needs the scroll offset added, or a scrolled page crops the wrong area.
+// Nothing is scrolled, so the user's view stays where it was.
+function __pageClip(box, at, pad) {
+  var sx = Number(at && at.scrollX) || 0, sy = Number(at && at.scrollY) || 0;
+  return {x: Math.max(0, box.x + sx - pad), y: Math.max(0, box.y + sy - pad), width: box.width + pad * 2, height: box.height + pad * 2, scale: 1};
+}
 function __iconBoxes(max, selector) {
   var textOf = (node) => (node.innerText ?? node.textContent ?? '').trim();
   var nodes = [...document.querySelectorAll(selector || 'button,[role=button],a')];
@@ -171,6 +178,7 @@ function __iconBoxes(max, selector) {
       label: node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('data-testid') || undefined,
       tag: node.tagName.toLowerCase(),
       box: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+      scrollX: window.scrollX, scrollY: window.scrollY,
     };
   });
 }
@@ -584,7 +592,7 @@ function __extendPageSurface(target, base) {
             var r = el.getBoundingClientRect();
             if (r.width < 8 || r.height < 8) continue;
             if (!selector && el.tagName === 'IFRAME' && !pattern.test(el.src || '')) continue;
-            return {x: r.x, y: r.y, width: r.width, height: r.height, frame: el.tagName === 'IFRAME' ? String(el.src || '').slice(0, 200) : null};
+            return {x: r.x, y: r.y, width: r.width, height: r.height, scrollX: window.scrollX, scrollY: window.scrollY, frame: el.tagName === 'IFRAME' ? String(el.src || '').slice(0, 200) : null};
           }
           for (var host of root.querySelectorAll('*')) if (host.shadowRoot) roots.push(host.shadowRoot);
         }
@@ -593,7 +601,7 @@ function __extendPageSurface(target, base) {
       var box = (await __step({op:'evaluate', target, expression: '(' + find.toString() + ')(' + JSON.stringify(options.selector || '') + ')'})).data.value;
       if (!box) return {found: false};
       var pad = Math.max(0, Math.min(64, options.padding ?? 8));
-      var clip = {x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + pad * 2, height: box.height + pad * 2, scale: 1};
+      var clip = __pageClip(box, box, pad);
       var shot = await page.cdp('Page.captureScreenshot', {format: 'png', clip});
       var name = options.path || 'widgets/widget-' + Date.now() + '.png';
       await artifact(name, __bytesFromBase64(shot.data));
@@ -605,7 +613,7 @@ function __extendPageSurface(target, base) {
       var saved = [];
       for (var box of boxes) {
         if (box.box.width < 8 || box.box.height < 8) continue;
-        var shot = await page.cdp('Page.captureScreenshot', { format: 'png', clip: { x: box.box.x, y: box.box.y, width: box.box.width, height: box.box.height, scale: 1 } });
+        var shot = await page.cdp('Page.captureScreenshot', { format: 'png', clip: __pageClip(box.box, box, 0) });
         var name = (options.folder || 'icons') + '/' + String(box.label || ('icon-' + box.index)).replace(/[^\\w.-]+/g, '-') + '.png';
         await artifact(name, __bytesFromBase64(shot.data));
         saved.push({ label: box.label, name, box: box.box });

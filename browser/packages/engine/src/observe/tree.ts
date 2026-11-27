@@ -1,6 +1,7 @@
 import type { BrowserSemanticNode } from "@browserkit/protocol";
 import type { AxNode } from "../native-browser-common.js";
 import { textValue } from "../native-browser-common.js";
+import { headedRowText, isHeaderRow, tableColumns } from "./table-columns.js";
 import { framesOutsideMain, mainScopeNote, unusableMainIds, usableMain } from "./usable-main.js";
 import {
   CELL_ROLES,
@@ -174,9 +175,26 @@ function toTreeNode(
   const merged = shown ? applyShown(base, shown) : base;
   if (offscreen.has(`${merged.role}|${merged.name}`)) merged.offscreen = true;
   if (isContainer(ax, kids, new Map())) merged.container = true;
-  const label = rowLabel(ax, kids);
+  const columns = role === "table" ? tableColumns(ax, kids) : undefined;
+  if (columns) merged.columns = columns;
+  const headerCell = role === "columnheader" || (role === "row" && isHeaderRow(ax, kids));
+  if (headerCell && tableHeaded(ax, byId, kids)) merged.columnRow = true;
+  const label = headedRowText(ax, byId, kids) ?? rowLabel(ax, kids);
   if (label && (role === "row" || role === "listitem")) merged.name = label;
   return merged;
+}
+
+function tableHeaded(
+  start: AxNode,
+  byId: Map<string, AxNode>,
+  kids: Map<string, AxNode[]>,
+): boolean {
+  let current = start.parentId ? byId.get(start.parentId) : undefined;
+  for (let depth = 0; current && depth < 4; depth++) {
+    if (tableColumns(current, kids)) return true;
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return false;
 }
 
 function nodeFromAx(
@@ -340,6 +358,7 @@ const LAYOUT_ROLES: Readonly<Record<string, string>> = {
   layouttable: "table",
   layouttablerow: "row",
   layouttablecell: "cell",
+  grid: "table",
 };
 
 export function canonicalRole(role: string): string {

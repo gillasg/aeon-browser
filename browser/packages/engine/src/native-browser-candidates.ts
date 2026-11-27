@@ -40,6 +40,33 @@ function compatible(wanted: string, found: string): boolean {
   return left === found || sameFamily(left, found);
 }
 
+/** Edit distance between two short strings, cut off once it passes `limit`. */
+function editDistance(left: string, right: string, limit: number): number {
+  if (Math.abs(left.length - right.length) > limit) return limit + 1;
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row++) {
+    const current = [row];
+    let best = row;
+    for (let col = 1; col <= right.length; col++) {
+      const swap = left[row - 1] === right[col - 1] ? 0 : 1;
+      const value = Math.min(previous[col]! + 1, current[col - 1]! + 1, previous[col - 1]! + swap);
+      current.push(value);
+      best = Math.min(best, value);
+    }
+    if (best > limit) return limit + 1;
+    previous = current;
+  }
+  return previous[right.length]!;
+}
+
+/** A typo-level miss ("Sav chnges" for "Save changes"): up to a third of the name may differ. */
+function typoScore(left: string, right: string): number {
+  const limit = Math.max(1, Math.floor(Math.max(left.length, right.length) / 3));
+  const distance = editDistance(left, right, limit);
+  if (distance > limit) return 0;
+  return Math.round(70 - (distance / limit) * 30);
+}
+
 /** How close two control names are. Zero means there is nothing to offer. */
 export function nameScore(wanted: string, found: string): number {
   const left = wanted.toLowerCase().trim();
@@ -50,7 +77,7 @@ export function nameScore(wanted: string, found: string): number {
   const words = new Set(left.split(/\s+/).filter((word) => word.length > 1));
   let shared = 0;
   for (const word of right.split(/\s+/)) if (words.has(word)) shared += 1;
-  return shared * 20;
+  return Math.max(shared * 20, typoScore(left, right.slice(0, 80)));
 }
 
 function rowContext(tree: AxNode[], node: AxNode): string | undefined {
@@ -88,20 +115,51 @@ export function ambiguousCandidates(tree: AxNode[], matches: AxNode[]): ErrorCan
   return out;
 }
 
-/** Nearest named controls of a compatible role, best name first, at most eight. */
-export function nearestCandidates(tree: AxNode[], role: string, name: string): ErrorCandidate[] {
+/** Nodes scanned for a hint, so a huge page never slows an error down. */
+const SCAN_CAP = 4000;
+const NEAREST_CAP = 5;
+
+function rankNearest(
+  tree: AxNode[],
+  name: string,
+  keep: (role: string) => boolean,
+): ErrorCandidate[] {
   const ranked: { score: number; node: AxNode }[] = [];
-  for (const node of tree) {
+  for (const node of tree.slice(0, SCAN_CAP)) {
     if (node.ignored || node.backendDOMNodeId === undefined) continue;
-    const foundRole = roleOf(node);
     const foundName = nameOf(node);
-    if (!compatible(role, foundRole) || !foundName) continue;
+    if (!foundName || !keep(roleOf(node))) continue;
     const score = nameScore(name, foundName);
-    if (score <= 0) continue;
-    ranked.push({ score, node });
+    if (score > 0) ranked.push({ score, node });
   }
   ranked.sort((left, right) => right.score - left.score);
-  return ranked.slice(0, 8).map((item) => toCandidate(tree, item.node));
+  return ranked.slice(0, NEAREST_CAP).map((item) => toCandidate(tree, item.node));
+}
+
+function hasRole(tree: AxNode[], role: string): boolean {
+  return tree
+    .slice(0, SCAN_CAP)
+    .some((node) => !node.ignored && compatible(role, roleOf(node)) && nameOf(node) !== "");
+}
+
+/** Nearest named controls of a compatible role, best name first, at most five. */
+export function nearestCandidates(tree: AxNode[], role: string, name: string): ErrorCandidate[] {
+  return rankNearest(tree, name, (found) => compatible(role, found));
+}
+
+/** A page with none of the wanted role offers the closest names of any interactive role. */
+export function notFoundError(tree: AxNode[], role: string, name: string): BrowserActionError {
+  const none = Boolean(role) && !hasRole(tree, role);
+  const candidates = none
+    ? rankNearest(tree, name, (found) => INTERACTIVE.has(found) || found === "heading")
+    : nearestCandidates(tree, role, name);
+  const missing = `No ${role} named ${JSON.stringify(name)}`;
+  const detail = none ? `${missing}. The page has no ${role} elements` : missing;
+  const shown = candidates.length ? `; closest: ${candidates.length} below` : "";
+  return new BrowserActionError("TARGET_NOT_FOUND", detail + shown, {
+    candidates,
+    target: { ...(role ? { role } : {}), name },
+  });
 }
 
 function expanded(node: AxNode): boolean | undefined {
@@ -136,13 +194,6 @@ export function openerCandidate(
     current = parent;
   }
   return undefined;
-}
-
-export function notFoundError(tree: AxNode[], role: string, name: string): BrowserActionError {
-  return new BrowserActionError("TARGET_NOT_FOUND", `No ${role} named ${JSON.stringify(name)}`, {
-    candidates: nearestCandidates(tree, role, name),
-    target: { ...(role ? { role } : {}), name },
-  });
 }
 
 export function ambiguousError(

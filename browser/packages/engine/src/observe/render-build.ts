@@ -16,6 +16,7 @@ import {
   tableText,
   type Line,
 } from "./render-model.js";
+import { columnsText } from "./table-columns.js";
 
 interface Flags {
   dialog: boolean;
@@ -102,6 +103,11 @@ const STRUCTURAL = new Set([
 function walk(node: TreeNode, parentKey: string | undefined, flags: Flags, build: Build): void {
   if (build.visited.has(node)) return;
   build.visited.add(node);
+  if (node.columnRow) {
+    // Its names are already on the table line; a sort button inside still prints.
+    walkKids(node, parentKey, { ...flags, underRow: true }, build);
+    return;
+  }
   if (STRUCTURAL.has(node.role) || skipNode(node, flags)) {
     walkKids(node, parentKey, flags, build);
     return;
@@ -175,14 +181,17 @@ function containerLine(node: TreeNode, dialog: boolean, build: Build): Line {
   line.hay = `${node.role} ${node.name} ${text}`.toLowerCase();
   line.row = node.role === "row";
   line.table = node.role === "table";
+  if (node.columns) line.columns = columnsText(node.columns);
   if (node.backendNodeId !== undefined) line.id = node.backendNodeId;
   return line;
 }
 
 function containerBody(node: TreeNode, build: Build): string {
   if (node.role !== "table") return containerText(node);
-  const rows = (build.kids.get(node.axId) ?? []).filter((child) => child.role === "row").length;
-  return tableText(node.name, rows, rows);
+  const rows = (build.kids.get(node.axId) ?? []).filter(
+    (child) => child.role === "row" && !child.columnRow,
+  ).length;
+  return tableText(node.name, rows, rows) + columnsText(node.columns);
 }
 
 function contentLine(node: TreeNode, dialog: boolean, build: Build): Line | undefined {

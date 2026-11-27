@@ -8,6 +8,7 @@ import { engineConfig } from "./engine-config.js";
 import { assertBrowserNetwork } from "./native-browser-dns.js";
 import { inventoryMatchesRequest, isTargetStep } from "./native-browser-target-step.js";
 import { isExtraStep, isPageAction } from "./native-browser-step-guards.js";
+import { blockedPageError } from "./native-browser-load-result.js";
 import {
   type BrowserExecutorRequest,
   type BrowserExecutorResult,
@@ -643,7 +644,9 @@ async function assertTarget(request: BrowserExecutorRequest): Promise<chrome.tab
   const known = currentInventoryTabs().find((tab) => sameTarget(tab.target, target));
   if (!inventoryMatchesRequest(known, request)) throw new Error("TARGET_LOST");
   const live = await chrome.tabs.get(target.tabId).catch(() => undefined);
-  if (!live?.url || !drivablePage(live.url)) throw new Error("TARGET_LOST");
+  if (live?.url && !drivablePage(live.url))
+    throw blockedPageError(live.url) ?? new Error("TARGET_LOST");
+  if (!live?.url) throw new Error("TARGET_LOST");
   const refreshed = await refreshInventoryTab(target.tabId);
   if (!inventoryMatchesRequest(refreshed, request)) throw new Error("TARGET_LOST");
   return live;
