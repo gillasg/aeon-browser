@@ -75,7 +75,9 @@ export function drivablePage(value: string): boolean {
  * PROTECTED_UI, so the agent asks the user rather than retrying; anything else is INVALID_TARGET.
  */
 export function assertOpenable(url: string): void {
-  if (drivablePage(url)) return;
+  // Exactly about:blank may be opened (a blank tab to fill later); every other about: and file:
+  // URL stays refused.
+  if (url === "about:blank" || drivablePage(url)) return;
   if (/^(chrome|chrome-extension):/i.test(url))
     throw new Error(
       "PROTECTED_UI: Chrome's own pages and other extensions' pages are not open to the agent; open a web page or one of Graft's own pages (home, chat)",
