@@ -93,6 +93,8 @@ jobs:
           pnpm agent-text:check
 
   # The fast lane (no browser) on every OS Graft ships to, built once.
+  # Linux and Windows split browser vs root suites across 2 runners; macOS keeps one combined
+  # runner so GitHub's 5-runner macOS concurrency cap does not queue browser-e2e shards.
   unit:
     name: unit (${{ matrix.os }}, ${{ matrix.suite }})
     needs: changes
@@ -101,8 +103,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-26]
-        suite: [browser, root]
+        include:
+          - os: ubuntu-latest
+            suite: browser
+          - os: ubuntu-latest
+            suite: root
+          - os: windows-latest
+            suite: browser
+          - os: windows-latest
+            suite: root
+          - os: macos-26
+            suite: all
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -116,21 +127,21 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm build
       - name: Browser unit tests
-        if: matrix.suite == 'browser'
+        if: matrix.suite == 'browser' || matrix.suite == 'all'
         run: pnpm --dir browser run test
       - name: Root unit tests
-        if: matrix.suite == 'root'
+        if: matrix.suite == 'root' || matrix.suite == 'all'
         run: pnpm test
       # The Claw & Primitive contract: deterministic, zero-LLM, loopback-only, Node alone (no
       # Chrome, no model calls), on every OS Graft ships to.
       - name: Claw & Primitive contract
-        if: matrix.suite == 'root'
+        if: matrix.suite == 'root' || matrix.suite == 'all'
         run: pnpm test:claws
       # On main the Mac session reuses these built outputs instead of rebuilding from scratch.
       # The paths mirror the pnpm workspace build outputs; name carries the commit so the session
       # only restores it when its own commit matches.
       - name: Upload macOS build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'macOS' && matrix.suite == 'root' && success()
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'macOS' && success()
         uses: actions/upload-artifact@v4
         with:
           name: graft-macos-build-${{ github.sha }}
