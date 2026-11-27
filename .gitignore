@@ -33,6 +33,7 @@ coverage/
 
 # Minimal public project introduction
 !/README.md
+!/store/*.md
 !/docs/evals.md
 !/docs/tools-for-agents.md
 # The Graft skill ships with the CLI: agents install it with `graft install`.
@@ -71,3 +72,4 @@ apps/chrome-extension/test/.orb-module-*
 /benchmarks/chaos/results/
 /benchmarks/kernel/results/
 /benchmarks/installed/results/
+apps/chrome-extension/store-dist/
