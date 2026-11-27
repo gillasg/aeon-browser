@@ -12,7 +12,8 @@ import {
 } from "./abilities.js";
 import { operationOutputSchema } from "./output-schema.js";
 import type { Operation } from "./types.js";
-import { loadModel, siteName } from "./registry.js";
+import { siteName } from "./registry.js";
+import { loadCurrentModel } from "./model-refresh.js";
 import { refreshSiteSkill } from "./site-notes.js";
 import {
   readHelperOps,
@@ -34,7 +35,7 @@ function withOutputSchema(operation: Operation): { outputSchema?: Record<string,
 export async function compileSiteOps(site: string): Promise<SiteOpsFile> {
   const host = siteName(site);
   const [model, abilities, helpers] = await Promise.all([
-    loadModel(host).catch(() => undefined),
+    loadCurrentModel(host).catch(() => undefined),
     listAbilities(host).catch(() => [] as Ability[]),
     readHelperOps(host),
   ]);
@@ -63,7 +64,7 @@ export async function compileSiteOps(site: string): Promise<SiteOpsFile> {
 export async function readSiteOps(site: string): Promise<SiteOpsFile> {
   const [file, model] = await Promise.all([
     readOpsFile(site),
-    loadModel(siteName(site)).catch(() => undefined),
+    loadCurrentModel(siteName(site)).catch(() => undefined),
   ]);
   if (file && !(model && Date.parse(model.generatedAt) > Date.parse(file.compiledAt))) return file;
   return compileSiteOps(site);

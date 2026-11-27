@@ -31,7 +31,7 @@ import {
   type ChannelResult,
 } from "./channels.js";
 import { docsExpression, docsTargets, type SiteDocs } from "./docs.js";
-import { paginate, type PaginateOptions } from "./paginate.js";
+import { collectPages, paginate, takeMaxItems, type PaginateOptions } from "./paginate.js";
 import { applyPaceNotes, exportPaced, takePace } from "../pace.js";
 import { readSiteFacts } from "../site-notes.js";
 import { isRung0Paused } from "../circuit-breaker.js";
@@ -601,6 +601,8 @@ export class SiteClient {
   async call(id: string, params: Params = {}, options?: { pace?: boolean }): Promise<unknown> {
     // An export already took a token for this row. A second take would halve the printed rate.
     if (options?.pace !== false) await takePace(this.site);
+    const pages = takeMaxItems(this.operation(id), params);
+    if (pages) return collectPages(this, this.operation(id), pages.rest, pages.maxItems);
     const response = await this.request(id, params);
     const wall = paceOnChallenge(this.site, response, this.options.account);
     return finishRead(id, response, wall, { operation: this.operation(id), params });

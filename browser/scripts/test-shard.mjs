@@ -25,6 +25,9 @@ export function parseShard(argv) {
 const COST = {
   "bridge.e2e.test.mjs": 300,
   "pace-export.e2e.test.mjs": 195,
+  "learn-real.e2e.test.mjs": 90,
+  "abilities-replay.e2e.test.mjs": 60,
+  "heal-real.e2e.test.mjs": 40,
   "receipts.e2e.test.mjs": 44,
   "vault-save.e2e.test.mjs": 33,
   "dialogs.e2e.test.mjs": 30,

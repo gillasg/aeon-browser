@@ -15,6 +15,13 @@ import {
   listAbilities,
   listSites,
   loadModel,
+  loadCurrentModel,
+  describeCatalogOperation,
+  filledDefaults,
+  healingCall,
+  learnBlocked,
+  paramRequired,
+  visibleParams,
   rebuild,
   runSiteToolAction,
   siteMapper,
@@ -343,7 +350,7 @@ export type SiteMapperToolInput = {
 };
 
 export const HOW_TO_CALL =
-  "Pass params flat: path and query parameters and top-level body fields by name. Every required parameter must be passed; nothing is filled from the recording. Use body: {...} for deeper body fields.";
+  "Pass params flat: path and query parameters and top-level body fields by name. Required inputs must be passed; an optional input left out is filled with what the site sent (each operation's defaults list them). Use body: {...} for deeper body fields. maxItems reads every page, only on a paginated operation.";
 
 const siteMapperParameters: JsonObjectSchema = {
   type: "object",
@@ -540,7 +547,9 @@ async function runSiteMapper(
   if (input.action === "operations") return describeOperations(site);
   if (input.action === "call") {
     if (!input.operation) throw new Error("Give the operation id (see the operations action)");
-    const api = await siteMapper(site, { transport: input.transport ?? "auto" });
+    if (!input.transport || input.transport === "auto")
+      return healingCall(site, input.operation, (input.params ?? {}) as never);
+    const api = await siteMapper(site, { transport: input.transport });
     return api.call(input.operation, (input.params ?? {}) as never);
   }
   if (input.action === "watch") {
@@ -589,7 +598,9 @@ async function learnCaptures(input: SiteMapperToolInput, workspace?: string): Pr
 }
 
 async function describeOperations(site: string): Promise<unknown> {
-  const model = await loadModel(site);
+  const model = await loadCurrentModel(site);
+  const blocked = model ? undefined : await learnBlocked(site);
+  if (blocked) throw new Error(blocked);
   if (!model)
     throw new Error(
       `${site} has no API yet. Fastest learn: site_mapper({action:"explore", sites:[${JSON.stringify(site)}]}) records search, product, price and link. Until then, use the page.`,
@@ -620,17 +631,17 @@ function bodyFields(op: SiteOperation): Record<string, unknown> | undefined {
 
 function describeOperation(op: SiteOperation): Record<string, unknown> {
   const body = bodyFields(op);
+  const defaults = filledDefaults(op);
   return {
     id: op.id,
-    what: op.summary,
+    what: describeCatalogOperation(op),
     method: op.method,
     path: op.path,
     role: op.role,
     effect: operationEffect(op),
-    params: op.params
-      .filter((param) => !param.constant && !param.generated)
-      .map((param) => `${param.name}${param.required ? "" : "?"}`),
+    params: visibleParams(op).map((param) => `${param.name}${paramRequired(param) ? "" : "?"}`),
     ...(body ? { bodyFields: body } : {}),
+    ...(defaults.length ? { defaults } : {}),
     ...(op.pagination ? { paginated: true } : {}),
   };
 }

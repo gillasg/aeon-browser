@@ -4,7 +4,8 @@ import { htmlReport } from "./emit/html.js";
 import { generateClient } from "./emit/client.js";
 import { toAsyncApi, toOpenApi } from "./emit/openapi.js";
 import { toYaml } from "./emit/yaml.js";
-import { listSites, loadModel, readOverrides, siteName } from "./registry.js";
+import { listSites, readOverrides, siteName } from "./registry.js";
+import { loadCurrentModel } from "./model-refresh.js";
 import {
   HttpError,
   siteMapper,
@@ -192,7 +193,7 @@ export async function serve(options: ServeOptions = {}): Promise<Server> {
 
   async function siteRoute(ctx: Ctx, name: string): Promise<void> {
     const site = siteName(name);
-    const model = await loadModel(site);
+    const model = await loadCurrentModel(site);
     if (!model) return send(ctx.response, 404, { error: `${site} is not mapped` });
     const siteCtx: SiteCtx = { ...ctx, site, model, overrides: await readOverrides(site) };
     if (publicFile(siteCtx)) return;

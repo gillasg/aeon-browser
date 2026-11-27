@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Ability } from "./abilities.js";
 import { abilityEffect, effectAnnotations, operationEffect, type CallEffect } from "./effect.js";
 import { operationInputSchema } from "./mcp.js";
+import { describeOperation } from "./op-catalog.js";
 import { operationOutputSchema } from "./output-schema.js";
 import type { SiteModel } from "./types.js";
 
@@ -37,8 +38,8 @@ export function catalogToolsForSite(
       kind: "operation",
       id: operation.id,
       effect,
-      description: `${operation.summary ?? operation.description ?? operation.id}: ${operation.method} ${operation.path} (${effect}). Returns the operation's JSON value.`,
-      inputSchema: operationInputSchema(operation),
+      description: `${describeOperation(operation)} (${effect}).`,
+      inputSchema: operationInputSchema(operation, model ?? { operations: [operation] }),
       annotations: effectAnnotations(effect),
       ...withSchema(operationOutputSchema(operation)),
     });

@@ -127,11 +127,27 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm build
       - name: Browser unit tests
-        if: matrix.suite == 'browser' || matrix.suite == 'all'
+        if: matrix.suite == 'browser'
         run: pnpm --dir browser run test
       - name: Root unit tests
-        if: matrix.suite == 'root' || matrix.suite == 'all'
+        if: matrix.suite == 'root'
         run: pnpm test
+      # macOS runs both suites on one runner, side by side: the browser suite (~5 min) sets the
+      # time and the root suite (~2 min) fits inside it. Each log is printed whole when done.
+      - name: Browser and root unit tests (side by side)
+        if: matrix.suite == 'all'
+        shell: bash
+        run: |
+          pnpm --dir browser run test > browser-unit.log 2>&1 &
+          browser=$!
+          pnpm test > root-unit.log 2>&1 &
+          root=$!
+          status=0
+          wait $browser || status=1
+          echo "::group::Browser unit tests"; cat browser-unit.log; echo "::endgroup::"
+          wait $root || status=1
+          echo "::group::Root unit tests"; cat root-unit.log; echo "::endgroup::"
+          exit $status
       # The Claw & Primitive contract: deterministic, zero-LLM, loopback-only, Node alone (no
       # Chrome, no model calls), on every OS Graft ships to.
       - name: Claw & Primitive contract

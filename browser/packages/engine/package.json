@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.node.json",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test --test-concurrency=8 test/*.test.mjs"
   },
   "dependencies": {
     "acorn": "8.18.0",

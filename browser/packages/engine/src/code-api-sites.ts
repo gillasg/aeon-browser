@@ -312,6 +312,10 @@ function __stepLabel(step) {
   if (step.op === 'keys' || step.op === 'press') return 'press ' + (step.keys || step.key || '') + (quoted ? ' in' + quoted : '');
   return step.op + quoted;
 }
+function __learnDeadline(promise, ms, fallback) {
+  var timer;
+  return Promise.race([promise, new Promise((done) => { timer = setTimeout(() => done(fallback), ms); })]).finally(() => clearTimeout(timer));
+}
 async function __learnFromCell() {
   var lines = [], approved = __handedOff;
   __handedOff = false;
@@ -322,7 +326,7 @@ async function __learnFromCell() {
   var closedHar = new Map((Array.isArray(closed) ? closed : []).filter(item => item && item.har).map(item => [item.tabId, item.har]));
   for (var target of touched) {
     try {
-      var har = closedHar.get(target && target.tabId) || await __call({network: 'take', target});
+      var har = closedHar.get(target && target.tabId) || await __learnDeadline(__call({network: 'take', target}), 10000, undefined);
       var entries = (har && har.log && har.log.entries) || [];
       if (!entries.length) continue;
       var key = __key(target);
@@ -334,7 +338,9 @@ async function __learnFromCell() {
         if (cause) entry._step = cause.label;
       }
       var url = (__tabs.get(key) && __tabs.get(key).url) || entries[0].request.url;
-      var result = await __call({siteMapper: 'learn-live', site: __siteHost(url), har, approved});
+      // Each learning step has a deadline, so one slow rebuild never holds the cell.
+      var result = await __learnDeadline(__call({siteMapper: 'learn-live', site: __siteHost(url), har, approved}), 20000, {learned: []});
+      if (result && result.blocked) { lines.push(result.blocked); continue; }
       for (var op of (result && result.learned) || []) {
         // Only operations this cell's own actions caused (or a write it proved): unrelated
         // page-load requests (a checkout widget, an animation JSON) stay in siteMapper.operations.

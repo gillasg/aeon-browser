@@ -338,6 +338,9 @@ export {
   undoLive,
   reversePairs,
   writeKind,
+  harChallenge,
+  learnBlocked,
+  provenWrites,
   requestShape,
   NotProven,
   type LearnedOperation,
@@ -486,3 +489,15 @@ export {
 } from "./site-helpers-call.js";
 export { migrateLegacyHelpers } from "./site-memory-migrate.js";
 export { exactTrigger } from "./route-match.js";
+export { healingCall, opPageUrl, pageBundle, bundleExpression } from "./heal-call.js";
+export {
+  describeOperation as describeCatalogOperation,
+  filledDefaults,
+  howToCallFor,
+  paramDescription,
+  paramRequired,
+  producerOf,
+  visibleParams,
+} from "./op-catalog.js";
+export { mergeRotated } from "./rotated-merge.js";
+export { NoPagination } from "./runtime/paginate.js";

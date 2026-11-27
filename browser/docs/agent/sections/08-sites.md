@@ -62,6 +62,10 @@ limit, cursor})` or `site.<name>(inputs)`. An ability is not a mapped operation:
   site shows `[api]` on the first turn, and a `[site]` line when you open it. `browserkit sites`
   lists them when nothing on the turn matches. To map a site: `map`, `describe`, `learn`, or use
   it in `browser_code` so its requests are learned as you go.
+- **The operations list is the contract:** pass only the inputs it lists; one marked optional
+  is filled with what the site sent, an id input names the read that returns it, and `maxItems`
+  works only on a paginated operation (otherwise `NO_PAGINATION`). A call that answers with
+  `healed: {from, to}` was repaired from the site's own code on the way; nothing to do.
 - `call` reads. A write the page made successfully can be repeated with `siteMapper.write`; the
   same change on many items is `siteMapper.batch` in one call (paced, stops at the first error).
   Paying, ordering, sending, posting, deleting and account changes always stay in the page.

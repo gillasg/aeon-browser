@@ -36,10 +36,30 @@ const HEALABLE_TEXT =
   /PersistedQueryNotFound|PERSISTED_QUERY_NOT_FOUND|persisted ?query not found/i;
 const HASH_SEGMENT = /^[A-Za-z0-9_-]{16,}$/;
 
+const HEALABLE_CODE =
+  /^(PERSISTED_QUERY_NOT_FOUND|ENDPOINT_MOVED|OP_NOT_FOUND|HTTP_(400|404|410|422))$/;
+const UNHEALABLE_CODE = /^(SITE_BLOCKED|RATE_LIMITED|SIGNED_OUT|AUTH_REQUIRED|HTTP_(401|403|429))$/;
+
+function errorCode(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function codeVerdict(code: string | undefined): boolean | undefined {
+  if (!code) return undefined;
+  if (UNHEALABLE_CODE.test(code)) return false;
+  return HEALABLE_CODE.test(code) ? true : undefined;
+}
+
 /** A failure that looks like a moved endpoint or a rotated query hash, not a bot wall or auth. */
 export function isHealableFailure(error: unknown): boolean {
+  // The error's code decides first; the message text is the fallback for errors without one.
+  const byCode = codeVerdict(errorCode(error));
+  if (byCode !== undefined) return byCode;
   const text = error instanceof Error ? error.message : String(error ?? "");
   if (/SITE_BLOCKED|RATE_LIMITED|answered HTTP (401|403|429)\b/.test(text)) return false;
+  const status = (error as { response?: { status?: unknown } } | null)?.response?.status;
+  if (typeof status === "number" && [400, 404, 410, 422].includes(status)) return true;
   return HEALABLE_STATUS.test(text) || HEALABLE_TEXT.test(text);
 }
 
@@ -274,8 +294,15 @@ export function proposeRebind(op: Operation, graph: BundleGraph): RebindProposal
 
 /** A copy of the operation pointed at the new hash or path. */
 /** A persisted-hash path param carries the new hash too. */
-function rehashParams(op: Operation, hash: string): void {
-  for (const param of op.params) if (param.persistedHash) param.constant = hash;
+function rehashParams(op: Operation, hash: string, old: string | undefined): void {
+  for (const param of op.params) {
+    if (param.persistedHash) param.constant = hash;
+    else if (old) {
+      // The hash inside a query value too: extensions={"persistedQuery":{"sha256Hash":"…"}}.
+      if (param.constant?.includes(old)) param.constant = param.constant.split(old).join(hash);
+      if (param.default?.includes(old)) param.default = param.default.split(old).join(hash);
+    }
+  }
 }
 
 export function applyRebind(op: Operation, rebind: BundleRebind): Operation {
@@ -283,12 +310,19 @@ export function applyRebind(op: Operation, rebind: BundleRebind): Operation {
   next.path = rebind.path;
   if (rebind.kind !== "graphql_hash" || !rebind.hash) return next;
   const hash = rebind.hash;
+  const old = oldHash(op) ?? /@(.+)$/.exec(rebind.oldTarget)?.[1];
+  // The hash wherever it appears: a path segment, extensions.persistedQuery, query values.
+  if (old && old !== "?") next.path = next.path.split(old).join(hash);
+  rehashGraphql(next, op, hash);
+  rehashParams(next, hash, old);
+  return next;
+}
+
+function rehashGraphql(next: Operation, op: Operation, hash: string): void {
   if (next.graphql) {
     if (next.graphql.hash !== undefined || !persisted(op)) next.graphql.hash = hash;
     const ext = next.graphql.extensions as { persistedQuery?: Record<string, unknown> } | undefined;
     if (ext?.persistedQuery) ext.persistedQuery.sha256Hash = hash;
   }
   if (next.match?.graphql?.hash) next.match.graphql.hash = hash;
-  rehashParams(next, hash);
-  return next;
 }

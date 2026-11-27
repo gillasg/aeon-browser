@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { operationEffect } from "./effect.js";
+import { detectChallenge } from "./challenge.js";
 import { filterExchanges } from "./filter.js";
 import { parseCapture } from "./load/index.js";
 import { learnedNoise, loadModel, saveFlow, siteDir, siteName, writeAtomic } from "./registry.js";
@@ -38,6 +38,8 @@ export interface LearnedOperation {
 export interface LiveLearnResult {
   site: string;
   learned: LearnedOperation[];
+  /** The page showed a bot check instead of the site: nothing could be learned. */
+  blocked?: string;
 }
 
 interface LiveState {
@@ -50,9 +52,14 @@ interface LiveState {
 }
 
 const CONSEQUENTIAL =
-  /\b(pay|payment|checkout|check out|order|purchase|buy|place order|send|message|reply|comment|post|publish|tweet|share|submit|confirm|transfer|withdraw|donate|book|reserve|subscribe|unsubscribe|account|password|email|invite|apply|delete)\b/i;
+  /\b(pay|payment|checkout|check out|order|purchase|buy|place order|send|message|reply|comment|post|publish|tweet|share|submit|confirm|transfer|withdraw|donate|book|reserve|unsubscribe|account|password|email|invite|apply|delete|destroy|revoke|cancel)\b/i;
 const ROUTINE =
-  /\b(remove|add|save|unsave|mark|read|unread|label|tag|star|unstar|like|unlike|follow|unfollow|archive|unarchive|bookmark|pin|unpin|move|rename|watch later|playlist|hide|mute|unmute|dismiss|snooze|rate|vote|upvote|downvote|favou?rite|wishlist|cart|seen|watched)\b/i;
+  /\b(remove|add|save|unsave|mark|read|unread|label|tag|star|unstar|like|unlike|follow|unfollow|archive|unarchive|bookmark|pin|unpin|move|rename|watch later|playlist|hide|mute|unmute|dismiss|snooze|rate|vote|upvote|downvote|favou?rite|wishlist|cart|seen|watched|subscribe|newsletter|note|notes)\b/i;
+/** Body fields that only change how something looks or is sorted: editing them is routine. */
+const DISPLAY_FIELD =
+  /^(name|title|label|note|description|tags?|starred|read|archived|order|position)$/i;
+/** Body fields that move money or touch the account: never routine. */
+const SENSITIVE_FIELD = /pass(word)?|card|cvv|cvc|iban|amount|ssn|pin$/i;
 
 /**
  * Routine writes (remove from a list, mark read, star, follow) may be repeated through the API
@@ -61,11 +68,28 @@ const ROUTINE =
  */
 export function writeKind(operation: Operation, approved: readonly string[] = []): WriteKind {
   if (approved.includes(operation.id)) return "consequential";
+  // Method, path words, body field names and the label clicked in the page, together.
+  const fields = bodyFieldNames(operation);
+  if (fields.some((field) => SENSITIVE_FIELD.test(field))) return "consequential";
   const text = [operation.id.replace(/([a-z])([A-Z])/g, "$1 $2"), ...(operation.steps ?? [])]
     .join(" ")
     .concat(" ", operation.path.replace(/[/_-]+/g, " "));
+  if (operation.method.toUpperCase() === "DELETE" && !ROUTINE.test(text)) return "consequential";
   if (CONSEQUENTIAL.test(text)) return "consequential";
+  if (/^(PATCH|PUT)$/i.test(operation.method) && displayOnly(fields)) return "routine";
   return ROUTINE.test(text) ? "routine" : "consequential";
+}
+
+function bodyFieldNames(operation: Operation): string[] {
+  return Object.keys(
+    ((operation.requestBody?.schema as { properties?: object } | undefined)?.properties ??
+      {}) as object,
+  );
+}
+
+/** A PATCH/PUT that changes only display fields (rename, retitle, star, reorder). */
+function displayOnly(fields: readonly string[]): boolean {
+  return fields.length > 0 && fields.every((field) => DISPLAY_FIELD.test(field));
 }
 
 /** What a proof is tied to: when the request's shape changes, the proof no longer holds. */
@@ -92,6 +116,11 @@ async function readState(site: string): Promise<LiveState> {
   }
 }
 
+/** The writes the page has proven, so the catalog can drop its "do it once in the page" note. */
+export async function provenWrites(site: string): Promise<Set<string>> {
+  return new Set(Object.keys((await readState(siteName(site))).proofs));
+}
+
 /** Learns from one step's capture: saves it as a flow, rebuilds, and reports what is new. */
 export async function learnLive(
   site: string,
@@ -99,6 +128,12 @@ export async function learnLive(
   options: { approved?: boolean } = {},
 ): Promise<LiveLearnResult> {
   const name = siteName(site);
+  const wall = harChallenge(har);
+  if (wall) {
+    const blocked = `SITE_BLOCKED: ${name} showed a bot check while learning (${wall})`;
+    await writeBlocked(name, blocked);
+    return { site: name, learned: [], blocked };
+  }
   const kept = filterExchanges(parseCapture(JSON.stringify(har), "live"), {
     origins: [name],
     noise: await learnedNoise(),
@@ -124,6 +159,55 @@ export async function learnLive(
     site: name,
     learned: touched.filter(isNews).map((operation) => describe(name, operation, state, sent)),
   };
+}
+
+interface HarEntry {
+  response?: {
+    status?: number;
+    headers?: { name: string; value: string }[];
+    content?: { mimeType?: string; text?: string };
+  };
+}
+
+/** A page document in the capture that is a bot wall, not the site: its vendor and evidence. */
+export function harChallenge(har: unknown): string | undefined {
+  const entries = (har as { log?: { entries?: HarEntry[] } } | null)?.log?.entries ?? [];
+  for (const entry of entries) {
+    const wall = entryChallenge(entry.response);
+    if (wall) return wall;
+  }
+  return undefined;
+}
+
+function entryChallenge(response: HarEntry["response"]): string | undefined {
+  const content = response?.content;
+  if (!response || !/html/i.test(content?.mimeType ?? "")) return undefined;
+  const headers = Object.fromEntries(
+    (response.headers ?? []).map((header) => [header.name.toLowerCase(), header.value]),
+  );
+  const wall = detectChallenge({
+    status: response.status ?? 0,
+    headers,
+    text: content?.text ?? "",
+  });
+  return wall ? `${wall.vendor}: ${wall.evidence}` : undefined;
+}
+
+const blockedPath = (site: string) => join(siteDir(site), "blocked.json");
+
+async function writeBlocked(site: string, message: string): Promise<void> {
+  await mkdir(siteDir(site), { recursive: true });
+  await writeAtomic(blockedPath(site), JSON.stringify({ at: new Date().toISOString(), message }));
+}
+
+/** The last learning visit's bot check, when nothing was learned from the site since. */
+export async function learnBlocked(site: string): Promise<string | undefined> {
+  try {
+    return (JSON.parse(await readFile(blockedPath(siteName(site)), "utf8")) as { message?: string })
+      .message;
+  } catch {
+    return undefined;
+  }
 }
 
 function saveState(site: string, state: LiveState): Promise<void> {
@@ -269,9 +353,14 @@ export async function reverseOperation(
   operationId: string,
 ): Promise<{ reverseId: string; irreversible: boolean } | undefined> {
   try {
-    const { model, reverseId } = await undoTarget(site, operationId);
+    const { model, state, reverseId } = await undoTarget(site, operationId);
     const forward = model.operations.find((item) => item.id === operationId);
-    return { reverseId, irreversible: !!forward && operationEffect(forward) === "irreversible" };
+    const irreversible =
+      !!forward &&
+      (forward.effect === "irreversible" ||
+        forward.method.toUpperCase() === "DELETE" ||
+        writeKind(forward, state.approved) !== "routine");
+    return { reverseId, irreversible };
   } catch {
     return undefined;
   }

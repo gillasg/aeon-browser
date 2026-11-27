@@ -1,4 +1,4 @@
-// The real-Chrome suites that live inside packages (crawl, Site Boosts). They need Chrome for
+// The real-Chrome suites that live inside packages (crawl, site-mapper heal, Site Boosts). They need Chrome for
 // Testing (branded Chrome ignores --load-extension): CHROME_PATH, or the copy the repo keeps in
 // .slice0-audit. REQUIRE_E2E makes a missing browser a failure instead of a silent skip.
 import { spawnSync } from "node:child_process";
@@ -23,5 +23,14 @@ for (const suite of ["packages/crawl"]) {
     ["--test", "--test-timeout=300000", join("test", "e2e.test.mjs")],
     { cwd: join(root, suite), env, stdio: "inherit" },
   );
+  if (run.status !== 0) process.exit(run.status ?? 1);
+}
+// Site-mapper's real-Chrome suites use the bridge helpers, which resolve from the browser root.
+for (const file of ["packages/site-mapper/test/heal-real.e2e.test.mjs"]) {
+  const run = spawnSync(process.execPath, ["--test", "--test-timeout=300000", file], {
+    cwd: root,
+    env,
+    stdio: "inherit",
+  });
   if (run.status !== 0) process.exit(run.status ?? 1);
 }
