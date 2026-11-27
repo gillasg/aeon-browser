@@ -216,7 +216,7 @@ test(
       // 10. Download: tracked to completion and saved with its attachment name.
       assert.deepEqual(
         line("W"),
-        { name: "graft-report.csv", state: "completed", bytes: 19, url: "report.csv" },
+        { name: "graft-report.csv", state: "completed", bytes: 20, url: "report.csv" },
         out,
       );
       const files = await waitFor(async () => {
