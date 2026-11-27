@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { chmodSync, lstatSync, mkdirSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
 
 // The same app root the daemon and the CLI resolve (see @graft/location). Paths are computed here
@@ -53,12 +53,14 @@ function posixRuntimeDirectory(platform, env, uid) {
 
 /**
  * macOS gives each user a private temp dir (confstr _CS_DARWIN_USER_TEMP_DIR), exposed by Node as
- * os.tmpdir()/$TMPDIR. The Chrome-launched host and the launchd supervisor resolve the same path,
+ * $TMPDIR. The Chrome-launched host and the launchd supervisor resolve the same path,
  * so they agree on the socket. A shared /tmp is not good enough; fall back to /tmp/graft-<uid>.
  */
 function macRuntimeDirectory(env, uid) {
-  const base = env.TMPDIR ?? tmpdir();
-  return privateTempDir(base, uid) ? posix.join(base, "graft") : undefined;
+  // Only the env this call was given: os.tmpdir() would read the ambient process TMPDIR even when a
+  // caller passes its own env, and without TMPDIR it is the shared /tmp, which never passes anyway.
+  const base = env.TMPDIR;
+  return base && privateTempDir(base, uid) ? posix.join(base, "graft") : undefined;
 }
 
 /** True when `base` is this user's own temp dir and safe to hold the socket directory. */

@@ -19,10 +19,7 @@
     {
       "step": "snapshot",
       "kind": "ok",
-      "result": [
-        "RootWebArea CSP",
-        "StaticText strict"
-      ]
+      "result": ["RootWebArea CSP", "StaticText strict"]
     }
   ]
 }

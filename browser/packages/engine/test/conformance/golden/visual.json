@@ -22,43 +22,19 @@
       "result": {
         "probes": [
           {
-            "at": [
-              "<TIME>",
-              "<TIME>"
-            ],
-            "rgb": [
-              255,
-              0,
-              0
-            ]
+            "at": ["<TIME>", "<TIME>"],
+            "rgb": [255, 0, 0]
           },
           {
-            "at": [
-              "<TIME>",
-              "<TIME>"
-            ],
-            "rgb": [
-              0,
-              0,
-              255
-            ]
+            "at": ["<TIME>", "<TIME>"],
+            "rgb": [0, 0, 255]
           },
           {
-            "at": [
-              "<TIME>",
-              "<TIME>"
-            ],
-            "rgb": [
-              0,
-              128,
-              0
-            ]
+            "at": ["<TIME>", "<TIME>"],
+            "rgb": [0, 128, 0]
           }
         ],
-        "size": [
-          "<BYTES>",
-          "<BYTES>"
-        ],
+        "size": ["<BYTES>", "<BYTES>"],
         "type": "png"
       }
     }

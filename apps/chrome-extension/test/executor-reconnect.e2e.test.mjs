@@ -1,11 +1,12 @@
 /* eslint-disable max-lines-per-function -- one end-to-end scenario with a replaceable fake Core */
 // Real Chrome proof: after the daemon/host link drops and the daemon restarts on a new endpoint,
 // the extension reconnects on its own (via the wake alarm) without restarting Chrome.
+import { waitForDebugPort } from "./browser-cdp-helper.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -250,14 +251,7 @@ async function fakeCore() {
 }
 
 async function debugPort(profile) {
-  for (let i = 0; i < 100; i++) {
-    try {
-      return Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]);
-    } catch {
-      await sleep(100);
-    }
-  }
-  throw new Error("Chrome did not open a debugging port");
+  return Number(await waitForDebugPort(profile));
 }
 
 async function waitForTarget(port, match) {

@@ -168,7 +168,7 @@ const pages = {
           await new Promise(d => { x.onload = d; x.send(JSON.stringify({hello: 'xhr'})); });
           const w = new Worker('/worker.js'); const wv = await new Promise(d => w.onmessage = e => d(e.data));
           const red = await fetch('/r/1').then(r => r.url.replace(location.origin, ''));
-          const ctl = new AbortController(); const ab = fetch('/gate/abort', {signal: ctl.signal}).catch(e => e.name); ctl.abort(); const aborted = await ab;
+          const ctl = new AbortController(); const ab = fetch('/gate/abort', {signal: ctl.signal}).catch(e => e.name); await fetch('/gate-arrived/abort'); ctl.abort(); const aborted = await ab;
           const f = document.createElement('iframe'); f.src = '${cross}/network/frame'; f.style.cssText = 'width:200px;height:50px'; document.body.appendChild(f);
           await new Promise(d => f.onload = d);
           out.textContent = ['data ' + a.value, 'xhr ' + x.status, 'worker ' + wv, 'redirect ' + red, 'abort ' + aborted].join(' | ');
@@ -279,15 +279,20 @@ function specialRoute(path, req, res, body) {
   return false;
 }
 
-/** A gate holds `/gate/<name>` open until `release(name)`; a gate never released stays pending. */
+/**
+ * A gate holds `/gate/<name>` open until `release(name)`; a gate never released stays pending.
+ * `/gate-arrived/<name>` answers once the gate's request reached the server, so a page can abort a
+ * held request only after it is on the wire instead of racing its own fetch.
+ */
 function gates() {
   const held = new Map();
   const channel = (name) => {
     let entry = held.get(name);
     if (!entry) {
-      let open;
+      let open, arrive;
       const opened = new Promise((done) => (open = done));
-      entry = { opened, open, waiting: 0 };
+      const arrived = new Promise((done) => (arrive = done));
+      entry = { opened, open, arrived, arrive, waiting: 0 };
       held.set(name, entry);
     }
     return entry;
@@ -296,10 +301,18 @@ function gates() {
     async hold(name, res) {
       const entry = channel(name);
       entry.waiting += 1;
+      entry.arrive();
       await entry.opened;
       if (!res.destroyed) {
         res.writeHead(200, { "content-type": "text/html" });
         res.end(html(`Gate ${name}`, `<p id="gate">${name} released</p>`));
+      }
+    },
+    async arrived(name, res) {
+      await channel(name).arrived;
+      if (!res.destroyed) {
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end("arrived");
       }
     },
     release: (name) => channel(name).open(),
@@ -327,6 +340,7 @@ export async function startSites() {
     log.push({ site, method: req.method, target, headers: { ...req.headers }, body });
     const path = new URL(target, "http://x").pathname;
     if (path.startsWith("/gate/")) return gate.hold(path.slice(6), res);
+    if (path.startsWith("/gate-arrived/")) return gate.arrived(path.slice(14), res);
     if (apiRoute(path, req, res, body) || specialRoute(path, req, res, body)) return;
     const page = pages[path];
     if (!page) {

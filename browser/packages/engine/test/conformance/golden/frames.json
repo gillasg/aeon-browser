@@ -51,9 +51,7 @@
     {
       "step": "embedded",
       "kind": "ok",
-      "result": [
-        "CROSS/frames/n3 = level 3 deep text"
-      ]
+      "result": ["CROSS/frames/n3 = level 3 deep text"]
     }
   ]
 }

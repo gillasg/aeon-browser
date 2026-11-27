@@ -30,15 +30,18 @@ export const scenarios = [
     name: "baseline",
     async run(r, { site }) {
       await r.ok("open", open(`${site.primary}/baseline`));
-      // On macOS Chrome's debugger infobar slides in after the first attach (~250ms), shrinking
-      // innerHeight from 656 to 600; read the fingerprint once the viewport height has settled.
+      // On macOS Chrome's debugger infobar slides in after the first attach, shrinking innerHeight
+      // from 656 to 600. Attach happened before this evaluate ran, but on a loaded runner the bar can
+      // start sliding well after a 300ms poll gave up, so wait until no resize has fired for a full
+      // second (bounded at 4s) before reading the fingerprint.
       const settledFingerprint = `await page.evaluate(async () => {
-        let prev = innerHeight;
-        for (let i = 0; i < 6; i++) {
-          await new Promise((done) => setTimeout(done, 150));
-          if (innerHeight === prev && i >= 1) break;
-          prev = innerHeight;
-        }
+        await new Promise((done) => {
+          let quiet;
+          const settle = () => { clearTimeout(quiet); quiet = setTimeout(done, 1000); };
+          addEventListener("resize", settle);
+          settle();
+          setTimeout(done, 4000);
+        });
         return {
           viewport: [innerWidth, innerHeight], dpr: devicePixelRatio, ua: navigator.userAgent,
           onLine: navigator.onLine, dark: matchMedia("(prefers-color-scheme: dark)").matches,
