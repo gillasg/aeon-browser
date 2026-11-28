@@ -5,6 +5,8 @@
 
 export const CURSOR_STATE_EVENT = "cursor-overlay-state";
 export const CURSOR_COMMAND_EVENT = "cursor-overlay-command";
+/** The painter hands its working caption to the extension overlay when that overlay owns the pill. */
+export const CURSOR_CAPTION_EVENT = "cursor-overlay-caption";
 
 export interface CursorBox {
   x: number;

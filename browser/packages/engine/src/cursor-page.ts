@@ -1,7 +1,14 @@
 // The one cursor's painter. On web pages it runs in the extension's isolated world (injected with
 // chrome.scripting), so its host expandos, state and event bus are invisible to page scripts.
-import { CURSOR_MARK, CURSOR_TOKEN_CSS, glideDuration, glidePoint } from "./cursor-mark.js";
-import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "./cursor-bus.js";
+import {
+  CURSOR_MARK,
+  CURSOR_TOKEN_CSS,
+  UNIFIED_OVERLAY_ATTR,
+  glideDuration,
+  glidePoint,
+  pillDodge,
+} from "./cursor-mark.js";
+import { CURSOR_CAPTION_EVENT, CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT } from "./cursor-bus.js";
 
 /** What the painter is showing right now. Nothing shown means the host leaves the page. */
 export interface CursorPaint {
@@ -72,11 +79,17 @@ const PAGE_STYLE = [
   "border-radius:var(--graft-r-8);background:var(--graft-island-keys);color:var(--graft-island-ink);box-shadow:var(--graft-island-elev);",
   "font:500 var(--graft-fs-xs)/14px -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,sans-serif;opacity:0;transition:opacity .18s ease,transform .18s ease;pointer-events:none}",
   ".k.on{opacity:1;transform:translateX(-50%)}",
+  // One pill on the page: when the extension's overlay is mounted it owns the working pill, and
+  // this painter hands it the caption instead of showing a second one.
+  ".orb .p{display:none!important}",
+  ".p.dock{transition:left .28s ease,top .28s ease,opacity 160ms ease}",
 ].join("");
 
 const PAGE_BODY = `
   var styleText = ${JSON.stringify(PAGE_STYLE)};
   var STATE_EVENT = ${JSON.stringify(CURSOR_STATE_EVENT)};
+  var CAPTION_EVENT = ${JSON.stringify(CURSOR_CAPTION_EVENT)};
+  var ORB_SELECTOR = ${JSON.stringify("[" + UNIFIED_OVERLAY_ATTR + '="true"]')};
   var COMMAND_EVENT = ${JSON.stringify(CURSOR_COMMAND_EVENT)};
   // The bus lives in the world the painter runs in (the extension's isolated world on web pages),
   // so a page script can neither hear the cursor nor send it commands.
@@ -147,6 +160,7 @@ const PAGE_BODY = `
     state.place = function () {
       var x = state.pageX - scrollX, y = state.pageY - scrollY;
       state.cursor.style.transform = "translate(" + x + "px," + y + "px)";
+      dockPill(state, x, y);
       state.point = { x: Math.round(x), y: Math.round(y) };
       state.publish();
     };
@@ -209,6 +223,9 @@ const PAGE_BODY = `
     state.place();
   }
   var s = host.__s;
+  s.orb = Boolean(document.querySelector(ORB_SELECTOR));
+  s.wrap.classList.toggle("orb", s.orb);
+  if (typeof update.x === "number" && typeof update.y === "number") aimDodge(s, update);
   if (update.glowColor && update.glowColor !== s.glowColor) {
     s.glowColor = update.glowColor;
     // Dynamic Ink: the edge glow and the pill stay neutral bone on obsidian whatever the site's
@@ -331,6 +348,7 @@ const PAGE_BODY = `
   function paintCaption(state, next) {
     state.captionAt = Date.now();
     var text = String(next.caption).slice(0, next.needs ? 300 : 120);
+    if (state.orb) bus.dispatchEvent(new CustomEvent(CAPTION_EVENT, { detail: { text: text, needs: Boolean(next.needs) } }));
     clearTimeout(state.hide); clearInterval(state.type);
     state.pill.classList.add("on");
     if (next.typing) {
@@ -353,6 +371,25 @@ const PAGE_BODY = `
     if (data.place) { cancelAnimationFrame(state.frame); state.pageX = destX; state.pageY = destY; state.place(); }
     else glideTo(state, destX, destY, false);
   }
+  // The pill rides beside the cursor. When the next target would sit under it (or within 48px),
+  // it docks in the viewport corner farthest from that target before the click lands.
+  function aimDodge(state, next) {
+    var box = next.spotlight ? { x: next.spotlight.x, y: next.spotlight.y, w: next.spotlight.width, h: next.spotlight.height } : { x: next.x, y: next.y };
+    var size = state.pill.getBoundingClientRect();
+    var pill = { x: next.x + 18, y: next.y + 20, w: Math.max(size.width, 120), h: Math.max(size.height, 28) };
+    state.dock = pillDodge(pill, box, { w: innerWidth, h: innerHeight });
+  }
+  function dockPill(state, x, y) {
+    var corner = state.dock || "";
+    state.pill.classList.toggle("dock", Boolean(corner));
+    if (!corner) { state.pill.style.left = ""; state.pill.style.top = ""; return; }
+    var size = state.pill.getBoundingClientRect();
+    var w = Math.max(size.width, 120), h = Math.max(size.height, 28);
+    var cx = corner.indexOf("left") >= 0 ? 16 : innerWidth - 16 - w;
+    var cy = corner.indexOf("top") >= 0 ? 16 : innerHeight - 16 - h;
+    state.pill.style.left = (cx - x) + "px";
+    state.pill.style.top = (cy - y) + "px";
+  }
   function hostFor(state) {
     var kids = (document.documentElement || document.body).children;
     for (var i = 0; i < kids.length; i++) if (kids[i].__s === state) return kids[i];
@@ -360,6 +397,7 @@ const PAGE_BODY = `
   }
   function rest(state, node) {
     state.agent = false;
+    state.dock = "";
     state.summoned = false;
     state.wrap.classList.remove("needs");
     state.wrap.removeAttribute("data-needs-kind");
@@ -383,6 +421,8 @@ export function cursorFunctionSource(): string {
     glideDuration.toString() +
     "\n" +
     cursorVisible.toString() +
+    "\n" +
+    pillDodge.toString() +
     "\n" +
     PAGE_BODY +
     "\n}"

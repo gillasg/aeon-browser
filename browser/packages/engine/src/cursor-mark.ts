@@ -137,3 +137,32 @@ export function glidePoint(
     y: rest * rest * fromY + 2 * rest * eased * cy + eased * eased * toY,
   };
 }
+
+/** The one overlay's host marker: the orb host carries it, and the page painter defers to it. */
+export const UNIFIED_OVERLAY_ATTR = "data-graft-overlay";
+
+/**
+ * Where the working pill goes so it never sits on what the agent is about to click or type into.
+ * `pill` is the pill's box, `target` the point or box being acted on, `view` the viewport (all in
+ * viewport pixels). Returns the viewport corner farthest from the target when the pill comes
+ * within `margin` pixels of it, or "" when the pill is already clear.
+ */
+export function pillDodge(
+  pill: { x: number; y: number; w: number; h: number },
+  target: { x: number; y: number; w?: number; h?: number },
+  view: { w: number; h: number },
+  margin?: number,
+): string {
+  const gap = typeof margin === "number" ? margin : 48;
+  const tw = target.w || 0;
+  const th = target.h || 0;
+  const clear =
+    pill.x > target.x + tw + gap ||
+    pill.x + pill.w < target.x - gap ||
+    pill.y > target.y + th + gap ||
+    pill.y + pill.h < target.y - gap;
+  if (clear) return "";
+  const vertical = target.y + th / 2 < view.h / 2 ? "bottom" : "top";
+  const horizontal = target.x + tw / 2 < view.w / 2 ? "right" : "left";
+  return vertical + "-" + horizontal;
+}

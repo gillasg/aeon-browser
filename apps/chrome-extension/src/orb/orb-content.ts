@@ -39,6 +39,14 @@ if (!window.__orbLoaded && (!graftPage || window.parent === window)) {
   start();
 }
 
+/** Brings the working overlay back when the tab shows again, or returns from the back/forward cache. */
+function listenForRestore(restore: () => void): void {
+  document.addEventListener("visibilitychange", restore);
+  addEventListener("pageshow", (event) => {
+    if (event.persisted) restore();
+  });
+}
+
 function start(): void {
   let overlay: OrbOverlay | undefined;
   let recording = false;
@@ -83,7 +91,7 @@ function start(): void {
       .catch(() => undefined);
   };
   restore();
-  document.addEventListener("visibilitychange", restore);
+  listenForRestore(restore);
 
   listenToCursorButtons(() => overlay !== undefined);
   listenForEscape(() => overlay);
