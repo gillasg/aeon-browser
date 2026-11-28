@@ -176,6 +176,11 @@ test("Compose never shows the X-Ray strip or the power row", async () => {
   assert.doesNotMatch(html, /isl-xray|isl-power|Boost this site/);
   assert.doesNotMatch(html, /Fill this form|isl-whisper|Type \//);
   assert.match(html, /isl-context/);
+  // The site chip is a cap above the input row, never inline beside the field.
+  const chip = html.indexOf("isl-context");
+  const row = html.indexOf("isl-input");
+  assert.ok(chip >= 0 && row > chip, "isl-context renders before (above) isl-input");
+  assert.doesNotMatch(html.slice(row), /isl-context/);
 });
 
 test("Teach folds the box to its pill", async () => {

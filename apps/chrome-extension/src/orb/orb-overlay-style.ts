@@ -15,12 +15,13 @@ const LAYER_STYLE = `
 .pill {
   position: fixed; left: 0; top: 0; display: flex; align-items: center; gap: 8px;
   max-width: 360px; padding: 5px 5px 5px 12px; box-sizing: border-box;
-  border-radius: var(--graft-r-full); pointer-events: auto; white-space: nowrap;
-  will-change: transform; font: 500 var(--graft-fs-md)/17px -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  border-radius: var(--graft-r-full); pointer-events: none; white-space: nowrap;
+  will-change: transform; transition: transform .28s ease, opacity .3s ease; font: 500 var(--graft-fs-md)/17px -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
   color: var(--graft-island-ink); background: var(--graft-island-bg);
   -webkit-backdrop-filter: none; backdrop-filter: none;
-  box-shadow: var(--graft-island-elev); transition: opacity .3s ease;
+  box-shadow: var(--graft-island-elev);
 }
+.pill .label, .pill .ic { pointer-events: auto; }
 .pill[hidden] { display: none; }
 .pill.fading { opacity: 0; }
 .pill .label {

@@ -238,10 +238,10 @@ function Compose({
     <>
       {model.ask && <p className="isl-ask">{model.ask}</p>}
       <RunningLine model={model} actions={actions} />
+      <ContextLead model={model} actions={actions} />
       <div className="isl-input" data-warn={String(Boolean(model.notice))}>
         {model.line && islandState(model) === "answer" ? null : <InkDots />}
         <AddTab model={model} actions={actions} />
-        <ContextLead model={model} actions={actions} />
         <textarea
           id="prompt"
           rows={1}
@@ -269,7 +269,7 @@ function Compose({
   );
 }
 
-/** The `@ site` context chip, left-aligned inside the bar, then the pointed-at element. */
+/** The `@ site` context chips and the pointed-at element: a cap above the input row. */
 function ContextLead({
   model,
   actions,

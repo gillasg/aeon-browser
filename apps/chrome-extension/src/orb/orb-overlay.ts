@@ -5,7 +5,13 @@ import {
   type OrbToContent,
   type OrbVisualState,
 } from "./orb-messages.js";
-import { CURSOR_COMMAND_EVENT, CURSOR_STATE_EVENT, cursorBus } from "@browserkit/engine/cursor-bus";
+import {
+  CURSOR_CAPTION_EVENT,
+  CURSOR_COMMAND_EVENT,
+  CURSOR_STATE_EVENT,
+  cursorBus,
+} from "@browserkit/engine/cursor-bus";
+import { UNIFIED_OVERLAY_ATTR, pillDodge } from "@browserkit/engine/cursor-mark";
 import type { OrbBox, OrbCursorStep } from "./orb-run.js";
 import type { OrbLayout } from "./orb-messages.js";
 import { OVERLAY_STYLE } from "./orb-overlay-style.js";
@@ -131,6 +137,7 @@ export class OrbOverlay {
     });
     sleepers.add(this.wake);
     this.stopWatching = watchOrbPosition((position) => this.moveHome(position));
+    cursorBus().addEventListener(CURSOR_CAPTION_EVENT, this.onCaption);
     addEventListener("resize", this.resize);
     addEventListener("pointerdown", this.clickAway, { capture: true });
     document.addEventListener("visibilitychange", this.onVisibility);
@@ -200,7 +207,9 @@ export class OrbOverlay {
   }
 
   private updatePill(): void {
-    const show = !this.open && this.state !== "listening" && this.label !== "" && !this.acting;
+    // One working pill: it stays up while the agent drives the page (the painter hands it its
+    // caption), so nothing vanishes between asking and working.
+    const show = !this.open && this.state !== "listening" && this.label !== "";
     if (!show) this.releasePillLayout();
     this.pill.hidden = !show;
     this.pill.dataset.state = this.state;
@@ -235,6 +244,7 @@ export class OrbOverlay {
     clearTimeout(this.fadeTimer);
     removeEventListener("resize", this.resize);
     removeEventListener("pointerdown", this.clickAway, { capture: true });
+    cursorBus().removeEventListener(CURSOR_CAPTION_EVENT, this.onCaption);
     document.removeEventListener("visibilitychange", this.onVisibility);
     this.stopWatching();
     this.host.remove();
@@ -272,6 +282,9 @@ export class OrbOverlay {
     this.host.setAttribute("data-ux-orb", "");
     // The engine leaves every data-ux-overlay subtree out of the page state the agent reads.
     this.host.setAttribute("data-ux-overlay", "");
+    // The one overlay: the page painter finds it here and never mounts a second pill beside it.
+    this.host.setAttribute(UNIFIED_OVERLAY_ATTR, "true");
+    this.host.setAttribute("aria-hidden", "true");
     document.documentElement.append(this.host);
   }
 
@@ -503,9 +516,24 @@ export class OrbOverlay {
   private placePill(x: number, y: number): void {
     if (this.pill.hidden) return;
     const width = this.pillWidth;
-    const left = x + 24 + width > innerWidth - 8 ? x - 8 - width : x + 24;
-    this.pill.style.transform = `translate(${left}px, ${y + 16}px)`;
+    // While the agent drives, the pill waits at home instead of riding on the cursor, and steps
+    // to the far corner when the cursor heads within reach of it.
+    const anchor = this.acting ? this.home() : { x, y };
+    const left = anchor.x + 24 + width > innerWidth - 8 ? anchor.x - 8 - width : anchor.x + 24;
+    const top = anchor.y + 16;
+    const place = this.acting
+      ? dockedPill({ x: left, y: top, w: width, h: 34 }, cursorPoint)
+      : null;
+    this.pill.style.transform = `translate(${place?.x ?? left}px, ${place?.y ?? top}px)`;
   }
+
+  private readonly onCaption = (event: Event): void => {
+    const text = (event as CustomEvent<{ text?: unknown }>).detail?.text;
+    if (typeof text !== "string" || !text || !this.running) return;
+    this.label = text;
+    this.updatePill();
+    this.wake();
+  };
 
   private glyphPoint(): Point {
     return cursorPoint ?? this.point;
@@ -624,4 +652,19 @@ export function framePlace(input: {
 
 function clampSize(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/** Where the working pill moves when `target` comes within 48px of it; null when it is clear. */
+export function dockedPill(
+  pill: { x: number; y: number; w: number; h: number },
+  target: Point | undefined,
+  view: { w: number; h: number } = { w: innerWidth, h: innerHeight },
+): Point | null {
+  if (!target) return null;
+  const corner = pillDodge(pill, target, view);
+  if (!corner) return null;
+  return {
+    x: corner.endsWith("left") ? 16 : view.w - 16 - pill.w,
+    y: corner.startsWith("top") ? 16 : view.h - 16 - pill.h,
+  };
 }
