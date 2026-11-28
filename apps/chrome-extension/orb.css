@@ -32,7 +32,8 @@ body {
   box-sizing: border-box;
   width: 100%;
   padding: 8px 8px 8px 14px;
-  border-radius: var(--graft-r-full);
+  /* One shape in every state: a stadium at one-row height, a crisp rounded box when it grows. */
+  border-radius: 18px;
   background: var(--graft-island-bg);
   /* Top-lit hairline and a tight dark framing edge only: never a drop shadow beneath. */
   box-shadow: var(--graft-island-edge);

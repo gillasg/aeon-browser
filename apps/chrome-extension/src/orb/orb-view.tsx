@@ -12,7 +12,6 @@ import {
   ErrorCard,
   Palette,
   AnswerFoot,
-  InkDots,
   RunTabPills,
   SendButton,
   TargetChip,
@@ -240,7 +239,6 @@ function Compose({
       <RunningLine model={model} actions={actions} />
       <ContextLead model={model} actions={actions} />
       <div className="isl-input" data-warn={String(Boolean(model.notice))}>
-        {model.line && islandState(model) === "answer" ? null : <InkDots />}
         <AddTab model={model} actions={actions} />
         <textarea
           id="prompt"
@@ -441,7 +439,8 @@ function TabChoices({
 
 // 16px line icons in one stroke weight, so the bar reads as one set.
 const ICONS = {
-  panel: "M3 3.5h10v9H3zM9.5 3.5v9",
+  // ☰: the same three lines as the working pill's transcript button.
+  panel: "M3 4.5h10M3 8h10M3 11.5h10",
 } as const;
 
 function Button({
