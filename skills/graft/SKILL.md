@@ -23,14 +23,14 @@ Act in this order. Use an id the page state already printed (`bu.click(id)`, `bu
 page = await browser.openTab(url);
 await bu.state();
 await page.getByRole('button', {name: 'Continue'}).click();
-return await page.read();
+return await page.glance();
 ```
 
 A task about the tab the user is on runs on `browser.activeTab()`. Anything else opens its own tab, so theirs stays put. `help('when')`. An ability result may add `unverified`: that part is not verified, so say which part or re-read it in the page. A bracketed `[writes …]` on a site line is the way's inventory, never a permission gate.
 
 ---
 
-Read a page once: `await page.read()` returns an object; `.text` is the page text, and `data`, `list` and `markdown` stay. A list says whether it is complete or partial. Rows the page already loaded come back from `page.data(name)` with no new request. Never screenshot just to check; read the page (`page.read()`, `bu.state()`). A screenshot is for layout, an image or a visual problem, not to find text or confirm a step. `help('reading')`.
+Between steps `page.glance()`; a whole page: `await page.read()` returns an object; `.text` is the page text, and `data`, `list` and `markdown` stay. A list says whether it is complete or partial. Rows the page already loaded come back from `page.data(name)` with no new request. Never screenshot to check; glance instead. A screenshot is for layout, an image or a visual problem, not to find text or confirm a step. `help('reading')`.
 
 ---
 

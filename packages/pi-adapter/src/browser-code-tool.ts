@@ -700,7 +700,8 @@ async function journalOutput(
       const saved = await workspaceCall(workspace, {
         workspace: "artifact",
         name: "browser-results/" + operationId + ".json",
-        value: encoded,
+        // Indented on disk, so grep and a line-by-line read work; never one huge line.
+        value: JSON.stringify(cell.value, null, 2),
       });
       cell.value = {
         savedResult: saved,

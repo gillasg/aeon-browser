@@ -36,7 +36,7 @@ __job.result = async (id) => {
   var result = await __call({job:{action:'result', id:String(id)}});
   if (result && result.status === 'complete' && !result.artifact) {
     try {
-      var saved = await artifact('jobs/' + id + '.json', JSON.stringify(result));
+      var saved = await artifact('jobs/' + id + '.json', JSON.stringify(result, null, 2));
       await __call({job:{action:'artifact', id:String(id), path:saved.path}}).catch(() => undefined);
       result.artifact = saved.path;
     } catch (error) {

@@ -21,6 +21,10 @@ export type RealmPost = (message: Record<string, unknown>) => void;
 type Waiter = { resolve: (json: string | undefined) => void; reject: (message: string) => void };
 
 const CELL_SYNC_MS = 10 * 60_000;
+/** The final observation and footers after a cell: a strict budget, never the cell's deadline. */
+export const FINISH_CELL_MS = 1800;
+/** How long a stopped cell may take to unwind before the realm moves on without it. */
+export const HUNG_CELL_GRACE_MS = 1500;
 const messageOf = (error: unknown): string =>
   error !== null && typeof error === "object" && "message" in error
     ? String((error as { message: unknown }).message)
@@ -40,6 +44,8 @@ export class CodeRealm {
   private asynchronousError: string | undefined;
   private stopped = false;
   private keep = false;
+  /** Counts cells; a cell abandoned after its deadline cannot post into a later one. */
+  private generation = 0;
   private disposed = false;
 
   constructor(private readonly post: RealmPost) {
@@ -76,6 +82,7 @@ export class CodeRealm {
       const reason = this.keep ? "TIMEOUT: browser cell did not finish" : "RUN_RESET";
       for (const waiter of this.pending.values()) waiter.reject(reason);
       this.pending.clear();
+      if (this.keep) this.abandonHungCell();
     } else if (message.kind === "cell") {
       // One cell at a time, and only while this realm is alive. A deadline stops the realm, so a
       // timed-out cell does not keep running and its late result cannot reach the next cell.
@@ -84,6 +91,22 @@ export class CodeRealm {
         .then(() => (this.stopped ? undefined : this.run(message)))
         .catch(() => undefined);
     }
+  }
+
+  /**
+   * A stopped cell whose code still awaits something that never settles (a page promise, a
+   * timer) would hold the queue, and the next cell would wait at realm-ready until its own
+   * deadline. After a short grace the partial is posted and the queue moves on without it.
+   */
+  private abandonHungCell(): void {
+    const generation = this.generation;
+    const timer = setTimeout(() => {
+      if (this.disposed || generation !== this.generation || !this.stopped) return;
+      this.generation++;
+      this.postPartial();
+      this.queue = Promise.resolve();
+    }, HUNG_CELL_GRACE_MS);
+    timer.unref?.();
   }
 
   /** Drops the realm: its timers stop and nothing it does reaches the host again. */
@@ -153,6 +176,7 @@ export class CodeRealm {
   }
 
   private async run(message: Record<string, unknown>): Promise<void> {
+    const generation = ++this.generation;
     this.cellId = String(message.cellId);
     this.send({ kind: "started", cellId: this.cellId });
     this.output = "";
@@ -165,6 +189,8 @@ export class CodeRealm {
     } catch (caught) {
       error = withHint(this.scope, nameModelCodeError(asError(caught)), messageOf(caught), code);
     }
+    // Abandoned after its deadline: a later cell owns the realm now.
+    if (generation !== this.generation) return;
     // A deadline keeps the realm and returns what the cell had built. A reset posts nothing.
     if (this.stopped) {
       if (this.keep) this.postPartial();
@@ -218,7 +244,7 @@ export class CodeRealm {
     // The final observation is not the cell's work: it must never burn the whole deadline when a
     // tab is hung or held by another chat. Give it a short, fixed budget and still answer.
     try {
-      await bounded(this.evaluate("__finishCell()"), 5000);
+      await bounded(this.evaluate("__finishCell()"), FINISH_CELL_MS);
     } catch (caught) {
       this.print("Final observation unavailable:", messageOf(caught));
     }

@@ -51,7 +51,7 @@ export function stepEventFrom(input: {
   if (!kind) return undefined;
   const result = record(input.entry.result);
   const target = eventTarget(input.step.element);
-  const effect = effectOf(input.entry, result);
+  const effect = effectOf(input.entry, result, input.step.op === "evaluate" ? "evaluate" : kind);
   const evidence = evidenceOf(result);
   const sensitive = Boolean(target && isSensitive(target));
   const box = boxOf(input.entry.box);
@@ -229,10 +229,16 @@ function backendId(element: unknown): number | undefined {
 function effectOf(
   entry: Record<string, unknown>,
   result: Record<string, unknown> | undefined,
+  kind: string,
 ): StepEffect | undefined {
   const value = result?.effect ?? entry.effect;
   if (isEffect(value)) return value;
-  return entry.disposition === "failed" ? "refused" : undefined;
+  if (entry.disposition === "failed") return "refused";
+  // A read that answered and a tab that opened did what they said: no "unverifiable" for them.
+  if (kind === "read" && result) return "confirmed";
+  if (kind === "open" && result && result.navigation !== "failed" && record(result.tab))
+    return "opened_tab";
+  return undefined;
 }
 
 function evidenceOf(

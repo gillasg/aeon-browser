@@ -61,15 +61,17 @@ globalThis.chrome = {
 
 configureEngine({ tabGroupTitle: (_owner, title) => title ?? "Agent" });
 
-test("one shared group per window, titled by the host, with a rejoin marker", async () => {
+test("one shared group per window, titled cleanly by the host without a raw marker", async () => {
   await groupAgentTab(1, 1, "owner-one", "Trip planning for the long weekend");
   await groupAgentTab(2, 1, "owner-two", "Dinner ideas");
   assert.equal(groups.size, 1);
   const group = [...groups.values()][0];
-  // "Agent · 2" for two chats, then the invisible marker and owner key; strip both.
-  const [visible, marker] = group.title.split("\u2063");
-  assert.equal(visible.replace(/\s*·\s*\d+$/, ""), "Agent");
-  assert.equal(marker, "shared--");
+  assert.ok(
+    !group.title.includes("\u2063"),
+    "no invisible separator leaks into the tab group title",
+  );
+  assert.ok(!group.title.includes("shared--"), "no raw shared-- owner key leaks into the title");
+  assert.equal(group.title.replace(/\s*·\s*\d+$/, ""), "Agent");
   assert.equal(group.color, group.color.toLowerCase());
 
   // A new window gets its own group; the first window still has exactly one.

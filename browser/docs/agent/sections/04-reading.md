@@ -1,5 +1,10 @@
 ## Reading pages
 
+**Browsing: `page.glance()`.** It returns `{url, title, text, controls, scroll}` for what is on
+screen now, in under a second: no settle wait, no "Show more" clicks, no walk of the whole page.
+Links come back without ad redirects and tracking parameters. Use it (or `bu.state()`) between
+clicks, typing and scrolling; use `page.read()` only to extract a whole page.
+
 **One `page.read()` per page, every tab at once with `Promise.all`.** It returns an object, not
 text: `url`, `title`, `text`, `markdown`, `data`, `list`, `partial`, `notes`, plus `scrollers`,
 `embedded` and `artifact` when those apply. `text` is `markdown` plus each frame's text under

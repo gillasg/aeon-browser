@@ -170,7 +170,7 @@ test("a failed cell keeps only tabs it opened, never a tab it attached to", asyn
 
 test("the final observation has its own deadline in the realm", () => {
   const realm = readFileSync(new URL("../src/code-realm.ts", import.meta.url), "utf8");
-  assert.match(realm, /bounded\(this\.evaluate\("__finishCell\(\)"\), 5000\)/);
+  assert.match(realm, /bounded\(this\.evaluate\("__finishCell\(\)"\), FINISH_CELL_MS\)/);
 });
 
 test("cross-chat steps fail before any queue, and listTabs marks another chat's tab", async () => {
