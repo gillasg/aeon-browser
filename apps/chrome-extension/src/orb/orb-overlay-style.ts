@@ -8,14 +8,15 @@ const LAYER_STYLE = `
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
 .hit {
   all: unset; position: fixed; left: 0; top: 0; width: 32px; height: 32px;
-  border-radius: var(--graft-r-full); pointer-events: auto; cursor: grab; will-change: transform;
+  border-radius: var(--graft-r-full); pointer-events: auto; cursor: default; will-change: transform;
 }
-.hit:active { cursor: grabbing; }
+/* While a run drives the page or the box is open, the hit target is gone: no stray pointer. */
+:host([data-run]) .hit, :host([data-open]) .hit { display: none; }
 .hit:focus-visible { outline: 2px solid var(--graft-island-focus); outline-offset: -4px; }
 .pill {
   position: fixed; left: 0; top: 0; display: flex; align-items: center; gap: 8px;
   max-width: 360px; padding: 5px 5px 5px 12px; box-sizing: border-box;
-  border-radius: var(--graft-r-full); pointer-events: none; white-space: nowrap;
+  border-radius: 18px; pointer-events: none; white-space: nowrap;
   will-change: transform; transition: transform .28s ease, opacity .3s ease; font: 500 var(--graft-fs-md)/17px -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
   color: var(--graft-island-ink); background: var(--graft-island-bg);
   -webkit-backdrop-filter: none; backdrop-filter: none;
@@ -28,14 +29,20 @@ const LAYER_STYLE = `
   all: unset; cursor: pointer; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 .pill .spin {
-  width: 9px; height: 9px; flex: none; border-radius: var(--graft-r-full); box-sizing: border-box;
-  border: 1px solid var(--graft-island-ink-soft); animation: ink-breathe 2.4s ease-in-out infinite alternate;
+  flex: none; display: inline-grid; grid-template-columns: 3px 3px; gap: 3px;
 }
+.pill .spin i {
+  width: 3px; height: 3px; border-radius: 50%; background: var(--graft-island-dot);
+  opacity: .14; animation: ink-wave 1.4s ease-in-out infinite;
+}
+.pill .spin i:nth-child(2) { animation-delay: .18s; }
+.pill .spin i:nth-child(4) { animation-delay: .36s; }
+.pill .spin i:nth-child(3) { animation-delay: .54s; }
 .pill:not([data-state="thinking"]):not([data-state="working"]) .spin { display: none; }
 .pill:not([data-state="thinking"]):not([data-state="working"]):not([data-state="needs"]) .stop { display: none; }
-.pill.hold-layout:not([data-state="thinking"]):not([data-state="working"]) .spin { display: block; visibility: hidden; }
+.pill.hold-layout:not([data-state="thinking"]):not([data-state="working"]) .spin { display: inline-grid; visibility: hidden; }
 .pill.hold-layout:not([data-state="thinking"]):not([data-state="working"]):not([data-state="needs"]) .stop { display: grid; visibility: hidden; pointer-events: none; }
-@keyframes ink-breathe { from { opacity: .35; } to { opacity: 1; } }
+@keyframes ink-wave { 0%, 100% { opacity: .14; } 40% { opacity: .95; } }
 .pill .ic {
   all: unset; width: 24px; height: 24px; flex: none; border-radius: var(--graft-r-full);
   display: grid; place-items: center; cursor: pointer; background: var(--graft-island-line-strong);
@@ -58,10 +65,10 @@ iframe.off {
 }
 @media (prefers-reduced-motion: reduce) {
   iframe, .pill { transition: none; }
-  .pill .spin { animation: none; }
+  .pill .spin i { animation: none; }
 }
 :host([data-reduced-motion]) iframe, :host([data-reduced-motion]) .pill { transition: none; }
-:host([data-reduced-motion]) .pill .spin { animation: none; }
+:host([data-reduced-motion]) .pill .spin i { animation: none; }
 `;
 
 export const OVERLAY_STYLE = ":host { all: initial; }" + CURSOR_TOKEN_CSS + LAYER_STYLE;

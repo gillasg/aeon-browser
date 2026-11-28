@@ -367,6 +367,8 @@ const PAGE_BODY = `
     if (data.release) { rest(state, hostFor(state)); return; }
     state.summoned = true;
     if (state.agent) return;
+    state.cursorShown = true;
+    state.cursor.style.opacity = "1";
     var destX = data.x + scrollX, destY = data.y + scrollY;
     if (data.place) { cancelAnimationFrame(state.frame); state.pageX = destX; state.pageY = destY; state.place(); }
     else glideTo(state, destX, destY, false);

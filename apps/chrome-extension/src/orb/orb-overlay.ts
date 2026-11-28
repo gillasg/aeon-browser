@@ -213,6 +213,9 @@ export class OrbOverlay {
     if (!show) this.releasePillLayout();
     this.pill.hidden = !show;
     this.pill.dataset.state = this.state;
+    // No hit target (and so no stray pointer) while the agent drives or the box is open.
+    this.host.toggleAttribute("data-run", this.state === "thinking" || this.state === "working");
+    this.host.toggleAttribute("data-open", this.open);
     this.pillLabel.textContent = this.label;
     this.pillLabel.title = this.label;
     // One layout read when the label changes, instead of one on every animation frame.
@@ -264,7 +267,6 @@ export class OrbOverlay {
     layer.className = "layer";
     this.hit.className = "hit";
     this.hit.type = "button";
-    this.hit.title = "Graft · click to ask, drag to move";
     this.hit.setAttribute("aria-label", "Graft");
     this.hit.addEventListener("pointerdown", this.dragStart);
     const url = new URL(chrome.runtime.getURL("orb.html"));
@@ -292,8 +294,12 @@ export class OrbOverlay {
   private buildPill(): void {
     this.pill.className = "pill";
     this.pill.hidden = true;
+    // The same 2×2 Dynamic Ink wave as the box's working line.
     const spin = document.createElement("span");
-    spin.className = "spin";
+    spin.className = "spin ink-dots";
+    spin.dataset.live = "true";
+    spin.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 4; i++) spin.append(document.createElement("i"));
     this.pillLabel.className = "label";
     this.pillLabel.type = "button";
     this.pillLabel.addEventListener("click", () => this.showBubble(true, false));
@@ -323,6 +329,7 @@ export class OrbOverlay {
   }
 
   private setVisual(state: OrbVisualState, label: string): void {
+    const wasRunning = this.state === "thinking" || this.state === "working";
     this.syncPillLayoutHold(state);
     this.state = state;
     this.label = state === "listening" ? "" : label;
@@ -332,8 +339,10 @@ export class OrbOverlay {
     this.pill.classList.remove("fading");
     clearTimeout(this.fadeTimer);
     this.scheduleFade();
-    // A question comes to the user even if they closed the box: its field opens, focus stays put.
-    if (state === "needs" && !this.open) this.showBubble(false);
+    // A question or finished answer comes back to the user even after navigation or agent clicks
+    // folded the box to the working pill; focus stays put so we never interrupt typing elsewhere.
+    const expandAnswer = (state === "done" || state === "error") && wasRunning;
+    if ((state === "needs" || expandAnswer) && !this.open) this.showBubble(false);
   }
 
   /** A result or a failure is one line that goes after a few seconds, unless hovered. */
