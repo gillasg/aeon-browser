@@ -66,7 +66,10 @@ test("one shared group per window, titled cleanly by the host without a raw mark
   await groupAgentTab(2, 1, "owner-two", "Dinner ideas");
   assert.equal(groups.size, 1);
   const group = [...groups.values()][0];
-  assert.ok(!group.title.includes("\u2063"), "no invisible separator leaks into the tab group title");
+  assert.ok(
+    !group.title.includes("\u2063"),
+    "no invisible separator leaks into the tab group title",
+  );
   assert.ok(!group.title.includes("shared--"), "no raw shared-- owner key leaks into the title");
   assert.equal(group.title.replace(/\s*·\s*\d+$/, ""), "Agent");
   assert.equal(group.color, group.color.toLowerCase());
