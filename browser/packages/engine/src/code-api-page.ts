@@ -587,7 +587,15 @@ var bu = Object.freeze({
     var target = __lastTarget;
     var element = __element(target, id);
     var result = await browser.page(target).fill(element, text);
-    if (options.enter) result = await browser.page(target).press(element, 'Enter', {focus:false});
+    // Enter submits the search the way a person does. A field the page swapped out while typing
+    // (an autocomplete re-render) still has focus, so the key goes to the focused element.
+    if (options.enter) {
+      try { result = await browser.page(target).press(element, 'Enter', {focus:false}); }
+      catch (error) {
+        if (!/TARGET_NOT_FOUND|STALE_REF|TARGET_LOST|TARGET_HIDDEN|TARGET_BLOCKED/.test(String(error && error.message))) throw error;
+        result = await browser.page(target).keyboard('Enter');
+      }
+    }
     return result;
   },
   // {selector} points the amber cursor at the element; {start: true} registers the hand-off and
@@ -683,19 +691,39 @@ async function __fastProbe(target, url) {
   __probeCache.set(key, {at: Date.now(), text: text});
   return text;
 }
+// A promise that settles by until or rejects, so no after-cell step can hold the cell.
+function __within(work, until) {
+  return new Promise((resolve, reject) => {
+    var timer = setTimeout(() => reject(Error('TIMEOUT')), Math.max(0, until - Date.now()));
+    Promise.resolve(work).then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+  });
+}
+// The tabs a cell acted on (click, press, navigate...). Reads, listings and value-only fills owe
+// no final observation.
+function __actedTargets() {
+  return [...__dirty.entries()].filter(([key]) => !__valueOnly.has(key)).map(([, target]) => target);
+}
+// After the cell: a short look at each tab it acted on, then the footers. All of it fits the
+// realm's 1.8 s budget; a heavy page says so in one line instead of holding the next cell.
 async function __finishCell() {
   __speedEnd();
-  for (var target of [...__dirty.values()]) {
-    if (__valueOnly.has(__key(target))) continue;
-    try { await bu.state({target, final: true}); }
-    catch (error) { if (!/UNSUPPORTED/.test(String(error && error.message))) console.log('Final observation unavailable: ' + error.message); }
-  }
+  var acted = __actedTargets(), until = Date.now() + 1200;
   __dirty.clear();
   __valueOnly.clear();
-  await __wallNote();
+  for (var target of acted) {
+    if (Date.now() >= until) break;
+    try { await __within(bu.state({target, final: true}), until); }
+    catch (error) {
+      var message = String(error && error.message || error);
+      if (/^TIMEOUT/.test(message)) console.log('[note] final observation skipped: the page is slow to read; call bu.state() or page.glance() when you need it');
+      else if (!/UNSUPPORTED/.test(message)) console.log('Final observation unavailable: ' + message);
+    }
+  }
+  var rest = Date.now() + 500;
+  await __within(__wallNote(), rest).catch(function () {});
   // Passive learning deletes the bodies it hands over. The [data] line has to read them first.
-  await __harvestFooter(__lastTarget).catch(function () {});
-  await __learnFromCell();
+  if (acted.length) await __within(__harvestFooter(__lastTarget), rest).catch(function () {});
+  await __within(__learnFromCell(), rest).catch(function () {});
   await __saveReads();
 }
 `;

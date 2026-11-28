@@ -242,11 +242,10 @@ async function findGroup(
   title: string,
 ): Promise<number | undefined> {
   if (typeof chrome.tabGroups.query !== "function") return undefined;
+  // Older titles carried an owner marker; a group with one, or with this exact title, is reused.
   const mark = marker(owner);
-  if (!mark) return undefined;
-  const legacy = title.slice(0, title.indexOf(MARK));
   const all = await chrome.tabGroups.query({ windowId }).catch(() => []);
-  return all.find((group) => group.title?.endsWith(mark) || group.title === legacy)?.id;
+  return all.find((group) => group.title?.endsWith(mark) || group.title === title)?.id;
 }
 
 function setRecord(owner: string, record: GroupRecord): void {
@@ -259,10 +258,11 @@ function groupTitle(owner: string, ownerTitle: string | undefined): string {
   const configured = engineConfig.tabGroupTitle(owner, ownerTitle);
   const visible = configured.replace(/\s+/g, " ").trim() || "Agent";
   const short = visible.length > MAX_TITLE ? visible.slice(0, MAX_TITLE - 1) + "." : visible;
-  return short + MARK + owner.slice(0, 8);
+  // The visible title stays clean: ownership lives in the stored records, never in the title.
+  return short;
 }
 
-function marker(owner: string): string | undefined {
+function marker(owner: string): string {
   return MARK + owner.slice(0, 8);
 }
 function colorFor(owner: string): Color {

@@ -21,8 +21,10 @@ import {
 } from "./native-browser-common.js";
 import { currentInventoryTabs } from "./native-inventory-client.js";
 import { getAxTree, withDebugger } from "./native-browser-debugger.js";
-import { onNode, scopedBackendIds } from "./native-browser-dom.js";
+import { onNode, queryNodes, scopedBackendIds, subtreeBackendIds } from "./native-browser-dom.js";
 import { overlayBackendIds } from "./native-browser-overlay.js";
+import { dropOwnOverlayNodes } from "./observe/own-overlay.js";
+import { nestedLabels } from "./observe/nested-label.js";
 import { controlHint, hintTargets } from "./observe/hints.js";
 import { emptyScan, readPageScan, resolveClickables } from "./observe/scan.js";
 import { matchesQuery } from "./observe/render-model.js";
@@ -210,7 +212,8 @@ function relevant(node: AxNode, options: Options, depth: number): boolean {
 function priority(node: AxNode): number {
   if (booleanProperty(node, "focused").focused) return 0;
   const role = textValue(node.role?.value).toLowerCase();
-  if (["textbox", "searchbox", "combobox"].includes(role)) return 1;
+  // An open popover's choices (autocomplete, a select menu) are what the next step picks from.
+  if (["textbox", "searchbox", "combobox", "option"].includes(role)) return 1;
   if (role === "button") return 2;
   return interactiveRoles.has(role) ? 3 : 4;
 }
@@ -286,6 +289,7 @@ export function createSemanticNodes(
     candidates.filter((node) => selected.has(node)),
     rootFrame,
   );
+  const nested = nestedLabels(nodes);
   const labels = new Map<string, string>();
   const counters = new Map<string, number>();
   const refs = new Map<string, AxRef>();
@@ -295,7 +299,8 @@ export function createSemanticNodes(
     if (backendNodeId === undefined) continue;
     const role = textValue(node.role?.value).slice(0, 80);
     const limit = options.compact ? 80 : 512;
-    const name = textValue(node.name?.value).trim().slice(0, limit);
+    const own = textValue(node.name?.value).trim();
+    const name = ((node.nodeId && nested.get(node.nodeId)) || own).slice(0, limit);
     const label =
       node.frameId && node.frameId !== rootFrame
         ? (labels.get(node.frameId) ?? `f${labels.size + 1}`)
@@ -449,18 +454,41 @@ async function collectPage(
   await revalidateTarget(request, tabId);
   await settleBrowserPage(debuggee, 3000, 0);
   await revalidateTarget(request, tabId);
-  const [all, scan, overlay] = await Promise.all([
+  const [all, scan, overlay, marked] = await Promise.all([
     getAxTree(debuggee),
     readPageScan(debuggee).catch(() => emptyScan()),
     overlayBackendIds(debuggee),
+    markedOverlayIds(debuggee),
   ]);
   // Graft's own overlay is not the page: its nodes are left out of the state the agent reads.
-  const ax = all.filter((node) => !overlay.has(node.backendDOMNodeId ?? -1));
+  const ax = dropOwnOverlayNodes(
+    all.filter((node) => {
+      const id = node.backendDOMNodeId ?? -1;
+      return !overlay.has(id) && !marked.has(id);
+    }),
+  );
   const clickables =
     ax.length > CLICKABLE_NODE_LIMIT
       ? []
       : await resolveClickables(debuggee, scan.clickables).catch(() => []);
   return { ax, text: scan.text, clickables, offscreen: scan.offscreen };
+}
+
+/** Subtrees marked data-graft-overlay="true": Graft UI that carries the attribute. */
+async function markedOverlayIds(debuggee: chrome.debugger.Debuggee): Promise<Set<number>> {
+  const ids = new Set<number>();
+  const hosts = await queryNodes(debuggee, {
+    by: "css",
+    value: '[data-graft-overlay="true"]',
+  }).catch(() => [] as number[]);
+  for (const backendNodeId of hosts) {
+    const subtree = await subtreeBackendIds(debuggee, { backendNodeId }, "overlayIds").catch(
+      () => new Set<number>(),
+    );
+    for (const id of subtree) ids.add(id);
+    ids.add(backendNodeId);
+  }
+  return ids;
 }
 
 async function scopeAx(

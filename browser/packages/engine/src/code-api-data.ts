@@ -199,6 +199,8 @@ function __extendPageData(target, base) {
         ? result.markdown + '\\n\\n[PARTIAL: ' + (result.notes.join('; ') || 'read cut') + ']'
         : result.markdown;
     },
+    // The fast look at what is on screen now (code-api-glance.ts): under a second, no waits.
+    glance: (options = {}) => __glance(base, target, options),
     // One read of the page (code-api-read.ts). A selector still reads one element.
     read: async (options = {}, settings = {}) =>
       typeof options === 'string' ? readElement(options, settings) : __pageRead(base, target, options),

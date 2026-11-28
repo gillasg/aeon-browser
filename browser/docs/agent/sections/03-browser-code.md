@@ -34,8 +34,10 @@ await page.hold("#confirm", { ms: 1500 }); // hold-to-confirm, long-press menu, 
   `shift`, held for the move, the press and the release. A right click opens a context menu.
   A meta-click (Command on macOS; Control there opens the menu) opens a link in a new tab, and
   Control does that on Linux and Windows.
-- One `page` per site: `browser.openTab` on a site you already have a tab for navigates it
-  (`{newTab: true}` for another tab). `browser.activeTab()` is the tab the user is on;
+- `browser.openTab(url)` reuses a tab you have on that exact URL; another URL opens its own tab,
+  so `Promise.all` opens never collide (`{reuse: true}` navigates the site's tab instead,
+  `{newTab: true}` always opens another). `browser.activeTab()` is the tab the user is on: a task
+  about the site they are viewing drives that tab where they can see it, not a background one;
   `browser.tabs(query?)` lists tabs (`mine:true` only for tabs this chat or session opened). Any
   open tab works directly, no attaching: `bu.use(tabId)` or `browser.tab(tabId)`; a tab on a site
   the user blocked answers `SITE_BLOCKED`, so tell them. Work through the user's tabs

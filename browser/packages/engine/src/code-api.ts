@@ -121,6 +121,8 @@ function __refuseFileUrl(url) {
   if (/^\\s*file:/i.test(String(url))) throw Error("URL_NOT_ALLOWED: file URLs can't be opened; put the file in the workspace (artifact(name, data)) and use page.upload");
 }
 function __originOf(url) { try { return new URL(url).origin; } catch { return ''; } }
+// The same page for openTab's reuse: the URL without its fragment or a trailing slash.
+function __sameOpenUrl(a, b) { var bare = (u) => String(u || '').split('#')[0].replace(/[/]$/, ''); return bare(a) === bare(b); }
 // Host-wide calls (cookies, the network store, the scheduler) still need a live tab to answer on.
 function __hostTarget() {
   if (!__lastTarget) throw Error('NO_TAB: open or attach a tab first (browser.openTab / bu.use)');
@@ -197,30 +199,33 @@ var browser = Object.freeze({
   openTab: async (url, options = {}) => {
     // {browser: 'viewer'} names a profile (browser.profiles()); several and none named: the focused one.
     const clientInstanceId = await __pickClient(options, __lastTarget);
-    // One working tab per site: a URL on an origin this session already has a tab for navigates that
-    // tab. Pass {newTab: true} for a separate tab.
+    // A tab this session already has on the exact URL is reused; another URL on the same site
+    // opens its own tab, so parallel opens never land on one tab. {reuse: true} navigates the
+    // site's working tab instead; {newTab: true} always opens a separate tab.
     url = String(url);
     __refuseFileUrl(url);
     const origin = __originOf(url);
-    var known = options.newTab === true || options.new === true || options.window || options.readOnly === true || options.allowedOrigins || options.windowOf !== undefined ? undefined : __opened.get(origin || url);
-    // Parallel opens on one site: the first navigates the working tab, the rest get their own tabs.
+    var known = options.newTab === true || options.new === true || options.window || options.readOnly === true || options.allowedOrigins || options.windowOf !== undefined ? undefined : (options.reuse === true ? __opened.get(origin || url) : __opened.get(url) || __opened.get(origin || url));
+    // Parallel opens on one site: the first may take the working tab, the rest get their own tabs.
     if (known && __busy.has(__key(known))) known = undefined;
     if (known) {
-      __busy.add(__key(known));
+      var busyKey = __key(known);
+      __busy.add(busyKey);
       try {
         const live = (await browser.tabs()).find(tab => __key(tab.target) === __key(known));
-        if (live) {
-          const same = String(live.url) === url;
+        const same = live && __sameOpenUrl(live.url, url);
+        if (live && (same || options.reuse === true)) {
           await bu.use(known);
           if (options.quiet === true) await __call({quiet:{target:known, enabled:true, ...(options.ads === true ? {ads:true} : {})}});
           if (!same) await browser.page(known).navigate(url);
-          console.log('[ok] openTab reused tab ' + known.tabId + ' for ' + (origin || url) + (same ? '' : ' (navigated)') + '; pass {newTab: true} for a separate tab');
+          console.log('[ok] openTab reused tab ' + known.tabId + ' for ' + (origin || url) + (same ? '' : ' (navigated)'));
           return __openResult(live, true);
         }
+        if (live) known = undefined;
         // A working tab the user closed is not a failure: open a fresh one and say so. One this
         // session closed itself needs no word.
-        if (!__closedTabs.has(known.tabId)) console.log('[warn] the working tab ' + known.tabId + ' for ' + (origin || url) + ' was closed; opened a fresh tab');
-      } finally { __busy.delete(__key(known)); }
+        else if (!__closedTabs.has(known.tabId)) console.log('[warn] the working tab ' + known.tabId + ' for ' + (origin || url) + ' was closed; opened a fresh tab');
+      } finally { __busy.delete(busyKey); }
     }
     const result = await __step({op:'openTab', clientInstanceId, url,
       foreground: options.foreground === true, ...__placementStep(options),
@@ -234,7 +239,7 @@ var browser = Object.freeze({
       ...(options.windowOf !== undefined ? {windowOf: typeof options.windowOf === 'number' ? options.windowOf : (options.windowOf.tabId ?? options.windowOf.target?.tabId)} : {}),
       ...(options.timeoutMs ? {timeoutMs: Math.max(500, Math.min(Number(options.timeoutMs) || 0, 120000))} : {}),
       ...(options.window ? {window: {width: Math.round(options.window.width ?? 1920), height: Math.round(options.window.height ?? 1080)}} : {})});
-    if (!options.window && options.readOnly !== true && !options.allowedOrigins) __opened.set(origin || url, result.tab.target);
+    if (!options.window && options.readOnly !== true && !options.allowedOrigins) { __opened.set(origin || url, result.tab.target); __opened.set(url, result.tab.target); }
     // What an earlier session learned about this host (a gate, a required referer, a play click)
     // arrives as one line, so a new run starts where the last one ended.
     __call({learned:{url}}).then((note) => {

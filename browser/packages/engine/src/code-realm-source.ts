@@ -7,6 +7,7 @@ import { browserPlaywrightApi } from "./code-api-playwright.js";
 import { browserDataApi } from "./code-api-data.js";
 import { browserListApi } from "./code-api-list.js";
 import { browserReadApi } from "./code-api-read.js";
+import { browserGlanceApi } from "./code-api-glance.js";
 import { browserTargetApi } from "./code-api-target.js";
 import { browserScrollersApi } from "./code-api-scrollers.js";
 import { browserEventsApi } from "./code-api-events.js";
@@ -67,6 +68,7 @@ export function realmRuntimeSource(evaluate: (source: string) => unknown): void 
       browserDataApi,
       browserListApi,
       browserReadApi,
+      browserGlanceApi,
       browserTargetApi,
       browserScrollersApi,
       browserEventsApi,

@@ -168,6 +168,15 @@ async function __actInfer(target, instruction, variables, names) {
   if (second.actions.length) done.push(await __actPerform(target, second.actions[0], variables));
   return done;
 }
+// "scroll down", "Scroll down the page a bit", "scroll up 2 screens": the window scrolls, with no
+// model call and no element for the step to get wrong. A named panel ("scroll the reviews") still
+// goes to the model.
+function __plainScroll(instruction) {
+  var match = /^scroll\\s+(down|up)\\b(?:\\s+(?:the\\s+)?(?:page|window|screen))?(?:\\s+(?:a\\s+(?:bit|little)|(\\d+)\\s+(?:screens?|pages?|times?)|more|further))?\\s*[.!]?$/i.exec(instruction);
+  if (!match) return null;
+  var screens = Math.min(5, Number(match[2]) || 1);
+  return {direction: match[1].toLowerCase(), amount: 900 * screens};
+}
 async function __act(target, input, options) {
   var startedAt = Date.now();
   var variables = __actVariables(options.variables);
@@ -178,6 +187,12 @@ async function __act(target, input, options) {
   }
   var instruction = String(input || '').trim();
   if (!instruction) throw Error('INVALID_ACTION: page.act takes an instruction or an action from page.observe()');
+  var plainScroll = __plainScroll(instruction);
+  if (plainScroll) {
+    var scrolled = await browser.page(target).scroll(plainScroll.direction, plainScroll.amount);
+    console.log('[act] scroll ' + plainScroll.direction + ' ' + (Date.now() - startedAt) + ' ms');
+    return __actOutcome([{method: 'scroll', args: [plainScroll.direction], description: 'scroll ' + plainScroll.direction, effect: 'confirmed', label: 'Scroll', role: 'document', name: '', result: scrolled}], false);
+  }
   var names = Object.keys(variables);
   var state = __states.get(__key(target)) || await browser.page(target).snapshot({});
   var key = {site: __actSite(state), instruction, variables: names};

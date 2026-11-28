@@ -131,8 +131,8 @@ async function __readFinish(base, target, options, run) {
     url: batch.url,
     title: batch.title,
     data: batch.data,
-    list,
-    markdown: markdown.markdown,
+    list: __cleanListLinks(list),
+    markdown: typeof __cleanMarkdownLinks === 'function' ? __cleanMarkdownLinks(String(markdown.markdown || '')) : markdown.markdown,
     ...(panels.length ? {scrollers: panels} : {}),
     ...(embedded.length ? {embedded} : {}),
     wait: waited,
@@ -157,12 +157,26 @@ async function __readFinish(base, target, options, run) {
   return result;
 }
 
-// Keeps a read under max characters; the full read goes to an artifact first.
+// Ad trackers and tracking parameters on the list's links, cut the way page.glance() cuts them.
+function __cleanListLinks(list) {
+  if (!list || !Array.isArray(list.items) || typeof __cleanLinkUrl !== 'function') return list;
+  var clean = (item) => {
+    if (!item || typeof item !== 'object') return item;
+    var out = {...item};
+    for (var key of Object.keys(out))
+      if (typeof out[key] === 'string' && /^https?:[/][/]/.test(out[key])) out[key] = __cleanLinkUrl(out[key]);
+    return out;
+  };
+  return {...list, items: list.items.map(clean)};
+}
+
+// Keeps a read under max characters; the full read goes to an artifact first, indented so grep
+// and a line reader can work through it.
 async function __readCap(result, max) {
   var serialized = JSON.stringify(result);
   if (serialized.length <= max) return;
   var saved = 'page-read-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
-  var file = await artifact(saved, serialized).catch(() => null);
+  var file = await artifact(saved, JSON.stringify(result, null, 2)).catch(() => null);
   var where = (file && file.path) || saved;
   result.partial = true;
   result.artifact = where;
