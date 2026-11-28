@@ -112,7 +112,8 @@
 .island[data-state="working"] {
   padding: 4px 6px 4px 12px;
 }
-.island[data-state="working"] .isl-input {
+.island[data-state="working"] .isl-input,
+.island[data-state="working"] .isl-context {
   display: none;
 }
 .island[data-state="working"] .isl-working {

@@ -33,3 +33,22 @@ test("the working pill uses the 2x2 ink wave and no grab hand or tooltip", () =>
     /:host\(\[data-run\]\) \.hit, :host\(\[data-open\]\) \.hit \{ display: none; \}/,
   );
 });
+
+test("working hides context chips and finished runs re-expand the box in place", () => {
+  const ink = read("orb-ink.css");
+  const overlay = read("src/orb/orb-overlay.ts");
+  assert.match(ink, /\.island\[data-state="working"\] \.isl-context/);
+  assert.match(
+    overlay,
+    /const expandAnswer = \(state === "done" \|\| state === "error"\) && wasRunning;/,
+  );
+  assert.match(
+    overlay,
+    /if \(\(state === "needs" \|\| expandAnswer\) && !this\.open\) this\.showBubble\(false\);/,
+  );
+  const cursorPage = read("../../browser/packages/engine/src/cursor-page.ts");
+  assert.match(
+    cursorPage,
+    /function applySummon[\s\S]*state\.cursorShown = true;\s*state\.cursor\.style\.opacity = "1";/,
+  );
+});

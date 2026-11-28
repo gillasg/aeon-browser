@@ -329,6 +329,7 @@ export class OrbOverlay {
   }
 
   private setVisual(state: OrbVisualState, label: string): void {
+    const wasRunning = this.state === "thinking" || this.state === "working";
     this.syncPillLayoutHold(state);
     this.state = state;
     this.label = state === "listening" ? "" : label;
@@ -338,8 +339,10 @@ export class OrbOverlay {
     this.pill.classList.remove("fading");
     clearTimeout(this.fadeTimer);
     this.scheduleFade();
-    // A question comes to the user even if they closed the box: its field opens, focus stays put.
-    if (state === "needs" && !this.open) this.showBubble(false);
+    // A question or finished answer comes back to the user even after navigation or agent clicks
+    // folded the box to the working pill; focus stays put so we never interrupt typing elsewhere.
+    const expandAnswer = (state === "done" || state === "error") && wasRunning;
+    if ((state === "needs" || expandAnswer) && !this.open) this.showBubble(false);
   }
 
   /** A result or a failure is one line that goes after a few seconds, unless hovered. */
