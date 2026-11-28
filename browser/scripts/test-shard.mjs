@@ -20,16 +20,15 @@ export function parseShard(argv) {
 }
 
 // Seconds a file takes on a CI runner (Linux, real Chrome). Unlisted files count as DEFAULT_COST.
-// bridge.e2e runs about twice as long on macOS (~295s), and every OS shares this table.
+// Measured on Linux CI, 2026-11; macOS runs bridge.e2e about twice as long, and every OS shares this table.
 // Only rough sizes matter: a stale number moves files between shards, never drops one.
 const COST = {
-  "bridge.e2e.test.mjs": 300,
+  "bridge.e2e.test.mjs": 125,
   "pace-export.e2e.test.mjs": 195,
   "learn-real.e2e.test.mjs": 90,
-  "abilities-replay.e2e.test.mjs": 60,
-  "heal-real.e2e.test.mjs": 40,
+  "abilities-replay.e2e.test.mjs": 15,
   "receipts.e2e.test.mjs": 44,
-  "vault-save.e2e.test.mjs": 33,
+  "vault-save.e2e.test.mjs": 40,
   "dialogs.e2e.test.mjs": 30,
   "challenge-wait.e2e.test.mjs": 23,
   "page-controls.e2e.test.mjs": 15,
@@ -38,7 +37,7 @@ const COST = {
   "evaluate-timeout.e2e.test.mjs": 12,
   "hold.e2e.test.mjs": 11,
   "frame-input.e2e.test.mjs": 10,
-  "signin-shadow-iframe.e2e.test.mjs": 80,
+  "signin-shadow-iframe.e2e.test.mjs": 45,
 };
 const DEFAULT_COST = 8;
 
