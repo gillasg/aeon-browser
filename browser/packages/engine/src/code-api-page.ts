@@ -722,7 +722,7 @@ async function __finishCell() {
   var rest = Date.now() + 500;
   await __within(__wallNote(), rest).catch(function () {});
   // Passive learning deletes the bodies it hands over. The [data] line has to read them first.
-  if (acted.length) await __within(__harvestFooter(__lastTarget), rest).catch(function () {});
+  if (__lastTarget) await __within(__harvestFooter(__lastTarget), rest).catch(function () {});
   await __within(__learnFromCell(), rest).catch(function () {});
   await __saveReads();
 }

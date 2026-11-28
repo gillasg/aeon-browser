@@ -242,10 +242,16 @@ async function findGroup(
   title: string,
 ): Promise<number | undefined> {
   if (typeof chrome.tabGroups.query !== "function") return undefined;
-  // Older titles carried an owner marker; a group with one, or with this exact title, is reused.
+  // Older titles carried an owner marker; clean shared titles may carry a " · N" agent count.
   const mark = marker(owner);
+  const base = title.replace(/\s*·\s*\d+$/, "");
   const all = await chrome.tabGroups.query({ windowId }).catch(() => []);
-  return all.find((group) => group.title?.endsWith(mark) || group.title === title)?.id;
+  return all.find(
+    (group) =>
+      group.title?.endsWith(mark) ||
+      group.title === title ||
+      (owner === SHARED && group.title?.replace(/\s*·\s*\d+$/, "") === base),
+  )?.id;
 }
 
 function setRecord(owner: string, record: GroupRecord): void {
